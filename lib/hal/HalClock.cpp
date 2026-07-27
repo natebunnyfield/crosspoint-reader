@@ -39,6 +39,48 @@ bool HalClock::getTime(uint8_t& hour, uint8_t& minute) const {
   return true;
 }
 
+bool HalClock::getDateTime(uint16_t& year, uint8_t& month, uint8_t& day, uint8_t& hour,
+                           uint8_t& minute) const {
+  if (!_available) return false;
+
+  // DS3231 registers 0x00-0x06: seconds, minutes, hours, dayOfWeek (unused),
+  // dayOfMonth, month (bit 7 = century), year (00-99). Read all seven in one
+  // burst — cheaper than two transactions.
+  Wire.beginTransmission(I2C_ADDR_DS3231);
+  Wire.write(DS3231_SEC_REG);
+  if (Wire.endTransmission(false) != 0) return false;
+  Wire.requestFrom(I2C_ADDR_DS3231, (uint8_t)7);
+  if (Wire.available() < 7) return false;
+
+  Wire.read();                                   // seconds — discard
+  const uint8_t rawMin = Wire.read();
+  const uint8_t rawHour = Wire.read();
+  Wire.read();                                   // dayOfWeek — unused
+  const uint8_t rawDay = Wire.read();
+  const uint8_t rawMon = Wire.read();
+  const uint8_t rawYear = Wire.read();
+
+  minute = bcdToDec(rawMin & 0x7F);
+  if (rawHour & 0x40) {
+    // 12h mode: bit 5 = PM, bits 4-0 = hours (1-12)
+    uint8_t h12 = bcdToDec(rawHour & 0x1F);
+    bool pm = rawHour & 0x20;
+    if (h12 == 12) h12 = 0;
+    hour = pm ? (h12 + 12) : h12;
+  } else {
+    hour = bcdToDec(rawHour & 0x3F);
+  }
+  day = bcdToDec(rawDay & 0x3F);
+  // The DS3231 encodes month in bits 4-0 and uses bit 7 as a century flag
+  // (rolls over once the internal year counter wraps 99->00). We anchor at
+  // 2000, then bump by 100 whenever the century bit is set.
+  month = bcdToDec(rawMon & 0x1F);
+  const bool century = (rawMon & 0x80) != 0;
+  year = 2000 + bcdToDec(rawYear) + (century ? 100 : 0);
+
+  return true;
+}
+
 bool HalClock::formatTime(char* buf, size_t bufSize, uint8_t utcOffsetQuarterHoursBiased, bool use12Hour) const {
   if (bufSize < (use12Hour ? 9u : 6u)) return false;
   uint8_t h, m;

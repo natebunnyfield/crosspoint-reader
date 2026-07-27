@@ -21,6 +21,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     COVER_CUSTOM = 4,
     BLANK = 5,
     QUICK_RESUME = 6,
+    // New enum values MUST be appended so persisted settings.json indices
+    // stay stable — same rule as LONG_PRESS_MENU_FUNCTION above.
+    CALENDAR_6WEEK = 7,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
