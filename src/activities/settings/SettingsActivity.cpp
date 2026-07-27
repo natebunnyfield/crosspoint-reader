@@ -10,6 +10,7 @@
 #include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
 #include "CrossPointSettings.h"
+#include "activities/boot_sleep/CalendarSleepScreen.h"
 #include "FontDownloadActivity.h"
 #include "FontSelectionActivity.h"
 #include "KOReaderSettingsActivity.h"
@@ -59,6 +60,13 @@ void SettingsActivity::rebuildSettingsLists() {
   // Append device-only ACTION items
   controlsSettings.insert(controlsSettings.begin(),
                           SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
+  // Only expose the on-demand calendar regen action when the mode is
+  // actually selected — hides an otherwise-orphan entry from the display
+  // category. Cheap: rebuildSettingsLists() runs on category change.
+  if (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_6WEEK) {
+    displaySettings.push_back(SettingInfo::Action(StrId::STR_REGENERATE_CALENDAR_SLEEP,
+                                                  SettingAction::RegenerateCalendarSleep));
+  }
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_KOREADER_SYNC, SettingAction::KOReaderSync));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
@@ -294,6 +302,15 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::Language:
         startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::RegenerateCalendarSleep:
+        // Just invalidate the staleness marker; the next sleep entry sees
+        // "stale" and regenerates. Keeps the settings screen responsive and
+        // avoids painting the calendar over the current settings view.
+        calendar::CalendarSleepScreen::clearStamp();
+        GUI.drawPopup(renderer, tr(STR_CALENDAR_WILL_REGENERATE));
+        delay(1200);
+        render(RenderLock{});  // repaint the settings list under the dismissed popup
         break;
       case SettingAction::None:
         // Do nothing

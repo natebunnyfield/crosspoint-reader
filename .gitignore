@@ -25,3 +25,8 @@ lib/EpdFont/scripts/output/
 # (worktrees, scheduled-task locks, settings.local, scout CLEANUP.md) out.
 .claude/*
 !.claude/skills/
+
+# Calendar render-harness build artifacts
+tools/calendar_preview/render_test
+tools/calendar_preview/*.o
+tools/calendar_preview/fs_/

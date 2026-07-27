@@ -16,43 +16,20 @@
 
 // Build the font family setting dynamically. When registry is non-null, SD card fonts
 // are appended after the built-in fonts. Otherwise only built-in fonts are listed.
+// The built-in Noto Serif / Noto Sans faces are hidden from the reader font
+// picker whenever SD card fonts are installed, so the list shows only the
+// user's own curated set.
+//
+// They are NOT removed from the firmware: they remain the UI faces, and
+// CrossPointSettings::getReaderFontId() still falls back to Noto Serif when a
+// selected SD font cannot be resolved (card pulled, .cpfont deleted). Hiding
+// them is therefore a menu-only change with a working safety net behind it.
+//
+// When NO SD fonts are installed this function is not used at all — see
+// getSettingsList() below, which keeps the two built-in entries so the picker
+// can never be empty and leave the reader with nothing to render text in.
 inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
-  // Built-in font labels (StrId)
-  std::vector<StrId> enumValues = {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS};
-  // Runtime string labels for SD card fonts
-  std::vector<std::string> enumStringValues;
-
-  // Reserve: first CrossPointSettings::BUILTIN_FONT_COUNT entries use StrId, rest use strings
-  if (registry) {
-    const auto& families = registry->getFamilies();
-    enumStringValues.reserve(families.size());
-    std::transform(families.begin(), families.end(), std::back_inserter(enumStringValues),
-                   [](const SdCardFontFamilyInfo& f) { return f.name; });
-  }
-
-  // Capture the SD font count for the lambdas
-  const int sdFontCount = static_cast<int>(enumStringValues.size());
-
-  // Total option count = built-in + SD card families
-  // For the combined enumStringValues: we need all entries as strings (built-in names + SD names)
-  // The render code checks enumStringValues first, then enumValues. So we build enumStringValues
-  // with all options when SD fonts are present.
-  std::vector<std::string> allStringValues;
-  if (sdFontCount > 0) {
-    allStringValues.push_back(I18N.get(StrId::STR_NOTO_SERIF));
-    allStringValues.push_back(I18N.get(StrId::STR_NOTO_SANS));
-    allStringValues.insert(allStringValues.end(), enumStringValues.begin(), enumStringValues.end());
-  }
-
-  SettingInfo s;
-  s.nameId = StrId::STR_FONT_FAMILY;
-  s.type = SettingType::ENUM;
-  s.enumValues = std::move(enumValues);
-  s.enumStringValues = std::move(allStringValues);
-  s.key = "fontFamily";
-  s.category = StrId::STR_CAT_READER;
-
-  // Capture registry families by copy for the lambdas
+  // SD card family names, in registry order. These are the only options shown.
   std::vector<std::string> sdFamilyNames;
   if (registry) {
     const auto& families = registry->getFamilies();
@@ -61,30 +38,30 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
                    [](const SdCardFontFamilyInfo& f) { return f.name; });
   }
 
+  SettingInfo s;
+  s.nameId = StrId::STR_FONT_FAMILY;
+  s.type = SettingType::ENUM;
+  // enumValues stays empty: the render path prefers enumStringValues when set.
+  s.enumStringValues = sdFamilyNames;
+  s.key = "fontFamily";
+  s.category = StrId::STR_CAT_READER;
+
   s.valueGetter = [sdFamilyNames]() -> uint8_t {
-    // If an SD card font is selected, find its index
-    if (SETTINGS.sdFontFamilyName[0] != '\0') {
-      for (int i = 0; i < static_cast<int>(sdFamilyNames.size()); i++) {
-        if (sdFamilyNames[i] == SETTINGS.sdFontFamilyName) {
-          return static_cast<uint8_t>(CrossPointSettings::BUILTIN_FONT_COUNT + i);
-        }
+    for (int i = 0; i < static_cast<int>(sdFamilyNames.size()); i++) {
+      if (sdFamilyNames[i] == SETTINGS.sdFontFamilyName) {
+        return static_cast<uint8_t>(i);
       }
-      // SD font name not found in registry — fall through to built-in
     }
-    return SETTINGS.fontFamily < CrossPointSettings::BUILTIN_FONT_COUNT ? SETTINGS.fontFamily : 0;
+    // Nothing selected yet, or the stored name is no longer installed —
+    // show the first available SD font.
+    return 0;
   };
 
   s.valueSetter = [sdFamilyNames](uint8_t v) {
-    if (v < CrossPointSettings::BUILTIN_FONT_COUNT) {
-      SETTINGS.fontFamily = v;
-      SETTINGS.sdFontFamilyName[0] = '\0';
-    } else {
-      int sdIdx = v - CrossPointSettings::BUILTIN_FONT_COUNT;
-      if (sdIdx < static_cast<int>(sdFamilyNames.size())) {
-        strncpy(SETTINGS.sdFontFamilyName, sdFamilyNames[sdIdx].c_str(), sizeof(SETTINGS.sdFontFamilyName) - 1);
-        SETTINGS.sdFontFamilyName[sizeof(SETTINGS.sdFontFamilyName) - 1] = '\0';
-      }
-    }
+    if (v >= sdFamilyNames.size()) return;
+    strncpy(SETTINGS.sdFontFamilyName, sdFamilyNames[v].c_str(),
+            sizeof(SETTINGS.sdFontFamilyName) - 1);
+    SETTINGS.sdFontFamilyName[sizeof(SETTINGS.sdFontFamilyName) - 1] = '\0';
   };
 
   return s;
@@ -103,9 +80,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
   static const std::vector<SettingInfo> baseList = [] {
     std::vector<SettingInfo> v = {
         // --- Display ---
+        // Order MUST match CrossPointSettings::SLEEP_SCREEN_MODE enum
+        // (settings.json persists the *index*, not the label).
         SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
                           {StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER,
-                           StrId::STR_COVER_CUSTOM, StrId::STR_NONE_OPT, StrId::STR_QUICK_RESUME},
+                           StrId::STR_COVER_CUSTOM, StrId::STR_NONE_OPT, StrId::STR_QUICK_RESUME,
+                           StrId::STR_SLEEP_CALENDAR_6WEEK},
                           "sleepScreen", StrId::STR_CAT_DISPLAY),
         SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
                           {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_DISPLAY),

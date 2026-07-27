@@ -16,6 +16,10 @@ class SleepActivity final : public Activity {
   void renderBitmapSleepScreen(const Bitmap& bitmap) const;
   void renderLastScreenSleepScreen() const;
   void renderBlankSleepScreen() const;
+  // CALENDAR_6WEEK: (re)generate /sleep.bmp if today's calendar view is
+  // stale, then fall through to renderCustomSleepScreen() so the existing
+  // BMP-load path handles the actual display. See CalendarSleepScreen.h.
+  void renderCalendarSleepScreen() const;
 
   bool fromTimeout = false;
 };

@@ -24,6 +24,11 @@ enum class SettingAction {
   SdFirmwareUpdate,
   Language,
   DownloadFonts,
+  // On-demand regeneration of /sleep.bmp for CALENDAR_6WEEK. Deletes the
+  // stamp file so the next sleep entry sees "stale" and re-renders. Handled
+  // inline (no new activity) — same lightweight pattern the ClearCache popup
+  // uses on its OK press.
+  RegenerateCalendarSleep,
 };
 
 struct SettingInfo {

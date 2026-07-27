@@ -3,13 +3,17 @@
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalClock.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Logging.h>
 #include <Txt.h>
 #include <Xtc.h>
 
+#include "CalendarSleepScreen.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "HolidayCalculator.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -50,9 +54,52 @@ void SleepActivity::onEnter() {
       } else {
         return renderCustomSleepScreen();
       }
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_6WEEK):
+      return renderCalendarSleepScreen();
     default:
       return renderDefaultSleepScreen();
   }
+}
+
+void SleepActivity::renderCalendarSleepScreen() const {
+  // Only devices with a real RTC (X3) can produce a meaningful calendar.
+  // On X4 (no DS3231), HalClock::getDateTime() will fail — fall back to the
+  // stock sleep image rather than shipping a stale/wrong calendar.
+  uint16_t year;
+  uint8_t month, day, hour, minute;
+  if (!halClock.getDateTime(year, month, day, hour, minute)) {
+    LOG_INF("SLP", "CALENDAR_6WEEK: no RTC available, falling back to default");
+    return renderDefaultSleepScreen();
+  }
+
+  const calendar::YMD today{year, month, day};
+
+  // Staleness check: only regenerate the BMP when today's date differs from
+  // the last stamped date. Keeps SD write churn to ONE 54KB file per calendar
+  // day even when the user sleeps repeatedly.
+  calendar::YMD lastStamped{};
+  const bool haveStamp = calendar::CalendarSleepScreen::readStamp(lastStamped);
+  const bool bmpExists = Storage.exists("/sleep.bmp");
+  const bool needsRegen = !haveStamp || !bmpExists || !calendar::sameDate(lastStamped, today);
+
+  if (needsRegen) {
+    LOG_INF("SLP", "CALENDAR_6WEEK: regenerating /sleep.bmp for %04u-%02u-%02u", year, month, day);
+    // Paint into the framebuffer, then serialise the framebuffer into
+    // /sleep.bmp. The subsequent renderCustomSleepScreen() call reads the
+    // file back and drives the actual panel refresh — same code path as any
+    // user-supplied CUSTOM sleep image.
+    calendar::CalendarSleepScreen::render(renderer, today);
+    if (calendar::CalendarSleepScreen::serialiseFramebufferAsPortraitBmp(renderer, "/sleep.bmp")) {
+      calendar::CalendarSleepScreen::writeStamp(today);
+    } else {
+      LOG_ERR("SLP", "CALENDAR_6WEEK: BMP write failed; using default sleep screen");
+      return renderDefaultSleepScreen();
+    }
+  }
+
+  // Delegate display to the existing CUSTOM path — reads /sleep.bmp and drives
+  // the panel with the same waveform pipeline as user-provided images.
+  renderCustomSleepScreen();
 }
 
 void SleepActivity::renderCustomSleepScreen() const {

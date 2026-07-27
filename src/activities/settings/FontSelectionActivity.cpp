@@ -17,17 +17,38 @@
 namespace {
 constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
 
-int findCurrentFontIndex(const SdCardFontRegistry* registry, const char* sdFontFamilyName, uint8_t fontFamily) {
+// Resolve the current selection to a POSITION IN `fonts_`.
+//
+// This must search the built list rather than compute an index: `settingIndex`
+// is the persisted value ID (built-ins 0..BUILTIN_FONT_COUNT-1, SD fonts
+// BUILTIN_FONT_COUNT + i), which only coincides with the list position while
+// the built-in entries are present. They are hidden whenever SD fonts are
+// installed, so the two numbering schemes diverge.
+template <typename FontList>
+int findCurrentFontIndex(const FontList& fonts, const SdCardFontRegistry* registry,
+                         const char* sdFontFamilyName, uint8_t fontFamily) {
+  // An SD font is selected: match by settingIndex derived from registry order.
   if (sdFontFamilyName[0] != '\0' && registry) {
     const auto& families = registry->getFamilies();
     for (int i = 0; i < static_cast<int>(families.size()); i++) {
       if (families[i].name == sdFontFamilyName) {
-        return CrossPointSettings::BUILTIN_FONT_COUNT + i;
+        const auto target = static_cast<uint8_t>(CrossPointSettings::BUILTIN_FONT_COUNT + i);
+        for (int p = 0; p < static_cast<int>(fonts.size()); p++) {
+          if (!fonts[p].isBuiltin && fonts[p].settingIndex == target) return p;
+        }
       }
     }
   }
 
-  return fontFamily < CrossPointSettings::BUILTIN_FONT_COUNT ? fontFamily : 0;
+  // A built-in is selected: only findable when built-ins are being shown.
+  for (int p = 0; p < static_cast<int>(fonts.size()); p++) {
+    if (fonts[p].isBuiltin && fonts[p].settingIndex == fontFamily) return p;
+  }
+
+  // Selection is not in the list (e.g. a built-in was selected before SD fonts
+  // were installed, or the stored SD font is no longer present). Fall back to
+  // the first entry rather than leaving an out-of-range index.
+  return 0;
 }
 }  // namespace
 
@@ -49,11 +70,20 @@ void FontSelectionActivity::onEnter() {
   strncpy(originalSdFontFamilyName_, SETTINGS.sdFontFamilyName, sizeof(originalSdFontFamilyName_) - 1);
   originalSdFontFamilyName_[sizeof(originalSdFontFamilyName_) - 1] = '\0';
 
-  fonts_.clear();
-  fonts_.reserve(CrossPointSettings::BUILTIN_FONT_COUNT + (registry_ ? registry_->getFamilyCount() : 0));
+  const int sdFontCount = registry_ ? static_cast<int>(registry_->getFamilyCount()) : 0;
 
-  fonts_.push_back({I18N.get(StrId::STR_NOTO_SERIF), true, static_cast<uint8_t>(CrossPointSettings::NOTOSERIF)});
-  fonts_.push_back({I18N.get(StrId::STR_NOTO_SANS), true, static_cast<uint8_t>(CrossPointSettings::NOTOSANS)});
+  fonts_.clear();
+  fonts_.reserve(sdFontCount > 0 ? sdFontCount : CrossPointSettings::BUILTIN_FONT_COUNT);
+
+  // The built-in Noto faces are hidden once the user has installed their own
+  // fonts, so this list shows only their set. They are still listed when no SD
+  // fonts are present — the picker must never be empty, and Noto remains the
+  // fallback CrossPointSettings::getReaderFontId() resolves to when a selected
+  // SD font cannot be loaded.
+  if (sdFontCount == 0) {
+    fonts_.push_back({I18N.get(StrId::STR_NOTO_SERIF), true, static_cast<uint8_t>(CrossPointSettings::NOTOSERIF)});
+    fonts_.push_back({I18N.get(StrId::STR_NOTO_SANS), true, static_cast<uint8_t>(CrossPointSettings::NOTOSANS)});
+  }
 
   if (registry_) {
     const auto& families = registry_->getFamilies();
@@ -62,7 +92,7 @@ void FontSelectionActivity::onEnter() {
     }
   }
 
-  selectedIndex_ = findCurrentFontIndex(registry_, SETTINGS.sdFontFamilyName, SETTINGS.fontFamily);
+  selectedIndex_ = findCurrentFontIndex(fonts_, registry_, SETTINGS.sdFontFamilyName, SETTINGS.fontFamily);
   previewFontIndex_ = selectedIndex_;
 
   requestUpdate();
@@ -205,7 +235,10 @@ void FontSelectionActivity::render(RenderLock&&) {
 
   renderer.drawLine(0, listTop - metrics_.verticalSpacing / 2, pageWidth, listTop - metrics_.verticalSpacing / 2);
 
-  const int currentFontIndex = findCurrentFontIndex(registry_, originalSdFontFamilyName_, originalFontFamily_);
+  // Position (in fonts_) of the selection the user arrived with, so the list
+  // can badge it "Selected" while another entry is being previewed.
+  const int currentFontIndex =
+      findCurrentFontIndex(fonts_, registry_, originalSdFontFamilyName_, originalFontFamily_);
   GUI.drawList(
       renderer, Rect{0, listTop, pageWidth, listHeight}, static_cast<int>(fonts_.size()), selectedIndex_,
       [this](int index) { return fonts_[index].name; }, nullptr, nullptr,
