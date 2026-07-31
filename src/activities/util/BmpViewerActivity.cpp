@@ -5,6 +5,7 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Memory.h>
 
 #include <algorithm>
 
@@ -149,12 +150,20 @@ void BmpViewerActivity::doSetSleepCover() {
   bool success = false;
   HalFile inFile, outFile;
   if (Storage.openFileForRead("BMP", filePath, inFile)) {
-    if (Storage.openFileForWrite("BMP", "/sleep.bmp", outFile)) {
-      char buffer[2048];
+    // The copy buffer was a 2048-byte stack array, which made this frame 2432 bytes
+    // (measured with -fstack-usage on the riscv32 target) — 9.5x the 256-byte limit in
+    // the Resource Protocol. It lived in the prologue, so it stayed on the stack across
+    // SETTINGS.saveToFile() and the full onEnter() re-render below, i.e. at the deepest
+    // point of this call chain. On the heap it is also released before that re-render.
+    constexpr size_t COPY_BUFFER_SIZE = 2048;
+    const auto buffer = makeUniqueNoThrow<char[]>(COPY_BUFFER_SIZE);
+    if (!buffer) {
+      LOG_ERR("BMP", "OOM: %u byte sleep cover copy buffer", static_cast<unsigned>(COPY_BUFFER_SIZE));
+    } else if (Storage.openFileForWrite("BMP", "/sleep.bmp", outFile)) {
       int bytesRead;
       success = true;
-      while ((bytesRead = inFile.read(buffer, sizeof(buffer))) > 0) {
-        if (outFile.write(buffer, bytesRead) != bytesRead) {
+      while ((bytesRead = inFile.read(buffer.get(), COPY_BUFFER_SIZE)) > 0) {
+        if (outFile.write(buffer.get(), bytesRead) != bytesRead) {
           success = false;
           break;
         }

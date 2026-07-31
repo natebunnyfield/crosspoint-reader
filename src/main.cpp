@@ -302,6 +302,23 @@ void setupDisplayAndFonts(bool seamless = false) {
   LOG_DBG("MAIN", "Fonts setup");
 }
 
+#ifndef SIMULATOR
+// Pin the Arduino loopTask stack explicitly.
+//
+// Without this the size comes from whichever WEAK getArduinoLoopTaskStackSize()
+// the linker happens to pick: the Arduino core's (CONFIG_ARDUINO_LOOP_STACK_SIZE,
+// 8192) or FreeInkUI's (16384). Which one lands depends on whether that archive
+// member gets extracted at all — i.e. on link order, not on intent. This macro
+// emits a STRONG definition that beats both, so the budget is deterministic.
+//
+// 16K because the deepest measured loopTask frames are large and can nest:
+// getSettingsList's builder, CrossPointWebServer::handleDownload and
+// WebDAVHandler::handleCopy are all multi-KB (each is being reduced separately,
+// but headroom here is what turns a stack-canary panic into a non-event).
+// Costs 8KB of DRAM against ~200KB free at link time.
+SET_LOOP_TASK_STACK_SIZE(16 * 1024);
+#endif
+
 void setup() {
   t1 = millis();
 

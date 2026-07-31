@@ -5,6 +5,7 @@
 #include <Logging.h>
 
 #include <algorithm>
+#include <cstring>
 
 struct ZipInflateCtx {
   HalFile* file = nullptr;
@@ -241,7 +242,15 @@ bool ZipFile::loadZipDetails() {
   int foundOffset = -1;
   for (int i = scanRange - 22; i >= 0; i--) {
     constexpr uint32_t signature = 0x06054b50;
-    if (*reinterpret_cast<uint32_t*>(&buffer[i]) == signature) {
+    // memcpy, not *reinterpret_cast<uint32_t*>: this scan walks the buffer one
+    // BYTE at a time, so three of every four reads are misaligned. That is UB,
+    // and on the rv32 ESP32-C3 an unaligned load traps into an emulation
+    // handler — thousands of traps per book open. UBSan flags it as
+    // "load of misaligned address ... requires 4 byte alignment".
+    // memcpy of a fixed size compiles to the same (or better) code with no trap.
+    uint32_t candidate;
+    memcpy(&candidate, &buffer[i], sizeof(candidate));
+    if (candidate == signature) {
       foundOffset = i;
       break;
     }
@@ -257,8 +266,13 @@ bool ZipFile::loadZipDetails() {
   // Relative positions within EOCD:
   // Offset 10: Total number of entries (2 bytes)
   // Offset 16: Offset of start of central directory with respect to the starting disk number (4 bytes)
-  zipDetails.totalEntries = *reinterpret_cast<uint16_t*>(&buffer[foundOffset + 10]);
-  zipDetails.centralDirOffset = *reinterpret_cast<uint32_t*>(&buffer[foundOffset + 16]);
+  // Same reason: foundOffset is byte-granular, so these are unaligned too.
+  uint16_t totalEntries;
+  uint32_t centralDirOffset;
+  memcpy(&totalEntries, &buffer[foundOffset + 10], sizeof(totalEntries));
+  memcpy(&centralDirOffset, &buffer[foundOffset + 16], sizeof(centralDirOffset));
+  zipDetails.totalEntries = totalEntries;
+  zipDetails.centralDirOffset = centralDirOffset;
   zipDetails.isSet = true;
 
   free(buffer);

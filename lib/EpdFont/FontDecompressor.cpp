@@ -5,6 +5,8 @@
 #include <Utf8.h>
 
 #include <cstdlib>
+#include <memory>
+#include <new>
 
 FontDecompressor::~FontDecompressor() { deinit(); }
 
@@ -258,8 +260,30 @@ int FontDecompressor::prewarmCache(const EpdFontData* fontData, const char* utf8
   }
   PageSlot& slot = pageSlots[pageSlotCount];
 
+  // The three scratch tables below were stack arrays, which made this frame 2912 bytes
+  // (measured with -fstack-usage on the riscv32 target) — 11x the 256-byte limit in the
+  // Resource Protocol. That matters because of WHERE it is reached from: this runs on the
+  // render task, which has only 8192 bytes total (xTaskCreatePinnedToCore in
+  // ActivityManager::begin), on every page turn, with the layout/render frames already on
+  // it and the group decompression frames still to come underneath.
+  //
+  // One transient heap block instead, for exactly the reason SdCardFont::prewarm gives for
+  // its codepoint buffer: 2816 bytes is fine on the heap and is not fine on this stack.
+  // Value-initialized, so groupAlignedTracker starts zeroed as it did when it was a local
+  // `= {}` array. The block is freed on every return path below by unique_ptr.
+  struct PrewarmScratch {
+    uint32_t neededGlyphs[MAX_PAGE_GLYPHS];  // unique glyph indices needed for this page
+    uint16_t neededGroups[128];              // unique groups covering those glyphs
+    uint32_t groupAlignedTracker[128];       // running byte-aligned offset for each needed group
+  };
+  std::unique_ptr<PrewarmScratch> scratch(new (std::nothrow) PrewarmScratch());
+  if (!scratch) {
+    LOG_ERR("FDC", "Failed to allocate prewarm scratch (%u bytes)", (unsigned)sizeof(PrewarmScratch));
+    return -1;
+  }
+
   // Step 1: Collect unique glyph indices needed for this page
-  uint32_t neededGlyphs[MAX_PAGE_GLYPHS];
+  uint32_t* const neededGlyphs = scratch->neededGlyphs;
   uint16_t glyphCount = 0;
   bool glyphCapWarned = false;
 
@@ -331,7 +355,7 @@ int FontDecompressor::prewarmCache(const EpdFontData* fontData, const char* utf8
 
   // Step 2: Compute total buffer size and collect unique groups
   uint32_t totalBytes = 0;
-  uint16_t neededGroups[128];
+  uint16_t* const neededGroups = scratch->neededGroups;
   uint8_t groupCount = 0;
   bool groupCapWarned = false;
 
@@ -392,7 +416,7 @@ int FontDecompressor::prewarmCache(const EpdFontData* fontData, const char* utf8
 
   // Step 3b: Pre-scan to compute each needed glyph's byte-aligned offset within its group.
   // This avoids recomputing aligned offsets per group during extraction in step 4.
-  uint32_t groupAlignedTracker[128] = {};  // running byte-aligned offset for each needed group
+  uint32_t* const groupAlignedTracker = scratch->groupAlignedTracker;  // zeroed by the value-init above
 
   if (fontData->glyphToGroup) {
     // Frequency-grouped: single O(totalGlyphs) pass through glyphToGroup

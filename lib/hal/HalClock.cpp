@@ -169,17 +169,33 @@ bool HalClock::formatTime(char* buf, size_t bufSize, uint8_t utcOffsetQuarterHou
   return true;
 }
 
-bool HalClock::writeTimeToRTC(uint8_t hour, uint8_t minute, uint8_t second) {
+bool HalClock::writeDateTimeToRTC(uint16_t year, uint8_t month, uint8_t day, uint8_t weekday, uint8_t hour,
+                                  uint8_t minute, uint8_t second) {
+  assert(month >= 1 && month <= 12);
+  assert(day >= 1 && day <= 31);
   assert(hour < 24);
   assert(minute < 60);
   assert(second < 60);
+  // Mirrors the decode in getDateTime(): anchored at 2000, century flag in bit 7
+  // of the month register.
+  if (year < 2000 || year > 2199) return false;
+  const bool century = (year - 2000) >= 100;
+  const uint8_t yearInCentury = static_cast<uint8_t>((year - 2000) % 100);
+
   Wire.beginTransmission(I2C_ADDR_DS3231);
   Wire.write(DS3231_SEC_REG);    // Start at register 0x00
   Wire.write(decToBcd(second));  // 0x00: Seconds
   Wire.write(decToBcd(minute));  // 0x01: Minutes
   Wire.write(decToBcd(hour));    // 0x02: Hours (24h mode, bit 6 = 0)
+  // 0x03: day-of-week. The DS3231 is 1..7 and only self-increments it; nothing
+  // here reads it back (getDateTime discards it), but it must be advanced with
+  // the rest or it goes stale.
+  Wire.write(static_cast<uint8_t>(weekday + 1));
+  Wire.write(decToBcd(day));                                                   // 0x04: Date
+  Wire.write(static_cast<uint8_t>(decToBcd(month) | (century ? 0x80 : 0x00)));  // 0x05: Month + century
+  Wire.write(decToBcd(yearInCentury));                                         // 0x06: Year within century
   if (Wire.endTransmission() != 0) {
-    LOG_ERR("CLK", "Failed to write time to DS3231");
+    LOG_ERR("CLK", "Failed to write date/time to DS3231");
     return false;
   }
 
@@ -210,8 +226,12 @@ bool HalClock::syncFromNTP() {
       struct tm timeinfo;
       gmtime_r(&now, &timeinfo);
 
-      if (writeTimeToRTC(timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec)) {
-        LOG_INF("CLK", "RTC set to %02d:%02d:%02d UTC", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+      if (writeDateTimeToRTC(static_cast<uint16_t>(timeinfo.tm_year + 1900), static_cast<uint8_t>(timeinfo.tm_mon + 1),
+                             static_cast<uint8_t>(timeinfo.tm_mday), static_cast<uint8_t>(timeinfo.tm_wday),
+                             static_cast<uint8_t>(timeinfo.tm_hour), static_cast<uint8_t>(timeinfo.tm_min),
+                             static_cast<uint8_t>(timeinfo.tm_sec))) {
+        LOG_INF("CLK", "RTC set to %04d-%02d-%02d %02d:%02d:%02d UTC", timeinfo.tm_year + 1900, timeinfo.tm_mon + 1,
+                timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         return true;
       }
       return false;

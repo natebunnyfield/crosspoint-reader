@@ -32,8 +32,12 @@ class OpdsBookBrowserActivity final : public Activity {
   std::vector<std::string> navigationHistory;
   std::string currentPath;
   std::string searchTemplate;
+  // Guards against an edge orphaned by a child activity that finished on the
+  // button PRESS: each consumes exactly one leftover RELEASE so it is not
+  // dispatched here as a fresh tap. Armed by armChildEdgeGuards(); see the
+  // comment there for why they are armed on resume and not at the launch site.
   bool consumeConfirm = false;
-  bool consumeBack = false;  // Added missing member
+  bool consumeBack = false;
   int selectorIndex = 0;
   std::string errorMessage;
   std::string statusMessage;
@@ -45,6 +49,7 @@ class OpdsBookBrowserActivity final : public Activity {
   void checkAndConnectWifi();
   void launchWifiSelection();
   void onWifiSelectionComplete(bool connected);
+  void armChildEdgeGuards();
   void fetchFeed(const std::string& path);
   void releaseEntries();
   void navigateToEntry(const OpdsEntry& entry);

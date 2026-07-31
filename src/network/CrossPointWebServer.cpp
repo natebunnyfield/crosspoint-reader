@@ -12,6 +12,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <memory>
+#include <new>
 
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
@@ -571,23 +573,42 @@ void CrossPointWebServer::handleDownload() const {
     filename = nameBuf;
   }
 
+  // The 4KB transfer buffer below was a stack array, which made this frame 4416
+  // bytes (measured with -fstack-usage on the riscv32 target) — 17x the
+  // 256-byte limit in the Resource Protocol, and over half of the stack it runs
+  // on: HTTP handlers are dispatched from the Arduino loopTask, whose stack is
+  // 8192 bytes, with the WebServer request-parse frames already on it and the
+  // HalStorage/SdFat/FATFS read frames still to come underneath.
+  //
+  // One transient heap block per download instead. This is not a hot path: a
+  // single SD read + socket write of a 4KB chunk dwarfs the allocation, which
+  // happens once per request, not per chunk. unique_ptr frees it on every
+  // return path. Allocated before the response headers go out so that an OOM
+  // can still be reported as a 500 (once send(200) has run, it cannot).
+  const size_t chunkSize = 4096;
+  auto buffer = std::unique_ptr<uint8_t[]>(new (std::nothrow) uint8_t[chunkSize]);
+  if (!buffer) {
+    LOG_ERR("WEB", "OOM: %d bytes for download buffer", static_cast<int>(chunkSize));
+    file.close();
+    server->send(500, "text/plain", "Out of memory");
+    return;
+  }
+
   server->setContentLength(file.size());
   server->sendHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
   server->send(200, contentType.c_str(), "");
 
   NetworkClient client = server->client();
-  const size_t chunkSize = 4096;
-  uint8_t buffer[chunkSize];
 
   bool downloadOk = true;
   while (downloadOk && file.available()) {
-    int result = file.read(buffer, chunkSize);
+    int result = file.read(buffer.get(), chunkSize);
     if (result <= 0) break;
     size_t bytesRead = static_cast<size_t>(result);
     size_t totalWritten = 0;
     while (totalWritten < bytesRead) {
       esp_task_wdt_reset();
-      size_t wrote = client.write(buffer + totalWritten, bytesRead - totalWritten);
+      size_t wrote = client.write(buffer.get() + totalWritten, bytesRead - totalWritten);
       if (wrote == 0) {
         downloadOk = false;
         break;

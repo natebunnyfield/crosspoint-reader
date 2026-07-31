@@ -3,6 +3,7 @@
 #include <FsHelpers.h>
 #include <JpegToBmpConverter.h>
 #include <Logging.h>
+#include <Memory.h>
 
 Txt::Txt(std::string path, std::string cacheBasePath)
     : filepath(std::move(path)), cacheBasePath(std::move(cacheBasePath)) {
@@ -122,10 +123,17 @@ bool Txt::generateCoverBmp() const {
     if (!Storage.openFileForWrite("TXT", getCoverBmpPath(), dst)) {
       return false;
     }
-    uint8_t buffer[1024];
+    // Copy buffer on the heap: as a 1024-byte local it dominated a 1136-byte
+    // frame (-fstack-usage, riscv32). One allocation per cover generation.
+    constexpr size_t COPY_BUFFER_SIZE = 1024;
+    const auto buffer = makeUniqueNoThrow<uint8_t[]>(COPY_BUFFER_SIZE);
+    if (!buffer) {
+      LOG_ERR("TXT", "OOM: %zu bytes for cover copy buffer", COPY_BUFFER_SIZE);
+      return false;
+    }
     while (src.available()) {
-      size_t bytesRead = src.read(buffer, sizeof(buffer));
-      dst.write(buffer, bytesRead);
+      size_t bytesRead = src.read(buffer.get(), COPY_BUFFER_SIZE);
+      dst.write(buffer.get(), bytesRead);
     }
     LOG_DBG("TXT", "Copied BMP cover to cache");
     return true;

@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <array>
@@ -12,7 +13,7 @@
 
 namespace {
 
-// Stack-allocated string buffer to avoid heap reallocations during parsing
+// Fixed-capacity string buffer to avoid heap reallocations during parsing
 // Provides string-like interface with fixed capacity
 struct StackBuffer {
   static constexpr size_t CAPACITY = 1024;
@@ -36,6 +37,18 @@ struct StackBuffer {
 
 // Buffer size for reading CSS files
 constexpr size_t READ_BUFFER_SIZE = 512;
+
+// loadFromStream's three parsing buffers, bundled so a single heap allocation
+// covers all of them. As locals they measured a 2800-byte frame with
+// -fstack-usage — the largest non-vendor frame in the firmware — and stylesheet
+// parsing runs on the render task, whose stack is 8192 bytes. One allocation per
+// stylesheet is negligible; the point of the fixed capacities is still to avoid
+// per-token reallocation while parsing.
+struct ParseScratch {
+  StackBuffer selector;
+  StackBuffer declBuffer;
+  char readBuffer[READ_BUFFER_SIZE];
+};
 
 // Maximum number of CSS rules to store in the selector map
 // Prevents unbounded memory growth from pathological CSS files
@@ -498,11 +511,20 @@ bool CssParser::loadFromStream(HalFile& source) {
     return false;
   }
 
+  // Parsing buffers live in one transient heap block (see ParseScratch above);
+  // value-initialised, so every StackBuffer starts with len == 0 exactly as the
+  // former locals did.
+  auto scratch = makeUniqueNoThrow<ParseScratch>();
+  if (!scratch) {
+    LOG_ERR("CSS", "OOM: %zu bytes for parse buffers", sizeof(ParseScratch));
+    return false;
+  }
+
   size_t totalRead = 0;
 
-  // Use stack-allocated buffers for parsing to avoid heap reallocations
-  StackBuffer selector;
-  StackBuffer declBuffer;
+  // Fixed-capacity buffers, no per-token reallocation
+  StackBuffer& selector = scratch->selector;
+  StackBuffer& declBuffer = scratch->declBuffer;
 
   bool inComment = false;
   bool maybeSlash = false;
@@ -586,9 +608,9 @@ bool CssParser::loadFromStream(HalFile& source) {
     }
   };
 
-  char buffer[READ_BUFFER_SIZE];
+  char* const buffer = scratch->readBuffer;
   while (source.available()) {
-    int bytesRead = source.read(buffer, sizeof(buffer));
+    int bytesRead = source.read(buffer, READ_BUFFER_SIZE);
     if (bytesRead <= 0) break;
 
     totalRead += static_cast<size_t>(bytesRead);

@@ -55,5 +55,13 @@ class HalClock {
   bool syncFromNTP();
 
  private:
-  bool writeTimeToRTC(uint8_t hour, uint8_t minute, uint8_t second);
+  // Writes DS3231 registers 0x00-0x06 (sec, min, hour, dayOfWeek, date, month, year).
+  //
+  // The date registers MUST be written together with the time. The old version of
+  // this wrote only 0x00-0x02, which jumps the hour across midnight without
+  // bumping the date: syncing while the local evening is already the next day in
+  // UTC left the RTC permanently one day behind, and the calendar sleep screen
+  // highlighted the wrong day forever after.
+  bool writeDateTimeToRTC(uint16_t year, uint8_t month, uint8_t day, uint8_t weekday, uint8_t hour,
+                          uint8_t minute, uint8_t second);
 };

@@ -12,6 +12,10 @@
 
 #include "FontCacheManager.h"
 
+#ifdef GFX_BOUNDS_COUNTER
+GfxRenderer::OutOfRange GfxRenderer::outOfRange{};
+#endif
+
 namespace {
 
 /**
@@ -411,6 +415,13 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
 
   // Bounds checking against runtime panel dimensions
   if (phyX < 0 || phyX >= panelWidth || phyY < 0 || phyY >= panelHeight) {
+#ifdef GFX_BOUNDS_COUNTER
+    outOfRange.count++;
+    outOfRange.lastX = x;
+    outOfRange.lastY = y;
+    outOfRange.lastPhyX = phyX;
+    outOfRange.lastPhyY = phyY;
+#endif
     LOG_ERR("GFX", "!! Outside range (%d, %d) -> (%d, %d)", x, y, phyX, phyY);
     return;
   }

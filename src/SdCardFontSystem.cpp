@@ -108,6 +108,45 @@ void SdCardFontSystem::ensureLoaded(GfxRenderer& renderer) {
   }
 }
 
+int SdCardFontSystem::loadForDisplay(const char* familyName, uint8_t fontSizeEnum, GfxRenderer& renderer) {
+  if (familyName == nullptr || familyName[0] == '\0') return 0;
+  refreshIfDirty();
+
+  const auto* family = registry_.findFamily(familyName);
+  if (family == nullptr) return 0;  // not installed; caller falls back
+
+  // Already resident (e.g. it is also the selected reader font) — reuse it
+  // rather than paying for another .cpfont read, but ONLY if the resident point
+  // size is the one being asked for.
+  //
+  // getFontId matches on family NAME only, so the old unconditional reuse
+  // returned whatever size happened to be loaded. The caller that hurts is
+  // CalendarSleepScreen, which asks for EXTRA_LARGE (18pt): if the user's
+  // reader font was the same family at any other slot — and the default is
+  // MEDIUM, so three of four slots — the sleep screen silently got the
+  // reader's size instead, and computeLayout() then derived titleH, gridTop,
+  // rowH and the highlight square from the wrong metrics. No log line, no
+  // fallback: a whole-screen proportion regression.
+  if (const int existing = manager_.getFontId(familyName); existing != 0) {
+    const auto* wanted = family->findClosestReaderSize(fontSizeEnum);
+    if (wanted != nullptr && wanted->pointSize == manager_.currentPointSize()) {
+      return existing;
+    }
+    LOG_DBG("SDFS", "Resident %s is %upt but %upt wanted (enum %u) — reloading", familyName,
+            manager_.currentPointSize(), wanted ? wanted->pointSize : 0, fontSizeEnum);
+  }
+
+  if (!manager_.currentFamilyName().empty()) {
+    manager_.unloadAll(renderer);
+  }
+  if (!manager_.loadFamily(*family, renderer, fontSizeEnum)) {
+    LOG_ERR("SDFS", "loadForDisplay failed to load: %s", familyName);
+    return 0;
+  }
+  LOG_DBG("SDFS", "Loaded %s for display use (size enum %u)", familyName, fontSizeEnum);
+  return manager_.getFontId(familyName);
+}
+
 int SdCardFontSystem::resolveFontId(const char* familyName, uint8_t /*fontSizeEnum*/) const {
   // The manager loads exactly one size (closest to SETTINGS.fontSize), so the
   // enum is implicit — always return the single loaded font ID for this family.

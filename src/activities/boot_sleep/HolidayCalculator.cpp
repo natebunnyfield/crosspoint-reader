@@ -170,4 +170,21 @@ YMD resolveHoliday(HolidayId id, uint16_t year) {
   return out;
 }
 
+YMD localDateFromUtc(const YMD& utcDate, uint8_t utcHour, uint8_t utcMinute, uint8_t offsetQuarterHoursBiased) {
+  // Same clamp as HalClock::formatTime: a corrupted setting must not shift the
+  // date by a wild amount.
+  uint8_t offsetQ = offsetQuarterHoursBiased;
+  if (offsetQ > 104) offsetQ = 48;  // 48 == UTC+0
+
+  YMD local = utcDate;
+  const int32_t localMinutes =
+      static_cast<int32_t>(utcHour) * 60 + utcMinute + (static_cast<int32_t>(offsetQ) - 48) * 15;
+  if (localMinutes < 0) {
+    addDays(local, -1);
+  } else if (localMinutes >= 24 * 60) {
+    addDays(local, 1);
+  }
+  return local;
+}
+
 }  // namespace calendar

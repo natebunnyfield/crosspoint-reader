@@ -1,0 +1,226 @@
+PATCH: HalGPIO — report the completed hold on the release frame
+
+Prepared in the crosspoint-reader firmware tree (tools/patches/README.md explains
+why it cannot live there). Not an mbox: apply with `git apply`, not `git am`.
+
+Target repo: https://github.com/crosspoint-reader/crosspoint-simulator
+File:        src/HalGPIO.cpp
+Base:        ed31bd9 ("feat: support firmware web server output"), branch main
+Apply with:  git apply -p1 <this file>   (from the simulator repo root)
+
+THE DEFECT
+----------
+HalGPIO::getHeldTime() only counts buttons that are down at the moment it is
+called:
+
+    src/HalGPIO.cpp:584-598   for (i) if (keystate[i] || syntheticButtonDown[i]) ...
+                              return maxHeld;   // 0 when nothing is down
+
+The release frame is by definition the frame on which the button is no longer
+down. Both release paths latch releasedThisFrame[] before the firmware's loop()
+runs, and both leave the button reading "up" to that loop: the SDL KEYUP branch
+(src/HalGPIO.cpp:508-516) because SDL's own key state has already gone up, and
+the synthetic KeyUp branch (src/HalGPIO.cpp:385-388) because it clears
+syntheticButtonDown[]. So every firmware check of the shape
+
+    wasReleased(BUTTON) && getHeldTime() <compare> THRESHOLD
+
+reads 0 in the simulator and the wrong branch is taken. Three confirmed cases in
+crosspoint-reader (paths relative to that repo):
+
+  * src/activities/home/FileBrowserActivity.cpp:209+230
+    `wasReleased(Confirm)` then `getHeldTime() >= GO_HOME_MS` — the long-press
+    "Delete?" prompt can never fire in the simulator (false negative).
+
+  * src/activities/home/FileBrowserActivity.cpp:278-280
+    `wasReleased(Back)` then `getHeldTime() < GO_HOME_MS` — after a long Back
+    hold has already jumped to the root folder, the release reads 0, passes the
+    "short press" test and calls onGoHome(). Simulator-only false positive: the
+    device correctly reports the completed hold here, so this is NOT a firmware
+    bug and must not be "fixed" in the firmware.
+
+  * src/activities/reader/EpubReaderActivity.cpp:542
+    `getHeldTime() > SKIP_HOLD_MS` evaluated after ReaderUtils::detectPageTurn(),
+    which is release-triggered whenever SETTINGS.longPressButtonBehavior != OFF
+    (src/activities/reader/ReaderUtils.h:49-58) — chapter skip is dead in the
+    simulator.
+
+The `isPressed(BUTTON) && getHeldTime()` shape is NOT affected and is correct
+today; this patch deliberately leaves that path byte-for-byte identical.
+
+THE DEVICE BEHAVIOUR IT MUST MATCH
+----------------------------------
+freeink-sdk libs/hardware/InputManager/src/InputManager.cpp:405-412
+
+    unsigned long InputManager::getHeldTime() const {
+      if (currentState > 0) return millis() - buttonPressStart;   // still down
+      return buttonPressFinish - buttonPressStart;                // completed
+    }
+
+with buttonPressStart stamped when a button goes down while nothing was down and
+buttonPressFinish stamped when the last button comes up (InputManager.cpp:
+242-252). The completed value persists until the next hold ends, so a caller one
+or two frames after the release still sees it.
+
+THE FIX
+-------
+Latch the completed hold at each release (recordButtonRelease()) and return it
+from getHeldTime() when no button is down. `completedHoldFresh` is cleared in
+beginFrame() so that when several buttons are released in the same frame the
+longest of them is reported, which is what the device's chord-span value comes
+out as in that case. clearButtonState() (deep sleep) clears the latch, matching
+the state loss of a real wake.
+
+Known deviation, deliberately not chased: for an OVERLAPPING chord where the
+first-pressed button is released first (UP down, BACK down, UP up, BACK up), the
+device reports the whole chord span from UP's press while this patch reports
+BACK's own press-to-release span. Measured on the host: 796 ms here vs the
+device's ~1100 ms for that trace. Closing that gap needs an authoritative
+"is anything else down" latch; on SDL that latch can be left stuck by a focus
+loss that swallows the KEYUP, and a stuck latch would make getHeldTime() return
+an ever-growing value with nothing pressed — a far worse failure than the
+residual inaccuracy. No firmware call site depends on the difference.
+
+HOW TO TEST
+-----------
+Build the simulator project as usual, then use the built-in synthetic input
+script (src/HalGPIO.cpp:290-297, CROSSPOINT_SIM_INPUT_SCRIPT="<atMs>:<KEY>[:<holdMs>];..."):
+
+  1. Long Back hold in the file browser — before: drops to Home on release;
+     after: stays in the browser at the root folder.
+       CROSSPOINT_SIM_INPUT_SCRIPT="1500:ESCAPE:1500;6000:QUIT" .pio/build/simulator/program
+
+  2. Long Confirm hold on a book — before: opens the book; after: shows the
+     "Delete?" confirmation.
+       CROSSPOINT_SIM_INPUT_SCRIPT="1500:RETURN:1500;6000:QUIT" .pio/build/simulator/program
+
+  3. Short taps must be unchanged (`:80` holds), and continuous list scrolling
+     (hold Up/Down) must still repeat — that path uses the isPressed shape.
+
+Verified while preparing this patch: the translation unit was compiled on macOS
+(clang++ -std=gnu++2a -Wall -Wextra, zero diagnostics, patched and pristine) and
+linked into a probe that drives the real HalGPIO with the synthetic script:
+
+  script 300:ESCAPE:1500  before: running=1488 release_frame=0     after: running=1490 release_frame=1503
+  script 300:ESCAPE:80    before: running=72   release_frame=0     after: running=69   release_frame=82
+  script 300:RETURN:1200  before: running=1180 release_frame=0     after: running=1189 release_frame=1202
+  long 1500 then short 60 before: release_frame=0                  after: release_frame=59  (no stale hold)
+
+diff --git a/src/HalGPIO.cpp b/src/HalGPIO.cpp
+index f9d5850..2712a14 100644
+--- a/src/HalGPIO.cpp
++++ b/src/HalGPIO.cpp
+@@ -55,6 +55,36 @@ static unsigned long buttonPressTime[NUM_BUTTONS] = {};
+ static bool syntheticButtonDown[NUM_BUTTONS] = {};
+ static bool simulatorSleepRequested = false;
+ 
++// Completed hold of the most recent release, mirroring InputManager's
++// `buttonPressFinish - buttonPressStart`. The device reports the finished hold
++// once every button is up (InputManager::getHeldTime), so a release-frame check
++// such as `wasReleased(BTN_BACK) && getHeldTime() < GO_HOME_MS` sees the real
++// duration there. Without this the host returned 0 on the release frame, which
++// inverted every such check. Latched at release and kept until the next one, as
++// on device; `completedHoldFresh` is cleared per frame so several buttons
++// released in the same frame report the longest hold rather than the last one.
++static unsigned long completedHoldMs = 0;
++static bool completedHoldFresh = false;
++
++// Latches the release edge and the hold it completed. Shared by the SDL KEYUP
++// path and the CROSSPOINT_SIM_INPUT_SCRIPT KeyUp path so both report held time
++// the same way.
++static void recordButtonRelease(int button) {
++  const unsigned long now = SDL_GetTicks();
++  releasedThisFrame[button] = true;
++
++  // buttonPressTime is 0 when the matching key-down was never seen (key held
++  // before the window gained focus, or state cleared by deep sleep). Report 0
++  // rather than an epoch-sized hold.
++  const unsigned long pressedAt = buttonPressTime[button];
++  const unsigned long held =
++      (pressedAt > 0 && now >= pressedAt) ? now - pressedAt : 0;
++  if (!completedHoldFresh || held > completedHoldMs) {
++    completedHoldMs = held;
++    completedHoldFresh = true;
++  }
++}
++
+ namespace {
+ 
+ struct TouchState {
+@@ -383,7 +413,7 @@ void processSyntheticEvents() {
+       buttonPressTime[event.button] = SDL_GetTicks();
+       break;
+     case SyntheticAction::KeyUp:
+-      releasedThisFrame[event.button] = true;
++      recordButtonRelease(event.button);
+       syntheticButtonDown[event.button] = false;
+       break;
+     case SyntheticAction::TouchDown:
+@@ -417,6 +447,10 @@ static void clearButtonState() {
+     buttonPressTime[i] = 0;
+     syntheticButtonDown[i] = false;
+   }
++  // A hold completed before deep sleep must not be visible to the first frame
++  // after wake — on device the state is gone with the reboot.
++  completedHoldMs = 0;
++  completedHoldFresh = false;
+   touchState = {};
+   homeKeyDown = false;
+   homeKeyPressedThisFrame = false;
+@@ -466,6 +500,9 @@ void HalGPIO::beginFrame() {
+     pressedThisFrame[i] = false;
+     releasedThisFrame[i] = false;
+   }
++  // completedHoldMs itself persists (the device keeps the finished hold until
++  // the next one); only the per-frame "already latched" marker is cleared.
++  completedHoldFresh = false;
+   touchState.pressedThisFrame = false;
+   touchState.releasedThisFrame = false;
+   touchState.activityThisFrame = false;
+@@ -512,7 +549,7 @@ void HalGPIO::update() {
+       }
+       int btn = scancodeToButton(e.key.keysym.scancode);
+       if (btn >= 0) {
+-        releasedThisFrame[btn] = true;
++        recordButtonRelease(btn);
+       }
+     } else if (e.type == SDL_MOUSEBUTTONDOWN &&
+                e.button.button == SDL_BUTTON_LEFT) {
+@@ -582,19 +619,30 @@ bool HalGPIO::wasAnyReleased() const {
+ }
+ 
+ unsigned long HalGPIO::getHeldTime() const {
+-  // Return the longest held time among all currently pressed buttons
++  // Mirrors InputManager::getHeldTime(): the running hold while a button is
++  // still down, otherwise the hold that the last release completed. Returning 0
++  // once everything was up (the old behaviour) broke every firmware check of
++  // the form `wasReleased(X) && getHeldTime() <compare> N`, because the release
++  // frame is exactly the frame on which no button is down any more.
+   unsigned long now = SDL_GetTicks();
+   unsigned long maxHeld = 0;
++  bool anyDown = false;
+   const uint8_t *state = SDL_GetKeyboardState(NULL);
+   for (int i = 0; i < NUM_BUTTONS; i++) {
+-    if ((state[buttonScancode[i]] || syntheticButtonDown[i]) &&
+-        buttonPressTime[i] > 0) {
+-      unsigned long held = now - buttonPressTime[i];
+-      if (held > maxHeld)
+-        maxHeld = held;
++    if (state[buttonScancode[i]] || syntheticButtonDown[i]) {
++      anyDown = true;
++      if (buttonPressTime[i] > 0) {
++        unsigned long held = now - buttonPressTime[i];
++        if (held > maxHeld)
++          maxHeld = held;
++      }
+     }
+   }
+-  return maxHeld;
++  // Still held: longest held time among the currently pressed buttons, as
++  // before. Only the all-released case changes.
++  if (anyDown)
++    return maxHeld;
++  return completedHoldMs;
+ }
+ 
+ unsigned long HalGPIO::getPowerButtonHeldTime() const {

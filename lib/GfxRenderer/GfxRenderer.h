@@ -98,6 +98,28 @@ class GfxRenderer {
   static constexpr int VIEWABLE_MARGIN_BOTTOM = 3;
   static constexpr int VIEWABLE_MARGIN_LEFT = 3;
 
+#ifdef GFX_BOUNDS_COUNTER
+  // Test-only instrumentation.
+  //
+  // drawPixel() CLIPS an out-of-range write: it logs "!! Outside range" and
+  // returns before touching the framebuffer, so a geometry bug corrupts
+  // nothing and no test can observe it — it surfaces only as a log line on a
+  // device nobody is watching. That is exactly how the font picker shipped a
+  // draw at logical x == screen width (crash_report.txt:
+  // "!! Outside range (528, 302) -> (302, -1)").
+  //
+  // Host test builds define GFX_BOUNDS_COUNTER to turn that silent clip into
+  // an assertable counter. Not compiled on device: no flash, no DRAM, and no
+  // branch added to the per-pixel hot path.
+  struct OutOfRange {
+    uint32_t count = 0;
+    int lastX = 0, lastY = 0, lastPhyX = 0, lastPhyY = 0;
+  };
+  static OutOfRange outOfRange;
+  static void resetOutOfRange() { outOfRange = OutOfRange{}; }
+  static uint32_t outOfRangeCount() { return outOfRange.count; }
+#endif
+
   // Setup
   void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);

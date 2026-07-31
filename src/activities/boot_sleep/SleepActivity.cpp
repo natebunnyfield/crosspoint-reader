@@ -54,7 +54,7 @@ void SleepActivity::onEnter() {
       } else {
         return renderCustomSleepScreen();
       }
-    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_6WEEK):
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR):
       return renderCalendarSleepScreen();
     default:
       return renderDefaultSleepScreen();
@@ -62,44 +62,36 @@ void SleepActivity::onEnter() {
 }
 
 void SleepActivity::renderCalendarSleepScreen() const {
-  // Only devices with a real RTC (X3) can produce a meaningful calendar.
-  // On X4 (no DS3231), HalClock::getDateTime() will fail — fall back to the
-  // stock sleep image rather than shipping a stale/wrong calendar.
+  // The calendar needs a trustworthy wall clock. X3 has a DS3231; X4 does not,
+  // and its internal RTC drifts badly across deep sleep (see SCOPE.md), so
+  // fall back to the stock sleep image rather than showing a wrong date.
   uint16_t year;
   uint8_t month, day, hour, minute;
   if (!halClock.getDateTime(year, month, day, hour, minute)) {
-    LOG_INF("SLP", "CALENDAR_6WEEK: no RTC available, falling back to default");
+    LOG_INF("SLP", "CALENDAR: no RTC available, falling back to default sleep screen");
     return renderDefaultSleepScreen();
   }
 
-  const calendar::YMD today{year, month, day};
+  // The DS3231 holds UTC (HalClock::syncFromNTP configures "UTC0" and writes
+  // gmtime), so shift to the local date before deciding which day to highlight.
+  // Without this the calendar showed the UTC day: with a negative offset it read
+  // one day AHEAD during the local evening, and it silently cancelled out the
+  // separate RTC date bug for part of the day, which is what made that bug look
+  // intermittent.
+  const calendar::YMD today =
+      calendar::localDateFromUtc(calendar::YMD{year, month, day}, hour, minute, SETTINGS.clockUtcOffsetQ);
 
-  // Staleness check: only regenerate the BMP when today's date differs from
-  // the last stamped date. Keeps SD write churn to ONE 54KB file per calendar
-  // day even when the user sleeps repeatedly.
-  calendar::YMD lastStamped{};
-  const bool haveStamp = calendar::CalendarSleepScreen::readStamp(lastStamped);
-  const bool bmpExists = Storage.exists("/sleep.bmp");
-  const bool needsRegen = !haveStamp || !bmpExists || !calendar::sameDate(lastStamped, today);
+  // Drawn fresh on every sleep entry straight into the framebuffer — no
+  // intermediate /sleep.bmp, no staleness stamp, and nothing cached on the SD
+  // card to go out of date. Note the PANEL itself still holds this image with no
+  // power, so what you see on a sleeping device is the date as of the last sleep
+  // entry, not the current date; there is no timer wake to refresh it (and on
+  // battery the MCU is fully powered off, so there could not be).
+  calendar::CalendarSleepScreen::render(renderer, today);
 
-  if (needsRegen) {
-    LOG_INF("SLP", "CALENDAR_6WEEK: regenerating /sleep.bmp for %04u-%02u-%02u", year, month, day);
-    // Paint into the framebuffer, then serialise the framebuffer into
-    // /sleep.bmp. The subsequent renderCustomSleepScreen() call reads the
-    // file back and drives the actual panel refresh — same code path as any
-    // user-supplied CUSTOM sleep image.
-    calendar::CalendarSleepScreen::render(renderer, today);
-    if (calendar::CalendarSleepScreen::serialiseFramebufferAsPortraitBmp(renderer, "/sleep.bmp")) {
-      calendar::CalendarSleepScreen::writeStamp(today);
-    } else {
-      LOG_ERR("SLP", "CALENDAR_6WEEK: BMP write failed; using default sleep screen");
-      return renderDefaultSleepScreen();
-    }
-  }
-
-  // Delegate display to the existing CUSTOM path — reads /sleep.bmp and drives
-  // the panel with the same waveform pipeline as user-provided images.
-  renderCustomSleepScreen();
+  // Same single-pass HALF waveform the other sleep screens use (see the note
+  // above renderDefaultSleepScreen).
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
 
 void SleepActivity::renderCustomSleepScreen() const {

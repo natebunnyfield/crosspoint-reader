@@ -41,7 +41,24 @@ void OpdsServerListActivity::loop() {
     return;
   }
 
-  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+  // The Confirm edge has to match whoever receives the rest of the gesture, or
+  // one tap is consumed twice.
+  //
+  // Picker mode hands off to OpdsBookBrowserActivity, which acts on the Confirm
+  // RELEASE (OpdsBookBrowserActivity.cpp:99). Selecting on the press left the
+  // release unconsumed, and InputManager recomputes the edge latches once per
+  // frame (InputManager.cpp:243-262), so the freshly created browser saw it and
+  // immediately opened or downloaded its entry 0. Waiting for the release keeps
+  // both edges of the gesture inside this activity. Safe from the entry side
+  // too: picker mode is only reached via ActivityManager::goToBrowser() from
+  // HomeActivity, which itself acts on the Confirm RELEASE (HomeActivity.cpp:182),
+  // so no release is ever left over for us.
+  //
+  // Settings mode must stay on the press: SettingsActivity launches this list on
+  // the Confirm PRESS (SettingsActivity.cpp:121), so its release lands here, and
+  // acting on the release would open the first server's editor by itself.
+  if (pickerMode ? mappedInput.wasReleased(MappedInputManager::Button::Confirm)
+                 : mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     handleSelection();
     return;
   }

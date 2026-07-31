@@ -8,7 +8,22 @@
 #include "fontIds.h"
 
 namespace {
-constexpr int MENU_ITEM_COUNT = 3;
+// One row of the File Transfer menu. Label, description, icon and resulting NetworkMode travel together so the
+// display order can be changed without re-deriving the action from the row index.
+struct MenuEntry {
+  StrId label;
+  StrId desc;
+  UIIcon icon;
+  NetworkMode mode;
+};
+
+// Display order (top to bottom). Calibre Wireless is intentionally last.
+constexpr MenuEntry MENU_ENTRIES[] = {
+    {StrId::STR_JOIN_NETWORK, StrId::STR_JOIN_DESC, UIIcon::Wifi, NetworkMode::JOIN_NETWORK},
+    {StrId::STR_CREATE_HOTSPOT, StrId::STR_HOTSPOT_DESC, UIIcon::Hotspot, NetworkMode::CREATE_HOTSPOT},
+    {StrId::STR_CALIBRE_WIRELESS, StrId::STR_CALIBRE_DESC, UIIcon::Library, NetworkMode::CONNECT_CALIBRE},
+};
+constexpr int MENU_ITEM_COUNT = static_cast<int>(sizeof(MENU_ENTRIES) / sizeof(MENU_ENTRIES[0]));
 }  // namespace
 
 void NetworkModeSelectionActivity::onEnter() {
@@ -32,13 +47,8 @@ void NetworkModeSelectionActivity::loop() {
 
   // Handle confirm button - select current option
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    NetworkMode mode = NetworkMode::JOIN_NETWORK;
-    if (selectedIndex == 1) {
-      mode = NetworkMode::CONNECT_CALIBRE;
-    } else if (selectedIndex == 2) {
-      mode = NetworkMode::CREATE_HOTSPOT;
-    }
-    onModeSelected(mode);
+    if (selectedIndex < 0 || selectedIndex >= MENU_ITEM_COUNT) return;
+    onModeSelected(MENU_ENTRIES[selectedIndex].mode);
     return;
   }
 
@@ -65,17 +75,12 @@ void NetworkModeSelectionActivity::render(RenderLock&&) {
 
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
-  // Menu items and descriptions
-  static constexpr StrId menuItems[MENU_ITEM_COUNT] = {StrId::STR_JOIN_NETWORK, StrId::STR_CALIBRE_WIRELESS,
-                                                       StrId::STR_CREATE_HOTSPOT};
-  static constexpr StrId menuDescs[MENU_ITEM_COUNT] = {StrId::STR_JOIN_DESC, StrId::STR_CALIBRE_DESC,
-                                                       StrId::STR_HOTSPOT_DESC};
-  static constexpr UIIcon menuIcons[MENU_ITEM_COUNT] = {UIIcon::Wifi, UIIcon::Library, UIIcon::Hotspot};
-
+  // Menu items and descriptions come from MENU_ENTRIES so labels stay paired with their NetworkMode.
   GUI.drawList(
       renderer, Rect{0, contentTop, pageWidth, contentHeight}, static_cast<int>(MENU_ITEM_COUNT), selectedIndex,
-      [](int index) { return std::string(I18N.get(menuItems[index])); },
-      [](int index) { return std::string(I18N.get(menuDescs[index])); }, [](int index) { return menuIcons[index]; });
+      [](int index) { return std::string(I18N.get(MENU_ENTRIES[index].label)); },
+      [](int index) { return std::string(I18N.get(MENU_ENTRIES[index].desc)); },
+      [](int index) { return MENU_ENTRIES[index].icon; });
 
   // Draw help text at bottom
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));

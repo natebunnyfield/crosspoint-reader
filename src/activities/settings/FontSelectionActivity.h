@@ -21,7 +21,18 @@ class FontSelectionActivity final : public Activity {
   void render(RenderLock&&) override;
 
  private:
-  void handleSelection();
+  // Applies the highlighted font immediately and stays on screen. There is no
+  // commit step: the user leaves with Back and keeps whatever is applied.
+  void applySelectedFont();
+  // Step the reader font size by `delta` slots (S -> M -> L -> XL), clamped at
+  // both ends, and reload the SD font at the new size. Bound to the side
+  // buttons so a font can be judged at the size it will actually be read at.
+  void changeFontSize(int delta);
+  // Point size the current FONT_SIZE slot actually resolves to for the font
+  // being previewed, or 0 if it cannot be determined. The slot is ordinal, not
+  // absolute, so the same slot can mean different point sizes for different
+  // families — the slot name alone is not an accurate readout.
+  uint8_t resolvedPointSize() const;
   int getFontIdForPreview(int index) const;
   void renderPreviewPane(int top, int height, int fontId, const char* fontName) const;
 
@@ -36,8 +47,6 @@ class FontSelectionActivity final : public Activity {
   std::vector<FontEntry> fonts_;
   int selectedIndex_ = 0;
   int previewFontIndex_ = 0;
-  uint8_t originalFontFamily_ = 0;
-  char originalSdFontFamilyName_[32] = {};
 
   ThemeMetrics metrics_ = {};
   int afterHeader = 0;

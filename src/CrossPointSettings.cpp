@@ -102,7 +102,39 @@ bool CrossPointSettings::saveToFile() const {
   return JsonSettingsIO::saveSettings(*this, SETTINGS_FILE_JSON);
 }
 
+void CrossPointSettings::normalizeRetiredSettings() {
+  std::lock_guard<std::mutex> lock(_mutex);
+
+  // The reader is portrait-only and no longer exposes any way to rotate. A
+  // save written before the controls were withdrawn can still hold a landscape
+  // or inverted value, which would otherwise be permanent, so it is pinned
+  // back on every load. The field itself stays: ReaderUtils, UITheme and the
+  // sleep screens all still read it.
+  orientation = PORTRAIT;
+
+  // longPressMenuFunction dropped its trailing choice. Its stored value is an index
+  // (see the warning above LONG_PRESS_MENU_FUNCTION), so a save holding the retired
+  // index would point one past the end of the shortened label list and the settings UI
+  // would read out of range.
+  if (longPressMenuFunction == LP_MENU_BOOKMARK) longPressMenuFunction = LP_MENU_DISABLED;
+
+  // longPressButtonBehavior deliberately has NO such line any more. It used to pin the
+  // retired ORIENTATION_CHANGE index (2) back to OFF; index 2 is now FONT_SIZE_STEP, a
+  // live choice with a label of its own, so pinning it would silently wipe the setting —
+  // including the factory default — on every load. Out-of-range values are still handled:
+  // JsonSettingsIO clamps anything >= enumValues.size() to the field default, and the
+  // binary migration path validates against LONG_PRESS_BUTTON_BEHAVIOR_COUNT.
+}
+
 bool CrossPointSettings::loadFromFile() {
+  // Normalization has to run on every exit path — JSON, binary migration, and
+  // the no-settings-file case all land here.
+  const bool loaded = loadSettingsFromDisk();
+  normalizeRetiredSettings();
+  return loaded;
+}
+
+bool CrossPointSettings::loadSettingsFromDisk() {
   // Try JSON first
   if (Storage.exists(SETTINGS_FILE_JSON)) {
     String json = Storage.readFile(SETTINGS_FILE_JSON);
