@@ -33,8 +33,7 @@ lib/EpdFont/scripts/output/
 /sdkconfig.defaults
 sdkconfig.sticky
 
-# Calendar render-harness build artifacts
-tools/calendar_preview/render_test
-tools/calendar_preview/kern_specimen
+# Simulator build artifacts
+tools/calendar_preview/sim
 tools/calendar_preview/*.o
 tools/calendar_preview/fs_/
