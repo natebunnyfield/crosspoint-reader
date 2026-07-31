@@ -496,8 +496,10 @@ void EpubReaderActivity::loop() {
   // halves of the gesture: `sideHeldNow.any()` covers the window while the chord's side button
   // is still down (the hold threshold can be crossed mid-chord), and `confirmModifierUsed`
   // covers the rest of the Confirm hold after the side button has already been released. Note
-  // sideHeldNow is false when SETTINGS.sideButtonLayout is SIDE_BUTTONS_DISABLED, so a user
-  // with no side buttons keeps this function completely unchanged.
+  // sideHeldNow now follows ReaderUtils::sideFontButtons(), so it is live even when
+  // SETTINGS.sideButtonLayout is SIDE_BUTTONS_DISABLED — that setting withdraws side PAGING,
+  // not the side buttons themselves, and the chord has to be reachable wherever the font
+  // gestures are.
   //
   // This suppresses the sync only if the side button arrives BEFORE the threshold. Measured in
   // the simulator with credentials stored: a side tap 200ms into the Confirm hold gives the
