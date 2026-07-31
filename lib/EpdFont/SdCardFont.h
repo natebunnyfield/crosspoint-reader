@@ -243,17 +243,36 @@ class SdCardFont {
   };
   OverflowContext overflowCtx_[MAX_STYLES] = {};
 
-  // Shared on-demand overflow buffer (ring buffer of glyphs loaded via glyphMissHandler)
-  static constexpr uint32_t OVERFLOW_CAPACITY = 8;
+  // Shared on-demand overflow buffer (glyphs loaded via glyphMissHandler).
+  //
+  // Eviction is LRU, not round-robin: with round-robin reuse a working set one
+  // glyph larger than the cache degenerated to a miss on every lookup (the slot
+  // reused was always the one needed next), so a single un-prewarmed UI string
+  // re-read the same handful of letters from SD hundreds of times per render.
+  // LRU guarantees any working set <= OVERFLOW_CAPACITY loads each glyph once.
+  //
+  // Capacity 16 covers typical short UI strings (a filename title is ~10-14
+  // unique glyphs plus the ellipsis). Per-slot cost on the 32-bit target:
+  // 16 (EpdGlyph) + 4 (bitmap ptr) + 4 (codepoint) + 4 (lastUse) + 1 (+3 pad)
+  // = 32 bytes in-object, 512 bytes total, plus one heap bitmap per occupied
+  // slot (~65 B/glyph at 12pt, ~144 B at 18pt for a 2-bit font), freed on
+  // every clearOverflow(). Longer text must go through prewarm() instead —
+  // this cache is a safety net for stragglers, not a rendering path.
+  static constexpr uint32_t OVERFLOW_CAPACITY = 16;
   struct OverflowEntry {
     EpdGlyph glyph;
     uint8_t* bitmap = nullptr;
     uint32_t codepoint = 0;
+    uint32_t lastUse = 0;  // LRU stamp from overflowUseTick_ (0 = never used)
     uint8_t styleIdx = 0;
   };
   OverflowEntry overflow_[OVERFLOW_CAPACITY] = {};
   uint32_t overflowCount_ = 0;
-  uint32_t overflowNext_ = 0;
+  uint32_t overflowUseTick_ = 0;
+  // Loads since the last clearOverflow(). Drives the log throttle in
+  // onGlyphMiss(): per-load logging is capped, then only a periodic summary,
+  // so a thrashing caller can no longer flood the log.
+  uint32_t overflowLoadsSinceClear_ = 0;
 
   // Compact advance-only table for layout measurement (per-style).
   // Built by buildAdvanceTable(), queried by getAdvance().

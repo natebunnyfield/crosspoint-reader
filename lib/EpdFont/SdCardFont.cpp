@@ -201,9 +201,11 @@ void SdCardFont::clearOverflow() {
     delete[] overflow_[i].bitmap;
     overflow_[i].bitmap = nullptr;
     overflow_[i].codepoint = 0;
+    overflow_[i].lastUse = 0;
   }
   overflowCount_ = 0;
-  overflowNext_ = 0;
+  overflowUseTick_ = 0;
+  overflowLoadsSinceClear_ = 0;
 }
 
 // --- Per-style kern/ligature ---
@@ -1456,6 +1458,7 @@ const EpdGlyph* SdCardFont::onGlyphMiss(void* ctx, uint32_t codepoint) {
   // Check overflow cache first (matching both codepoint and style)
   for (uint32_t i = 0; i < self->overflowCount_; i++) {
     if (self->overflow_[i].codepoint == codepoint && self->overflow_[i].styleIdx == styleIdx) {
+      self->overflow_[i].lastUse = ++self->overflowUseTick_;  // keep the hot set resident
       return &self->overflow_[i].glyph;
     }
   }
@@ -1464,11 +1467,19 @@ const EpdGlyph* SdCardFont::onGlyphMiss(void* ctx, uint32_t codepoint) {
   int32_t globalIdx = self->findGlobalGlyphIndex(s, codepoint);
   if (globalIdx < 0) return nullptr;
 
-  // Pick overflow slot (ring buffer). Read into temporaries first so the
-  // existing slot stays valid if SD I/O fails. Bookkeeping (count/next)
-  // is deferred until after all I/O succeeds to avoid inconsistent state.
-  uint32_t slot = self->overflowNext_;
-  bool wasAtCapacity = (self->overflowCount_ == OVERFLOW_CAPACITY);
+  // Pick overflow slot: first unoccupied, else evict the least-recently-used
+  // entry (see the OverflowEntry comment in the header for why not
+  // round-robin). Read into temporaries first so the existing slot stays valid
+  // if SD I/O fails. Bookkeeping (count/stamps) is deferred until after all
+  // I/O succeeds to avoid inconsistent state.
+  const bool wasAtCapacity = (self->overflowCount_ == OVERFLOW_CAPACITY);
+  uint32_t slot = self->overflowCount_;
+  if (wasAtCapacity) {
+    slot = 0;
+    for (uint32_t i = 1; i < OVERFLOW_CAPACITY; i++) {
+      if (self->overflow_[i].lastUse < self->overflow_[slot].lastUse) slot = i;
+    }
+  }
 
   // Read glyph metadata into temporary
   HalFile file;
@@ -1510,20 +1521,30 @@ const EpdGlyph* SdCardFont::onGlyphMiss(void* ctx, uint32_t codepoint) {
     }
   }
 
-  // All reads succeeded — commit to slot and advance ring buffer
+  // All reads succeeded — commit to slot
   if (wasAtCapacity) {
     delete[] self->overflow_[slot].bitmap;
   } else {
     self->overflowCount_++;
   }
-  self->overflowNext_ = (slot + 1) % OVERFLOW_CAPACITY;
   self->overflow_[slot].glyph = tempGlyph;
   self->overflow_[slot].bitmap = tempBitmap;
   self->overflow_[slot].codepoint = codepoint;
   self->overflow_[slot].styleIdx = styleIdx;
+  self->overflow_[slot].lastUse = ++self->overflowUseTick_;
 
-  LOG_DBG("SDCF", "Overflow: loaded U+%04X style %u on demand (slot %u/%u)", codepoint, styleIdx, slot,
-          OVERFLOW_CAPACITY);
+  // Per-load logging is only useful while the cache is behaving (a handful of
+  // genuinely rare glyphs). Once loads exceed capacity the caller is cycling a
+  // working set through the cache and per-load lines would flood the log at SD
+  // speed — drop to a 1-in-256 summary that names the problem instead.
+  const uint32_t loads = ++self->overflowLoadsSinceClear_;
+  if (loads <= OVERFLOW_CAPACITY) {
+    LOG_DBG("SDCF", "Overflow: loaded U+%04X style %u on demand (slot %u/%u)", codepoint, styleIdx, slot,
+            OVERFLOW_CAPACITY);
+  } else if ((loads & 0xFF) == 0) {
+    LOG_DBG("SDCF", "Overflow: %u on-demand loads since cache clear — working set exceeds %u slots, missing prewarm?",
+            loads, OVERFLOW_CAPACITY);
+  }
 
   return &self->overflow_[slot].glyph;
 }

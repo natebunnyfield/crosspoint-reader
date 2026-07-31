@@ -1,5 +1,6 @@
 #include "LyraSixTheme.h"
 
+#include <FontCacheManager.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 
@@ -133,6 +134,29 @@ void LyraSixTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const s
   // re-renders on every selector move) costs an SD read only on the first pass.
   const int sdTitleFontId = sdFontSystem.loadForDisplay(TITLE_SD_FAMILY, TITLE_SD_SIZE_SLOT, renderer);
   const int titleFontId = sdTitleFontId != 0 ? sdTitleFontId : SMALL_FONT_ID;
+
+  // An SD title font arrives here cold: loadForDisplay() runs outside any
+  // PrewarmScope, so without an explicit prewarm every wrappedText() measure
+  // and every drawText() glyph goes through SdCardFont's on-demand overflow
+  // path — and a screenful of titles is a working set larger than that cache,
+  // so the same letters were re-read from the card over and over within one
+  // render (hundreds of SD loads per frame, measured). One batched prewarm
+  // makes the whole title set resident; SdCardFont's subset check then makes
+  // the repeat prewarm on every selector-move re-render free (zero SD reads).
+  if (sdTitleFontId != 0) {
+    if (auto* fcm = renderer.getFontCacheManager()) {
+      size_t prewarmLen = 0;
+      for (int i = 0; i < visible; i++) prewarmLen += recentBooks[i].title.size() + 1;
+      std::string prewarmText;
+      prewarmText.reserve(prewarmLen + 3);
+      for (int i = 0; i < visible; i++) {
+        prewarmText += recentBooks[i].title;
+        prewarmText += ' ';
+      }
+      prewarmText += "\xe2\x80\xa6";  // U+2026: wrappedText/truncatedText append it on truncation
+      fcm->prewarmCache(titleFontId, prewarmText.c_str(), 0x01);  // titles draw REGULAR only
+    }
+  }
 
   const int titleLineHeight = renderer.getLineHeight(titleFontId);
   const int titleMaxLines = titleLinesThatFit(titleLineHeight, rowHeight, coverHeight);
