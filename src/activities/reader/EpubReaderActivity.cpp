@@ -36,7 +36,6 @@
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "activities/settings/FontSelectionActivity.h"
-#include "activities/settings/TextSettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/BookmarkUtil.h"
@@ -991,24 +990,6 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::TEXT_SETTINGS: {
-      startActivityForResult(std::make_unique<TextSettingsActivity>(renderer, mappedInput, &sdFontSystem.registry(),
-                                                                    TextSettingsActivity::Tab::Family),
-                             [this](const ActivityResult&) {
-                               // TextSettingsActivity saves on each change; no save needed here.
-                               // Font/size/spacing/margin changes invalidate the current
-                               // layout: preserve position and force a re-layout, mirroring
-                               // applyOrientation()'s reflow.
-                               RenderLock lock(*this);
-                               if (section) {
-                                 cachedSpineIndex = currentSpineIndex;
-                                 cachedChapterTotalPageCount = section->pageCount;
-                                 nextPageNumber = section->currentPage;
-                               }
-                               section.reset();
-                             });
-      break;
-    }
-    case EpubReaderMenuActivity::MenuAction::SELECT_FONT: {
       {
         // Drop the paginated section BEFORE the picker opens, not just after
         // it closes.
@@ -1187,7 +1168,7 @@ bool EpubReaderActivity::launchKOReaderSync() {
 
 void EpubReaderActivity::stepReaderFontSize(const int delta) {
   // The selectable sizes are the point sizes the active family actually ships
-  // (the same list buildFontSizeSetting() and TextSettingsActivity offer), so a
+  // (the same list buildFontSizeSetting() and FontSelectionActivity offer), so a
   // step walks that list. Clamped at the ends rather than wrapped, for the same
   // "the end of the range must be perceptible" reason
   // ReaderUtils::steppedLineSpacing clamps.
@@ -1222,7 +1203,7 @@ void EpubReaderActivity::stepReaderFontSize(const int delta) {
     RenderLock lock(*this);
 
     // Preserve the reading position across the reflow, exactly as the retired
-    // applyOrientation() did before its own section.reset() and as the SELECT_FONT menu
+    // applyOrientation() did before its own section.reset() and as the TEXT_SETTINGS menu
     // case does (onReaderMenuConfirm above). Without these three lines the position is
     // simply lost: nextPageNumber is never written by an intra-chapter page turn, so the
     // rebuild lands on whatever page the CHAPTER was entered at and render() then persists
@@ -1238,7 +1219,7 @@ void EpubReaderActivity::stepReaderFontSize(const int delta) {
     // Drop the section BEFORE ensureLoaded(), never after: Section caches the font ID it
     // was built with and its destructor still runs suspendBuild(), while ensureLoaded ->
     // SdCardFontManager::unloadAll() does removeFont(id) / delete lf.font and frees exactly
-    // those glyph tables. Same ordering, same reason, as the SELECT_FONT case.
+    // those glyph tables. Same ordering, same reason, as the TEXT_SETTINGS case.
     section.reset();
 
     SETTINGS.fontPointSize = next;

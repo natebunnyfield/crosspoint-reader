@@ -21,14 +21,14 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInpu
 
 std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuItems(bool hasFootnotes) {
   std::vector<MenuItem> items;
-  // Exact upper bound: six unconditional rows plus footnotes when present.
-  items.reserve(7);
-  // First items: text appearance is the most frequently reached for while
-  // actually reading, and the list is not scrolled to get to either row.
-  // TEXT_SETTINGS opens the tabbed size/layout/style editor; SELECT_FONT is
-  // the dedicated font picker with its full-page live preview.
+  // Exact upper bound: five unconditional rows plus footnotes when present.
+  items.reserve(6);
+  // First item: text appearance is the most frequently reached for while
+  // actually reading, and the list is not scrolled to get to the row.
+  // TEXT_SETTINGS is the single entry point for it — the font picker with its
+  // full-page live preview (FontSelectionActivity, titled "Text Settings");
+  // everything else text-related lives in the device Settings list.
   items.push_back({MenuAction::TEXT_SETTINGS, StrId::STR_TEXT_SETTINGS});
-  items.push_back({MenuAction::SELECT_FONT, StrId::STR_FONT});
   items.push_back({MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER});
   if (hasFootnotes) {
     items.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});

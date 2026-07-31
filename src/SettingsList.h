@@ -83,8 +83,8 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
   // this call, so they must not reference the registry.
   const std::vector<uint8_t> sizes = readerFontPointSizes(registry, SETTINGS.sdFontFamilyName);
 
-  // "pt" is deliberately not translated — see the matching note in
-  // TextSettingsActivity::rebuildSizeList().
+  // "pt" is deliberately not translated: it is the typographic unit symbol,
+  // written the same way in every language CrossPoint ships.
   std::vector<std::string> labels;
   labels.reserve(sizes.size());
   for (const uint8_t pt : sizes) {
@@ -243,39 +243,31 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                     .withTextSettings());
     v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing,
                                   {StrId::STR_TIGHT, StrId::STR_NORMAL, StrId::STR_WIDE}, "lineSpacing",
-                                  StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                  StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Value(StrId::STR_SCREEN_MARGIN, &CrossPointSettings::screenMargin,
                                    {CrossPointSettings::SCREEN_MARGIN_MIN, CrossPointSettings::SCREEN_MARGIN_MAX,
                                     CrossPointSettings::SCREEN_MARGIN_STEP},
-                                   "screenMargin", StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                   "screenMargin", StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Enum(StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
                                   {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT,
                                    StrId::STR_BOOK_S_STYLE},
-                                  "paragraphAlignment", StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                  "paragraphAlignment", StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &CrossPointSettings::embeddedStyle, "embeddedStyle",
-                                    StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                    StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled,
-                                    "focusReadingEnabled", StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                    "focusReadingEnabled", StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_HYPHENATION, &CrossPointSettings::hyphenationEnabled,
-                                    "hyphenationEnabled", StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                    "hyphenationEnabled", StrId::STR_CAT_READER));
     // Reading orientation has no UI: the reader is portrait-only. The
     // `orientation` field is still read by ReaderUtils and the themes, and
     // is pinned to PORTRAIT on load by normalizeRetiredSettings().
     v.push_back(SettingInfo::Toggle(StrId::STR_EXTRA_SPACING, &CrossPointSettings::extraParagraphSpacing,
-                                    "extraParagraphSpacing", StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                    "extraParagraphSpacing", StrId::STR_CAT_READER));
     // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
     // legacy Off/On toggle (persisted files round-trip), 2+ appended.
     v.push_back(SettingInfo::Enum(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing,
                                   {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_AA_CRISP, StrId::STR_AA_DARK},
-                                  "textAntiAliasing", StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                  "textAntiAliasing", StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Enum(StrId::STR_IMAGES, &CrossPointSettings::imageRendering,
                                   {StrId::STR_IMAGES_DISPLAY, StrId::STR_IMAGES_PLACEHOLDER, StrId::STR_IMAGES_SUPPRESS},
                                   "imageRendering", StrId::STR_CAT_READER));
