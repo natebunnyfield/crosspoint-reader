@@ -10,6 +10,7 @@
 
 #include "CrossPointSettings.h"
 #include "FontDisplayNames.h"
+#include "ReaderFontSizes.h"
 #include "MappedInputManager.h"
 #include "SdCardFontSystem.h"
 #include "components/UITheme.h"
@@ -17,23 +18,6 @@
 
 namespace {
 constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
-
-// Label for a FONT_SIZE slot. The enum is ordinal, not absolute — the point
-// sizes behind it depend on which sizes are installed — so these stay generic.
-const char* fontSizeLabel(uint8_t fontSize) {
-  switch (fontSize) {
-    case CrossPointSettings::SMALL:
-      return tr(STR_SMALL);
-    case CrossPointSettings::MEDIUM:
-      return tr(STR_MEDIUM);
-    case CrossPointSettings::LARGE:
-      return tr(STR_LARGE);
-    case CrossPointSettings::EXTRA_LARGE:
-      return tr(STR_X_LARGE);
-    default:
-      return "";
-  }
-}
 
 // Resolve the current selection to a POSITION IN `fonts_`.
 //
@@ -192,11 +176,24 @@ void FontSelectionActivity::loop() {
 }
 
 void FontSelectionActivity::changeFontSize(int delta) {
-  const int current = static_cast<int>(SETTINGS.fontSize);
-  // Clamp rather than wrap: at four slots, wrapping from XL back to S reads as
-  // a glitch, and clamping makes the ends of the range perceptible.
-  const int next = std::clamp(current + delta, 0, static_cast<int>(CrossPointSettings::FONT_SIZE_COUNT) - 1);
-  if (next == current) return;
+  // The selectable sizes are the point sizes the active family actually ships
+  // (readerFontPointSizes never returns empty — it falls back to the built-in
+  // ramp). Clamp rather than wrap: wrapping from the largest size back to the
+  // smallest reads as a glitch, and clamping makes the ends of the range
+  // perceptible.
+  const std::vector<uint8_t> sizes = readerFontPointSizes(registry_, SETTINGS.sdFontFamilyName);
+  if (sizes.empty()) return;
+  const uint8_t current = snapToNearestPointSize(sizes, SETTINGS.fontPointSize);
+  int idx = 0;
+  for (int i = 0; i < static_cast<int>(sizes.size()); i++) {
+    if (sizes[i] == current) {
+      idx = i;
+      break;
+    }
+  }
+  const int nextIdx = std::clamp(idx + delta, 0, static_cast<int>(sizes.size()) - 1);
+  const uint8_t next = sizes[nextIdx];
+  if (next == SETTINGS.fontPointSize) return;
 
   {
     // RenderLock is REQUIRED here, not defensive. ActivityManager::loop() calls
@@ -210,10 +207,10 @@ void FontSelectionActivity::changeFontSize(int delta) {
     // that is a LoadProhibited panic or garbled glyphs; the host simulator
     // renders in 5-8ms so the window never opens there.
     //
-    // Also serialises the SETTINGS.fontSize write itself, which the render task
-    // reads every frame (resolvedPointSize / getReaderFontId).
+    // Also serialises the SETTINGS.fontPointSize write itself, which the render
+    // task reads every frame (resolvedPointSize / getReaderFontId).
     RenderLock lock(*this);
-    SETTINGS.fontSize = static_cast<uint8_t>(next);
+    SETTINGS.fontPointSize = next;
     // An SD family keeps only one point size resident, so the new size has to be
     // loaded before the preview can draw at it. Built-in faces just resolve to a
     // different font ID.
@@ -261,21 +258,17 @@ uint8_t FontSelectionActivity::resolvedPointSize() const {
   // family wins if it resolves, otherwise it falls through to the built-in ramp.
   if (SETTINGS.sdFontFamilyName[0] != '\0' && registry_ != nullptr) {
     if (const auto* family = registry_->findFamily(SETTINGS.sdFontFamilyName)) {
-      // An SD family only ships the sizes it ships; findClosestReaderSize maps
-      // the ordinal slot onto that family's own set, which is why this can
-      // differ from the built-in ramp for the same slot.
-      if (const auto* file = family->findClosestReaderSize(SETTINGS.fontSize)) return file->pointSize;
+      // An SD family only ships the sizes it ships; findNearestSize snaps the
+      // stored point size onto that family's own set, which is why this can
+      // differ from the built-in ramp for the same stored value.
+      if (const auto* file = family->findNearestSize(SETTINGS.fontPointSize)) return file->pointSize;
     }
   }
 
-  // Built-in faces are compiled at a fixed ramp; getReaderFontId() maps the
-  // slots onto these point sizes for both NotoSerif and NotoSans.
-  static constexpr uint8_t kBuiltinPointSizes[] = {12, 14, 16, 18};
-  static_assert(sizeof(kBuiltinPointSizes) / sizeof(kBuiltinPointSizes[0]) ==
-                    static_cast<size_t>(CrossPointSettings::FONT_SIZE_COUNT),
-                "Built-in point size ramp must cover every FONT_SIZE slot");
-  if (SETTINGS.fontSize < CrossPointSettings::FONT_SIZE_COUNT) return kBuiltinPointSizes[SETTINGS.fontSize];
-  return 0;
+  // Built-in faces are compiled at a fixed ramp; getReaderFontId() snaps the
+  // stored point size onto it for both NotoSerif and NotoSans.
+  return snapToNearestPointSize(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES),
+                                SETTINGS.fontPointSize);
 }
 
 void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, const char* fontName) const {
@@ -307,11 +300,9 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
   char scratch[256];
   const uint8_t pointSize = resolvedPointSize();
   if (pointSize > 0) {
-    snprintf(scratch, sizeof(scratch), "%s \"%s\" — %s (%upt)", tr(STR_PREVIEW), fontName ? fontName : "",
-             fontSizeLabel(SETTINGS.fontSize), pointSize);
+    snprintf(scratch, sizeof(scratch), "%s \"%s\" — %upt", tr(STR_PREVIEW), fontName ? fontName : "", pointSize);
   } else {
-    snprintf(scratch, sizeof(scratch), "%s \"%s\" — %s", tr(STR_PREVIEW), fontName ? fontName : "",
-             fontSizeLabel(SETTINGS.fontSize));
+    snprintf(scratch, sizeof(scratch), "%s \"%s\"", tr(STR_PREVIEW), fontName ? fontName : "");
   }
 
   const int labelY = top + height - metrics_.previewPadding - labelH;
