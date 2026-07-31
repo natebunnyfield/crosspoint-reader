@@ -144,8 +144,11 @@ void FontSelectionActivity::loop() {
   }
 
   const int listSize = static_cast<int>(fonts_.size());
+  // hasSubtitle=true: the list rows carry a designer/years subtitle, so the
+  // page stride must use the taller subtitle row height or continuous paging
+  // would jump past entries the screen never showed.
   const int pageItems =
-      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, previewHeight + metrics_.verticalSpacing);
+      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true, previewHeight + metrics_.verticalSpacing);
 
   // List navigation is bound to the FRONT buttons only. ButtonNavigator's
   // NavNext/NavPrevious resolve to "side Down OR front Right" and "side Up OR
@@ -435,13 +438,19 @@ void FontSelectionActivity::render(RenderLock&&) {
   // user arrived with. One badge, on the applied font.
   GUI.drawList(
       renderer, Rect{0, listTop, pageWidth, listHeight}, static_cast<int>(fonts_.size()), selectedIndex_,
-      // Directory name -> "Typeface - Designer" (FontDisplayNames.h). Built-in
-      // entries already carry a translated display name, so only SD families are
-      // mapped; an unlisted family falls through to its own name.
+      // Title: the typeface name alone (FontDisplayNames.h). Built-in entries
+      // already carry a translated display name, so only SD families are
+      // mapped; an unlisted family falls through to its own directory name.
       [this](int index) {
-        return fonts_[index].isBuiltin ? fonts_[index].name : FontDisplayNames::displayLabel(fonts_[index].name);
+        return fonts_[index].isBuiltin ? fonts_[index].name : FontDisplayNames::displayName(fonts_[index].name);
       },
-      nullptr, nullptr,
+      // Subtitle: "Designer · original / digital years" — the attribution that
+      // used to share the title line, now with room for the dates. Built-ins
+      // and unlisted families return "" and simply show no second line.
+      [this](int index) -> std::string {
+        return fonts_[index].isBuiltin ? "" : FontDisplayNames::subtitle(fonts_[index].name);
+      },
+      nullptr,
       [this](int index) -> std::string {
         if (index == previewFontIndex_) return tr(STR_SELECTED);
         return "";
