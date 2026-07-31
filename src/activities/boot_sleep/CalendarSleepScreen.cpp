@@ -14,8 +14,8 @@
 #include "SdCardFontSystem.h"
 #include "fontIds.h"
 
-// 5-week Costa Rican + US holiday calendar, drawn straight into the panel
-// framebuffer.
+// Costa Rican + US holiday calendar (4/5/6 week rows — see render()'s `weeks`
+// parameter), drawn straight into the panel framebuffer.
 //
 // All geometry derives from renderer.getScreenWidth()/getScreenHeight() at
 // runtime rather than hardcoded, per the "No Hardcoding" rule in CLAUDE.md.
@@ -34,7 +34,12 @@ namespace {
 // ---------------------------------------------------------------------------
 // Grid shape
 // ---------------------------------------------------------------------------
-constexpr int ROW_COUNT = 5;  // five-week look-ahead
+// Week-row count is a render() parameter ("Calendar Four/Five/Six" styles pick
+// 4/5/6; the classic "Calendar" style keeps the original 5). These bound it:
+// fewer than 4 rows makes the look-ahead pointless, more than 6 leaves rows
+// shorter than the digit ink on the 792px panel.
+constexpr int WEEKS_MIN = 4;
+constexpr int WEEKS_MAX = 6;
 constexpr int COL_COUNT = 7;
 constexpr int LEGEND_MAX_ROWS = 6;
 // Border weight shared by the today and holiday squares — they are the same
@@ -168,6 +173,7 @@ int topYForInkCentre(const GfxRenderer& renderer, int fontId, const char* text,
 // ---------------------------------------------------------------------------
 struct Layout {
   CalendarFonts fonts;
+  int rows;  // week rows in this render
   int screenW;
   int screenH;
   int marginX;
@@ -196,9 +202,10 @@ struct Layout {
   }
 };
 
-Layout computeLayout(const GfxRenderer& renderer, const CalendarFonts& fonts) {
+Layout computeLayout(const GfxRenderer& renderer, const CalendarFonts& fonts, const int weeks) {
   Layout L{};
   L.fonts = fonts;
+  L.rows = weeks;
   L.screenW = renderer.getScreenWidth();
   L.screenH = renderer.getScreenHeight();
 
@@ -220,9 +227,12 @@ Layout computeLayout(const GfxRenderer& renderer, const CalendarFonts& fonts) {
   // Reserve the legend block, then split what remains across the week rows.
   L.legendRowH = legendLineH + 8;
   const int legendBlockH = LEGEND_MAX_ROWS * L.legendRowH;
+  // The grid band (header bottom to legend top) is fixed; the week count only
+  // decides how many rows it is divided into, so "Calendar Four" gets taller
+  // cells and "Calendar Six" shorter ones, never a taller or shorter screen.
   const int gridBottom = L.screenH - vBottom - legendBlockH - 20;
-  L.rowH = (gridBottom - L.gridTop) / ROW_COUNT;
-  L.legendTop = L.gridTop + ROW_COUNT * L.rowH + 20;
+  L.rowH = (gridBottom - L.gridTop) / L.rows;
+  L.legendTop = L.gridTop + L.rows * L.rowH + 20;
   L.legendBottomY = L.screenH - vBottom;
 
   const int legendSpace = L.legendBottomY - L.legendTop;
@@ -267,7 +277,7 @@ const char* regionTag(uint8_t regions) {
 
 // Header text, degrading to a shorter form when the full one will not fit.
 //
-// The year is deliberately omitted. The window is always the five weeks around
+// The year is deliberately omitted. The window is always the 4-6 weeks around
 // today, so the year is never genuinely in question, and dropping it removes
 // the two widest cases the old code had to degrade through (a full
 // "Diciembre 2026 – Febrero 2027" and its ’26/’27 last resort).
@@ -465,11 +475,13 @@ int drawLegend(GfxRenderer& renderer, const Layout& L, const YMD& first, const Y
 // Public API
 // ---------------------------------------------------------------------------
 
-void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today) {
+void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_t weeks) {
   if (!isValidDate(today.year, today.month, today.day)) {
     LOG_ERR("CAL", "invalid today: %u-%u-%u", today.year, today.month, today.day);
     return;
   }
+  if (weeks < WEEKS_MIN) weeks = WEEKS_MIN;
+  if (weeks > WEEKS_MAX) weeks = WEEKS_MAX;
 
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   renderer.clearScreen();
@@ -479,11 +491,11 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today) {
     LOG_ERR("CAL", "no usable display font");
     return;
   }
-  const Layout L = computeLayout(renderer, fonts);
+  const Layout L = computeLayout(renderer, fonts, weeks);
 
   const YMD anchor = anchorSundayOf(today);
   YMD last = anchor;
-  addDays(last, ROW_COUNT * COL_COUNT - 1);
+  addDays(last, L.rows * COL_COUNT - 1);
 
   // Warm the glyph cache for everything the display face is about to draw.
   //
@@ -506,7 +518,7 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today) {
   drawHeader(renderer, L, anchor, last);
 
   YMD cursor = anchor;
-  for (int row = 0; row < ROW_COUNT; ++row) {
+  for (int row = 0; row < L.rows; ++row) {
     for (int col = 0; col < COL_COUNT; ++col) {
       HolidayId hid;
       const bool isHoliday = findHolidayFor(cursor, hid);

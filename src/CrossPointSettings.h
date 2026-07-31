@@ -24,6 +24,12 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     // New enum values MUST be appended so persisted settings.json indices
     // stay stable — same rule as LONG_PRESS_MENU_FUNCTION above.
     CALENDAR = 7,
+    // Week-count variants of the calendar sleep screen ("Calendar Four/Five/
+    // Six"). CALENDAR above predates them and keeps its original five-week
+    // meaning so existing saves are untouched; these append after it.
+    CALENDAR_FOUR = 8,
+    CALENDAR_FIVE = 9,
+    CALENDAR_SIX = 10,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };

@@ -18,7 +18,7 @@ class SleepActivity final : public Activity {
   void renderBlankSleepScreen() const;
   // CALENDAR: draw the holiday calendar straight into the framebuffer
   // and refresh. Nothing is written to the SD card. See CalendarSleepScreen.h.
-  void renderCalendarSleepScreen() const;
+  void renderCalendarSleepScreen(uint8_t weeks) const;
 
   bool fromTimeout = false;
 };

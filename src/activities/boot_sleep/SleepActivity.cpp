@@ -56,13 +56,20 @@ void SleepActivity::onEnter() {
         return renderCustomSleepScreen();
       }
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR):
-      return renderCalendarSleepScreen();
+      // The classic style keeps its original five-week look.
+      return renderCalendarSleepScreen(5);
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR):
+      return renderCalendarSleepScreen(4);
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE):
+      return renderCalendarSleepScreen(5);
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX):
+      return renderCalendarSleepScreen(6);
     default:
       return renderDefaultSleepScreen();
   }
 }
 
-void SleepActivity::renderCalendarSleepScreen() const {
+void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks) const {
   // The calendar needs a trustworthy wall clock. X3 has a DS3231; X4 does not,
   // and its internal RTC drifts badly across deep sleep (see SCOPE.md), so
   // fall back to the stock sleep image rather than showing a wrong date.
@@ -88,7 +95,7 @@ void SleepActivity::renderCalendarSleepScreen() const {
   // power, so what you see on a sleeping device is the date as of the last sleep
   // entry, not the current date; there is no timer wake to refresh it (and on
   // battery the MCU is fully powered off, so there could not be).
-  calendar::CalendarSleepScreen::render(renderer, today);
+  calendar::CalendarSleepScreen::render(renderer, today, weeks);
 
   // Same single-pass HALF waveform the other sleep screens use (see the note
   // above renderDefaultSleepScreen).
