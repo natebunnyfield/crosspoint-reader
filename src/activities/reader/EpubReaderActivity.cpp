@@ -675,39 +675,6 @@ void EpubReaderActivity::loop() {
       stepReaderFontSize(sideTap.next ? +1 : -1);
       return;
     }
-
-    // THE FRONT PAGE-TURN BUTTONS GET THE SAME SIZE STEP, ON A HOLD.
-    //
-    // Without this the setting is unreachable for anyone who pages with the front Left/Right
-    // buttons, and completely dead when sideButtonLayout is SIDE_BUTTONS_DISABLED — then
-    // PageBack/PageForward map to nothing (MappedInputManager.cpp:41-62) and every branch
-    // above is inert, so "Long-press button behavior: Font size" selects a behaviour that no
-    // physical gesture can produce. CHAPTER_SKIP, the choice beside it in the same list, has
-    // always worked on BOTH front and side because it keys off detectPageTurn.
-    //
-    // HOLD, not tap: a front tap must keep turning the page. That also matches the setting's
-    // own name — it is the long-press behaviour of the page-turn buttons.
-    //
-    // The family cycle deliberately stays side-only. Front tap is already the page turn and
-    // front hold is now the size step; a third gesture on the same two buttons would have to
-    // be a second, longer threshold, which is not something a reader can feel reliably.
-    // Family remains on the side hold and in Settings -> Reader Font Family.
-    const auto frontHeld = ReaderUtils::detectHeldFrontDirection(mappedInput);
-    if (!frontHeld.any()) {
-      frontHoldFired = false;  // gesture finished (or never started): re-arm
-    } else if (!frontHoldFired && mappedInput.getHeldTime() >= ReaderUtils::SKIP_HOLD_MS) {
-      // One step per hold, like the side branch: leaning on the button must not race through
-      // the ramp, each step of which costs an SD font load and a full re-paginate.
-      frontHoldFired = true;
-      suppressNextFrontRelease = true;
-      stepReaderFontSize(frontHeld.next ? +1 : -1);
-      return;
-    }
-
-    if (suppressNextFrontRelease && ReaderUtils::detectFrontRelease(mappedInput).any()) {
-      suppressNextFrontRelease = false;
-      return;  // the release that ended the hold: consumed here, so it cannot also page
-    }
   }
 
   const auto [prevTriggered, nextTriggered, fromTilt] = ReaderUtils::detectPageTurn(mappedInput);
