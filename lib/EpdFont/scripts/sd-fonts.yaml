@@ -14,6 +14,8 @@
 #   styles:      Map of style name -> font source
 #                  path: relative to lib/EpdFont (for committed fonts)
 #                  url:  download URL (for fonts not in the repo)
+#                  zip + member: release-archive URL plus the font's path inside
+#                  it, for foundries that only publish a whole-family zip
 #
 # Variable fonts:
 #   Some fonts (Bitter, Inter, Alegreya) are distributed as variable fonts.
@@ -142,6 +144,19 @@ families:
       bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/vollkorn/Vollkorn%5Bwght%5D.ttf", variable: {wght: 700}}
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/vollkorn/Vollkorn-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/vollkorn/Vollkorn-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: Junicode
+    description: "Medievalist scholarly serif, semi-condensed (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    # SemiCondensed Light/Medium rather than Regular/Bold: on 2-bit e-ink the
+    # Light weight reads as a book roman and Medium gives enough contrast for
+    # emphasis without clogging counters at reading sizes.
+    styles:
+      regular:    {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondLight.ttf"}
+      bold:       {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondMedium.ttf"}
+      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondLightItalic.ttf"}
+      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondMediumItalic.ttf"}
 
   # ── Sans-serif ─────────────────────────────────────────────────────────
 
