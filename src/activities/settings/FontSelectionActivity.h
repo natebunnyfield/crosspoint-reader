@@ -36,6 +36,11 @@ class FontSelectionActivity final : public Activity {
   uint8_t resolvedPointSize() const;
   int getFontIdForPreview(int index) const;
   void renderPreviewPane(int top, int height, int fontId, const char* fontName) const;
+  // Draws only the preview pane's specimen text (no label, no prewarm). Split
+  // out of renderPreviewPane so the grayscale anti-aliasing passes can
+  // re-render exactly the glyphs the BW pass drew — it is the content callback
+  // handed to ReaderUtils::renderAntiAliased() from render().
+  void renderPreviewSpecimen(int top, int height, int fontId) const;
 
   struct FontEntry {
     std::string name;

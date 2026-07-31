@@ -10,9 +10,10 @@
 
 #include "CrossPointSettings.h"
 #include "FontDisplayNames.h"
-#include "ReaderFontSizes.h"
 #include "MappedInputManager.h"
+#include "ReaderFontSizes.h"
 #include "SdCardFontSystem.h"
+#include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -278,8 +279,6 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
 
   const int labelFontId = UI_10_FONT_ID;
   const int labelH = renderer.getTextHeight(labelFontId);
-  const int labelGap = 4;
-  const int labelReserved = labelH + labelGap + metrics_.previewPadding;
 
   // Include the current size: the side buttons change it, but they have no
   // on-screen hint (the hint row covers the front buttons only), so this is
@@ -315,12 +314,6 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
 
   if (fontId == 0) return;
 
-  const int lineH = renderer.getTextHeight(fontId);
-  if (lineH <= 0) return;
-
-  const int innerHeight = height - metrics_.previewPadding - labelReserved;
-  const int maxLines = std::max(1, innerHeight / (lineH + 2));
-
   const char* previewText = I18N.get(StrId::STR_FONT_PREVIEW_TEXT);
   if (auto* fcm = renderer.getFontCacheManager()) {
     // Reuses `scratch` — the label was drawn above and is no longer needed.
@@ -330,6 +323,34 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
     // card per character.
     fcm->prewarmCache(fontId, scratch, 0x0F);
   }
+
+  renderPreviewSpecimen(top, height, fontId);
+}
+
+// Guards and geometry are re-derived from the same renderer + SETTINGS inputs
+// as renderPreviewPane above, so a second call within the same frame draws the
+// identical glyph set — which is what the grayscale AA passes require (they
+// flag pixels the BW base pass painted black). Keep the two derivations in
+// lockstep. The prewarm stays in renderPreviewPane: by the time the AA passes
+// re-render, the glyphs are already cached.
+void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontId) const {
+  const int left = metrics_.previewPadding;
+  const int width = renderer.getScreenWidth() - (metrics_.previewPadding * 2);
+  if (width <= 0 || height <= 0) return;
+
+  const int labelH = renderer.getTextHeight(UI_10_FONT_ID);
+  const int labelGap = 4;
+  const int labelReserved = labelH + labelGap + metrics_.previewPadding;
+
+  if (fontId == 0) return;
+
+  const int lineH = renderer.getTextHeight(fontId);
+  if (lineH <= 0) return;
+
+  const int innerHeight = height - metrics_.previewPadding - labelReserved;
+  const int maxLines = std::max(1, innerHeight / (lineH + 2));
+
+  const char* previewText = I18N.get(StrId::STR_FONT_PREVIEW_TEXT);
 
   int y = top + metrics_.previewPadding;
   const int textBottomLimit = top + height - labelReserved;
@@ -433,4 +454,19 @@ void FontSelectionActivity::render(RenderLock&&) {
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();
+
+  // Grayscale AA pass over the preview specimen, mirroring the reader's
+  // pipeline (TxtReaderActivity::renderPage): the BW base frame is on the
+  // panel from displayBuffer() above; re-render just the specimen text into
+  // the LSB/MSB planes and push them via the gray LUT path. Everything outside
+  // the specimen stays unflagged ("leave alone"), so no extra full flash is
+  // introduced. renderAntiAliased() picks the strength mapping (On/Crisp/Dark)
+  // from SETTINGS.textAntiAliasing itself; at Off this whole block is skipped
+  // and the render is byte-identical to the pure-BW path. This is what makes
+  // the specimen an honest sample of the reader with AA enabled — the same
+  // glyph edges the reader softens are softened here.
+  if (SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF) {
+    ReaderUtils::renderAntiAliased(
+        renderer, [&] { renderPreviewSpecimen(previewTop, previewHeight, previewFontId); });
+  }
 }
