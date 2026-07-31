@@ -43,6 +43,8 @@ inline constexpr Entry kEntries[] = {
     {"Lora", "Lora", "Olga Karpushina"},
     {"Newsreader", "Newsreader", "Hugues Gentile"},
     {"Rosarivo", "Rosarivo", "Pablo Ugerman"},
+    {"Junicode", "Junicode", "Peter S. Baker"},
+    {"Venetian301", "Venetian 301", "Bruce Rogers"},
 };
 
 inline const Entry* find(const char* directory) {
