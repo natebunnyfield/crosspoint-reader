@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BIN = os.path.join(HERE, "sim")
+BIN = os.path.join(HERE, "render_harness")
 
 def render(d):
     fs = os.path.join(HERE, "fs_")

@@ -1,14 +1,27 @@
-// CrossPoint off-device simulator.
+// CrossPoint off-device RENDER HARNESS.
+//
+// NOT the simulator. The simulator is ~/src/crosspoint-simulator: it boots the
+// whole firmware as an SDL app on Mac/Linux and as an iOS app, and the firmware
+// repo consumes it via `lib_deps: simulator=symlink://...` + `[env:simulator]`.
+// Run that with `pio run -e simulator -t run_simulator`.
+//
+// This is the test rig that sits underneath it. It links a handful of firmware
+// translation units, calls one draw function directly — no boot, no navigation,
+// no window — and dumps the device's raw 528x792 1-bit framebuffer. That makes
+// it ~9ms per render (sweep.py does 203 dates in 1.87s) and pixel-exact, which
+// is what check_centering.py's 2px assertion needs. The simulator's screenshots
+// are SDL output at the host's Retina drawable size, so they cannot serve that
+// measurement. Keep both; they answer different questions.
 //
 // One binary, two modes, both driving the REAL firmware GfxRenderer / EpdFont /
 // SdCardFont against a host-side framebuffer:
 //
-//   sim calendar [YYYY MM DD]      -> fs_/sleep.bmp
-//   sim fonts    FAMILY_A FAMILY_B -> fs_/kern_specimen_{12,14,16,18}.bmp
-//   sim YYYY MM DD                 -> legacy calendar form (sweep.py, check_centering.py)
+//   render_harness calendar [YYYY MM DD]      -> fs_/sleep.bmp
+//   render_harness fonts    FAMILY_A FAMILY_B -> fs_/kern_specimen_{12,14,16,18}.bmp
+//   render_harness YYYY MM DD                 -> legacy form (sweep.py, check_centering.py)
 //
-// Supersedes render_harness.cpp + kern_specimen.cpp, which were two mains
-// duplicating the same framebuffer setup and BMP writer.
+// Merged from the previous render_harness.cpp + kern_specimen.cpp, which were
+// two mains duplicating the same framebuffer setup and BMP writer.
 //
 // The BMP writer lives HERE and not in the firmware on purpose: the device
 // draws straight to the panel, so serialisation is purely a development
@@ -232,11 +245,12 @@ namespace {
 
 int usage(const char* argv0) {
   fprintf(stderr,
-          "CrossPoint off-device simulator\n\n"
+          "CrossPoint off-device render harness (NOT the simulator -- that is\n"
+          "~/src/crosspoint-simulator, run via `pio run -e simulator -t run_simulator`)\n\n"
           "  %s calendar [YYYY MM DD]        render the sleep screen -> fs_/sleep.bmp\n"
           "  %s fonts FAMILY_A FAMILY_B      A-B two SD font families -> fs_/kern_specimen_*.bmp\n"
           "  %s YYYY MM DD                   legacy calendar form\n\n"
-          "fonts mode reads CPFONT_DIR (default /.fonts), a DEVICE-style path;\n"
+          "fonts mode reads CPFONT_DIR (use /.fonts), a DEVICE-style path;\n"
           "the stub HalStorage prefixes ./fs_ to it.\n",
           argv0, argv0, argv0);
   return 2;

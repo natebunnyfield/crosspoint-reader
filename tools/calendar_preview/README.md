@@ -1,6 +1,6 @@
-# CrossPoint off-device simulator
+# CrossPoint off-device render harness
 
-One binary, `./sim`, that drives the **real** firmware `GfxRenderer`, `EpdFont`
+One binary, `./render_harness`, that drives the **real** firmware `GfxRenderer`, `EpdFont`
 and `SdCardFont` against a host-side framebuffer and dumps 1-bit BMPs.
 
 This exercises the actual on-device code — font metrics, glyph rasterisation,
@@ -16,15 +16,39 @@ framebuffer, `millis()`, and a `HalStorage` that maps SD paths onto `./fs_/`.
 Was two binaries (`render_test`, `kern_specimen`) until they were consolidated;
 they duplicated the framebuffer setup and the BMP writer.
 
+## This is not the simulator
+
+The simulator is a separate project: [`~/src/crosspoint-simulator`](https://github.com/crosspoint-reader/crosspoint-simulator).
+It boots the **whole firmware** as an SDL app on Mac/Linux and as an iOS app.
+This repo consumes it through `lib_deps: simulator=symlink://...` plus
+`[env:simulator]` in `platformio.ini`, and you run it with:
+
+    pio run -e simulator -t run_simulator
+
+Use the simulator to *use the reader* — navigate, turn pages, check a flow end
+to end, or ship to TestFlight. Use this harness to *measure a rendering*.
+
+|  | this harness | the simulator |
+|---|---|---|
+| what it runs | a few firmware TUs, one draw call | the entire firmware, booted |
+| output | raw 528×792 1-bit framebuffer | SDL screenshot at host Retina size |
+| cost | ~9 ms per render (203 dates in 1.87 s) | full app launch per run |
+| determinism | same input, same bytes | depends on scripted input timing |
+| good for | pixel-exact layout + kerning regressions | interaction, flows, shipping |
+
+The precision difference is the reason both exist: `check_centering.py` asserts
+digits sit within 2 **device** pixels of their box centre, which only means
+something against the real framebuffer, not a Retina-scaled screenshot of it.
+
 ## Build
 
     cd tools/calendar_preview
-    ./build.sh          # -> ./sim
+    ./build.sh          # -> ./render_harness
 
 ## Calendar sleep screen
 
-    ./sim calendar 2026 7 27     # year month day (defaults to 2026-07-27)
-    ./sim 2026 7 27              # legacy form, same thing
+    ./render_harness calendar 2026 7 27     # year month day (defaults to 2026-07-27)
+    ./render_harness 2026 7 27              # legacy form, same thing
     # -> ./fs_/sleep.bmp  (528x792, 1-bit)
 
 ## Font / kerning specimen
@@ -33,7 +57,7 @@ Renders the same text through two installed SD font families, one above the
 other, at 12/14/16/18pt — for judging a `.cpfont` kerning change against the
 real `GfxRenderer` / `SdCardFont` path rather than a host reimplementation.
 
-    CPFONT_DIR=/.fonts ./sim fonts RosarivoV1 Rosarivo
+    CPFONT_DIR=/.fonts ./render_harness fonts RosarivoV1 Rosarivo
     # -> ./fs_/kern_specimen_{12,14,16,18}.bmp, plus per-line widths on stdout
 
 Install each family under `./fs_/.fonts/<Family>/<Family>_<size>.cpfont`.

@@ -9,7 +9,7 @@ from PIL import Image
 def render(y,m,d):
     if os.path.exists('fs_'): shutil.rmtree('fs_')
     os.makedirs('fs_/.crosspoint')
-    subprocess.run(['./sim',str(y),str(m),str(d)],capture_output=True,check=True)
+    subprocess.run(['./render_harness',str(y),str(m),str(d)],capture_output=True,check=True)
     return np.array(Image.open('fs_/sleep.bmp').convert('L'))
 
 def blobs(mask, minpx):
