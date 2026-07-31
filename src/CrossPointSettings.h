@@ -185,6 +185,19 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     QUICK_RESUME_SLEEP_SCREEN_COUNT
   };
 
+  // Text anti-aliasing strength. Values 0/1 are the legacy Off/On toggle and
+  // MUST keep their meaning so persisted settings from older builds round-trip;
+  // new strengths append at the END (same rule as LONG_PRESS_MENU_FUNCTION).
+  // The strengths pick how the 2-bit glyph gray levels map onto the panel's two
+  // grayscale planes — see GfxRenderer::GrayscaleAaStrength.
+  enum TEXT_ANTIALIASING {
+    TEXT_AA_OFF = 0,       // 1-bit text, no grayscale passes
+    TEXT_AA_STANDARD = 1,  // legacy On: light-gray + dark-gray edge pixels
+    TEXT_AA_CRISP = 2,     // dark-gray edge pixels harden to black, light kept
+    TEXT_AA_DARK = 3,      // all edge pixels darken one level (boldest)
+    TEXT_ANTIALIASING_COUNT
+  };
+
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings
@@ -212,7 +225,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t clockHasBeenSynced = 0;
   // Text rendering settings
   uint8_t extraParagraphSpacing = 1;
-  uint8_t textAntiAliasing = 1;
+  // TEXT_ANTIALIASING value (0=Off, 1=Standard, 2=Crisp, 3=Dark). Non-zero
+  // still reads as "AA enabled" everywhere the old toggle was tested as a bool.
+  uint8_t textAntiAliasing = TEXT_AA_STANDARD;
   // Short power button click behaviour
   uint8_t shortPwrBtn = IGNORE;
   // EPUB reading orientation settings

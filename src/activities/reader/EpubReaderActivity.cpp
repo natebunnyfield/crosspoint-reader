@@ -1897,8 +1897,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // retained frame after a silent restart (for example, when returning from
   // KOReader sync), leaving the old UI mixed with the image.
   const bool cleanImageBasePending = manualRefreshPending || pagesUntilFullRefresh <= 1;
-  const bool needsTextGrayscale = SETTINGS.textAntiAliasing;
+  const bool needsTextGrayscale = SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF;
   const bool needsAnyGrayscale = needsTextGrayscale || pageHasImages;
+  // Pick the glyph-gray -> plane mapping for every grayscale pass below (text
+  // only; drawBitmap's image mapping is fixed).
+  renderer.setGrayscaleAaStrength(ReaderUtils::textAaStrength());
   const bool tiledGrayscale = needsAnyGrayscale && renderer.supportsStripGrayscale();
   // Whole-plane buffering only pays when the BW refresh genuinely runs async
   // underneath it; on blocking panels (X3) it would just spend ~50 KB for the

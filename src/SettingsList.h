@@ -267,8 +267,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Toggle(StrId::STR_EXTRA_SPACING, &CrossPointSettings::extraParagraphSpacing,
                                     "extraParagraphSpacing", StrId::STR_CAT_READER)
                     .withTextSettings());
-    v.push_back(SettingInfo::Toggle(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing, "textAntiAliasing",
-                                    StrId::STR_CAT_READER)
+    // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
+    // legacy Off/On toggle (persisted files round-trip), 2+ appended.
+    v.push_back(SettingInfo::Enum(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing,
+                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_AA_CRISP, StrId::STR_AA_DARK},
+                                  "textAntiAliasing", StrId::STR_CAT_READER)
                     .withTextSettings());
     v.push_back(SettingInfo::Enum(StrId::STR_IMAGES, &CrossPointSettings::imageRendering,
                                   {StrId::STR_IMAGES_DISPLAY, StrId::STR_IMAGES_PLACEHOLDER, StrId::STR_IMAGES_SUPPRESS},

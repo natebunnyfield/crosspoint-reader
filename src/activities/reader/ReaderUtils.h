@@ -251,12 +251,26 @@ inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntil
   }
 }
 
+// Map the persisted TEXT_ANTIALIASING value onto the renderer's plane-mapping
+// strength. TEXT_AA_OFF has no grayscale pass, so it maps to the default.
+inline GfxRenderer::GrayscaleAaStrength textAaStrength() {
+  switch (SETTINGS.textAntiAliasing) {
+    case CrossPointSettings::TEXT_AA_CRISP:
+      return GfxRenderer::AA_CRISP;
+    case CrossPointSettings::TEXT_AA_DARK:
+      return GfxRenderer::AA_DARK;
+    default:
+      return GfxRenderer::AA_STANDARD;
+  }
+}
+
 // Grayscale anti-aliasing pass. Renders content twice (LSB + MSB) to build
 // the grayscale buffer. Only the content callback is re-rendered — status bars
 // and other overlays should be drawn before calling this.
 // Kept as a template to avoid std::function overhead; instantiated once per reader type.
 template <typename RenderFn>
 void renderAntiAliased(GfxRenderer& renderer, RenderFn&& renderFn) {
+  renderer.setGrayscaleAaStrength(textAaStrength());
   if (!renderer.storeBwBuffer()) {
     LOG_ERR("READER", "Failed to store BW buffer for anti-aliasing");
     return;

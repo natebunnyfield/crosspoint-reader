@@ -451,7 +451,9 @@ void TextSettingsActivity::confirmStyleRow(int row) {
       SETTINGS.embeddedStyle = !SETTINGS.embeddedStyle;
       break;
     case StyleRow::AntiAliasing:
-      SETTINGS.textAntiAliasing = !SETTINGS.textAntiAliasing;
+      // Cycles Off -> On -> Crisp -> Dark -> Off (TEXT_ANTIALIASING order).
+      SETTINGS.textAntiAliasing =
+          static_cast<uint8_t>((SETTINGS.textAntiAliasing + 1) % CrossPointSettings::TEXT_ANTIALIASING_COUNT);
       break;
 
     default:
@@ -470,7 +472,16 @@ std::string TextSettingsActivity::styleValueText(int row) const {
     case StyleRow::EmbeddedStyle:
       return SETTINGS.embeddedStyle ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
     case StyleRow::AntiAliasing:
-      return SETTINGS.textAntiAliasing ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+      switch (SETTINGS.textAntiAliasing) {
+        case CrossPointSettings::TEXT_AA_OFF:
+          return tr(STR_STATE_OFF);
+        case CrossPointSettings::TEXT_AA_CRISP:
+          return tr(STR_AA_CRISP);
+        case CrossPointSettings::TEXT_AA_DARK:
+          return tr(STR_AA_DARK);
+        default:
+          return tr(STR_STATE_ON);
+      }
 
     default:
       return "";
