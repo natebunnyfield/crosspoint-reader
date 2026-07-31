@@ -1,0 +1,231 @@
+PATCH: InputManager — add per-button getHeldTime(buttonIndex)
+
+Prepared in the crosspoint-reader firmware tree (tools/patches/README.md explains
+why it cannot live there). Not an mbox: apply with `git apply`, not `git am`.
+
+Target repo: https://github.com/Free-Ink/freeink-sdk.git (branch main)
+Files:       libs/hardware/InputManager/include/InputManager.h
+             libs/hardware/InputManager/src/InputManager.cpp
+Base:        e7d3361 ("Fix grayscale rendering and add OEM LUT reference")
+             — the commit crosspoint-reader currently pins the submodule to
+Apply with:  git apply -p1 <this file>   (from the freeink-sdk repo root)
+
+THE DEFECT
+----------
+getHeldTime() is a single timer for the whole chord:
+
+    libs/hardware/InputManager/src/InputManager.cpp:246-248
+      if (pressedEvents > 0 && currentState == 0) buttonPressStart = currentTime;
+    libs/hardware/InputManager/src/InputManager.cpp:405-412
+      if (currentState > 0) return millis() - buttonPressStart;
+
+buttonPressStart is stamped only when a button goes down while NOTHING was down,
+and a button that joins a chord already in progress does not restart it. Nothing
+in a consumer's activity/screen switch resets it either.
+
+On X3/X4 that is reachable, because the two button groups sit on separate ADC
+pins and are sampled independently (InputManager.cpp:133-145): BUTTON_ADC_PIN_1
+carries BACK/CONFIRM/LEFT/RIGHT, BUTTON_ADC_PIN_2 carries UP/DOWN, and BTN_POWER
+is a plain digital pin (InputManager.cpp:147-151). Within one group a second
+press is ambiguous on the resistor ladder, but across groups both bits are set.
+
+So: hold a side page-turn button for more than the consumer's long-press
+threshold, then press a front button, and the front button's long-press fires
+instantly. In crosspoint-reader that turns a normal Back tap into
+"go to the file browser" (src/activities/reader/EpubReaderActivity.cpp:476,
+threshold 1000 ms).
+
+Measured on the host with the real InputManager driven by a fake ADC trace
+(UP down at t=50, BACK pressed at t=1550, both ~X4 ADC averages):
+
+chord = getHeldTime(), back/up = getHeldTime(BTN_BACK) / getHeldTime(BTN_UP):
+
+    UP held 1500ms                      chord=1493   back=0      up=1493
+    BACK pressed 100ms into UP hold     chord=1593   back=93     up=1593
+    BACK released (UP still down)       chord=1643   back=100    up=1643
+    UP released (all up)                chord=1650   back=100    up=1650
+
+`chord=1593` is what a caller asking "how long has Back been held?" gets today;
+93 ms is the truth. The chord column is identical before and after this patch.
+
+THE FIX IN THIS PATCH
+---------------------
+Purely additive, so it can land without touching any consumer:
+
+  * per-button buttonPressStartAt[]/buttonPressFinishAt[], stamped from
+    pressedEvents/releasedEvents inside applyStateChange() — the single funnel
+    every input style goes through — plus the two hold-emulating styles
+    (updateConfirmBackHold / updateConfirmPowerHold) which synthesize their
+    button bits after applyStateChange() and therefore stamp explicitly;
+  * a new overload `getHeldTime(uint8_t buttonIndex)` with the same two-case
+    shape as the existing accessor, applied to one button;
+  * `BTN_COUNT` for the array bound;
+  * the existing getHeldTime() is UNCHANGED, so no current caller moves.
+
+Verified: identical `chord=` column for the pristine and patched SDK on the trace
+above (host build, real InputManager.cpp, fake Arduino layer), and no new
+compiler diagnostics (clang++ -std=gnu++2a -Wall -Wextra: the only warning,
+`absInt` unused at FREEINK_CAP_TOUCH=0, is present before the patch too).
+
+WHY THE NO-ARG SEMANTICS WERE NOT CHANGED INSTEAD
+-------------------------------------------------
+Redefining getHeldTime() to mean "the newest press" would silently retarget every
+existing call in every SDK consumer, including continuous list-scroll repeat and
+multi-stage keyboard holds, on hardware that cannot be regression-tested from a
+patch. The chord timer is also legitimately what a few callers want (a two-button
+chord's total duration). Adding the precise accessor and migrating callers one at
+a time is reviewable; flipping the shared meaning is not.
+
+CONSUMER MIGRATION (crosspoint-reader), for reference — not part of this patch
+-----------------------------------------------------------------------------
+Every call that asks about one specific button should move to the overload:
+
+  src/activities/reader/EpubReaderActivity.cpp:451,462  Confirm  (bookmark / KOsync)
+  src/activities/reader/EpubReaderActivity.cpp:476,483  Back     (file browser / home)
+  src/activities/reader/XtcReaderActivity.cpp:105,112   Back
+  src/activities/reader/TxtReaderActivity.cpp:64,71     Back
+  src/activities/reader/EndOfBookOptions.cpp:56         Back
+  src/activities/reader/EpubReaderBookmarksActivity.cpp:131  Confirm
+  src/activities/home/FileBrowserActivity.cpp:193,230,280    Back / Confirm
+  src/activities/home/RecentBooksActivity.cpp:60        Confirm
+  src/activities/util/KeyboardEntryActivity.cpp:200,294,323,332  Up / Right / Confirm
+
+Three call sites cannot migrate as-is; they need the button plumbed to them
+first, or must stay on the chord timer:
+
+  src/activities/reader/EpubReaderActivity.cpp:542 and
+  src/activities/reader/XtcReaderActivity.cpp:140 ask "was the page-turn press a
+  long one?" without knowing which of the four possible page-turn buttons fired
+  (ReaderUtils::detectPageTurn collapses them), so they need the button plumbed
+  out of detectPageTurn first.
+
+  src/util/ButtonNavigator.cpp:70 (shouldNavigateContinuously) has no button in
+  scope; onContinuous() knows the candidate set and would have to pass the
+  matching one down.
+
+diff --git a/libs/hardware/InputManager/include/InputManager.h b/libs/hardware/InputManager/include/InputManager.h
+index be0d113..d012bf6 100644
+--- a/libs/hardware/InputManager/include/InputManager.h
++++ b/libs/hardware/InputManager/include/InputManager.h
+@@ -46,8 +46,24 @@ class InputManager {
+   bool isDebouncePending() const { return lastState != currentState; }
+ 
+   // Duration between the first button press and final release.
++  //
++  // NOTE: this is a single timer for the whole chord. It starts when a button
++  // goes down while nothing was down, and is NOT restarted by a button that
++  // joins an already-pressed chord. On boards whose buttons sit on independent
++  // pins (the X3/X4 ADC ladder puts UP/DOWN on BUTTON_ADC_PIN_2 and the four
++  // front buttons on BUTTON_ADC_PIN_1, so cross-group combinations are
++  // detectable), holding one button and then pressing a second makes the second
++  // button report the first one's elapsed hold. Use getHeldTime(buttonIndex)
++  // when the caller means "how long has THIS button been held".
+   unsigned long getHeldTime() const;
+ 
++  // Duration of the current or most recent hold of one specific button:
++  // millis() - its press while it is down, else its own press-to-release span.
++  // Unlike getHeldTime(), an unrelated button already being held does not
++  // inflate the result. Returns 0 for an out-of-range index or a button that
++  // has not been pressed since begin().
++  unsigned long getHeldTime(uint8_t buttonIndex) const;
++
+   // Duration of the current or most recent power-button hold.
+   unsigned long getPowerButtonHeldTime() const;
+ 
+@@ -58,6 +74,7 @@ class InputManager {
+   static constexpr uint8_t BTN_UP = 4;
+   static constexpr uint8_t BTN_DOWN = 5;
+   static constexpr uint8_t BTN_POWER = 6;
++  static constexpr uint8_t BTN_COUNT = BTN_POWER + 1;
+ 
+   // Pins. POWER_BUTTON_PIN stays constexpr (consumers reference it in pin-config
+   // contexts) and is bound to the build's default device; the input code reads
+@@ -212,6 +229,11 @@ class InputManager {
+   unsigned long lastDebounceTime;
+   unsigned long buttonPressStart;
+   unsigned long buttonPressFinish;
++  // Per-button copies of the pair above, stamped from pressedEvents /
++  // releasedEvents in applyStateChange(). They back getHeldTime(buttonIndex);
++  // the chord-wide scalars keep getHeldTime() unchanged for existing callers.
++  unsigned long buttonPressStartAt[BTN_COUNT];
++  unsigned long buttonPressFinishAt[BTN_COUNT];
+   unsigned long powerButtonPressStart;
+   unsigned long powerButtonPressFinish;
+   unsigned long confirmBackPressStart;
+diff --git a/libs/hardware/InputManager/src/InputManager.cpp b/libs/hardware/InputManager/src/InputManager.cpp
+index 482d263..802b406 100644
+--- a/libs/hardware/InputManager/src/InputManager.cpp
++++ b/libs/hardware/InputManager/src/InputManager.cpp
+@@ -63,6 +63,8 @@ InputManager::InputManager()
+       lastDebounceTime(0),
+       buttonPressStart(0),
+       buttonPressFinish(0),
++      buttonPressStartAt{},
++      buttonPressFinishAt{},
+       powerButtonPressStart(0),
+       powerButtonPressFinish(0),
+       confirmBackPressStart(0),
+@@ -259,6 +261,15 @@ void InputManager::applyStateChange(const uint8_t state, const unsigned long cur
+     powerButtonPressFinish = currentTime;
+   }
+ 
++  // Per-button timers. Every input style funnels through applyStateChange(), so
++  // this is the one place that has to stamp them. Unlike the chord scalars above
++  // these are restamped for a button that joins a chord already in progress.
++  for (uint8_t i = 0; i < BTN_COUNT; i++) {
++    const uint8_t mask = static_cast<uint8_t>(1 << i);
++    if (pressedEvents & mask) buttonPressStartAt[i] = currentTime;
++    if (releasedEvents & mask) buttonPressFinishAt[i] = currentTime;
++  }
++
+   currentState = state;
+   // Keep lastState in sync with the committed state so isDebouncePending() is
+   // meaningful on every input style. A no-op for the debounced ADC path (state
+@@ -299,6 +310,10 @@ void InputManager::updateConfirmBackHold(const unsigned long currentTime) {
+   if (emitConfirmClick) {
+     pressedEvents |= (1 << BTN_CONFIRM);
+     releasedEvents |= (1 << BTN_CONFIRM);
++    // These bits are synthesized after applyStateChange(), so its per-button
++    // loop never saw them. Mirror the chord scalars set above.
++    buttonPressStartAt[BTN_CONFIRM] = confirmBackPressStart;
++    buttonPressFinishAt[BTN_CONFIRM] = currentTime;
+   }
+ }
+ 
+@@ -341,11 +356,17 @@ void InputManager::updateConfirmPowerHold(const unsigned long currentTime) {
+ 
+   if (pressedEvents & (1 << BTN_POWER)) {
+     powerButtonPressStart = confirmPowerPressStart;
++    // The shared pin went down before the BTN_POWER bit was synthesized; date
++    // the per-button timer from the physical press, as above.
++    buttonPressStartAt[BTN_POWER] = confirmPowerPressStart;
+   }
+ 
+   if (emitConfirmClick) {
+     pressedEvents |= (1 << BTN_CONFIRM);
+     releasedEvents |= (1 << BTN_CONFIRM);
++    // Synthesized after applyStateChange(); mirror the chord scalars set above.
++    buttonPressStartAt[BTN_CONFIRM] = confirmPowerPressStart;
++    buttonPressFinishAt[BTN_CONFIRM] = currentTime;
+   }
+ }
+ 
+@@ -411,6 +432,18 @@ unsigned long InputManager::getHeldTime() const {
+   return buttonPressFinish - buttonPressStart;
+ }
+ 
++unsigned long InputManager::getHeldTime(const uint8_t buttonIndex) const {
++  if (buttonIndex >= BTN_COUNT) return 0;
++
++  // Still holding this specific button
++  if (isPressed(buttonIndex)) {
++    return millis() - buttonPressStartAt[buttonIndex];
++  }
++
++  // Never pressed since begin(): both stamps are 0, so the span is 0.
++  return buttonPressFinishAt[buttonIndex] - buttonPressStartAt[buttonIndex];
++}
++
+ unsigned long InputManager::getPowerButtonHeldTime() const {
+   if (isPressed(BTN_POWER)) {
+     return millis() - powerButtonPressStart;

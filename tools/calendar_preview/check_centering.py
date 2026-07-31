@@ -48,10 +48,15 @@ def check(datestr, y,m,d, tol=2):
         ix0,iy0,ix1,iy1 = x0+pad, y0+pad, x1-pad, y1-pad
         if ix1<=ix0 or iy1<=iy0: continue
         interior = black[iy0:iy1+1, ix0:ix1+1]
+        # Today's cell is inverted (black fill, white digit); holiday cells are
+        # grey dither with a black digit. Detect polarity from the fill density
+        # and measure whichever colour the digit actually is.
+        inverted = interior.mean() > 0.75
+        ink = ~interior if inverted else interior
         # The grey dither is a regular 50% checkerboard; digit strokes are solid
         # runs. Keep pixels whose 4-neighbours are also ink (erosion) to drop dither.
-        er = (interior[1:-1,1:-1] & interior[:-2,1:-1] & interior[2:,1:-1]
-              & interior[1:-1,:-2] & interior[1:-1,2:])
+        er = (ink[1:-1,1:-1] & ink[:-2,1:-1] & ink[2:,1:-1]
+              & ink[1:-1,:-2] & ink[1:-1,2:])
         ys,xs = np.where(er)
         if len(ys)==0:
             problems.append(f"  box at ({x0},{y0}) {bw}x{bh}: no digit ink found")
@@ -64,7 +69,8 @@ def check(datestr, y,m,d, tol=2):
         status = "ok" if (abs(dx)<=tol and abs(dy)<=tol) else "OFF"
         if status=="OFF":
             problems.append(f"  box ({x0},{y0}) {bw}x{bh}: digit offset dx={dx:+.1f} dy={dy:+.1f}")
-        print(f"    box@({x0:3d},{y0:3d}) {bw}x{bh}  digit dx={dx:+5.1f} dy={dy:+5.1f}  {status}")
+        kind = "INVERTED(today)" if inverted else "grey(holiday)"
+        print(f"    box@({x0:3d},{y0:3d}) {bw}x{bh} {kind:15s} digit dx={dx:+5.1f} dy={dy:+5.1f}  {status}")
     return problems
 
 if __name__=='__main__':

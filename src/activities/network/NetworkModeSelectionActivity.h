@@ -8,10 +8,12 @@
 enum class NetworkMode { JOIN_NETWORK, CONNECT_CALIBRE, CREATE_HOTSPOT };
 
 /**
- * NetworkModeSelectionActivity presents the user with a choice:
+ * NetworkModeSelectionActivity presents the user with a choice (in display order):
  * - "Join a Network" - Connect to an existing WiFi network (STA mode)
- * - "Connect to Calibre" - Use Calibre wireless device transfers
  * - "Create Hotspot" - Create an Access Point that others can connect to (AP mode)
+ * - "Calibre Wireless" - Use Calibre wireless device transfers
+ *
+ * The display order lives in MENU_ENTRIES in the .cpp; the enum order below is independent of it.
  *
  * The onModeSelected callback is called with the user's choice.
  * The onCancel callback is called if the user presses back.

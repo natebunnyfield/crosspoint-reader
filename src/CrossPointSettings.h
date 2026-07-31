@@ -23,7 +23,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     QUICK_RESUME = 6,
     // New enum values MUST be appended so persisted settings.json indices
     // stay stable — same rule as LONG_PRESS_MENU_FUNCTION above.
-    CALENDAR_6WEEK = 7,
+    CALENDAR = 7,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
@@ -150,16 +150,27 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Hide battery percentage
   enum HIDE_BATTERY_PERCENTAGE { HIDE_NEVER = 0, HIDE_READER = 1, HIDE_ALWAYS = 2, HIDE_BATTERY_PERCENTAGE_COUNT };
 
-  // Page turn button long press behavior
-  enum LONG_PRESS_BUTTON_BEHAVIOR {
-    OFF = 0,
-    CHAPTER_SKIP = 1,
-    ORIENTATION_CHANGE = 2,
-    LONG_PRESS_BUTTON_BEHAVIOR_COUNT
-  };
+  // Page turn button long press behavior.
+  //
+  // Index 2 was ORIENTATION_CHANGE (long-press rotated the screen). That choice was
+  // retired when the reader became portrait-only, so nothing could select index 2 any
+  // more: the UI listed two labels and normalizeRetiredSettings() mapped a stored 2 back
+  // to OFF. FONT_SIZE_STEP now REUSES that free slot rather than appending a 3, because
+  // the settings UI persists the *index into the label list* (SettingsList.h) and index 3
+  // would be unreachable from a 3-label list. The consequence is that a settings.json old
+  // enough to still hold 2 now reads as FONT_SIZE_STEP instead of OFF — which is the new
+  // default anyway — and the ORIENTATION_CHANGE line in normalizeRetiredSettings() had to
+  // go, or it would wipe this value on every single load.
+  enum LONG_PRESS_BUTTON_BEHAVIOR { OFF = 0, CHAPTER_SKIP = 1, FONT_SIZE_STEP = 2, LONG_PRESS_BUTTON_BEHAVIOR_COUNT };
 
-  // UI Theme
-  enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2, ROUNDEDRAFF = 3 };
+  // UI Theme.
+  //
+  // These are INDICES into the label list in SettingsList.h (settings.json
+  // persists the index, not the label), so new themes may only be APPENDED —
+  // inserting one would silently re-point every device's saved uiTheme at a
+  // different theme. LYRA_SIX is therefore 4, at the end, even though it
+  // belongs with the other Lyra entries.
+  enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2, ROUNDEDRAFF = 3, LYRA_SIX = 4 };
 
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
@@ -246,13 +257,18 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t opdsFilenameFormat = 0;
   // Hide battery percentage
   uint8_t hideBatteryPercentage = HIDE_NEVER;
-  // Long-press page turn button behavior
-  uint8_t longPressButtonBehavior = OFF;
+  // Long-press page turn button behavior. Defaults to stepping the reader font size
+  // (long-press page-back = smaller, page-forward = larger). Note this default also
+  // decides the page-turn EDGE: ReaderUtils::detectPageTurn() turns on button PRESS only
+  // while this is OFF, and on RELEASE otherwise, so that a hold can be told apart from a
+  // tap. Every fresh install therefore turns pages on release.
+  uint8_t longPressButtonBehavior = FONT_SIZE_STEP;
   // Long-press Confirm function in EPUB reader (cycles through LONG_PRESS_MENU_FUNCTION values).
   // Defaults to Disabled so shortcut-based bookmark toggling remains opt-in.
   uint8_t longPressMenuFunction = LP_MENU_DISABLED;
-  // UI Theme
-  uint8_t uiTheme = LYRA;
+  // UI Theme. Fresh installs only: any device that has ever written
+  // settings.json already has a uiTheme key and keeps whatever it holds.
+  uint8_t uiTheme = LYRA_SIX;
   // Sunlight fading compensation
   uint8_t fadingFix = 0;
   // Power button return from footnotes (1 = enabled, 0 = disabled)
@@ -352,6 +368,12 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   static void validateFrontButtonMapping(CrossPointSettings& settings);
   static uint8_t sleepTimeoutEnumToMinutes(uint8_t legacyValue);
 
+ private:
+  // Pins values whose UI has been withdrawn back into a valid, reachable
+  // state. Runs at the end of fromJson(), under PersistableStore's storeMutex.
+  void normalizeRetiredSettings();
+
+ public:
   float getReaderLineCompression() const;
   unsigned long getSleepTimeoutMs() const;
   int getRefreshFrequency() const;

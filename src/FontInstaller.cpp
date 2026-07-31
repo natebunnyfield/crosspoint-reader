@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "CrossPointSettings.h"
+#include "SdCardFontSystem.h"
 
 FontInstaller::FontInstaller(SdCardFontRegistry& registry) : registry_(registry) {}
 
@@ -144,6 +145,15 @@ FontInstaller::Error FontInstaller::deleteFamily(const char* familyName) {
     SETTINGS.clearSdFontFamily();
     LOG_DBG("FONT", "Cleared active SD font (deleted family: %s)", familyName);
   }
+
+  // Clearing the setting is not enough: the .cpfont we just deleted may still be
+  // RESIDENT and registered with the renderer, its filePath_ now pointing at a
+  // directory that no longer exists, so any later glyph fetch reads a dead path.
+  // This class only holds the registry — it has no renderer, so it cannot call
+  // unloadAll itself. Marking the registry dirty makes the next ensureLoaded()
+  // re-discover and then unload (with sdFontFamilyName now empty,
+  // SdCardFontSystem::ensureLoaded takes its unloadAll path).
+  sdFontSystem.markRegistryDirty();
 
   return Error::OK;
 }

@@ -117,4 +117,18 @@ inline bool dateLess(const YMD& a, const YMD& b) {
 // Return true if `date` is a leap-year Feb 29 or otherwise valid.
 bool isValidDate(uint16_t year, uint8_t month, uint8_t day);
 
+// Convert a UTC calendar date plus UTC time-of-day into the LOCAL calendar date.
+//
+// `offsetQuarterHoursBiased` is SETTINGS.clockUtcOffsetQ: quarter-hour steps
+// biased by 48, so 48 == UTC+0 and 28 == UTC-5. Values above 104 are treated as
+// UTC+0, matching HalClock::formatTime's clamp.
+//
+// Needed because the DS3231 holds UTC (HalClock::syncFromNTP writes gmtime) while
+// the calendar sleep screen must highlight the LOCAL day. A negative offset in the
+// small hours of UTC rolls the local date back one day; a positive offset late in
+// the UTC evening rolls it forward. |offset| <= 14h, so the shift is never more
+// than a single day. Only the date is returned — the time of day is not needed
+// downstream.
+YMD localDateFromUtc(const YMD& utcDate, uint8_t utcHour, uint8_t utcMinute, uint8_t offsetQuarterHoursBiased);
+
 }  // namespace calendar

@@ -343,9 +343,36 @@ bool SdCardFont::buildMiniKernMatrix(PerStyle& s, const uint32_t* codepoints, ui
     return true;  // font has no kern classes — nothing to build
   }
 
+  // The six 256-entry scratch tables below were stack arrays, which made this
+  // frame 1648 bytes (measured with -fstack-usage on the riscv32 target) —
+  // 6.4x the 256-byte limit in the Resource Protocol, and the largest frame in
+  // the whole font path.
+  //
+  // That matters because of WHERE it is reached from: the render task has an
+  // 8192-byte stack (ActivityManager::begin), and by the time this runs,
+  // FontSelectionActivity::render (224) + renderPreviewPane (400) +
+  // prewarmCache/prewarm/prewarmStyle (224) are already on it, with the SD and
+  // FATFS read frames still to come underneath. A device crash report taken
+  // while stepping the font size in the picker ends mid-way through the third
+  // style's mini-kern build with an EMPTY panic reason — the signature
+  // freeink-ui.md documents for a blown stack.
+  //
+  // One transient heap block instead, for exactly the reason prewarm() gives
+  // for its codepoint buffer (see the comment there): 1536 bytes is fine on the
+  // heap and is not fine on this stack. The block is freed on every return path
+  // by unique_ptr, including the early ones below.
+  static constexpr size_t kScratchTables = 6;
+  static constexpr size_t kScratchStride = 256;
+  std::unique_ptr<uint8_t[]> scratch(new (std::nothrow) uint8_t[kScratchTables * kScratchStride]());
+  if (!scratch) {
+    LOG_ERR("SDCF", "Failed to allocate mini kern scratch (%u bytes)",
+            static_cast<unsigned>(kScratchTables * kScratchStride));
+    return false;
+  }
+  uint8_t* const usedLeft = scratch.get();
+  uint8_t* const usedRight = scratch.get() + kScratchStride;
+
   // Step 1: mark used left/right classes via a 256-wide bitmap (class IDs are uint8_t).
-  bool usedLeft[256] = {};
-  bool usedRight[256] = {};
   for (uint32_t i = 0; i < cpCount; i++) {
     uint8_t lc = miniLookupKernClass(s.kernLeftClasses, s.header.kernLeftEntryCount, codepoints[i]);
     if (lc) usedLeft[lc] = true;
@@ -355,10 +382,10 @@ bool SdCardFont::buildMiniKernMatrix(PerStyle& s, const uint32_t* codepoints, ui
 
   // Step 2: build renumber maps (oldClassId -> newClassId, 1-based) and
   // reverse maps (newClassId -> oldClassId) for the SD read step.
-  uint8_t leftRenumber[256] = {};
-  uint8_t rightRenumber[256] = {};
-  uint8_t newToOldLeft[256] = {};
-  uint8_t newToOldRight[256] = {};
+  uint8_t* const leftRenumber = scratch.get() + 2 * kScratchStride;
+  uint8_t* const rightRenumber = scratch.get() + 3 * kScratchStride;
+  uint8_t* const newToOldLeft = scratch.get() + 4 * kScratchStride;
+  uint8_t* const newToOldRight = scratch.get() + 5 * kScratchStride;
   uint8_t numLeft = 0, numRight = 0;
   for (int i = 1; i < 256; i++) {
     if (usedLeft[i]) {

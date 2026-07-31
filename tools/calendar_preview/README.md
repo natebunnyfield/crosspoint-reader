@@ -21,6 +21,29 @@ framebuffer, `millis()`, and a `HalStorage` that maps SD paths onto `./fs_/`.
     ./render_test 2026 7 27      # year month day  (defaults to 2026-07-27)
     # -> ./fs_/sleep.bmp  (528x792, 1-bit)
 
+## Kerning specimen (`kern_specimen`)
+
+Renders the same text through two installed SD font families, one above the
+other, at 12/14/16/18pt — for judging a `.cpfont` kerning change against the
+real `GfxRenderer` / `SdCardFont` path rather than a host reimplementation.
+
+    ./build_specimen.sh
+    CPFONT_DIR=/.fonts ./kern_specimen RosarivoV1 Rosarivo
+    # -> ./fs_/kern_specimen_{12,14,16,18}.bmp, plus per-line widths on stdout
+
+Install each family under `./fs_/.fonts/<Family>/<Family>_<size>.cpfont`.
+`CPFONT_DIR` is a *device-style* path (`/.fonts`); the stub HalStorage prefixes
+`./fs_`, so the default `./fs_/.fonts` double-prefixes and finds nothing.
+
+**Kerning is not resident until a page is prewarmed.** `SdCardFont` keeps only
+a per-page mini kern matrix ([SdCardFont.h:179](../../lib/EpdFont/SdCardFont.h)),
+built by `prewarmStyle` ([SdCardFont.cpp:956](../../lib/EpdFont/SdCardFont.cpp)).
+Measure straight after `load()` and you silently measure an *unkerned* font —
+the first version of this harness reported identical widths for two very
+different fonts. Call `prewarm(text, styleMask, /*metadataOnly=*/false)` before
+each measurement; each call replaces the previous page's tables, and the
+`metadataOnly=true` path skips the mini kern entirely.
+
 ## Regression sweep
 
 `sweep.py` renders several hundred dates and asserts nothing touches the panel

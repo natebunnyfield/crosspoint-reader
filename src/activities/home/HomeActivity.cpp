@@ -9,6 +9,7 @@
 #include <Utf8.h>
 #include <Xtc.h>
 
+#include <algorithm>
 #include <cstring>
 #include <vector>
 
@@ -197,13 +198,32 @@ void HomeActivity::loop() {
     }
   };
 
-  buttonNavigator.onNext([this, menuCount] {
-    selectorIndex = ButtonNavigator::nextIndex(selectorIndex, menuCount);
+  // Wrap-around is wrong when the menu lives on a second page (Lyra Six): Up on
+  // the first book would jump to Settings and Down on Settings back to the books,
+  // i.e. a single press teleports across a page boundary with no visible relation
+  // to the direction pressed. Clamp at both ends instead, so the ends of the list
+  // are perceptible and paging is always one step in the direction you pressed.
+  // Every other theme keeps its existing wrap — ButtonNavigator::nextIndex /
+  // previousIndex are shared by many activities and are deliberately not touched.
+  const bool clampEnds = UITheme::getInstance().getMetrics().homeMenuOnSecondPage;
+
+  buttonNavigator.onNext([this, menuCount, clampEnds] {
+    if (clampEnds) {
+      if (selectorIndex + 1 >= menuCount) return;  // already at the end; nothing moved, no redraw
+      selectorIndex++;
+    } else {
+      selectorIndex = ButtonNavigator::nextIndex(selectorIndex, menuCount);
+    }
     requestUpdate();
   });
 
-  buttonNavigator.onPrevious([this, menuCount] {
-    selectorIndex = ButtonNavigator::previousIndex(selectorIndex, menuCount);
+  buttonNavigator.onPrevious([this, menuCount, clampEnds] {
+    if (clampEnds) {
+      if (selectorIndex <= 0) return;  // already at the start
+      selectorIndex--;
+    } else {
+      selectorIndex = ButtonNavigator::previousIndex(selectorIndex, menuCount);
+    }
     requestUpdate();
   });
 
@@ -280,50 +300,90 @@ void HomeActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
+  const int bookCount = static_cast<int>(recentBooks.size());
+
+  // Cover grid shape. Every theme except Lyra Six is 1x1, for which coverRows is
+  // 1 and coverAreaHeight is exactly metrics.homeCoverTileHeight — the value
+  // this function used before the grid existed.
+  const int coverColumns = std::max(1, metrics.homeCoverColumns);
+  const int coverRows =
+      bookCount > 0 ? std::min(std::max(1, metrics.homeCoverRows), (bookCount + coverColumns - 1) / coverColumns) : 1;
+  const int coverAreaHeight = metrics.homeCoverTileHeight * coverRows;
+
+  // Two-page home (Lyra Six): the covers own page 0 and the menu rows own
+  // page 1. There is no separate page state to keep in sync — the page is
+  // DERIVED from selectorIndex, the same way BaseTheme::drawList derives its
+  // page from the selected row, so Up/Down alone moves between pages and
+  // wrapping at either end crosses back over. Indices [0, bookCount) are
+  // covers, [bookCount, getMenuItemCount()) are menu rows.
+  //
+  // With no recent books at all there is nothing to put on page 0, so the
+  // split is off and the layout falls back to the one-page form: the theme's
+  // "no open book" panel (one row tall) above the menu, exactly as Lyra
+  // Extended renders that case.
+  const bool splitPages = metrics.homeMenuOnSecondPage && bookCount > 0;
+  const bool showCovers = !splitPages || selectorIndex < bookCount;
+  const bool showMenu = !splitPages || selectorIndex >= bookCount;
 
   renderer.clearScreen();
-  bool bufferRestored = coverBufferStored && restoreCoverBuffer();
+  // Only the cover page owns that region of the framebuffer; restoring the
+  // snapshot while the menu page is up would blit stale covers under the rows.
+  bool bufferRestored = showCovers && coverBufferStored && restoreCoverBuffer();
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.homeTopPadding},
                  metrics.homeContinueReadingInMenu && !recentBooks.empty() ? recentBooks[0].title.c_str() : nullptr);
 
-  // Record the tile rect so storeCoverBuffer (called from the theme) knows
-  // which sub-region of the framebuffer to snapshot. ~16 KB in Portrait
-  // instead of the 48 KB full framebuffer the previous bind captured.
-  coverRectX = 0;
-  coverRectY = metrics.homeTopPadding;
-  coverRectW = pageWidth;
-  coverRectH = metrics.homeCoverTileHeight;
+  if (showCovers) {
+    // Record the tile rect so storeCoverBuffer (called from the theme) knows
+    // which sub-region of the framebuffer to snapshot. ~16 KB in Portrait
+    // instead of the 48 KB full framebuffer the previous bind captured.
+    coverRectX = 0;
+    coverRectY = metrics.homeTopPadding;
+    coverRectW = pageWidth;
+    coverRectH = coverAreaHeight;
 
-  GUI.drawRecentBookCover(renderer, Rect{0, metrics.homeTopPadding, pageWidth, metrics.homeCoverTileHeight},
-                          recentBooks, selectorIndex, coverRendered, coverBufferStored, bufferRestored,
-                          std::bind(&HomeActivity::storeCoverBuffer, this));
-
-  // Build menu items dynamically
-  std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS), tr(STR_FILE_TRANSFER),
-                                        tr(STR_SETTINGS_TITLE)};
-  std::vector<UIIcon> menuIcons = {Folder, Recent, Transfer, Settings};
-
-  if (hasOpdsServers) {
-    menuItems.insert(menuItems.begin() + 2, tr(STR_OPDS_BROWSER));
-    menuIcons.insert(menuIcons.begin() + 2, Library);
+    GUI.drawRecentBookCover(renderer, Rect{0, metrics.homeTopPadding, pageWidth, coverAreaHeight}, recentBooks,
+                            selectorIndex, coverRendered, coverBufferStored, bufferRestored,
+                            std::bind(&HomeActivity::storeCoverBuffer, this));
   }
 
-  if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
-    // Insert Continue Reading at the top if enabled in theme
-    menuItems.insert(menuItems.begin(), tr(STR_CONTINUE_READING));
-    menuIcons.insert(menuIcons.begin(), Book);
-  }
+  if (showMenu) {
+    // Build menu items dynamically
+    std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS), tr(STR_FILE_TRANSFER),
+                                          tr(STR_SETTINGS_TITLE)};
+    std::vector<UIIcon> menuIcons = {Folder, Recent, Transfer, Settings};
 
-  GUI.drawButtonMenu(
-      renderer,
-      Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset, pageWidth,
-           pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
-                         metrics.homeMenuTopOffset + metrics.buttonHintsHeight)},
-      static_cast<int>(menuItems.size()),
-      metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - recentBooks.size(),
-      [&menuItems](int index) { return std::string(menuItems[index]); },
-      [&menuIcons](int index) { return menuIcons[index]; });
+    if (hasOpdsServers) {
+      menuItems.insert(menuItems.begin() + 2, tr(STR_OPDS_BROWSER));
+      menuIcons.insert(menuIcons.begin() + 2, Library);
+    }
+
+    if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
+      // Insert Continue Reading at the top if enabled in theme
+      menuItems.insert(menuItems.begin(), tr(STR_CONTINUE_READING));
+      menuIcons.insert(menuIcons.begin(), Book);
+    }
+
+    // On its own page the menu starts just below the header instead of below
+    // the covers. The one-page geometry is left exactly as it was.
+    const Rect menuRect =
+        splitPages
+            ? Rect{0, metrics.homeTopPadding + metrics.homeMenuTopOffset, pageWidth,
+                   pageHeight - (metrics.homeTopPadding + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)}
+            : Rect{0, metrics.homeTopPadding + coverAreaHeight + metrics.homeMenuTopOffset, pageWidth,
+                   pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
+                                 metrics.homeMenuTopOffset + metrics.buttonHintsHeight)};
+
+    // Menu-relative selection. Themes that fold Continue Reading INTO the menu
+    // (RoundedRaff) give that row index 0, so selectorIndex is already
+    // menu-relative for them; every other theme has the covers ahead of the
+    // menu and has to subtract them. On page 1 of a split home this is
+    // selectorIndex - bookCount >= 0, i.e. the row the selector is really on.
+    GUI.drawButtonMenu(renderer, menuRect, static_cast<int>(menuItems.size()),
+                       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - bookCount,
+                       [&menuItems](int index) { return std::string(menuItems[index]); },
+                       [&menuIcons](int index) { return menuIcons[index]; });
+  }
 
   const auto labels = mappedInput.mapLabels(recentBooks.empty() ? "" : tr(STR_RESUME), tr(STR_SELECT), tr(STR_DIR_UP),
                                             tr(STR_DIR_DOWN));

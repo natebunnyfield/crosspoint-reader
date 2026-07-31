@@ -53,6 +53,15 @@ struct ThemeMetrics {
   int homeRecentBooksCount;
   bool homeContinueReadingInMenu;
   int homeMenuTopOffset;
+  // Home cover grid shape. homeCoverTileHeight is the height of ONE row, so a
+  // theme with homeCoverRows > 1 reserves homeCoverTileHeight * rows. Both
+  // default to 1 (a single tile), which is what every theme except Lyra Six
+  // uses; HomeActivity only reserves the rows the books on hand actually fill.
+  int homeCoverRows;
+  int homeCoverColumns;
+  // When true the home menu rows move off the cover page onto a second page,
+  // reached by navigating past the last cover. See HomeActivity::render().
+  bool homeMenuOnSecondPage;
 
   int buttonHintsHeight;
   int sideButtonHintsWidth;
@@ -130,6 +139,9 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .homeRecentBooksCount = 1,
                                  .homeContinueReadingInMenu = false,
                                  .homeMenuTopOffset = 10,
+                                 .homeCoverRows = 1,
+                                 .homeCoverColumns = 1,
+                                 .homeMenuOnSecondPage = false,
                                  .buttonHintsHeight = 40,
                                  .sideButtonHintsWidth = 30,
                                  .progressBarHeight = 16,

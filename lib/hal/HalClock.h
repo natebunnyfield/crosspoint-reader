@@ -27,11 +27,11 @@ class HalClock {
   // Returns false if RTC is not available.
   bool getTime(uint8_t& hour, uint8_t& minute) const;
 
-  // Get full date+time from the DS3231. year is 4-digit (e.g. 2026). month is
-  // 1..12, day 1..31, hour 0..23, minute 0..59. Reads DS3231 registers
-  // 0x00-0x06 in one bus transaction; not cached (calendar sleep screen calls
-  // this at most once per sleep). Returns false if RTC is unavailable or the
-  // read fails.
+  // Get full date+time from the RTC. year is 4-digit (e.g. 2026). month is
+  // 1..12, day 1..31, hour 0..23, minute 0..59. Deliberately uncached (unlike
+  // getTime): callers are one-shot renderers (the calendar sleep screen calls
+  // this at most once per sleep), not per-frame consumers. Returns false if
+  // the RTC is unavailable or the read fails.
   //
   // Matches the simulator-side signature in the crosspoint-simulator lib so
   // downstream code links on both host and device (see simulator CLAUDE.md

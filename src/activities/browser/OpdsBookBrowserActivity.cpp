@@ -77,6 +77,8 @@ void OpdsBookBrowserActivity::loop() {
     return;
   }
 
+  // Swallow an edge left over from a child that finished on the press — one edge
+  // each, then disarm. See armChildEdgeGuards().
   if (consumeConfirm && mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     consumeConfirm = false;
     return;
@@ -402,13 +404,42 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
   requestUpdate();
 }
 
+// This activity acts on button RELEASES (see loop()), but the children it hands
+// off to finish on the PRESS, which leaves the matching release unconsumed:
+// KeyboardEntryActivity cancels on the Back press (KeyboardEntryActivity.cpp:354)
+// and WifiSelectionActivity cancels on the Back press (WifiSelectionActivity.cpp:450,
+// 467, 597) and completes from its save prompt on the Confirm press (:517-524).
+// InputManager recomputes the edge latches once per frame
+// (InputManager.cpp:243-262), so the leftover release is still pending when this
+// activity resumes and used to be dispatched as if the user had tapped again:
+// cancelling either child reached navigateBack() with an empty history ->
+// onGoHome() -> onExit()'s silentRestart(), so one Back tap rebooted the device
+// and the Wi-Fi failure screen never appeared; and the save prompt's leftover
+// Confirm release opened or downloaded entry 0 of the feed that had just loaded.
+//
+// Armed from the result handler rather than the launch site, and only while the
+// button is physically still down: the handler runs in the same frame as the
+// child's finish() (ActivityManager.cpp:79-104) and isPressed() reads the
+// debounced current state, so this means exactly "the child ended mid-gesture".
+// A child that ended on a release orphans nothing and must not leave a guard
+// armed — that is what the old launch-site `consumeConfirm = true` did, and it
+// swallowed the user's first real Confirm after every search.
+//
+// FontSelectionActivity.cpp:116-137 closes the same hazard the other way, by
+// moving its own handler to the release edge. That is not an option here: these
+// children are shared with screens that expect them to act on the press.
+void OpdsBookBrowserActivity::armChildEdgeGuards() {
+  consumeBack = mappedInput.isPressed(MappedInputManager::Button::Back);
+  consumeConfirm = mappedInput.isPressed(MappedInputManager::Button::Confirm);
+}
+
 void OpdsBookBrowserActivity::launchSearch() {
-  consumeConfirm = true;
   state = BrowserState::SEARCH_INPUT;
   requestUpdate();
 
   auto keyboard = std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_SEARCH));
   startActivityForResult(std::move(keyboard), [this](const ActivityResult& result) {
+    armChildEdgeGuards();
     state = BrowserState::BROWSING;
     if (!result.isCancelled) {
       performSearch(std::get<KeyboardResult>(result.data).text);
@@ -476,6 +507,7 @@ void OpdsBookBrowserActivity::launchWifiSelection() {
 }
 
 void OpdsBookBrowserActivity::onWifiSelectionComplete(const bool connected) {
+  armChildEdgeGuards();
   if (connected) {
     state = BrowserState::LOADING;
     statusMessage = tr(STR_LOADING);
