@@ -47,6 +47,14 @@ class EpubReaderActivity final : public Activity {
   // The release that ends such a hold must not also be read as a TAP (which would step the
   // font size on top of the family change the hold just made).
   bool suppressNextSideRelease = false;
+  // The FRONT page-turn buttons carry the same font-size step on a HOLD, so the setting is
+  // reachable on a device whose owner pages with the front buttons or has the side buttons
+  // disabled (PageBack/PageForward then map to nothing and every side gesture is inert).
+  // One step per hold, same as sideHoldFired; cleared when both front buttons are up.
+  bool frontHoldFired = false;
+  // The release ending a front hold must not ALSO turn the page: detectPageTurn is
+  // release-triggered whenever longPressButtonBehavior != OFF.
+  bool suppressNextFrontRelease = false;
   // Confirm-as-modifier chord: a line-spacing step has already acted during the Confirm hold
   // that is still in progress. Suppresses the long-press Confirm function
   // (SETTINGS.longPressMenuFunction) for the REST of that hold, which ignoreNextConfirmRelease

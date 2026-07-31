@@ -184,6 +184,33 @@ inline HeldTurnDirection detectSidePress(const MappedInputManager& input) {
           input.wasPressed(MappedInputManager::Button::PageForward)};
 }
 
+// FRONT Left/Right only — the mirror of detectHeldSideDirection, and the reason it exists:
+// FONT_SIZE_STEP was a SIDE-button-only gesture, so on a device whose owner turns pages with
+// the front buttons (or has sideButtonLayout == SIDE_BUTTONS_DISABLED, which makes
+// PageBack/PageForward map to nothing at all) the setting had no reachable gesture and looked
+// simply broken. CHAPTER_SKIP, the choice next to it in the same list, has always acted on
+// BOTH front and side because it keys off detectPageTurn — so the asymmetry was the defect,
+// not the expectation.
+//
+// Same front-button set and the same frontButtonFollowOrientation swap as detectPageTurn, so
+// "next" here is the same physical button that pages forward.
+inline HeldTurnDirection detectHeldFrontDirection(const MappedInputManager& input) {
+  const bool swapFront = input.isNavDirectionSwapped();
+  const auto prevButton = swapFront ? MappedInputManager::Button::Right : MappedInputManager::Button::Left;
+  const auto nextButton = swapFront ? MappedInputManager::Button::Left : MappedInputManager::Button::Right;
+  return {input.isPressed(prevButton), input.isPressed(nextButton)};
+}
+
+// Release edge of a FRONT page-turn button. Needed to swallow the release that ends a front
+// hold: detectPageTurn is RELEASE-triggered whenever longPressButtonBehavior != OFF, so an
+// unswallowed release would turn the page on top of the size step the hold just made.
+inline HeldTurnDirection detectFrontRelease(const MappedInputManager& input) {
+  const bool swapFront = input.isNavDirectionSwapped();
+  const auto prevButton = swapFront ? MappedInputManager::Button::Right : MappedInputManager::Button::Left;
+  const auto nextButton = swapFront ? MappedInputManager::Button::Left : MappedInputManager::Button::Right;
+  return {input.wasReleased(prevButton), input.wasReleased(nextButton)};
+}
+
 inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh) {
   if (pagesUntilFullRefresh <= 1) {
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
