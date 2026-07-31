@@ -907,11 +907,13 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       self->currentFootnote.number[0] = '\0';
       self->currentFootnoteLinkTextLen = 0;
 
-      // Apply underline style to visually indicate the link.
+      // Links are deliberately not underlined: the reader has no way to select
+      // or follow a link inline, so the decoration is pure visual noise. The
+      // entry is still pushed so direction inheritance and the depth-keyed pop
+      // in endElement stay symmetric. <u>/<ins> tags and CSS text-decoration
+      // keep their underlines through the normal style paths.
       StyleStackEntry entry;
       entry.depth = self->depth;
-      entry.hasTextDecoration = true;
-      entry.textDecoration = CssTextDecoration::Underline;
       applyDirectionToEntry(entry, cssStyle);
       self->inlineStyleStack.push_back(entry);
       self->updateEffectiveInlineStyle();
