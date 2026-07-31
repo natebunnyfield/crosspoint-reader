@@ -135,22 +135,44 @@ inline HeldTurnDirection detectHeldTurnDirection(const MappedInputManager& input
   return {prev, next};
 }
 
+// Which physical side button counts as "previous" / "next" for the reader's FONT gestures.
+//
+// Normally the PageBack/PageForward aliases, so the user's sideButtonLayout prev/next swap
+// applies to the font controls exactly as it does to paging.
+//
+// The exception is SIDE_BUTTONS_DISABLED, where those aliases map to NOTHING at all
+// (MappedInputManager.cpp:41-62). That setting means "the side buttons must not turn pages" —
+// but under FONT_SIZE_STEP the side buttons are not page-turn buttons any more, they are the
+// font controls, and routing them through the paging aliases made the whole feature dead on
+// exactly the devices whose owner had already decided to page with the front buttons. The
+// symptom is a setting that is selectable, shows as selected, and does nothing.
+//
+// So in that case fall back to the raw side buttons in the natural PREV_NEXT order. Paging is
+// unaffected: detectPageTurn keeps using PageBack/PageForward, which stay inert.
+struct SideFontButtons {
+  MappedInputManager::Button prev;
+  MappedInputManager::Button next;
+};
+
+inline SideFontButtons sideFontButtons() {
+  if (SETTINGS.sideButtonLayout == CrossPointSettings::SIDE_BUTTONS_DISABLED) {
+    return {MappedInputManager::Button::Up, MappedInputManager::Button::Down};
+  }
+  return {MappedInputManager::Button::PageBack, MappedInputManager::Button::PageForward};
+}
+
 // SIDE buttons only — no front buttons, no tilt. Used for the reader's font
 // controls, which are deliberately a side-button-only gesture so the front
-// Left/Right keep turning pages.
-//
-// Goes through PageBack/PageForward rather than raw Up/Down so the user's
-// sideButtonLayout swap still applies, and so the gesture is inert when side
-// buttons are set to Disabled (both map to nothing then).
+// buttons keep turning pages and nothing else.
 inline HeldTurnDirection detectHeldSideDirection(const MappedInputManager& input) {
-  return {input.isPressed(MappedInputManager::Button::PageBack),
-          input.isPressed(MappedInputManager::Button::PageForward)};
+  const auto side = sideFontButtons();
+  return {input.isPressed(side.prev), input.isPressed(side.next)};
 }
 
 // Release edge of a SIDE button, i.e. the end of a tap.
 inline HeldTurnDirection detectSideRelease(const MappedInputManager& input) {
-  return {input.wasReleased(MappedInputManager::Button::PageBack),
-          input.wasReleased(MappedInputManager::Button::PageForward)};
+  const auto side = sideFontButtons();
+  return {input.wasReleased(side.prev), input.wasReleased(side.next)};
 }
 
 // PRESS edge of a SIDE button, i.e. the start of a tap.
@@ -161,11 +183,11 @@ inline HeldTurnDirection detectSideRelease(const MappedInputManager& input) {
 // inside a Confirm+side chord it reports the time since CONFIRM went down and a 300ms side
 // tap already reads as a completed long press.
 //
-// Same PageBack/PageForward routing as its sibling detectors, so the user's sideButtonLayout
-// swap still applies and the chord is inert when side buttons are set to Disabled.
+// Same sideFontButtons() routing as its sibling detectors, so the chord follows the user's
+// prev/next swap and stays reachable when side paging is Disabled.
 inline HeldTurnDirection detectSidePress(const MappedInputManager& input) {
-  return {input.wasPressed(MappedInputManager::Button::PageBack),
-          input.wasPressed(MappedInputManager::Button::PageForward)};
+  const auto side = sideFontButtons();
+  return {input.wasPressed(side.prev), input.wasPressed(side.next)};
 }
 
 struct TouchPageTurn {
