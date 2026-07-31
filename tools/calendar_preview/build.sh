@@ -12,7 +12,7 @@ gcc -c -O1 -I"$R/lib/uzlib/src" "$R/lib/uzlib/src/tinflate.c" -o tinflate.o
 gcc -c -O1 -I"$R/lib/MiniBidi" "$R/lib/MiniBidi/minibidi.c" -o minibidi.o
 gcc -c -O1 uzlib_checksums.c -o uzlib_checksums.o
 
-g++ -std=gnu++2a -O1 -include Arduino.h -o sim sim.cpp \
+g++ -std=gnu++2a -O1 -include Arduino.h -o render_harness render_harness.cpp \
   "$R/lib/GfxRenderer/GfxRenderer.cpp" "$R/lib/GfxRenderer/Bitmap.cpp" \
   "$R/lib/GfxRenderer/BitmapHelpers.cpp" "$R/lib/GfxRenderer/FontCacheManager.cpp" \
   "$R/lib/EpdFont/EpdFont.cpp" "$R/lib/EpdFont/EpdFontFamily.cpp" \
@@ -25,4 +25,4 @@ g++ -std=gnu++2a -O1 -include Arduino.h -o sim sim.cpp \
   -I"$R/lib/MiniBidi" -I"$R/lib/Memory" -I"$R/lib/InflateReader" -I"$R/lib/uzlib/src"
 
 mkdir -p fs_
-echo "built ./sim"
+echo "built ./render_harness"
