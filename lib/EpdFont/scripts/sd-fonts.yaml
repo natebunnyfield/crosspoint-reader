@@ -11,6 +11,13 @@
 #   intervals:   Comma-separated Unicode interval presets for fontconvert_sdcard.py
 #   sizes:       Point sizes to generate
 #   force_autohint: (optional) Force FreeType auto-hinter instead of native hinting
+#   metrics:     (optional) Vertical-metrics override, {ascent, descent, linegap}
+#                in font units per 1000 upem (descent negative, hhea convention;
+#                linegap defaults to 0). Rewrites hhea + OS/2 typo + OS/2 win on
+#                a cached copy of the source (patched_fonts/, gitignored) before
+#                conversion — the .cpfont's advanceY derives from hhea. For faces
+#                whose stock metrics are sized for scripts the built charset
+#                never includes.
 #   styles:      Map of style name -> font source
 #                  path: relative to lib/EpdFont (for committed fonts)
 #                  url:  download URL (for fonts not in the repo)
@@ -252,6 +259,15 @@ families:
     # Harmonized ramp: x-height 0.531 em vs the 0.475 anchor (SourceSerif4) —
     # big-on-body, drops ~1-2pt to read at the anchor size.
     sizes: [11, 13, 14, 16]
+    # Stock vertical metrics are enormous — hhea 1703/-876 = 2.58 em line
+    # height, sized for the Devanagari conjunct stacks a Latin build never
+    # renders. The "62" in the family name records fixing exactly this: a
+    # 74/62/57 px-leading A/B chose 62, i.e. ink-tight metrics 1244/-364,
+    # lineGap 0 (Latin ink extents + padding; Inknut carries an extra
+    # +100-unit pad because the Bold's ink exceeds tighter values at every
+    # size). Same values as the shipped S-tier builds. Without this
+    # override the family reads with ~60% extra leading.
+    metrics: {ascent: 1244, descent: -364, linegap: 0}
     # The family has no italics at all; obliques shear the REAL weights
     # (regular -> italic, bold -> bolditalic) at a gentle 10° — sturdy antiqua,
     # so no embolden is ever synthesized on top of the real Bold.

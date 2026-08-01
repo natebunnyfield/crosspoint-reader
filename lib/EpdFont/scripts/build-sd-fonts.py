@@ -48,6 +48,7 @@ DEFAULT_CONFIG = SCRIPT_DIR / "sd-fonts.yaml"
 DEFAULT_OUTPUT = SCRIPT_DIR / "output"
 DOWNLOAD_DIR = SCRIPT_DIR / "downloaded_fonts"
 INSTANCE_DIR = SCRIPT_DIR / "instanced_fonts"
+PATCHED_DIR = SCRIPT_DIR / "patched_fonts"
 DEFAULT_FALLBACK_FONT = EPDFONTS_DIR / "builtinFonts/source/NotoSans/NotoSans-Regular.ttf"
 
 
@@ -151,6 +152,67 @@ def extract_static_instance(source_path: Path, axes: dict, family_name: str, sty
     return cached
 
 
+def apply_metrics_override(source_path: Path, metrics: dict, family_name: str, style_name: str) -> Path:
+    """Rewrite a font's vertical metrics before conversion.
+
+    `metrics` comes from the family's YAML block: {ascent, descent, linegap}
+    in font units **per 1000 upem** (scaled for 2048/4096-upem fonts). All
+    three metric homes are set consistently — hhea (what FreeType's
+    face.size.height, i.e. the .cpfont advanceY, is derived from), OS/2 typo,
+    and OS/2 win — the same way the hand-patched S-tier sources were built.
+
+    Exists for faces whose stock metrics are sized for scripts the built
+    charset never includes (Inknut Antiqua: hhea 1703/-876 for Devanagari
+    stacks = 2.58 em line height on Latin-only text). Cached in
+    PATCHED_DIR/<family>/, keyed on the values + source mtime.
+    """
+    from fontTools.ttLib import TTFont
+
+    ascent = int(metrics["ascent"])
+    descent = int(metrics["descent"])  # negative, hhea convention
+    linegap = int(metrics.get("linegap", 0))
+    if descent > 0:
+        raise ValueError(
+            f"{family_name}: metrics.descent must be negative (hhea convention), got {descent}")
+
+    mtime = int(source_path.stat().st_mtime)
+    cache_name = f"{style_name}_a{ascent}_d{descent}_g{linegap}_{mtime}{source_path.suffix}"
+    cached = PATCHED_DIR / family_name / cache_name
+    if cached.exists():
+        return cached
+
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    for old in cached.parent.glob(f"{style_name}_*{source_path.suffix}"):
+        old.unlink()
+
+    print(f"  Patching metrics: {family_name}/{style_name} -> {ascent}/{descent} gap {linegap}")
+    font = TTFont(str(source_path))
+    try:
+        scale = font["head"].unitsPerEm / 1000.0
+        asc = round(ascent * scale)
+        desc = round(descent * scale)
+        gap = round(linegap * scale)
+        hhea = font["hhea"]
+        hhea.ascent, hhea.descent, hhea.lineGap = asc, desc, gap
+        os2 = font["OS/2"]
+        os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap = asc, desc, gap
+        os2.usWinAscent, os2.usWinDescent = asc, -desc
+        # Atomic write, mirroring extract_static_instance: never leave a
+        # truncated file where the cached.exists() check would reuse it.
+        tmp_fd, tmp_name = tempfile.mkstemp(suffix=source_path.suffix, dir=cached.parent)
+        os.close(tmp_fd)
+        tmp_path = Path(tmp_name)
+        try:
+            font.save(str(tmp_path))
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
+    finally:
+        font.close()
+    tmp_path.replace(cached)
+    return cached
+
+
 def extract_zip_member(url: str, member: str, family_name: str) -> Path:
     """Fetch a release archive and pull one font file out of it.
 
@@ -239,6 +301,13 @@ def build_family(
             if "from" in style_spec:
                 continue
             resolved_styles[style_name] = resolve_font_path(style_spec, name, style_name)
+        # Family-level metrics override, applied to the real sources before
+        # `from:` styles alias them, so synthetics inherit the patched file.
+        metrics = family.get("metrics")
+        if metrics:
+            for style_name in list(resolved_styles):
+                resolved_styles[style_name] = apply_metrics_override(
+                    resolved_styles[style_name], metrics, name, style_name)
         for style_name, style_spec in styles.items():
             if "from" not in style_spec:
                 continue

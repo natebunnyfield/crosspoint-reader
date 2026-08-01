@@ -79,9 +79,12 @@ def main() -> int:
 
     out_dir = SCRIPTS / "output"
     print(f"Building {len(families)} families: {', '.join(families)}")
+    # --clean: a stale output/ from an earlier run with a different size ramp
+    # would otherwise be globbed below and installed alongside the fresh
+    # sizes (this shipped a 5-size Junicode once).
     result = subprocess.run(
         [sys.executable, str(SCRIPTS / "build-sd-fonts.py"),
-         "--only", ",".join(families), "--output-dir", str(out_dir)],
+         "--only", ",".join(families), "--output-dir", str(out_dir), "--clean"],
         cwd=SCRIPTS,
     )
     if result.returncode != 0:
@@ -107,6 +110,14 @@ def main() -> int:
                 old.unlink()
                 print(f"  pruned stale {old.relative_to(fonts_root.parent)}")
         print(f"  installed {family}: {len(built)} sizes -> {dest}")
+
+        # The firmware scans /.fonts BEFORE /fonts and dedups by family name
+        # (SdCardFontRegistry::discover), so a stale copy of this family in
+        # the hidden root would silently shadow everything just installed.
+        hidden = Path(args.fs_dir) / ".fonts" / family
+        if hidden.is_dir():
+            shutil.rmtree(hidden)
+            print(f"  removed shadowing stale copy {hidden.relative_to(fonts_root.parent)}")
 
     print("\nDone. Launch the simulator; the families appear in Text Settings.")
     return 0
