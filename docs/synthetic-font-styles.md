@@ -217,27 +217,18 @@ zero converter changes — so both routes can coexist per-family.
 3. ~~Build GoudyBookletter1911 with the parameters above; run the acceptance
    measurements; judge in the simulator picker.~~ — done: numbers recorded
    under Acceptance; picker specimen verified in the simulator.
-4. Caledonia CC: embolden Regular → bold and the real Italic → bold-italic
-   (no shear), starting near `embolden_em: 0.030`; same acceptance, with
-   extra attention to hairline survival at 12 pt. The config exists as a
-   commented block in `sd-fonts.yaml`; to build on the machine that owns the
-   fonts (they are commercial and never leave it):
-
-   ```bash
-   cd lib/EpdFont
-   mkdir -p local_fonts
-   cp /path/to/CaledoniaCC-TextRegular.otf local_fonts/
-   cp /path/to/CaledoniaCC-TextItalic.otf local_fonts/
-   cd scripts
-   ```
-
-   then uncomment the `CalendoniaCC` block in `sd-fonts.yaml` and run:
-
-   ```bash
-   python3 build-sd-fonts.py --only CalendoniaCC
-   ```
-
-   `local_fonts/` is gitignored, so neither the fonts nor the built
-   `.cpfont`s can be committed by accident. Copy the four files from
-   `output/CalendoniaCC/` into the card's `.fonts/CalendoniaCC/`.
+4. Caledonia CC — **shelved: the source OTFs are no longer available** (the
+   owner will not be re-acquiring them), and outline synthesis needs vector
+   sources. The commented `CalendoniaCC` block in `sd-fonts.yaml` and the
+   gitignored `local_fonts/` flow stay in place in case the files ever
+   resurface (`embolden_em: 0.030`, bold from Regular, bold-italic from the
+   real Italic, no shear). The one remaining path without sources is
+   **bitmap-domain emboldening of the already-built `.cpfont`**: grayscale
+   dilation of the 2-bit glyph bitmaps by ~1 px horizontally with advances
+   widened to match — crengine's retired `LVFontBoldTransform` approach.
+   Workable at 25–37 ppem where outline emboldening quantizes to roughly the
+   same pixels anyway, but strictly below outline quality (that is why
+   crengine retired it); it needs a `.cpfont` read/transform/write tool that
+   does not exist yet. Build it only if the missing Caledonia bold actually
+   hurts in reading.
 5. Only if a family fails on quality: FontForge route for that family.
