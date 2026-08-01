@@ -662,7 +662,6 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_
   if (weeks < WEEKS_MIN) weeks = WEEKS_MIN;
   if (weeks > WEEKS_MAX) weeks = WEEKS_MAX;
 
-  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   renderer.clearScreen();
 
   const CalendarFonts fonts = resolveFonts(renderer);

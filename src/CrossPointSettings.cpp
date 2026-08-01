@@ -121,7 +121,6 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // the factory default — on every load. Out-of-range values are still clamped
   // by the generic enum loop in fromJson().
   //
-  orientation = PORTRAIT;
 
   // The Display tab, Manage Fonts and Customise Status Bar were withdrawn from
   // the device Settings UI. The settings below have no on-device control left,

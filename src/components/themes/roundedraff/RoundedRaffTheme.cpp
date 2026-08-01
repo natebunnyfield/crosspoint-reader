@@ -357,8 +357,6 @@ void RoundedRaffTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, 
     return;
   }
 
-  const GfxRenderer::Orientation origOrientation = renderer.getOrientation();
-  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
@@ -403,5 +401,4 @@ void RoundedRaffTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, 
   renderer.drawText(kGuideFontId, upX, textY, upText.c_str(), true, EpdFontFamily::REGULAR);
   renderer.drawText(kGuideFontId, downX, textY, downText.c_str(), true, EpdFontFamily::REGULAR);
 
-  renderer.setOrientation(origOrientation);
 }

@@ -56,7 +56,9 @@ class GfxRenderer {
   HalDisplay& display;
   RenderMode renderMode;
   GrayscaleAaStrength grayscaleAaStrength = AA_STANDARD;
-  Orientation orientation;
+  // The panel is physically 800x480; portrait reading IS the 90 degree rotation.
+  // Constant rather than a field so every non-Portrait branch folds out at compile time.
+  static constexpr Orientation orientation = Portrait;
   bool fadingFix;
   uint8_t* frameBuffer = nullptr;
   uint16_t panelWidth = HalDisplay::DISPLAY_WIDTH;
@@ -119,7 +121,7 @@ class GfxRenderer {
 
  public:
   explicit GfxRenderer(HalDisplay& halDisplay)
-      : display(halDisplay), renderMode(BW), orientation(Portrait), fadingFix(false) {}
+      : display(halDisplay), renderMode(BW), fadingFix(false) {}
   ~GfxRenderer() { freeBwBufferChunks(); }
 
   static constexpr int VIEWABLE_MARGIN_TOP = 9;
@@ -189,9 +191,9 @@ class GfxRenderer {
   void ensureSdCardFontReady(int fontId, const std::deque<std::string>& words, bool includeHyphen,
                              uint8_t styleMask = 0x0F) const;
 
-  // Orientation control (affects logical width/height and coordinate transforms)
-  void setOrientation(const Orientation o) { orientation = o; }
-  Orientation getOrientation() const { return orientation; }
+  // Orientation is fixed at Portrait; the getter stays so call sites read as
+  // coordinate-space queries rather than hardcoded assumptions.
+  static constexpr Orientation getOrientation() { return orientation; }
 
   // Fading fix control
   void setFadingFix(const bool enabled) { fadingFix = enabled; }

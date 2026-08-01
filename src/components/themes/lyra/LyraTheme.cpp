@@ -349,8 +349,6 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
     return;
   }
 
-  const GfxRenderer::Orientation orig_orientation = renderer.getOrientation();
-  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   const int pageHeight = renderer.getScreenHeight();
   constexpr int buttonWidth = 80;
@@ -383,7 +381,6 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
     }
   }
 
-  renderer.setOrientation(orig_orientation);
 }
 
 void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* topBtn, const char* bottomBtn) const {

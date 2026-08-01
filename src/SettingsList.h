@@ -210,9 +210,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                     "focusReadingEnabled", StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_HYPHENATION, &CrossPointSettings::hyphenationEnabled,
                                     "hyphenationEnabled", StrId::STR_CAT_READER));
-    // Reading orientation has no UI: the reader is portrait-only. The
-    // `orientation` field is still read by ReaderUtils and the themes, and
-    // is pinned to PORTRAIT on load by normalizeRetiredSettings().
+    // The reader is portrait-only; there is no orientation setting.
     v.push_back(SettingInfo::Toggle(StrId::STR_EXTRA_SPACING, &CrossPointSettings::extraParagraphSpacing,
                                     "extraParagraphSpacing", StrId::STR_CAT_READER));
     // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
@@ -231,9 +229,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_TOUCH_READER_CONTROLS, &CrossPointSettings::touchReaderControls,
                                   {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "touchReaderControls",
                                   StrId::STR_CAT_CONTROLS));
-    v.push_back(SettingInfo::Toggle(StrId::STR_FRONT_BTN_FOLLOW_ORIENTATION,
-                                    &CrossPointSettings::frontButtonFollowOrientation,
-                                    "frontButtonFollowOrientation", StrId::STR_CAT_CONTROLS));
     // Third label = stored value 2 = FONT_SIZE_STEP. The order of this array IS
     // the persisted encoding, so append only — see LONG_PRESS_BUTTON_BEHAVIOR in
     // CrossPointSettings.h for why the retired ORIENTATION_CHANGE slot was reused

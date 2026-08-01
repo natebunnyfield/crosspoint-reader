@@ -62,7 +62,7 @@ bool HalTiltSensor::deepSleep() {
   return true;
 }
 
-void HalTiltSensor::update(const uint8_t mode, const uint8_t orientation, const bool inReader) {
+void HalTiltSensor::update(const uint8_t mode, const bool inReader) {
   if (!_available) {
     return;
   }
@@ -97,26 +97,8 @@ void HalTiltSensor::update(const uint8_t mode, const uint8_t orientation, const 
     return;
   }
 
-  // Map the gyro axis to left/right tilt based on reader orientation.
-  // On the X3 PCB: X axis = left/right in portrait, Y axis = left/right in landscape.
-  float tiltAxis;
-  switch (orientation) {
-    case CrossPointOrientation::PORTRAIT:
-      tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? -gx : gx;
-      break;
-    case CrossPointOrientation::INVERTED:
-      tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? gx : -gx;
-      break;
-    case CrossPointOrientation::LANDSCAPE_CW:
-      tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? gy : -gy;
-      break;
-    case CrossPointOrientation::LANDSCAPE_CCW:
-      tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? -gy : gy;
-      break;
-    default:
-      tiltAxis = gx;
-      break;
-  }
+  // The reader is portrait-only, and on the X3 PCB the X axis is left/right in portrait.
+  const float tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? -gx : gx;
 
   if (_inTilt) {
     // Wait for device to return to neutral before allowing next trigger

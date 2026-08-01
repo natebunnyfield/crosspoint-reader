@@ -4,10 +4,6 @@
 #include <Imu.h>
 
 // TODO: Move enums into new header and share with CrossPointSettings.h
-namespace CrossPointOrientation {
-enum Value : uint8_t { PORTRAIT = 0, LANDSCAPE_CW = 1, INVERTED = 2, LANDSCAPE_CCW = 3 };
-}
-
 namespace CrossPointTiltPageTurn {
 enum Value : uint8_t { TILT_OFF = 0, TILT_NORMAL = 1, TILT_INVERTED = 2 };
 }
@@ -54,7 +50,7 @@ class HalTiltSensor {
   bool isAvailable() const { return _available; }
 
   // Poll the accelerometer and update tilt gesture state.
-  void update(const uint8_t mode, const uint8_t orientation, const bool inReader);
+  void update(const uint8_t mode, const bool inReader);
 
   // Returns true once per tilt-forward gesture (next page direction).
   // Consumed on read — subsequent calls return false until next gesture.

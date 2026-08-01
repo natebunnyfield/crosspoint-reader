@@ -56,24 +56,6 @@ static_assert(steppedLineSpacing(CrossPointSettings::WIDE, +1) == CrossPointSett
 static_assert(steppedLineSpacing(CrossPointSettings::NORMAL, +1) == CrossPointSettings::WIDE, "Normal + 1 == Wide");
 static_assert(steppedLineSpacing(CrossPointSettings::NORMAL, -1) == CrossPointSettings::TIGHT, "Normal - 1 == Tight");
 
-inline void applyOrientation(GfxRenderer& renderer, const uint8_t orientation) {
-  switch (orientation) {
-    case CrossPointSettings::ORIENTATION::PORTRAIT:
-      renderer.setOrientation(GfxRenderer::Orientation::Portrait);
-      break;
-    case CrossPointSettings::ORIENTATION::LANDSCAPE_CW:
-      renderer.setOrientation(GfxRenderer::Orientation::LandscapeClockwise);
-      break;
-    case CrossPointSettings::ORIENTATION::INVERTED:
-      renderer.setOrientation(GfxRenderer::Orientation::PortraitInverted);
-      break;
-    case CrossPointSettings::ORIENTATION::LANDSCAPE_CCW:
-      renderer.setOrientation(GfxRenderer::Orientation::LandscapeCounterClockwise);
-      break;
-    default:
-      break;
-  }
-}
 
 struct PageTurnResult {
   bool prev;

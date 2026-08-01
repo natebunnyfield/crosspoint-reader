@@ -169,8 +169,8 @@ class EpubReaderActivity final : public Activity {
   // Opens the reader menu for the current position (short-press Confirm)
   // Step the reader font size one slot (delta -1 / +1) from a long-press of the page-turn
   // buttons, preserving the reading position across the re-pagination. A step that would
-  // leave the ramp only raises the popup. Replaces applyOrientation(), whose only caller
-  // was the retired ORIENTATION_CHANGE branch that shared this setting's index 2.
+  // leave the ramp only raises the popup. Took over the setting index the retired
+  // ORIENTATION_CHANGE branch used.
   void stepReaderFontSize(int delta);
   // Next / previous font family, cycling at both ends. Mirrors the ordering
   // FontSelectionActivity lists: the installed SD families, or the built-in Noto faces when

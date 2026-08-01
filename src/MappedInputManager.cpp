@@ -9,22 +9,14 @@
 #include "components/UITheme.h"
 
 bool MappedInputManager::isNavDirectionSwapped() const {
-  // Key the swap on the orientation the screen is *actually* rendered at, not the persisted reader
-  // setting. The reader (and its modal menus) render rotated, so navigation/labels flip there; the
-  // home and settings UI render in portrait, so they never flip even when a rotated reader is configured.
-  const auto orientation = renderer.getOrientation();
-  return SETTINGS.frontButtonFollowOrientation &&
-         (orientation == GfxRenderer::PortraitInverted || orientation == GfxRenderer::LandscapeCounterClockwise);
+  // Everything renders portrait, so the nav axis never flips. Kept as a named
+  // predicate because the call sites read as "which way is next" questions.
+  return false;
 }
 
 MappedInputManager::Button MappedInputManager::mapScreenDirection(const Button button) const {
-  // Rows follow GfxRenderer::Orientation's declared order.
-  static constexpr Button directions[][4] = {
-      {Button::Left, Button::Right, Button::Up, Button::Down},
-      {Button::Down, Button::Up, Button::Left, Button::Right},
-      {Button::Right, Button::Left, Button::Down, Button::Up},
-      {Button::Up, Button::Down, Button::Right, Button::Left},
-  };
+  // Portrait only: screen directions map straight through.
+  static constexpr Button directions[4] = {Button::Left, Button::Right, Button::Up, Button::Down};
 
   uint8_t direction = 0;
   switch (button) {
@@ -44,9 +36,7 @@ MappedInputManager::Button MappedInputManager::mapScreenDirection(const Button b
       return button;
   }
 
-  const uint8_t orientation =
-      SETTINGS.frontButtonFollowOrientation ? static_cast<uint8_t>(renderer.getOrientation()) : 0;
-  return directions[orientation][direction];
+  return directions[direction];
 }
 
 bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint8_t) const) const {
@@ -97,12 +87,11 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
           return false;
       }
     case Button::NavNext:
-      // Logical "next item" navigation: side Down + front Right, with the control axis flipped in
-      // INVERTED / LANDSCAPE_CCW (frontButtonFollowOrientation) so it matches the rotated hint labels.
+      // Logical "next item" navigation: side Down + front Right.
       return isNavDirectionSwapped() ? (mapButton(Button::Up, fn) || mapButton(Button::Left, fn))
                                      : (mapButton(Button::Down, fn) || mapButton(Button::Right, fn));
     case Button::NavPrevious:
-      // Logical "previous item" navigation: side Up + front Left, axis-flipped in the same orientations.
+      // Logical "previous item" navigation: side Up + front Left.
       return isNavDirectionSwapped() ? (mapButton(Button::Down, fn) || mapButton(Button::Right, fn))
                                      : (mapButton(Button::Up, fn) || mapButton(Button::Left, fn));
     case Button::ScreenLeft:
@@ -336,7 +325,7 @@ unsigned long MappedInputManager::getHeldTime() const {
 
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,
                                                          const char* next) const {
-  // Swap previous/next labels to match the page turn direction swap in INVERTED and LANDSCAPE_CCW.
+  // Labels follow the nav direction; portrait never swaps them.
   const bool swapLabels = isNavDirectionSwapped();
   const char* leftLabel = swapLabels ? next : previous;
   const char* rightLabel = swapLabels ? previous : next;

@@ -132,7 +132,6 @@ void EpubReaderActivity::onEnter() {
 
   // Configure screen orientation based on settings
   // NOTE: This affects layout math and must be applied before any render calls.
-  ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
 
   epub->setupCacheDir();
 
@@ -185,7 +184,6 @@ void EpubReaderActivity::onExit() {
   ImageBlock::setExtractor(nullptr, nullptr);
 
   // Reset orientation back to portrait for the rest of the UI
-  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
@@ -713,7 +711,7 @@ void EpubReaderActivity::stepReaderFontSize(const int delta) {
     RenderLock lock(*this);
 
     // Preserve the reading position across the reflow, exactly as the retired
-    // applyOrientation() did before its own section.reset(). Without these three lines the position is
+    // the retired applyOrientation() did before its own section.reset(). Without these three lines the position is
     // simply lost: nextPageNumber is never written by an intra-chapter page turn, so the
     // rebuild lands on whatever page the CHAPTER was entered at and render() then persists
     // that wrong page. They also re-arm applyDeferredReposition(), which bails on
