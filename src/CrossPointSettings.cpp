@@ -121,9 +121,9 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // the factory default — on every load. Out-of-range values are still clamped
   // by the generic enum loop in fromJson().
   //
-  // longPressMenuFunction no longer remaps LP_MENU_BOOKMARK either: the stored
-  // index space is 0..2 and every value is reachable from the UI. A saved 3
-  // from when Dictionary existed is out of range and clamps on load.
+  // longPressMenuFunction needs no line either: the stored index space is 0..1
+  // and both values are reachable from the UI. A saved 2 or 3 from when Bookmark
+  // or Dictionary existed is out of range and clamps on load.
   orientation = PORTRAIT;
 
   // The Display tab, Manage Fonts and Customise Status Bar were withdrawn from

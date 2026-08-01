@@ -5,7 +5,6 @@
 
 #include <optional>
 
-#include "BookmarkEntry.h"
 #include "EndOfBookOptions.h"
 #include "ProgressMapper.h"
 #include "activities/Activity.h"
@@ -25,8 +24,6 @@ class EpubReaderActivity final : public Activity {
   bool forcedRefreshPending = false;
   int cachedSpineIndex = 0;
   int cachedChapterTotalPageCount = 0;
-  unsigned long lastPageTurnTime = 0UL;
-  unsigned long pageTurnDuration = 0UL;
   // Signals that the next render should reposition within the newly loaded section
   // based on a cross-book percentage jump.
   bool pendingPercentJump = false;
@@ -38,8 +35,6 @@ class EpubReaderActivity final : public Activity {
   uint8_t pageLoadRetryCount = 0;
   static constexpr uint8_t MAX_PAGE_LOAD_RETRIES = 3;
   bool skipNextButtonCheck = false;  // Skip button processing for one frame after subactivity exit
-  bool automaticPageTurnActive = false;
-  bool showBookmarkMessage = false;
   // One-shot latch for the side-button HOLD gesture (next/previous font family). Fires the
   // moment the hold crosses SKIP_HOLD_MS rather than on release, so the reflow starts while
   // the button is still down; cleared once both side buttons are up, so one hold produces
@@ -62,7 +57,6 @@ class EpubReaderActivity final : public Activity {
   // the page-turn path.
   bool sideChordConsumed = false;
   bool ignoreNextConfirmRelease = false;
-  bool currentPageBookmarked = false;
   // Idle-time glyph prewarm: after a page settles, scan the LIKELY next page
   // (scan mode draws nothing) and load its missing glyphs from SD during idle,
   // so the next turn's in-render prewarm is a cache hit instead of ~100 ms of
@@ -70,12 +64,9 @@ class EpubReaderActivity final : public Activity {
   int idlePrewarmSpine = -1;
   int idlePrewarmPage = -1;
   unsigned long lastRenderCompleteMs = 0;
-  bool bookmarkRemoved = false;  // true when last toggle removed (controls popup text)
-  std::vector<BookmarkEntry> cachedBookmarks;
   // Tracks whether this book is currently removed from Recent Books by the
   // removeReadBooksFromRecents feature (set at End-of-Book, cleared if paged back in).
   bool recentsEntryRemoved = false;
-  unsigned long bookmarkMessageTime = 0UL;
   // Set when the reader is left at end-of-book and SETTINGS.moveFinishedToReadFolder is on.
   // Consumed in onExit() to relocate the finished book into /Read/.
   bool pendingReadFolderMove = false;
@@ -102,7 +93,7 @@ class EpubReaderActivity final : public Activity {
   bool partialRebuildStartFailed = false;
 
   // Last position persisted by render()'s saveProgress, used to skip redundant
-  // writeAtomic calls on no-op re-renders (menu/bookmark).
+  // writeAtomic calls on no-op re-renders.
   int lastSavedSpineIndex = -1;
   int lastSavedPage = -1;
   int lastSavedPageCount = -1;
@@ -199,11 +190,8 @@ class EpubReaderActivity final : public Activity {
   // stepReaderFontSize does. Clamps at TIGHT / WIDE; a step that would leave the three-slot
   // ramp does nothing at all (no settings write, no refresh).
   void stepReaderLineSpacing(int delta);
-  void toggleAutoPageTurn(uint8_t selectedPageTurnOption);
+  void openChapterSelection();
   void pageTurn(bool isForwardTurn);
-  void loadCachedBookmarks();
-  void addBookmark();
-  void updateBookmarkFlag();
 
   // Footnote navigation
   void navigateToHref(const std::string& href, bool savePosition = false);

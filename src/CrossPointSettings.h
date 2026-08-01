@@ -150,7 +150,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   enum LONG_PRESS_MENU_FUNCTION {
     LP_MENU_KOSYNC = 0,
     LP_MENU_DISABLED = 1,
-    LP_MENU_BOOKMARK = 2,
     LONG_PRESS_MENU_FUNCTION_COUNT
   };
 
@@ -291,7 +290,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // tap. Every fresh install therefore turns pages on release.
   uint8_t longPressButtonBehavior = FONT_SIZE_STEP;
   // Long-press Confirm function in EPUB reader (cycles through LONG_PRESS_MENU_FUNCTION values).
-  // Defaults to Disabled so shortcut-based bookmark toggling remains opt-in.
+  // Defaults to Disabled so the long-press stays inert unless the owner opts in.
   uint8_t longPressMenuFunction = LP_MENU_DISABLED;
   // UI Theme. Fresh installs only: any device that has ever written
   // settings.json already has a uiTheme key and keeps whatever it holds.

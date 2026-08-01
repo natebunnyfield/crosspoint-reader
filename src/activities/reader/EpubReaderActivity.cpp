@@ -16,8 +16,6 @@
 #include <iterator>
 #include <limits>
 
-#include "../../util/BookmarkFile.h"
-#include "BookmarkEntry.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "EpubReaderFootnotesActivity.h"
@@ -30,17 +28,14 @@
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
+#include "EpubReaderChapterSelectionActivity.h"
 #include "activities/settings/FontSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "util/BookmarkUtil.h"
 
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
 // pages per minute, first item is 1 to prevent division by zero if accessed
-constexpr int PAGE_TURN_RATES[] = {1, 1, 3, 6, 12};
-constexpr size_t initialBookmarkCacheCapacity = 16;
-constexpr float bookmarkProgressEpsilon = 0.0001f;
 
 // SD card folder finished books are moved into. Single source of truth for the path.
 // constexpr ⇒ lives in flash .rodata, no DRAM cost.
@@ -69,18 +64,6 @@ ProgressRange getPageProgressRange(const std::shared_ptr<Epub>& epub, const int 
   const float start = std::max(0.0f, anchor - (step * 0.5f));
   const float end = std::min(1.0f, anchor + (step * 0.5f));
   return {epub->calculateProgress(spineIndex, start), epub->calculateProgress(spineIndex, end)};
-}
-
-bool bookmarkMatchesProgress(const BookmarkEntry& bookmark, const int spineIndex, const int page, const int pageCount,
-                             const ProgressRange& pageRange) {
-  if (bookmark.computedSpineIndex == spineIndex && bookmark.computedChapterPageCount == pageCount &&
-      bookmark.computedChapterProgress == page) {
-    return true;
-  }
-
-  const float bookmarkProgress = std::clamp(bookmark.percentage, 0.0f, 1.0f);
-  return bookmarkProgress + bookmarkProgressEpsilon >= pageRange.start &&
-         bookmarkProgress - bookmarkProgressEpsilon <= pageRange.end;
 }
 
 // Pick a non-colliding destination path inside /Read/ for a finished book.
@@ -192,7 +175,6 @@ void EpubReaderActivity::onEnter() {
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(epub->getPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
 
-  loadCachedBookmarks();
 
   // Trigger first update
   requestUpdate();
@@ -404,41 +386,10 @@ void EpubReaderActivity::loop() {
 
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
 
-  if (automaticPageTurnActive) {
-    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
-        mappedInput.wasReleased(MappedInputManager::Button::Back) || ReaderUtils::isTouchMenuGesture(mappedInput)) {
-      automaticPageTurnActive = false;
-      // updates chapter title space to indicate page turn disabled
-      requestUpdate();
-      return;
-    }
-
-    if (!section) {
-      requestUpdate();
-      return;
-    }
-
-    // Skips page turn if renderingMutex is busy
-    if (RenderLock::peek()) {
-      lastPageTurnTime = millis();
-      return;
-    }
-
-    if ((millis() - lastPageTurnTime) >= pageTurnDuration) {
-      pageTurn(true);
-      return;
-    }
-  }
-
-  if (showBookmarkMessage && (millis() - bookmarkMessageTime) >= ReaderUtils::BOOKMARK_MESSAGE_DURATION_MS) {
-    showBookmarkMessage = false;
-    requestUpdate();
-  }
-
   // While the end screen suggestion menu is showing it owns Confirm/Back/navigation
   // input. Anything it doesn't handle (e.g. long-press Back to the file browser) falls
   // through to the regular handlers below; page turns are absorbed by the end-of-book
-  // block. A Confirm release after a long-press function (bookmark/sync) fired is left
+  // block. A Confirm release after a long-press function (KOReader sync) fired is left
   // to the regular Confirm handler below, which consumes it via ignoreNextConfirmRelease.
   // `!sideChordConsumed` for the same reason as the ignoreNextConfirmRelease term beside
   // it: a leftover edge from a gesture already acted on must not be dispatched again here.
@@ -477,11 +428,10 @@ void EpubReaderActivity::loop() {
   // Read here, ahead of every Confirm and side-button handler below, because a chord must
   // produce exactly ONE action. Three of the reader's existing gestures overlap it and are
   // gated off in three different places:
-  //   1. the long-press Confirm function (bookmark / KOReader sync) — guarded immediately
+  //   1. the long-press Confirm function (KOReader sync) — guarded immediately
   //      below on `confirmModifierUsed` and on "a side button is down";
-  //   2. the reader menu on Confirm RELEASE — suppressed through the existing
-  //      ignoreNextConfirmRelease latch, set where the chord acts (same precedent as the
-  //      bookmark path);
+  //   2. chapter select on Confirm RELEASE — suppressed through the existing
+  //      ignoreNextConfirmRelease latch, set where the chord acts;
   //   3. the side button's own gestures — font SIZE on tap, font FAMILY on hold, and the page
   //      turn from detectPageTurn() — all skipped by the chord block further down, for the
   //      press AND for the release that ends it.
@@ -509,15 +459,17 @@ void EpubReaderActivity::loop() {
     confirmModifierUsed = false;  // hold is over: re-arm for the next chord
   }
 
-  // Enter reader menu activity on short-press Confirm or a downward swipe from the top edge.
-  // A long-press that fired a bound function (bookmark or KOReader sync) sets
-  // ignoreNextConfirmRelease so the release following the hold does not also open the menu;
-  // so does a line-spacing chord.
-  // There is no reader menu — the book is the whole surface. The release is
-  // still consumed so the latch set by a long-press or chord does not leak into
-  // the next one.
+  // Chapter select on short-press Confirm or a downward swipe from the top edge. There is no
+  // reader menu — jumping to a chapter is the one thing Confirm does.
+  //
+  // A long-press that fired a bound function (KOReader sync) sets ignoreNextConfirmRelease so
+  // the release ending the hold does not also open chapter select; so does a line-spacing chord.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput)) {
-    ignoreNextConfirmRelease = false;
+    if (ignoreNextConfirmRelease) {
+      ignoreNextConfirmRelease = false;
+    } else {
+      openChapterSelection();
+    }
   }
 
   // Long-press Confirm runs the user-selected function (SETTINGS.longPressMenuFunction).
@@ -544,16 +496,6 @@ void EpubReaderActivity::loop() {
   // same way.
   if (confirmModifierDown && !confirmModifierUsed && !sideHeldNow.any()) {
     switch (SETTINGS.longPressMenuFunction) {
-      case CrossPointSettings::LP_MENU_BOOKMARK:
-        // Hold ~0.4s drops a bookmark at the current page.
-        if (mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && !showBookmarkMessage) {
-          addBookmark();
-          showBookmarkMessage = true;
-          ignoreNextConfirmRelease = true;  // swallow the release that ends this hold
-          bookmarkMessageTime = millis();
-          requestUpdate();
-        }
-        break;
       case CrossPointSettings::LP_MENU_KOSYNC:
         // Hold ~1s launches KOReader sync. If sync can't run (no credentials stored), fall
         // through and let the Confirm release be handled normally.
@@ -1003,29 +945,27 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
   requestUpdate();
 }
 
-void EpubReaderActivity::toggleAutoPageTurn(const uint8_t selectedPageTurnOption) {
-  if (selectedPageTurnOption == 0 || selectedPageTurnOption >= std::size(PAGE_TURN_RATES)) {
-    automaticPageTurnActive = false;
-    return;
-  }
+void EpubReaderActivity::openChapterSelection() {
+  const int spineIdx = currentSpineIndex;
+  const std::string path = epub->getPath();
+  startActivityForResult(std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path,
+                                                                             spineIdx),
+                         [this](const ActivityResult& result) {
+                           if (!result.isCancelled) {
+                             const auto& chapterResult = std::get<ChapterResult>(result.data);
+                             RenderLock lock(*this);
 
-  lastPageTurnTime = millis();
-  // calculates page turn duration by dividing by number of pages
-  pageTurnDuration = (1UL * 60 * 1000) / PAGE_TURN_RATES[selectedPageTurnOption];
-  automaticPageTurnActive = true;
+                             currentSpineIndex = chapterResult.spineIndex;
 
-  const uint8_t statusBarHeight = UITheme::getInstance().getStatusBarHeight();
-  // resets cached section so that space is reserved for auto page turn indicator when None or progress bar only
-  if (statusBarHeight == 0 || statusBarHeight == UITheme::getInstance().getProgressBarHeight()) {
-    // Preserve current reading position so we can restore after reflow.
-    RenderLock lock(*this);
-    if (section) {
-      cachedSpineIndex = currentSpineIndex;
-      cachedChapterTotalPageCount = section->pageCount;
-      nextPageNumber = section->currentPage;
-    }
-    section.reset();
-  }
+                             // If anchor is not empty, it will be used later to calculate the page number.
+                             pendingAnchor = chapterResult.anchor;
+
+                             // Otherwise page 0 will be used.
+                             nextPageNumber = 0;
+
+                             section.reset();
+                           }
+                         });
 }
 
 void EpubReaderActivity::pageTurn(bool isForwardTurn) {
@@ -1060,7 +1000,6 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn) {
       }
     }
   }
-  lastPageTurnTime = millis();
   requestUpdate();
 }
 
@@ -1082,7 +1021,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   const auto showBuildError = [this]() {
     renderer.clearScreen();
     GUI.drawPopup(renderer, tr(STR_INDEX_FAILED));
-    automaticPageTurnActive = false;
   };
 
   // edge case handling for sub-zero spine index
@@ -1102,7 +1040,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     renderer.clearScreen();
     endOfBookOptions.render(renderer, mappedInput);
     renderer.displayBuffer();
-    automaticPageTurnActive = false;
     showPendingSyncSaveError();
     return;
   }
@@ -1116,16 +1053,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   orientedMarginRight += SETTINGS.screenMargin;
 
   const uint8_t statusBarHeight = UITheme::getInstance().getStatusBarHeight();
-
-  // reserves space for automatic page turn indicator when no status bar or progress bar only
-  if (automaticPageTurnActive &&
-      (statusBarHeight == 0 || statusBarHeight == UITheme::getInstance().getProgressBarHeight())) {
-    orientedMarginBottom +=
-        std::max(SETTINGS.screenMargin,
-                 static_cast<uint8_t>(statusBarHeight + UITheme::getInstance().getMetrics().statusBarVerticalMargin));
-  } else {
-    orientedMarginBottom += std::max(SETTINGS.screenMargin, statusBarHeight);
-  }
+  orientedMarginBottom += std::max(SETTINGS.screenMargin, statusBarHeight);
 
   const uint16_t viewportWidth = renderer.getScreenWidth() - orientedMarginLeft - orientedMarginRight;
   const uint16_t viewportHeight = renderer.getScreenHeight() - orientedMarginTop - orientedMarginBottom;
@@ -1398,7 +1326,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_EMPTY_CHAPTER), true, EpdFontFamily::BOLD);
     renderStatusBar();
     renderer.displayBuffer();
-    automaticPageTurnActive = false;
     showPendingSyncSaveError();
     return;
   }
@@ -1408,12 +1335,10 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_OUT_OF_BOUNDS), true, EpdFontFamily::BOLD);
     renderStatusBar();
     renderer.displayBuffer();
-    automaticPageTurnActive = false;
     showPendingSyncSaveError();
     return;
   }
 
-  updateBookmarkFlag();
 
   {
     // Unified page read: the in-progress build's in-RAM table if it has reached the page,
@@ -1421,7 +1346,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     auto p = section->loadPage(section->currentPage);
     if (!p) {
       LOG_ERR("ERS", "Failed to load page from SD - clearing section cache");
-      automaticPageTurnActive = false;
       // Retrying rebuilds a transiently corrupt section and usually recovers, but a page that keeps
       // failing would loop forever on a blank screen, so bound the retries before giving up.
       const bool giveUp = ++pageLoadRetryCount > MAX_PAGE_LOAD_RETRIES;
@@ -1453,8 +1377,8 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     LOG_DBG("ERS", "Rendered page in %dms", millis() - start);
     lastRenderCompleteMs = millis();
   }
-  // Only persist when the position actually changed. render() also runs on menu,
-  // bookmark re-renders, and writeAtomic is several FAT ops for 6 bytes.
+  // Only persist when the position actually changed. render() also runs on re-renders that
+  // do not move the position, and writeAtomic is several FAT ops for 6 bytes.
   // Every real page turn changes currentPage, so progress durability is unaffected.
   if (currentSpineIndex != lastSavedSpineIndex || section->currentPage != lastSavedPage ||
       section->pageCount != lastSavedPageCount) {
@@ -1466,11 +1390,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   }
 
   showPendingSyncSaveError();
-
-  if (showBookmarkMessage) {
-    GUI.drawPopup(renderer, bookmarkRemoved ? tr(STR_BOOKMARK_REMOVED) : tr(STR_BOOKMARK_ADDED));
-  }
-
 }
 
 bool EpubReaderActivity::applyDeferredReposition() {
@@ -1802,18 +1721,7 @@ void EpubReaderActivity::renderStatusBar() const {
   int textYOffset = 0;
   const auto sb = SETTINGS.statusBarSpec();
 
-  if (automaticPageTurnActive) {
-    title = tr(STR_AUTO_TURN_ENABLED) + std::to_string(60 * 1000 / pageTurnDuration);
-
-    // calculates textYOffset when rendering title in status bar
-    const uint8_t statusBarHeight = UITheme::getInstance().getStatusBarHeight();
-
-    // offsets text if no status bar or progress bar only
-    if (statusBarHeight == 0 || statusBarHeight == UITheme::getInstance().getProgressBarHeight()) {
-      textYOffset += UITheme::getInstance().getMetrics().statusBarVerticalMargin;
-    }
-
-  } else if (sb.titleMode == CrossPointSettings::STATUS_BAR_TITLE::CHAPTER_TITLE) {
+  if (sb.titleMode == CrossPointSettings::STATUS_BAR_TITLE::CHAPTER_TITLE) {
     title = tr(STR_UNNAMED);
     const int tocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
     if (tocIndex != -1) {
@@ -1825,7 +1733,7 @@ void EpubReaderActivity::renderStatusBar() const {
     title = epub->getTitle();
   }
 
-  GUI.drawStatusBar(renderer, bookProgress, currentPage, pageCount, title, 0, textYOffset, true, currentPageBookmarked,
+  GUI.drawStatusBar(renderer, bookProgress, currentPage, pageCount, title, 0, textYOffset, true,
                     section->isBuilding());
 }
 
@@ -1886,81 +1794,6 @@ void EpubReaderActivity::restoreSavedPosition() {
     section.reset();
   }
   requestUpdate();
-}
-
-void EpubReaderActivity::loadCachedBookmarks() {
-  cachedBookmarks.clear();
-  if (cachedBookmarks.capacity() < initialBookmarkCacheCapacity) {
-    cachedBookmarks.reserve(initialBookmarkCacheCapacity);
-  }
-  if (!epub) {
-    currentPageBookmarked = false;
-    return;
-  }
-
-  BookmarkFile::load(epub->getPath(), cachedBookmarks);
-  updateBookmarkFlag();
-}
-
-void EpubReaderActivity::addBookmark() {
-  if (!section || !epub) {
-    return;
-  }
-  LOG_DBG("ERS", "Toggle bookmark at spine %d, page %d", currentSpineIndex, section ? section->currentPage : -1);
-  int currentPage;
-  int pageCount;
-  {
-    RenderLock lock(*this);
-    pageCount = section->estimatedTotalPages();
-    currentPage = section->currentPage;
-  }
-
-  SavedProgressPosition progress = ProgressMapper::toSavedProgress(epub, getCurrentPosition());
-  const ProgressRange pageRange = getPageProgressRange(epub, currentSpineIndex, currentPage, pageCount);
-
-  const size_t bookmarkCountBeforeToggle = cachedBookmarks.size();
-  cachedBookmarks.erase(std::remove_if(cachedBookmarks.begin(), cachedBookmarks.end(),
-                                       [&](const BookmarkEntry& b) {
-                                         return bookmarkMatchesProgress(b, currentSpineIndex, currentPage, pageCount,
-                                                                        pageRange);
-                                       }),
-                        cachedBookmarks.end());
-  if (cachedBookmarks.size() != bookmarkCountBeforeToggle) {
-    bookmarkRemoved = true;
-    currentPageBookmarked = false;
-  } else {
-    std::string pageText;
-    if (currentPage >= 0 && currentPage < pageCount) {
-      pageText = section->getTextFromSectionFile();
-    }
-    BookmarkEntry entry;
-    entry.percentage = progress.percentage;
-    entry.xpath = progress.xpath;
-    entry.summary = BookmarkUtil::sanitizeBookmarkSummary(pageText);
-    entry.computedSpineIndex = currentSpineIndex;
-    entry.computedChapterPageCount = pageCount;
-    entry.computedChapterProgress = currentPage;
-    cachedBookmarks.insert(cachedBookmarks.begin(), entry);
-    bookmarkRemoved = false;
-    currentPageBookmarked = true;
-  }
-
-  if (!BookmarkFile::save(epub->getPath(), cachedBookmarks)) {
-    LOG_ERR("ERS", "Failed to save bookmarks");
-  }
-  requestUpdate();
-}
-
-void EpubReaderActivity::updateBookmarkFlag() {
-  if (!section || !epub || cachedBookmarks.empty()) {
-    currentPageBookmarked = false;
-    return;
-  }
-  const int pageCount = section->estimatedTotalPages();
-  const ProgressRange pageRange = getPageProgressRange(epub, currentSpineIndex, section->currentPage, pageCount);
-  currentPageBookmarked = std::any_of(cachedBookmarks.begin(), cachedBookmarks.end(), [&](const BookmarkEntry& b) {
-    return bookmarkMatchesProgress(b, currentSpineIndex, section->currentPage, pageCount, pageRange);
-  });
 }
 
 CrossPointPosition EpubReaderActivity::getCurrentPosition() const {

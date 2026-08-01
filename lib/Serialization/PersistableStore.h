@@ -42,7 +42,7 @@ class PersistableStoreBase {
   bool resaveRequested = false;
 
  public:
-  // Public so non-store JSON files (e.g. per-book bookmarks) can reuse them
+  // Public so non-store JSON files can reuse them
   // instead of instantiating serializeJson/deserializeJson in their own TU —
   // that per-TU duplication is exactly what this class exists to prevent.
 
