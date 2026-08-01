@@ -60,9 +60,19 @@ real `GfxRenderer` / `SdCardFont` path rather than a host reimplementation.
     CPFONT_DIR=/.fonts ./render_harness fonts RosarivoV1 Rosarivo
     # -> ./fs_/kern_specimen_{12,14,16,18}.bmp, plus per-line widths on stdout
 
-Install each family under `./fs_/.fonts/<Family>/<Family>_<size>.cpfont`.
-`CPFONT_DIR` is a *device-style* path (`/.fonts`); the stub HalStorage prefixes
-`./fs_`, so the default `./fs_/.fonts` double-prefixes and finds nothing.
+Families live under `./fs_/.fonts/<Family>/` **and** `./fs_/fonts/<Family>/` —
+`SdCardFontRegistry` scans both roots and dedupes by name, hidden first, and the
+installed set routinely straddles the two (locally-sourced families in `.fonts`,
+`install-sim-fonts.py`-rebuildable ones in `fonts`). Leave `CPFONT_DIR` unset and
+the harness searches both the same way. Set it to pin one *device-style* root
+(`/.fonts`), or to empty to simulate "family not installed" and exercise the
+calendar's Noto fallback.
+
+Sizes are resolved **nearest-match, not by exact filename**, mirroring
+`family.findNearestSize()` ([SdCardFontManager.cpp:68](../../lib/EpdFont/SdCardFontManager.cpp)).
+Families ship different ladders — Venetian301 is 15/17/19/21, Inknut 10/12/14/16,
+Coelacanth 14/16/18/20 — and an earlier version of this stub assumed 12/14/16/18,
+which made every one of those fail to load with "not installed".
 
 **Kerning is not resident until a page is prewarmed.** `SdCardFont` keeps only
 a per-page mini kern matrix ([SdCardFont.h:179](../../lib/EpdFont/SdCardFont.h)),
