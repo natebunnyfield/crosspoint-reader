@@ -33,7 +33,6 @@
 #include "fontIds.h"
 #include "images/LoadingIcon.h"
 #include "util/ButtonNavigator.h"
-#include "util/ScreenshotUtil.h"
 
 GfxRenderer renderer(display);
 MappedInputManager mappedInputManager(gpio, renderer);
@@ -439,14 +438,11 @@ void setup() {
     activityManager.goHome();
   } else if (APP_STATE.openEpubPath.empty() || !APP_STATE.lastSleepFromReader ||
              mappedInputManager.isPressed(MappedInputManager::Button::Back) || APP_STATE.readerActivityLoadCount > 0) {
-    // Boot to home screen if no book is open, last sleep was not from reader, back button is held, or reader activity
-    // crashed (indicated by readerActivityLoadCount > 0)
-#if defined(CROSSPOINT_ZEN)
-    // Zen build: the device IS the current book. Boot into the last-open book
-    // whenever one is known, else the first EPUB on the card. Home remains the
-    // escape hatch for the cases above that need it: crash recovery
-    // (readerActivityLoadCount) and holding BACK during boot — the one
-    // deliberate way out, so a bad book cannot brick the build.
+    // The device IS the current book: boot into the last-open one whenever it is
+    // known, else the first EPUB on the card. Home exists only as the escape
+    // hatch for the two cases that need it — crash recovery
+    // (readerActivityLoadCount) and holding BACK during boot — so a bad book
+    // cannot brick the device.
     if (!mappedInputManager.isPressed(MappedInputManager::Button::Back) &&
         APP_STATE.readerActivityLoadCount == 0) {
       std::string zenPath = APP_STATE.openEpubPath;
@@ -477,9 +473,6 @@ void setup() {
     } else {
       activityManager.goHome();
     }
-#else
-    activityManager.goHome();
-#endif
   } else {
     // Clear app state to avoid getting into a boot loop if the epub doesn't load
     const auto path = APP_STATE.openEpubPath;
@@ -551,37 +544,6 @@ void loop() {
       activityManager.preventAutoSleep()) {
     lastActivityTime = millis();         // Reset inactivity timer
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
-  }
-
-  static bool screenshotButtonsReleased = true;
-  static bool screenshotComboActive = false;
-#if defined(CROSSPOINT_ZEN)
-  // Zen build: no screenshots. The combo would also delay hold-to-sleep.
-  screenshotButtonsReleased = true;
-  screenshotComboActive = false;
-  if (false) {
-#else
-  if (gpio.isPressed(HalGPIO::BTN_POWER) && gpio.isPressed(HalGPIO::BTN_DOWN)) {
-#endif
-    screenshotComboActive = true;
-    if (screenshotButtonsReleased) {
-      screenshotButtonsReleased = false;
-      {
-        RenderLock lock;
-        ScreenshotUtil::takeScreenshot(renderer);
-      }
-    }
-    return;
-  }
-  if (screenshotComboActive) {
-    if (gpio.isPressed(HalGPIO::BTN_POWER)) return;
-    if (gpio.wasReleased(HalGPIO::BTN_POWER)) {
-      screenshotButtonsReleased = true;
-      screenshotComboActive = false;
-      return;
-    }
-    screenshotButtonsReleased = true;
-    screenshotComboActive = false;
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();

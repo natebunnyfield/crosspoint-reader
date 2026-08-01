@@ -583,15 +583,11 @@ void EpubReaderActivity::loop() {
   // A long-press that fired a bound function (bookmark or KOReader sync) sets
   // ignoreNextConfirmRelease so the release following the hold does not also open the menu;
   // so does a line-spacing chord.
+  // There is no reader menu — the book is the whole surface. The release is
+  // still consumed so the latch set by a long-press or chord does not leak into
+  // the next one.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput)) {
-    if (ignoreNextConfirmRelease) {
-      ignoreNextConfirmRelease = false;
-    } else {
-#if !defined(CROSSPOINT_ZEN)
-      // Zen build: there is no reader menu — the book is the whole surface.
-      openReaderMenu();
-#endif
-    }
+    ignoreNextConfirmRelease = false;
   }
 
   // Long-press Confirm runs the user-selected function (SETTINGS.longPressMenuFunction).
@@ -635,17 +631,6 @@ void EpubReaderActivity::loop() {
             ignoreNextConfirmRelease = true;  // sync launched or error shown; suppress menu open
             return;
           }
-        }
-        break;
-      case CrossPointSettings::LP_MENU_DICTIONARY:
-        // Hold ~0.4s starts dictionary word selection on the current page.
-        if (mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && !showDictionaryMessage) {
-          ignoreNextConfirmRelease = true;  // Prevent menu open on the release that follows
-#if !defined(CROSSPOINT_ZEN)
-          // Zen build: no dictionary lookup, even via the long-press binding.
-          openDictionaryWordSelect();
-#endif
-          return;
         }
         break;
       case CrossPointSettings::LP_MENU_DISABLED:
