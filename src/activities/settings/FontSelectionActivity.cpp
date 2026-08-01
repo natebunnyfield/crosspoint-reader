@@ -207,24 +207,16 @@ void FontSelectionActivity::loop() {
 }
 
 void FontSelectionActivity::changeFontSize(int delta) {
-  // The selectable sizes are the point sizes the active family actually ships
-  // (readerFontPointSizes never returns empty — it falls back to the built-in
-  // ramp). Clamp rather than wrap: wrapping from the largest size back to the
-  // smallest reads as a glitch, and clamping makes the ends of the range
-  // perceptible.
+  // Steps the SLOT, not a point size: the slot is what persists and what
+  // survives a family switch. Clamp rather than wrap — wrapping from the largest
+  // size back to the smallest reads as a glitch, and clamping makes the ends of
+  // the range perceptible. readerFontPointSizes never returns empty (it falls
+  // back to the built-in ramp), so its size bounds the slot.
   const std::vector<uint8_t> sizes = readerFontPointSizes(registry_, SETTINGS.sdFontFamilyName);
   if (sizes.empty()) return;
-  const uint8_t current = snapToNearestPointSize(sizes, SETTINGS.fontPointSize);
-  int idx = 0;
-  for (int i = 0; i < static_cast<int>(sizes.size()); i++) {
-    if (sizes[i] == current) {
-      idx = i;
-      break;
-    }
-  }
-  const int nextIdx = std::clamp(idx + delta, 0, static_cast<int>(sizes.size()) - 1);
-  const uint8_t next = sizes[nextIdx];
-  if (next == SETTINGS.fontPointSize) return;
+  const int maxSlot = static_cast<int>(sizes.size()) - 1;
+  const int nextSlot = std::clamp(static_cast<int>(SETTINGS.fontSizeSlot) + delta, 0, maxSlot);
+  if (nextSlot == static_cast<int>(SETTINGS.fontSizeSlot)) return;
 
   {
     // RenderLock is REQUIRED here, not defensive. ActivityManager::loop() calls
@@ -238,10 +230,11 @@ void FontSelectionActivity::changeFontSize(int delta) {
     // that is a LoadProhibited panic or garbled glyphs; the host simulator
     // renders in 5-8ms so the window never opens there.
     //
-    // Also serialises the SETTINGS.fontPointSize write itself, which the render
-    // task reads every frame (resolvedPointSize / getReaderFontId).
+    // Also serialises the SETTINGS.fontSizeSlot / fontPointSize writes, which
+    // the render task reads every frame (resolvedPointSize / getReaderFontId).
     RenderLock lock(*this);
-    SETTINGS.fontPointSize = next;
+    SETTINGS.fontSizeSlot = static_cast<uint8_t>(nextSlot);
+    SETTINGS.fontPointSize = sizes[nextSlot];
     // An SD family keeps only one point size resident, so the new size has to be
     // loaded before the preview can draw at it. Built-in faces just resolve to a
     // different font ID.
@@ -289,17 +282,16 @@ uint8_t FontSelectionActivity::resolvedPointSize() const {
   // family wins if it resolves, otherwise it falls through to the built-in ramp.
   if (SETTINGS.sdFontFamilyName[0] != '\0' && registry_ != nullptr) {
     if (const auto* family = registry_->findFamily(SETTINGS.sdFontFamilyName)) {
-      // An SD family only ships the sizes it ships; findNearestSize snaps the
-      // stored point size onto that family's own set, which is why this can
-      // differ from the built-in ramp for the same stored value.
-      if (const auto* file = family->findNearestSize(SETTINGS.fontPointSize)) return file->pointSize;
+      // An SD family only ships the sizes it ships; the slot indexes into that
+      // family's own ramp, which is why the same slot is a different point size
+      // here than on the built-in ramp.
+      if (const auto* file = family->findClosestReaderSize(SETTINGS.fontSizeSlot)) return file->pointSize;
     }
   }
 
-  // Built-in faces are compiled at a fixed ramp; getReaderFontId() snaps the
-  // stored point size onto it for both NotoSerif and NotoSans.
-  return snapToNearestPointSize(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES),
-                                SETTINGS.fontPointSize);
+  // Built-in faces are compiled at a fixed ramp; the slot indexes straight into
+  // it for both NotoSerif and NotoSans.
+  return pointSizeForSlot(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), SETTINGS.fontSizeSlot);
 }
 
 void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, const char* fontName) const {
@@ -329,7 +321,12 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
   char scratch[256];
   const uint8_t pointSize = resolvedPointSize();
   if (pointSize > 0) {
-    snprintf(scratch, sizeof(scratch), "%s \"%s\" — %upt", tr(STR_PREVIEW), fontName ? fontName : "", pointSize);
+    // Slot first, then what it resolves to on this family: the slot is the thing
+    // the owner selected and the only part that means the same across families.
+    static constexpr const char* SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"S", "M", "L", "XL"};
+    const uint8_t slot = SETTINGS.fontSizeSlot < READER_FONT_SLOT_COUNT ? SETTINGS.fontSizeSlot : 0;
+    snprintf(scratch, sizeof(scratch), "%s \"%s\" — %s (%upt)", tr(STR_PREVIEW), fontName ? fontName : "",
+             SLOT_NAMES[slot], pointSize);
   } else {
     snprintf(scratch, sizeof(scratch), "%s \"%s\"", tr(STR_PREVIEW), fontName ? fontName : "");
   }

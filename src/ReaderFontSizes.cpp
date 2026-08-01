@@ -27,3 +27,23 @@ uint8_t snapToNearestPointSize(const uint8_t* sizes, const size_t count, const u
   }
   return best;
 }
+
+uint8_t pointSizeForSlot(const uint8_t* sizes, const size_t count, const uint8_t slot) {
+  if (!sizes || count == 0) return 0;
+  return sizes[slot < count ? slot : count - 1];
+}
+
+uint8_t slotForPointSize(const uint8_t* sizes, const size_t count, const uint8_t pt) {
+  if (!sizes || count == 0) return 0;
+  uint8_t best = 0;
+  uint8_t bestDelta = sizes[0] > pt ? sizes[0] - pt : pt - sizes[0];
+  for (size_t i = 1; i < count; i++) {
+    const uint8_t delta = sizes[i] > pt ? sizes[i] - pt : pt - sizes[i];
+    // Strictly-less keeps the smaller slot on a tie, matching snapToNearestPointSize().
+    if (delta < bestDelta) {
+      best = static_cast<uint8_t>(i);
+      bestDelta = delta;
+    }
+  }
+  return best;
+}

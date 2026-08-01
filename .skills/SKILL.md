@@ -987,8 +987,11 @@ rm -rf /path/to/sd/.crosspoint/epub_<hash>/sections/
 **Source**: `lib/Epub/Epub/Section.cpp`, `lib/Epub/Epub/BookMetadataCache.cpp`
 
 **Current Versions** (as of docs/file-formats.md):
-- `book.bin`: **Version 7** (metadata structure)
-- `section.bin`: **Version 25** (layout structure)
+- `book.bin`: **Version 10** (metadata structure)
+- `section.bin`: **Version 34** (layout structure)
+- `progress.bin`: **no version byte** — its LENGTH discriminates. 4 bytes =
+  spine+page, 6 adds the chapter page count, 8 adds the paragraph index the
+  reader was on. Shorter files still load and degrade gracefully.
 
 **Version Increment Rules**:
 1. **ALWAYS increment version** BEFORE changing binary structure

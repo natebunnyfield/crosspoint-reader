@@ -73,11 +73,15 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   enum FONT_FAMILY { NOTOSERIF = 0, NOTOSANS = 1, FONT_FAMILY_COUNT };
   static constexpr uint8_t LEGACY_OPENDYSLEXIC = 2;
   static constexpr uint8_t BUILTIN_FONT_COUNT = FONT_FAMILY_COUNT;
-  // Reader font size is a point size, not an enum slot — see fontPointSize.
-  // Legacy 1.4-and-earlier files stored a 0..3 SMALL/MEDIUM/LARGE/EXTRA_LARGE
-  // slot; fromJson() folds that range up (see LEGACY_FONT_SIZE_MAX).
+  // Reader font size is a SLOT (S/M/L/XL) again — see fontSizeSlot. 1.5 stored an
+  // absolute point size, which broke every family switch because families ship
+  // harmonized-but-different ramps; that is what "fontSize" still holds on disk.
+  // 1.4-and-earlier ALSO stored a 0..3 slot there, so a value in 0..3 read from
+  // "fontSize" is a 1.4 file and folds up via LEGACY_FONT_SIZE_MAX. The new
+  // "fontSizeSlot" key exists precisely because 0..3 is ambiguous in the old one.
   static constexpr uint8_t LEGACY_FONT_SIZE_MAX = 3;
   static constexpr uint8_t DEFAULT_FONT_POINT_SIZE = 14;
+  static constexpr uint8_t DEFAULT_FONT_SIZE_SLOT = 1;  // M, = 14pt on the built-in ramp
   enum LINE_COMPRESSION { TIGHT = 0, NORMAL = 1, WIDE = 2, LINE_COMPRESSION_COUNT };
   enum PARAGRAPH_ALIGNMENT {
     JUSTIFIED = 0,
@@ -206,10 +210,18 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t frontButtonRight = FRONT_HW_RIGHT;
   // Reader font settings
   uint8_t fontFamily = NOTOSERIF;
-  // Point size of the reader font. Only sizes the active family actually ships
-  // are selectable; SdCardFontSystem::ensureLoaded() snaps this to the nearest
-  // available size (and persists the snap) whenever the family changes.
+  // Reader font size, as a slot into the active family's ascending size ramp.
+  // THIS is the persisted truth; it is family-independent, so switching family
+  // keeps the apparent size instead of dragging an absolute pt across ramps.
+  uint8_t fontSizeSlot = DEFAULT_FONT_SIZE_SLOT;
+  // Point size the slot currently resolves to. DERIVED, not persisted truth:
+  // SdCardFontSystem::resolveReaderPointSize() refreshes it whenever the family
+  // or slot changes. It exists so getReaderFontId() — which runs in the page
+  // render loop and must not allocate — has a plain point size to switch on.
   uint8_t fontPointSize = DEFAULT_FONT_POINT_SIZE;
+  // Set when a pre-slot settings file was read: the slot cannot be derived until
+  // the font registry exists, so SdCardFontSystem::begin() does it once and saves.
+  bool fontSlotNeedsMigration = false;
   uint8_t lineSpacing = NORMAL;
   uint8_t paragraphAlignment = JUSTIFIED;
   // Auto-sleep timeout setting (default 10 minutes). Legacy sleepTimeout enum values are migration-only.

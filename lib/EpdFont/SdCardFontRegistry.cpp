@@ -34,6 +34,20 @@ const SdCardFontFileInfo* SdCardFontFamilyInfo::findNearestSize(const uint8_t po
   return best;
 }
 
+const SdCardFontFileInfo* SdCardFontFamilyInfo::findClosestReaderSize(const uint8_t slot, const uint8_t style) const {
+  // Collect this style's sizes in ascending order, then index by slot. Done
+  // against `files` directly rather than availableSizes() so a family that ships
+  // a style at fewer sizes still clamps within what that style actually has.
+  std::vector<uint8_t> sizes;
+  for (const auto& f : files) {
+    if (f.style != style) continue;
+    if (std::find(sizes.begin(), sizes.end(), f.pointSize) == sizes.end()) sizes.push_back(f.pointSize);
+  }
+  if (sizes.empty()) return nullptr;
+  std::sort(sizes.begin(), sizes.end());
+  return findFile(sizes[slot < sizes.size() ? slot : sizes.size() - 1], style);
+}
+
 bool SdCardFontFamilyInfo::hasSize(uint8_t size) const {
   for (const auto& f : files) {
     if (f.pointSize == size) return true;

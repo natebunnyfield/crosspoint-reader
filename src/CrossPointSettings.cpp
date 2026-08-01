@@ -90,6 +90,9 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // Font family and size — both use dynamic getter/setters in SettingsList (the
   // option lists depend on the SD font registry), so the generic loop skips them.
   doc["fontFamily"] = fontFamily;
+  doc["fontSizeSlot"] = fontSizeSlot;
+  // The resolved point size is written too, and is what pre-slot firmware reads
+  // back from "fontSize" if this card is moved to an older build.
   doc["fontSize"] = fontPointSize;
   // SD card font family name — not in SettingsList, save manually
   if (sdFontFamilyName[0] != '\0') {
@@ -224,6 +227,15 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
     needsResave = true;
   }
   fontPointSize = storedFontSize;
+  if (doc["fontSizeSlot"].isNull()) {
+    // Pre-slot file. The slot has to come from the point size measured against
+    // the ACTIVE family's ramp, and the registry does not exist yet at load time
+    // (main.cpp loads settings well before sdFontSystem.begin()), so defer it.
+    fontSlotNeedsMigration = true;
+    needsResave = true;
+  } else {
+    fontSizeSlot = clamp(doc["fontSizeSlot"] | DEFAULT_FONT_SIZE_SLOT, READER_FONT_SLOT_COUNT, DEFAULT_FONT_SIZE_SLOT);
+  }
 
   // Font family — uses dynamic getter/setter in SettingsList so the generic loop skips it.
   const uint8_t storedFontFamily = doc["fontFamily"] | (uint8_t)0;
@@ -343,8 +355,9 @@ int CrossPointSettings::getRefreshFrequency() const {
 
 void CrossPointSettings::clearSdFontFamily() {
   sdFontFamilyName[0] = '\0';
-  fontPointSize =
-      snapToNearestPointSize(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), fontPointSize);
+  // The slot is family-independent, so it carries over untouched; only the
+  // resolved point size has to move onto the built-in ramp.
+  fontPointSize = pointSizeForSlot(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), fontSizeSlot);
   saveToFile();
 }
 

@@ -137,9 +137,9 @@ void EpubReaderActivity::onEnter() {
 
   HalFile f;
   if (Storage.openFileForRead("ERS", epub->getCachePath() + "/progress.bin", f)) {
-    uint8_t data[6];
-    int dataSize = f.read(data, 6);
-    if (dataSize == 4 || dataSize == 6) {
+    uint8_t data[8];
+    int dataSize = f.read(data, 8);
+    if (dataSize == 4 || dataSize == 6 || dataSize == 8) {
       currentSpineIndex = data[0] + (data[1] << 8);
       nextPageNumber = data[2] + (data[3] << 8);
       if (nextPageNumber == UINT16_MAX) {
@@ -152,8 +152,13 @@ void EpubReaderActivity::onEnter() {
       cachedSpineIndex = currentSpineIndex;
       LOG_DBG("ERS", "Loaded cache: %d, %d", currentSpineIndex, nextPageNumber);
     }
-    if (dataSize == 6) {
+    if (dataSize == 6 || dataSize == 8) {
       cachedChapterTotalPageCount = data[4] + (data[5] << 8);
+    }
+    if (dataSize == 8) {
+      // Re-arms the exact reposition across an activity teardown, which is what
+      // the Text Settings font and size controls go through.
+      pendingParagraphAnchor = static_cast<uint16_t>(data[6] + (data[7] << 8));
     }
   }
   // We may want a better condition to detect if we are opening for the first time.
@@ -680,22 +685,16 @@ void EpubReaderActivity::stepReaderFontSize(const int delta) {
   // step walks that list. Clamped at the ends rather than wrapped, for the same
   // "the end of the range must be perceptible" reason
   // ReaderUtils::steppedLineSpacing clamps.
+  // Steps the SLOT. Mirrors FontSelectionActivity::changeFontSize so a side-button
+  // hold and the Text Settings control walk the same ramp.
   const std::vector<uint8_t> sizes = readerFontPointSizes(&sdFontSystem.registry(), SETTINGS.sdFontFamilyName);
   if (sizes.empty()) return;
-  const uint8_t current = snapToNearestPointSize(sizes, SETTINGS.fontPointSize);
-  int idx = 0;
-  for (int i = 0; i < static_cast<int>(sizes.size()); i++) {
-    if (sizes[i] == current) {
-      idx = i;
-      break;
-    }
-  }
-  int nextIdx = idx + delta;
-  if (nextIdx < 0) nextIdx = 0;
-  if (nextIdx >= static_cast<int>(sizes.size())) nextIdx = static_cast<int>(sizes.size()) - 1;
-  const uint8_t next = sizes[nextIdx];
+  int nextSlot = static_cast<int>(SETTINGS.fontSizeSlot) + delta;
+  if (nextSlot < 0) nextSlot = 0;
+  if (nextSlot >= static_cast<int>(sizes.size())) nextSlot = static_cast<int>(sizes.size()) - 1;
+  const uint8_t next = sizes[nextSlot];
 
-  if (next == SETTINGS.fontPointSize) {
+  if (nextSlot == static_cast<int>(SETTINGS.fontSizeSlot)) {
     // At an end of the ramp: nothing to persist (Resource Protocol 8 — no settings write
     // without a value change) and nothing to re-paginate. Return without requesting an
     // update: there is no longer a popup to draw, so a refresh here would spend a full
@@ -720,6 +719,12 @@ void EpubReaderActivity::stepReaderFontSize(const int delta) {
     if (section) {
       cachedSpineIndex = currentSpineIndex;
       cachedChapterTotalPageCount = section->pageCount;
+      // Capture a paragraph anchor while the OLD section is still alive. A page
+      // index cannot survive a reflow; a paragraph index can, and the LUT that
+      // resolves it is already written to every section file. The proportional
+      // remap in applyDeferredReposition() stays as the fallback for chapters
+      // whose LUT is degenerate (no <p> elements -> paragraph 0 on every page).
+      pendingParagraphAnchor = section->getParagraphIndexForPage(static_cast<uint16_t>(section->currentPage));
       nextPageNumber = section->currentPage;
     }
 
@@ -729,6 +734,7 @@ void EpubReaderActivity::stepReaderFontSize(const int delta) {
     // those glyph tables. Same ordering, same reason, as the TEXT_SETTINGS case.
     section.reset();
 
+    SETTINGS.fontSizeSlot = static_cast<uint8_t>(nextSlot);
     SETTINGS.fontPointSize = next;
     // Guarded by the no-change early-return above, so this only ever runs on a real
     // change — the SPIFFS/SD write is not repeated by leaning on the button at the end of
@@ -776,6 +782,12 @@ void EpubReaderActivity::stepReaderLineSpacing(const int delta) {
     if (section) {
       cachedSpineIndex = currentSpineIndex;
       cachedChapterTotalPageCount = section->pageCount;
+      // Capture a paragraph anchor while the OLD section is still alive. A page
+      // index cannot survive a reflow; a paragraph index can, and the LUT that
+      // resolves it is already written to every section file. The proportional
+      // remap in applyDeferredReposition() stays as the fallback for chapters
+      // whose LUT is degenerate (no <p> elements -> paragraph 0 on every page).
+      pendingParagraphAnchor = section->getParagraphIndexForPage(static_cast<uint16_t>(section->currentPage));
       nextPageNumber = section->currentPage;
     }
     section.reset();
@@ -818,6 +830,12 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
     if (section) {
       cachedSpineIndex = currentSpineIndex;
       cachedChapterTotalPageCount = section->pageCount;
+      // Capture a paragraph anchor while the OLD section is still alive. A page
+      // index cannot survive a reflow; a paragraph index can, and the LUT that
+      // resolves it is already written to every section file. The proportional
+      // remap in applyDeferredReposition() stays as the fallback for chapters
+      // whose LUT is degenerate (no <p> elements -> paragraph 0 on every page).
+      pendingParagraphAnchor = section->getParagraphIndexForPage(static_cast<uint16_t>(section->currentPage));
       nextPageNumber = section->currentPage;
     }
     section.reset();
@@ -1090,7 +1108,10 @@ void EpubReaderActivity::render(RenderLock&& lock) {
             return;
           }
           while (!section->isBuildComplete() &&
-                 (anchorJump ? !section->findAnchor(pendingAnchor) : static_cast<int>(section->pageCount) <= target)) {
+                 (anchorJump ? !section->findAnchor(pendingAnchor)
+                             : (static_cast<int>(section->pageCount) <= target ||
+                                (pendingParagraphAnchor &&
+                                 !section->getPageForParagraphIndex(*pendingParagraphAnchor))))) {
             // Anchor jump: build until the anchor's page is laid out (usually page 0), checking a
             // partial's on-disk anchor map too so an already-indexed anchor resolves immediately.
             // Otherwise: build until the target page exists. loop() builds the rest behind it.
@@ -1120,6 +1141,28 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       section->currentPage = nextPageNumber;
       if (section->currentPage < 0) {
         section->currentPage = 0;
+      }
+    }
+
+    // Resolve a pending paragraph anchor here, on the same footing as a named
+    // anchor, rather than waiting for applyDeferredReposition(). That runs only
+    // once the section has finished building, but the build-to-target loop above
+    // stops as soon as the target page exists, so on a font or size change the
+    // reader would otherwise be shown — and would then PERSIST — the old page
+    // index on the new pagination, losing the position for good.
+    if (pendingParagraphAnchor) {
+      if (const auto page = section->getPageForParagraphIndex(*pendingParagraphAnchor)) {
+        LOG_DBG("ERS", "Reposition by paragraph %u: page %d -> %u", *pendingParagraphAnchor, section->currentPage,
+                *page);
+        section->currentPage = *page;
+        pendingParagraphAnchor.reset();
+        cachedChapterTotalPageCount = 0;  // consumed: don't also apply the proportional remap
+      } else if (!section->isBuilding()) {
+        // The whole chapter is laid out and the paragraph still does not resolve
+        // (no <p> elements, or a degenerate LUT) — leave the proportional remap armed.
+        LOG_DBG("ERS", "Paragraph %u did not resolve; leaving proportional remap armed",
+                *pendingParagraphAnchor);
+        pendingParagraphAnchor.reset();
       }
     }
 
@@ -1287,6 +1330,24 @@ bool EpubReaderActivity::applyDeferredReposition() {
     return false;
   }
   bool changed = false;
+  // Exact path first: the paragraph the owner was reading, resolved onto the new
+  // pagination. Only the proportional remap below needs a page COUNT, so this
+  // works even when the count is an estimate.
+  if (pendingParagraphAnchor && currentSpineIndex == cachedSpineIndex) {
+    if (const auto page = section->getPageForParagraphIndex(*pendingParagraphAnchor)) {
+      LOG_DBG("ERS", "Reposition by paragraph %u: page %d -> %u", *pendingParagraphAnchor, section->currentPage, *page);
+      if (static_cast<int>(*page) != section->currentPage) {
+        section->currentPage = static_cast<int>(*page);
+        changed = true;
+      }
+      pendingParagraphAnchor.reset();
+      cachedChapterTotalPageCount = 0;  // consumed
+      return changed;
+    }
+    // LUT absent or degenerate for this chapter — fall through to the estimate.
+    LOG_DBG("ERS", "Paragraph %u did not resolve; using proportional remap", *pendingParagraphAnchor);
+    pendingParagraphAnchor.reset();
+  }
   // Only remap when the chapter actually re-paginated (e.g. after a settings change). A plain
   // resume has identical pagination, so section->pageCount == cachedChapterTotalPageCount and
   // nothing moves.
@@ -1307,7 +1368,19 @@ bool EpubReaderActivity::applyDeferredReposition() {
 }
 
 bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageCount) {
-  return EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount);
+  // Record the paragraph alongside the page so a later font/size change can land
+  // on the same text rather than the same page number. Unavailable mid-build or
+  // for a chapter with no <p> elements, in which case this writes the 6-byte form.
+  int paragraphIndex = -1;
+  if (section) {
+    // Asked unconditionally, including mid-build: getParagraphIndexForPage()
+    // consults the in-RAM build LUT first, and progress is routinely saved while
+    // the section is still building.
+    if (const auto p = section->getParagraphIndexForPage(static_cast<uint16_t>(currentPage))) {
+      paragraphIndex = static_cast<int>(*p);
+    }
+  }
+  return EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, paragraphIndex);
 }
 void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int orientedMarginTop,
                                         const int orientedMarginRight, const int orientedMarginBottom,

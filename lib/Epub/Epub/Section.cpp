@@ -449,6 +449,31 @@ std::optional<uint16_t> Section::findAnchorDuringBuild(const std::string& anchor
   return std::nullopt;
 }
 
+std::optional<uint16_t> Section::getParagraphIndexForPageDuringBuild(const uint16_t page) const {
+  if (!build_ || page >= build_->lut.size()) return std::nullopt;
+  return build_->lut[page].paragraphIndex;
+}
+
+std::optional<uint16_t> Section::getPageForParagraphIndexDuringBuild(const uint16_t pIndex) const {
+  if (!build_ || build_->lut.empty()) return std::nullopt;
+  // Refuse to answer until the build has actually passed pIndex. Otherwise every
+  // paragraph beyond the watermark resolves to the watermark itself, and the
+  // reader lands short of where it was — the caller must build further and retry,
+  // exactly as it does for a named anchor.
+  if (build_->lut.back().paragraphIndex < pIndex) return std::nullopt;
+  // Last page whose paragraph starts at or before pIndex: a paragraph can span
+  // several pages, and the one it STARTS on is where the reader was.
+  std::optional<uint16_t> best;
+  for (size_t i = 0; i < build_->lut.size(); i++) {
+    if (build_->lut[i].paragraphIndex <= pIndex) {
+      best = static_cast<uint16_t>(i);
+    } else {
+      break;  // lut paragraph indices are non-decreasing
+    }
+  }
+  return best;
+}
+
 std::optional<uint16_t> Section::findAnchor(const std::string& anchor) const {
   if (const auto page = findAnchorDuringBuild(anchor)) {
     return page;
@@ -810,6 +835,12 @@ std::optional<uint16_t> Section::getPageForAnchor(const std::string& anchor) con
 }
 
 std::optional<uint16_t> Section::getPageForParagraphIndex(const uint16_t pIndex) const {
+  // The active build's table wins for the same reason as the forward lookup: the
+  // pages being repositioned onto may not be committed yet.
+  if (const auto page = getPageForParagraphIndexDuringBuild(pIndex)) {
+    return page;
+  }
+
   HalFile f;
   if (!Storage.openFileForRead("SCT", filePath, f)) {
     return std::nullopt;
@@ -849,6 +880,12 @@ std::optional<uint16_t> Section::getPageForParagraphIndex(const uint16_t pIndex)
 }
 
 std::optional<uint16_t> Section::getParagraphIndexForPage(const uint16_t page) const {
+  // The active build's table wins: it covers pages that are on screen but not yet
+  // committed to disk.
+  if (const auto p = getParagraphIndexForPageDuringBuild(page)) {
+    return p;
+  }
+
   HalFile f;
   if (!Storage.openFileForRead("SCT", filePath, f)) {
     return std::nullopt;

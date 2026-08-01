@@ -21,6 +21,11 @@ struct SdCardFontFamilyInfo {
   // Installed file closest to `pointSize` (ties → smaller). nullptr when the
   // family ships nothing in `style`.
   const SdCardFontFileInfo* findNearestSize(uint8_t pointSize, uint8_t style = 0) const;
+  // Installed file for reader size SLOT `slot` (0 = smallest), clamped to the
+  // ramp this family actually ships. This is what the reader selects with:
+  // ramps are harmonized by slot, so the slot survives a family switch where an
+  // absolute point size does not.
+  const SdCardFontFileInfo* findClosestReaderSize(uint8_t slot, uint8_t style = 0) const;
   bool hasSize(uint8_t size) const;
   std::vector<uint8_t> availableSizes() const;
 };

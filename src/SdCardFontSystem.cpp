@@ -11,13 +11,22 @@
 
 namespace {
 
-// Point the reader font size at a size the given family actually ships, and
-// persist the change so the settings UI and the loaded font never disagree.
-// Guarded by the value-change check: a no-op snap must not write SPIFFS.
-void snapFontPointSizeTo(const uint8_t availablePointSize) {
+// Refresh the DERIVED point size for the slot the owner selected. Deliberately
+// does NOT write SPIFFS: fontSizeSlot is the persisted truth and has not changed,
+// so there is nothing new to save. This replaced a snap that rewrote and SAVED
+// fontPointSize on every family switch — that write destroyed the owner's
+// original choice, so switching Lora -> Venetian301 -> Lora landed on a
+// different size than it started at, permanently.
+void resolveReaderPointSize(const uint8_t availablePointSize) {
   if (availablePointSize == 0 || availablePointSize == SETTINGS.fontPointSize) return;
-  LOG_DBG("SDFS", "Font size %u unavailable, snapping to %u", SETTINGS.fontPointSize, availablePointSize);
+  LOG_DBG("SDFS", "Slot %u resolves to %u pt (was %u)", SETTINGS.fontSizeSlot, availablePointSize,
+          SETTINGS.fontPointSize);
   SETTINGS.fontPointSize = availablePointSize;
+  // Persist the refreshed mirror. Unlike the snap this replaced, this cannot
+  // destroy the owner's choice — fontSizeSlot is the truth and is untouched — but
+  // "fontSize" is what pre-slot firmware reads if the card is moved to an older
+  // build, and a stale mirror there would select the wrong size. The value-change
+  // guard above keeps this to real changes only (Resource Protocol 8).
   SETTINGS.saveToFile();
 }
 
@@ -39,6 +48,18 @@ constexpr UiFontSize kUiFontSizes[] = {
 void SdCardFontSystem::begin(GfxRenderer& renderer) {
   registry_.discover();
 
+  // One-time migration from the pre-slot format, done here because it is the
+  // first point at which the registry can tell us the active family's ramp.
+  // The stored point size is matched against that ramp to recover the slot the
+  // owner was actually on.
+  if (SETTINGS.fontSlotNeedsMigration) {
+    const auto sizes = readerFontPointSizes(&registry_, SETTINGS.sdFontFamilyName);
+    SETTINGS.fontSizeSlot = slotForPointSize(sizes, SETTINGS.fontPointSize);
+    SETTINGS.fontSlotNeedsMigration = false;
+    LOG_INF("SDFS", "Migrated font size %u pt -> slot %u", SETTINGS.fontPointSize, SETTINGS.fontSizeSlot);
+    SETTINGS.saveToFile();
+  }
+
   // Register this system as the SD font ID resolver in settings.
   // Uses a static trampoline since CrossPointSettings stores a plain function pointer.
   SETTINGS.sdFontIdResolver = [](void* ctx, const char* familyName, uint8_t pointSize) -> int {
@@ -50,8 +71,9 @@ void SdCardFontSystem::begin(GfxRenderer& renderer) {
   if (SETTINGS.sdFontFamilyName[0] != '\0') {
     const auto* family = registry_.findFamily(SETTINGS.sdFontFamilyName);
     if (family) {
-      if (manager_.loadFamily(*family, renderer, SETTINGS.fontPointSize)) {
-        snapFontPointSizeTo(manager_.currentPointSize());
+      const auto* slotFile = family->findClosestReaderSize(SETTINGS.fontSizeSlot);
+      if (manager_.loadFamily(*family, renderer, slotFile ? slotFile->pointSize : SETTINGS.fontPointSize)) {
+        resolveReaderPointSize(manager_.currentPointSize());
         setupUiFallbacks(renderer);
         LOG_DBG("SDFS", "Loaded SD card font family: %s", SETTINGS.sdFontFamilyName);
       } else {
@@ -85,10 +107,9 @@ void SdCardFontSystem::ensureLoaded(GfxRenderer& renderer) {
     if (!currentFamily.empty()) {
       manager_.unloadAll(renderer);
     }
-    // Back on a built-in family, which exists only at BUILTIN_READER_POINT_SIZES:
-    // a size inherited from an SD family has to come back into that set.
-    snapFontPointSizeTo(snapToNearestPointSize(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES),
-                                               SETTINGS.fontPointSize));
+    // Back on a built-in family: resolve the same slot against the built-in ramp.
+    resolveReaderPointSize(
+        pointSizeForSlot(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), SETTINGS.fontSizeSlot));
     return;
   }
 
@@ -104,11 +125,11 @@ void SdCardFontSystem::ensureLoaded(GfxRenderer& renderer) {
       SETTINGS.clearSdFontFamily();
       return;
     }
-    const auto* selected = family->findNearestSize(SETTINGS.fontPointSize);
+    const auto* selected = family->findClosestReaderSize(SETTINGS.fontSizeSlot);
     const uint8_t wantedPt = selected ? selected->pointSize : 0;
-    // Snap before the early return: the wanted size can already be loaded while
-    // the setting still names a size this family does not ship.
-    snapFontPointSizeTo(wantedPt);
+    // Resolve before the early return: the wanted size can already be loaded
+    // while fontPointSize still holds the previous family's resolution.
+    resolveReaderPointSize(wantedPt);
     if (!registryWasDirty && wantedPt == manager_.currentPointSize()) return;
     LOG_DBG("SDFS", "Reloading %s: size %u -> %u%s", wantedFamily, manager_.currentPointSize(), wantedPt,
             registryWasDirty ? " [registry dirty]" : "");
@@ -120,8 +141,9 @@ void SdCardFontSystem::ensureLoaded(GfxRenderer& renderer) {
 
   const auto* family = registry_.findFamily(wantedFamily);
   if (family) {
-    if (manager_.loadFamily(*family, renderer, SETTINGS.fontPointSize)) {
-      snapFontPointSizeTo(manager_.currentPointSize());
+    const auto* slotFile = family->findClosestReaderSize(SETTINGS.fontSizeSlot);
+    if (manager_.loadFamily(*family, renderer, slotFile ? slotFile->pointSize : SETTINGS.fontPointSize)) {
+      resolveReaderPointSize(manager_.currentPointSize());
       setupUiFallbacks(renderer);
       LOG_DBG("SDFS", "Loaded SD font family: %s", wantedFamily);
     } else {

@@ -17,6 +17,10 @@ class EpubReaderActivity final : public Activity {
   // Set when navigating to a footnote href with a fragment (e.g. #note1).
   // Cleared on the next render after the new section loads and resolves it to a page.
   std::string pendingAnchor;
+  // Paragraph the reader was on before a font/size change re-paginated the
+  // chapter. Resolved back to a page against the NEW pagination, which is exact
+  // where the proportional remap is only proportional. Consumed on use.
+  std::optional<uint16_t> pendingParagraphAnchor;
   int pagesUntilFullRefresh = 0;
   // Image pages use a dedicated double-FAST refresh path, so retain a manual
   // refresh request until renderContents can issue its clean base pass.

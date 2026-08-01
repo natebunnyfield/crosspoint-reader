@@ -69,12 +69,18 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   return s;
 }
 
-// Build the font size setting dynamically: the options are the point sizes the
-// active family actually ships, so an SD family built at 10/12/14 offers three
-// sizes and a family built at 8..18 offers six. The selected point size persists
-// in SETTINGS.fontPointSize (saved/loaded manually in CrossPointSettings::
-// toJson/fromJson — the generic loop skips dynamic entries), while the ENUM
-// contract shared with the web UI stays index-based.
+// Build the font size setting dynamically. The VALUE is the slot
+// (SETTINGS.fontSizeSlot), which is family-independent; the LABELS are built
+// from the point sizes the active family actually ships, so the owner can still
+// see what a slot resolves to on this family — "M (15pt)".
+//
+// Families that ship exactly READER_FONT_SLOT_COUNT sizes (every family
+// CrossPoint ships) get S/M/L/XL names. A family with a different count — a
+// partial install, or a user-built family — falls back to point-size-only
+// labels rather than inventing names, so no installed size becomes unreachable.
+//
+// The ENUM contract shared with the web UI stays index-based, and the index IS
+// the slot, so nothing on the wire changes shape.
 inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
   // Captured by copy: getSettingsList() returns by value and the lambdas outlive
   // this call, so they must not reference the registry.
@@ -82,10 +88,13 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
 
   // "pt" is deliberately not translated: it is the typographic unit symbol,
   // written the same way in every language CrossPoint ships.
+  static constexpr const char* SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"S", "M", "L", "XL"};
+  const bool named = sizes.size() == READER_FONT_SLOT_COUNT;
   std::vector<std::string> labels;
   labels.reserve(sizes.size());
-  for (const uint8_t pt : sizes) {
-    labels.push_back(std::to_string(pt) + " pt");
+  for (size_t i = 0; i < sizes.size(); i++) {
+    const std::string pt = std::to_string(sizes[i]) + "pt";
+    labels.push_back(named ? std::string(SLOT_NAMES[i]) + " (" + pt + ")" : pt);
   }
 
   SettingInfo s;
@@ -97,15 +106,14 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
   s.inTextSettings = true;  // matches the static font-size entry it replaces
 
   s.valueGetter = [sizes]() -> uint8_t {
-    const uint8_t pt = snapToNearestPointSize(sizes, SETTINGS.fontPointSize);
-    for (int i = 0; i < static_cast<int>(sizes.size()); i++) {
-      if (sizes[i] == pt) return static_cast<uint8_t>(i);
-    }
-    return 0;
+    const uint8_t slot = SETTINGS.fontSizeSlot;
+    return slot < sizes.size() ? slot : static_cast<uint8_t>(sizes.size() - 1);
   };
 
   s.valueSetter = [sizes](uint8_t v) {
-    if (v < sizes.size()) SETTINGS.fontPointSize = sizes[v];
+    if (v >= sizes.size()) return;
+    SETTINGS.fontSizeSlot = v;
+    SETTINGS.fontPointSize = sizes[v];  // keep the derived size in step
   };
 
   return s;

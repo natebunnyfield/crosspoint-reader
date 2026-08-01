@@ -134,6 +134,16 @@ class Section {
   // (TOC / chapter select, usually the chapter top = page 0) can resolve without laying out the
   // whole chapter. Returns nullopt if the anchor hasn't been reached yet (build more) or no build.
   std::optional<uint16_t> findAnchorDuringBuild(const std::string& anchor) const;
+  // Paragraph index for `page` from the ACTIVE build's in-RAM LUT. The on-disk
+  // lookup below cannot see pages the build has not committed yet, and progress
+  // is routinely saved while a section is still building, so without this the
+  // reader records no paragraph anchor for exactly the pages it is showing.
+  std::optional<uint16_t> getParagraphIndexForPageDuringBuild(uint16_t page) const;
+  // Reverse of the above, over the same in-RAM table: the first page whose
+  // paragraph index is >= pIndex. Needed because a font or size change discards
+  // the cached section, so the pages being repositioned onto have not been
+  // committed to disk yet.
+  std::optional<uint16_t> getPageForParagraphIndexDuringBuild(uint16_t pIndex) const;
 
   // Get the page count from the section cache file without fully loading it.
   std::optional<uint16_t> getCachedPageCount() const;
