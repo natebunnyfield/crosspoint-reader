@@ -62,6 +62,22 @@ FontSelectionActivity::FontSelectionActivity(GfxRenderer& renderer, MappedInputM
 void FontSelectionActivity::onEnter() {
   Activity::onEnter();
 
+  // Re-assert the reader's SD family before anything reads it. The resident font
+  // is NOT guaranteed to be SETTINGS.sdFontFamilyName on entry: the Lyra Six theme
+  // loads GTAlpinaCond for Home's titles, and loadForDisplay() evicts the reader
+  // family to do it (SdCardFontSystem.h documents the eviction). Home always
+  // renders between the reader and here, so without this the first preview draws
+  // with getReaderFontId()'s BUILT-IN fallback — Noto Sans or Noto Serif depending
+  // on SETTINGS.fontFamily — while the label above it still names the real family.
+  // The list build below also reads the registry, and ensureLoaded() may clear a
+  // missing family, so this has to come first.
+  {
+    // ActivityManager releases the render lock before calling onEnter, so take
+    // our own — same reason changeFontSize() and applySelectedFont() do.
+    RenderLock lock(*this);
+    sdFontSystem.ensureLoaded(renderer);
+  }
+
   // Get metrics and calculate layout dimensions
   metrics_ = UITheme::getInstance().getMetrics();
   afterHeader = metrics_.topPadding + metrics_.headerHeight + metrics_.verticalSpacing;

@@ -38,6 +38,15 @@ FontDecompressor fontDecompressor;
 SdCardFontSystem sdFontSystem;
 FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts());
 static unsigned long allowSleepAt = 0;
+// Inactivity clock for auto-sleep. File scope, not a loop()-local static, because
+// the simulator's iOS build wakes from deep sleep with a longjmp back into the
+// same process instead of relaunching it. A function-local static keeps its
+// pre-sleep value across that jump while millis() keeps counting, so the first
+// post-wake loop() sees a stale timestamp already past the timeout and sleeps
+// again immediately — the device looks unwakeable. setup() resets this
+// explicitly; on real hardware that is a no-op, since a chip reset would have
+// re-initialised it anyway.
+static unsigned long lastActivityTime = 0;
 
 // Fonts
 EpdFont notoserif14RegularFont(&notoserif_14_regular);
@@ -128,8 +137,10 @@ enum class BootResume : uint8_t {
 // the current activity. WiFi activities call silentRestart() in onExit() to
 // clear heap fragmentation on the way out, but deep sleep is a full chip reset
 // on wake and already clears the heap, so rebooting here would just power the
-// device back up against the user's sleep gesture. Never cleared:
-// startDeepSleep() does not return, so a set latch only ends at the wakeup reset.
+// device back up against the user's sleep gesture. On hardware startDeepSleep()
+// does not return, so the latch ends at the wakeup reset; setup() clears it
+// explicitly for the simulator's in-process wake, where it would otherwise stay
+// latched and silently disable silentRestart() for the rest of the session.
 static bool deepSleepInProgress = false;
 
 void silentRestart() {
@@ -495,6 +506,10 @@ void setup() {
   // Ensure we're not still holding the power button before leaving setup
   waitForPowerRelease();
   allowSleepAt = millis() + 2000;
+  // Both of these are what a chip reset would give us for free on hardware, and
+  // what the simulator's in-process (longjmp) wake does not.
+  lastActivityTime = millis();
+  deepSleepInProgress = false;
 }
 
 void loop() {
@@ -531,7 +546,6 @@ void loop() {
   }
 
   // Check for any user activity (button press or release) or active background work
-  static unsigned long lastActivityTime = millis();
   if (gpio.wasAnyPressed() || gpio.wasAnyReleased() || gpio.wasTouchActivity() || activityManager.preventAutoSleep()) {
     lastActivityTime = millis();         // Reset inactivity timer
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
