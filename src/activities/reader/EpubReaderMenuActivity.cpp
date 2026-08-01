@@ -21,8 +21,8 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInpu
 
 std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuItems(bool hasFootnotes) {
   std::vector<MenuItem> items;
-  // Exact upper bound: five unconditional rows plus footnotes when present.
-  items.reserve(6);
+  // Exact upper bound: two unconditional rows plus footnotes when present.
+  items.reserve(3);
   // First item: text appearance is the most frequently reached for while
   // actually reading, and the list is not scrolled to get to the row.
   // TEXT_SETTINGS is the single entry point for it — the font picker with its
@@ -33,11 +33,11 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
   if (hasFootnotes) {
     items.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
-  // Dictionary lookup is an upstream feature this menu keeps: without the row
-  // it is only reachable via the long-press Confirm binding.
-  items.push_back({MenuAction::DICTIONARY, StrId::STR_LOOKUP});
-  items.push_back({MenuAction::SCREENSHOT, StrId::STR_SCREENSHOT_BUTTON});
-  items.push_back({MenuAction::DELETE_CACHE, StrId::STR_DELETE_CACHE});
+  // Look Up, Take screenshot and Delete Book Cache are deliberately not listed.
+  // Their MenuAction handlers below stay live: dictionary lookup is still
+  // reachable through the long-press Confirm binding (Settings > Controls >
+  // Long Press Menu > Dictionary), and the cache can still be cleared from
+  // Settings > System > Clear Reading Cache.
   return items;
 }
 

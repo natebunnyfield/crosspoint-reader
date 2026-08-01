@@ -125,6 +125,28 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // kept Bookmark as a live choice and appended Dictionary after it, so the
   // stored index space is 0..3 again and every value is reachable from the UI.
   orientation = PORTRAIT;
+
+  // The Display tab, Manage Fonts and Customise Status Bar were withdrawn from
+  // the device Settings UI. The settings below have no on-device control left,
+  // so they are pinned to the values the UI used to be set to rather than left
+  // wherever an older save happened to leave them. The fields stay live: the
+  // status bar renderer, the theme loader and the sleep path all still read
+  // them, and they remain in getSettingsList() so both persistence and the web
+  // settings API keep working. A change made over the web therefore lasts until
+  // the next load, which is the same contract `orientation` has.
+  quickResumeSleepScreen = QUICK_RESUME_AFTER_TIMEOUT;
+  hideBatteryPercentage = HIDE_ALWAYS;
+  uiTheme = LYRA_SIX;
+
+  // Status bar: every element hidden. Thickness is left alone — it only has an
+  // effect while the progress bar is drawn, and it is not a visibility control.
+  statusBarChapterPageCount = 0;
+  statusBarBookProgressPercentage = 0;
+  statusBarProgressBar = HIDE_PROGRESS;
+  statusBarTitle = HIDE_TITLE;
+  statusBarBattery = 0;
+  xtcStatusBarMode = XTC_STATUS_BAR_HIDE;
+  statusBarClock = STATUS_BAR_CLOCK_HIDE;
 }
 
 bool CrossPointSettings::fromJson(JsonVariantConst doc) {

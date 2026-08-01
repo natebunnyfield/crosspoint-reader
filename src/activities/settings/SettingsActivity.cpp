@@ -27,11 +27,10 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
-const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
-                                                              StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
+const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_READER, StrId::STR_CAT_CONTROLS,
+                                                              StrId::STR_CAT_SYSTEM};
 
 void SettingsActivity::rebuildSettingsLists() {
-  displaySettings.clear();
   readerSettings.clear();
   controlsSettings.clear();
   systemSettings.clear();
@@ -47,9 +46,16 @@ void SettingsActivity::rebuildSettingsLists() {
 
   for (auto& setting : getSettingsList(&sdFontSystem.registry(), &dictionaries)) {
     if (setting.category == StrId::STR_NONE_OPT) continue;
+    // Display is withdrawn from the device UI, so its entries are dropped here
+    // rather than removed from getSettingsList() — that list is also what
+    // fromJson()/toJson() iterate, so deleting entries would stop those
+    // settings persisting at all. Sleep screen, refresh frequency and the
+    // sunlight fading fix keep whatever value is stored; quick resume, hide
+    // battery % and UI theme are pinned by normalizeRetiredSettings().
     if (setting.category == StrId::STR_CAT_DISPLAY) {
-      displaySettings.push_back(setting);
-    } else if (setting.category == StrId::STR_CAT_READER) {
+      continue;
+    }
+    if (setting.category == StrId::STR_CAT_READER) {
       // Font family and size are covered by the "Text Settings" screen
       // (FontSelectionActivity, with its live preview and side-button size
       // stepping), so their flat entries are hidden here. They stay in the
@@ -84,22 +90,19 @@ void SettingsActivity::rebuildSettingsLists() {
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   readerSettings.insert(readerSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
-  readerSettings.insert(readerSettings.begin() + 1,
-                        SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
-  readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
+  // Manage Fonts and Customise Status Bar are withdrawn. SD card fonts are
+  // still discovered and selectable from Text Settings; the status bar is
+  // pinned to fully hidden by normalizeRetiredSettings().
 
   // Update currentSettings pointer and count for the active category
   switch (selectedCategoryIndex) {
     case 0:
-      currentSettings = &displaySettings;
-      break;
-    case 1:
       currentSettings = &readerSettings;
       break;
-    case 2:
+    case 1:
       currentSettings = &controlsSettings;
       break;
-    case 3:
+    case 2:
       currentSettings = &systemSettings;
       break;
   }
@@ -137,15 +140,12 @@ void SettingsActivity::loop() {
   auto applyCategorySelection = [this] {
     switch (selectedCategoryIndex) {
       case 0:
-        currentSettings = &displaySettings;
-        break;
-      case 1:
         currentSettings = &readerSettings;
         break;
-      case 2:
+      case 1:
         currentSettings = &controlsSettings;
         break;
-      case 3:
+      case 2:
         currentSettings = &systemSettings;
         break;
     }

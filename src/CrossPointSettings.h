@@ -210,13 +210,17 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t sleepScreenCoverMode = FIT;
   // Sleep screen cover filter
   uint8_t sleepScreenCoverFilter = NO_FILTER;
-  // Status bar settings
-  uint8_t statusBarChapterPageCount = 1;
-  uint8_t statusBarBookProgressPercentage = 1;
+  // Status bar settings. Every element defaults to hidden, matching the pin in
+  // normalizeRetiredSettings() — the Customise Status Bar screen is no longer
+  // reachable, and a fresh install never runs fromJson() (PersistableStore's
+  // loadFromFile() returns early when there is no file), so the pin alone would
+  // not cover it.
+  uint8_t statusBarChapterPageCount = 0;
+  uint8_t statusBarBookProgressPercentage = 0;
   uint8_t statusBarProgressBar = HIDE_PROGRESS;
   uint8_t statusBarProgressBarThickness = PROGRESS_BAR_NORMAL;
-  uint8_t statusBarTitle = CHAPTER_TITLE;
-  uint8_t statusBarBattery = 1;
+  uint8_t statusBarTitle = HIDE_TITLE;
+  uint8_t statusBarBattery = 0;
   uint8_t xtcStatusBarMode = XTC_STATUS_BAR_HIDE;
   // Clock display in status bar (X3 only, requires DS3231 RTC)
   uint8_t statusBarClock = STATUS_BAR_CLOCK_HIDE;
@@ -276,8 +280,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // 2=Title). See OpdsFilenameFormat. Persisted via a category-less SettingInfo::Enum,
   // edited from the OPDS server list; hidden from the on-device Settings screen.
   uint8_t opdsFilenameFormat = 0;
-  // Hide battery percentage
-  uint8_t hideBatteryPercentage = HIDE_NEVER;
+  // Hide battery percentage. Pinned to HIDE_ALWAYS by normalizeRetiredSettings();
+  // the default matches so fresh installs agree.
+  uint8_t hideBatteryPercentage = HIDE_ALWAYS;
   // Long-press page turn button behavior. Defaults to stepping the reader font size
   // (long-press page-back = smaller, page-forward = larger). Note this default also
   // decides the page-turn EDGE: ReaderUtils::detectPageTurn() turns on button PRESS only
@@ -319,7 +324,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Language setting (Language enum index, default 0 = EN)
   uint8_t language = 0;
   // Quick Resume: keep current content visible with moon icon instead of showing a static sleep screen.
-  uint8_t quickResumeSleepScreen = QUICK_RESUME_NEVER;
+  // Pinned on by normalizeRetiredSettings(); the default matches so fresh installs agree.
+  uint8_t quickResumeSleepScreen = QUICK_RESUME_AFTER_TIMEOUT;
 
   static constexpr uint8_t MIN_SLEEP_TIMEOUT_MINUTES = 1;
   static constexpr uint8_t SLEEP_TIMEOUT_NEVER_MINUTES = 31;

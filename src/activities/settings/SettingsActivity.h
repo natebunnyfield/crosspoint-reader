@@ -157,8 +157,10 @@ class SettingsActivity final : public Activity {
   int selectedSettingIndex = 0;
   int settingsCount = 0;
 
-  // Per-category settings derived from shared list + device-only actions
-  std::vector<SettingInfo> displaySettings;
+  // Per-category settings derived from shared list + device-only actions.
+  // There is no displaySettings: the Display tab is withdrawn from the device
+  // UI. Its entries stay in getSettingsList() because that list also drives
+  // persistence (CrossPointSettings::fromJson/toJson) and the web settings API.
   std::vector<SettingInfo> readerSettings;
   std::vector<SettingInfo> controlsSettings;
   std::vector<SettingInfo> systemSettings;
@@ -169,7 +171,7 @@ class SettingsActivity final : public Activity {
 
   OptionPopup optionPopup;
 
-  static constexpr int categoryCount = 4;
+  static constexpr int categoryCount = 3;
   static const StrId categoryNames[categoryCount];
 
   void enterCategory(int categoryIndex);
