@@ -24,6 +24,7 @@
 #include "StatusBarSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -88,6 +89,7 @@ void SettingsActivity::rebuildSettingsLists() {
   }
   systemSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
   readerSettings.insert(readerSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
   // Manage Fonts and Customise Status Bar are withdrawn. SD card fonts are
@@ -410,6 +412,22 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::Language:
         startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::DeviceOwner:
+        // Free-text owner name, shown on the sleep screens. Saved immediately:
+        // sleep can power the device off, and an unsaved name would vanish.
+        startActivityForResult(
+            std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_DEVICE_OWNER),
+                                                    SETTINGS.ownerName, sizeof(SETTINGS.ownerName) - 1,
+                                                    InputType::Text),
+            [this](const ActivityResult& result) {
+              if (!result.isCancelled) {
+                const auto& kb = std::get<KeyboardResult>(result.data);
+                strncpy(SETTINGS.ownerName, kb.text.c_str(), sizeof(SETTINGS.ownerName) - 1);
+                SETTINGS.ownerName[sizeof(SETTINGS.ownerName) - 1] = '\0';
+                SETTINGS.saveToFile();
+              }
+            });
         break;
       case SettingAction::None:
         // Do nothing

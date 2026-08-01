@@ -23,6 +23,7 @@ enum class SettingAction {
   CheckForUpdates,
   SdFirmwareUpdate,
   Language,
+  DeviceOwner,
   DownloadFonts,
   TextSettings,
 };

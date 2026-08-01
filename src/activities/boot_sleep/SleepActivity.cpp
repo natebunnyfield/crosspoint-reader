@@ -208,6 +208,9 @@ void SleepActivity::renderDefaultSleepScreen() const {
   renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
   renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSPOINT), true, EpdFontFamily::BOLD);
   renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_SLEEPING));
+  if (SETTINGS.ownerName[0] != '\0') {
+    renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - 60, SETTINGS.ownerName);
+  }
 
   // Make sleep screen dark unless light is selected in settings
   if (SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT) {
@@ -390,5 +393,9 @@ void SleepActivity::renderLastScreenSleepScreen() const {
 
 void SleepActivity::renderBlankSleepScreen() const {
   renderer.clearScreen();
+  // The one thing a blank screen still says: whose device this is.
+  if (SETTINGS.ownerName[0] != '\0') {
+    renderer.drawCenteredText(SMALL_FONT_ID, renderer.getScreenHeight() - 60, SETTINGS.ownerName);
+  }
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
