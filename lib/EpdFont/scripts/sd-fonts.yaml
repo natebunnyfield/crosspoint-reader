@@ -104,6 +104,9 @@ families:
     # Harmonized ramp: x-height 0.500 em vs the 0.475 anchor (SourceSerif4), so
     # each size drops ~5% to hit the same apparent letter size.
     sizes: [11, 13, 15, 17]
+    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
+    # side, fixes 1 px line-overlap. Borderline −1 px at 11 pt. Override -> 1.440 em.
+    metrics: {ascent: 1069, descent: -371, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/main/fonts/ttf/Lora-Regular.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/main/fonts/ttf/Lora-Bold.ttf"}
@@ -200,6 +203,8 @@ families:
   #   description: "Caledonia CC, Dwiggins's transitional Scotch Roman (Latin)"
   #   intervals: latin-ext
   #   sizes: [12, 14, 16, 18]
+  #   # Worst −2 px plain-text overlap measured 2026-08-01.
+  #   metrics: {ascent: 991, descent: -345, linegap: 0}
   #   styles:
   #     regular:    {path: "local_fonts/CaledoniaCC-TextRegular.otf"}
   #     italic:     {path: "local_fonts/CaledoniaCC-TextItalic.otf"}
@@ -242,6 +247,10 @@ families:
     # Harmonized ramp: x-height 0.407 em vs the 0.475 anchor (SourceSerif4) —
     # small-on-body like Goudy, needs ~+2-3pt to read as large as the moderns.
     sizes: [14, 16, 19, 21]
+    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
+    # side, fixes 2 px line-overlap. CTAN metrics too tight for the long extenders;
+    # worst −2 px. Override -> 1.457 em.
+    metrics: {ascent: 1003, descent: -454, linegap: 0}
     # Upstream (CTAN) ships Regular/Bold/Italic but no BoldItalic, so
     # bolditalic emboldens the real Italic — never sheared. Measured: italic
     # stems 0.069 em; embolden_em 0.037 + y_ratio 0.35 lands 1.49-1.55x stems
@@ -283,6 +292,10 @@ families:
     # Harmonized ramp: x-height 0.524 em vs the 0.475 anchor (SourceSerif4) —
     # big-on-body, drops ~1-2pt to read at the anchor size.
     sizes: [11, 13, 15, 16]
+    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
+    # side, fixes 3 px line-overlap. Worst −3 px plain-text overlap (gstatic static
+    # italic has mismatched metrics). Override -> 1.484 em.
+    metrics: {ascent: 1113, descent: -371, linegap: 0}
     # Roman is a wght 400-700 variable; italic exists only as a static 400
     # (raw path 404s — this is the css2 API's gstatic static TTF), so
     # bolditalic emboldens the real Italic — never sheared. Measured: italic
@@ -300,6 +313,11 @@ families:
     # Harmonized ramp: x-height 0.426 em vs the 0.475 anchor (SourceSerif4) —
     # small-on-body, needs ~+1-2pt to read as large as the moderns.
     sizes: [13, 16, 18, 20]
+    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
+    # side, fixes 5–6 px line-overlap. opsz-16 instanced metrics give a 1.013 em
+    # line advance — near-zero leading against 1.196 em of ink; every size/style
+    # overlapped by 5–6 px in plain text. Override -> 1.326 em.
+    metrics: {ascent: 965, descent: -361, linegap: 0}
     # Both variable axes pinned: opsz 16 (text cut), wght 400/700 — all four
     # styles are real instances, nothing synthesized.
     styles:
@@ -314,6 +332,10 @@ families:
     # Harmonized ramp: x-height 0.509 em vs the 0.475 anchor (SourceSerif4) —
     # slightly big-on-body, each size drops ~1pt to hit the anchor size.
     sizes: [11, 13, 15, 17]
+    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
+    # side, fixes 1 px line-overlap. Bold at 11 pt overlapped by 1 px.
+    # Override -> 1.571 em.
+    metrics: {ascent: 1069, descent: -502, linegap: 0}
     # Upstream ships Regular and Italic only — no bold exists — so bold
     # emboldens the Regular and bolditalic emboldens the real Italic (never
     # sheared). Measured: regular stems 0.081 em, italic 0.078 em; the shared

@@ -186,7 +186,12 @@ def apply_metrics_override(source_path: Path, metrics: dict, family_name: str, s
         old.unlink()
 
     print(f"  Patching metrics: {family_name}/{style_name} -> {ascent}/{descent} gap {linegap}")
-    font = TTFont(str(source_path))
+    # recalcBBoxes=False: on save, fontTools would otherwise re-walk every
+    # charstring to recompute hhea bounds — clobbering nothing here (we set the
+    # values explicitly) and crashing outright on CFF fonts that use the
+    # deprecated seac-style two-argument endchar (Coelacanth: "not enough
+    # values to unpack (expected 4, got 2)" in psCharStrings.op_endchar).
+    font = TTFont(str(source_path), recalcBBoxes=False, recalcTimestamp=False)
     try:
         scale = font["head"].unitsPerEm / 1000.0
         asc = round(ascent * scale)
