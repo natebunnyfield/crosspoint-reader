@@ -214,6 +214,102 @@ families:
       italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondLightItalic.ttf"}
       bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondMediumItalic.ttf"}
 
+  - name: Almendra
+    description: "Bookish oldstyle drawn from medieval calligraphy (Latin)"
+    intervals: latin-ext
+    # Harmonized ramp: x-height 0.485 em vs the 0.475 anchor (SourceSerif4) —
+    # within ~2%, so the standard ramp already reads at the anchor size.
+    sizes: [12, 14, 16, 18]
+    # raw.githubusercontent ofl/almendra paths error out; these are the static
+    # TTFs the css2 API serves for ital,wght 0,400 / 0,700 / 1,400 / 1,700 —
+    # all four styles are real.
+    styles:
+      regular:    {url: "https://fonts.gstatic.com/s/almendra/v28/H4ckBXKAlMnTn0CskyY6.ttf"}
+      bold:       {url: "https://fonts.gstatic.com/s/almendra/v28/H4cjBXKAlMnTn0Cskx6G7Zu4.ttf"}
+      italic:     {url: "https://fonts.gstatic.com/s/almendra/v28/H4ciBXKAlMnTn0CskxY4yLs.ttf"}
+      bolditalic: {url: "https://fonts.gstatic.com/s/almendra/v28/H4chBXKAlMnTn0CskxY48Ae9oqY.ttf"}
+
+  - name: Coelacanth
+    description: "Centaur revival, Venetian oldstyle (Latin, Greek, Cyrillic)"
+    intervals: latin-ext,greek,cyrillic
+    # Harmonized ramp: x-height 0.407 em vs the 0.475 anchor (SourceSerif4) —
+    # small-on-body like Goudy, needs ~+2-3pt to read as large as the moderns.
+    sizes: [14, 16, 19, 21]
+    # Upstream (CTAN) ships Regular/Bold/Italic but no BoldItalic, so
+    # bolditalic emboldens the real Italic — never sheared. Measured: italic
+    # stems 0.069 em; embolden_em 0.037 + y_ratio 0.35 lands 1.49-1.55x stems
+    # with hairline growth held near stem growth (default y_ratio flattened
+    # the face's contrast). See docs/synthetic-font-styles.md.
+    styles:
+      regular:    {url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf"}
+      bold:       {url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthBold.otf"}
+      italic:     {url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthItalic.otf"}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.037, y_ratio: 0.35}}
+
+  - name: InknutAntiqua62
+    description: "Sturdy slab antiqua for literary fiction (Latin)"
+    intervals: latin-ext
+    # Harmonized ramp: x-height 0.531 em vs the 0.475 anchor (SourceSerif4) —
+    # big-on-body, drops ~1-2pt to read at the anchor size.
+    sizes: [11, 13, 14, 16]
+    # The family has no italics at all; obliques shear the REAL weights
+    # (regular -> italic, bold -> bolditalic) at a gentle 10° — sturdy antiqua,
+    # so no embolden is ever synthesized on top of the real Bold.
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inknutantiqua/InknutAntiqua-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inknutantiqua/InknutAntiqua-Bold.ttf"}
+      italic:     {from: regular, synthetic: {slant_deg: 10}}
+      bolditalic: {from: bold, synthetic: {slant_deg: 10}}
+
+  - name: LibreCaslonText
+    description: "Caslon revival tuned for body text (Latin)"
+    intervals: latin-ext
+    # Harmonized ramp: x-height 0.524 em vs the 0.475 anchor (SourceSerif4) —
+    # big-on-body, drops ~1-2pt to read at the anchor size.
+    sizes: [11, 13, 15, 16]
+    # Roman is a wght 400-700 variable; italic exists only as a static 400
+    # (raw path 404s — this is the css2 API's gstatic static TTF), so
+    # bolditalic emboldens the real Italic — never sheared. Measured: italic
+    # stems 0.109 em; embolden_em 0.055 + y_ratio 0.35 lands 1.50-1.52x stems
+    # (matching the real 700/400 roman ratio of 1.50x) with contrast kept.
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librecaslontext/LibreCaslonText%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librecaslontext/LibreCaslonText%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://fonts.gstatic.com/s/librecaslontext/v5/DdT678IGsGw1aF1JU10PUbTvNNaDMfq91-c.ttf"}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.055, y_ratio: 0.35}}
+
+  - name: Newsreader
+    description: "Editorial serif with optical sizing pinned for text (Latin)"
+    intervals: latin-ext
+    # Harmonized ramp: x-height 0.426 em vs the 0.475 anchor (SourceSerif4) —
+    # small-on-body, needs ~+1-2pt to read as large as the moderns.
+    sizes: [13, 16, 18, 20]
+    # Both variable axes pinned: opsz 16 (text cut), wght 400/700 — all four
+    # styles are real instances, nothing synthesized.
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/newsreader/Newsreader%5Bopsz%2Cwght%5D.ttf", variable: {opsz: 16, wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/newsreader/Newsreader%5Bopsz%2Cwght%5D.ttf", variable: {opsz: 16, wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/newsreader/Newsreader-Italic%5Bopsz%2Cwght%5D.ttf", variable: {opsz: 16, wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/newsreader/Newsreader-Italic%5Bopsz%2Cwght%5D.ttf", variable: {opsz: 16, wght: 700}}
+
+  - name: Rosarivo
+    description: "Garalde bookface with calligraphic roots (Latin)"
+    intervals: latin-ext
+    # Harmonized ramp: x-height 0.509 em vs the 0.475 anchor (SourceSerif4) —
+    # slightly big-on-body, each size drops ~1pt to hit the anchor size.
+    sizes: [11, 13, 15, 17]
+    # Upstream ships Regular and Italic only — no bold exists — so bold
+    # emboldens the Regular and bolditalic emboldens the real Italic (never
+    # sheared). Measured: regular stems 0.081 em, italic 0.078 em; the shared
+    # embolden_em 0.043 + y_ratio 0.35 lands 1.52-1.53x (bold) / 1.51-1.63x
+    # (bolditalic) stems at matching absolute weight, hairline growth below
+    # stem growth on the roman (contrast preserved).
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/rosarivo/Rosarivo-Regular.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/rosarivo/Rosarivo-Italic.ttf"}
+      bold:       {from: regular, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
+
   # ── Sans-serif ─────────────────────────────────────────────────────────
 
   - name: NotoSansExtended
