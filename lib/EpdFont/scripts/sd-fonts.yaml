@@ -196,8 +196,8 @@ families:
   #   styles:
   #     regular:    {path: "local_fonts/CaledoniaCC-TextRegular.otf"}
   #     italic:     {path: "local_fonts/CaledoniaCC-TextItalic.otf"}
-  #     bold:       {from: regular, synthetic: {embolden_em: 0.030}}
-  #     bolditalic: {from: italic, synthetic: {embolden_em: 0.030}}
+  #     bold:       {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
+  #     bolditalic: {from: italic, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
 
   - name: Junicode
     description: "Medievalist scholarly serif, semi-condensed (Latin)"

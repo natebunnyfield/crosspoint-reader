@@ -217,17 +217,18 @@ zero converter changes — so both routes can coexist per-family.
 3. ~~Build GoudyBookletter1911 with the parameters above; run the acceptance
    measurements; judge in the simulator picker.~~ — done: numbers recorded
    under Acceptance; picker specimen verified in the simulator.
-4. Caledonia CC — the desktop OTFs are gone, but the owner holds **WOFF
-   files**, and WOFF is just a compressed sfnt wrapper: fontTools unwraps it
-   losslessly (`TTFont(woff); font.flavor = None; font.save(otf)` — WOFF2
-   additionally needs `pip install brotli`). Convert the Text Regular and
-   Text Italic WOFFs into `local_fonts/CaledoniaCC-TextRegular.otf` /
-   `-TextItalic.otf`, uncomment the `CalendoniaCC` block, and the normal
-   build applies (`embolden_em: 0.030`, bold from Regular, bold-italic from
-   the real Italic, no shear; watch hairline survival at 12 pt). One caveat:
-   web-licensed WOFFs are sometimes glyph-subset — the converter validates
-   intervals against the font and the NotoSans fallback fills gaps, so a
-   subset source thins coverage rather than breaking the build. `local_fonts/`
-   stays gitignored, so neither fonts nor output can be committed by
-   accident.
+4. ~~Caledonia CC~~ — done, built from the owner's recovered TTF/WOFF pair
+   (Text Regular + Italic, 523 glyphs, real italic angle −12° — which
+   validates the per-genre slant table above). The initial 0.030 em guess
+   measured too light: Caledonia's stems are 0.089 em, thicker than Goudy's,
+   so 0.030 gave only a 1.32–1.36× stem ratio. A parameter sweep landed on
+   **`embolden_em: 0.045, y_ratio: 0.35`**: stems 1.50× at every size, and
+   the reduced vertical strength keeps hairline growth (1.37–1.49×) BELOW
+   stem growth, preserving the face's transitional contrast — the exact
+   failure the plan predicted for high-contrast faces at default y_ratio.
+   Counters at 12 pt: e/a/s keep 13–30 interior white px in both synthetic
+   styles. x-height measured 0.469 em — within 1.3% of the SourceSerif4
+   anchor, so the standard 12/14/16/18 ramp is already harmonized. The
+   commented block carries the final parameters; fonts and output stay
+   uncommitted (commercial), the built .cpfonts were handed to the owner.
 5. Only if a family fails on quality: FontForge route for that family.
