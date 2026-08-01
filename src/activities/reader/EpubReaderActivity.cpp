@@ -587,7 +587,10 @@ void EpubReaderActivity::loop() {
     if (ignoreNextConfirmRelease) {
       ignoreNextConfirmRelease = false;
     } else {
+#if !defined(CROSSPOINT_ZEN)
+      // Zen build: there is no reader menu — the book is the whole surface.
       openReaderMenu();
+#endif
     }
   }
 
@@ -638,7 +641,10 @@ void EpubReaderActivity::loop() {
         // Hold ~0.4s starts dictionary word selection on the current page.
         if (mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && !showDictionaryMessage) {
           ignoreNextConfirmRelease = true;  // Prevent menu open on the release that follows
+#if !defined(CROSSPOINT_ZEN)
+          // Zen build: no dictionary lookup, even via the long-press binding.
           openDictionaryWordSelect();
+#endif
           return;
         }
         break;
