@@ -21,6 +21,8 @@ build
 lib/EpdFont/scripts/downloaded_fonts/
 lib/EpdFont/scripts/instanced_fonts/
 lib/EpdFont/scripts/output/
+# Commercial font files a user supplies locally (e.g. Caledonia CC) - never committed
+lib/EpdFont/local_fonts/
 # Claude Code: share project skills with the team, keep local agent state
 # (worktrees, scheduled-task locks, settings.local, scout CLEANUP.md) out.
 .claude/*
