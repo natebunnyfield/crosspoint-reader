@@ -94,6 +94,31 @@ find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i
   * `gh_release_rc`: Release candidate (LOG_LEVEL=1)
   * `slim`: Minimal build (no serial logging)
 
+**One C3 binary serves both X4 and X3.** The C3 envs set `-DFREEINK_DEVICE_X4=1`
+and `-DFREEINK_DEVICE_X3=1` together, and `XteinkDetect` probes the panel at boot
+to pick the right one (the dual path is `BoardConfig.h`'s
+`#elif FREEINK_DEVICE_X3 && !FREEINK_DEVICE_X4`). Do not go looking for a
+separate X3 target. `sticky` is ESP32-S3 — a different MCU family, not an
+alternative X3 build.
+
+**Overriding the version string.** `scripts/git_branch.py` force-injects
+`CROSSPOINT_VERSION` for `-e default` only, so adding your own
+`-DCROSSPOINT_VERSION` there collides ("macro redefined"), and the shell-escaped
+quotes usually arrive mangled and break the build outright. Use the mechanism
+that already exists instead:
+```bash
+CROSSPOINT_RC_HASH=mytag pio run -e gh_release_rc   # -> 1.5.0-rc+mytag
+```
+The dev version carries no dirty marker: a build from a modified working tree
+reports the same string as a clean build of the same commit. If a binary has to
+be identifiable later, stamp it this way or commit first.
+
+**Editing `platformio.ini` wipes every build directory.** Any change alters
+`.pio/build/project.checksum`, and the next `pio run` cleans *all* env build
+dirs, not only the one being built. Do not edit it mid-task to tweak a flag —
+prefer an env var or an existing env — or finished device builds vanish and you
+pay a full rebuild.
+
 ### Critical Build Flags
 These flags in `platformio.ini` fundamentally affect firmware behavior:
 
@@ -165,6 +190,51 @@ if (Storage.openFileForRead("MODULE", "/path/to/file.bin", file)) {
 - SdFat's `SdSpiCard` tracks SPI bus state with an unsynchronized `m_spiActive` bool. Two tasks calling SdFat concurrently can confuse that state machine and end with one task calling `SPIClass::endTransaction()` against a paramLock the *other* task is holding. That trips FreeRTOS's `xTaskPriorityDisinherit` assert (`tasks.c:5156, pxTCB == pxCurrentTCBs[0]`) and panics the system. See SdFat issue #518.
 - `HalStorage` serializes everything via `storageMutex`. Downstream code uses `HalFile` (declared in `<HalStorage.h>`); every method call (read, write, seek, close) takes the mutex. `HalFile`'s destructor also takes the mutex before letting the underlying SdFat `FsFile` close.
 - **Never** call into `SdFat` / `SdSpiCard` / `FsBaseFile` / `SDCardManager` / raw `FsFile` directly — that bypasses the mutex.
+
+---
+
+## SD Card Fonts (`.cpfont`)
+
+**Font rendering fixes almost never ship in the firmware binary.** The reading
+faces are `.cpfont` files that live on the SD card and are read at runtime. The
+firmware renders whatever it finds; it embeds none of them. Get this backwards
+and you will hand someone a firmware build claiming it contains a font fix that
+is physically not in it.
+
+Which side a change lands on:
+
+| Change | Lives in | Ships via |
+|---|---|---|
+| Metrics/leading overrides, size ramps, glyph coverage, adding a family | `lib/EpdFont/scripts/sd-fonts.yaml` + `build-sd-fonts.py` | Regenerated `.cpfont` files on the SD card |
+| Picker labels, lineage dates, sort order | `src/FontDisplayNames.h`, `activities/settings/FontSelectionActivity.cpp` | Firmware binary |
+
+So a commit touching only `lib/EpdFont/scripts/**` changes nothing about a
+flashed build. Check the diff's paths before claiming a font fix is included.
+
+**Two scan roots, deduped by name.** `SdCardFontRegistry` scans `/.fonts`
+(preferred, hidden) *and* `/fonts` (visible), deduping by family name — see
+`FONTS_DIR_HIDDEN` / `FONTS_DIR_VISIBLE` in `lib/EpdFont/SdCardFontRegistry.h`.
+Either location works. When collecting a complete font set off a dev machine,
+look in **both** `fs_/.fonts/` and `fs_/fonts/`; the two halves of the installed
+set routinely sit in different roots.
+
+**Buildable ≠ available.** `src/FontDisplayNames.h` defines the curated picker
+set (15 families). `scripts/install-sim-fonts.py` rebuilds only the subset whose
+sources `sd-fonts.yaml` can fetch, and prints
+`Skipping (no buildable source in sd-fonts.yaml): ...` for the rest — commercial
+or locally-sourced families such as Edgar, GTAlpinaCond, TeXGyreSchola,
+Venetian301, CaledoniaCC. That message means "cannot regenerate," **not** "not
+present": their already-built `.cpfont` files are on disk and are shipped as-is.
+
+```bash
+python3 scripts/install-sim-fonts.py          # rebuild + install what it can
+python3 lib/EpdFont/scripts/build-sd-fonts.py --only Lora --output-dir out/
+```
+
+**Installing families can silently change the selected font.** Adding a batch of
+families reshuffles the registry, and `SETTINGS.sdFontFamilyName` has been
+observed jumping to a different family after an install. Re-check the setting
+afterwards rather than assuming it survived.
 
 ---
 
