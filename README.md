@@ -12,13 +12,11 @@ CrossPoint is open-source e-reader firmware - community-built, fully hackable, f
 
 ## What can CrossPoint do?
 
-- **Reader engine**: EPUB 2/3 rendering with embedded-style option, image handling, hyphenation, kerning, footnotes, focus reading, and KOReader progress sync.
+- **Reader engine**: EPUB 2/3 rendering with embedded-style option, image handling, hyphenation (English and Spanish), kerning, footnotes, chapter select, and focus reading.
 
 - **Various formats**: native handling for `.epub`, `.xtc/.xtch`, `.txt`, and `.bmp`.
 
 - **Custom fonts**: install your favorite fonts on the SD card.
-
-- **Tilt page turn (X3 only)**.
 
 - **Library workflow**: folder browser, hidden-file toggle, long-press delete, recent books, SD-cache management.
 
@@ -30,13 +28,12 @@ CrossPoint is open-source e-reader firmware - community-built, fully hackable, f
   - WebSocket fast uploads
   - WebDAV handler
   - AP mode (hotspot) and STA mode (join existing Wi-Fi), both with QR helpers
-  - Calibre wireless connect flow
-  - OPDS browser with saved servers (up to 8), search, pagination, and direct download
+  - NTP clock sync on connect
   - OTA update checks and installs from GitHub releases
 
-- **Customization**: multiple themes (Classic, Lyra, Lyra Extended, RoundedRaff), sleep screen modes, front/side button remapping, status bar controls, power-button behavior, refresh cadence, and more.
+- **Customization**: multiple themes (Classic, Lyra, Lyra Extended, RoundedRaff, Lyra Six), sleep screen modes, front/side button remapping, power-button behavior, refresh cadence, and more.
 
-- **Localization**: 24 UI languages and counting. RTL support.
+- **Localization**: English and Spanish.
 
 ### Coming soon:
 

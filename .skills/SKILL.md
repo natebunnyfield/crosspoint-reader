@@ -438,17 +438,20 @@ sdkApiThatTakesOwnership(obj);  // SDK calls delete
 
 ---
 
-## UI and Orientation Guidelines
+## UI Guidelines
 
-### Orientation-Aware Logic
+### Screen Geometry
 * No Hardcoding: Never assume 800 or 480. Use renderer.getScreenWidth() and renderer.getScreenHeight().
 * Viewable Area: Use renderer.getOrientedViewableTRBL() to stay within physical bezel margins.
+* **Portrait only.** `GfxRenderer::orientation` is a `static constexpr Orientation = Portrait`,
+  so the panel's 90-degree rotation still happens but there is no orientation to
+  choose and no setOrientation(). The other three branches fold out at compile time.
 
 ### Logical Button Mapping
 
 **Source**: [src/MappedInputManager.cpp:20-55](../src/MappedInputManager.cpp)
 
-Constraint: Physical button positions are fixed on hardware, but their logical functions change based on user settings and screen orientation.
+Constraint: Physical button positions are fixed on hardware, but their logical functions change based on user settings.
 
 **Button Categories**:
 1. **Physical Fixed** (Up/Down side buttons):
@@ -469,13 +472,12 @@ Constraint: Physical button positions are fixed on hardware, but their logical f
 - Activities use **logical buttons** (e.g., `Button::Confirm`)
 - `MappedInputManager` translates to **physical hardware buttons**
 - User can remap front buttons in settings
-- Orientation changes handled separately by renderer coordinate transforms
 
 **Rule**: Always use `MappedInputManager::Button::*` enums, never raw `HalGPIO::BTN_*` indices (except in ButtonRemapActivity).
 
 ### UITheme (The GUI Macro)
 * Rule: All UI rendering must go through the GUI macro (UITheme). 
-* Do not hardcode fonts, colors, or positioning. This ensures orientation-aware layout consistency.
+* Do not hardcode fonts, colors, or positioning. This keeps layout consistent across themes.
 
 ---
 
@@ -765,7 +767,7 @@ feat: add real-time SD download progress bar
 Implements progress tracking for book downloads using
 UITheme progress bar component with heap-safe updates.
 
-Tested in all 4 orientations with 5MB+ files.
+Tested with 5MB+ files.
 ```
 
 ### When to Commit
@@ -889,13 +891,12 @@ build_flags =
 2. ✅ **Quality**: `pio check` + `find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i`
 3. ✅ **Format**: Commit messages (`feat:`/`fix:`), no `.gitignore`-excluded files staged (e.g., `*.generated.h`, `.pio/`, `platformio.local.ini`)
 4. ✅ **CI**: Fix GitHub Actions failures before review
-5. ✅ **Code review**: Ensure orientation-aware logic is correct in all 4 modes by inspecting switch/case coverage
+5. ✅ **Code review**: Inspect switch/case coverage for the states a change can reach
 
 **Human tester scope** (flag these for the user):
 6. 🔲 **Device**: Test on hardware
-7. 🔲 **Orientations**: Verify all 4 modes (Portrait/Inverted/Landscape CW/CCW)
-8. 🔲 **Heap**: `ESP.getFreeHeap()` > 50KB, no leaks
-9. 🔲 **Cache**: If EPUB modified, delete `.crosspoint/` and verify re-parse
+7. 🔲 **Heap**: `ESP.getFreeHeap()` > 50KB, no leaks
+8. 🔲 **Cache**: If EPUB modified, delete `.crosspoint/` and verify re-parse
 
 ### CI/CD Pipeline Awareness
 
@@ -956,7 +957,6 @@ build_flags =
    - Paragraph spacing (`SETTINGS.extraParagraphSpacing`)
    - Screen margins (`SETTINGS.screenMargin`)
 3. **Viewport dimensions change**:
-   - Screen orientation change
    - Display resolution change
 4. **Book file modified**:
    - Moved, renamed, or content changed (new hash)
