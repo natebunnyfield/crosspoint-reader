@@ -217,18 +217,17 @@ zero converter changes — so both routes can coexist per-family.
 3. ~~Build GoudyBookletter1911 with the parameters above; run the acceptance
    measurements; judge in the simulator picker.~~ — done: numbers recorded
    under Acceptance; picker specimen verified in the simulator.
-4. Caledonia CC — **shelved: the source OTFs are no longer available** (the
-   owner will not be re-acquiring them), and outline synthesis needs vector
-   sources. The commented `CalendoniaCC` block in `sd-fonts.yaml` and the
-   gitignored `local_fonts/` flow stay in place in case the files ever
-   resurface (`embolden_em: 0.030`, bold from Regular, bold-italic from the
-   real Italic, no shear). The one remaining path without sources is
-   **bitmap-domain emboldening of the already-built `.cpfont`**: grayscale
-   dilation of the 2-bit glyph bitmaps by ~1 px horizontally with advances
-   widened to match — crengine's retired `LVFontBoldTransform` approach.
-   Workable at 25–37 ppem where outline emboldening quantizes to roughly the
-   same pixels anyway, but strictly below outline quality (that is why
-   crengine retired it); it needs a `.cpfont` read/transform/write tool that
-   does not exist yet. Build it only if the missing Caledonia bold actually
-   hurts in reading.
+4. Caledonia CC — the desktop OTFs are gone, but the owner holds **WOFF
+   files**, and WOFF is just a compressed sfnt wrapper: fontTools unwraps it
+   losslessly (`TTFont(woff); font.flavor = None; font.save(otf)` — WOFF2
+   additionally needs `pip install brotli`). Convert the Text Regular and
+   Text Italic WOFFs into `local_fonts/CaledoniaCC-TextRegular.otf` /
+   `-TextItalic.otf`, uncomment the `CalendoniaCC` block, and the normal
+   build applies (`embolden_em: 0.030`, bold from Regular, bold-italic from
+   the real Italic, no shear; watch hairline survival at 12 pt). One caveat:
+   web-licensed WOFFs are sometimes glyph-subset — the converter validates
+   intervals against the font and the NotoSans fallback fills gaps, so a
+   subset source thins coverage rather than breaking the build. `local_fonts/`
+   stays gitignored, so neither fonts nor output can be committed by
+   accident.
 5. Only if a family fails on quality: FontForge route for that family.
