@@ -33,7 +33,6 @@ class EpubReaderActivity final : public Activity {
   bool pendingPercentJump = false;
   // Normalized 0.0-1.0 progress within the target spine item, computed from book percentage.
   float pendingSpineProgress = 0.0f;
-  bool pendingScreenshot = false;
   bool pendingSyncSaveError = false;
   // Consecutive page-load failures. Each failure drops the section and rebuilds on the next render,
   // which recovers a transiently corrupt cache; capped so a persistently bad page can't spin forever.
@@ -42,9 +41,6 @@ class EpubReaderActivity final : public Activity {
   bool skipNextButtonCheck = false;  // Skip button processing for one frame after subactivity exit
   bool automaticPageTurnActive = false;
   bool showBookmarkMessage = false;
-  // "No dictionary set" popup, shown when a lookup is triggered without a configured dictionary.
-  bool showDictionaryMessage = false;
-  unsigned long dictionaryMessageTime = 0UL;
   // One-shot latch for the side-button HOLD gesture (next/previous font family). Fires the
   // moment the hold crosses SKIP_HOLD_MS rather than on release, so the reflow starts while
   // the button is still down; cleared once both side buttons are up, so one hold produces
@@ -107,7 +103,7 @@ class EpubReaderActivity final : public Activity {
   bool partialRebuildStartFailed = false;
 
   // Last position persisted by render()'s saveProgress, used to skip redundant
-  // writeAtomic calls on no-op re-renders (menu/bookmark/screenshot).
+  // writeAtomic calls on no-op re-renders (menu/bookmark).
   int lastSavedSpineIndex = -1;
   int lastSavedPage = -1;
   int lastSavedPageCount = -1;
@@ -190,7 +186,6 @@ class EpubReaderActivity final : public Activity {
   void onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action);
   // Opens the reader menu for the current position (short-press Confirm)
   void openReaderMenu();
-  void openDictionaryWordSelect();
   // Returns true if sync acted (launched, or surfaced a save error); false if it was a no-op
   // because no KOReader credentials are stored.
   bool launchKOReaderSync();
@@ -245,6 +240,5 @@ class EpubReaderActivity final : public Activity {
     requestUpdate();
     return true;
   }
-  ScreenshotInfo getScreenshotInfo() const override;
   CrossPointPosition getCurrentPosition() const;
 };

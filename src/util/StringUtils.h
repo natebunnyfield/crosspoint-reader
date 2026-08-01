@@ -10,11 +10,11 @@ namespace StringUtils {
  * each byte by its lowercased value.
  *
  * Used wherever data is sorted case-insensitively: StarDict indexes (including
- * wiktionary-derived dictionaries) and the on-disk dictionary folder list.
+ * wiktionary-derived sources).
  * Plain strcmp would land a binary search on the wrong page for any word whose
  * alphabetic neighbourhood contains mixed-case boundaries.
  *
- * Inline (header) because Dictionary's binary search calls it per comparison
+ * Inline (header) because it is called per comparison in hot loops
  * step; a cross-TU call here would defeat inlining on a hot path.
  */
 inline int asciiCaseCmp(const char* a, const char* b) {

@@ -33,10 +33,10 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
   if (hasFootnotes) {
     items.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
-  // Look Up, Take screenshot and Delete Book Cache are deliberately not listed.
-  // Their MenuAction handlers below stay live: dictionary lookup is still
+  // Look Up and Delete Book Cache are deliberately not listed.
+  // Their MenuAction handlers below stay live:
   // reachable through the long-press Confirm binding (Settings > Controls >
-  // Long Press Menu > Dictionary), and the cache can still be cleared from
+  // the cache can still be cleared from
   // Settings > System > Clear Reading Cache.
   return items;
 }

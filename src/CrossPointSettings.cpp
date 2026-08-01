@@ -99,10 +99,6 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   if (ownerName[0] != '\0') {
     doc["ownerName"] = ownerName;
   }
-  // Dictionary folder name — uses dynamic getter/setter in SettingsList, save manually
-  if (dictionaryName[0] != '\0') {
-    doc["dictionaryName"] = dictionaryName;
-  }
 
   // Language -- managed by LanguageSelectActivity, not in SettingsList.
   // Stored as ISO code string ("EN", "DE", ...) for stability across enum reorders.
@@ -125,9 +121,9 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // the factory default — on every load. Out-of-range values are still clamped
   // by the generic enum loop in fromJson().
   //
-  // longPressMenuFunction no longer remaps LP_MENU_BOOKMARK either: upstream
-  // kept Bookmark as a live choice and appended Dictionary after it, so the
-  // stored index space is 0..3 again and every value is reachable from the UI.
+  // longPressMenuFunction no longer remaps LP_MENU_BOOKMARK either: the stored
+  // index space is 0..2 and every value is reachable from the UI. A saved 3
+  // from when Dictionary existed is out of range and clamps on load.
   orientation = PORTRAIT;
 
   // The Display tab, Manage Fonts and Customise Status Bar were withdrawn from
@@ -259,8 +255,6 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   } else if (storedFontFamily >= BUILTIN_FONT_COUNT) {
     needsResave = true;
   }
-  // Dictionary folder name — uses dynamic getter/setter in SettingsList, load manually
-  copyToField(dictionaryName, doc["dictionaryName"] | "", sizeof(dictionaryName));
 
   // Language -- stored as code string for stability across enum reorders.
   if (doc["language"].is<const char*>()) {

@@ -57,5 +57,4 @@ class XtcReaderActivity final : public Activity {
     requestUpdate();
     return true;
   }
-  ScreenshotInfo getScreenshotInfo() const override;
 };

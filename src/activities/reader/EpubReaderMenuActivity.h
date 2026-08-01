@@ -30,12 +30,10 @@ class EpubReaderMenuActivity final : public Activity {
     ROTATE_SCREEN,
     BOOKMARKS,
     TOGGLE_BOOKMARK,
-    SCREENSHOT,
     DISPLAY_QR,
     GO_HOME,
     SYNC,
-    DELETE_CACHE,
-    DICTIONARY
+    DELETE_CACHE
   };
 
   explicit EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
