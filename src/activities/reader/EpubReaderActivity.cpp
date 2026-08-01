@@ -562,7 +562,7 @@ void EpubReaderActivity::loop() {
   // SIDE BUTTONS ARE THE FONT CONTROLS while this setting is on:
   //   hold  = next / previous font FAMILY, cycling at both ends
   //   tap   = font SIZE step
-  // Page turning therefore moves entirely to the FRONT Left/Right buttons (and tilt, and
+  // Page turning therefore moves entirely to the FRONT Left/Right buttons (and
   // the power button when configured for it) — detectPageTurn still provides those below.
   // This is a deliberate trade the device owner asked for, not an oversight: the side
   // buttons no longer turn pages while longPressButtonBehavior == FONT_SIZE_STEP.
@@ -605,7 +605,7 @@ void EpubReaderActivity::loop() {
     }
   }
 
-  auto [prevTriggered, nextTriggered, fromTilt] = ReaderUtils::detectPageTurn(mappedInput);
+  auto [prevTriggered, nextTriggered] = ReaderUtils::detectPageTurn(mappedInput);
   prevTriggered = prevTriggered || touch.prev;
   nextTriggered = nextTriggered || touch.next;
   if (!prevTriggered && !nextTriggered) {
@@ -632,7 +632,7 @@ void EpubReaderActivity::loop() {
   }
 
   const unsigned long heldMs = (touch.prev || touch.next) ? touch.heldMs : mappedInput.getHeldTime();
-  const bool longPress = !fromTilt && heldMs > ReaderUtils::SKIP_HOLD_MS;
+  const bool longPress = heldMs > ReaderUtils::SKIP_HOLD_MS;
 
   if (longPress && SETTINGS.longPressButtonBehavior == SETTINGS.CHAPTER_SKIP) {
     if (!nextTriggered && section && section->currentPage > 0) {

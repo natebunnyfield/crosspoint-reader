@@ -2,7 +2,6 @@
 
 #include <BoardConfig.h>
 #include <HalClock.h>
-#include <HalTiltSensor.h>
 #include <I18n.h>
 #include <SdCardFontRegistry.h>
 
@@ -149,11 +148,10 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // unchanged.
     //
     // Exact final capacity: the 50 fixed entries below plus the one conditional
-    // tilt entry appended further down (X3 only), so neither the push_backs nor
-    // that insert() reallocate. Keep in sync when adding an entry.
+    // Keep in sync when adding an entry so the push_backs never reallocate.
     constexpr size_t FIXED_ENTRY_COUNT = 50;
     std::vector<SettingInfo> v;
-    v.reserve(FIXED_ENTRY_COUNT + (halTiltSensor.isAvailable() ? 1 : 0));
+    v.reserve(FIXED_ENTRY_COUNT);
 
     // --- Display ---
     v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
@@ -272,18 +270,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // on next WiFi connect, which is useful when crossing time zones.
     v.push_back(SettingInfo::Toggle(StrId::STR_CLOCK_SYNCED, &CrossPointSettings::clockHasBeenSynced,
                                     "clockHasBeenSynced", StrId::STR_CAT_SYSTEM));
-    // Only show tilt page turn setting when the QMI8658 IMU is present (X3)
-    if (halTiltSensor.isAvailable()) {
-      // Insert after the short power button setting (end of Controls section)
-      for (auto it = v.begin(); it != v.end(); ++it) {
-        if (it->nameId == StrId::STR_SHORT_PWR_BTN) {
-          v.insert(it + 1, SettingInfo::Enum(StrId::STR_TILT_PAGE_TURN, &CrossPointSettings::tiltPageTurn,
-                                             {StrId::STR_STATE_OFF, StrId::STR_NORMAL, StrId::STR_INVERTED},
-                                             "tiltPageTurn", StrId::STR_CAT_CONTROLS));
-          break;
-        }
-      }
-    }
     return v;
   }();
 
