@@ -218,13 +218,34 @@ Either location works. When collecting a complete font set off a dev machine,
 look in **both** `fs_/.fonts/` and `fs_/fonts/`; the two halves of the installed
 set routinely sit in different roots.
 
-**Buildable ≠ available.** `src/FontDisplayNames.h` defines the curated picker
-set (15 families). `scripts/install-sim-fonts.py` rebuilds only the subset whose
-sources `sd-fonts.yaml` can fetch, and prints
-`Skipping (no buildable source in sd-fonts.yaml): ...` for the rest — commercial
-or locally-sourced families such as Edgar, GTAlpinaCond, TeXGyreSchola,
-Venetian301, CaledoniaCC. That message means "cannot regenerate," **not** "not
-present": their already-built `.cpfont` files are on disk and are shipped as-is.
+**All 15 curated families are now buildable** (2026-08-01). `sd-fonts.yaml` has a
+recipe for every family in `src/FontDisplayNames.h`, so
+`scripts/install-sim-fonts.py` no longer prints
+`Skipping (no buildable source in sd-fonts.yaml): ...`. If it does, a recipe
+regressed or a local source is missing.
+
+Four of them — Edgar, GTAlpinaCond, Venetian301, CaledoniaCC, all commercial or
+webfont cuts — build from `lib/EpdFont/local_fonts/` (gitignored). The **recipe**
+is committed, never the font files. Without those files the family skips with a
+clear message, which means "cannot regenerate here," **not** "missing from the
+card". TeXGyreSchola needs nothing local — GUST/CTAN, fetched by URL.
+
+**A rebuild is not byte-identical to what shipped, and that is expected.**
+`build-sd-fonts.py` always passes `--fallback-{style}` (line 342), filling every
+codepoint in the interval from Noto; the older ad-hoc `fontconvert_sdcard.py`
+invocations did not. A rebuilt family therefore has *more* glyph coverage (Edgar
+637 → 1849) while advanceY, ascender, descender, the kern matrix and ligature
+counts match exactly. Compare those fields, not the file hash.
+
+**Recovering metrics for a family whose numbers were never written down:**
+re-measuring the source gives the wrong answer (Edgar measures 987; its builds
+are only consistent with ~952). `ascender = norm_ceil(face.size.ascender)`
+(`fontconvert_sdcard.py:796`) with `ppem = pt * 150/72`, so each built size bounds
+the original and four sizes pin it to a narrow range. Edgar needed
+`{ascent: 952, descent: -284}`; the other three already carried metrics that
+reproduce their builds and take no override. The kern-cell count is a good
+fingerprint for the interval preset — GTAlpinaCond only matched its installed
+853 cells under `reading`, not `latin-ext`.
 
 ```bash
 python3 scripts/install-sim-fonts.py          # rebuild + install what it can

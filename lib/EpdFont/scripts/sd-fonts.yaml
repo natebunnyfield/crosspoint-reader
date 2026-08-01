@@ -199,17 +199,91 @@ families:
   # contrast means hairlines gain proportionally more than stems. Judge the
   # hairline/stem relationship at 12 pt first; see docs/synthetic-font-styles.md.
   #
-  # - name: CaledoniaCC
-  #   description: "Caledonia CC, Dwiggins's transitional Scotch Roman (Latin)"
-  #   intervals: latin-ext
-  #   sizes: [12, 14, 16, 18]
-  #   # Worst −2 px plain-text overlap measured 2026-08-01.
-  #   metrics: {ascent: 991, descent: -345, linegap: 0}
-  #   styles:
-  #     regular:    {path: "local_fonts/CaledoniaCC-TextRegular.otf"}
-  #     italic:     {path: "local_fonts/CaledoniaCC-TextItalic.otf"}
-  #     bold:       {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
-  #     bolditalic: {from: italic, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
+  - name: CaledoniaCC
+    description: "Caledonia CC, Dwiggins's transitional Scotch Roman (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    # Worst −2 px plain-text overlap measured 2026-08-01.
+    metrics: {ascent: 991, descent: -345, linegap: 0}
+    styles:
+      regular:    {path: "local_fonts/CaledoniaCC-Regular.ttf"}
+      italic:     {path: "local_fonts/CaledoniaCC-Italic.ttf"}
+      bold:       {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
+
+  # The four families below are commercial or webfont cuts: the FILES are never
+  # committed or distributed, only these recipes. Put the sources in
+  # lib/EpdFont/local_fonts/ (gitignored) under the names below and they build
+  # like any other family. Without them `install-sim-fonts.py` skips the family
+  # and says so — it does NOT mean the font is missing from the card, only that
+  # it cannot be regenerated here.
+  #
+  # Metrics were recovered from the shipped .cpfont files on 2026-08-01, not
+  # re-measured: re-measuring gives different numbers (Edgar measures 987, but
+  # the builds are only consistent with ~952). ascender = norm_ceil(size.ascender)
+  # (fontconvert_sdcard.py:796), so four sizes pin the original to a narrow
+  # range. Only Edgar needs an override; the other three already carry metrics
+  # that reproduce their builds.
+
+  - name: Edgar
+    description: "Frere-Jones/Stössinger Caslon-adjacent text serif (Latin)"
+    # `reading` plus ™ ℗ ℠ (0x2100-0x214F) and ə (0x0250-0x02AF), then the PUA
+    # block: 'liga'/'rlig' emit f_b f_h f_j f_k f_f_b f_f_h f_f_j f_f_k (and g_y
+    # in the italics) with no cmap entry, and fontconvert can only carry a
+    # ligature whose OUTPUT glyph has a codepoint. The staged sources are already
+    # PUA-encoded at U+E000-E008 by add_pua_ligs.py, which is what gets Edgar to
+    # 13 ligature pairs (14 in the italics) instead of the bare 5.
+    intervals: reading,(0x2100-0x214F),(0x0250-0x02AF),(0xE000-0xE008)
+    sizes: [12, 14, 16, 18]
+    # Native hhea is 1043/-255; the build used ink extents ±65/1000 measured on
+    # the Regular, per the family metrics pass.
+    metrics: {ascent: 952, descent: -284, linegap: 0}
+    styles:
+      regular:    {path: "local_fonts/Edgar-Regular.ttf"}
+      bold:       {path: "local_fonts/Edgar-Bold.ttf"}
+      italic:     {path: "local_fonts/Edgar-Italic.ttf"}
+      bolditalic: {path: "local_fonts/Edgar-BoldItalic.ttf"}
+
+  - name: GTAlpinaCond
+    description: "GT Alpina Condensed, tightest set in the tier (Latin)"
+    intervals: reading
+    sizes: [12, 14, 16, 18]
+    # No metrics override: the webfont cut already ships 892/-281, which is
+    # exactly ink ±65/1000 and reproduces the installed build.
+    styles:
+      regular:    {path: "local_fonts/GTAlpinaCond-Regular.otf"}
+      bold:       {path: "local_fonts/GTAlpinaCond-Bold.otf"}
+      italic:     {path: "local_fonts/GTAlpinaCond-Italic.otf"}
+      bolditalic: {path: "local_fonts/GTAlpinaCond-BoldItalic.otf"}
+
+  - name: Venetian301
+    description: "Bitstream's Centaur — Rogers after Jenson; italic is Warde's Arrighi (Latin)"
+    intervals: latin-ext
+    # Non-standard ladder, preserved from the shipped build. Ordinal slot mapping
+    # (findClosestReaderSize) makes that a non-issue.
+    sizes: [15, 17, 19, 21]
+    # Deliberately NO metrics override: this family was never put through the
+    # family-wide metrics pass, so its four styles still carry the source's own
+    # differing values (hhea 871/904/826/893). Unifying them would change its
+    # leading from what ships today; that is a separate decision, not a
+    # side-effect of making it rebuildable.
+    styles:
+      regular:    {path: "local_fonts/Venetian301-Regular.otf"}
+      bold:       {path: "local_fonts/Venetian301-Bold.otf"}
+      italic:     {path: "local_fonts/Venetian301-Italic.otf"}
+      bolditalic: {path: "local_fonts/Venetian301-BoldItalic.otf"}
+
+  - name: TeXGyreSchola
+    description: "GUST's Century Schoolbook revival (Latin, Greek, Cyrillic)"
+    intervals: reading
+    sizes: [12, 14, 16, 18]
+    # Freely licensed (GUST Font License), so this one needs no local files and
+    # rebuilds on any machine. Native 1135/-332 reproduces the build as-is.
+    styles:
+      regular:    {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf"}
+      bold:       {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-bold.otf"}
+      italic:     {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-italic.otf"}
+      bolditalic: {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-bolditalic.otf"}
 
   - name: Junicode
     description: "Medievalist scholarly serif, semi-condensed (Latin)"
