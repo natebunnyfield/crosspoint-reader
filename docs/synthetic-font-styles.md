@@ -28,24 +28,23 @@ high-contrast faces most. Schwartz's own *Sorts Mill Goudy* (OFL, roman +
 italic) is the closest open reference for what a Goudy italic's slant and
 rhythm should feel like: measure its `post.italicAngle` before picking ours.
 
-**CalendoniaCC** — publicly untraceable under this name (web, GitHub code
-search, MobileRead, the CrossPoint font packs: zero hits). Almost certainly a
-renamed digitization of W.A. Dwiggins's *Caledonia* (1938) — a transitional
-Scotch Roman with vertical stress and much higher stroke contrast than
-Kennerley. **Step zero of the implementation is identifying the actual file**
-on the card:
+**CalendoniaCC** — identified (owner confirmed): **Caledonia CC**, Carter &
+Cone's 2026 rendition by Matthew Carter of W.A. Dwiggins's *Caledonia* (1938),
+a transitional Scotch Roman with vertical stress and much higher stroke
+contrast than Kennerley. The foundry ships **Regular and Italic only**, in
+four optical sizes — **no Bold or Bold Italic exists in the family at all**
+(carterandcone.com/font/caledonia/), so synthesis is genuinely the only path
+to a bold, not a workaround for an unpurchased style. Two consequences:
 
-```bash
-python3 -m fontTools.ttx -o - -t name -t post -t "OS/2" CalendoniaCC_16.ttf-source.ttf
-```
-
-(or the original TTF it was converted from). The `name` table reveals the true
-family/foundry/copyright; `post.italicAngle` tells us the slant its designer
-intended if an italic sibling exists. If it turns out to be renamed *New
-Caledonia* or *Bitstream Transitional 511*, real bold and italics exist
-commercially and buying them beats synthesizing them. Until identified, treat
-its license as unknown: synthesis output stays on the user's own card, not in
-any distributed font pack.
+- **The italic is real.** Nothing is ever sheared for this family: synthesize
+  bold by emboldening the Regular and bold-italic by emboldening the Italic.
+  The `slant_deg` machinery below is Goudy-only.
+- **Commercial license.** Synthesis output stays on the user's own card, never
+  in a distributed font pack. Use the Text optical size as the source.
+- **High contrast is the risk.** Outline emboldening adds the same absolute
+  weight to hairlines as to stems, so Caledonia's thins fatten
+  proportionally more than Kennerley's. Start from a smaller `embolden_em`
+  than Goudy's and judge the hairline/stem relationship at 12 pt first.
 
 ## Measured facts the parameters hang on
 
@@ -123,13 +122,14 @@ outlines by hand.
 
 `embolden_em` is the x-strength as a fraction of the em (y gets half unless
 `y_ratio` overrides); per-size px strength = `embolden_em × ppem`, rounded to
-26.6. `slant_deg` defaults are per-genre: **~11°** for an old-style like
-Kennerley (gentle, like its 1918 italic; calibrate against Sorts Mill Goudy
-Italic's `post.italicAngle`), **~14°** for a transitional like Caledonia
-(FreeType/crengine synthetic oblique is 12°, CSS oblique defaults to 14°,
-FontForge italicize ~13°). CalendoniaCC's numbers wait on its identification;
-expect a smaller `embolden_em` to need testing, because its thin strokes gain
-the same absolute weight as its stems and its contrast is high.
+26.6. `slant_deg` is Goudy-only: **~11°** for an old-style like Kennerley
+(gentle, like its 1918 italic; calibrate against Sorts Mill Goudy Italic's
+`post.italicAngle`; for reference, FreeType/crengine synthetic oblique is 12°,
+CSS oblique defaults to 14°, FontForge italicize ~13°). Caledonia CC has a
+real Italic, so its config names that file as the italic source and derives
+bold-italic from it with `embolden_em` alone — start smaller than Goudy's
+0.039 (try ~0.030) because its high contrast means hairlines gain
+proportionally more than stems.
 
 ## Prototype (validated in this session)
 
@@ -174,11 +174,13 @@ zero converter changes — so both routes can coexist per-family.
 
 ## Order of work
 
-1. Identify CalendoniaCC (`ttx -t name -t post -t "OS/2"` on the Mac).
+1. ~~Identify CalendoniaCC~~ — done: Caledonia CC, Carter & Cone 2026
+   (Regular + Italic only; no bold exists upstream).
 2. Implement `from:`/`synthetic:` in `build-sd-fonts.py` +
    `fontconvert_sdcard.py` (split load/render, embolden, shear, advance).
 3. Build GoudyBookletter1911 with the parameters above; run the acceptance
    measurements; judge in the simulator picker.
-4. Tune CalendoniaCC's `embolden_em`/`slant_deg` against its identified
-   contrast; same acceptance.
+4. Caledonia CC: embolden Regular → bold and the real Italic → bold-italic
+   (no shear), starting near `embolden_em: 0.030`; same acceptance, with
+   extra attention to hairline survival at 12 pt.
 5. Only if a family fails on quality: FontForge route for that family.
