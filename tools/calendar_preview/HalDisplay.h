@@ -20,6 +20,9 @@ class HalDisplay {
   void returnFrameBufferStorage() {}
   void clearScreen(uint8_t c) { memset(getFrameBuffer(), c, BUFFER_SIZE); }
   void displayBuffer(RefreshMode = FAST_REFRESH, bool = false) {}
+  void displayBufferAsync(RefreshMode = FAST_REFRESH) {}
+  void waitRefreshComplete() {}
+  bool supportsAsyncRefresh() const { return false; }
   void refreshDisplay(RefreshMode = FAST_REFRESH, bool = false) {}
   void displayGrayscaleBase(RefreshMode = HALF_REFRESH, bool = false) {}
   void copyGrayscaleBuffers(const uint8_t*, const uint8_t*) {}

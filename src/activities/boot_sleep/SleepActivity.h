@@ -1,5 +1,6 @@
 #pragma once
 #include "activities/Activity.h"
+#include "activities/boot_sleep/CalendarSleepScreen.h"
 
 class Bitmap;
 
@@ -18,7 +19,8 @@ class SleepActivity final : public Activity {
   void renderBlankSleepScreen() const;
   // CALENDAR: draw the holiday calendar straight into the framebuffer
   // and refresh. Nothing is written to the SD card. See CalendarSleepScreen.h.
-  void renderCalendarSleepScreen(uint8_t weeks) const;
+  void renderCalendarSleepScreen(uint8_t weeks,
+      calendar::Style style = calendar::Style::SpanishCR) const;
 
   bool fromTimeout = false;
 };

@@ -178,6 +178,17 @@ bool renderCalendar(int year, int month, int day, const char* outPath) {
   return true;
 }
 
+bool renderCalendarWestside(int year, int month, int day, const char* outPath) {
+  calendar::CalendarSleepScreen::render(renderer,
+                                        calendar::YMD{static_cast<uint16_t>(year),
+                                                      static_cast<uint8_t>(month),
+                                                      static_cast<uint8_t>(day)},
+                                        5, calendar::Style::WestsideEN);
+  if (!writeMonoPortraitBmp(outPath, renderer)) return false;
+  printf("wrote %s\n", outPath);
+  return true;
+}
+
 // One page per point size: four sizes of two families would overflow the 792px
 // panel and silently clip.
 bool renderFontSpecimen(const char* famA, const char* famB, const char* outDir) {
@@ -247,12 +258,13 @@ int usage(const char* argv0) {
   fprintf(stderr,
           "CrossPoint off-device render harness (NOT the simulator -- that is\n"
           "~/src/crosspoint-simulator, run via `pio run -e simulator -t run_simulator`)\n\n"
-          "  %s calendar [YYYY MM DD]        render the sleep screen -> fs_/sleep.bmp\n"
-          "  %s fonts FAMILY_A FAMILY_B      A-B two SD font families -> fs_/kern_specimen_*.bmp\n"
-          "  %s YYYY MM DD                   legacy calendar form\n\n"
+          "  %s calendar [YYYY MM DD]                render Spanish/CR sleep screen -> fs_/sleep.bmp\n"
+          "  %s calendar-westside [YYYY MM DD]        render Westside/EN sleep screen -> fs_/sleep.bmp\n"
+          "  %s fonts FAMILY_A FAMILY_B               A-B two SD font families -> fs_/kern_specimen_*.bmp\n"
+          "  %s YYYY MM DD                            legacy calendar form\n\n"
           "fonts mode reads CPFONT_DIR (use /.fonts), a DEVICE-style path;\n"
           "the stub HalStorage prefixes ./fs_ to it.\n",
-          argv0, argv0, argv0);
+          argv0, argv0, argv0, argv0);
   return 2;
 }
 
@@ -272,10 +284,14 @@ int main(int argc, char** argv) {
     return renderFontSpecimen(argv[2], argv[3], "./fs_") ? 0 : 1;
   }
 
-  // "calendar [Y M D]", bare "calendar", and the legacy bare "Y M D" that
-  // sweep.py and check_centering.py drive.
+  // "calendar [Y M D]", "calendar-westside [Y M D]", bare "calendar", and the
+  // legacy bare "Y M D" that sweep.py and check_centering.py drive.
   int y = 2026, m = 7, d = 27;
-  if (strcmp(mode, "calendar") == 0) {
+  if (strcmp(mode, "calendar-westside") == 0) {
+    if (argc == 5) { y = atoi(argv[2]); m = atoi(argv[3]); d = atoi(argv[4]); }
+    else if (argc != 2) return usage(argv[0]);
+    return renderCalendarWestside(y, m, d, "./fs_/sleep.bmp") ? 0 : 1;
+  } else if (strcmp(mode, "calendar") == 0) {
     if (argc == 5) { y = atoi(argv[2]); m = atoi(argv[3]); d = atoi(argv[4]); }
     else if (argc != 2) return usage(argv[0]);
   } else if (argc == 4 && atoi(argv[1]) > 1000) {

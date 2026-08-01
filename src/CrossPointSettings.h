@@ -30,6 +30,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     CALENDAR_FOUR = 8,
     CALENDAR_FIVE = 9,
     CALENDAR_SIX = 10,
+    // Westside Community Schools (D66, Omaha) + US federal holidays, English.
+    CALENDAR_WESTSIDE = 11,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };

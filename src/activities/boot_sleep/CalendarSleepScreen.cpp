@@ -9,9 +9,9 @@
 #include <initializer_list>
 #include <string>
 
-#include "CrossPointSettings.h"
 #include "HolidayCalculator.h"
 #include "SdCardFontSystem.h"
+#include "WestsideCalendar_2026_2027.h"
 #include "fontIds.h"
 
 // Costa Rican + US holiday calendar (4/5/6 week rows — see render()'s `weeks`
@@ -67,6 +67,48 @@ constexpr const char* MONTHS_SHORT[12] = {"ene", "feb", "mar", "abr", "may", "ju
 // would overflow (e.g. "Diciembre 2026 – Febrero 2027" exceeds 528px at 18pt).
 constexpr const char* MONTHS_ABBR[12] = {"Ene", "Feb", "Mar", "Abr", "May", "Jun",
                                          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"};
+
+// ---------------------------------------------------------------------------
+// English month labels (WestsideEN style).
+// ---------------------------------------------------------------------------
+constexpr const char* MONTHS_LONG_EN[12] = {
+    "January", "February", "March",     "April",   "May",      "June",
+    "July",    "August",   "September", "October", "November", "December"};
+constexpr const char* MONTHS_SHORT_EN[12] = {"jan", "feb", "mar", "apr", "may", "jun",
+                                             "jul", "aug", "sep", "oct", "nov", "dec"};
+// Capitalised abbreviations for the header fallback in the WestsideEN path.
+constexpr const char* MONTHS_ABBR_EN[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+// English short labels for REGION_US holidays, indexed by HolidayId.
+// CR-only entries are nullptr and are never reached in the WestsideEN legend.
+// Order must match the HolidayId enum in HolidayCalculator.h exactly.
+static const char* const US_HOLIDAY_LABEL_EN[static_cast<size_t>(HolidayId::HolidayIdCount)] = {
+    "New Year's Day",          // AnoNuevo            CR+US
+    "MLK Jr. Day",             // DiaDeMlk            US
+    "Presidents' Day",         // DiaDeLosPresidentes US
+    nullptr,                   // JuevesSanto         CR only
+    nullptr,                   // ViernesSanto        CR only
+    nullptr,                   // JuanSantamaria      CR only
+    nullptr,                   // DiaDelTrabajoCR     CR only
+    "Memorial Day",            // DiaDeLosCaidos      US
+    "Juneteenth",              // Juneteenth          US
+    "Independence Day",        // IndependenciaUS     US
+    nullptr,                   // AnexionNicoya       CR only
+    nullptr,                   // VirgenDeLosAngeles  CR only
+    nullptr,                   // DiaDeLaMadre        CR only
+    nullptr,                   // DiaDeLaPersonaNegra CR only
+    "Labor Day",               // DiaDelTrabajoUS     US
+    nullptr,                   // IndependenciaCR     CR only
+    "Indigenous Peoples' Day", // DiaDeLosPueblosIndigenas US
+    nullptr,                   // EncuentroDeLasCulturas   CR only
+    "Veterans Day",            // DiaDeLosVeteranos   US
+    "Thanksgiving",            // AccionDeGracias     US
+    "Black Friday",            // ViernesNegro        US
+    nullptr,                   // AbolicionDelEjercito CR only
+    "Christmas Eve",           // NocheBuena          US
+    "Christmas",               // Navidad             CR+US
+};
 
 // ---------------------------------------------------------------------------
 // Font selection
@@ -173,6 +215,7 @@ int topYForInkCentre(const GfxRenderer& renderer, int fontId, const char* text,
 // ---------------------------------------------------------------------------
 struct Layout {
   CalendarFonts fonts;
+  Style style;  // data source / locale selection
   int rows;  // week rows in this render
   int screenW;
   int screenH;
@@ -202,9 +245,11 @@ struct Layout {
   }
 };
 
-Layout computeLayout(const GfxRenderer& renderer, const CalendarFonts& fonts, const int weeks) {
+Layout computeLayout(const GfxRenderer& renderer, const CalendarFonts& fonts, const int weeks,
+                     const Style style) {
   Layout L{};
   L.fonts = fonts;
+  L.style = style;
   L.rows = weeks;
   L.screenW = renderer.getScreenWidth();
   L.screenH = renderer.getScreenHeight();
@@ -282,7 +327,10 @@ const char* regionTag(uint8_t regions) {
 // the two widest cases the old code had to degrade through (a full
 // "Diciembre 2026 – Febrero 2027" and its ’26/’27 last resort).
 void formatHeader(char* buf, size_t bufSize, const YMD& first, const YMD& last,
-                  const GfxRenderer& renderer, int displayFontId, int maxWidth) {
+                  const GfxRenderer& renderer, int displayFontId, int maxWidth, Style style) {
+  const char* const* longNames = (style == Style::WestsideEN) ? MONTHS_LONG_EN : MONTHS_LONG;
+  const char* const* abbrNames = (style == Style::WestsideEN) ? MONTHS_ABBR_EN : MONTHS_ABBR;
+
   auto fits = [&](const char* s) {
     return renderer.getTextWidth(displayFontId, s, HEADER_STYLE) <= maxWidth;
   };
@@ -290,15 +338,15 @@ void formatHeader(char* buf, size_t bufSize, const YMD& first, const YMD& last,
   // A December–February window spans two years but still reads as one month
   // range, so only the months are compared here.
   if (first.month == last.month) {
-    std::snprintf(buf, bufSize, "%s", MONTHS_LONG[first.month - 1]);
+    std::snprintf(buf, bufSize, "%s", longNames[first.month - 1]);
     return;
   }
 
-  std::snprintf(buf, bufSize, "%s \xe2\x80\x93 %s", MONTHS_LONG[first.month - 1],
-                MONTHS_LONG[last.month - 1]);
+  std::snprintf(buf, bufSize, "%s \xe2\x80\x93 %s", longNames[first.month - 1],
+                longNames[last.month - 1]);
   if (fits(buf)) return;
-  std::snprintf(buf, bufSize, "%s \xe2\x80\x93 %s", MONTHS_ABBR[first.month - 1],
-                MONTHS_ABBR[last.month - 1]);
+  std::snprintf(buf, bufSize, "%s \xe2\x80\x93 %s", abbrNames[first.month - 1],
+                abbrNames[last.month - 1]);
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +389,8 @@ void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const
 
   // Month-rollover subscript, below both the digit and the highlight square.
   if (showMonthSubscript) {
-    const char* mon = MONTHS_SHORT[date.month - 1];
+    const char* mon = (L.style == Style::WestsideEN) ? MONTHS_SHORT_EN[date.month - 1]
+                                                     : MONTHS_SHORT[date.month - 1];
     const int subW = renderer.getTextWidth(L.fonts.subscript, mon);
     const InkBox sub = inkBox(renderer, L.fonts.subscript, mon, EpdFontFamily::REGULAR);
     const InkBox num = inkBox(renderer, L.fonts.display, numBuf, DAY_STYLE);
@@ -354,7 +403,7 @@ void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const
 void drawHeader(GfxRenderer& renderer, const Layout& L, const YMD& first, const YMD& last) {
   char header[80];
   const int avail = L.screenW - 2 * L.marginX;
-  formatHeader(header, sizeof(header), first, last, renderer, L.fonts.display, avail);
+  formatHeader(header, sizeof(header), first, last, renderer, L.fonts.display, avail, L.style);
   const std::string fitted =
       renderer.truncatedText(L.fonts.display, header, avail, HEADER_STYLE);
   const int y = topYForInkCentre(renderer, L.fonts.display, fitted.c_str(),
@@ -468,6 +517,135 @@ int drawLegend(GfxRenderer& renderer, const Layout& L, const YMD& first, const Y
   return rows;
 }
 
+// Legend for Style::WestsideEN. Columns: day (right-aligned), short month
+// (left-aligned), label (left-aligned). No region-tag column.
+//
+// Sources merged and deduped:
+//   (a) REGION_US holidays in the visible window, labeled in English.
+//   (b) WESTSIDE_2026_2027 entries whose range intersects the window.
+//
+// If a Westside entry and a US holiday share the same date, the Westside row
+// wins (it is more specific). Sorted chronologically; respects legendMaxRows.
+int drawLegendWestside(GfxRenderer& renderer, const Layout& L, const YMD& first,
+                       const YMD& last) {
+  struct Entry {
+    YMD date;
+    const char* label;
+    bool isWestside;  // used for dedup: Westside beats US holiday on same date
+  };
+  constexpr int MAX_EN_FOUND = static_cast<int>(HolidayId::HolidayIdCount) +
+                               static_cast<int>(WESTSIDE_2026_2027_COUNT);
+  Entry found[MAX_EN_FOUND];
+  int found_n = 0;
+
+  // (a) REGION_US holidays in the visible window.
+  const uint16_t years[2] = {first.year, last.year};
+  const int yearIterations = (first.year != last.year) ? 2 : 1;
+  for (int yi = 0; yi < yearIterations; ++yi) {
+    for (uint8_t i = 0;
+         i < static_cast<uint8_t>(HolidayId::HolidayIdCount) && found_n < MAX_EN_FOUND; ++i) {
+      const auto id = static_cast<HolidayId>(i);
+      if (!(HOLIDAY_TABLE[i].regions & REGION_US)) continue;
+      const char* lbl = US_HOLIDAY_LABEL_EN[i];
+      if (!lbl) continue;  // belt-and-suspenders (should never happen for REGION_US entries)
+      const YMD d = resolveHoliday(id, years[yi]);
+      if (!dateLess(d, first) && !dateLess(last, d)) {
+        found[found_n++] = {d, lbl, false};
+      }
+    }
+  }
+
+  // (b) WESTSIDE_2026_2027 entries whose [day..endDay] range intersects
+  // the visible window [first..last]. Legend date = first visible day.
+  for (size_t i = 0; i < WESTSIDE_2026_2027_COUNT && found_n < MAX_EN_FOUND; ++i) {
+    const WestsideEvent& e = WESTSIDE_2026_2027[i];
+    const YMD rangeFirst = {e.year, e.month, e.day};
+    const YMD rangeLast = {e.year, e.month, e.endDay};
+    if (dateLess(rangeLast, first) || dateLess(last, rangeFirst)) continue;
+    const YMD legendDate = dateLess(rangeFirst, first) ? first : rangeFirst;
+    found[found_n++] = {legendDate, e.label, true};
+  }
+
+  if (found_n == 0) return 0;
+
+  // Chronological insertion sort (n is small — at most a few dozen entries).
+  for (int i = 1; i < found_n; ++i) {
+    const Entry key = found[i];
+    int j = i - 1;
+    while (j >= 0 && dateLess(key.date, found[j].date)) {
+      found[j + 1] = found[j];
+      --j;
+    }
+    found[j + 1] = key;
+  }
+
+  // Dedup: when a Westside entry and a US holiday share a date, keep only the
+  // Westside row. After the sort, same-date entries are contiguous.
+  {
+    int out = 0;
+    for (int i = 0; i < found_n;) {
+      int j = i + 1;
+      while (j < found_n && sameDate(found[j].date, found[i].date)) ++j;
+      // Determine whether any entry in [i..j) is Westside.
+      bool anyWest = false;
+      for (int k = i; k < j; ++k) {
+        if (found[k].isWestside) { anyWest = true; break; }
+      }
+      for (int k = i; k < j; ++k) {
+        if (!anyWest || found[k].isWestside) found[out++] = found[k];
+      }
+      i = j;
+    }
+    found_n = out;
+  }
+
+  const int rows = std::min(found_n, L.legendMaxRows);
+  const bool overflow = found_n > L.legendMaxRows;
+  const int listed = overflow ? rows - 1 : rows;
+
+  const int blockTop = std::max(L.legendTop, L.legendBottomY - rows * L.legendRowH);
+
+  constexpr int GUTTER = 10;
+  int dayW = 0, monthW = 0;
+  for (int i = 0; i < listed; ++i) {
+    char dayBuf[4];
+    std::snprintf(dayBuf, sizeof(dayBuf), "%u", found[i].date.day);
+    dayW = std::max(dayW, renderer.getTextWidth(L.fonts.legend, dayBuf, LEGEND_STYLE));
+    monthW = std::max(monthW, renderer.getTextWidth(L.fonts.legend,
+                                                    MONTHS_SHORT_EN[found[i].date.month - 1],
+                                                    LEGEND_STYLE));
+  }
+
+  const int dayRight = L.marginX + dayW;
+  const int monthLeft = dayRight + GUTTER;
+  const int nameLeft = monthLeft + monthW + GUTTER;
+  const int nameW = L.screenW - L.marginX - nameLeft;
+
+  for (int i = 0; i < listed; ++i) {
+    const int cy = L.legendRowCentreY(i, blockTop);
+    const int y = topYForInkCentre(renderer, L.fonts.legend, "0", LEGEND_STYLE, cy);
+
+    char dayBuf[4];
+    std::snprintf(dayBuf, sizeof(dayBuf), "%u", found[i].date.day);
+    const int w = renderer.getTextWidth(L.fonts.legend, dayBuf, LEGEND_STYLE);
+    renderer.drawText(L.fonts.legend, dayRight - w, y, dayBuf, /*black=*/true, LEGEND_STYLE);
+    renderer.drawText(L.fonts.legend, monthLeft, y, MONTHS_SHORT_EN[found[i].date.month - 1],
+                      /*black=*/true, LEGEND_STYLE);
+    const std::string name =
+        renderer.truncatedText(L.fonts.legend, found[i].label, nameW, LEGEND_STYLE);
+    renderer.drawText(L.fonts.legend, nameLeft, y, name.c_str(), /*black=*/true, LEGEND_STYLE);
+  }
+
+  if (overflow) {
+    const int cy = L.legendRowCentreY(listed, blockTop);
+    const int y = topYForInkCentre(renderer, L.fonts.legend, "0", LEGEND_STYLE, cy);
+    char more[32];
+    std::snprintf(more, sizeof(more), "+%d more", found_n - listed);
+    renderer.drawText(L.fonts.legend, L.marginX, y, more, /*black=*/true, LEGEND_STYLE);
+  }
+  return rows;
+}
+
 
 }  // namespace
 
@@ -475,7 +653,8 @@ int drawLegend(GfxRenderer& renderer, const Layout& L, const YMD& first, const Y
 // Public API
 // ---------------------------------------------------------------------------
 
-void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_t weeks) {
+void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_t weeks,
+                                Style style) {
   if (!isValidDate(today.year, today.month, today.day)) {
     LOG_ERR("CAL", "invalid today: %u-%u-%u", today.year, today.month, today.day);
     return;
@@ -491,7 +670,7 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_
     LOG_ERR("CAL", "no usable display font");
     return;
   }
-  const Layout L = computeLayout(renderer, fonts, weeks);
+  const Layout L = computeLayout(renderer, fonts, weeks, style);
 
   const YMD anchor = anchorSundayOf(today);
   YMD last = anchor;
@@ -509,8 +688,9 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_
   // used for measurement, not the bitmaps used for drawing.
   if (auto* fcm = renderer.getFontCacheManager()) {
     char warm[128];
-    std::snprintf(warm, sizeof(warm), "0123456789%s%s", MONTHS_LONG[anchor.month - 1],
-                  MONTHS_LONG[last.month - 1]);
+    const char* const* longNames = (style == Style::WestsideEN) ? MONTHS_LONG_EN : MONTHS_LONG;
+    std::snprintf(warm, sizeof(warm), "0123456789%s%s", longNames[anchor.month - 1],
+                  longNames[last.month - 1]);
     // Bit 0 (regular) for the day numbers, bit 2 (italic) for the header.
     fcm->prewarmCache(L.fonts.display, warm, 0x05);
   }
@@ -520,8 +700,29 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_
   YMD cursor = anchor;
   for (int row = 0; row < L.rows; ++row) {
     for (int col = 0; col < COL_COUNT; ++col) {
-      HolidayId hid;
-      const bool isHoliday = findHolidayFor(cursor, hid);
+      bool isHoliday = false;
+      if (style == Style::WestsideEN) {
+        // WestsideEN shading: REGION_US federal holiday OR a Westside entry
+        // with shaded=true that covers this date. CR-only holidays do not shade.
+        HolidayId hid;
+        if (findHolidayFor(cursor, hid) && (HOLIDAY_TABLE[static_cast<size_t>(hid)].regions & REGION_US)) {
+          isHoliday = true;
+        }
+        if (!isHoliday) {
+          for (size_t i = 0; i < WESTSIDE_2026_2027_COUNT; ++i) {
+            const WestsideEvent& e = WESTSIDE_2026_2027[i];
+            if (e.shaded && e.year == cursor.year && e.month == cursor.month &&
+                cursor.day >= e.day && cursor.day <= e.endDay) {
+              isHoliday = true;
+              break;
+            }
+          }
+        }
+      } else {
+        // SpanishCR: shade any CR or US holiday (original behavior).
+        HolidayId hid;
+        isHoliday = findHolidayFor(cursor, hid);
+      }
       const bool isToday = sameDate(cursor, today);
       const bool showSub = cursor.day == 1 && cursor.month != anchor.month;
       drawDayCell(renderer, L, row, col, cursor, isToday, isHoliday, showSub);
@@ -529,7 +730,11 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_
     }
   }
 
-  drawLegend(renderer, L, anchor, last);
+  if (style == Style::WestsideEN) {
+    drawLegendWestside(renderer, L, anchor, last);
+  } else {
+    drawLegend(renderer, L, anchor, last);
+  }
 }
 
 }  // namespace calendar

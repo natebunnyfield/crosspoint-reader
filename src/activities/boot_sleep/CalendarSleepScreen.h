@@ -24,6 +24,16 @@ namespace calendar {
 
 struct YMD;  // fwd — defined in HolidayCalculator.h
 
+// Data source and locale selection for CalendarSleepScreen::render().
+//
+//   SpanishCR  — original: CR + US holidays, Spanish month names and labels.
+//   WestsideEN — Westside Community Schools (D66, Omaha) + REGION_US federal
+//                holidays, English month names and labels, no region-tag column.
+enum class Style : uint8_t {
+  SpanishCR,
+  WestsideEN,
+};
+
 class CalendarSleepScreen {
  public:
   // Paint the calendar into `renderer`'s framebuffer. Sets Portrait
@@ -34,7 +44,11 @@ class CalendarSleepScreen {
   // classic style and the render harness — keep the five-week look). Clamped
   // to a sane range rather than trusted: an out-of-range count would divide
   // the grid band into rows too short for the digit ink.
-  static void render(GfxRenderer& renderer, const YMD& today, uint8_t weeks = 5);
+  //
+  // `style` selects the holiday data source and locale; defaults to SpanishCR
+  // so all existing callers are unaffected.
+  static void render(GfxRenderer& renderer, const YMD& today, uint8_t weeks = 5,
+                     Style style = Style::SpanishCR);
 };
 
 }  // namespace calendar
