@@ -16,6 +16,19 @@
 #                  url:  download URL (for fonts not in the repo)
 #                  zip + member: release-archive URL plus the font's path inside
 #                  it, for foundries that only publish a whole-family zip
+#                  from + synthetic: synthesize the style at build time from
+#                  another style's font file (for families that ship fewer
+#                  real styles than the reader uses). `from:` names the base
+#                  style; `synthetic:` gives the parameters:
+#                    embolden_em: stem weight to add, as a fraction of the em
+#                                 (per-size pixel strength = embolden_em x ppem)
+#                    y_ratio:     vertical strength as a fraction of the
+#                                 horizontal (default 0.5 - full vertical
+#                                 growth eats x-height and closes counters)
+#                    slant_deg:   oblique shear angle for synthetic italics;
+#                                 omit when the family has a real italic
+#                  See docs/synthetic-font-styles.md for how the parameters
+#                  were derived and the acceptance criteria.
 #
 # Variable fonts:
 #   Some fonts (Bitter, Inter, Alegreya) are distributed as variable fonts.
@@ -144,6 +157,40 @@ families:
       bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/vollkorn/Vollkorn%5Bwght%5D.ttf", variable: {wght: 700}}
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/vollkorn/Vollkorn-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/vollkorn/Vollkorn-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: GoudyBookletter1911
+    description: "Goudy's Kennerley Old Style revival, low-contrast Venetian serif (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    # Upstream ships regular only; bold/italic/bolditalic are synthesized at
+    # build time (embolden target ~1.55x stems, 11deg oblique like Kennerley's
+    # gentle 1918 italic). Parameters derived in docs/synthetic-font-styles.md.
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/goudybookletter1911/GoudyBookletter1911.ttf"}
+      bold:       {from: regular, synthetic: {embolden_em: 0.039}}
+      italic:     {from: regular, synthetic: {slant_deg: 11}}
+      bolditalic: {from: regular, synthetic: {embolden_em: 0.039, slant_deg: 11}}
+
+  # Caledonia CC (Carter & Cone) - commercial, so the files are never
+  # committed or distributed; the family ships Regular and Italic only (no
+  # bold exists upstream), so bold/bolditalic are synthesized by emboldening
+  # the real styles - never sheared, the italic is real. To build on your own
+  # machine: place CaledoniaCC-TextRegular.otf and CaledoniaCC-TextItalic.otf
+  # in lib/EpdFont/local_fonts/ (gitignored), uncomment this block, then run
+  #   python3 build-sd-fonts.py --only CalendoniaCC
+  # embolden_em starts lower than Goudy's 0.039: Caledonia's high stroke
+  # contrast means hairlines gain proportionally more than stems. Judge the
+  # hairline/stem relationship at 12 pt first; see docs/synthetic-font-styles.md.
+  #
+  # - name: CalendoniaCC
+  #   description: "Caledonia CC, Dwiggins's transitional Scotch Roman (Latin)"
+  #   intervals: latin-ext
+  #   sizes: [12, 14, 16, 18]
+  #   styles:
+  #     regular:    {path: "local_fonts/CaledoniaCC-TextRegular.otf"}
+  #     italic:     {path: "local_fonts/CaledoniaCC-TextItalic.otf"}
+  #     bold:       {from: regular, synthetic: {embolden_em: 0.030}}
+  #     bolditalic: {from: italic, synthetic: {embolden_em: 0.030}}
 
   - name: Junicode
     description: "Medievalist scholarly serif, semi-condensed (Latin)"

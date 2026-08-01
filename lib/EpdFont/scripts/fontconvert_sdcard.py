@@ -24,6 +24,7 @@ Usage:
 
 from __future__ import annotations
 
+import ctypes
 import struct
 import sys
 import os
@@ -564,9 +565,38 @@ def extract_ligatures_fonttools(font_path, codepoints):
     return pairs
 
 
+def synth_params_for_size(synthetic, size):
+    """Compute per-size synthetic-style parameters in FreeType units.
+
+    `synthetic` is a dict with optional keys:
+      embolden_em  x-strength as a fraction of the em (0 = no embolden)
+      y_ratio      y-strength as a fraction of x-strength (default 0.5 —
+                   vertical growth eats x-height and closes counters, so it
+                   gets half strength)
+      slant_deg    oblique shear angle in degrees (0 = no shear)
+
+    Returns (x_strength, y_strength, shear_xy) where the strengths are 26.6
+    pixel units at this size's ppem (the converter renders at 150 DPI, so
+    ppem = size * 150 / 72) and shear_xy is the 16.16 matrix coefficient.
+    """
+    ppem = size * 150.0 / 72.0
+    embolden_em = float(synthetic.get("embolden_em", 0.0))
+    y_ratio = float(synthetic.get("y_ratio", 0.5))
+    slant_deg = float(synthetic.get("slant_deg", 0.0))
+    x_strength = int(round(embolden_em * ppem * 64))
+    y_strength = int(round(x_strength * y_ratio))
+    shear_xy = int(round(math.tan(math.radians(slant_deg)) * 0x10000)) if slant_deg else 0
+    return x_strength, y_strength, shear_xy
+
+
 def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=False,
-                         fallback_fontfile=None):
-    """Rasterize all glyphs for one font style. Returns StyleRasterData."""
+                         fallback_fontfile=None, synthetic=None):
+    """Rasterize all glyphs for one font style. Returns StyleRasterData.
+
+    `synthetic`, when set, is a dict (see synth_params_for_size) describing a
+    build-time synthetic style: glyph outlines are emboldened and/or sheared
+    before rendering, per docs/synthetic-font-styles.md.
+    """
     import freetype
 
     style_names = {0: "regular", 1: "bold", 2: "italic", 3: "bolditalic"}
@@ -584,9 +614,49 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         fallback_face = freetype.Face(fallback_fontfile)
         fallback_face.set_char_size(size << 6, size << 6, 150, 150)
 
-    load_flags = freetype.FT_LOAD_RENDER
+    # Synthetic styles must split load from render so the outline can be
+    # modified in between; real styles keep the single-call FT_LOAD_RENDER
+    # fast path.
+    synth_x, synth_y, synth_shear = (0, 0, 0)
+    if synthetic:
+        synth_x, synth_y, synth_shear = synth_params_for_size(synthetic, size)
+        print(f"  [{style_label}] Synthetic: embolden x={synth_x} y={synth_y} (26.6 px units), "
+              f"shear xy={synth_shear} (16.16)", file=sys.stderr)
+        load_flags = freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP
+    else:
+        load_flags = freetype.FT_LOAD_RENDER
     if force_autohint:
         load_flags |= freetype.FT_LOAD_FORCE_AUTOHINT
+
+    def apply_synthetic_and_render(f):
+        """Embolden (centered) then shear the loaded outline, then render.
+
+        Order matters: embolden-then-shear — shearing first distorts the
+        stroke stress that the embolden then amplifies. Fallback-font glyphs
+        get the same treatment; the strengths are pixel-space (26.6 at this
+        ppem), so they apply uniformly regardless of the source font's UPM.
+        """
+        slot = f.glyph
+        if slot.format == freetype.FT_GLYPH_FORMAT_OUTLINE:
+            outline_ref = ctypes.byref(slot.outline._FT_Outline)
+            if synth_x or synth_y:
+                err = freetype.FT_Outline_EmboldenXY(outline_ref, synth_x, synth_y)
+                if err:
+                    raise RuntimeError(
+                        f"FT_Outline_EmboldenXY failed (error {err}) for style {style_label}")
+                # Center the growth (KOReader's trick) so bearings stay honest.
+                freetype.FT_Outline_Translate(outline_ref, -(synth_x // 2), -(synth_y // 2))
+            if synth_shear:
+                m = freetype.FT_Matrix()
+                m.xx = 0x10000
+                m.xy = synth_shear
+                m.yx = 0
+                m.yy = 0x10000
+                freetype.FT_Outline_Transform(outline_ref, ctypes.byref(m))
+            err = freetype.FT_Render_Glyph(slot._FT_GlyphSlot, freetype.FT_RENDER_MODE_NORMAL)
+            if err:
+                raise RuntimeError(
+                    f"FT_Render_Glyph failed (error {err}) for style {style_label}")
 
     def load_glyph(code_point):
         glyph_index = face.get_char_index(code_point)
@@ -594,11 +664,15 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             glyph_index = ligature_glyph_indices.get(code_point, 0)
         if glyph_index > 0:
             face.load_glyph(glyph_index, load_flags)
+            if synthetic:
+                apply_synthetic_and_render(face)
             return face
         if fallback_face:
             fallback_glyph_index = fallback_face.get_char_index(code_point)
             if fallback_glyph_index > 0:
                 fallback_face.load_glyph(fallback_glyph_index, load_flags)
+                if synthetic:
+                    apply_synthetic_and_render(fallback_face)
                 return fallback_face
         return None
 
@@ -698,10 +772,14 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 pixels2b.append(px)
 
             packed = bytes(pixels2b)
+            # Advance compensation for synthetic embolden: add the full
+            # x-strength to the advance (FreeType and KOReader both do;
+            # skipping it is what makes faux bold look cramped). The
+            # strength is 26.6, linearHoriAdvance is 16.16: << 10 converts.
             glyph = GlyphProps(
                 width=bitmap.width,
                 height=bitmap.rows,
-                advance_x=fp4_from_ft16_16(f.glyph.linearHoriAdvance),
+                advance_x=fp4_from_ft16_16(f.glyph.linearHoriAdvance + (synth_x << 10)),
                 left=f.glyph.bitmap_left,
                 top=f.glyph.bitmap_top,
                 data_length=len(packed),
@@ -824,11 +902,15 @@ def style_sections_total_size(sections):
 # --- File writers ---
 
 def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
-                               force_autohint=False, fallback_style_fonts=None):
+                               force_autohint=False, fallback_style_fonts=None,
+                               synth_specs=None):
     """Generate a multi-style v4 .cpfont file.
 
     style_fonts: dict of {style_id: fontfile_path} e.g. {0: "Regular.ttf", 2: "Italic.ttf"}
     fallback_style_fonts: optional dict of {style_id: fallback_fontfile_path}
+    synth_specs: optional dict of {style_id: synthetic_spec_dict} for styles
+        synthesized from another style's font file (embolden/shear at build
+        time, see docs/synthetic-font-styles.md)
     """
     MAGIC = b"CPFONT\x00\x00"
     HEADER_SIZE = 32
@@ -839,6 +921,7 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     # Rasterize each style
     raster_data = {}  # style_id -> StyleRasterData
     fallback_style_fonts = fallback_style_fonts or {}
+    synth_specs = synth_specs or {}
     for style_id in sorted(style_fonts.keys()):
         fontfile = style_fonts[style_id]
         fallback_fontfile = fallback_style_fonts.get(style_id)
@@ -846,7 +929,8 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
         raster_data[style_id] = rasterize_font_style(
             fontfile, size, intervals, style_id=style_id,
             force_autohint=force_autohint,
-            fallback_fontfile=fallback_fontfile)
+            fallback_fontfile=fallback_fontfile,
+            synthetic=synth_specs.get(style_id))
 
     # Pack binary sections for each style
     packed_sections = {}  # style_id -> tuple of section bytearrays
@@ -966,6 +1050,16 @@ def main():
     parser.add_argument("--fallback-bolditalic", dest="fallback_bolditalic",
                         help="Fallback font file for bold-italic style.")
 
+    # Synthetic style specs: comma-separated key=value pairs, e.g.
+    # "embolden_em=0.039,slant_deg=11". Keys: embolden_em, y_ratio, slant_deg.
+    SYNTH_HELP = ("Synthesize this style from its font file at build time: "
+                  "comma-separated key=value pairs "
+                  "(embolden_em, y_ratio, slant_deg).")
+    parser.add_argument("--synth-regular", dest="synth_regular", help=SYNTH_HELP)
+    parser.add_argument("--synth-bold", dest="synth_bold", help=SYNTH_HELP)
+    parser.add_argument("--synth-italic", dest="synth_italic", help=SYNTH_HELP)
+    parser.add_argument("--synth-bolditalic", dest="synth_bolditalic", help=SYNTH_HELP)
+
     args = parser.parse_args()
 
     if args.list_presets:
@@ -995,6 +1089,39 @@ def main():
         fallback_style_fonts[2] = args.fallback_italic
     if args.fallback_bolditalic:
         fallback_style_fonts[3] = args.fallback_bolditalic
+
+    def parse_synth_spec(spec_str, style_label):
+        allowed = {"embolden_em", "y_ratio", "slant_deg"}
+        spec = {}
+        for part in spec_str.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if "=" not in part:
+                print(f"Error: --synth-{style_label}: expected key=value, got '{part}'",
+                      file=sys.stderr)
+                sys.exit(1)
+            key, _, value = part.partition("=")
+            key = key.strip()
+            if key not in allowed:
+                print(f"Error: --synth-{style_label}: unknown key '{key}' "
+                      f"(allowed: {', '.join(sorted(allowed))})", file=sys.stderr)
+                sys.exit(1)
+            try:
+                spec[key] = float(value)
+            except ValueError:
+                print(f"Error: --synth-{style_label}: '{key}' value '{value}' is not a number",
+                      file=sys.stderr)
+                sys.exit(1)
+        return spec
+
+    synth_specs = {}
+    for style_id, style_label, spec_str in ((0, "regular", args.synth_regular),
+                                            (1, "bold", args.synth_bold),
+                                            (2, "italic", args.synth_italic),
+                                            (3, "bolditalic", args.synth_bolditalic)):
+        if spec_str:
+            synth_specs[style_id] = parse_synth_spec(spec_str, style_label)
 
     is_multistyle = len(style_fonts) > 0
     fontfile = args.fontfile
@@ -1064,7 +1191,8 @@ def main():
         total_size += generate_cpfont_multistyle(
             style_fonts, sz, intervals, output_path,
             force_autohint=args.force_autohint,
-            fallback_style_fonts=fallback_style_fonts)
+            fallback_style_fonts=fallback_style_fonts,
+            synth_specs=synth_specs)
     print(f"\nTotal: {len(sizes)} files, {total_size / 1024 / 1024:.2f} MB", file=sys.stderr)
 
 

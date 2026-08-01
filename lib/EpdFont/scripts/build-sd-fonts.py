@@ -227,11 +227,31 @@ def build_family(
     intervals = family["intervals"]
     sizes = ",".join(str(s) for s in family["sizes"])
 
-    # Resolve all font file paths (downloads as needed)
+    # Resolve all font file paths (downloads as needed).
+    # Two passes: styles with real sources first, then `from:` styles, which
+    # reuse another style's resolved file (optionally with a `synthetic:`
+    # embolden/shear spec applied at conversion time — see
+    # docs/synthetic-font-styles.md).
     try:
         resolved_styles = {}
+        synth_flags = {}
         for style_name, style_spec in styles.items():
+            if "from" in style_spec:
+                continue
             resolved_styles[style_name] = resolve_font_path(style_spec, name, style_name)
+        for style_name, style_spec in styles.items():
+            if "from" not in style_spec:
+                continue
+            base = style_spec["from"]
+            if base not in resolved_styles:
+                return name, False, (
+                    f"{name}/{style_name}: 'from: {base}' must name another "
+                    f"style in this family with a real source (path/url/zip)")
+            resolved_styles[style_name] = resolved_styles[base]
+            synth = style_spec.get("synthetic")
+            if synth:
+                synth_flags[style_name] = ",".join(
+                    f"{k}={v}" for k, v in sorted(synth.items()))
     except (FileNotFoundError, RuntimeError) as e:
         return name, False, str(e)
 
@@ -253,6 +273,9 @@ def build_family(
         cmd.append(str(font_path))
         cmd.extend(["--style", style_name])
         cmd.extend([f"--fallback-{style_name}", str(DEFAULT_FALLBACK_FONT)])
+
+    for style_name, spec in synth_flags.items():
+        cmd.extend([f"--synth-{style_name}", spec])
 
     cmd.extend(["--intervals", intervals])
     cmd.extend(["--sizes", sizes])

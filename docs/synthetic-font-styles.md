@@ -2,7 +2,10 @@
 
 Plan for giving **CalendoniaCC** and **GoudyBookletter1911** usable bold and
 bold-italic (and italic, where none exists) at `.cpfont` build time. Status:
-researched and prototyped; implementation not started.
+implemented (`from:`/`synthetic:` in the build pipeline) and shipped for
+GoudyBookletter1911 with the acceptance numbers recorded below; Caledonia CC
+is configured as a commented block in `sd-fonts.yaml` awaiting the owner's
+font files (commercial, never committed).
 
 ## Why
 
@@ -159,6 +162,36 @@ converter-internal route is good enough to build.
   style (regular/bold/italic/bold-italic), so the picker itself is the
   acceptance specimen — verify in the simulator, then on the panel.
 
+### Measured — GoudyBookletter1911 (embolden_em 0.039, y_ratio 0.5, slant 11°)
+
+Stem ratio, mid-band coverage-weighted stem widths of n/m/i (sub-pixel:
+per-row ink area ÷ stems crossed, so a 2.6 px stem doesn't binarize to 3),
+synthetic bold vs regular through the converter's exact load path:
+
+| size | regular stem | synthetic bold stem | ratio | requirement |
+|---|---|---|---|---|
+| 12 pt | 1.68 px | 2.64 px | **1.576** | 1.45–1.75 ✓ |
+| 14 pt | 1.95 px | 3.08 px | **1.576** | ✓ |
+| 16 pt | 2.22 px | 3.50 px | **1.575** | ✓ |
+| 18 pt | 2.56 px | 4.03 px | **1.575** | ✓ |
+
+Counter survival at 12 pt, measured in the built `.cpfont`'s 2-bit bitmaps
+(enclosed white = fully-white pixels unreachable from the glyph border;
+'s' has no enclosed counter, so its check is aperture rows — rows whose
+ink-white-ink pattern shows the bowls haven't fused):
+
+| glyph | bold | bolditalic | requirement |
+|---|---|---|---|
+| e | 4 px enclosed white | 4 px | ≥1 ✓ |
+| a | 6 px enclosed white | 4 px | ≥1 ✓ |
+| s | 3 aperture rows | 3 | ≥1 ✓ |
+
+Glyph counts: 982 for all four styles at all four sizes — no dropped glyphs.
+Simulator picker specimen: four visually distinct lines; the synthetic
+italic's double-story sheared a/g confirm the oblique path (a real italic
+would be single-story); accents (Ñ, ü, É) intact in bold-italic; advance
+compensation keeps spacing sane (no faux-bold cramping).
+
 ## Escalation path
 
 If the FreeType route disappoints on CalendoniaCC (high contrast is the risky
@@ -176,11 +209,35 @@ zero converter changes — so both routes can coexist per-family.
 
 1. ~~Identify CalendoniaCC~~ — done: Caledonia CC, Carter & Cone 2026
    (Regular + Italic only; no bold exists upstream).
-2. Implement `from:`/`synthetic:` in `build-sd-fonts.py` +
-   `fontconvert_sdcard.py` (split load/render, embolden, shear, advance).
-3. Build GoudyBookletter1911 with the parameters above; run the acceptance
-   measurements; judge in the simulator picker.
+2. ~~Implement `from:`/`synthetic:` in `build-sd-fonts.py` +
+   `fontconvert_sdcard.py` (split load/render, embolden, shear, advance).~~
+   — done: `--synth-<style>` in the converter, `from:` resolution in the
+   orchestrator; fallback-font glyphs get the same treatment, and kerning /
+   ligatures are inherited automatically (same source file).
+3. ~~Build GoudyBookletter1911 with the parameters above; run the acceptance
+   measurements; judge in the simulator picker.~~ — done: numbers recorded
+   under Acceptance; picker specimen verified in the simulator.
 4. Caledonia CC: embolden Regular → bold and the real Italic → bold-italic
    (no shear), starting near `embolden_em: 0.030`; same acceptance, with
-   extra attention to hairline survival at 12 pt.
+   extra attention to hairline survival at 12 pt. The config exists as a
+   commented block in `sd-fonts.yaml`; to build on the machine that owns the
+   fonts (they are commercial and never leave it):
+
+   ```bash
+   cd lib/EpdFont
+   mkdir -p local_fonts
+   cp /path/to/CaledoniaCC-TextRegular.otf local_fonts/
+   cp /path/to/CaledoniaCC-TextItalic.otf local_fonts/
+   cd scripts
+   ```
+
+   then uncomment the `CalendoniaCC` block in `sd-fonts.yaml` and run:
+
+   ```bash
+   python3 build-sd-fonts.py --only CalendoniaCC
+   ```
+
+   `local_fonts/` is gitignored, so neither the fonts nor the built
+   `.cpfont`s can be committed by accident. Copy the four files from
+   `output/CalendoniaCC/` into the card's `.fonts/CalendoniaCC/`.
 5. Only if a family fails on quality: FontForge route for that family.
