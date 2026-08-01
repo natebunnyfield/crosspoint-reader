@@ -184,12 +184,12 @@ families:
   # the real styles - never sheared, the italic is real. To build on your own
   # machine: place CaledoniaCC-TextRegular.otf and CaledoniaCC-TextItalic.otf
   # in lib/EpdFont/local_fonts/ (gitignored), uncomment this block, then run
-  #   python3 build-sd-fonts.py --only CalendoniaCC
+  #   python3 build-sd-fonts.py --only CaledoniaCC
   # embolden_em starts lower than Goudy's 0.039: Caledonia's high stroke
   # contrast means hairlines gain proportionally more than stems. Judge the
   # hairline/stem relationship at 12 pt first; see docs/synthetic-font-styles.md.
   #
-  # - name: CalendoniaCC
+  # - name: CaledoniaCC
   #   description: "Caledonia CC, Dwiggins's transitional Scotch Roman (Latin)"
   #   intervals: latin-ext
   #   sizes: [12, 14, 16, 18]
