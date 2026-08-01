@@ -151,22 +151,6 @@ UIIcon UITheme::getFileIcon(const std::string& filename) {
   return File;
 }
 
-int UITheme::getStatusBarHeight() {
-  const ThemeMetrics metrics = UITheme::getInstance().getMetrics();
-  const auto sb = SETTINGS.statusBarSpec();
-
-  // Layout reservation is hardware-agnostic: pass clockAvailable=true so the
-  // reserved height does not depend on whether an RTC is present.
-  return (sb.textLaneVisible(true) ? (metrics.statusBarVerticalMargin) : 0) +
-         (sb.showsProgressBar() ? (sb.progressBarHeightPx + metrics.progressBarMarginTop) : 0);
-}
-
-int UITheme::getProgressBarHeight() {
-  const ThemeMetrics metrics = UITheme::getInstance().getMetrics();
-  const auto sb = SETTINGS.statusBarSpec();
-  return sb.showsProgressBar() ? (sb.progressBarHeightPx + metrics.progressBarMarginTop) : 0;
-}
-
 // Centered text implementation that takes the safe area into account
 void UITheme::drawCenteredText(const GfxRenderer& renderer, Rect screen, int fontId, int y, const char* text,
                                bool black, EpdFontFamily::Style style) {

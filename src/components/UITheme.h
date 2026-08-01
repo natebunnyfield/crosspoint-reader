@@ -35,8 +35,6 @@ class UITheme {
                                      bool hasSubtitle, int extraReservedHeight = 0);
   static std::string getCoverThumbPath(std::string coverBmpPath, int coverHeight);
   static UIIcon getFileIcon(const std::string& filename);
-  static int getStatusBarHeight();
-  static int getProgressBarHeight();
 
  private:
   const ThemeMetrics* currentMetrics;

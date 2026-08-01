@@ -23,18 +23,10 @@ class XtcReaderActivity final : public Activity {
   // Next-book suggestion menu for the End-of-Book screen
   EndOfBookOptions endOfBookOptions;
 
-  enum class StatusBarOverlayPosition { Bottom, Top };
-  struct StatusBarInfo {
-    int currentPage;
-    int pageCount;
-    std::string title;
-  };
 
   void renderPage();
   // Opens chapter selection when the book has chapters (short-press Confirm); no-op otherwise
   void openChapterSelection();
-  void renderStatusBarOverlay(StatusBarOverlayPosition position) const;
-  StatusBarInfo getStatusBarInfo() const;
   void saveProgress() const;
   void loadProgress();
 

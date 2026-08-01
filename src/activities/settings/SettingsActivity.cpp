@@ -13,7 +13,6 @@
 #include "CrossPointSettings.h"
 #include "FontDownloadActivity.h"
 #include "FontSelectionActivity.h"
-#include "KOReaderSettingsActivity.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"
@@ -21,7 +20,6 @@
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
-#include "StatusBarSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
@@ -75,7 +73,6 @@ void SettingsActivity::rebuildSettingsLists() {
                             SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
   }
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_KOREADER_SYNC, SettingAction::KOReaderSync));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
   // TODO: Touch devices need their own firmware update path/artifacts before OTA is exposed.
@@ -87,9 +84,8 @@ void SettingsActivity::rebuildSettingsLists() {
   systemSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
   readerSettings.insert(readerSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
-  // Manage Fonts and Customise Status Bar are withdrawn. SD card fonts are
-  // still discovered and selectable from Text Settings; the status bar is
-  // pinned to fully hidden by normalizeRetiredSettings().
+  // Manage Fonts is withdrawn. SD card fonts are still discovered and
+  // selectable from Text Settings.
 
   // Update currentSettings pointer and count for the active category
   switch (selectedCategoryIndex) {
@@ -369,11 +365,7 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::RemapFrontButtons:
         startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput), resultHandler);
         break;
-      case SettingAction::CustomiseStatusBar:
-        startActivityForResult(std::make_unique<StatusBarSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
-      case SettingAction::KOReaderSync:
-        startActivityForResult(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::OPDSBrowser:
         startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);

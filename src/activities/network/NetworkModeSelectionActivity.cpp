@@ -17,11 +17,10 @@ struct MenuEntry {
   NetworkMode mode;
 };
 
-// Display order (top to bottom). Calibre Wireless is intentionally last.
+// Display order (top to bottom).
 constexpr MenuEntry MENU_ENTRIES[] = {
     {StrId::STR_JOIN_NETWORK, StrId::STR_JOIN_DESC, UIIcon::Wifi, NetworkMode::JOIN_NETWORK},
     {StrId::STR_CREATE_HOTSPOT, StrId::STR_HOTSPOT_DESC, UIIcon::Hotspot, NetworkMode::CREATE_HOTSPOT},
-    {StrId::STR_CALIBRE_WIRELESS, StrId::STR_CALIBRE_DESC, UIIcon::Library, NetworkMode::CONNECT_CALIBRE},
 };
 constexpr int MENU_ITEM_COUNT = static_cast<int>(sizeof(MENU_ENTRIES) / sizeof(MENU_ENTRIES[0]));
 }  // namespace

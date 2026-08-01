@@ -6,7 +6,6 @@
 #include <optional>
 
 #include "EndOfBookOptions.h"
-#include "ProgressMapper.h"
 #include "activities/Activity.h"
 
 class EpubReaderActivity final : public Activity {
@@ -29,7 +28,6 @@ class EpubReaderActivity final : public Activity {
   bool pendingPercentJump = false;
   // Normalized 0.0-1.0 progress within the target spine item, computed from book percentage.
   float pendingSpineProgress = 0.0f;
-  bool pendingSyncSaveError = false;
   // Consecutive page-load failures. Each failure drops the section and rebuilds on the next render,
   // which recovers a transiently corrupt cache; capped so a persistently bad page can't spin forever.
   uint8_t pageLoadRetryCount = 0;
@@ -44,10 +42,7 @@ class EpubReaderActivity final : public Activity {
   // font size on top of the family change the hold just made).
   bool suppressNextSideRelease = false;
   // Confirm-as-modifier chord: a line-spacing step has already acted during the Confirm hold
-  // that is still in progress. Suppresses the long-press Confirm function
-  // (SETTINGS.longPressMenuFunction) for the REST of that hold, which ignoreNextConfirmRelease
-  // cannot do because that latch is only read on the release edge. Cleared as soon as Confirm
-  // is physically up.
+  // that is still in progress. Cleared as soon as Confirm is physically up.
   bool confirmModifierUsed = false;
   // The side button(s) currently down were consumed by a Confirm chord. Their release edges
   // must not also reach the font-size tap branch or ReaderUtils::detectPageTurn(), both of
@@ -100,7 +95,6 @@ class EpubReaderActivity final : public Activity {
 
   void renderContents(std::unique_ptr<Page> page, int orientedMarginTop, int orientedMarginRight,
                       int orientedMarginBottom, int orientedMarginLeft);
-  void renderStatusBar() const;
   // Pages laid out per incremental-build pump: on the render path (catching up to the page
   // being shown) and per loop() tick (background build of a large chapter). Kept small so a
   // background build chunk never noticeably delays input or a pending render.
@@ -173,9 +167,6 @@ class EpubReaderActivity final : public Activity {
   bool saveProgress(int spineIndex, int currentPage, int pageCount);
   // Jump to a percentage of the book (0-100), mapping it to spine and page.
   // Opens the reader menu for the current position (short-press Confirm)
-  // Returns true if sync acted (launched, or surfaced a save error); false if it was a no-op
-  // because no KOReader credentials are stored.
-  bool launchKOReaderSync();
   // Step the reader font size one slot (delta -1 / +1) from a long-press of the page-turn
   // buttons, preserving the reading position across the re-pagination. A step that would
   // leave the ramp only raises the popup. Replaces applyOrientation(), whose only caller
@@ -224,5 +215,4 @@ class EpubReaderActivity final : public Activity {
     requestUpdate();
     return true;
   }
-  CrossPointPosition getCurrentPosition() const;
 };

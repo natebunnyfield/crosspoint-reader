@@ -22,7 +22,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     BLANK = 5,
     QUICK_RESUME = 6,
     // New enum values MUST be appended so persisted settings.json indices
-    // stay stable — same rule as LONG_PRESS_MENU_FUNCTION above.
+    // stay stable.
     CALENDAR = 7,
     // Week-count variants of the calendar sleep screen ("Calendar Four/Five/
     // Six"). CALENDAR above predates them and keeps its original five-week
@@ -42,32 +42,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     SLEEP_SCREEN_COVER_FILTER_COUNT
   };
 
-  enum STATUS_BAR_PROGRESS_BAR {
-    BOOK_PROGRESS = 0,
-    CHAPTER_PROGRESS = 1,
-    HIDE_PROGRESS = 2,
-    STATUS_BAR_PROGRESS_BAR_COUNT
-  };
-  enum STATUS_BAR_PROGRESS_BAR_THICKNESS {
-    PROGRESS_BAR_THIN = 0,
-    PROGRESS_BAR_NORMAL = 1,
-    PROGRESS_BAR_THICK = 2,
-    STATUS_BAR_PROGRESS_BAR_THICKNESS_COUNT
-  };
-  enum STATUS_BAR_TITLE { BOOK_TITLE = 0, CHAPTER_TITLE = 1, HIDE_TITLE = 2, STATUS_BAR_TITLE_COUNT };
-  enum XTC_STATUS_BAR_MODE {
-    XTC_STATUS_BAR_HIDE = 0,
-    XTC_STATUS_BAR_BOTTOM = 1,
-    XTC_STATUS_BAR_TOP = 2,
-    XTC_STATUS_BAR_MODE_COUNT
-  };
 
-  enum STATUS_BAR_CLOCK_MODE {
-    STATUS_BAR_CLOCK_HIDE = 0,
-    STATUS_BAR_CLOCK_RIGHT = 1,
-    STATUS_BAR_CLOCK_LEFT = 2,
-    STATUS_BAR_CLOCK_MODE_COUNT
-  };
 
   enum ORIENTATION {
     PORTRAIT = 0,       // 480x800 logical coordinates (current default)
@@ -147,12 +122,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Persisted in settings.json by index: any new function MUST use a
   // value >= 2 and be appended at the END of the enumValues array in SettingsList.h, otherwise the
   // stored indices shift and existing saves are silently misinterpreted.
-  enum LONG_PRESS_MENU_FUNCTION {
-    LP_MENU_KOSYNC = 0,
-    LP_MENU_DISABLED = 1,
-    LONG_PRESS_MENU_FUNCTION_COUNT
-  };
-
   // Hide battery percentage
   enum HIDE_BATTERY_PERCENTAGE { HIDE_NEVER = 0, HIDE_READER = 1, HIDE_ALWAYS = 2, HIDE_BATTERY_PERCENTAGE_COUNT };
 
@@ -193,7 +162,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
 
   // Text anti-aliasing strength. Values 0/1 are the legacy Off/On toggle and
   // MUST keep their meaning so persisted settings from older builds round-trip;
-  // new strengths append at the END (same rule as LONG_PRESS_MENU_FUNCTION).
+  // new strengths append at the END.
   // The strengths pick how the 2-bit glyph gray levels map onto the panel's two
   // grayscale planes — see GfxRenderer::GrayscaleAaStrength.
   enum TEXT_ANTIALIASING {
@@ -215,15 +184,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // reachable, and a fresh install never runs fromJson() (PersistableStore's
   // loadFromFile() returns early when there is no file), so the pin alone would
   // not cover it.
-  uint8_t statusBarChapterPageCount = 0;
-  uint8_t statusBarBookProgressPercentage = 0;
-  uint8_t statusBarProgressBar = HIDE_PROGRESS;
-  uint8_t statusBarProgressBarThickness = PROGRESS_BAR_NORMAL;
-  uint8_t statusBarTitle = HIDE_TITLE;
-  uint8_t statusBarBattery = 0;
-  uint8_t xtcStatusBarMode = XTC_STATUS_BAR_HIDE;
   // Clock display in status bar (X3 only, requires DS3231 RTC)
-  uint8_t statusBarClock = STATUS_BAR_CLOCK_HIDE;
   // Clock UTC offset in quarter-hour steps, biased by 48 so it fits in uint8_t.
   // Value 48 = UTC+0, 0 = UTC-12:00, 104 = UTC+14:00.
   // Quarter-hour granularity supports oddball zones like Nepal (+5:45) and Chatham (+12:45).
@@ -289,9 +250,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // while this is OFF, and on RELEASE otherwise, so that a hold can be told apart from a
   // tap. Every fresh install therefore turns pages on release.
   uint8_t longPressButtonBehavior = FONT_SIZE_STEP;
-  // Long-press Confirm function in EPUB reader (cycles through LONG_PRESS_MENU_FUNCTION values).
-  // Defaults to Disabled so the long-press stays inert unless the owner opts in.
-  uint8_t longPressMenuFunction = LP_MENU_DISABLED;
   // UI Theme. Fresh installs only: any device that has ever written
   // settings.json already has a uiTheme key and keeps whatever it holds.
   uint8_t uiTheme = LYRA_SIX;
@@ -358,35 +316,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // e-ink frame drawn with a mixed status bar, which self-corrects on the next
   // refresh. Locking here would instead put a mutex on the render path and
   // stall it behind the SD write inside saveToFile(). Don't add one back.
-  struct StatusBarSpec {
-    bool showChapterPageCount = false;
-    bool showBookProgressPercent = false;
-    uint8_t titleMode = HIDE_TITLE;  // STATUS_BAR_TITLE
-    bool showBattery = false;
-    bool showBatteryPercent = false;
-    uint8_t clockMode = STATUS_BAR_CLOCK_HIDE;  // STATUS_BAR_CLOCK_MODE
-    bool clock12h = false;
-    uint8_t clockUtcOffsetQ = 48;             // 48 = UTC+0
-    uint8_t progressBarMode = HIDE_PROGRESS;  // STATUS_BAR_PROGRESS_BAR
-    uint8_t progressBarHeightPx = 0;          // (thickness+1)*2; 0 when the bar is hidden
-    uint8_t xtcMode = XTC_STATUS_BAR_HIDE;    // XTC_STATUS_BAR_MODE
-
-    bool showsProgressBar() const { return progressBarMode != HIDE_PROGRESS; }
-    bool showsTitle() const { return titleMode != HIDE_TITLE; }
-    bool showsClock() const { return clockMode != STATUS_BAR_CLOCK_HIDE; }
-    // Visibility of the text lane. Clock hardware presence is the caller's
-    // concern: pass halClock.isAvailable(), or true for layout reservation.
-    bool textLaneVisible(bool clockAvailable) const {
-      return showChapterPageCount || showBookProgressPercent || showsTitle() || showBattery ||
-             (showsClock() && clockAvailable);
-    }
-  };
-  StatusBarSpec statusBarSpec() const;
 
   // Resolved text-rendering configuration for the Epub layout engine. The
   // viewport is renderer/orientation-derived, so the caller supplies it —
   // passing it in keeps a spec from ever existing in a half-filled state.
-  // Unlocked for the same reason as statusBarSpec(); see the note above.
+  // Unlocked for the same reason as readerRenderSpec(); see the note above.
   ReaderRenderSpec readerRenderSpec(uint16_t viewportWidth, uint16_t viewportHeight) const;
 
   static const char* getFilePath() { return "/.crosspoint/settings.json"; }

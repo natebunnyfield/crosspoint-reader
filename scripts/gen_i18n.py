@@ -557,9 +557,19 @@ def generate_keys_header(
         "EN", "ES", "FR", "DE", "CS", "PT", "RU", "SV", "RO", "CA", "UK",
         "BE", "IT", "PL", "FI", "DA", "NL", "TR", "KK", "HU", "LT", "SI",
     ]
+    # A language that is no longer built falls back to English rather than
+    # breaking the build: the stored V1 index still has to map somewhere, and
+    # English is the reference every other file inherits from.
+    available = set(languages)
+    v1_mapped = [c if c in available else "EN" for c in v1_codes]
+    dropped = [c for c in v1_codes if c not in available]
     lines.append("// V1 language.bin migration table (frozen enum order from 2f969a9)")
+    if dropped:
+        lines.append(
+            "// No longer built, mapped to EN: " + ", ".join(dropped)
+        )
     lines.append("constexpr Language V1_LANGUAGES[] = {")
-    lines.append("    " + ", ".join(f"Language::{c}" for c in v1_codes) + ",")
+    lines.append("    " + ", ".join(f"Language::{c}" for c in v1_mapped) + ",")
     lines.append("};")
     lines.append(
         f"constexpr uint8_t V1_LANGUAGE_COUNT = {len(v1_codes)};"

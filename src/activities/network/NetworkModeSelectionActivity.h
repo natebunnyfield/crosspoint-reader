@@ -5,13 +5,12 @@
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 
-enum class NetworkMode { JOIN_NETWORK, CONNECT_CALIBRE, CREATE_HOTSPOT };
+enum class NetworkMode { JOIN_NETWORK, CREATE_HOTSPOT };
 
 /**
  * NetworkModeSelectionActivity presents the user with a choice (in display order):
  * - "Join a Network" - Connect to an existing WiFi network (STA mode)
  * - "Create Hotspot" - Create an Access Point that others can connect to (AP mode)
- * - "Calibre Wireless" - Use Calibre wireless device transfers
  *
  * The display order lives in MENU_ENTRIES in the .cpp; the enum order below is independent of it.
  *

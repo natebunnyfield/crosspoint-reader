@@ -67,9 +67,7 @@ struct ThemeMetrics {
   int sideButtonHintsWidth;
 
   int progressBarHeight;
-  int progressBarMarginTop;
-  int statusBarHorizontalMargin;
-  int statusBarVerticalMargin;
+
   int keyboardKeyHeight;
   int keyboardKeySpacing;
   bool keyboardCenteredText;
@@ -145,9 +143,6 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .buttonHintsHeight = 40,
                                  .sideButtonHintsWidth = 30,
                                  .progressBarHeight = 16,
-                                 .progressBarMarginTop = 1,
-                                 .statusBarHorizontalMargin = 5,
-                                 .statusBarVerticalMargin = 19,
                                  .keyboardKeyHeight = 48,
                                  .keyboardKeySpacing = 0,
                                  .keyboardCenteredText = false,
@@ -225,9 +220,6 @@ class BaseTheme {
   virtual void drawOptionPopup(const GfxRenderer& renderer, const char* title, const std::vector<std::string>& options,
                                int selectedIndex) const;
   virtual void fillPopupProgress(const GfxRenderer& renderer, const Rect& layout, const int progress) const;
-  void drawStatusBar(GfxRenderer& renderer, const float bookProgress, const int currentPage, const int pageCount,
-                     std::string title, const int paddingBottom = 0, const int textYOffset = 0,
-                     const bool fillMargin = true, const bool pageCountEstimated = false) const;
   void drawHelpText(const GfxRenderer& renderer, Rect rect, const char* label) const;
   virtual void drawTextField(const GfxRenderer& renderer, Rect rect, const int textWidth, bool cursorMode = false,
                              int contentStartX = 0, int contentWidth = 0) const;

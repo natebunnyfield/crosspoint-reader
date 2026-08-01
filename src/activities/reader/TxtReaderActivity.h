@@ -31,7 +31,6 @@ class TxtReaderActivity final : public Activity {
   int cachedOrientedMarginLeft = 0;
 
   void renderPage();
-  void renderStatusBar() const;
 
   void initializeReader();
   bool loadPageAtOffset(size_t offset, std::vector<std::string>& outLines, size_t& nextOffset);

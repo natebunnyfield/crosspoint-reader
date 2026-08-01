@@ -20,10 +20,7 @@
 #include "CrossPointState.h"
 #include "EpubReaderFootnotesActivity.h"
 #include "EpubReaderUtils.h"
-#include "KOReaderCredentialStore.h"
-#include "KOReaderSyncActivity.h"
 #include "MappedInputManager.h"
-#include "ProgressMapper.h"
 #include "ReaderFontSizes.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
@@ -389,7 +386,7 @@ void EpubReaderActivity::loop() {
   // While the end screen suggestion menu is showing it owns Confirm/Back/navigation
   // input. Anything it doesn't handle (e.g. long-press Back to the file browser) falls
   // through to the regular handlers below; page turns are absorbed by the end-of-book
-  // block. A Confirm release after a long-press function (KOReader sync) fired is left
+  // block. A Confirm release after a chord fired is left
   // to the regular Confirm handler below, which consumes it via ignoreNextConfirmRelease.
   // `!sideChordConsumed` for the same reason as the ignoreNextConfirmRelease term beside
   // it: a leftover edge from a gesture already acted on must not be dispatched again here.
@@ -428,9 +425,7 @@ void EpubReaderActivity::loop() {
   // Read here, ahead of every Confirm and side-button handler below, because a chord must
   // produce exactly ONE action. Three of the reader's existing gestures overlap it and are
   // gated off in three different places:
-  //   1. the long-press Confirm function (KOReader sync) — guarded immediately
-  //      below on `confirmModifierUsed` and on "a side button is down";
-  //   2. chapter select on Confirm RELEASE — suppressed through the existing
+  //   1. chapter select on Confirm RELEASE — suppressed through the existing
   //      ignoreNextConfirmRelease latch, set where the chord acts;
   //   3. the side button's own gestures — font SIZE on tap, font FAMILY on hold, and the page
   //      turn from detectPageTurn() — all skipped by the chord block further down, for the
@@ -472,46 +467,10 @@ void EpubReaderActivity::loop() {
     }
   }
 
-  // Long-press Confirm runs the user-selected function (SETTINGS.longPressMenuFunction).
-  //
-  // Skipped while Confirm is acting as the line-spacing modifier, or the same hold would both
-  // step the leading and launch a KOReader sync. Two conditions, because they cover different
-  // halves of the gesture: `sideHeldNow.any()` covers the window while the chord's side button
-  // is still down (the hold threshold can be crossed mid-chord), and `confirmModifierUsed`
-  // covers the rest of the Confirm hold after the side button has already been released. Note
-  // sideHeldNow now follows ReaderUtils::sideFontButtons(), so it is live even when
+  // Note sideHeldNow follows ReaderUtils::sideFontButtons(), so it is live even when
   // SETTINGS.sideButtonLayout is SIDE_BUTTONS_DISABLED — that setting withdraws side PAGING,
   // not the side buttons themselves, and the chord has to be reachable wherever the font
   // gestures are.
-  //
-  // This suppresses the sync only if the side button arrives BEFORE the threshold. Measured in
-  // the simulator with credentials stored: a side tap 200ms into the Confirm hold gives the
-  // line-spacing step and zero KOReaderSync launches, while a tap 1400ms in gets the sync
-  // (which fires at ~1047ms and replaces the activity, so the chord never happens). That
-  // ordering is inherent — a threshold action already taken cannot be un-taken — and it is
-  // deliberately NOT "fixed" by deferring the sync to the Confirm release, which would change
-  // an existing gesture's feel. LP_MENU_BOOKMARK is a live choice — SettingsList.h offers it and
-  // CrossPointSettings.cpp deliberately does not remap it — but it sits under the same
-  // !sideHeldNow.any() guard, so a side tap before its ~0.4s threshold suppresses it the
-  // same way.
-  if (confirmModifierDown && !confirmModifierUsed && !sideHeldNow.any()) {
-    switch (SETTINGS.longPressMenuFunction) {
-      case CrossPointSettings::LP_MENU_KOSYNC:
-        // Hold ~1s launches KOReader sync. If sync can't run (no credentials stored), fall
-        // through and let the Confirm release be handled normally.
-        if (mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
-          if (launchKOReaderSync()) {
-            ignoreNextConfirmRelease = true;  // sync launched or error shown; swallow the release
-            return;
-          }
-        }
-        break;
-      case CrossPointSettings::LP_MENU_DISABLED:
-      default:
-        break;
-    }
-  }
-
   // Short press Back restores position when viewing a footnote (takes priority over navigation)
   if (footnoteDepth > 0 && mappedInput.wasReleased(MappedInputManager::Button::Back) &&
       mappedInput.getHeldTime() < ReaderUtils::GO_BACK_OR_HOME_MS) {
@@ -717,58 +676,6 @@ void EpubReaderActivity::loop() {
 
 // Translate an absolute percent into a spine index plus a normalized position
 // within that spine so we can jump after the section is loaded.
-bool EpubReaderActivity::launchKOReaderSync() {
-  if (!KOREADER_STORE.hasCredentials()) return false;  // no-op: nothing to launch
-
-  const int currentPage = section ? section->currentPage : nextPageNumber;
-  const int totalPages = section ? section->estimatedTotalPages() : cachedChapterTotalPageCount;
-  std::optional<uint16_t> paragraphIndex;
-  if (section && currentPage >= 0 && currentPage < section->pageCount) {
-    const uint16_t paragraphPage =
-        currentPage > 0 ? static_cast<uint16_t>(currentPage - 1) : static_cast<uint16_t>(currentPage);
-    if (const auto pIdx = section->getParagraphIndexForPage(paragraphPage)) {
-      paragraphIndex = *pIdx;
-    }
-  }
-
-  // Pre-compute local KO position and chapter name while Epub is still in RAM.
-  CrossPointPosition localPos = getCurrentPosition();
-  SavedProgressPosition localKoPos = ProgressMapper::toSavedProgress(epub, localPos);
-  const int tocIdx = epub->getTocIndexForSpineIndex(currentSpineIndex);
-  std::string localChapterName = (tocIdx >= 0) ? epub->getTocItem(tocIdx).title : "";
-  const std::string savedEpubPath = epub->getPath();
-
-  // Persist current position so the reader resumes at the right page on return.
-  // goToReader() depends on this file, so abort the sync if the write fails.
-  if (!saveProgress(currentSpineIndex, currentPage, totalPages)) {
-    LOG_ERR("KOSync", "Aborting sync because current progress could not be saved");
-    pendingSyncSaveError = true;
-    requestUpdate();
-    return true;  // acted: surfaced a save error to the user
-  }
-
-  // Release Epub and Section to free ~65KB RAM for the TLS handshake.
-  LOG_DBG("KOSync", "Releasing epub for sync (heap before: %u)", (unsigned)ESP.getFreeHeap());
-  {
-    RenderLock lock(*this);
-    if (section) {
-      nextPageNumber = section->currentPage;
-    }
-    // The image extractor holds a raw pointer into this epub (see onEnter);
-    // clear it before the early release, mirroring onExit(), or a later image
-    // render would call through a dangling context.
-    ImageBlock::setExtractor(nullptr, nullptr);
-    section.reset();
-    epub.reset();
-  }
-  LOG_DBG("KOSync", "Epub released (heap after: %u)", (unsigned)ESP.getFreeHeap());
-
-  activityManager.replaceActivity(std::make_unique<KOReaderSyncActivity>(
-      renderer, mappedInput, savedEpubPath, currentSpineIndex, currentPage, totalPages, std::move(localKoPos),
-      std::move(localChapterName), paragraphIndex));
-  return true;  // acted: launched the sync activity
-}
-
 void EpubReaderActivity::stepReaderFontSize(const int delta) {
   // The selectable sizes are the point sizes the active family actually ships
   // (the same list buildFontSizeSetting() and FontSelectionActivity offer), so a
@@ -1009,12 +916,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     return;
   }
 
-  const auto showPendingSyncSaveError = [this]() {
-    if (!pendingSyncSaveError) return;
-    pendingSyncSaveError = false;
-    GUI.drawPopup(renderer, tr(STR_SAVE_PROGRESS_FAILED));
-  };
-
   // A section build failure (e.g. an invalid/corrupt EPUB that fails XML parsing) leaves the
   // "Indexing" popup on screen with no way forward. Surface an explicit error instead of hanging.
   // clearScreen first so the error popup doesn't overlay the stale "Indexing" popup.
@@ -1040,7 +941,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     renderer.clearScreen();
     endOfBookOptions.render(renderer, mappedInput);
     renderer.displayBuffer();
-    showPendingSyncSaveError();
     return;
   }
 
@@ -1052,8 +952,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   orientedMarginLeft += SETTINGS.screenMargin;
   orientedMarginRight += SETTINGS.screenMargin;
 
-  const uint8_t statusBarHeight = UITheme::getInstance().getStatusBarHeight();
-  orientedMarginBottom += std::max(SETTINGS.screenMargin, statusBarHeight);
+  orientedMarginBottom += SETTINGS.screenMargin;
 
   const uint16_t viewportWidth = renderer.getScreenWidth() - orientedMarginLeft - orientedMarginRight;
   const uint16_t viewportHeight = renderer.getScreenHeight() - orientedMarginTop - orientedMarginBottom;
@@ -1324,18 +1223,14 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   if (section->pageCount == 0) {
     LOG_DBG("ERS", "No pages to render");
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_EMPTY_CHAPTER), true, EpdFontFamily::BOLD);
-    renderStatusBar();
     renderer.displayBuffer();
-    showPendingSyncSaveError();
     return;
   }
 
   if (section->currentPage < 0 || section->currentPage >= section->pageCount) {
     LOG_DBG("ERS", "Page out of bounds: %d (max %d)", section->currentPage, section->pageCount);
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_OUT_OF_BOUNDS), true, EpdFontFamily::BOLD);
-    renderStatusBar();
     renderer.displayBuffer();
-    showPendingSyncSaveError();
     return;
   }
 
@@ -1360,11 +1255,9 @@ void EpubReaderActivity::render(RenderLock&& lock) {
         renderer.clearScreen();
         renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
         renderer.displayBuffer();
-        showPendingSyncSaveError();
         return;
       }
       requestUpdate();  // Try again after clearing cache
-      showPendingSyncSaveError();
       return;
     }
     pageLoadRetryCount = 0;  // Reset the retry counter once a page loads cleanly
@@ -1389,7 +1282,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     }
   }
 
-  showPendingSyncSaveError();
 }
 
 bool EpubReaderActivity::applyDeferredReposition() {
@@ -1471,13 +1363,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
   if (pageHasImagesNeedingDecode) {
     page->renderWithImagePlaceholders(renderer, fontId, orientedMarginLeft, orientedMarginTop);
-    renderStatusBar();
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     renderer.clearScreen();
   }
 
   page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);
-  renderStatusBar();
   const auto tBwRender = millis();
 
   if (pageHasImages) {
@@ -1708,35 +1598,6 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   }
 }
 
-void EpubReaderActivity::renderStatusBar() const {
-  // Calculate progress in book. Use the estimated total while a giant spine is still building so
-  // "page X of Y" and the progress bar don't read off the small build watermark.
-  const int currentPage = section->currentPage + 1;
-  const float pageCount = section->estimatedTotalPages();
-  const float sectionChapterProg = (pageCount > 0) ? (static_cast<float>(currentPage) / pageCount) : 0;
-  const float bookProgress = epub->calculateProgress(currentSpineIndex, sectionChapterProg) * 100;
-
-  std::string title;
-
-  int textYOffset = 0;
-  const auto sb = SETTINGS.statusBarSpec();
-
-  if (sb.titleMode == CrossPointSettings::STATUS_BAR_TITLE::CHAPTER_TITLE) {
-    title = tr(STR_UNNAMED);
-    const int tocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
-    if (tocIndex != -1) {
-      const auto tocItem = epub->getTocItem(tocIndex);
-      title = tocItem.title;
-    }
-
-  } else if (sb.titleMode == CrossPointSettings::STATUS_BAR_TITLE::BOOK_TITLE) {
-    title = epub->getTitle();
-  }
-
-  GUI.drawStatusBar(renderer, bookProgress, currentPage, pageCount, title, 0, textYOffset, true,
-                    section->isBuilding());
-}
-
 void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool savePosition) {
   if (!epub) return;
 
@@ -1796,22 +1657,3 @@ void EpubReaderActivity::restoreSavedPosition() {
   requestUpdate();
 }
 
-CrossPointPosition EpubReaderActivity::getCurrentPosition() const {
-  const int currentPage = section ? section->currentPage : nextPageNumber;
-  const int totalPages = section ? section->estimatedTotalPages() : cachedChapterTotalPageCount;
-  std::optional<uint16_t> paragraphIndex;
-  if (section && currentPage >= 0 && currentPage < section->pageCount) {
-    const uint16_t paragraphPage =
-        currentPage > 0 ? static_cast<uint16_t>(currentPage - 1) : static_cast<uint16_t>(currentPage);
-    if (const auto pIdx = section->getParagraphIndexForPage(paragraphPage)) {
-      paragraphIndex = *pIdx;
-    }
-  }
-
-  CrossPointPosition localPos = {currentSpineIndex, currentPage, totalPages};
-  if (paragraphIndex.has_value()) {
-    localPos.paragraphIndex = *paragraphIndex;
-    localPos.hasParagraphIndex = true;
-  }
-  return localPos;
-}

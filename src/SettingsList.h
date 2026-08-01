@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
-#include "KOReaderCredentialStore.h"
 #include "ReaderFontSizes.h"
 #include "activities/settings/SettingsActivity.h"
 
@@ -141,11 +140,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     sleepScreenValues[CrossPointSettings::CALENDAR_SIX] = StrId::STR_CALENDAR_SIX;
     sleepScreenValues[CrossPointSettings::CALENDAR_WESTSIDE] = StrId::STR_SLEEP_WESTSIDE;
 
-    std::vector<StrId> statusBarClockValues(CrossPointSettings::STATUS_BAR_CLOCK_MODE_COUNT);
-    statusBarClockValues[CrossPointSettings::STATUS_BAR_CLOCK_HIDE] = StrId::STR_HIDE;
-    statusBarClockValues[CrossPointSettings::STATUS_BAR_CLOCK_RIGHT] = StrId::STR_DIR_RIGHT;
-    statusBarClockValues[CrossPointSettings::STATUS_BAR_CLOCK_LEFT] = StrId::STR_DIR_LEFT;
-
     // Built one entry at a time instead of from a single braced initializer_list:
     // the whole list was materialised as one stack temporary (~50 x
     // sizeof(SettingInfo)), which made this frame the largest non-vendor frame in
@@ -248,9 +242,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                   {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
                                    StrId::STR_LONG_PRESS_BEHAVIOR_FONT_SIZE},
                                   "longPressButtonBehavior", StrId::STR_CAT_CONTROLS));
-    v.push_back(SettingInfo::Enum(StrId::STR_LONG_PRESS_MENU, &CrossPointSettings::longPressMenuFunction,
-                                  {StrId::STR_KOSYNC, StrId::STR_DISABLED},
-                                  "longPressMenuFunction", StrId::STR_CAT_CONTROLS));
     v.push_back(SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
                                   {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH,
                                    StrId::STR_FOOTNOTES},
@@ -283,88 +274,19 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                   {StrId::STR_FMT_AUTHOR_TITLE, StrId::STR_FMT_TITLE_AUTHOR, StrId::STR_FMT_TITLE},
                                   "opdsFilenameFormat"));
 
-    // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
-    v.push_back(SettingInfo::DynamicString(
-        StrId::STR_KOREADER_USERNAME, [] { return KOREADER_STORE.getUsername(); },
-        [](const std::string& val) {
-          KOREADER_STORE.setCredentials(val, KOREADER_STORE.getPassword());
-          KOREADER_STORE.saveToFile();
-        },
-        "koUsername", StrId::STR_KOREADER_SYNC));
-    v.push_back(SettingInfo::DynamicString(
-        StrId::STR_KOREADER_PASSWORD, [] { return KOREADER_STORE.getPassword(); },
-        [](const std::string& val) {
-          KOREADER_STORE.setCredentials(KOREADER_STORE.getUsername(), val);
-          KOREADER_STORE.saveToFile();
-        },
-        "koPassword", StrId::STR_KOREADER_SYNC));
-    v.push_back(SettingInfo::DynamicString(
-        StrId::STR_SYNC_SERVER_URL, [] { return KOREADER_STORE.getServerUrl(); },
-        [](const std::string& val) {
-          KOREADER_STORE.setServerUrl(val);
-          KOREADER_STORE.saveToFile();
-        },
-        "koServerUrl", StrId::STR_KOREADER_SYNC));
-    v.push_back(SettingInfo::DynamicEnum(
-        StrId::STR_DOCUMENT_MATCHING, {StrId::STR_FILENAME, StrId::STR_BINARY},
-        [] { return static_cast<uint8_t>(KOREADER_STORE.getMatchMethod()); },
-        [](uint8_t val) {
-          KOREADER_STORE.setMatchMethod(static_cast<DocumentMatchMethod>(val));
-          KOREADER_STORE.saveToFile();
-        },
-        "koMatchMethod", StrId::STR_KOREADER_SYNC));
-    v.push_back(SettingInfo::DynamicEnum(
-        StrId::STR_SEND_METADATA, {StrId::STR_STATE_OFF, StrId::STR_STATE_ON},
-        [] { return static_cast<uint8_t>(KOREADER_STORE.getSendMetadata()); },
-        [](uint8_t val) {
-          KOREADER_STORE.setSendMetadata(val != 0);
-          KOREADER_STORE.saveToFile();
-        },
-        "koSendMetadata", StrId::STR_KOREADER_SYNC));
-    v.push_back(SettingInfo::DynamicEnum(
-        StrId::STR_SYNC_BEHAVIOR, {StrId::STR_ASK_EVERY_TIME, StrId::STR_SMART_SYNC},
-        [] { return static_cast<uint8_t>(KOREADER_STORE.getSyncBehavior()); },
-        [](uint8_t val) {
-          KOREADER_STORE.setSyncBehavior(static_cast<KOReaderSyncBehavior>(val));
-          KOREADER_STORE.saveToFile();
-        },
-        "koSyncBehavior", StrId::STR_KOREADER_SYNC));
-
-    // --- Status Bar Settings (web-only, uses StatusBarSettingsActivity) ---
-    v.push_back(SettingInfo::Toggle(StrId::STR_CHAPTER_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
-                                    "statusBarChapterPageCount", StrId::STR_CUSTOMISE_STATUS_BAR));
-    v.push_back(SettingInfo::Toggle(StrId::STR_BOOK_PROGRESS_PERCENTAGE,
-                                    &CrossPointSettings::statusBarBookProgressPercentage,
-                                    "statusBarBookProgressPercentage", StrId::STR_CUSTOMISE_STATUS_BAR));
-    v.push_back(SettingInfo::Enum(StrId::STR_PROGRESS_BAR, &CrossPointSettings::statusBarProgressBar,
-                                  {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE}, "statusBarProgressBar",
-                                  StrId::STR_CUSTOMISE_STATUS_BAR));
-    v.push_back(SettingInfo::Enum(StrId::STR_PROGRESS_BAR_THICKNESS,
-                                  &CrossPointSettings::statusBarProgressBarThickness,
-                                  {StrId::STR_PROGRESS_BAR_THIN, StrId::STR_PROGRESS_BAR_MEDIUM,
-                                   StrId::STR_PROGRESS_BAR_THICK},
-                                  "statusBarProgressBarThickness", StrId::STR_CUSTOMISE_STATUS_BAR));
-    v.push_back(SettingInfo::Enum(StrId::STR_TITLE, &CrossPointSettings::statusBarTitle,
-                                  {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE}, "statusBarTitle",
-                                  StrId::STR_CUSTOMISE_STATUS_BAR));
-    v.push_back(SettingInfo::Toggle(StrId::STR_BATTERY, &CrossPointSettings::statusBarBattery, "statusBarBattery",
-                                    StrId::STR_CUSTOMISE_STATUS_BAR));
-    v.push_back(SettingInfo::Enum(StrId::STR_XTC_STATUS_BAR, &CrossPointSettings::xtcStatusBarMode,
-                                  {StrId::STR_HIDE, StrId::STR_BOTTOM, StrId::STR_TOP}, "xtcStatusBarMode",
-                                  StrId::STR_CUSTOMISE_STATUS_BAR));
-    // Clock entries (web settings only; device UI uses ClockOffsetActivity for the offset).
+    // Clock entries, web-only. Kept after the status bar was removed because the
+    // calendar sleep screen shifts the RTC's UTC date by clockUtcOffsetQ
+    // (SleepActivity.cpp) and WifiSelectionActivity drives the NTP re-sync.
     // Range 0..104 = quarter-hour steps from UTC-12:00 to UTC+14:00, biased by 48.
-    v.push_back(SettingInfo::Enum(StrId::STR_CLOCK, &CrossPointSettings::statusBarClock,
-                                  std::move(statusBarClockValues), "statusBarClock", StrId::STR_CUSTOMISE_STATUS_BAR));
     v.push_back(SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &CrossPointSettings::clockUtcOffsetQ, {0, 104, 1},
-                                   "clockUtcOffsetQ", StrId::STR_CUSTOMISE_STATUS_BAR));
+                                   "clockUtcOffsetQ", StrId::STR_CAT_SYSTEM));
     v.push_back(SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat,
                                   {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
-                                  StrId::STR_CUSTOMISE_STATUS_BAR));
+                                  StrId::STR_CAT_SYSTEM));
     // Persistence flag for NTP debounce. Resetting from the web UI forces a re-sync
     // on next WiFi connect, which is useful when crossing time zones.
     v.push_back(SettingInfo::Toggle(StrId::STR_CLOCK_SYNCED, &CrossPointSettings::clockHasBeenSynced,
-                                    "clockHasBeenSynced", StrId::STR_CUSTOMISE_STATUS_BAR));
+                                    "clockHasBeenSynced", StrId::STR_CAT_SYSTEM));
     // Only show tilt page turn setting when the QMI8658 IMU is present (X3)
     if (halTiltSensor.isAvailable()) {
       // Insert after the short power button setting (end of Controls section)

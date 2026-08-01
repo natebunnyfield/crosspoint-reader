@@ -102,8 +102,7 @@ void TxtReaderActivity::initializeReader() {
   cachedOrientedMarginTop += cachedScreenMargin;
   cachedOrientedMarginLeft += cachedScreenMargin;
   cachedOrientedMarginRight += cachedScreenMargin;
-  cachedOrientedMarginBottom +=
-      std::max(cachedScreenMargin, static_cast<uint8_t>(UITheme::getInstance().getStatusBarHeight()));
+  cachedOrientedMarginBottom += cachedScreenMargin;
 
   viewportWidth = renderer.getScreenWidth() - cachedOrientedMarginLeft - cachedOrientedMarginRight;
   const int viewportHeight = renderer.getScreenHeight() - cachedOrientedMarginTop - cachedOrientedMarginBottom;
@@ -397,7 +396,6 @@ void TxtReaderActivity::renderPage() {
 
   // BW rendering
   renderLines();
-  renderStatusBar();
 
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
 
@@ -405,15 +403,6 @@ void TxtReaderActivity::renderPage() {
     ReaderUtils::renderAntiAliased(renderer, [&renderLines]() { renderLines(); });
   }
   // scope destructor clears font cache via FontCacheManager
-}
-
-void TxtReaderActivity::renderStatusBar() const {
-  const float progress = totalPages > 0 ? (currentPage + 1) * 100.0f / totalPages : 0;
-  std::string title;
-  if (SETTINGS.statusBarSpec().showsTitle()) {
-    title = txt->getTitle();
-  }
-  GUI.drawStatusBar(renderer, progress, currentPage + 1, totalPages, title);
 }
 
 void TxtReaderActivity::saveProgress() const {

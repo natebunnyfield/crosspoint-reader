@@ -121,9 +121,6 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // the factory default — on every load. Out-of-range values are still clamped
   // by the generic enum loop in fromJson().
   //
-  // longPressMenuFunction needs no line either: the stored index space is 0..1
-  // and both values are reachable from the UI. A saved 2 or 3 from when Bookmark
-  // or Dictionary existed is out of range and clamps on load.
   orientation = PORTRAIT;
 
   // The Display tab, Manage Fonts and Customise Status Bar were withdrawn from
@@ -140,13 +137,6 @@ void CrossPointSettings::normalizeRetiredSettings() {
 
   // Status bar: every element hidden. Thickness is left alone — it only has an
   // effect while the progress bar is drawn, and it is not a visibility control.
-  statusBarChapterPageCount = 0;
-  statusBarBookProgressPercentage = 0;
-  statusBarProgressBar = HIDE_PROGRESS;
-  statusBarTitle = HIDE_TITLE;
-  statusBarBattery = 0;
-  xtcStatusBarMode = XTC_STATUS_BAR_HIDE;
-  statusBarClock = STATUS_BAR_CLOCK_HIDE;
 }
 
 bool CrossPointSettings::fromJson(JsonVariantConst doc) {
@@ -272,23 +262,6 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   LOG_DBG("CPS", "Settings loaded from file");
 
   return true;
-}
-
-CrossPointSettings::StatusBarSpec CrossPointSettings::statusBarSpec() const {
-  StatusBarSpec spec;
-  spec.showChapterPageCount = statusBarChapterPageCount != 0;
-  spec.showBookProgressPercent = statusBarBookProgressPercentage != 0;
-  spec.titleMode = statusBarTitle;
-  spec.showBattery = statusBarBattery != 0;
-  spec.showBatteryPercent = hideBatteryPercentage == HIDE_NEVER;
-  spec.clockMode = statusBarClock;
-  spec.clock12h = clockFormat == 1;
-  spec.clockUtcOffsetQ = clockUtcOffsetQ;
-  spec.progressBarMode = statusBarProgressBar;
-  spec.progressBarHeightPx =
-      statusBarProgressBar != HIDE_PROGRESS ? static_cast<uint8_t>((statusBarProgressBarThickness + 1) * 2) : 0;
-  spec.xtcMode = xtcStatusBarMode;
-  return spec;
 }
 
 ReaderRenderSpec CrossPointSettings::readerRenderSpec(const uint16_t viewportWidth,

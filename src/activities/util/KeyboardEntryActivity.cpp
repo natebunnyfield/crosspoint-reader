@@ -111,10 +111,6 @@ const fui::KeyboardLayout URL_SNIPPET_LAYOUT{URL_SNIP_ROWS, 4};
 
 fui::KeyboardLayoutId layoutForLanguage(const Language language) {
   switch (language) {
-    case Language::FR:
-      return fui::KeyboardLayoutId::AzertyFr;
-    case Language::DE:
-      return fui::KeyboardLayoutId::QwertzDe;
     case Language::ES:
       return fui::KeyboardLayoutId::SpanishEs;
     default:
