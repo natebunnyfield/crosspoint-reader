@@ -15,7 +15,6 @@
 #include "FontSelectionActivity.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
-#include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
@@ -73,7 +72,6 @@ void SettingsActivity::rebuildSettingsLists() {
                             SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
   }
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
   // TODO: Touch devices need their own firmware update path/artifacts before OTA is exposed.
   if (!BoardConfig::hasTouch()) {
@@ -367,8 +365,6 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
         break;
         break;
-      case SettingAction::OPDSBrowser:
-        startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false), resultHandler);
