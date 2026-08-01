@@ -45,6 +45,27 @@ class EpubReaderActivity final : public Activity {
   // "No dictionary set" popup, shown when a lookup is triggered without a configured dictionary.
   bool showDictionaryMessage = false;
   unsigned long dictionaryMessageTime = 0UL;
+  // One-shot latch for the side-button HOLD gesture (next/previous font family). Fires the
+  // moment the hold crosses SKIP_HOLD_MS rather than on release, so the reflow starts while
+  // the button is still down; cleared once both side buttons are up, so one hold produces
+  // exactly one family step.
+  bool sideHoldFired = false;
+  // The release that ends such a hold must not also be read as a TAP (which would step the
+  // font size on top of the family change the hold just made).
+  bool suppressNextSideRelease = false;
+  // Confirm-as-modifier chord: a line-spacing step has already acted during the Confirm hold
+  // that is still in progress. Suppresses the long-press Confirm function
+  // (SETTINGS.longPressMenuFunction) for the REST of that hold, which ignoreNextConfirmRelease
+  // cannot do because that latch is only read on the release edge. Cleared as soon as Confirm
+  // is physically up.
+  bool confirmModifierUsed = false;
+  // The side button(s) currently down were consumed by a Confirm chord. Their release edges
+  // must not also reach the font-size tap branch or ReaderUtils::detectPageTurn(), both of
+  // which are release-triggered while longPressButtonBehavior != OFF — an unswallowed release
+  // is a second action from one press. Distinct from suppressNextSideRelease, which is only
+  // consulted inside the longPressButtonBehavior == FONT_SIZE_STEP block and so cannot cover
+  // the page-turn path.
+  bool sideChordConsumed = false;
   bool ignoreNextConfirmRelease = false;
   bool currentPageBookmarked = false;
   // Idle-time glyph prewarm: after a page settles, scan the LIKELY next page
@@ -173,7 +194,20 @@ class EpubReaderActivity final : public Activity {
   // Returns true if sync acted (launched, or surfaced a save error); false if it was a no-op
   // because no KOReader credentials are stored.
   bool launchKOReaderSync();
-  void applyOrientation(uint8_t orientation);
+  // Step the reader font size one slot (delta -1 / +1) from a long-press of the page-turn
+  // buttons, preserving the reading position across the re-pagination. A step that would
+  // leave the ramp only raises the popup. Replaces applyOrientation(), whose only caller
+  // was the retired ORIENTATION_CHANGE branch that shared this setting's index 2.
+  void stepReaderFontSize(int delta);
+  // Next / previous font family, cycling at both ends. Mirrors the ordering
+  // FontSelectionActivity lists: the installed SD families, or the built-in Noto faces when
+  // no SD fonts are present.
+  void cycleReaderFontFamily(int delta);
+  // Step SETTINGS.lineSpacing one slot (delta -1 tighter / +1 wider) from the Confirm-held +
+  // side-button-tap chord, preserving the reading position across the re-pagination exactly as
+  // stepReaderFontSize does. Clamps at TIGHT / WIDE; a step that would leave the three-slot
+  // ramp does nothing at all (no settings write, no refresh).
+  void stepReaderLineSpacing(int delta);
   void toggleAutoPageTurn(uint8_t selectedPageTurnOption);
   void pageTurn(bool isForwardTurn);
   void loadCachedBookmarks();

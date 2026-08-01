@@ -170,6 +170,54 @@ void SdCardFontSystem::setupUiFallbacks(GfxRenderer& renderer) {
   }
 }
 
+// Make `familyName` resident for a non-reader consumer (the calendar sleep
+// screen) at (closest to) `pointSize`. Reuses the resident reader font when the
+// size already matches, and piggybacks on the extra-size path when only the
+// size differs, so the reader font is not evicted needlessly. When a different
+// family must be loaded, the reader font IS evicted — safe only because sleep
+// is a deep sleep and setup() rebuilds font state on wake.
+//
+// getFontId matches on family NAME only, so an unconditional reuse would
+// return whatever size happened to be loaded. The caller that hurts is
+// CalendarSleepScreen, which asks for 18pt: if the user's reader font was the
+// same family at any other size, the sleep screen silently got the reader's
+// size instead, and computeLayout() then derived titleH, gridTop, rowH and the
+// highlight square from the wrong metrics. No log line, no fallback: a
+// whole-screen proportion regression.
+int SdCardFontSystem::loadForDisplay(const char* familyName, uint8_t pointSize, GfxRenderer& renderer) {
+  if (familyName == nullptr || familyName[0] == '\0') return 0;
+  refreshIfDirty();
+
+  const auto* family = registry_.findFamily(familyName);
+  if (family == nullptr) return 0;  // not installed; caller falls back
+
+  const auto* wanted = family->findNearestSize(pointSize);
+  if (wanted == nullptr) return 0;
+
+  if (const int existing = manager_.getFontId(familyName); existing != 0) {
+    if (wanted->pointSize == manager_.currentPointSize()) {
+      return existing;
+    }
+    // Same family resident at another size: load the wanted size as an extra
+    // size, which shares the manager without unloading the reader font.
+    if (const int extra = manager_.loadFamilyExtraSize(*family, renderer, wanted->pointSize); extra != 0) {
+      return extra;
+    }
+    LOG_DBG("SDFS", "Resident %s is %upt but %upt wanted - reloading", familyName, manager_.currentPointSize(),
+            wanted->pointSize);
+  }
+
+  if (!manager_.currentFamilyName().empty()) {
+    manager_.unloadAll(renderer);
+  }
+  if (!manager_.loadFamily(*family, renderer, wanted->pointSize)) {
+    LOG_ERR("SDFS", "loadForDisplay failed to load: %s", familyName);
+    return 0;
+  }
+  LOG_DBG("SDFS", "Loaded %s for display use (%upt)", familyName, wanted->pointSize);
+  return manager_.getFontId(familyName);
+}
+
 int SdCardFontSystem::resolveFontId(const char* familyName, uint8_t /*pointSize*/) const {
   // The manager holds exactly one reader-size font, already selected for
   // SETTINGS.fontPointSize, so the size argument is implicit — always return

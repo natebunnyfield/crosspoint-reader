@@ -35,6 +35,7 @@ import threading
 import time
 import socket
 import urllib.request
+import zipfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -150,8 +151,33 @@ def extract_static_instance(source_path: Path, axes: dict, family_name: str, sty
     return cached
 
 
+def extract_zip_member(url: str, member: str, family_name: str) -> Path:
+    """Fetch a release archive and pull one font file out of it.
+
+    Some foundries (e.g. Junicode) publish only a zip of the whole family, with
+    no per-file raw URLs. The archive is cached in DOWNLOAD_DIR/_archives/ and
+    shared across styles/families; the extracted member is cached next to the
+    plain-url downloads so the rest of the pipeline sees an ordinary file.
+    """
+    zip_path = DOWNLOAD_DIR / "_archives" / url.rsplit("/", 1)[-1]
+    dest = DOWNLOAD_DIR / family_name / Path(member).name
+    if dest.exists():
+        return dest
+    download_font(url, zip_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_path) as zf:
+        try:
+            with zf.open(member) as src, open(dest, "wb") as out:
+                shutil.copyfileobj(src, out)
+        except KeyError:
+            raise FileNotFoundError(
+                f"{family_name}: '{member}' not found in {zip_path.name}"
+            ) from None
+    return dest
+
+
 def resolve_font_path(style_spec: dict, family_name: str, style_name: str) -> Path:
-    """Resolve a style spec (path or url) to a local font file path.
+    """Resolve a style spec (path, url, or zip+member) to a local font file path.
 
     If 'variable' key is present, extracts a static instance via fonttools
     instancer after resolving the source file.
@@ -160,6 +186,10 @@ def resolve_font_path(style_spec: dict, family_name: str, style_name: str) -> Pa
         resolved = EPDFONTS_DIR / style_spec["path"]
         if not resolved.exists():
             raise FileNotFoundError(f"{family_name}/{style_name}: {resolved} not found")
+    elif "zip" in style_spec:
+        if "member" not in style_spec:
+            raise ValueError(f"{family_name}/{style_name}: 'zip' requires 'member'")
+        resolved = extract_zip_member(style_spec["zip"], style_spec["member"], family_name)
     elif "url" in style_spec:
         url = style_spec["url"]
         # Derive a stable filename from the URL
@@ -167,7 +197,7 @@ def resolve_font_path(style_spec: dict, family_name: str, style_name: str) -> Pa
         dest = DOWNLOAD_DIR / family_name / filename
         resolved = download_font(url, dest)
     else:
-        raise ValueError(f"{family_name}/{style_name}: must have 'path' or 'url'")
+        raise ValueError(f"{family_name}/{style_name}: must have 'path', 'url', or 'zip'")
 
     # If variable font axes are specified, extract a static instance
     if "variable" in style_spec:
@@ -197,11 +227,31 @@ def build_family(
     intervals = family["intervals"]
     sizes = ",".join(str(s) for s in family["sizes"])
 
-    # Resolve all font file paths (downloads as needed)
+    # Resolve all font file paths (downloads as needed).
+    # Two passes: styles with real sources first, then `from:` styles, which
+    # reuse another style's resolved file (optionally with a `synthetic:`
+    # embolden/shear spec applied at conversion time — see
+    # docs/synthetic-font-styles.md).
     try:
         resolved_styles = {}
+        synth_flags = {}
         for style_name, style_spec in styles.items():
+            if "from" in style_spec:
+                continue
             resolved_styles[style_name] = resolve_font_path(style_spec, name, style_name)
+        for style_name, style_spec in styles.items():
+            if "from" not in style_spec:
+                continue
+            base = style_spec["from"]
+            if base not in resolved_styles:
+                return name, False, (
+                    f"{name}/{style_name}: 'from: {base}' must name another "
+                    f"style in this family with a real source (path/url/zip)")
+            resolved_styles[style_name] = resolved_styles[base]
+            synth = style_spec.get("synthetic")
+            if synth:
+                synth_flags[style_name] = ",".join(
+                    f"{k}={v}" for k, v in sorted(synth.items()))
     except (FileNotFoundError, RuntimeError) as e:
         return name, False, str(e)
 
@@ -223,6 +273,9 @@ def build_family(
         cmd.append(str(font_path))
         cmd.extend(["--style", style_name])
         cmd.extend([f"--fallback-{style_name}", str(DEFAULT_FALLBACK_FONT)])
+
+    for style_name, spec in synth_flags.items():
+        cmd.extend([f"--synth-{style_name}", spec])
 
     cmd.extend(["--intervals", intervals])
     cmd.extend(["--sizes", sizes])
@@ -393,7 +446,7 @@ def main():
     print(f"\n=== Resolving {len(families)} font families ===\n")
     for family in families:
         for style_name, style_spec in family.get("styles", {}).items():
-            if "url" in style_spec:
+            if "url" in style_spec or "zip" in style_spec:
                 try:
                     resolve_font_path(style_spec, family["name"], style_name)
                 except Exception as e:

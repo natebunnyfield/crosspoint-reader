@@ -1,0 +1,66 @@
+# Font dates — source data for `src/FontDisplayNames.h`
+
+Editable source of truth for the Text Settings picker's designer/years subtitles
+and the picker's ordering. Edit this table, then update `kEntries` in
+`src/FontDisplayNames.h` to match.
+
+## Rules
+
+- **Years format**: `creation; digital…` — the historical/design year before the
+  semicolon, digital releases after it, ascending. A born-digital face lists its
+  years plainly.
+- **Adjacent-year collapse**: a design year and its store release one year apart
+  (2011 design, 2012 Google Fonts) is release lag, not history — keep only the
+  design year.
+- **No unreliable dates**: a year that can't be pinned to a source stays out.
+- **Places**: city + country where the creation-era design was made, and where
+  the digital version was made. Country only when no city is pinnable.
+- **Place column format**: `creation city, state, country; digital city, state,
+  country` — mirrors the Years `creation; digital` split. A born-digital face
+  has one place, no semicolon. State only where the country has them.
+- **Picker order** = this table's order: reverse chronological by EARLIEST
+  (creation) year — newest lineage first, undated families last, ties
+  alphabetical by display name.
+
+## Families
+
+| Tier | Directory | Display name | Designer | Years | Place | Creation place | Digital place | Basis |
+|---|---|---|---|---|---|---|---|---|
+|  | SourceSerif4 | Source Serif 4 | Frank Grießhammer | 2014, 2021 | Santa Clara, California | — (born digital) | Santa Clara / San Jose, California, USA (Adobe Type) | Pro 1.0 May 2014 ([Typekit blog](https://blog.typekit.com/2014/05/20/source-serif-pro/)); v4 2021-01-25 ([Wikipedia](https://en.wikipedia.org/wiki/Source_Serif)); Grießhammer in Santa Clara, Adobe Type at San Jose HQ ([Typekit interview](https://blog.typekit.com/2013/12/09/interview-frank-griesshammer/)) |
+|  | GTAlpinaCond | GT Alpina | Reto Moser | 2011, 2020 | Bern; Lucerne, Switzerland | Bern, Switzerland (Moser lives/works in Bern) | Lucerne, Switzerland (Grilli Type foundry) | Design start 2011 ([Fonts In Use](https://fontsinuse.com/typefaces/102321/gt-alpina)); release 2020 ([It's Nice That](https://www.itsnicethat.com/articles/grilli-type-gt-alpina-graphic-design-030220)); places ([Grilli Type](https://www.grillitype.com/about)) |
+|  | Lora | Lora | Olga Karpushina | 2011, 2019 | Moscow | — (born digital) | Moscow, Russia (Karpushina; Cyreal foundry, Russia) | First release 2011 ([GitHub](https://github.com/cyrealtype/Lora-Cyrillic)); variable 2019 ([Cyreal](https://www.cyreal.org/fonts/lora/)); [Behance](https://www.behance.net/OlgaKarpushina) |
+| S | CaledoniaCC | Caledonia CC | W.A. Dwiggins | 1938; 1988, 1994, 2026 | Hingham, Mass.; Cambridge, Mass. | Hingham, Massachusetts, USA (Dwiggins' studio; for Mergenthaler Linotype, Brooklyn NY) | Cambridge, Massachusetts, USA (Carter & Cone: 1994 Time Caledonia, 2026 CC). 1988 New Caledonia: David Berlow, Adobe (USA) / Linotype AG (Germany) | 1938 design ([Wikipedia](https://en.wikipedia.org/wiki/Caledonia_(typeface))); 1988 = New Caledonia PostScript ([Wikipedia](https://en.wikipedia.org/wiki/Caledonia_(typeface))); 1994 = Time Caledonia by Matthew Carter; CC release April 2026 ([Carter & Cone](https://carterandcone.com/font/caledonia/), [Creative Boom](https://www.creativeboom.com/resources/the-best-new-typefaces-for-april-2026/)); Dwiggins in Hingham 1906–56 ([Britannica](https://www.britannica.com/biography/W-A-Dwiggins)) |
+| S | TeXGyreSchola | TeX Gyre Schola | Bogusław Jackowski & Janusz M. Nowacki | 1918; 2007 | Jersey City; Gdańsk | Jersey City, New Jersey, USA (model: Century Schoolbook, Morris Fuller Benton for American Type Founders, roman 1918) | Gdańsk / Grudziądz, Poland (GUST e-foundry, seated in Toruń; via URW Century Schoolbook L) | First stable v0.996 2007-01-14, final v2.005 2009 ([CTAN README](http://ftp.math.utah.edu/pub/tex/historic/fonts/tex-gyre/schola/0.996/README-TeX-Gyre-Schola.txt), [GUST](https://www.gust.org.pl/projects/e-foundry/tex-gyre/schola)); Benton/ATF ([Wikipedia](https://en.wikipedia.org/wiki/Century_type_family), [ATF](https://en.wikipedia.org/wiki/American_Type_Founders)); designers ([Typoteka: Jackowski](https://typoteka.pl/en/designer/boguslaw-jackowski), [Nowacki](https://typoteka.pl/en/designer/janusz-marian-nowacki)) |
+|  | Coelacanth | Coelacanth | Ben Whitmore | 1914, 2014 | New York; Waiheke Island, New Zealand | New York, USA (Centaur: Bruce Rogers for the Metropolitan Museum of Art; matrices cut in Chicago) | Waiheke Island (Auckland), New Zealand | Centaur 1914 ([Wikipedia](https://en.wikipedia.org/wiki/Centaur_(typeface))); release 2014-08-29 ([Font Library](https://fontlibrary.org/en/font/coelacanth)); "Ben Whitmore from Waiheke, New Zealand" ([ben-whitmore.com](http://ben-whitmore.com/coelacanth-type-family/)) |
+|  | Venetian301 | Venetian 301 | Bruce Rogers | 1914, 1990 | New York; Cambridge, Mass. | New York, USA (Centaur: Rogers for the Metropolitan Museum of Art) | Cambridge, Massachusetts, USA (Bitstream's city at the time; later Marlborough MA) | Centaur 1914 ([Wikipedia](https://en.wikipedia.org/wiki/Centaur_(typeface))); Bitstream © 1990 ([Bitstream key](http://www.sanskritweb.net/forgers/bitstream2.pdf)); Cambridge-era Bitstream ([Wikipedia](https://en.wikipedia.org/wiki/Bitstream_Inc.)) |
+|  | GoudyBookletter1911 | Goudy Bookletter | Barry Schwartz | 1911; 2009 | New York; St. Paul | New York City, USA (Goudy's Village Press era; Kennerley Old Style for publisher Mitchell Kennerley) | St. Paul, Minnesota, USA (Schwartz) | Kennerley 1911 ([Wikipedia](https://en.wikipedia.org/wiki/Kennerley_Old_Style)); League of Moveable Type ~2009 ([League](https://www.theleagueofmoveabletype.com/goudy-bookletter-1911)); Schwartz in St. Paul ([Luc Devroye](https://luc.devroye.org/fonts-46940.html), single source) |
+|  | Newsreader | Newsreader | Hugues Gentile | 1757; 2020 | Birmingham; Paris | Birmingham, England (model: John Baskerville's types, 1757) | Paris, France (Production Type) | Google Fonts 2020-07-01 ([METADATA.pb](https://raw.githubusercontent.com/google/fonts/main/ofl/newsreader/METADATA.pb)); [Production Type](https://productiontype.com/font/newsreader) |
+|  | Edgar | Edgar | Tobias Frere-Jones & Nina Stössinger | 1722; 2025 | London; Brooklyn | London, England (model: William Caslon's types, 1722) | Brooklyn, New York, USA (Frere-Jones Type, 126 13th St) | Release 2025-10-01 ([Typecache](https://typecache.com/news/6518/)); studio ([frerejones.com](https://frerejones.com/)) |
+|  | LibreCaslonText | Libre Caslon Text | Pablo Impallari & Rodrigo Fuenzalida | 1722, 2012 | London; Rosario, Argentina | London, England (William Caslon's foundry) | Rosario, Argentina (Impallari); Fuenzalida: Venezuela, city uncertain (Caracas-trained) | Initial release 2012-11-08 ([FONTLOG](https://github.com/impallari/Libre-Caslon-Text/blob/master/FONTLOG.txt)); [Caslon](https://en.wikipedia.org/wiki/William_Caslon); [Impallari Behance](https://www.behance.net/impallari) |
+|  | Junicode | Junicode SemiCond | Peter S. Baker | 1703; 1998, 2023 | Oxford; Charlottesville, Virginia | Oxford, England (Oxford University Press — the "Pica Roman" purchased 1692, printed in Hickes' Thesaurus 1703–05) | Charlottesville, Virginia, USA (Baker, University of Virginia — both 1998 and 2023 eras) | [Junicode design history](https://junicode.sourceforge.io/design.html); Junicode 2 2023-08-18 ([Wikipedia](https://en.wikipedia.org/wiki/Junicode)); [Baker at UVA](https://english.as.virginia.edu/people/peter-baker). Note: Baker says the model "looks more like" the 1692 Pica Roman than a Fell/Walpergen type |
+|  | Rosarivo | Rosarivo | Pablo Ugerman | 1470; 2011 | Venice; Buenos Aires | Venice, Italy (model: Nicolas Jenson's roman, 1470) | Buenos Aires, Argentina (Ugerman, UBA postgrad program) | [Font Squirrel](https://www.fontsquirrel.com/fonts/rosarivo) |
+|  | InknutAntiqua62 | Inknut Antiqua | Claus Eggers Sørensen | 1469; 2014 | Venice; Amsterdam | Venice, Italy (model: Johannes de Spira's roman, 1469) | Amsterdam, Netherlands (Sørensen, Danish, based in Amsterdam) | [GitHub](https://github.com/clauseggers/Inknut-Antiqua); [FontsArena](https://fontsarena.com/inknut-antiqua-by-claus-eggers-sorensen/) |
+|  | Almendra | Almendra | Ana Sanfelippo | 1350; 2011 | London; Buenos Aires | London, England (model: English chancery hand, ~1350) | Buenos Aires, Argentina (Sanfelippo, CDT UBA postgrad program) | [Font Squirrel](https://www.fontsquirrel.com/fonts/almendra); [METADATA.pb](https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/METADATA.pb) |
+
+## Sync status vs `FontDisplayNames.h`
+
+Synced. The header stores `years` and `place` as pre-formatted strings copied
+verbatim from the Years and Place columns here, plus a numeric `newestYear` for
+the picker's reverse-chronological sort. Device subtitle:
+`Designer · years · place`, ellipsized by the theme when a row overflows.
+
+## Excluded dates (and why)
+
+- **Libre Caslon Text VF** (~2019, Stephen Nixon for Google Fonts) — inferred
+  from repo activity, no dated announcement.
+- **Coelacanth v0.005** (2022, CTAN) — minor package bump, not a revision.
+- **Source Serif's Fournier model** — cited as loose inspiration, never with a
+  year (Fournier's types span the 1740s–60s).
+- **Junicode 1.000** (2017) — intermediate milestone between 1998 and the 2023
+  rewrite. (Wikipedia also lists 2001 as first release; Baker's copyright string
+  says 1998.)
+- **Centaur 1929** (Monotype commercial release) — the 1914 design is the model
+  year for both Coelacanth and Venetian 301.
+- **Newsreader 2021** (Production Type official launch) — collapsed as release
+  lag behind the 2020 Google Fonts release.
+- **Rosarivo 2012 / Almendra 2011-12** Google Fonts dates — release lag.

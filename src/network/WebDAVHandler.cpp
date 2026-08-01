@@ -4,6 +4,9 @@
 #include <HalStorage.h>
 #include <Logging.h>
 
+#include <memory>
+#include <new>
+
 #include "util/BookCacheUtils.h"
 #include "util/TaskWatchdog.h"
 
@@ -606,6 +609,28 @@ void WebDAVHandler::handleCopy(WebServer& s) {
     }
   }
 
+  // The 4KB copy buffer below was a stack array, which made this frame 4224
+  // bytes (measured with -fstack-usage on the riscv32 target) — 16x the
+  // 256-byte limit in the Resource Protocol, and over half of the stack it runs
+  // on: WebDAV methods are dispatched from the Arduino loopTask, whose stack is
+  // 8192 bytes, with the WebServer request-parse frames already on it and two
+  // sets of HalStorage/SdFat/FATFS read+write frames still to come underneath.
+  //
+  // One transient heap block per COPY instead. This is not a hot path: the SD
+  // read plus SD write of each 4KB chunk dwarfs the allocation, which happens
+  // once per request, not per chunk. unique_ptr frees it on every return path.
+  // Allocated here — before the destination is removed/created below — so an OOM
+  // fails the request the same way the checks above do, without leaving a
+  // truncated destination behind.
+  constexpr size_t copyChunkSize = 4096;
+  auto buf = std::unique_ptr<uint8_t[]>(new (std::nothrow) uint8_t[copyChunkSize]);
+  if (!buf) {
+    LOG_ERR("DAV", "OOM: %d bytes for copy buffer", static_cast<int>(copyChunkSize));
+    srcFile.close();
+    s.send(500, "text/plain", "Copy failed - out of memory");
+    return;
+  }
+
   bool dstExists = Storage.exists(dstPath.c_str());
   if (dstExists && !overwrite) {
     srcFile.close();
@@ -624,14 +649,13 @@ void WebDAVHandler::handleCopy(WebServer& s) {
     return;
   }
 
-  // Streaming copy with 4KB buffer on stack
-  uint8_t buf[4096];
+  // Streaming copy with the 4KB heap buffer allocated above
   bool copyOk = true;
   while (srcFile.available()) {
     resetTaskWatchdogIfSubscribed();
-    int bytesRead = srcFile.read(buf, sizeof(buf));
+    int bytesRead = srcFile.read(buf.get(), copyChunkSize);
     if (bytesRead <= 0) break;
-    size_t written = dstFile.write(buf, bytesRead);
+    size_t written = dstFile.write(buf.get(), bytesRead);
     if (written != (size_t)bytesRead) {
       copyOk = false;
       break;

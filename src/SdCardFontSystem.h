@@ -26,6 +26,18 @@ class SdCardFontSystem {
   /// Returns 0 if not found. Used by CrossPointSettings::getReaderFontId().
   int resolveFontId(const char* familyName, uint8_t pointSize) const;
 
+  /// Make `familyName` resident for a non-reader consumer at (closest to)
+  /// `pointSize` and return its font ID, or 0 if the family is not installed
+  /// or fails to load.
+  ///
+  /// Reuses the resident reader font when family and size already match, and
+  /// the extra-size path when only the size differs. Loading a DIFFERENT
+  /// family EVICTS the reader font (see SdCardFontManager.h). Callers must be
+  /// on a path where that does not matter — the sleep screen is, because sleep
+  /// is a deep sleep: the chip resets on wake and setup() rebuilds font state
+  /// from the saved selection via begin().
+  int loadForDisplay(const char* familyName, uint8_t pointSize, GfxRenderer& renderer);
+
   /// Access the registry (e.g. for settings UI to enumerate available fonts).
   const SdCardFontRegistry& registry() const { return registry_; }
 

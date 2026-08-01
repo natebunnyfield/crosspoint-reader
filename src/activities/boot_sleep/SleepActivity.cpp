@@ -3,14 +3,18 @@
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalClock.h>
 #include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Logging.h>
 #include <Txt.h>
 #include <Xtc.h>
 
+#include "CalendarSleepScreen.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "HolidayCalculator.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -51,9 +55,51 @@ void SleepActivity::onEnter() {
       } else {
         return renderCustomSleepScreen();
       }
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR):
+      // The classic style keeps its original five-week look.
+      return renderCalendarSleepScreen(5);
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR):
+      return renderCalendarSleepScreen(4);
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE):
+      return renderCalendarSleepScreen(5);
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX):
+      return renderCalendarSleepScreen(6);
     default:
       return renderDefaultSleepScreen();
   }
+}
+
+void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks) const {
+  // The calendar needs a trustworthy wall clock. X3 has a DS3231; X4 does not,
+  // and its internal RTC drifts badly across deep sleep (see SCOPE.md), so
+  // fall back to the stock sleep image rather than showing a wrong date.
+  uint16_t year;
+  uint8_t month, day, hour, minute;
+  if (!halClock.getDateTime(year, month, day, hour, minute)) {
+    LOG_INF("SLP", "CALENDAR: no RTC available, falling back to default sleep screen");
+    return renderDefaultSleepScreen();
+  }
+
+  // The DS3231 holds UTC (HalClock::syncFromNTP configures "UTC0" and writes
+  // gmtime), so shift to the local date before deciding which day to highlight.
+  // Without this the calendar showed the UTC day: with a negative offset it read
+  // one day AHEAD during the local evening, and it silently cancelled out the
+  // separate RTC date bug for part of the day, which is what made that bug look
+  // intermittent.
+  const calendar::YMD today =
+      calendar::localDateFromUtc(calendar::YMD{year, month, day}, hour, minute, SETTINGS.clockUtcOffsetQ);
+
+  // Drawn fresh on every sleep entry straight into the framebuffer — no
+  // intermediate /sleep.bmp, no staleness stamp, and nothing cached on the SD
+  // card to go out of date. Note the PANEL itself still holds this image with no
+  // power, so what you see on a sleeping device is the date as of the last sleep
+  // entry, not the current date; there is no timer wake to refresh it (and on
+  // battery the MCU is fully powered off, so there could not be).
+  calendar::CalendarSleepScreen::render(renderer, today, weeks);
+
+  // Same single-pass HALF waveform the other sleep screens use (see the note
+  // above renderDefaultSleepScreen).
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
 
 void SleepActivity::renderCustomSleepScreen() const {

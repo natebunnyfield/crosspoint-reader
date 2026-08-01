@@ -6,6 +6,7 @@
 // the local header last and break the build.
 #include "HttpDownloader.h"
 #include <Logging.h>
+#include <Memory.h>
 #include <ReleaseJsonParser.h>
 #include <esp_ota_ops.h>
 #include <esp_wifi.h>
@@ -25,7 +26,15 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   // on top of the TLS session's heap during the fetch; with -fno-exceptions an
   // OOM there aborts. fetchUrl handles the verified-https GET, redirects, and
   // User-Agent (see HttpDownloader).
-  ReleaseJsonParser releaseParser;
+  // The parser is heap-allocated rather than a local: its two 512-byte URL
+  // buffers plus StreamingJsonParser's 512-byte token buffer put this frame at
+  // 1872 bytes measured with -fstack-usage. It is freed on every return path.
+  auto parser = makeUniqueNoThrow<ReleaseJsonParser>();
+  if (!parser) {
+    LOG_ERR("OTA", "OOM: %zu bytes for release JSON parser", sizeof(ReleaseJsonParser));
+    return OOM_ERROR;
+  }
+  ReleaseJsonParser& releaseParser = *parser;
   const bool ok = HttpDownloader::fetchUrl(latestReleaseUrl, [&releaseParser](const uint8_t* data, size_t len) {
     releaseParser.feed(reinterpret_cast<const char*>(data), len);
     return true;

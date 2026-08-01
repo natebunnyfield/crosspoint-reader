@@ -1,6 +1,7 @@
 #include "LiangHyphenation.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
 /*
@@ -64,6 +65,15 @@
  * and MAX_WORD_CHARS=70 give comfortable headroom. Words exceeding these limits
  * are silently skipped (no hyphenation), which is acceptable for correctness.
  * The struct lives on the render-task stack (8 KB) so no permanent DRAM is wasted.
+ *
+ * The two lookup tables are deliberately narrow rather than heap-allocated. Both
+ * index spaces are bounded by the constants above, so a byte per entry suffices
+ * (see the static_asserts on AugmentedWord); the former size_t/int32_t tables
+ * cost 688 bytes of frame for no benefit. liangBreakIndexes runs once per overflowing
+ * word during line layout (ParsedText::hyphenateWordAtIndex -> Hyphenator::
+ * breakOffsets -> LanguageHyphenator::breakIndexes), i.e. hundreds of times per
+ * section, so moving these buffers to the heap would reintroduce exactly the
+ * alloc/free churn described above.
  */
 
 namespace {
@@ -76,10 +86,18 @@ using EmbeddedAutomaton = SerializedHyphenationPatterns;
 static constexpr size_t MAX_WORD_BYTES = 160;  // max UTF-8 bytes in augmented word
 static constexpr size_t MAX_WORD_CHARS = 70;   // max codepoints + 2 sentinel dots
 
+// charByteOffsets holds UTF-8 byte offsets, bounded by MAX_WORD_BYTES;
+// byteToCharIndex holds -1 or a codepoint index, bounded by MAX_WORD_CHARS - 1.
+// Both fit in a single byte, which keeps liangBreakIndexes' frame at ~640 bytes
+// instead of the 1328 it measured with size_t/int32_t tables (-fstack-usage,
+// riscv32). It runs on the render task's 8 KB stack, per word.
+static_assert(MAX_WORD_BYTES <= UINT8_MAX, "charByteOffsets element type too narrow for MAX_WORD_BYTES");
+static_assert(MAX_WORD_CHARS - 1 <= INT8_MAX, "byteToCharIndex element type too narrow for MAX_WORD_CHARS");
+
 struct AugmentedWord {
   uint8_t bytes[MAX_WORD_BYTES];
-  size_t charByteOffsets[MAX_WORD_CHARS];
-  int32_t byteToCharIndex[MAX_WORD_BYTES];
+  uint8_t charByteOffsets[MAX_WORD_CHARS];
+  int8_t byteToCharIndex[MAX_WORD_BYTES];
   size_t byteLen = 0;
   size_t charCount_ = 0;
 
@@ -150,7 +168,9 @@ bool buildAugmentedWord(AugmentedWord& word, const std::vector<CodepointInfo>& c
       word.charCount_ = 0;
       return false;  // word too long
     }
-    word.charByteOffsets[word.charCount_++] = word.byteLen;
+    // byteLen <= MAX_WORD_BYTES here (encodeUtf8 refuses to exceed it), so the
+    // narrowing to uint8_t cannot truncate.
+    word.charByteOffsets[word.charCount_++] = static_cast<uint8_t>(word.byteLen);
     if (encodeUtf8(config.toLower(info.value), word) == 0) {
       word.byteLen = 0;
       word.charCount_ = 0;
@@ -164,7 +184,8 @@ bool buildAugmentedWord(AugmentedWord& word, const std::vector<CodepointInfo>& c
     word.charCount_ = 0;
     return false;
   }
-  word.charByteOffsets[word.charCount_++] = word.byteLen;
+  // byteLen < MAX_WORD_BYTES was just checked above, so this fits in uint8_t.
+  word.charByteOffsets[word.charCount_++] = static_cast<uint8_t>(word.byteLen);
   word.bytes[word.byteLen++] = '.';
 
   // Build byte→char reverse index: -1 for mid-codepoint bytes, char index for start bytes.
@@ -174,7 +195,8 @@ bool buildAugmentedWord(AugmentedWord& word, const std::vector<CodepointInfo>& c
   for (size_t i = 0; i < word.charCount_; ++i) {
     const size_t offset = word.charByteOffsets[i];
     if (offset < word.byteLen) {
-      word.byteToCharIndex[offset] = static_cast<int32_t>(i);
+      // i < charCount_ <= MAX_WORD_CHARS, which the static_assert bounds to INT8_MAX.
+      word.byteToCharIndex[offset] = static_cast<int8_t>(i);
     }
   }
 

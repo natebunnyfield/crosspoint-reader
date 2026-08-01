@@ -105,6 +105,28 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   doc["language"] = (language < getLanguageCount()) ? LANGUAGE_CODES[language] : "EN";
 }
 
+void CrossPointSettings::normalizeRetiredSettings() {
+  // The reader is portrait-only and no longer exposes any way to rotate. A
+  // save written before the controls were withdrawn can still hold a landscape
+  // or inverted value, which would otherwise be permanent, so it is pinned
+  // back on every load. The field itself stays: ReaderUtils, UITheme and the
+  // sleep screens all still read it.
+  //
+  // Runs at the end of fromJson(), i.e. under PersistableStore's storeMutex —
+  // no extra locking here.
+  //
+  // longPressButtonBehavior deliberately has NO line here. Index 2 was the
+  // retired ORIENTATION_CHANGE and is now FONT_SIZE_STEP, a live choice with a
+  // label of its own, so pinning it would silently wipe the setting — including
+  // the factory default — on every load. Out-of-range values are still clamped
+  // by the generic enum loop in fromJson().
+  //
+  // longPressMenuFunction no longer remaps LP_MENU_BOOKMARK either: upstream
+  // kept Bookmark as a live choice and appended Dictionary after it, so the
+  // stored index space is 0..3 again and every value is reachable from the UI.
+  orientation = PORTRAIT;
+}
+
 bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   CrossPointSettings& s = *this;
   bool needsResave = false;
@@ -214,6 +236,9 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   if (doc["language"].is<const char*>()) {
     language = static_cast<uint8_t>(I18n::languageFromCode(doc["language"].as<const char*>()));
   }
+
+  // Pin values whose UI has been withdrawn back into a valid, reachable state.
+  normalizeRetiredSettings();
 
   if (needsResave) {
     LOG_DBG("CPS", "Resaving settings to update format");

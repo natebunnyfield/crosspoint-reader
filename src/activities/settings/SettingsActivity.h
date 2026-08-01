@@ -45,7 +45,7 @@ struct SettingInfo {
   const char* key = nullptr;             // JSON API key (nullptr for ACTION types)
   StrId category = StrId::STR_NONE_OPT;  // Category for web UI grouping
   bool obfuscated = false;               // Save/load via base64 obfuscation (passwords)
-  bool inTextSettings = false;           // Surfaced in the Text Settings screen; hidden from the flat Reader list
+  bool inTextSettings = false;  // Covered by the Text Settings screen (FontSelectionActivity); hidden from the flat Reader list
 
   // Direct char[] string fields (for settings stored in CrossPointSettings)
   size_t stringOffset = 0;

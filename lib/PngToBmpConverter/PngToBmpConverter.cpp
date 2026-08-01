@@ -4,6 +4,7 @@
 #include <HalStorage.h>
 #include <InflateStream.h>
 #include <Logging.h>
+#include <Memory.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -501,24 +502,33 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     return false;
   }
 
-  // Initialize decode context
-  PngDecodeContext ctx = {};
-  ctx.file = &pngFile;
-  ctx.width = width;
-  ctx.height = height;
-  ctx.bitDepth = bitDepth;
-  ctx.colorType = colorType;
-  ctx.bytesPerPixel = bytesPerPixel;
-  ctx.rawRowBytes = rawRowBytes;
-  ctx.paletteSize = 0;
+  // Initialize decode context. As a local it carried readBuf[2048] + palette[768],
+  // which made this frame 3120 bytes (measured with -fstack-usage on the riscv32
+  // target) — 12x the 256-byte limit in the Resource Protocol. One heap block
+  // instead: makeUniqueNoThrow value-initializes, so every member is zero-filled
+  // exactly as the previous `= {}` did, and unique_ptr releases the block on every
+  // return path below.
+  auto ctx = makeUniqueNoThrow<PngDecodeContext>();
+  if (!ctx) {
+    LOG_ERR("PNG", "Failed to allocate decode context (%u bytes)", static_cast<unsigned>(sizeof(PngDecodeContext)));
+    return false;
+  }
+  ctx->file = &pngFile;
+  ctx->width = width;
+  ctx->height = height;
+  ctx->bitDepth = bitDepth;
+  ctx->colorType = colorType;
+  ctx->bytesPerPixel = bytesPerPixel;
+  ctx->rawRowBytes = rawRowBytes;
+  ctx->paletteSize = 0;
 
   // Allocate scanline buffers
-  ctx.currentRow = static_cast<uint8_t*>(malloc(rawRowBytes));
-  ctx.previousRow = static_cast<uint8_t*>(calloc(rawRowBytes, 1));
-  if (!ctx.currentRow || !ctx.previousRow) {
+  ctx->currentRow = static_cast<uint8_t*>(malloc(rawRowBytes));
+  ctx->previousRow = static_cast<uint8_t*>(calloc(rawRowBytes, 1));
+  if (!ctx->currentRow || !ctx->previousRow) {
     LOG_ERR("PNG", "Failed to allocate scanline buffers (%u bytes each)", rawRowBytes);
-    free(ctx.currentRow);
-    free(ctx.previousRow);
+    free(ctx->currentRow);
+    free(ctx->previousRow);
     return false;
   }
 
@@ -535,14 +545,14 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     if (memcmp(chunkType, "PLTE", 4) == 0) {
       int entries = chunkLen / 3;
       if (entries > 256) entries = 256;
-      ctx.paletteSize = entries;
+      ctx->paletteSize = entries;
       size_t palBytes = entries * 3;
-      pngFile.read(ctx.palette, palBytes);
+      pngFile.read(ctx->palette, palBytes);
       // Skip any remaining palette data
       if (chunkLen > palBytes) pngFile.seekCur(chunkLen - palBytes);
       pngFile.seekCur(4);  // CRC
     } else if (memcmp(chunkType, "IDAT", 4) == 0) {
-      ctx.chunkBytesRemaining = chunkLen;
+      ctx->chunkBytesRemaining = chunkLen;
       foundIdat = true;
     } else if (memcmp(chunkType, "IEND", 4) == 0) {
       break;
@@ -554,21 +564,21 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
 
   if (!foundIdat) {
     LOG_ERR("PNG", "No IDAT chunk found");
-    free(ctx.currentRow);
-    free(ctx.previousRow);
+    free(ctx->currentRow);
+    free(ctx->previousRow);
     return false;
   }
 
   // Initialize streaming decompressor with 32KB window for back-reference history
-  if (!ctx.reader.init(true)) {
+  if (!ctx->reader.init(true)) {
     LOG_ERR("PNG", "Failed to init inflate stream");
-    free(ctx.currentRow);
-    free(ctx.previousRow);
+    free(ctx->currentRow);
+    free(ctx->previousRow);
     return false;
   }
-  ctx.reader.setFill(pngIdatFillCallback, &ctx);
+  ctx->reader.setFill(pngIdatFillCallback, ctx.get());
   // PNG IDAT data is zlib-wrapped (2-byte header + trailing adler32)
-  ctx.reader.setZlibWrapped();
+  ctx->reader.setZlibWrapped();
 
   // Calculate output dimensions (same logic as JpegToBmpConverter)
   int outWidth = width;
@@ -618,8 +628,8 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   auto* rowBuffer = static_cast<uint8_t*>(malloc(bytesPerRow));
   if (!rowBuffer) {
     LOG_ERR("PNG", "Failed to allocate row buffer");
-    free(ctx.currentRow);
-    free(ctx.previousRow);
+    free(ctx->currentRow);
+    free(ctx->previousRow);
     return false;
   }
 
@@ -661,8 +671,8 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     delete fsDitherer;
     delete atkinson1BitDitherer;
     free(rowBuffer);
-    free(ctx.currentRow);
-    free(ctx.previousRow);
+    free(ctx->currentRow);
+    free(ctx->previousRow);
     return false;
   }
 
@@ -672,14 +682,14 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   // Process each scanline
   for (uint32_t y = 0; y < height; y++) {
     // Decode one scanline
-    if (!decodeScanline(ctx)) {
+    if (!decodeScanline(*ctx)) {
       LOG_ERR("PNG", "Failed to decode scanline %u", y);
       success = false;
       break;
     }
 
     // Batch-convert entire scanline to grayscale (one branch, tight loop)
-    convertScanlineToGray(ctx, grayRow);
+    convertScanlineToGray(*ctx, grayRow);
 
     if (!needsScaling) {
       // Direct output (no scaling)
@@ -805,9 +815,9 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     }
 
     // Swap current/previous row buffers
-    uint8_t* temp = ctx.previousRow;
-    ctx.previousRow = ctx.currentRow;
-    ctx.currentRow = temp;
+    uint8_t* temp = ctx->previousRow;
+    ctx->previousRow = ctx->currentRow;
+    ctx->currentRow = temp;
   }
 
   // Clean up
@@ -818,8 +828,8 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   delete fsDitherer;
   delete atkinson1BitDitherer;
   free(rowBuffer);
-  free(ctx.currentRow);
-  free(ctx.previousRow);
+  free(ctx->currentRow);
+  free(ctx->previousRow);
 
   if (success) {
     LOG_DBG("PNG", "Successfully converted PNG to BMP");

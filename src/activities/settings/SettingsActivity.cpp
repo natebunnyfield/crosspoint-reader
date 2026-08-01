@@ -12,6 +12,7 @@
 #include "ClearCacheActivity.h"
 #include "CrossPointSettings.h"
 #include "FontDownloadActivity.h"
+#include "FontSelectionActivity.h"
 #include "KOReaderSettingsActivity.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
@@ -21,7 +22,6 @@
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
 #include "StatusBarSettingsActivity.h"
-#include "TextSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "components/UITheme.h"
@@ -50,8 +50,10 @@ void SettingsActivity::rebuildSettingsLists() {
     if (setting.category == StrId::STR_CAT_DISPLAY) {
       displaySettings.push_back(setting);
     } else if (setting.category == StrId::STR_CAT_READER) {
-      // Settings merged into "Text Settings"
-      // (they stay in the shared list for the web settings API)
+      // Font family and size are covered by the "Text Settings" screen
+      // (FontSelectionActivity, with its live preview and side-button size
+      // stepping), so their flat entries are hidden here. They stay in the
+      // shared list for the web settings API.
       if (setting.inTextSettings) continue;
       readerSettings.push_back(setting);
     } else if (setting.category == StrId::STR_CAT_CONTROLS) {
@@ -399,10 +401,10 @@ void SettingsActivity::toggleCurrentSetting() {
                                });
         break;
       case SettingAction::TextSettings:
-        startActivityForResult(std::make_unique<TextSettingsActivity>(renderer, mappedInput, &sdFontSystem.registry(),
-                                                                      TextSettingsActivity::Tab::Family),
+        startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                                [this](const ActivityResult&) {
-                                 // TextSettingsActivity saves on each change; no save needed here.
+                                 // The picker applies changes live but does not persist them.
+                                 SETTINGS.saveToFile();
                                  rebuildSettingsLists();
                                });
         break;

@@ -31,10 +31,11 @@
 #include "MappedInputManager.h"
 #include "ProgressMapper.h"
 #include "QrDisplayActivity.h"
+#include "ReaderFontSizes.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
-#include "activities/settings/TextSettingsActivity.h"
+#include "activities/settings/FontSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/BookmarkUtil.h"
@@ -257,12 +258,14 @@ void EpubReaderActivity::openReaderMenu() {
   const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
   startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
                              renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
-                             SETTINGS.orientation, !currentPageFootnotes.empty(), !cachedBookmarks.empty()),
+                             SETTINGS.orientation, !currentPageFootnotes.empty()),
                          [this](const ActivityResult& result) {
-                           // Always apply orientation change even if the menu was cancelled
                            const auto& menu = std::get<MenuResult>(result.data);
-                           applyOrientation(menu.orientation);
-                           toggleAutoPageTurn(menu.pageTurnOption);
+                           // No orientation / auto-page-turn re-apply here: the
+                           // menu can no longer change either value, so it would
+                           // only ever re-apply what is already set. (The
+                           // orientation helper itself is gone — see
+                           // stepReaderFontSize, which took over its enum slot.)
                            if (!result.isCancelled) {
                              onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
                            }
@@ -414,6 +417,27 @@ void EpubReaderActivity::loop() {
     }
   }
 
+  // Second chance at the deferred remap.
+  //
+  // The only other call is inside the background-build tick above, which is
+  // gated on `isPartial() || pageCount < currentPage + BUILD_WINDOW_AHEAD`. The
+  // initial synchronous build in render() runs in BUILD_PAGES_PER_CHUNK (8)
+  // steps while BUILD_WINDOW_AHEAD is 5, so it routinely overshoots the window:
+  // the tick never runs, isBuildComplete() is never observed there, and the
+  // remap never fires at all. The user then lands on the old page NUMBER after a
+  // font/size change instead of the proportionally equivalent page.
+  //
+  // applyDeferredReposition() self-disarms (sets cachedChapterTotalPageCount = 0)
+  // and no-ops when pagination is unchanged, so this cannot double-apply or
+  // disturb a plain resume. Takes the lock because it mutates
+  // section->currentPage, which the render task reads.
+  if (section && !section->isBuilding() && cachedChapterTotalPageCount != 0 && !RenderLock::peek()) {
+    RenderLock lock;
+    if (applyDeferredReposition()) {
+      requestUpdate();
+    }
+  }
+
   // End-of-Book screen reached (currentSpineIndex == spine count) means the book is
   // finished. Two independent finished-book features key off this same condition.
   const bool atEndOfBook = currentSpineIndex > 0 && currentSpineIndex >= epub->getSpineItemsCount();
@@ -486,7 +510,15 @@ void EpubReaderActivity::loop() {
   // through to the regular handlers below; page turns are absorbed by the end-of-book
   // block. A Confirm release after a long-press function (bookmark/sync) fired is left
   // to the regular Confirm handler below, which consumes it via ignoreNextConfirmRelease.
-  if (atEndOfBook && endOfBookOptions.menuActive() &&
+  // `!sideChordConsumed` for the same reason as the ignoreNextConfirmRelease term beside
+  // it: a leftover edge from a gesture already acted on must not be dispatched again here.
+  // This block sits AHEAD of the chord gating, and EndOfBookOptions::triggered() is
+  // release-based with NavNext/NavPrevious including the side buttons — so a Confirm+side
+  // chord would step the line spacing on the press and then ALSO move this menu's selector
+  // on the release. One gesture, two actions. The latch is set on the press frame and is
+  // still set when that release arrives, so testing it here closes the window; the swallow
+  // block below then clears it.
+  if (atEndOfBook && endOfBookOptions.menuActive() && !sideChordConsumed &&
       !(ignoreNextConfirmRelease && mappedInput.wasReleased(MappedInputManager::Button::Confirm))) {
     std::string openPath;
     switch (endOfBookOptions.handleMenuInput(mappedInput, &openPath)) {
@@ -510,9 +542,47 @@ void EpubReaderActivity::loop() {
     }
   }
 
-  // Enter reader menu activity on short-press Confirm or a downward swipe from the top edge. A long-press
-  // that fired a bound function (bookmark or KOReader sync) sets ignoreNextConfirmRelease so the release
-  // following the hold does not also open the menu.
+  // ---- CONFIRM AS A MODIFIER KEY (Confirm held + side button tap = line spacing) ----
+  //
+  // Read here, ahead of every Confirm and side-button handler below, because a chord must
+  // produce exactly ONE action. Three of the reader's existing gestures overlap it and are
+  // gated off in three different places:
+  //   1. the long-press Confirm function (bookmark / KOReader sync) — guarded immediately
+  //      below on `confirmModifierUsed` and on "a side button is down";
+  //   2. the reader menu on Confirm RELEASE — suppressed through the existing
+  //      ignoreNextConfirmRelease latch, set where the chord acts (same precedent as the
+  //      bookmark path);
+  //   3. the side button's own gestures — font SIZE on tap, font FAMILY on hold, and the page
+  //      turn from detectPageTurn() — all skipped by the chord block further down, for the
+  //      press AND for the release that ends it.
+  //
+  // Cross-group chord, so the hardware really can see it: freeink-sdk
+  // InputManager::getState() reads the FRONT group (BACK/CONFIRM/LEFT/RIGHT) off ADC pin 1 as
+  // `state |= (1 << button1)` and UP/DOWN off a SECOND ADC as `state |= (1 << (button2 + 4))`
+  // (InputManager.cpp:133-145). Two buttons in the SAME resistor ladder collapse to one
+  // voltage and one index, which is why the modifier must be a FRONT button paired with a
+  // SIDE button and not, say, Confirm + front Left.
+  //
+  // Nothing in the chord may be timed with getHeldTime(): applyStateChange() stamps
+  // buttonPressStart only when `pressedEvents > 0 && currentState == 0`
+  // (InputManager.cpp:242-248), i.e. once per whole chord, and never restamps per button. So
+  // during a chord getHeldTime() reports the time since CONFIRM went down. Measured in the
+  // simulator before this gate existed: Confirm down at t=12.0s, a 300ms side tap at t=13.0s
+  // reported held=1000 on the very frame the side button went down — already past
+  // SKIP_HOLD_MS, so the family-hold branch fired and changed the font family (observed:
+  // sdFontFamilyName InknutAntiqua62 -> LibreCaslonText) while the Confirm release then also
+  // opened the menu. The modifier is therefore read as isPressed() STATE and the trigger as a
+  // press EDGE.
+  const bool confirmModifierDown = mappedInput.isPressed(MappedInputManager::Button::Confirm);
+  const auto sideHeldNow = ReaderUtils::detectHeldSideDirection(mappedInput);
+  if (!confirmModifierDown) {
+    confirmModifierUsed = false;  // hold is over: re-arm for the next chord
+  }
+
+  // Enter reader menu activity on short-press Confirm or a downward swipe from the top edge.
+  // A long-press that fired a bound function (bookmark or KOReader sync) sets
+  // ignoreNextConfirmRelease so the release following the hold does not also open the menu;
+  // so does a line-spacing chord.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput)) {
     if (ignoreNextConfirmRelease) {
       ignoreNextConfirmRelease = false;
@@ -522,7 +592,27 @@ void EpubReaderActivity::loop() {
   }
 
   // Long-press Confirm runs the user-selected function (SETTINGS.longPressMenuFunction).
-  if (mappedInput.isPressed(MappedInputManager::Button::Confirm)) {
+  //
+  // Skipped while Confirm is acting as the line-spacing modifier, or the same hold would both
+  // step the leading and launch a KOReader sync. Two conditions, because they cover different
+  // halves of the gesture: `sideHeldNow.any()` covers the window while the chord's side button
+  // is still down (the hold threshold can be crossed mid-chord), and `confirmModifierUsed`
+  // covers the rest of the Confirm hold after the side button has already been released. Note
+  // sideHeldNow now follows ReaderUtils::sideFontButtons(), so it is live even when
+  // SETTINGS.sideButtonLayout is SIDE_BUTTONS_DISABLED — that setting withdraws side PAGING,
+  // not the side buttons themselves, and the chord has to be reachable wherever the font
+  // gestures are.
+  //
+  // This suppresses the sync only if the side button arrives BEFORE the threshold. Measured in
+  // the simulator with credentials stored: a side tap 200ms into the Confirm hold gives the
+  // line-spacing step and zero KOReaderSync launches, while a tap 1400ms in gets the sync
+  // (which fires at ~1047ms and replaces the activity, so the chord never happens). That
+  // ordering is inherent — a threshold action already taken cannot be un-taken — and it is
+  // deliberately NOT "fixed" by deferring the sync to the Confirm release, which would change
+  // an existing gesture's feel. LP_MENU_BOOKMARK cannot collide at all: it is a retired choice
+  // that CrossPointSettings.cpp:119 migrates to LP_MENU_DISABLED on load and SettingsList.h:180
+  // no longer offers, so that branch is unreachable on any device.
+  if (confirmModifierDown && !confirmModifierUsed && !sideHeldNow.any()) {
     switch (SETTINGS.longPressMenuFunction) {
       case CrossPointSettings::LP_MENU_BOOKMARK:
         // Hold ~0.4s drops a bookmark at the current page.
@@ -596,6 +686,104 @@ void EpubReaderActivity::loop() {
     return;
   }
 
+  // Side buttons whose press a chord already consumed: swallow the remainder of the gesture.
+  // This has to sit ahead of BOTH the font block and detectPageTurn(), because both of them
+  // are RELEASE-triggered whenever longPressButtonBehavior != OFF (the font tap branch reads
+  // detectSideRelease; detectPageTurn's `usePress` is false unless the setting is OFF — see
+  // ReaderUtils.h). An unswallowed release is therefore a second action from one press, which
+  // is the exact "one edge consumed by two handlers" failure this feature had to avoid.
+  if (sideChordConsumed) {
+    if (sideHeldNow.any()) {
+      return;  // still down: this press belongs to the chord and to nobody else
+    }
+    sideChordConsumed = false;  // both side buttons up: gesture over, re-arm
+    // Clear the FONT block's latch too. It is set when a hold cycles the family
+    // (below) and is only ever cleared by a side RELEASE reaching the font-tap
+    // branch — but the return below eats exactly that release. Ordering that
+    // reaches here: hold a side button past the threshold (family cycles, latch
+    // set), press Confirm while still holding, then release the side button. The
+    // latch would survive and silently swallow the user's NEXT plain font-size
+    // tap. Both latches describe "this gesture is spent", so they must retire
+    // together.
+    suppressNextSideRelease = false;
+    if (ReaderUtils::detectSideRelease(mappedInput).any()) {
+      return;  // consume the release edge that ended it
+    }
+  }
+
+  // THE CHORD: Confirm held + a side button PRESS steps SETTINGS.lineSpacing.
+  //
+  // Acting on the press rather than the release is both the modifier-key convention and what
+  // makes the reflow start while the button is still down — the same reasoning that moved the
+  // font-family hold off the release edge below.
+  if (confirmModifierDown) {
+    const auto sidePress = ReaderUtils::detectSidePress(mappedInput);
+    if (sidePress.any()) {
+      confirmModifierUsed = true;       // no long-press Confirm function for the rest of this hold
+      sideChordConsumed = true;         // no font tap and no page turn from this press or release
+      ignoreNextConfirmRelease = true;  // and no reader menu when Confirm is let go
+      // PageForward widens, PageBack tightens: `next` = "more", matching the font-size ramp
+      // where a `next` tap goes larger. Routed through PageBack/PageForward, so the user's
+      // sideButtonLayout swap applies here too.
+      stepReaderLineSpacing(sidePress.next ? +1 : -1);
+      return;
+    }
+    if (sideHeldNow.any()) {
+      // A side button was already down when Confirm arrived. There is no press edge left to
+      // act on, but while Confirm is down the side buttons belong to the modifier, so this
+      // must not become a font-family hold or a page turn either. Mark the press spent: the
+      // gesture ends with no action rather than with the wrong one.
+      sideChordConsumed = true;
+      return;
+    }
+  }
+
+  // SIDE BUTTONS ARE THE FONT CONTROLS while this setting is on:
+  //   hold  = next / previous font FAMILY, cycling at both ends
+  //   tap   = font SIZE step
+  // Page turning therefore moves entirely to the FRONT Left/Right buttons (and tilt, and
+  // the power button when configured for it) — detectPageTurn still provides those below.
+  // This is a deliberate trade the device owner asked for, not an oversight: the side
+  // buttons no longer turn pages while longPressButtonBehavior == FONT_SIZE_STEP.
+  //
+  // The hold branch reads the HELD state rather than an edge, which is why it sits ahead of
+  // detectPageTurn: it must not be gated behind "an edge fired this frame". Acting at the
+  // threshold instead of on release also means the reflow starts while the button is still
+  // down, and it uses the isPressed()+getHeldTime() shape, which reports a real duration on
+  // both device and host (the wasReleased() shape does not — see
+  // tools/patches/0001-crosspoint-simulator-halgpio-completed-hold.patch).
+  if (SETTINGS.longPressButtonBehavior == SETTINGS.FONT_SIZE_STEP) {
+    const auto held = ReaderUtils::detectHeldSideDirection(mappedInput);
+    if (!held.any()) {
+      // Gesture finished (or never started): re-arm for the next hold.
+      sideHoldFired = false;
+    } else if (!sideHoldFired && mappedInput.getHeldTime() >= ReaderUtils::SKIP_HOLD_MS) {
+      // One family step per hold. Holding longer does not auto-repeat — lift and hold again
+      // — so a lean on the button cannot race through the whole font list, each step of
+      // which costs an SD load and a full re-paginate.
+      sideHoldFired = true;
+      // Mark the release this hold will end with, so the tap branch below does not then
+      // read it as a size step.
+      suppressNextSideRelease = true;
+      // `next` wins if both are somehow down: getHeldTime() is a single global chord timer
+      // (freeink-sdk InputManager stamps it only when everything was up), so a two-button
+      // hold has no per-button duration to disambiguate with.
+      cycleReaderFontFamily(held.next ? +1 : -1);
+      return;
+    }
+
+    // Tap: the release of a side button that never crossed the hold threshold.
+    const auto sideTap = ReaderUtils::detectSideRelease(mappedInput);
+    if (sideTap.any()) {
+      if (suppressNextSideRelease) {
+        suppressNextSideRelease = false;  // this release belonged to a hold we already acted on
+        return;
+      }
+      stepReaderFontSize(sideTap.next ? +1 : -1);
+      return;
+    }
+  }
+
   auto [prevTriggered, nextTriggered, fromTilt] = ReaderUtils::detectPageTurn(mappedInput);
   prevTriggered = prevTriggered || touch.prev;
   nextTriggered = nextTriggered || touch.next;
@@ -652,14 +840,8 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  if (longPress && SETTINGS.longPressButtonBehavior == SETTINGS.ORIENTATION_CHANGE) {
-    const uint8_t newOrientation =
-        nextTriggered ? (SETTINGS.orientation - 1 + SETTINGS.ORIENTATION_COUNT) % SETTINGS.ORIENTATION_COUNT
-                      : (SETTINGS.orientation + 1) % SETTINGS.ORIENTATION_COUNT;
-    applyOrientation(newOrientation);
-    requestUpdate();
-    return;
-  }
+  // NOTE: the font-size step is handled ABOVE, on the held state, before detectPageTurn.
+  // It used to live here keyed off the release edge; that is what made it feel laggy.
 
   // No current section, attempt to rerender the book
   if (!section) {
@@ -808,21 +990,48 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::TEXT_SETTINGS: {
-      startActivityForResult(std::make_unique<TextSettingsActivity>(renderer, mappedInput, &sdFontSystem.registry(),
-                                                                    TextSettingsActivity::Tab::Family),
-                             [this](const ActivityResult&) {
-                               // TextSettingsActivity saves on each change; no save needed here.
-                               // Font/size/spacing/margin changes invalidate the current
-                               // layout: preserve position and force a re-layout, mirroring
-                               // applyOrientation()'s reflow.
-                               RenderLock lock(*this);
-                               if (section) {
-                                 cachedSpineIndex = currentSpineIndex;
-                                 cachedChapterTotalPageCount = section->pageCount;
-                                 nextPageNumber = section->currentPage;
-                               }
-                               section.reset();
-                             });
+      {
+        // Drop the paginated section BEFORE the picker opens, not just after
+        // it closes.
+        //
+        // `section` caches a font ID captured at startBuild() and keeps using
+        // it from loop()'s background build. The picker previews fonts live,
+        // and every preview calls ensureLoaded() -> manager_.unloadAll(),
+        // which frees exactly those glyph tables. A section that outlives the
+        // picker's first preview is therefore pointing at freed memory for the
+        // whole time the user is browsing.
+        RenderLock lock(*this);
+        // Preserve the reading position across the reflow, exactly as
+        // stepReaderFontSize does before its own section.reset() (and as the
+        // retired applyOrientation did before it).
+        //
+        // Without this the position is simply lost: nextPageNumber is only
+        // written by chapter transitions (-> 0), resume-from-disk and explicit
+        // jumps — never by an intra-chapter page turn — so the rebuild lands on
+        // whatever page the CHAPTER was entered at, and render() then persists
+        // that wrong page. It applies even when the user changes nothing and
+        // just backs out of the picker, and it survives reboot.
+        //
+        // It also re-arms applyDeferredReposition(), which bails on
+        // cachedChapterTotalPageCount == 0 — i.e. the proportional remap after
+        // re-pagination was dead here for the same missing three lines.
+        if (section) {
+          cachedSpineIndex = currentSpineIndex;
+          cachedChapterTotalPageCount = section->pageCount;
+          nextPageNumber = section->currentPage;
+        }
+        section.reset();
+      }
+      startActivityForResult(
+          std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
+          [this](const ActivityResult&) {
+            // Re-paginate against whatever the user settled on. The section is
+            // already gone, so this only has to persist and reload.
+            RenderLock lock(*this);
+            SETTINGS.saveToFile();
+            sdFontSystem.ensureLoaded(renderer);
+            requestUpdate();
+          });
       break;
     }
     case EpubReaderMenuActivity::MenuAction::GO_TO_PERCENT: {
@@ -957,31 +1166,181 @@ bool EpubReaderActivity::launchKOReaderSync() {
   return true;  // acted: launched the sync activity
 }
 
-void EpubReaderActivity::applyOrientation(const uint8_t orientation) {
-  // No-op if the selected orientation matches current settings.
-  if (SETTINGS.orientation == orientation) {
+void EpubReaderActivity::stepReaderFontSize(const int delta) {
+  // The selectable sizes are the point sizes the active family actually ships
+  // (the same list buildFontSizeSetting() and FontSelectionActivity offer), so a
+  // step walks that list. Clamped at the ends rather than wrapped, for the same
+  // "the end of the range must be perceptible" reason
+  // ReaderUtils::steppedLineSpacing clamps.
+  const std::vector<uint8_t> sizes = readerFontPointSizes(&sdFontSystem.registry(), SETTINGS.sdFontFamilyName);
+  if (sizes.empty()) return;
+  const uint8_t current = snapToNearestPointSize(sizes, SETTINGS.fontPointSize);
+  int idx = 0;
+  for (int i = 0; i < static_cast<int>(sizes.size()); i++) {
+    if (sizes[i] == current) {
+      idx = i;
+      break;
+    }
+  }
+  int nextIdx = idx + delta;
+  if (nextIdx < 0) nextIdx = 0;
+  if (nextIdx >= static_cast<int>(sizes.size())) nextIdx = static_cast<int>(sizes.size()) - 1;
+  const uint8_t next = sizes[nextIdx];
+
+  if (next == SETTINGS.fontPointSize) {
+    // At an end of the ramp: nothing to persist (Resource Protocol 8 — no settings write
+    // without a value change) and nothing to re-paginate. Return without requesting an
+    // update: there is no longer a popup to draw, so a refresh here would spend a full
+    // e-ink pass redrawing a page that has not changed.
     return;
   }
 
-  // Preserve current reading position so we can restore after reflow.
   {
+    // Everything below has to be atomic with respect to the render task, which is why this
+    // is one lock and not three. ActivityManager::loop() calls us holding NO lock by design
+    // ("the loop() method must be responsible for acquire one if needed",
+    // ActivityManager.cpp), so the render task can be inside render() right now.
     RenderLock lock(*this);
+
+    // Preserve the reading position across the reflow, exactly as the retired
+    // applyOrientation() did before its own section.reset() and as the TEXT_SETTINGS menu
+    // case does (onReaderMenuConfirm above). Without these three lines the position is
+    // simply lost: nextPageNumber is never written by an intra-chapter page turn, so the
+    // rebuild lands on whatever page the CHAPTER was entered at and render() then persists
+    // that wrong page. They also re-arm applyDeferredReposition(), which bails on
+    // cachedChapterTotalPageCount == 0 — i.e. the proportional remap onto the new
+    // pagination happens only because the count is captured here.
     if (section) {
       cachedSpineIndex = currentSpineIndex;
       cachedChapterTotalPageCount = section->pageCount;
       nextPageNumber = section->currentPage;
     }
 
-    // Persist the selection so the reader keeps the new orientation on next launch.
-    SETTINGS.orientation = orientation;
+    // Drop the section BEFORE ensureLoaded(), never after: Section caches the font ID it
+    // was built with and its destructor still runs suspendBuild(), while ensureLoaded ->
+    // SdCardFontManager::unloadAll() does removeFont(id) / delete lf.font and frees exactly
+    // those glyph tables. Same ordering, same reason, as the TEXT_SETTINGS case.
+    section.reset();
+
+    SETTINGS.fontPointSize = next;
+    // Guarded by the no-change early-return above, so this only ever runs on a real
+    // change — the SPIFFS/SD write is not repeated by leaning on the button at the end of
+    // the ramp.
     SETTINGS.saveToFile();
 
-    // Update renderer orientation to match the new logical coordinate system.
-    ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
-
-    // Reset section to force re-layout in the new orientation.
-    section.reset();
+    // An SD card family keeps only ONE point size resident, so the new size has to be
+    // loaded before the chapter can be re-paginated or drawn at it; a built-in face just
+    // resolves to a different font ID. Called under the lock because unloadAll() frees
+    // glyph tables the render task may be mid-draw with.
+    sdFontSystem.ensureLoaded(renderer);
   }
+  // Outside the lock: requestUpdate() only sets a deferred flag / notifies the render task.
+  // requestUpdateAndWait() would deadlock (ActivityManager asserts on a held lock).
+  requestUpdate();
+}
+
+void EpubReaderActivity::stepReaderLineSpacing(const int delta) {
+  const uint8_t current = SETTINGS.lineSpacing;
+  const uint8_t next = ReaderUtils::steppedLineSpacing(current, delta);
+
+  if (next == current) {
+    // At an end of the three-slot ramp: nothing to persist (Resource Protocol 8 — no settings
+    // write without a value change) and nothing to re-paginate. Deliberately no
+    // requestUpdate() either: a full e-ink pass to redraw an identical page is exactly the
+    // flash the owner asked to be removed from the font-resize path.
+    return;
+  }
+
+  {
+    // One lock for the whole mutation, for the same reason as stepReaderFontSize:
+    // ActivityManager::loop() calls activities with NO lock held by design, so the render task
+    // may be inside render() right now — and render() reads SETTINGS.lineSpacing on every
+    // build/load path via SETTINGS.getReaderLineCompression() (lines 1188 / 1232 / 1293 /
+    // 1372 here). Mutating the setting and dropping the section have to be atomic against it.
+    RenderLock lock(*this);
+
+    // Position preservation, copied from stepReaderFontSize above (see the long comment
+    // there): capture BEFORE section.reset(). Without these three lines the place is simply
+    // lost — nextPageNumber is never written by an intra-chapter page turn, so the rebuild
+    // lands on whatever page the CHAPTER was entered at and render() then persists that wrong
+    // page. They are also what re-arms applyDeferredReposition(), which bails on
+    // cachedChapterTotalPageCount == 0, so the proportional remap onto the new (re-leaded)
+    // pagination happens only because the count is captured here.
+    if (section) {
+      cachedSpineIndex = currentSpineIndex;
+      cachedChapterTotalPageCount = section->pageCount;
+      nextPageNumber = section->currentPage;
+    }
+    section.reset();
+
+    SETTINGS.lineSpacing = next;
+    // Guarded by the next == current early return above, so repeated presses at either end of
+    // the ramp do not repeat the write (Resource Protocol 8).
+    SETTINGS.saveToFile();
+
+    // No sdFontSystem.ensureLoaded() here, unlike stepReaderFontSize and
+    // cycleReaderFontFamily: line spacing changes neither the font family nor its point size,
+    // so no glyph table is loaded or freed and there is nothing for the render task to be
+    // mid-draw with. The re-pagination instead comes from Section::loadSectionFile rejecting
+    // the cached .bin on the lineCompression mismatch (lib/Epub/Epub/Section.cpp:156).
+  }
+  LOG_DBG("ERS", "Line spacing slot %u -> %u (chord)", current, next);
+  // Outside the lock: requestUpdate() only sets a deferred flag / notifies the render task.
+  // requestUpdateAndWait() would deadlock (ActivityManager asserts on a held lock).
+  requestUpdate();
+}
+
+void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
+  // Mirror FontSelectionActivity's list EXACTLY, or holding a side button would walk a
+  // different set of fonts than the picker shows. That list is: the installed SD families
+  // if there are any, and ONLY otherwise the two built-in Noto faces
+  // (FontSelectionActivity.cpp, onEnter).
+  const auto& families = sdFontSystem.registry().getFamilies();
+  const int sdCount = static_cast<int>(families.size());
+
+  // Cycles at both ends, as asked: the modulo is written to work for delta = -1 too, since
+  // (-1 % n) is negative in C++.
+  const auto wrap = [](const int index, const int count) { return ((index % count) + count) % count; };
+
+  {
+    RenderLock lock(*this);
+
+    // Same position-preservation and same ordering as stepReaderFontSize: capture before the
+    // reset, reset before ensureLoaded. See the comments there — the reasons are identical
+    // and the failure modes (lost place, freed glyph tables mid-draw) are the same.
+    if (section) {
+      cachedSpineIndex = currentSpineIndex;
+      cachedChapterTotalPageCount = section->pageCount;
+      nextPageNumber = section->currentPage;
+    }
+    section.reset();
+
+    if (sdCount == 0) {
+      const int count = static_cast<int>(CrossPointSettings::BUILTIN_FONT_COUNT);
+      const int current = SETTINGS.fontFamily < count ? SETTINGS.fontFamily : 0;
+      SETTINGS.fontFamily = static_cast<uint8_t>(wrap(current + delta, count));
+      SETTINGS.sdFontFamilyName[0] = '\0';
+    } else {
+      // An empty sdFontFamilyName means a built-in is selected while SD fonts exist (the
+      // picker does not list built-ins then), so start from the first SD family.
+      int current = 0;
+      if (SETTINGS.sdFontFamilyName[0] != '\0') {
+        for (int i = 0; i < sdCount; i++) {
+          if (families[i].name == SETTINGS.sdFontFamilyName) {
+            current = i;
+            break;
+          }
+        }
+      }
+      const std::string& picked = families[wrap(current + delta, sdCount)].name;
+      strncpy(SETTINGS.sdFontFamilyName, picked.c_str(), sizeof(SETTINGS.sdFontFamilyName) - 1);
+      SETTINGS.sdFontFamilyName[sizeof(SETTINGS.sdFontFamilyName) - 1] = '\0';
+    }
+
+    SETTINGS.saveToFile();
+    sdFontSystem.ensureLoaded(renderer);
+  }
+  requestUpdate();
 }
 
 void EpubReaderActivity::toggleAutoPageTurn(const uint8_t selectedPageTurnOption) {
@@ -1350,14 +1709,27 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   // navigation, an explicit jump beyond a finished chapter, or a stale saved position.
   // Guarded on !isBuilding() because a still-building section's pageCount is only the current
   // watermark (not the final count) and has already been driven far enough by the loops above.
+  // Apply a deferred settings-change reposition FIRST, before the clamp below.
+  //
+  // Order matters and getting it backwards loses the reader's place when pagination
+  // SHRINKS (tightening the line spacing, or a smaller font). The remap divides the
+  // target page by the OLD page count, so it must see the pre-clamp target. Clamping
+  // first fed it an already-truncated value and compounded the error: page 20 of 21
+  // tightened to 18 pages clamped to 17, then 17/21 = 0.81 -> page 14 of 18 (~78%)
+  // instead of the chapter end (~95%) — a silent 3-page jump backwards.
+  //
+  // Safe in this order: applyDeferredReposition() no-ops unless the spine matches and
+  // the page count actually changed, it clamps its own result to pageCount - 1, and it
+  // is disarmed (cachedChapterTotalPageCount == 0) on a plain resume — so the
+  // UINT16_MAX "last page" sentinel still falls through to the clamp below.
+  applyDeferredReposition();
+
+  // clamp to the last real page: the UINT16_MAX sentinel from backward chapter navigation,
+  // an explicit jump beyond a finished chapter, or a stale saved position.
   if (!section->isBuilding() && section->pageCount > 0 &&
       section->currentPage >= static_cast<int>(section->pageCount)) {
     section->currentPage = section->pageCount - 1;
   }
-
-  // Apply a deferred settings-change reposition now that the real page count is known (a no-op for
-  // a plain resume / unchanged pagination). If still building, this defers to loop() on completion.
-  applyDeferredReposition();
 
   renderer.clearScreen();
 
@@ -1506,8 +1878,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // retained frame after a silent restart (for example, when returning from
   // KOReader sync), leaving the old UI mixed with the image.
   const bool cleanImageBasePending = manualRefreshPending || pagesUntilFullRefresh <= 1;
-  const bool needsTextGrayscale = SETTINGS.textAntiAliasing;
+  const bool needsTextGrayscale = SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF;
   const bool needsAnyGrayscale = needsTextGrayscale || pageHasImages;
+  // Pick the glyph-gray -> plane mapping for every grayscale pass below (text
+  // only; drawBitmap's image mapping is fixed).
+  renderer.setGrayscaleAaStrength(ReaderUtils::textAaStrength());
   const bool tiledGrayscale = needsAnyGrayscale && renderer.supportsStripGrayscale();
   // Whole-plane buffering only pays when the BW refresh genuinely runs async
   // underneath it; on blocking panels (X3) it would just spend ~50 KB for the

@@ -30,6 +30,18 @@ class GfxRenderer {
  public:
   enum RenderMode { BW, GRAYSCALE_LSB, GRAYSCALE_MSB };
 
+  // How the 2-bit glyph edge levels (1 = dark gray, 2 = light gray) map onto
+  // the panel's two grayscale planes during the GRAYSCALE_LSB/MSB text passes.
+  // The panel offers exactly two gray targets (light via MSB-only, dark via
+  // MSB+LSB); an unflagged glyph pixel keeps the black laid down by the BW base
+  // pass, so "stronger" AA means flagging fewer/darker targets. Text-only:
+  // image rendering (drawBitmap) keeps its fixed mapping.
+  enum GrayscaleAaStrength : uint8_t {
+    AA_STANDARD,  // glyph dark -> panel dark, glyph light -> panel light
+    AA_CRISP,     // glyph dark -> black, glyph light -> panel light
+    AA_DARK       // glyph dark -> black, glyph light -> panel dark
+  };
+
   // Logical screen orientation from the perspective of callers
   enum Orientation {
     Portrait,                  // 480x800 logical coordinates (current default)
@@ -43,6 +55,7 @@ class GfxRenderer {
 
   HalDisplay& display;
   RenderMode renderMode;
+  GrayscaleAaStrength grayscaleAaStrength = AA_STANDARD;
   Orientation orientation;
   bool fadingFix;
   uint8_t* frameBuffer = nullptr;
@@ -113,6 +126,28 @@ class GfxRenderer {
   static constexpr int VIEWABLE_MARGIN_RIGHT = 3;
   static constexpr int VIEWABLE_MARGIN_BOTTOM = 3;
   static constexpr int VIEWABLE_MARGIN_LEFT = 3;
+
+#ifdef GFX_BOUNDS_COUNTER
+  // Test-only instrumentation.
+  //
+  // drawPixel() CLIPS an out-of-range write: it logs "!! Outside range" and
+  // returns before touching the framebuffer, so a geometry bug corrupts
+  // nothing and no test can observe it — it surfaces only as a log line on a
+  // device nobody is watching. That is exactly how the font picker shipped a
+  // draw at logical x == screen width (crash_report.txt:
+  // "!! Outside range (528, 302) -> (302, -1)").
+  //
+  // Host test builds define GFX_BOUNDS_COUNTER to turn that silent clip into
+  // an assertable counter. Not compiled on device: no flash, no DRAM, and no
+  // branch added to the per-pixel hot path.
+  struct OutOfRange {
+    uint32_t count = 0;
+    int lastX = 0, lastY = 0, lastPhyX = 0, lastPhyY = 0;
+  };
+  static OutOfRange outOfRange;
+  static void resetOutOfRange() { outOfRange = OutOfRange{}; }
+  static uint32_t outOfRangeCount() { return outOfRange.count; }
+#endif
 
   // Setup
   void begin();  // must be called right after display.begin()
@@ -276,6 +311,11 @@ class GfxRenderer {
   // Grayscale functions
   void setRenderMode(const RenderMode mode) { this->renderMode = mode; }
   RenderMode getRenderMode() const { return renderMode; }
+  // Text AA strength for the grayscale passes. Renderer state (like renderMode)
+  // rather than a drawText parameter so reader activities can set it once from
+  // SETTINGS.textAntiAliasing without threading it through every call site.
+  void setGrayscaleAaStrength(const GrayscaleAaStrength s) { this->grayscaleAaStrength = s; }
+  GrayscaleAaStrength getGrayscaleAaStrength() const { return grayscaleAaStrength; }
   // Grayscale preconditioning settle pass (no-op on X4). The rect overload
   // takes the gray region in LOGICAL screen coordinates and rotates it to the
   // panel; the no-arg overload settles the full frame. Call after the BW base

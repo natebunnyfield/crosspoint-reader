@@ -12,6 +12,10 @@
 
 #include "FontCacheManager.h"
 
+#ifdef GFX_BOUNDS_COUNTER
+GfxRenderer::OutOfRange GfxRenderer::outOfRange{};
+#endif
+
 namespace {
 
 /**
@@ -425,6 +429,30 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     }
 
     if (is2Bit) {
+      // Plane membership per glyph gray level, chosen by the configured AA
+      // strength. planeMask bit N set = glyph level N flags the current plane
+      // (glyph levels after the swap below: 1 = dark gray, 2 = light gray; the
+      // BW base pass has already painted every non-white pixel black, so an
+      // unflagged level simply stays black).
+      //   STANDARD: MSB {1,2}, LSB {1}  -> dark stays dark, light stays light
+      //   CRISP:    MSB {2},   LSB {}   -> dark hardens to black, light kept
+      //   DARK:     MSB {2},   LSB {2}  -> dark to black, light to dark
+      uint8_t planeMask = 0;
+      if (renderMode == GfxRenderer::GRAYSCALE_MSB || renderMode == GfxRenderer::GRAYSCALE_LSB) {
+        const bool msb = renderMode == GfxRenderer::GRAYSCALE_MSB;
+        switch (renderer.getGrayscaleAaStrength()) {
+          case GfxRenderer::AA_CRISP:
+            planeMask = msb ? 0b0100 : 0b0000;
+            break;
+          case GfxRenderer::AA_DARK:
+            planeMask = 0b0100;
+            break;
+          case GfxRenderer::AA_STANDARD:
+          default:
+            planeMask = msb ? 0b0110 : 0b0010;
+            break;
+        }
+      }
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
         const int outerCoord = outerBase + glyphY;
@@ -448,13 +476,11 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
           if (renderMode == GfxRenderer::BW && bmpVal < 3) {
             // Black (also paints over the grays in BW mode)
             renderer.drawPixel(screenX, screenY, pixelState);
-          } else if (renderMode == GfxRenderer::GRAYSCALE_MSB && (bmpVal == 1 || bmpVal == 2)) {
-            // Light gray (also mark the MSB if it's going to be a dark gray too)
-            // Dedicated X3 gray LUTs now provide proper 4-level gray on both devices
-            // We have to flag pixels in reverse for the gray buffers, as 0 leave alone, 1 update
-            renderer.drawPixel(screenX, screenY, false);
-          } else if (renderMode == GfxRenderer::GRAYSCALE_LSB && bmpVal == 1) {
-            // Dark gray
+          } else if ((planeMask >> bmpVal) & 1) {
+            // Grayscale pass: flag this pixel in the active plane. Dedicated X3
+            // gray LUTs now provide proper 4-level gray on both devices. We
+            // have to flag pixels in reverse for the gray buffers, as 0 leave
+            // alone, 1 update.
             renderer.drawPixel(screenX, screenY, false);
           }
         }
@@ -496,6 +522,13 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
 
   // Bounds checking against runtime panel dimensions
   if (phyX < 0 || phyX >= panelWidth || phyY < 0 || phyY >= panelHeight) {
+#ifdef GFX_BOUNDS_COUNTER
+    outOfRange.count++;
+    outOfRange.lastX = x;
+    outOfRange.lastY = y;
+    outOfRange.lastPhyX = phyX;
+    outOfRange.lastPhyY = phyY;
+#endif
     LOG_ERR("GFX", "!! Outside range (%d, %d) -> (%d, %d)", x, y, phyX, phyY);
     return;
   }
