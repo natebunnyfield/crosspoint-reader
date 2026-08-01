@@ -1,0 +1,128 @@
+[0] [DBG] [UI] Using Lyra Six theme
+[261] [INF] [MAIN] Hardware detect: X4
+[SIM] storage root: ./fs_
+[268] [DBG] [CPS] Settings loaded from file
+[269] [DBG] [RBS] Recent books loaded from file (2 entries)
+[269] [DBG] [UI] Using Lyra Six theme
+[270] [DBG] [MAIN] Starting CrossPoint version dev-simulator
+[569] [DBG] [MAIN] Display initialized
+[570] [DBG] [SDREG] Found family: Venetian301 (4 files) in /.fonts
+[571] [DBG] [SDREG] Found family: GTAlpinaCond (4 files) in /.fonts
+[571] [DBG] [SDREG] Found family: TeXGyreSchola (4 files) in /.fonts
+[571] [DBG] [SDREG] Found family: Edgar (4 files) in /.fonts
+[571] [DBG] [SDREG] Found family: Junicode (4 files) in /fonts
+[572] [DBG] [SDREG] Found family: Almendra (4 files) in /fonts
+[572] [DBG] [SDREG] Found family: LibreCaslonText (4 files) in /fonts
+[572] [DBG] [SDREG] Found family: Rosarivo (4 files) in /fonts
+[572] [DBG] [SDREG] Found family: Coelacanth (4 files) in /fonts
+[572] [DBG] [SDREG] Found family: InknutAntiqua62 (4 files) in /fonts
+[573] [DBG] [SDREG] Found family: GoudyBookletter1911 (4 files) in /fonts
+[573] [DBG] [SDREG] Found family: CaledoniaCC (4 files) in /fonts
+[573] [DBG] [SDREG] Found family: Newsreader (4 files) in /fonts
+[573] [DBG] [SDREG] Found family: Lora (4 files) in /fonts
+[574] [DBG] [SDREG] Found family: SourceSerif4 (4 files) in /fonts
+[574] [DBG] [SDREG] Discovery complete: 15 families
+[574] [DBG] [SDCF] Loaded: /.fonts/Edgar/Edgar_14.cpfont (v4, 4 styles)
+[574] [DBG] [SDCF]   style[0]: 79 intervals, 637 glyphs, advY=36, asc=28, desc=-9, kernL=539, kernR=534, ligs=13
+[574] [DBG] [SDCF]   style[1]: 79 intervals, 637 glyphs, advY=36, asc=28, desc=-9, kernL=537, kernR=535, ligs=13
+[574] [DBG] [SDCF]   style[2]: 79 intervals, 638 glyphs, advY=36, asc=28, desc=-9, kernL=540, kernR=538, ligs=14
+[574] [DBG] [SDCF]   style[3]: 79 intervals, 638 glyphs, advY=36, asc=28, desc=-9, kernL=541, kernR=537, ligs=14
+[575] [DBG] [SDMGR] Loaded /.fonts/Edgar/Edgar_14.cpfont size=14 id=-2050208382 styles=4
+[575] [DBG] [SDFS] Edgar has no CJK coverage - skipping UI fallback sizes
+[575] [DBG] [SDFS] Loaded SD card font family: Edgar
+[575] [DBG] [SDFS] SD font system ready (15 families discovered)
+[575] [DBG] [MAIN] Fonts setup
+[575] [DBG] [ACT] Entering activity: Boot
+[576] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[619] [DBG] [ACT] Exiting activity: Boot
+[620] [DBG] [ACT] Entering activity: Home
+[620] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[620] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[621] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[621] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[624] [DBG] [SDCF] Loaded: /.fonts/GTAlpinaCond/GTAlpinaCond_12.cpfont (v4, 4 styles)
+[624] [DBG] [SDCF]   style[0]: 105 intervals, 736 glyphs, advY=29, asc=23, desc=-8, kernL=339, kernR=371, ligs=2
+[624] [DBG] [SDCF]   style[1]: 105 intervals, 736 glyphs, advY=29, asc=23, desc=-8, kernL=340, kernR=369, ligs=2
+[624] [DBG] [SDCF]   style[2]: 106 intervals, 734 glyphs, advY=29, asc=23, desc=-8, kernL=347, kernR=358, ligs=2
+[624] [DBG] [SDCF]   style[3]: 106 intervals, 734 glyphs, advY=29, asc=23, desc=-8, kernL=346, kernR=356, ligs=2
+[624] [DBG] [SDMGR] Loaded /.fonts/GTAlpinaCond/GTAlpinaCond_12.cpfont size=12 id=350459445 styles=4
+[624] [DBG] [SDFS] Loaded GTAlpinaCond for display use (12pt)
+[624] [DBG] [SDCF] Kern classes + lig loaded: kernL=339, kernR=371, ligs=2
+[624] [DBG] [SDCF] Built mini kern: 14×15 matrix (210 bytes, full was 79×84 = 6636 bytes)
+[624] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[625] [DBG] [GFX] Time = 5 ms from clearScreen to displayBuffer
+[640] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[640] [DBG] [GFX] Time = 0 ms from clearScreen to displayBuffer
+[3003] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[3004] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[3205] [DBG] [GFX] Time = 3 ms from clearScreen to displayBuffer
+[3403] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[3602] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[3804] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[6288] [DBG] [ACT] Exiting activity: Home
+[6289] [DBG] [ACT] Entering activity: Settings
+[SIM] open failed: ./fs_/dictionaries (flags=0x0 errno=2 No such file or directory)
+[6289] [DBG] [DREG] No /dictionaries directory on SD card
+[SIM] open failed: ./fs_/.dictionaries (flags=0x0 errno=2 No such file or directory)
+[6289] [DBG] [DREG] No /.dictionaries directory on SD card
+[6294] [DBG] [GFX] Time = 4 ms from clearScreen to displayBuffer
+[SIM] Saved screenshot: ./qa_x4b/10_settings.bmp
+[7092] [DBG] [GFX] Time = 5 ms from clearScreen to displayBuffer
+[7613] [DBG] [ACT] Pushed to activity stack, new size = 1
+[7613] [DBG] [ACT] Entering activity: FontSelect
+[7617] [DBG] [FDC] Prewarm: 64 glyphs in 4243 bytes from 4 groups (0 missed)
+[7619] [DBG] [FDC] Prewarm: 64 glyphs in 4780 bytes from 4 groups (0 missed)
+[7622] [DBG] [FDC] Prewarm: 64 glyphs in 5187 bytes from 4 groups (0 missed)
+[7625] [DBG] [FDC] Prewarm: 64 glyphs in 5687 bytes from 4 groups (0 missed)
+[7633] [DBG] [GFX] Time = 20 ms from clearScreen to displayBuffer
+[7636] [DBG] [GFX] Stored BW buffer in 6 chunks (8000 bytes each)
+[7648] [DBG] [GFX] Restored and freed BW buffer chunks
+[SIM] Saved screenshot: ./qa_x4b/11_textsettings.bmp
+[9088] [DBG] [SDCF] Loaded: /.fonts/Edgar/Edgar_16.cpfont (v4, 4 styles)
+[9088] [DBG] [SDCF]   style[0]: 79 intervals, 637 glyphs, advY=41, asc=32, desc=-10, kernL=539, kernR=534, ligs=13
+[9088] [DBG] [SDCF]   style[1]: 79 intervals, 637 glyphs, advY=41, asc=32, desc=-10, kernL=537, kernR=535, ligs=13
+[9088] [DBG] [SDCF]   style[2]: 79 intervals, 638 glyphs, advY=41, asc=32, desc=-10, kernL=540, kernR=538, ligs=14
+[9088] [DBG] [SDCF]   style[3]: 79 intervals, 638 glyphs, advY=41, asc=32, desc=-10, kernL=541, kernR=537, ligs=14
+[9088] [DBG] [SDMGR] Loaded /.fonts/Edgar/Edgar_16.cpfont size=16 id=-292341037 styles=4
+[9088] [DBG] [SDFS] Edgar has no CJK coverage - skipping UI fallback sizes
+[9088] [DBG] [SDFS] Loaded SD font family: Edgar
+[9089] [DBG] [SDCF] Kern classes + lig loaded: kernL=539, kernR=534, ligs=13
+[9089] [DBG] [SDCF] Kern classes + lig loaded: kernL=537, kernR=535, ligs=13
+[9090] [DBG] [SDCF] Kern classes + lig loaded: kernL=540, kernR=538, ligs=14
+[9090] [DBG] [SDCF] Kern classes + lig loaded: kernL=541, kernR=537, ligs=14
+[9091] [DBG] [SDCF] Built mini kern: 45×38 matrix (1710 bytes, full was 111×86 = 9546 bytes)
+[9092] [DBG] [SDCF] Built mini kern: 43×39 matrix (1677 bytes, full was 107×89 = 9523 bytes)
+[9093] [DBG] [SDCF] Built mini kern: 40×38 matrix (1520 bytes, full was 101×79 = 7979 bytes)
+[9094] [DBG] [SDCF] Built mini kern: 43×38 matrix (1634 bytes, full was 103×79 = 8137 bytes)
+[9094] [DBG] [FCM] prewarmCache(SD): 8 glyph(s) not found (styleMask=0x0F)
+[9101] [DBG] [GFX] Time = 13 ms from clearScreen to displayBuffer
+[9103] [DBG] [GFX] Stored BW buffer in 6 chunks (8000 bytes each)
+[9110] [DBG] [GFX] Restored and freed BW buffer chunks
+[9601] [DBG] [FCM] prewarmCache(SD): 8 glyph(s) not found (styleMask=0x0F)
+[9615] [DBG] [GFX] Time = 15 ms from clearScreen to displayBuffer
+[9618] [DBG] [GFX] Stored BW buffer in 6 chunks (8000 bytes each)
+[9630] [DBG] [GFX] Restored and freed BW buffer chunks
+[10003] [INF] [MEM] Free: 1048576 bytes, Total: 1048576 bytes, Min Free: 1048576 bytes, MaxAlloc: 1048576 bytes
+[SIM] Saved screenshot: ./qa_x4b/12_after_enter.bmp
+[12089] [DBG] [SDFS] Reloading Edgar: size 16 -> 18
+[12092] [DBG] [SDCF] Loaded: /.fonts/Edgar/Edgar_18.cpfont (v4, 4 styles)
+[12092] [DBG] [SDCF]   style[0]: 79 intervals, 637 glyphs, advY=46, asc=36, desc=-11, kernL=539, kernR=534, ligs=13
+[12092] [DBG] [SDCF]   style[1]: 79 intervals, 637 glyphs, advY=46, asc=36, desc=-11, kernL=537, kernR=535, ligs=13
+[12092] [DBG] [SDCF]   style[2]: 79 intervals, 638 glyphs, advY=46, asc=36, desc=-11, kernL=540, kernR=538, ligs=14
+[12092] [DBG] [SDCF]   style[3]: 79 intervals, 638 glyphs, advY=46, asc=36, desc=-11, kernL=541, kernR=537, ligs=14
+[12092] [DBG] [SDMGR] Loaded /.fonts/Edgar/Edgar_18.cpfont size=18 id=2112974484 styles=4
+[12092] [DBG] [SDFS] Edgar has no CJK coverage - skipping UI fallback sizes
+[12092] [DBG] [SDFS] Loaded SD font family: Edgar
+[12093] [DBG] [SDCF] Kern classes + lig loaded: kernL=539, kernR=534, ligs=13
+[12094] [DBG] [SDCF] Kern classes + lig loaded: kernL=537, kernR=535, ligs=13
+[12094] [DBG] [SDCF] Kern classes + lig loaded: kernL=540, kernR=538, ligs=14
+[12094] [DBG] [SDCF] Kern classes + lig loaded: kernL=541, kernR=537, ligs=14
+[12095] [DBG] [SDCF] Built mini kern: 45×38 matrix (1710 bytes, full was 111×86 = 9546 bytes)
+[12097] [DBG] [SDCF] Built mini kern: 43×39 matrix (1677 bytes, full was 107×89 = 9523 bytes)
+[12097] [DBG] [SDCF] Built mini kern: 40×38 matrix (1520 bytes, full was 101×79 = 7979 bytes)
+[12100] [DBG] [SDCF] Built mini kern: 43×38 matrix (1634 bytes, full was 103×79 = 8137 bytes)
+[12100] [DBG] [FCM] prewarmCache(SD): 8 glyph(s) not found (styleMask=0x0F)
+[12108] [DBG] [GFX] Time = 15 ms from clearScreen to displayBuffer
+[12111] [DBG] [GFX] Stored BW buffer in 6 chunks (8000 bytes each)
+[12124] [DBG] [GFX] Restored and freed BW buffer chunks
+[SIM] Saved screenshot: ./qa_x4b/13_scrolled.bmp

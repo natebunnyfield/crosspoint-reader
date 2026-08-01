@@ -1,0 +1,98 @@
+[0] [DBG] [UI] Using Lyra Six theme
+[255] [INF] [MAIN] Hardware detect: X4
+[SIM] storage root: ./fs_
+[258] [DBG] [CPS] Settings loaded from file
+[259] [DBG] [RBS] Recent books loaded from file (2 entries)
+[259] [DBG] [UI] Using Lyra Six theme
+[259] [DBG] [MAIN] Starting CrossPoint version dev-simulator
+[804] [DBG] [MAIN] Display initialized
+[805] [DBG] [SDREG] Found family: Venetian301 (4 files) in /.fonts
+[805] [DBG] [SDREG] Found family: GTAlpinaCond (4 files) in /.fonts
+[805] [DBG] [SDREG] Found family: TeXGyreSchola (4 files) in /.fonts
+[806] [DBG] [SDREG] Found family: Edgar (4 files) in /.fonts
+[806] [DBG] [SDREG] Found family: Junicode (4 files) in /fonts
+[806] [DBG] [SDREG] Found family: Almendra (4 files) in /fonts
+[807] [DBG] [SDREG] Found family: LibreCaslonText (4 files) in /fonts
+[807] [DBG] [SDREG] Found family: Rosarivo (4 files) in /fonts
+[807] [DBG] [SDREG] Found family: Coelacanth (4 files) in /fonts
+[807] [DBG] [SDREG] Found family: InknutAntiqua62 (4 files) in /fonts
+[808] [DBG] [SDREG] Found family: GoudyBookletter1911 (4 files) in /fonts
+[808] [DBG] [SDREG] Found family: CaledoniaCC (4 files) in /fonts
+[808] [DBG] [SDREG] Found family: Newsreader (4 files) in /fonts
+[808] [DBG] [SDREG] Found family: Lora (4 files) in /fonts
+[808] [DBG] [SDREG] Found family: SourceSerif4 (4 files) in /fonts
+[808] [DBG] [SDREG] Discovery complete: 15 families
+[809] [DBG] [SDCF] Loaded: /.fonts/Edgar/Edgar_14.cpfont (v4, 4 styles)
+[809] [DBG] [SDCF]   style[0]: 79 intervals, 637 glyphs, advY=36, asc=28, desc=-9, kernL=539, kernR=534, ligs=13
+[809] [DBG] [SDCF]   style[1]: 79 intervals, 637 glyphs, advY=36, asc=28, desc=-9, kernL=537, kernR=535, ligs=13
+[809] [DBG] [SDCF]   style[2]: 79 intervals, 638 glyphs, advY=36, asc=28, desc=-9, kernL=540, kernR=538, ligs=14
+[809] [DBG] [SDCF]   style[3]: 79 intervals, 638 glyphs, advY=36, asc=28, desc=-9, kernL=541, kernR=537, ligs=14
+[809] [DBG] [SDMGR] Loaded /.fonts/Edgar/Edgar_14.cpfont size=14 id=-2050208382 styles=4
+[809] [DBG] [SDFS] Edgar has no CJK coverage - skipping UI fallback sizes
+[809] [DBG] [SDFS] Loaded SD card font family: Edgar
+[809] [DBG] [SDFS] SD font system ready (15 families discovered)
+[809] [DBG] [MAIN] Fonts setup
+[809] [DBG] [ACT] Entering activity: Boot
+[810] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[914] [DBG] [ACT] Exiting activity: Boot
+[914] [DBG] [ACT] Entering activity: Home
+[SIM] open failed: ./fs_/.crosspoint/epub_8312161409984123044/thumb_226.bmp (flags=0x0 errno=2 No such file or directory)
+[915] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[915] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[916] [DBG] [SDCF] Loaded: /.fonts/GTAlpinaCond/GTAlpinaCond_12.cpfont (v4, 4 styles)
+[916] [DBG] [SDCF]   style[0]: 105 intervals, 736 glyphs, advY=29, asc=23, desc=-8, kernL=339, kernR=371, ligs=2
+[916] [DBG] [SDCF]   style[1]: 105 intervals, 736 glyphs, advY=29, asc=23, desc=-8, kernL=340, kernR=369, ligs=2
+[916] [DBG] [SDCF]   style[2]: 106 intervals, 734 glyphs, advY=29, asc=23, desc=-8, kernL=347, kernR=358, ligs=2
+[916] [DBG] [SDCF]   style[3]: 106 intervals, 734 glyphs, advY=29, asc=23, desc=-8, kernL=346, kernR=356, ligs=2
+[916] [DBG] [SDMGR] Loaded /.fonts/GTAlpinaCond/GTAlpinaCond_12.cpfont size=12 id=350459445 styles=4
+[916] [DBG] [SDFS] Loaded GTAlpinaCond for display use (12pt)
+[917] [DBG] [SDCF] Kern classes + lig loaded: kernL=339, kernR=371, ligs=2
+[917] [DBG] [SDCF] Built mini kern: 14×15 matrix (210 bytes, full was 79×84 = 6636 bytes)
+[917] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[917] [DBG] [GFX] Time = 3 ms from clearScreen to displayBuffer
+[932] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[932] [DBG] [GFX] Time = 0 ms from clearScreen to displayBuffer
+[935] [DBG] [EBP] Loading ePub: /books/Celtic Fairy Tales - Joseph Jacobs.epub
+[935] [DBG] [BMC] Loaded cache data: 5 spine, 60 TOC entries
+[935] [DBG] [EBP] Loaded ePub: /books/Celtic Fairy Tales - Joseph Jacobs.epub
+[935] [DBG] [GFX] Time = 3 ms from clearScreen to displayBuffer
+[937] [DBG] [GFX] Time = 5 ms from clearScreen to displayBuffer
+[940] [DBG] [EBP] Generating thumb BMP from PNG cover image
+[940] [DBG] [ZIP] Decompressed 20379 bytes into 25330 bytes
+[941] [DBG] [PNG] Converting PNG to 1-bit BMP (target: 135x226)
+[941] [DBG] [PNG] Image: 1024x1536, depth=8, color=2, interlace=0
+[941] [DBG] [PNG] Scaling 1024x1536 -> 150x226 (target 135x226)
+[977] [DBG] [PNG] Successfully converted PNG to BMP
+[977] [DBG] [EBP] Generated thumb BMP from PNG cover image, success: yes
+[987] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[987] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[988] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[988] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[989] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[989] [DBG] [GFX] Time = 2 ms from clearScreen to displayBuffer
+[SIM] Saved screenshot: ./qa_x4/00_home.bmp
+[3004] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[3005] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[3202] [DBG] [GFX] Time = 2 ms from clearScreen to displayBuffer
+[3412] [DBG] [GFX] Time = 2 ms from clearScreen to displayBuffer
+[3609] [DBG] [GFX] Time = 2 ms from clearScreen to displayBuffer
+[3805] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[6281] [DBG] [ACT] Exiting activity: Home
+[6281] [DBG] [ACT] Entering activity: Settings
+[SIM] open failed: ./fs_/dictionaries (flags=0x0 errno=2 No such file or directory)
+[6281] [DBG] [DREG] No /dictionaries directory on SD card
+[SIM] open failed: ./fs_/.dictionaries (flags=0x0 errno=2 No such file or directory)
+[6281] [DBG] [DREG] No /.dictionaries directory on SD card
+[6285] [DBG] [GFX] Time = 3 ms from clearScreen to displayBuffer
+[SIM] Saved screenshot: ./qa_x4/01_tab1.bmp
+[7511] [DBG] [GFX] Time = 3 ms from clearScreen to displayBuffer
+[SIM] Saved screenshot: ./qa_x4/02_tab2.bmp
+[8710] [DBG] [GFX] Time = 2 ms from clearScreen to displayBuffer
+[SIM] Saved screenshot: ./qa_x4/03_tab3.bmp
+[9913] [DBG] [GFX] Time = 4 ms from clearScreen to displayBuffer
+[10007] [INF] [MEM] Free: 1048576 bytes, Total: 1048576 bytes, Min Free: 1048576 bytes, MaxAlloc: 1048576 bytes
+[SIM] Saved screenshot: ./qa_x4/04_tab4.bmp
+[11103] [DBG] [GFX] Time = 2 ms from clearScreen to displayBuffer
+[SIM] Saved screenshot: ./qa_x4/05_tab5.bmp
+[12308] [DBG] [GFX] Time = 4 ms from clearScreen to displayBuffer
+[SIM] Saved screenshot: ./qa_x4/06_tab6.bmp

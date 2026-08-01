@@ -1,0 +1,66 @@
+[0] [DBG] [UI] Using Lyra Six theme
+[262] [INF] [MAIN] Hardware detect: X4
+[SIM] storage root: ./fs_
+[265] [DBG] [CPS] Settings loaded from file
+[266] [DBG] [RBS] Recent books loaded from file (2 entries)
+[266] [DBG] [UI] Using Lyra Six theme
+[266] [DBG] [MAIN] Starting CrossPoint version dev-simulator
+[1170] [DBG] [MAIN] Display initialized
+[1171] [DBG] [SDREG] Found family: Venetian301 (4 files) in /.fonts
+[1171] [DBG] [SDREG] Found family: GTAlpinaCond (4 files) in /.fonts
+[1172] [DBG] [SDREG] Found family: TeXGyreSchola (4 files) in /.fonts
+[1172] [DBG] [SDREG] Found family: Edgar (4 files) in /.fonts
+[1172] [DBG] [SDREG] Found family: Junicode (4 files) in /fonts
+[1172] [DBG] [SDREG] Found family: Almendra (4 files) in /fonts
+[1173] [DBG] [SDREG] Found family: LibreCaslonText (4 files) in /fonts
+[1173] [DBG] [SDREG] Found family: Rosarivo (4 files) in /fonts
+[1173] [DBG] [SDREG] Found family: Coelacanth (4 files) in /fonts
+[1173] [DBG] [SDREG] Found family: InknutAntiqua62 (4 files) in /fonts
+[1174] [DBG] [SDREG] Found family: GoudyBookletter1911 (4 files) in /fonts
+[1174] [DBG] [SDREG] Found family: CaledoniaCC (4 files) in /fonts
+[1174] [DBG] [SDREG] Found family: Newsreader (4 files) in /fonts
+[1174] [DBG] [SDREG] Found family: Lora (4 files) in /fonts
+[1174] [DBG] [SDREG] Found family: SourceSerif4 (4 files) in /fonts
+[1174] [DBG] [SDREG] Discovery complete: 15 families
+[1176] [DBG] [SDCF] Loaded: /.fonts/Edgar/Edgar_14.cpfont (v4, 4 styles)
+[1176] [DBG] [SDCF]   style[0]: 79 intervals, 637 glyphs, advY=36, asc=28, desc=-9, kernL=539, kernR=534, ligs=13
+[1176] [DBG] [SDCF]   style[1]: 79 intervals, 637 glyphs, advY=36, asc=28, desc=-9, kernL=537, kernR=535, ligs=13
+[1176] [DBG] [SDCF]   style[2]: 79 intervals, 638 glyphs, advY=36, asc=28, desc=-9, kernL=540, kernR=538, ligs=14
+[1176] [DBG] [SDCF]   style[3]: 79 intervals, 638 glyphs, advY=36, asc=28, desc=-9, kernL=541, kernR=537, ligs=14
+[1176] [DBG] [SDMGR] Loaded /.fonts/Edgar/Edgar_14.cpfont size=14 id=-2050208382 styles=4
+[1176] [DBG] [SDFS] Edgar has no CJK coverage - skipping UI fallback sizes
+[1176] [DBG] [SDFS] Loaded SD card font family: Edgar
+[1176] [DBG] [SDFS] SD font system ready (15 families discovered)
+[1176] [DBG] [MAIN] Fonts setup
+[1177] [DBG] [GFX] Time = 1177 ms from clearScreen to displayBuffer
+[1179] [DBG] [ACT] Entering activity: Home
+[1376] [DBG] [LOOP] New max loop duration: 133 ms (activity: 1 ms)
+[1376] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[1376] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[1377] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[1377] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[1380] [DBG] [SDCF] Loaded: /.fonts/GTAlpinaCond/GTAlpinaCond_12.cpfont (v4, 4 styles)
+[1380] [DBG] [SDCF]   style[0]: 105 intervals, 736 glyphs, advY=29, asc=23, desc=-8, kernL=339, kernR=371, ligs=2
+[1380] [DBG] [SDCF]   style[1]: 105 intervals, 736 glyphs, advY=29, asc=23, desc=-8, kernL=340, kernR=369, ligs=2
+[1380] [DBG] [SDCF]   style[2]: 106 intervals, 734 glyphs, advY=29, asc=23, desc=-8, kernL=347, kernR=358, ligs=2
+[1380] [DBG] [SDCF]   style[3]: 106 intervals, 734 glyphs, advY=29, asc=23, desc=-8, kernL=346, kernR=356, ligs=2
+[1380] [DBG] [SDMGR] Loaded /.fonts/GTAlpinaCond/GTAlpinaCond_12.cpfont size=12 id=350459445 styles=4
+[1380] [DBG] [SDFS] Loaded GTAlpinaCond for display use (12pt)
+[1380] [DBG] [SDCF] Kern classes + lig loaded: kernL=339, kernR=371, ligs=2
+[1381] [DBG] [SDCF] Built mini kern: 14×15 matrix (210 bytes, full was 79×84 = 6636 bytes)
+[1381] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[1382] [DBG] [GFX] Time = 6 ms from clearScreen to displayBuffer
+[1394] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[1394] [DBG] [GFX] Time = 0 ms from clearScreen to displayBuffer
+[10014] [INF] [MEM] Free: 1048576 bytes, Total: 1048576 bytes, Min Free: 1048576 bytes, MaxAlloc: 1048576 bytes
+[20038] [INF] [MEM] Free: 1048576 bytes, Total: 1048576 bytes, Min Free: 1048576 bytes, MaxAlloc: 1048576 bytes
+[30062] [INF] [MEM] Free: 1048576 bytes, Total: 1048576 bytes, Min Free: 1048576 bytes, MaxAlloc: 1048576 bytes
+[40079] [INF] [MEM] Free: 1048576 bytes, Total: 1048576 bytes, Min Free: 1048576 bytes, MaxAlloc: 1048576 bytes
+[50089] [INF] [MEM] Free: 1048576 bytes, Total: 1048576 bytes, Min Free: 1048576 bytes, MaxAlloc: 1048576 bytes
+[60102] [INF] [MEM] Free: 1048576 bytes, Total: 1048576 bytes, Min Free: 1048576 bytes, MaxAlloc: 1048576 bytes
+[61409] [DBG] [SLP] Auto-sleep triggered after 60000 ms of inactivity
+[61414] [DBG] [ACT] Exiting activity: Home
+[61414] [DBG] [ACT] Entering activity: Sleep
+[61414] [DBG] [GFX] Time = 60020 ms from clearScreen to displayBuffer
+[61427] [DBG] [MAIN] Entering deep sleep
+[SIM] Saved screenshot: ./qa_west/30_westside.bmp

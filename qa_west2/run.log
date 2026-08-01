@@ -1,0 +1,62 @@
+[0] [DBG] [UI] Using Lyra Six theme
+[263] [INF] [MAIN] Hardware detect: X4
+[SIM] storage root: ./fs_
+[271] [DBG] [CPS] Settings loaded from file
+[272] [DBG] [RBS] Recent books loaded from file (2 entries)
+[272] [DBG] [UI] Using Lyra Six theme
+[273] [DBG] [MAIN] Starting CrossPoint version dev-simulator
+[1402] [DBG] [MAIN] Display initialized
+[1404] [DBG] [SDREG] Found family: Venetian301 (4 files) in /.fonts
+[1404] [DBG] [SDREG] Found family: GTAlpinaCond (4 files) in /.fonts
+[1405] [DBG] [SDREG] Found family: TeXGyreSchola (4 files) in /.fonts
+[1405] [DBG] [SDREG] Found family: Edgar (4 files) in /.fonts
+[1406] [DBG] [SDREG] Found family: Junicode (4 files) in /fonts
+[1406] [DBG] [SDREG] Found family: Almendra (4 files) in /fonts
+[1407] [DBG] [SDREG] Found family: LibreCaslonText (4 files) in /fonts
+[1407] [DBG] [SDREG] Found family: Rosarivo (4 files) in /fonts
+[1407] [DBG] [SDREG] Found family: Coelacanth (4 files) in /fonts
+[1407] [DBG] [SDREG] Found family: InknutAntiqua62 (4 files) in /fonts
+[1408] [DBG] [SDREG] Found family: GoudyBookletter1911 (4 files) in /fonts
+[1408] [DBG] [SDREG] Found family: CaledoniaCC (4 files) in /fonts
+[1408] [DBG] [SDREG] Found family: Newsreader (4 files) in /fonts
+[1408] [DBG] [SDREG] Found family: Lora (4 files) in /fonts
+[1408] [DBG] [SDREG] Found family: SourceSerif4 (4 files) in /fonts
+[1408] [DBG] [SDREG] Discovery complete: 15 families
+[1410] [DBG] [SDCF] Loaded: /.fonts/Edgar/Edgar_14.cpfont (v4, 4 styles)
+[1410] [DBG] [SDCF]   style[0]: 79 intervals, 637 glyphs, advY=36, asc=28, desc=-9, kernL=539, kernR=534, ligs=13
+[1410] [DBG] [SDCF]   style[1]: 79 intervals, 637 glyphs, advY=36, asc=28, desc=-9, kernL=537, kernR=535, ligs=13
+[1410] [DBG] [SDCF]   style[2]: 79 intervals, 638 glyphs, advY=36, asc=28, desc=-9, kernL=540, kernR=538, ligs=14
+[1410] [DBG] [SDCF]   style[3]: 79 intervals, 638 glyphs, advY=36, asc=28, desc=-9, kernL=541, kernR=537, ligs=14
+[1410] [DBG] [SDMGR] Loaded /.fonts/Edgar/Edgar_14.cpfont size=14 id=-2050208382 styles=4
+[1410] [DBG] [SDFS] Edgar has no CJK coverage - skipping UI fallback sizes
+[1410] [DBG] [SDFS] Loaded SD card font family: Edgar
+[1410] [DBG] [SDFS] SD font system ready (15 families discovered)
+[1410] [DBG] [MAIN] Fonts setup
+[1412] [DBG] [GFX] Time = 1412 ms from clearScreen to displayBuffer
+[1415] [DBG] [ACT] Entering activity: Home
+[1555] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[1555] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[1557] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[1557] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[1560] [DBG] [SDCF] Loaded: /.fonts/GTAlpinaCond/GTAlpinaCond_12.cpfont (v4, 4 styles)
+[1560] [DBG] [SDCF]   style[0]: 105 intervals, 736 glyphs, advY=29, asc=23, desc=-8, kernL=339, kernR=371, ligs=2
+[1560] [DBG] [SDCF]   style[1]: 105 intervals, 736 glyphs, advY=29, asc=23, desc=-8, kernL=340, kernR=369, ligs=2
+[1560] [DBG] [SDCF]   style[2]: 106 intervals, 734 glyphs, advY=29, asc=23, desc=-8, kernL=347, kernR=358, ligs=2
+[1560] [DBG] [SDCF]   style[3]: 106 intervals, 734 glyphs, advY=29, asc=23, desc=-8, kernL=346, kernR=356, ligs=2
+[1560] [DBG] [SDMGR] Loaded /.fonts/GTAlpinaCond/GTAlpinaCond_12.cpfont size=12 id=350459445 styles=4
+[1560] [DBG] [SDFS] Loaded GTAlpinaCond for display use (12pt)
+[1561] [DBG] [SDCF] Kern classes + lig loaded: kernL=339, kernR=371, ligs=2
+[1562] [DBG] [SDCF] Built mini kern: 14×15 matrix (210 bytes, full was 79×84 = 6636 bytes)
+[1562] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[1564] [DBG] [GFX] Time = 10 ms from clearScreen to displayBuffer
+[1572] [DBG] [FCM] prewarmCache(SD): 1 glyph(s) not found (styleMask=0x01)
+[1573] [DBG] [GFX] Time = 1 ms from clearScreen to displayBuffer
+[1762] [DBG] [LOOP] New max loop duration: 154 ms (activity: 0 ms)
+[4016] [DBG] [ACT] Exiting activity: Home
+[4017] [DBG] [ACT] Entering activity: Sleep
+[4018] [DBG] [GFX] Time = 2446 ms from clearScreen to displayBuffer
+[4022] [INF] [SLP] CALENDAR: no RTC available, falling back to default sleep screen
+[4024] [DBG] [GFX] Time = 2 ms from clearScreen to displayBuffer
+[4028] [DBG] [MAIN] Entering deep sleep
+[SIM] Saved screenshot: ./qa_west2/31_westside.bmp
+[SIM] Saved screenshot: ./qa_west2/32_westside_late.bmp
