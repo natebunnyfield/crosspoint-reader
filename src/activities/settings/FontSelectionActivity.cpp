@@ -89,6 +89,17 @@ void FontSelectionActivity::onEnter() {
     for (int i = 0; i < static_cast<int>(families.size()); i++) {
       fonts_.push_back({families[i].name, false, static_cast<uint8_t>(CrossPointSettings::BUILTIN_FONT_COUNT + i)});
     }
+    // Reverse chronological by lineage: newest EARLIEST (creation) year first,
+    // per FontDisplayNames. Undated (unlisted/user-installed) families sort
+    // last; ties fall back to the display name so the order is stable run to
+    // run. settingIndex travels with each row, so reordering never changes
+    // which registry family a row selects.
+    std::sort(fonts_.begin(), fonts_.end(), [](const FontEntry& a, const FontEntry& b) {
+      const uint16_t ya = FontDisplayNames::earliestYear(a.name.c_str());
+      const uint16_t yb = FontDisplayNames::earliestYear(b.name.c_str());
+      if (ya != yb) return ya > yb;
+      return FontDisplayNames::displayName(a.name) < FontDisplayNames::displayName(b.name);
+    });
   }
 
   selectedIndex_ = findCurrentFontIndex(fonts_, registry_, SETTINGS.sdFontFamilyName, SETTINGS.fontFamily);
@@ -444,9 +455,9 @@ void FontSelectionActivity::render(RenderLock&&) {
       [this](int index) {
         return fonts_[index].isBuiltin ? fonts_[index].name : FontDisplayNames::displayName(fonts_[index].name);
       },
-      // Subtitle: "Designer · original / digital years" — the attribution that
-      // used to share the title line, now with room for the dates. Built-ins
-      // and unlisted families return "" and simply show no second line.
+      // Subtitle: "Designer · years · place" (creation; digital groups) — the
+      // attribution that used to share the title line. Built-ins and unlisted
+      // families return "" and simply show no second line.
       [this](int index) -> std::string {
         return fonts_[index].isBuiltin ? "" : FontDisplayNames::subtitle(fonts_[index].name);
       },
