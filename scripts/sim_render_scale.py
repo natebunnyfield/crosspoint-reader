@@ -23,9 +23,9 @@ redefine.
 
 Usage
 -----
-    pio run -e simulator_x3                                  # 2x (default)
-    CROSSPOINT_RENDER_SCALE=1 pio run -e simulator_x3        # 1x, device-exact
-    CROSSPOINT_RENDER_SCALE=1 pio run -e simulator_x3 -t run_simulator
+    pio run -e simulator_x3                                  # 1x, device-exact (default)
+    CROSSPOINT_RENDER_SCALE=2 pio run -e simulator_x3        # 2x supersampled
+    CROSSPOINT_RENDER_SCALE=2 pio run -e simulator_x3 -t run_simulator
 
 The env var is read at build time only; it does not need to be set when the
 resulting binary is run. Toggling it does not change platformio.ini, so the
@@ -46,11 +46,12 @@ Import("env")  # noqa: F821 -- injected by SCons
 
 MACRO = "CROSSPOINT_RENDER_SCALE"
 
-# The desktop/host panel has the pixel density to rasterise glyphs at 2x; the
-# e-ink panel does not. The simulator's HalDisplay.h defaults to 1 (mirror the
-# device) and consumers opt in, so the opt-in for this repo's simulator envs
-# lives here.
-DEFAULT_SCALE = 2
+# 1x mirrors the device: the simulator exists to show what the e-ink panel will
+# actually show, so a plain `pio run` must not flatter it. The host panel does
+# have the density to rasterise glyphs at 2x, which is useful for judging shape,
+# but that is a deliberate opt-in and never the default -- matching
+# HalDisplay.h's own #ifndef default.
+DEFAULT_SCALE = 1
 
 
 def find_explicit_flag(build_flags):
