@@ -295,9 +295,11 @@ void SettingsActivity::toggleCurrentSetting() {
   if (setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) {
     // Upstream's device UI never steps this value in place. The stored byte is
     // quarter-hours biased by 48, so a VALUE row would walk 0..104 one 15-minute
-    // notch at a time -- 96 presses to reach UTC+12. Confirm opens the dedicated
-    // three-field picker instead, which saves on exit (hence no result handler,
-    // matching StatusBarSettingsActivity.cpp:224 upstream).
+    // notch at a time -- 96 presses to reach UTC+12. Confirm opens the named
+    // time zone list instead, which saves the picked zone's offset itself
+    // (hence no result handler). The row still renders the stored byte through
+    // formatUtcOffset(), so any offset -- including ones no list entry uses --
+    // reads back correctly.
     startActivityForResult(std::make_unique<ClockOffsetActivity>(renderer, mappedInput), nullptr);
     return;
   }

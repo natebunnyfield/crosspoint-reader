@@ -7,45 +7,41 @@
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 
-struct Rect;
-
 // Render a biased quarter-hour offset as "UTC+5:45" / "UTC-12:00".
 // Upstream keeps this next to the menu row that displays it, in
 // StatusBarSettingsActivity.cpp; this fork has no status bar screen, so it lives
 // with the picker that owns the encoding and the two cannot drift apart.
 std::string formatUtcOffset(uint8_t biasedQ);
 
-// Dedicated UTC offset picker for the clock.
-// Three editable fields (sign, hours, minutes); Confirm cycles fields, Up/Down adjust the active one.
-// Supports the full IANA UTC offset range in 15 minute steps, including oddball zones like Nepal (+5:45).
+// Time zone picker for the clock. Presents a short flash-resident list of named
+// zones, each bound to a fixed UTC offset in the same biased quarter-hour
+// encoding SETTINGS.clockUtcOffsetQ has always used (48 = UTC+0). Confirm
+// stores the highlighted zone's offset; Back leaves the stored value untouched.
+//
+// A stored offset that matches no list entry (written by older firmware or the
+// web settings API, e.g. Nepal +5:45) is surfaced as an extra "Custom offset"
+// row rather than discarded — arbitrary offsets remain settable via the web
+// settings control, which edits the raw byte.
 class ClockOffsetActivity final : public Activity {
  public:
   explicit ClockOffsetActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : Activity("ClockOffset", renderer, mappedInput) {}
 
   void onEnter() override;
-  void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
 
  private:
   ButtonNavigator buttonNavigator;
 
-  enum Field { FIELD_SIGN = 0, FIELD_HOURS = 1, FIELD_MINUTES = 2, FIELD_COUNT };
-  Field activeField = FIELD_HOURS;
+  int selectedIndex = 0;
+  // TZ_COUNT named rows, plus one trailing "Custom offset" row when the stored
+  // byte matches no named zone. Fixed for the lifetime of the activity.
+  int itemCount = 0;
+  // Set when the stored offset matches no named zone; the raw byte it carries
+  // is what the custom row displays and preserves.
+  bool hasCustomRow = false;
+  uint8_t customOffsetQ = 48;
 
-  // Working copy of the offset, edited in-place. Saved back to SETTINGS on exit.
-  // 0 = positive offset, 1 = negative offset.
-  uint8_t sign = 0;
-  // Hours: 0..14 when positive, 0..12 when negative.
-  uint8_t hours = 0;
-  // Quarter-hour index 0..3 (0, 15, 30, 45).
-  uint8_t minutesQuarter = 0;
-
-  void loadFromSettings();
-  void saveToSettings() const;
-  void adjustActiveField(int delta);
-  void clampForSign();
-  bool fieldFromPoint(int x, int y, Field& field) const;
-  void getTouchControlRects(Rect& minusRect, Rect& plusRect) const;
+  void handleSelection();
 };

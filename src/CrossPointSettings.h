@@ -42,9 +42,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     SLEEP_SCREEN_COVER_FILTER_COUNT
   };
 
-
-
-
   // Front button layout options (legacy)
   // Default: Back, Confirm, Left, Right
   // Swapped: Left, Right, Back, Confirm
@@ -147,7 +144,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
 
-
   enum TOUCH_READER_CONTROLS { TOUCH_READER_OFF = 0, TOUCH_READER_ON = 1, TOUCH_READER_CONTROLS_COUNT };
 
   enum QUICK_RESUME_SLEEP_SCREEN {
@@ -184,7 +180,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Clock UTC offset in quarter-hour steps, biased by 48 so it fits in uint8_t.
   // Value 48 = UTC+0, 0 = UTC-12:00, 104 = UTC+14:00.
   // Quarter-hour granularity supports oddball zones like Nepal (+5:45) and Chatham (+12:45).
-  uint8_t clockUtcOffsetQ = 48;
+  // Fresh devices default to US Central daylight time (Chicago, UTC-5, biased 28).
+  // The firmware has no DST rules, so the user flips between the CDT and CST
+  // list entries seasonally; existing devices keep whatever byte they stored.
+  uint8_t clockUtcOffsetQ = 28;
   // Clock display format: 0 = 24-hour, 1 = 12-hour
   uint8_t clockFormat = 0;
   // Set once an NTP sync succeeds. Used to skip re-syncing on every WiFi connect.
