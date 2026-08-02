@@ -3,6 +3,16 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
+## S tier (fork ruling, 2026-08-02)
+
+The installed set on this fork is exactly four families — **Edgar, Coelacanth,
+Rosarivo, TeXGyreSchola** — on every surface: both device SD cards, the
+simulator's `fs_/fonts/`, and the iOS app's bundled seed set
+(`crosspoint-simulator/ios/seedfonts/`). The other eleven curated families
+remain fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
+`src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
+surface or reprovisioning a card, install these four and nothing else.
+
 ## Installing Fonts
 
 There are three ways to install fonts:

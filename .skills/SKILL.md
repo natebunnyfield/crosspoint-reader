@@ -255,6 +255,13 @@ recipe for every family in `src/FontDisplayNames.h`, so
 `Skipping (no buildable source in sd-fonts.yaml): ...`. If it does, a recipe
 regressed or a local source is missing.
 
+**S tier — the only INSTALLED families (fork ruling, 2026-08-02): Edgar,
+Coelacanth, Rosarivo, TeXGyreSchola.** Buildable is not installed: the other
+eleven stay as recipes only. Every surface carries exactly these four — device
+SD cards, `fs_/fonts/`, and the iOS seed bundle
+(`crosspoint-simulator/ios/seedfonts/`). Do not install additional families
+anywhere without a new ruling; see docs/sd-card-fonts.md "S tier".
+
 Four of them — Edgar, GTAlpinaCond, Venetian301, CaledoniaCC, all commercial or
 webfont cuts — build from `lib/EpdFont/local_fonts/` (gitignored). The **recipe**
 is committed, never the font files. Without those files the family skips with a
