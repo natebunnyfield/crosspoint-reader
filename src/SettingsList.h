@@ -247,10 +247,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // --- Controls ---
     v.push_back(SettingInfo::Enum(StrId::STR_SIDE_BTN_LAYOUT, &CrossPointSettings::sideButtonLayout,
                                   {StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV, StrId::STR_DISABLED},
-                                  "sideButtonLayout", StrId::STR_CAT_CONTROLS));
+                                  "sideButtonLayout"));
     v.push_back(SettingInfo::Enum(StrId::STR_TOUCH_READER_CONTROLS, &CrossPointSettings::touchReaderControls,
-                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "touchReaderControls",
-                                  StrId::STR_CAT_CONTROLS));
+                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "touchReaderControls"));
     // Third label = stored value 2 = FONT_SIZE_STEP. The order of this array IS
     // the persisted encoding, so append only — see LONG_PRESS_BUTTON_BEHAVIOR in
     // CrossPointSettings.h for why the retired ORIENTATION_CHANGE slot was reused
@@ -258,28 +257,21 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_LONG_PRESS_BEHAVIOR, &CrossPointSettings::longPressButtonBehavior,
                                   {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
                                    StrId::STR_LONG_PRESS_BEHAVIOR_FONT_SIZE},
-                                  "longPressButtonBehavior", StrId::STR_CAT_CONTROLS));
+                                  "longPressButtonBehavior"));
     v.push_back(SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
                                   {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH,
                                    StrId::STR_FOOTNOTES},
-                                  "shortPwrBtn", StrId::STR_CAT_CONTROLS));
+                                  "shortPwrBtn"));
     v.push_back(SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &CrossPointSettings::pwrBtnFootnoteBack,
-                                    "pwrBtnFootnoteBack", StrId::STR_CAT_CONTROLS));
+                                    "pwrBtnFootnoteBack"));
     v.push_back(SettingInfo::Toggle(StrId::STR_BACK_SHORT_TO_FILE_BROWSER, &CrossPointSettings::backShortToFileBrowser,
-                                    "backShortToFileBrowser", StrId::STR_CAT_CONTROLS));
+                                    "backShortToFileBrowser"));
 
     // --- System ---
     v.push_back(SettingInfo::Value(StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
                                    {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES,
                                     CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
                                    "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM));
-    v.push_back(SettingInfo::Toggle(StrId::STR_SHOW_HIDDEN_FILES, &CrossPointSettings::showHiddenFiles,
-                                    "showHiddenFiles", StrId::STR_CAT_SYSTEM));
-    v.push_back(SettingInfo::Toggle(StrId::STR_REMOVE_READ_FROM_RECENTS,
-                                    &CrossPointSettings::removeReadBooksFromRecents, "removeReadBooksFromRecents",
-                                    StrId::STR_CAT_SYSTEM));
-    v.push_back(SettingInfo::Toggle(StrId::STR_MOVE_FINISHED_TO_READ, &CrossPointSettings::moveFinishedToReadFolder,
-                                    "moveFinishedToReadFolder", StrId::STR_CAT_SYSTEM));
     // Simulator/iOS only, deliberately compiled out on device.
     //
     // On an X4/X3 this row would be a control that cannot do anything: e-ink
@@ -311,8 +303,32 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // calendar sleep screen shifts the RTC's UTC date by clockUtcOffsetQ
     // (SleepActivity.cpp) and WifiSelectionActivity drives the NTP re-sync.
     // Range 0..104 = quarter-hour steps from UTC-12:00 to UTC+14:00, biased by 48.
-    v.push_back(SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &CrossPointSettings::clockUtcOffsetQ, {0, 104, 1},
-                                   "clockUtcOffsetQ", StrId::STR_CAT_SYSTEM));
+    // Displayed as the offset it means, not the byte it is stored in. The value
+    // is quarter-hours biased by 48 (0 = UTC-12:00, 48 = UTC+00:00, 104 = UTC+14:00),
+    // which as a bare VALUE row rendered as an unlabelled 0..104 counter that told
+    // the owner nothing. Built here rather than translated: an offset is written
+    // the same way in every language CrossPoint ships.
+    {
+      std::vector<std::string> utcLabels;
+      utcLabels.reserve(105);
+      for (int q = 0; q <= 104; q++) {
+        const int minutes = (q - 48) * 15;
+        const char sign = minutes < 0 ? '-' : '+';
+        const int mag = minutes < 0 ? -minutes : minutes;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "UTC%c%02d:%02d", sign, mag / 60, mag % 60);
+        utcLabels.emplace_back(buf);
+      }
+      SettingInfo utc;
+      utc.nameId = StrId::STR_CLOCK_UTC_OFFSET;
+      utc.type = SettingType::ENUM;
+      // enumValues stays empty: the render path prefers enumStringValues when set.
+      utc.enumStringValues = std::move(utcLabels);
+      utc.valuePtr = &CrossPointSettings::clockUtcOffsetQ;
+      utc.key = "clockUtcOffsetQ";
+      utc.category = StrId::STR_CAT_SYSTEM;
+      v.push_back(std::move(utc));
+    }
     v.push_back(SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat,
                                   {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
                                   StrId::STR_CAT_SYSTEM));

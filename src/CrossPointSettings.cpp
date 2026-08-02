@@ -139,6 +139,14 @@ void CrossPointSettings::normalizeRetiredSettings() {
 
   // Status bar: every element hidden. Thickness is left alone — it only has an
   // effect while the progress bar is drawn, and it is not a visibility control.
+
+  // The Controls tab was withdrawn from the device Settings UI, so these two have
+  // no on-device control left and are pinned to the behaviour the owner wants
+  // rather than left wherever an older save happened to leave them. They stay
+  // live and web-settable: the reader reads shortPwrBtn every frame and
+  // longPressButtonBehavior gates the font-size gesture.
+  shortPwrBtn = SHORT_PWRBTN::SLEEP;
+  longPressButtonBehavior = FONT_SIZE_STEP;
 }
 
 bool CrossPointSettings::fromJson(JsonVariantConst doc) {

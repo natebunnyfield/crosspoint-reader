@@ -25,12 +25,11 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
-const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_READER, StrId::STR_CAT_CONTROLS,
-                                                              StrId::STR_CAT_SYSTEM};
+// Controls was withdrawn: its settings are pinned on load and remain web-settable.
+const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_READER, StrId::STR_CAT_SYSTEM};
 
 void SettingsActivity::rebuildSettingsLists() {
   readerSettings.clear();
-  controlsSettings.clear();
   systemSettings.clear();
 
   // Pick up any fonts uploaded/deleted over the web server since the last
@@ -55,28 +54,15 @@ void SettingsActivity::rebuildSettingsLists() {
       // shared list for the web settings API.
       if (setting.inTextSettings) continue;
       readerSettings.push_back(setting);
-    } else if (setting.category == StrId::STR_CAT_CONTROLS) {
-      if (setting.valuePtr == &CrossPointSettings::pwrBtnFootnoteBack &&
-          SETTINGS.shortPwrBtn != CrossPointSettings::SHORT_PWRBTN::FOOTNOTES) {
-        continue;
-      }
-      controlsSettings.push_back(setting);
+
     } else if (setting.category == StrId::STR_CAT_SYSTEM) {
       systemSettings.push_back(setting);
     }
   }
 
   // Append device-only ACTION items
-  if (!BoardConfig::hasTouch()) {
-    controlsSettings.insert(controlsSettings.begin(),
-                            SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
-  }
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
-  // TODO: Touch devices need their own firmware update path/artifacts before OTA is exposed.
-  if (!BoardConfig::hasTouch()) {
-    systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
-  }
   systemSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
@@ -90,10 +76,9 @@ void SettingsActivity::rebuildSettingsLists() {
     case 0:
       currentSettings = &readerSettings;
       break;
+    // Index 1 is System: the Controls tab was withdrawn, so there is no
+    // index 2 any more (categoryCount == 2).
     case 1:
-      currentSettings = &controlsSettings;
-      break;
-    case 2:
       currentSettings = &systemSettings;
       break;
   }
@@ -133,10 +118,9 @@ void SettingsActivity::loop() {
       case 0:
         currentSettings = &readerSettings;
         break;
+      // Index 1 is System: the Controls tab was withdrawn, so there is no
+      // index 2 any more (categoryCount == 2).
       case 1:
-        currentSettings = &controlsSettings;
-        break;
-      case 2:
         currentSettings = &systemSettings;
         break;
     }

@@ -160,7 +160,6 @@ class SettingsActivity final : public Activity {
   // UI. Its entries stay in getSettingsList() because that list also drives
   // persistence (CrossPointSettings::fromJson/toJson) and the web settings API.
   std::vector<SettingInfo> readerSettings;
-  std::vector<SettingInfo> controlsSettings;
   std::vector<SettingInfo> systemSettings;
   const std::vector<SettingInfo>* currentSettings = nullptr;
 
@@ -169,7 +168,7 @@ class SettingsActivity final : public Activity {
 
   OptionPopup optionPopup;
 
-  static constexpr int categoryCount = 3;
+  static constexpr int categoryCount = 2;
   static const StrId categoryNames[categoryCount];
 
   void enterCategory(int categoryIndex);
