@@ -137,9 +137,9 @@ void EpubReaderActivity::onEnter() {
 
   HalFile f;
   if (Storage.openFileForRead("ERS", epub->getCachePath() + "/progress.bin", f)) {
-    uint8_t data[8];
-    int dataSize = f.read(data, 8);
-    if (dataSize == 4 || dataSize == 6 || dataSize == 8) {
+    uint8_t data[12];
+    int dataSize = f.read(data, 12);
+    if (dataSize == 4 || dataSize == 6 || dataSize == 8 || dataSize == 12) {
       currentSpineIndex = data[0] + (data[1] << 8);
       nextPageNumber = data[2] + (data[3] << 8);
       if (nextPageNumber == UINT16_MAX) {
@@ -152,13 +152,17 @@ void EpubReaderActivity::onEnter() {
       cachedSpineIndex = currentSpineIndex;
       LOG_DBG("ERS", "Loaded cache: %d, %d", currentSpineIndex, nextPageNumber);
     }
-    if (dataSize == 6 || dataSize == 8) {
+    if (dataSize >= 6) {
       cachedChapterTotalPageCount = data[4] + (data[5] << 8);
     }
-    if (dataSize == 8) {
+    if (dataSize >= 8) {
       // Re-arms the exact reposition across an activity teardown, which is what
       // the Text Settings font and size controls go through.
       pendingParagraphAnchor = static_cast<uint16_t>(data[6] + (data[7] << 8));
+    }
+    if (dataSize == 12) {
+      pendingWordAnchor = static_cast<uint32_t>(data[8]) | (static_cast<uint32_t>(data[9]) << 8) |
+                          (static_cast<uint32_t>(data[10]) << 16) | (static_cast<uint32_t>(data[11]) << 24);
     }
   }
   // We may want a better condition to detect if we are opening for the first time.
@@ -728,6 +732,10 @@ void EpubReaderActivity::stepReaderFontSize(const int delta) {
       // remap in applyDeferredReposition() stays as the fallback for chapters
       // whose LUT is degenerate (no <p> elements -> paragraph 0 on every page).
       pendingParagraphAnchor = section->getParagraphIndexForPage(static_cast<uint16_t>(section->currentPage));
+      pendingWordAnchor = section->getFirstWordAnchorForPage(static_cast<uint16_t>(section->currentPage));
+      LOG_DBG("ERS", "Capture: page %d para %d word %ld", section->currentPage,
+              pendingParagraphAnchor ? static_cast<int>(*pendingParagraphAnchor) : -1,
+              pendingWordAnchor ? static_cast<long>(*pendingWordAnchor) : -1L);
       nextPageNumber = section->currentPage;
     }
 
@@ -791,6 +799,10 @@ void EpubReaderActivity::stepReaderLineSpacing(const int delta) {
       // remap in applyDeferredReposition() stays as the fallback for chapters
       // whose LUT is degenerate (no <p> elements -> paragraph 0 on every page).
       pendingParagraphAnchor = section->getParagraphIndexForPage(static_cast<uint16_t>(section->currentPage));
+      pendingWordAnchor = section->getFirstWordAnchorForPage(static_cast<uint16_t>(section->currentPage));
+      LOG_DBG("ERS", "Capture: page %d para %d word %ld", section->currentPage,
+              pendingParagraphAnchor ? static_cast<int>(*pendingParagraphAnchor) : -1,
+              pendingWordAnchor ? static_cast<long>(*pendingWordAnchor) : -1L);
       nextPageNumber = section->currentPage;
     }
     section.reset();
@@ -839,6 +851,10 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
       // remap in applyDeferredReposition() stays as the fallback for chapters
       // whose LUT is degenerate (no <p> elements -> paragraph 0 on every page).
       pendingParagraphAnchor = section->getParagraphIndexForPage(static_cast<uint16_t>(section->currentPage));
+      pendingWordAnchor = section->getFirstWordAnchorForPage(static_cast<uint16_t>(section->currentPage));
+      LOG_DBG("ERS", "Capture: page %d para %d word %ld", section->currentPage,
+              pendingParagraphAnchor ? static_cast<int>(*pendingParagraphAnchor) : -1,
+              pendingWordAnchor ? static_cast<long>(*pendingWordAnchor) : -1L);
       nextPageNumber = section->currentPage;
     }
     section.reset();
@@ -1123,13 +1139,36 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       }
     }
 
-    // Resolve a pending paragraph anchor here, on the same footing as a named
-    // anchor, rather than waiting for applyDeferredReposition(). That runs only
-    // once the section has finished building, but the build-to-target loop above
+    // Resolve pending anchors here, on the same footing as a named anchor,
+    // rather than waiting for applyDeferredReposition(). That runs only once
+    // the section has finished building, but the build-to-target loop above
     // stops as soon as the target page exists, so on a font or size change the
     // reader would otherwise be shown — and would then PERSIST — the old page
     // index on the new pagination, losing the position for good.
-    if (pendingParagraphAnchor) {
+    //
+    // Word anchor first, and the paragraph anchor stays GATED while it is
+    // armed: in a chapter without <p> elements the paragraph LUT resolves
+    // every page to paragraph 0, so letting the paragraph path run first
+    // would "successfully" consume the reposition to page 0 — the exact
+    // rewind this anchor exists to fix. While the build has not yet laid out
+    // past the word anchor, getPageForWordAnchor refuses, the anchor stays
+    // armed, and the completion-time applyDeferredReposition() finishes the
+    // job (cachedChapterTotalPageCount is deliberately left non-zero).
+    if (pendingWordAnchor) {
+      if (const auto page = section->getPageForWordAnchor(*pendingWordAnchor)) {
+        LOG_DBG("ERS", "Reposition by word anchor %u: page %d -> %u", *pendingWordAnchor, section->currentPage, *page);
+        section->currentPage = static_cast<int>(*page);
+        pendingWordAnchor.reset();
+        pendingParagraphAnchor.reset();
+        cachedChapterTotalPageCount = 0;  // consumed: don't also apply the proportional remap
+      } else if (!section->isBuilding()) {
+        // Fully laid out and still unresolved (pre-v35 cache without a word
+        // LUT) — drop to the paragraph anchor below.
+        LOG_DBG("ERS", "Word anchor %u did not resolve; trying paragraph", *pendingWordAnchor);
+        pendingWordAnchor.reset();
+      }
+    }
+    if (!pendingWordAnchor && pendingParagraphAnchor) {
       if (const auto page = section->getPageForParagraphIndex(*pendingParagraphAnchor)) {
         LOG_DBG("ERS", "Reposition by paragraph %u: page %d -> %u", *pendingParagraphAnchor, section->currentPage,
                 *page);
@@ -1306,9 +1345,31 @@ bool EpubReaderActivity::applyDeferredReposition() {
     return false;
   }
   bool changed = false;
-  // Exact path first: the paragraph the owner was reading, resolved onto the new
-  // pagination. Only the proportional remap below needs a page COUNT, so this
-  // works even when the count is an estimate.
+  // Most exact path first: the source position of the first word the owner was
+  // looking at, resolved onto the new pagination via the word-anchor LUT. This
+  // is what keeps the place in chapters where the paragraph LUT is degenerate
+  // (poems: no <p> elements, so every page maps to paragraph 0 and the
+  // paragraph path "successfully" rewinds to page 0).
+  if (pendingWordAnchor && currentSpineIndex == cachedSpineIndex) {
+    if (const auto page = section->getPageForWordAnchor(*pendingWordAnchor)) {
+      LOG_DBG("ERS", "Reposition by word anchor %u: page %d -> %u", *pendingWordAnchor, section->currentPage, *page);
+      if (static_cast<int>(*page) != section->currentPage) {
+        section->currentPage = static_cast<int>(*page);
+        changed = true;
+      }
+      pendingWordAnchor.reset();
+      pendingParagraphAnchor.reset();
+      cachedChapterTotalPageCount = 0;  // consumed
+      return changed;
+    }
+    // No word LUT (pre-v35 file) or build not yet past the anchor while the
+    // callers only invoke this on a complete build — fall back to paragraph.
+    LOG_DBG("ERS", "Word anchor %u did not resolve; trying paragraph", *pendingWordAnchor);
+    pendingWordAnchor.reset();
+  }
+  // The paragraph the owner was reading, resolved onto the new pagination. Only
+  // the proportional remap below needs a page COUNT, so this works even when
+  // the count is an estimate.
   if (pendingParagraphAnchor && currentSpineIndex == cachedSpineIndex) {
     if (const auto page = section->getPageForParagraphIndex(*pendingParagraphAnchor)) {
       LOG_DBG("ERS", "Reposition by paragraph %u: page %d -> %u", *pendingParagraphAnchor, section->currentPage, *page);
@@ -1348,6 +1409,7 @@ bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
   // on the same text rather than the same page number. Unavailable mid-build or
   // for a chapter with no <p> elements, in which case this writes the 6-byte form.
   int paragraphIndex = -1;
+  int64_t wordAnchor = -1;
   if (section) {
     // Asked unconditionally, including mid-build: getParagraphIndexForPage()
     // consults the in-RAM build LUT first, and progress is routinely saved while
@@ -1355,8 +1417,11 @@ bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
     if (const auto p = section->getParagraphIndexForPage(static_cast<uint16_t>(currentPage))) {
       paragraphIndex = static_cast<int>(*p);
     }
+    if (const auto a = section->getFirstWordAnchorForPage(static_cast<uint16_t>(currentPage))) {
+      wordAnchor = static_cast<int64_t>(*a);
+    }
   }
-  return EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, paragraphIndex);
+  return EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, paragraphIndex, wordAnchor);
 }
 void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int orientedMarginTop,
                                         const int orientedMarginRight, const int orientedMarginBottom,

@@ -28,6 +28,15 @@ class ParsedText {
   std::vector<bool> wordContinues;      // true = word attaches to previous with no break
   std::vector<bool> wordNoSpaceBefore;  // true = may break before token, but no synthetic space when joined
   std::vector<bool> wordIsFocusSuffix;  // true = token is the regular tail of a focus bold-prefix split
+  // Block-relative source byte offset of each fragment's SOURCE WORD (all
+  // fragments of one addWord() call share one value; hyphenation remainders
+  // inherit the prefix's). Layout-invariant: depends only on the addWord()
+  // sequence, never on font metrics — which is what lets a page's start
+  // position survive a font or size reflow. uint16_t: a single block beyond
+  // 64 KB of text clamps and the anchor degrades to block-tail granularity.
+  std::vector<uint16_t> wordSourceStart;
+  uint32_t sourceBytesTotal_ = 0;     // bytes added over this block's lifetime (unclamped)
+  uint32_t lastLineSourceStart_ = 0;  // anchor of the line most recently handed to processLine
   std::deque<std::string> rubyTexts;
   BlockStyle blockStyle;
   bool extraParagraphSpacing;
@@ -82,6 +91,12 @@ class ParsedText {
   BlockStyle& getBlockStyle() { return blockStyle; }
   size_t size() const { return words.size(); }
   bool isEmpty() const { return words.empty(); }
+  // Total source bytes ever added to this block (unclamped). The parser sums
+  // these across blocks into a chapter-global anchor space.
+  uint32_t sourceByteCount() const { return sourceBytesTotal_; }
+  // Block-relative anchor of the line most recently emitted via processLine.
+  // Valid inside and after a layoutAndExtractLines() call.
+  uint32_t lastExtractedLineSourceStart() const { return lastLineSourceStart_; }
   void layoutAndExtractLines(const GfxRenderer& renderer, int fontId, uint16_t viewportWidth,
                              const std::function<void(std::shared_ptr<TextBlock>)>& processLine,
                              bool includeLastLine = true);

@@ -263,6 +263,23 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
   // result is cached in the section file) and is a cheap no-op for mark-free text.
   word = utf8ComposeNfc(word);
 
+  // Source-position anchor for this call. Every fragment the tokenizers below
+  // produce (CJK segments, focus splits, punctuation slices) belongs to this
+  // one source word, so they all carry the SAME offset — the padding resize at
+  // the end of this function stamps it without each push site needing to know.
+  // The offset is what survives a reflow: line breaking and hyphenation depend
+  // on the font, but the sequence of addWord() calls does not.
+  const uint16_t srcOff = static_cast<uint16_t>(std::min<uint32_t>(sourceBytesTotal_, 0xFFFFu));
+  sourceBytesTotal_ += static_cast<uint32_t>(word.size());
+  // Scope guard: on every return path, stamp srcOff onto whatever fragments
+  // this call appended, keeping wordSourceStart parallel to words.
+  struct AnchorPad {
+    std::deque<std::string>& words;
+    std::vector<uint16_t>& anchors;
+    uint16_t off;
+    ~AnchorPad() { anchors.resize(words.size(), off); }
+  } anchorPad{words, wordSourceStart, srcOff};
+
   EpdFontFamily::Style baseStyle = fontStyle;
   if (underline) {
     baseStyle = static_cast<EpdFontFamily::Style>(baseStyle | EpdFontFamily::UNDERLINE);
@@ -573,6 +590,7 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
     wordContinues.erase(wordContinues.begin(), wordContinues.begin() + consumed);
     wordNoSpaceBefore.erase(wordNoSpaceBefore.begin(), wordNoSpaceBefore.begin() + consumed);
     wordIsFocusSuffix.erase(wordIsFocusSuffix.begin(), wordIsFocusSuffix.begin() + consumed);
+    wordSourceStart.erase(wordSourceStart.begin(), wordSourceStart.begin() + consumed);
     if (!rubyTexts.empty()) {
       const size_t rtConsumed = std::min(consumed, rubyTexts.size());
       rubyTexts.erase(rubyTexts.begin(), rubyTexts.begin() + rtConsumed);
@@ -1012,6 +1030,9 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
   // Insert the remainder word (with matching style and continuation flag) directly after the prefix.
   words.insert(words.begin() + wordIndex + 1, remainder);
   wordStyles.insert(wordStyles.begin() + wordIndex + 1, style);
+  // The remainder is still the same source word: it inherits the prefix's
+  // anchor so a page that begins mid-word repositions to that word's start.
+  wordSourceStart.insert(wordSourceStart.begin() + wordIndex + 1, wordSourceStart[wordIndex]);
   // The hyphen remainder is not a focus suffix - it starts fresh on the next line.
   wordIsFocusSuffix.insert(wordIsFocusSuffix.begin() + wordIndex + 1, false);
   if (wordIndex + 1 <= rubyTexts.size()) {
@@ -1056,6 +1077,14 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
   const size_t lineBreak = lineBreakIndices[breakIndex];
   const size_t lastBreakAt = breakIndex > 0 ? lineBreakIndices[breakIndex - 1] : 0;
   const size_t lineWordCount = lineBreak - lastBreakAt;
+
+  // Source anchor of this line's first fragment, published BEFORE processLine
+  // so the page-break path inside it (ChapterHtmlSlimParser::addLineToPage)
+  // reads the position the new page will start at. Logical order, not visual:
+  // RTL reordering below shuffles display order only.
+  if (lastBreakAt < wordSourceStart.size()) {
+    lastLineSourceStart_ = wordSourceStart[lastBreakAt];
+  }
 
   const int firstLineIndent = resolveFirstLineIndent(breakIndex == 0, renderer, fontId);
 

@@ -96,6 +96,20 @@ Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
 current reader settings, the section is discarded and rebuilt.
 
+Version 35 appends a word-anchor LUT after the list-item LUT — one uint32 per
+page, no count prefix (the page count bounds it), located by a fifth offset
+slot appended to the header (so every earlier offset's distance from the
+header end shifts by 4). Entry `i` is the chapter-global source byte position
+where page `i+1` begins, sampled by the parser as page `i` completed; page 0
+starts at 0 by definition. Anchors are layout-invariant — they depend only on
+the source text, not on font, size, or spacing — which is what lets a reflow
+reposition to the page containing the exact word the reader was on. A partial
+file's watermark trailer now follows the word LUT.
+
+`progress.bin` gained a 12-byte form at the same time: the 8-byte form plus
+the current page's word anchor (uint32 LE). Length remains the discriminator;
+shorter files degrade to paragraph, then proportional, repositioning.
+
 Version 34 is binary-identical to version 33. The version was bumped because
 word-gap suppression was narrowed to tokens glued together in the source: v33
 dropped the gap between any two words meeting at a CJK break opportunity, which
