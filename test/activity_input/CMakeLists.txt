@@ -62,6 +62,7 @@ add_executable(ActivityInputTest
   ${REPO_ROOT}/src/MappedInputManager.cpp
   ${REPO_ROOT}/src/activities/Activity.cpp
   ${REPO_ROOT}/src/activities/settings/FontSelectionActivity.cpp
+  ${REPO_ROOT}/src/ReaderFontSizes.cpp
   ${REPO_ROOT}/src/activities/util/IntervalSelectionActivity.cpp
   ${REPO_ROOT}/src/util/ButtonNavigator.cpp
   # i18n (tr() is used by every activity above)
@@ -102,6 +103,7 @@ target_include_directories(ActivityInputTest PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CP_PREVIEW}
   ${REPO_ROOT}/src
+  ${REPO_ROOT}/freeink-sdk/libs/ui/FreeInkUI/include
   ${REPO_ROOT}/lib/GfxRenderer
   ${REPO_ROOT}/lib/EpdFont
   ${REPO_ROOT}/lib/I18n

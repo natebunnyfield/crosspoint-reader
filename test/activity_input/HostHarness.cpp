@@ -127,13 +127,14 @@ class HostPlaceholderActivity final : public Activity {
 //
 // Every field default lives in CrossPointSettings.h, so this gives the genuine
 // shipped defaults (frontButtonBack = FRONT_HW_BACK, sideButtonLayout =
-// PREV_NEXT, fontSize = MEDIUM, ...) which is exactly what MappedInputManager's
+// PREV_NEXT, fontSizeSlot = DEFAULT_FONT_SIZE_SLOT, ...) which is exactly what MappedInputManager's
 // logical-to-physical mapping is driven by. Only the two methods the linked TUs
 // reference are defined; the real CrossPointSettings.cpp is not linked because
 // it pulls in JsonSettingsIO/ArduinoJson and the settings file I/O.
 // ============================================================================
 
-CrossPointSettings CrossPointSettings::instance;
+// (The singleton itself lives in PersistableStore<T>::getInstance()'s
+// function-local static; no out-of-line member definition is needed.)
 
 int CrossPointSettings::getReaderFontId() const {
   // Only reachable from FontSelectionActivity::render(), which this suite never
@@ -162,6 +163,8 @@ int CrossPointSettings::getReaderFontId() const {
 UITheme UITheme::instance;
 
 UITheme::UITheme() : currentMetrics(&BaseMetrics::values) {}
+
+const ThemeMetrics& UITheme::getMetrics() const { return *currentMetrics; }
 
 // Copied from src/components/UITheme.cpp:52-70. Self-contained — metrics plus
 // the renderer — so this is the real computation, not an approximation.
@@ -353,7 +356,7 @@ void ActivityManager::goHome(HomeMenuItem) {
   replaceActivity(std::make_unique<HostPlaceholderActivity>("TestHome", renderer, mappedInput));
 }
 
-void ActivityManager::goToReader(std::string) {
+void ActivityManager::goToReader(std::string, bool) {
   am().counters.goToReader++;
   replaceActivity(std::make_unique<HostPlaceholderActivity>("TestReader", renderer, mappedInput));
 }
@@ -437,7 +440,13 @@ const std::string& currentActivityName() { return am().currentName; }
 
 const Counters& counters() { return am().counters; }
 
-void resetCounters() { am().counters = Counters{}; }
+// Clears fontCalls too: FontSelectionActivity::onEnter() preloads the SD font
+// (ensureLoaded) since the uniform-slots preview work, so tests that assert on
+// per-action call counts must be able to zero the ledger after activity entry.
+void resetCounters() {
+  am().counters = Counters{};
+  am().fontCalls = FontSystemCalls{};
+}
 
 const FontSystemCalls& fontSystemCalls() { return am().fontCalls; }
 
@@ -460,13 +469,13 @@ void reset() {
   SETTINGS.frontButtonConfirm = CrossPointSettings::FRONT_HW_CONFIRM;
   SETTINGS.frontButtonLeft = CrossPointSettings::FRONT_HW_LEFT;
   SETTINGS.frontButtonRight = CrossPointSettings::FRONT_HW_RIGHT;
-  SETTINGS.frontButtonFollowOrientation = 0;
   SETTINGS.sideButtonLayout = CrossPointSettings::PREV_NEXT;
-  SETTINGS.fontSize = CrossPointSettings::MEDIUM;
+  SETTINGS.fontSizeSlot = CrossPointSettings::DEFAULT_FONT_SIZE_SLOT;
   SETTINGS.fontFamily = CrossPointSettings::NOTOSERIF;
   SETTINGS.sdFontFamilyName[0] = '\0';
 
-  renderer().setOrientation(GfxRenderer::Portrait);
+  // Orientation is a compile-time constant now (GfxRenderer::orientation =
+  // Portrait); there is no setter.
 
   // ButtonNavigator holds the input manager in a static, set once in
   // src/main.cpp; without it every onRelease/onContinuous silently no-ops.
