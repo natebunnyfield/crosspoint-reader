@@ -18,6 +18,7 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "EpubReaderChapterSelectionActivity.h"
 #include "EpubReaderFootnotesActivity.h"
 #include "EpubReaderUtils.h"
 #include "MappedInputManager.h"
@@ -25,7 +26,6 @@
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
-#include "EpubReaderChapterSelectionActivity.h"
 #include "activities/settings/FontSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -176,7 +176,6 @@ void EpubReaderActivity::onEnter() {
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(epub->getPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
 
-
   // Trigger first update
   requestUpdate();
 }
@@ -230,6 +229,10 @@ void EpubReaderActivity::showBuildPopup() {
   // If it fires while the loan is active (e.g. the parser's size-based call during
   // startBuild), pending stays set and the deadline check retries after the loan.
   if (!buildPopupPending || !renderer.hasFrameBuffer()) return;
+  // Enforced here rather than at the call sites so the parser's image-probe callback
+  // obeys it too: that fires early in a build which may still finish inside the delay,
+  // one of the ways a fast build used to flash the popup.
+  if (buildStartMs == 0 || millis() - buildStartMs < BUILD_POPUP_DELAY_MS) return;
   GUI.drawPopup(renderer, tr(STR_INDEXING));
   // HALF-clear the popup when the page replaces it, else "INDEXING" ghosts.
   pagesUntilFullRefresh = 1;
@@ -871,24 +874,24 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
 void EpubReaderActivity::openChapterSelection() {
   const int spineIdx = currentSpineIndex;
   const std::string path = epub->getPath();
-  startActivityForResult(std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path,
-                                                                             spineIdx),
-                         [this](const ActivityResult& result) {
-                           if (!result.isCancelled) {
-                             const auto& chapterResult = std::get<ChapterResult>(result.data);
-                             RenderLock lock(*this);
+  startActivityForResult(
+      std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, spineIdx),
+      [this](const ActivityResult& result) {
+        if (!result.isCancelled) {
+          const auto& chapterResult = std::get<ChapterResult>(result.data);
+          RenderLock lock(*this);
 
-                             currentSpineIndex = chapterResult.spineIndex;
+          currentSpineIndex = chapterResult.spineIndex;
 
-                             // If anchor is not empty, it will be used later to calculate the page number.
-                             pendingAnchor = chapterResult.anchor;
+          // If anchor is not empty, it will be used later to calculate the page number.
+          pendingAnchor = chapterResult.anchor;
 
-                             // Otherwise page 0 will be used.
-                             nextPageNumber = 0;
+          // Otherwise page 0 will be used.
+          nextPageNumber = 0;
 
-                             section.reset();
-                           }
-                         });
+          section.reset();
+        }
+      });
 }
 
 void EpubReaderActivity::pageTurn(bool isForwardTurn) {
@@ -1062,36 +1065,10 @@ void EpubReaderActivity::render(RenderLock&& lock) {
           const size_t spineBytes =
               epub->getCumulativeSpineItemSize(currentSpineIndex) -
               (currentSpineIndex > 0 ? epub->getCumulativeSpineItemSize(currentSpineIndex - 1) : 0);
-          // Popup only when the build will actually be slow: a big spine whose HTML still needs
-          // inflating (the multi-second cost), or a deep page target. A reopen with cached HTML builds
-          // fast, so no popup -- that's what made an already-indexed book look like it was reindexing.
-          // A partial cache that already covers the target page shows it instantly: never popup.
-          const bool willInflate = !section->hasHtmlCache();
-          bool showPopup;
-          if (anchorJump) {
-            // An anchor jump's cost is bounded by the anchor's page, not `target`. An anchor already
-            // in the on-disk map (partial or finalized cache) lands instantly: no popup. Otherwise it
-            // lies beyond the indexed watermark and the build may lay out the whole spine to find it,
-            // so gate on spine size alone -- laying out a big spine takes seconds even with cached
-            // HTML. Ordinary chapter-top TOC jumps resolve on page 0 and stay popup-free.
-            showPopup = !section->findAnchor(pendingAnchor).has_value() && spineBytes > BUILD_POPUP_BYTE_THRESHOLD;
-          } else {
-            const bool targetAvailable = target < static_cast<int>(section->pageCount);
-            showPopup = !targetAvailable && ((spineBytes > BUILD_POPUP_BYTE_THRESHOLD && willInflate) ||
-                                             target > BUILD_POPUP_PAGE_THRESHOLD);
-          }
-          if (showPopup) {
-            GUI.drawPopup(renderer, tr(STR_INDEXING));
-            // HALF-clear the popup when the page replaces it, else "INDEXING" ghosts under the page.
-            pagesUntilFullRefresh = 1;
-          }
-          // Mid-build popup surfacing for slow builds the predictive gates can't
-          // see (image extraction/probing inside a single page, or any chunk
-          // overrunning the deadline). The parser fires the callback before the
-          // first image probe; buildPopupPending gates it to this blocking phase
-          // so a background build in loop() can never draw over a displayed page.
-          buildPopupPending = !showPopup;
-          const unsigned long buildStartMs = millis();
+          // Decided by elapsed time alone (showBuildPopup), so nothing is drawn up front
+          // and nothing has to predict how slow this build will be.
+          buildPopupPending = true;
+          buildStartMs = millis();
           bool started;
           {
             // Lend the framebuffer's 48 KB to startBuild only (the spine HTML
@@ -1104,18 +1081,19 @@ void EpubReaderActivity::render(RenderLock&& lock) {
             LOG_ERR("ERS", "Failed to start section build");
             section.reset();
             buildPopupPending = false;
+            buildStartMs = 0;
             showBuildError();
             return;
           }
           while (!section->isBuildComplete() &&
-                 (anchorJump ? !section->findAnchor(pendingAnchor)
-                             : (static_cast<int>(section->pageCount) <= target ||
-                                (pendingParagraphAnchor &&
-                                 !section->getPageForParagraphIndex(*pendingParagraphAnchor))))) {
+                 (anchorJump
+                      ? !section->findAnchor(pendingAnchor)
+                      : (static_cast<int>(section->pageCount) <= target ||
+                         (pendingParagraphAnchor && !section->getPageForParagraphIndex(*pendingParagraphAnchor))))) {
             // Anchor jump: build until the anchor's page is laid out (usually page 0), checking a
             // partial's on-disk anchor map too so an already-indexed anchor resolves immediately.
             // Otherwise: build until the target page exists. loop() builds the rest behind it.
-            if (buildPopupPending && millis() - buildStartMs >= BUILD_POPUP_DEADLINE_MS) {
+            if (buildPopupPending) {
               // The predictive gates guessed fast but the build blew the silent budget.
               showBuildPopup();
             }
@@ -1128,6 +1106,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
             }
           }
           buildPopupPending = false;
+          buildStartMs = 0;
         }
       }
     } else {
@@ -1160,8 +1139,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       } else if (!section->isBuilding()) {
         // The whole chapter is laid out and the paragraph still does not resolve
         // (no <p> elements, or a degenerate LUT) — leave the proportional remap armed.
-        LOG_DBG("ERS", "Paragraph %u did not resolve; leaving proportional remap armed",
-                *pendingParagraphAnchor);
+        LOG_DBG("ERS", "Paragraph %u did not resolve; leaving proportional remap armed", *pendingParagraphAnchor);
         pendingParagraphAnchor.reset();
       }
     }
@@ -1275,7 +1253,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     return;
   }
 
-
   {
     // Unified page read: the in-progress build's in-RAM table if it has reached the page,
     // otherwise the on-disk file (finalized section, or a partial from a previous session).
@@ -1322,7 +1299,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       lastSavedPageCount = section->estimatedTotalPages();
     }
   }
-
 }
 
 bool EpubReaderActivity::applyDeferredReposition() {
@@ -1727,4 +1703,3 @@ void EpubReaderActivity::restoreSavedPosition() {
   }
   requestUpdate();
 }
-

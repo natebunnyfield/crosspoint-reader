@@ -146,22 +146,27 @@ class EpubReaderActivity final : public Activity {
   // per page rebuilt, this margin gives the rebuild ample runway to catch up (and finalize)
   // before the reader arrives.
   static constexpr int PARTIAL_REBUILD_START_MARGIN = 15;
-  // Show the indexing popup when an initial build must lay out more than this many pages up front
-  // (a deep resume/jump into a not-yet-built section), so it isn't a silent wait. Kept independent
-  // of the small look-ahead window so ordinary landings stay popup-free.
-  static constexpr int BUILD_POPUP_PAGE_THRESHOLD = 20;
-  // Also show the popup when first building a spine larger than this (uncompressed bytes): its
-  // whole HTML must be inflated before page 1 can lay out (the giant single-spine case), which is
-  // a multi-second wait. Normal chapters are well under this and stay popup-free.
-  static constexpr size_t BUILD_POPUP_BYTE_THRESHOLD = 96 * 1024;
-  // Deadline backstop for the predictive gates above: if the blocking build-to-target still
-  // hasn't produced the landing page this long after the build started, surface the popup
-  // mid-build. Builds that finish under the deadline stay popup-free.
-  static constexpr unsigned long BUILD_POPUP_DEADLINE_MS = 1000;
+  // The indexing popup is purely ELAPSED-TIME gated: it may not be drawn until the
+  // blocking build has genuinely been running this long. A build that finishes sooner
+  // never shows it at all, so a fast build cannot flash "Indexing" and vanish.
+  //
+  // This replaced a pair of predictive gates (spine bytes > 96 KB, page target > 20)
+  // that drew the popup BEFORE the build started, from heuristics. When they guessed
+  // slow and the build was fast -- a cached spine, or a partial already covering the
+  // target -- the popup appeared and disappeared within a frame. Predicting duration is
+  // the wrong tool; measuring it is exact and needs no thresholds kept in tune.
+  //
+  // The cost is deliberate: a genuinely slow build now shows the previous page for two
+  // seconds before the popup appears, rather than announcing itself up front.
+  static constexpr unsigned long BUILD_POPUP_DELAY_MS = 2000;
   // True only during onEnter's blocking build-to-target phase, until the popup has been
   // drawn. Gates showBuildPopup() so the parser's popup callback (which persists into
   // background buildSomeMore chunks) can never draw over a displayed page.
   bool buildPopupPending = false;
+  // millis() when the current blocking build-to-target began; 0 when none runs.
+  // showBuildPopup() measures against this, so every path that could draw the popup --
+  // the parser's image-probe callback included -- obeys the same delay.
+  unsigned long buildStartMs = 0;
   // Draw the indexing popup mid-build (parser image-probe callback and deadline backstop).
   void showBuildPopup();
   // Remap the cached relative reading position once the section's real page count is known
