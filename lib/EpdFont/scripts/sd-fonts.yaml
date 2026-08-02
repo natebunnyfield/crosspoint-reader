@@ -235,9 +235,15 @@ families:
     # 13 ligature pairs (14 in the italics) instead of the bare 5.
     intervals: reading,(0x2100-0x214F),(0x0250-0x02AF),(0xE000-0xE008)
     sizes: [12, 14, 16, 18]
-    # Native hhea is 1043/-255; the build used ink extents ±65/1000 measured on
-    # the Regular, per the family metrics pass.
-    metrics: {ascent: 952, descent: -284, linegap: 0}
+    # Ink extents ±65/1000 measured on the Regular, per the family metrics pass.
+    # (Native hhea is 1043/-255.) The previously shipped 952/-284 did NOT follow
+    # that rule: measured max ink top is 0.975-0.987 em, so 952 sat 35/1000 em
+    # BELOW the ink rather than 65 above it, and the declared ascender was under
+    # the tallest glyph at all 16 size/style slots -- accented capitals drew
+    # above their own line box. Total padding was ~9/1000 em against the rule's
+    # 130/1000, which put the line box inside the ink extent and left English at
+    # 3-7 px of interline white where Coelacanth has 9-13.
+    metrics: {ascent: 1052, descent: -305, linegap: 0}
     styles:
       regular:    {path: "local_fonts/Edgar-Regular.ttf"}
       bold:       {path: "local_fonts/Edgar-Bold.ttf"}
