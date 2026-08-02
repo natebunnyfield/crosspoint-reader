@@ -120,6 +120,15 @@ class FontSwitchChurn : public ::testing::Test {
     }
   }
 
+  // SdCardFontManager::loadFamily() takes a POINT SIZE: resolving a reader slot
+  // onto a family's own ramp is policy and lives in SdCardFontSystem, not in the
+  // manager. These tests are written in slots (the unit that is stable across
+  // families), so resolve here at the call boundary.
+  static uint8_t ptForSlot(const SdCardFontFamilyInfo& fam, uint8_t slot) {
+    const auto* f = fam.findClosestReaderSize(slot);
+    return f ? f->pointSize : 0;
+  }
+
   // Invariant 1+2 for a family that was just loaded.
   void expectExactlyResident(const SdCardFontFamilyInfo& fam, uint8_t slot) {
     EXPECT_EQ(manager_.currentFamilyName(), fam.name);
@@ -153,7 +162,7 @@ TEST_F(FontSwitchChurn, FamilyToFamilyKeepsExactlyOneResident) {
   for (size_t i = 0; i < fams.size(); ++i) {
     const auto& fam = fams[i];
     const uint8_t slot = kSizeSlots[i % 4];
-    ASSERT_TRUE(manager_.loadFamily(fam, *renderer_, slot)) << "failed to load " << fam.name;
+    ASSERT_TRUE(manager_.loadFamily(fam, *renderer_, ptForSlot(fam, slot))) << "failed to load " << fam.name;
     expectExactlyResident(fam, slot);
   }
 }
@@ -165,7 +174,7 @@ TEST_F(FontSwitchChurn, SelectingBuiltinAfterSdFamilyUnloadsTheCpfont) {
 
   for (int round = 0; round < 4; ++round) {
     const auto& fam = fams[static_cast<size_t>(round) % fams.size()];
-    ASSERT_TRUE(manager_.loadFamily(fam, *renderer_, /*slot=*/1));
+    ASSERT_TRUE(manager_.loadFamily(fam, *renderer_, ptForSlot(fam, 1)));
     expectExactlyResident(fam, 1);
 
     // "User picked a built-in": sdFontFamilyName cleared => unloadAll.
@@ -179,7 +188,7 @@ TEST_F(FontSwitchChurn, SelectingBuiltinAfterSdFamilyUnloadsTheCpfont) {
 TEST_F(FontSwitchChurn, ResidentSizeAlwaysMatchesClosestReaderSize) {
   for (const auto& fam : registry_.getFamilies()) {
     for (const uint8_t slot : kSizeSlots) {
-      ASSERT_TRUE(manager_.loadFamily(fam, *renderer_, slot)) << fam.name << " slot " << static_cast<int>(slot);
+      ASSERT_TRUE(manager_.loadFamily(fam, *renderer_, ptForSlot(fam, slot))) << fam.name << " slot " << static_cast<int>(slot);
       expectExactlyResident(fam, slot);
     }
   }
@@ -193,13 +202,13 @@ TEST_F(FontSwitchChurn, HeapDoesNotGrowAcrossSwitches) {
 
   // Warm up: first load populates one-time caches, so measure from a settled
   // state rather than counting first-touch allocations as growth.
-  ASSERT_TRUE(manager_.loadFamily(fams[0], *renderer_, 1));
+  ASSERT_TRUE(manager_.loadFamily(fams[0], *renderer_, ptForSlot(fams[0], 1)));
   manager_.unloadAll(*renderer_);
 
   std::vector<std::size_t> liveAfterRound;
   for (int round = 0; round < 6; ++round) {
     for (size_t i = 0; i < fams.size(); ++i) {
-      ASSERT_TRUE(manager_.loadFamily(fams[i], *renderer_, kSizeSlots[i % 4]));
+      ASSERT_TRUE(manager_.loadFamily(fams[i], *renderer_, ptForSlot(fams[i], kSizeSlots[i % 4])));
     }
     manager_.unloadAll(*renderer_);  // back to built-in
     expectNothingResident();
@@ -234,14 +243,14 @@ TEST_F(FontSwitchChurn, HeapDoesNotGrowAcrossSwitches) {
 TEST_F(FontSwitchChurn, LeakedFamilyIsDetectable) {
   const auto& fams = registry_.getFamilies();
 
-  ASSERT_TRUE(manager_.loadFamily(fams[0], *renderer_, 1));
+  ASSERT_TRUE(manager_.loadFamily(fams[0], *renderer_, ptForSlot(fams[0], 1)));
   manager_.unloadAll(*renderer_);
   const std::size_t settled = g_liveBytes;
 
   // The missing-unloadAll case. loadFamily() internally unloads the PREVIOUS
   // family, so to model "never unloaded" we simply leave one loaded and
   // measure what a single retained family costs.
-  ASSERT_TRUE(manager_.loadFamily(fams[0], *renderer_, 1));
+  ASSERT_TRUE(manager_.loadFamily(fams[0], *renderer_, ptForSlot(fams[0], 1)));
   const long long retained = static_cast<long long>(g_liveBytes) - static_cast<long long>(settled);
 
   EXPECT_GT(retained, 2048) << "a resident .cpfont should cost multiple KB; the heap instrument may be broken";

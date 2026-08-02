@@ -46,8 +46,6 @@
 #include "MappedInputManager.h"
 #include "activities/Activity.h"
 #include "activities/RenderLock.h"
-#include "activities/reader/EpubReaderMenuActivity.h"
-#include "activities/reader/EpubReaderPercentSelectionActivity.h"
 #include "activities/settings/FontSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 
@@ -101,15 +99,6 @@ std::unique_ptr<Activity> makeFontSelection() {
   return std::make_unique<FontSelectionActivity>(host::renderer(), host::input(), nullptr);
 }
 
-std::unique_ptr<Activity> makeReaderMenu() {
-  return std::make_unique<EpubReaderMenuActivity>(host::renderer(), host::input(), "Test Book", 3, 42, 17,
-                                                 /*currentOrientation=*/0, /*hasFootnotes=*/false);
-}
-
-std::unique_ptr<Activity> makePercentSelection() {
-  return std::make_unique<EpubReaderPercentSelectionActivity>(host::renderer(), host::input(), 17);
-}
-
 std::unique_ptr<Activity> makeIntervalSelection() {
   return std::make_unique<IntervalSelectionActivity>(host::renderer(), host::input(), "TestInterval",
                                                      StrId::STR_NONE_OPT, 30, 10, 120, 10, 30);
@@ -126,8 +115,6 @@ void PrintTo(const BackEdgeCase& testCase, std::ostream* os) { *os << testCase.l
 
 const BackEdgeCase kBackEdgeCases[] = {
     {"FontSelection", makeFontSelection},
-    {"EpubReaderMenu", makeReaderMenu},
-    {"EpubReaderPercentSelection", makePercentSelection},
     {"IntervalSelection", makeIntervalSelection},
 };
 

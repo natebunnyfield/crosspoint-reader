@@ -85,13 +85,13 @@ class Gfx {
   EpdFontFamily small_{&small8_};
 };
 
-// Fixture: portrait (the orientation the crash happened in) and a zeroed
-// counter per test.
+// Fixture: a zeroed counter per test. The renderer is portrait-only now —
+// GfxRenderer::orientation is a compile-time constant, so there is nothing to
+// set and no other orientation to escape into.
 class RendererBounds : public ::testing::Test {
  protected:
   void SetUp() override {
     r = &Gfx::instance().renderer();
-    r->setOrientation(GfxRenderer::Portrait);
     r->clearScreen();
     GfxRenderer::resetOutOfRange();
   }
@@ -148,11 +148,11 @@ TEST_F(RendererBounds, FullWidthRuleAtLastValidColumnIsClean) {
   EXPECT_TRUE(noEscapes());
 }
 
-// Every row and column of the screen edge, both orientations that the reader
-// actually uses. Catches an off-by-one that only shows up on one edge.
+// Every row and column of the screen edge. This used to sweep two
+// orientations; the renderer is portrait-only now, so the loop would have run
+// the same case twice. Catches an off-by-one that only shows up on one edge.
 TEST_F(RendererBounds, ScreenEdgeRulesAreClean) {
-  for (const auto o : {GfxRenderer::Portrait, GfxRenderer::LandscapeCounterClockwise}) {
-    r->setOrientation(o);
+  {
     GfxRenderer::resetOutOfRange();
     const int w = r->getScreenWidth();
     const int h = r->getScreenHeight();
@@ -161,7 +161,7 @@ TEST_F(RendererBounds, ScreenEdgeRulesAreClean) {
     r->drawLine(0, 0, 0, h - 1);          // left
     r->drawLine(w - 1, 0, w - 1, h - 1);  // right
     r->drawRect(0, 0, w, h);              // full-screen border
-    EXPECT_TRUE(noEscapes()) << "orientation " << static_cast<int>(o);
+    EXPECT_TRUE(noEscapes());
   }
 }
 

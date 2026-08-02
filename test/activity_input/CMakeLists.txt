@@ -48,8 +48,6 @@ add_executable(ActivityInputTest
   ${REPO_ROOT}/src/MappedInputManager.cpp
   ${REPO_ROOT}/src/activities/Activity.cpp
   ${REPO_ROOT}/src/activities/settings/FontSelectionActivity.cpp
-  ${REPO_ROOT}/src/activities/reader/EpubReaderMenuActivity.cpp
-  ${REPO_ROOT}/src/activities/reader/EpubReaderPercentSelectionActivity.cpp
   ${REPO_ROOT}/src/activities/util/IntervalSelectionActivity.cpp
   ${REPO_ROOT}/src/util/ButtonNavigator.cpp
   # i18n (tr() is used by every activity above)
@@ -97,10 +95,9 @@ target_include_directories(ActivityInputTest PRIVATE
   ${REPO_ROOT}/lib/Memory
   ${REPO_ROOT}/lib/InflateReader
   ${REPO_ROOT}/lib/uzlib/src
-  # Headers only: EpubReaderMenuActivity.h includes <Epub.h> for the book handle,
-  # which reaches BookMetadataCache -> BufferedFile / ZipFile / the XML helpers.
-  # No .cpp from any of these is compiled — the menu's input path never touches
-  # the book (Epub.h is not even referenced in EpubReaderMenuActivity.cpp).
+  # Headers only: FontSelectionActivity reaches <Epub.h> transitively, which pulls
+  # BookMetadataCache -> BufferedFile / ZipFile / the XML helpers. No .cpp from any
+  # of these is compiled — the input paths under test never touch the book.
   ${REPO_ROOT}/lib/Epub
   ${REPO_ROOT}/lib/Serialization
   ${REPO_ROOT}/lib/XmlParserUtils
