@@ -348,7 +348,7 @@ families:
     # 74/62/57 px-leading A/B chose 62, i.e. ink-tight metrics 1244/-364,
     # lineGap 0 (Latin ink extents + padding; Inknut carries an extra
     # +100-unit pad because the Bold's ink exceeds tighter values at every
-    # size). Same values as the shipped S-tier builds. Without this
+    # size). Same values as the builds shipped at the time. Without this
     # override the family reads with ~60% extra leading.
     metrics: {ascent: 1244, descent: -364, linegap: 0}
     # The family has no italics at all; obliques shear the REAL weights

@@ -128,7 +128,7 @@ static const char* const US_HOLIDAY_LABEL_EN[static_cast<size_t>(HolidayId::Holi
 // is a deep sleep, so the chip resets on wake and setup() rebuilds font state
 // from the saved selection.
 // ---------------------------------------------------------------------------
-constexpr const char* PREFERRED_SD_FAMILY = "GTAlpinaCond";  // GT Alpina Condensed
+constexpr const char* PREFERRED_SD_FAMILY = "Edgar";  // S tier; the only faces installed
 
 struct CalendarFonts {
   int display;    // header + day numbers
@@ -148,8 +148,9 @@ int firstAvailable(const GfxRenderer& renderer, std::initializer_list<int> candi
 
 CalendarFonts resolveFonts(GfxRenderer& renderer) {
   CalendarFonts f{};
-  // 18pt is the largest size in the standard pack; loadForDisplay snaps to the
-  // closest installed size if this exact one is missing.
+  // 18pt is the largest size in the standard pack, and Edgar ships exactly
+  // 12/14/16/18, so this is an exact hit rather than a snap. loadForDisplay
+  // still snaps to the closest installed size if that ever changes.
   const int sdId = sdFontSystem.loadForDisplay(PREFERRED_SD_FAMILY, 18, renderer);
   if (sdId != 0) {
     f.display = sdId;
