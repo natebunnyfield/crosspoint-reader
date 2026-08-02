@@ -109,6 +109,20 @@ def main() -> int:
             if old.name not in keep:
                 old.unlink()
                 print(f"  pruned stale {old.relative_to(fonts_root.parent)}")
+        # Hi-res companions (dest/2x/<same 1x filename>, see
+        # SdCardFontManager::hiResCompanionPath) are built out-of-band at
+        # doubled point sizes; this script cannot regenerate them, but a ramp
+        # change makes the old set unreachable (lookup is by 1x filename) and
+        # leaves it lying as dead weight. Prune the orphans and say so.
+        hires = dest / "2x"
+        if hires.is_dir():
+            for old in hires.glob("*.cpfont"):
+                if old.name not in keep:
+                    old.unlink()
+                    print(f"  pruned orphaned hi-res {old.relative_to(fonts_root.parent)}")
+            if not any(hires.glob("*.cpfont")):
+                print(f"  NOTE: {family} hi-res set now empty — rebuild at 2x sizes "
+                      f"and install under {hires.relative_to(fonts_root.parent)}")
         print(f"  installed {family}: {len(built)} sizes -> {dest}")
 
         # The firmware scans /.fonts BEFORE /fonts and dedups by family name
@@ -116,6 +130,18 @@ def main() -> int:
         # the hidden root would silently shadow everything just installed.
         hidden = Path(args.fs_dir) / ".fonts" / family
         if hidden.is_dir():
+            # Carry a hi-res set over before deleting: the hidden copy may hold
+            # the only 2x build (this script cannot regenerate those), and the
+            # visible-root family it now shadows should inherit it. Only sizes
+            # matching the fresh ramp survive; the rest are orphans anyway.
+            hidden_hires = hidden / "2x"
+            if hidden_hires.is_dir() and not (dest / "2x").is_dir():
+                salvaged = [f for f in hidden_hires.glob("*.cpfont") if f.name in keep]
+                if salvaged:
+                    (dest / "2x").mkdir()
+                    for f in salvaged:
+                        shutil.copy2(f, dest / "2x" / f.name)
+                    print(f"  salvaged {len(salvaged)} hi-res files from {hidden_hires.relative_to(fonts_root.parent)}")
             shutil.rmtree(hidden)
             print(f"  removed shadowing stale copy {hidden.relative_to(fonts_root.parent)}")
 

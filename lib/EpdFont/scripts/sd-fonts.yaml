@@ -51,6 +51,24 @@
 #
 #   Extracted static fonts are cached in instanced_fonts/ (gitignored).
 #   Requires fonttools: pip install -r requirements.txt
+#
+# Slot uniformity (2026-08-02, curated reader families):
+#   The four sizes of every curated family are chosen so the same ordinal
+#   slot shows the same MEASURED letter size and leading, not the same
+#   nominal point size:
+#     x-height  12 / 14 / 16 / 18 px   (slots 0-3, regular style)
+#     advanceY  34 / 40 / 46 / 51 px
+#   metrics overrides implement the leading: the .cpfont's
+#   advanceY = ceil((ascent - descent)/1000 * pt * 150/72). Two floors bound
+#   it per family: advanceY never drops below the worst-style plain-text ink
+#   span + 0.13 em (the +-65/1000 rule from the earlier ink-tight passes),
+#   and the declared ascender clears accented capitals wherever the span
+#   allows. Long-extender faces (Coelacanth, Venetian 301) end up a few px
+#   looser than target; that is ink, not drift. Where hinting skips a pixel
+#   value entirely, a slot may sit +-1 px off target (noted per family).
+#   Derivation: every family swept at 9-24 pt, x-height/ink measured from
+#   the built .cpfonts (2026-08-02); supersedes the source-unit "harmonized
+#   ramp" x-height estimates, which hinting made wrong by up to 3 px.
 
 families:
   # ── Serif ──────────────────────────────────────────────────────────────
@@ -68,10 +86,10 @@ families:
   - name: SourceSerif4
     description: "Adobe transitional serif (Latin, Greek, Cyrillic)"
     intervals: latin-ext,greek,cyrillic
-    # The x-height anchor (0.475 em) for harmonized size ramps: families whose
-    # lowercase fills the em differently scale their ramps so the same slot
-    # reads as the same apparent size (see Lora, Junicode, GoudyBookletter1911).
+    # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four.
+    # This family is the historical anchor the slot targets were drawn from.
     sizes: [12, 14, 16, 18]
+    metrics: {ascent: 1009, descent: -342, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/adobe-fonts/source-serif/release/TTF/SourceSerif4-Regular.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/adobe-fonts/source-serif/release/TTF/SourceSerif4-Bold.ttf"}
@@ -101,12 +119,11 @@ families:
   - name: Lora
     description: "Calligraphic serif for literary reading (Latin, Cyrillic)"
     intervals: latin-ext,cyrillic
-    # Harmonized ramp: x-height 0.500 em vs the 0.475 anchor (SourceSerif4), so
-    # each size drops ~5% to hit the same apparent letter size.
-    sizes: [11, 13, 15, 17]
-    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
-    # side, fixes 1 px line-overlap. Borderline −1 px at 11 pt. Override -> 1.440 em.
-    metrics: {ascent: 1069, descent: -371, linegap: 0}
+    # Uniform slots: xh 12/14/16/17, advY 34/40/46/50 — slot 3 sits 1 px small
+    # and tight because Lora's hinted x-height jumps 17 -> 19 px between 16 and
+    # 18 pt; 16 pt is the closer landing.
+    sizes: [11, 13, 15, 16]
+    metrics: {ascent: 1113, descent: -358, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/main/fonts/ttf/Lora-Regular.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/main/fonts/ttf/Lora-Bold.ttf"}
@@ -176,9 +193,10 @@ families:
   - name: GoudyBookletter1911
     description: "Goudy's Kennerley Old Style revival, low-contrast Venetian serif (Latin)"
     intervals: latin-ext
-    # Harmonized ramp: x-height 0.415 em vs the 0.475 anchor (SourceSerif4) —
-    # this face needs ~+2pt to read as large as the moderns.
-    sizes: [14, 16, 18, 21]
+    # Uniform slots: xh 12/14/17/18, advY 34/39/46/51 — slot 2 lands 1 px big
+    # (hinted x-height skips 16 px entirely: 15 px at 16-17 pt, 17 px at 18 pt).
+    sizes: [13, 15, 18, 20]
+    metrics: {ascent: 952, descent: -267, linegap: 0}
     # Upstream ships regular only; bold/italic/bolditalic are synthesized at
     # build time (embolden target ~1.55x stems, 11deg oblique like Kennerley's
     # gentle 1918 italic). Parameters derived in docs/synthetic-font-styles.md.
@@ -202,9 +220,11 @@ families:
   - name: CaledoniaCC
     description: "Caledonia CC, Dwiggins's transitional Scotch Roman (Latin)"
     intervals: latin-ext
-    sizes: [12, 14, 16, 18]
-    # Worst −2 px plain-text overlap measured 2026-08-01.
-    metrics: {ascent: 991, descent: -345, linegap: 0}
+    # Uniform slots: xh 12/14/16/18 (exact), advY 33/39/46/52 (+-1 rounding at
+    # the ends of the 10-16 pt ramp). Caledonia is big-on-body: the old
+    # 12-18 pt ramp read two slots larger than the anchor.
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1074, descent: -469, linegap: 0}
     styles:
       regular:    {path: "local_fonts/CaledoniaCC-Regular.ttf"}
       italic:     {path: "local_fonts/CaledoniaCC-Italic.ttf"}
@@ -235,15 +255,11 @@ families:
     # 13 ligature pairs (14 in the italics) instead of the bare 5.
     intervals: reading,(0x2100-0x214F),(0x0250-0x02AF),(0xE000-0xE008)
     sizes: [12, 14, 16, 18]
-    # Ink extents ±65/1000 measured on the Regular, per the family metrics pass.
-    # (Native hhea is 1043/-255.) The previously shipped 952/-284 did NOT follow
-    # that rule: measured max ink top is 0.975-0.987 em, so 952 sat 35/1000 em
-    # BELOW the ink rather than 65 above it, and the declared ascender was under
-    # the tallest glyph at all 16 size/style slots -- accented capitals drew
-    # above their own line box. Total padding was ~9/1000 em against the rule's
-    # 130/1000, which put the line box inside the ink extent and left English at
-    # 3-7 px of interline white where Coelacanth has 9-13.
-    metrics: {ascent: 1052, descent: -305, linegap: 0}
+    # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four, and
+    # the ascender clears accented capitals at every size (the defect the
+    # earlier 952/-284 metrics had; its 1052/-305 fix is superseded by this
+    # slot-uniform span, which keeps the same clearance).
+    metrics: {ascent: 1031, descent: -320, linegap: 0}
     styles:
       regular:    {path: "local_fonts/Edgar-Regular.ttf"}
       bold:       {path: "local_fonts/Edgar-Bold.ttf"}
@@ -254,8 +270,11 @@ families:
     description: "GT Alpina Condensed, tightest set in the tier (Latin)"
     intervals: reading
     sizes: [12, 14, 16, 18]
-    # No metrics override: the webfont cut already ships 892/-281, which is
-    # exactly ink ±65/1000 and reproduces the installed build.
+    # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four.
+    # The webfont cut's stock 892/-281 (ink +-65/1000) gave advY 29-44,
+    # the tightest leading in the set, and its ascender sat 1 px under the
+    # accented capitals at 18 pt; this span fixes both.
+    metrics: {ascent: 1013, descent: -338, linegap: 0}
     styles:
       regular:    {path: "local_fonts/GTAlpinaCond-Regular.otf"}
       bold:       {path: "local_fonts/GTAlpinaCond-Bold.otf"}
@@ -265,14 +284,17 @@ families:
   - name: Venetian301
     description: "Bitstream's Centaur — Rogers after Jenson; italic is Warde's Arrighi (Latin)"
     intervals: latin-ext
-    # Non-standard ladder, preserved from the shipped build. Ordinal slot mapping
-    # (findClosestReaderSize) makes that a non-issue.
-    sizes: [15, 17, 19, 21]
-    # Deliberately NO metrics override: this family was never put through the
-    # family-wide metrics pass, so its four styles still carry the source's own
-    # differing values (hhea 871/904/826/893). Unifying them would change its
-    # leading from what ships today; that is a separate decision, not a
-    # side-effect of making it rebuildable.
+    # Uniform slots: xh 12/14/16/18 (exact — the old 15-21 pt ramp read up to
+    # 2 px small at the top). Venetian is the smallest-on-body face in the set,
+    # hence the tall ramp.
+    sizes: [15, 18, 20, 23]
+    # advY 38/46/51/58, +4..+7 over target: floor-bound. Rogers' long extenders
+    # plus Warde's Arrighi italic put the plain-ink span + 0.13 em above the
+    # uniform leading at every slot; accents may still poke 1-3 px over the
+    # declared ascender (span cannot cover both, descenders win). This unifies
+    # the four styles' previously differing source metrics (871/904/826/893) —
+    # the decision the earlier recipe deliberately deferred.
+    metrics: {ascent: 841, descent: -360, linegap: 0}
     styles:
       regular:    {path: "local_fonts/Venetian301-Regular.otf"}
       bold:       {path: "local_fonts/Venetian301-Bold.otf"}
@@ -283,8 +305,12 @@ families:
     description: "GUST's Century Schoolbook revival (Latin, Greek, Cyrillic)"
     intervals: reading
     sizes: [12, 14, 16, 18]
+    # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four.
+    # Native 1135/-332 (1.467 em) gave the loosest leading in the set
+    # (advY 37-55); this span brings it to the shared rhythm.
+    metrics: {ascent: 1049, descent: -302, linegap: 0}
     # Freely licensed (GUST Font License), so this one needs no local files and
-    # rebuilds on any machine. Native 1135/-332 reproduces the build as-is.
+    # rebuilds on any machine.
     styles:
       regular:    {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf"}
       bold:       {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-bold.otf"}
@@ -294,9 +320,13 @@ families:
   - name: Junicode
     description: "Medievalist scholarly serif, semi-condensed (Latin)"
     intervals: latin-ext
-    # Harmonized ramp: x-height 0.418 em vs the 0.475 anchor (SourceSerif4) —
-    # this face needs ~+2pt to read as large as the moderns.
-    sizes: [14, 16, 18, 20]
+    # Uniform slots: xh 13/15/16/18 (+1 px at the two small slots — hinting
+    # skips 12 and 14 px), advY 34/40/46/51 exact. The old "0.418 em x-height,
+    # +2 pt ramp" estimate was wrong: the hinted build measures ~0.50 em, so
+    # 14-20 pt read 2-3 px oversize. Standard ramp keeps the leading exact;
+    # the xh-exact ramp (11/13/16/18) would force advY 3 px tight at slot 1.
+    sizes: [12, 14, 16, 18]
+    metrics: {ascent: 991, descent: -360, linegap: 0}
     # SemiCondensed Light/Medium rather than Regular/Bold: on 2-bit e-ink the
     # Light weight reads as a book roman and Medium gives enough contrast for
     # emphasis without clogging counters at reading sizes.
@@ -309,9 +339,13 @@ families:
   - name: Almendra
     description: "Bookish oldstyle drawn from medieval calligraphy (Latin)"
     intervals: latin-ext
-    # Harmonized ramp: x-height 0.485 em vs the 0.475 anchor (SourceSerif4) —
-    # within ~2%, so the standard ramp already reads at the anchor size.
-    sizes: [12, 14, 16, 18]
+    # Uniform slots: xh 12/14/16/18 (exact), advY 33/39/46/55. The hinted build
+    # measures ~0.55 em x-height (the old "0.485, standard ramp" estimate read
+    # two slots big), and its xh curve is nonlinear: 18 px needs 17 pt while
+    # 16 px needs only 14 pt, so slot 3 runs +4 px loose — one span cannot fit
+    # the 14->17 pt jump. xh takes priority.
+    sizes: [10, 12, 14, 17]
+    metrics: {ascent: 1114, descent: -429, linegap: 0}
     # raw.githubusercontent ofl/almendra paths error out; these are the static
     # TTFs the css2 API serves for ital,wght 0,400 / 0,700 / 1,400 / 1,700 —
     # all four styles are real.
@@ -324,13 +358,13 @@ families:
   - name: Coelacanth
     description: "Centaur revival, Venetian oldstyle (Latin, Greek, Cyrillic)"
     intervals: latin-ext,greek,cyrillic
-    # Harmonized ramp: x-height 0.407 em vs the 0.475 anchor (SourceSerif4) —
-    # small-on-body like Goudy, needs ~+2-3pt to read as large as the moderns.
-    sizes: [14, 16, 19, 21]
-    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
-    # side, fixes 2 px line-overlap. CTAN metrics too tight for the long extenders;
-    # worst −2 px. Override -> 1.457 em.
-    metrics: {ascent: 1003, descent: -454, linegap: 0}
+    # Uniform slots: xh 12/14/16/18 (exact), advY 36/42/50/55, +2..+4 over
+    # target: floor-bound. Coelacanth's extenders are the longest in the set —
+    # plain-ink span + 0.13 em exceeds the uniform leading at every slot, so it
+    # keeps the minimum ink-safe leading instead (still far tighter than the
+    # old 43-64 px range).
+    sizes: [13, 15, 18, 20]
+    metrics: {ascent: 929, descent: -384, linegap: 0}
     # Upstream (CTAN) ships Regular/Bold/Italic but no BoldItalic, so
     # bolditalic emboldens the real Italic — never sheared. Measured: italic
     # stems 0.069 em; embolden_em 0.037 + y_ratio 0.35 lands 1.49-1.55x stems
@@ -345,18 +379,16 @@ families:
   - name: InknutAntiqua62
     description: "Sturdy slab antiqua for literary fiction (Latin)"
     intervals: latin-ext
-    # Harmonized ramp: x-height 0.531 em vs the 0.475 anchor (SourceSerif4) —
-    # big-on-body, drops ~1-2pt to read at the anchor size.
-    sizes: [11, 13, 14, 16]
+    # Uniform slots: xh 11/14/16/18 (slot 0 is 1 px small — hinting skips
+    # 12 px between 10 and 11 pt), advY 33/39/46/52 (+-1 rounding).
+    sizes: [10, 12, 14, 16]
     # Stock vertical metrics are enormous — hhea 1703/-876 = 2.58 em line
     # height, sized for the Devanagari conjunct stacks a Latin build never
-    # renders. The "62" in the family name records fixing exactly this: a
-    # 74/62/57 px-leading A/B chose 62, i.e. ink-tight metrics 1244/-364,
-    # lineGap 0 (Latin ink extents + padding; Inknut carries an extra
-    # +100-unit pad because the Bold's ink exceeds tighter values at every
-    # size). Same values as the builds shipped at the time. Without this
-    # override the family reads with ~60% extra leading.
-    metrics: {ascent: 1244, descent: -364, linegap: 0}
+    # renders. The "62" in the family name records the first fix (a 74/62/57
+    # px-leading A/B chose 62 = ink-tight 1244/-364); this span re-derives the
+    # same idea against the uniform slot targets. Without an override the
+    # family reads with ~60% extra leading.
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
     # The family has no italics at all; obliques shear the REAL weights
     # (regular -> italic, bold -> bolditalic) at a gentle 10° — sturdy antiqua,
     # so no embolden is ever synthesized on top of the real Bold.
@@ -369,13 +401,10 @@ families:
   - name: LibreCaslonText
     description: "Caslon revival tuned for body text (Latin)"
     intervals: latin-ext
-    # Harmonized ramp: x-height 0.524 em vs the 0.475 anchor (SourceSerif4) —
-    # big-on-body, drops ~1-2pt to read at the anchor size.
-    sizes: [11, 13, 15, 16]
-    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
-    # side, fixes 3 px line-overlap. Worst −3 px plain-text overlap (gstatic static
-    # italic has mismatched metrics). Override -> 1.484 em.
-    metrics: {ascent: 1113, descent: -371, linegap: 0}
+    # Uniform slots: xh 11/14/16/18 (slot 0 is 1 px small — hinting skips
+    # 12 px between 10 and 11 pt), advY 33/39/46/52 (+-1 rounding).
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1136, descent: -407, linegap: 0}
     # Roman is a wght 400-700 variable; italic exists only as a static 400
     # (raw path 404s — this is the css2 API's gstatic static TTF), so
     # bolditalic emboldens the real Italic — never sheared. Measured: italic
@@ -390,14 +419,12 @@ families:
   - name: Newsreader
     description: "Editorial serif with optical sizing pinned for text (Latin)"
     intervals: latin-ext
-    # Harmonized ramp: x-height 0.426 em vs the 0.475 anchor (SourceSerif4) —
-    # small-on-body, needs ~+1-2pt to read as large as the moderns.
-    sizes: [13, 16, 18, 20]
-    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
-    # side, fixes 5–6 px line-overlap. opsz-16 instanced metrics give a 1.013 em
-    # line advance — near-zero leading against 1.196 em of ink; every size/style
-    # overlapped by 5–6 px in plain text. Override -> 1.326 em.
-    metrics: {ascent: 965, descent: -361, linegap: 0}
+    # Uniform slots: xh 12/14/16/18 (exact), advY 35/40/46/51 (+1 rounding at
+    # slot 0). The opsz-16 instance's stock metrics give a 1.013 em advance —
+    # near-zero leading against 1.196 em of ink, 5-6 px overlap everywhere —
+    # so an override is mandatory regardless of the slot targets.
+    sizes: [13, 15, 17, 19]
+    metrics: {ascent: 949, descent: -322, linegap: 0}
     # Both variable axes pinned: opsz 16 (text cut), wght 400/700 — all four
     # styles are real instances, nothing synthesized.
     styles:
@@ -409,13 +436,9 @@ families:
   - name: Rosarivo
     description: "Garalde bookface with calligraphic roots (Latin)"
     intervals: latin-ext
-    # Harmonized ramp: x-height 0.509 em vs the 0.475 anchor (SourceSerif4) —
-    # slightly big-on-body, each size drops ~1pt to hit the anchor size.
-    sizes: [11, 13, 15, 17]
-    # Measured plain-text ink extents from the built .cpfonts + 65/1000 padding each
-    # side, fixes 1 px line-overlap. Bold at 11 pt overlapped by 1 px.
-    # Override -> 1.571 em.
-    metrics: {ascent: 1069, descent: -502, linegap: 0}
+    # Uniform slots: xh 12/14/16/18 (exact), advY 33/39/46/52 (+-1 rounding).
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1054, descent: -489, linegap: 0}
     # Upstream ships Regular and Italic only — no bold exists — so bold
     # emboldens the Regular and bolditalic emboldens the real Italic (never
     # sheared). Measured: regular stems 0.081 em, italic 0.078 em; the shared

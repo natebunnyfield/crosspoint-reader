@@ -119,6 +119,37 @@ dirs, not only the one being built. Do not edit it mid-task to tweak a flag —
 prefer an env var or an existing env — or finished device builds vanish and you
 pay a full rebuild.
 
+**The build cache is capped now.** `build_cache_dir = .cache` is a
+content-addressed SCons CacheDir with no eviction of its own — it reached
+**11 GB in ten days** (19,781 entries) before `scripts/build_cache_policy.py`
+was added. That script caps it at 3 GB, evicting least-recently-used first
+(APFS updates atime on read here, so recency is a real signal), and calls
+`env.NoCache()` on the link artifact: 63 unstripped 51–57 MB `.elf` files were
+3.2 GB of that 11 GB, and re-linking is cheap next to a recompile. Override with
+`CROSSPOINT_BUILD_CACHE_MAX_MB`; `0` disables the cap but still keeps `.elf`s
+out of the cache.
+
+Two things about how it is wired, both of which cost a debugging cycle to find:
+
+* It is registered as **both `pre:` and `post:`**. During `pre:`, `PROGNAME` is
+  still SCons's default `program`, so `$BUILD_DIR/${PROGNAME}.elf` resolves to
+  `program.elf` — a node that never gets built, and `NoCache` silently does
+  nothing. The espressif32 builder sets `PROGNAME=firmware` only by `post:`
+  time. Pruning still runs in `pre:`, because on a full disk it has to happen
+  before anything compiles. A per-`$PIOENV` marker in `os.environ` separates the
+  phases — do not try to detect the phase from the program name, since native
+  simulator envs genuinely link a binary called `program`.
+* It is listed in **both `[base]` and `[env:simulator]`** `extra_scripts`.
+  `[env:simulator]` does not `extends = base`, so a single entry silently misses
+  all four simulator envs.
+
+Two things make this cache grow superlinearly, worth knowing before touching
+flags: a C3 object and a native arm64 object for the same translation unit are
+different hashes (nothing is shared across the nine envs), and `[base]
+build_flags` reaches every TU via `${base.build_flags}` — flip one define and
+all ~150 TUs miss at once and re-store under fresh hashes while the previous
+generation stays on disk.
+
 ### Critical Build Flags
 These flags in `platformio.ini` fundamentally affect firmware behavior:
 
@@ -237,15 +268,20 @@ invocations did not. A rebuilt family therefore has *more* glyph coverage (Edgar
 637 → 1849) while advanceY, ascender, descender, the kern matrix and ligature
 counts match exactly. Compare those fields, not the file hash.
 
-**Recovering metrics for a family whose numbers were never written down:**
-re-measuring the source gives the wrong answer (Edgar measures 987; its builds
-are only consistent with ~952). `ascender = norm_ceil(face.size.ascender)`
-(`fontconvert_sdcard.py:796`) with `ppem = pt * 150/72`, so each built size bounds
-the original and four sizes pin it to a narrow range. Edgar needed
-`{ascent: 952, descent: -284}`; the other three already carried metrics that
-reproduce their builds and take no override. The kern-cell count is a good
-fingerprint for the interval preset — GTAlpinaCond only matched its installed
-853 cells under `reading`, not `latin-ext`.
+**Uniform slots (2026-08-02): every curated family's sizes AND metrics are
+now derived, not inherited.** The same ordinal size slot shows the same
+measured x-height (12/14/16/18 px) and leading (advanceY ~34/40/46/51 px)
+across all 15 curated families; `sd-fonts.yaml` documents the rule and each
+family's deviation (floor-bound extender faces, ±1 px hinting skips). Do NOT
+"recover" a family's old metrics from shipped cards or re-measure sources by
+hand — sweep-build the family at candidate sizes and measure the built
+`.cpfont` pixels (the hinted x-height differs from source-unit estimates by
+up to 3 px). Pre-2026-08-02 cards carry the old per-family ramps/metrics;
+`findClosestReaderSize` maps slots onto either set, but a family directory
+must never mix ramps (installer prunes stale sizes for exactly this reason).
+The kern-cell count is a good fingerprint for the interval preset —
+GTAlpinaCond only matched its installed 853 cells under `reading`, not
+`latin-ext`.
 
 ```bash
 python3 scripts/install-sim-fonts.py          # rebuild + install what it can
