@@ -105,6 +105,19 @@ class HalGPIO {
   static constexpr uint8_t BTN_POWER = 6;
   static constexpr uint8_t BTN_COUNT = 7;
 
+  // Touch surface. The X4/X3 this suite models has no touch (BoardConfig::hasTouch
+  // is false there), and every activity under test reads these only behind that
+  // check, so a hard false is the honest double rather than an unused parameter
+  // pretending to report a gesture. Added because the firmware HalGPIO grew the
+  // touch API and this stub did not, which is one of the reasons this target
+  // stopped compiling.
+  bool hasTouch() const { return false; }
+  bool wasTouchTap(float&, float&) const { return false; }
+  bool isTouchTapCandidate(float&, float&, unsigned long&) const { return false; }
+  bool isTouchHeldAt(float&, float&) const { return false; }
+  unsigned long lastTouchHeldMs() const { return 0; }
+  bool wasSwipe(float&, float&, float&, float&) const { return false; }
+
  private:
   static bool valid(uint8_t buttonIndex) { return buttonIndex < BTN_COUNT; }
 

@@ -35,6 +35,20 @@ set(CP_PREVIEW "${REPO_ROOT}/tools/calendar_preview")
 # I18nStrings.cpp is generated at build time by scripts/gen_i18n.py (gitignored,
 # like I18nKeys.h / I18nStrings.h). Every activity here uses tr(), so fail with
 # the command to run rather than cmake's "cannot find source file".
+# ArduinoJson comes from PlatformIO's lib_deps, not from the repo, so it only
+# exists under .pio/libdeps after a pio build has run. CrossPointSettings.h
+# includes it and MappedInputManager.cpp includes that, so this target cannot
+# compile without it -- it never could, which is why this test has been unbuildable.
+# Any env's copy will do; they are the same package.
+file(GLOB _cp_arduinojson_dirs "${REPO_ROOT}/.pio/libdeps/*/ArduinoJson/src")
+if(_cp_arduinojson_dirs)
+  list(GET _cp_arduinojson_dirs 0 _cp_arduinojson)
+else()
+  message(FATAL_ERROR
+    "ArduinoJson not found under ${REPO_ROOT}/.pio/libdeps/*/ArduinoJson/src.\n"
+    "Run any PlatformIO build first, e.g.:  pio run -e simulator_x3")
+endif()
+
 if(NOT EXISTS "${REPO_ROOT}/lib/I18n/I18nStrings.cpp")
   message(FATAL_ERROR
     "lib/I18n/I18nStrings.cpp is missing (generated). Run:\n"
@@ -84,6 +98,7 @@ target_include_directories(ActivityInputTest BEFORE PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/stubs
 )
 target_include_directories(ActivityInputTest PRIVATE
+  ${_cp_arduinojson}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CP_PREVIEW}
   ${REPO_ROOT}/src

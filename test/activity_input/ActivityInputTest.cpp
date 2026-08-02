@@ -30,10 +30,8 @@
 // computed once per gpio.update(), stubs/HalGPIO.h) through the real
 // MappedInputManager mapping.
 
-#include <gtest/gtest.h>
-
 #include <HalGPIO.h>
-
+#include <gtest/gtest.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -303,23 +301,23 @@ TEST_F(ActivityInput, ConfirmAppliesTheFontUnderTheRenderLock) {
 
 TEST_F(ActivityInput, SideButtonChangesFontSizeUnderTheRenderLock) {
   host::setRootActivity(makeFontSelection());
-  ASSERT_EQ(SETTINGS.fontSize, CrossPointSettings::MEDIUM);
+  ASSERT_EQ(SETTINGS.fontSizeSlot, CrossPointSettings::DEFAULT_FONT_SIZE_SLOT);
   host::resetCounters();
 
   // PageForward with the default PREV_NEXT side layout is BTN_DOWN
   // (MappedInputManager.cpp:52-56); the size step runs on the RELEASE.
   host::tap(HalGPIO::BTN_DOWN);
 
-  EXPECT_EQ(SETTINGS.fontSize, CrossPointSettings::LARGE) << "side button did not step the reader font size";
+  EXPECT_EQ(SETTINGS.fontSizeSlot, CrossPointSettings::LARGE) << "side button did not step the reader font size";
   ASSERT_EQ(host::fontSystemCalls().ensureLoaded, 1);
   EXPECT_EQ(host::fontSystemCalls().ensureLoadedWithoutRenderLock, 0)
       << "changeFontSize() called ensureLoaded() with no RenderLock held";
 
   // And it clamps rather than wrapping at the top of the ramp.
   host::tap(HalGPIO::BTN_DOWN);
-  EXPECT_EQ(SETTINGS.fontSize, CrossPointSettings::EXTRA_LARGE);
+  EXPECT_EQ(SETTINGS.fontSizeSlot, CrossPointSettings::EXTRA_LARGE);
   host::tap(HalGPIO::BTN_DOWN);
-  EXPECT_EQ(SETTINGS.fontSize, CrossPointSettings::EXTRA_LARGE) << "font size wrapped instead of clamping";
+  EXPECT_EQ(SETTINGS.fontSizeSlot, CrossPointSettings::EXTRA_LARGE) << "font size wrapped instead of clamping";
 }
 
 }  // namespace

@@ -57,7 +57,7 @@ class Gfx {
     renderer_.insertFont(UI_10_FONT_ID, ui10_);
     renderer_.insertFont(UI_12_FONT_ID, ui12_);
     renderer_.insertFont(SMALL_FONT_ID, small_);
-    renderer_.setOrientation(GfxRenderer::Portrait);
+    // Orientation is a compile-time constant now (3b30b531); nothing to set.
   }
 
   GfxRenderer renderer_;
