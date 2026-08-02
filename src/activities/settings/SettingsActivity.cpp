@@ -384,9 +384,8 @@ void SettingsActivity::toggleCurrentSetting() {
         // Free-text owner name, shown on the sleep screens. Saved immediately:
         // sleep can power the device off, and an unsaved name would vanish.
         startActivityForResult(
-            std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_DEVICE_OWNER),
-                                                    SETTINGS.ownerName, sizeof(SETTINGS.ownerName) - 1,
-                                                    InputType::Text),
+            std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_DEVICE_OWNER), SETTINGS.ownerName,
+                                                    sizeof(SETTINGS.ownerName) - 1, InputType::Text),
             [this](const ActivityResult& result) {
               if (!result.isCancelled) {
                 const auto& kb = std::get<KeyboardResult>(result.data);
@@ -484,13 +483,24 @@ void SettingsActivity::render(RenderLock&&) {
         if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
           const bool value = SETTINGS.*(setting.valuePtr);
           valueText = value ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
-        } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
-          const uint8_t value = SETTINGS.*(setting.valuePtr);
-          valueText = I18N.get(setting.enumValues[value]);
-        } else if (setting.type == SettingType::ENUM && setting.valueGetter) {
-          const uint8_t value = setting.valueGetter();
-          if (!setting.enumStringValues.empty() && value < setting.enumStringValues.size()) {
-            valueText = setting.enumStringValues[value];
+        } else if (setting.type == SettingType::ENUM && (setting.valuePtr != nullptr || setting.valueGetter)) {
+          // WHERE THE VALUE COMES FROM AND WHERE THE LABEL COMES FROM ARE
+          // INDEPENDENT. A row supplies its value through either a member
+          // pointer or a getter, and its labels through either translated
+          // StrIds (enumValues) or strings it builds at runtime
+          // (enumStringValues) -- any combination is legal. This used to pick
+          // the label source off the value source, so a row with valuePtr was
+          // forced down the enumValues path: the UTC offset row builds its own
+          // labels and leaves enumValues empty, and rendering it indexed that
+          // empty vector with 48 (UTC+00:00) and segfaulted at address 0x60.
+          // enumStringValues wins whenever populated, matching what the option
+          // popup (totalValues, above) and the web settings API already do.
+          const uint8_t value = setting.valuePtr != nullptr ? SETTINGS.*(setting.valuePtr) : setting.valueGetter();
+          // Both indexes are bounds-checked: a stored value can outlive the
+          // label list it was written against (a font uninstalled, an enum
+          // shortened), and neither vector is guaranteed to cover it.
+          if (!setting.enumStringValues.empty()) {
+            if (value < setting.enumStringValues.size()) valueText = setting.enumStringValues[value];
           } else if (value < setting.enumValues.size()) {
             valueText = I18N.get(setting.enumValues[value]);
           }

@@ -61,8 +61,7 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
 
   s.valueSetter = [sdFamilyNames](uint8_t v) {
     if (v >= sdFamilyNames.size()) return;
-    strncpy(SETTINGS.sdFontFamilyName, sdFamilyNames[v].c_str(),
-            sizeof(SETTINGS.sdFontFamilyName) - 1);
+    strncpy(SETTINGS.sdFontFamilyName, sdFamilyNames[v].c_str(), sizeof(SETTINGS.sdFontFamilyName) - 1);
     SETTINGS.sdFontFamilyName[sizeof(SETTINGS.sdFontFamilyName) - 1] = '\0';
   };
 
@@ -189,12 +188,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                   {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "quickResumeSleepScreen",
                                   StrId::STR_CAT_DISPLAY));
     v.push_back(SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
-                                  {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS},
-                                  "hideBatteryPercentage", StrId::STR_CAT_DISPLAY));
-    v.push_back(SettingInfo::Enum(StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshFrequency,
-                                  {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15,
-                                   StrId::STR_PAGES_30},
-                                  "refreshFrequency", StrId::STR_CAT_DISPLAY));
+                                  {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
+                                  StrId::STR_CAT_DISPLAY));
+    v.push_back(SettingInfo::Enum(
+        StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshFrequency,
+        {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15, StrId::STR_PAGES_30},
+        "refreshFrequency", StrId::STR_CAT_DISPLAY));
     // Order MUST match CrossPointSettings::UI_THEME — settings.json persists the
     // index into this list, so APPEND ONLY (see the enum's comment).
     v.push_back(SettingInfo::Enum(StrId::STR_UI_THEME, &CrossPointSettings::uiTheme,
@@ -213,8 +212,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // Placeholder: the selectable sizes depend on the active font family, so
     // this entry is always replaced by buildFontSizeSetting() below. It only
     // fixes the setting's position in the Reader category.
-    v.push_back(SettingInfo::Enum(StrId::STR_FONT_SIZE, nullptr, {}, "fontSize", StrId::STR_CAT_READER)
-                    .withTextSettings());
+    v.push_back(
+        SettingInfo::Enum(StrId::STR_FONT_SIZE, nullptr, {}, "fontSize", StrId::STR_CAT_READER).withTextSettings());
     v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing,
                                   {StrId::STR_TIGHT, StrId::STR_NORMAL, StrId::STR_WIDE}, "lineSpacing",
                                   StrId::STR_CAT_READER));
@@ -222,10 +221,10 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                    {CrossPointSettings::SCREEN_MARGIN_MIN, CrossPointSettings::SCREEN_MARGIN_MAX,
                                     CrossPointSettings::SCREEN_MARGIN_STEP},
                                    "screenMargin", StrId::STR_CAT_READER));
-    v.push_back(SettingInfo::Enum(StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
-                                  {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT,
-                                   StrId::STR_BOOK_S_STYLE},
-                                  "paragraphAlignment", StrId::STR_CAT_READER));
+    v.push_back(SettingInfo::Enum(
+        StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
+        {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT, StrId::STR_BOOK_S_STYLE},
+        "paragraphAlignment", StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &CrossPointSettings::embeddedStyle, "embeddedStyle",
                                     StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled,
@@ -240,9 +239,10 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing,
                                   {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_AA_CRISP, StrId::STR_AA_DARK},
                                   "textAntiAliasing", StrId::STR_CAT_READER));
-    v.push_back(SettingInfo::Enum(StrId::STR_IMAGES, &CrossPointSettings::imageRendering,
-                                  {StrId::STR_IMAGES_DISPLAY, StrId::STR_IMAGES_PLACEHOLDER, StrId::STR_IMAGES_SUPPRESS},
-                                  "imageRendering", StrId::STR_CAT_READER));
+    v.push_back(
+        SettingInfo::Enum(StrId::STR_IMAGES, &CrossPointSettings::imageRendering,
+                          {StrId::STR_IMAGES_DISPLAY, StrId::STR_IMAGES_PLACEHOLDER, StrId::STR_IMAGES_SUPPRESS},
+                          "imageRendering", StrId::STR_CAT_READER));
 
     // --- Controls ---
     v.push_back(SettingInfo::Enum(StrId::STR_SIDE_BTN_LAYOUT, &CrossPointSettings::sideButtonLayout,
@@ -258,20 +258,20 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                   {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
                                    StrId::STR_LONG_PRESS_BEHAVIOR_FONT_SIZE},
                                   "longPressButtonBehavior"));
-    v.push_back(SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
-                                  {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH,
-                                   StrId::STR_FOOTNOTES},
-                                  "shortPwrBtn"));
+    v.push_back(SettingInfo::Enum(
+        StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
+        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH, StrId::STR_FOOTNOTES},
+        "shortPwrBtn"));
     v.push_back(SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &CrossPointSettings::pwrBtnFootnoteBack,
                                     "pwrBtnFootnoteBack"));
     v.push_back(SettingInfo::Toggle(StrId::STR_BACK_SHORT_TO_FILE_BROWSER, &CrossPointSettings::backShortToFileBrowser,
                                     "backShortToFileBrowser"));
 
     // --- System ---
-    v.push_back(SettingInfo::Value(StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
-                                   {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES,
-                                    CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
-                                   "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM));
+    v.push_back(SettingInfo::Value(
+        StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
+        {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
+        "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM));
     // Simulator/iOS only, deliberately compiled out on device.
     //
     // On an X4/X3 this row would be a control that cannot do anything: e-ink
@@ -322,7 +322,10 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       SettingInfo utc;
       utc.nameId = StrId::STR_CLOCK_UTC_OFFSET;
       utc.type = SettingType::ENUM;
-      // enumValues stays empty: the render path prefers enumStringValues when set.
+      // enumValues stays empty; enumStringValues carries the labels. The render
+      // path picks the label source by which vector is populated, independently
+      // of whether the value arrives via valuePtr or valueGetter -- see the ENUM
+      // branch in SettingsActivity::render.
       utc.enumStringValues = std::move(utcLabels);
       utc.valuePtr = &CrossPointSettings::clockUtcOffsetQ;
       utc.key = "clockUtcOffsetQ";
