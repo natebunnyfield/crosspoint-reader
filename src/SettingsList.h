@@ -155,9 +155,25 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // on the stack at a time; the entries, their order and their values are
     // unchanged.
     //
-    // Exact final capacity: the 50 fixed entries below plus the one conditional
-    // Keep in sync when adding an entry so the push_backs never reallocate.
-    constexpr size_t FIXED_ENTRY_COUNT = 50;
+    // Exact final capacity. Keep in sync when adding an entry so the push_backs
+    // never reallocate.
+    //
+    // 32 unconditional entries below, plus the simulator-only keep-screen-awake
+    // toggle in the System block. Nothing else is pushed: the SD-font-aware
+    // font-family/font-size entries REPLACE elements in the returned copy
+    // (`*it = ...`), they do not append, and the capability filters below only
+    // erase.
+    //
+    // This constant read 50 with a comment claiming "50 fixed entries plus the
+    // one conditional" while the real count was 32 and no conditional push_back
+    // existed. Over-reserving is invisible (no realloc, just ~18 unused
+    // SettingInfo slots held for the life of the process), which is why it
+    // drifted. Corrected to the true count here.
+#ifdef SIMULATOR
+    constexpr size_t FIXED_ENTRY_COUNT = 33;
+#else
+    constexpr size_t FIXED_ENTRY_COUNT = 32;
+#endif
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
@@ -264,6 +280,32 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                     StrId::STR_CAT_SYSTEM));
     v.push_back(SettingInfo::Toggle(StrId::STR_MOVE_FINISHED_TO_READ, &CrossPointSettings::moveFinishedToReadFolder,
                                     "moveFinishedToReadFolder", StrId::STR_CAT_SYSTEM));
+    // Simulator/iOS only, deliberately compiled out on device.
+    //
+    // On an X4/X3 this row would be a control that cannot do anything: e-ink
+    // holds its image with no power, there is no backlight and no host idle
+    // timer, and the firmware's own auto-sleep is the Time to Sleep row three
+    // lines up. Shown on device, "Keep Screen Awake" reads as "disable
+    // auto-sleep" and silently does nothing — a lying control, which is worse
+    // than an absent one.
+    //
+    // This is a gate on a NEW row, not the withdrawal of an existing one: no
+    // device owner can see or select this today, so nothing users rely on is
+    // being hidden. Capability-gating rows in this list is the established
+    // pattern — STR_TOUCH_READER_CONTROLS is filtered by BoardConfig::hasTouch()
+    // just below. That one is a runtime check because one C3 binary serves both
+    // X4 and X3; SIMULATOR is a genuine compile-time split between separate
+    // binaries, so the preprocessor is the right tool and the device build pays
+    // nothing for it.
+    //
+    // Consequence to know about: toJson/fromJson iterate this list, so
+    // "keepScreenAwake" is absent from settings.json on device builds. A
+    // settings.json written by the iOS app and then loaded and resaved by device
+    // firmware drops the key. Acceptable — the device cannot act on it.
+#ifdef SIMULATOR
+    v.push_back(SettingInfo::Toggle(StrId::STR_KEEP_SCREEN_AWAKE, &CrossPointSettings::keepScreenAwake,
+                                    "keepScreenAwake", StrId::STR_CAT_SYSTEM));
+#endif
 
     // Clock entries, web-only. Kept after the status bar was removed because the
     // calendar sleep screen shifts the RTC's UTC date by clockUtcOffsetQ

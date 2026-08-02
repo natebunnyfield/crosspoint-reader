@@ -277,6 +277,15 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Quick Resume: keep current content visible with moon icon instead of showing a static sleep screen.
   // Pinned on by normalizeRetiredSettings(); the default matches so fresh installs agree.
   uint8_t quickResumeSleepScreen = QUICK_RESUME_AFTER_TIMEOUT;
+  // Keep the HOST screen awake while CrossPoint is in the foreground
+  // (0 = let the host dim/lock normally, 1 = suppress it).
+  //
+  // Simulator/iOS only. The field itself is unconditional so the struct layout
+  // and this header stay identical across builds; only the Settings row and its
+  // persistence are #ifdef SIMULATOR (see SettingsList.h). On an X4/X3 there is
+  // no backlight and no idle timer to suppress — the e-ink panel holds its image
+  // with no power — so the value is simply never read on device.
+  uint8_t keepScreenAwake = 0;
 
   static constexpr uint8_t MIN_SLEEP_TIMEOUT_MINUTES = 1;
   static constexpr uint8_t SLEEP_TIMEOUT_NEVER_MINUTES = 31;
