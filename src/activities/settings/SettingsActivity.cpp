@@ -10,6 +10,7 @@
 
 #include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
+#include "ClockOffsetActivity.h"
 #include "CrossPointSettings.h"
 #include "FontDownloadActivity.h"
 #include "FontSelectionActivity.h"
@@ -291,6 +292,16 @@ void SettingsActivity::toggleCurrentSetting() {
     return;
   }
 
+  if (setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) {
+    // Upstream's device UI never steps this value in place. The stored byte is
+    // quarter-hours biased by 48, so a VALUE row would walk 0..104 one 15-minute
+    // notch at a time -- 96 presses to reach UTC+12. Confirm opens the dedicated
+    // three-field picker instead, which saves on exit (hence no result handler,
+    // matching StatusBarSettingsActivity.cpp:224 upstream).
+    startActivityForResult(std::make_unique<ClockOffsetActivity>(renderer, mappedInput), nullptr);
+    return;
+  }
+
   if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
     // Toggle the boolean value using the member pointer
     const bool currentValue = SETTINGS.*(setting.valuePtr);
@@ -505,7 +516,11 @@ void SettingsActivity::render(RenderLock&&) {
             valueText = I18N.get(setting.enumValues[value]);
           }
         } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
-          if (setting.nameId == StrId::STR_TIME_TO_SLEEP) {
+          if (setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) {
+            // The stored byte is a biased quarter-hour count; show the offset it
+            // means. Same helper the picker uses.
+            valueText = formatUtcOffset(SETTINGS.*(setting.valuePtr));
+          } else if (setting.nameId == StrId::STR_TIME_TO_SLEEP) {
             char valueBuffer[32];
             if (SETTINGS.sleepTimeoutMinutes >= CrossPointSettings::SLEEP_TIMEOUT_NEVER_MINUTES) {
               valueText = tr(STR_SLEEP_NEVER);
@@ -522,11 +537,17 @@ void SettingsActivity::render(RenderLock&&) {
       },
       true);
 
-  // Draw help text
+  // Draw help text. Rows that open a screen say "Select", not "Toggle" --
+  // Confirm on them does not cycle a value. (Upstream's status bar screen used a
+  // blanket "Toggle" hint for every row; this fork already made the distinction
+  // for Time to Sleep, and the offset row behaves the same way.)
+  auto opensSubScreen = [](const StrId nameId) {
+    return nameId == StrId::STR_TIME_TO_SLEEP || nameId == StrId::STR_CLOCK_UTC_OFFSET;
+  };
   const auto confirmLabel =
       (selectedSettingIndex == 0)
           ? I18N.get(categoryNames[(selectedCategoryIndex + 1) % categoryCount])
-          : (selectedSettingIndex > 0 && (*currentSettings)[selectedSettingIndex - 1].nameId == StrId::STR_TIME_TO_SLEEP
+          : (selectedSettingIndex > 0 && opensSubScreen((*currentSettings)[selectedSettingIndex - 1].nameId)
                  ? tr(STR_SELECT)
                  : tr(STR_TOGGLE));
 

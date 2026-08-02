@@ -299,39 +299,20 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                     "keepScreenAwake", StrId::STR_CAT_SYSTEM));
 #endif
 
-    // Clock entries, web-only. Kept after the status bar was removed because the
-    // calendar sleep screen shifts the RTC's UTC date by clockUtcOffsetQ
+    // Clock entries. Kept after the status bar was removed because the calendar
+    // sleep screen shifts the RTC's UTC date by clockUtcOffsetQ
     // (SleepActivity.cpp) and WifiSelectionActivity drives the NTP re-sync.
     // Range 0..104 = quarter-hour steps from UTC-12:00 to UTC+14:00, biased by 48.
-    // Displayed as the offset it means, not the byte it is stored in. The value
-    // is quarter-hours biased by 48 (0 = UTC-12:00, 48 = UTC+00:00, 104 = UTC+14:00),
-    // which as a bare VALUE row rendered as an unlabelled 0..104 counter that told
-    // the owner nothing. Built here rather than translated: an offset is written
-    // the same way in every language CrossPoint ships.
-    {
-      std::vector<std::string> utcLabels;
-      utcLabels.reserve(105);
-      for (int q = 0; q <= 104; q++) {
-        const int minutes = (q - 48) * 15;
-        const char sign = minutes < 0 ? '-' : '+';
-        const int mag = minutes < 0 ? -minutes : minutes;
-        char buf[16];
-        snprintf(buf, sizeof(buf), "UTC%c%02d:%02d", sign, mag / 60, mag % 60);
-        utcLabels.emplace_back(buf);
-      }
-      SettingInfo utc;
-      utc.nameId = StrId::STR_CLOCK_UTC_OFFSET;
-      utc.type = SettingType::ENUM;
-      // enumValues stays empty; enumStringValues carries the labels. The render
-      // path picks the label source by which vector is populated, independently
-      // of whether the value arrives via valuePtr or valueGetter -- see the ENUM
-      // branch in SettingsActivity::render.
-      utc.enumStringValues = std::move(utcLabels);
-      utc.valuePtr = &CrossPointSettings::clockUtcOffsetQ;
-      utc.key = "clockUtcOffsetQ";
-      utc.category = StrId::STR_CAT_SYSTEM;
-      v.push_back(std::move(utc));
-    }
+    //
+    // Declared exactly as upstream declares it, so the JSON key, the range clamp
+    // and the web settings control are identical. Upstream files it under its
+    // "Customise Status Bar" category, which its device UI never shows; with the
+    // status bar screen gone this fork files it under System. On device the row
+    // is not edited in place: SettingsActivity intercepts it and opens
+    // ClockOffsetActivity, and renders the stored byte through formatUtcOffset()
+    // so the row reads "UTC+5:45" rather than "141".
+    v.push_back(SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &CrossPointSettings::clockUtcOffsetQ, {0, 104, 1},
+                                   "clockUtcOffsetQ", StrId::STR_CAT_SYSTEM));
     v.push_back(SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat,
                                   {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
                                   StrId::STR_CAT_SYSTEM));
