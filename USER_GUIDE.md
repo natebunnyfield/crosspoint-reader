@@ -241,6 +241,8 @@ The Settings screen allows you to configure the device's behavior. There are a f
 
 - **Reader Font Size**: Adjust the text size for reading; options are "Small", "Medium" (default), "Large", or "X Large".
 
+Changing the font, font size, or line spacing keeps your reading position: the reader reopens on the page containing the exact words you were reading. Section headings (h1-h3) always begin at the top of a fresh page, so a chapter or section you had open stays put across these changes.
+
 - **Reader Line Spacing**: Adjust the spacing between lines; options are "Tight", "Normal" (default), or "Wide".
 
 - **Reader Screen Margin**: Controls the screen margins in Reading Mode between 5 and 40 pixels in 5-pixel increments.
