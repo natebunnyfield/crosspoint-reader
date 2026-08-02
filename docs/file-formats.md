@@ -106,6 +106,10 @@ the source text, not on font, size, or spacing — which is what lets a reflow
 reposition to the page containing the exact word the reader was on. A partial
 file's watermark trailer now follows the word LUT.
 
+Version 35 also changes pagination itself: h1-h3 headings force a page break
+(as TOC chapter boundaries always did), which pins a page-top heading to the
+page top under every font, size, and spacing. h4-h6 still flow inline.
+
 `progress.bin` gained a 12-byte form at the same time: the 8-byte form plus
 the current page's word anchor (uint32 LE). Length remains the discriminator;
 shorter files degrade to paragraph, then proportional, repositioning.

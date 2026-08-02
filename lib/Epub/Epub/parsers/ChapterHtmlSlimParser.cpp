@@ -962,6 +962,27 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         self->blockStyleStack.back().getCombinedBlockStyle(headerBlockStyle, BlockStyle::CombineAxis::Horizontal);
     self->blockStyleStack.push_back(accumulated);
     self->startNewTextBlock(accumulated.withoutBottom());
+    // h1-h3 always open a fresh page, the same way a TOC chapter boundary does
+    // (flushPendingAnchor). Beyond the typographic nicety, this is what makes a
+    // heading the reader saw at the top of a page STAY at the top across a
+    // font or size reflow: a page that begins at a forced break begins at the
+    // same source position under every pagination, so the word-anchor
+    // reposition lands exactly on it instead of on whichever page happens to
+    // contain it. h4-h6 keep flowing inline — minor subheadings would
+    // otherwise shatter dense technical books into page-per-heading. A TOC
+    // boundary heading has already been split by flushPendingAnchor inside
+    // startNewTextBlock, in which case the page is empty and this is a no-op.
+    if (name[1] >= '1' && name[1] <= '3' && self->currentPage && !self->currentPage->elements.empty()) {
+      self->completePageFn(std::move(self->currentPage), self->xpathParagraphIndex, self->xpathListItemIndex,
+                           self->pageStartAnchor());
+      self->completedPageCount++;
+      self->currentPage.reset(new (std::nothrow) Page());
+      if (!self->currentPage) {
+        LOG_ERR("EHP", "Failed to create page after heading page break");
+        return;
+      }
+      self->currentPageNextY = 0;
+    }
     self->boldUntilDepth = std::min(self->boldUntilDepth, self->depth);
     self->updateEffectiveInlineStyle();
   } else if (matches(name, BLOCK_TAGS, std::size(BLOCK_TAGS))) {
