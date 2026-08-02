@@ -45,17 +45,16 @@ def main() -> int:
     W, H = args.width, args.height
     src = Image.open(args.input).convert("L")
 
-    # Fit-width; the leftover vertical space becomes the caption band. If the
-    # source is taller than the panel even at fit-width, fall back to fit-height
-    # and center horizontally (caption then overlays the bottom of the art on a
-    # white strip).
+    # With a caption: fit-width and reserve a band below (fit-height fallback
+    # when the source is too tall). With --name "" (art carries its own text):
+    # plain best-fit of the whole panel, centered, no band.
     scale = W / src.width
     fit_h = round(src.height * scale)
     canvas = Image.new("L", (W, H), 255)
-    band_min = 64  # keep at least this much for the caption
+    band_min = 64 if args.name else 0  # caption space; none when no name
     if fit_h <= H - band_min:
         art = src.resize((W, fit_h), Image.LANCZOS)
-        canvas.paste(art, (0, 0))
+        canvas.paste(art, (0, (H - band_min - fit_h) // 2 if not args.name else 0))
         band_top = fit_h
     else:
         scale = (H - band_min) / src.height
