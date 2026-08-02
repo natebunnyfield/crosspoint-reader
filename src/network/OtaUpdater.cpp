@@ -104,7 +104,12 @@ bool OtaUpdater::isUpdateNewer() const {
   // If we reach here, it means all segments are equal.
   // One final check, if we're on an RC build (contains "-rc"), we should consider the latest version as newer even if
   // the segments are equal, since RC builds are pre-release versions.
-  if (strstr(currentVersion, "-rc") != nullptr) {
+  //
+  // EXCEPT on the -BNY fork: latestReleaseUrl points at the UPSTREAM repo, so
+  // promoting an equal-numbered release over a fork RC would offer stock
+  // upstream firmware as an "update" and silently erase the fork's changes.
+  // Fork builds only update on a strictly greater numeric version.
+  if (strstr(currentVersion, "-rc") != nullptr && strstr(currentVersion, "-BNY") == nullptr) {
     return true;
   }
 
