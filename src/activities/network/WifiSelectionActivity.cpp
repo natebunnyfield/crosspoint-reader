@@ -14,6 +14,22 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/WifiDiagnostics.h"
+
+namespace {
+// Append the last WiFi disconnect reason as a technical suffix, e.g.
+// " [202 AUTH_FAIL]", so failure screens carry a code the user can report.
+// Reason names are IDF identifiers, not translatable prose.
+void appendDisconnectReason(std::string& error) {
+  const uint8_t reason = WifiDiagnostics::lastDisconnectReason();
+  if (reason == 0) {
+    return;
+  }
+  char suffix[48];
+  snprintf(suffix, sizeof(suffix), " [%u %s]", static_cast<unsigned>(reason), WifiDiagnostics::reasonName(reason));
+  error += suffix;
+}
+}  // namespace
 
 void WifiSelectionActivity::onEnter() {
   Activity::onEnter();
@@ -344,10 +360,12 @@ void WifiSelectionActivity::showNetworkListFromAutoConnect() {
 
 void WifiSelectionActivity::attemptConnection() {
   state = autoConnecting ? WifiSelectionState::AUTO_CONNECTING : WifiSelectionState::CONNECTING;
-  connectionStartTime = millis();
   connectedIP.clear();
   connectionError.clear();
   requestUpdate();
+
+  WifiDiagnostics::begin();
+  WifiDiagnostics::resetCounters();
 
   WiFi.persistent(false);  // Credentials are managed by WifiCredentialStore; suppress SDK NVS auto-connect
   WiFi.mode(WIFI_STA);
@@ -365,11 +383,18 @@ void WifiSelectionActivity::attemptConnection() {
   String hostname = "CrossPoint-Reader-" + mac;
   WiFi.setHostname(hostname.c_str());
 
+  LOG_INF("WIFI", "Connecting to %s (auto=%d)", selectedSSID.c_str(), autoConnecting ? 1 : 0);
   if (selectedRequiresPassword && !enteredPassword.empty()) {
     WiFi.begin(selectedSSID.c_str(), enteredPassword.c_str());
   } else {
     WiFi.begin(selectedSSID.c_str());
   }
+
+  // Start the timeout clock only once begin() is issued: the mode switch,
+  // disconnect and delay above are driver setup, not connection time, and
+  // counting them eats into the window the all-channel scan + handshake +
+  // DHCP genuinely need.
+  connectionStartTime = millis();
 }
 
 void WifiSelectionActivity::checkConnectionStatus() {
@@ -386,6 +411,7 @@ void WifiSelectionActivity::checkConnectionStatus() {
     snprintf(ipStr, sizeof(ipStr), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
     connectedIP = ipStr;
     autoConnecting = false;
+    LOG_INF("WIFI", "Connected to %s in %lu ms", selectedSSID.c_str(), millis() - connectionStartTime);
 
 #if defined(ENABLE_SERIAL_LOG) && LOG_LEVEL >= 2
     uint8_t connectedBssid[6] = {};
@@ -435,6 +461,32 @@ void WifiSelectionActivity::checkConnectionStatus() {
     if (status == WL_NO_SSID_AVAIL) {
       connectionError = tr(STR_ERROR_NETWORK_NOT_FOUND);
     }
+    appendDisconnectReason(connectionError);
+    LOG_ERR("WIFI", "Connect to %s failed after %lu ms: status=%d, last reason=%u (%s)", selectedSSID.c_str(),
+            millis() - connectionStartTime, static_cast<int>(status),
+            static_cast<unsigned>(WifiDiagnostics::lastDisconnectReason()),
+            WifiDiagnostics::reasonName(WifiDiagnostics::lastDisconnectReason()));
+    if (autoConnecting) {
+      handleAutoConnectFailure();
+      return;
+    }
+    state = WifiSelectionState::CONNECTION_FAILED;
+    requestUpdate();
+    return;
+  }
+
+  // Fail fast on repeated auth failures (wrong password, handshake timeout).
+  // The SDK retries these in a loop while WiFi.status() stays WL_DISCONNECTED,
+  // so without this check a credential problem is reported as a plain timeout
+  // only after the full timeout elapses.
+  if (WifiDiagnostics::authFailureCount() >= 3) {
+    WiFi.disconnect();
+    connectionError = tr(STR_ERROR_GENERAL_FAILURE);
+    appendDisconnectReason(connectionError);
+    LOG_ERR("WIFI", "Connect to %s failed after %lu ms: repeated auth failure, last reason=%u (%s)",
+            selectedSSID.c_str(), millis() - connectionStartTime,
+            static_cast<unsigned>(WifiDiagnostics::lastDisconnectReason()),
+            WifiDiagnostics::reasonName(WifiDiagnostics::lastDisconnectReason()));
     if (autoConnecting) {
       handleAutoConnectFailure();
       return;
@@ -449,6 +501,10 @@ void WifiSelectionActivity::checkConnectionStatus() {
   if (millis() - connectionStartTime > timeoutMs) {
     WiFi.disconnect();
     connectionError = tr(STR_ERROR_CONNECTION_TIMEOUT);
+    appendDisconnectReason(connectionError);
+    LOG_ERR("WIFI", "Connect to %s timed out after %lu ms, last reason=%u (%s)", selectedSSID.c_str(),
+            millis() - connectionStartTime, static_cast<unsigned>(WifiDiagnostics::lastDisconnectReason()),
+            WifiDiagnostics::reasonName(WifiDiagnostics::lastDisconnectReason()));
     if (autoConnecting) {
       handleAutoConnectFailure();
       return;

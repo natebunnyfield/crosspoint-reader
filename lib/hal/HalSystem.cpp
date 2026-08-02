@@ -1,6 +1,8 @@
 #include "HalSystem.h"
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 #include "Arduino.h"
 #include "HalStorage.h"
@@ -93,9 +95,71 @@ void begin() {
   }
 }
 
+namespace {
+
+constexpr char CRASH_DIR[] = "/crash_reports";
+constexpr size_t MAX_CRASH_REPORTS = 10;
+
+// Archive one report per crash under /crash_reports/crash_<N>.txt, evicting
+// the lowest-numbered (oldest) files so at most MAX_CRASH_REPORTS remain.
+// Indices instead of timestamps: the RTC may be unset or wrong at crash time,
+// and a monotonically growing index also encodes crash order.
+void archiveCrashReport(const std::string& panicInfo) {
+  if (!Storage.ensureDirectoryExists(CRASH_DIR)) {
+    LOG_ERR("SYS", "Cannot create %s", CRASH_DIR);
+    return;
+  }
+
+  std::vector<int> indices;
+  indices.reserve(MAX_CRASH_REPORTS + 1);
+  {
+    auto dir = Storage.open(CRASH_DIR);
+    if (dir && dir.isDirectory()) {
+      while (true) {
+        HalFile entry = dir.openNextFile();
+        if (!entry) {
+          break;
+        }
+        char name[32];
+        entry.getName(name, sizeof(name));
+        int idx = -1;
+        if (sscanf(name, "crash_%d.txt", &idx) == 1 && idx >= 0) {
+          indices.push_back(idx);
+        }
+      }
+    }
+  }
+
+  std::sort(indices.begin(), indices.end());
+  const int nextIdx = indices.empty() ? 0 : indices.back() + 1;
+
+  // Evict oldest until at most MAX_CRASH_REPORTS-1 remain (the new report
+  // brings the total back to MAX_CRASH_REPORTS).
+  size_t remaining = indices.size();
+  for (size_t i = 0; i < indices.size() && remaining >= MAX_CRASH_REPORTS; i++, remaining--) {
+    char path[48];
+    snprintf(path, sizeof(path), "%s/crash_%d.txt", CRASH_DIR, indices[i]);
+    Storage.remove(path);
+  }
+
+  char path[48];
+  snprintf(path, sizeof(path), "%s/crash_%d.txt", CRASH_DIR, nextIdx);
+  auto file = Storage.open(path, O_WRITE | O_CREAT | O_TRUNC);
+  if (file) {
+    file.write(panicInfo.c_str(), panicInfo.size());
+    file.close();
+    LOG_INF("SYS", "Archived crash report to %s", path);
+  } else {
+    LOG_ERR("SYS", "Failed to open %s for writing", path);
+  }
+}
+
+}  // namespace
+
 void checkPanic() {
   if (isRebootFromPanic()) {
     auto panicInfo = getPanicInfo(true);
+    // Fixed path always holds the most recent crash (existing user workflow).
     auto file = Storage.open("/crash_report.txt", O_WRITE | O_CREAT | O_TRUNC);
     if (file) {
       file.write(panicInfo.c_str(), panicInfo.size());
@@ -104,6 +168,8 @@ void checkPanic() {
     } else {
       LOG_ERR("SYS", "Failed to open crash_report.txt for writing");
     }
+    // Rotating archive so consecutive crashes don't overwrite each other.
+    archiveCrashReport(panicInfo);
   }
 }
 
@@ -122,6 +188,11 @@ std::string getPanicInfo(bool full) {
     std::string info;
 
     info += "CrossPoint version: " CROSSPOINT_VERSION;
+    {
+      char resetLine[40];
+      snprintf(resetLine, sizeof(resetLine), "\nReset reason: %d", static_cast<int>(esp_reset_reason()));
+      info += resetLine;
+    }
     info += "\n\nPanic reason: " + std::string(panicMessage);
     info += "\n\nLast logs:\n" + getLastLogs();
     info += "\n\nStack memory:\n";
