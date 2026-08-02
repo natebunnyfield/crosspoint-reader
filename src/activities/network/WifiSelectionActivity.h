@@ -89,9 +89,15 @@ class WifiSelectionActivity final : public Activity {
   int savePromptSelection = 0;
   int forgetPromptSelection = 0;
 
-  // Connection timeout
+  // Connection timeout. The connect path uses WIFI_ALL_CHANNEL_SCAN, which
+  // alone takes ~2-4s before association even starts; add the WPA handshake
+  // and DHCP on a busy or mesh AP and 7s was routinely exceeded, so the first
+  // auto-connect attempt "timed out" on networks that were actually fine.
+  // Absent networks still fail fast via WL_NO_SSID_AVAIL, and credential
+  // errors fail fast via the auth-failure counter, so the long timeout only
+  // applies to networks that are genuinely still negotiating.
   static constexpr unsigned long CONNECTION_TIMEOUT_MS = 15000;
-  static constexpr unsigned long AUTO_CONNECTION_TIMEOUT_MS = 7000;
+  static constexpr unsigned long AUTO_CONNECTION_TIMEOUT_MS = 15000;
   unsigned long connectionStartTime = 0;
 
   void renderNetworkList(const Rect* screen, const ThemeMetrics* metrics) const;
