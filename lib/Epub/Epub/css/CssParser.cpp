@@ -1,3 +1,6 @@
+#include <type_traits>
+#include <cstdlib>
+#include <cerrno>
 #include "CssParser.h"
 
 #include <Arduino.h>
@@ -122,8 +125,34 @@ bool tryParseNumber(std::string_view s, T& out) {
   const char* begin = s.data();
   const char* end = s.data() + s.size();
   if (begin < end && *begin == '+') ++begin;
-  const auto r = std::from_chars(begin, end, out);
-  return r.ec == std::errc{} && r.ptr == end;
+  if (begin >= end) return false;
+  if constexpr (std::is_floating_point_v<T>) {
+    // The FLOATING-POINT std::from_chars overloads live in libc++'s dylib and
+    // Apple marks them introduced in iOS 26.0, so using them here silently
+    // raised the whole app's minimum OS. strtof/strtod are C89 and available
+    // everywhere, including the ESP32 build, and give the same all-or-nothing
+    // parse once the end pointer is checked. The integral overloads below are
+    // header-only and carry no such gate.
+    //
+    // strtod needs a NUL terminator, which a string_view does not promise. CSS
+    // numeric tokens are short; anything longer than this buffer is not a number
+    // we could represent anyway, so it is rejected rather than truncated (a
+    // truncated parse would silently succeed on the wrong value).
+    char buf[64];
+    const size_t n = static_cast<size_t>(end - begin);
+    if (n >= sizeof(buf)) return false;
+    memcpy(buf, begin, n);
+    buf[n] = '\0';
+    char* parseEnd = nullptr;
+    errno = 0;
+    const double v = std::strtod(buf, &parseEnd);
+    if (parseEnd != buf + n || errno == ERANGE) return false;
+    out = static_cast<T>(v);
+    return true;
+  } else {
+    const auto r = std::from_chars(begin, end, out);
+    return r.ec == std::errc{} && r.ptr == end;
+  }
 }
 
 // Collect up to 4 whitespace-separated tokens for a CSS edge-value shorthand
