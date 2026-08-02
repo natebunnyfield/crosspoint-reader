@@ -73,6 +73,11 @@ class GfxRenderer {
   // fontCacheManager_ below.
   mutable std::map<int, SdCardFont*> sdCardFonts_;
   mutable std::map<int, uint16_t> sdCardFontScales_;  // fontId -> 8.8 fixed point scale (256=1.0x)
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Glyph-blit-only companions; see registerHiResFont(). Not present on device.
+  std::map<int, EpdFontFamily> hiResFontMap_;
+  mutable std::map<int, SdCardFont*> hiResSdFonts_;
+#endif
 
   // Mutable because drawText() is const but needs to delegate scan-mode
   // recording to the (non-const) FontCacheManager. Same pragmatic compromise
@@ -161,6 +166,9 @@ class GfxRenderer {
     fontMap.erase(fontId);
     sdCardFonts_.erase(fontId);
     sdCardFontScales_.erase(fontId);
+#if CROSSPOINT_RENDER_SCALE > 1
+    removeHiResFont(fontId);
+#endif
   }
   void setFontCacheManager(FontCacheManager* m) { fontCacheManager_ = m; }
   FontCacheManager* getFontCacheManager() const { return fontCacheManager_; }
@@ -171,7 +179,35 @@ class GfxRenderer {
   void clearSdCardFonts() {
     sdCardFonts_.clear();
     sdCardFontScales_.clear();
+#if CROSSPOINT_RENDER_SCALE > 1
+    clearHiResFonts();
+#endif
   }
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Hi-res companion faces: the SAME family/point size rasterised at
+  // RENDER_SCALE x the ppem. Used ONLY to blit glyphs onto the device pixel
+  // grid. Never consulted for advances, kerning, ascender, line height or any
+  // other measurement -- those must keep coming from the 1x tables or layout
+  // would move. Registration is optional; a font with no companion falls back to
+  // the 1x glyph replicated RENDER_SCALE x RENDER_SCALE, i.e. today's output.
+  void registerHiResFont(int fontId, SdCardFont* font, EpdFontFamily family) {
+    hiResSdFonts_[fontId] = font;
+    hiResFontMap_.insert_or_assign(fontId, family);
+  }
+  void removeHiResFont(int fontId) {
+    hiResFontMap_.erase(fontId);
+    hiResSdFonts_.erase(fontId);
+  }
+  void clearHiResFonts() {
+    hiResFontMap_.clear();
+    hiResSdFonts_.clear();
+  }
+  const std::map<int, SdCardFont*>& getHiResSdCardFonts() const { return hiResSdFonts_; }
+  const EpdFontFamily* getHiResFamily(int fontId) const {
+    const auto it = hiResFontMap_.find(fontId);
+    return it != hiResFontMap_.end() ? &it->second : nullptr;
+  }
+#endif
   void registerSdCardFontScale(int fontId, uint16_t scale) { sdCardFontScales_[fontId] = scale; }
   void clearSdCardFontScales() { sdCardFontScales_.clear(); }
   uint16_t getSdCardFontScale(int fontId) const {
@@ -245,8 +281,22 @@ class GfxRenderer {
   int getWriteOriginY() const { return _stripActive ? _stripY0 : 0; }
   int getWriteRows() const { return _stripActive ? _stripRows : panelHeight; }
 
+  // Supersampling: how many framebuffer pixels one logical pixel covers on each
+  // axis. 1 on device (see HalDisplay.h). Everything above the pixel-write layer
+  // -- coordinates, metrics, layout -- is in LOGICAL units regardless.
+  static constexpr int RENDER_SCALE = CROSSPOINT_RENDER_SCALE;
+
   // Drawing
   void drawPixel(int x, int y, bool state = true) const;
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Write ONE framebuffer pixel, in device coordinates (logical * RENDER_SCALE).
+  // drawPixel() is this replicated over a RENDER_SCALE x RENDER_SCALE block, so
+  // every non-glyph primitive keeps looking exactly as it does at scale 1. Only
+  // the hi-res glyph blit addresses device pixels individually.
+  void drawPixelDevice(int dx, int dy, bool state) const;
+  // Device-coordinate form of glyphIntersectsStrip(), for the hi-res glyph path.
+  bool glyphIntersectsStripDevice(int dx0, int dy0, int dx1, int dy1) const;
+#endif
   void drawLine(int x1, int y1, int x2, int y2, bool state = true) const;
   void drawLine(int x1, int y1, int x2, int y2, int lineWidth, bool state) const;
   void drawArc(int maxRadius, int cx, int cy, int xDir, int yDir, int lineWidth, bool state) const;

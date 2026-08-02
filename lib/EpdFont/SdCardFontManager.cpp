@@ -6,10 +6,44 @@
 #include <SdCardFont.h>
 #include <SdCardFontRegistry.h>
 
+#if CROSSPOINT_RENDER_SCALE > 1
+#include <HalStorage.h>
+
+namespace {
+// Hi-res companion path for a 1x .cpfont: the SAME filename inside a
+// "<RENDER_SCALE>x" subdirectory of the family folder, e.g.
+//   /fonts/Coelacanth/Coelacanth_19.cpfont        (1x, rasterised at 19 pt)
+//   /fonts/Coelacanth/2x/Coelacanth_19.cpfont     (same face at 38 pt)
+//
+// Why there and not a new root or a new family directory:
+//   * SdCardFontRegistry::scanDirectory() skips subdirectories outright
+//     (SdCardFontRegistry.cpp:120-123), so the companion is INVISIBLE to
+//     discovery -- it cannot show up in the font picker, cannot be selected,
+//     and cannot shift SETTINGS.sdFontFamilyName.
+//   * It travels with the family: copying /fonts/Coelacanth to a phone brings
+//     the hi-res set along, and it works from either scan root.
+//   * The filename keeps the 1x POINT SIZE, so the companion for a loaded font
+//     is a pure string transform -- no second registry, no size matching.
+// The point size in the name is a label only; nothing in the .cpfont header
+// records ppem (SdCardFont::load reads magic/version/styleCount/TOC and no
+// size), so a 2x-rasterised file named _19 loads fine and simply carries
+// bigger glyphs and a bigger advanceY -- neither of which layout ever reads,
+// because the companion is registered for GLYPH BLITTING ONLY.
+std::string hiResCompanionPath(const std::string& path) {
+  const size_t slash = path.find_last_of('/');
+  if (slash == std::string::npos) return {};
+  return path.substr(0, slash + 1) + std::to_string(CROSSPOINT_RENDER_SCALE) + "x/" + path.substr(slash + 1);
+}
+}  // namespace
+#endif
+
 SdCardFontManager::~SdCardFontManager() {
   for (auto& lf : loaded_) {
     delete lf.font;
   }
+#if CROSSPOINT_RENDER_SCALE > 1
+  for (auto* f : hiResFonts_) delete f;
+#endif
 }
 
 // FNV-1a continuation: seeds with contentHash, then hashes family name + point size.
@@ -56,6 +90,29 @@ int SdCardFontManager::loadFile(const SdCardFontFileInfo& file, const char* fami
 
   EpdFontFamily fontFamily(font->getEpdFont(0), font->getEpdFont(1), font->getEpdFont(2), font->getEpdFont(3));
   renderer.insertFont(fontId, fontFamily);
+
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Optional hi-res companion. Absent = the 1x glyph replicated, i.e. exactly
+  // what shipped before. Note this is registered under the SAME fontId, so the
+  // section cache key (which is that id) is unaffected and pagination cannot
+  // move because a companion appeared or disappeared.
+  const std::string hiResPath = hiResCompanionPath(file.path);
+  if (!hiResPath.empty() && Storage.exists(hiResPath.c_str())) {
+    auto* hiRes = new (std::nothrow) SdCardFont();
+    if (!hiRes) {
+      LOG_ERR("SDMGR", "OOM: hi-res SdCardFont for %s", hiResPath.c_str());
+    } else if (!hiRes->load(hiResPath.c_str())) {
+      LOG_ERR("SDMGR", "Failed to load hi-res %s", hiResPath.c_str());
+      delete hiRes;
+    } else {
+      hiResFonts_.push_back(hiRes);
+      renderer.registerHiResFont(
+          fontId, hiRes,
+          EpdFontFamily(hiRes->getEpdFont(0), hiRes->getEpdFont(1), hiRes->getEpdFont(2), hiRes->getEpdFont(3)));
+      LOG_DBG("SDMGR", "Loaded hi-res %s for id=%d", hiResPath.c_str(), fontId);
+    }
+  }
+#endif
   return fontId;
 }
 
@@ -99,10 +156,14 @@ void SdCardFontManager::unloadAll(GfxRenderer& renderer) {
   renderer.clearFallbackFonts();
   renderer.clearSdCardFonts();
   for (auto& lf : loaded_) {
-    renderer.removeFont(lf.fontId);
+    renderer.removeFont(lf.fontId);  // also drops any hi-res companion registration
     delete lf.font;
   }
   loaded_.clear();
+#if CROSSPOINT_RENDER_SCALE > 1
+  for (auto* f : hiResFonts_) delete f;
+  hiResFonts_.clear();
+#endif
   loadedFamilyName_.clear();
   loadedPointSize_ = 0;
 }

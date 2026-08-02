@@ -1,5 +1,7 @@
 #pragma once
 
+#include <HalDisplay.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -58,4 +60,9 @@ class SdCardFontManager {
   std::string loadedFamilyName_;
   uint8_t loadedPointSize_ = 0;
   std::vector<LoadedFont> loaded_;
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Hi-res companion faces, owned here, registered with the renderer for glyph
+  // blitting only. Simulator-only (see HalDisplay.h CROSSPOINT_RENDER_SCALE).
+  std::vector<SdCardFont*> hiResFonts_;
+#endif
 };

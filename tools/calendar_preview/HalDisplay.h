@@ -3,8 +3,14 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
+// Host stubs render at 1:1 with the panel; see lib/hal/HalDisplay.h.
+#ifndef CROSSPOINT_RENDER_SCALE
+#define CROSSPOINT_RENDER_SCALE 1
+#endif
+
 class HalDisplay {
  public:
+  static constexpr int RENDER_SCALE = CROSSPOINT_RENDER_SCALE;
   static constexpr uint16_t DISPLAY_WIDTH = 792;   // X3 landscape panel
   static constexpr uint16_t DISPLAY_HEIGHT = 528;
   static constexpr uint16_t DISPLAY_WIDTH_BYTES = DISPLAY_WIDTH / 8;

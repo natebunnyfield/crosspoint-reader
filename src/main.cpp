@@ -36,7 +36,12 @@ MappedInputManager mappedInputManager(gpio, renderer);
 ActivityManager activityManager(renderer, mappedInputManager);
 FontDecompressor fontDecompressor;
 SdCardFontSystem sdFontSystem;
-FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts());
+FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts()
+#if CROSSPOINT_RENDER_SCALE > 1
+                                                             ,
+                                  renderer.getHiResSdCardFonts()
+#endif
+);
 static unsigned long allowSleepAt = 0;
 // Inactivity clock for auto-sleep. File scope, not a loop()-local static, because
 // the simulator's iOS build wakes from deep sleep with a longjmp back into the

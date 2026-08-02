@@ -7,8 +7,20 @@
 #include <cstring>
 
 FontCacheManager::FontCacheManager(const std::map<int, EpdFontFamily>& fontMap,
-                                   const std::map<int, SdCardFont*>& sdCardFonts)
-    : fontMap_(fontMap), sdCardFonts_(sdCardFonts) {}
+                                   const std::map<int, SdCardFont*>& sdCardFonts
+#if CROSSPOINT_RENDER_SCALE > 1
+                                   ,
+                                   const std::map<int, SdCardFont*>& hiResSdCardFonts
+#endif
+                                   )
+    : fontMap_(fontMap),
+      sdCardFonts_(sdCardFonts)
+#if CROSSPOINT_RENDER_SCALE > 1
+      ,
+      hiResSdCardFonts_(hiResSdCardFonts)
+#endif
+{
+}
 
 void FontCacheManager::setFontDecompressor(FontDecompressor* d) { fontDecompressor_ = d; }
 
@@ -17,6 +29,11 @@ void FontCacheManager::clearCache() {
   for (auto& [id, font] : sdCardFonts_) {
     font->clearCache();
   }
+#if CROSSPOINT_RENDER_SCALE > 1
+  for (auto& [id, font] : hiResSdCardFonts_) {
+    font->clearCache();
+  }
+#endif
 }
 
 void FontCacheManager::prewarmCache(int fontId, const char* utf8Text, uint8_t styleMask) {
@@ -27,6 +44,15 @@ void FontCacheManager::prewarmCache(int fontId, const char* utf8Text, uint8_t st
     if (missed > 0) {
       LOG_DBG("FCM", "prewarmCache(SD): %d glyph(s) not found (styleMask=0x%02X)", missed, styleMask);
     }
+#if CROSSPOINT_RENDER_SCALE > 1
+    // Same text, same styles, into the hi-res companion: the render pass that
+    // follows blits from IT, so without this every glyph would fall through to
+    // the on-demand overflow ring (capacity 16) and re-read from storage.
+    auto hiIt = hiResSdCardFonts_.find(fontId);
+    if (hiIt != hiResSdCardFonts_.end()) {
+      hiIt->second->prewarm(utf8Text, styleMask);
+    }
+#endif
     return;
   }
 
@@ -57,6 +83,11 @@ void FontCacheManager::resetStats() {
   for (auto& [id, font] : sdCardFonts_) {
     font->resetStats();
   }
+#if CROSSPOINT_RENDER_SCALE > 1
+  for (auto& [id, font] : hiResSdCardFonts_) {
+    font->resetStats();
+  }
+#endif
 }
 
 bool FontCacheManager::isScanning() const { return scanMode_ == ScanMode::Scanning; }

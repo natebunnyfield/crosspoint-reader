@@ -2,6 +2,19 @@
 #include <Arduino.h>
 #include <EInkDisplay.h>
 
+// Supersampling factor between the LOGICAL screen coordinate space every caller
+// draws in and the PHYSICAL framebuffer. On real hardware there is exactly one
+// framebuffer pixel per logical pixel, so this is 1 and every scale-aware branch
+// compiles out via `#if` -- the device build stays textually the original code.
+// The SIMULATOR's own HalDisplay.h defines it >1 to give glyphs a denser raster
+// on a Retina/phone panel WITHOUT changing layout: advances, kerning, wrapping
+// and pagination keep reading the 1x font tables and keep producing logical
+// coordinates; only the pixel-write layer scales. See
+// GfxRenderer::drawPixelDevice() and the hi-res font path in drawText().
+#ifndef CROSSPOINT_RENDER_SCALE
+#define CROSSPOINT_RENDER_SCALE 1
+#endif
+
 class HalDisplay {
  public:
   // Constructor with pin configuration
@@ -26,10 +39,16 @@ class HalDisplay {
   void begin(bool seamless = false);
 
   // Display dimensions
+  static constexpr int RENDER_SCALE = CROSSPOINT_RENDER_SCALE;  // always 1 on device
   static constexpr uint16_t DISPLAY_WIDTH = EInkDisplay::DISPLAY_WIDTH;
   static constexpr uint16_t DISPLAY_HEIGHT = EInkDisplay::DISPLAY_HEIGHT;
   static constexpr uint16_t DISPLAY_WIDTH_BYTES = DISPLAY_WIDTH / 8;
   static constexpr uint32_t BUFFER_SIZE = DISPLAY_WIDTH_BYTES * DISPLAY_HEIGHT;
+  // Logical panel geometry. Identical to the physical panel on hardware; the
+  // simulator's HalDisplay.h keeps these at the real panel size while
+  // DISPLAY_WIDTH/HEIGHT grow by RENDER_SCALE.
+  static constexpr uint16_t LOGICAL_WIDTH = DISPLAY_WIDTH;
+  static constexpr uint16_t LOGICAL_HEIGHT = DISPLAY_HEIGHT;
 
   // Frame buffer operations
   void clearScreen(uint8_t color = 0xFF) const;

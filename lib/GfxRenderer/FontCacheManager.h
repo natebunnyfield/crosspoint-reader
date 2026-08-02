@@ -1,6 +1,7 @@
 #pragma once
 
 #include <EpdFontFamily.h>
+#include <HalDisplay.h>
 
 #include <cstdint>
 #include <map>
@@ -11,7 +12,12 @@ class SdCardFont;
 
 class FontCacheManager {
  public:
-  FontCacheManager(const std::map<int, EpdFontFamily>& fontMap, const std::map<int, SdCardFont*>& sdCardFonts);
+  FontCacheManager(const std::map<int, EpdFontFamily>& fontMap, const std::map<int, SdCardFont*>& sdCardFonts
+#if CROSSPOINT_RENDER_SCALE > 1
+                   ,
+                   const std::map<int, SdCardFont*>& hiResSdCardFonts
+#endif
+  );
 
   void setFontDecompressor(FontDecompressor* d);
 
@@ -47,6 +53,12 @@ class FontCacheManager {
  private:
   const std::map<int, EpdFontFamily>& fontMap_;
   const std::map<int, SdCardFont*>& sdCardFonts_;
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Hi-res glyph-blit companions. Prewarmed/cleared in lockstep with their 1x
+  // font so the render pass finds their bitmaps resident instead of thrashing
+  // the 16-entry on-demand overflow ring. Never measured from.
+  const std::map<int, SdCardFont*>& hiResSdCardFonts_;
+#endif
   FontDecompressor* fontDecompressor_ = nullptr;
 
   enum class ScanMode : uint8_t { None, Scanning };

@@ -272,9 +272,12 @@ static AlignedMemRect screenRectToAlignedMemRect(GfxRenderer::Orientation orient
   AlignedMemRect out;
   if (sw <= 0 || sh <= 0) return out;
 
+  // rotateCoordinates works in DEVICE space (it is parameterised by the
+  // framebuffer dims), so scale the logical rect up first. Folds away at scale 1.
+  constexpr int S = CROSSPOINT_RENDER_SCALE;
   int x0, y0, x1, y1;
-  rotateCoordinates(orientation, sx, sy, &x0, &y0, panelWidth, panelHeight);
-  rotateCoordinates(orientation, sx + sw - 1, sy + sh - 1, &x1, &y1, panelWidth, panelHeight);
+  rotateCoordinates(orientation, sx * S, sy * S, &x0, &y0, panelWidth, panelHeight);
+  rotateCoordinates(orientation, (sx + sw) * S - 1, (sy + sh) * S - 1, &x1, &y1, panelWidth, panelHeight);
 
   const int memXLo = std::min(x0, x1);
   const int memYLo = std::min(y0, y1);
@@ -304,6 +307,32 @@ static AlignedMemRect screenRectToAlignedMemRect(GfxRenderer::Orientation orient
 
 enum class TextRotation { None, Rotated90CW };
 
+// Glyph plotting target. `deviceSpace` is only ever true when a hi-res
+// companion face is in play (RENDER_SCALE > 1): the glyph bitmap is already
+// rasterised at the framebuffer's pixel density, so each of its pixels is ONE
+// framebuffer pixel and the cursor arrives pre-multiplied. At scale 1 the
+// parameter is always false and these fold back to the original calls.
+template <bool deviceSpace>
+static inline void plotGlyphPixel(const GfxRenderer& renderer, const int x, const int y, const bool state) {
+#if CROSSPOINT_RENDER_SCALE > 1
+  if constexpr (deviceSpace) {
+    renderer.drawPixelDevice(x, y, state);
+    return;
+  }
+#endif
+  renderer.drawPixel(x, y, state);
+}
+
+template <bool deviceSpace>
+static inline bool glyphInBand(const GfxRenderer& renderer, const int x0, const int y0, const int x1, const int y1) {
+#if CROSSPOINT_RENDER_SCALE > 1
+  if constexpr (deviceSpace) {
+    return renderer.glyphIntersectsStripDevice(x0, y0, x1, y1);
+  }
+#endif
+  return renderer.glyphIntersectsStrip(x0, y0, x1, y1);
+}
+
 // Shared glyph rendering logic for normal and rotated text.
 // Coordinate mapping and cursor advance direction are selected at compile time via the template parameter.
 // Render a glyph at 50% scale. Used for SUP/SUB style bits.
@@ -313,6 +342,7 @@ enum class TextRotation { None, Rotated90CW };
 //
 // The advance width is also halved in drawText() so layout reserves exactly the right
 // horizontal space for the scaled glyph.
+template <bool deviceSpace = false>
 static void renderCharScaled(const GfxRenderer& renderer, GfxRenderer::RenderMode renderMode,
                              const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
                              const bool pixelState, const EpdFontFamily::Style style) {
@@ -351,7 +381,7 @@ static void renderCharScaled(const GfxRenderer& renderer, GfxRenderer::RenderMod
           }
         }
         if (maxRaw >= 2 || coverage >= 2) {
-          renderer.drawPixel(baseX + dstX, baseY + dstY, pixelState);
+          plotGlyphPixel<deviceSpace>(renderer, baseX + dstX, baseY + dstY, pixelState);
         }
       }
     }
@@ -373,14 +403,14 @@ static void renderCharScaled(const GfxRenderer& renderer, GfxRenderer::RenderMod
           }
         }
         if (hasInk) {
-          renderer.drawPixel(baseX + dstX, baseY + dstY, pixelState);
+          plotGlyphPixel<deviceSpace>(renderer, baseX + dstX, baseY + dstY, pixelState);
         }
       }
     }
   }
 }
 
-template <TextRotation rotation = TextRotation::None>
+template <TextRotation rotation = TextRotation::None, bool deviceSpace = false>
 static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode renderMode,
                            const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
                            const bool pixelState, const EpdFontFamily::Style style) {
@@ -403,13 +433,13 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
   if constexpr (rotation == TextRotation::Rotated90CW) {
     const int ob = cursorX + fontData->ascender - top;
     const int ib = cursorY - left;
-    if (!renderer.glyphIntersectsStrip(ob, ib - (width - 1), ob + height - 1, ib)) {
+    if (!glyphInBand<deviceSpace>(renderer, ob, ib - (width - 1), ob + height - 1, ib)) {
       return;
     }
   } else {
     const int gx0 = cursorX + left;
     const int gy0 = cursorY - top;
-    if (!renderer.glyphIntersectsStrip(gx0, gy0, gx0 + width - 1, gy0 + height - 1)) {
+    if (!glyphInBand<deviceSpace>(renderer, gx0, gy0, gx0 + width - 1, gy0 + height - 1)) {
       return;
     }
   }
@@ -475,13 +505,13 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
 
           if (renderMode == GfxRenderer::BW && bmpVal < 3) {
             // Black (also paints over the grays in BW mode)
-            renderer.drawPixel(screenX, screenY, pixelState);
+            plotGlyphPixel<deviceSpace>(renderer, screenX, screenY, pixelState);
           } else if ((planeMask >> bmpVal) & 1) {
             // Grayscale pass: flag this pixel in the active plane. Dedicated X3
             // gray LUTs now provide proper 4-level gray on both devices. We
             // have to flag pixels in reverse for the gray buffers, as 0 leave
             // alone, 1 update.
-            renderer.drawPixel(screenX, screenY, false);
+            plotGlyphPixel<deviceSpace>(renderer, screenX, screenY, false);
           }
         }
       }
@@ -503,7 +533,7 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
           const uint8_t bit_index = 7 - (pixelPosition & 7);
 
           if ((byte >> bit_index) & 1) {
-            renderer.drawPixel(screenX, screenY, pixelState);
+            plotGlyphPixel<deviceSpace>(renderer, screenX, screenY, pixelState);
           }
         }
       }
@@ -511,9 +541,29 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
   }
 }
 
+#if CROSSPOINT_RENDER_SCALE > 1
+// Logical pixel -> a RENDER_SCALE x RENDER_SCALE block of device pixels. This is
+// what keeps every non-glyph primitive (rules, fills, icons, images, arcs)
+// looking exactly as it does at scale 1: the shape is unchanged, only its
+// sampling grid is finer. Glyphs bypass this via the hi-res path in drawText().
+void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
+  const int dx0 = x * RENDER_SCALE;
+  const int dy0 = y * RENDER_SCALE;
+  for (int j = 0; j < RENDER_SCALE; ++j) {
+    for (int i = 0; i < RENDER_SCALE; ++i) {
+      drawPixelDevice(dx0 + i, dy0 + j, state);
+    }
+  }
+}
+
+// IMPORTANT: This function is in critical rendering path and is called for every pixel. Please keep it as simple and
+// efficient as possible.
+void GfxRenderer::drawPixelDevice(const int x, const int y, const bool state) const {
+#else
 // IMPORTANT: This function is in critical rendering path and is called for every pixel. Please keep it as simple and
 // efficient as possible.
 void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
+#endif
   int phyX = 0;
   int phyY = 0;
 
@@ -618,6 +668,16 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   }
   const auto& font = fontIt->second;
 
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Hi-res glyph blit. `font` above stays the ONLY source of metrics -- the
+  // cursor walk below (advanceX, kerning, ligatures, the fp4 snap) is untouched,
+  // so every glyph lands on exactly the logical pixel it would at scale 1. The
+  // companion face only supplies a denser BITMAP for that position, drawn on the
+  // device grid at (logical * RENDER_SCALE). No companion registered => nullptr
+  // => the 1x glyph replicated, i.e. today's output.
+  const EpdFontFamily* hiRes = getHiResFamily(resolvedFontId);
+#endif
+
   const char* textCursor = renderedText;
   uint32_t cp;
   uint32_t prevCp = 0;
@@ -637,6 +697,13 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
           combiningMark::raiseAboveBase(anchor, combiningGlyph->top, combiningGlyph->height, lastBaseTop);
       const int combiningX = combiningMark::anchorOver(anchor, lastBaseX, lastBaseLeft, lastBaseWidth,
                                                        combiningGlyph->left, combiningGlyph->width);
+#if CROSSPOINT_RENDER_SCALE > 1
+      if (hiRes && hiRes->getGlyph(cp, style)) {
+        renderCharImpl<TextRotation::None, true>(*this, renderMode, *hiRes, cp, combiningX * RENDER_SCALE,
+                                                 (yPos - raiseBy) * RENDER_SCALE, black, style);
+        continue;
+      }
+#endif
       renderCharImpl<TextRotation::None>(*this, renderMode, font, cp, combiningX, yPos - raiseBy, black, style);
       continue;
     }
@@ -665,6 +732,21 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
       prevAdvanceFP = (prevAdvanceFP + 1) / 2;
     }
 
+#if CROSSPOINT_RENDER_SCALE > 1
+    if (hiRes && hiRes->getGlyph(cp, style)) {
+      const int devX = lastBaseX * RENDER_SCALE;
+      const int devY = yPos * RENDER_SCALE;
+      if (isSupSub) {
+        // renderCharScaled halves the glyph. A RENDER_SCALE-x face halved on the
+        // device grid is exactly the half-size logical glyph, supersampled.
+        renderCharScaled<true>(*this, renderMode, *hiRes, cp, devX, devY, black, style);
+      } else {
+        renderCharImpl<TextRotation::None, true>(*this, renderMode, *hiRes, cp, devX, devY, black, style);
+      }
+      prevCp = cp;
+      continue;
+    }
+#endif
     if (isSupSub) {
       // yPos already carries the vertical offset applied by TextBlock::render().
       renderCharScaled(*this, renderMode, font, cp, lastBaseX, yPos, black, style);
@@ -939,9 +1021,12 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
   // Rotate the two opposing logical corners into physical-framebuffer space.
   // The bounding rect in physical space is the rect we need to fill — rotation
   // is rigid (no shear/stretch) so the bbox of the two corners IS the rect.
+  // Scale to device pixels first: a logical rect covers S x S framebuffer pixels
+  // per logical pixel, so the fill is the same shape at a finer sampling grid.
+  constexpr int S = CROSSPOINT_RENDER_SCALE;
   int paX, paY, pbX, pbY;
-  rotateCoordinates(orientation, lx0, ly0, &paX, &paY, panelWidth, panelHeight);
-  rotateCoordinates(orientation, lx1 - 1, ly1 - 1, &pbX, &pbY, panelWidth, panelHeight);
+  rotateCoordinates(orientation, lx0 * S, ly0 * S, &paX, &paY, panelWidth, panelHeight);
+  rotateCoordinates(orientation, lx1 * S - 1, ly1 * S - 1, &pbX, &pbY, panelWidth, panelHeight);
 
   const int phyX0 = std::min(paX, pbX);
   const int phyX1 = std::max(paX, pbX);  // inclusive
@@ -1025,8 +1110,17 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
     // blackMask byte therefore repeats with period 2 in py. Precompute both
     // variants outside the row loop to eliminate the per-row switch + 8-bit
     // construction loop.
-    uint8_t blackMasks[2];
-    for (int parityIdx = 0; parityIdx < 2; ++parityIdx) {
+    //
+    // At RENDER_SCALE S each logical pixel spans S device rows and columns, so
+    // the period in py becomes 2*S and the logical coordinate is the device
+    // coordinate divided by S. That keeps the dither at LOGICAL resolution --
+    // the fill looks pixel-for-pixel like scale 1, just replicated -- rather
+    // than becoming a finer (and visibly different) pattern.
+    constexpr int S = CROSSPOINT_RENDER_SCALE;
+    static_assert((S & (S - 1)) == 0, "RENDER_SCALE must be a power of two (the dither mask indexes with a mask)");
+    constexpr int MASK_PERIOD = 2 * S;
+    uint8_t blackMasks[MASK_PERIOD];
+    for (int parityIdx = 0; parityIdx < MASK_PERIOD; ++parityIdx) {
       const int samplePy = phyY0 + parityIdx;
       int lxBase = 0, lyBase = 0;
       switch (orientation) {
@@ -1049,8 +1143,17 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
       }
       uint8_t mask = 0;
       for (int b = 0; b < 8; ++b) {
+#if CROSSPOINT_RENDER_SCALE > 1
+        // Device coords -> logical, floor-divided so the parity stays consistent
+        // for the (unused) sample rows a short rect can push past the panel edge.
+        const int dlx = lxBase + b * dlxPerPhyX;
+        const int dly = lyBase + b * dlyPerPhyX;
+        const int lx = (dlx >= 0 ? dlx : dlx - (S - 1)) / S;
+        const int ly = (dly >= 0 ? dly : dly - (S - 1)) / S;
+#else
         const int lx = lxBase + b * dlxPerPhyX;
         const int ly = lyBase + b * dlyPerPhyX;
+#endif
         bool isBlack;
         if constexpr (C == Color::LightGray) {
           isBlack = ((lx & 1) == 0) && ((ly & 1) == 0);
@@ -1059,11 +1162,11 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
         }
         if (isBlack) mask |= static_cast<uint8_t>(1u << (7 - b));
       }
-      blackMasks[samplePy & 1] = mask;
+      blackMasks[samplePy & (MASK_PERIOD - 1)] = mask;
     }
 
     for (int py = phyY0; py <= phyY1; ++py) {
-      const uint8_t blackMask = blackMasks[py & 1];
+      const uint8_t blackMask = blackMasks[py & (MASK_PERIOD - 1)];
       const uint8_t whiteMask = static_cast<uint8_t>(~blackMask);
 
       // Dither writes BOTH inks (the slow path called drawPixel for every
@@ -1239,6 +1342,60 @@ void GfxRenderer::fillRoundedRect(const int x, const int y, const int width, con
 }
 
 void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, const int width, const int height) const {
+#if CROSSPOINT_RENDER_SCALE > 1
+  // The SDK blit copies bytes 1:1 into the framebuffer, so it cannot express a
+  // supersampled panel — and its bitmaps are stored pre-rotated, so re-plotting
+  // them through the logical rotate would land them wrong (see drawIcon's note).
+  // Instead reproduce the blit EXACTLY: work out the physical rect it would
+  // occupy on the un-scaled panel, then write each of its pixels as a
+  // RENDER_SCALE x RENDER_SCALE device block. Mapping-agnostic and pixel-exact.
+  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int logicalPanelW = panelWidth / S;
+  const int logicalPanelH = panelHeight / S;
+  int rotatedX = 0;
+  int rotatedY = 0;
+  rotateCoordinates(orientation, x, y, &rotatedX, &rotatedY, logicalPanelW, logicalPanelH);
+  switch (orientation) {
+    case Portrait:
+      rotatedY -= height;
+      break;
+    case PortraitInverted:
+      rotatedX -= width;
+      break;
+    case LandscapeClockwise:
+      rotatedY -= height;
+      rotatedX -= width;
+      break;
+    case LandscapeCounterClockwise:
+      break;
+  }
+  // The blit snaps x down to a byte boundary; match it.
+  const int baseX = (rotatedX / 8) * 8;
+  const int imageWidthBytes = width / 8;
+  for (int row = 0; row < height; row++) {
+    const int phyRow = rotatedY + row;
+    if (phyRow < 0 || phyRow >= logicalPanelH) continue;
+    for (int col = 0; col < imageWidthBytes * 8; col++) {
+      const int phyCol = baseX + col;
+      if (phyCol < 0 || phyCol >= logicalPanelW) continue;
+      const uint8_t byte = bitmap[row * imageWidthBytes + (col >> 3)];
+      const bool black = ((byte >> (7 - (col & 7))) & 1) == 0;
+      for (int j = 0; j < S; ++j) {
+        for (int i = 0; i < S; ++i) {
+          const uint32_t byteIndex =
+              static_cast<uint32_t>(phyRow * S + j) * panelWidthBytes + static_cast<uint32_t>(phyCol * S + i) / 8;
+          const uint8_t bitPosition = 7 - ((phyCol * S + i) % 8);
+          if (black) {
+            frameBuffer[byteIndex] &= ~(1 << bitPosition);
+          } else {
+            frameBuffer[byteIndex] |= 1 << bitPosition;
+          }
+        }
+      }
+    }
+  }
+  return;
+#else
   int rotatedX = 0;
   int rotatedY = 0;
   rotateCoordinates(orientation, x, y, &rotatedX, &rotatedY, panelWidth, panelHeight);
@@ -1259,6 +1416,7 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, co
   }
   // TODO: Rotate bits
   display.drawImage(bitmap, rotatedX, rotatedY, width, height);
+#endif
 }
 
 void GfxRenderer::drawIcon(const uint8_t bitmap[], const int x, const int y, const int size) const {
@@ -1549,7 +1707,17 @@ void GfxRenderer::endStripTarget() const {
   _stripRows = 0;
 }
 
+#if CROSSPOINT_RENDER_SCALE > 1
+// Logical bbox -> device bbox (inclusive corners), then the device test below.
 bool GfxRenderer::glyphIntersectsStrip(int x0, int y0, int x1, int y1) const {
+  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  return glyphIntersectsStripDevice(x0 * S, y0 * S, x1 * S + S - 1, y1 * S + S - 1);
+}
+
+bool GfxRenderer::glyphIntersectsStripDevice(int x0, int y0, int x1, int y1) const {
+#else
+bool GfxRenderer::glyphIntersectsStrip(int x0, int y0, int x1, int y1) const {
+#endif
   if (!_stripActive) {
     return true;
   }
@@ -1708,18 +1876,22 @@ std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* 
 }
 
 // Note: Internal driver treats screen in command orientation; this library exposes a logical orientation
+// The /RENDER_SCALE is what pins layout to the real panel: panelWidth/Height are
+// FRAMEBUFFER dimensions, which the simulator inflates, but every caller of
+// these two lays out against the logical panel and must keep seeing 480x800 /
+// 528x792. Divide here and nothing above the pixel-write layer can notice.
 int GfxRenderer::getScreenWidth() const {
   switch (orientation) {
     case Portrait:
     case PortraitInverted:
       // 480px wide in portrait logical coordinates
-      return panelHeight;
+      return panelHeight / RENDER_SCALE;
     case LandscapeClockwise:
     case LandscapeCounterClockwise:
       // 800px wide in landscape logical coordinates
-      return panelWidth;
+      return panelWidth / RENDER_SCALE;
   }
-  return panelHeight;
+  return panelHeight / RENDER_SCALE;
 }
 
 int GfxRenderer::getScreenHeight() const {
@@ -1727,13 +1899,13 @@ int GfxRenderer::getScreenHeight() const {
     case Portrait:
     case PortraitInverted:
       // 800px tall in portrait logical coordinates
-      return panelWidth;
+      return panelWidth / RENDER_SCALE;
     case LandscapeClockwise:
     case LandscapeCounterClockwise:
       // 480px tall in landscape logical coordinates
-      return panelHeight;
+      return panelHeight / RENDER_SCALE;
   }
-  return panelWidth;
+  return panelWidth / RENDER_SCALE;
 }
 
 void GfxRenderer::tapToLogical(float nx, float ny, int& outX, int& outY) const {
@@ -1763,6 +1935,9 @@ void GfxRenderer::tapToLogical(float nx, float ny, int& outX, int& outY) const {
       outY = phyY;
       break;
   }
+  // The inverse rotate lands in DEVICE pixels; callers want logical ones.
+  outX /= RENDER_SCALE;
+  outY /= RENDER_SCALE;
 }
 
 // Translate a logical rect through rotateCoordinates and take the bounding
@@ -1772,6 +1947,13 @@ static bool logicalRectToPhysicalBounds(GfxRenderer::Orientation orientation, in
                                         uint16_t panelWidth, uint16_t panelHeight, int* outX0, int* outY0, int* outX1,
                                         int* outY1) {
   if (lw <= 0 || lh <= 0) return false;
+  // Corners in DEVICE pixels: rotateCoordinates is parameterised by the
+  // framebuffer dims, which are RENDER_SCALE x the logical panel.
+  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  lx *= S;
+  ly *= S;
+  lw *= S;
+  lh *= S;
   int minX = INT32_MAX;
   int minY = INT32_MAX;
   int maxX = INT32_MIN;
@@ -2094,9 +2276,10 @@ void GfxRenderer::preconditionGrayscale(int x, int y, int w, int h) const {
   if (w <= 0 || h <= 0) return;
   // Rotate the logical rect's opposite corners to physical panel coords; the
   // physical bbox stays axis-aligned for all four orientations.
+  constexpr int S = CROSSPOINT_RENDER_SCALE;
   int ax, ay, bx, by;
-  rotateCoordinates(orientation, x, y, &ax, &ay, panelWidth, panelHeight);
-  rotateCoordinates(orientation, x + w - 1, y + h - 1, &bx, &by, panelWidth, panelHeight);
+  rotateCoordinates(orientation, x * S, y * S, &ax, &ay, panelWidth, panelHeight);
+  rotateCoordinates(orientation, (x + w) * S - 1, (y + h) * S - 1, &bx, &by, panelWidth, panelHeight);
   int x0 = ax < bx ? ax : bx, x1 = ax > bx ? ax : bx;
   int y0 = ay < by ? ay : by, y1 = ay > by ? ay : by;
   if (x0 < 0) x0 = 0;

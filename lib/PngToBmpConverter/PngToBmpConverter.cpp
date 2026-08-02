@@ -838,9 +838,13 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
 }
 
 bool PngToBmpConverter::pngFileToBmpStream(HalFile& pngFile, Print& bmpOut, bool crop) {
-  // Use runtime display dimensions (swapped for portrait cover sizing)
-  const int targetWidth = display.getDisplayHeight();
-  const int targetHeight = display.getDisplayWidth();
+  // Use runtime display dimensions (swapped for portrait cover sizing).
+  // LOGICAL, not framebuffer: at CROSSPOINT_RENDER_SCALE > 1 the framebuffer is
+  // a multiple of the panel, and a cover.bmp is cached on the SD card without a
+  // dimension key -- sizing it from the framebuffer would silently write covers
+  // at a different resolution than the device produces.
+  const int targetWidth = display.getDisplayHeight() / HalDisplay::RENDER_SCALE;
+  const int targetHeight = display.getDisplayWidth() / HalDisplay::RENDER_SCALE;
   return pngFileToBmpStreamInternal(pngFile, bmpOut, targetWidth, targetHeight, false, crop);
 }
 

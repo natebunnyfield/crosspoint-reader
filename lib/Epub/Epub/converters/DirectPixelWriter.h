@@ -35,6 +35,12 @@ struct DirectPixelWriter {
   // Row-precomputed: the Y-dependent portion of the physical coords
   int rowPhyXBase, rowPhyYBase;
 
+  // Supersampling: one logical image pixel covers S x S framebuffer pixels, so
+  // images keep exactly the size and shape they have at scale 1 (this change is
+  // about text; image resolution is deliberately left alone). S == 1 on device,
+  // where every branch below compiles out.
+  static constexpr int S = CROSSPOINT_RENDER_SCALE;
+
   void init(GfxRenderer& renderer) {
     fb = renderer.getWriteTarget();
     originY = renderer.getWriteOriginY();
@@ -97,8 +103,8 @@ struct DirectPixelWriter {
   // Call once per row before the column loop.
   // Pre-computes the Y-dependent portion so writePixel() only needs the X part.
   inline void beginRow(int logicalY) {
-    rowPhyXBase = phyXBase + logicalY * phyXStepY;
-    rowPhyYBase = phyYBase + logicalY * phyYStepY;
+    rowPhyXBase = phyXBase + logicalY * S * phyXStepY;
+    rowPhyYBase = phyYBase + logicalY * S * phyYStepY;
   }
 
   // For the current row (set via beginRow), narrow [colStart, colEnd) to the
@@ -115,13 +121,26 @@ struct DirectPixelWriter {
     colStart = 0;
     colEnd = width;
     if (phyYStepX == 0) {
+#if CROSSPOINT_RENDER_SCALE > 1
+      // At S > 1 the row occupies S framebuffer rows (phyYStepY is +/-1 exactly
+      // when phyYStepX is 0), so keep it if ANY of them lands in the band.
+      const int syA = rowPhyYBase - originY;
+      const int syB = syA + (S - 1) * phyYStepY;
+      const int syLo = syA < syB ? syA : syB;
+      const int syHi = syA > syB ? syA : syB;
+      if (syHi < 0 || syLo >= clipRows) colEnd = 0;
+      return;
+#else
       // phyY is constant across the row: the whole row is in-band or out.
       const int sy = rowPhyYBase - originY;
       if (static_cast<unsigned>(sy) >= static_cast<unsigned>(clipRows)) colEnd = 0;
       return;
+#endif
     }
-    // phyY = rowPhyYBase + logicalX * phyYStepX (phyYStepX is +1 or -1).
-    // Solve originY <= phyY <= originY + clipRows - 1 for logicalX.
+    // phyY = rowPhyYBase + deviceX * phyYStepX (phyYStepX is +1 or -1), where
+    // deviceX = (xBase + col) * S + i, i in [0, S).
+    // Solve originY <= phyY <= originY + clipRows - 1 for deviceX, then widen by
+    // one logical column each way; writePixel() clips whatever survives.
     const int loY = originY;
     const int hiY = originY + clipRows - 1;
     int xLo, xHi;
@@ -132,6 +151,11 @@ struct DirectPixelWriter {
       xLo = rowPhyYBase - hiY;
       xHi = rowPhyYBase - loY;
     }
+#if CROSSPOINT_RENDER_SCALE > 1
+    // Floor-divide device X back to logical columns, padding by one.
+    xLo = (xLo >= 0 ? xLo : xLo - (S - 1)) / S - 1;
+    xHi = (xHi >= 0 ? xHi : xHi - (S - 1)) / S + 1;
+#endif
     const int cs = xLo - xBase;
     const int ce = xHi - xBase + 1;  // exclusive
     if (cs > colStart) colStart = cs;
@@ -167,6 +191,30 @@ struct DirectPixelWriter {
 
     if (!draw) return;
 
+#if CROSSPOINT_RENDER_SCALE > 1
+    // One logical pixel -> an S x S device block, so the image keeps its scale-1
+    // size and shape. byteIndex is uint32_t here: at S = 2 on X3 the largest
+    // index is 1055 * 198 + 197 = 209,087, which does NOT fit the uint16_t the
+    // scale-1 path uses (that one is safe because 479 * 100 + 99 = 48,-odd).
+    const int bx = logicalX * S;
+    for (int j = 0; j < S; ++j) {
+      const int rx = rowPhyXBase + j * phyXStepY;
+      const int ry = rowPhyYBase + j * phyYStepY;
+      for (int i = 0; i < S; ++i) {
+        const int phyX = rx + (bx + i) * phyXStepX;
+        const int phyY = ry + (bx + i) * phyYStepX;
+        const int sy = phyY - originY;
+        if (static_cast<unsigned>(sy) >= static_cast<unsigned>(clipRows)) continue;
+        const uint32_t byteIndex = static_cast<uint32_t>(sy) * displayWidthBytes + (phyX >> 3);
+        const uint8_t bitMask = 1 << (7 - (phyX & 7));
+        if (state) {
+          fb[byteIndex] &= ~bitMask;  // Clear bit (draw black)
+        } else {
+          fb[byteIndex] |= bitMask;  // Set bit (draw white)
+        }
+      }
+    }
+#else
     const int phyX = rowPhyXBase + logicalX * phyXStepX;
     const int phyY = rowPhyYBase + logicalX * phyYStepX;
 
@@ -183,6 +231,7 @@ struct DirectPixelWriter {
     } else {
       fb[byteIndex] |= bitMask;  // Set bit (draw white)
     }
+#endif
   }
 };
 

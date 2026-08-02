@@ -715,8 +715,10 @@ bool JpegToBmpConverter::jpegFileToBmpStreamInternal(HalFile& jpegFile, Print& b
 // Core function: Convert JPEG file to 2-bit BMP (uses default target size)
 bool JpegToBmpConverter::jpegFileToBmpStream(HalFile& jpegFile, Print& bmpOut, bool crop) {
   // Use runtime display dimensions (swapped for portrait cover sizing)
-  const int targetWidth = display.getDisplayHeight();
-  const int targetHeight = display.getDisplayWidth();
+  // LOGICAL, not framebuffer: cover.bmp is cached without a dimension key, so
+  // it must keep the size the device would write (see PngToBmpConverter).
+  const int targetWidth = display.getDisplayHeight() / HalDisplay::RENDER_SCALE;
+  const int targetHeight = display.getDisplayWidth() / HalDisplay::RENDER_SCALE;
   return jpegFileToBmpStreamInternal(jpegFile, bmpOut, targetWidth, targetHeight, false, crop);
 }
 
