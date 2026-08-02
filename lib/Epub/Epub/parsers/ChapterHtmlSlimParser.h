@@ -26,7 +26,10 @@ class ChapterHtmlSlimParser {
   std::shared_ptr<Epub> epub;
   const std::string& filepath;
   GfxRenderer& renderer;
-  std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t)> completePageFn;
+  // (page, paragraphIndex, listItemIndex, wordAnchor) — wordAnchor is the
+  // chapter-global source byte position where the NEXT page begins; see
+  // pageStartAnchor().
+  std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t, uint32_t)> completePageFn;
   std::function<void()> popupFn;  // Popup callback
   bool imagePopupFired = false;   // popupFn fired for the first image probe (single-shot)
   int depth = 0;
@@ -95,6 +98,17 @@ class ChapterHtmlSlimParser {
   std::vector<std::string> tocAnchors;  // the list of anchors that are TOC chapter boundaries
   uint16_t xpathParagraphIndex = 0;
   uint16_t xpathListItemIndex = 0;
+  // Source bytes of every COMPLETED text block. Together with the live
+  // block's own counters this yields a chapter-global, layout-invariant
+  // anchor for any page boundary.
+  uint32_t chapterSourceBytes_ = 0;
+  // Anchor for a page break at a BLOCK boundary (TOC/HR/image breaks, final
+  // flush): the live block — empty, or fully laid out but not yet folded into
+  // chapterSourceBytes_ — contributes its whole byte count. Mid-block breaks
+  // in addLineToPage use the incoming line's own anchor instead.
+  uint32_t pageStartAnchor() const {
+    return chapterSourceBytes_ + (currentTextBlock ? currentTextBlock->sourceByteCount() : 0);
+  }
 
   // Footnote link tracking
   bool insideFootnoteLink = false;
@@ -131,16 +145,15 @@ class ChapterHtmlSlimParser {
   static void XMLCALL endElement(void* userData, const XML_Char* name);
 
  public:
-  explicit ChapterHtmlSlimParser(std::shared_ptr<Epub> epub, const std::string& filepath, GfxRenderer& renderer,
-                                 const int fontId, const float lineCompression, const bool extraParagraphSpacing,
-                                 const uint8_t paragraphAlignment, const uint16_t viewportWidth,
-                                 const uint16_t viewportHeight, const bool hyphenationEnabled,
-                                 const bool focusReadingEnabled,
-                                 const std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t)>& completePageFn,
-                                 const bool embeddedStyle, const std::string& contentBase,
-                                 const std::string& imageBasePath, const uint8_t imageRendering = 0,
-                                 std::vector<std::string> tocAnchors = {},
-                                 const std::function<void()>& popupFn = nullptr, const CssParser* cssParser = nullptr)
+  explicit ChapterHtmlSlimParser(
+      std::shared_ptr<Epub> epub, const std::string& filepath, GfxRenderer& renderer, const int fontId,
+      const float lineCompression, const bool extraParagraphSpacing, const uint8_t paragraphAlignment,
+      const uint16_t viewportWidth, const uint16_t viewportHeight, const bool hyphenationEnabled,
+      const bool focusReadingEnabled,
+      const std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t, uint32_t)>& completePageFn,
+      const bool embeddedStyle, const std::string& contentBase, const std::string& imageBasePath,
+      const uint8_t imageRendering = 0, std::vector<std::string> tocAnchors = {},
+      const std::function<void()>& popupFn = nullptr, const CssParser* cssParser = nullptr)
 
       : epub(epub),
         filepath(filepath),

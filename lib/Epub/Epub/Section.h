@@ -29,6 +29,10 @@ class Section {
     uint32_t fileOffset;
     uint16_t paragraphIndex;
     uint16_t listItemIndex;
+    // Chapter-global source byte position where the NEXT page begins (sampled
+    // by the parser as this page completed). Layout-invariant, so it survives
+    // any font/size/spacing reflow. Page P's own start = lut[P-1].wordAnchor.
+    uint32_t wordAnchor;
   };
   // Held only while an incremental build is in progress (see startBuild). Carries the
   // live parser plus the strings it references (the parser stores them by reference)
@@ -156,4 +160,19 @@ class Section {
 
   // Look up the synthetic paragraph index for the given rendered page.
   std::optional<uint16_t> getParagraphIndexForPage(uint16_t page) const;
+
+  // Source-position anchor of `page`'s first word (chapter-global byte offset;
+  // 0 for page 0). The exact-reposition counterpart of the paragraph LUT:
+  // stable across reflows even in chapters with no <p> elements at all.
+  std::optional<uint32_t> getFirstWordAnchorForPage(uint16_t page) const;
+
+  // The page whose span contains source position `anchor` under the CURRENT
+  // pagination — the first page of the run whose start anchor <= anchor.
+  // During a build, returns nullopt until the build has laid out past
+  // `anchor` (build further and retry), mirroring the paragraph variant.
+  std::optional<uint16_t> getPageForWordAnchor(uint32_t anchor) const;
+
+ private:
+  std::optional<uint32_t> getFirstWordAnchorForPageDuringBuild(uint16_t page) const;
+  std::optional<uint16_t> getPageForWordAnchorDuringBuild(uint32_t anchor) const;
 };

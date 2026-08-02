@@ -228,7 +228,7 @@ void ChapterHtmlSlimParser::flushPendingAnchor() {
   // block is flushed so the chapter starts on a fresh page.
   if (std::find(tocAnchors.begin(), tocAnchors.end(), pendingAnchorId) != tocAnchors.end()) {
     if (currentPage && !currentPage->elements.empty()) {
-      completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex);
+      completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
       completedPageCount++;
       currentPage.reset(new Page());
       currentPageNextY = 0;
@@ -312,6 +312,10 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
   // If the pending anchor is a TOC chapter boundary, force a page break after the previous
   // block is flushed so the chapter starts on a fresh page.
   flushPendingAnchor();
+  // The block being retired is fully laid out (makePages() above): fold its
+  // source bytes into the chapter-global anchor base BEFORE the new block
+  // starts counting from zero.
+  if (currentTextBlock) chapterSourceBytes_ += currentTextBlock->sourceByteCount();
   currentTextBlock.reset(new ParsedText(extraParagraphSpacing, hyphenationEnabled, focusReadingEnabled, blockStyle));
   wordsExtractedInBlock = 0;
   listItemBulletOnly = false;
@@ -352,7 +356,7 @@ void ChapterHtmlSlimParser::emitHorizontalRule(const BlockStyle& blockStyle) {
   const int16_t totalHeight = static_cast<int16_t>(topSpacing + ruleThickness + bottomSpacing);
 
   if (!currentPage->elements.empty() && currentPageNextY + totalHeight > viewportHeight) {
-    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex);
+    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
     completedPageCount++;
     currentPage.reset(new (std::nothrow) Page());
     if (!currentPage) {
@@ -750,7 +754,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                     (self->currentPageNextY + imageMarginTop + displayHeight + imageMarginBottom >
                      self->viewportHeight)) {
                   self->completePageFn(std::move(self->currentPage), self->xpathParagraphIndex,
-                                       self->xpathListItemIndex);
+                                       self->xpathListItemIndex, self->pageStartAnchor());
                   self->completedPageCount++;
                   self->currentPage.reset(new Page());
                   if (!self->currentPage) {
@@ -958,6 +962,27 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         self->blockStyleStack.back().getCombinedBlockStyle(headerBlockStyle, BlockStyle::CombineAxis::Horizontal);
     self->blockStyleStack.push_back(accumulated);
     self->startNewTextBlock(accumulated.withoutBottom());
+    // h1-h3 always open a fresh page, the same way a TOC chapter boundary does
+    // (flushPendingAnchor). Beyond the typographic nicety, this is what makes a
+    // heading the reader saw at the top of a page STAY at the top across a
+    // font or size reflow: a page that begins at a forced break begins at the
+    // same source position under every pagination, so the word-anchor
+    // reposition lands exactly on it instead of on whichever page happens to
+    // contain it. h4-h6 keep flowing inline — minor subheadings would
+    // otherwise shatter dense technical books into page-per-heading. A TOC
+    // boundary heading has already been split by flushPendingAnchor inside
+    // startNewTextBlock, in which case the page is empty and this is a no-op.
+    if (name[1] >= '1' && name[1] <= '3' && self->currentPage && !self->currentPage->elements.empty()) {
+      self->completePageFn(std::move(self->currentPage), self->xpathParagraphIndex, self->xpathListItemIndex,
+                           self->pageStartAnchor());
+      self->completedPageCount++;
+      self->currentPage.reset(new (std::nothrow) Page());
+      if (!self->currentPage) {
+        LOG_ERR("EHP", "Failed to create page after heading page break");
+        return;
+      }
+      self->currentPageNextY = 0;
+    }
     self->boldUntilDepth = std::min(self->boldUntilDepth, self->depth);
     self->updateEffectiveInlineStyle();
   } else if (matches(name, BLOCK_TAGS, std::size(BLOCK_TAGS))) {
@@ -1568,7 +1593,7 @@ bool ChapterHtmlSlimParser::finishParse() {
       anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
       pendingAnchorId.clear();
     }
-    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex);
+    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
     completedPageCount++;
     currentPage.reset();
     currentTextBlock.reset();
@@ -1604,7 +1629,10 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
   }
 
   if (currentPageNextY + lineHeight > viewportHeight) {
-    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex);
+    // The page ends here; the incoming line opens the next one, so the next
+    // page's start anchor is that line's source position within the chapter.
+    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex,
+                   chapterSourceBytes_ + (currentTextBlock ? currentTextBlock->lastExtractedLineSourceStart() : 0));
     completedPageCount++;
     currentPage.reset(new Page());
     currentPageNextY = 0;

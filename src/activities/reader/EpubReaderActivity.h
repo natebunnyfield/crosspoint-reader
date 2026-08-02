@@ -21,6 +21,12 @@ class EpubReaderActivity final : public Activity {
   // chapter. Resolved back to a page against the NEW pagination, which is exact
   // where the proportional remap is only proportional. Consumed on use.
   std::optional<uint16_t> pendingParagraphAnchor;
+  // Exact-word anchor captured alongside the paragraph one: the chapter-global
+  // source byte position of the current page's first word (Section word LUT).
+  // Tried FIRST in applyDeferredReposition — unlike the paragraph index it is
+  // meaningful in chapters with no <p> elements, where the paragraph anchor
+  // resolves every page to 0 and a reflow rewound to the chapter start.
+  std::optional<uint32_t> pendingWordAnchor;
   int pagesUntilFullRefresh = 0;
   // Image pages use a dedicated double-FAST refresh path, so retain a manual
   // refresh request until renderContents can issue its clean base pass.

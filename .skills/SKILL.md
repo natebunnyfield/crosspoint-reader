@@ -1024,10 +1024,14 @@ rm -rf /path/to/sd/.crosspoint/epub_<hash>/sections/
 
 **Current Versions** (as of docs/file-formats.md):
 - `book.bin`: **Version 10** (metadata structure)
-- `section.bin`: **Version 34** (layout structure)
+- `section.bin`: **Version 35** (layout structure; v35 added the per-page
+  word-anchor LUT used for exact reposition after font/size changes, and made
+  h1-h3 headings force a page break so a page-top heading stays pinned across
+  reflows)
 - `progress.bin`: **no version byte** — its LENGTH discriminates. 4 bytes =
   spine+page, 6 adds the chapter page count, 8 adds the paragraph index the
-  reader was on. Shorter files still load and degrade gracefully.
+  reader was on, 12 adds the page's word anchor (uint32 LE source byte
+  position). Shorter files still load and degrade gracefully.
 
 **Version Increment Rules**:
 1. **ALWAYS increment version** BEFORE changing binary structure
