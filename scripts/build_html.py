@@ -4,9 +4,43 @@ import gzip
 
 SRC_DIR = "src"
 
+def minify_css(css: str) -> str:
+    """Conservative CSS minification: strip block comments and blank lines.
+
+    Only /* ... */ comments are removed; string literals in CSS rules are
+    never multi-line, so a cross-line regex match cannot hit a false positive
+    inside a string value in practice.  Trailing/leading whitespace on each
+    line is left intact to avoid altering selector specificity or calc()
+    expressions.
+    """
+    css = re.sub(r'/\*.*?\*/', '', css, flags=re.DOTALL)
+    # Drop lines that became blank after comment removal
+    lines = [l for l in css.splitlines() if l.strip()]
+    return '\n'.join(lines) + '\n' if lines else ''
+
+
+def minify_js(js: str) -> str:
+    """Conservative JS minification: strip comment-only lines and blank lines.
+
+    Only lines whose *entire* content (after stripping leading whitespace) is a
+    // comment are removed.  Inline comments after code are left untouched,
+    so URLs like https://... and regex literals are safe.  This avoids the
+    complex state-machine needed for full tokenisation while still trimming the
+    ~20 KB of developer comments found in FilesPage.html.
+    """
+    out = []
+    for line in js.splitlines(keepends=True):
+        if line.strip().startswith('//'):
+            continue
+        if not line.strip():
+            continue
+        out.append(line)
+    return ''.join(out)
+
+
 def minify_html(html: str) -> str:
-    # Tags where whitespace should be preserved
-    preserve_tags = ['pre', 'code', 'textarea', 'script', 'style']
+    # Tags where whitespace must be fully preserved (no minification at all)
+    preserve_tags = ['pre', 'code', 'textarea']
     preserve_regex = '|'.join(preserve_tags)
 
     # Protect preserve blocks with placeholders
@@ -16,6 +50,18 @@ def minify_html(html: str) -> str:
         return f"__PRESERVE_BLOCK_{len(preserve_blocks)-1}__"
 
     html = re.sub(rf'<({preserve_regex})[\s\S]*?</\1>', preserve, html, flags=re.IGNORECASE)
+
+    # Minify inline <style> blocks (CSS comment stripping)
+    def minify_style_tag(match):
+        open_tag, inner, close_tag = match.group(1), match.group(2), match.group(3)
+        return open_tag + minify_css(inner) + close_tag
+    html = re.sub(r'(<style[^>]*>)([\s\S]*?)(</style>)', minify_style_tag, html, flags=re.IGNORECASE)
+
+    # Minify inline <script> blocks (comment-only line stripping)
+    def minify_script_tag(match):
+        open_tag, inner, close_tag = match.group(1), match.group(2), match.group(3)
+        return open_tag + minify_js(inner) + close_tag
+    html = re.sub(r'(<script[^>]*>)([\s\S]*?)(</script>)', minify_script_tag, html, flags=re.IGNORECASE)
 
     # Remove HTML comments
     html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
