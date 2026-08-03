@@ -12,59 +12,6 @@ was found, and what closing it requires.
 
 ## OPEN
 
-### [B-008] iOS app offers WiFi and web-server menus that cannot work
-**severity: medium · scope: iOS app · CODE LANDED 2026-08-03, NOT YET VERIFIED**
-
-⚠️ Fix committed (`CROSSPOINT_NO_NETWORK` guards, firmware `5bce63bf`; iOS TU
-exclusions, simulator `ac8cdef`) but **not confirmed running**. The agent
-reported `pad_core_test: all tests passed`, which is not a UI test — it does
-not show the menus are gone, that nothing dangles, or that the app still
-launches. Same for B-007's symlink and the `OMIT_FONTS` change shipped
-alongside it: `OMIT_FONTS` removes 28 of 37 font faces on iOS, so a wrong
-fallback blanks the app's text entirely, and that cannot be seen from a clean
-compile.
-
-**Do not ship to TestFlight until** someone launches it in the iOS Simulator
-and confirms: text renders, a book opens and pages turn, the font picker lists
-the four SD families, no removed menu entry dangles, and fonts still load from
-Documents after a fresh install. Verified inert on DEVICE firmware at least:
-`CROSSPOINT_NO_NETWORK` is undefined in platformio.ini and a gh_release_rc
-build before and after the guards is identical at 3,658,031 bytes flash.
-
-Original report below.
-
-The iOS build compiles and ships the whole firmware network stack, and exposes
-it in the UI, but none of it can function on a phone. `WiFi.scanNetworks()`
-returns a synthetic list (`crosspoint-simulator/src/WiFi.h:244`), and
-`CrossPointWebServerActivity` shows the user `WiFi.localIP()`, which is
-hardcoded to **127.0.0.1** (`WiFi.h:196`) — so the app renders a URL and QR
-code pointing at loopback that nothing can reach. OTA is stubbed to always
-report NO_UPDATE and to fail install with `INTERNAL_UPDATE_ERROR`
-(`simulator_ota.cpp:19`). SD Firmware Update offers to flash a `.bin` from an
-SD card the device does not have.
-
-This is the lying-control class of defect: the control exists, is reachable,
-and silently does nothing useful. `Info.plist.in` also carries no
-`NSLocalNetworkUsageDescription`.
-
-**Close by:** hiding these entries on the iOS target (menu surgery in
-`SettingsActivity` / `NetworkModeSelectionActivity`), ideally alongside
-compiling the ~16 dead TUs out. Note this is capability *removal* from a
-surface where the capability never worked — flag it as such when doing it.
-
-### [B-007] iOS seed fonts are stored twice on device
-**severity: low · scope: iOS app · found 2026-08-03**
-
-`seedOneFontDirectory` hard-copies every bundled `.cpfont` into
-`Documents/fonts/`, including the `2x/` subdirectory
-(`crosspoint-simulator/ios/CrossPointFsPrep.cpp:193,245`). The 54.8 MB seed
-set therefore exists in both the app bundle and Documents, so a 19.8 MB
-download presents as roughly **113 MB** in iOS Storage settings — the number
-users actually see.
-
-**Close by:** symlinking rather than copying, provided the installer and prune
-paths never write through the link. Would halve the visible footprint to
-~58 MB with no capability change.
 
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
@@ -149,6 +96,70 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-008] iOS app offers WiFi and web-server menus that cannot work
+**severity: medium · scope: iOS app · FIXED + VERIFIED 2026-08-03**
+
+Fixed by `CROSSPOINT_NO_NETWORK` guards (firmware `5bce63bf`) plus iOS TU
+exclusions (simulator `ac8cdef`).
+
+**Verified by driving the iOS Simulator, not by a clean compile.** Fresh
+install on crosspoint-x3-air, iOS 26.5:
+- Home menu shows exactly Browse Files / Recent Books / Settings. **File
+  Transfer is gone**, nothing dangles.
+- Settings > System shows Time to Sleep, Quick Resume, the three Sleep Screen
+  rows, Keep Screen Awake, the three Clock rows, Clear Reading Cache,
+  Language, Device owner. **Wi-Fi Networks and SD Card Firmware Update are
+  gone**, nothing dangles.
+- App launches, a book opens, pages turn, images render.
+- Font picker lists exactly the four S-tier families with live previews.
+
+Also verified inert on DEVICE firmware: `CROSSPOINT_NO_NETWORK` is undefined
+in platformio.ini and gh_release_rc builds identically at 3,658,031 bytes
+flash before and after the guards.
+
+Original report below.
+
+The iOS build compiles and ships the whole firmware network stack, and exposes
+it in the UI, but none of it can function on a phone. `WiFi.scanNetworks()`
+returns a synthetic list (`crosspoint-simulator/src/WiFi.h:244`), and
+`CrossPointWebServerActivity` shows the user `WiFi.localIP()`, which is
+hardcoded to **127.0.0.1** (`WiFi.h:196`) — so the app renders a URL and QR
+code pointing at loopback that nothing can reach. OTA is stubbed to always
+report NO_UPDATE and to fail install with `INTERNAL_UPDATE_ERROR`
+(`simulator_ota.cpp:19`). SD Firmware Update offers to flash a `.bin` from an
+SD card the device does not have.
+
+This is the lying-control class of defect: the control exists, is reachable,
+and silently does nothing useful. `Info.plist.in` also carries no
+`NSLocalNetworkUsageDescription`.
+
+**Close by:** hiding these entries on the iOS target (menu surgery in
+`SettingsActivity` / `NetworkModeSelectionActivity`), ideally alongside
+compiling the ~16 dead TUs out. Note this is capability *removal* from a
+surface where the capability never worked — flag it as such when doing it.
+
+### [B-007] iOS seed fonts are stored twice on device
+**severity: low · scope: iOS app · FIXED + VERIFIED 2026-08-03**
+
+Fixed by symlinking rather than copying (simulator `ac8cdef`). Verified from
+the app's own launch log on a fresh install: `[harness] symlinked
+fonts/TeXGyreSchola -> bundle SeedFonts` and the same for Rosarivo,
+Coelacanth and Edgar. The font picker then listed all four and text rendered,
+so the symlinks resolve for reading. Saves ~54.8 MB of duplicated storage.
+
+Original report below.
+
+`seedOneFontDirectory` hard-copies every bundled `.cpfont` into
+`Documents/fonts/`, including the `2x/` subdirectory
+(`crosspoint-simulator/ios/CrossPointFsPrep.cpp:193,245`). The 54.8 MB seed
+set therefore exists in both the app bundle and Documents, so a 19.8 MB
+download presents as roughly **113 MB** in iOS Storage settings — the number
+users actually see.
+
+**Close by:** symlinking rather than copying, provided the installer and prune
+paths never write through the link. Would halve the visible footprint to
+~58 MB with no capability change.
 
 ### [B-001] Quick Resume pin made the sleep-screen setting a lying control
 **severity: high · fixed 2026-08-03 · `6bb7efc8`, `780982ed`**
