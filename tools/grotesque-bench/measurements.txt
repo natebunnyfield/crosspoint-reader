@@ -1,0 +1,36 @@
+Archivo              slot 0  line 33px  lc-alphabet 273px  body lines 10  col 494px
+Archivo              slot 1  line 39px  lc-alphabet 324px  body lines 11  col 494px
+Archivo              slot 2  line 46px  lc-alphabet 379px  body lines  8 (cut)  col 494px
+Archivo              slot 3  line 52px  lc-alphabet 431px  body lines  6 (cut)  col 494px
+LibreFranklin        slot 0  line 33px  lc-alphabet 286px  body lines 10  col 494px
+LibreFranklin        slot 1  line 39px  lc-alphabet 346px  body lines 12  col 494px
+LibreFranklin        slot 2  line 46px  lc-alphabet 401px  body lines  8 (cut)  col 494px
+LibreFranklin        slot 3  line 52px  lc-alphabet 455px  body lines  6 (cut)  col 494px
+InstrumentSans       slot 0  line 34px  lc-alphabet 313px  body lines 11  col 494px
+InstrumentSans       slot 1  line 40px  lc-alphabet 367px  body lines 10 (cut)  col 494px
+InstrumentSans       slot 2  line 46px  lc-alphabet 427px  body lines  8 (cut)  col 494px
+InstrumentSans       slot 3  line 50px  lc-alphabet 450px  body lines  7 (cut)  col 494px
+SchibstedGrotesk     slot 0  line 33px  lc-alphabet 286px  body lines 10  col 494px
+SchibstedGrotesk     slot 1  line 39px  lc-alphabet 343px  body lines 12  col 494px
+SchibstedGrotesk     slot 2  line 46px  lc-alphabet 396px  body lines  8 (cut)  col 494px
+SchibstedGrotesk     slot 3  line 52px  lc-alphabet 457px  body lines  6 (cut)  col 494px
+HankenGrotesk        slot 0  line 33px  lc-alphabet 297px  body lines 11  col 494px
+HankenGrotesk        slot 1  line 39px  lc-alphabet 351px  body lines 12  col 494px
+HankenGrotesk        slot 2  line 45px  lc-alphabet 403px  body lines  8 (cut)  col 494px
+HankenGrotesk        slot 3  line 51px  lc-alphabet 456px  body lines  6 (cut)  col 494px
+WixMadeforText       slot 0  line 33px  lc-alphabet 313px  body lines 11  col 494px
+WixMadeforText       slot 1  line 39px  lc-alphabet 370px  body lines 11 (cut)  col 494px
+WixMadeforText       slot 2  line 45px  lc-alphabet 427px  body lines  8 (cut)  col 494px
+WixMadeforText       slot 3  line 51px  lc-alphabet 481px  body lines  6 (cut)  col 494px
+FamiljenGrotesk      slot 0  line 33px  lc-alphabet 285px  body lines 10  col 494px
+FamiljenGrotesk      slot 1  line 39px  lc-alphabet 339px  body lines 12  col 494px
+FamiljenGrotesk      slot 2  line 45px  lc-alphabet 388px  body lines  8 (cut)  col 494px
+FamiljenGrotesk      slot 3  line 51px  lc-alphabet 442px  body lines  6 (cut)  col 494px
+HostGrotesk          slot 0  line 33px  lc-alphabet 309px  body lines 11  col 494px
+HostGrotesk          slot 1  line 39px  lc-alphabet 363px  body lines 12 (cut)  col 494px
+HostGrotesk          slot 2  line 45px  lc-alphabet 422px  body lines  8 (cut)  col 494px
+HostGrotesk          slot 3  line 51px  lc-alphabet 474px  body lines  6 (cut)  col 494px
+Roboto               slot 0  line 34px  lc-alphabet 300px  body lines 11  col 494px
+Roboto               slot 1  line 38px  lc-alphabet 324px  body lines 11  col 494px
+Roboto               slot 2  line 44px  lc-alphabet 379px  body lines  9 (cut)  col 494px
+Roboto               slot 3  line 53px  lc-alphabet 463px  body lines  6 (cut)  col 494px

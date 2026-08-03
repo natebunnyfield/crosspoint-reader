@@ -255,19 +255,27 @@ recipe for every family in `src/FontDisplayNames.h`, so
 `Skipping (no buildable source in sd-fonts.yaml): ...`. If it does, a recipe
 regressed or a local source is missing.
 
-**S tier — the only INSTALLED families (fork ruling, 2026-08-02; sans added
-2026-08-03): Edgar, Coelacanth, Rosarivo, TeXGyreSchola,
-LexicaUltralegible.** Buildable is not installed: everything else stays a recipe
-only. Every surface carries exactly these five — device SD cards, `fs_/fonts/`,
-and the iOS seed bundle (`crosspoint-simulator/ios/seedfonts/`), each with its
-`2x/` hi-res companions. Do not install additional families anywhere without a
-new ruling; see docs/sd-card-fonts.md "S tier".
+**S tier — the only INSTALLED families (fork ruling, 2026-08-02; four sans
+added 2026-08-03): Edgar, Coelacanth, Rosarivo, TeXGyreSchola,
+LexicaUltralegible, Archivo, LibreFranklin, HostGrotesk.** Buildable is not
+installed: everything else stays a recipe only. Every surface carries exactly
+these eight — device SD cards, `fs_/fonts/`, and the iOS seed bundle
+(`crosspoint-simulator/ios/seedfonts/`), each with its `2x/` hi-res companions.
+Do not install additional families anywhere without a new ruling; see
+docs/sd-card-fonts.md "S tier".
 
-Lexica Ultralegible is the sans, picked off a 13-candidate bench rendered
-through the real renderer at matched x-height
-(`lib/EpdFont/scripts/sans-candidates.yaml`, `render_harness reading FAMILY`).
-The bench families are NOT installed and deliberately live in their own YAML so
-they stay out of the device's font-download manifest.
+The four sans came off two benches, both rendered through the real renderer at
+matched x-height: `sans-candidates.yaml` (humanist/accessibility, gave Lexica
+Ultralegible) and `grotesque-candidates.yaml` (text grotesques, gave Archivo,
+Libre Franklin and Host Grotesk). Bench families are NOT installed and live in
+their own YAMLs so they stay out of the device's font-download manifest.
+
+**Archivo needs `force_autohint: true` and it is load-bearing.** Under the
+font's native hinting no point size renders a 12 px x-height at all — it jumps
+11 px straight to 13 px — and at the 11 px build the apertures of its `s` seal
+shut. The auto-hinter puts 11 pt exactly on 12 px and reopens the aperture.
+Check a new family's x-height ramp under BOTH hinters before accepting that a
+slot cannot be hit.
 
 Four of them — Edgar, GTAlpinaCond, Venetian301, CaledoniaCC, all commercial or
 webfont cuts — build from `lib/EpdFont/local_fonts/` (gitignored). The **recipe**

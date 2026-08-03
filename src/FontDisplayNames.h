@@ -74,6 +74,17 @@ inline constexpr Entry kEntries[] = {
     // neither, unlike Caledonia CC or Goudy Bookletter.
     {"LexicaUltralegible", "Lexica Ultralegible", "Applied Design Works & Jacob Perez", "2019, 2024",
      "New York; El Paso, Texas", 2019},
+    // The three installed text grotesques. Every UTF-8 escape below is closed
+    // off with a string break because C++ hex escapes are greedy: "\xC3\xA9"
+    // followed by the 'c' of "ctor" would otherwise parse as \xA9C. The Turkish
+    // ğ/İ/ı are Latin Extended-A, outside Latin-1 — checked against the builtin
+    // interval preset, which covers the block, and confirmed in the picker.
+    {"HostGrotesk", "Host Grotesk",
+     "Do\xC4\x9F" "ukan Karap\xC4\xB1" "nar & \xC4\xB0" "brahim Ka\xC3\xA7" "t\xC4\xB1" "o\xC4\x9F" "lu",
+     "2023", "", 2023},
+    {"Archivo", "Archivo", "H\xC3\xA9" "ctor Gatti", "2012, 2020", "Buenos Aires", 2012},
+    {"LibreFranklin", "Libre Franklin", "Pablo Impallari, Rodrigo Fuenzalida & Nhung Nguyen",
+     "1902; 2016", "Jersey City; Rosario, Argentina", 1902},
     {"Venetian301", "Venetian 301", "Bruce Rogers", "1914, 1990", "New York; Cambridge, Mass.", 1914},
 };
 
