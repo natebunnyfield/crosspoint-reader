@@ -1,0 +1,148 @@
+# Text-grotesque candidates for CrossPoint (evaluation set)
+#
+# NOT a shipping list, and a sibling of sans-candidates.yaml rather than an
+# addition to sd-fonts.yaml — that file feeds the device's font-download
+# manifest, which is no place for unranked candidates. installed_families:
+# still rules what ships.
+#
+#   python3 lib/EpdFont/scripts/build-sd-fonts.py \
+#     --config lib/EpdFont/scripts/grotesque-candidates.yaml --output-dir out/
+#
+# Same uniform-slot rule as the other two files: x-height 12/14/16/18 px
+# measured on the hinted render, leading solved against 34/39/45/51 — which is
+# what Edgar and TeX Gyre Schola actually BUILD to, not the 34/40/46/51 the
+# sd-fonts.yaml header states. `metrics:` is per-1000-upem; the builder scales
+# by head.unitsPerEm/1000 before writing hhea, so the same number means the
+# same leading on a 2048-upem face. Deviations are noted per family.
+#
+# intervals: latin-ext deliberately, matching sans-candidates.yaml, so set
+# widths are directly comparable against that bench's numbers.
+
+families:
+
+  - name: Archivo
+    description: "Omnibus-Type grotesque drawn for text (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 0: xh 11, advY 33
+    #   slot 2: advY 46
+    #   slot 3: advY 52
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1202, descent: -359, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 700}}
+
+  - name: LibreFranklin
+    description: "Franklin Gothic revival, the American gothic line (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 0: advY 33
+    #   slot 2: advY 46
+    #   slot 3: advY 52
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1202, descent: -359, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: InstrumentSans
+    description: "Instrument's neo-grotesque (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 1: advY 40
+    #   slot 2: advY 46
+    #   slot 3: xh 17, advY 50
+    sizes: [11, 13, 15, 16]
+    metrics: {ascent: 1144, descent: -342, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/InstrumentSans%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/InstrumentSans%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/InstrumentSans-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/InstrumentSans-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 700}}
+
+  - name: SchibstedGrotesk
+    description: "Schibsted's news-brand grotesque (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 0: xh 11, advY 33
+    #   slot 2: advY 46
+    #   slot 3: advY 52
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1201, descent: -359, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/schibstedgrotesk/SchibstedGrotesk%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/schibstedgrotesk/SchibstedGrotesk%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/schibstedgrotesk/SchibstedGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/schibstedgrotesk/SchibstedGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: HankenGrotesk
+    description: "Hanken Design grotesque (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 0: advY 33
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1098, descent: -328, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hankengrotesk/HankenGrotesk%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hankengrotesk/HankenGrotesk%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hankengrotesk/HankenGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hankengrotesk/HankenGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: WixMadeforText
+    description: "Wix Madefor, the TEXT optical cut (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 0: advY 33
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1098, descent: -328, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/wixmadefortext/WixMadeforText%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/wixmadefortext/WixMadeforText%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/wixmadefortext/WixMadeforText-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/wixmadefortext/WixMadeforText-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: FamiljenGrotesk
+    description: "Letters from Sweden grotesque (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 0: advY 33
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1098, descent: -328, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/familjengrotesk/FamiljenGrotesk%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/familjengrotesk/FamiljenGrotesk%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/familjengrotesk/FamiljenGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/familjengrotesk/FamiljenGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: HostGrotesk
+    description: "Host Grotesk (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 0: advY 33
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1098, descent: -328, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: Roboto
+    description: "the neo-grotesque of the last decade (Latin)"
+    intervals: latin-ext
+    # Deviations (hinting skips the pixel value; no span fixes it):
+    #   slot 1: xh 13, advY 38
+    #   slot 2: advY 44
+    #   slot 3: advY 53
+    sizes: [11, 12, 14, 17]
+    metrics: {ascent: 1155, descent: -345, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wdth: 100, wght: 700}}

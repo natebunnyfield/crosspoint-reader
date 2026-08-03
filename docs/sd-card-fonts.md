@@ -3,15 +3,21 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; sans added 2026-08-03)
+## S tier (fork ruling, 2026-08-02; sans added 2026-08-03, grotesques same day)
 
-The installed set on this fork is exactly five families — **Edgar, Coelacanth,
-Rosarivo, TeXGyreSchola, LexicaUltralegible** — on every surface: both device SD
-cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed set
+The installed set on this fork is exactly eight families — **Edgar, Coelacanth,
+Rosarivo, TeXGyreSchola, LexicaUltralegible, Archivo, LibreFranklin,
+HostGrotesk** — on every surface: both device SD cards, the simulator's
+`fs_/fonts/`, and the iOS app's bundled seed set
 (`crosspoint-simulator/ios/seedfonts/`). The other curated families remain fully
 buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these five and nothing else.
+surface or reprovisioning a card, install these eight and nothing else.
+
+Four of the eight are sans: Lexica Ultralegible from the humanist/accessibility
+bench, and Archivo, Libre Franklin and Host Grotesk from the text-grotesque
+bench (`lib/EpdFont/scripts/grotesque-candidates.yaml`). Archivo carries
+`force_autohint: true` and it is load-bearing — see its recipe comment.
 
 Lexica Ultralegible is the one sans in the set, added after a bench of 13
 sans-serif candidates rendered through the real `GfxRenderer` at matched
@@ -40,7 +46,7 @@ excludes, which is exactly the drift the list now prevents. Use
 The iOS app needs no equivalent list. `CrossPointFsPrep.cpp::seedOneFontDirectory`
 seeds whatever `crosspoint-simulator/ios/seedfonts/` contains and prunes files
 the bundle no longer carries, so that directory is its own source of truth —
-keep it holding exactly these five.
+keep it holding exactly these eight.
 
 ## Installing Fonts
 
