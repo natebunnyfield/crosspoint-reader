@@ -1,0 +1,132 @@
+{
+  "AtkinsonNext": {
+    "upem": 1000,
+    "x_height_em": 0.496,
+    "cap_em": 0.668,
+    "xh_over_cap": 0.743,
+    "asc_em": 0.708,
+    "desc_em": -0.162,
+    "n_width_em": 0.408,
+    "glyphs": 392
+  },
+  "Luciole": {
+    "upem": 1000,
+    "x_height_em": 0.545,
+    "cap_em": 0.763,
+    "xh_over_cap": 0.714,
+    "asc_em": 0.791,
+    "desc_em": -0.224,
+    "n_width_em": 0.44,
+    "glyphs": 755
+  },
+  "LexicaUltralegible": {
+    "upem": 1000,
+    "x_height_em": 0.496,
+    "cap_em": 0.668,
+    "xh_over_cap": 0.743,
+    "asc_em": 0.668,
+    "desc_em": -0.161,
+    "n_width_em": 0.408,
+    "glyphs": 642
+  },
+  "Andika": {
+    "upem": 2048,
+    "x_height_em": 0.498,
+    "cap_em": 0.713,
+    "xh_over_cap": 0.699,
+    "asc_em": 0.781,
+    "desc_em": -0.239,
+    "n_width_em": 0.461,
+    "glyphs": 3775
+  },
+  "SourceSans3": {
+    "upem": 1000,
+    "x_height_em": 0.486,
+    "cap_em": 0.656,
+    "xh_over_cap": 0.741,
+    "asc_em": 0.712,
+    "desc_em": -0.205,
+    "n_width_em": 0.389,
+    "glyphs": 2478
+  },
+  "FiraSans": {
+    "upem": 1000,
+    "x_height_em": 0.527,
+    "cap_em": 0.689,
+    "xh_over_cap": 0.765,
+    "asc_em": 0.75,
+    "desc_em": -0.213,
+    "n_width_em": 0.401,
+    "glyphs": 2708
+  },
+  "IBMPlexSans": {
+    "upem": 1000,
+    "x_height_em": 0.516,
+    "cap_em": 0.698,
+    "xh_over_cap": 0.739,
+    "asc_em": 0.74,
+    "desc_em": -0.2,
+    "n_width_em": 0.403,
+    "glyphs": 1019
+  },
+  "AlegreyaSans": {
+    "upem": 1000,
+    "x_height_em": 0.461,
+    "cap_em": 0.641,
+    "xh_over_cap": 0.719,
+    "asc_em": 0.702,
+    "desc_em": -0.185,
+    "n_width_em": 0.364,
+    "glyphs": 2109
+  },
+  "OpenSans": {
+    "upem": 2048,
+    "x_height_em": 0.535,
+    "cap_em": 0.714,
+    "xh_over_cap": 0.75,
+    "asc_em": 0.76,
+    "desc_em": -0.239,
+    "n_width_em": 0.446,
+    "glyphs": 1150
+  },
+  "PublicSans": {
+    "upem": 2000,
+    "x_height_em": 0.517,
+    "cap_em": 0.723,
+    "xh_over_cap": 0.715,
+    "asc_em": 0.743,
+    "desc_em": -0.161,
+    "n_width_em": 0.432,
+    "glyphs": 648
+  },
+  "PTSans": {
+    "upem": 1000,
+    "x_height_em": 0.5,
+    "cap_em": 0.7,
+    "xh_over_cap": 0.714,
+    "asc_em": 0.7,
+    "desc_em": -0.2,
+    "n_width_em": 0.401,
+    "glyphs": 720
+  },
+  "Inter": {
+    "upem": 2048,
+    "x_height_em": 0.546,
+    "cap_em": 0.728,
+    "xh_over_cap": 0.75,
+    "asc_em": 0.728,
+    "desc_em": -0.204,
+    "n_width_em": 0.437,
+    "glyphs": 2933
+  },
+  "NotoSans": {
+    "upem": 1000,
+    "x_height_em": 0.536,
+    "cap_em": 0.714,
+    "xh_over_cap": 0.751,
+    "asc_em": 0.76,
+    "desc_em": -0.24,
+    "n_width_em": 0.452,
+    "glyphs": 3884
+  }
+}
