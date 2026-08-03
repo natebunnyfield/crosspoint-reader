@@ -132,6 +132,7 @@ Conversion runs the firmware repo's `lib/EpdFont/scripts/fontconvert_sdcard.py` 
 - [Project scope](./SCOPE.md)
 - [Contributing docs](./docs/contributing/README.md)
 - [Touch and UI development](./docs/contributing/touch-and-ui.md) - FreeInkUI components for new screens, the touch bridge for existing ones, and build envs for the non-Xteink touch devices
+- [Fork sync](./docs/fork-sync.md) - why this fork must not blind-merge upstream, how to take an upstream change safely, and which clones are working copies. Run `scripts/repo-status.sh` for a read-only status across repos
 
 ---
 
