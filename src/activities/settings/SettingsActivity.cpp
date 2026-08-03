@@ -42,10 +42,11 @@ void SettingsActivity::rebuildSettingsLists() {
     // Display is withdrawn from the device UI, so its entries are dropped here
     // rather than removed from getSettingsList() — that list is also what
     // fromJson()/toJson() iterate, so deleting entries would stop those
-    // settings persisting at all. Sleep screen, refresh frequency and the
-    // sunlight fading fix keep whatever value is stored; hide battery % and UI
-    // theme are pinned by normalizeRetiredSettings(). Quick resume on timeout
-    // used to be in this group and is now a live row under System.
+    // settings persisting at all. Refresh frequency and the sunlight fading fix
+    // keep whatever value is stored; hide battery % and UI theme are pinned by
+    // normalizeRetiredSettings(). The whole sleep group — sleep screen, its two
+    // cover options and quick resume on timeout — used to be here and is now
+    // live under System.
     if (setting.category == StrId::STR_CAT_DISPLAY) {
       continue;
     }
