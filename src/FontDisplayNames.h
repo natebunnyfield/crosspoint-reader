@@ -69,11 +69,14 @@ inline constexpr Entry kEntries[] = {
      "1918; 2007", "Jersey City; Gda\xC5\x84sk", 1918},
     {"Junicode", "Junicode SemiCond", "Peter S. Baker", "1703; 1998, 2023",
      "Oxford; Charlottesville, Virginia", 1703},
-    // Born digital, so both years are its own: Atkinson Hyperlegible 2019, the
-    // Lexica extension 2024. Credits both hands — the face's name carries
-    // neither, unlike Caledonia CC or Goudy Bookletter.
-    {"LexicaUltralegible", "Lexica Ultralegible", "Applied Design Works & Jacob Perez", "2019, 2024",
-     "New York; El Paso, Texas", 2019},
+    // Model-dated like the rest of the table, not born-digital: the lineage
+    // starts with the grotesque named in Vincent Figgins' 1832 London specimen,
+    // then Atkinson Hyperlegible 2019 and the Lexica extension 2024. Credits
+    // both modern hands — the face's name carries neither, unlike Caledonia CC
+    // or Goudy Bookletter. See docs/font-dates.md, which also records why 1832
+    // rather than Caslon IV's 1816.
+    {"LexicaUltralegible", "Lexica Ultralegible", "Applied Design Works & Jacob Perez", "1832; 2019, 2024",
+     "London; New York; El Paso, Texas", 1832},
     {"Venetian301", "Venetian 301", "Bruce Rogers", "1914, 1990", "New York; Cambridge, Mass.", 1914},
 };
 
