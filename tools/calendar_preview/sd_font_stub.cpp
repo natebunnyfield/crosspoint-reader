@@ -14,6 +14,7 @@
 #include <SdCardFontManager.h>
 #include <SdCardFontSystem.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -67,7 +68,80 @@ uint8_t nearestInstalledSize(const std::string& hostDir, const char* familyName,
   return best;
 }
 
+// Every installed size for a family, ascending. The ORDINAL slot (0-3) of the
+// uniform-slot scheme is an index into this list, not a point size: two
+// families hit the same 12px x-height at 10pt and 11pt, which is the whole
+// reason the sizes differ. Nearest-to-12/14/16/18 cannot express that — for a
+// family shipping 10/12/14/15 it maps both slot 2 and slot 3 onto 15pt.
+std::vector<uint8_t> installedSizes(const std::string& hostDir, const char* familyName) {
+  std::vector<uint8_t> sizes;
+  DIR* d = opendir(hostDir.c_str());
+  if (d == nullptr) return sizes;
+  const std::string prefix = std::string(familyName) + "_";
+  while (dirent* e = readdir(d)) {
+    const std::string n = e->d_name;
+    if (n.compare(0, prefix.size(), prefix) != 0) continue;
+    if (n.rfind(".cpfont") == std::string::npos) continue;
+    const int size = atoi(n.c_str() + prefix.size());
+    if (size > 0) sizes.push_back(static_cast<uint8_t>(size));
+  }
+  closedir(d);
+  std::sort(sizes.begin(), sizes.end());
+  return sizes;
+}
+
+// Shared tail of both loaders: load the .cpfont and wire it into the renderer
+// exactly as SdCardFontManager::loadFamily does on the device.
+int registerFromPath(const std::string& path, GfxRenderer& renderer) {
+  static int nextId = 900000;  // outside the builtin font-ID space
+  auto* font = new SdCardFont();
+  if (!font->load(path.c_str())) {
+    fprintf(stderr, "[stub] load failed: %s\n", path.c_str());
+    delete font;
+    return 0;
+  }
+  const int id = nextId++;
+  // An SD font must be BOTH registered (for the glyph-miss/advance-table path)
+  // AND inserted into the flash font map as an EpdFontFamily wrapping its four
+  // styles, which is what getFontAscenderSize/getGlyph/drawText look up.
+  renderer.registerSdCardFont(id, font);
+  EpdFontFamily family(font->getEpdFont(0), font->getEpdFont(1), font->getEpdFont(2),
+                       font->getEpdFont(3));
+  renderer.insertFont(id, family);
+  fprintf(stderr, "[stub] loaded %s as id %d (%u styles)\n", path.c_str(), id, font->styleCount());
+  return id;
+}
+
+// The roots to search, honouring the CPFONT_DIR pin. Empty result means the
+// caller asked for "family not installed".
+std::vector<const char*> searchRoots(bool* disabled) {
+  const char* pinned = getenv("CPFONT_DIR");
+  *disabled = pinned != nullptr && pinned[0] == '\0';
+  if (*disabled) return {};
+  if (pinned != nullptr) return {pinned};
+  return {kRoots[0], kRoots[1]};
+}
+
 }  // namespace
+
+// Ordinal-slot loader, for the `reading` specimen mode. Declared in
+// render_harness.cpp; not part of the firmware's SdCardFontSystem API, because
+// on the device the user picks from the family's own size list directly.
+int loadSdFontByOrdinal(const char* familyName, uint8_t ordinal, GfxRenderer& renderer) {
+  if (familyName == nullptr || familyName[0] == '\0') return 0;
+  bool disabled = false;
+  for (const char* root : searchRoots(&disabled)) {
+    const std::string hostDir = std::string("./fs_") + root + "/" + familyName;
+    const std::vector<uint8_t> sizes = installedSizes(hostDir, familyName);
+    if (sizes.empty()) continue;
+    const uint8_t size = sizes[ordinal < sizes.size() ? ordinal : sizes.size() - 1];
+    char buf[512];
+    snprintf(buf, sizeof(buf), "%s/%s/%s_%u.cpfont", root, familyName, familyName, size);
+    return registerFromPath(buf, renderer);
+  }
+  fprintf(stderr, "[stub] not installed: %s\n", familyName);
+  return 0;
+}
 
 int SdCardFontSystem::loadForDisplay(const char* familyName, uint8_t fontSizeEnum,
                                      GfxRenderer& renderer) {
@@ -103,24 +177,7 @@ int SdCardFontSystem::loadForDisplay(const char* familyName, uint8_t fontSizeEnu
     return 0;
   }
 
-  static int nextId = 900000;  // outside the builtin font-ID space
-  auto* font = new SdCardFont();
-  if (!font->load(path.c_str())) {
-    fprintf(stderr, "[stub] load failed: %s\n", path.c_str());
-    delete font;
-    return 0;
-  }
-  const int id = nextId++;
-  // Mirror SdCardFontManager::loadFamily: an SD font must be BOTH registered
-  // (for the glyph-miss/advance-table path) AND inserted into the flash font
-  // map as an EpdFontFamily wrapping its four styles, which is what
-  // getFontAscenderSize/getGlyph/drawText look up.
-  renderer.registerSdCardFont(id, font);
-  EpdFontFamily family(font->getEpdFont(0), font->getEpdFont(1), font->getEpdFont(2),
-                       font->getEpdFont(3));
-  renderer.insertFont(id, family);
-  fprintf(stderr, "[stub] loaded %s as id %d (%u styles)\n", path.c_str(), id, font->styleCount());
-  return id;
+  return registerFromPath(path, renderer);
 }
 
 // Unused by the calendar, but required for linking.
