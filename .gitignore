@@ -40,3 +40,6 @@ sdkconfig.sticky
 tools/calendar_preview/render_harness
 tools/calendar_preview/*.o
 tools/calendar_preview/fs_/
+
+# Simulator QA screenshot dumps: keep the .png, never the raw framebuffer .bmp
+qa_*/*.bmp
