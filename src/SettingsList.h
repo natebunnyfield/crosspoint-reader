@@ -184,9 +184,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
                                   {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
                                   "sleepScreenCoverFilter", StrId::STR_CAT_DISPLAY));
-    v.push_back(SettingInfo::Enum(StrId::STR_QUICK_RESUME_TIMEOUT, &CrossPointSettings::quickResumeSleepScreen,
-                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "quickResumeSleepScreen",
-                                  StrId::STR_CAT_DISPLAY));
     v.push_back(SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
                                   {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
                                   StrId::STR_CAT_DISPLAY));
@@ -272,6 +269,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
         {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
         "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM));
+    // Filed under System, next to Time to Sleep, because that is the row it
+    // qualifies: it decides what an inactivity-timeout sleep DRAWS, and while it
+    // is ON the Sleep Screen setting is bypassed entirely on that path
+    // (SleepActivity::onEnter checks it before the sleepScreen switch). It was
+    // originally under Display, which the device UI withdrew, so the only
+    // control over the dominant sleep path lived on the web UI. It is also no
+    // longer pinned in normalizeRetiredSettings() — a visible row that a reload
+    // silently reverts is worse than no row.
+    v.push_back(SettingInfo::Enum(StrId::STR_QUICK_RESUME_TIMEOUT, &CrossPointSettings::quickResumeSleepScreen,
+                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "quickResumeSleepScreen",
+                                  StrId::STR_CAT_SYSTEM));
     // Simulator/iOS only, deliberately compiled out on device.
     //
     // On an X4/X3 this row would be a control that cannot do anything: e-ink

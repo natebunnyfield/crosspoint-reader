@@ -43,8 +43,9 @@ void SettingsActivity::rebuildSettingsLists() {
     // rather than removed from getSettingsList() — that list is also what
     // fromJson()/toJson() iterate, so deleting entries would stop those
     // settings persisting at all. Sleep screen, refresh frequency and the
-    // sunlight fading fix keep whatever value is stored; quick resume, hide
-    // battery % and UI theme are pinned by normalizeRetiredSettings().
+    // sunlight fading fix keep whatever value is stored; hide battery % and UI
+    // theme are pinned by normalizeRetiredSettings(). Quick resume on timeout
+    // used to be in this group and is now a live row under System.
     if (setting.category == StrId::STR_CAT_DISPLAY) {
       continue;
     }

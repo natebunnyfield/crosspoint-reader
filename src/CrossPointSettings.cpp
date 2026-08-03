@@ -133,7 +133,10 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // them, and they remain in getSettingsList() so both persistence and the web
   // settings API keep working. A change made over the web therefore lasts until
   // the next load, which is the same contract `orientation` has.
-  quickResumeSleepScreen = QUICK_RESUME_AFTER_TIMEOUT;
+  // quickResumeSleepScreen deliberately has NO line here any more. It was pinned
+  // when its only control lived on the withdrawn Display tab; it now has a real
+  // row under System (SettingsList.h), and pinning a visible control would
+  // silently revert the owner's choice on the next load.
   hideBatteryPercentage = HIDE_ALWAYS;
   uiTheme = LYRA_SIX;
 
