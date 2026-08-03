@@ -15,8 +15,11 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
+#include <HalClock.h>
+
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
+#include "activities/clock/RingClockActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -26,6 +29,9 @@ int HomeActivity::getMenuItemCount() const {
     count += recentBooks.size();
   }
   if (hasOpdsServers) {
+    count++;
+  }
+  if (hasClock) {
     count++;
   }
   return count;
@@ -112,12 +118,14 @@ void HomeActivity::onEnter() {
   Activity::onEnter();
 
   hasOpdsServers = OPDS_STORE.hasServers();
+  hasClock = halClock.isAvailable();
 
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
 
   const auto base = static_cast<int>(recentBooks.size());
-  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, hasOpdsServers);
+  selectorIndex =
+      initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, hasOpdsServers, hasClock);
 
   // Trigger first update
   requestUpdate();
@@ -184,7 +192,7 @@ void HomeActivity::loop() {
       onSelectBook(recentBooks[selectorIndex].path);
     } else {
       const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
-      switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
+      switch (indexToMenuItem(menuIndex, hasOpdsServers, hasClock)) {
         case HomeMenuItem::FILE_BROWSER:
           onFileBrowserOpen();
           break;
@@ -196,6 +204,9 @@ void HomeActivity::loop() {
           break;
         case HomeMenuItem::FILE_TRANSFER:
           onFileTransferOpen();
+          break;
+        case HomeMenuItem::RING_CLOCK:
+          onRingClockOpen();
           break;
         case HomeMenuItem::SETTINGS_MENU:
           onSettingsOpen();
@@ -234,6 +245,12 @@ void HomeActivity::render(RenderLock&&) {
   std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS), tr(STR_FILE_TRANSFER),
                                         tr(STR_SETTINGS_TITLE)};
   std::vector<UIIcon> menuIcons = {Folder, Recent, Transfer, Settings};
+
+  if (hasClock) {
+    // Ring Clock sits between File Transfer and Settings (X3 with RTC only)
+    menuItems.insert(menuItems.end() - 1, tr(STR_RING_CLOCK));
+    menuIcons.insert(menuIcons.end() - 1, Clock);
+  }
 
   if (hasOpdsServers) {
     menuItems.insert(menuItems.begin() + 2, tr(STR_OPDS_BROWSER));
@@ -281,3 +298,10 @@ void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
+
+void HomeActivity::onRingClockOpen() {
+  // Replace (like the sibling menu entries) so HomeActivity and its cover
+  // buffer are freed during a potentially very long clock session; Back from
+  // the clock lands on goHome() via popActivity's empty-stack fallback.
+  activityManager.replaceActivity(std::make_unique<RingClockActivity>(renderer, mappedInput));
+}
