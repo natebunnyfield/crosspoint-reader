@@ -28,8 +28,8 @@ constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
 // the built-in entries are present. They are hidden whenever SD fonts are
 // installed, so the two numbering schemes diverge.
 template <typename FontList>
-int findCurrentFontIndex(const FontList& fonts, const SdCardFontRegistry* registry,
-                         const char* sdFontFamilyName, uint8_t fontFamily) {
+int findCurrentFontIndex(const FontList& fonts, const SdCardFontRegistry* registry, const char* sdFontFamilyName,
+                         uint8_t fontFamily) {
   // An SD font is selected: match by settingIndex derived from registry order.
   if (sdFontFamilyName[0] != '\0' && registry) {
     const auto& families = registry->getFamilies();
@@ -174,8 +174,12 @@ void FontSelectionActivity::loop() {
   // hasSubtitle=true: the list rows carry a designer/years subtitle, so the
   // page stride must use the taller subtitle row height or continuous paging
   // would jump past entries the screen never showed.
-  const int pageItems =
-      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true, previewHeight + metrics_.verticalSpacing);
+  //
+  // Clamped to kFamiliesPerPage, and to the same value render() clamps the list
+  // rect to, so the page stride and the drawn page always agree.
+  const int pageItems = std::min(
+      kFamiliesPerPage,
+      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true, previewHeight + metrics_.verticalSpacing));
 
   // List navigation is bound to the FRONT buttons only. ButtonNavigator's
   // NavNext/NavPrevious resolve to "side Down OR front Right" and "side Up OR
@@ -274,6 +278,21 @@ void FontSelectionActivity::applySelectedFont() {
     sdFontSystem.ensureLoaded(renderer);
   }
   requestUpdate();
+}
+
+int FontSelectionActivity::listPageHeight() const {
+  // Rows carry a designer/years subtitle, so the taller subtitle row height is
+  // the one that applies. Read from the ACTIVE theme rather than BaseMetrics:
+  // Lyra and RoundedRaff override drawList() with their own row heights, and a
+  // hardcoded value would show five rows on one theme and three on another.
+  const int rowHeight =
+      metrics_.listWithSubtitleRowHeight > 0 ? metrics_.listWithSubtitleRowHeight : metrics_.listRowHeight;
+  const int available = usableHeight - previewHeight - metrics_.verticalSpacing;
+  if (rowHeight <= 0) return available;
+  // Never grow past what is actually free — on a short panel fewer than
+  // kFamiliesPerPage rows fit, and drawList would otherwise paint over the
+  // button hints.
+  return std::min(available, kFamiliesPerPage * rowHeight);
 }
 
 uint8_t FontSelectionActivity::resolvedPointSize() const {
@@ -392,8 +411,7 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
   // for the other 28 languages.
   if (std::strchr(previewText, '\n') != nullptr) {
     static constexpr EpdFontFamily::Style kStyles[] = {EpdFontFamily::REGULAR, EpdFontFamily::BOLD,
-                                                       EpdFontFamily::ITALIC,
-                                                       EpdFontFamily::BOLD_ITALIC};
+                                                       EpdFontFamily::ITALIC, EpdFontFamily::BOLD_ITALIC};
     constexpr int kStyleCount = static_cast<int>(sizeof(kStyles) / sizeof(kStyles[0]));
     const char* cursor = previewText;
     for (int i = 0; i < kStyleCount && cursor != nullptr; ++i) {
@@ -405,8 +423,7 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
       if (y + lineH > textBottomLimit) break;  // fewer lines fit at large sizes
       // A font lacking a style falls back to regular inside EpdFontFamily, so
       // an incomplete family degrades rather than failing.
-      const std::string fitted =
-          renderer.truncatedText(fontId, segment.c_str(), width, kStyles[i]);
+      const std::string fitted = renderer.truncatedText(fontId, segment.c_str(), width, kStyles[i]);
       renderer.drawText(fontId, left, y, fitted.c_str(), /*black=*/true, kStyles[i]);
       y += lineH + 2;
     }
@@ -433,7 +450,7 @@ void FontSelectionActivity::render(RenderLock&&) {
 
   const int previewTop = afterHeader;
   const int listTop = previewTop + previewHeight + metrics_.verticalSpacing;
-  const int listHeight = usableHeight - previewHeight - metrics_.verticalSpacing;
+  const int listHeight = listPageHeight();
 
   const int previewFontId = SETTINGS.getReaderFontId();
   // Typeface name WITHOUT the designer credit: the label already carries the
@@ -499,7 +516,6 @@ void FontSelectionActivity::render(RenderLock&&) {
   // the specimen an honest sample of the reader with AA enabled — the same
   // glyph edges the reader softens are softened here.
   if (SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF) {
-    ReaderUtils::renderAntiAliased(
-        renderer, [&] { renderPreviewSpecimen(previewTop, previewHeight, previewFontId); });
+    ReaderUtils::renderAntiAliased(renderer, [&] { renderPreviewSpecimen(previewTop, previewHeight, previewFontId); });
   }
 }

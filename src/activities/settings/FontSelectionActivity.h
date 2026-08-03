@@ -34,6 +34,21 @@ class FontSelectionActivity final : public Activity {
   // the sizes they ship, so the stored value snaps per-family — the stored
   // number alone is not an accurate readout.
   uint8_t resolvedPointSize() const;
+  // Typefaces shown per page. Capped so a page is a comparison set rather than
+  // a scroll: four specimens is what fits above the preview pane without the
+  // rows crowding, and it keeps the page stride stable as families are added
+  // or removed instead of reflowing with whatever height happens to be free.
+  //
+  // The list rect and the navigation stride MUST derive from the same number.
+  // drawList() computes its own pageItems from rect.height / rowHeight, so
+  // clamping only one of the two desynchronises the highlight from the page:
+  // ButtonNavigator would step past entries the screen never drew.
+  static constexpr int kFamiliesPerPage = 4;
+
+  // Height of a list page: kFamiliesPerPage rows at the ACTIVE theme's
+  // subtitle-row height, never more than the space actually available.
+  int listPageHeight() const;
+
   int getFontIdForPreview(int index) const;
   void renderPreviewPane(int top, int height, int fontId, const char* fontName) const;
   // Draws only the preview pane's specimen text (no label, no prewarm). Split
