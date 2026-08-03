@@ -175,11 +175,11 @@ void FontSelectionActivity::loop() {
   // page stride must use the taller subtitle row height or continuous paging
   // would jump past entries the screen never showed.
   //
-  // Clamped to kFamiliesPerPage, and to the same value render() clamps the list
-  // rect to, so the page stride and the drawn page always agree.
-  const int pageItems = std::min(
-      kFamiliesPerPage,
-      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true, previewHeight + metrics_.verticalSpacing));
+  // No cap: the stride is whatever the theme says fits below the preview pane,
+  // which is the same question render()'s list rect answers, so the page stride
+  // and the drawn page still agree.
+  const int pageItems =
+      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true, previewHeight + metrics_.verticalSpacing);
 
   // List navigation is bound to the FRONT buttons only. ButtonNavigator's
   // NavNext/NavPrevious resolve to "side Down OR front Right" and "side Up OR
@@ -289,10 +289,10 @@ int FontSelectionActivity::listPageHeight() const {
       metrics_.listWithSubtitleRowHeight > 0 ? metrics_.listWithSubtitleRowHeight : metrics_.listRowHeight;
   const int available = usableHeight - previewHeight - metrics_.verticalSpacing;
   if (rowHeight <= 0) return available;
-  // Never grow past what is actually free — on a short panel fewer than
-  // kFamiliesPerPage rows fit, and drawList would otherwise paint over the
-  // button hints.
-  return std::min(available, kFamiliesPerPage * rowHeight);
+  // `available` already excludes the header and the button hints, so it IS what
+  // is free: no cap on top of it, just a whole number of rows so the last one
+  // is never drawn clipped.
+  return std::min(available, (available / rowHeight) * rowHeight);
 }
 
 uint8_t FontSelectionActivity::resolvedPointSize() const {
