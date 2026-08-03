@@ -719,6 +719,30 @@ clang-format -i src/**/*.cpp src/**/*.h
 
 ## Git Workflow and Repository Awareness
 
+### Fork sync: never blind-merge upstream
+
+Read [docs/fork-sync.md](docs/fork-sync.md) before any upstream merge, and run
+`scripts/repo-status.sh` to see where things stand (it reports; it never
+merges).
+
+This fork is **selectively divergent**, not a tracking mirror — 91 ahead / 2
+behind as of 2026-08-03 — and it has DELETED whole subsystems upstream still
+develops: KOReader sync, Calibre and the status bar (`08d5bdee`), bookmarks
+and auto page turn (`e0509aef`), the reader menu (`9494d88e`), the tabbed Text
+Settings editor (`9fdd7dfe`). `git merge upstream/develop` therefore resurrects
+them: attempted 2026-08-03, it produced 18 conflicts, six of them
+`modify/delete`. Take upstream changes per commit, live hunks only.
+
+`scripts/repo-status.sh` classifies each unmerged upstream commit `N/A` (touches
+only removed subsystems — skip) or `REVIEW` (straddles live code — read it).
+
+**Other clones are not working copies.** `~/src/crosspoint` and
+`~/src/xteink/crosspoint-reader` point `origin` straight at *upstream*, so a
+push from either targets the upstream project, not the fork. Check any clone
+for uncommitted work before consolidating it — on 2026-08-03 the xteink clone
+held 451 lines of ring-clock work on no branch and no remote, now rescued as
+`rescue/ring-clock` on the fork.
+
 ### Repository Detection Protocol
 
 **CRITICAL**: ALWAYS verify repository context before git operations. This could be:
