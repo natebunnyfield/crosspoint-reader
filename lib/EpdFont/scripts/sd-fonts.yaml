@@ -70,6 +70,26 @@
 #   the built .cpfonts (2026-08-02); supersedes the source-unit "harmonized
 #   ramp" x-height estimates, which hinting made wrong by up to 3 px.
 
+# The S-tier ruling (docs/sd-card-fonts.md, 2026-08-02): these four, and only
+# these four, are INSTALLED on every surface — both device SD cards, the
+# simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below
+# stays a buildable recipe that ships nowhere.
+#
+# This list exists so the ruling is ENFORCED rather than merely documented.
+# scripts/install-sim-fonts.py defaults to it; before it did, the default was
+# "every curated family sd-fonts.yaml can build", which by 2026-08-01 meant all
+# 15 — so a routine re-run silently reinstalled the eleven the ruling excludes.
+# The iOS side needs no equivalent list: CrossPointFsPrep.cpp seeds whatever
+# ios/seedfonts/ contains and prunes the rest, so that directory is its own
+# source of truth and already holds exactly these four.
+#
+# build-sd-fonts.py reads only `families:` and ignores this key.
+installed_families:
+  - Edgar
+  - Coelacanth
+  - Rosarivo
+  - TeXGyreSchola
+
 families:
   # ── Serif ──────────────────────────────────────────────────────────────
 

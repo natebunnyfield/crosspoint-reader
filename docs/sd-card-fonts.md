@@ -13,6 +13,19 @@ remain fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
 surface or reprovisioning a card, install these four and nothing else.
 
+The ruling is enforced, not just written down. `installed_families:` at the top
+of `lib/EpdFont/scripts/sd-fonts.yaml` is the single source of truth, and
+`scripts/install-sim-fonts.py` defaults to it. That default used to be "every
+curated family the recipes can build"; once all 15 became buildable
+(2026-08-01) a routine re-run silently reinstalled the eleven this ruling
+excludes, which is exactly the drift the list now prevents. Use
+`--all-curated` to opt back into the old behaviour; it prints a parity warning.
+
+The iOS app needs no equivalent list. `CrossPointFsPrep.cpp::seedOneFontDirectory`
+seeds whatever `crosspoint-simulator/ios/seedfonts/` contains and prunes files
+the bundle no longer carries, so that directory is its own source of truth —
+keep it holding exactly these four.
+
 ## Installing Fonts
 
 There are three ways to install fonts:

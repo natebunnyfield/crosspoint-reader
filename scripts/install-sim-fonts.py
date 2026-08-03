@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 """Build SD-card fonts and install them into the simulator's emulated card.
 
-    python3 scripts/install-sim-fonts.py                 # the display-name set
+    python3 scripts/install-sim-fonts.py                 # the S-tier four
     python3 scripts/install-sim-fonts.py --families Junicode,Lora
+    python3 scripts/install-sim-fonts.py --all-curated   # every buildable family
     python3 scripts/install-sim-fonts.py --fs-dir /path/to/fs_
 
-The default family list is the intersection of the families named in
-src/FontDisplayNames.h (the set actually curated for the picker) with the
-ACTIVE families in lib/EpdFont/scripts/sd-fonts.yaml — commented blocks
-(e.g. commercial fonts whose sources live only in gitignored local_fonts/)
-and families this checkout cannot build are skipped with a note, never an
-error. That way the same command keeps working as families are added.
+The default family list is `installed_families:` from
+lib/EpdFont/scripts/sd-fonts.yaml — the S-tier ruling in docs/sd-card-fonts.md,
+which is the set installed on every surface (both device SD cards, fs_/fonts/,
+and the iOS seed bundle). It defaulted to "every curated family sd-fonts.yaml
+can build" until 2026-08-03; once all 15 became buildable that meant a routine
+re-run silently reinstalled the eleven the ruling excludes, so the default now
+follows the ruling and --all-curated opts back into the old behaviour.
+
+Either way the list is intersected with the ACTIVE families in sd-fonts.yaml —
+commented blocks (e.g. commercial fonts whose sources live only in gitignored
+local_fonts/) and families this checkout cannot build are skipped with a note,
+never an error. That way the same command keeps working as families are added.
 
 Installation mirrors the iOS bundle-seeding rules (crosspoint-simulator
 ios/CrossPointFsPrep.cpp): a family directory under fs_/fonts/ is made to
@@ -38,19 +45,39 @@ def displayname_families() -> list[str]:
     return re.findall(r'\{"([^"]+)"', body)
 
 
-def active_yaml_families() -> set[str]:
+def _yaml_config() -> dict:
     import yaml
 
     with open(SCRIPTS / "sd-fonts.yaml") as f:
-        config = yaml.safe_load(f)
-    return {fam["name"] for fam in config.get("families", [])}
+        return yaml.safe_load(f)
+
+
+def active_yaml_families() -> set[str]:
+    return {fam["name"] for fam in _yaml_config().get("families", [])}
+
+
+def installed_families() -> list[str]:
+    """The S-tier set: what actually ships on every surface.
+
+    Falls back to the curated FontDisplayNames set if the key is ever removed,
+    so this script degrades to its pre-2026-08-03 behaviour rather than
+    installing nothing.
+    """
+    declared = _yaml_config().get("installed_families")
+    return list(declared) if declared else displayname_families()
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--families",
-        help="Comma-separated family names (default: FontDisplayNames set that sd-fonts.yaml can build)",
+        help="Comma-separated family names (default: installed_families from sd-fonts.yaml)",
+    )
+    parser.add_argument(
+        "--all-curated",
+        action="store_true",
+        help="Install every curated family sd-fonts.yaml can build, not just the S-tier set. "
+             "This breaks four-family parity with the device cards and the iOS seed bundle.",
     )
     parser.add_argument(
         "--fs-dir",
@@ -68,7 +95,12 @@ def main() -> int:
             return 1
         families = wanted
     else:
-        curated = displayname_families()
+        if args.all_curated:
+            curated = displayname_families()
+            print("--all-curated: installing beyond the S-tier set; this breaks parity "
+                  "with the device cards and the iOS seed bundle.")
+        else:
+            curated = installed_families()
         families = [f for f in curated if f in buildable]
         skipped = [f for f in curated if f not in buildable]
         if skipped:
