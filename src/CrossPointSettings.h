@@ -274,7 +274,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Language setting (Language enum index, default 0 = EN)
   uint8_t language = 0;
   // Quick Resume: keep current content visible with moon icon instead of showing a static sleep screen.
-  // Pinned on by normalizeRetiredSettings(); the default matches so fresh installs agree.
+  // While ON, an inactivity-timeout sleep takes this path and never consults
+  // sleepScreen, so an owner who wants their sleep image on the common sleep
+  // path has to turn this OFF (Settings > System > Quick Resume on Timeout).
   uint8_t quickResumeSleepScreen = QUICK_RESUME_AFTER_TIMEOUT;
   // Keep the HOST screen awake while CrossPoint is in the foreground
   // (0 = let the host dim/lock normally, 1 = suppress it).
