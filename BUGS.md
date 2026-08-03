@@ -12,6 +12,42 @@ was found, and what closing it requires.
 
 ## OPEN
 
+### [B-008] iOS app offers WiFi and web-server menus that cannot work
+**severity: medium · scope: iOS app · found 2026-08-03**
+
+The iOS build compiles and ships the whole firmware network stack, and exposes
+it in the UI, but none of it can function on a phone. `WiFi.scanNetworks()`
+returns a synthetic list (`crosspoint-simulator/src/WiFi.h:244`), and
+`CrossPointWebServerActivity` shows the user `WiFi.localIP()`, which is
+hardcoded to **127.0.0.1** (`WiFi.h:196`) — so the app renders a URL and QR
+code pointing at loopback that nothing can reach. OTA is stubbed to always
+report NO_UPDATE and to fail install with `INTERNAL_UPDATE_ERROR`
+(`simulator_ota.cpp:19`). SD Firmware Update offers to flash a `.bin` from an
+SD card the device does not have.
+
+This is the lying-control class of defect: the control exists, is reachable,
+and silently does nothing useful. `Info.plist.in` also carries no
+`NSLocalNetworkUsageDescription`.
+
+**Close by:** hiding these entries on the iOS target (menu surgery in
+`SettingsActivity` / `NetworkModeSelectionActivity`), ideally alongside
+compiling the ~16 dead TUs out. Note this is capability *removal* from a
+surface where the capability never worked — flag it as such when doing it.
+
+### [B-007] iOS seed fonts are stored twice on device
+**severity: low · scope: iOS app · found 2026-08-03**
+
+`seedOneFontDirectory` hard-copies every bundled `.cpfont` into
+`Documents/fonts/`, including the `2x/` subdirectory
+(`crosspoint-simulator/ios/CrossPointFsPrep.cpp:193,245`). The 54.8 MB seed
+set therefore exists in both the app bundle and Documents, so a 19.8 MB
+download presents as roughly **113 MB** in iOS Storage settings — the number
+users actually see.
+
+**Close by:** symlinking rather than copying, provided the installer and prune
+paths never write through the link. Would halve the visible footprint to
+~58 MB with no capability change.
+
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
