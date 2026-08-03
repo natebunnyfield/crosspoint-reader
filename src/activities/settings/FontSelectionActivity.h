@@ -34,19 +34,24 @@ class FontSelectionActivity final : public Activity {
   // the sizes they ship, so the stored value snaps per-family — the stored
   // number alone is not an accurate readout.
   uint8_t resolvedPointSize() const;
-  // Typefaces shown per page. Capped so a page is a comparison set rather than
-  // a scroll: four specimens is what fits above the preview pane without the
-  // rows crowding, and it keeps the page stride stable as families are added
-  // or removed instead of reflowing with whatever height happens to be free.
+  // Typefaces shown per page: AS MANY AS FIT, with no fixed cap.
   //
-  // The list rect and the navigation stride MUST derive from the same number.
-  // drawList() computes its own pageItems from rect.height / rowHeight, so
-  // clamping only one of the two desynchronises the highlight from the page:
-  // ButtonNavigator would step past entries the screen never drew.
-  static constexpr int kFamiliesPerPage = 4;
+  // There was a `kFamiliesPerPage = 4` here, on the reasoning that a page
+  // should be a comparison set rather than a scroll. It stopped paying for
+  // itself the moment the installed set outgrew it — a fifth family could only
+  // be seen by paging, on a screen with the room to show it, which reads as the
+  // font simply being missing. The space below the preview pane is the only
+  // limit now.
+  //
+  // The list rect and the navigation stride MUST still derive from the same
+  // number. drawList() computes its own pageItems from rect.height / rowHeight,
+  // so if these two ever disagree the highlight desynchronises from the page and
+  // ButtonNavigator steps past entries the screen never drew. Both sides now ask
+  // the theme (getNumberOfItemsPerPage / the same row height), which is one
+  // source rather than two.
 
-  // Height of a list page: kFamiliesPerPage rows at the ACTIVE theme's
-  // subtitle-row height, never more than the space actually available.
+  // Height of a list page: whatever is free below the preview pane, in whole
+  // rows at the ACTIVE theme's subtitle-row height.
   int listPageHeight() const;
 
   int getFontIdForPreview(int index) const;
