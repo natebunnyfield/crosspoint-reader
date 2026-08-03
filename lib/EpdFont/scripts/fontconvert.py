@@ -61,7 +61,8 @@ intervals = [
     ### Vietnamese Extended ###
     # All precomposed Vietnamese characters with tone marks
     # Ả Ấ Ầ Ẩ Ẫ Ậ Ắ Ằ Ẳ Ẵ Ặ Ẹ Ẻ Ẽ Ế Ề Ể Ễ Ệ Ỉ Ị Ọ Ỏ Ố Ồ Ổ Ỗ Ộ Ớ Ờ Ở Ỡ Ợ Ụ Ủ Ứ Ừ Ử Ữ Ự Ỳ Ỵ Ỷ Ỹ
-    (0x1EA0, 0x1EF9),
+    # (Removed: Vietnamese translation deleted in commit 08d5bdee)
+    # (0x1EA0, 0x1EF9),
     ### General Punctuation (core subset) ###
     # Smart quotes, en dash, em dash, ellipsis, NO-BREAK SPACE
     (0x2000, 0x206F),
@@ -80,7 +81,8 @@ intervals = [
     # (0x0370, 0x03FF),
     ### Cyrillic ###
     # Russian, Ukrainian, Bulgarian, etc.
-    (0x0400, 0x04FF),
+    # (Removed: Russian/Ukrainian translations deleted in commit 08d5bdee)
+    # (0x0400, 0x04FF),
     ### Math Symbols (common subset) ###
     # Superscripts and Subscripts
     (0x2070, 0x209F),
