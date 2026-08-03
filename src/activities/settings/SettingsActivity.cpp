@@ -12,15 +12,21 @@
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
 #include "CrossPointSettings.h"
+#ifndef CROSSPOINT_NO_NETWORK
 #include "FontDownloadActivity.h"
+#endif
 #include "FontSelectionActivity.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
+#ifndef CROSSPOINT_NO_NETWORK
 #include "OtaUpdateActivity.h"
-#include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
+#endif
+#include "SdCardFontSystem.h"
 #include "SettingsList.h"
+#ifndef CROSSPOINT_NO_NETWORK
 #include "activities/network/WifiSelectionActivity.h"
+#endif
 #include "activities/util/IntervalSelectionActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
@@ -64,9 +70,13 @@ void SettingsActivity::rebuildSettingsLists() {
   }
 
   // Append device-only ACTION items
+#ifndef CROSSPOINT_NO_NETWORK
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
+#endif
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
+#ifndef CROSSPOINT_NO_NETWORK
   systemSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
+#endif
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
   readerSettings.insert(readerSettings.begin(),
@@ -365,12 +375,15 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
         break;
         break;
+#ifndef CROSSPOINT_NO_NETWORK
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false), resultHandler);
         break;
+#endif
       case SettingAction::ClearCache:
         startActivityForResult(std::make_unique<ClearCacheActivity>(renderer, mappedInput), resultHandler);
         break;
+#ifndef CROSSPOINT_NO_NETWORK
       case SettingAction::CheckForUpdates:
         startActivityForResult(std::make_unique<OtaUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
@@ -384,6 +397,7 @@ void SettingsActivity::toggleCurrentSetting() {
                                  rebuildSettingsLists();
                                });
         break;
+#endif
       case SettingAction::TextSettings:
         startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                                [this](const ActivityResult&) {
