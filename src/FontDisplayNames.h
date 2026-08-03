@@ -69,6 +69,11 @@ inline constexpr Entry kEntries[] = {
      "1918; 2007", "Jersey City; Gda\xC5\x84sk", 1918},
     {"Junicode", "Junicode SemiCond", "Peter S. Baker", "1703; 1998, 2023",
      "Oxford; Charlottesville, Virginia", 1703},
+    // Born digital, so both years are its own: Atkinson Hyperlegible 2019, the
+    // Lexica extension 2024. Credits both hands — the face's name carries
+    // neither, unlike Caledonia CC or Goudy Bookletter.
+    {"LexicaUltralegible", "Lexica Ultralegible", "Applied Design Works & Jacob Perez", "2019, 2024",
+     "New York; El Paso, Texas", 2019},
     {"Venetian301", "Venetian 301", "Bruce Rogers", "1914, 1990", "New York; Cambridge, Mass.", 1914},
 };
 

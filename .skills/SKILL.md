@@ -255,12 +255,19 @@ recipe for every family in `src/FontDisplayNames.h`, so
 `Skipping (no buildable source in sd-fonts.yaml): ...`. If it does, a recipe
 regressed or a local source is missing.
 
-**S tier — the only INSTALLED families (fork ruling, 2026-08-02): Edgar,
-Coelacanth, Rosarivo, TeXGyreSchola.** Buildable is not installed: the other
-eleven stay as recipes only. Every surface carries exactly these four — device
-SD cards, `fs_/fonts/`, and the iOS seed bundle
-(`crosspoint-simulator/ios/seedfonts/`). Do not install additional families
-anywhere without a new ruling; see docs/sd-card-fonts.md "S tier".
+**S tier — the only INSTALLED families (fork ruling, 2026-08-02; sans added
+2026-08-03): Edgar, Coelacanth, Rosarivo, TeXGyreSchola,
+LexicaUltralegible.** Buildable is not installed: everything else stays a recipe
+only. Every surface carries exactly these five — device SD cards, `fs_/fonts/`,
+and the iOS seed bundle (`crosspoint-simulator/ios/seedfonts/`), each with its
+`2x/` hi-res companions. Do not install additional families anywhere without a
+new ruling; see docs/sd-card-fonts.md "S tier".
+
+Lexica Ultralegible is the sans, picked off a 13-candidate bench rendered
+through the real renderer at matched x-height
+(`lib/EpdFont/scripts/sans-candidates.yaml`, `render_harness reading FAMILY`).
+The bench families are NOT installed and deliberately live in their own YAML so
+they stay out of the device's font-download manifest.
 
 Four of them — Edgar, GTAlpinaCond, Venetian301, CaledoniaCC, all commercial or
 webfont cuts — build from `lib/EpdFont/local_fonts/` (gitignored). The **recipe**
