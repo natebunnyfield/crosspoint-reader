@@ -79,9 +79,9 @@
 #   so a span has to be checked against the built file, not computed.
 
 # The S-tier ruling (docs/sd-card-fonts.md, 2026-08-02; Lexica Ultralegible
-# added 2026-08-03): these five, and only these five, are INSTALLED on every
-# surface — both device SD cards, the simulator's fs_/fonts/, and the iOS
-# bundled seed set. Everything else below stays a buildable recipe that ships
+# added 2026-08-03, three text grotesques the same day): these eight, and only
+# these eight, are INSTALLED on every surface — both device SD cards, the
+# simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
 # This list exists so the ruling is ENFORCED rather than merely documented.
@@ -90,7 +90,7 @@
 # 15 — so a routine re-run silently reinstalled the eleven the ruling excludes.
 # The iOS side needs no equivalent list: CrossPointFsPrep.cpp seeds whatever
 # ios/seedfonts/ contains and prunes the rest, so that directory is its own
-# source of truth and already holds exactly these five.
+# source of truth and already holds exactly these eight.
 #
 # build-sd-fonts.py reads only `families:` and ignores this key.
 installed_families:
@@ -99,6 +99,9 @@ installed_families:
   - Rosarivo
   - TeXGyreSchola
   - LexicaUltralegible
+  - Archivo
+  - LibreFranklin
+  - HostGrotesk
 
 families:
   # ── Serif ──────────────────────────────────────────────────────────────
@@ -482,6 +485,61 @@ families:
       bolditalic: {from: italic, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
 
   # ── Sans-serif ─────────────────────────────────────────────────────────
+
+  # The three INSTALLED text grotesques (2026-08-03), promoted out of
+  # grotesque-candidates.yaml after the bench. Built to the same uniform slots
+  # as the rest of the installed set: x-height 12/14/16/18 px measured on the
+  # hinted render, advanceY against the tier's shipped 34/39/45/51.
+
+  - name: Archivo
+    description: "Archivo, Omnibus-Type's grotesque for text (Latin, Greek, Cyrillic)"
+    intervals: reading
+    # force_autohint is LOAD-BEARING, not a tweak. Under the font's native
+    # hinting no point size renders a 12 px x-height at all — it jumps 11 px
+    # (10 pt) straight to 13 px (11 pt) — so slot 0 had to be built a pixel
+    # small, and at that size the apertures of 's' sealed shut (5 enclosed
+    # pixels where an open letter must have none). The auto-hinter puts 11 pt
+    # exactly on 12 px AND reopens the aperture: s = 0, and the 'e' eye goes
+    # from 7 px to 26. The bench disqualified this face on the native-hinted
+    # build; that verdict was an artifact of the hinter, not the design.
+    force_autohint: true
+    # Uniform slots: xh 12/14/16/18 exact on all four; advY 35/39/45/51,
+    # slot 0 one px over (no span lands 34 there without moving the rest).
+    sizes: [11, 12, 14, 16]
+    metrics: {ascent: 1186, descent: -354, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf", variable: {wght: 400, wdth: 100}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf", variable: {wght: 700, wdth: 100}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wght: 400, wdth: 100}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wght: 700, wdth: 100}}
+
+  - name: LibreFranklin
+    description: "Libre Franklin, Impallari's Franklin Gothic revival (Latin, Greek, Cyrillic)"
+    intervals: reading
+    # Uniform slots: xh 12/14/16/18 exact on all four; advY 33/39/46/52,
+    # slots 0/2/3 within a pixel. Best-rounded face in the grotesque bench:
+    # counters intact, 99% of Latin Extended-A, a real drawn italic.
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1202, descent: -359, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: HostGrotesk
+    description: "Host Grotesk, Element Type's contemporary grotesque (Latin)"
+    intervals: reading
+    # Uniform slots: xh 12/14/16/18 exact, advY 33/39/45/51 — the cleanest
+    # ramp of the three. Its own Latin Extended-A coverage is 88%, so the
+    # remaining accents come from the Noto fallback the converter applies.
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1098, descent: -328, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
 
   - name: NotoSansExtended
     description: "Sans-serif (Latin, Greek, Cyrillic, Georgian, Armenian, Ethiopic)"
