@@ -58,6 +58,10 @@ FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts
 
 extern SdCardFontSystem sdFontSystem;
 
+// sd_font_stub.cpp. Loads a family's Nth installed size rather than the size
+// nearest a nominal 12/14/16/18 — see the comment on renderReadingSpecimen().
+int loadSdFontByOrdinal(const char* familyName, uint8_t ordinal, GfxRenderer& renderer);
+
 // Global font objects, mirroring src/main.cpp — including ALL FOUR styles per
 // family. Registering only regular+bold here would make italic silently fall
 // back inside EpdFontFamily::getFont(), so the sim would render something the
@@ -250,6 +254,147 @@ bool renderFontSpecimen(const char* famA, const char* famB, const char* outDir) 
   return true;
 }
 
+// A whole reading page in ONE family, at each of the four size slots.
+//
+// renderFontSpecimen() above answers "did this kerning change move a word?" —
+// four short strings, two families, no wrapping. Judging a face for READING
+// needs the opposite: one family, a full column of wrapped body text, so the
+// texture of a paragraph, the leading, and the italic/bold in context are all
+// visible at once. Nothing here measures; the output is for looking at.
+//
+// The body text is written for this harness rather than quoted, so it can carry
+// the pairs that decide a face on a 1-bit panel — rn/m, Il1, O0, ligature f's,
+// accented capitals, numerals — inside ordinary prose rather than a test string.
+namespace {
+
+// Greedy wrap against the real getTextWidth, one word at a time: measuring a
+// whole candidate line each time would be O(n^2) on a 90-word paragraph, and
+// word-at-a-time is what the reader's own layout does. Draws from `y` down,
+// stops before `limit`, returns the y after the last line drawn and reports
+// how many lines it managed through `outLines` / `outTruncated`.
+int drawWrapped(int id, const char* text, EpdFontFamily::Style style, int x, int y, int colW,
+                int lineH, int limit, int* outLines, bool* outTruncated) {
+  char line[512] = {0};
+  int lineLen = 0;
+  int lines = 0;
+  bool truncated = false;
+  const char* p = text;
+  while (*p != '\0') {
+    if (y + lineH > limit) { truncated = true; break; }
+    const char* sp = strchr(p, ' ');
+    const size_t wordLen = sp != nullptr ? static_cast<size_t>(sp - p) : strlen(p);
+    char cand[512];
+    snprintf(cand, sizeof(cand), "%s%s%.*s", line, lineLen > 0 ? " " : "", (int)wordLen, p);
+    if (renderer.getTextWidth(id, cand, style) > colW && lineLen > 0) {
+      renderer.drawText(id, x, y, line, true, style);
+      y += lineH;
+      ++lines;
+      snprintf(line, sizeof(line), "%.*s", (int)wordLen, p);
+    } else {
+      snprintf(line, sizeof(line), "%s", cand);
+    }
+    lineLen = static_cast<int>(strlen(line));
+    p = sp != nullptr ? sp + 1 : p + wordLen;
+  }
+  if (lineLen > 0 && !truncated) {
+    renderer.drawText(id, x, y, line, true, style);
+    y += lineH;
+    ++lines;
+  }
+  if (outLines != nullptr) *outLines = lines;
+  if (outTruncated != nullptr) *outTruncated = truncated;
+  return y;
+}
+
+}  // namespace
+
+bool renderReadingSpecimen(const char* family, const char* outDir) {
+  static const char* kBody =
+      "The lamp on the far wall flickered once and held, and for a while nobody "
+      "in the reading room moved. Outside, rain filled the gutters. Marjorie "
+      "turned page 148 of the ledger, following a column of figures she had "
+      "copied out of the Illinois office three months earlier — 30,865 tons, "
+      "then 41,072, then a jump nobody had ever explained. Official policy said "
+      "the difference was rounding. She did not believe it, and neither, she "
+      "suspected, did the auditor who had signed off on it.";
+  static const char* kItalic =
+      "Every officer aboard knew the difference between quiet and silence.";
+  static const char* kBold = "Chapter Nine: The Ledger of the Wharf";
+  static const char* kHard = "Illinois 1lI0O · rn m · cl d · 3/8 5/6 · fjord ffi · ÄÖÜ Café";
+  static const char* kAlphabet = "abcdefghijklmnopqrstuvwxyz";
+
+  for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
+    // Ordinal slot, NOT nearest-to-12/14/16/18: families reach the same
+    // x-height at different point sizes, so slot 3 of a 10/12/14/15 family is
+    // its 15pt file, which a nearest-match to 18pt would collapse onto slot 2.
+    const int id = loadSdFontByOrdinal(family, sizeEnum, renderer);
+    if (id == 0) {
+      fprintf(stderr, "%s: missing at slot %u\n", family, sizeEnum);
+      return false;
+    }
+    auto it = renderer.getSdCardFonts().find(id);
+    if (it == renderer.getSdCardFonts().end()) {
+      fprintf(stderr, "%s: not registered at slot %u\n", family, sizeEnum);
+      return false;
+    }
+
+    // One prewarm for the whole page: SdCardFont's mini kern matrix is
+    // per-page and each prewarm replaces the last, so wrapping against a
+    // stale one would measure an unkerned font (see renderFontSpecimen).
+    char page[1536];
+    snprintf(page, sizeof(page), "%s %s %s %s %s", kBody, kItalic, kBold, kHard, kAlphabet);
+    it->second->prewarm(page, 0x0F, /*metadataOnly=*/false);
+
+    int top, right, bottom, left;
+    renderer.getOrientedViewableTRBL(&top, &right, &bottom, &left);
+    const int margin = left + 14;
+    const int colW = renderer.getScreenWidth() - margin - (right + 14);
+    const int lineH = renderer.getLineHeight(id);
+
+    renderer.clearScreen(0xFF);
+    int y = top + 6;
+
+    char hdr[128];
+    snprintf(hdr, sizeof(hdr), "%s  --  slot %u  --  line %dpx", family, sizeEnum, lineH);
+    renderer.drawText(UI_12_FONT_ID, margin, y, hdr, true, EpdFontFamily::BOLD);
+    y += renderer.getLineHeight(UI_12_FONT_ID) + 10;
+
+    const int pageBottom = renderer.getScreenHeight() - bottom - 6;
+    y = drawWrapped(id, kBold, EpdFontFamily::BOLD, margin, y, colW, lineH, pageBottom, nullptr,
+                    nullptr);
+    y += lineH / 2;
+
+    // The tail (italic sample + confusables) is the point of the page, so the
+    // body gets whatever is left after reserving room for it. Without this the
+    // 18px slot runs off the bottom and GfxRenderer logs every clipped glyph.
+    const int bodyLimit = pageBottom - (4 * lineH + lineH);
+
+    int lines = 0;
+    bool truncated = false;
+    y = drawWrapped(id, kBody, EpdFontFamily::REGULAR, margin, y, colW, lineH, bodyLimit, &lines,
+                    &truncated);
+
+    y += lineH / 2;
+    y = drawWrapped(id, kItalic, EpdFontFamily::ITALIC, margin, y, colW, lineH, pageBottom, nullptr,
+                    nullptr);
+    y += lineH / 2;
+    y = drawWrapped(id, kHard, EpdFontFamily::REGULAR, margin, y, colW, lineH, pageBottom, nullptr,
+                    nullptr);
+
+    // Set width is the other half of "readable" on a 528px column: a wider
+    // face at the same x-height fits fewer words per line and so more page
+    // turns per chapter. Report it rather than leaving it to the eye.
+    const int alphaW = renderer.getTextWidth(id, kAlphabet);
+    printf("%-20s slot %u  line %2dpx  lc-alphabet %3dpx  body lines %2d%s  col %dpx\n",
+           family, sizeEnum, lineH, alphaW, lines, truncated ? " (cut)" : "", colW);
+
+    char path[256];
+    snprintf(path, sizeof(path), "%s/reading_%s_%u.bmp", outDir, family, sizeEnum);
+    if (!writeMonoPortraitBmp(path, renderer)) return false;
+  }
+  return true;
+}
+
 #ifndef SIM_NO_MAIN
 
 namespace {
@@ -261,10 +406,11 @@ int usage(const char* argv0) {
           "  %s calendar [YYYY MM DD]                render Spanish/CR sleep screen -> fs_/sleep.bmp\n"
           "  %s calendar-westside [YYYY MM DD]        render Westside/EN sleep screen -> fs_/sleep.bmp\n"
           "  %s fonts FAMILY_A FAMILY_B               A-B two SD font families -> fs_/kern_specimen_*.bmp\n"
+          "  %s reading FAMILY                        a wrapped body-text page -> fs_/reading_FAMILY_*.bmp\n"
           "  %s YYYY MM DD                            legacy calendar form\n\n"
-          "fonts mode reads CPFONT_DIR (use /.fonts), a DEVICE-style path;\n"
-          "the stub HalStorage prefixes ./fs_ to it.\n",
-          argv0, argv0, argv0, argv0);
+          "fonts and reading modes read CPFONT_DIR (use /.fonts), a DEVICE-style\n"
+          "path; the stub HalStorage prefixes ./fs_ to it.\n",
+          argv0, argv0, argv0, argv0, argv0);
   return 2;
 }
 
@@ -282,6 +428,11 @@ int main(int argc, char** argv) {
   if (strcmp(mode, "fonts") == 0) {
     if (argc != 4) return usage(argv[0]);
     return renderFontSpecimen(argv[2], argv[3], "./fs_") ? 0 : 1;
+  }
+
+  if (strcmp(mode, "reading") == 0) {
+    if (argc != 3) return usage(argv[0]);
+    return renderReadingSpecimen(argv[2], "./fs_") ? 0 : 1;
   }
 
   // "calendar [Y M D]", "calendar-westside [Y M D]", bare "calendar", and the

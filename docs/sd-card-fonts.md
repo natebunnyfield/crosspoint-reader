@@ -3,15 +3,31 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02)
+## S tier (fork ruling, 2026-08-02; sans added 2026-08-03)
 
-The installed set on this fork is exactly four families — **Edgar, Coelacanth,
-Rosarivo, TeXGyreSchola** — on every surface: both device SD cards, the
-simulator's `fs_/fonts/`, and the iOS app's bundled seed set
-(`crosspoint-simulator/ios/seedfonts/`). The other eleven curated families
-remain fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
+The installed set on this fork is exactly five families — **Edgar, Coelacanth,
+Rosarivo, TeXGyreSchola, LexicaUltralegible** — on every surface: both device SD
+cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed set
+(`crosspoint-simulator/ios/seedfonts/`). The other curated families remain fully
+buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these four and nothing else.
+surface or reprovisioning a card, install these five and nothing else.
+
+Lexica Ultralegible is the one sans in the set, added after a bench of 13
+sans-serif candidates rendered through the real `GfxRenderer` at matched
+x-height (`lib/EpdFont/scripts/sans-candidates.yaml`, `render_harness reading`).
+It carries Atkinson Hyperlegible's letterform-disambiguation design with the
+coverage gap closed — 100% of Latin-1 and Latin Extended-A against Atkinson's
+own static TTFs at 98% / 73%, which matters because `build-sd-fonts.py` fills
+every uncovered codepoint from Noto, so a thin face renders two textures inside
+one word.
+
+The 2x hi-res companions (`<Family>/2x/<same 1x filename>`, built at doubled
+point sizes for `CROSSPOINT_RENDER_SCALE=2`) are part of the set: every
+installed family carries one, and `install-sim-fonts.py` cannot regenerate them
+— it only prunes orphans. Build them by hand with the doubled `sizes:` and
+rename the output back to the 1x filenames, which is what
+`SdCardFontManager::hiResCompanionPath` looks up.
 
 The ruling is enforced, not just written down. `installed_families:` at the top
 of `lib/EpdFont/scripts/sd-fonts.yaml` is the single source of truth, and
@@ -24,7 +40,7 @@ excludes, which is exactly the drift the list now prevents. Use
 The iOS app needs no equivalent list. `CrossPointFsPrep.cpp::seedOneFontDirectory`
 seeds whatever `crosspoint-simulator/ios/seedfonts/` contains and prunes files
 the bundle no longer carries, so that directory is its own source of truth —
-keep it holding exactly these four.
+keep it holding exactly these five.
 
 ## Installing Fonts
 

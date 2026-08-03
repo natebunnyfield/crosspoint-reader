@@ -69,11 +69,20 @@
 #   Derivation: every family swept at 9-24 pt, x-height/ink measured from
 #   the built .cpfonts (2026-08-02); supersedes the source-unit "harmonized
 #   ramp" x-height estimates, which hinting made wrong by up to 3 px.
+#
+#   The advanceY line above is the TARGET; read the shipped files before
+#   matching a new family to it. Edgar and TeX Gyre Schola both build to
+#   34/39/45/51, not 34/40/46/51 — slots 1 and 2 land a pixel under and no
+#   span fixes only those two. Rosarivo is 32/39/45/51, Coelacanth 36/41/49/55
+#   (floor-bound). The formula is also not plain ceil(): FreeType rounds
+#   face.size.height to whole pixels before fontconvert's norm_ceil sees it,
+#   so a span has to be checked against the built file, not computed.
 
-# The S-tier ruling (docs/sd-card-fonts.md, 2026-08-02): these four, and only
-# these four, are INSTALLED on every surface — both device SD cards, the
-# simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below
-# stays a buildable recipe that ships nowhere.
+# The S-tier ruling (docs/sd-card-fonts.md, 2026-08-02; Lexica Ultralegible
+# added 2026-08-03): these five, and only these five, are INSTALLED on every
+# surface — both device SD cards, the simulator's fs_/fonts/, and the iOS
+# bundled seed set. Everything else below stays a buildable recipe that ships
+# nowhere.
 #
 # This list exists so the ruling is ENFORCED rather than merely documented.
 # scripts/install-sim-fonts.py defaults to it; before it did, the default was
@@ -81,7 +90,7 @@
 # 15 — so a routine re-run silently reinstalled the eleven the ruling excludes.
 # The iOS side needs no equivalent list: CrossPointFsPrep.cpp seeds whatever
 # ios/seedfonts/ contains and prunes the rest, so that directory is its own
-# source of truth and already holds exactly these four.
+# source of truth and already holds exactly these five.
 #
 # build-sd-fonts.py reads only `families:` and ignores this key.
 installed_families:
@@ -89,6 +98,7 @@ installed_families:
   - Coelacanth
   - Rosarivo
   - TeXGyreSchola
+  - LexicaUltralegible
 
 families:
   # ── Serif ──────────────────────────────────────────────────────────────
@@ -570,9 +580,21 @@ families:
       bolditalic: {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-BoldItalic.ttf"}
 
   - name: LexicaUltralegible
-    description: "Accessibility font for low vision / dyslexia (Latin)"
-    intervals: latin-ext
-    sizes: [12, 14, 16, 18]
+    description: "Lexica Ultralegible, Atkinson Hyperlegible extended for reading (Latin)"
+    # INSTALLED (S tier). The one sans in the installed set: Atkinson
+    # Hyperlegible's letterform-disambiguation design with the coverage gap
+    # closed — 100% of Latin-1 and Latin Extended-A where Atkinson's own static
+    # TTFs carry 98% / 73%, so accented European text stays in the face instead
+    # of falling back to Noto mid-word. `reading` rather than `latin-ext` to
+    # match Edgar, the other recently-added installed family.
+    intervals: reading
+    # Uniform slots: xh 12/14/16/18 (exact on all four), advY 33/39/45/51.
+    # Slot 0 sits 1 px under the tier's 34 and cannot be fixed: the next span
+    # that reaches 34 px there pushes the other three to 40/46/52, three misses
+    # instead of one. This is the hinting-skip case sd-fonts.yaml documents
+    # above. The ascender/advanceY ratio (0.77-0.79) matches TeX Gyre Schola's.
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1102, descent: -339, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-Regular.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-Bold.ttf"}
