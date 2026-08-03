@@ -1,0 +1,67 @@
+{
+  "AtkinsonNext": {
+    "latin1": 97.9,
+    "latinA": 72.7,
+    "punct": 34.9
+  },
+  "Luciole": {
+    "latin1": 99.0,
+    "latinA": 100.0,
+    "punct": 34.9
+  },
+  "LexicaUltralegible": {
+    "latin1": 100.0,
+    "latinA": 100.0,
+    "punct": 37.2
+  },
+  "Andika": {
+    "latin1": 100.0,
+    "latinA": 99.2,
+    "punct": 97.7
+  },
+  "SourceSans3": {
+    "latin1": 100.0,
+    "latinA": 100.0,
+    "punct": 65.1
+  },
+  "FiraSans": {
+    "latin1": 100.0,
+    "latinA": 100.0,
+    "punct": 41.9
+  },
+  "IBMPlexSans": {
+    "latin1": 100.0,
+    "latinA": 100.0,
+    "punct": 55.8
+  },
+  "AlegreyaSans": {
+    "latin1": 100.0,
+    "latinA": 98.4,
+    "punct": 51.2
+  },
+  "OpenSans": {
+    "latin1": 100.0,
+    "latinA": 100.0,
+    "punct": 46.5
+  },
+  "PublicSans": {
+    "latin1": 100.0,
+    "latinA": 96.9,
+    "punct": 34.9
+  },
+  "PTSans": {
+    "latin1": 100.0,
+    "latinA": 78.1,
+    "punct": 37.2
+  },
+  "Inter": {
+    "latin1": 99.0,
+    "latinA": 99.2,
+    "punct": 83.7
+  },
+  "NotoSans": {
+    "latin1": 100.0,
+    "latinA": 100.0,
+    "punct": 100.0
+  }
+}

@@ -1,0 +1,191 @@
+# Sans-serif reading-face candidates for CrossPoint (evaluation set)
+#
+# NOT a shipping list. This is the bench for the sans-serif evaluation: every
+# family here is built to the SAME apparent size and leading as the curated
+# serif tier, so the only variable left between two specimens is the typeface.
+# Nothing here is installed anywhere; sd-fonts.yaml's `installed_families:`
+# still rules that (Edgar, Coelacanth, Rosarivo, TeXGyreSchola,
+# LexicaUltralegible — promoted out of this bench on 2026-08-03).
+#
+#   python3 lib/EpdFont/scripts/build-sd-fonts.py \
+#     --config lib/EpdFont/scripts/sans-candidates.yaml --output-dir out/
+#
+# Why a separate file: adding these to sd-fonts.yaml would put 13 unranked
+# candidates into the device's font-download manifest.
+#
+# Slot uniformity (same rule as sd-fonts.yaml, derived 2026-08-03):
+#   x-height  12 / 14 / 16 / 18 px   (slots 0-3, regular, hinted, 150 DPI)
+#   advanceY  34 / 40 / 46 / 51 px
+# `sizes:` is the point size whose HINTED x-height hits each slot — measured,
+# not assumed, because hinting moves it by up to 3 px off the source-unit
+# estimate. Every family below lands all four x-heights exactly; the leading
+# targets land within +-2 px (one span per family cannot hit four slots whose
+# point sizes are not exactly proportional). `metrics:` is the span solved for
+# those targets, floored by the worst-of-regular/italic plain-text ink span
+# +0.13 em, with the ascender clearing accented capitals — verified for all 13.
+#
+# The point sizes differ family to family BECAUSE the comparison is fair:
+# Luciole and Inter reach a 12 px x-height at 10 pt where Atkinson and Source
+# Sans need 11 pt. Comparing all of them "at 12 pt" would be comparing
+# different sizes of text.
+
+families:
+  # ── Accessibility-engineered ───────────────────────────────────────────
+  # Drawn against a stated legibility brief and, for Luciole and the Atkinson
+  # line, tested with low-vision readers.
+
+  - name: AtkinsonNext
+    description: "Atkinson Hyperlegible Next — Braille Institute, letterform disambiguation (Latin)"
+    intervals: latin-ext
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 932, descent: -509, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-BoldItalic.ttf"}
+
+  - name: Luciole
+    description: "Luciole — CTRDV/Bourcellier, drawn for low vision, CC-BY (Latin, Greek)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 15]
+    metrics: {ascent: 1114, descent: -455, linegap: 0}
+    # The foundry publishes one zip; there is no per-file URL.
+    styles:
+      regular:    {zip: "https://www.luciole-vision.com/fonts/Luciole.zip", member: "Luciole/Luciole-Regular.ttf"}
+      bold:       {zip: "https://www.luciole-vision.com/fonts/Luciole.zip", member: "Luciole/Luciole-Bold.ttf"}
+      italic:     {zip: "https://www.luciole-vision.com/fonts/Luciole.zip", member: "Luciole/Luciole-Regular-Italic.ttf"}
+      bolditalic: {zip: "https://www.luciole-vision.com/fonts/Luciole.zip", member: "Luciole/Luciole-Bold-Italic.ttf"}
+
+  - name: LexicaUltralegible
+    description: "Lexica Ultralegible — Atkinson Hyperlegible extended, 102 languages (Latin)"
+    intervals: latin-ext
+    sizes: [11, 13, 15, 17]
+    # Same span as the bench solved (1441), re-split to the tier's ascender
+    # ratio when this family shipped — see sd-fonts.yaml, which is now the
+    # authoritative recipe for it. Kept here so a bench rebuild matches ships.
+    metrics: {ascent: 1102, descent: -339, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-BoldItalic.ttf"}
+
+  - name: Andika
+    description: "Andika — SIL literacy face, unambiguous letterforms (Latin)"
+    intervals: latin-ext
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1056, descent: -385, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/andika/Andika-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/andika/Andika-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/andika/Andika-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/andika/Andika-BoldItalic.ttf"}
+
+  # ── Humanist text sans ─────────────────────────────────────────────────
+  # Drawn for running text or for small sizes on screen; all four have a real
+  # drawn italic, not a slant.
+
+  - name: SourceSans3
+    description: "Source Sans 3 — Adobe humanist sans, Paul D. Hunt (Latin, Greek, Cyrillic)"
+    intervals: latin-ext
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 945, descent: -496, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-It.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-BoldIt.ttf"}
+
+  - name: FiraSans
+    description: "Fira Sans — Spiekermann/Carrois, drawn for small sizes on low-res screens (Latin, Greek, Cyrillic)"
+    intervals: latin-ext
+    sizes: [11, 12, 14, 16]
+    metrics: {ascent: 1027, descent: -493, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-BoldItalic.ttf"}
+
+  - name: IBMPlexSans
+    description: "IBM Plex Sans — Bold/Blank, neo-grotesque with humanist italics (Latin, Greek, Cyrillic)"
+    intervals: latin-ext
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1041, descent: -400, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-BoldItalic.ttf"}
+
+  - name: AlegreyaSans
+    description: "Alegreya Sans — Huerta Tipográfica, humanist sans for long-form literary text (Latin, Greek, Cyrillic)"
+    intervals: latin-ext
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 945, descent: -496, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/AlegreyaSans-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/AlegreyaSans-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/AlegreyaSans-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/AlegreyaSans-BoldItalic.ttf"}
+
+  - name: OpenSans
+    description: "Open Sans — Steve Matteson, humanist workhorse with a large x-height (Latin, Greek, Cyrillic)"
+    intervals: latin-ext
+    sizes: [10, 13, 14, 16]
+    metrics: {ascent: 1010, descent: -499, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf", variable: {wght: 400, wdth: 100}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf", variable: {wght: 700, wdth: 100}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/opensans/OpenSans-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wght: 400, wdth: 100}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/opensans/OpenSans-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wght: 700, wdth: 100}}
+
+  - name: PublicSans
+    description: "Public Sans — USWDS, Libre Franklin reworked for plain-language text (Latin)"
+    intervals: latin-ext
+    sizes: [11, 13, 14, 16]
+    metrics: {ascent: 1052, descent: -456, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/publicsans/PublicSans%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/publicsans/PublicSans%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/publicsans/PublicSans-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/publicsans/PublicSans-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: PTSans
+    description: "PT Sans — ParaType, humanist sans of the Russian public-type programme (Latin, Cyrillic)"
+    intervals: latin-ext
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 935, descent: -506, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/PT_Sans-Web-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/PT_Sans-Web-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/PT_Sans-Web-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/PT_Sans-Web-BoldItalic.ttf"}
+
+  # ── Controls ───────────────────────────────────────────────────────────
+  # Not proposals. Inter is the UI-neutral reference every reader has seen;
+  # Noto Sans is what CrossPoint already ships in flash. Both are here so the
+  # candidates are judged against something known rather than in isolation.
+
+  - name: Inter
+    description: "CONTROL — Inter, Rasmus Andersson, screen-UI sans (Latin, Greek, Cyrillic)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 15]
+    metrics: {ascent: 1062, descent: -507, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf", variable: {wght: 400, opsz: 14}}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf", variable: {wght: 700, opsz: 14}}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter-Italic%5Bopsz%2Cwght%5D.ttf", variable: {wght: 400, opsz: 14}}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter-Italic%5Bopsz%2Cwght%5D.ttf", variable: {wght: 700, opsz: 14}}
+
+  - name: NotoSans
+    description: "CONTROL — Noto Sans, the family CrossPoint already carries in flash (Latin)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1009, descent: -534, linegap: 0}
+    styles:
+      regular:    {path: "builtinFonts/source/NotoSans/NotoSans-Regular.ttf"}
+      bold:       {path: "builtinFonts/source/NotoSans/NotoSans-Bold.ttf"}
+      italic:     {path: "builtinFonts/source/NotoSans/NotoSans-Italic.ttf"}
+      bolditalic: {path: "builtinFonts/source/NotoSans/NotoSans-BoldItalic.ttf"}

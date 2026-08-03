@@ -1,0 +1,60 @@
+AtkinsonNext         slot 0  line 33px  lc-alphabet 291px  body lines 11  col 494px
+AtkinsonNext         slot 1  line 39px  lc-alphabet 343px  body lines 12  col 494px
+AtkinsonNext         slot 2  line 45px  lc-alphabet 394px  body lines  8 (cut)  col 494px
+AtkinsonNext         slot 3  line 51px  lc-alphabet 448px  body lines  6 (cut)  col 494px
+Luciole              slot 0  line 33px  lc-alphabet 295px  body lines 11  col 494px
+Luciole              slot 1  line 39px  lc-alphabet 351px  body lines 11 (cut)  col 494px
+Luciole              slot 2  line 46px  lc-alphabet 411px  body lines  8 (cut)  col 494px
+Luciole              slot 3  line 49px  lc-alphabet 438px  body lines  7 (cut)  col 494px
+LexicaUltralegible   slot 0  line 33px  lc-alphabet 287px  body lines 11  col 494px
+LexicaUltralegible   slot 1  line 39px  lc-alphabet 343px  body lines 11 (cut)  col 494px
+LexicaUltralegible   slot 2  line 45px  lc-alphabet 393px  body lines  8 (cut)  col 494px
+LexicaUltralegible   slot 3  line 51px  lc-alphabet 444px  body lines  6 (cut)  col 494px
+Andika               slot 0  line 33px  lc-alphabet 305px  body lines 11  col 494px
+Andika               slot 1  line 39px  lc-alphabet 366px  body lines 11 (cut)  col 494px
+Andika               slot 2  line 45px  lc-alphabet 420px  body lines  8 (cut)  col 494px
+Andika               slot 3  line 51px  lc-alphabet 475px  body lines  6 (cut)  col 494px
+SourceSans3          slot 0  line 33px  lc-alphabet 285px  body lines 10  col 494px
+SourceSans3          slot 1  line 39px  lc-alphabet 334px  body lines 12  col 494px
+SourceSans3          slot 2  line 45px  lc-alphabet 387px  body lines  8 (cut)  col 494px
+SourceSans3          slot 3  line 51px  lc-alphabet 436px  body lines  6 (cut)  col 494px
+FiraSans             slot 0  line 35px  lc-alphabet 303px  body lines 11  col 494px
+FiraSans             slot 1  line 38px  lc-alphabet 330px  body lines 12  col 494px
+FiraSans             slot 2  line 44px  lc-alphabet 382px  body lines  9 (cut)  col 494px
+FiraSans             slot 3  line 51px  lc-alphabet 437px  body lines  6 (cut)  col 494px
+IBMPlexSans          slot 0  line 33px  lc-alphabet 298px  body lines 11  col 494px
+IBMPlexSans          slot 1  line 39px  lc-alphabet 355px  body lines 12  col 494px
+IBMPlexSans          slot 2  line 45px  lc-alphabet 413px  body lines  8 (cut)  col 494px
+IBMPlexSans          slot 3  line 51px  lc-alphabet 466px  body lines  6 (cut)  col 494px
+AlegreyaSans         slot 0  line 33px  lc-alphabet 266px  body lines  9  col 494px
+AlegreyaSans         slot 1  line 39px  lc-alphabet 313px  body lines 11  col 494px
+AlegreyaSans         slot 2  line 45px  lc-alphabet 359px  body lines  9 (cut)  col 494px
+AlegreyaSans         slot 3  line 51px  lc-alphabet 405px  body lines  6 (cut)  col 494px
+OpenSans             slot 0  line 31px  lc-alphabet 284px  body lines 10  col 494px
+OpenSans             slot 1  line 41px  lc-alphabet 371px  body lines 10 (cut)  col 494px
+OpenSans             slot 2  line 44px  lc-alphabet 396px  body lines  9 (cut)  col 494px
+OpenSans             slot 3  line 50px  lc-alphabet 450px  body lines  7 (cut)  col 494px
+PublicSans           slot 0  line 35px  lc-alphabet 316px  body lines 11  col 494px
+PublicSans           slot 1  line 41px  lc-alphabet 369px  body lines 10 (cut)  col 494px
+PublicSans           slot 2  line 44px  lc-alphabet 398px  body lines  9 (cut)  col 494px
+PublicSans           slot 3  line 50px  lc-alphabet 457px  body lines  7 (cut)  col 494px
+PTSans               slot 0  line 33px  lc-alphabet 284px  body lines 10  col 494px
+PTSans               slot 1  line 39px  lc-alphabet 337px  body lines 12  col 494px
+PTSans               slot 2  line 45px  lc-alphabet 388px  body lines  8 (cut)  col 494px
+PTSans               slot 3  line 51px  lc-alphabet 439px  body lines  6 (cut)  col 494px
+Inter                slot 0  line 33px  lc-alphabet 290px  body lines 10  col 494px
+Inter                slot 1  line 39px  lc-alphabet 346px  body lines 12  col 494px
+Inter                slot 2  line 46px  lc-alphabet 405px  body lines  8 (cut)  col 494px
+Inter                slot 3  line 49px  lc-alphabet 437px  body lines  7 (cut)  col 494px
+NotoSans             slot 0  line 32px  lc-alphabet 289px  body lines 10  col 494px
+NotoSans             slot 1  line 39px  lc-alphabet 339px  body lines 12  col 494px
+NotoSans             slot 2  line 45px  lc-alphabet 403px  body lines  8 (cut)  col 494px
+NotoSans             slot 3  line 51px  lc-alphabet 464px  body lines  6 (cut)  col 494px
+Edgar                slot 0  line 34px  lc-alphabet 335px  body lines 12  col 494px
+Edgar                slot 1  line 39px  lc-alphabet 388px  body lines 11 (cut)  col 494px
+Edgar                slot 2  line 45px  lc-alphabet 443px  body lines  8 (cut)  col 494px
+Edgar                slot 3  line 51px  lc-alphabet 501px  body lines  6 (cut)  col 494px
+TeXGyreSchola        slot 0  line 34px  lc-alphabet 334px  body lines 12  col 494px
+TeXGyreSchola        slot 1  line 39px  lc-alphabet 395px  body lines 11 (cut)  col 494px
+TeXGyreSchola        slot 2  line 45px  lc-alphabet 451px  body lines  8 (cut)  col 494px
+TeXGyreSchola        slot 3  line 51px  lc-alphabet 508px  body lines  6 (cut)  col 494px
