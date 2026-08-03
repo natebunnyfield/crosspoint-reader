@@ -11,7 +11,9 @@
 #include "home/FileBrowserActivity.h"
 #include "home/HomeActivity.h"
 #include "home/RecentBooksActivity.h"
+#ifndef CROSSPOINT_NO_NETWORK
 #include "network/CrossPointWebServerActivity.h"
+#endif
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
 #include "util/FullScreenMessageActivity.h"
@@ -182,7 +184,11 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
 }
 
 void ActivityManager::goToFileTransfer() {
+#ifndef CROSSPOINT_NO_NETWORK
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
+#else
+  goHome();  // File Transfer is not available on this platform.
+#endif
 }
 
 void ActivityManager::goToSettings() { replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }

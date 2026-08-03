@@ -39,8 +39,10 @@ class HomeActivity final : public Activity {
     ++i;
     if (item == HomeMenuItem::RECENTS) return i;
     ++i;
+#ifndef CROSSPOINT_NO_NETWORK
     if (item == HomeMenuItem::FILE_TRANSFER) return i;
     ++i;
+#endif
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
     return 0;
   }
@@ -50,7 +52,9 @@ class HomeActivity final : public Activity {
     int i = 0;
     if (idx == i++) return HomeMenuItem::FILE_BROWSER;
     if (idx == i++) return HomeMenuItem::RECENTS;
+#ifndef CROSSPOINT_NO_NETWORK
     if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
+#endif
     if (idx == i) return HomeMenuItem::SETTINGS_MENU;
     return HomeMenuItem::NONE;
   }

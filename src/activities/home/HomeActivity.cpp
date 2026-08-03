@@ -21,7 +21,11 @@
 #include "fontIds.h"
 
 int HomeActivity::getMenuItemCount() const {
-  int count = 4;  // File Browser, Recents, File transfer, Settings
+#ifndef CROSSPOINT_NO_NETWORK
+  int count = 4;  // File Browser, Recents, File Transfer, Settings
+#else
+  int count = 3;  // File Browser, Recents, Settings (no File Transfer on this platform)
+#endif
   if (!recentBooks.empty()) {
     count += recentBooks.size();
   }
@@ -342,9 +346,16 @@ void HomeActivity::render(RenderLock&&) {
 
   if (showMenu) {
     // Build menu items dynamically
-    std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS), tr(STR_FILE_TRANSFER),
+    std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS),
+#ifndef CROSSPOINT_NO_NETWORK
+                                          tr(STR_FILE_TRANSFER),
+#endif
                                           tr(STR_SETTINGS_TITLE)};
-    std::vector<UIIcon> menuIcons = {Folder, Recent, Transfer, Settings};
+    std::vector<UIIcon> menuIcons = {Folder, Recent,
+#ifndef CROSSPOINT_NO_NETWORK
+                                     Transfer,
+#endif
+                                     Settings};
 
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
