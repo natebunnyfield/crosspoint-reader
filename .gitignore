@@ -43,3 +43,11 @@ tools/calendar_preview/fs_/
 
 # Simulator QA screenshot dumps: keep the .png, never the raw framebuffer .bmp
 qa_*/*.bmp
+
+# PlatformIO writes one of these per env it builds; the three named entries
+# above predate the custom_sdkconfig block and miss every other env.
+sdkconfig.*
+
+# make_sleep_bmp.py's --out defaults to a bare "sleep.bmp" in the CWD, so
+# running it from the repo root or scripts/ drops a 48 KB build artifact here.
+sleep.bmp
