@@ -28,8 +28,9 @@ Every family carries an explicit tier. The column used to be blank for all but
 two rows, which made "demote everything below S" ambiguous — blank was doing
 double duty as both "unranked" and "the curated baseline". It no longer is.
 
-- **S** — the reading faces. Coelacanth and Edgar only. New work, previews and
-  screenshots use these unless there is a reason not to.
+- **S** — the reading faces. Coelacanth and Edgar for serif work, Lexica
+  Ultralegible for sans. New work, previews and screenshots use Edgar or
+  Coelacanth unless a sans is called for.
 - **A** — previously S, kept installed and fully supported.
 - **B** — installed and buildable, not the default choice for new work.
 
@@ -42,6 +43,7 @@ reader sees.
 
 | Tier | Directory | Display name | Designer | Years | Place | Creation place | Digital place | Basis |
 |---|---|---|---|---|---|---|---|---|
+| S | LexicaUltralegible | Lexica Ultralegible | Applied Design Works & Jacob Perez | 2019, 2024 | New York; El Paso, Texas | New York, USA (Applied Design Works, NY/LA; for Braille Institute of America, Los Angeles) | El Paso, Texas, USA (Jacob Perez) | Atkinson Hyperlegible released 2019, Applied Design Works with Elliott Scott as lead designer and Craig Dobie as creative director ([Wikipedia](https://en.wikipedia.org/wiki/Atkinson_Hyperlegible), [Fast Company](https://www.fastcompany.com/90395836/this-typeface-hides-a-secret-in-plain-sight-and-thats-the-point)); studio in New York and Los Angeles, Braille Institute in Los Angeles ([Applied Design Works](https://helloapplied.com/braille-institute-of-america/), [It's Nice That](https://www.itsnicethat.com/news/applied-design-braille-institute-atkinson-hyperlegible-graphic-design-050821)); Lexica v1.0.0 released 2024-10-06 ([GitHub release](https://github.com/jacobxperez/lexica-ultralegible/releases)); Perez in El Paso ([GitHub profile](https://github.com/jacobxperez)) |
 | B | SourceSerif4 | Source Serif 4 | Frank Grießhammer | 2014, 2021 | Santa Clara, California | — (born digital) | Santa Clara / San Jose, California, USA (Adobe Type) | Pro 1.0 May 2014 ([Typekit blog](https://blog.typekit.com/2014/05/20/source-serif-pro/)); v4 2021-01-25 ([Wikipedia](https://en.wikipedia.org/wiki/Source_Serif)); Grießhammer in Santa Clara, Adobe Type at San Jose HQ ([Typekit interview](https://blog.typekit.com/2013/12/09/interview-frank-griesshammer/)) |
 | B | GTAlpinaCond | GT Alpina | Reto Moser | 2011, 2020 | Bern; Lucerne, Switzerland | Bern, Switzerland (Moser lives/works in Bern) | Lucerne, Switzerland (Grilli Type foundry) | Design start 2011 ([Fonts In Use](https://fontsinuse.com/typefaces/102321/gt-alpina)); release 2020 ([It's Nice That](https://www.itsnicethat.com/articles/grilli-type-gt-alpina-graphic-design-030220)); places ([Grilli Type](https://www.grillitype.com/about)) |
 | B | Lora | Lora | Olga Karpushina | 2011, 2019 | Moscow | — (born digital) | Moscow, Russia (Karpushina; Cyreal foundry, Russia) | First release 2011 ([GitHub](https://github.com/cyrealtype/Lora-Cyrillic)); variable 2019 ([Cyreal](https://www.cyreal.org/fonts/lora/)); [Behance](https://www.behance.net/OlgaKarpushina) |
@@ -80,3 +82,9 @@ the picker's reverse-chronological sort. Device subtitle:
 - **Newsreader 2021** (Production Type official launch) — collapsed as release
   lag behind the 2020 Google Fonts release.
 - **Rosarivo 2012 / Almendra 2011-12** Google Fonts dates — release lag.
+- **Lexica Ultralegible's 2023 repo creation and 2025 pushes** — the repo
+  predates the release and is still maintained; v1.0.0 (2024-10-06) is the
+  first dated release. Its OFL string carries `2020 Braille Institute of
+  America`, the upstream Atkinson copyright, not a Lexica date.
+- **Atkinson Hyperlegible Next 2025** — a separate family from the one Lexica
+  forked, and not installed here.
