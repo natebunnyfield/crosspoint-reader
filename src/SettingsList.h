@@ -177,13 +177,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.reserve(FIXED_ENTRY_COUNT);
 
     // --- Display ---
-    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
-                                  std::move(sleepScreenValues), "sleepScreen", StrId::STR_CAT_DISPLAY));
-    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
-                                  {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_DISPLAY));
-    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
-                                  {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
-                                  "sleepScreenCoverFilter", StrId::STR_CAT_DISPLAY));
     v.push_back(SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
                                   {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
                                   StrId::STR_CAT_DISPLAY));
@@ -280,6 +273,23 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_QUICK_RESUME_TIMEOUT, &CrossPointSettings::quickResumeSleepScreen,
                                   {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "quickResumeSleepScreen",
                                   StrId::STR_CAT_SYSTEM));
+    // The sleep image itself, moved out of the withdrawn Display tab for the same
+    // reason as the row above: with no device control, the only way to reach
+    // Custom was BmpViewerActivity's "set as sleep screen" side effect or the web
+    // UI, and an owner whose stored mode was anything else had no way back.
+    //
+    // The two cover rows come along because they are sub-options of this one,
+    // not independent settings — they are read only when a COVER mode is
+    // selected (SleepActivity::renderBitmapSleepScreen). Surfacing the parent
+    // without them would let an owner pick Cover and then be unable to choose
+    // fit/crop or a filter.
+    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
+                                  std::move(sleepScreenValues), "sleepScreen", StrId::STR_CAT_SYSTEM));
+    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
+                                  {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_SYSTEM));
+    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
+                                  {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
+                                  "sleepScreenCoverFilter", StrId::STR_CAT_SYSTEM));
     // Simulator/iOS only, deliberately compiled out on device.
     //
     // On an X4/X3 this row would be a control that cannot do anything: e-ink
