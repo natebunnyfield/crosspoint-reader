@@ -13,7 +13,25 @@ was found, and what closing it requires.
 ## OPEN
 
 ### [B-008] iOS app offers WiFi and web-server menus that cannot work
-**severity: medium · scope: iOS app · found 2026-08-03**
+**severity: medium · scope: iOS app · CODE LANDED 2026-08-03, NOT YET VERIFIED**
+
+⚠️ Fix committed (`CROSSPOINT_NO_NETWORK` guards, firmware `5bce63bf`; iOS TU
+exclusions, simulator `ac8cdef`) but **not confirmed running**. The agent
+reported `pad_core_test: all tests passed`, which is not a UI test — it does
+not show the menus are gone, that nothing dangles, or that the app still
+launches. Same for B-007's symlink and the `OMIT_FONTS` change shipped
+alongside it: `OMIT_FONTS` removes 28 of 37 font faces on iOS, so a wrong
+fallback blanks the app's text entirely, and that cannot be seen from a clean
+compile.
+
+**Do not ship to TestFlight until** someone launches it in the iOS Simulator
+and confirms: text renders, a book opens and pages turn, the font picker lists
+the four SD families, no removed menu entry dangles, and fonts still load from
+Documents after a fresh install. Verified inert on DEVICE firmware at least:
+`CROSSPOINT_NO_NETWORK` is undefined in platformio.ini and a gh_release_rc
+build before and after the guards is identical at 3,658,031 bytes flash.
+
+Original report below.
 
 The iOS build compiles and ships the whole firmware network stack, and exposes
 it in the UI, but none of it can function on a phone. `WiFi.scanNetworks()`
