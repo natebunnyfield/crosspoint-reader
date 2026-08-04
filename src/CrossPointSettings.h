@@ -240,10 +240,18 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t hyphenationEnabled = 0;
 
   // Reader screen margin settings
-  static constexpr uint8_t SCREEN_MARGIN_MIN = 5;
-  static constexpr uint8_t SCREEN_MARGIN_MAX = 40;
+  // Extra margin in pixels, added on top of the panel's bezel margins
+  // (GfxRenderer::VIEWABLE_MARGIN_*), so 0 means bezel-only rather than text
+  // against the glass. The picker offers this whole ramp; the value stored is
+  // the pixel count, never the picker's index.
+  static constexpr uint8_t SCREEN_MARGIN_MIN = 0;
+  static constexpr uint8_t SCREEN_MARGIN_MAX = 45;
   static constexpr uint8_t SCREEN_MARGIN_STEP = 5;
-  uint8_t screenMargin = SCREEN_MARGIN_MIN;
+  // Separate from MIN since 2026-08-04, when the range grew down to 0: the
+  // default was written as SCREEN_MARGIN_MIN and would have silently become 0
+  // for every fresh install.
+  static constexpr uint8_t SCREEN_MARGIN_DEFAULT = 5;
+  uint8_t screenMargin = SCREEN_MARGIN_DEFAULT;
   // Hide battery percentage. Pinned to HIDE_ALWAYS by normalizeRetiredSettings();
   // the default matches so fresh installs agree.
   uint8_t hideBatteryPercentage = HIDE_ALWAYS;
