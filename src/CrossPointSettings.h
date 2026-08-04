@@ -132,14 +132,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // go, or it would wipe this value on every single load.
   enum LONG_PRESS_BUTTON_BEHAVIOR { OFF = 0, CHAPTER_SKIP = 1, FONT_SIZE_STEP = 2, LONG_PRESS_BUTTON_BEHAVIOR_COUNT };
 
-  // UI Theme.
-  //
-  // These are INDICES into the label list in SettingsList.h (settings.json
-  // persists the index, not the label), so new themes may only be APPENDED —
-  // inserting one would silently re-point every device's saved uiTheme at a
-  // different theme. LYRA_SIX is therefore 4, at the end, even though it
-  // belongs with the other Lyra entries.
-  enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2, ROUNDEDRAFF = 3, LYRA_SIX = 4 };
   // Order is the picker's order and the persisted value, so it is frozen:
   // Ubuntu must stay 0 or every settings.json that already names a system font
   // would silently change the UI face on the next boot. New families append.
@@ -265,9 +257,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // while this is OFF, and on RELEASE otherwise, so that a hold can be told apart from a
   // tap. Every fresh install therefore turns pages on release.
   uint8_t longPressButtonBehavior = FONT_SIZE_STEP;
-  // UI Theme. Fresh installs only: any device that has ever written
-  // settings.json already has a uiTheme key and keeps whatever it holds.
-  uint8_t uiTheme = LYRA_SIX;
   // Typeface the UI chrome is drawn in -- headers, list rows, button hints,
   // popups, the battery readout. Swaps all three UI sizes (8/10/12 pt) at once;
   // the reader's body face is a separate setting and is not affected.

@@ -3,18 +3,19 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; sans added 2026-08-03, cut back to one 2026-08-04)
+## S tier (fork ruling, 2026-08-02; sans added 2026-08-03, resolved to two 2026-08-04)
 
-The installed set on this fork is exactly five families — **Edgar, Coelacanth,
-Rosarivo, TeXGyreSchola, LibreFranklin** — on every surface: both device SD
-cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed set
-(`crosspoint-simulator/ios/seedfonts/`). The other curated families remain fully
-buildable recipes in `sd-fonts.yaml` (picker labels stay in
+The installed set on this fork is exactly six families — **Edgar, Coelacanth,
+Rosarivo, TeXGyreSchola, LibreFranklin, QuattrocentoSans** — on every surface:
+both device SD cards, the simulator's `fs_/fonts/`, and the iOS app's bundled
+seed set (`crosspoint-simulator/ios/seedfonts/`). The other curated families
+remain fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these five and nothing else.
+surface or reprovisioning a card, install these six and nothing else.
 
-One of the five is a sans: **Libre Franklin**, from the text-grotesque bench
-(`lib/EpdFont/scripts/grotesque-candidates.yaml`).
+Two of the six are sans, one per cell of the taxonomy: **Libre Franklin**, the
+text grotesque, from `lib/EpdFont/scripts/grotesque-candidates.yaml`; and
+**Quattrocento Sans**, the humanist, promoted 2026-08-04.
 
 **Archivo and Host Grotesk were cut on 2026-08-04**, promoting Libre Franklin to
 the single text grotesque. The bench they came off answered "which grotesque",
@@ -28,7 +29,8 @@ terms as well. Both remain buildable recipes and keep their picker labels, since
 a card provisioned before this ruling still carries them.
 
 **Lexica Ultralegible was cut on 2026-08-04**, the same day as the other two
-grotesques, leaving Libre Franklin the only installed sans. It had been added on
+grotesques, leaving Libre Franklin the only installed sans until Quattrocento
+Sans joined it later that day. It had been added on
 2026-08-03 after winning a bench of 13 sans-serif candidates rendered through
 the real `GfxRenderer` at matched x-height
 (`lib/EpdFont/scripts/sans-candidates.yaml`, `render_harness reading`), on the
@@ -46,6 +48,62 @@ its picker label stays in `src/FontDisplayNames.h` (cards provisioned before
 files were deleted from all four surfaces on 2026-08-04. Putting
 `LexicaUltralegible` back into `installed_families:` — or back onto a surface —
 is a regression, not a restoration; it needs a fresh ruling first.
+
+### The humanist sans: Quattrocento Sans in, Freight Sans out (2026-08-04)
+
+Both were built on 2026-08-04, both are humanist sans, and both therefore fill
+one cell of the taxonomy — the same "three answers to one question" that cut
+Archivo and Host Grotesk that morning. The tier takes one.
+
+**Quattrocento Sans is S tier and installed on every surface.** Pablo Impallari
+and Igino Marini's humanist companion to the Quattrocento serif, OFL, all four
+styles real. It won on everything outside the page:
+
+- **Rebuildable anywhere.** Four Google Fonts URLs, no local files. Freight Sans
+  builds only from gitignored commercial sources, which means no CI machine and
+  no other contributor can regenerate it.
+- **cmap audits clean.** `tools/font-cmap-audit.py` finds only
+  comma/quotesinglbase and Eth/Dcroat sharing outlines, both normal practice.
+  (`ã õ` look flat-tilde at small ppem but are real tildes drawn as simple
+  outlines — `ā`/`ō` are not in the font at all.) Freight Sans needed eight
+  `drop_codepoints` to stop `¾` rendering as `ffl`.
+- **Kerning and ligatures.** 10,780 kern cells, the richest in the set against
+  Edgar's 9,546 — the 2012 v2 was iKerned — plus real `fi`/`fl`. The Freight
+  Sans cut ships no `GSUB` at all and 4,284 cells.
+- **Provenance.** OFL from Google Fonts, against a fontsgeek.com download of a
+  face whose own name table carries the GarageFonts / Phil's Fonts EULA.
+
+Freight Sans wins on slot fit, and that is the one thing it wins: it hits
+x-height 12/14/16/18 px AND advanceY 34/39/45/51 exactly, the only family in
+`sd-fonts.yaml` needing no per-slot caveat. Quattrocento Sans is x-height-exact
+and a pixel off on leading — **12/14/17/19 pt → x-height 12/14/16/18 px,
+advanceY 33/38/46/51**. That is the floor, not a first attempt: `advanceY`
+depends only on the span, and sweeping every span from the 1162 ink floor upward
+bottoms out at three slots ±1 for this size set. The cause is the ramp — the
+hinted x-height plateaus at 15 px across both 15 and 16 pt, so 16 px costs
+17 pt, and no single span serves 17 and 19 pt at the tier's spacing at once.
+x-height exactness wins, the same call Almendra's recipe records. A pixel of
+leading did not outweigh the four rows above.
+
+`force_autohint` was tried on Quattrocento Sans and rejected: it moves slot 2 to
+16 pt and yields 33/39/44/52 — also three slots ±1, the misses merely shuffled,
+with equal-or-smaller counters at matched slots. Archivo's remains the set's
+only `force_autohint`, and it is there for a defect this family does not have.
+
+Both carry the same shape of coverage gap, and it is a property of the available
+cuts rather than either design: Latin-1 is 96% (Freight) / 99–100%
+(Quattrocento), but Latin Extended-A is 8% / 9%, so Œœ Šš Žž Ÿ are in the faces
+and the Central European set comes from the Noto fallback. English and Western
+European text stays in one texture; Polish or Czech will not.
+
+**Freight Sans is C tier.** Its `.cpfont` files were deleted from every surface
+on 2026-08-04. The recipe stays in `sd-fonts.yaml` so the comparison can be
+re-run, and the picker label stays in `src/FontDisplayNames.h` because a card
+provisioned before the ruling still carries the family — the same treatment
+Archivo, Host Grotesk and Lexica Ultralegible got. Its commercial sources stay
+in gitignored `lib/EpdFont/local_fonts/`, never committed or distributed.
+Putting it back into `installed_families:` — or back onto a surface — is a
+regression, not a restoration; it needs a fresh ruling.
 
 The 2x hi-res companions (`<Family>/2x/<same 1x filename>`, built at doubled
 point sizes for `CROSSPOINT_RENDER_SCALE=2`) are part of the set: every
@@ -91,7 +149,7 @@ excludes, which is exactly the drift the list now prevents. Use
 The iOS app needs no equivalent list. `CrossPointFsPrep.cpp::seedOneFontDirectory`
 seeds whatever `crosspoint-simulator/ios/seedfonts/` contains and prunes files
 the bundle no longer carries, so that directory is its own source of truth —
-keep it holding exactly these five.
+keep it holding exactly these six.
 
 ## Installing Fonts
 

@@ -374,11 +374,13 @@ void HomeActivity::render(RenderLock&&) {
                    pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
                                  metrics.homeMenuTopOffset + metrics.buttonHintsHeight)};
 
-    // Menu-relative selection. Themes that fold Continue Reading INTO the menu
-    // (RoundedRaff) give that row index 0, so selectorIndex is already
-    // menu-relative for them; every other theme has the covers ahead of the
-    // menu and has to subtract them. On page 1 of a split home this is
-    // selectorIndex - bookCount >= 0, i.e. the row the selector is really on.
+    // Menu-relative selection. A theme that folds Continue Reading INTO the
+    // menu gives that row index 0, so selectorIndex is already menu-relative;
+    // otherwise the covers sit ahead of the menu and have to be subtracted.
+    // Lyra Six, the only theme left, is the second kind, but the branch stays:
+    // homeContinueReadingInMenu is a live metric, not a per-theme constant. On
+    // page 1 of a split home this is selectorIndex - bookCount >= 0, i.e. the
+    // row the selector is really on.
     GUI.drawButtonMenu(renderer, menuRect, static_cast<int>(menuItems.size()),
                        metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - bookCount,
                        [&menuItems](int index) { return std::string(menuItems[index]); },

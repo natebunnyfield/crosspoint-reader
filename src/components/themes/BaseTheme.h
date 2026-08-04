@@ -38,6 +38,9 @@ struct ThemeMetrics {
   int contentSidePadding;
   int listRowHeight;
   int listWithSubtitleRowHeight;
+  // Height a row grows by for each subtitle line past the first, for lists
+  // that ask drawList for a multi-line subtitle (the font picker's colophon).
+  int listSubtitleLineStep;
   int menuRowHeight;
   int menuSpacing;
 
@@ -53,10 +56,10 @@ struct ThemeMetrics {
   int homeRecentBooksCount;
   bool homeContinueReadingInMenu;
   int homeMenuTopOffset;
-  // Home cover grid shape. homeCoverTileHeight is the height of ONE row, so a
-  // theme with homeCoverRows > 1 reserves homeCoverTileHeight * rows. Both
-  // default to 1 (a single tile), which is what every theme except Lyra Six
-  // uses; HomeActivity only reserves the rows the books on hand actually fill.
+  // Home cover grid shape. homeCoverTileHeight is the height of ONE row, so
+  // homeCoverRows > 1 reserves homeCoverTileHeight * rows. Both default to 1
+  // (a single tile) in BaseMetrics; Lyra Six is the 3x2 grid. HomeActivity only
+  // reserves the rows the books on hand actually fill.
   int homeCoverRows;
   int homeCoverColumns;
   // When true the home menu rows move off the cover page onto a second page,
@@ -110,8 +113,17 @@ struct ThemeMetrics {
 
 enum UIIcon { None = 0, Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot };
 
-// Default theme implementation (Classic Theme)
-// Additional themes can inherit from this and override methods as needed
+// Base of the single theme, NOT a theme itself. Lyra Six is the only theme
+// since 2026-08-04 (BaseTheme <- LyraTheme <- Lyra3CoversTheme <-
+// LyraSixTheme); `UITheme::setTheme()` instantiates nothing else.
+//
+// Every BaseTheme method that reads BaseMetrics::values is overridden somewhere
+// up that chain, so these bodies and this metrics struct are unreachable from
+// the app — but they are NOT dead: test/activity_input/HostHarness.cpp wires
+// BaseMetrics::values in as its UITheme double precisely because it cannot link
+// the real one. Deleting either would take the activity-input suite with it.
+// The non-overridden helpers below (progress bar, battery, popups, keyboard,
+// text field) are live in every build.
 
 namespace BaseMetrics {
 constexpr ThemeMetrics values = {.batteryWidth = 15,
@@ -125,6 +137,7 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .contentSidePadding = 20,
                                  .listRowHeight = 30,
                                  .listWithSubtitleRowHeight = 50,
+                                 .listSubtitleLineStep = 16,
                                  .menuRowHeight = 45,
                                  .menuSpacing = 8,
                                  .tabSpacing = 10,
@@ -194,14 +207,18 @@ class BaseTheme {
   virtual void drawButtonHints(GfxRenderer& renderer, const char* btn1, const char* btn2, const char* btn3,
                                const char* btn4) const;
   virtual void drawSideButtonHints(const GfxRenderer& renderer, const char* topBtn, const char* bottomBtn) const;
-  virtual int getListRowStep(bool hasSubtitle) const;
-  virtual int getListPageItems(int contentHeight, bool hasSubtitle) const;
+  // `subtitleLines` > 1 grows the row by listSubtitleLineStep per extra line,
+  // for lists that wrap their subtitle rather than ellipsizing it. Every
+  // caller that computes a page stride or hit-tests a row has to pass the same
+  // value drawList gets, or paging skips entries the screen never showed.
+  virtual int getListRowStep(bool hasSubtitle, int subtitleLines = 1) const;
+  virtual int getListPageItems(int contentHeight, bool hasSubtitle, int subtitleLines = 1) const;
   virtual void drawList(const GfxRenderer& renderer, Rect rect, int itemCount, int selectedIndex,
                         const std::function<std::string(int index)>& rowTitle,
                         const std::function<std::string(int index)>& rowSubtitle = nullptr,
                         const std::function<UIIcon(int index)>& rowIcon = nullptr,
                         const std::function<std::string(int index)>& rowValue = nullptr, bool highlightValue = false,
-                        const std::function<bool(int index)>& rowDimmed = nullptr) const;
+                        const std::function<bool(int index)>& rowDimmed = nullptr, int subtitleLines = 1) const;
   virtual void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title,
                           const char* subtitle = nullptr) const;
   virtual void drawSubHeader(const GfxRenderer& renderer, Rect rect, const char* label,
