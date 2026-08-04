@@ -91,6 +91,11 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // option lists depend on the SD font registry), so the generic loop skips them.
   doc["fontFamily"] = fontFamily;
   doc["fontSizeSlot"] = fontSizeSlot;
+  // Same reason: screenMargin became a drop-down over a value ramp, so its
+  // SettingInfo carries a getter/setter and no valuePtr, and the loop above
+  // skips it. Without this line the margin silently resets to its default on
+  // every boot -- the row still worked, which is what made it invisible.
+  doc["screenMargin"] = screenMargin;
   // The resolved point size is written too, and is what pre-slot firmware reads
   // back from "fontSize" if this card is moved to an older build.
   doc["fontSize"] = fontPointSize;
@@ -251,6 +256,13 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   // Font family — uses dynamic getter/setter in SettingsList so the generic loop skips it.
   const uint8_t storedFontFamily = doc["fontFamily"] | (uint8_t)0;
   fontFamily = clamp(storedFontFamily, BUILTIN_FONT_COUNT, 0);
+  // Screen margin — same, a drop-down with a getter/setter and no valuePtr.
+  // Stored in PIXELS, not as the picker's index. Clamped rather than snapped to
+  // the ramp: a file written by the old 5..40 stepper, or by an API client, can
+  // hold any value in range, and the picker resolves it to the nearest step
+  // when it renders. Only an out-of-range byte falls back to the default.
+  const uint8_t storedMargin = doc["screenMargin"] | SCREEN_MARGIN_DEFAULT;
+  screenMargin = storedMargin <= SCREEN_MARGIN_MAX ? storedMargin : SCREEN_MARGIN_DEFAULT;
   // SD card font family name — not in SettingsList, load manually
   const char* sfn = doc["sdFontFamilyName"] | "";
   strncpy(sdFontFamilyName, sfn, sizeof(sdFontFamilyName) - 1);

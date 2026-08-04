@@ -118,6 +118,67 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
   return s;
 }
 
+// Screen margin as a drop-down over the SCREEN_MARGIN_MIN..MAX ramp rather than
+// a stepper that walks one notch per press.
+//
+// The STORED value stays the margin in PIXELS, never the picker's index. That
+// is the whole reason this is a getter/setter entry instead of a plain
+// SettingInfo::Enum over the member pointer: the reader adds
+// SETTINGS.screenMargin straight onto its oriented margins
+// (EpubReaderActivity::applyMargins) and the value is part of what invalidates
+// the section cache, so storing an index would reinterpret every settings.json
+// ever written — a saved 20 px margin would come back as 20, be read as index
+// 20, and run off the end of a ten-entry ramp.
+//
+// valuePtr is deliberately left null. CrossPointWebServer's ENUM case prefers
+// valuePtr over valueSetter when both are set, and would write the raw index
+// into the byte.
+inline SettingInfo buildScreenMarginSetting() {
+  std::vector<uint8_t> steps;
+  steps.reserve(CrossPointSettings::SCREEN_MARGIN_MAX / CrossPointSettings::SCREEN_MARGIN_STEP + 1);
+  for (int v = CrossPointSettings::SCREEN_MARGIN_MIN; v <= CrossPointSettings::SCREEN_MARGIN_MAX;
+       v += CrossPointSettings::SCREEN_MARGIN_STEP) {
+    steps.push_back(static_cast<uint8_t>(v));
+  }
+
+  // Bare numbers: a unit suffix would have to be translated, and the row already
+  // says what it is.
+  std::vector<std::string> labels;
+  labels.reserve(steps.size());
+  for (const uint8_t v : steps) labels.push_back(std::to_string(v));
+
+  SettingInfo s;
+  s.nameId = StrId::STR_SCREEN_MARGIN;
+  s.type = SettingType::ENUM;
+  s.enumStringValues = std::move(labels);
+  s.key = "screenMargin";
+  s.category = StrId::STR_CAT_READER;
+
+  s.valueGetter = [steps]() -> uint8_t {
+    const int cur = SETTINGS.screenMargin;
+    // Nearest rather than exact. A byte saved under the old 5..40 stepper, or
+    // posted by an API client, need not sit on the ramp; falling back to index
+    // 0 would quietly move the reader's margin the next time this row rendered.
+    uint8_t best = 0;
+    int bestDist = 256;
+    for (size_t i = 0; i < steps.size(); i++) {
+      const int d = steps[i] > cur ? steps[i] - cur : cur - steps[i];
+      if (d < bestDist) {
+        bestDist = d;
+        best = static_cast<uint8_t>(i);
+      }
+    }
+    return best;
+  };
+
+  s.valueSetter = [steps](const uint8_t v) {
+    if (v >= steps.size()) return;
+    SETTINGS.screenMargin = steps[v];
+  };
+
+  return s;
+}
+
 // Shared settings list used by both the device settings UI and the web settings API.
 // Each entry has a key (for JSON API) and category (for grouping).
 // ACTION-type entries and entries without a key are device-only.
@@ -207,10 +268,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing,
                                   {StrId::STR_TIGHT, StrId::STR_NORMAL, StrId::STR_WIDE}, "lineSpacing",
                                   StrId::STR_CAT_READER));
-    v.push_back(SettingInfo::Value(StrId::STR_SCREEN_MARGIN, &CrossPointSettings::screenMargin,
-                                   {CrossPointSettings::SCREEN_MARGIN_MIN, CrossPointSettings::SCREEN_MARGIN_MAX,
-                                    CrossPointSettings::SCREEN_MARGIN_STEP},
-                                   "screenMargin", StrId::STR_CAT_READER));
+    v.push_back(buildScreenMarginSetting());
     v.push_back(SettingInfo::Enum(
         StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
         {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT, StrId::STR_BOOK_S_STYLE},
