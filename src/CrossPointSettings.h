@@ -237,7 +237,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t sleepTimeoutMinutes = 10;
   // E-ink refresh frequency (default 15 pages)
   uint8_t refreshFrequency = REFRESH_15;
-  uint8_t hyphenationEnabled = 0;
+  // Pinned to 1 by normalizeRetiredSettings() now that the Reader tab is
+  // withdrawn; the default matches so fresh installs agree. It shipped 0, and a
+  // device that has one lands on 1 the next time settings.json is read — which
+  // re-renders cached sections, since hyphenation is part of ReaderRenderSpec.
+  uint8_t hyphenationEnabled = 1;
 
   // Reader screen margin settings
   // Extra margin in pixels, added on top of the panel's bezel margins

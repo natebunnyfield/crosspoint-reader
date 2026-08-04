@@ -46,7 +46,6 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   s.enumStringValues = sdFamilyNames;
   s.key = "fontFamily";
   s.category = StrId::STR_CAT_READER;
-  s.inTextSettings = true;  // matches the static font-family entry it replaces
 
   s.valueGetter = [sdFamilyNames]() -> uint8_t {
     for (int i = 0; i < static_cast<int>(sdFamilyNames.size()); i++) {
@@ -102,7 +101,6 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
   s.enumStringValues = std::move(labels);
   s.key = "fontSize";
   s.category = StrId::STR_CAT_READER;
-  s.inTextSettings = true;  // matches the static font-size entry it replaces
 
   s.valueGetter = [sizes]() -> uint8_t {
     const uint8_t slot = SETTINGS.fontSizeSlot;
@@ -133,6 +131,12 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
 // valuePtr is deliberately left null. CrossPointWebServer's ENUM case prefers
 // valuePtr over valueSetter when both are set, and would write the raw index
 // into the byte.
+//
+// Filed under System since 2026-08-04. It is a reading setting by nature, but
+// the Reader tab was withdrawn from the device UI and this row is one of the
+// two the owner kept, so its category moves with it rather than the device
+// growing a second, divergent notion of where a row lives. Same move the sleep
+// group made out of the withdrawn Display tab, for the same reason.
 inline SettingInfo buildScreenMarginSetting() {
   std::vector<uint8_t> steps;
   steps.reserve(CrossPointSettings::SCREEN_MARGIN_MAX / CrossPointSettings::SCREEN_MARGIN_STEP + 1);
@@ -152,7 +156,7 @@ inline SettingInfo buildScreenMarginSetting() {
   s.type = SettingType::ENUM;
   s.enumStringValues = std::move(labels);
   s.key = "screenMargin";
-  s.category = StrId::STR_CAT_READER;
+  s.category = StrId::STR_CAT_SYSTEM;
 
   s.valueGetter = [steps]() -> uint8_t {
     const int cur = SETTINGS.screenMargin;
@@ -258,17 +262,14 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // Built-in font-family entry. Replaced per-call with a registry-aware
     // version when SD fonts are installed.
     v.push_back(SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,
-                                  {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS}, "fontFamily", StrId::STR_CAT_READER)
-                    .withTextSettings());
+                                  {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS}, "fontFamily", StrId::STR_CAT_READER));
     // Placeholder: the selectable sizes depend on the active font family, so
     // this entry is always replaced by buildFontSizeSetting() below. It only
     // fixes the setting's position in the Reader category.
-    v.push_back(
-        SettingInfo::Enum(StrId::STR_FONT_SIZE, nullptr, {}, "fontSize", StrId::STR_CAT_READER).withTextSettings());
+    v.push_back(SettingInfo::Enum(StrId::STR_FONT_SIZE, nullptr, {}, "fontSize", StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing,
                                   {StrId::STR_TIGHT, StrId::STR_NORMAL, StrId::STR_WIDE}, "lineSpacing",
                                   StrId::STR_CAT_READER));
-    v.push_back(buildScreenMarginSetting());
     v.push_back(SettingInfo::Enum(
         StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
         {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT, StrId::STR_BOOK_S_STYLE},
@@ -316,6 +317,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                     "backShortToFileBrowser"));
 
     // --- System ---
+    // Screen margin leads the System block because it is one of the two rows
+    // the withdrawn Reader tab kept (the other is the Text Settings action,
+    // which SettingsActivity inserts above this one), and the two belong
+    // together at the top of the only list the device now shows: they are what
+    // a page of a book looks like. Everything below is about the device.
+    v.push_back(buildScreenMarginSetting());
     // The typeface the chrome itself is drawn in. Filed under System rather than
     // Reader because it is not about books: it changes headers, list rows,
     // button hints, popups and the battery readout, and leaves the reader's body
