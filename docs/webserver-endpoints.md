@@ -421,7 +421,15 @@ OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, MKCOL, MOVE, COPY, LOCK, UNLOCK
 Notes:
 
 - `PUT` writes to a temporary `.davtmp` file first, then renames it into place.
-- Protected paths are rejected.
+- Dot-paths (`/.crosspoint`, `/.fonts`, …) are fully listed and writable over
+  WebDAV — unlike the HTML file browser — so sync tools such as `rclone` can
+  mirror an entire card, settings and fonts included. See
+  [webserver.md](webserver.md) for the rclone recipe and
+  `scripts/sync-card.sh` for a ready-made wrapper.
+- Only `System Volume Information` and `XTCache` are protected. PROPFIND also
+  hides them, so sync clients neither see nor try to prune them.
+- Every file's `getlastmodified` is a fixed fake date (no RTC guarantee), so
+  rclone must compare by size (`--size-only`) or content (`--ignore-times`).
 - `LOCK` and `UNLOCK` are accepted for client compatibility only. The server
   does not implement full WebDAV Class 2 locking semantics such as persistent
   locks or lock discovery.
