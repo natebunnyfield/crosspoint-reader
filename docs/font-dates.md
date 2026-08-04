@@ -35,11 +35,17 @@ double duty as both "unranked" and "the curated baseline". It no longer is.
   necessarily installed**. Whether a family ships is decided by
   `installed_families` in `lib/EpdFont/scripts/sd-fonts.yaml`, not by this
   column. The two meant the same thing while every S family was installed and
-  stopped meaning the same on 2026-08-04, when Archivo, Host Grotesk and Lexica
-  Ultralegible all came off the cards as recipes-only — three faces filling one
-  cell of the taxonomy, cut back to Libre Franklin. They are A rather than B
-  because they were the curated baseline until that day; B has never been S.
+  stopped meaning the same on 2026-08-04, when Lexica Ultralegible came off the
+  cards as a recipe only. A rather than B because it was the curated baseline
+  until that day, and it still holds the one cell nothing else covers — the
+  low-vision / hyperlegible sans. B has never been S.
 - **B** — buildable, not the default choice for new work.
+- **C** — cut. Was curated once, then beaten at its own job by a face that stays.
+  The recipe survives so the bench that ruled against it can be re-run, and for
+  no other reason: not installed, not for new work, not a fallback. Archivo and
+  Host Grotesk are the first entries — the text-grotesque bench shipped all
+  three of its finalists, and all three filled the same cell, so it cut back to
+  Libre Franklin on 2026-08-04.
 
 Tier is editorial and lives only here. It does not reach the device: the picker
 sorts reverse-chronologically by earliest year (see below), and
@@ -50,9 +56,9 @@ reader sees.
 
 | Tier | Directory | Display name | Designer | Years | Place | Creation place | Digital place | Basis |
 |---|---|---|---|---|---|---|---|---|
-| A | HostGrotesk | Host Grotesk | Doğukan Karapınar & İbrahim Kaçtıoğlu | 2023 | — | — (born digital) | Not disclosed by the foundry | Copyright 2023 in the shipped font's name table; designers and foundry from the same table and [METADATA.pb](https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/METADATA.pb); [Element Type](https://elementtype.co/host-grotesk/). Google Fonts listing 2024-10-03 collapsed as release lag. Element Type publishes no location, so the place column stays empty rather than guessing from the designers' names |
+| C | HostGrotesk | Host Grotesk | Doğukan Karapınar & İbrahim Kaçtıoğlu | 2023 | — | — (born digital) | Not disclosed by the foundry | Copyright 2023 in the shipped font's name table; designers and foundry from the same table and [METADATA.pb](https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/METADATA.pb); [Element Type](https://elementtype.co/host-grotesk/). Google Fonts listing 2024-10-03 collapsed as release lag. Element Type publishes no location, so the place column stays empty rather than guessing from the designers' names |
 | B | SourceSerif4 | Source Serif 4 | Frank Grießhammer | 2014, 2021 | Santa Clara, California | — (born digital) | Santa Clara / San Jose, California, USA (Adobe Type) | Pro 1.0 May 2014 ([Typekit blog](https://blog.typekit.com/2014/05/20/source-serif-pro/)); v4 2021-01-25 ([Wikipedia](https://en.wikipedia.org/wiki/Source_Serif)); Grießhammer in Santa Clara, Adobe Type at San Jose HQ ([Typekit interview](https://blog.typekit.com/2013/12/09/interview-frank-griesshammer/)) |
-| A | Archivo | Archivo | Héctor Gatti | 2012, 2020 | Buenos Aires | — (born digital) | Buenos Aires, Argentina (Omnibus-Type) | Design 2012 ([Wikipedia](https://en.wikipedia.org/wiki/Archivo), [Omnibus-Type](https://www.omnibus-type.com/fonts/archivo/)); 2020 = the variable rework, per the shipped font's copyright string and [repo](https://github.com/Omnibus-Type/Archivo); designer from the font's name table (ID 9). Google Fonts listing 2016-12-03 is neither a design nor a release date and is excluded |
+| C | Archivo | Archivo | Héctor Gatti | 2012, 2020 | Buenos Aires | — (born digital) | Buenos Aires, Argentina (Omnibus-Type) | Design 2012 ([Wikipedia](https://en.wikipedia.org/wiki/Archivo), [Omnibus-Type](https://www.omnibus-type.com/fonts/archivo/)); 2020 = the variable rework, per the shipped font's copyright string and [repo](https://github.com/Omnibus-Type/Archivo); designer from the font's name table (ID 9). Google Fonts listing 2016-12-03 is neither a design nor a release date and is excluded |
 | B | GTAlpinaCond | GT Alpina | Reto Moser | 2011, 2020 | Bern; Lucerne, Switzerland | Bern, Switzerland (Moser lives/works in Bern) | Lucerne, Switzerland (Grilli Type foundry) | Design start 2011 ([Fonts In Use](https://fontsinuse.com/typefaces/102321/gt-alpina)); release 2020 ([It's Nice That](https://www.itsnicethat.com/articles/grilli-type-gt-alpina-graphic-design-030220)); places ([Grilli Type](https://www.grillitype.com/about)) |
 | B | Lora | Lora | Olga Karpushina | 2011, 2019 | Moscow | — (born digital) | Moscow, Russia (Karpushina; Cyreal foundry, Russia) | First release 2011 ([GitHub](https://github.com/cyrealtype/Lora-Cyrillic)); variable 2019 ([Cyreal](https://www.cyreal.org/fonts/lora/)); [Behance](https://www.behance.net/OlgaKarpushina) |
 | A | CaledoniaCC | Caledonia CC | W.A. Dwiggins | 1938; 1988, 1994, 2026 | Hingham, Mass.; Cambridge, Mass. | Hingham, Massachusetts, USA (Dwiggins' studio; for Mergenthaler Linotype, Brooklyn NY) | Cambridge, Massachusetts, USA (Carter & Cone: 1994 Time Caledonia, 2026 CC). 1988 New Caledonia: David Berlow, Adobe (USA) / Linotype AG (Germany) | 1938 design ([Wikipedia](https://en.wikipedia.org/wiki/Caledonia_(typeface))); 1988 = New Caledonia PostScript ([Wikipedia](https://en.wikipedia.org/wiki/Caledonia_(typeface))); 1994 = Time Caledonia by Matthew Carter; CC release April 2026 ([Carter & Cone](https://carterandcone.com/font/caledonia/), [Creative Boom](https://www.creativeboom.com/resources/the-best-new-typefaces-for-april-2026/)); Dwiggins in Hingham 1906–56 ([Britannica](https://www.britannica.com/biography/W-A-Dwiggins)) |
