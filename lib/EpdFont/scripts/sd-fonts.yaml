@@ -18,6 +18,16 @@
 #                conversion — the .cpfont's advanceY derives from hhea. For faces
 #                whose stock metrics are sized for scripts the built charset
 #                never includes.
+#   drop_codepoints: (optional) Codepoints to delete from the source's cmap
+#                before conversion, so the Noto fallback supplies them. For
+#                sources whose cmap points at the WRONG outline: the converter
+#                falls back only when get_char_index() returns 0, so a
+#                codepoint mapped to a real-but-wrong glyph renders that glyph
+#                and never falls back — and the font holds no correct outline
+#                to re-point at. Narrowing `intervals:` does NOT do this: a
+#                codepoint outside every interval is dropped from the build
+#                entirely rather than fallen back. Not a styling knob; requires
+#                a rendered contact sheet showing the wrong letter.
 #   styles:      Map of style name -> font source
 #                  path: relative to lib/EpdFont (for committed fonts)
 #                  url:  download URL (for fonts not in the repo)
@@ -80,10 +90,18 @@
 
 # The S-tier ruling (docs/sd-card-fonts.md, 2026-08-02; Lexica Ultralegible
 # added 2026-08-03, three text grotesques the same day, two of those three cut
-# 2026-08-04, Lexica Ultralegible itself cut 2026-08-04): these five, and only
-# these five, are INSTALLED on every surface — both device SD cards, the
-# simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below
-# stays a buildable recipe that ships nowhere.
+# 2026-08-04, Lexica Ultralegible itself cut 2026-08-04, Quattrocento Sans
+# promoted 2026-08-04): these six, and only these six, are INSTALLED on every
+# surface — both device SD cards, the simulator's fs_/fonts/, and the iOS
+# bundled seed set. Everything else below stays a buildable recipe that ships
+# nowhere.
+#
+# Quattrocento Sans came in on 2026-08-04 in the same ruling that cut Freight
+# Sans to C. The two were built the same day and fill the same cell — humanist
+# sans — so the tier takes one of them, and it is the OFL one that rebuilds from
+# a URL on any machine, audits clean, and carries the set's richest kern data.
+# Freight Sans' recipe and picker label stay; its .cpfont files are gone from
+# every surface.
 #
 # Archivo and Host Grotesk were cut on 2026-08-04 and Libre Franklin kept as the
 # single text grotesque. Three faces off one bench was three answers to one
@@ -93,8 +111,9 @@
 # only force_autohint in the set and an 11 px x-height at slot 0 against the
 # tier's 12 — see its recipe comment and tools/grotesque-bench.
 #
-# Lexica Ultralegible was cut the same day, leaving Libre Franklin as the set's
-# only sans. It came off the humanist/accessibility bench
+# Lexica Ultralegible was cut the same day, leaving Libre Franklin the only sans
+# until Quattrocento Sans joined it later that day. It came off the
+# humanist/accessibility bench
 # (lib/EpdFont/scripts/sans-candidates.yaml) and won it; the cut is a demotion to
 # buildable-only, NOT a finding against the face. Its recipe below and its picker
 # label in src/FontDisplayNames.h both stay, because a card provisioned before
@@ -117,6 +136,7 @@ installed_families:
   - Rosarivo
   - TeXGyreSchola
   - LibreFranklin
+  - QuattrocentoSans
 
 families:
   # ── Serif ──────────────────────────────────────────────────────────────
@@ -501,8 +521,8 @@ families:
 
   # ── Sans-serif ─────────────────────────────────────────────────────────
 
-  # The three INSTALLED text grotesques (2026-08-03), promoted out of
-  # grotesque-candidates.yaml after the bench. Built to the same uniform slots
+  # The text grotesques (2026-08-03), promoted out of grotesque-candidates.yaml
+  # after the bench; only Libre Franklin is still installed. Built to the same uniform slots
   # as the rest of the installed set: x-height 12/14/16/18 px measured on the
   # hinted render, advanceY against the tier's shipped 34/39/45/51.
 
@@ -555,6 +575,107 @@ families:
       bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk%5Bwght%5D.ttf", variable: {wght: 700}}
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/hostgrotesk/HostGrotesk-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  # C TIER since 2026-08-04: cut, recipe only. Its .cpfont files were deleted
+  # from every surface the same day Quattrocento Sans was promoted to S — the
+  # two are both humanist sans and fill one cell, and the tier takes one. The
+  # cut is not a finding against the face: it lost on provenance and
+  # rebuildability, not on the page. This recipe survives so the comparison can
+  # be re-run, and the picker label in src/FontDisplayNames.h stays because a
+  # card provisioned before the ruling still carries the family.
+  #
+  # Commercial (GarageFonts/Phil's Fonts EULA embedded in the font's name
+  # table), so the FILES are never committed or distributed, only this recipe —
+  # same posture as Edgar, GT Alpina, Venetian 301 and Caledonia CC. Put the
+  # four sources in lib/EpdFont/local_fonts/ (gitignored) under the names
+  # below.
+  - name: FreightSans
+    description: "Freight Sans, Darden's humanist sans for text (Latin)"
+    intervals: reading
+    # Uniform slots: xh 12/14/16/18 and advY 34/39/45/51 — EXACT on all four,
+    # the only family in the file that needs no per-slot caveat. Freight's
+    # hinted x-height tracks the point size 1:1 at 150 dpi across 8-21 pt
+    # (x-height is 0.48 em), so the ramp lands on every target without a skip
+    # and no size has to be built a pixel off. Swept under both hinters
+    # (2026-08-04): native and forced-autohint give the same sizes, the same
+    # span and the same advanceY, so there is no force_autohint here — unlike
+    # Archivo, where it was load-bearing. Counters survive the panel threshold
+    # at every slot (a/e/o enclosed and open; s/c have no enclosed counter to
+    # lose, which is the passing result).
+    sizes: [12, 14, 16, 18]
+    # Stock hhea is 800/-200/75 — a 1.075 em line height against 1.13 em of
+    # plain ink, so an override is mandatory regardless of the slot targets.
+    # 1037/-310 is 1.347 em, clear of the 1.130 em ink floor, and the ascender
+    # clears accented capitals at every size.
+    metrics: {ascent: 1037, descent: -310, linegap: 0}
+    # These cuts carry 231 glyphs: ASCII and the reading punctuation in full,
+    # Latin-1 at 96% (only U+00AD and the ¹²³ superscripts absent), but Latin
+    # Extended-A at 8% — Œœ Šš Žž Ÿ and the whole Central European set come
+    # from the Noto fallback build-sd-fonts.py applies. English and Western
+    # European text stays in the face; Polish or Czech will show two textures
+    # inside a word. This is a property of the available cut, not the design.
+    #
+    # The same cut mis-maps eight Latin-1 symbols: the cmap entry names the
+    # right character but points at a different outline, identically in all
+    # four styles. ¾ rendering as "ffl" is visible in the Text Settings
+    # specimen line. Dropped so Noto supplies them; there is no correct outline
+    # in the font to point at. Verified on a rendered contact sheet of all 231
+    # cmap codepoints against Noto (tools/font-cmap-audit.py):
+    #   A4 ¤ -> €    A6 ¦ -> J    AC ¬ -> ɑ    B1 ± -> ℗
+    #   B5 µ -> g    BC ¼ -> ﬀ    BD ½ -> ﬃ    BE ¾ -> ﬄ
+    # U+005E ^ sharing U+02C6 ˆ's outline is NOT in this list — that one is
+    # normal font practice, not a defect.
+    drop_codepoints: [0x00A4, 0x00A6, 0x00AC, 0x00B1, 0x00B5, 0x00BC, 0x00BD, 0x00BE]
+    styles:
+      regular:    {path: "local_fonts/FreightSans-Regular.otf"}
+      bold:       {path: "local_fonts/FreightSans-Bold.otf"}
+      italic:     {path: "local_fonts/FreightSans-Italic.ttf"}
+      bolditalic: {path: "local_fonts/FreightSans-BoldItalic.ttf"}
+
+  # INSTALLED (S tier, promoted 2026-08-04). The humanist sans of the set, and
+  # the ruling that promoted it cut Freight Sans to C: the two were built the
+  # same day and fill one cell of the taxonomy, so the tier takes one. This is
+  # the one that is OFL and rebuilds from a URL on any machine (Freight Sans
+  # needs gitignored commercial files), audits clean where Freight Sans needed
+  # eight cmap drops, and carries the richest kern data in the set.
+  #
+  # It sits alongside Libre Franklin, not against it — grotesque and humanist
+  # are different cells, which is what made three grotesques a duplicate on
+  # 2026-08-04 and makes these two not one.
+  - name: QuattrocentoSans
+    description: "Quattrocento Sans, Impallari's humanist companion sans (Latin)"
+    intervals: reading
+    # Uniform slots: xh 12/14/16/18 EXACT on all four; advY 33/38/46/51 —
+    # slots 0 and 1 a pixel tight, slot 2 a pixel loose, slot 3 exact. Best
+    # reachable: advanceY depends only on the span, and a sweep of every span
+    # from the 1162 ink floor up bottoms out at err=3 for this size set. The
+    # ramp is the reason — the hinted x-height plateaus at 15 px across both
+    # 15 and 16 pt, so 16 px costs 17 pt and no span serves 17 and 19 pt at
+    # the tier's spacing at once. x-height exactness wins, as in Almendra.
+    #
+    # Swept under both hinters (2026-08-04). force_autohint would move slot 2
+    # to 16 pt and give advY 33/39/44/52 — also err=3, errors merely shuffled,
+    # with equal-or-smaller counters at matched slots. So no force_autohint:
+    # Archivo's stays the set's only one, and it is there for a defect this
+    # family does not have.
+    sizes: [12, 14, 17, 19]
+    # Stock hhea 848/-260/0 = 1.108 em against 1.162 em of plain ink across the
+    # four styles — the lines overlap without an override. 1300 clears the ink
+    # floor and the ascender clears accented capitals (849) at every size.
+    metrics: {ascent: 1001, descent: -299, linegap: 0}
+    # cmap audited clean (tools/font-cmap-audit.py): the only shared outlines
+    # are comma/quotesinglbase and Eth/Dcroat, both normal practice. ã õ render
+    # flat-tilde at small ppem but are real tildes — ā/ō are not in the font at
+    # all. No drop_codepoints needed, unlike FreightSans.
+    #
+    # Latin-1 is 99-100% but Latin Extended-A is 9%, so Œœ Šš Žž Ÿ are in the
+    # face and the Central European set comes from the Noto fallback — the same
+    # shape of gap as Freight Sans and Host Grotesk.
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/quattrocentosans/QuattrocentoSans-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/quattrocentosans/QuattrocentoSans-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/quattrocentosans/QuattrocentoSans-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/quattrocentosans/QuattrocentoSans-BoldItalic.ttf"}
 
   - name: NotoSansExtended
     description: "Sans-serif (Latin, Greek, Cyrillic, Georgian, Armenian, Ethiopic)"
