@@ -225,13 +225,14 @@ bool LyraTheme::tabIndexFromPoint(const GfxRenderer& renderer, const Rect rect, 
   return false;
 }
 
-int LyraTheme::getListRowStep(bool hasSubtitle) const {
-  int rowHeight = (hasSubtitle) ? LyraMetrics::values.listWithSubtitleRowHeight : LyraMetrics::values.listRowHeight;
-  return rowHeight;
+int LyraTheme::getListRowStep(bool hasSubtitle, int subtitleLines) const {
+  if (!hasSubtitle) return LyraMetrics::values.listRowHeight;
+  const int extraLines = std::max(0, subtitleLines - 1);
+  return LyraMetrics::values.listWithSubtitleRowHeight + extraLines * LyraMetrics::values.listSubtitleLineStep;
 }
 
-int LyraTheme::getListPageItems(int contentHeight, bool hasSubtitle) const {
-  const int rowStep = getListRowStep(hasSubtitle);
+int LyraTheme::getListPageItems(int contentHeight, bool hasSubtitle, int subtitleLines) const {
+  const int rowStep = getListRowStep(hasSubtitle, subtitleLines);
   if (rowStep <= 0) return 1;
   return std::max(1, contentHeight / rowStep);
 }
@@ -241,9 +242,8 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
                          const std::function<std::string(int index)>& rowSubtitle,
                          const std::function<UIIcon(int index)>& rowIcon,
                          const std::function<std::string(int index)>& rowValue, bool highlightValue,
-                         const std::function<bool(int index)>& rowDimmed) const {
-  int rowHeight =
-      (rowSubtitle != nullptr) ? LyraMetrics::values.listWithSubtitleRowHeight : LyraMetrics::values.listRowHeight;
+                         const std::function<bool(int index)>& rowDimmed, int subtitleLines) const {
+  int rowHeight = getListRowStep(rowSubtitle != nullptr, subtitleLines);
   int pageItems = rowHeight > 0 ? std::max(1, rect.height / rowHeight) : 1;
 
   const int totalPages = (itemCount + pageItems - 1) / pageItems;
@@ -319,10 +319,20 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     }
 
     if (rowSubtitle != nullptr) {
-      // Draw subtitle
+      // Draw subtitle. subtitleLines == 1 keeps the original single truncated
+      // line, so lists that never ask for more render exactly as before.
       std::string subtitleText = rowSubtitle(i);
-      auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
-      renderer.drawText(SMALL_FONT_ID, textX, itemY + 30, subtitle.c_str(), true);
+      if (subtitleLines <= 1) {
+        auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
+        renderer.drawText(SMALL_FONT_ID, textX, itemY + 30, subtitle.c_str(), true);
+      } else {
+        const auto lines = renderer.wrappedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth, subtitleLines);
+        int subtitleY = itemY + 30;
+        for (const auto& line : lines) {
+          renderer.drawText(SMALL_FONT_ID, textX, subtitleY, line.c_str(), true);
+          subtitleY += LyraMetrics::values.listSubtitleLineStep;
+        }
+      }
     }
 
     // Draw value

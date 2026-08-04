@@ -233,13 +233,14 @@ void BaseTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
   }
 }
 
-int BaseTheme::getListRowStep(bool hasSubtitle) const {
-  int rowHeight = (hasSubtitle) ? BaseMetrics::values.listWithSubtitleRowHeight : BaseMetrics::values.listRowHeight;
-  return rowHeight;
+int BaseTheme::getListRowStep(bool hasSubtitle, int subtitleLines) const {
+  if (!hasSubtitle) return BaseMetrics::values.listRowHeight;
+  const int extraLines = std::max(0, subtitleLines - 1);
+  return BaseMetrics::values.listWithSubtitleRowHeight + extraLines * BaseMetrics::values.listSubtitleLineStep;
 }
 
-int BaseTheme::getListPageItems(int contentHeight, bool hasSubtitle) const {
-  const int rowStep = getListRowStep(hasSubtitle);
+int BaseTheme::getListPageItems(int contentHeight, bool hasSubtitle, int subtitleLines) const {
+  const int rowStep = getListRowStep(hasSubtitle, subtitleLines);
   if (rowStep <= 0) return 1;
   return std::max(1, contentHeight / rowStep);
 }
@@ -249,9 +250,8 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
                          const std::function<std::string(int index)>& rowSubtitle,
                          const std::function<UIIcon(int index)>& rowIcon,
                          const std::function<std::string(int index)>& rowValue, bool highlightValue,
-                         const std::function<bool(int index)>& rowDimmed) const {
-  int rowHeight =
-      (rowSubtitle != nullptr) ? BaseMetrics::values.listWithSubtitleRowHeight : BaseMetrics::values.listRowHeight;
+                         const std::function<bool(int index)>& rowDimmed, int subtitleLines) const {
+  int rowHeight = getListRowStep(rowSubtitle != nullptr, subtitleLines);
   int pageItems = rowHeight > 0 ? std::max(1, rect.height / rowHeight) : 1;
 
   const int totalPages = (itemCount + pageItems - 1) / pageItems;
@@ -322,9 +322,22 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     if (rowSubtitle != nullptr) {
       std::string subtitleText = rowSubtitle(i);
       if (!subtitleText.empty()) {
-        auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
-        renderer.drawText(SMALL_FONT_ID, rect.x + BaseMetrics::values.contentSidePadding, itemY + 22, subtitle.c_str(),
-                          i != selectedIndex);
+        // subtitleLines == 1 keeps the original single truncated line, so every
+        // list that never asks for more is byte-identical to before.
+        const int subtitleX = rect.x + BaseMetrics::values.contentSidePadding;
+        if (subtitleLines <= 1) {
+          auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
+          renderer.drawText(SMALL_FONT_ID, subtitleX, itemY + 22, subtitle.c_str(), i != selectedIndex);
+        } else {
+          // The value badge ("Selected") only reserves width on the first line;
+          // wrapped lines run the full row width beneath it.
+          const auto lines = renderer.wrappedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth, subtitleLines);
+          int subtitleY = itemY + 22;
+          for (const auto& line : lines) {
+            renderer.drawText(SMALL_FONT_ID, subtitleX, subtitleY, line.c_str(), i != selectedIndex);
+            subtitleY += BaseMetrics::values.listSubtitleLineStep;
+          }
+        }
       }
     }
 
