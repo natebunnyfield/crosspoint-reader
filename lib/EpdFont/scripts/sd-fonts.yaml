@@ -80,9 +80,10 @@
 
 # The S-tier ruling (docs/sd-card-fonts.md, 2026-08-02; Lexica Ultralegible
 # added 2026-08-03, three text grotesques the same day, two of those three cut
-# 2026-08-04): these six, and only these six, are INSTALLED on every surface —
-# both device SD cards, the simulator's fs_/fonts/, and the iOS bundled seed
-# set. Everything else below stays a buildable recipe that ships nowhere.
+# 2026-08-04, Lexica Ultralegible itself cut 2026-08-04): these five, and only
+# these five, are INSTALLED on every surface — both device SD cards, the
+# simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below
+# stays a buildable recipe that ships nowhere.
 #
 # Archivo and Host Grotesk were cut on 2026-08-04 and Libre Franklin kept as the
 # single text grotesque. Three faces off one bench was three answers to one
@@ -92,14 +93,22 @@
 # only force_autohint in the set and an 11 px x-height at slot 0 against the
 # tier's 12 — see its recipe comment and tools/grotesque-bench.
 #
+# Lexica Ultralegible was cut the same day, leaving Libre Franklin as the set's
+# only sans. It came off the humanist/accessibility bench
+# (lib/EpdFont/scripts/sans-candidates.yaml) and won it; the cut is a demotion to
+# buildable-only, NOT a finding against the face. Its recipe below and its picker
+# label in src/FontDisplayNames.h both stay, because a card provisioned before
+# this ruling still carries the family. Do not "restore" it to this list — that
+# would be a regression, not a fix.
+#
 # This list exists so the ruling is ENFORCED rather than merely documented.
 # scripts/install-sim-fonts.py defaults to it; before it did, the default was
 # "every curated family sd-fonts.yaml can build", which by 2026-08-01 meant all
 # 15 — so a routine re-run silently reinstalled the ones the ruling excludes.
 # The iOS side needs no equivalent list: CrossPointFsPrep.cpp seeds whatever
 # ios/seedfonts/ contains and prunes the rest, so that directory is its own
-# source of truth — delete the two cut families from it by hand, since nothing
-# in this repo can reach it.
+# source of truth — delete any cut family from it by hand, since nothing in this
+# repo can reach it.
 #
 # build-sd-fonts.py reads only `families:` and ignores this key.
 installed_families:
@@ -107,7 +116,6 @@ installed_families:
   - Coelacanth
   - Rosarivo
   - TeXGyreSchola
-  - LexicaUltralegible
   - LibreFranklin
 
 families:

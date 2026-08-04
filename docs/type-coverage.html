@@ -139,10 +139,12 @@
     calligraphic bookface, and its own description in the YAML says "calligraphic serif/display". It sits in the
     sans block between IBM Plex Sans and the Monospace header. Nothing breaks, but any count of "how many sans do
     we have" made from the headings is off by one.</p>
-    <p style="margin-bottom:0"><b>The S tier is better spread than the catalogue.</b> The six installed families
-    occupy six different classes — Caslon, Venetian, Garalde, Clarendon/legibility, humanist sans, grotesque. The
+    <p style="margin-bottom:0"><b>The S tier is better spread than the catalogue.</b> The five installed families
+    occupy five different classes — Caslon, Venetian, Garalde, Clarendon/legibility, grotesque. The
     catalogue as a whole is not: 19 of its 25 serifs are oldstyle or contemporary-text, two classes. Cutting Archivo
-    and Host Grotesk improved the spread rather than narrowing it, because all three grotesques were one cell.</p>
+    and Host Grotesk improved the spread rather than narrowing it, because all three grotesques were one cell.
+    Cutting Lexica Ultralegible is the one cut that did cost a class — humanist sans, and with it the
+    low-vision/hyperlegible cell — leaving Libre Franklin to carry the sans on its own.</p>
   </div>
 </section>
 
@@ -158,8 +160,8 @@
 <script>
 (function () {
   "use strict";
-  var S = ["Edgar","Coelacanth","Rosarivo","TeXGyreSchola","LexicaUltralegible","LibreFranklin"];
-  var CUT = ["Archivo","HostGrotesk"];
+  var S = ["Edgar","Coelacanth","Rosarivo","TeXGyreSchola","LibreFranklin"];
+  var CUT = ["Archivo","HostGrotesk","LexicaUltralegible"];
 
   var CLASSES = [
     {g:"serif", code:"A1", name:"Venetian / humanist oldstyle",
