@@ -125,8 +125,7 @@ class GfxRenderer {
   void fillRectImpl(int x, int y, int width, int height) const;
 
  public:
-  explicit GfxRenderer(HalDisplay& halDisplay)
-      : display(halDisplay), renderMode(BW), fadingFix(false) {}
+  explicit GfxRenderer(HalDisplay& halDisplay) : display(halDisplay), renderMode(BW), fadingFix(false) {}
   ~GfxRenderer() { freeBwBufferChunks(); }
 
   static constexpr int VIEWABLE_MARGIN_TOP = 9;
@@ -159,6 +158,16 @@ class GfxRenderer {
   // Setup
   void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);
+  // Rebinds a font id that is ALREADY registered. insertFont() deliberately
+  // refuses to overwrite -- that refusal is the guard against two SD families
+  // hashing to the same id -- so a caller that means to swap a face has to say
+  // so. Used by applySystemFont() when the System font setting changes: the
+  // chrome ids are registered at boot, and re-inserting them silently did
+  // nothing but log "already registered", leaving the old face on screen while
+  // the setting read as changed. Worse on a 2x build, where the hi-res half of
+  // the swap DID take (it uses insert_or_assign), so the UI briefly blitted the
+  // new family's glyphs against the outgoing family's metrics.
+  void replaceFont(int fontId, EpdFontFamily font) { fontMap.insert_or_assign(fontId, font); }
   // Clears both the flash-font map and any SD-font registration for fontId.
   // Coupled to avoid dangling SdCardFont* in sdCardFonts_ when callers free
   // the underlying SdCardFont and forget the SD-side unregister.
@@ -180,7 +189,7 @@ class GfxRenderer {
     sdCardFonts_.clear();
     sdCardFontScales_.clear();
 #if CROSSPOINT_RENDER_SCALE > 1
-    clearHiResFonts();
+    clearSdCardHiResFonts();
 #endif
   }
 #if CROSSPOINT_RENDER_SCALE > 1
@@ -194,12 +203,29 @@ class GfxRenderer {
     hiResSdFonts_[fontId] = font;
     hiResFontMap_.insert_or_assign(fontId, family);
   }
+  // Same thing for a font compiled into the binary. Deliberately NOT the call
+  // above with a null SdCardFont*: hiResSdFonts_ exists so FontCacheManager can
+  // prewarm glyphs off the card before a render pass, and it dereferences every
+  // entry it holds. A built-in has nothing to prewarm -- its bitmaps are already
+  // addressable -- so it belongs in the family map only.
+  void registerHiResBuiltinFont(int fontId, EpdFontFamily family) { hiResFontMap_.insert_or_assign(fontId, family); }
   void removeHiResFont(int fontId) {
     hiResFontMap_.erase(fontId);
     hiResSdFonts_.erase(fontId);
   }
-  void clearHiResFonts() {
-    hiResFontMap_.clear();
+  // Drops the SD-backed hi-res registrations ONLY. hiResSdFonts_ holds exactly
+  // the companions that came off the card, so its keys are the set to erase;
+  // a built-in companion is registered into hiResFontMap_ alone (see
+  // registerHiResBuiltinFont) and is deliberately left standing.
+  //
+  // It used to clear both maps outright, and that silently broke the chrome the
+  // moment built-ins gained companions: every reader font or size change routes
+  // through SdCardFontManager::unloadAll -> clearSdCardFonts -> here, so the UI
+  // faces lost their 2x bitmaps on the first switch and fell back to replicated
+  // 1x pixels until the next reboot. loadFile re-registers the reader font
+  // afterwards, which is why the reader looked fine and only the chrome broke.
+  void clearSdCardHiResFonts() {
+    for (const auto& entry : hiResSdFonts_) hiResFontMap_.erase(entry.first);
     hiResSdFonts_.clear();
   }
   const std::map<int, SdCardFont*>& getHiResSdCardFonts() const { return hiResSdFonts_; }

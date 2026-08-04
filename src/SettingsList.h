@@ -258,6 +258,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                     "backShortToFileBrowser"));
 
     // --- System ---
+    // The typeface the chrome itself is drawn in. Filed under System rather than
+    // Reader because it is not about books: it changes headers, list rows,
+    // button hints, popups and the battery readout, and leaves the reader's body
+    // face entirely alone. Ubuntu first, because it is the value every existing
+    // settings.json already holds by omission.
+    // Order must match CrossPointSettings::SYSTEM_FONT -- the index IS the
+    // persisted value.
+    v.push_back(
+        SettingInfo::Enum(StrId::STR_SYSTEM_FONT, &CrossPointSettings::systemFont,
+                          {StrId::STR_UBUNTU, StrId::STR_NOTO_SANS, StrId::STR_NOTO_SERIF, StrId::STR_LIBRE_FRANKLIN},
+                          "systemFont", StrId::STR_CAT_SYSTEM));
     v.push_back(SettingInfo::Value(
         StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
         {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
