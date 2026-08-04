@@ -163,6 +163,23 @@ What this means in practice:
 The current list of pre-built fonts is maintained in the
 [crosspoint-fonts repository](https://github.com/crosspoint-reader/crosspoint-fonts).
 
+## What the catalogue covers
+
+[type-coverage.html](type-coverage.html) sorts all 37 curated families by what
+the letterforms actually are rather than by the four headings `sd-fonts.yaml`
+files them under, which are a filing system and not a classification. The 37
+land in 13 of 22 structural classes; the nine empty ones are listed with a
+judgement on each, because a gap only matters if the class survives a 1-bit
+panel at 12-18 pt — a Didone is defined by a hairline, and a hairline here is
+one pixel or none.
+
+Two things worth knowing from it. **Alegreya is filed under Sans-serif and is a
+serif** (its own `description:` says "calligraphic serif/display"), so any count
+of the sans taken from the headings is off by one. And **the S tier is better
+spread than the catalogue**: its six occupy six different classes, while 19 of
+the catalogue's 25 serifs sit in two. Cutting Archivo and Host Grotesk widened
+that spread rather than narrowing it, since all three grotesques filled one cell.
+
 ## Converting Custom Fonts
 
 To convert your own TrueType/OpenType fonts:

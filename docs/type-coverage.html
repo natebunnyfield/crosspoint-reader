@@ -1,0 +1,288 @@
+<title>Typeface coverage — what the catalogue holds and what it doesn't</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --paper: #FBFBF9; --ink: #2D2D2D; --ink-soft: #63635E; --ink-faint: #9A9A94;
+    --rule: #E2E2DC; --hair: #D9D9D7; --sunk: #F4F4F0;
+    --s: #7A5C1E;        /* installed / S tier */
+    --s-bg: rgba(122,92,30,.10);
+    --gap: #A0392B;      /* empty cell */
+    --gap-bg: rgba(160,57,43,.08);
+    --ok: #3B6B4F;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #121212; --ink: #E0E0DE; --ink-soft: #9C9C97; --ink-faint: #6A6A65;
+      --rule: #2B2B2B; --hair: #333; --sunk: #1A1A1A;
+      --s: #D9B45F; --s-bg: rgba(217,180,95,.13);
+      --gap: #E08472; --gap-bg: rgba(224,132,114,.11);
+      --ok: #86BE9C;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#121212; --ink:#E0E0DE; --ink-soft:#9C9C97; --ink-faint:#6A6A65;
+    --rule:#2B2B2B; --hair:#333; --sunk:#1A1A1A;
+    --s:#D9B45F; --s-bg:rgba(217,180,95,.13); --gap:#E08472; --gap-bg:rgba(224,132,114,.11);
+    --ok:#86BE9C; color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --paper:#FBFBF9; --ink:#2D2D2D; --ink-soft:#63635E; --ink-faint:#9A9A94;
+    --rule:#E2E2DC; --hair:#D9D9D7; --sunk:#F4F4F0;
+    --s:#7A5C1E; --s-bg:rgba(122,92,30,.10); --gap:#A0392B; --gap-bg:rgba(160,57,43,.08);
+    --ok:#3B6B4F; color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family: system-ui,-apple-system,"Segoe UI",sans-serif; font-size:16px; line-height:1.55;
+    -webkit-text-size-adjust:100%; }
+  .wrap { max-width: 50rem; margin:0 auto; padding:0 20px 90px; }
+  h1,h2,h3 { font-family: ui-serif,"New York","Iowan Old Style",Palatino,Georgia,serif; font-weight:600; text-wrap:balance; }
+  h1 { font-size:2rem; line-height:1.13; margin:0 0 .35rem; letter-spacing:-.012em; }
+  h2 { font-size:1.3rem; margin:0 0 .5rem; letter-spacing:-.005em; }
+  h3 { font-size:1rem; margin:0 0 .2rem; }
+  p { margin:0 0 .85rem; }
+  .num, code { font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; font-size:.92em; }
+  .eyebrow { font:500 .7rem/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-faint); }
+  header { padding:42px 0 24px; border-bottom:1px solid var(--rule); }
+  header p.lede { font-size:1.05rem; color:var(--ink-soft); margin:.7rem 0 0; max-width:36rem; }
+
+  section { margin-top:34px; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:.8rem; color:var(--ink-soft); margin:14px 0 0; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .dot.s { background:var(--s); }
+  .dot.g { background:var(--gap); }
+
+  .cls { border-top:1px solid var(--rule); padding:15px 0 13px; display:grid; grid-template-columns:5.2rem 1fr; gap:4px 16px; }
+  .cls.empty { background:var(--gap-bg); }
+  .code { font:600 .74rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink-faint); letter-spacing:.04em; }
+  .cls.empty .code { color:var(--gap); }
+  .body h3 { margin-bottom:.15rem; }
+  .marks { font-size:.79rem; color:var(--ink-faint); margin:0 0 .4rem; }
+  .fam { display:flex; flex-wrap:wrap; gap:5px; margin:.35rem 0 0; padding:0; list-style:none; }
+  .fam li { font:500 .78rem/1 ui-monospace,SFMono-Regular,Menlo,monospace; padding:5px 7px;
+            border:1px solid var(--rule); border-radius:3px; color:var(--ink-soft); }
+  .fam li.s { border-color:var(--s); color:var(--s); background:var(--s-bg); font-weight:600; }
+  .fam li.cut { text-decoration:line-through; opacity:.55; }
+  .none { font:600 .78rem/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--gap); margin-top:.35rem; }
+  .verdict { font-size:.83rem; color:var(--ink-soft); margin:.45rem 0 0; }
+  .verdict b { color:var(--ink); font-weight:600; }
+
+  table { width:100%; border-collapse:collapse; font-size:.85rem; margin-top:8px; }
+  th,td { text-align:left; padding:8px 9px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th { font:500 .68rem/1.3 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); }
+  td.k { font-family:ui-monospace,Menlo,monospace; font-size:.8rem; white-space:nowrap; }
+  .scroll { overflow-x:auto; }
+  tr.gap td { color:var(--gap); }
+
+  .note { border-left:2px solid var(--rule); padding-left:15px; font-size:.92rem; color:var(--ink-soft); margin:20px 0; }
+  .note b { color:var(--ink); }
+  footer { border-top:1px solid var(--rule); margin-top:36px; padding-top:18px; font-size:.81rem; color:var(--ink-faint); }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">CrossPoint · sd-fonts.yaml · 37 curated families</div>
+  <h1>What the catalogue can set, and what it can't</h1>
+  <p class="lede">The YAML files everything under four headings — Serif, Sans-serif, Monospace, Dyslexia,
+  Accessibility. That is a filing system, not a classification. Sorted by what the letterforms actually are, the
+  37 families land in <b>13 of 22</b> structural classes — nine are empty. The fourth group below,
+  engineered-for-a-condition, is a cross-cutting axis rather than a shape, so its four classes are counted
+  separately and all four are occupied.</p>
+  <div class="legend">
+    <span><i class="dot s"></i> installed (S tier)</span>
+    <span><i class="dot g"></i> nothing in this class</span>
+    <span>struck through = cut 2026-08-04</span>
+  </div>
+</header>
+
+<section>
+  <h2>A · Serif</h2>
+  <div id="serif"></div>
+</section>
+
+<section>
+  <h2>B · Sans</h2>
+  <div id="sans"></div>
+</section>
+
+<section>
+  <h2>C · Written &amp; non-roman construction</h2>
+  <div id="written"></div>
+</section>
+
+<section>
+  <h2>D · Fixed width</h2>
+  <div id="mono"></div>
+</section>
+
+<section>
+  <h2>E · Engineered for a reading condition</h2>
+  <p style="font-size:.9rem;color:var(--ink-soft)">A cross-cutting axis, not a shape: these faces also belong to a
+  class above. Listed separately because it is the axis a reader picks on.</p>
+  <div id="cond"></div>
+</section>
+
+<section>
+  <h2>The nine empty classes, ranked by whether they are worth filling</h2>
+  <p style="font-size:.93rem">A gap is only a problem if the class survives the medium. This panel is 1-bit, and
+  the reader sets 12–18 pt at 2× supersampling — so contrast, hairlines and small apertures are the filter.</p>
+  <div class="scroll"><table id="gaps"></table></div>
+</section>
+
+<section>
+  <h2>Two things the filing hides</h2>
+  <div class="note">
+    <p style="margin-bottom:.6rem"><b>Alegreya is filed under Sans-serif.</b> It is a serif — Huerta Tipográfica's
+    calligraphic bookface, and its own description in the YAML says "calligraphic serif/display". It sits in the
+    sans block between IBM Plex Sans and the Monospace header. Nothing breaks, but any count of "how many sans do
+    we have" made from the headings is off by one.</p>
+    <p style="margin-bottom:0"><b>The S tier is better spread than the catalogue.</b> The six installed families
+    occupy six different classes — Caslon, Venetian, Garalde, Clarendon/legibility, humanist sans, grotesque. The
+    catalogue as a whole is not: 19 of its 25 serifs are oldstyle or contemporary-text, two classes. Cutting Archivo
+    and Host Grotesk improved the spread rather than narrowing it, because all three grotesques were one cell.</p>
+  </div>
+</section>
+
+<footer>
+  Families and their descriptions from <code>lib/EpdFont/scripts/sd-fonts.yaml</code> (37 recipes) and
+  <code>src/FontDisplayNames.h</code>; the installed set from <code>installed_families:</code> after the 2026-08-04
+  ruling. Classification follows the Vox-ATypI skeleton where it is useful and departs where it is not — Vox was
+  withdrawn by ATypI in 2021 for exactly the reasons visible here: it collapses everything post-1950 into
+  "contemporary" and has no cell at all for faces engineered for a reading condition.
+</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var S = ["Edgar","Coelacanth","Rosarivo","TeXGyreSchola","LexicaUltralegible","LibreFranklin"];
+  var CUT = ["Archivo","HostGrotesk"];
+
+  var CLASSES = [
+    {g:"serif", code:"A1", name:"Venetian / humanist oldstyle",
+     marks:"Sloped bar on the e, low contrast, calligraphic axis. Jenson, Centaur.",
+     fams:["Coelacanth","Venetian301","GoudyBookletter1911","InknutAntiqua62"]},
+    {g:"serif", code:"A2", name:"Garalde / Aldine oldstyle",
+     marks:"Horizontal bar, moderate contrast, bracketed serifs. Garamond, Bembo.",
+     fams:["Rosarivo","Almendra","Junicode","Vollkorn"]},
+    {g:"serif", code:"A3", name:"Dutch–English baroque",
+     marks:"Sturdier, sharper, more contrast than a Garalde. Caslon, Fell, Janson.",
+     fams:["Edgar","LibreCaslonText"]},
+    {g:"serif", code:"A4", name:"Transitional / réale",
+     marks:"Vertical axis, crisper serifs, higher contrast. Baskerville, Times.",
+     fams:["SourceSerif4","LibreBaskerville","NotoSerifExtended"]},
+    {g:"serif", code:"A5", name:"Scotch roman",
+     marks:"A 19th-century branch off transitional: ball terminals, big x-height.",
+     fams:["CaledoniaCC"]},
+    {g:"serif", code:"A6", name:"Didone / modern",
+     marks:"Abrupt hairline-to-stem contrast, flat unbracketed serifs. Bodoni, Didot.",
+     fams:[]},
+    {g:"serif", code:"A7", name:"Slab serif / egyptian",
+     marks:"Serifs as heavy as the stems, little modulation. Rockwell, Memphis.",
+     fams:["Bitter"]},
+    {g:"serif", code:"A8", name:"Clarendon / ionic legibility group",
+     marks:"Bracketed slabs bred for small sizes and bad paper. Century Schoolbook, Ionic No. 5.",
+     fams:["TeXGyreSchola"]},
+    {g:"serif", code:"A9", name:"Glyphic / incised / wedge",
+     marks:"Cut rather than written: flared stems, wedge serifs, chiselled joins. Albertus, Trump Mediäval.",
+     fams:["Domitian"], partial:"Domitian only — a Trump Mediäval descendant, so wedge-ish but filed and read as humanist."},
+    {g:"serif", code:"A10", name:"Contemporary text serif",
+     marks:"Post-1950 book faces that answer to no historical model. The catalogue's centre of gravity.",
+     fams:["Literata","Merriweather","Lora","IBMPlexSerif","Newsreader","GentiumBookPlus","GTAlpinaCond","Alegreya"]},
+    {g:"serif", code:"A11", name:"Flared / semi-serif",
+     marks:"Stems that widen into a terminal without becoming a serif. Optima, Rotis Semi-serif.",
+     fams:[]},
+
+    {g:"sans", code:"B1", name:"Grotesque",
+     marks:"19th-century sans: closed apertures, slight weight modulation, squarish bowls. Akzidenz, Franklin Gothic.",
+     fams:["LibreFranklin","Archivo","HostGrotesk"]},
+    {g:"sans", code:"B2", name:"Neo-grotesque",
+     marks:"Mid-century rationalisation: horizontal terminals, tighter fit, less modulation. Helvetica, Univers.",
+     fams:["Inter","IBMPlexSans"]},
+    {g:"sans", code:"B3", name:"Geometric",
+     marks:"Circle-and-line construction, single-storey a, small x-height. Futura, Avenir.",
+     fams:[]},
+    {g:"sans", code:"B4", name:"Humanist sans",
+     marks:"Roman skeleton without serifs: open apertures, calligraphic stress, true italic. Gill, Frutiger, Myriad.",
+     fams:["SourceSans3","NotoSansExtended","AtkinsonHyperlegibleNext","LexicaUltralegible"]},
+    {g:"sans", code:"B5", name:"Rounded",
+     marks:"Terminals capped with a half-circle. Not a text class, listed for completeness.",
+     fams:[]},
+    {g:"sans", code:"B6", name:"Squarish / technical",
+     marks:"Rectangular bowls, engineering lineage. DIN, Eurostile.",
+     fams:[]},
+
+    {g:"written", code:"C1", name:"Blackletter",
+     marks:"Textura, rotunda, schwabacher, fraktur — the broad-nib northern tradition.",
+     fams:[]},
+    {g:"written", code:"C2", name:"Uncial / insular",
+     marks:"Majuscule book hands predating the roman lowercase.",
+     fams:[]},
+    {g:"written", code:"C3", name:"Chancery / script as primary",
+     marks:"A cursive as the roman, not as the italic. Zapf Chancery, Poetica.",
+     fams:[], partial:"Every family here ships an italic, but none is a script FACE — the italic is always the companion."},
+
+    {g:"mono", code:"D1", name:"Typewriter",
+     marks:"Fixed pitch descended from the machine: slab serifs, wide sidebearings. Courier, Prestige.",
+     fams:[]},
+    {g:"mono", code:"D2", name:"Programming monospace",
+     marks:"Fixed pitch designed for code: disambiguated 0/O, l/1, generous x-height.",
+     fams:["IBMPlexMono","SourceCodePro"]},
+
+    {g:"cond", code:"E1", name:"Dyslexia-targeted",
+     marks:"Weighted bottoms and deliberate asymmetry to resist letter rotation.",
+     fams:["OpenDyslexic"]},
+    {g:"cond", code:"E2", name:"Low vision / hyperlegible",
+     marks:"Maximal letterform disambiguation at the cost of evenness.",
+     fams:["AtkinsonHyperlegibleNext","LexicaUltralegible"]},
+    {g:"cond", code:"E3", name:"Small-size / newsprint legibility",
+     marks:"Large x-height, open counters, sturdy joins — built to survive bad reproduction.",
+     fams:["TeXGyreSchola","Bitter"], partial:"Both arrive here by lineage rather than by brief; no face in the set was drawn for this."},
+    {g:"cond", code:"E4", name:"Screen / low-resolution optimised",
+     marks:"Hinted and fitted for a pixel grid, which is what this panel actually is.",
+     fams:["Literata","Inter","Bitter","NotoSerifExtended"]}
+  ];
+
+  var GAPS = [
+    ["A6","Didone / modern","No","The class is defined by a hairline. At 12 pt on a 1-bit panel a hairline is either one pixel or none, and the whole point of the face — the contrast — is what dithering cannot carry. A correct gap."],
+    ["A11","Flared / semi-serif","<b>Yes</b>","The most defensible gap to close. No hairlines, no serif to clog a counter at small ppem, and it reads as neither serif nor sans — a genuinely different choice rather than a fifth oldstyle."],
+    ["B3","Geometric","Marginal","Circular bowls degrade badly at low ppem and the small x-height costs apparent size. Would need a text-tuned cut, not a Futura."],
+    ["B5","Rounded","No","Not a continuous-text class."],
+    ["B6","Squarish / technical","Marginal","Reads as interface rather than book. Cheap to add, hard to justify."],
+    ["C1","Blackletter","Novelty","Useless for continuous reading and genuinely wanted for period texts. The one gap where the answer depends on what the reader is opening, not on the panel."],
+    ["C2","Uncial / insular","No","Majuscule-only; no lowercase to set a paragraph in."],
+    ["C3","Chancery / script as primary","Niche","A whole book in a chancery is a real preference and a rare one. Nothing here blocks it technically."],
+    ["D1","Typewriter","<b>Yes</b>","You have two monospaces and both are for code. A typewriter face changes the reading experience rather than the character set — the nearest thing to a new genre in this list."]
+  ];
+
+  function render(groupId, list) {
+    document.getElementById(groupId).innerHTML = list.map(function (c) {
+      var empty = c.fams.length === 0;
+      var chips = empty
+        ? '<div class="none">— nothing in this class</div>'
+        : '<ul class="fam">' + c.fams.map(function (f) {
+            var cls = S.indexOf(f) >= 0 ? "s" : (CUT.indexOf(f) >= 0 ? "cut" : "");
+            return '<li class="' + cls + '">' + f + "</li>";
+          }).join("") + "</ul>";
+      return '<div class="cls' + (empty ? " empty" : "") + '">' +
+        '<div class="code">' + c.code + "</div>" +
+        '<div class="body"><h3>' + c.name + "</h3>" +
+        '<p class="marks">' + c.marks + "</p>" + chips +
+        (c.partial ? '<p class="verdict">' + c.partial + "</p>" : "") +
+        "</div></div>";
+    }).join("");
+  }
+  ["serif","sans","written","mono","cond"].forEach(function (g) {
+    render(g, CLASSES.filter(function (c) { return c.g === g; }));
+  });
+
+  document.getElementById("gaps").innerHTML =
+    "<tr><th>Class</th><th>Fill it?</th><th>Why</th></tr>" +
+    GAPS.map(function (r) {
+      return '<tr><td class="k">' + r[0] + " · " + r[1] + "</td><td class='k'>" + r[2] + "</td><td>" + r[3] + "</td></tr>";
+    }).join("");
+})();
+</script>
