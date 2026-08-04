@@ -134,16 +134,19 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // the device Settings UI. The settings below have no on-device control left,
   // so they are pinned to the values the UI used to be set to rather than left
   // wherever an older save happened to leave them. The fields stay live: the
-  // status bar renderer, the theme loader and the sleep path all still read
-  // them, and they remain in getSettingsList() so both persistence and the web
-  // settings API keep working. A change made over the web therefore lasts until
-  // the next load, which is the same contract `orientation` has.
+  // status bar renderer and the sleep path still read them, and they remain in
+  // getSettingsList() so both persistence and the web settings API keep
+  // working. A change made over the web therefore lasts until the next load,
+  // which is the same contract `orientation` has.
+  //
+  // `uiTheme` used to be pinned here. It no longer exists: on 2026-08-04 the
+  // four other themes were deleted and UITheme::setTheme() builds Lyra Six
+  // unconditionally, so there is nothing left to pin or to persist.
   // quickResumeSleepScreen deliberately has NO line here any more. It was pinned
   // when its only control lived on the withdrawn Display tab; it now has a real
   // row under System (SettingsList.h), and pinning a visible control would
   // silently revert the owner's choice on the next load.
   hideBatteryPercentage = HIDE_ALWAYS;
-  uiTheme = LYRA_SIX;
 
   // Status bar: every element hidden. Thickness is left alone — it only has an
   // effect while the progress bar is drawn, and it is not a visibility control.

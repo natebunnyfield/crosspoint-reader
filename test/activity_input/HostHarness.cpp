@@ -146,10 +146,10 @@ int CrossPointSettings::getReaderFontId() const {
 // ============================================================================
 // UITheme double.
 //
-// The real UITheme.cpp cannot be linked: its constructor make_unique's one of
-// the four concrete themes, which drags in BaseTheme + Lyra + Lyra3Covers +
-// RoundedRaff and, behind them, HalClock, HalPowerManager, RecentBooksStore and
-// the icon tables. So the metrics — the only part activity *logic* reads — are
+// The real UITheme.cpp cannot be linked: its constructor make_unique's
+// LyraSixTheme, which drags in BaseTheme + LyraTheme + Lyra3CoversTheme and,
+// behind them, HalClock, HalPowerManager, RecentBooksStore and the icon
+// tables. So the metrics — the only part activity *logic* reads — are
 // wired to the genuine BaseMetrics::values from BaseTheme.h, and `currentTheme`
 // is left null.
 //
