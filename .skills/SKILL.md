@@ -881,6 +881,11 @@ Read [docs/fork-sync.md](docs/fork-sync.md) before any upstream merge, and run
 `scripts/repo-status.sh` to see where things stand (it reports; it never
 merges).
 
+**Branch names are asymmetric: this fork's is `main`, upstream's is `develop`**
+(and upstream also has a `master`). Renamed 2026-08-04, owner convention. So
+`upstream/develop` throughout these docs is deliberate, not a stale name — there
+is no `upstream/main` to "correct" it to. `git push origin main` is the push.
+
 This fork is **selectively divergent**, not a tracking mirror — 91 ahead / 2
 behind as of 2026-08-03 — and it has DELETED whole subsystems upstream still
 develops: KOReader sync, Calibre and the status bar (`08d5bdee`), bookmarks
