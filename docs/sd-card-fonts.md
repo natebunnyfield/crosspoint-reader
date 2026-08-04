@@ -3,21 +3,30 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; sans added 2026-08-03, grotesques same day)
+## S tier (fork ruling, 2026-08-02; sans added 2026-08-03, cut back 2026-08-04)
 
-The installed set on this fork is exactly eight families — **Edgar, Coelacanth,
-Rosarivo, TeXGyreSchola, LexicaUltralegible, Archivo, LibreFranklin,
-HostGrotesk** — on every surface: both device SD cards, the simulator's
-`fs_/fonts/`, and the iOS app's bundled seed set
-(`crosspoint-simulator/ios/seedfonts/`). The other curated families remain fully
-buildable recipes in `sd-fonts.yaml` (picker labels stay in
+The installed set on this fork is exactly six families — **Edgar, Coelacanth,
+Rosarivo, TeXGyreSchola, LexicaUltralegible, LibreFranklin** — on every surface:
+both device SD cards, the simulator's `fs_/fonts/`, and the iOS app's bundled
+seed set (`crosspoint-simulator/ios/seedfonts/`). The other curated families
+remain fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these eight and nothing else.
+surface or reprovisioning a card, install these six and nothing else.
 
-Four of the eight are sans: Lexica Ultralegible from the humanist/accessibility
-bench, and Archivo, Libre Franklin and Host Grotesk from the text-grotesque
-bench (`lib/EpdFont/scripts/grotesque-candidates.yaml`). Archivo carries
-`force_autohint: true` and it is load-bearing — see its recipe comment.
+Two of the six are sans: **Lexica Ultralegible** from the humanist/accessibility
+bench, and **Libre Franklin** from the text-grotesque bench
+(`lib/EpdFont/scripts/grotesque-candidates.yaml`).
+
+**Archivo and Host Grotesk were cut on 2026-08-04**, promoting Libre Franklin to
+the single text grotesque. The bench they came off answered "which grotesque",
+and shipping all three of its finalists turned one answer into three: they
+occupy the same cell of the taxonomy — 19th-century grotesque for continuous
+text — so a picker offering all three spends the reader's attention on a
+distinction the page does not make. Archivo carried the set's only
+`force_autohint: true` and an 11 px x-height at slot 0 against the tier's 12
+(see `tools/grotesque-bench`), so it was the weakest of the three on its own
+terms as well. Both remain buildable recipes and keep their picker labels, since
+a card provisioned before this ruling still carries them.
 
 Lexica Ultralegible is the one sans in the set, added after a bench of 13
 sans-serif candidates rendered through the real `GfxRenderer` at matched
