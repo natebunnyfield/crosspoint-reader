@@ -217,12 +217,12 @@ The Settings screen allows you to configure the device's behavior. There are a f
 
 - **Refresh Frequency**: Set how often the screen does a full refresh while reading to reduce ghosting; options are every 1, 5, 10, 15, or 30 pages.
 
-- **UI Theme**: Set which UI theme to use:
-  
-  - "Classic" - The original Crosspoint theme
-  - "Lyra" - The new theme for Crosspoint featuring rounded elements and menu icons
-  - "Lyra Extended" - Lyra, but displays 3 books instead of 1 on the **[Home Screen](#31-home-screen)**
-  - "RoundedRaff" - A rounded theme with additional visual styling
+> [!NOTE]
+> **There is no UI Theme setting on this fork.** The interface is Lyra Six —
+> rounded elements, menu icons, and a six-cover **[Home Screen](#31-home-screen)**.
+> The Classic, Lyra, Lyra Extended and RoundedRaff themes were removed on
+> 2026-08-04, along with the setting that chose between them; the setting had
+> already been withdrawn from the Settings screen before that.
 
 - **Sunlight Fading Fix**: Configure whether to enable a software-fix for the issue where white X4 models may fade when used in direct sunlight:
   
