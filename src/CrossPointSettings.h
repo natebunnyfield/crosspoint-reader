@@ -303,9 +303,14 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t language = 0;
   // Quick Resume: keep current content visible with moon icon instead of showing a static sleep screen.
   // While ON, an inactivity-timeout sleep takes this path and never consults
-  // sleepScreen, so an owner who wants their sleep image on the common sleep
-  // path has to turn this OFF (Settings > System > Quick Resume on Timeout).
-  uint8_t quickResumeSleepScreen = QUICK_RESUME_AFTER_TIMEOUT;
+  // sleepScreen (see sleepscreen::shouldQuickResume).
+  //
+  // Defaults OFF since 2026-08-04. It shipped ON, and because an inactivity
+  // timeout is how a reader sleeps nearly every time, that made the whole Sleep
+  // Screen setting look broken out of the box: pick Calendar, watch the row
+  // update, never see it. Turning it on is still one row away, and picking the
+  // Quick Resume sleep screen turns it on for you.
+  uint8_t quickResumeSleepScreen = QUICK_RESUME_NEVER;
   // Keep the HOST screen awake while CrossPoint is in the foreground
   // (0 = let the host dim/lock normally, 1 = suppress it).
   //
