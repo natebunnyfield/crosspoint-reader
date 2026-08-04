@@ -116,6 +116,54 @@ server is running.
 
 Endpoint details are documented in [webserver-endpoints.md](./webserver-endpoints.md).
 
+## Mirroring a Whole Card with rclone
+
+Curate a card layout on a computer (books, `.fonts` families, even
+`.crosspoint/settings.json`), then make the device's card match it exactly —
+additions **and deletions** — without removing the SD card:
+
+```bash
+scripts/sync-card.sh path/to/card-root            # device found via crosspoint.local
+scripts/sync-card.sh path/to/card-root 192.168.1.42
+scripts/sync-card.sh path/to/card-root --dry-run  # preview the changes first
+```
+
+The script wraps `rclone sync` over WebDAV with the right guardrails:
+
+- Single connection (`--transfers 1 --checkers 1`) — the device's server is
+  single-threaded.
+- `--size-only` — the server has no real modtimes. Because a settings edit can
+  keep the file size identical, `settings.json` is force-pushed in a second
+  pass. Use `--full` to force-recopy everything when in doubt.
+- Mac litter (`.DS_Store`, `._*` AppleDouble stubs) is deleted from the card
+  in a cleanup pass and never pushed from the source.
+- `wifi.json` (saved Wi-Fi networks) and `recent.json` (recents list) ARE
+  mirrored — the firmware prunes recents entries whose book is gone, so a
+  curated list is safe. If the source tree lacks either file, the device's
+  copy is left alone instead of deleted.
+- Never mirrored: `state.json`, the sleep-frame cache, and the
+  `epub_*`/`txt_*`/`xtc_*` layout caches (their directory names hash
+  differently on a computer than on the device; the reader rebuilds and prunes
+  its own — deleting a book over WebDAV clears that book's cache
+  automatically).
+
+One tree can also carry a distinct sleep image for every unit: name it
+`sleep_<deviceId>.bmp`, where `<deviceId>` is the 6-hex-char unit ID shown on
+the File Transfer screen and in `/api/status` (derived from the last 3 bytes
+of the unit's factory MAC — unique per physical device, not per model). Each
+device loads only its own file, preferring it over the shared `sleep.bmp`.
+
+When the sync finishes, press **Back** on the device. Leaving File Transfer
+mode reboots the reader, and the reboot loads the synced settings and fonts.
+
+The same flow works against the desktop or iOS simulator (its web server
+listens on `localhost:8080`), so a card can be perfected in the simulator and
+then mirrored to real devices:
+
+```bash
+scripts/sync-card.sh fs_ localhost:8080
+```
+
 ## Security Notes
 
 - The HTTP server runs on port 80.
