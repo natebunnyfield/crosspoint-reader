@@ -255,20 +255,21 @@ recipe for every family in `src/FontDisplayNames.h`, so
 `Skipping (no buildable source in sd-fonts.yaml): ...`. If it does, a recipe
 regressed or a local source is missing.
 
-**S tier — the only INSTALLED families (fork ruling, 2026-08-02; four sans
-added 2026-08-03): Edgar, Coelacanth, Rosarivo, TeXGyreSchola,
-LexicaUltralegible, Archivo, LibreFranklin, HostGrotesk.** Buildable is not
-installed: everything else stays a recipe only. Every surface carries exactly
-these eight — device SD cards, `fs_/fonts/`, and the iOS seed bundle
-(`crosspoint-simulator/ios/seedfonts/`), each with its `2x/` hi-res companions.
-Do not install additional families anywhere without a new ruling; see
-docs/sd-card-fonts.md "S tier".
+**S tier — the only INSTALLED families (fork ruling, 2026-08-02; sans added
+2026-08-03, cut back 2026-08-04): Edgar, Coelacanth, Rosarivo, TeXGyreSchola,
+LexicaUltralegible, LibreFranklin.** Buildable is not installed: everything else
+stays a recipe only. Every surface carries exactly these six — device SD cards,
+`fs_/fonts/`, and the iOS seed bundle (`crosspoint-simulator/ios/seedfonts/`),
+each with its `2x/` hi-res companions. Do not install additional families
+anywhere without a new ruling; see docs/sd-card-fonts.md "S tier".
 
-The four sans came off two benches, both rendered through the real renderer at
+The two sans came off two benches, both rendered through the real renderer at
 matched x-height: `sans-candidates.yaml` (humanist/accessibility, gave Lexica
-Ultralegible) and `grotesque-candidates.yaml` (text grotesques, gave Archivo,
-Libre Franklin and Host Grotesk). Bench families are NOT installed and live in
-their own YAMLs so they stay out of the device's font-download manifest.
+Ultralegible) and `grotesque-candidates.yaml` (text grotesques, gave Libre
+Franklin). The grotesque bench first shipped all three of its finalists; Archivo
+and Host Grotesk were cut on 2026-08-04 because all three fill the same cell of
+the taxonomy. Bench families are NOT installed and live in their own YAMLs so
+they stay out of the device's font-download manifest.
 
 **Archivo needs `force_autohint: true` and it is load-bearing.** Under the
 font's native hinting no point size renders a 12 px x-height at all — it jumps
