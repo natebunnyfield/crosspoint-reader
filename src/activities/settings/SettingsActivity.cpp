@@ -16,9 +16,10 @@
 #include "FontDownloadActivity.h"
 #endif
 #include "FontSelectionActivity.h"
-#include "SystemFont.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
+#include "SystemFont.h"
+#include "activities/boot_sleep/SleepScreenPolicy.h"
 #ifndef CROSSPOINT_NO_NETWORK
 #include "OtaUpdateActivity.h"
 #include "SdFirmwareUpdateActivity.h"
@@ -105,10 +106,15 @@ void SettingsActivity::onEnter() {
   // Reset selection to first category
   selectedCategoryIndex = 0;
   selectedSettingIndex = 0;
-  preserveQuickResumeTimeoutOn =
-      SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT;
-  quickResumeTimeoutAutoEnabled = false;
-  syncQuickResumeTimeoutForSleepScreen(/*sleepScreenChanged=*/true, /*quickResumeTimeoutChanged=*/false);
+  {
+    const sleepscreen::QuickResumeState start = sleepscreen::initialState(SETTINGS.quickResumeSleepScreen);
+    quickResumeTimeoutAutoEnabled = start.autoEnabled;
+    preserveQuickResumeTimeoutOn = start.preserveOn;
+  }
+  // sleepScreenChanged is FALSE: opening this screen is not the owner picking a
+  // sleep screen. The pass still runs, because the Quick Resume MODE implies the
+  // timeout row and that has to hold however the screen was reached.
+  syncQuickResumeTimeoutForSleepScreen(/*sleepScreenChanged=*/false, /*quickResumeTimeoutChanged=*/false);
 
   rebuildSettingsLists();
 
@@ -328,17 +334,17 @@ void SettingsActivity::toggleCurrentSetting() {
     const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
     if (setting.enumValues.size() > 2) {
       const auto valuePtr = setting.valuePtr;
-      optionPopup.show(
-          setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()), currentValue,
-          [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged, systemFontChanged](int idx) {
-            SETTINGS.*valuePtr = idx;
-            // Before rebuildSettingsLists(), which measures rows with the UI
-            // font and would otherwise size them against the outgoing face.
-            if (systemFontChanged) applySystemFont(renderer);
-            syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
-            SETTINGS.saveToFile();
-            rebuildSettingsLists();
-          });
+      optionPopup.show(setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()),
+                       currentValue,
+                       [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged, systemFontChanged](int idx) {
+                         SETTINGS.*valuePtr = idx;
+                         // Before rebuildSettingsLists(), which measures rows with the UI
+                         // font and would otherwise size them against the outgoing face.
+                         if (systemFontChanged) applySystemFont(renderer);
+                         syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
+                         SETTINGS.saveToFile();
+                         rebuildSettingsLists();
+                       });
       requestUpdate();
       return;
     }
@@ -448,26 +454,16 @@ void SettingsActivity::toggleCurrentSetting() {
 }
 
 void SettingsActivity::syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged) {
-  if (quickResumeTimeoutChanged) {
-    preserveQuickResumeTimeoutOn =
-        SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT;
-    quickResumeTimeoutAutoEnabled = false;
-  }
+  // The decision itself lives in sleepscreen::reconcile so it can be tested
+  // without this activity (test/sleep_screen). This is the seam that applies it.
+  const sleepscreen::QuickResumeState next = sleepscreen::reconcile(
+      SETTINGS.sleepScreen,
+      {SETTINGS.quickResumeSleepScreen, quickResumeTimeoutAutoEnabled, preserveQuickResumeTimeoutOn},
+      sleepScreenChanged, quickResumeTimeoutChanged);
 
-  if (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME) {
-    if (SETTINGS.quickResumeSleepScreen != CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT) {
-      SETTINGS.quickResumeSleepScreen = CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT;
-      quickResumeTimeoutAutoEnabled = !preserveQuickResumeTimeoutOn;
-    } else if (sleepScreenChanged && !preserveQuickResumeTimeoutOn) {
-      quickResumeTimeoutAutoEnabled = true;
-    }
-    return;
-  }
-
-  if (sleepScreenChanged && quickResumeTimeoutAutoEnabled && !preserveQuickResumeTimeoutOn) {
-    SETTINGS.quickResumeSleepScreen = CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_NEVER;
-    quickResumeTimeoutAutoEnabled = false;
-  }
+  SETTINGS.quickResumeSleepScreen = next.quickResumeOnTimeout;
+  quickResumeTimeoutAutoEnabled = next.autoEnabled;
+  preserveQuickResumeTimeoutOn = next.preserveOn;
 }
 
 void SettingsActivity::openSleepTimeoutPicker() {

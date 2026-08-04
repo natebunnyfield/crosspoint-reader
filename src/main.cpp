@@ -26,6 +26,7 @@
 #include "SystemFont.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
+#include "activities/boot_sleep/SleepScreenPolicy.h"
 #ifndef CROSSPOINT_NO_NETWORK
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #endif
@@ -294,10 +295,12 @@ void enterDeepSleep(bool fromTimeout = false) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
 
+  // Must be the SAME decision SleepActivity::onEnter makes, hence the shared
+  // policy: this one picks whether to save the frame buffer and skip the boot
+  // screen, and if the two ever disagreed the device would either restore a
+  // frame nothing drew or drop the one it did.
   const bool isQuickResumeSleep =
-      SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
-      (fromTimeout &&
-       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
+      sleepscreen::shouldQuickResume(SETTINGS.sleepScreen, SETTINGS.quickResumeSleepScreen, fromTimeout);
   APP_STATE.showBootScreen = !isQuickResumeSleep;
 
   APP_STATE.saveToFile();

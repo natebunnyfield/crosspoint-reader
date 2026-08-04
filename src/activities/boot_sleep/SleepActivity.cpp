@@ -15,6 +15,7 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "HolidayCalculator.h"
+#include "SleepScreenPolicy.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -25,9 +26,7 @@ void SleepActivity::onEnter() {
   Activity::onEnter();
 
   const bool renderQuickResume =
-      SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
-      (fromTimeout &&
-       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
+      sleepscreen::shouldQuickResume(SETTINGS.sleepScreen, SETTINGS.quickResumeSleepScreen, fromTimeout);
 
   if (renderQuickResume) {
     return renderLastScreenSleepScreen();
@@ -69,8 +68,7 @@ void SleepActivity::onEnter() {
   }
 }
 
-void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks,
-                                              const calendar::Style style) const {
+void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks, const calendar::Style style) const {
   // The calendar needs a trustworthy wall clock. X3 has a DS3231; X4 does not,
   // and its internal RTC drifts badly across deep sleep (see SCOPE.md), so
   // fall back to the stock sleep image rather than showing a wrong date.
