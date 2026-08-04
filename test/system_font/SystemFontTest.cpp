@@ -279,6 +279,47 @@ TEST_F(ChromeHiRes, SurvivesFamilySwitchesAndGoingBuiltin) {
   expectChromeHasCompanions("after going built-in");
 }
 
+// --- 3. The rotated path ----------------------------------------------------
+
+// drawTextRotated90CW is how the side-button hint labels are drawn -- the only
+// rotated text in the chrome. It walks the same 1x metrics as drawText() but
+// used to blit only the 1x glyph bitmaps, so at RENDER_SCALE=2 the hint
+// chevrons rendered pixel-doubled on an otherwise hi-res screen (reported as
+// mixed-resolution rendering on the keyboard entry screen, 2026-08-04).
+// Registering a companion must change the rotated raster too; the cursor walk
+// stays on the 1x metrics either way, so layout is unaffected.
+TEST(RotatedHiRes, RotatedTextBlitsTheCompanionFace) {
+  GfxRenderer renderer(display);
+  renderer.begin();
+
+  EpdFont regular{&librefranklin_8_regular}, bold{&librefranklin_8_bold};
+  const EpdFontFamily fam{&regular, &bold};
+  EpdFont regular2x{&librefranklin_8_regular_2x}, bold2x{&librefranklin_8_bold_2x};
+  const EpdFontFamily fam2x{&regular2x, &bold2x};
+  renderer.insertFont(SMALL_FONT_ID, fam);
+
+  const auto snapshot = [&renderer]() {
+    const uint8_t* fb = renderer.getFrameBuffer();
+    return std::vector<uint8_t>(fb, fb + renderer.getBufferSize());
+  };
+
+  // The real chrome strings: the side hints draw single chevrons.
+  renderer.clearScreen();
+  renderer.drawTextRotated90CW(SMALL_FONT_ID, 40, 200, "<a");
+  const std::vector<uint8_t> withoutCompanion = snapshot();
+  ASSERT_NE(withoutCompanion, std::vector<uint8_t>(withoutCompanion.size(), withoutCompanion[0]))
+      << "rotated draw produced a blank framebuffer -- the comparison below would be vacuous";
+
+  renderer.registerHiResBuiltinFont(SMALL_FONT_ID, fam2x);
+  renderer.clearScreen();
+  renderer.drawTextRotated90CW(SMALL_FONT_ID, 40, 200, "<a");
+  const std::vector<uint8_t> withCompanion = snapshot();
+
+  EXPECT_NE(withoutCompanion, withCompanion)
+      << "drawTextRotated90CW ignored the registered 2x companion -- rotated chrome text (the side-button "
+         "hints) renders pixel-doubled at RENDER_SCALE > 1";
+}
+
 // The other half of the fix: sparing the built-ins must not spare the SD ones.
 // If clearSdCardHiResFonts() stopped erasing them, every reader font ever
 // loaded would leave a dangling companion behind pointing at freed glyph data.

@@ -775,6 +775,12 @@ Two traps in that path, both of which shipped as silent wrong-pixel bugs:
   *only* the SD-backed entries (`clearSdCardHiResFonts()`); clearing the map
   outright wiped the chrome's 2x bitmaps on the first reader font/size change,
   since every one of those routes through `SdCardFontManager::unloadAll()`.
+* **Every text-draw entry point needs its own hi-res branch.** `drawText` looked
+  up `hiResFontMap_`; `drawTextRotated90CW` did not, so rotated labels (the
+  reader side-button hints, keyboard chevrons) blitted pixel-doubled 1x glyphs
+  next to crisp 2x text (fixed 2026-08-04; `test/system_font`
+  `RotatedHiRes.RotatedTextBlitsTheCompanionFace` covers it). When adding any
+  new glyph-blitting path, wire the companion lookup or it will ship mixed-res.
 
 Both are covered by `test/system_font/`, built at `CROSSPOINT_RENDER_SCALE=2` —
 at scale 1 the hi-res path compiles out and those cases assert nothing.
@@ -1206,7 +1212,7 @@ build_flags =
 
 **Structure**: `.crosspoint/epub_<hash>/{book.bin, progress.bin, cover.bmp, sections/*.bin}`
 
-**Hash**: `std::hash<std::string>{}(filepath)` → Moving/renaming file = new hash = lost progress
+**Hash**: `std::hash<std::string>{}(filepath)` → Moving/renaming a file OUTSIDE the firmware (PC, web upload) = new hash = lost progress. Rename/move via the on-device **Manage Files** screen migrates the cache dir to the new hash (`FsOps::migrateBookRefs`, recursive for folders), so progress survives; if that cache-dir rename fails the old cache is deleted, never orphaned. Ruling + mechanism: [docs/manage-files.md](docs/manage-files.md). The read-folder move (`moveFinishedBookToReadFolder`) migrates the same way.
 
 ### Cache Invalidation Rules
 
@@ -1222,7 +1228,7 @@ build_flags =
 3. **Viewport dimensions change**:
    - Display resolution change
 4. **Book file modified**:
-   - Moved, renamed, or content changed (new hash)
+   - Moved, renamed (outside Manage Files / read-folder move — those migrate), or content changed (new hash)
 
 **Manual Cache Clear** (safe operations):
 ```bash

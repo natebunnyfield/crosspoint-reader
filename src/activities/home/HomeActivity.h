@@ -43,6 +43,8 @@ class HomeActivity final : public Activity {
     if (item == HomeMenuItem::FILE_TRANSFER) return i;
     ++i;
 #endif
+    if (item == HomeMenuItem::MANAGE_FILES) return i;
+    ++i;
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
     return 0;
   }
@@ -55,6 +57,7 @@ class HomeActivity final : public Activity {
 #ifndef CROSSPOINT_NO_NETWORK
     if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
 #endif
+    if (idx == i++) return HomeMenuItem::MANAGE_FILES;
     if (idx == i) return HomeMenuItem::SETTINGS_MENU;
     return HomeMenuItem::NONE;
   }
@@ -63,6 +66,7 @@ class HomeActivity final : public Activity {
   void onRecentsOpen();
   void onSettingsOpen();
   void onFileTransferOpen();
+  void onManageFilesOpen();
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image
