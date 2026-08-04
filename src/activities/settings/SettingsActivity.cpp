@@ -4,7 +4,6 @@
 #include <GfxRenderer.h>
 #include <Logging.h>
 
-#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -34,77 +33,57 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
-// Controls was withdrawn: its settings are pinned on load and remain web-settable.
-const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_READER, StrId::STR_CAT_SYSTEM};
-
 void SettingsActivity::rebuildSettingsLists() {
-  readerSettings.clear();
-  systemSettings.clear();
+  deviceSettings.clear();
 
   // Pick up any fonts uploaded/deleted over the web server since the last
   // reader activity ran — otherwise the font-family picker shows stale list.
   sdFontSystem.refreshIfDirty();
 
   for (auto& setting : getSettingsList(&sdFontSystem.registry())) {
-    if (setting.category == StrId::STR_NONE_OPT) continue;
-    // Display is withdrawn from the device UI, so its entries are dropped here
-    // rather than removed from getSettingsList() — that list is also what
-    // fromJson()/toJson() iterate, so deleting entries would stop those
-    // settings persisting at all. Refresh frequency and the sunlight fading fix
-    // keep whatever value is stored; hide battery % and UI theme are pinned by
-    // normalizeRetiredSettings(). The whole sleep group — sleep screen, its two
-    // cover options and quick resume on timeout — used to be here and is now
-    // live under System.
-    if (setting.category == StrId::STR_CAT_DISPLAY) {
-      continue;
-    }
-    if (setting.category == StrId::STR_CAT_READER) {
-      // Font family and size are covered by the "Text Settings" screen
-      // (FontSelectionActivity, with its live preview and side-button size
-      // stepping), so their flat entries are hidden here. They stay in the
-      // shared list for the web settings API.
-      if (setting.inTextSettings) continue;
-      readerSettings.push_back(setting);
-
-    } else if (setting.category == StrId::STR_CAT_SYSTEM) {
-      systemSettings.push_back(setting);
-    }
+    // Display, Controls and Reader are all withdrawn from the device UI, so
+    // their entries are dropped here rather than removed from
+    // getSettingsList() — that list is also what fromJson()/toJson() iterate,
+    // so deleting entries would stop those settings persisting at all, and it
+    // is what the web settings API serves. Every withdrawn row is either pinned
+    // by normalizeRetiredSettings() or left holding whatever is stored; see
+    // that function for which is which.
+    //
+    // What the Reader tab kept: the Text Settings action (font family and size,
+    // appended below) and Screen Margin, which now carries STR_CAT_SYSTEM and
+    // so arrives through this loop.
+    if (setting.category != StrId::STR_CAT_SYSTEM) continue;
+    deviceSettings.push_back(setting);
   }
 
   // Append device-only ACTION items
 #ifndef CROSSPOINT_NO_NETWORK
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
 #endif
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
 #ifndef CROSSPOINT_NO_NETWORK
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
 #endif
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
-  readerSettings.insert(readerSettings.begin(),
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
+  // Text Settings leads the list: it is the reading screen's own settings
+  // (font family, size, live preview), and Screen Margin sits directly under it
+  // as the first entry the shared list contributes.
+  deviceSettings.insert(deviceSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
   // Manage Fonts is withdrawn. SD card fonts are still discovered and
   // selectable from Text Settings.
 
-  // Update currentSettings pointer and count for the active category
-  switch (selectedCategoryIndex) {
-    case 0:
-      currentSettings = &readerSettings;
-      break;
-    // Index 1 is System: the Controls tab was withdrawn, so there is no
-    // index 2 any more (categoryCount == 2).
-    case 1:
-      currentSettings = &systemSettings;
-      break;
+  settingsCount = static_cast<int>(deviceSettings.size());
+  if (selectedSettingIndex >= settingsCount) {
+    selectedSettingIndex = settingsCount > 0 ? settingsCount - 1 : 0;
   }
-  settingsCount = static_cast<int>(currentSettings->size());
 }
 
 void SettingsActivity::onEnter() {
   Activity::onEnter();
 
-  // Reset selection to first category
-  selectedCategoryIndex = 0;
+  // Reset selection to the first row
   selectedSettingIndex = 0;
   {
     const sleepscreen::QuickResumeState start = sleepscreen::initialState(SETTINGS.quickResumeSleepScreen);
@@ -131,178 +110,85 @@ void SettingsActivity::onExit() {
 void SettingsActivity::loop() {
   if (optionPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
 
-  bool hasChangedCategory = false;
-
-  auto applyCategorySelection = [this] {
-    switch (selectedCategoryIndex) {
-      case 0:
-        currentSettings = &readerSettings;
-        break;
-      // Index 1 is System: the Controls tab was withdrawn, so there is no
-      // index 2 any more (categoryCount == 2).
-      case 1:
-        currentSettings = &systemSettings;
-        break;
-    }
-    settingsCount = static_cast<int>(currentSettings->size());
-  };
-
   // Handle actions with early return
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    if (selectedSettingIndex == 0) {
-      selectedCategoryIndex = (selectedCategoryIndex < categoryCount - 1) ? (selectedCategoryIndex + 1) : 0;
-      hasChangedCategory = true;
-      requestUpdate();
-    } else {
-      toggleCurrentSetting();
-      requestUpdate();
-      return;
-    }
+    toggleCurrentSetting();
+    requestUpdate();
+    return;
   }
 
+  // Back leaves outright. It used to send the selection back to the tab bar
+  // first and only exit on a second press; with the tab bar gone there is
+  // nothing to go back TO, and a two-press exit would be worse than what every
+  // other list screen in the firmware does.
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-    if (selectedSettingIndex > 0) {
-      selectedSettingIndex = 0;
-      requestUpdate();
-    } else {
-      SETTINGS.saveToFile();
-      onGoHome();
-    }
+    SETTINGS.saveToFile();
+    onGoHome();
     return;
   }
 
   const auto& metrics = UITheme::getInstance().getMetrics();
-  int tx = 0;
-  int ty = 0;
-  const int tabTop = metrics.topPadding + metrics.headerHeight;
-  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
-  const int listHeight =
-      renderer.getScreenHeight() - (metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight +
-                                    metrics.buttonHintsHeight + metrics.verticalSpacing * 2);
-  auto buildTabs = [&]() {
-    std::vector<TabInfo> tabs;
-    tabs.reserve(categoryCount);
-    for (int i = 0; i < categoryCount; i++) {
-      tabs.push_back({I18N.get(categoryNames[i]), selectedCategoryIndex == i});
-    }
-    return tabs;
-  };
-  auto settingIndexFromPoint = [&](const int x, const int y, int& settingIndex) {
-    (void)x;
-    if (settingsCount <= 0 || y < listTop || y >= listTop + listHeight) return false;
-    const int rowStep = GUI.getListRowStep(false);
-    if (rowStep <= 0) return false;
-    const int pageItems = GUI.getListPageItems(listHeight, false);
-    const int selectedRow = std::max(0, selectedSettingIndex - 1);
-    const int pageStart = selectedRow / pageItems * pageItems;
-    const int row = (y - listTop) / rowStep;
-    const int touched = pageStart + row;
-    if (row < 0 || row >= pageItems || touched < 0 || touched >= settingsCount) return false;
-    settingIndex = touched + 1;
-    return true;
-  };
+  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const int listHeight = renderer.getScreenHeight() - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
 
-  if (mappedInput.wasScreenTouchDown(tx, ty)) {
-    int touchedCategory = -1;
-    const auto tabs = buildTabs();
-    if (GUI.tabIndexFromPoint(renderer, Rect{0, tabTop, renderer.getScreenWidth(), metrics.tabBarHeight}, tabs, tx, ty,
-                              touchedCategory)) {
-      if (selectedCategoryIndex != touchedCategory || selectedSettingIndex != 0) {
-        selectedCategoryIndex = touchedCategory;
-        selectedSettingIndex = 0;
-        applyCategorySelection();
-        requestUpdate();
-      }
-      return;
-    }
-
-    int touchedSetting = -1;
-    if (settingIndexFromPoint(tx, ty, touchedSetting)) {
-      if (selectedSettingIndex != touchedSetting) {
-        selectedSettingIndex = touchedSetting;
-        requestUpdate();
-      }
-      return;
-    }
-  }
-
-  if (mappedInput.wasScreenTapped(tx, ty)) {
-    int tappedCategory = -1;
-    const auto tabs = buildTabs();
-    if (GUI.tabIndexFromPoint(renderer, Rect{0, tabTop, renderer.getScreenWidth(), metrics.tabBarHeight}, tabs, tx, ty,
-                              tappedCategory)) {
-      selectedCategoryIndex = tappedCategory;
-      selectedSettingIndex = 0;
-      applyCategorySelection();
-      requestUpdate();
-      return;
-    }
-
-    int tappedSetting = -1;
-    if (settingIndexFromPoint(tx, ty, tappedSetting)) {
-      selectedSettingIndex = tappedSetting;
+  // The bespoke hit-test this replaced existed only to undo the tab bar's +1
+  // row offset. Without it the shared helper is exact.
+  switch (handleListTouch(selectedSettingIndex, settingsCount, listTop, listHeight, false)) {
+    case ListTouchResult::Activated:
       toggleCurrentSetting();
       requestUpdate();
       return;
-    }
+    case ListTouchResult::Consumed:
+      return;
+    case ListTouchResult::None:
+      break;
   }
 
   // Handle navigation
-  const auto& navMetrics = UITheme::getInstance().getMetrics();
-  const int settingsListHeight =
-      renderer.getScreenHeight() - (navMetrics.topPadding + navMetrics.headerHeight + navMetrics.tabBarHeight +
-                                    navMetrics.buttonHintsHeight + navMetrics.verticalSpacing * 2);
-  const int settingsPageItems = GUI.getListPageItems(settingsListHeight, false);
+  const int settingsPageItems = GUI.getListPageItems(listHeight, false);
   const auto swipe = mappedInput.wasSwipe();
   if (swipe == MappedInputManager::SwipeDir::Up) {
-    selectedSettingIndex = selectedSettingIndex == 0 ? 1
-                                                     : ButtonNavigator::nextPageIndex(
-                                                           selectedSettingIndex, settingsCount + 1, settingsPageItems);
+    selectedSettingIndex = ButtonNavigator::nextPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
     requestUpdate();
     return;
   }
   if (swipe == MappedInputManager::SwipeDir::Down) {
-    selectedSettingIndex =
-        ButtonNavigator::previousPageIndex(selectedSettingIndex, settingsCount + 1, settingsPageItems);
+    selectedSettingIndex = ButtonNavigator::previousPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
     requestUpdate();
     return;
   }
 
   buttonNavigator.onNextRelease([this] {
-    selectedSettingIndex = ButtonNavigator::nextIndex(selectedSettingIndex, settingsCount + 1);
+    selectedSettingIndex = ButtonNavigator::nextIndex(selectedSettingIndex, settingsCount);
     requestUpdate();
   });
 
   buttonNavigator.onPreviousRelease([this] {
-    selectedSettingIndex = ButtonNavigator::previousIndex(selectedSettingIndex, settingsCount + 1);
+    selectedSettingIndex = ButtonNavigator::previousIndex(selectedSettingIndex, settingsCount);
     requestUpdate();
   });
 
-  buttonNavigator.onNextContinuous([this, &hasChangedCategory] {
-    hasChangedCategory = true;
-    selectedCategoryIndex = ButtonNavigator::nextIndex(selectedCategoryIndex, categoryCount);
+  // A held Up/Down used to switch category. There are no categories left, so it
+  // pages the list instead — the same thing a hold does on every other list
+  // screen (LanguageSelectActivity.cpp) — rather than becoming a dead gesture on
+  // what is now the longest list in the firmware.
+  buttonNavigator.onNextContinuous([this, settingsPageItems] {
+    selectedSettingIndex = ButtonNavigator::nextPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
     requestUpdate();
   });
 
-  buttonNavigator.onPreviousContinuous([this, &hasChangedCategory] {
-    hasChangedCategory = true;
-    selectedCategoryIndex = ButtonNavigator::previousIndex(selectedCategoryIndex, categoryCount);
+  buttonNavigator.onPreviousContinuous([this, settingsPageItems] {
+    selectedSettingIndex = ButtonNavigator::previousPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
     requestUpdate();
   });
-
-  if (hasChangedCategory) {
-    selectedSettingIndex = (selectedSettingIndex == 0) ? 0 : 1;
-    applyCategorySelection();
-  }
 }
 
 void SettingsActivity::toggleCurrentSetting() {
-  int selectedSetting = selectedSettingIndex - 1;
-  if (selectedSetting < 0 || selectedSetting >= settingsCount) {
+  if (selectedSettingIndex < 0 || selectedSettingIndex >= settingsCount) {
     return;
   }
 
-  const auto& setting = (*currentSettings)[selectedSetting];
+  const auto& setting = deviceSettings[selectedSettingIndex];
   const bool sleepScreenChanged = setting.valuePtr == &CrossPointSettings::sleepScreen;
   const bool quickResumeTimeoutChanged = setting.valuePtr == &CrossPointSettings::quickResumeSleepScreen;
   // The system font has to be pushed into the renderer before anything repaints,
@@ -449,8 +335,8 @@ void SettingsActivity::toggleCurrentSetting() {
 
   syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
   SETTINGS.saveToFile();
+  // rebuildSettingsLists() clamps selectedSettingIndex to the new count itself.
   rebuildSettingsLists();
-  selectedSettingIndex = std::min(selectedSettingIndex, settingsCount);
 }
 
 void SettingsActivity::syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged) {
@@ -494,21 +380,16 @@ void SettingsActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_SETTINGS_TITLE),
                  CROSSPOINT_VERSION);
 
-  std::vector<TabInfo> tabs;
-  tabs.reserve(categoryCount);
-  for (int i = 0; i < categoryCount; i++) {
-    tabs.push_back({I18N.get(categoryNames[i]), selectedCategoryIndex == i});
-  }
-  GUI.drawTabBar(renderer, Rect{0, metrics.topPadding + metrics.headerHeight, pageWidth, metrics.tabBarHeight}, tabs,
-                 selectedSettingIndex == 0);
-
-  const auto& settings = *currentSettings;
+  // No tab bar. With Reader withdrawn there is one category left, and a tab bar
+  // that cannot switch to anything is not a control — it would only occupy a
+  // band of the panel and a focus stop whose Confirm does nothing. The rows it
+  // used to cost are given back to the list, which now holds every setting the
+  // device exposes.
+  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const auto& settings = deviceSettings;
   GUI.drawList(
-      renderer,
-      Rect{0, metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing, pageWidth,
-           pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.buttonHintsHeight +
-                         metrics.verticalSpacing * 2)},
-      settingsCount, selectedSettingIndex - 1,
+      renderer, Rect{0, listTop, pageWidth, pageHeight - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing},
+      settingsCount, selectedSettingIndex,
       [&settings](int index) { return std::string(I18N.get(settings[index].nameId)); }, nullptr, nullptr,
       [&settings](int i) {
         const auto& setting = settings[i];
@@ -563,15 +444,18 @@ void SettingsActivity::render(RenderLock&&) {
   // Confirm on them does not cycle a value. (Upstream's status bar screen used a
   // blanket "Toggle" hint for every row; this fork already made the distinction
   // for Time to Sleep, and the offset row behaves the same way.)
-  auto opensSubScreen = [](const StrId nameId) {
-    return nameId == StrId::STR_TIME_TO_SLEEP || nameId == StrId::STR_CLOCK_UTC_OFFSET;
+  //
+  // ACTION rows are the same case and were saying "Toggle": every one of them
+  // opens a screen. Text Settings — the row this list now leads with — is one.
+  //
+  // There is no category name in this hint any more. It named the tab Confirm
+  // would switch to, and there is no second tab to switch to.
+  auto opensSubScreen = [](const SettingInfo& setting) {
+    return setting.type == SettingType::ACTION || setting.nameId == StrId::STR_TIME_TO_SLEEP ||
+           setting.nameId == StrId::STR_CLOCK_UTC_OFFSET;
   };
-  const auto confirmLabel =
-      (selectedSettingIndex == 0)
-          ? I18N.get(categoryNames[(selectedCategoryIndex + 1) % categoryCount])
-          : (selectedSettingIndex > 0 && opensSubScreen((*currentSettings)[selectedSettingIndex - 1].nameId)
-                 ? tr(STR_SELECT)
-                 : tr(STR_TOGGLE));
+  const bool onRow = selectedSettingIndex >= 0 && selectedSettingIndex < settingsCount;
+  const auto confirmLabel = (onRow && opensSubScreen(settings[selectedSettingIndex])) ? tr(STR_SELECT) : tr(STR_TOGGLE);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

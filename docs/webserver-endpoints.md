@@ -39,7 +39,8 @@ Response:
   "rssi": -45,
   "freeHeap": 123456,
   "uptime": 3600,
-  "device": "X4"
+  "device": "X4",
+  "deviceId": "ef0001"
 }
 ```
 
@@ -52,6 +53,7 @@ Response:
 | `freeHeap` | number | Free heap in bytes |
 | `uptime` | number | Seconds since boot |
 | `device` | string | `"X3"` or `"X4"` hardware detection |
+| `deviceId` | string | Per-unit ID: the last 3 bytes of the factory (efuse) MAC as 6 lowercase hex chars (`src/util/DeviceId.cpp`). Unlike `device` it distinguishes two units of the same model. Used to name per-device SD files (`/sleep_<deviceId>.bmp`); also shown on the device's File Transfer screen. The first 3 MAC bytes are the vendor prefix (same across Espressif chips), so the tail carries all the discriminating bits. |
 
 ## File Management
 
@@ -421,7 +423,15 @@ OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, MKCOL, MOVE, COPY, LOCK, UNLOCK
 Notes:
 
 - `PUT` writes to a temporary `.davtmp` file first, then renames it into place.
-- Protected paths are rejected.
+- Dot-paths (`/.crosspoint`, `/.fonts`, …) are fully listed and writable over
+  WebDAV — unlike the HTML file browser — so sync tools such as `rclone` can
+  mirror an entire card, settings and fonts included. See
+  [webserver.md](webserver.md) for the rclone recipe and
+  `scripts/sync-card.sh` for a ready-made wrapper.
+- Only `System Volume Information` and `XTCache` are protected. PROPFIND also
+  hides them, so sync clients neither see nor try to prune them.
+- Every file's `getlastmodified` is a fixed fake date (no RTC guarantee), so
+  rclone must compare by size (`--size-only`) or content (`--ignore-times`).
 - `LOCK` and `UNLOCK` are accepted for client compatibility only. The server
   does not implement full WebDAV Class 2 locking semantics such as persistent
   locks or lock discovery.

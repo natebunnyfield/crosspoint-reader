@@ -1,9 +1,17 @@
 # Keeping this fork in sync
 
 `natebunnyfield/crosspoint-reader` is a **selectively divergent** fork, not a
-tracking mirror. As of 2026-08-03 `develop` is 91 commits ahead of
+tracking mirror. As of 2026-08-03 the fork's branch was 91 commits ahead of
 `upstream/develop` and 2 behind. The gap is permanent and intentional, so the
 usual advice — "just merge upstream regularly" — is actively wrong here.
+
+**The fork's branch is `main`; upstream's is `develop`.** Renamed 2026-08-04 as
+an owner convention — the fork has never had a `develop`/`main` pair, so there
+is exactly one branch and `main` is it. The asymmetry is the thing to watch:
+`upstream/develop` below is NOT a typo and must not be "corrected" to
+`upstream/main`, which does not exist. Upstream also has a `master`, which is
+what `.github/workflows/ci.yml` still triggers its push job on — inherited, and
+it has never fired on this fork.
 
 Run `scripts/repo-status.sh` to see where everything stands. It only reports;
 it never merges.

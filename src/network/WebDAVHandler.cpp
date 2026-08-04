@@ -230,14 +230,14 @@ void WebDAVHandler::handlePropfind(WebServer& s) {
       file.getName(name, sizeof(name));
       String fileName(name);
 
-      // Skip hidden/protected items
-      bool shouldHide = fileName.startsWith(".");
-      if (!shouldHide) {
-        for (const auto* item : HIDDEN_ITEMS) {
-          if (fileName.equals(item)) {
-            shouldHide = true;
-            break;
-          }
+      // Skip protected items (see isProtectedPath). Dot-entries are listed:
+      // /.crosspoint and /.fonts are user data that sync clients must see to
+      // mirror and prune them.
+      bool shouldHide = false;
+      for (const auto* item : HIDDEN_ITEMS) {
+        if (fileName.equals(item)) {
+          shouldHide = true;
+          break;
         }
       }
 
@@ -783,8 +783,15 @@ void WebDAVHandler::urlEncodePath(const String& path, String& out) const {
 }
 
 bool WebDAVHandler::isProtectedPath(const String& path) const {
-  // Check every segment of the path, not just the last one.
-  // This prevents access to e.g. /.hidden/somefile or /System Volume Information/foo
+  // Check every segment of the path, not just the last one, so
+  // e.g. /System Volume Information/foo is caught too.
+  //
+  // Dot-paths are deliberately NOT protected here: /.crosspoint (settings,
+  // progress, caches) and /.fonts are user data on this firmware, and a full
+  // card mirror (rclone sync over WebDAV) must be able to list, write and
+  // delete them. Only HIDDEN_ITEMS — artifacts owned by Windows and the stock
+  // firmware — stay off-limits, and PROPFIND hides them so sync clients never
+  // see them and never try to prune them.
   int start = 0;
   while (start < (int)path.length()) {
     if (path.charAt(start) == '/') {
@@ -795,8 +802,6 @@ bool WebDAVHandler::isProtectedPath(const String& path) const {
     if (end == -1) end = path.length();
 
     String segment = path.substring(start, end);
-
-    if (segment.startsWith(".")) return true;
 
     for (const auto* item : HIDDEN_ITEMS) {
       if (segment.equals(item)) return true;
