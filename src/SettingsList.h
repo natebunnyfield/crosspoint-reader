@@ -249,12 +249,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshFrequency,
         {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15, StrId::STR_PAGES_30},
         "refreshFrequency", StrId::STR_CAT_DISPLAY));
-    // Order MUST match CrossPointSettings::UI_THEME — settings.json persists the
-    // index into this list, so APPEND ONLY (see the enum's comment).
-    v.push_back(SettingInfo::Enum(StrId::STR_UI_THEME, &CrossPointSettings::uiTheme,
-                                  {StrId::STR_THEME_CLASSIC, StrId::STR_THEME_LYRA, StrId::STR_THEME_LYRA_EXTENDED,
-                                   StrId::STR_THEME_ROUNDEDRAFF, StrId::STR_THEME_LYRA_SIX},
-                                  "uiTheme", StrId::STR_CAT_DISPLAY));
     v.push_back(SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
                                     StrId::STR_CAT_DISPLAY));
 

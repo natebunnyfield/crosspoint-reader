@@ -11,51 +11,25 @@
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "components/themes/BaseTheme.h"
-#include "components/themes/lyra/Lyra3CoversTheme.h"
 #include "components/themes/lyra/LyraSixTheme.h"
-#include "components/themes/lyra/LyraTheme.h"
-#include "components/themes/roundedraff/RoundedRaffTheme.h"
 
 UITheme UITheme::instance;
 
-UITheme::UITheme() {
-  auto themeType = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme);
-  setTheme(themeType);
-}
+UITheme::UITheme() { setTheme(); }
 
-void UITheme::reload() {
-  auto themeType = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme);
-  setTheme(themeType);
-}
+// Kept as a call rather than folded into the constructor because the metrics
+// cache has to be invalidated wherever the theme is (re)applied, and
+// SettingsActivity still re-applies on exit — a setting it reads (screen
+// margin, system font) can change what the cached metrics resolve to.
+void UITheme::reload() { setTheme(); }
 
-void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
-  switch (type) {
-    case CrossPointSettings::UI_THEME::CLASSIC:
-      LOG_DBG("UI", "Using Classic theme");
-      currentTheme = std::make_unique<BaseTheme>();
-      currentMetrics = &BaseMetrics::values;
-      break;
-    case CrossPointSettings::UI_THEME::LYRA:
-      LOG_DBG("UI", "Using Lyra theme");
-      currentTheme = std::make_unique<LyraTheme>();
-      currentMetrics = &LyraMetrics::values;
-      break;
-    case CrossPointSettings::UI_THEME::ROUNDEDRAFF:
-      LOG_DBG("UI", "Using RoundedRaff theme");
-      currentTheme = std::make_unique<RoundedRaffTheme>();
-      currentMetrics = &RoundedRaffMetrics::values;
-      break;
-    case CrossPointSettings::UI_THEME::LYRA_3_COVERS:
-      LOG_DBG("UI", "Using Lyra 3 Covers theme");
-      currentTheme = std::make_unique<Lyra3CoversTheme>();
-      currentMetrics = &Lyra3CoversMetrics::values;
-      break;
-    case CrossPointSettings::UI_THEME::LYRA_SIX:
-      LOG_DBG("UI", "Using Lyra Six theme");
-      currentTheme = std::make_unique<LyraSixTheme>();
-      currentMetrics = &LyraSixMetrics::values;
-      break;
-  }
+void UITheme::setTheme() {
+  // One theme since 2026-08-04. The selectable UI_THEME enum, its settings row
+  // and the four other themes are gone; Lyra Six is what LyraTheme and
+  // Lyra3CoversTheme (and BaseTheme under them) exist to compose, so those
+  // three stay as its implementation layers, not as choices.
+  currentTheme = std::make_unique<LyraSixTheme>();
+  currentMetrics = &LyraSixMetrics::values;
   metricsValid = false;
 }
 
@@ -75,7 +49,7 @@ const ThemeMetrics& UITheme::getMetrics() const {
 }
 
 int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader, bool hasTabBar, bool hasButtonHints,
-                                     bool hasSubtitle, int extraReservedHeight) {
+                                     bool hasSubtitle, int extraReservedHeight, int subtitleLines) {
   const ThemeMetrics metrics = UITheme::getInstance().getMetrics();
   auto orientation = renderer.getOrientation();
   int reservedHeight = metrics.topPadding;
@@ -90,7 +64,7 @@ int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader
     reservedHeight += metrics.verticalSpacing + metrics.buttonHintsHeight;
   }
   const int availableHeight = renderer.getScreenHeight() - reservedHeight - extraReservedHeight;
-  return UITheme::getInstance().getTheme().getListPageItems(availableHeight, hasSubtitle);
+  return UITheme::getInstance().getTheme().getListPageItems(availableHeight, hasSubtitle, subtitleLines);
 }
 
 // Screen area excluding the button hints

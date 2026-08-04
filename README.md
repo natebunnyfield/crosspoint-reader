@@ -31,13 +31,12 @@ CrossPoint is open-source e-reader firmware - community-built, fully hackable, f
   - NTP clock sync on connect
   - OTA update checks and installs from GitHub releases
 
-- **Customization**: multiple themes (Classic, Lyra, Lyra Extended, RoundedRaff, Lyra Six), sleep screen modes, front/side button remapping, power-button behavior, refresh cadence, and more.
+- **Customization**: sleep screen modes, front/side button remapping, power-button behavior, refresh cadence, reading typeface and size, and more. The interface itself is a single theme (Lyra Six) — the other four were removed on 2026-08-04.
 
 - **Localization**: English and Spanish.
 
 ### Coming soon:
 
-- More themes.
 
 - Much more! stay tuned.
 
