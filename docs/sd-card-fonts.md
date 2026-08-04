@@ -55,9 +55,20 @@ half the resolution the build asked for. That used to happen in silence; since
 
 once per load. To audit a card without running anything, compare each family's
 1x filenames against its `2x/` directory — any name present in one and not the
-other is a size slot that will render 1x. Note that UI chrome is 1x regardless:
-`registerHiResFont` is only ever called for SD fonts, and the UI faces
-(`UI_10_FONT_ID`, `UI_12_FONT_ID`, `SMALL_FONT_ID`) are built-ins.
+other is a size slot that will render 1x.
+
+This applies to the READER font only. UI chrome takes a different route: the
+chrome ids (`SMALL_FONT_ID`, `UI_10_FONT_ID`, `UI_12_FONT_ID`) are built-ins,
+and since the selectable System font landed they get their hi-res halves from
+`registerHiResBuiltinFont` in `applySystemFont` rather than from the card, so
+no `2x/` directory is involved and nothing here can degrade them. Two details
+of that path are worth knowing because both are load-bearing: built-ins are
+registered in `hiResFontMap_` but deliberately NOT in `hiResSdFonts_` (which
+`FontCacheManager` dereferences to prewarm glyphs off the card, and a built-in
+has nothing to prewarm), and unloading SD fonts calls `clearSdCardHiResFonts`,
+which erases only the ids it finds in `hiResSdFonts_`. That is what keeps a
+reader-font reload — every font-size change is one — from taking the UI's
+hi-res registrations down with it.
 
 The ruling is enforced, not just written down. `installed_families:` at the top
 of `lib/EpdFont/scripts/sd-fonts.yaml` is the single source of truth, and
