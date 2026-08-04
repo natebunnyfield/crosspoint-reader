@@ -22,6 +22,7 @@
 #include "components/icons/hotspot.h"
 #include "components/icons/image24.h"
 #include "components/icons/library.h"
+#include "components/icons/managefiles.h"
 #include "components/icons/recent.h"
 #include "components/icons/settings2.h"
 #include "components/icons/text24.h"
@@ -53,6 +54,9 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return Book24Icon;
       case UIIcon::File:
         return File24Icon;
+      case UIIcon::ManageFiles:
+        // No 24px cut of folder-cog; the plain file glyph reads fine at list size.
+        return File24Icon;
       default:
         return nullptr;
     }
@@ -74,6 +78,8 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return WifiIcon;
       case UIIcon::Hotspot:
         return HotspotIcon;
+      case UIIcon::ManageFiles:
+        return ManageFiles32Icon;
       default:
         return nullptr;
     }
@@ -349,7 +355,6 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
     return;
   }
 
-
   const int pageHeight = renderer.getScreenHeight();
   constexpr int buttonWidth = 80;
   constexpr int smallButtonHeight = 15;
@@ -365,12 +370,17 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   for (int i = 0; i < 4; i++) {
     const int x = buttonPositions[i];
     if (labels[i] != nullptr && labels[i][0] != '\0') {
-      // Draw the filled background and border for a FULL-sized button
-      renderer.fillRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, cornerRadius, Color::White);
-      renderer.drawRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, 1, cornerRadius, true, true, false,
-                               false, true);
       const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, labels[i]);
-      const int textX = x + (buttonWidth - 1 - textWidth) / 2;
+      // A label wider than the standard chip ("Open/Menu", long translations)
+      // grows its chip symmetrically around the physical button position
+      // instead of bleeding over the chip border.
+      const int chipWidth = std::max(buttonWidth, textWidth + 10);
+      const int chipX = x - (chipWidth - buttonWidth) / 2;
+      // Draw the filled background and border for a FULL-sized button
+      renderer.fillRoundedRect(chipX, pageHeight - buttonY, chipWidth, buttonHeight, cornerRadius, Color::White);
+      renderer.drawRoundedRect(chipX, pageHeight - buttonY, chipWidth, buttonHeight, 1, cornerRadius, true, true, false,
+                               false, true);
+      const int textX = chipX + (chipWidth - 1 - textWidth) / 2;
       renderer.drawText(SMALL_FONT_ID, textX, pageHeight - buttonY + textYOffset, labels[i]);
     } else {
       // Draw the filled background and border for a SMALL-sized button
@@ -380,7 +390,6 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
                                true, false, false, true);
     }
   }
-
 }
 
 void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* topBtn, const char* bottomBtn) const {
