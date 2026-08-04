@@ -111,7 +111,7 @@ struct ThemeMetrics {
   int textFieldLineEndOffset;
 };
 
-enum UIIcon { None = 0, Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot };
+enum UIIcon { None = 0, Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot, ManageFiles };
 
 // Base of the single theme, NOT a theme itself. Lyra Six is the only theme
 // since 2026-08-04 (BaseTheme <- LyraTheme <- Lyra3CoversTheme <-

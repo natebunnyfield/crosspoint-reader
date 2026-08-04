@@ -23,10 +23,10 @@ class FileBrowserActivity final : public Activity {
   // — was never persisted either. It could only ever hold 0. Removed 2026-08-04
   // rather than left as an option nothing could reach.
   //
-  // A switch rather than `return false`, because Manage Files is the one surface
-  // that must show them: it adds its Mode here and returns true. Written this
-  // way so that under -Wswitch a new enumerator does not compile silently — the
-  // new mode has to answer this question rather than inherit an answer.
+  // A switch rather than `return false`, because Manage Files was expected to
+  // land as a Mode here; it shipped instead as its own FileManagerActivity
+  // (docs/manage-files.md), which always lists dot-entries. Kept as a switch so
+  // that under -Wswitch a new enumerator does not compile silently.
   bool showsHiddenEntries() const {
     switch (mode) {
       case Mode::Books:
@@ -35,9 +35,6 @@ class FileBrowserActivity final : public Activity {
     }
     return false;
   }
-
-  // Deletion
-  bool removeDirFile(const std::string& fullPath);
 
   ButtonNavigator buttonNavigator;
 
