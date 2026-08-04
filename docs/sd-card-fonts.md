@@ -44,6 +44,21 @@ installed family carries one, and `install-sim-fonts.py` cannot regenerate them
 rename the output back to the 1x filenames, which is what
 `SdCardFontManager::hiResCompanionPath` looks up.
 
+**A companion is matched per POINT SIZE, so a set can be complete for one size
+slot and missing for the next.** The lookup is by exact filename and the
+filename carries the size, so changing the reader's size in Text Settings can
+move it onto a slot with no 2x file — the page then renders 1x-replicated at
+half the resolution the build asked for. That used to happen in silence; since
+2026-08-04 it logs
+
+    INF SDMGR: No hi-res companion /fonts/<Family>/2x/<Family>_<pt>.cpfont - <pt> pt renders 1x-replicated
+
+once per load. To audit a card without running anything, compare each family's
+1x filenames against its `2x/` directory — any name present in one and not the
+other is a size slot that will render 1x. Note that UI chrome is 1x regardless:
+`registerHiResFont` is only ever called for SD fonts, and the UI faces
+(`UI_10_FONT_ID`, `UI_12_FONT_ID`, `SMALL_FONT_ID`) are built-ins.
+
 The ruling is enforced, not just written down. `installed_families:` at the top
 of `lib/EpdFont/scripts/sd-fonts.yaml` is the single source of truth, and
 `scripts/install-sim-fonts.py` defaults to it. That default used to be "every

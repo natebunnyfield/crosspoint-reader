@@ -97,7 +97,28 @@ int SdCardFontManager::loadFile(const SdCardFontFileInfo& file, const char* fami
   // section cache key (which is that id) is unaffected and pagination cannot
   // move because a companion appeared or disappeared.
   const std::string hiResPath = hiResCompanionPath(file.path);
-  if (!hiResPath.empty() && Storage.exists(hiResPath.c_str())) {
+  if (hiResPath.empty()) {
+    LOG_ERR("SDMGR", "No directory component in %s - cannot form a hi-res path", file.path.c_str());
+  } else if (!Storage.exists(hiResPath.c_str())) {
+    // SAY SO. A missing companion is a supported fallback rather than a
+    // failure -- the 1x glyph replicated, exactly what shipped before hi-res
+    // existed -- and this branch used to be absent entirely, which made it the
+    // only outcome here that produced no output at all.
+    //
+    // That silence was the real defect. The companion is found by exact
+    // filename and the filename carries the point size, so a set can be
+    // complete for one size slot and missing for the next: the reader changes
+    // size in Text Settings, the page quietly renders at half the resolution
+    // the build asked for, and nothing says why. The fault also lives on the
+    // CARD rather than in the code -- install-sim-fonts.py cannot regenerate
+    // these and prunes orphans whenever a size ramp changes -- so without this
+    // line a report blames the renderer for a file deleted three commits ago.
+    //
+    // INF not DBG so it survives a release LOG_LEVEL; INF not ERR because a
+    // family may legitimately ship no 2x set at all. Only compiled where
+    // CROSSPOINT_RENDER_SCALE > 1, i.e. never on device.
+    LOG_INF("SDMGR", "No hi-res companion %s - %u pt renders 1x-replicated", hiResPath.c_str(), file.pointSize);
+  } else {
     auto* hiRes = new (std::nothrow) SdCardFont();
     if (!hiRes) {
       LOG_ERR("SDMGR", "OOM: hi-res SdCardFont for %s", hiResPath.c_str());
