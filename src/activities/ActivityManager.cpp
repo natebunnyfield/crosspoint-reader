@@ -9,6 +9,7 @@
 #include "boot_sleep/SleepActivity.h"
 #include "home/CrashActivity.h"
 #include "home/FileBrowserActivity.h"
+#include "home/FileManagerActivity.h"
 #include "home/HomeActivity.h"
 #include "home/RecentBooksActivity.h"
 #ifndef CROSSPOINT_NO_NETWORK
@@ -195,6 +196,10 @@ void ActivityManager::goToSettings() { replaceActivity(std::make_unique<Settings
 
 void ActivityManager::goToFileBrowser(std::string path) {
   replaceActivity(std::make_unique<FileBrowserActivity>(renderer, mappedInput, std::move(path)));
+}
+
+void ActivityManager::goToFileManager() {
+  replaceActivity(std::make_unique<FileManagerActivity>(renderer, mappedInput));
 }
 
 void ActivityManager::goToRecentBooks() {

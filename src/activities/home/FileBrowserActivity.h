@@ -15,9 +15,6 @@ class FileBrowserActivity final : public Activity {
   enum class Mode { Books, PickFirmware };
 
  private:
-  // Deletion
-  bool removeDirFile(const std::string& fullPath);
-
   ButtonNavigator buttonNavigator;
 
   size_t selectorIndex = 0;

@@ -22,9 +22,9 @@
 
 int HomeActivity::getMenuItemCount() const {
 #ifndef CROSSPOINT_NO_NETWORK
-  int count = 4;  // File Browser, Recents, File Transfer, Settings
+  int count = 5;  // File Browser, Recents, File Transfer, Manage Files, Settings
 #else
-  int count = 3;  // File Browser, Recents, Settings (no File Transfer on this platform)
+  int count = 4;  // File Browser, Recents, Manage Files, Settings (no File Transfer on this platform)
 #endif
   if (!recentBooks.empty()) {
     count += recentBooks.size();
@@ -112,7 +112,6 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 void HomeActivity::onEnter() {
   Activity::onEnter();
 
-
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
 
@@ -183,9 +182,11 @@ void HomeActivity::loop() {
       case HomeMenuItem::RECENTS:
         onRecentsOpen();
         break;
-        break;
       case HomeMenuItem::FILE_TRANSFER:
         onFileTransferOpen();
+        break;
+      case HomeMenuItem::MANAGE_FILES:
+        onManageFilesOpen();
         break;
       case HomeMenuItem::SETTINGS_MENU:
         onSettingsOpen();
@@ -350,13 +351,12 @@ void HomeActivity::render(RenderLock&&) {
 #ifndef CROSSPOINT_NO_NETWORK
                                           tr(STR_FILE_TRANSFER),
 #endif
-                                          tr(STR_SETTINGS_TITLE)};
+                                          tr(STR_MANAGE_FILES), tr(STR_SETTINGS_TITLE)};
     std::vector<UIIcon> menuIcons = {Folder, Recent,
 #ifndef CROSSPOINT_NO_NETWORK
                                      Transfer,
 #endif
-                                     Settings};
-
+                                     ManageFiles, Settings};
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme
@@ -367,22 +367,22 @@ void HomeActivity::render(RenderLock&&) {
     // On its own page the menu starts just below the header instead of below
     // the covers. The one-page geometry is left exactly as it was.
     const Rect menuRect =
-        splitPages
-            ? Rect{0, metrics.homeTopPadding + metrics.homeMenuTopOffset, pageWidth,
-                   pageHeight - (metrics.homeTopPadding + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)}
-            : Rect{0, metrics.homeTopPadding + coverAreaHeight + metrics.homeMenuTopOffset, pageWidth,
-                   pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
-                                 metrics.homeMenuTopOffset + metrics.buttonHintsHeight)};
+        splitPages ? Rect{0, metrics.homeTopPadding + metrics.homeMenuTopOffset, pageWidth,
+                          pageHeight - (metrics.homeTopPadding + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)}
+                   : Rect{0, metrics.homeTopPadding + coverAreaHeight + metrics.homeMenuTopOffset, pageWidth,
+                          pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
+                                        metrics.homeMenuTopOffset + metrics.buttonHintsHeight)};
 
     // Menu-relative selection. Themes that fold Continue Reading INTO the menu
     // (RoundedRaff) give that row index 0, so selectorIndex is already
     // menu-relative for them; every other theme has the covers ahead of the
     // menu and has to subtract them. On page 1 of a split home this is
     // selectorIndex - bookCount >= 0, i.e. the row the selector is really on.
-    GUI.drawButtonMenu(renderer, menuRect, static_cast<int>(menuItems.size()),
-                       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - bookCount,
-                       [&menuItems](int index) { return std::string(menuItems[index]); },
-                       [&menuIcons](int index) { return menuIcons[index]; });
+    GUI.drawButtonMenu(
+        renderer, menuRect, static_cast<int>(menuItems.size()),
+        metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - bookCount,
+        [&menuItems](int index) { return std::string(menuItems[index]); },
+        [&menuIcons](int index) { return menuIcons[index]; });
   }
 
   const auto labels = mappedInput.mapLabels(recentBooks.empty() ? "" : tr(STR_RESUME), tr(STR_SELECT), tr(STR_DIR_UP),
@@ -410,3 +410,4 @@ void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
+void HomeActivity::onManageFilesOpen() { activityManager.goToFileManager(); }
