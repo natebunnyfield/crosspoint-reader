@@ -155,6 +155,38 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // longPressButtonBehavior gates the font-size gesture.
   shortPwrBtn = SHORT_PWRBTN::SLEEP;
   longPressButtonBehavior = FONT_SIZE_STEP;
+
+  // The Reader tab was withdrawn from the device Settings UI (2026-08-04). Two
+  // of its rows survived and moved to System — the Text Settings action (font
+  // family and size) and Screen Margin — so neither appears here: pinning a
+  // control the owner can still see would silently revert their choice on the
+  // next load — which is exactly why quickResumeSleepScreen above lost its pin.
+  //
+  // Everything else the tab held has no on-device control left and is pinned to
+  // the values the owner asked for. The fields stay live and web-settable, and
+  // stay in getSettingsList() so persistence keeps working; a change made over
+  // the web lasts until the next load, the same contract the pins above have.
+  //
+  // Two of these do not map onto "on":
+  //  * lineSpacing is Tight/Normal/Wide, so NORMAL — the shipped default, and
+  //    the value getReaderLineCompression() answers 1.0 for, i.e. the font's own
+  //    leading rather than a squeeze or a stretch.
+  //  * textAntiAliasing's values 0/1 ARE the legacy Off/On toggle (see
+  //    TEXT_ANTIALIASING), so "on" is exactly TEXT_AA_STANDARD. CRISP and DARK
+  //    were appended later and no "on" ever meant them.
+  //
+  // Each pin matches its field's initializer in CrossPointSettings.h, because a
+  // fresh install never runs fromJson() (PersistableStore::loadFromFile()
+  // returns early with no file) and would otherwise disagree with a loaded one.
+  lineSpacing = NORMAL;
+  paragraphAlignment = JUSTIFIED;
+  embeddedStyle = 1;
+  // OFF, unlike its neighbours: the owner named it as the exception.
+  focusReadingEnabled = 0;
+  hyphenationEnabled = 1;
+  extraParagraphSpacing = 1;
+  textAntiAliasing = TEXT_AA_STANDARD;
+  imageRendering = IMAGES_DISPLAY;
 }
 
 bool CrossPointSettings::fromJson(JsonVariantConst doc) {
