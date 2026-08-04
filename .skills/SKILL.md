@@ -265,14 +265,22 @@ recipe for every family in `src/FontDisplayNames.h`, so
 regressed or a local source is missing.
 
 **S tier — the only INSTALLED families (fork ruling, 2026-08-02; sans added
-2026-08-03, cut back 2026-08-04): Edgar, Coelacanth, Rosarivo, TeXGyreSchola,
-LexicaUltralegible, LibreFranklin.** Buildable is not installed: everything else
-stays a recipe only. Every surface carries exactly these six — device SD cards,
+2026-08-03, cut back to one 2026-08-04): Edgar, Coelacanth, Rosarivo,
+TeXGyreSchola, LibreFranklin.** Buildable is not installed: everything else
+stays a recipe only. Every surface carries exactly these five — device SD cards,
 `fs_/fonts/`, and the iOS seed bundle (`crosspoint-simulator/ios/seedfonts/`),
 each with its `2x/` hi-res companions. Verified byte-identical across all four
-on 2026-08-03 (48 `.cpfont` files each); that sweep also found one 16 KB cluster
+on 2026-08-04 (40 `.cpfont` files each); an earlier sweep found one 16 KB cluster
 of `Rosarivo_16.cpfont` on BUNNYFIELDS overwritten with foreign data, so compare
 hashes rather than filenames when checking a card.
+
+**Lexica Ultralegible was demoted to buildable-only on 2026-08-04** and deleted
+from all four surfaces, leaving Libre Franklin the set's only sans. It won the
+humanist/accessibility bench (`sans-candidates.yaml`) — the cut is a taxonomy
+ruling, not a finding against the face. Its `sd-fonts.yaml` recipe and its
+`src/FontDisplayNames.h` picker label both stay, so cards provisioned before the
+ruling still label it. Re-adding it to `installed_families:` or to any surface
+is a REGRESSION, not a restoration.
 
 **Libre Franklin is additionally compiled into the firmware**, as one of the four
 System font choices for the UI chrome (8/10/12 pt). That is a separate artifact
@@ -280,13 +288,14 @@ from its `.cpfont` reading cuts (10/12/14/16 pt), which stay on the card — the
 built-in sizes are too small to read at. Costs ~134 KB of flash on device. Do not install additional families
 anywhere without a new ruling; see docs/sd-card-fonts.md "S tier".
 
-The two sans came off two benches, both rendered through the real renderer at
+The sans came off two benches, both rendered through the real renderer at
 matched x-height: `sans-candidates.yaml` (humanist/accessibility, gave Lexica
 Ultralegible) and `grotesque-candidates.yaml` (text grotesques, gave Libre
-Franklin). The grotesque bench first shipped all three of its finalists; Archivo
-and Host Grotesk were cut on 2026-08-04 because all three fill the same cell of
-the taxonomy. Bench families are NOT installed and live in their own YAMLs so
-they stay out of the device's font-download manifest.
+Franklin). Four sans shipped at first and three were cut on 2026-08-04: Archivo
+and Host Grotesk because all three grotesques fill the same cell of the taxonomy,
+then Lexica Ultralegible, leaving Libre Franklin as the only installed sans. All
+three keep their recipes and picker labels. Bench families are NOT installed and
+live in their own YAMLs so they stay out of the device's font-download manifest.
 
 **Archivo needs `force_autohint: true` and it is load-bearing.** Under the
 font's native hinting no point size renders a 12 px x-height at all — it jumps

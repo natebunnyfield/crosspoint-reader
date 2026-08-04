@@ -3,18 +3,17 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; sans added 2026-08-03, cut back 2026-08-04)
+## S tier (fork ruling, 2026-08-02; sans added 2026-08-03, cut back to one 2026-08-04)
 
-The installed set on this fork is exactly six families — **Edgar, Coelacanth,
-Rosarivo, TeXGyreSchola, LexicaUltralegible, LibreFranklin** — on every surface:
-both device SD cards, the simulator's `fs_/fonts/`, and the iOS app's bundled
-seed set (`crosspoint-simulator/ios/seedfonts/`). The other curated families
-remain fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
+The installed set on this fork is exactly five families — **Edgar, Coelacanth,
+Rosarivo, TeXGyreSchola, LibreFranklin** — on every surface: both device SD
+cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed set
+(`crosspoint-simulator/ios/seedfonts/`). The other curated families remain fully
+buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these six and nothing else.
+surface or reprovisioning a card, install these five and nothing else.
 
-Two of the six are sans: **Lexica Ultralegible** from the humanist/accessibility
-bench, and **Libre Franklin** from the text-grotesque bench
+One of the five is a sans: **Libre Franklin**, from the text-grotesque bench
 (`lib/EpdFont/scripts/grotesque-candidates.yaml`).
 
 **Archivo and Host Grotesk were cut on 2026-08-04**, promoting Libre Franklin to
@@ -28,14 +27,25 @@ distinction the page does not make. Archivo carried the set's only
 terms as well. Both remain buildable recipes and keep their picker labels, since
 a card provisioned before this ruling still carries them.
 
-Lexica Ultralegible is the one sans in the set, added after a bench of 13
-sans-serif candidates rendered through the real `GfxRenderer` at matched
-x-height (`lib/EpdFont/scripts/sans-candidates.yaml`, `render_harness reading`).
-It carries Atkinson Hyperlegible's letterform-disambiguation design with the
+**Lexica Ultralegible was cut on 2026-08-04**, the same day as the other two
+grotesques, leaving Libre Franklin the only installed sans. It had been added on
+2026-08-03 after winning a bench of 13 sans-serif candidates rendered through
+the real `GfxRenderer` at matched x-height
+(`lib/EpdFont/scripts/sans-candidates.yaml`, `render_harness reading`), on the
+strength of Atkinson Hyperlegible's letterform-disambiguation design with the
 coverage gap closed — 100% of Latin-1 and Latin Extended-A against Atkinson's
 own static TTFs at 98% / 73%, which matters because `build-sd-fonts.py` fills
 every uncovered codepoint from Noto, so a thin face renders two textures inside
-one word.
+one word. Nothing about that verdict changed; the cut is the same taxonomy
+argument applied once more — one installed sans is the answer to "which sans",
+and the humanist/accessibility bench and the grotesque bench were both asking it.
+
+The demotion is to **buildable-only**: its recipe stays in `sd-fonts.yaml` and
+its picker label stays in `src/FontDisplayNames.h` (cards provisioned before
+2026-08-04 still carry the family and must still label it), but its `.cpfont`
+files were deleted from all four surfaces on 2026-08-04. Putting
+`LexicaUltralegible` back into `installed_families:` — or back onto a surface —
+is a regression, not a restoration; it needs a fresh ruling first.
 
 The 2x hi-res companions (`<Family>/2x/<same 1x filename>`, built at doubled
 point sizes for `CROSSPOINT_RENDER_SCALE=2`) are part of the set: every
@@ -81,7 +91,7 @@ excludes, which is exactly the drift the list now prevents. Use
 The iOS app needs no equivalent list. `CrossPointFsPrep.cpp::seedOneFontDirectory`
 seeds whatever `crosspoint-simulator/ios/seedfonts/` contains and prunes files
 the bundle no longer carries, so that directory is its own source of truth —
-keep it holding exactly these eight.
+keep it holding exactly these five.
 
 ## Installing Fonts
 
@@ -202,9 +212,11 @@ one pixel or none.
 Two things worth knowing from it. **Alegreya is filed under Sans-serif and is a
 serif** (its own `description:` says "calligraphic serif/display"), so any count
 of the sans taken from the headings is off by one. And **the S tier is better
-spread than the catalogue**: its six occupy six different classes, while 19 of
+spread than the catalogue**: its five occupy five different classes, while 19 of
 the catalogue's 25 serifs sit in two. Cutting Archivo and Host Grotesk widened
 that spread rather than narrowing it, since all three grotesques filled one cell.
+Cutting Lexica Ultralegible is the one cut that did cost a class — humanist sans,
+and the low-vision/hyperlegible cell with it.
 
 ## Converting Custom Fonts
 
