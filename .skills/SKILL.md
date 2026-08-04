@@ -342,6 +342,47 @@ families reshuffles the registry, and `SETTINGS.sdFontFamilyName` has been
 observed jumping to a different family after an install. Re-check the setting
 afterwards rather than assuming it survived.
 
+**Never `cp -R` a font tree onto a card from macOS.** It writes an AppleDouble
+`._Family_14.cpfont` beside every file. `SdCardFontRegistry` matches on the
+`.cpfont` suffix and would parse those as fonts. Copy, then sweep:
+```bash
+find /Volumes/<CARD>/.fonts -name '._*' -delete && sync
+```
+Sixteen of them were left on a card on 2026-08-04 by exactly this.
+
+**Verify a card by HASH, never by filename.** On 2026-08-04 a card's
+`Rosarivo_16.cpfont` had the right name and the exact right byte length, and one
+16 KB cluster inside it had been overwritten with unrelated ASCII. A listing
+looks perfect; only `shasum -a 256` against `fs_/fonts` finds it. Do this after
+any card operation, and treat a mismatch as a card-health question, not a
+font-build question.
+
+---
+
+## Firmware binaries on the SD card
+
+`SdFirmwareUpdateActivity` shows a file browser over every `.bin` on the card, so
+whatever is there is a menu the owner picks from.
+
+**Name them `<UTC-timestamp>-crosspoint-<sha>.bin`**, e.g.
+`20260804T0210Z-crosspoint-53737d47.bin`. The sha alone was the old convention
+and it is not enough: it says *which* commit but nothing about *when*, so a card
+carrying two builds gives no way to tell which is newer without going back to
+git — and the owner picking from that list has no git. The timestamp sorts, the
+sha identifies. **Delete superseded bins** rather than leaving them; every one
+left behind is a chance to flash the wrong firmware.
+
+**Build shipping bins from a clean tree, and check that it is clean.** This is
+the same rule as the version-string note above, but here it is worse, because a
+`.bin` on a card outlives the session that built it and carries no dirty marker
+at all:
+```bash
+git status --porcelain   # must be EMPTY before pio run -e gh_release
+```
+A `git worktree` at the intended sha is the belt-and-braces version. The main
+checkout routinely carries another session's WIP — on 2026-08-04 it literally
+did, mid-task, while a shipping binary was being built from it.
+
 ---
 
 ## Coding Standards
@@ -577,6 +618,45 @@ Constraint: Physical button positions are fixed on hardware, but their logical f
 #define Storage HalStorage::getInstance()            // SD card I/O
 #define I18N I18n::getInstance()                     // Internationalization
 ```
+
+### Settings: adding, moving or re-typing a row
+
+`getSettingsList()` in `src/SettingsList.h` is not just the device UI. It is
+also the web settings API AND what `CrossPointSettings::toJson`/`fromJson`
+iterate to persist. One list, three consumers, and the failure modes are silent
+in all three.
+
+**A row with no `valuePtr` does not persist.** `toJson` skips any entry where
+`!info.valuePtr && !info.stringOffset` — that is how dynamic rows (KOReader
+credentials) stay out of settings.json. So the moment you convert a row to the
+getter/setter form — which you must do for any drop-down whose stored value is
+not the picker index — it stops being written, and the value silently resets to
+its default on every boot. **The row keeps working perfectly**, which is what
+makes it invisible: the UI reads through the getter, so only a reboot shows it.
+Add an explicit line to BOTH `toJson` and `fromJson`, the way `fontFamily`,
+`fontSizeSlot` and `screenMargin` already do. This shipped as a real bug on
+2026-08-04.
+
+**Never delete an entry to hide it.** Deleting it from `getSettingsList()` stops
+the setting persisting at all and drops it from the web API. Withdraw it at the
+UI layer instead — filter by category in `rebuildSettingsLists()`, exactly as the
+retired Display and Reader categories are — and pin its value in
+`normalizeRetiredSettings()` so behaviour is fixed rather than merely hidden.
+
+**Pinning in `normalizeRetiredSettings()` is only half.** A fresh install never
+runs `fromJson()`, so a pin alone leaves fresh and upgraded devices disagreeing.
+Change the field initialiser in `CrossPointSettings.h` to match the pin.
+
+**An ENUM row persists its INDEX.** If the stored byte means something else — a
+pixel count, a point size — it must be a getter/setter row with `valuePtr` left
+null, mapping index to value. Leaving `valuePtr` set writes the raw index into
+the byte: `CrossPointWebServer`'s ENUM case prefers `valuePtr` over the setter,
+and the device's own popup branch checks `valuePtr` first and would modulo by an
+empty `enumValues`.
+
+**Enum order is frozen.** Both the picker order and the persisted value are the
+same integer, so new values APPEND. Inserting one silently re-points every saved
+settings.json at a different choice.
 
 ### Activity Lifecycle and Memory Management
 
