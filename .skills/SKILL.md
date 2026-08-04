@@ -265,17 +265,31 @@ recipe for every family in `src/FontDisplayNames.h`, so
 regressed or a local source is missing.
 
 **S tier — the only INSTALLED families (fork ruling, 2026-08-02; sans added
-2026-08-03, cut back to one 2026-08-04): Edgar, Coelacanth, Rosarivo,
-TeXGyreSchola, LibreFranklin.** Buildable is not installed: everything else
-stays a recipe only. Every surface carries exactly these five — device SD cards,
-`fs_/fonts/`, and the iOS seed bundle (`crosspoint-simulator/ios/seedfonts/`),
-each with its `2x/` hi-res companions. Verified byte-identical across all four
-on 2026-08-04 (40 `.cpfont` files each); an earlier sweep found one 16 KB cluster
-of `Rosarivo_16.cpfont` on BUNNYFIELDS overwritten with foreign data, so compare
-hashes rather than filenames when checking a card.
+2026-08-03, resolved to two 2026-08-04): Edgar, Coelacanth, Rosarivo,
+TeXGyreSchola, LibreFranklin, QuattrocentoSans.** Buildable is not installed:
+everything else stays a recipe only. Every surface carries exactly these six —
+device SD cards, `fs_/fonts/`, and the iOS seed bundle
+(`crosspoint-simulator/ios/seedfonts/`), each with its `2x/` hi-res companions.
+An earlier sweep found one 16 KB cluster of `Rosarivo_16.cpfont` on BUNNYFIELDS
+overwritten with foreign data, so compare hashes rather than filenames when
+checking a card.
+
+**The device SD cards are one family behind.** Quattrocento Sans was promoted on
+2026-08-04 and installed on `fs_/fonts/` and the iOS seed bundle; the physical
+cards still hold the old five, and Freight Sans (never on a card) was cut to C
+the same day. Reprovision the cards from `fs_/fonts/` to close the gap.
+
+**Freight Sans was cut to C tier on 2026-08-04**, the same ruling that promoted
+Quattrocento Sans to S. Both are humanist sans filling one cell of the taxonomy,
+so the tier took one: the OFL face that rebuilds from a URL on any machine,
+audits clean (Freight Sans needed eight `drop_codepoints` to stop `¾` rendering
+as `ffl`) and carries 10,780 kern cells plus real `fi`/`fl` against a cut with
+no `GSUB` at all. Freight Sans wins on slot fit alone — the only family that
+hits x-height AND advanceY exactly — which did not outweigh the rest. Its
+`.cpfont` files are deleted from every surface; recipe and picker label stay.
 
 **Lexica Ultralegible was demoted to buildable-only on 2026-08-04** and deleted
-from all four surfaces, leaving Libre Franklin the set's only sans. It won the
+from all four surfaces. It won the
 humanist/accessibility bench (`sans-candidates.yaml`) — the cut is a taxonomy
 ruling, not a finding against the face. Its `sd-fonts.yaml` recipe and its
 `src/FontDisplayNames.h` picker label both stay, so cards provisioned before the
@@ -293,8 +307,9 @@ matched x-height: `sans-candidates.yaml` (humanist/accessibility, gave Lexica
 Ultralegible) and `grotesque-candidates.yaml` (text grotesques, gave Libre
 Franklin). Four sans shipped at first and three were cut on 2026-08-04: Archivo
 and Host Grotesk because all three grotesques fill the same cell of the taxonomy,
-then Lexica Ultralegible, leaving Libre Franklin as the only installed sans. All
-three keep their recipes and picker labels. Bench families are NOT installed and
+then Lexica Ultralegible. Libre Franklin was briefly the only installed sans,
+until Quattrocento Sans was promoted later that day as the humanist half of the
+pair. All three cut faces keep their recipes and picker labels. Bench families are NOT installed and
 live in their own YAMLs so they stay out of the device's font-download manifest.
 
 **Archivo needs `force_autohint: true` and it is load-bearing.** Under the
@@ -562,7 +577,20 @@ Constraint: Physical button positions are fixed on hardware, but their logical f
 
 ### UITheme (The GUI Macro)
 * Rule: All UI rendering must go through the GUI macro (UITheme). 
-* Do not hardcode fonts, colors, or positioning. This keeps layout consistent across themes.
+* Do not hardcode fonts, colors, or positioning. This keeps layout consistent
+  and keeps every screen reading the same metrics.
+* **One theme.** `UITheme::setTheme()` takes no argument and always builds
+  `LyraSixTheme`; the four other themes, the `UI_THEME` enum, the `uiTheme`
+  setting and the `STR_THEME_*` strings were deleted on 2026-08-04. Do not
+  reintroduce a theme switch to "make something configurable" — the metrics
+  struct is the configuration surface.
+* `BaseTheme` ← `LyraTheme` ← `Lyra3CoversTheme` ← `LyraSixTheme` is an
+  inheritance chain, NOT four themes. Lyra Six overrides a handful of methods
+  and inherits the rest, so all four classes are live code and only the last is
+  ever instantiated. `LyraSixMetrics` likewise derives from `Lyra3CoversMetrics`
+  from `LyraMetrics`. A metric you add must go in `ThemeMetrics` (BaseTheme.h)
+  and be given a value in `BaseMetrics` and `LyraMetrics` — the derived ones
+  copy-and-patch, so they pick it up for free.
 
 ---
 
@@ -805,7 +833,14 @@ This fork is **selectively divergent**, not a tracking mirror — 91 ahead / 2
 behind as of 2026-08-03 — and it has DELETED whole subsystems upstream still
 develops: KOReader sync, Calibre and the status bar (`08d5bdee`), bookmarks
 and auto page turn (`e0509aef`), the reader menu (`9494d88e`), the tabbed Text
-Settings editor (`9fdd7dfe`). `git merge upstream/develop` therefore resurrects
+Settings editor (`9fdd7dfe`), and **four of the five UI themes plus the setting
+that chose between them** (2026-08-04 — Classic, Lyra, Lyra Extended and
+RoundedRaff; `src/components/themes/roundedraff/` is gone outright, and
+`CrossPointSettings::UI_THEME`, the `uiTheme` field and the six `STR_THEME_*`
+strings with it). Anything upstream touching a theme is `N/A` unless it lands
+in `BaseTheme`, `LyraTheme`, `Lyra3CoversTheme` or `LyraSixTheme`, which are
+still live as the layers Lyra Six is composed from.
+`git merge upstream/develop` therefore resurrects
 them: attempted 2026-08-03, it produced 18 conflicts, six of them
 `modify/delete`. Take upstream changes per commit, live hunks only.
 
