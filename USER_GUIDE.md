@@ -517,7 +517,9 @@ When using **Cover** or **Cover + Custom**, two additional settings apply:
 To use custom sleep images, set the sleep screen mode to **Custom** or **Cover + Custom**, then place images on the SD card:
 
 - **Multiple Images (recommended):** Create a `.sleep` directory in the root of the SD card and place any number of `.bmp` images inside. One will be randomly selected each time the device sleeps. (A directory named `sleep` is also accepted as a fallback.)
+- **Device-Specific Image:** Place `sleep_<id>.bmp` in the root directory, where `<id>` is the unit's 6-character Device ID shown on the File Transfer screen (also in the web interface's status info). The ID is derived from the device's factory MAC address (the last 3 bytes as lowercase hex), so it is permanent and unique per physical unit — even two devices of the same model — letting one SD-card tree serve a whole family of readers. A device-specific file takes priority over `sleep.bmp`.
 - **Single Image:** Place a file named `sleep.bmp` in the root directory. This is used as a fallback if no valid images are found in the `.sleep`/`sleep` directory.
+- **No images at all:** the device falls back to the calendar sleep screen (on hardware with a real-time clock; otherwise the default logo screen).
 
 > [!TIP]
 > For best results:

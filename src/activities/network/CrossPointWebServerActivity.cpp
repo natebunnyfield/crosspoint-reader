@@ -14,6 +14,7 @@
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/DeviceId.h"
 #include "util/QrUtils.h"
 #include "util/TaskWatchdog.h"
 
@@ -26,6 +27,14 @@ constexpr uint8_t AP_CHANNEL = 1;
 constexpr uint8_t AP_MAX_CONNECTIONS = 4;
 constexpr int QR_CODE_WIDTH = 198;
 constexpr int QR_CODE_HEIGHT = 198;
+
+// "Device ID: <6 hex chars>" — the unit id per-device SD files use
+// (/sleep_<id>.bmp), surfaced on the screen users look at while syncing.
+std::string deviceIdLine() {
+  char id[8];
+  getDeviceIdHex(id, sizeof(id));
+  return std::string(tr(STR_DEVICE_ID_PREFIX)) + id;
+}
 
 // DNS server for captive portal (redirects all DNS queries to our IP)
 DNSServer* dnsServer = nullptr;
@@ -415,6 +424,8 @@ void CrossPointWebServerActivity::renderServerRunning() const {
                       hostnameUrl.c_str());
     renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding + QR_CODE_WIDTH + metrics.verticalSpacing, startY + 100,
                       ipUrl.c_str());
+    renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding + QR_CODE_WIDTH + metrics.verticalSpacing, startY + 120,
+                      deviceIdLine().c_str());
   } else {
     startY += metrics.verticalSpacing * 2;
 
@@ -438,6 +449,11 @@ void CrossPointWebServerActivity::renderServerRunning() const {
     // Also show hostname URL
     std::string hostnameUrl = std::string(tr(STR_OR_HTTP_PREFIX)) + AP_HOSTNAME + ".local/";
     renderer.drawCenteredText(SMALL_FONT_ID, startY, hostnameUrl.c_str(), true);
+    startY += renderer.getLineHeight(SMALL_FONT_ID) + 5;
+
+    // Unit ID for per-device SD files (/sleep_<id>.bmp) — shown here because
+    // this screen is where card syncs happen.
+    renderer.drawCenteredText(SMALL_FONT_ID, startY, deviceIdLine().c_str(), true);
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_EXIT), "", "", "");

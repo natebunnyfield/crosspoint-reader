@@ -39,7 +39,8 @@ Response:
   "rssi": -45,
   "freeHeap": 123456,
   "uptime": 3600,
-  "device": "X4"
+  "device": "X4",
+  "deviceId": "ef0001"
 }
 ```
 
@@ -52,6 +53,7 @@ Response:
 | `freeHeap` | number | Free heap in bytes |
 | `uptime` | number | Seconds since boot |
 | `device` | string | `"X3"` or `"X4"` hardware detection |
+| `deviceId` | string | Per-unit ID: the last 3 bytes of the factory (efuse) MAC as 6 lowercase hex chars (`src/util/DeviceId.cpp`). Unlike `device` it distinguishes two units of the same model. Used to name per-device SD files (`/sleep_<deviceId>.bmp`); also shown on the device's File Transfer screen. The first 3 MAC bytes are the vendor prefix (same across Espressif chips), so the tail carries all the discriminating bits. |
 
 ## File Management
 
