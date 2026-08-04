@@ -20,6 +20,12 @@
 namespace {
 constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
 
+// Subtitle lines the colophon row gets. Two, because one ellipsized every
+// entry that carries a two-stage lineage — "Bogusław Jackowski & Janusz M.
+// Nowacki · 1918 Jersey…" cut off exactly the half the credit exists to show.
+// Both the page stride and drawList have to be told, or paging skips rows.
+constexpr int kColophonLines = 2;
+
 // Resolve the current selection to a POSITION IN `fonts_`.
 //
 // This must search the built list rather than compute an index: `settingIndex`
@@ -178,8 +184,8 @@ void FontSelectionActivity::loop() {
   // No cap: the stride is whatever the theme says fits below the preview pane,
   // which is the same question render()'s list rect answers, so the page stride
   // and the drawn page still agree.
-  const int pageItems =
-      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true, previewHeight + metrics_.verticalSpacing);
+  const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true,
+                                                        previewHeight + metrics_.verticalSpacing, kColophonLines);
 
   // List navigation is bound to the FRONT buttons only. ButtonNavigator's
   // NavNext/NavPrevious resolve to "side Down OR front Right" and "side Up OR
@@ -281,12 +287,16 @@ void FontSelectionActivity::applySelectedFont() {
 }
 
 int FontSelectionActivity::listPageHeight() const {
-  // Rows carry a designer/years subtitle, so the taller subtitle row height is
-  // the one that applies. Read from the ACTIVE theme rather than BaseMetrics:
-  // Lyra and RoundedRaff override drawList() with their own row heights, and a
-  // hardcoded value would show five rows on one theme and three on another.
-  const int rowHeight =
-      metrics_.listWithSubtitleRowHeight > 0 ? metrics_.listWithSubtitleRowHeight : metrics_.listRowHeight;
+  // Rows carry a designer/lineage subtitle, so the taller subtitle row height
+  // is the one that applies. Read from the ACTIVE theme rather than
+  // BaseMetrics: LyraTheme overrides drawList() with its own row heights, and a
+  // hardcoded value would disagree with whatever the theme actually draws.
+  //
+  // Through getListRowStep() rather than the metric directly, because the
+  // colophon wraps over kColophonLines lines and the row is that much taller;
+  // reading listWithSubtitleRowHeight raw would size the rect for the old
+  // one-line row and clip the last entry.
+  const int rowHeight = GUI.getListRowStep(true, kColophonLines);
   const int available = usableHeight - previewHeight - metrics_.verticalSpacing;
   if (rowHeight <= 0) return available;
   // `available` already excludes the header and the button hints, so it IS what
@@ -485,9 +495,9 @@ void FontSelectionActivity::render(RenderLock&&) {
       [this](int index) {
         return fonts_[index].isBuiltin ? fonts_[index].name : FontDisplayNames::displayName(fonts_[index].name);
       },
-      // Subtitle: "Designer · years · place" (creation; digital groups) — the
-      // attribution that used to share the title line. Built-ins and unlisted
-      // families return "" and simply show no second line.
+      // Subtitle: "Designer · YEAR PLACE; YEAR PLACE" — the attribution that
+      // used to share the title line, wrapped over kColophonLines lines.
+      // Built-ins and unlisted families return "" and show no second line.
       [this](int index) -> std::string {
         return fonts_[index].isBuiltin ? "" : FontDisplayNames::subtitle(fonts_[index].name);
       },
@@ -496,7 +506,7 @@ void FontSelectionActivity::render(RenderLock&&) {
         if (index == previewFontIndex_) return tr(STR_SELECTED);
         return "";
       },
-      true);
+      true, nullptr, kColophonLines);
 
   // Confirm always means the same thing now, so the label no longer alternates
   // between Preview and Select depending on where the cursor is.
