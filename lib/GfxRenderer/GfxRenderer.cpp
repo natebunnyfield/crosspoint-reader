@@ -2209,6 +2209,17 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
   const auto& font = fontIt->second;
 
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Hi-res glyph blit, same contract as drawText(): `font` stays the ONLY
+  // source of metrics, so the cursor walk below is untouched and every glyph
+  // lands on exactly the logical pixel it would at scale 1. The companion face
+  // only supplies a denser bitmap, drawn on the device grid at
+  // (logical * RENDER_SCALE). No companion registered => the 1x glyph
+  // replicated, i.e. today's output. Without this the rotated side-button
+  // hints were the one piece of chrome text left pixel-doubled at 2x.
+  const EpdFontFamily* hiRes = getHiResFamily(resolvedFontId);
+#endif
+
   int lastBaseY = y;
   int lastBaseLeft = 0;
   int lastBaseWidth = 0;
@@ -2234,6 +2245,13 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
       const int combiningX = x - raiseBy;
       const int combiningY = combiningMark::anchorOverRotated90CW(anchor, lastBaseY, lastBaseLeft, lastBaseWidth,
                                                                   combiningGlyph->left, combiningGlyph->width);
+#if CROSSPOINT_RENDER_SCALE > 1
+      if (hiRes && hiRes->getGlyph(cp, style)) {
+        renderCharImpl<TextRotation::Rotated90CW, true>(*this, renderMode, *hiRes, cp, combiningX * RENDER_SCALE,
+                                                        combiningY * RENDER_SCALE, black, style);
+        continue;
+      }
+#endif
       renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, combiningX, combiningY, black, style);
       continue;
     }
@@ -2254,6 +2272,14 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     lastBaseTop = glyph ? glyph->top : 0;
     prevAdvanceFP = glyph ? glyph->advanceX : 0;  // 12.4 fixed-point
 
+#if CROSSPOINT_RENDER_SCALE > 1
+    if (hiRes && hiRes->getGlyph(cp, style)) {
+      renderCharImpl<TextRotation::Rotated90CW, true>(*this, renderMode, *hiRes, cp, x * RENDER_SCALE,
+                                                      lastBaseY * RENDER_SCALE, black, style);
+      prevCp = cp;
+      continue;
+    }
+#endif
     renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, x, lastBaseY, black, style);
     prevCp = cp;
   }
