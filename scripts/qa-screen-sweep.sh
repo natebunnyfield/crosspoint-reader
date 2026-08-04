@@ -18,22 +18,21 @@
 set -u
 OUT="${1:?usage: sweep.sh <output-dir>}"
 BIN=.pio/build/simulator/program
-SETTINGS=fs_/.crosspoint/settings.json
-BASELINE="$OUT/settings.baseline.json"
-# Reading position lives in progress.bin, not settings.json, and the reader
-# saves it on exit — so without restoring this too the reader screenshots drift
-# a page per sweep and compare false-negative against an earlier run.
-PROGRESS="$(find fs_/.crosspoint -name progress.bin | head -1)"
-PROGRESS_BASELINE="$OUT/progress.baseline.bin"
+# Everything mutable lives under fs_/.crosspoint: settings.json, one progress.bin
+# per book, the section caches and the recent-books list. ALL of it is restored
+# before every case — settings alone is not enough. The reader saves its position
+# on exit, so without the progress files the reader shots drift a page per sweep;
+# without the recent-books list the home covers reorder. Both look exactly like a
+# regression and are not one.
+STATE=fs_/.crosspoint
+BASELINE="$OUT/state.baseline"
 mkdir -p "$OUT"
-# Snapshot the current state on first use; later sweeps reuse it so a
-# before/after pair starts from identical device state.
-[ -f "$BASELINE" ] || cp "$SETTINGS" "$BASELINE"
-[ -n "${PROGRESS:-}" ] && [ ! -f "$PROGRESS_BASELINE" ] && cp "$PROGRESS" "$PROGRESS_BASELINE"
+# Snapshot on first use; later sweeps reuse it, so a before/after pair starts
+# from identical device state.
+[ -d "$BASELINE" ] || cp -R "$STATE" "$BASELINE"
 
 run() { # name  input-script  screenshot-script
-  cp "$BASELINE" "$SETTINGS"
-  [ -n "${PROGRESS:-}" ] && cp "$PROGRESS_BASELINE" "$PROGRESS"
+  rm -rf "$STATE" && cp -R "$BASELINE" "$STATE"
   CROSSPOINT_SIM_INPUT_SCRIPT="$2" \
   CROSSPOINT_SIM_SCREENSHOTS="$3" \
   SDL_VIDEODRIVER=dummy "$BIN" >"$OUT/$1.log" 2>&1
@@ -58,12 +57,17 @@ run recent-books \
   '3000:DOWN;3400:DOWN;4200:ENTER;12000:QUIT' \
   "8000:$OUT/04-recent-books.bmp"
 
-run settings-tabs \
-  '3000:DOWN;3400:DOWN;3800:DOWN;4200:DOWN;5000:ENTER;8000:ENTER;16000:QUIT' \
-  "7000:$OUT/05-settings-reader.bmp;11000:$OUT/06-settings-system.bmp"
+# Settings is ONE tab, so no tab cycling: the list is focused on entry and the
+# first row is Text Settings. Do not add blind DOWN/ENTER steps here — they walk
+# into the Screen Margin popup and CHANGE the margin, which correctly
+# invalidates every cached section and fills the log with
+# "[SCT] Deserialization failed", looking exactly like a regression.
+run settings \
+  '3000:DOWN;3400:DOWN;3800:DOWN;4200:DOWN;5000:ENTER;16000:QUIT' \
+  "8000:$OUT/05-settings.bmp;12000:$OUT/06-settings-scrolled.bmp"
 
 run text-settings \
-  '3000:DOWN;3400:DOWN;3800:DOWN;4200:DOWN;5000:ENTER;7000:DOWN;7600:ENTER;20000:QUIT' \
+  '3000:DOWN;3400:DOWN;3800:DOWN;4200:DOWN;5000:ENTER;7000:ENTER;20000:QUIT' \
   "11000:$OUT/07-text-settings.bmp;15000:$OUT/08-text-settings-2.bmp"
 
 # Back from Home resumes the most recent book; Confirm in the reader opens
@@ -76,6 +80,5 @@ run reader-paging \
   '3000:BACK;14000:RIGHT;18000:RIGHT;30000:QUIT' \
   "24000:$OUT/11-reader-paged.bmp"
 
-cp "$BASELINE" "$SETTINGS"
-[ -n "${PROGRESS:-}" ] && cp "$PROGRESS_BASELINE" "$PROGRESS"
+rm -rf "$STATE" && cp -R "$BASELINE" "$STATE"
 echo "  wrote $(ls "$OUT"/*.png 2>/dev/null | wc -l | tr -d ' ') screenshots to $OUT"
