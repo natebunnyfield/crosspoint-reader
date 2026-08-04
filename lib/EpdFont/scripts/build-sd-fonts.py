@@ -152,6 +152,67 @@ def extract_static_instance(source_path: Path, axes: dict, family_name: str, sty
     return cached
 
 
+def apply_cmap_drops(source_path: Path, codepoints, family_name: str, style_name: str) -> Path:
+    """Delete cmap entries so the Noto fallback fills those codepoints instead.
+
+    For sources whose cmap points at the WRONG outline. fontconvert_sdcard.py
+    reaches for the fallback face only when `face.get_char_index(cp) == 0`
+    (see its `load_glyph`), so a codepoint that maps to a real-but-wrong glyph
+    renders that wrong glyph and never falls back. Removing the entry is the
+    only lever: the font has no correct outline to point at.
+
+    Not a styling knob — reach for it only with a rendered contact sheet
+    showing the wrong letter, and list the exact codepoints. Narrowing the
+    family's `intervals:` would NOT work: a codepoint outside every interval is
+    dropped from the build entirely rather than fallen back.
+
+    Patched into PATCHED_DIR/<family>/cmap/, a directory of its own so
+    apply_metrics_override's stale-file sweep (which globs `<style>_*` in
+    PATCHED_DIR/<family>/) cannot delete this function's output — which is its
+    input when both are configured.
+    """
+    from fontTools.ttLib import TTFont
+
+    wanted = sorted({int(c) for c in codepoints})
+    if not wanted:
+        return source_path
+
+    mtime = int(source_path.stat().st_mtime)
+    key = "_".join(f"{c:04X}" for c in wanted)
+    cached = PATCHED_DIR / family_name / "cmap" / f"{style_name}_{key}_{mtime}{source_path.suffix}"
+    if cached.exists():
+        return cached
+
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    for old in cached.parent.glob(f"{style_name}_*{source_path.suffix}"):
+        old.unlink()
+
+    # recalcBBoxes=False for the same reason apply_metrics_override needs it:
+    # re-walking CFF charstrings crashes on seac-style endchar.
+    font = TTFont(str(source_path), recalcBBoxes=False, recalcTimestamp=False)
+    try:
+        dropped = 0
+        for table in font["cmap"].tables:
+            for cp in wanted:
+                if cp in table.cmap:
+                    del table.cmap[cp]
+                    dropped += 1
+        print(f"  Dropping {len(wanted)} cmap codepoints: {family_name}/{style_name} "
+              f"({dropped} subtable entries) -> Noto fallback")
+        tmp_fd, tmp_name = tempfile.mkstemp(suffix=source_path.suffix, dir=cached.parent)
+        os.close(tmp_fd)
+        tmp_path = Path(tmp_name)
+        try:
+            font.save(str(tmp_path))
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
+    finally:
+        font.close()
+    tmp_path.replace(cached)
+    return cached
+
+
 def apply_metrics_override(source_path: Path, metrics: dict, family_name: str, style_name: str) -> Path:
     """Rewrite a font's vertical metrics before conversion.
 
@@ -306,6 +367,14 @@ def build_family(
             if "from" in style_spec:
                 continue
             resolved_styles[style_name] = resolve_font_path(style_spec, name, style_name)
+        # Family-level cmap drops, before the metrics patch so the two chain
+        # (drops -> metrics -> conversion) and before `from:` aliasing so
+        # synthetics inherit both.
+        drops = family.get("drop_codepoints")
+        if drops:
+            for style_name in list(resolved_styles):
+                resolved_styles[style_name] = apply_cmap_drops(
+                    resolved_styles[style_name], drops, name, style_name)
         # Family-level metrics override, applied to the real sources before
         # `from:` styles alias them, so synthetics inherit the patched file.
         metrics = family.get("metrics")
