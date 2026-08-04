@@ -21,6 +21,7 @@
 #include "fontIds.h"
 #include "images/Logo120.h"
 #include "images/MoonIcon.h"
+#include "util/DeviceId.h"
 
 void SleepActivity::onEnter() {
   Activity::onEnter();
@@ -102,9 +103,40 @@ void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks, const calenda
 }
 
 void SleepActivity::renderCustomSleepScreen() const {
+  // Custom sleep image priority (device-specific files win so one SD-card tree
+  // can serve every unit, each showing its own image):
+  //   1. /sleep_<id>.bmp — <id> is this unit's DeviceId (last 3 factory-MAC
+  //      bytes as hex, shown on the File Transfer screen), so two units of the
+  //      same model stay distinct. Wins over /sleep.bmp set on-device via
+  //      "Set as sleep screen".
+  //   2. /sleep.bmp — generic fallback (the path BmpViewerActivity writes).
+  //   3. /.sleep / /sleep directory rotation.
+  //   4. Calendar — renderCalendarSleepScreen itself falls back to the default
+  //      logo screen on a device without a trustworthy RTC (the X4).
+
   // Check if we have a /.sleep (preferred) or /sleep directory
   const char* sleepDir = nullptr;
   auto dir = Storage.open("/.sleep");
+
+  // Try device-specific sleep image first.
+  char deviceId[8];
+  getDeviceIdHex(deviceId, sizeof(deviceId));
+  char deviceBmpPath[24];
+  snprintf(deviceBmpPath, sizeof(deviceBmpPath), "/sleep_%s.bmp", deviceId);
+  {
+    HalFile devFile;
+    if (Storage.openFileForRead("SLP", deviceBmpPath, devFile)) {
+      Bitmap bitmap(devFile, true);
+      if (bitmap.parseHeaders() == BmpReaderError::Ok) {
+        LOG_DBG("SLP", "Loading: %s", deviceBmpPath);
+        renderBitmapSleepScreen(bitmap);
+        devFile.close();
+        if (dir) dir.close();
+        return;
+      }
+      devFile.close();
+    }
+  }
 
   // Look for sleep.bmp on the root of the sd card to determine if we should
   // render a custom sleep screen instead of the default.
@@ -192,7 +224,10 @@ void SleepActivity::renderCustomSleepScreen() const {
   }
   if (dir) dir.close();
 
-  renderDefaultSleepScreen();
+  // No custom image anywhere on the card: show the calendar rather than the
+  // logo. On the X4 renderCalendarSleepScreen refuses without an RTC and
+  // paints the default screen itself.
+  renderCalendarSleepScreen(5);
 }
 
 // Sleep screens paint with a single HALF refresh (stock parity): the OEM X4

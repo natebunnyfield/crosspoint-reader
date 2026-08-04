@@ -43,7 +43,10 @@ struct SettingInfo {
   const char* key = nullptr;             // JSON API key (nullptr for ACTION types)
   StrId category = StrId::STR_NONE_OPT;  // Category for web UI grouping
   bool obfuscated = false;               // Save/load via base64 obfuscation (passwords)
-  bool inTextSettings = false;  // Covered by the Text Settings screen (FontSelectionActivity); hidden from the flat Reader list
+  // There is no inTextSettings flag any more. It marked the two rows the
+  // Text Settings screen covers (font family and size) so the flat Reader list
+  // could hide them; the Reader tab is withdrawn, so nothing reads it and the
+  // list it referred to does not exist.
 
   // Direct char[] string fields (for settings stored in CrossPointSettings)
   size_t stringOffset = 0;
@@ -57,11 +60,6 @@ struct SettingInfo {
 
   SettingInfo& withObfuscated() {
     obfuscated = true;
-    return *this;
-  }
-
-  SettingInfo& withTextSettings() {
-    inTextSettings = true;
     return *this;
   }
 
@@ -151,27 +149,24 @@ struct SettingInfo {
 class SettingsActivity final : public Activity {
   ButtonNavigator buttonNavigator;
 
-  int selectedCategoryIndex = 0;  // Currently selected category
+  // Index into deviceSettings[]. Plain 0-based: there is no tab bar, so no
+  // row 0 standing in for one.
   int selectedSettingIndex = 0;
   int settingsCount = 0;
 
-  // Per-category settings derived from shared list + device-only actions.
-  // There is no displaySettings: the Display tab is withdrawn from the device
-  // UI. Its entries stay in getSettingsList() because that list also drives
-  // persistence (CrossPointSettings::fromJson/toJson) and the web settings API.
-  std::vector<SettingInfo> readerSettings;
-  std::vector<SettingInfo> systemSettings;
-  const std::vector<SettingInfo>* currentSettings = nullptr;
+  // The one list the device shows: the STR_CAT_SYSTEM entries of the shared
+  // list, plus the device-only actions. There is no displaySettings and no
+  // readerSettings — the Display, Controls and Reader tabs are all withdrawn
+  // from the device UI. Their entries stay in getSettingsList() because that
+  // list also drives persistence (CrossPointSettings::fromJson/toJson) and the
+  // web settings API.
+  std::vector<SettingInfo> deviceSettings;
 
   bool preserveQuickResumeTimeoutOn = false;
   bool quickResumeTimeoutAutoEnabled = false;
 
   OptionPopup optionPopup;
 
-  static constexpr int categoryCount = 2;
-  static const StrId categoryNames[categoryCount];
-
-  void enterCategory(int categoryIndex);
   void toggleCurrentSetting();
   void openSleepTimeoutPicker();
   void rebuildSettingsLists();

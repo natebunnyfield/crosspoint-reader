@@ -26,6 +26,7 @@
 #include "html/SettingsPageHtml.generated.h"
 #include "html/js/jszip_minJs.generated.h"
 #include "util/BookCacheUtils.h"
+#include "util/DeviceId.h"
 #include "util/TaskWatchdog.h"
 
 namespace {
@@ -173,7 +174,6 @@ void CrossPointWebServer::begin() {
   server->on("/api/fonts", HTTP_GET, [this] { handleFontList(); });
   server->on("/api/fonts/upload", HTTP_POST, [this] { handleFontUpload(); }, [this] { handleFontUploadData(); });
   server->on("/api/fonts/delete", HTTP_POST, [this] { handleFontDelete(); });
-
 
   // Wi-Fi credential endpoints
   server->on("/api/wifi", HTTP_GET, [this] { handleGetWifiNetworks(); });
@@ -405,6 +405,9 @@ void CrossPointWebServer::handleStatus() const {
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["uptime"] = millis() / 1000;
   doc["device"] = gpio.deviceIsX3() ? "X3" : "X4";
+  char deviceId[8];
+  getDeviceIdHex(deviceId, sizeof(deviceId));
+  doc["deviceId"] = deviceId;
 
   char snBuf[33] = {0};
   bool valid = false;
@@ -453,8 +456,11 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
     file.getName(name, sizeof(name));
     auto fileName = String(name);
 
-    // Skip hidden items (starting with ".")
-    bool shouldHide = !SETTINGS.showHiddenFiles && fileName.startsWith(".");
+    // Skip hidden items (starting with "."). Was gated on
+    // SETTINGS.showHiddenFiles, which had no row in SettingsList.h and so was
+    // neither settable nor persisted — it could only ever be 0, which is this.
+    // Removed 2026-08-04; behaviour here is unchanged.
+    bool shouldHide = fileName.startsWith(".");
 
     // Check against explicitly hidden items list
     if (!shouldHide) {
@@ -1347,7 +1353,6 @@ void CrossPointWebServer::handlePostSettings() {
   LOG_DBG("WEB", "Applied %d setting(s)", applied);
   server->send(200, "text/plain", String("Applied ") + String(applied) + " setting(s)");
 }
-
 
 // Uses POST (not HTTP DELETE) because ESP32 WebServer doesn't support DELETE with body.
 // ---- Wi-Fi Credentials API ----
