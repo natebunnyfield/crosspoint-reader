@@ -16,6 +16,7 @@
 #include "FontDownloadActivity.h"
 #endif
 #include "FontSelectionActivity.h"
+#include "SystemFont.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
 #ifndef CROSSPOINT_NO_NETWORK
@@ -298,6 +299,9 @@ void SettingsActivity::toggleCurrentSetting() {
   const auto& setting = (*currentSettings)[selectedSetting];
   const bool sleepScreenChanged = setting.valuePtr == &CrossPointSettings::sleepScreen;
   const bool quickResumeTimeoutChanged = setting.valuePtr == &CrossPointSettings::quickResumeSleepScreen;
+  // The system font has to be pushed into the renderer before anything repaints,
+  // otherwise the popup closes onto a screen still drawn in the old face.
+  const bool systemFontChanged = setting.valuePtr == &CrossPointSettings::systemFont;
 
   if (setting.nameId == StrId::STR_TIME_TO_SLEEP) {
     openSleepTimeoutPicker();
@@ -324,13 +328,17 @@ void SettingsActivity::toggleCurrentSetting() {
     const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
     if (setting.enumValues.size() > 2) {
       const auto valuePtr = setting.valuePtr;
-      optionPopup.show(setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()),
-                       currentValue, [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged](int idx) {
-                         SETTINGS.*valuePtr = idx;
-                         syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
-                         SETTINGS.saveToFile();
-                         rebuildSettingsLists();
-                       });
+      optionPopup.show(
+          setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()), currentValue,
+          [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged, systemFontChanged](int idx) {
+            SETTINGS.*valuePtr = idx;
+            // Before rebuildSettingsLists(), which measures rows with the UI
+            // font and would otherwise size them against the outgoing face.
+            if (systemFontChanged) applySystemFont(renderer);
+            syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
+            SETTINGS.saveToFile();
+            rebuildSettingsLists();
+          });
       requestUpdate();
       return;
     }

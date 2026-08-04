@@ -111,7 +111,16 @@ CROSSPOINT_RC_HASH=mytag pio run -e gh_release_rc   # -> 1.5.0-rc+mytag
 ```
 The dev version carries no dirty marker: a build from a modified working tree
 reports the same string as a clean build of the same commit. If a binary has to
-be identifiable later, stamp it this way or commit first.
+be identifiable later, stamp it this way or commit first — and build shipping
+bins from a clean throwaway worktree, because the main checkout routinely carries
+someone's uncommitted WIP that would land in the binary invisibly.
+
+`CROSSPOINT_RC_HASH` also feeds `project.checksum`, so **toggling it between runs
+wipes every environment's build directory** — the same blast radius as editing
+`platformio.ini` (below), and easy to trigger by accident when you dip into
+`gh_release_rc` once just to read a Flash number. Hold the value constant across
+a session; a mid-session measurement otherwise costs you the `simulator` build
+you were iterating on.
 
 **Editing `platformio.ini` wipes every build directory.** Any change alters
 `.pio/build/project.checksum`, and the next `pio run` cleans *all* env build
@@ -260,7 +269,15 @@ regressed or a local source is missing.
 LexicaUltralegible, LibreFranklin.** Buildable is not installed: everything else
 stays a recipe only. Every surface carries exactly these six — device SD cards,
 `fs_/fonts/`, and the iOS seed bundle (`crosspoint-simulator/ios/seedfonts/`),
-each with its `2x/` hi-res companions. Do not install additional families
+each with its `2x/` hi-res companions. Verified byte-identical across all four
+on 2026-08-03 (48 `.cpfont` files each); that sweep also found one 16 KB cluster
+of `Rosarivo_16.cpfont` on BUNNYFIELDS overwritten with foreign data, so compare
+hashes rather than filenames when checking a card.
+
+**Libre Franklin is additionally compiled into the firmware**, as one of the four
+System font choices for the UI chrome (8/10/12 pt). That is a separate artifact
+from its `.cpfont` reading cuts (10/12/14/16 pt), which stay on the card — the
+built-in sizes are too small to read at. Costs ~134 KB of flash on device. Do not install additional families
 anywhere without a new ruling; see docs/sd-card-fonts.md "S tier".
 
 The two sans came off two benches, both rendered through the real renderer at
@@ -609,7 +626,41 @@ void onExit()   { /* free: vTaskDelete, free buffer, close member FsFiles */ Act
 **All fonts are loaded as global static objects** at firmware startup:
 - Noto Serif: 12, 14, 16, 18pt (4 styles each: regular, bold, italic, bold-italic)
 - Noto Sans: 12, 14, 16, 18pt (4 styles each)
-- Ubuntu UI fonts: 10, 12pt (2 styles)
+- System-font matrix: Ubuntu, Noto Sans, Noto Serif and Libre Franklin at
+  8/10/12pt, regular + bold, plus a `_2x` companion of each on a
+  `CROSSPOINT_RENDER_SCALE > 1` host build. Regenerate with
+  `lib/EpdFont/scripts/convert-builtin-fonts.sh`, which now scripts the whole
+  matrix (it previously covered neither the 8pt nor any 2x cut).
+
+**Which faces the UI chrome actually draws with.** Three ids carry all of it:
+`SMALL_FONT_ID` (22 draw sites — battery readout, page counters), `UI_10_FONT_ID`
+and `UI_12_FONT_ID` (27 sites — headers, list rows, button hints, popups). Which
+*family* fills them is the **System font** setting (`SETTINGS.systemFont`,
+System tab), and `applySystemFont()` in `main.cpp` binds all three at once from
+a 3x2 matrix — 8/10/12 pt, regular and bold. Offered: Ubuntu, Noto Sans, Noto
+Serif, **Libre Franklin (the default since 2026-08-03)**. Before that the three
+were hardcoded to Noto Sans 8 + Ubuntu 10/12. The Noto Sans/Serif 12–18 families
+still appear only in `getReaderFontId()`'s built-in fallback and the calendar
+sleep screen. Confirm with:
+```bash
+grep -rn "NOTOSERIF_\|NOTOSANS_" --include=*.cpp --include=*.h src/ lib/ | grep -v fontIds.h | grep -v main.cpp
+```
+
+Two traps in that path, both of which shipped as silent wrong-pixel bugs:
+
+* **`insertFont()` refuses to overwrite** — it logs `Font ID N already
+  registered, ignoring duplicate` and returns. `applySystemFont()` runs at boot
+  *and* on every change of the setting, so it must use **`replaceFont()`**.
+  Going through `insertFont` made every change after boot a no-op: the settings
+  row read "Ubuntu" while every pixel stayed on the old face until reboot.
+* **Built-in hi-res companions are not SD fonts.** `registerHiResBuiltinFont()`
+  puts them in `hiResFontMap_` only. `clearSdCardFonts()` must therefore clear
+  *only* the SD-backed entries (`clearSdCardHiResFonts()`); clearing the map
+  outright wiped the chrome's 2x bitmaps on the first reader font/size change,
+  since every one of those routes through `SdCardFontManager::unloadAll()`.
+
+Both are covered by `test/system_font/`, built at `CROSSPOINT_RENDER_SCALE=2` —
+at scale 1 the hi-res path compiles out and those cases assert nothing.
 
 **Total**: ~80+ global `EpdFont` and `EpdFontFamily` objects
 

@@ -14,3 +14,8 @@
 !OpenDyslexic/**
 !Ubuntu/
 !Ubuntu/**
+# Libre Franklin ships as a variable font upstream; these are the wght 400 and
+# 700 instances cut by build-sd-fonts.py, committed as statics so
+# convert-builtin-fonts.sh reproduces the UI headers without a network fetch.
+!LibreFranklin/
+!LibreFranklin/**

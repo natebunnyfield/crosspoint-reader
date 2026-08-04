@@ -23,6 +23,7 @@
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
+#include "SystemFont.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #ifndef CROSSPOINT_NO_NETWORK
@@ -109,16 +110,99 @@ EpdFontFamily notosans18FontFamily(&notosans18RegularFont, &notosans18BoldFont, 
 
 #endif  // OMIT_FONTS
 
-EpdFont smallFont(&notosans_8_regular);
-EpdFontFamily smallFontFamily(&smallFont);
+// The UI faces used to be three fixed globals here (Noto Sans 8, Ubuntu 10 and
+// Ubuntu 12). They are now the Ubuntu column of the system-font matrix below --
+// byte-for-byte the same faces, still reachable, just no longer the default.
 
-EpdFont ui10RegularFont(&ubuntu_10_regular);
-EpdFont ui10BoldFont(&ubuntu_10_bold);
-EpdFontFamily ui10FontFamily(&ui10RegularFont, &ui10BoldFont);
+// --- System font families ---------------------------------------------------
+//
+// The UI draws at three sizes and the System font setting swaps all three at
+// once, so each offered family is a 3x2 matrix: 8/10/12 pt, regular and bold.
+// Libre Franklin is the default; Ubuntu is what every build before this used.
+//
+// SMALL (8 pt) has a bold face now where it previously had only regular. That
+// is additive -- nothing asked for bold at 8 pt before, and EpdFontFamily falls
+// back to regular for a style it lacks, so the old single-face behaviour is
+// still what an 8pt bold request gets on any family that has no bold cut.
+#define CP_UI_FAMILY(sym, r8, b8, r10, b10, r12, b12) \
+  EpdFont sym##8R(&r8), sym##8B(&b8);                 \
+  EpdFontFamily sym##8(&sym##8R, &sym##8B);           \
+  EpdFont sym##10R(&r10), sym##10B(&b10);             \
+  EpdFontFamily sym##10(&sym##10R, &sym##10B);        \
+  EpdFont sym##12R(&r12), sym##12B(&b12);             \
+  EpdFontFamily sym##12(&sym##12R, &sym##12B)
 
-EpdFont ui12RegularFont(&ubuntu_12_regular);
-EpdFont ui12BoldFont(&ubuntu_12_bold);
-EpdFontFamily ui12FontFamily(&ui12RegularFont, &ui12BoldFont);
+CP_UI_FAMILY(sysUbuntu, ubuntu_8_regular, ubuntu_8_bold, ubuntu_10_regular, ubuntu_10_bold, ubuntu_12_regular,
+             ubuntu_12_bold);
+CP_UI_FAMILY(sysNotoSans, notosans_8_regular, notosans_8_bold, notosans_10_regular, notosans_10_bold,
+             notosans_12_regular, notosans_12_bold);
+CP_UI_FAMILY(sysNotoSerif, notoserif_8_regular, notoserif_8_bold, notoserif_10_regular, notoserif_10_bold,
+             notoserif_12_regular, notoserif_12_bold);
+CP_UI_FAMILY(sysLibreFranklin, librefranklin_8_regular, librefranklin_8_bold, librefranklin_10_regular,
+             librefranklin_10_bold, librefranklin_12_regular, librefranklin_12_bold);
+
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
+// The same matrix at double the ppem, for glyph blitting only. Named for the 1x
+// face each stands in for; their own point sizes are 16/20/24.
+CP_UI_FAMILY(sysUbuntu2x, ubuntu_8_regular_2x, ubuntu_8_bold_2x, ubuntu_10_regular_2x, ubuntu_10_bold_2x,
+             ubuntu_12_regular_2x, ubuntu_12_bold_2x);
+CP_UI_FAMILY(sysNotoSans2x, notosans_8_regular_2x, notosans_8_bold_2x, notosans_10_regular_2x, notosans_10_bold_2x,
+             notosans_12_regular_2x, notosans_12_bold_2x);
+CP_UI_FAMILY(sysNotoSerif2x, notoserif_8_regular_2x, notoserif_8_bold_2x, notoserif_10_regular_2x, notoserif_10_bold_2x,
+             notoserif_12_regular_2x, notoserif_12_bold_2x);
+CP_UI_FAMILY(sysLibreFranklin2x, librefranklin_8_regular_2x, librefranklin_8_bold_2x, librefranklin_10_regular_2x,
+             librefranklin_10_bold_2x, librefranklin_12_regular_2x, librefranklin_12_bold_2x);
+#endif
+#undef CP_UI_FAMILY
+
+// One row per offered family, in CrossPointSettings::SYSTEM_FONT order, so the
+// setting's stored value indexes straight in. A table rather than an if-chain
+// because the 2x table below has to be selected by the SAME index: two parallel
+// chains let a family end up drawing one face's bitmaps against another's
+// metrics the first time someone extends one chain and not the other.
+static EpdFontFamily* const kSystemFonts[][3] = {
+    {&sysUbuntu8, &sysUbuntu10, &sysUbuntu12},
+    {&sysNotoSans8, &sysNotoSans10, &sysNotoSans12},
+    {&sysNotoSerif8, &sysNotoSerif10, &sysNotoSerif12},
+    {&sysLibreFranklin8, &sysLibreFranklin10, &sysLibreFranklin12},
+};
+static_assert(sizeof(kSystemFonts) / sizeof(kSystemFonts[0]) == CrossPointSettings::SYSTEM_FONT_COUNT,
+              "system font table and SYSTEM_FONT enum disagree");
+
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
+static EpdFontFamily* const kSystemFonts2x[][3] = {
+    {&sysUbuntu2x8, &sysUbuntu2x10, &sysUbuntu2x12},
+    {&sysNotoSans2x8, &sysNotoSans2x10, &sysNotoSans2x12},
+    {&sysNotoSerif2x8, &sysNotoSerif2x10, &sysNotoSerif2x12},
+    {&sysLibreFranklin2x8, &sysLibreFranklin2x10, &sysLibreFranklin2x12},
+};
+static_assert(sizeof(kSystemFonts2x) / sizeof(kSystemFonts2x[0]) == CrossPointSettings::SYSTEM_FONT_COUNT,
+              "hi-res system font table and SYSTEM_FONT enum disagree");
+#endif
+
+// Swap every UI slot to the chosen family. Called at boot and again whenever the
+// System font setting changes, so the change lands without a restart:
+// replaceFont rebinds the entry the whole UI already draws through, and the next
+// render picks it up. Metrics come from these same families, so layout recomputes with
+// the new face rather than keeping the outgoing one's spacing.
+void applySystemFont(GfxRenderer& renderer) {
+  // A settings.json carried over from a build that offered fewer families can
+  // hold a value past the end of the table; fall back rather than index out.
+  const uint8_t choice = SETTINGS.systemFont < CrossPointSettings::SYSTEM_FONT_COUNT
+                             ? SETTINGS.systemFont
+                             : static_cast<uint8_t>(CrossPointSettings::SYSTEM_FONT_LIBREFRANKLIN);
+  // replaceFont, not insertFont: this runs again on every change of the setting,
+  // and insertFont refuses to overwrite an id it already holds.
+  renderer.replaceFont(SMALL_FONT_ID, *kSystemFonts[choice][0]);
+  renderer.replaceFont(UI_10_FONT_ID, *kSystemFonts[choice][1]);
+  renderer.replaceFont(UI_12_FONT_ID, *kSystemFonts[choice][2]);
+
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
+  renderer.registerHiResBuiltinFont(SMALL_FONT_ID, *kSystemFonts2x[choice][0]);
+  renderer.registerHiResBuiltinFont(UI_10_FONT_ID, *kSystemFonts2x[choice][1]);
+  renderer.registerHiResBuiltinFont(UI_12_FONT_ID, *kSystemFonts2x[choice][2]);
+#endif
+}
 
 // measurement of power button press duration calibration value
 unsigned long t1 = 0;
@@ -263,9 +347,9 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(NOTOSANS_16_FONT_ID, notosans16FontFamily);
   renderer.insertFont(NOTOSANS_18_FONT_ID, notosans18FontFamily);
 #endif  // OMIT_FONTS
-  renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
-  renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
-  renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
+  // Fills SMALL / UI_10 / UI_12 from the chosen system font, and on a 2x build
+  // registers the matching hi-res companions alongside them.
+  applySystemFont(renderer);
 
   // Discover and load SD card fonts
   sdFontSystem.begin(renderer);
@@ -459,8 +543,7 @@ void setup() {
     // hatch for the two cases that need it — crash recovery
     // (readerActivityLoadCount) and holding BACK during boot — so a bad book
     // cannot brick the device.
-    if (!mappedInputManager.isPressed(MappedInputManager::Button::Back) &&
-        APP_STATE.readerActivityLoadCount == 0) {
+    if (!mappedInputManager.isPressed(MappedInputManager::Button::Back) && APP_STATE.readerActivityLoadCount == 0) {
       std::string zenPath = APP_STATE.openEpubPath;
       if (zenPath.empty()) {
         HalFile books = Storage.open("/books");

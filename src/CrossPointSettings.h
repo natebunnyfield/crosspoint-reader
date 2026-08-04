@@ -140,6 +140,16 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // different theme. LYRA_SIX is therefore 4, at the end, even though it
   // belongs with the other Lyra entries.
   enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2, ROUNDEDRAFF = 3, LYRA_SIX = 4 };
+  // Order is the picker's order and the persisted value, so it is frozen:
+  // Ubuntu must stay 0 or every settings.json that already names a system font
+  // would silently change the UI face on the next boot. New families append.
+  enum SYSTEM_FONT {
+    SYSTEM_FONT_UBUNTU = 0,
+    SYSTEM_FONT_NOTOSANS = 1,
+    SYSTEM_FONT_NOTOSERIF = 2,
+    SYSTEM_FONT_LIBREFRANKLIN = 3,
+    SYSTEM_FONT_COUNT
+  };
 
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
@@ -246,6 +256,16 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // UI Theme. Fresh installs only: any device that has ever written
   // settings.json already has a uiTheme key and keeps whatever it holds.
   uint8_t uiTheme = LYRA_SIX;
+  // Typeface the UI chrome is drawn in -- headers, list rows, button hints,
+  // popups, the battery readout. Swaps all three UI sizes (8/10/12 pt) at once;
+  // the reader's body face is a separate setting and is not affected.
+  // Libre Franklin is the default: the grotesque bench picked it as the fork's
+  // text sans, and the chrome should be set in the same face the reader is.
+  // This DOES change the UI face on a device upgrading from a build that had no
+  // systemFont key -- there is no value to preserve there, and the alternative
+  // is a default nobody chose. A settings.json that already names a font keeps
+  // it; Ubuntu stays available and unchanged at index 0.
+  uint8_t systemFont = SYSTEM_FONT_LIBREFRANKLIN;
   // Sunlight fading compensation
   uint8_t fadingFix = 0;
   // Power button return from footnotes (1 = enabled, 0 = disabled)
