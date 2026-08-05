@@ -59,6 +59,18 @@ class KeyboardEntryActivity : public Activity {
   int selRow = 0;
   int selCol = 0;
 
+  // 13-grid mode (SETTINGS.keyboardLayout == KEYBOARD_GRID13): one app-defined
+  // layer whose rows all sum to 13 width units. Vertical moves keep an integer
+  // column anchor instead of the proportional index remap, so Up/Down always
+  // lands on the key occupying the same column; wide keys (Del/Space/OK) clamp
+  // the anchor into their span on horizontal entry and give the column back on
+  // exit.
+  bool grid13 = false;
+  int8_t anchorCol = 6;
+  int keyIndexAtUnit(int row, int unit) const;
+  void keyUnitSpan(int row, int keyIdx, int& start, int& end) const;
+  void syncAnchorToSelection();
+
   bool confirmHeld = false;
   bool confirmLongHandled = false;
 

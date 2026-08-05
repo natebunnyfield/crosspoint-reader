@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstring>
 
+#include "CrossPointSettings.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -92,6 +93,40 @@ const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("abc", fui::KeyKind::Mode, fui::
                                             UKW("URL", nullptr, URL_PANEL_VALUE, 2),
                                             UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2),
                                             UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 2)};
+
+// ---------------------------------------------------------------------------
+// 13-grid split-letters layout ("Class rows", ruled 2026-08-04). One layer:
+// numbers, symbols, a-m, n-z, Del/Space/OK -- no Shift, no symbols mode, full
+// printable ASCII (the number row gains - ' = so nothing is uneven). Every row
+// sums to 13 width units and the bottom row is 3+7+3, so the column-anchor
+// navigation in moveSelectionRow/Col is integer-exact. Letters carry no
+// explicit alt: keyboardAltOutputFor's case-flip supplies uppercase on
+// long-press without printing it on the key face (display ruling).
+// ---------------------------------------------------------------------------
+const fui::KeyboardKey SL_NUM[] = {UKA("1", "1", '1', "!"), UKA("2", "2", '2', "@"), UKA("3", "3", '3', "#"),
+                                   UKA("4", "4", '4', "$"), UKA("5", "5", '5', "%"), UKA("6", "6", '6', "^"),
+                                   UKA("7", "7", '7', "&"), UKA("8", "8", '8', "*"), UKA("9", "9", '9', "("),
+                                   UKA("0", "0", '0', ")"), UKA("-", "-", '-', "_"), UKA("'", "'", '\'', "\""),
+                                   UKA("=", "=", '=', "+")};
+const fui::KeyboardKey SL_SYM[] = {UKA(".", ".", '.', ">"), UKA(",", ",", ',', "<"), UKA("/", "/", '/', "\\"),
+                                   UKA(":", ":", ':', "|"), UK(";", ";", ';'),       UK("?", "?", '?'),
+                                   UK("!", "!", '!'),       UK("@", "@", '@'),       UK("&", "&", '&'),
+                                   UK("+", "+", '+'),       UKA("[", "[", '[', "{"), UKA("]", "]", ']', "}"),
+                                   UKA("`", "`", '`', "~")};
+const fui::KeyboardKey SL_AM[] = {UK("a", "a", 'a'), UK("b", "b", 'b'), UK("c", "c", 'c'), UK("d", "d", 'd'),
+                                  UK("e", "e", 'e'), UK("f", "f", 'f'), UK("g", "g", 'g'), UK("h", "h", 'h'),
+                                  UK("i", "i", 'i'), UK("j", "j", 'j'), UK("k", "k", 'k'), UK("l", "l", 'l'),
+                                  UK("m", "m", 'm')};
+const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), UK("p", "p", 'p'), UK("q", "q", 'q'),
+                                  UK("r", "r", 'r'), UK("s", "s", 's'), UK("t", "t", 't'), UK("u", "u", 'u'),
+                                  UK("v", "v", 'v'), UK("w", "w", 'w'), UK("x", "x", 'x'), UK("y", "y", 'y'),
+                                  UK("z", "z", 'z')};
+const fui::KeyboardKey SL_BOTTOM[] = {UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 3),
+                                      UKW(" ", " ", ' ', 7), UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 3)};
+
+const fui::KeyboardRow SL_ROWS[] = {
+    {SL_NUM, 13, 0}, {SL_SYM, 13, 0}, {SL_AM, 13, 0}, {SL_NZ, 13, 0}, {SL_BOTTOM, 3, 0}};
+const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 5};
 
 #undef UK
 #undef UKA
@@ -252,11 +287,20 @@ void KeyboardEntryActivity::onEnter() {
   shifted = false;
   symbols = false;
   urlPanel = false;
+  // 13-grid replaces every layer for all input types (URL fields lose the
+  // snippet panel: its workhorses : / . are full keys on the one layer).
+  grid13 = SETTINGS.keyboardLayout == CrossPointSettings::KEYBOARD_GRID13;
   cursorMode = false;
   togglePos = false;
   passwordVisible = false;
-  selRow = 0;
-  selCol = 0;
+  if (grid13) {
+    selRow = 2;  // start on 'g' -- the letter-row center, playground default
+    selCol = 6;
+    anchorCol = 6;
+  } else {
+    selRow = 0;
+    selCol = 0;
+  }
   delPressCount = 0;
   hintVisible = false;
   hintShowTime = 0;
@@ -274,6 +318,7 @@ void KeyboardEntryActivity::onEnter() {
 void KeyboardEntryActivity::onExit() { Activity::onExit(); }
 
 const fui::KeyboardLayout& KeyboardEntryActivity::currentLayout() const {
+  if (grid13) return SL_LAYOUT;
   if (symbols) return fui::builtinKeyboardLayout(layoutId, shifted, true);
   if (inputType == InputType::Url) {
     if (urlPanel) return URL_SNIPPET_LAYOUT;
@@ -316,6 +361,13 @@ void KeyboardEntryActivity::clampSelection() {
 void KeyboardEntryActivity::moveSelectionRow(const int delta) {
   const fui::KeyboardLayout& layout = currentLayout();
   if (layout.rowCount == 0) return;
+  if (grid13) {
+    // Column anchor: vertical moves never change the column. All rows sum to
+    // 13 units, so the unit lookup is exact -- no proportional remap.
+    selRow = (selRow + delta + layout.rowCount) % layout.rowCount;
+    selCol = keyIndexAtUnit(selRow, anchorCol);
+    return;
+  }
   const int oldCols = selRow < layout.rowCount ? layout.rows[selRow].count : 1;
   selRow = (selRow + delta + layout.rowCount) % layout.rowCount;
   const int newCols = layout.rows[selRow].count;
@@ -333,6 +385,48 @@ void KeyboardEntryActivity::moveSelectionCol(const int delta) {
   const int cols = layout.rows[selRow].count;
   if (cols <= 0) return;
   selCol = (selCol + delta + cols) % cols;
+  if (grid13) {
+    // Keep the anchor inside the entered key: minimal movement, so a wide key
+    // remembers which column it was entered from and returns it on exit.
+    int start = 0;
+    int end = 0;
+    keyUnitSpan(selRow, selCol, start, end);
+    if (anchorCol < start) anchorCol = static_cast<int8_t>(start);
+    if (anchorCol > end - 1) anchorCol = static_cast<int8_t>(end - 1);
+  }
+}
+
+int KeyboardEntryActivity::keyIndexAtUnit(const int row, const int unit) const {
+  const fui::KeyboardLayout& layout = currentLayout();
+  if (row < 0 || row >= layout.rowCount) return 0;
+  const fui::KeyboardRow& r = layout.rows[row];
+  int acc = 0;
+  for (int i = 0; i < r.count; i++) {
+    acc += r.keys[i].widthUnits;
+    if (unit < acc) return i;
+  }
+  return r.count > 0 ? r.count - 1 : 0;
+}
+
+void KeyboardEntryActivity::keyUnitSpan(const int row, const int keyIdx, int& start, int& end) const {
+  const fui::KeyboardLayout& layout = currentLayout();
+  start = 0;
+  end = 1;
+  if (row < 0 || row >= layout.rowCount) return;
+  const fui::KeyboardRow& r = layout.rows[row];
+  int acc = 0;
+  for (int i = 0; i < r.count && i <= keyIdx; i++) {
+    start = acc;
+    acc += r.keys[i].widthUnits;
+    end = acc;
+  }
+}
+
+void KeyboardEntryActivity::syncAnchorToSelection() {
+  int start = 0;
+  int end = 0;
+  keyUnitSpan(selRow, selCol, start, end);
+  anchorCol = static_cast<int8_t>(start + (end - 1 - start) / 2);
 }
 
 bool KeyboardEntryActivity::syncSelectionToValue(const int16_t value) {
@@ -643,6 +737,7 @@ void KeyboardEntryActivity::loop() {
                            static_cast<int16_t>(tapX), static_cast<int16_t>(tapY), inContact, millis());
     if (result.event) {
       syncSelectionToValue(result.event.value);
+      if (grid13) syncAnchorToSelection();  // touch jump: anchor = tapped key's center
       if (activateValue(result.event.value, result.event.longPress)) {
         requestUpdate();
       }
@@ -987,7 +1082,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   } else if (symbols) {
     tipCount = !text.empty() ? 1 : 0;
   } else {
-    tipCount = 1 + (inputType == InputType::Url ? 1 : 0) + (!text.empty() ? 1 : 0);
+    // grid13 has no snippet panel, so URL fields drop that tip line.
+    tipCount = 1 + (inputType == InputType::Url && !grid13 ? 1 : 0) + (!text.empty() ? 1 : 0);
   }
 
   if (tipCount > 0) {
@@ -1008,7 +1104,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
       }
     } else {
       const char* altCharTip;
-      if (inputType == InputType::Url) {
+      if (inputType == InputType::Url && !grid13) {
         altCharTip = tr(STR_KB_HINT_SECONDARY_CHAR);
       } else if (shifted) {
         altCharTip = tr(STR_KB_HINT_LOWER_SECONDARY);
@@ -1017,7 +1113,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
       }
       drawTip(altCharTip, y);
       y += tipsLh;
-      if (inputType == InputType::Url) {
+      if (inputType == InputType::Url && !grid13) {
         drawTip(tr(STR_KB_HINT_URL_SNIPPETS), y);
         y += tipsLh;
       }
