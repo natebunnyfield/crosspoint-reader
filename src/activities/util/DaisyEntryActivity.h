@@ -9,7 +9,8 @@
 #include "util/ButtonNavigator.h"
 
 // Daisywheel text entry per docs/daisywheel.md (ruled 2026-08-04): two rings
-// of 3-char petals around a hub preview. Front Left/Right rotate the focus
+// of 3-char petals around an empty hub; the underlined text field above the
+// wheel is the one text preview. Front Left/Right rotate the focus
 // (wrapping, auto-repeat); side Up / Confirm / side Down pick the top / middle
 // / bottom char of the focused petal; long-press on a pick = uppercase and
 // nothing else. The last petal of each ring is the utility petal (backspace /
@@ -60,6 +61,9 @@ class DaisyEntryActivity : public Activity {
   void swapRing();
   void insertChar(char c);
   void backspace();
+  // Vertical distance between adjacent slot centers: the font's line advance,
+  // clamped so the column fits the current ring's wedge at every angle.
+  int slotSpacing() const;
   void slotCenter(int petal, int slot, int& outX, int& outY) const;
 
   void onComplete(std::string text);
