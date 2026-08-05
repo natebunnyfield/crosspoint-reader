@@ -21,10 +21,12 @@
 #include "fontIds.h"
 
 int HomeActivity::getMenuItemCount() const {
+  // SPIKE: +1 for the BLE Editor row. This count is what bounds selectorIndex —
+  // leave it stale and the extra row renders but the selector cannot reach it.
 #ifndef CROSSPOINT_NO_NETWORK
-  int count = 5;  // File Browser, Recents, File Transfer, Manage Files, Settings
+  int count = 6;  // File Browser, Recents, File Transfer, Manage Files, Settings, BLE Editor
 #else
-  int count = 4;  // File Browser, Recents, Manage Files, Settings (no File Transfer on this platform)
+  int count = 5;  // File Browser, Recents, Manage Files, Settings, BLE Editor (no File Transfer here)
 #endif
   if (!recentBooks.empty()) {
     count += recentBooks.size();

@@ -169,3 +169,66 @@ uses) — worth one manual check on device.
 
 Copy (needs a chunked SD→SD stream pump + progress popup), New folder, Details
 popup (size/path/has-cache), mark-mode multi-select batch operations.
+
+### Text editor — BLE keyboard feasibility spike (2026-08-05)
+
+The editor was deferred pending a measurement: does a resident BLE HID host fit
+the C3's budget alongside the reader? Spike branch `spike/ble-editor`
+(`3cb0c4bf`) answers it. **Throwaway — never merged; the deliverable is the
+numbers below.**
+
+**Hardware constraint, settled.** The ESP32-C3 has BLE 5.0 and *no* Bluetooth
+Classic, so the keyboard must speak HID-over-GATT (HOGP). Test keyboard: Geonix
+rev.2, `Services: 0x400000 < BLE >`, static random address — BLE-only, confirmed
+by `system_profiler SPBluetoothDataType` before any code was written. Note that
+a BLE peripheral does not advertise while connected to another host, so the
+keyboard must be freed (or moved to a spare BT profile slot) before the device
+can scan it.
+
+**No sdkconfig work was needed, contrary to expectation.** Stock arduino-esp32
+for the C3 already ships `CONFIG_BT_ENABLED=y`, `CONFIG_BT_NIMBLE_ENABLED=y`,
+`CONFIG_BT_NIMBLE_ROLE_CENTRAL=y`, `CONFIG_BT_NIMBLE_GATT_CLIENT=y`,
+`SECURITY_ENABLE=y` and `NVS_PERSIST=y`, and the `custom_sdkconfig` isolated
+core rebuild preserves every one of them. So the CLAUDE.md warning about
+`platformio.ini` edits wiping all build dirs never applied: **zero edits.**
+
+The spike therefore uses the **raw ESP-IDF NimBLE C API**, not NimBLE-Arduino.
+NimBLE-Arduino 2.x bundles its own copy of the host while `libbt.a` already
+defines `ble_gap_connect` / `ble_hs_init` / `ble_gattc_disc_all_svcs`, which is
+a duplicate-symbol gamble, and adding it means a `lib_deps` line and a full
+wipe. One catch: PlatformIO does not put the `bt/` include dirs on the compile
+line for *project* sources (325 `-I` flags reach a project TU, none nimble), so
+`spike-build.sh` injects them via `PLATFORMIO_BUILD_FLAGS` — which feeds
+`project.checksum`, so hold it constant across a session or every build
+rebuilds.
+
+**Build cost (host build, exact):**
+
+| | baseline | +BLE HID host | delta |
+|---|---|---|---|
+| RAM (static, `.data`+`.bss`) | 50,508 B | 52,892 B | **+2,384 B** |
+| Flash | 4,087,725 B | 4,310,035 B | **+222,310 B** |
+
+Static RAM is only the spike's own state; the controller and host claim their
+working memory from the heap at `nimble_port_init()`.
+
+**Runtime heap (device-confirmed on X4, `-e default`):**
+
+| Point | Free heap |
+|---|---|
+| P0 — boot, end of `setup()`, no BLE | 137,772 B (total 253,688, maxalloc 114,676) |
+| P0b — Home idle, covers painted | 97,616 B |
+| P1 — editor entered, before BLE | *pending* |
+| P2 — after `nimble_port_init()` + host task | *pending* |
+| P3 — connected, bonded, subscribed | *pending* |
+| P4 — while typing | *pending* |
+
+Everything marked *pending* is **UNCONFIRMED** — not yet observed on the X4.
+The verdict (resident host vs connect-on-demand) turns on P2–P4 against the
+>50 KB-free-while-reading bar and is not yet decided.
+
+**One real bug this surfaced in shipped code**, worth knowing before any future
+home-menu row is added: `HomeActivity::getMenuItemCount()` hardcodes the row
+count, and it is what bounds `selectorIndex`. Add a row to the `menuItems`
+vector and forget the count and the row **renders but cannot be selected** — it
+looks like a dead menu entry, not an off-by-one.

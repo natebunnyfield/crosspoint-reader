@@ -1,0 +1,87 @@
+[2252]   Wait complete: refresh (1674 ms)
+[2296] [INF] [SPIKE] SPIKE-HEAP P0-boot-no-ble free=137772 total=253688 minfree=137772 maxalloc=114676
+[2301] [DBG] [ACT] Exiting activity: Boot
+[2301] [DBG] [ACT] Entering activity: Home
+[2349] [DBG] [GFX] Cropping 142x226 by 6x0 pix, is top-down
+[2349] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2408] [DBG] [GFX] Cropping 151x226 by 10x0 pix, is top-down
+[2409] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2472] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[2473] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2534] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[2535] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2593] [DBG] [GFX] Time = 257 ms from clearScreen to displayBuffer
+[3114]   Wait complete: refresh (497 ms)
+[3174] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[3695]   Wait complete: refresh (497 ms)
+[5300] [DBG] [PWR] Going to low-power mode
+[10010] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[20032] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[30054] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[40076] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[50098] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[60120] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[70142] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[80164] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[90186] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[100208] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[110230] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[120251] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[130273] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[170359] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[180381] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[190403] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[190517] [DBG] [PWR] Restoring normal CPU frequency
+[190529] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[191049]   Wait complete: refresh (497 ms)
+[191103] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[191624]   Wait complete: refresh (497 ms)
+[191943] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[192463]   Wait complete: refresh (496 ms)
+[192682] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[193202]   Wait complete: refresh (496 ms)
+[193337] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[193857]   Wait complete: refresh (496 ms)
+[193911] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[194431]   Wait complete: refresh (497 ms)
+[194485] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[195005]   Wait complete: refresh (497 ms)
+[197807] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[198327]   Wait complete: refresh (497 ms)
+[198381] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[198901]   Wait complete: refresh (497 ms)
+[200414] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[205267] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[205787]   Wait complete: refresh (497 ms)
+[205841] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[206361]   Wait complete: refresh (497 ms)
+[210419] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[210609] [DBG] [PWR] Going to low-power mode
+[220462] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[230484] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[240506] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[250528] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[2251]   Wait complete: refresh (1673 ms)
+[2295] [INF] [SPIKE] SPIKE-HEAP P0-boot-no-ble free=137772 total=253688 minfree=137772 maxalloc=114676
+[2300] [DBG] [ACT] Exiting activity: Boot
+[2300] [DBG] [ACT] Entering activity: Home
+[2348] [DBG] [GFX] Cropping 142x226 by 6x0 pix, is top-down
+[2348] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2407] [DBG] [GFX] Cropping 151x226 by 10x0 pix, is top-down
+[2408] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2471] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[2472] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2533] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[2534] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2592] [DBG] [GFX] Time = 257 ms from clearScreen to displayBuffer
+[3112]   Wait complete: refresh (496 ms)
+[3173] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[3693]   Wait complete: refresh (496 ms)
+[5299] [DBG] [PWR] Going to low-power mode
+[10009] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[20031] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[30053] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[40075] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[50097] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[60119] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[70141] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
