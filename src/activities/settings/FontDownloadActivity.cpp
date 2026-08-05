@@ -642,6 +642,7 @@ void FontDownloadActivity::render(RenderLock&&) {
 
     std::string statusText = std::string(tr(STR_DOWNLOADING)) + " " + family.name + " (" +
                              std::to_string(currentFileIndex_ + 1) + "/" + std::to_string(currentFileTotal_) + ")";
+    statusText = renderer.truncatedText(UI_10_FONT_ID, statusText.c_str(), pageWidth - metrics.contentSidePadding * 2);
     renderer.drawCenteredText(UI_10_FONT_ID, centerY - lineHeight, statusText.c_str());
 
     float progress = 0;
@@ -665,7 +666,9 @@ void FontDownloadActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_10_FONT_ID, centerY - lineHeight, tr(STR_FONT_INSTALL_FAILED), true,
                               EpdFontFamily::BOLD);
     if (!errorMessage_.empty()) {
-      renderer.drawCenteredText(UI_10_FONT_ID, centerY + metrics.verticalSpacing, errorMessage_.c_str());
+      const std::string safeError =
+          renderer.truncatedText(UI_10_FONT_ID, errorMessage_.c_str(), pageWidth - metrics.contentSidePadding * 2);
+      renderer.drawCenteredText(UI_10_FONT_ID, centerY + metrics.verticalSpacing, safeError.c_str());
     }
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_RETRY), "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
