@@ -26,6 +26,14 @@ void BleEditorActivity::onEnter() {
 
   logHeap("P1-editor-enter-before-ble");
 
+  // BLE FIRST, buffer second. nimble_port_init() wants ~65 KB and a large
+  // contiguous block; at ~86 KB free / ~73 KB maxalloc it is nondeterministic —
+  // observed both succeeding and HARD-HANGING the device (no panic, no reboot,
+  // USB CDC still enumerated but the firmware answers nothing). Allocating the
+  // editor's 8 KB first made that boundary worse for no reason.
+  blespike::begin();
+  logHeap("P2-after-ble-init");
+
   buf = makeUniqueNoThrow<char[]>(BUF_SIZE);
   if (!buf) {
     LOG_ERR(TAG, "OOM: %u bytes", (unsigned)BUF_SIZE);
@@ -41,8 +49,7 @@ void BleEditorActivity::onEnter() {
   if (maxLines > static_cast<int>(MAX_TRACKED_LINES)) maxLines = static_cast<int>(MAX_TRACKED_LINES);
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
 
-  blespike::begin();
-  logHeap("P2-after-ble-init");
+  logHeap("P2b-after-editor-buffer");
 
   layout();
   requestUpdate();

@@ -1902,3 +1902,323 @@ entry 0x403cbf10
 [12677] [DBG] [ACT] Entering activity: BleEditor
 [12680] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=95200 minfree=95152 maxalloc=73716
 [12684] [INF] [BLESPIKE] heap before nimble_port_init: 85980
+[378080] [INF] [MEM] Free: 95656 bytes, Total: 251060 bytes, Min Free: 95328 bytes, MaxAlloc: 73716 bytes
+[380090] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[380097] [DBG] [ACT] Pushed to activity stack, new size = 1
+[380099] [DBG] [ACT] Entering activity: BleEditor
+[380102] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=95204 minfree=95156 maxalloc=73716
+[380106] [INF] [BLESPIKE] heap before nimble_port_init: 85984
+[3108]   Wait complete: refresh (497 ms)
+[3171] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[3691]   Wait complete: refresh (497 ms)
+[5027] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[5027] [DBG] [ACT] Pushed to activity stack, new size = 1
+[5028] [DBG] [ACT] Entering activity: BleEditor
+[5028] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=95200 minfree=95152 maxalloc=73716
+[5028] [INF] [BLESPIKE] heap before nimble_port_init: 85980
+[5062] [INF] [BLESPIKE] heap after nimble_port_init: 20976
+[5065] [INF] [BLESPIKE] state -> starting
+[5071] [INF] [BLESPIKE] host synced, own addr type=0
+[5071] [INF] [BLESPIKE] state -> scanning
+[5072] [INF] [BLESPIKE] heap after host task start: 14228
+[5073] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=14228 minfree=14156 maxalloc=11764
+[5079] [INF] [BLESPIKE] NEW ca:9a:e1:b6:4d:29 type=1 rssi=-63 hid=1 name='Geonix rev.2-2' uuids16=[1812 ] appear=03c1/1
+[5079] [INF] [BLESPIKE]     raw[27]: 02 01 06 03 03 12 18 03 19 c1 03 0f 09 47 65 6f 6e 69 78 20 72 65 76 2e 32 2d 32
+[5079] [INF] [BLESPIKE] HID peripheral found: 'Geonix rev.2-2' rssi=-63
+[5080] [INF] [BLESPIKE] state -> connecting
+[5081] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[5601]   Wait complete: refresh (496 ms)
+[5679] [INF] [BLESPIKE] connected, handle=1 — starting security
+[5680] [INF] [BLESPIKE] state -> pairing
+[5680] [ERR] [BLESPIKE] security_initiate rc=2 — trying discovery unencrypted
+[5680] [INF] [BLESPIKE] state -> discovering
+[5780] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[6180] [DBG] [BLESPIKE] chr uuid=0x2a4e val=0x001b props=0x06
+[6180] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x001d props=0x12
+[6180] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0021 props=0x12
+[6287] [INF] [BLESPIKE] encryption change status=0
+[6287] [INF] [BLESPIKE] state -> discovering
+[6289] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0025 props=0x12
+[6290] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0029 props=0x12
+[6290] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x002d props=0x12
+[6430] [DBG] [BLESPIKE] notify h=0x0017 len=1 [5f ]
+[6479] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[6580] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0031 props=0x12
+[6580] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0035 props=0x0e
+[6580] [DBG] [BLESPIKE] chr uuid=0x2a4b val=0x0038 props=0x02
+[6780] [DBG] [BLESPIKE] chr uuid=0x2a22 val=0x003a props=0x12
+[6780] [DBG] [BLESPIKE] chr uuid=0x2a32 val=0x003d props=0x0e
+[6780] [DBG] [BLESPIKE] chr uuid=0x2a33 val=0x003f props=0x12
+[6880] [ERR] [BLESPIKE] chr discovery status=10
+[6880] [INF] [BLESPIKE] state -> failed
+[6880] [ERR] [BLESPIKE] chr discovery status=10
+[6880] [INF] [BLESPIKE] state -> failed
+[8829] [DBG] [BLESPIKE] notify h=0x0017 len=1 [5f ]
+[10001] [INF] [MEM] Free: 13592 bytes, Total: 251060 bytes, Min Free: 13316 bytes, MaxAlloc: 11252 bytes
+[20006] [INF] [MEM] Free: 13592 bytes, Total: 251060 bytes, Min Free: 13316 bytes, MaxAlloc: 11252 bytes
+[23660] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 4f 00 00 00 00 00 ]
+[23660] [DBG] [BLESPIKE] unmapped usage 0x4f
+[23660] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[30011] [INF] [MEM] Free: 13592 bytes, Total: 251060 bytes, Min Free: 13316 bytes, MaxAlloc: 11252 bytes
+[30664] [INF] [BLESPIKE] disconnected reason=531
+[30665] [INF] [BLESPIKE] state -> scanning
+[30681] [INF] [BLESPIKE] NEW 53:1c:77:30:bc:d6 type=1 rssi=-61 hid=0 name='' uuids16=[] appear=0000/0
+[30681] [INF] [BLESPIKE]     raw[31]: 02 01 1a 1b ff 4c 00 0c 0e 00 f5 52 b3 b8 6a 7c 6c ba 6f 5a 7b 26 77 10 06 4b 1d 2c 4c f9 68
+[30688] [INF] [BLESPIKE] NEW 47:92:8f:63:0c:53 type=1 rssi=-61 hid=0 name='' uuids16=[] appear=0000/0
+[30688] [INF] [BLESPIKE]     raw[31]: 02 01 1a 1b ff 4c 00 0c 0e 00 f5 52 b3 b8 6a 7c 6c ba 6f 5a 7b 26 77 10 06 4b 1d 2c 4c f9 68
+[30690] [INF] [BLESPIKE] NEW 71:96:ce:19:5f:97 type=1 rssi=-71 hid=0 name='' uuids16=[] appear=0000/0
+[30690] [INF] [BLESPIKE]     raw[17]: 02 01 1a 0a ff 4c 00 10 05 29 98 c8 65 e7 02 0a 00
+[30697] [INF] [BLESPIKE] NEW e8:fb:1c:0d:cc:7c type=0 rssi=-84 hid=0 name='N/A' uuids16=[] appear=0000/1
+[30698] [INF] [BLESPIKE]     raw[12]: 03 19 00 00 02 0a 00 04 09 4e 2f 41
+[30711] [INF] [BLESPIKE] NEW 56:c5:0e:8f:0e:20 type=1 rssi=-86 hid=0 name='' uuids16=[] appear=0000/0
+[30712] [INF] [BLESPIKE]     raw[18]: 02 01 1a 02 0a 0c 0b ff 4c 00 10 06 06 1d 84 f5 71 58
+[30717] [INF] [BLESPIKE] NEW 7b:33:d7:c7:d3:5b type=1 rssi=-86 hid=0 name='' uuids16=[] appear=0000/0
+[30717] [INF] [BLESPIKE]     raw[17]: 02 01 1a 0d ff 4c 00 16 08 00 d2 55 8c e6 f7 74 80
+[30756] [INF] [BLESPIKE] NEW 76:0f:6f:c0:eb:5d type=1 rssi=-84 hid=0 name='' uuids16=[] appear=0000/0
+[30757] [INF] [BLESPIKE]     raw[18]: 02 01 1a 02 0a 0c 0b ff 4c 00 10 06 0a 1d 84 f5 71 08
+[30770] [INF] [BLESPIKE] NEW 42:66:60:fe:87:3d type=1 rssi=-73 hid=0 name='' uuids16=[] appear=0000/0
+[30771] [INF] [BLESPIKE]     raw[19]: 02 01 1a 0c ff 4c 00 10 07 32 1f 93 8f 75 d8 08 02 0a 00
+[30782] [INF] [BLESPIKE] NEW 79:ca:13:71:d3:c8 type=1 rssi=-89 hid=0 name='' uuids16=[fe9f ] appear=0000/0
+[30782] [INF] [BLESPIKE]     raw[28]: 03 03 9f fe 17 16 9f fe 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[30838] [INF] [BLESPIKE] NEW 47:f7:70:37:72:b8 type=1 rssi=-68 hid=0 name='' uuids16=[] appear=0000/0
+[30838] [INF] [BLESPIKE]     raw[27]: 02 01 1a 17 ff 4c 00 09 08 13 04 c0 a8 01 e2 1b 58 16 08 00 91 2b d9 f2 17 4b 20
+[30863] [INF] [BLESPIKE] NEW ca:9a:e1:b6:4d:2a type=1 rssi=-60 hid=1 name='Geonix rev.2-2' uuids16=[1812 ] appear=03c1/1
+[30863] [INF] [BLESPIKE]     raw[27]: 02 01 06 03 03 12 18 03 19 c1 03 0f 09 47 65 6f 6e 69 78 20 72 65 76 2e 32 2d 32
+[30863] [INF] [BLESPIKE] HID peripheral found: 'Geonix rev.2-2' rssi=-60
+[30864] [INF] [BLESPIKE] state -> connecting
+[31429] [INF] [BLESPIKE] connected, handle=1 — starting security
+[31430] [INF] [BLESPIKE] state -> pairing
+[31430] [ERR] [BLESPIKE] security_initiate rc=2 — trying discovery unencrypted
+[31430] [INF] [BLESPIKE] state -> discovering
+[31580] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[31980] [DBG] [BLESPIKE] chr uuid=0x2a4e val=0x001b props=0x06
+[31980] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x001d props=0x12
+[31980] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0021 props=0x12
+[32138] [INF] [BLESPIKE] encryption change status=0
+[32139] [INF] [BLESPIKE] state -> discovering
+[32142] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0025 props=0x12
+[32142] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0029 props=0x12
+[32142] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x002d props=0x12
+[32329] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[32430] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0031 props=0x12
+[32430] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0035 props=0x0e
+[32430] [DBG] [BLESPIKE] chr uuid=0x2a4b val=0x0038 props=0x02
+[32630] [DBG] [BLESPIKE] chr uuid=0x2a22 val=0x003a props=0x12
+[32630] [DBG] [BLESPIKE] chr uuid=0x2a32 val=0x003d props=0x0e
+[32630] [DBG] [BLESPIKE] chr uuid=0x2a33 val=0x003f props=0x12
+[32730] [ERR] [BLESPIKE] chr discovery status=10
+[32730] [INF] [BLESPIKE] state -> failed
+[32730] [ERR] [BLESPIKE] chr discovery status=10
+[32730] [INF] [BLESPIKE] state -> failed
+[34679] [DBG] [BLESPIKE] notify h=0x0017 len=1 [5f ]
+[40013] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[50018] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[60023] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[70028] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[80033] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[90038] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[100043] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[110048] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[120053] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[130058] [INF] [MEM] Free: 13568 bytes, Total: 251060 bytes, Min Free: 13292 bytes, MaxAlloc: 11252 bytes
+[133310] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 4f 00 00 00 00 00 ]
+[133310] [DBG] [BLESPIKE] unmapped usage 0x4f
+[133324] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[133384] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 4f 00 00 00 00 00 ]
+[133385] [DBG] [BLESPIKE] unmapped usage 0x4f
+[133489] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[138004] [INF] [BLESPIKE] disconnected reason=531
+[138005] [INF] [BLESPIKE] state -> scanning
+[138034] [INF] [BLESPIKE] NEW 6e:d3:a7:6c:78:23 type=1 rssi=-91 hid=0 name='' uuids16=[] appear=0000/0
+[138034] [INF] [BLESPIKE]     raw[17]: 02 01 1a 02 0a 09 0a ff 4c 00 10 05 0a 18 34 9c cf
+[138202] [INF] [BLESPIKE] NEW ca:9a:e1:b6:4d:2b type=1 rssi=-62 hid=1 name='Geonix rev.2-2' uuids16=[1812 ] appear=03c1/1
+[138203] [INF] [BLESPIKE]     raw[27]: 02 01 06 03 03 12 18 03 19 c1 03 0f 09 47 65 6f 6e 69 78 20 72 65 76 2e 32 2d 32
+[138203] [INF] [BLESPIKE] HID peripheral found: 'Geonix rev.2-2' rssi=-62
+[138204] [INF] [BLESPIKE] state -> connecting
+[138579] [INF] [BLESPIKE] connected, handle=1 — starting security
+[138580] [INF] [BLESPIKE] state -> pairing
+[138580] [ERR] [BLESPIKE] security_initiate rc=2 — trying discovery unencrypted
+[138580] [INF] [BLESPIKE] state -> discovering
+[138680] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[139080] [DBG] [BLESPIKE] chr uuid=0x2a4e val=0x001b props=0x06
+[139080] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x001d props=0x12
+[139080] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0021 props=0x12
+[139190] [INF] [BLESPIKE] encryption change status=0
+[139190] [INF] [BLESPIKE] state -> discovering
+[139194] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0025 props=0x12
+[139195] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0029 props=0x12
+[139195] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x002d props=0x12
+[139379] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[139480] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0031 props=0x12
+[139480] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0035 props=0x0e
+[139480] [DBG] [BLESPIKE] chr uuid=0x2a4b val=0x0038 props=0x02
+[139680] [DBG] [BLESPIKE] chr uuid=0x2a22 val=0x003a props=0x12
+[139680] [DBG] [BLESPIKE] chr uuid=0x2a32 val=0x003d props=0x0e
+[139680] [DBG] [BLESPIKE] chr uuid=0x2a33 val=0x003f props=0x12
+[139780] [ERR] [BLESPIKE] chr discovery status=10
+[139780] [INF] [BLESPIKE] state -> failed
+[139780] [ERR] [BLESPIKE] chr discovery status=10
+[139780] [INF] [BLESPIKE] state -> failed
+[140066] [INF] [MEM] Free: 13420 bytes, Total: 251060 bytes, Min Free: 13144 bytes, MaxAlloc: 10740 bytes
+[141279] [DBG] [BLESPIKE] notify h=0x0017 len=1 [5f ]
+[143305] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 51 00 00 00 00 00 ]
+[143305] [DBG] [BLESPIKE] unmapped usage 0x51
+[143424] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[143514] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 51 00 00 00 00 00 ]
+[143515] [DBG] [BLESPIKE] unmapped usage 0x51
+[143619] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 51 52 00 00 00 00 ]
+[143620] [DBG] [BLESPIKE] unmapped usage 0x52
+[143679] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 52 00 00 00 00 00 ]
+[143799] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[143874] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 4f 00 00 00 00 00 ]
+[143875] [DBG] [BLESPIKE] unmapped usage 0x4f
+[143875] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[143904] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 51 00 00 00 00 00 ]
+[143905] [DBG] [BLESPIKE] unmapped usage 0x51
+[143994] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 51 52 00 00 00 00 ]
+[143995] [DBG] [BLESPIKE] unmapped usage 0x52
+[144039] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 52 00 00 00 00 00 ]
+[144084] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[146081] [INF] [BLEEDIT] nothing to save
+E (152030) NimBLE: ble_hs_stop: failed to terminate connection; rc=2
+
+[146085] [INF] [BLESPIKE] heap after nimble_port_deinit: 79156
+[146085] [INF] [BLEEDIT] SPIKE-HEAP P5-after-ble-teardown free=88376 minfree=13144 maxalloc=57332
+[146085] [DBG] [ACT] Exiting activity: BleEditor
+[146086] [DBG] [ACT] Popped from activity stack, new size = 0
+[146095] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[146615]   Wait complete: refresh (497 ms)
+[146669] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[147189]   Wait complete: refresh (497 ms)
+[147470] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[147990]   Wait complete: refresh (497 ms)
+[148043] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[148563]   Wait complete: refresh (496 ms)
+[148616] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[149136]   Wait complete: refresh (496 ms)
+[149526] [DBG] [ACT] Pushed to activity stack, new size = 1
+[149526] [DBG] [ACT] Entering activity: BleEditor
+[149526] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=94128 minfree=13144 maxalloc=63476
+[149527] [INF] [BLESPIKE] heap before nimble_port_init: 84908
+[149533] [INF] [BLESPIKE] heap after nimble_port_init: 20128
+[149538] [INF] [BLESPIKE] state -> starting
+[149547] [INF] [BLESPIKE] host synced, own addr type=0
+[149548] [INF] [BLESPIKE] state -> scanning
+[149549] [INF] [BLESPIKE] heap after host task start: 13380
+[149549] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=13380 minfree=13144 maxalloc=10740
+[149557] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[149595] [INF] [BLESPIKE] NEW 44:a6:e5:09:92:18 type=0 rssi=-98 hid=0 name='' uuids16=[ff00 ] appear=0000/0
+[149596] [INF] [BLESPIKE]     raw[7]: 02 01 06 03 02 00 ff
+[149630] [INF] [BLESPIKE] NEW fb:48:b4:69:1d:a9 type=1 rssi=-67 hid=0 name='' uuids16=[] appear=0000/0
+[149631] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 02
+[149757] [INF] [BLESPIKE] NEW eb:db:f9:80:04:71 type=1 rssi=-79 hid=0 name='' uuids16=[] appear=0000/0
+[149757] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 00
+[149962] [INF] [BLESPIKE] NEW e7:d9:e8:b9:89:27 type=1 rssi=-71 hid=0 name='' uuids16=[] appear=0000/0
+[149963] [INF] [BLESPIKE]     raw[27]: 1a ff 4c 00 12 02 6e 03 07 11 06 99 12 1f 9c ca 59 fb 45 f0 13 9e d3 c1 bb f5 93
+[150069] [INF] [MEM] Free: 13232 bytes, Total: 251060 bytes, Min Free: 13144 bytes, MaxAlloc: 10740 bytes
+[150078]   Wait complete: refresh (497 ms)
+[150231] [INF] [BLESPIKE] NEW 45:6b:fd:d9:dc:a9 type=1 rssi=-97 hid=0 name='' uuids16=[fe9f ] appear=0000/0
+[150232] [INF] [BLESPIKE]     raw[28]: 03 03 9f fe 17 16 9f fe 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[150619] [INF] [BLESPIKE] NEW 3c:dc:75:15:e6:ee type=0 rssi=-99 hid=0 name='' uuids16=[] appear=0000/0
+[150619] [INF] [BLESPIKE]     raw[0]:
+[151185] [INF] [BLESPIKE] NEW e9:d1:4a:cb:97:a7 type=1 rssi=-90 hid=0 name='' uuids16=[] appear=0000/0
+[151185] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 14 00
+[151221] [INF] [BLESPIKE] NEW ef:7c:d1:f0:71:0a type=1 rssi=-76 hid=0 name='' uuids16=[] appear=0000/0
+[151221] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 24 01
+[151354] [INF] [BLESPIKE] NEW fd:0c:58:e9:59:3e type=1 rssi=-72 hid=0 name='' uuids16=[] appear=0000/0
+[151354] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 02
+[152872] [INF] [BLESPIKE] NEW ca:6a:38:70:35:89 type=1 rssi=-89 hid=0 name='' uuids16=[] appear=0000/0
+[152872] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 03
+[154126] [INF] [BLESPIKE] NEW d6:89:ee:1a:70:d0 type=1 rssi=-97 hid=0 name='' uuids16=[feaf ] appear=0000/0
+[154126] [INF] [BLESPIKE]     raw[31]: 02 01 06 03 02 af fe 17 16 af fe 13 03 b6 ea c2 ce 3a 96 59 a2 33 36 78 06 aa e7 75 38 ec d4
+[156390] [INF] [BLESPIKE] NEW e1:94:10:48:51:a1 type=1 rssi=-90 hid=0 name='' uuids16=[feaf ] appear=0000/0
+[156390] [INF] [BLESPIKE]     raw[31]: 02 01 06 03 02 af fe 17 16 af fe 13 03 b3 b9 d4 ea 22 83 d9 6c 91 35 12 ee d9 70 3e 8d 61 f3
+[158904] [INF] [BLESPIKE] NEW ca:9a:e1:b6:4d:2c type=1 rssi=-64 hid=1 name='Geonix rev.2-2' uuids16=[1812 ] appear=03c1/1
+[158904] [INF] [BLESPIKE]     raw[27]: 02 01 06 03 03 12 18 03 19 c1 03 0f 09 47 65 6f 6e 69 78 20 72 65 76 2e 32 2d 32
+[158904] [INF] [BLESPIKE] HID peripheral found: 'Geonix rev.2-2' rssi=-64
+[158905] [INF] [BLESPIKE] state -> connecting
+[159278] [INF] [BLESPIKE] connected, handle=1 — starting security
+[159278] [INF] [BLESPIKE] state -> pairing
+[159278] [ERR] [BLESPIKE] security_initiate rc=2 — trying discovery unencrypted
+[159279] [INF] [BLESPIKE] state -> discovering
+[159378] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[159778] [DBG] [BLESPIKE] chr uuid=0x2a4e val=0x001b props=0x06
+[159779] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x001d props=0x12
+[159779] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0021 props=0x12
+[159895] [INF] [BLESPIKE] encryption change status=0
+[159896] [INF] [BLESPIKE] state -> discovering
+[159899] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0025 props=0x12
+[159899] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0029 props=0x12
+[159899] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x002d props=0x12
+[160074] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[160078] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[160178] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0031 props=0x12
+[160179] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0035 props=0x0e
+[160179] [DBG] [BLESPIKE] chr uuid=0x2a4b val=0x0038 props=0x02
+[160378] [DBG] [BLESPIKE] chr uuid=0x2a22 val=0x003a props=0x12
+[160379] [DBG] [BLESPIKE] chr uuid=0x2a32 val=0x003d props=0x0e
+[160379] [DBG] [BLESPIKE] chr uuid=0x2a33 val=0x003f props=0x12
+[160478] [ERR] [BLESPIKE] chr discovery status=10
+[160479] [INF] [BLESPIKE] state -> failed
+[160479] [ERR] [BLESPIKE] chr discovery status=10
+[160479] [INF] [BLESPIKE] state -> failed
+[162078] [DBG] [BLESPIKE] notify h=0x0017 len=1 [5f ]
+[162628] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 29 00 00 00 00 00 ]
+[162728] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[170079] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[180084] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[190089] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[200094] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[210099] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[220104] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[230109] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[232838] [DBG] [BLESPIKE] notify h=0x0017 len=1 [5e ]
+[240114] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[250119] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[260124] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[270129] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[280134] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[290139] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[300144] [INF] [MEM] Free: 13200 bytes, Total: 251060 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40389bde
+waiting for download
+      ��      ��      ��      ��      ��      �
+�       �
+�       �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380224
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e0
+waiting for download
+�
+     �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a4
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e0
+waiting for download
+�
+     �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a4
+waiting for download
+[15097] [INF] [MEM] Free: 95424 bytes, Total: 250980 bytes, Min Free: 95096 bytes, MaxAlloc: 73716 bytes
+[17107] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[17114] [DBG] [ACT] Pushed to activity stack, new size = 1
+[17116] [DBG] [ACT] Entering activity: BleEditor
+[17119] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=94972 minfree=94924 maxalloc=73716
+[17122] [INF] [BLESPIKE] heap before nimble_port_init: 85752

@@ -48,8 +48,12 @@ constexpr uint16_t UUID_BOOT_KBD_INPUT = 0x2A22;
 constexpr uint16_t UUID_PROTOCOL_MODE = 0x2A4E;
 constexpr uint16_t UUID_CCCD = 0x2902;
 
-constexpr size_t MAX_CHRS = 16;    // HID services carry ~8-12 characteristics
-constexpr size_t MAX_REPORTS = 6;  // input reports we will subscribe to
+// The test keyboard (Geonix rev.2) exposes 11 characteristics in 0x0019..0x0044:
+// Protocol Mode, six notifiable 0x2A4D reports, one writable 0x2A4D output
+// report, Report Map, Boot Keyboard Input, Boot Keyboard Output and Boot Mouse
+// Input. MAX_REPORTS=6 silently truncated that set.
+constexpr size_t MAX_CHRS = 24;
+constexpr size_t MAX_REPORTS = 10;
 constexpr size_t RING_SIZE = 128;  // power of two
 
 struct ChrInfo {
@@ -84,6 +88,7 @@ ReportInfo gReports[MAX_REPORTS];
 size_t gReportCount = 0;
 size_t gDscIndex = 0;  // which report we are hunting a CCCD for
 size_t gSubIndex = 0;  // which report we are subscribing
+bool gDiscoveryRunning = false;
 
 // Single-producer (host task) / single-consumer (main task) ring.
 char gRing[RING_SIZE];
@@ -143,6 +148,7 @@ void subscribeNext() {
   }
   if (gSubIndex >= gReportCount) {
     LOG_INF(TAG, "subscribed to %u input report(s)", (unsigned)gReportCount);
+    gDiscoveryRunning = false;
     setState(State::Ready);
     return;
   }
@@ -235,6 +241,7 @@ void onCharsDone() {
   LOG_INF(TAG, "HID service: %u chrs, %u notifiable input report(s)", (unsigned)gChrCount, (unsigned)gReportCount);
   if (gReportCount == 0) {
     LOG_ERR(TAG, "no notifiable input reports — not a keyboard we can read");
+    gDiscoveryRunning = false;
     setState(State::Failed);
     return;
   }
@@ -249,6 +256,7 @@ int onChr(uint16_t /*connHandle*/, const ble_gatt_error* error, const ble_gatt_c
   }
   if (error != nullptr && error->status != 0) {
     LOG_ERR(TAG, "chr discovery status=%d", error->status);
+    gDiscoveryRunning = false;
     setState(State::Failed);
     return 0;
   }
@@ -263,6 +271,7 @@ int onSvc(uint16_t /*connHandle*/, const ble_gatt_error* error, const ble_gatt_s
   if (error != nullptr && error->status == BLE_HS_EDONE) {
     if (!gSvcFound) {
       LOG_ERR(TAG, "peer has no HID service (0x1812)");
+      gDiscoveryRunning = false;
       setState(State::Failed);
       return 0;
     }
@@ -270,12 +279,14 @@ int onSvc(uint16_t /*connHandle*/, const ble_gatt_error* error, const ble_gatt_s
     const int rc = ble_gattc_disc_all_chrs(gConnHandle, gSvcStart, gSvcEnd, onChr, nullptr);
     if (rc != 0) {
       LOG_ERR(TAG, "disc_all_chrs rc=%d", rc);
+      gDiscoveryRunning = false;
       setState(State::Failed);
     }
     return 0;
   }
   if (error != nullptr && error->status != 0) {
     LOG_ERR(TAG, "svc discovery status=%d", error->status);
+    gDiscoveryRunning = false;
     setState(State::Failed);
     return 0;
   }
@@ -288,6 +299,16 @@ int onSvc(uint16_t /*connHandle*/, const ble_gatt_error* error, const ble_gatt_s
 }
 
 void startDiscovery() {
+  // Re-entry guard. security_initiate returning BLE_HS_EALREADY used to drop us
+  // straight into discovery, and then ENC_CHANGE started a SECOND one over the
+  // same globals: the service was discovered twice, the characteristic
+  // callbacks interleaved, and the peer answered the overlapping procedure with
+  // "chr discovery status=10". Observed on the X4, 2026-08-05.
+  if (gDiscoveryRunning) {
+    LOG_DBG(TAG, "discovery already running, ignoring restart");
+    return;
+  }
+  gDiscoveryRunning = true;
   setState(State::Discovering);
   gSvcFound = false;
   gChrCount = 0;
@@ -296,6 +317,7 @@ void startDiscovery() {
   const int rc = ble_gattc_disc_svc_by_uuid(gConnHandle, &hidUuid.u, onSvc, nullptr);
   if (rc != 0) {
     LOG_ERR(TAG, "disc_svc_by_uuid rc=%d", rc);
+    gDiscoveryRunning = false;
     setState(State::Failed);
   }
 }
@@ -430,9 +452,14 @@ int onGapEvent(ble_gap_event* event, void* /*arg*/) {
       setState(State::Securing);
       {
         const int rc = ble_gap_security_initiate(gConnHandle);
-        if (rc != 0) {
+        // BLE_HS_EALREADY means a bond exists / encryption is already under way,
+        // which is the normal path on a re-connect. Wait for ENC_CHANGE either
+        // way; starting discovery here races the one ENC_CHANGE will start.
+        if (rc != 0 && rc != BLE_HS_EALREADY) {
           LOG_ERR(TAG, "security_initiate rc=%d — trying discovery unencrypted", rc);
           startDiscovery();
+        } else if (rc == BLE_HS_EALREADY) {
+          LOG_INF(TAG, "security already in progress (bonded) — waiting for ENC_CHANGE");
         }
       }
       return 0;
@@ -460,6 +487,7 @@ int onGapEvent(ble_gap_event* event, void* /*arg*/) {
     case BLE_GAP_EVENT_DISCONNECT:
       LOG_INF(TAG, "disconnected reason=%d", event->disconnect.reason);
       gConnHandle = BLE_HS_CONN_HANDLE_NONE;
+      gDiscoveryRunning = false;
       memset(gPrevKeys, 0, sizeof(gPrevKeys));
       startScan();
       return 0;
@@ -526,7 +554,11 @@ void hostTask(void* /*param*/) {
 bool begin() {
   if (gStarted) return true;
 
-  LOG_INF(TAG, "heap before nimble_port_init: %u", (unsigned)ESP.getFreeHeap());
+  // maxalloc matters more than free here: the controller wants one large
+  // contiguous block, and this call has been seen to hang the device outright
+  // when the heap is fragmented rather than merely small.
+  LOG_INF(TAG, "heap before nimble_port_init: free=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
+          (unsigned)ESP.getMaxAllocHeap());
   const esp_err_t err = nimble_port_init();
   if (err != ESP_OK) {
     LOG_ERR(TAG, "nimble_port_init failed: %d", (int)err);

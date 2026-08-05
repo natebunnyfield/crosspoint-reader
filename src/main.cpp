@@ -617,6 +617,12 @@ void setup() {
   // In-RAM only: nothing here writes settings.json.
   SETTINGS.sleepTimeoutMinutes = CrossPointSettings::SLEEP_TIMEOUT_NEVER_MINUTES;
 
+  // SPIKE: the panic text is lost when USB CDC drops with the crash, so replay
+  // the persisted record over serial on the next boot instead.
+  if (HalSystem::isRebootFromPanic()) {
+    LOG_INF("SPIKE", "SPIKE-PANIC previous boot panicked: %s", HalSystem::getPanicInfo(true).c_str());
+  }
+
   // SPIKE (branch spike/ble-editor): measurement point 1. Nothing BLE has been
   // initialised at this point, so this is the plain-firmware boot heap.
   LOG_INF("SPIKE", "SPIKE-HEAP P0-boot-no-ble free=%u total=%u minfree=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
