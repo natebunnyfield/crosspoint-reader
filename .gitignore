@@ -41,8 +41,17 @@ tools/calendar_preview/render_harness
 tools/calendar_preview/*.o
 tools/calendar_preview/fs_/
 
-# Simulator QA screenshot dumps: keep the .png, never the raw framebuffer .bmp
+# Simulator QA screenshot dumps: keep the .png, never the raw framebuffer .bmp.
+# qa/ is deliberately NOT ignored wholesale — it is partially tracked, and the
+# committed .pngs there are the visual evidence behind specific changes. Only
+# the raw BMPs are intermediates (sips converts them and the .png is what gets
+# read), so they are what gets dropped.
 qa_*/*.bmp
+qa/*.bmp
+
+# Packaged .app bundles from packaging/macos. Build output, tens of MB, and
+# rebuilt from a tagged commit whenever it is actually needed.
+dist/
 
 # PlatformIO writes one of these per env it builds; the three named entries
 # above predate the custom_sdkconfig block and miss every other env.
