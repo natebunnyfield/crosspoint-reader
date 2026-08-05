@@ -165,7 +165,37 @@ uses) — worth one manual check on device.
   DOWN-count. Both documented in the simulator repo's CLAUDE.md ("Navigating to
   a screen from a headless script").
 
-## v2 candidates (explicitly deferred)
+## v2 plan (rulings 2026-08-05)
 
-Copy (needs a chunked SD→SD stream pump + progress popup), New folder, Details
-popup (size/path/has-cache), mark-mode multi-select batch operations.
+Planned in a second plan-first session. Every decision below is an explicit
+user ruling.
+
+| Question | Ruling |
+|---|---|
+| File short-press | **View directly** (was: action menu). Hold 1s = menu, files and folders alike. View stays in the menu too. Bottom nav updates: file → `View/Menu`, folder → `Open/Menu`. |
+| Back at root | **Return to home with the Manage Files row selected**, parity with the other home items. Bug: `ActivityManager::goHome()`'s name-match block lacks `"FileManager"`, so it falls to `NONE` = fresh home, first book selected. |
+| Normalize name | Renamed **"Rename using metadata"**, and the item is only added when the metadata probe succeeds (light epub/xtc load at menu-open, book files only). No more showing it then erroring. |
+| File info | **Inline under the menu title** — size, created, modified (FAT's three timestamps; there is no separate "updated"). Folders: entry count. Needs mutex-wrapped date getters on `HalFile`. |
+| Duplicate | New action **above Move**, **files only**. Streamed chunk copy, collision names ` copy`, ` copy 2`, …. **TODO: folder duplicate** (recursive streamed copy + progress popup + interrupted-state story) — deferred by ruling, tracked here. |
+| Viewer scrollbar | Persistent right-side scrollbar in the viewer, both modes: thumb position = byte offset / file size, thumb height = page/file ratio. Doubles as a size indicator. |
+| Viewer pretty mode | **Select toggles raw ↔ pretty** per type: json (streaming token re-indenter, no DOM), html (tag-strip state machine), bmp (existing BmpViewer path), png (PNGdec; sim needs the native-decoder opt-in), epub (metadata card: title/author/language/spine count/cover presence). Any parse trouble → fall back to raw, never crash. |
+| Binary formats | **Structured summaries only** for the known `.crosspoint` formats (book.bin version + chapters, section.bin version + pages, progress.bin decoded fields per docs/file-formats.md). No universal hex-dump view (ruled out). Unknown binaries keep the raw-text view. |
+| File icons | png (and jpg) get the Image icon — `UITheme::getFileIcon` currently maps only bmp. Audit the rest of the extension → icon table while in there. |
+| Editor + BT keyboard | **Deferred to its own plan-first session.** Vim-flavored + intuitive input modes both wanted; BLE HID host RAM on the C3 must be measured before any commitment. |
+
+Build order: Phase 1 = interaction rework (short-press View, nav labels,
+go-home selection fix, icon fix, metadata-gated rename); Phase 2 = inline info
++ Duplicate; Phase 3 = viewer scrollbar + pretty modes.
+
+## TODO — deferred, explicitly wanted (ruling 2026-08-05)
+
+- **Folder duplicate** — recursive streamed copy + progress popup +
+  interrupted-state story (files-only Duplicate shipped first).
+- **Hex-dump viewer mode** — offset/hex/ASCII columns for unknown binaries
+  (v2 ships structured `.crosspoint` summaries only).
+- **New folder** action.
+- **Mark-mode multi-select** — batch move/delete.
+- **Sort order** — name/date/size toggle for the list.
+- **Free space** readout (path bar or list footer).
+- **"Set as sleep screen"** on bmp files from the action menu —
+  `BmpViewerActivity` already has the machinery.
