@@ -22,6 +22,7 @@ class OptionPopup {
     }
     selectedIndex = currentIndex;
     onSelectCallback = std::move(onSelect);
+    infoLines.clear();
     layoutValid = false;
     active = true;
   }
@@ -35,8 +36,16 @@ class OptionPopup {
     }
     selectedIndex = currentIndex;
     onSelectCallback = std::move(onSelect);
+    infoLines.clear();
     layoutValid = false;
     active = true;
+  }
+
+  // Optional non-selectable small-font lines under the title (file info in
+  // Manage Files). Call right after show(); cleared on the next show().
+  void setInfoLines(std::vector<std::string> lines) {
+    infoLines = std::move(lines);
+    layoutValid = false;
   }
 
   void show(StrId titleId, const std::vector<std::string>& options, int currentIndex,
@@ -45,6 +54,7 @@ class OptionPopup {
     ownedStrings = options;
     selectedIndex = currentIndex;
     onSelectCallback = std::move(onSelect);
+    infoLines.clear();
     layoutValid = false;
     active = true;
   }
@@ -118,7 +128,7 @@ class OptionPopup {
 
   void render(const GfxRenderer& renderer) const {
     if (!active) return;
-    GUI.drawOptionPopup(renderer, title.c_str(), ownedStrings, selectedIndex);
+    GUI.drawOptionPopup(renderer, title.c_str(), ownedStrings, selectedIndex, infoLines.empty() ? nullptr : &infoLines);
   }
 
   bool isActive() const { return active; }
@@ -156,17 +166,26 @@ class OptionPopup {
       if (width > maxTextWidth) maxTextWidth = width;
     }
 
+    // Mirror drawOptionPopup's info-block sizing so touch hit rects line up.
+    const int infoCount = static_cast<int>(infoLines.size());
+    const int infoHeight =
+        infoCount > 0 ? infoCount * renderer.getLineHeight(SMALL_FONT_ID) + metrics.optionPopupTitleGap : 0;
+    for (const auto& line : infoLines) {
+      const int width = renderer.getTextWidth(SMALL_FONT_ID, line.c_str());
+      if (width > maxTextWidth) maxTextWidth = width;
+    }
+
     const int optionCount = static_cast<int>(ownedStrings.size());
     const int listHeight = rowHeight * optionCount + itemSpacing * (optionCount - 1);
     const int dialogW = std::min((maxTextWidth + innerPadding * 2 + selectionHPadding * 2) * 12 / 10,
                                  pageWidth - metrics.optionPopupDialogSideMargin * 2);
-    const int contentHeight = titleLineHeight + metrics.optionPopupTitleGap + listHeight;
+    const int contentHeight = titleLineHeight + infoHeight + metrics.optionPopupTitleGap + listHeight;
     const int dialogH = contentHeight + innerPadding * 2;
     const int dialogX = (pageWidth - dialogW) / 2;
     const int dialogY = (pageHeight - dialogH) / 2;
     const int itemRectX = dialogX + innerPadding;
     const int itemRectW = dialogW - innerPadding * 2;
-    const int firstItemY = dialogY + innerPadding + titleLineHeight + metrics.optionPopupTitleGap;
+    const int firstItemY = dialogY + innerPadding + titleLineHeight + infoHeight + metrics.optionPopupTitleGap;
 
     layout.dialog = Rect{dialogX, dialogY, dialogW, dialogH};
     layout.options.clear();
@@ -185,6 +204,7 @@ class OptionPopup {
   bool active = false;
   std::string title;
   std::vector<std::string> ownedStrings;
+  std::vector<std::string> infoLines;
   int selectedIndex = 0;
   std::function<void(int)> onSelectCallback;
   mutable Layout layout;

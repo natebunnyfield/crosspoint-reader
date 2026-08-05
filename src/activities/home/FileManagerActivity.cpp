@@ -150,7 +150,7 @@ void FileManagerActivity::onExit() {
 
 void FileManagerActivity::openActionMenu() {
   menuActions.clear();
-  const char* options[6];
+  const char* options[8];
   int count = 0;
   const bool hasEntry = !files.empty();
 
@@ -176,6 +176,8 @@ void FileManagerActivity::openActionMenu() {
         options[count++] = tr(STR_NORMALIZE_NAME);
         menuActions.push_back(MenuAction::Normalize);
       }
+      options[count++] = tr(STR_DUPLICATE);
+      menuActions.push_back(MenuAction::Duplicate);
     }
     options[count++] = tr(STR_MOVE);
     menuActions.push_back(MenuAction::Move);
@@ -199,7 +201,59 @@ void FileManagerActivity::openActionMenu() {
       runMenuAction(menuActions[index]);
     }
   });
+  if (hasEntry) popup.setInfoLines(buildInfoLines(files[selectorIndex]));
   requestUpdate();
+}
+
+// Small-font lines under the action-menu title: size + FAT timestamps for
+// files, entry count for folders. Failures just omit lines — info is best
+// effort, never an error surface.
+std::vector<std::string> FileManagerActivity::buildInfoLines(const std::string& entry) {
+  std::vector<std::string> lines;
+  lines.reserve(3);
+  const std::string full = fullPathOf(entry);
+  char buf[64];
+
+  if (entry.back() == '/') {
+    auto dir = Storage.open(full.c_str());
+    if (dir && dir.isDirectory() && fileNameBuffer) {
+      int n = 0;
+      dir.rewindDirectory();
+      for (auto f = dir.openNextFile(); f; f = dir.openNextFile()) {
+        f.getName(fileNameBuffer.get(), NAME_BUFFER_SIZE);
+        if (strcmp(fileNameBuffer.get(), ".") == 0 || strcmp(fileNameBuffer.get(), "..") == 0) continue;
+        n++;
+      }
+      snprintf(buf, sizeof(buf), "%d%s", n, tr(STR_ITEMS_SUFFIX));
+      lines.emplace_back(buf);
+    }
+    return lines;
+  }
+
+  HalFile file;
+  if (!Storage.openFileForRead("FileManager", full.c_str(), file)) return lines;
+
+  const uint64_t size = file.fileSize64();
+  if (size < 1024) {
+    snprintf(buf, sizeof(buf), "%u B", static_cast<unsigned>(size));
+  } else if (size < 1024ull * 1024) {
+    snprintf(buf, sizeof(buf), "%u.%u KB", static_cast<unsigned>(size / 1024),
+             static_cast<unsigned>(size % 1024 * 10 / 1024));
+  } else {
+    snprintf(buf, sizeof(buf), "%u.%u MB", static_cast<unsigned>(size / (1024 * 1024)),
+             static_cast<unsigned>(size % (1024 * 1024) * 10 / (1024 * 1024)));
+  }
+  lines.emplace_back(buf);
+
+  const auto fatLine = [&buf](const char* prefix, const uint16_t d, const uint16_t t) {
+    snprintf(buf, sizeof(buf), "%s%04d-%02d-%02d %02d:%02d", prefix, 1980 + (d >> 9), (d >> 5) & 0xF, d & 0x1F, t >> 11,
+             (t >> 5) & 0x3F);
+    return std::string(buf);
+  };
+  uint16_t d = 0, t = 0;
+  if (file.getCreateDateTime(&d, &t)) lines.push_back(fatLine(tr(STR_CREATED_PREFIX), d, t));
+  if (file.getModifyDateTime(&d, &t)) lines.push_back(fatLine(tr(STR_MODIFIED_PREFIX), d, t));
+  return lines;
 }
 
 void FileManagerActivity::runMenuAction(const MenuAction action) {
@@ -215,6 +269,9 @@ void FileManagerActivity::runMenuAction(const MenuAction action) {
       break;
     case MenuAction::Normalize:
       if (!files.empty()) startNormalize(files[selectorIndex]);
+      break;
+    case MenuAction::Duplicate:
+      if (!files.empty()) duplicateFile(files[selectorIndex]);
       break;
     case MenuAction::Move:
       if (!files.empty()) armMove(files[selectorIndex]);
@@ -320,6 +377,73 @@ void FileManagerActivity::startNormalize(const std::string& entry) {
   std::string proposed = author.empty() ? title + ext : title + " - " + author + ext;
   LOG_DBG("FileManager", "normalize '%s' -> '%s'", entry.c_str(), proposed.c_str());
   startRename(entry, proposed);
+}
+
+// Streamed copy to "<stem> copy<n><ext>" in the same directory. Files only
+// (folder duplicate is a tracked TODO in docs/manage-files.md).
+void FileManagerActivity::duplicateFile(const std::string& entry) {
+  const std::string src = fullPathOf(entry);
+  const size_t dot = entry.rfind('.');
+  const std::string stem = dot == std::string::npos ? entry : entry.substr(0, dot);
+  const std::string ext = dot == std::string::npos ? "" : entry.substr(dot);
+
+  std::string newName;
+  for (int i = 1; i <= 99; i++) {
+    std::string candidate = i == 1 ? stem + " copy" + ext : stem + " copy " + std::to_string(i) + ext;
+    if (!Storage.exists(fullPathOf(candidate).c_str())) {
+      newName = std::move(candidate);
+      break;
+    }
+  }
+  if (newName.empty()) {
+    showError(tr(STR_DUPLICATE_FAILED));
+    return;
+  }
+  const std::string dst = fullPathOf(newName);
+
+  HalFile in;
+  HalFile out;
+  if (!Storage.openFileForRead("FileManager", src.c_str(), in) ||
+      !Storage.openFileForWrite("FileManager", dst.c_str(), out)) {
+    LOG_ERR("FileManager", "duplicate open failed '%s'", src.c_str());
+    showError(tr(STR_DUPLICATE_FAILED));
+    return;
+  }
+
+  // 8KB transient copy buffer; freed on return. Stack is too small (<256B
+  // local limit) and the framebuffer can't be borrowed mid-activity.
+  constexpr size_t COPY_BUF = 8192;
+  auto buffer = makeUniqueNoThrow<uint8_t[]>(COPY_BUF);
+  if (!buffer) {
+    LOG_ERR("FileManager", "OOM: %u byte copy buffer", static_cast<unsigned>(COPY_BUF));
+    showError(tr(STR_DUPLICATE_FAILED));
+    return;
+  }
+
+  bool ok = true;
+  for (;;) {
+    const int n = in.read(buffer.get(), COPY_BUF);
+    if (n < 0) {
+      ok = false;
+      break;
+    }
+    if (n == 0) break;
+    if (out.write(buffer.get(), n) != static_cast<size_t>(n)) {
+      ok = false;
+      break;
+    }
+  }
+  out.close();  // close before a possible Storage.remove on the same path
+  if (!ok) {
+    LOG_ERR("FileManager", "duplicate copy failed '%s'", dst.c_str());
+    Storage.remove(dst.c_str());  // never leave a partial copy behind
+    showError(tr(STR_DUPLICATE_FAILED));
+    return;
+  }
+
+  loadFiles();
+  selectorIndex = findEntry(newName);
+  requestUpdate();
 }
 
 void FileManagerActivity::armMove(const std::string& entry) {
