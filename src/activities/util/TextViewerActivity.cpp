@@ -1,9 +1,11 @@
 #include "TextViewerActivity.h"
 
+#include <Bitmap.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 #include <Memory.h>
 
+#include "Epub/converters/ImageDecoderFactory.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -12,6 +14,7 @@ namespace {
 constexpr size_t CHUNK_SIZE = 4096;
 constexpr size_t PAGE_STACK_RESERVE = 64;
 constexpr int VIEWER_FONT_ID = UI_10_FONT_ID;
+constexpr int MIN_THUMB_HEIGHT = 12;
 }  // namespace
 
 void TextViewerActivity::onEnter() {
@@ -28,6 +31,23 @@ void TextViewerActivity::onEnter() {
     fileSize = static_cast<uint32_t>(file.size());
   }
 
+  if (!openFailed) {
+    prettyKind = PrettyView::detect(path, fileSize);
+    // Raw bytes are illegible for images, books and binary caches — open those
+    // in pretty view; json/html open raw (they are already text).
+    if (prettyKind != PrettyView::Kind::None && prettyKind != PrettyView::Kind::Json &&
+        prettyKind != PrettyView::Kind::Html) {
+      prettyMode = true;
+      if (!imageMode()) {
+        prettyText = PrettyView::generate(prettyKind, path);
+        if (prettyText.empty()) {
+          prettyMode = false;
+          prettyUnavailable = true;
+        }
+      }
+    }
+  }
+
   const auto& metrics = UITheme::getInstance().getMetrics();
   lineHeight = renderer.getLineHeight(VIEWER_FONT_ID);
   if (lineHeight < 1) lineHeight = 1;
@@ -35,7 +55,9 @@ void TextViewerActivity::onEnter() {
   const int contentBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing;
   maxLines = (contentBottom - contentTop) / lineHeight;
   if (maxLines < 1) maxLines = 1;
-  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
+  // Keep clear of the persistent scrollbar on the right edge.
+  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2 - metrics.scrollBarWidth -
+             metrics.scrollBarRightOffset;
 
   pageStarts.reserve(PAGE_STACK_RESERVE);
   pageStarts.push_back(0);
@@ -50,12 +72,24 @@ void TextViewerActivity::onExit() {
   chunk.reset();
   lines.clear();
   pageStarts.clear();
+  prettyText.clear();
+  prettyText.shrink_to_fit();
   Activity::onExit();
 }
 
-// Returns the byte at `offset`, refilling the chunk window as needed, or -1 at
-// EOF / on read error.
+// Size of whatever the pagination is currently reading (file or pretty doc).
+uint32_t TextViewerActivity::sourceSize() const {
+  if (prettyMode && !imageMode()) return static_cast<uint32_t>(prettyText.size());
+  return fileSize;
+}
+
+// Returns the byte at `offset` of the current source, refilling the chunk
+// window as needed for file reads, or -1 at EOF / on read error.
 int TextViewerActivity::byteAt(const uint32_t offset) {
+  if (prettyMode && !imageMode()) {
+    if (offset >= prettyText.size()) return -1;
+    return static_cast<unsigned char>(prettyText[offset]);
+  }
   if (openFailed || offset >= fileSize) return -1;
   if (offset < chunkStart || offset >= chunkStart + chunkLen) {
     if (!file.seek(offset)) return -1;
@@ -68,14 +102,15 @@ int TextViewerActivity::byteAt(const uint32_t offset) {
 }
 
 // Lays out one page of wrapped lines starting at byte `start`. Fills `lines`
-// and returns the byte offset the next page starts at (>= fileSize at EOF).
+// and returns the byte offset the next page starts at (>= sourceSize at EOF).
 uint32_t TextViewerActivity::layoutPage(const uint32_t start) {
   lines.clear();
+  const uint32_t srcSize = sourceSize();
 
   std::string line;
   line.reserve(128);
   int lineWidth = 0;
-  // Word-wrap state: length of `line` to keep, and the file offset to resume
+  // Word-wrap state: length of `line` to keep, and the source offset to resume
   // from (just past the space), when the word being appended overflows.
   int lastSpaceLen = -1;
   uint32_t lastSpaceResume = 0;
@@ -90,7 +125,7 @@ uint32_t TextViewerActivity::layoutPage(const uint32_t start) {
   };
 
   uint32_t offset = start;
-  while (offset < fileSize) {
+  while (offset < srcSize) {
     const int lead = byteAt(offset);
     if (lead < 0) break;  // read error: treat as EOF
 
@@ -168,19 +203,42 @@ uint32_t TextViewerActivity::layoutPage(const uint32_t start) {
   }
 
   if (!line.empty()) lines.push_back(std::move(line));
-  return fileSize;
+  return srcSize;
 }
 
 void TextViewerActivity::layoutCurrentPage() { nextPageOffset = layoutPage(pageStarts.back()); }
 
+void TextViewerActivity::resetPagination() {
+  pageStarts.clear();
+  pageStarts.push_back(0);
+  layoutCurrentPage();
+}
+
+void TextViewerActivity::togglePretty() {
+  if (prettyKind == PrettyView::Kind::None || prettyUnavailable) return;
+  if (!prettyMode && !imageMode() && prettyText.empty() && prettyKind != PrettyView::Kind::ImageBmp &&
+      prettyKind != PrettyView::Kind::ImageDecoded) {
+    prettyText = PrettyView::generate(prettyKind, path);
+    if (prettyText.empty()) {
+      prettyUnavailable = true;  // malformed/unreadable: stay raw for good
+      return;
+    }
+  }
+  prettyMode = !prettyMode;
+  resetPagination();
+  requestUpdate();
+}
+
 void TextViewerActivity::pageForward() {
-  if (nextPageOffset >= fileSize) return;  // at EOF: no wrap-around
+  if (imageMode()) return;
+  if (nextPageOffset >= sourceSize()) return;  // at EOF: no wrap-around
   pageStarts.push_back(nextPageOffset);
   layoutCurrentPage();
   requestUpdate();
 }
 
 void TextViewerActivity::pageBack() {
+  if (imageMode()) return;
   if (pageStarts.size() <= 1) return;
   pageStarts.pop_back();
   layoutCurrentPage();
@@ -190,6 +248,10 @@ void TextViewerActivity::pageBack() {
 void TextViewerActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     finish();
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    togglePretty();
     return;
   }
 
@@ -209,6 +271,80 @@ void TextViewerActivity::loop() {
   buttonNavigator.onPreviousContinuous([this] { pageBack(); });
 }
 
+// Persistent right-edge scrollbar: thumb position = page start / source size,
+// thumb height = the page's share of the source. Always drawn in text modes so
+// the file's size is visible at a glance (v2 plan ruling).
+void TextViewerActivity::drawScrollBar() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const uint32_t srcSize = sourceSize();
+  const int trackX = renderer.getScreenWidth() - metrics.scrollBarRightOffset - metrics.scrollBarWidth;
+  const int trackTop = contentTop;
+  const int trackHeight = maxLines * lineHeight;
+  if (trackHeight <= 0) return;
+
+  renderer.drawRect(trackX, trackTop, metrics.scrollBarWidth, trackHeight);
+
+  const uint32_t pageStart = pageStarts.back();
+  const uint32_t pageLen = nextPageOffset > pageStart ? nextPageOffset - pageStart : 0;
+  int thumbY = trackTop;
+  int thumbH = trackHeight;
+  if (srcSize > 0) {
+    thumbH = static_cast<int>(static_cast<uint64_t>(trackHeight) * pageLen / srcSize);
+    if (thumbH < MIN_THUMB_HEIGHT) thumbH = MIN_THUMB_HEIGHT;
+    if (thumbH > trackHeight) thumbH = trackHeight;
+    thumbY = trackTop + static_cast<int>(static_cast<uint64_t>(trackHeight - thumbH) * pageStart /
+                                         (srcSize - pageLen > 0 ? srcSize - pageLen : 1));
+  }
+  renderer.fillRect(trackX, thumbY, metrics.scrollBarWidth, thumbH, true);
+}
+
+// Renders the image kinds into the content area, centered and fit.
+void TextViewerActivity::renderImage() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int areaX = metrics.contentSidePadding;
+  const int areaW = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
+  const int areaH = maxLines * lineHeight;
+
+  bool ok = false;
+  if (prettyKind == PrettyView::Kind::ImageBmp) {
+    HalFile bmpFile;
+    if (Storage.openFileForRead("TextViewer", path, bmpFile)) {
+      Bitmap bitmap(bmpFile, true);
+      if (bitmap.parseHeaders() == BmpReaderError::Ok) {
+        int w = bitmap.getWidth();
+        int h = bitmap.getHeight();
+        int x = areaX;
+        int y = contentTop;
+        if (w <= areaW && h <= areaH) {
+          x = areaX + (areaW - w) / 2;
+          y = contentTop + (areaH - h) / 2;
+        }
+        renderer.drawBitmap(bitmap, x, y, areaW, areaH, 0, 0);
+        ok = true;
+      }
+    }
+  } else {
+    auto* decoder = ImageDecoderFactory::getDecoder(path);
+    if (decoder) {
+      RenderConfig config;
+      config.x = areaX;
+      config.y = contentTop;
+      config.maxWidth = areaW;
+      config.maxHeight = areaH;
+      // Center images that fit; oversized ones scale within the area instead.
+      ImageDimensions dims{};
+      if (decoder->getDimensions(path, dims) && dims.width <= areaW && dims.height <= areaH) {
+        config.x = areaX + (areaW - dims.width) / 2;
+        config.y = contentTop + (areaH - dims.height) / 2;
+      }
+      ok = decoder->decodeToFramebuffer(path, renderer, config);
+    }
+  }
+  if (!ok) {
+    renderer.drawCenteredText(VIEWER_FONT_ID, contentTop + areaH / 2, tr(STR_IMAGE_DECODE_FAILED));
+  }
+}
+
 void TextViewerActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
@@ -216,7 +352,9 @@ void TextViewerActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, displayTitle.c_str());
 
-  if (lines.empty()) {
+  if (imageMode()) {
+    renderImage();
+  } else if (lines.empty()) {
     renderer.drawText(VIEWER_FONT_ID, metrics.contentSidePadding, contentTop,
                       openFailed ? tr(STR_PAGE_LOAD_ERROR) : tr(STR_EMPTY_FILE));
   } else {
@@ -225,11 +363,14 @@ void TextViewerActivity::render(RenderLock&&) {
                         lines[i].c_str());
     }
   }
+  if (!imageMode()) drawScrollBar();
 
   const bool atStart = pageStarts.size() <= 1;
-  const bool atEnd = nextPageOffset >= fileSize;
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), "", atStart ? "" : tr(STR_DIR_UP), atEnd ? "" : tr(STR_DIR_DOWN));
+  const bool atEnd = nextPageOffset >= sourceSize();
+  const bool canToggle = prettyKind != PrettyView::Kind::None && !prettyUnavailable;
+  const char* toggleLabel = canToggle ? (prettyMode ? tr(STR_RAW) : tr(STR_PRETTY)) : "";
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), toggleLabel, (imageMode() || atStart) ? "" : tr(STR_DIR_UP),
+                                            (imageMode() || atEnd) ? "" : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();

@@ -12,7 +12,7 @@
 // the SD card — hidden files included — with rename, move (one-slot clipboard)
 // and delete via a per-item action menu.
 class FileManagerActivity final : public Activity {
-  enum class MenuAction : uint8_t { MoveHere, View, Rename, Normalize, Move, Delete };
+  enum class MenuAction : uint8_t { MoveHere, View, Rename, Normalize, Duplicate, Move, Delete };
 
   ButtonNavigator buttonNavigator;
   OptionPopup popup;
@@ -23,6 +23,10 @@ class FileManagerActivity final : public Activity {
   // release must not also act on the list below.
   bool lockNextConfirmRelease = false;
   bool lockNextBackRelease = false;
+  // True once a Confirm press edge was seen inside this activity; gates the
+  // long-press action menu so a press carried in from another screen can't
+  // trigger it.
+  bool confirmPressSeen = false;
 
   std::string basepath = "/";
   std::vector<std::string> files;  // directories carry a trailing '/'
@@ -43,6 +47,9 @@ class FileManagerActivity final : public Activity {
 
   void openActionMenu();
   void runMenuAction(MenuAction action);
+  bool probeBookMetadata(const std::string& entry, std::string& title, std::string& author);
+  std::vector<std::string> buildInfoLines(const std::string& entry);
+  void duplicateFile(const std::string& entry);
   void viewFile(const std::string& entry);
   // Opens the rename keyboard for `entry`. `seedName` pre-fills a proposed
   // name (used by Normalize); empty = seed with the current name.
