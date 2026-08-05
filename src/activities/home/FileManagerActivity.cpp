@@ -12,7 +12,7 @@
 
 #include "MappedInputManager.h"
 #include "activities/util/ConfirmationActivity.h"
-#include "activities/util/KeyboardEntryActivity.h"
+#include "activities/util/TextEntryFactory.h"
 #include "activities/util/TextViewerActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -236,8 +236,8 @@ void FileManagerActivity::startRename(const std::string& entry, const std::strin
   const std::string oldName = isDirectory ? entry.substr(0, entry.length() - 1) : entry;
   const std::string oldFull = fullPathOf(entry);
 
-  startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_NEW_NAME),
-                                                                 seedName.empty() ? oldName : seedName, MAX_RENAME_LEN),
+  startActivityForResult(makeTextEntryActivity(renderer, mappedInput, tr(STR_NEW_NAME),
+                                               seedName.empty() ? oldName : seedName, MAX_RENAME_LEN),
                          [this, oldFull, oldName, isDirectory](const ActivityResult& res) {
                            lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
                            lockNextConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);

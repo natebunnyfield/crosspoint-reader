@@ -29,7 +29,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #endif
 #include "activities/util/IntervalSelectionActivity.h"
-#include "activities/util/KeyboardEntryActivity.h"
+#include "activities/util/TextEntryFactory.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -313,8 +313,8 @@ void SettingsActivity::toggleCurrentSetting() {
         // Free-text owner name, shown on the sleep screens. Saved immediately:
         // sleep can power the device off, and an unsaved name would vanish.
         startActivityForResult(
-            std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_DEVICE_OWNER), SETTINGS.ownerName,
-                                                    sizeof(SETTINGS.ownerName) - 1, InputType::Text),
+            makeTextEntryActivity(renderer, mappedInput, tr(STR_DEVICE_OWNER), SETTINGS.ownerName,
+                                  sizeof(SETTINGS.ownerName) - 1, InputType::Text),
             [this](const ActivityResult& result) {
               if (!result.isCancelled) {
                 const auto& kb = std::get<KeyboardResult>(result.data);

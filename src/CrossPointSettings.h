@@ -143,6 +143,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     SYSTEM_FONT_COUNT
   };
 
+  // Text-entry keyboard. Order is the picker's order and the persisted value,
+  // so it is frozen: new keyboards append at the END.
+  enum KEYBOARD_LAYOUT { KEYBOARD_DAISY = 0, KEYBOARD_GRID13 = 1, KEYBOARD_QWERTY = 2, KEYBOARD_LAYOUT_COUNT };
+
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
 
@@ -267,6 +271,12 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // is a default nobody chose. A settings.json that already names a font keeps
   // it; Ubuntu stays available and unchanged at index 0.
   uint8_t systemFont = SYSTEM_FONT_LIBREFRANKLIN;
+  // Text-entry keyboard for every entry field (searches, WiFi passwords, owner
+  // name, renames). 13-grid is the default: the 2026-08-04 design ruling picked
+  // it as THE keyboard; QWERTY stays selectable for the unconvinced, and the
+  // daisywheel ships per docs/daisywheel.md. A settings.json without the key
+  // gets the ruling's default, same reasoning as systemFont above.
+  uint8_t keyboardLayout = KEYBOARD_GRID13;
   // Sunlight fading compensation
   uint8_t fadingFix = 0;
   // Power button return from footnotes (1 = enabled, 0 = disabled)
