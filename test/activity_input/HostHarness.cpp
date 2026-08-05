@@ -6,6 +6,7 @@
 #include <HalGPIO.h>
 #include <builtinFonts/all.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -170,7 +171,7 @@ const ThemeMetrics& UITheme::getMetrics() const { return *currentMetrics; }
 // the renderer — so this is the real computation, not an approximation.
 // FontSelectionActivity::loop() calls it every frame to size a page jump.
 int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader, bool hasTabBar, bool hasButtonHints,
-                                     bool hasSubtitle, int extraReservedHeight) {
+                                     bool hasSubtitle, int extraReservedHeight, int subtitleLines) {
   const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
   const auto orientation = renderer.getOrientation();
   int reservedHeight = metrics.topPadding;
@@ -185,8 +186,16 @@ int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader
     reservedHeight += metrics.verticalSpacing + metrics.buttonHintsHeight;
   }
   const int availableHeight = renderer.getScreenHeight() - reservedHeight - extraReservedHeight;
-  const int rowHeight = hasSubtitle ? metrics.listWithSubtitleRowHeight : metrics.listRowHeight;
-  return availableHeight / rowHeight;
+  // Mirrors BaseTheme::getListRowStep + getListPageItems, including both clamps
+  // — a zero rowStep would divide by zero, and a page of zero items would hang
+  // any caller paging through a list.
+  int rowStep = metrics.listRowHeight;
+  if (hasSubtitle) {
+    const int extraLines = std::max(0, subtitleLines - 1);
+    rowStep = metrics.listWithSubtitleRowHeight + extraLines * metrics.listSubtitleLineStep;
+  }
+  if (rowStep <= 0) return 1;
+  return std::max(1, availableHeight / rowStep);
 }
 
 // Render-path only (EpubReaderMenuActivity::render, EpubReaderPercentSelection
