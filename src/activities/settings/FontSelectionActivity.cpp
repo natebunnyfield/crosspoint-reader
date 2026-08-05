@@ -26,6 +26,13 @@ constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
 // Both the page stride and drawList have to be told, or paging skips rows.
 constexpr int kColophonLines = 2;
 
+// Families visible at once. Three, not "as many as fit": five rows left the
+// specimen pane at 30% of the usable height, which is a four-line sample and
+// nothing else. The list is a comparison set the user steps through, while the
+// specimen is the thing actually being judged — so the rows are capped and the
+// pane takes everything they give back.
+constexpr int kVisibleFontRows = 3;
+
 // Resolve the current selection to a POSITION IN `fonts_`.
 //
 // This must search the built list rather than compute an index: `settingIndex`
@@ -89,7 +96,16 @@ void FontSelectionActivity::onEnter() {
   afterHeader = metrics_.topPadding + metrics_.headerHeight + metrics_.verticalSpacing;
   bottomReserved = metrics_.buttonHintsHeight + metrics_.verticalSpacing;
   usableHeight = renderer.getScreenHeight() - afterHeader - bottomReserved;
-  previewHeight = usableHeight * metrics_.previewHeightPercent / 100;
+
+  // The LIST is sized first here, opposite to previewHeightPercent's usual
+  // ordering, because the row count is the fixed quantity now. Whole rows only,
+  // so the last one is never drawn clipped, and clamped to the space that
+  // exists in case a theme's row grows past a third of the screen.
+  const int listBudget = std::max(0, usableHeight - metrics_.verticalSpacing);
+  const int rowStep = GUI.getListRowStep(true, kColophonLines);
+  listHeight = rowStep > 0 ? std::min(rowStep * kVisibleFontRows, (listBudget / rowStep) * rowStep)
+                           : usableHeight * (100 - metrics_.previewHeightPercent) / 100;
+  previewHeight = usableHeight - metrics_.verticalSpacing - listHeight;
 
   const int sdFontCount = registry_ ? static_cast<int>(registry_->getFamilyCount()) : 0;
 
@@ -155,8 +171,21 @@ void FontSelectionActivity::loop() {
     return;
   }
 
+  // Confirm splits on context, and the button hint says which meaning applies:
+  //
+  //   cursor on a row that is NOT applied -> apply that font ("Select")
+  //   cursor on the applied row           -> swap the specimen ("Sample")
+  //
+  // Applying is never lost — every other row still does it, and the applied row
+  // has nothing left to apply. The specimen swap lives here because that is
+  // exactly where a user sits while judging the face they just chose.
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    applySelectedFont();
+    if (selectedIndex_ == previewFontIndex_) {
+      proseSpecimen_ = !proseSpecimen_;
+      requestUpdate();
+    } else {
+      applySelectedFont();
+    }
     return;
   }
 
@@ -286,25 +315,6 @@ void FontSelectionActivity::applySelectedFont() {
   requestUpdate();
 }
 
-int FontSelectionActivity::listPageHeight() const {
-  // Rows carry a designer/lineage subtitle, so the taller subtitle row height
-  // is the one that applies. Read from the ACTIVE theme rather than
-  // BaseMetrics: LyraTheme overrides drawList() with its own row heights, and a
-  // hardcoded value would disagree with whatever the theme actually draws.
-  //
-  // Through getListRowStep() rather than the metric directly, because the
-  // colophon wraps over kColophonLines lines and the row is that much taller;
-  // reading listWithSubtitleRowHeight raw would size the rect for the old
-  // one-line row and clip the last entry.
-  const int rowHeight = GUI.getListRowStep(true, kColophonLines);
-  const int available = usableHeight - previewHeight - metrics_.verticalSpacing;
-  if (rowHeight <= 0) return available;
-  // `available` already excludes the header and the button hints, so it IS what
-  // is free: no cap on top of it, just a whole number of rows so the last one
-  // is never drawn clipped.
-  return std::min(available, (available / rowHeight) * rowHeight);
-}
-
 uint8_t FontSelectionActivity::resolvedPointSize() const {
   // Mirrors CrossPointSettings::getReaderFontId()'s resolution order, so the
   // number shown always describes the specimen actually on screen: an SD
@@ -371,14 +381,23 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
 
   if (fontId == 0) return;
 
-  const char* previewText = I18N.get(StrId::STR_FONT_PREVIEW_TEXT);
   if (auto* fcm = renderer.getFontCacheManager()) {
-    // Reuses `scratch` — the label was drawn above and is no longer needed.
-    snprintf(scratch, sizeof(scratch), "%s %s", previewText, ELLIPSIS_UTF8);
-    // 0x0F warms all four style variants. The specimen below renders each one,
-    // and an SD card font that misses the cache re-reads glyph data from the
-    // card per character.
-    fcm->prewarmCache(fontId, scratch, 0x0F);
+    if (proseSpecimen_) {
+      // The prose passage is far longer than `scratch`, so warm each string
+      // directly and only in the style it is drawn in: body regular (0x01),
+      // closing line italic (0x04). The ellipsis comes from truncation in
+      // either of them.
+      fcm->prewarmCache(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE), 0x01);
+      fcm->prewarmCache(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE_ITALIC), 0x04);
+      fcm->prewarmCache(fontId, ELLIPSIS_UTF8, 0x05);
+    } else {
+      // Reuses `scratch` — the label was drawn above and is no longer needed.
+      snprintf(scratch, sizeof(scratch), "%s %s", I18N.get(StrId::STR_FONT_PREVIEW_TEXT), ELLIPSIS_UTF8);
+      // 0x0F warms all four style variants. The specimen below renders each one,
+      // and an SD card font that misses the cache re-reads glyph data from the
+      // card per character.
+      fcm->prewarmCache(fontId, scratch, 0x0F);
+    }
   }
 
   renderPreviewSpecimen(top, height, fontId);
@@ -405,22 +424,55 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
   if (lineH <= 0) return;
 
   const int innerHeight = height - metrics_.previewPadding - labelReserved;
-  const int maxLines = std::max(1, innerHeight / (lineH + 2));
+  const int lineStep = lineH + 2;
+  const int maxLines = std::max(1, innerHeight / lineStep);
+
+  // Lines are COLLECTED first and drawn second, so the block can be centred in
+  // the pane. The pane is now around half the screen (the list below it is
+  // capped at kVisibleFontRows), and a four-line style grid pinned to the top
+  // left a band of white between the specimen and its label.
+  struct SpecimenLine {
+    std::string text;
+    EpdFontFamily::Style style;
+    int gapBefore;
+  };
+  std::vector<SpecimenLine> lines;
+  lines.reserve(static_cast<size_t>(maxLines));
 
   const char* previewText = I18N.get(StrId::STR_FONT_PREVIEW_TEXT);
 
-  int y = top + metrics_.previewPadding;
-  const int textBottomLimit = top + height - labelReserved;
+  if (proseSpecimen_) {
+    // Prose specimen: continuous text, word-wrapped to the pane, closing with
+    // an italic sentence. The style grid shows what the four cuts look like;
+    // this shows what the face READS like — colour on the page, word-space
+    // rhythm, how the eye moves line to line — which a pangram cannot tell you.
+    // Wrapped (not one string per line) so it stays honest at every size slot:
+    // at XL the same passage simply shows fewer lines of itself.
+    //
+    // The closing line(s) are reserved BEFORE the body is wrapped, so the
+    // italic is never the thing squeezed out; it is half of what this specimen
+    // exists to show.
+    const int italicLines = maxLines >= 4 ? 2 : (maxLines >= 2 ? 1 : 0);
+    const int bodyLines = std::max(1, maxLines - italicLines);
 
-  // A specimen containing newlines is a per-style sample: one line each in
-  // regular, bold, italic and bold-italic, so all four can be judged together.
-  // The styles are left unlabelled deliberately — they are self-evident, and a
-  // label sitting next to a specimen competes with the thing being evaluated.
-  //
-  // Translations that have not been given a multi-line specimen are a single
-  // string and keep the original wrap-in-regular behaviour, so nothing breaks
-  // for the other 28 languages.
-  if (std::strchr(previewText, '\n') != nullptr) {
+    for (auto& line : renderer.wrappedText(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE), width, bodyLines)) {
+      lines.push_back({std::move(line), EpdFontFamily::REGULAR, 0});
+    }
+    if (italicLines > 0) {
+      bool first = true;
+      for (auto& line : renderer.wrappedText(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE_ITALIC), width, italicLines,
+                                             EpdFontFamily::ITALIC)) {
+        // Half a line of air between the passage and its closing sentence.
+        lines.push_back({std::move(line), EpdFontFamily::ITALIC, first ? lineStep / 2 : 0});
+        first = false;
+      }
+    }
+  } else if (std::strchr(previewText, '\n') != nullptr) {
+    // A specimen containing newlines is a per-style sample: one line each in
+    // regular, bold, italic and bold-italic, so all four can be judged
+    // together. The styles are left unlabelled deliberately — they are
+    // self-evident, and a label sitting next to a specimen competes with the
+    // thing being evaluated.
     static constexpr EpdFontFamily::Style kStyles[] = {EpdFontFamily::REGULAR, EpdFontFamily::BOLD,
                                                        EpdFontFamily::ITALIC, EpdFontFamily::BOLD_ITALIC};
     constexpr int kStyleCount = static_cast<int>(sizeof(kStyles) / sizeof(kStyles[0]));
@@ -431,21 +483,31 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
           newline ? std::string(cursor, static_cast<size_t>(newline - cursor)) : std::string(cursor);
       cursor = newline ? newline + 1 : nullptr;
       if (segment.empty()) continue;
-      if (y + lineH > textBottomLimit) break;  // fewer lines fit at large sizes
+      if (static_cast<int>(lines.size()) >= maxLines) break;  // fewer lines fit at large sizes
       // A font lacking a style falls back to regular inside EpdFontFamily, so
       // an incomplete family degrades rather than failing.
-      const std::string fitted = renderer.truncatedText(fontId, segment.c_str(), width, kStyles[i]);
-      renderer.drawText(fontId, left, y, fitted.c_str(), /*black=*/true, kStyles[i]);
-      y += lineH + 2;
+      lines.push_back({renderer.truncatedText(fontId, segment.c_str(), width, kStyles[i]), kStyles[i], 0});
     }
-    return;
+  } else {
+    // Translations that have not been given a multi-line specimen are a single
+    // string and keep the original wrap-in-regular behaviour, so nothing breaks
+    // for the other 28 languages.
+    for (auto& line : renderer.wrappedText(fontId, previewText, width, maxLines)) {
+      lines.push_back({std::move(line), EpdFontFamily::REGULAR, 0});
+    }
   }
 
-  const auto lines = renderer.wrappedText(fontId, previewText, width, maxLines);
+  int blockHeight = 0;
+  for (const auto& line : lines) blockHeight += line.gapBefore + lineStep;
+  blockHeight = std::max(0, blockHeight - 2);
+
+  const int textBottomLimit = top + height - labelReserved;
+  int y = top + metrics_.previewPadding + std::max(0, (innerHeight - blockHeight) / 2);
   for (const auto& line : lines) {
+    y += line.gapBefore;
     if (y + lineH > textBottomLimit) break;
-    renderer.drawText(fontId, left, y, line.c_str());
-    y += lineH + 2;
+    renderer.drawText(fontId, left, y, line.text.c_str(), /*black=*/true, line.style);
+    y += lineStep;
   }
 }
 
@@ -461,7 +523,6 @@ void FontSelectionActivity::render(RenderLock&&) {
 
   const int previewTop = afterHeader;
   const int listTop = previewTop + previewHeight + metrics_.verticalSpacing;
-  const int listHeight = listPageHeight();
 
   const int previewFontId = SETTINGS.getReaderFontId();
   // Typeface name WITHOUT the designer credit: the label already carries the
@@ -509,9 +570,12 @@ void FontSelectionActivity::render(RenderLock&&) {
       },
       true, nullptr, kColophonLines);
 
-  // Confirm always means the same thing now, so the label no longer alternates
-  // between Preview and Select depending on where the cursor is.
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  // Confirm carries two meanings and the label says which one is live: on any
+  // row but the applied one it applies that font, on the applied row it swaps
+  // the specimen. Without the alternating label the second meaning would be a
+  // hidden gesture.
+  const char* confirmLabel = (selectedIndex_ == previewFontIndex_) ? tr(STR_SAMPLE) : tr(STR_SELECT);
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();

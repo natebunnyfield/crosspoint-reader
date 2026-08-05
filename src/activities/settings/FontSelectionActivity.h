@@ -34,25 +34,14 @@ class FontSelectionActivity final : public Activity {
   // the sizes they ship, so the stored value snaps per-family — the stored
   // number alone is not an accurate readout.
   uint8_t resolvedPointSize() const;
-  // Typefaces shown per page: AS MANY AS FIT, with no fixed cap.
+  // Typefaces shown per page: kVisibleFontRows (three), fixed.
   //
-  // There was a `kFamiliesPerPage = 4` here, on the reasoning that a page
-  // should be a comparison set rather than a scroll. It stopped paying for
-  // itself the moment the installed set outgrew it — a fifth family could only
-  // be seen by paging, on a screen with the room to show it, which reads as the
-  // font simply being missing. The space below the preview pane is the only
-  // limit now.
-  //
-  // The list rect and the navigation stride MUST still derive from the same
-  // number. drawList() computes its own pageItems from rect.height / rowHeight,
-  // so if these two ever disagree the highlight desynchronises from the page and
-  // ButtonNavigator steps past entries the screen never drew. Both sides now ask
-  // the theme (getNumberOfItemsPerPage / the same row height), which is one
-  // source rather than two.
-
-  // Height of a list page: whatever is free below the preview pane, in whole
-  // rows at the ACTIVE theme's subtitle-row height.
-  int listPageHeight() const;
+  // The list rect and the navigation stride MUST derive from the same number.
+  // drawList() computes its own pageItems from rect.height / rowHeight, so if
+  // the two ever disagree the highlight desynchronises from the page and
+  // ButtonNavigator steps past entries the screen never drew. Both sides ask the
+  // theme (getNumberOfItemsPerPage / the same row height) against the same
+  // reserved preview height, which is one source rather than two.
 
   int getFontIdForPreview(int index) const;
   void renderPreviewPane(int top, int height, int fontId, const char* fontName) const;
@@ -73,10 +62,15 @@ class FontSelectionActivity final : public Activity {
   std::vector<FontEntry> fonts_;
   int selectedIndex_ = 0;
   int previewFontIndex_ = 0;
+  // false: the pangram/diacritic grid, one line per style. true: a prose
+  // passage, which is what actually shows how a face reads at length. Toggled
+  // with Confirm while the cursor sits on the applied font — see loop().
+  bool proseSpecimen_ = false;
 
   ThemeMetrics metrics_ = {};
   int afterHeader = 0;
   int bottomReserved = 0;
   int usableHeight = 0;
   int previewHeight = 0;
+  int listHeight = 0;
 };
