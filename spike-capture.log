@@ -2222,3 +2222,155 @@ waiting for download
 [17116] [DBG] [ACT] Entering activity: BleEditor
 [17119] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=94972 minfree=94924 maxalloc=73716
 [17122] [INF] [BLESPIKE] heap before nimble_port_init: 85752
+[3109]   Wait complete: refresh (496 ms)
+[3172] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[3691]   Wait complete: refresh (496 ms)
+[4978] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[4979] [DBG] [ACT] Pushed to activity stack, new size = 1
+[4979] [DBG] [ACT] Entering activity: BleEditor
+[4979] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=94972 minfree=94924 maxalloc=73716
+[4979] [INF] [BLESPIKE] heap before nimble_port_init: free=94972 maxalloc=73716
+[5014] [INF] [BLESPIKE] heap after nimble_port_init: 29768
+[5019] [INF] [BLESPIKE] state -> starting
+[5028] [INF] [BLESPIKE] host synced, own addr type=0
+[5029] [INF] [BLESPIKE] state -> scanning
+[5030] [INF] [BLESPIKE] heap after host task start: 23020
+[5030] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=23020 minfree=22948 maxalloc=20468
+[5030] [INF] [BLEEDIT] SPIKE-HEAP P2b-after-editor-buffer free=14312 minfree=14312 maxalloc=11764
+[5030] [DBG] [LOOP] New max loop duration: 52 ms (activity: 52 ms)
+[5036] [INF] [BLESPIKE] NEW ca:9a:e1:b6:4d:2d type=1 rssi=-59 hid=0 name='' uuids16=[] appear=0000/0
+[5036] [INF] [BLESPIKE]     raw[3]: 02 01 04
+[5038] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[5040] [INF] [BLESPIKE] NEW e8:fb:1c:0d:cc:7c type=0 rssi=-80 hid=0 name='N/A' uuids16=[] appear=0000/1
+[5040] [INF] [BLESPIKE]     raw[12]: 03 19 00 00 02 0a 00 04 09 4e 2f 41
+[5055] [INF] [BLESPIKE] NEW 77:50:7a:77:22:ce type=1 rssi=-92 hid=0 name='' uuids16=[] appear=0000/0
+[5055] [INF] [BLESPIKE]     raw[17]: 02 01 1a 02 0a 09 0a ff 4c 00 10 05 00 18 ef 5b 72
+[5099] [INF] [BLESPIKE] NEW c7:08:2b:64:e6:f5 type=1 rssi=-97 hid=0 name='' uuids16=[] appear=0000/0
+[5100] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 10 00
+[5116] [INF] [BLESPIKE] NEW 70:18:0c:21:b8:b7 type=1 rssi=-77 hid=0 name='' uuids16=[] appear=0000/0
+[5116] [INF] [BLESPIKE]     raw[19]: 02 01 1a 0f ff 4c 00 16 0a 04 74 bd c8 5f bf 5f 39 ae 13
+[5121] [INF] [BLESPIKE] NEW cd:b3:f4:bd:ad:c0 type=1 rssi=-97 hid=0 name='OB-4 LE' uuids16=[] appear=0000/0
+[5121] [INF] [BLESPIKE]     raw[24]: 02 01 06 0b ff 50 04 0b 01 00 33 00 f6 6c 00 08 09 4f 42 2d 34 20 4c 45
+[5127] [INF] [BLESPIKE] NEW 5b:1e:69:d5:7b:0e type=1 rssi=-88 hid=0 name='' uuids16=[] appear=0000/0
+[5127] [INF] [BLESPIKE]     raw[18]: 02 01 1a 02 0a 0c 0b ff 4c 00 10 06 0a 1d e0 f3 21 58
+[5153] [INF] [BLESPIKE] NEW 4c:2e:22:a6:db:52 type=1 rssi=-89 hid=0 name='' uuids16=[] appear=0000/0
+[5153] [INF] [BLESPIKE]     raw[18]: 02 01 1a 02 0a 0c 0b ff 4c 00 10 06 0a 1d e0 f3 21 58
+[5156] [INF] [BLESPIKE] NEW 54:49:8e:a6:16:98 type=1 rssi=-67 hid=0 name='' uuids16=[] appear=0000/0
+[5156] [INF] [BLESPIKE]     raw[17]: 02 01 1a 0a ff 4c 00 10 05 29 98 b7 ad cf 02 0a 00
+[5163] [INF] [BLESPIKE] NEW 4f:1a:1e:76:6f:35 type=1 rssi=-73 hid=0 name='' uuids16=[] appear=0000/0
+[5163] [INF] [BLESPIKE]     raw[17]: 02 01 1a 0d ff 4c 00 16 08 00 9d 12 d8 6f 59 f2 7d
+[5168] [INF] [BLESPIKE] NEW 4e:8d:6e:a3:a6:33 type=1 rssi=-74 hid=0 name='' uuids16=[] appear=0000/0
+[5168] [INF] [BLESPIKE]     raw[19]: 02 01 1a 0c ff 4c 00 10 07 35 1f c0 86 fe 0e 68 02 0a 00
+[5180] [INF] [BLESPIKE] NEW 43:55:7a:0a:a8:06 type=1 rssi=-64 hid=0 name='' uuids16=[] appear=0000/0
+[5180] [INF] [BLESPIKE]     raw[27]: 02 01 1a 17 ff 4c 00 09 08 13 04 c0 a8 01 e2 1b 58 16 08 00 6f d1 8d b8 32 05 d6
+[5182] [INF] [BLESPIKE] NEW 64:9b:32:e3:a1:0c type=1 rssi=-64 hid=0 name='' uuids16=[] appear=0000/0
+[5182] [INF] [BLESPIKE]     raw[31]: 02 01 1a 1b ff 4c 00 0c 0e 00 2b 53 34 f8 23 c3 d4 d7 93 56 95 3d 08 10 06 49 1d 73 58 46 78
+[5194] [INF] [BLESPIKE] NEW 42:5c:4e:3c:89:da type=1 rssi=-71 hid=0 name='' uuids16=[] appear=0000/0
+[5194] [INF] [BLESPIKE]     raw[31]: 02 01 1a 1b ff 4c 00 0c 0e 00 2b 53 34 f8 23 c3 d4 d7 93 56 95 3d 08 10 06 49 1d 73 58 46 78
+[5229] [INF] [BLESPIKE] NEW 79:9b:0a:7d:d2:4b type=1 rssi=-89 hid=0 name='' uuids16=[fe9f ] appear=0000/0
+[5229] [INF] [BLESPIKE]     raw[28]: 03 03 9f fe 17 16 9f fe 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[5560]   Wait complete: refresh (497 ms)
+[6016] [INF] [BLESPIKE] NEW e5:30:05:df:39:fc type=1 rssi=-78 hid=0 name='' uuids16=[] appear=0000/0
+[6017] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 20 01
+[6345] [INF] [BLESPIKE] NEW 44:a6:e5:09:92:18 type=0 rssi=-99 hid=0 name='' uuids16=[ff00 ] appear=0000/0
+[6345] [INF] [BLESPIKE]     raw[7]: 02 01 06 03 02 00 ff
+[6936] [INF] [BLESPIKE] NEW f2:8a:2b:e9:1b:2c type=1 rssi=-87 hid=0 name='' uuids16=[] appear=0000/0
+[6936] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 03
+[7320] [INF] [BLESPIKE] NEW fe:e8:b7:de:87:e3 type=1 rssi=-64 hid=0 name='' uuids16=[] appear=0000/0
+[7321] [INF] [BLESPIKE]     raw[27]: 1a ff 4c 00 12 02 6e 01 07 11 06 c2 54 e5 84 3d 39 99 4a 97 28 2e c2 dd b8 43 2e
+[8380] [INF] [BLESPIKE] NEW e4:8a:fe:e0:42:3f type=1 rssi=-70 hid=0 name='' uuids16=[] appear=0000/0
+[8380] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 02
+[8828] [INF] [BLESPIKE] NEW e9:4e:d2:cf:84:ff type=1 rssi=-61 hid=0 name='' uuids16=[] appear=0000/0
+[8828] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 03
+[10003] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[10672] [INF] [BLESPIKE] NEW e3:8f:81:1c:08:c5 type=1 rssi=-88 hid=0 name='' uuids16=[] appear=0000/0
+[10672] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 02
+[20008] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[26548] [INF] [BLESPIKE] NEW f2:e6:17:1a:7f:00 type=1 rssi=-92 hid=0 name='' uuids16=[] appear=0000/0
+[26549] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 01
+[28561] [INF] [BLESPIKE] NEW e1:94:10:48:51:a1 type=1 rssi=-93 hid=0 name='' uuids16=[feaf ] appear=0000/0
+[28561] [INF] [BLESPIKE]     raw[31]: 02 01 06 03 02 af fe 17 16 af fe 13 03 b3 b9 e9 ea 22 05 34 de 47 16 6a 84 c5 02 8e 63 c0 19
+[30013] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[35030] [INF] [BLESPIKE] scan complete reason=0
+[35031] [INF] [BLESPIKE] state -> scanning
+[37173] [INF] [BLESPIKE] NEW f3:c3:59:1a:d5:95 type=1 rssi=-97 hid=0 name='' uuids16=[] appear=0000/0
+[37173] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 10 00
+[40019] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[42785] [INF] [BLESPIKE] NEW 54:bf:62:ba:93:88 type=1 rssi=-72 hid=0 name='' uuids16=[] appear=0000/0
+[42785] [INF] [BLESPIKE]     raw[26]: 02 01 1a 02 0a 0c 13 ff 4c 00 0c 0e 00 2e 53 ae c5 bd 86 57 a9 19 8d bb 60 24
+[42797] [INF] [BLESPIKE] NEW 7f:5c:be:d2:7a:b4 type=1 rssi=-72 hid=0 name='' uuids16=[] appear=0000/0
+[42797] [INF] [BLESPIKE]     raw[17]: 02 01 1a 0d ff 4c 00 16 08 00 6f d1 8d b8 32 05 d6
+[42833] [INF] [BLESPIKE] NEW 4b:85:36:0e:04:d7 type=1 rssi=-65 hid=0 name='' uuids16=[] appear=0000/0
+[42834] [INF] [BLESPIKE]     raw[26]: 02 01 1a 02 0a 0c 13 ff 4c 00 0c 0e 00 2e 53 ae c5 bd 86 57 a9 19 8d bb 60 24
+[45123] [INF] [BLESPIKE] NEW 7d:1b:95:1e:f4:20 type=1 rssi=-98 hid=0 name='NCB98' uuids16=[feaf ] appear=0000/0
+[45123] [INF] [BLESPIKE]     raw[14]: 02 01 02 03 02 af fe 06 09 4e 43 42 39 38
+[50024] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[60030] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[65031] [INF] [BLESPIKE] scan complete reason=0
+[65032] [INF] [BLESPIKE] state -> scanning
+[70035] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[76411] [INF] [BLESPIKE] NEW d6:89:ee:1a:70:d0 type=1 rssi=-91 hid=0 name='' uuids16=[feaf ] appear=0000/0
+[76411] [INF] [BLESPIKE]     raw[31]: 02 01 06 03 02 af fe 17 16 af fe 13 03 b6 ea d8 ce 3a 92 25 28 e0 f9 43 52 78 76 84 5a 81 7a
+[80040] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[90045] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[95033] [INF] [BLESPIKE] scan complete reason=0
+[95034] [INF] [BLESPIKE] state -> scanning
+[100050] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[110055] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[120060] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[125035] [INF] [BLESPIKE] scan complete reason=0
+[125036] [INF] [BLESPIKE] state -> scanning
+[130067] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[140072] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[150077] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[155037] [INF] [BLESPIKE] scan complete reason=0
+[155038] [INF] [BLESPIKE] state -> scanning
+[158921] [INF] [BLESPIKE] NEW 66:49:be:96:8a:21 type=1 rssi=-97 hid=0 name='' uuids16=[fe9f ] appear=0000/0
+[158921] [INF] [BLESPIKE]     raw[28]: 03 03 9f fe 17 16 9f fe 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[160082] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[170087] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[180092] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[185039] [INF] [BLESPIKE] scan complete reason=0
+[185040] [INF] [BLESPIKE] state -> scanning
+[190097] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[200102] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[206915] [INF] [BLESPIKE] NEW 6f:6a:eb:da:03:3e type=1 rssi=-96 hid=0 name='NP06X' uuids16=[feaf ] appear=0000/0
+[206915] [INF] [BLESPIKE]     raw[14]: 02 01 02 03 02 af fe 06 09 4e 50 30 36 58
+[210107] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[212166] [INF] [BLESPIKE] NEW 48:83:13:77:71:31 type=1 rssi=-94 hid=0 name='NP06X' uuids16=[feaf ] appear=0000/0
+[212167] [INF] [BLESPIKE]     raw[14]: 02 01 02 03 02 af fe 06 09 4e 50 30 36 58
+[215041] [INF] [BLESPIKE] scan complete reason=0
+[215042] [INF] [BLESPIKE] state -> scanning
+[220113] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[230118] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[240123] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[245043] [INF] [BLESPIKE] scan complete reason=0
+[245044] [INF] [BLESPIKE] state -> scanning
+[250128] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[260133] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[270138] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[275046] [INF] [BLESPIKE] scan complete reason=0
+[275046] [INF] [BLESPIKE] state -> scanning
+[280143] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[290148] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[300153] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[305048] [INF] [BLESPIKE] scan complete reason=0
+[305048] [INF] [BLESPIKE] state -> scanning
+[310158] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[320163] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[330168] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[335050] [INF] [BLESPIKE] scan complete reason=0
+[335050] [INF] [BLESPIKE] state -> scanning
+[340173] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[350178] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[360183] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[365052] [INF] [BLESPIKE] scan complete reason=0
+[365052] [INF] [BLESPIKE] state -> scanning
+[370189] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[380194] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[390199] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[395054] [INF] [BLESPIKE] scan complete reason=0
+[395054] [INF] [BLESPIKE] state -> scanning
+[400204] [INF] [MEM] Free: 14164 bytes, Total: 250980 bytes, Min Free: 14164 bytes, MaxAlloc: 11764 bytes
+[455058] [INF] [BLESPIKE] scan complete reason=0
+[455058] [INF] [BLESPIKE] state -> scanning
