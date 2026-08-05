@@ -138,7 +138,6 @@ void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
     return;
   }
 
-
   const int pageHeight = renderer.getScreenHeight();
   constexpr int buttonWidth = 106;
   constexpr int buttonHeight = BaseMetrics::values.buttonHintsHeight;
@@ -161,7 +160,6 @@ void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
       renderer.drawText(UI_10_FONT_ID, textX, pageHeight - buttonY + textYOffset, labels[i]);
     }
   }
-
 }
 
 void BaseTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* topBtn, const char* bottomBtn) const {
@@ -847,7 +845,10 @@ void BaseTheme::drawOptionPopup(const GfxRenderer& renderer, const char* title, 
 
   int y = dialogY + innerPadding;
 
-  renderer.drawCenteredText(UI_12_FONT_ID, y, title, true, EpdFontFamily::BOLD);
+  // Title can be a raw filename; keep it inside the dialog.
+  const int maxContentWidth = dialogW - innerPadding * 2;
+  const std::string safeTitle = renderer.truncatedText(UI_12_FONT_ID, title, maxContentWidth, EpdFontFamily::BOLD);
+  renderer.drawCenteredText(UI_12_FONT_ID, y, safeTitle.c_str(), true, EpdFontFamily::BOLD);
   y += titleLineHeight;
 
   if (metrics.optionPopupTitleSeparator) {
@@ -861,10 +862,12 @@ void BaseTheme::drawOptionPopup(const GfxRenderer& renderer, const char* title, 
   const int itemRectW = dialogW - innerPadding * 2;
   const int selectionRadius = metrics.optionPopupSelectionRadius;
 
+  const int maxOptionWidth = itemRectW - selectionHPadding * 2;
   for (int i = 0; i < optionCount; i++) {
     const int itemY = y + i * (rowHeight + itemSpacing);
     const bool selected = (i == selectedIndex);
-    const char* labelText = options[i].c_str();
+    const std::string safeLabel = renderer.truncatedText(optionFontId, options[i].c_str(), maxOptionWidth, optionStyle);
+    const char* labelText = safeLabel.c_str();
 
     if (metrics.optionPopupDrawAllRows || selected) {
       Color rowColor;

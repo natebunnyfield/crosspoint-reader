@@ -569,7 +569,9 @@ void FileManagerActivity::render(RenderLock&&) {
   // Armed move: status line above the path separator.
   if (!moveSourcePath.empty()) {
     const int statusY = separatorY - metrics.verticalSpacing / 2 - pathLineHeight;
-    std::string status = std::string(tr(STR_MOVING_PREFIX)) + moveSourceName;
+    const std::string status =
+        renderer.truncatedText(SMALL_FONT_ID, (std::string(tr(STR_MOVING_PREFIX)) + moveSourceName).c_str(),
+                               pageWidth - metrics.contentSidePadding * 2);
     renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status.c_str());
   }
 
