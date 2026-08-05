@@ -185,7 +185,7 @@ void FontSelectionActivity::loop() {
   // which is the same question render()'s list rect answers, so the page stride
   // and the drawn page still agree.
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true,
-                                                        previewHeight + metrics_.verticalSpacing, kColophonLines);
+                                                         previewHeight + metrics_.verticalSpacing, kColophonLines);
 
   // List navigation is bound to the FRONT buttons only. ButtonNavigator's
   // NavNext/NavPrevious resolve to "side Down OR front Right" and "side Up OR
@@ -365,7 +365,8 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
   // drive this above the top edge, and the renderer logs
   // "!! Outside range ... -> (x, -1)" and writes outside the framebuffer.
   if (labelY >= 0) {
-    renderer.drawText(labelFontId, left, labelY, scratch);
+    const std::string safeLabel = renderer.truncatedText(labelFontId, scratch, width);
+    renderer.drawText(labelFontId, left, labelY, safeLabel.c_str());
   }
 
   if (fontId == 0) return;
