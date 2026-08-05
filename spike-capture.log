@@ -85,3 +85,1820 @@
 [50097] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
 [60119] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
 [70141] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[80163] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[90185] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[100207] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[110229] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[120251] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[130273] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[140295] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[150316] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[160338] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[170360] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[180382] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[190404] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[200426] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[210448] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[220470] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[230492] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[240514] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[250536] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[260558] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[270580] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[280602] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[290624] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[300646] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[310668] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[320690] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[330712] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[340734] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[350756] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[360778] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[370799] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[380821] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[390843] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[400865] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[410887] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[420909] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[430931] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[440953] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[450974] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[460996] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[471018] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[481040] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[491062] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[501084] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[511106] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[521128] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[531150] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[541172] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[551194] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[561216] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[571238] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[581260] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[591282] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[601304] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[602341] [DBG] [SLP] Auto-sleep triggered after 600000 ms of inactivity
+[602343] [DBG] [PWR] Restoring normal CPU frequency
+[602400] [DBG] [ACT] Exiting activity: Home
+[602400] [DBG] [ACT] Entering activity: Sleep
+[602402] [DBG] [GFX] Time = 599238 ms from clearScreen to displayBuffer
+[602920]   Wait complete: refresh (496 ms)
+[603038] [SLP] File does not exist: /sleep_f4259c.bmp
+[603041] [DBG] [SLP] Loading: /sleep.bmp
+[603041] [DBG] [SLP] bitmap 480 x 800, screen 480 x 800
+[603041] [DBG] [SLP] drawing to 0 x 0
+[603433] [DBG] [GFX] Time = 392 ms from clearScreen to displayBuffer
+[605149]   Wait complete: refresh (1673 ms)
+[3610]   Wait complete: refresh (496 ms)
+[3672] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[4192]   Wait complete: refresh (496 ms)
+[5798] [DBG] [PWR] Going to low-power mode
+[10022] [INF] [MEM] Free: 97640 bytes, Total: 253688 bytes, Min Free: 97308 bytes, MaxAlloc: 73716 bytes
+[20044] [INF] [MEM] Free: 97640 bytes, Total: 253688 bytes, Min Free: 97308 bytes, MaxAlloc: 73716 bytes
+[30066] [INF] [MEM] Free: 97640 bytes, Total: 253688 bytes, Min Free: 97308 bytes, MaxAlloc: 73716 bytes
+[40088] [INF] [MEM] Free: 97640 bytes, Total: 253688 bytes, Min Free: 97308 bytes, MaxAlloc: 73716 bytes
+[50110] [INF] [MEM] Free: 97640 bytes, Total: 253688 bytes, Min Free: 97308 bytes, MaxAlloc: 73716 bytes
+[17371] [INF] [MEM] Free: 97616 bytes, Total: 253688 bytes, Min Free: 97288 bytes, MaxAlloc: 73716 bytes
+[19381] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[19389] [DBG] [ACT] Pushed to activity stack, new size = 1
+[19391] [DBG] [ACT] Entering activity: BleEditor
+[19394] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=97164 minfree=97116 maxalloc=73716
+[19397] [INF] [BLESPIKE] heap before nimble_port_init: 87944
+Guru Meditation Error: Core  0 panic'ed (Instruction access fault). Exception was unhandled.
+
+Core  0 register dump:
+MEPC    : 0x00000000  RA      : 0x42162cb4  SP      : 0x3fcabdd0  GP      : 0x3fc95e00
+TP      : 0x3fcac060  T0      : 0x4215eae2  T1      : 0x0000000f  T2      : 0x00000001
+S0/FP   : 0x3fce0000  S1      : 0x3fce0000  A0      : 0x00000001  A1      : 0x0000011c
+A2      : 0x3fcbf890  A3      : 0x00000003  A4      : 0x00000000  A5      : 0x00000000
+A6      : 0x01010001  A7      : 0x01000001  S2      : 0x3fce0000  S3      : 0x3fce0000
+S4      : 0x3fce0000  S5      : 0x3fcdf96c  S6      : 0x00000001  S7      : 0x00000000
+S8      : 0x00000000  S9      : 0x00000000  S10     : 0x00000000  S11     : 0x00000000
+T3      : 0x00000000  T4      : 0x004b0005  T5      : 0x01010000  T6      : 0x00000064
+MSTATUS : 0x00001881  MTVEC   : 0x40380001  MCAUSE  : 0x00000001  MTVAL   : 0x00000000
+MHARTID : 0x00000000
+
+Stack memory:
+3fcabdd0: 0x3fce0000 0x3fce0000 0x3fcdf96c 0x4215eaec 0x00000001 0x3fcabe88 0x00000001 0x00000001
+3fcabdf0: 0x00fff000 0x0000000c 0x00000000 0x600c2000 0x4038224e 0x42138d96 0x3fc98000 0x3fc90006
+3fcabe10: 0x3fc98000 0x3fc9b338 0x00000001 0x00000000 0x00000001 0x3fc9b338 0x3fc98000 0x3fc98000
+3fcabe30: 0x3fc98000 0x3fcabe88 0x00000001 0x42139810 0x00000001 0x000b0000 0x3c1ea000 0x3fca2000
+3fcabe50: 0x3fca2000 0x3fc9b338 0x00000001 0x00000000 0x00000000 0x00000000 0x3fca2000 0x3fca2000
+3fcabe70: 0x3c1ea000 0x00000000 0x3c1f9000 0x4214682a 0x3fc9b394 0x3fc9b0b4 0x5a5aa5a5 0x02509280
+3fcabe90: 0x00171000 0x00000601 0x001e0000 0x01000000 0x00000000 0x000b0000 0x00000001 0x00640001
+3fcabeb0: 0x00000064 0x01010000 0x004b0005 0x00000000 0x01000001 0x01000001 0x01010001 0x00000100
+3fcabed0: 0x00000000 0x00000000 0x3c1f9000 0x420dffe2 0x00000000 0x00000000 0x00000003 0x00000002
+3fcabef0: 0x3c1f3000 0x3fc9b0b4 0x3fcbe4a0 0x420c6780 0x00000001 0x3fc9b338 0x00000003 0x00000000
+3fcabf10: 0x3c1f3000 0x3fca2000 0x3fcabf3c 0x00000002 0x3c1f3000 0x3fca2000 0x3fc9b320 0x420a22e4
+3fcabf30: 0x420986ca 0x00000000 0x3fca518c 0x4038c300 0x00000000 0x00000000 0x3fca518c 0x4038c9fe
+3fcabf50: 0x3fc9a000 0x3fc9b000 0x00000000 0x00000000 0x00000000 0x00000001 0x00000000 0x600c2000
+3fcabf70: 0x3fca2000 0x00000001 0x3fc9b000 0x00004bb2 0x00000002 0x00000000 0x3fca1ab8 0x8b3f7044
+3fcabf90: 0x00000000 0x00000000 0x00000000 0x00000000 0x3fca2000 0x00000001 0x3fc9b000 0x00004bb2
+3fcabfb0: 0x3fc9b000 0x3fca2000 0x00004bb9 0x420d23d4 0x3fca2000 0x000927c0 0x00000001 0x600c0028
+3fcabfd0: 0x00000001 0x3fc9c000 0x00000000 0x00000000 0x00000000 0x00000000 0x0b000000 0x00000000
+3fcabff0: 0x00000000 0x00000000 0x07ca2000 0x8b3f7044 0x00000000 0x00000000 0x00000000 0x00000000
+3fcac010: 0x00000000 0x420ec000 0x3fca2000 0x420ec42c 0x00000000 0x00000000 0x00000000 0x4038d6f4
+3fcac030: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+3fcac050: 0x00000000 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xbaad5678 0xe2b7d5ff 0x6e9a7220
+3fcac070: 0xfef1cbe7 0xf72c0b3e 0xb112302a 0xa4db7c06 0xc1179231 0x9227403e 0x647f4279 0x0219534c
+3fcac090: 0xe4c6823d 0x94fb5ed6 0x94002195 0x2fbae6a4 0x6784679a 0xb5a9ced2 0x03089e3f 0x5ac85854
+3fcac0b0: 0x6a098fc7 0x925e160f 0x62a36e02 0x1f3ba77c 0x487e2d28 0x8894b8ea 0xb8c779a5 0xe27c988a
+3fcac0d0: 0xa8677316 0x3bbe7b75 0xb0a41e13 0xa88eb605 0xd81585a2 0x7022a801 0x16d3eed1 0xd0814a45
+3fcac0f0: 0x9388ee7e 0xb68dec1a 0x040b5793 0xffcaa5d7 0x97671104 0x8aa4414c 0x6ec0ddbe 0xef58308c
+3fcac110: 0x659fdbdf 0xa3a63251 0x0213ad23 0xa9549929 0x4c00a4b2 0xc8196835 0xf5f88db0 0x1e929538
+3fcac130: 0x778d95de 0x1afd70d6 0x8823b21c 0xa42bcbdf 0xc46211ac 0x45866ec7 0x6f8d084c 0x709ec281
+3fcac150: 0x24960299 0xe4017b6f 0x902309f6 0x0fa35acb 0xe91a2995 0x37d9be06 0xb98c93d2 0xc3253084
+3fcac170: 0x8aa40f75 0x6f27374d 0xb30916a0 0xf77ab67f 0x98c8b02b 0x81c21000 0x11af99a2 0x9570ea52
+3fcac190: 0xbd707745 0xab7e03c9 0x0a55fb55 0x67e140fd 0x3b30b8c8 0x2b009c4e 0x5afab444 0x0a7760e4
+3fcac1b0: 0xa99aa33a 0x05a57902 0x2025a3a6 0x251ebf9d 0x6637f620 0x74a8c9a9 0x6757f785 0x870c903c
+
+
+
+ELF file SHA256: 5f9d6d4ca
+
+Rebooting...
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0xf (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4038c2cc
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1010
+load:0x403cbf10,len:0x9f4
+load:0x403ce710,len:0x2e94
+entry 0x403cbf10
+[272] [INF] [HW] Using cached device type: X4
+[341] [XTDET] no NVS screenType; bus probe VER=FF FF FF FF FF FLG=FF -> default controller
+[342] [INF] [CLK] RTC not found
+[342] [INF] [MAIN] Hardware detect: X4
+[348] [SD] SD card detected
+[425] [INF] [SYS] Dumped panic info to SD card
+[634] [INF] [SYS] Archived crash report to /crash_reports/crash_0.txt
+[648] [DBG] [CPS] Settings loaded from file
+[667] [DBG] [RBS] Recent books loaded from file (4 entries)
+[668] [DBG] [MAIN] Starting CrossPoint version 1.5.0-BNY-dev-spike/ble-editor-76a1e620
+[712]   Wait complete:  CMD_SOFT_RESET (2 ms)
+[717]   Wait complete:  CMD_AUTO_WRITE_BW_RAM (5 ms)
+[722]   Wait complete:  CMD_AUTO_WRITE_RED_RAM (5 ms)
+[722] [DBG] [MAIN] Display initialized
+[731] [DBG] [SDREG] Found family: Edgar (4 files) in /.fonts
+[738] [DBG] [SDREG] Found family: Rosarivo (4 files) in /.fonts
+[746] [DBG] [SDREG] Found family: TeXGyreSchola (4 files) in /.fonts
+[752] [DBG] [SDREG] Found family: Coelacanth (4 files) in /.fonts
+[760] [DBG] [SDREG] Found family: LibreFranklin (4 files) in /.fonts
+[800] [DBG] [SDREG] Fonts directory not found: /fonts
+[800] [DBG] [SDREG] Discovery complete: 5 families
+[817] [DBG] [SDCF] Loaded: /.fonts/Rosarivo/Rosarivo_16.cpfont (v4, 4 styles)
+[818] [DBG] [SDCF]   style[0]: 8 intervals, 982 glyphs, advY=51, asc=36, desc=-17, kernL=72, kernR=88, ligs=0
+[818] [DBG] [SDCF]   style[1]: 8 intervals, 982 glyphs, advY=51, asc=36, desc=-17, kernL=72, kernR=88, ligs=0
+[818] [DBG] [SDCF]   style[2]: 8 intervals, 982 glyphs, advY=51, asc=36, desc=-17, kernL=48, kernR=82, ligs=0
+[819] [DBG] [SDFS] Rosarivo has no CJK coverage - skipping UI fallback sizes
+[819] [DBG] [SDFS] Loaded SD card font family: Rosarivo
+[819] [DBG] [SDFS] SD font system ready (5 families discovered)
+[819] [DBG] [MAIN] Fonts setup
+[819] [DBG] [ACT] Entering activity: Boot
+[823] [DBG] [GFX] Time = 3 ms from clearScreen to displayBuffer
+[2539]   Wait complete: refresh (1673 ms)
+[2583] [INF] [SPIKE] SPIKE-HEAP P0-boot-no-ble free=137804 total=253688 minfree=137804 maxalloc=114676
+[2589] [DBG] [ACT] Exiting activity: Boot
+[2589] [DBG] [ACT] Entering activity: Crash
+[2601] [DBG] [GFX] Time = 12 ms from clearScreen to displayBuffer
+[3120]   Wait complete: refresh (497 ms)
+[3163] [DBG] [LOOP] New max loop duration: 574 ms (activity: 574 ms)
+[5588] [DBG] [PWR] Going to low-power mode
+[10038] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[20066] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[30093] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[40121] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[50148] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[60176] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[70203] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[80231] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[90253] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[100281] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[110308] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[120336] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[130363] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[140391] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[150418] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[160446] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[170473] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[180501] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[190528] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[200556] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[210578] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[220606] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[230633] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[240661] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[250688] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[260716] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[270743] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[280771] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[290798] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[300826] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[310853] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[320876] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[330903] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[340931] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[350958] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[360986] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[371013] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[381041] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[391068] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[401096] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[411123] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[421151] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[431173] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[441201] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[451228] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[461256] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[471283] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[481311] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[491338] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[501366] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[511393] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[521421] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[531448] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[541476] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[551498] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[561526] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[571553] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[581581] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[591608] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[601636] [INF] [MEM] Free: 137808 bytes, Total: 253688 bytes, Min Free: 137280 bytes, MaxAlloc: 114676 bytes
+[602610] [DBG] [SLP] Auto-sleep triggered after 600000 ms of inactivity
+[602612] [DBG] [PWR] Restoring normal CPU frequency
+[602666] [DBG] [ACT] Exiting activity: Crash
+[602667] [DBG] [ACT] Entering activity: Sleep
+[602668] [DBG] [GFX] Time = 600079 ms from clearScreen to displayBuffer
+[603187]   Wait complete: refresh (497 ms)
+[603303] [SLP] File does not exist: /sleep_f4259c.bmp
+[603305] [DBG] [SLP] Loading: /sleep.bmp
+[603306] [DBG] [SLP] bitmap 480 x 800, screen 480 x 800
+[603306] [DBG] [SLP] drawing to 0 x 0
+[603698] [DBG] [GFX] Time = 392 ms from clearScreen to displayBuffer
+[605414]   Wait complete: refresh (1673 ms)
+[3106]   Wait complete: refresh (496 ms)
+[3170] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[3690]   Wait complete: refresh (497 ms)
+[4996] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[4996] [DBG] [ACT] Pushed to activity stack, new size = 1
+[4997] [DBG] [ACT] Entering activity: BleEditor
+[4997] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=95564 minfree=95516 maxalloc=73716
+[4997] [INF] [BLESPIKE] heap before nimble_port_init: 86344
+[5031] [INF] [BLESPIKE] heap after nimble_port_init: 21296
+[5035] [INF] [BLESPIKE] state -> starting
+[5042] [INF] [BLESPIKE] host synced, own addr type=0
+[5042] [INF] [BLESPIKE] state -> scanning
+[5043] [INF] [BLESPIKE] heap after host task start: 14504
+[5044] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=14504 minfree=14368 maxalloc=11764
+[5046] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-61 hid=0 name=''
+[5047] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-60 hid=0 name=''
+[5049] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-60 hid=0 name=''
+[5052] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[5053] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-85 hid=0 name=''
+[5061] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[5061] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[5083] [DBG] [BLESPIKE] adv d6:38:ba:90:3b:03 rssi=-95 hid=0 name=''
+[5150] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-93 hid=0 name=''
+[5150] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-93 hid=0 name=''
+[5155] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-85 hid=0 name=''
+[5155] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-85 hid=0 name=''
+[5169] [DBG] [BLESPIKE] adv 6d:f1:1c:03:a8:d7 rssi=-85 hid=0 name=''
+[5174] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-83 hid=0 name='N/A'
+[5197] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-75 hid=0 name=''
+[5209] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-67 hid=0 name=''
+[5210] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-68 hid=0 name=''
+[5384] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-94 hid=0 name=''
+[5450] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-97 hid=0 name=''
+[5574]   Wait complete: refresh (497 ms)
+[5610] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-79 hid=0 name=''
+[5669] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-72 hid=0 name=''
+[5669] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-70 hid=0 name=''
+[5734] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-87 hid=0 name=''
+[5768] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-92 hid=0 name='Cinder 44A6E5099218'
+[5793] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-78 hid=0 name=''
+[5811] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-60 hid=0 name=''
+[6111] [DBG] [BLESPIKE] adv fe:b7:a4:aa:96:47 rssi=-88 hid=0 name=''
+[6533] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-80 hid=0 name=''
+[6813] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-75 hid=0 name=''
+[6814] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-75 hid=0 name=''
+[6821] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-70 hid=0 name=''
+[6848] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[6849] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-100 hid=0 name=''
+[8783] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[9881] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-86 hid=0 name=''
+[10005] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14356 bytes, MaxAlloc: 11764 bytes
+[10831] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-91 hid=0 name=''
+[14804] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-67 hid=0 name=''
+[15569] [DBG] [BLESPIKE] adv 3c:dc:75:15:e6:ee rssi=-98 hid=0 name=''
+[20010] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14356 bytes, MaxAlloc: 11764 bytes
+[23580] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-79 hid=0 name=''
+[30016] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14356 bytes, MaxAlloc: 11764 bytes
+[35044] [INF] [BLESPIKE] scan complete reason=0
+[35045] [INF] [BLESPIKE] state -> scanning
+[35064] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-77 hid=0 name='N/A'
+[35089] [DBG] [BLESPIKE] adv 6d:f1:1c:03:a8:d7 rssi=-77 hid=0 name=''
+[35093] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-62 hid=0 name=''
+[35094] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-61 hid=0 name=''
+[35096] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-62 hid=0 name=''
+[35099] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-62 hid=0 name=''
+[35140] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-67 hid=0 name=''
+[35143] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-92 hid=0 name=''
+[35143] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-92 hid=0 name=''
+[35158] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-85 hid=0 name=''
+[35158] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-84 hid=0 name=''
+[35166] [DBG] [BLESPIKE] adv d6:38:ba:90:3b:03 rssi=-92 hid=0 name=''
+[35171] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-68 hid=0 name=''
+[35172] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-69 hid=0 name=''
+[35225] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-78 hid=0 name=''
+[35225] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-77 hid=0 name=''
+[35434] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-95 hid=0 name=''
+[35539] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-96 hid=0 name='Cinder 44A6E5099218'
+[35894] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-72 hid=0 name=''
+[36084] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-71 hid=0 name=''
+[36184] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-89 hid=0 name=''
+[36202] [DBG] [BLESPIKE] adv fe:b7:a4:aa:96:47 rssi=-69 hid=0 name=''
+[36298] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-60 hid=0 name=''
+[36494] [DBG] [BLESPIKE] adv 3c:dc:75:15:e6:ee rssi=-102 hid=0 name=''
+[36659] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-78 hid=0 name=''
+[36709] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-95 hid=0 name=''
+[36883] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[36883] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[36891] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-62 hid=0 name=''
+[37769] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-80 hid=0 name=''
+[37770] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-79 hid=0 name=''
+[38854] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[40023] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14356 bytes, MaxAlloc: 11764 bytes
+[40857] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[40873] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-94 hid=0 name=''
+[50028] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14356 bytes, MaxAlloc: 11764 bytes
+[56964] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-98 hid=0 name=''
+[56965] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-98 hid=0 name=''
+[59780] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-69 hid=0 name=''
+[60033] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14356 bytes, MaxAlloc: 11764 bytes
+[60623] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-87 hid=0 name=''
+[62395] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-81 hid=0 name=''
+[65046] [INF] [BLESPIKE] scan complete reason=0
+[65047] [INF] [BLESPIKE] state -> scanning
+[65052] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-79 hid=0 name='N/A'
+[65053] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-80 hid=0 name=''
+[65090] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-94 hid=0 name=''
+[65094] [DBG] [BLESPIKE] adv 6d:f1:1c:03:a8:d7 rssi=-75 hid=0 name=''
+[65185] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-70 hid=0 name=''
+[65185] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-71 hid=0 name=''
+[65186] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-75 hid=0 name=''
+[65186] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-74 hid=0 name=''
+[65199] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-70 hid=0 name=''
+[65199] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-71 hid=0 name=''
+[65232] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-68 hid=0 name=''
+[65235] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-68 hid=0 name=''
+[65235] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-68 hid=0 name=''
+[65426] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-77 hid=0 name=''
+[65429] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-60 hid=0 name=''
+[65429] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-60 hid=0 name=''
+[65646] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-93 hid=0 name=''
+[65647] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-92 hid=0 name=''
+[65836] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-71 hid=0 name=''
+[65934] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-93 hid=0 name='Cinder 44A6E5099218'
+[66109] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[66436] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-62 hid=0 name=''
+[66798] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-94 hid=0 name=''
+[66915] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-72 hid=0 name=''
+[66916] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-72 hid=0 name=''
+[66958] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-91 hid=0 name=''
+[66970] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-61 hid=0 name=''
+[66995] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-98 hid=0 name=''
+[67798] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-71 hid=0 name=''
+[67841] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-72 hid=0 name=''
+[68516] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-94 hid=0 name=''
+[68968] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[68968] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[70039] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14356 bytes, MaxAlloc: 11764 bytes
+[70645] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-93 hid=0 name=''
+[70886] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-93 hid=0 name=''
+[74419] [INF] [BLEEDIT] nothing to save
+[74422] [INF] [BLESPIKE] heap after nimble_port_deinit: 80300
+[74423] [INF] [BLEEDIT] SPIKE-HEAP P5-after-ble-teardown free=89520 minfree=14248 maxalloc=57332
+[74423] [DBG] [ACT] Exiting activity: BleEditor
+[74423] [DBG] [ACT] Popped from activity stack, new size = 0
+[74432] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[74952]   Wait complete: refresh (496 ms)
+[75867] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[76387]   Wait complete: refresh (497 ms)
+[76440] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[76960]   Wait complete: refresh (497 ms)
+[77014] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[77533]   Wait complete: refresh (496 ms)
+[77586] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[78106]   Wait complete: refresh (496 ms)
+[78413] [DBG] [ACT] Pushed to activity stack, new size = 1
+[78413] [DBG] [ACT] Entering activity: BleEditor
+[78413] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=95272 minfree=14248 maxalloc=57332
+[78414] [INF] [BLESPIKE] heap before nimble_port_init: 86052
+[78420] [INF] [BLESPIKE] heap after nimble_port_init: 21252
+[78423] [INF] [BLESPIKE] state -> starting
+[78429] [INF] [BLESPIKE] host synced, own addr type=0
+[78429] [INF] [BLESPIKE] state -> scanning
+[78430] [INF] [BLESPIKE] heap after host task start: 14504
+[78431] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=14504 minfree=14248 maxalloc=11764
+[78436] [DBG] [GFX] Time = 5 ms from clearScreen to displayBuffer
+[78452] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-80 hid=0 name='N/A'
+[78455] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-67 hid=0 name=''
+[78459] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-92 hid=0 name=''
+[78460] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-92 hid=0 name='Cinder 44A6E5099218'
+[78475] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-87 hid=0 name=''
+[78476] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-86 hid=0 name=''
+[78481] [DBG] [BLESPIKE] adv 6d:f1:1c:03:a8:d7 rssi=-85 hid=0 name=''
+[78515] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-66 hid=0 name=''
+[78516] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-66 hid=0 name=''
+[78570] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-71 hid=0 name=''
+[78570] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-70 hid=0 name=''
+[78574] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-64 hid=0 name=''
+[78576] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-94 hid=0 name=''
+[78576] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-94 hid=0 name=''
+[78596] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-88 hid=0 name=''
+[78597] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-88 hid=0 name=''
+[78609] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-87 hid=0 name=''
+[78609] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-88 hid=0 name=''
+[78616] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-82 hid=0 name=''
+[78665] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-86 hid=0 name=''
+[78923] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-65 hid=0 name=''
+[78951] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-78 hid=0 name=''
+[78959]   Wait complete: refresh (497 ms)
+[78987] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-68 hid=0 name=''
+[78991] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-75 hid=0 name=''
+[78992] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-63 hid=0 name=''
+[79115] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-63 hid=0 name=''
+[79209] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-62 hid=0 name=''
+[79826] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-68 hid=0 name=''
+[79873] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-70 hid=0 name=''
+[79874] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-70 hid=0 name=''
+[80047] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 11764 bytes
+[80951] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-95 hid=0 name=''
+[80953] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-77 hid=0 name=''
+[80993] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-69 hid=0 name=''
+[81017] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[85028] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[86877] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-74 hid=0 name=''
+[90053] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 11764 bytes
+[100058] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 11764 bytes
+[101602] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-76 hid=0 name=''
+[108431] [INF] [BLESPIKE] scan complete reason=0
+[108432] [INF] [BLESPIKE] state -> scanning
+[108435] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-70 hid=0 name=''
+[108437] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-75 hid=0 name='N/A'
+[108444] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[108448] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-84 hid=0 name=''
+[108469] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-94 hid=0 name=''
+[108470] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-94 hid=0 name=''
+[108562] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-76 hid=0 name=''
+[108563] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-76 hid=0 name=''
+[108564] [DBG] [BLESPIKE] adv 6d:f1:1c:03:a8:d7 rssi=-76 hid=0 name=''
+[108571] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-62 hid=0 name=''
+[108572] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-61 hid=0 name=''
+[108619] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-69 hid=0 name=''
+[108620] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-70 hid=0 name=''
+[108621] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-69 hid=0 name=''
+[108622] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-68 hid=0 name=''
+[108639] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-83 hid=0 name=''
+[108639] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-83 hid=0 name=''
+[108643] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-70 hid=0 name=''
+[108644] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-71 hid=0 name=''
+[108819] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-83 hid=0 name=''
+[108944] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name=''
+[109013] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[109013] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-68 hid=0 name=''
+[109051] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name='Cinder 44A6E5099218'
+[109066] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-72 hid=0 name=''
+[109071] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-70 hid=0 name=''
+[109818] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-62 hid=0 name=''
+[109907] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-70 hid=0 name=''
+[109942] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-84 hid=0 name=''
+[110065] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 11764 bytes
+[110727] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-97 hid=0 name=''
+[111106] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[111106] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[113069] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-72 hid=0 name=''
+[113954] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-70 hid=0 name=''
+[120070] [INF] [MEM] Free: 14356 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 11764 bytes
+[120964] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-94 hid=0 name=''
+[122401] [DBG] [BLESPIKE] adv 75:88:56:09:eb:5f rssi=-96 hid=0 name=''
+[122660] [DBG] [BLESPIKE] adv 75:88:56:09:eb:5f rssi=-97 hid=0 name=''
+[123901] [INF] [BLEEDIT] nothing to save
+[123904] [INF] [BLESPIKE] heap after nimble_port_deinit: 80300
+[123905] [INF] [BLEEDIT] SPIKE-HEAP P5-after-ble-teardown free=89520 minfree=14248 maxalloc=38900
+[123905] [DBG] [ACT] Exiting activity: BleEditor
+[123905] [DBG] [ACT] Popped from activity stack, new size = 0
+[123913] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[124433]   Wait complete: refresh (497 ms)
+[124817] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[125337]   Wait complete: refresh (496 ms)
+[125430] [DBG] [ACT] Exiting activity: Home
+[125430] [DBG] [ACT] Entering activity: Settings
+[125459] [DBG] [GFX] Time = 27 ms from clearScreen to displayBuffer
+[125979]   Wait complete: refresh (496 ms)
+[127194] [DBG] [GFX] Time = 27 ms from clearScreen to displayBuffer
+[127714]   Wait complete: refresh (497 ms)
+[127786] [DBG] [GFX] Time = 27 ms from clearScreen to displayBuffer
+[128306]   Wait complete: refresh (496 ms)
+[128624] [DBG] [GFX] Time = 27 ms from clearScreen to displayBuffer
+[129144]   Wait complete: refresh (497 ms)
+[129217] [DBG] [GFX] Time = 29 ms from clearScreen to displayBuffer
+[129736]   Wait complete: refresh (496 ms)
+[129809] [DBG] [GFX] Time = 28 ms from clearScreen to displayBuffer
+[130072] [INF] [MEM] Free: 130952 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 94196 bytes
+[130328]   Wait complete: refresh (496 ms)
+[130400] [DBG] [GFX] Time = 27 ms from clearScreen to displayBuffer
+[130920]   Wait complete: refresh (496 ms)
+[130993] [DBG] [GFX] Time = 28 ms from clearScreen to displayBuffer
+[131513]   Wait complete: refresh (496 ms)
+[131585] [DBG] [GFX] Time = 27 ms from clearScreen to displayBuffer
+[132105]   Wait complete: refresh (496 ms)
+[132178] [DBG] [GFX] Time = 28 ms from clearScreen to displayBuffer
+[132699]   Wait complete: refresh (498 ms)
+[132778] [DBG] [ACT] Exiting activity: Settings
+[132778] [DBG] [ACT] Entering activity: Home
+[132810] [DBG] [LOOP] New max loop duration: 148 ms (activity: 148 ms)
+[132818] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[133338]   Wait complete: refresh (496 ms)
+[133399] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[133919]   Wait complete: refresh (496 ms)
+[133989] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[134509]   Wait complete: refresh (496 ms)
+[134553] [DBG] [ACT] Pushed to activity stack, new size = 1
+[134553] [DBG] [ACT] Entering activity: BleEditor
+[134553] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=134188 minfree=14248 maxalloc=94196
+[134554] [INF] [BLESPIKE] heap before nimble_port_init: 124968
+[134560] [INF] [BLESPIKE] heap after nimble_port_init: 60168
+[134563] [INF] [BLESPIKE] state -> starting
+[134569] [INF] [BLESPIKE] host synced, own addr type=0
+[134570] [INF] [BLESPIKE] state -> scanning
+[134570] [INF] [BLESPIKE] heap after host task start: 53420
+[134571] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=53420 minfree=14248 maxalloc=49140
+[134576] [DBG] [GFX] Time = 5 ms from clearScreen to displayBuffer
+[134597] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-72 hid=0 name=''
+[134627] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-76 hid=0 name=''
+[134628] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-76 hid=0 name=''
+[134663] [DBG] [BLESPIKE] adv 6d:f1:1c:03:a8:d7 rssi=-91 hid=0 name=''
+[134700] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-77 hid=0 name=''
+[134700] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-77 hid=0 name=''
+[134707] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name=''
+[134707] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name='Cinder 44A6E5099218'
+[134732] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-70 hid=0 name=''
+[134777] [DBG] [BLESPIKE] adv 75:88:56:09:eb:5f rssi=-98 hid=0 name=''
+[134825] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-88 hid=0 name=''
+[134833] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-88 hid=0 name=''
+[134833] [DBG] [BLESPIKE] adv 59:42:cc:19:49:5a rssi=-88 hid=0 name=''
+[134851] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-68 hid=0 name=''
+[134851] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-68 hid=0 name=''
+[134924] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-70 hid=0 name=''
+[135015] [DBG] [BLESPIKE] adv 70:d3:71:94:91:6d rssi=-84 hid=0 name=''
+[135049] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-76 hid=0 name=''
+[135096]   Wait complete: refresh (496 ms)
+[135110] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[135110] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[135137] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-63 hid=0 name=''
+[135144] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-81 hid=0 name='N/A'
+[135295] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-57 hid=0 name=''
+[135899] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-64 hid=0 name=''
+[135981] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-75 hid=0 name=''
+[136034] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-71 hid=0 name=''
+[136034] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-71 hid=0 name=''
+[136243] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-92 hid=0 name=''
+[136243] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-92 hid=0 name=''
+[136797] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-88 hid=0 name=''
+[137062] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-83 hid=0 name=''
+[137063] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-83 hid=0 name=''
+[137093] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-82 hid=0 name=''
+[137428] [DBG] [BLESPIKE] adv 3c:dc:75:15:e6:ee rssi=-97 hid=0 name=''
+[137429] [DBG] [BLESPIKE] adv 3c:dc:75:15:e6:ee rssi=-97 hid=0 name=''
+[138650] [DBG] [BLESPIKE] adv d6:89:ee:1a:70:d0 rssi=-96 hid=0 name=''
+[138663] [DBG] [BLESPIKE] adv 75:88:56:09:eb:5f rssi=-97 hid=0 name=''
+[140076] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[143079] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-72 hid=0 name=''
+[145199] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[145199] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[148540] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-84 hid=0 name=''
+[148571] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-76 hid=0 name=''
+[148571] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-76 hid=0 name=''
+[148617] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-90 hid=0 name=''
+[148618] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-90 hid=0 name=''
+[150081] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[151025] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-92 hid=0 name=''
+[154684] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[155455] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-99 hid=0 name=''
+[157510] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-94 hid=0 name=''
+[160086] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[164571] [INF] [BLESPIKE] scan complete reason=0
+[164572] [INF] [BLESPIKE] state -> scanning
+[164580] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-53 hid=0 name=''
+[164590] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-85 hid=0 name=''
+[164599] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-98 hid=0 name=''
+[164620] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-61 hid=0 name=''
+[164627] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-62 hid=0 name=''
+[164646] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-81 hid=0 name=''
+[164646] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-79 hid=0 name=''
+[164648] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-87 hid=0 name='N/A'
+[164651] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-79 hid=0 name=''
+[164652] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-80 hid=0 name=''
+[164676] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-63 hid=0 name=''
+[164676] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-63 hid=0 name=''
+[164694] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-84 hid=0 name=''
+[164695] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-85 hid=0 name=''
+[164705] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name='Cinder 44A6E5099218'
+[164738] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-70 hid=0 name=''
+[164855] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-71 hid=0 name=''
+[164860] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-85 hid=0 name=''
+[164891] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-81 hid=0 name=''
+[164908] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-92 hid=0 name=''
+[164909] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-91 hid=0 name=''
+[164975] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-93 hid=0 name=''
+[164976] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-93 hid=0 name=''
+[165131] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-71 hid=0 name=''
+[165132] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[165152] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-61 hid=0 name=''
+[165200] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-70 hid=0 name=''
+[165200] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[166009] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-89 hid=0 name=''
+[166074] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-69 hid=0 name=''
+[166092] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-65 hid=0 name=''
+[166093] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-65 hid=0 name=''
+[168061] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-71 hid=0 name=''
+[168667] [DBG] [BLESPIKE] adv d6:89:ee:1a:70:d0 rssi=-96 hid=0 name=''
+[170092] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[171253] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-88 hid=0 name=''
+[171335] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-90 hid=0 name=''
+[175232] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-58 hid=0 name=''
+[177257] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-89 hid=0 name=''
+[180097] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[181275] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-99 hid=0 name=''
+[190102] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[191044] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-91 hid=0 name=''
+[191293] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-99 hid=0 name=''
+[194573] [INF] [BLESPIKE] scan complete reason=0
+[194574] [INF] [BLESPIKE] state -> scanning
+[194581] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-93 hid=0 name=''
+[194581] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-94 hid=0 name=''
+[194590] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-53 hid=0 name=''
+[194614] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-85 hid=0 name='N/A'
+[194619] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-96 hid=0 name=''
+[194619] [DBG] [BLESPIKE] adv 77:bd:a3:f8:7e:72 rssi=-96 hid=0 name=''
+[194650] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-77 hid=0 name=''
+[194664] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-65 hid=0 name=''
+[194690] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-96 hid=0 name=''
+[194691] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-94 hid=0 name=''
+[194737] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-73 hid=0 name=''
+[194737] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-72 hid=0 name=''
+[194758] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-73 hid=0 name=''
+[194836] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-79 hid=0 name=''
+[194837] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-78 hid=0 name=''
+[194839] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-77 hid=0 name=''
+[194874] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-56 hid=0 name=''
+[194916] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-62 hid=0 name=''
+[194944] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-94 hid=0 name=''
+[194945] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-73 hid=0 name=''
+[195003] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-62 hid=0 name=''
+[195200] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[195278] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-86 hid=0 name=''
+[195279] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-87 hid=0 name='Cinder 44A6E5099218'
+[195281] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-77 hid=0 name=''
+[195281] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-76 hid=0 name=''
+[195292] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-58 hid=0 name=''
+[195721] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-94 hid=0 name=''
+[196142] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-79 hid=0 name=''
+[196169] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-81 hid=0 name=''
+[196170] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-79 hid=0 name=''
+[197209] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[197331] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-72 hid=0 name=''
+[200109] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[200881] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-97 hid=0 name=''
+[210114] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[211105] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-88 hid=0 name=''
+[212744] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[213084] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-95 hid=0 name=''
+[213342] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-99 hid=0 name=''
+[213343] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-100 hid=0 name=''
+[220119] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[224575] [INF] [BLESPIKE] scan complete reason=0
+[224576] [INF] [BLESPIKE] state -> scanning
+[224581] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-73 hid=0 name='N/A'
+[224584] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-88 hid=0 name=''
+[224585] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[224586] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[224594] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-60 hid=0 name=''
+[224595] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-60 hid=0 name=''
+[224600] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-53 hid=0 name=''
+[224625] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-84 hid=0 name=''
+[224651] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-78 hid=0 name=''
+[224661] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-73 hid=0 name=''
+[224662] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-72 hid=0 name=''
+[224665] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-87 hid=0 name=''
+[224666] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-87 hid=0 name=''
+[224696] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-93 hid=0 name=''
+[224739] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-74 hid=0 name=''
+[224904] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-90 hid=0 name=''
+[224951] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-90 hid=0 name=''
+[225024] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-78 hid=0 name=''
+[225095] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-88 hid=0 name=''
+[225096] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-88 hid=0 name='Cinder 44A6E5099218'
+[225350] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-60 hid=0 name=''
+[225369] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-77 hid=0 name=''
+[225370] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-76 hid=0 name=''
+[225377] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-68 hid=0 name=''
+[225457] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-92 hid=0 name=''
+[225959] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-99 hid=0 name=''
+[226155] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-84 hid=0 name=''
+[226224] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-71 hid=0 name=''
+[226234] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-72 hid=0 name=''
+[226235] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-72 hid=0 name=''
+[226495] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-91 hid=0 name=''
+[227278] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-68 hid=0 name=''
+[227278] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[227445] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-73 hid=0 name=''
+[227520] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-88 hid=0 name=''
+[230125] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[237397] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-98 hid=0 name=''
+[240130] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[241121] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-90 hid=0 name=''
+[246067] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-77 hid=0 name=''
+[250135] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[254577] [INF] [BLESPIKE] scan complete reason=0
+[254578] [INF] [BLESPIKE] state -> scanning
+[254599] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-53 hid=0 name=''
+[254630] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-58 hid=0 name=''
+[254641] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-94 hid=0 name=''
+[254684] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-69 hid=0 name=''
+[254685] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-70 hid=0 name=''
+[254740] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-73 hid=0 name=''
+[254745] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-91 hid=0 name=''
+[254754] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-73 hid=0 name=''
+[254805] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-87 hid=0 name=''
+[254806] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-87 hid=0 name='Cinder 44A6E5099218'
+[254817] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-84 hid=0 name=''
+[254938] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-73 hid=0 name=''
+[254938] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-73 hid=0 name=''
+[254970] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-93 hid=0 name=''
+[255122] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-91 hid=0 name=''
+[255134] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-88 hid=0 name='N/A'
+[255152] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-91 hid=0 name=''
+[255331] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-73 hid=0 name=''
+[255333] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-77 hid=0 name=''
+[255354] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[255355] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-68 hid=0 name=''
+[255379] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-58 hid=0 name=''
+[255433] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[255434] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[255439] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[255441] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-56 hid=0 name=''
+[255529] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-98 hid=0 name=''
+[255529] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-97 hid=0 name=''
+[255594] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-73 hid=0 name=''
+[255706] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-76 hid=0 name=''
+[256301] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[256302] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[256314] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-69 hid=0 name=''
+[257559] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-84 hid=0 name=''
+[260142] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[261175] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-90 hid=0 name=''
+[261200] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-76 hid=0 name=''
+[265717] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-98 hid=0 name=''
+[270147] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[275355] [DBG] [BLESPIKE] adv 3c:dc:75:15:e6:ee rssi=-99 hid=0 name=''
+[277912] [DBG] [BLESPIKE] adv cd:b3:f4:bd:ad:c0 rssi=-77 hid=0 name='OB-4 LE'
+[277913] [DBG] [BLESPIKE] adv cd:b3:f4:bd:ad:c0 rssi=-77 hid=0 name=''
+[280152] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[284579] [INF] [BLESPIKE] scan complete reason=0
+[284580] [INF] [BLESPIKE] state -> scanning
+[284596] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-88 hid=0 name=''
+[284601] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[284621] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-62 hid=0 name=''
+[284624] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-63 hid=0 name=''
+[284650] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-96 hid=0 name=''
+[284702] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-92 hid=0 name=''
+[284727] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-62 hid=0 name=''
+[284742] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-81 hid=0 name='N/A'
+[284755] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-68 hid=0 name=''
+[284756] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-68 hid=0 name=''
+[284823] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-80 hid=0 name=''
+[284836] [DBG] [BLESPIKE] adv cd:b3:f4:bd:ad:c0 rssi=-74 hid=0 name='OB-4 LE'
+[284847] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-72 hid=0 name=''
+[284883] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-66 hid=0 name=''
+[284883] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-65 hid=0 name=''
+[284896] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-95 hid=0 name=''
+[284941] [DBG] [BLESPIKE] adv cd:b3:f4:bd:ad:c0 rssi=-74 hid=0 name=''
+[285034] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-73 hid=0 name=''
+[285044] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-95 hid=0 name=''
+[285069] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-94 hid=0 name='Cinder 44A6E5099218'
+[285133] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-97 hid=0 name=''
+[285133] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[285380] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-81 hid=0 name=''
+[285423] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-71 hid=0 name=''
+[285423] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[285493] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-73 hid=0 name=''
+[285494] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-73 hid=0 name=''
+[285515] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-73 hid=0 name=''
+[285643] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-85 hid=0 name=''
+[285649] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-98 hid=0 name=''
+[285678] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-62 hid=0 name=''
+[286390] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[286391] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[286398] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-62 hid=0 name=''
+[287700] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-84 hid=0 name=''
+[288754] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-86 hid=0 name=''
+[289520] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[290161] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[291196] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-95 hid=0 name=''
+[300167] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[310172] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[310397] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-80 hid=0 name=''
+[310517] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-75 hid=0 name=''
+[314508] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-75 hid=0 name=''
+[314581] [INF] [BLESPIKE] scan complete reason=0
+[314582] [INF] [BLESPIKE] state -> scanning
+[314593] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[314593] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-59 hid=0 name=''
+[314600] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-92 hid=0 name=''
+[314600] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-91 hid=0 name=''
+[314601] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[314624] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-62 hid=0 name=''
+[314668] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-71 hid=0 name=''
+[314673] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-76 hid=0 name=''
+[314676] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-76 hid=0 name=''
+[314677] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-76 hid=0 name=''
+[314691] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-92 hid=0 name=''
+[314691] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-92 hid=0 name=''
+[314704] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-60 hid=0 name=''
+[314716] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-70 hid=0 name=''
+[314717] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-71 hid=0 name=''
+[314736] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-83 hid=0 name='N/A'
+[314739] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-91 hid=0 name=''
+[314757] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-72 hid=0 name=''
+[314757] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-72 hid=0 name=''
+[314798] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-92 hid=0 name=''
+[314855] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-72 hid=0 name=''
+[315117] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-95 hid=0 name=''
+[315473] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name='Cinder 44A6E5099218'
+[315495] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-71 hid=0 name=''
+[315496] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-71 hid=0 name=''
+[315555] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[315556] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-68 hid=0 name=''
+[315591] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-68 hid=0 name=''
+[317835] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-77 hid=0 name=''
+[318475] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-71 hid=0 name=''
+[318482] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-68 hid=0 name=''
+[318483] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-70 hid=0 name=''
+[319438] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-86 hid=0 name=''
+[320179] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[321254] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-90 hid=0 name=''
+[323585] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[325585] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[326716] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-96 hid=0 name=''
+[330184] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[340189] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[344583] [INF] [BLESPIKE] scan complete reason=0
+[344583] [INF] [BLESPIKE] state -> scanning
+[344589] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[344589] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[344594] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-57 hid=0 name=''
+[344594] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-57 hid=0 name=''
+[344604] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-53 hid=0 name=''
+[344613] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-60 hid=0 name=''
+[344622] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-83 hid=0 name='N/A'
+[344660] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-72 hid=0 name=''
+[344660] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-71 hid=0 name=''
+[344730] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-93 hid=0 name=''
+[344731] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-93 hid=0 name=''
+[344876] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-76 hid=0 name=''
+[344876] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-77 hid=0 name=''
+[344916] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-91 hid=0 name=''
+[345026] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-91 hid=0 name='Cinder 44A6E5099218'
+[345157] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-97 hid=0 name=''
+[345173] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-92 hid=0 name=''
+[345192] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-97 hid=0 name=''
+[345276] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-97 hid=0 name=''
+[345300] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-62 hid=0 name=''
+[345498] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-80 hid=0 name=''
+[345498] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-80 hid=0 name=''
+[345570] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[345635] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[345637] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-57 hid=0 name=''
+[345638] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-68 hid=0 name=''
+[345899] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-75 hid=0 name=''
+[346219] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-88 hid=0 name=''
+[346541] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-71 hid=0 name=''
+[346566] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-82 hid=0 name=''
+[347579] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[347962] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-82 hid=0 name=''
+[349652] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[350196] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[350578] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[351270] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-89 hid=0 name=''
+[357682] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[360201] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[370206] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[374585] [INF] [BLESPIKE] scan complete reason=0
+[374585] [INF] [BLESPIKE] state -> scanning
+[374591] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-89 hid=0 name=''
+[374609] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[374610] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-76 hid=0 name='N/A'
+[374652] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-72 hid=0 name=''
+[374663] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-74 hid=0 name=''
+[374666] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-78 hid=0 name=''
+[374674] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-74 hid=0 name=''
+[374676] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-78 hid=0 name=''
+[374699] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-87 hid=0 name=''
+[374699] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-87 hid=0 name=''
+[374720] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-89 hid=0 name=''
+[374723] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-72 hid=0 name=''
+[374723] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-72 hid=0 name=''
+[374731] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-58 hid=0 name=''
+[374731] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-58 hid=0 name=''
+[374739] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-62 hid=0 name=''
+[374782] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-97 hid=0 name=''
+[374836] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-71 hid=0 name=''
+[374882] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-97 hid=0 name='Cinder 44A6E5099218'
+[374910] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-89 hid=0 name=''
+[375095] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-62 hid=0 name=''
+[375229] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-77 hid=0 name=''
+[375244] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-93 hid=0 name=''
+[375260] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-60 hid=0 name=''
+[375264] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-67 hid=0 name=''
+[375357] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-90 hid=0 name=''
+[375704] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-65 hid=0 name=''
+[375736] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-69 hid=0 name=''
+[375736] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-69 hid=0 name=''
+[376619] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-70 hid=0 name=''
+[377052] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-98 hid=0 name=''
+[377053] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[378096] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-77 hid=0 name=''
+[378928] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-71 hid=0 name=''
+[380212] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[380339] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-77 hid=0 name=''
+[386957] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-72 hid=0 name=''
+[390217] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[400222] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[401349] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-89 hid=0 name=''
+[404588] [INF] [BLESPIKE] scan complete reason=0
+[404588] [INF] [BLESPIKE] state -> scanning
+[404593] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-74 hid=0 name='N/A'
+[404602] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[404607] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-67 hid=0 name=''
+[404608] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-67 hid=0 name=''
+[404610] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-94 hid=0 name=''
+[404628] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-62 hid=0 name=''
+[404630] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-62 hid=0 name=''
+[404631] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-62 hid=0 name=''
+[404637] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-83 hid=0 name=''
+[404646] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-91 hid=0 name=''
+[404646] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-91 hid=0 name='Cinder 44A6E5099218'
+[404686] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-94 hid=0 name=''
+[404688] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-67 hid=0 name=''
+[404696] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-55 hid=0 name=''
+[404696] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-56 hid=0 name=''
+[404764] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-95 hid=0 name=''
+[404766] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-73 hid=0 name=''
+[404820] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-93 hid=0 name=''
+[404820] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-92 hid=0 name=''
+[404834] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[404837] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[404955] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-95 hid=0 name=''
+[404985] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-66 hid=0 name=''
+[404986] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-66 hid=0 name=''
+[405149] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-73 hid=0 name=''
+[405299] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-89 hid=0 name=''
+[405754] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-60 hid=0 name=''
+[405801] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-64 hid=0 name=''
+[406999] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-73 hid=0 name=''
+[407823] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-70 hid=0 name=''
+[408228] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-88 hid=0 name=''
+[410227] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[411356] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-92 hid=0 name=''
+[411842] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[413012] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-72 hid=0 name=''
+[414453] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-95 hid=0 name=''
+[420233] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[423576] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[427160] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[430238] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[434590] [INF] [BLESPIKE] scan complete reason=0
+[434590] [INF] [BLESPIKE] state -> scanning
+[434602] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[434602] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-89 hid=0 name=''
+[434603] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-89 hid=0 name=''
+[434605] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[434616] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-60 hid=0 name=''
+[434629] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-80 hid=0 name=''
+[434641] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-88 hid=0 name=''
+[434642] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-89 hid=0 name=''
+[434651] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-62 hid=0 name=''
+[434664] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-77 hid=0 name=''
+[434664] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-76 hid=0 name=''
+[434675] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-65 hid=0 name=''
+[434747] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-63 hid=0 name=''
+[434747] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-63 hid=0 name=''
+[434767] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-70 hid=0 name=''
+[434772] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-83 hid=0 name='N/A'
+[434797] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-60 hid=0 name=''
+[434804] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-89 hid=0 name=''
+[434836] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-62 hid=0 name=''
+[434886] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-56 hid=0 name=''
+[435077] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[435102] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-91 hid=0 name=''
+[435103] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-92 hid=0 name='Cinder 44A6E5099218'
+[435191] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[435191] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[435370] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-89 hid=0 name=''
+[435883] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-58 hid=0 name=''
+[436212] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-60 hid=0 name=''
+[436591] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-90 hid=0 name=''
+[437068] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-77 hid=0 name=''
+[437069] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-77 hid=0 name=''
+[437085] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[437901] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-70 hid=0 name=''
+[438356] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-85 hid=0 name=''
+[439243] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-97 hid=0 name=''
+[445925] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[446328] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[446328] [DBG] [ACT] Pushed to activity stack, new size = 2
+[446328] [DBG] [ACT] Entering activity: BleEditor
+[446329] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=52820 minfree=14248 maxalloc=49140
+[446329] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=44112 minfree=14248 maxalloc=40948
+[446334] [DBG] [GFX] Time = 5 ms from clearScreen to displayBuffer
+[446854]   Wait complete: refresh (497 ms)
+[453275] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[455798] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-79 hid=0 name=''
+[461415] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-95 hid=0 name=''
+[463280] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[464592] [INF] [BLESPIKE] scan complete reason=0
+[464592] [INF] [BLESPIKE] state -> scanning
+[464597] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[464613] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-59 hid=0 name=''
+[464614] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-66 hid=0 name=''
+[464661] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-86 hid=0 name='N/A'
+[464666] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-69 hid=0 name=''
+[464667] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-70 hid=0 name=''
+[464672] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-74 hid=0 name=''
+[464672] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-73 hid=0 name=''
+[464674] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-77 hid=0 name=''
+[464675] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-76 hid=0 name=''
+[464694] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-59 hid=0 name=''
+[464717] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-86 hid=0 name=''
+[464730] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-85 hid=0 name=''
+[464754] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-93 hid=0 name=''
+[464755] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-93 hid=0 name=''
+[464824] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[464825] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-95 hid=0 name=''
+[464858] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-75 hid=0 name=''
+[464884] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-93 hid=0 name=''
+[464884] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-93 hid=0 name='Cinder 44A6E5099218'
+[465066] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-73 hid=0 name=''
+[465066] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-74 hid=0 name=''
+[465125] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[465126] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[465168] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-69 hid=0 name=''
+[465430] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-70 hid=0 name=''
+[465442] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-99 hid=0 name=''
+[465466] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-83 hid=0 name=''
+[465942] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-69 hid=0 name=''
+[465971] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-68 hid=0 name=''
+[465971] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[467176] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-70 hid=0 name=''
+[468483] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-74 hid=0 name=''
+[469283] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-98 hid=0 name=''
+[469283] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[473285] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[483290] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[491423] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-94 hid=0 name=''
+[493295] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[494594] [INF] [BLESPIKE] scan complete reason=0
+[494594] [INF] [BLESPIKE] state -> scanning
+[494608] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[494610] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-68 hid=0 name=''
+[494610] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-69 hid=0 name=''
+[494614] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-61 hid=0 name=''
+[494614] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-61 hid=0 name=''
+[494622] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name=''
+[494622] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name='Cinder 44A6E5099218'
+[494646] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-89 hid=0 name='N/A'
+[494648] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-83 hid=0 name=''
+[494649] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-83 hid=0 name=''
+[494651] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-83 hid=0 name=''
+[494652] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[494685] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-95 hid=0 name=''
+[494687] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-76 hid=0 name=''
+[494702] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-59 hid=0 name=''
+[494715] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-88 hid=0 name=''
+[494715] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-88 hid=0 name=''
+[494819] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-62 hid=0 name=''
+[494869] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-95 hid=0 name=''
+[494915] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-72 hid=0 name=''
+[495117] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-61 hid=0 name=''
+[495120] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-61 hid=0 name=''
+[495120] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-61 hid=0 name=''
+[495217] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[495267] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-69 hid=0 name=''
+[495518] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-96 hid=0 name=''
+[496025] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-61 hid=0 name=''
+[496041] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[496042] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[496451] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-62 hid=0 name=''
+[497225] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-71 hid=0 name=''
+[497348] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[497349] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[498614] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-88 hid=0 name=''
+[501477] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-88 hid=0 name=''
+[503293] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-85 hid=0 name=''
+[503301] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[513306] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[521643] [DBG] [BLESPIKE] adv 41:58:71:32:d6:98 rssi=-63 hid=0 name=''
+[523311] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[524596] [INF] [BLESPIKE] scan complete reason=0
+[524596] [INF] [BLESPIKE] state -> scanning
+[524622] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-60 hid=0 name=''
+[524623] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-59 hid=0 name=''
+[524650] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-83 hid=0 name=''
+[524660] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-57 hid=0 name=''
+[524675] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-70 hid=0 name=''
+[524676] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-69 hid=0 name=''
+[524683] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-96 hid=0 name=''
+[524684] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-98 hid=0 name=''
+[524685] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-72 hid=0 name=''
+[524685] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-72 hid=0 name=''
+[524696] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-85 hid=0 name=''
+[524697] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-85 hid=0 name=''
+[524702] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name=''
+[524703] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name='Cinder 44A6E5099218'
+[524735] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-91 hid=0 name='N/A'
+[524748] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-61 hid=0 name=''
+[524749] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-61 hid=0 name=''
+[524779] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-69 hid=0 name=''
+[524803] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-87 hid=0 name=''
+[524881] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-77 hid=0 name=''
+[524881] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-77 hid=0 name=''
+[524916] [DBG] [BLESPIKE] adv 41:58:71:32:d6:98 rssi=-65 hid=0 name=''
+[524950] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-73 hid=0 name=''
+[524988] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-70 hid=0 name=''
+[525078] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-59 hid=0 name=''
+[525278] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-71 hid=0 name=''
+[525278] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[525598] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-89 hid=0 name=''
+[525784] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[528122] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-66 hid=0 name=''
+[528122] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-66 hid=0 name=''
+[528754] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-82 hid=0 name=''
+[531367] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-72 hid=0 name=''
+[531368] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-72 hid=0 name=''
+[531431] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[533320] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[541844] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-95 hid=0 name=''
+[543325] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[545458] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[553330] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[554598] [INF] [BLESPIKE] scan complete reason=0
+[554598] [INF] [BLESPIKE] state -> scanning
+[554612] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-87 hid=0 name=''
+[554621] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-69 hid=0 name=''
+[554621] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-70 hid=0 name=''
+[554625] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[554627] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-78 hid=0 name='N/A'
+[554635] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-61 hid=0 name=''
+[554636] [DBG] [BLESPIKE] adv 45:11:ff:18:85:53 rssi=-62 hid=0 name=''
+[554642] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-61 hid=0 name=''
+[554643] [DBG] [BLESPIKE] adv 7b:ad:3b:ea:8a:74 rssi=-61 hid=0 name=''
+[554654] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-93 hid=0 name=''
+[554656] [DBG] [BLESPIKE] adv 51:14:ae:20:65:2e rssi=-61 hid=0 name=''
+[554684] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-76 hid=0 name=''
+[554702] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-95 hid=0 name=''
+[554703] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[554722] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-84 hid=0 name=''
+[554753] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-81 hid=0 name=''
+[554753] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-81 hid=0 name=''
+[554913] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-59 hid=0 name=''
+[554932] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-91 hid=0 name=''
+[554933] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-91 hid=0 name=''
+[555064] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-74 hid=0 name=''
+[555172] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-87 hid=0 name=''
+[555291] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-91 hid=0 name='Cinder 44A6E5099218'
+[555350] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[555393] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-65 hid=0 name=''
+[555487] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[555676] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-95 hid=0 name=''
+[556193] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-73 hid=0 name=''
+[556194] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-73 hid=0 name=''
+[556216] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-59 hid=0 name=''
+[558885] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-78 hid=0 name=''
+[559446] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-69 hid=0 name=''
+[559446] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-69 hid=0 name=''
+[561373] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[561560] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-88 hid=0 name=''
+[563337] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[565500] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[568652] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-62 hid=0 name=''
+[568653] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-62 hid=0 name=''
+[568668] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-62 hid=0 name=''
+[568896] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-69 hid=0 name=''
+[568896] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-69 hid=0 name=''
+[573342] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[582325] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-75 hid=0 name=''
+[583347] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[584598] [INF] [BLESPIKE] scan complete reason=0
+[584599] [INF] [BLESPIKE] state -> scanning
+[584603] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-59 hid=0 name=''
+[584604] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-58 hid=0 name=''
+[584612] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-78 hid=0 name='N/A'
+[584613] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-93 hid=0 name=''
+[584626] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[584631] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-86 hid=0 name=''
+[584634] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[584651] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[584652] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-81 hid=0 name=''
+[584659] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-70 hid=0 name=''
+[584660] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-70 hid=0 name=''
+[584681] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[584682] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[584713] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-92 hid=0 name='Cinder 44A6E5099218'
+[584749] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[584750] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-81 hid=0 name=''
+[584779] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-69 hid=0 name=''
+[584781] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-68 hid=0 name=''
+[584783] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-76 hid=0 name=''
+[584888] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-87 hid=0 name=''
+[585078] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-59 hid=0 name=''
+[585183] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-58 hid=0 name=''
+[585429] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[585430] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[585508] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-73 hid=0 name=''
+[585551] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-94 hid=0 name=''
+[585552] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-94 hid=0 name=''
+[585888] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-61 hid=0 name=''
+[586257] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-67 hid=0 name=''
+[586258] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-68 hid=0 name=''
+[587162] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-69 hid=0 name=''
+[587518] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-96 hid=0 name=''
+[587750] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-94 hid=0 name=''
+[589018] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-90 hid=0 name=''
+[591472] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-74 hid=0 name=''
+[592011] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-96 hid=0 name=''
+[593354] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[601577] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-96 hid=0 name=''
+[603359] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[687806] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[694262] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[699577] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-84 hid=0 name=''
+[699684] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-76 hid=0 name=''
+[701713] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-98 hid=0 name=''
+[704267] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[704604] [INF] [BLESPIKE] scan complete reason=0
+[704604] [INF] [BLESPIKE] state -> scanning
+[704617] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[704630] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-77 hid=0 name='N/A'
+[704664] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-72 hid=0 name=''
+[704665] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-73 hid=0 name=''
+[704680] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-75 hid=0 name=''
+[704702] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name=''
+[704712] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-66 hid=0 name=''
+[704713] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-65 hid=0 name=''
+[704743] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[704745] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-62 hid=0 name=''
+[704747] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-61 hid=0 name=''
+[704748] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-62 hid=0 name=''
+[704811] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name='Cinder 44A6E5099218'
+[704932] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-92 hid=0 name=''
+[704933] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-92 hid=0 name=''
+[704945] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-83 hid=0 name=''
+[704945] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-83 hid=0 name=''
+[705046] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[705198] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-84 hid=0 name=''
+[705464] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-69 hid=0 name=''
+[705493] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-61 hid=0 name=''
+[705565] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-84 hid=0 name=''
+[705740] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-68 hid=0 name=''
+[705842] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[705843] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[705851] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-93 hid=0 name=''
+[705890] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-70 hid=0 name=''
+[706063] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-93 hid=0 name=''
+[706572] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-70 hid=0 name=''
+[707396] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-92 hid=0 name=''
+[707739] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-67 hid=0 name=''
+[707747] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-66 hid=0 name=''
+[707900] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-94 hid=0 name=''
+[708572] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-70 hid=0 name=''
+[714273] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[719559] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-83 hid=0 name=''
+[723890] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-84 hid=0 name=''
+[724278] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[727788] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-75 hid=0 name=''
+[734283] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[734606] [INF] [BLESPIKE] scan complete reason=0
+[734606] [INF] [BLESPIKE] state -> scanning
+[734614] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-85 hid=0 name=''
+[734616] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-79 hid=0 name='N/A'
+[734627] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[734644] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-83 hid=0 name=''
+[734648] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-94 hid=0 name=''
+[734648] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-94 hid=0 name='Cinder 44A6E5099218'
+[734689] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-68 hid=0 name=''
+[734689] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-68 hid=0 name=''
+[734705] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-85 hid=0 name=''
+[734746] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[734748] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-61 hid=0 name=''
+[734750] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-61 hid=0 name=''
+[734815] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-71 hid=0 name=''
+[734815] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-70 hid=0 name=''
+[734825] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-85 hid=0 name=''
+[734930] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[734930] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[735033] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-92 hid=0 name=''
+[735034] [DBG] [BLESPIKE] adv 42:99:34:af:ef:fc rssi=-91 hid=0 name=''
+[735046] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[735049] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-61 hid=0 name=''
+[735561] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-71 hid=0 name=''
+[735798] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-68 hid=0 name=''
+[735829] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-67 hid=0 name=''
+[735981] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-70 hid=0 name=''
+[735981] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-71 hid=0 name=''
+[736034] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-85 hid=0 name=''
+[736153] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-98 hid=0 name=''
+[736651] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-65 hid=0 name=''
+[736652] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-65 hid=0 name=''
+[737686] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-61 hid=0 name=''
+[739646] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-78 hid=0 name=''
+[739811] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-68 hid=0 name=''
+[739922] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-97 hid=0 name=''
+[743930] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[744288] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[750550] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-94 hid=0 name=''
+[753655] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-94 hid=0 name=''
+[754293] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[764298] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[764608] [INF] [BLESPIKE] scan complete reason=0
+[764608] [INF] [BLESPIKE] state -> scanning
+[764628] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-59 hid=0 name=''
+[764632] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[764649] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-63 hid=0 name=''
+[764694] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-74 hid=0 name=''
+[764714] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-64 hid=0 name=''
+[764742] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-62 hid=0 name=''
+[764742] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-61 hid=0 name=''
+[764748] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[764749] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-62 hid=0 name=''
+[764758] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-76 hid=0 name=''
+[764758] [DBG] [BLESPIKE] adv 72:b5:0a:39:65:6c rssi=-76 hid=0 name=''
+[764762] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[764763] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[764802] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-78 hid=0 name='N/A'
+[764803] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name=''
+[764804] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name='Cinder 44A6E5099218'
+[764832] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[764833] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[764836] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-63 hid=0 name=''
+[765032] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-94 hid=0 name=''
+[765033] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-94 hid=0 name=''
+[765646] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-84 hid=0 name=''
+[765858] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-59 hid=0 name=''
+[765908] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-69 hid=0 name=''
+[765993] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[765994] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-96 hid=0 name=''
+[766050] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[766050] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[767163] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-96 hid=0 name=''
+[767164] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-96 hid=0 name=''
+[767887] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-68 hid=0 name=''
+[767888] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-68 hid=0 name=''
+[768727] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-66 hid=0 name=''
+[769782] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-94 hid=0 name=''
+[774227] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-92 hid=0 name=''
+[774306] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[784311] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[789919] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-71 hid=0 name=''
+[789919] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-71 hid=0 name=''
+[794311] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[794610] [INF] [BLESPIKE] scan complete reason=0
+[794610] [INF] [BLESPIKE] state -> scanning
+[794616] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-85 hid=0 name=''
+[794649] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-57 hid=0 name=''
+[794662] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-63 hid=0 name=''
+[794663] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-93 hid=0 name=''
+[794664] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-93 hid=0 name='Cinder 44A6E5099218'
+[794690] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-83 hid=0 name='N/A'
+[794695] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-70 hid=0 name=''
+[794695] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-70 hid=0 name=''
+[794696] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-76 hid=0 name=''
+[794697] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-75 hid=0 name=''
+[794698] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-70 hid=0 name=''
+[794698] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-70 hid=0 name=''
+[794700] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-70 hid=0 name=''
+[794725] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-85 hid=0 name=''
+[794755] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-86 hid=0 name=''
+[794756] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-86 hid=0 name=''
+[794758] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-93 hid=0 name=''
+[794759] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-93 hid=0 name=''
+[794784] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-71 hid=0 name=''
+[794955] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-94 hid=0 name=''
+[794984] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-76 hid=0 name=''
+[795209] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-92 hid=0 name=''
+[795919] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-80 hid=0 name=''
+[795952] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-67 hid=0 name=''
+[795953] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-67 hid=0 name=''
+[795996] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-62 hid=0 name=''
+[796011] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-70 hid=0 name=''
+[796055] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[796136] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[796283] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-93 hid=0 name=''
+[796332] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-60 hid=0 name=''
+[798066] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[798140] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[798787] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-64 hid=0 name=''
+[799907] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-85 hid=0 name=''
+[801855] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-89 hid=0 name=''
+[804318] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[814323] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[814858] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-75 hid=0 name=''
+[821340] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-97 hid=0 name=''
+[824329] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[824612] [INF] [BLESPIKE] scan complete reason=0
+[824612] [INF] [BLESPIKE] state -> scanning
+[824639] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[824642] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-87 hid=0 name=''
+[824644] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-59 hid=0 name=''
+[824655] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[824655] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[824684] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-73 hid=0 name=''
+[824684] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-73 hid=0 name=''
+[824695] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-70 hid=0 name=''
+[824698] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-70 hid=0 name=''
+[824698] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-70 hid=0 name=''
+[824703] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-76 hid=0 name=''
+[824711] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name=''
+[824712] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-81 hid=0 name=''
+[824769] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-62 hid=0 name=''
+[824868] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-73 hid=0 name=''
+[824869] [DBG] [BLESPIKE] adv fa:04:67:1a:42:58 rssi=-72 hid=0 name=''
+[824915] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-80 hid=0 name=''
+[824963] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-83 hid=0 name='N/A'
+[825020] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-59 hid=0 name=''
+[825336] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-92 hid=0 name='Cinder 44A6E5099218'
+[825677] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-88 hid=0 name=''
+[826007] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-70 hid=0 name=''
+[826007] [DBG] [BLESPIKE] adv fc:77:b2:10:52:d3 rssi=-69 hid=0 name=''
+[826008] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-73 hid=0 name=''
+[826068] [DBG] [BLESPIKE] adv f8:8b:c0:e9:69:27 rssi=-64 hid=0 name=''
+[826098] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-90 hid=0 name=''
+[826132] [DBG] [BLESPIKE] adv d2:a0:07:c9:df:91 rssi=-59 hid=0 name=''
+[826158] [DBG] [BLESPIKE] adv c3:ae:5d:73:4e:48 rssi=-95 hid=0 name=''
+[826213] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-93 hid=0 name=''
+[826282] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-90 hid=0 name=''
+[826331] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-90 hid=0 name=''
+[826788] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-72 hid=0 name=''
+[828222] [DBG] [BLESPIKE] adv ff:66:f8:db:81:6e rssi=-67 hid=0 name=''
+[828328] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-95 hid=0 name=''
+[830035] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-72 hid=0 name=''
+[831874] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-91 hid=0 name=''
+[834336] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[836668] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-63 hid=0 name=''
+[836669] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-63 hid=0 name=''
+[836721] [DBG] [BLESPIKE] adv de:d4:97:a2:5a:0d rssi=-70 hid=0 name=''
+[837575] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-91 hid=0 name=''
+[837576] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-91 hid=0 name=''
+[838645] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-68 hid=0 name=''
+[838646] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-67 hid=0 name=''
+[839124] [DBG] [BLESPIKE] adv e3:f4:db:14:4a:5e rssi=-59 hid=0 name=''
+[842659] [DBG] [BLESPIKE] adv c7:52:ff:cd:b6:32 rssi=-97 hid=0 name=''
+[842659] [DBG] [BLESPIKE] adv c7:52:ff:cd:b6:32 rssi=-98 hid=0 name=''
+[844341] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[854346] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[854615] [INF] [BLESPIKE] scan complete reason=0
+[854616] [INF] [BLESPIKE] state -> scanning
+[854643] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[854647] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-77 hid=0 name='N/A'
+[854658] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[854660] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-67 hid=0 name=''
+[854661] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-67 hid=0 name=''
+[854662] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-92 hid=0 name=''
+[854667] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-82 hid=0 name=''
+[854670] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-82 hid=0 name=''
+[854670] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-81 hid=0 name=''
+[854694] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-68 hid=0 name=''
+[854699] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-71 hid=0 name=''
+[854700] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-70 hid=0 name=''
+[854717] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-64 hid=0 name=''
+[854717] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-64 hid=0 name=''
+[854747] [DBG] [BLESPIKE] adv e3:f4:db:14:4a:5e rssi=-61 hid=0 name=''
+[854750] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-63 hid=0 name=''
+[854756] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-61 hid=0 name=''
+[854848] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-81 hid=0 name=''
+[854853] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-92 hid=0 name=''
+[854935] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-62 hid=0 name=''
+[854998] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name=''
+[854999] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name='Cinder 44A6E5099218'
+[855014] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-59 hid=0 name=''
+[855015] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-59 hid=0 name=''
+[855098] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-94 hid=0 name=''
+[855098] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-94 hid=0 name=''
+[855645] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-92 hid=0 name=''
+[856094] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-67 hid=0 name=''
+[856696] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-68 hid=0 name=''
+[856784] [DBG] [BLESPIKE] adv de:d4:97:a2:5a:0d rssi=-67 hid=0 name=''
+[858704] [DBG] [BLESPIKE] adv c7:52:ff:cd:b6:32 rssi=-97 hid=0 name=''
+[858705] [DBG] [BLESPIKE] adv c7:52:ff:cd:b6:32 rssi=-97 hid=0 name=''
+[860402] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-92 hid=0 name=''
+[864352] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[865664] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-72 hid=0 name=''
+[867938] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[870193] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-87 hid=0 name=''
+[871078] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-75 hid=0 name=''
+[871078] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-75 hid=0 name=''
+[871339] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[874357] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[881948] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-90 hid=0 name=''
+[884362] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[884617] [INF] [BLESPIKE] scan complete reason=0
+[884617] [INF] [BLESPIKE] state -> scanning
+[884623] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-54 hid=0 name=''
+[884625] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-76 hid=0 name='N/A'
+[884627] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-85 hid=0 name=''
+[884653] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-62 hid=0 name=''
+[884654] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-62 hid=0 name=''
+[884656] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-62 hid=0 name=''
+[884657] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[884693] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-75 hid=0 name=''
+[884726] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name=''
+[884730] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-60 hid=0 name=''
+[884730] [DBG] [BLESPIKE] adv 50:5b:7d:19:87:af rssi=-60 hid=0 name=''
+[884761] [DBG] [BLESPIKE] adv c7:52:ff:cd:b6:32 rssi=-97 hid=0 name=''
+[884762] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-70 hid=0 name=''
+[884763] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-70 hid=0 name=''
+[884774] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-81 hid=0 name=''
+[884794] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-76 hid=0 name=''
+[884795] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-76 hid=0 name=''
+[884803] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-74 hid=0 name=''
+[884804] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-74 hid=0 name=''
+[884839] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-89 hid=0 name=''
+[884839] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-89 hid=0 name=''
+[884847] [DBG] [BLESPIKE] adv de:d4:97:a2:5a:0d rssi=-65 hid=0 name=''
+[884850] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-62 hid=0 name=''
+[884868] [DBG] [BLESPIKE] adv e3:f4:db:14:4a:5e rssi=-62 hid=0 name=''
+[884875] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-75 hid=0 name=''
+[884883] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-95 hid=0 name=''
+[884884] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[884941] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-94 hid=0 name='Cinder 44A6E5099218'
+[885042] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-81 hid=0 name=''
+[885699] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-73 hid=0 name=''
+[885700] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-73 hid=0 name=''
+[885826] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-75 hid=0 name=''
+[886160] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-66 hid=0 name=''
+[886472] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-93 hid=0 name=''
+[888601] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-87 hid=0 name=''
+[888633] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-82 hid=0 name=''
+[890282] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-81 hid=0 name=''
+[891952] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-90 hid=0 name=''
+[893281] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-80 hid=0 name=''
+[894362] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[901228] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-61 hid=0 name=''
+[901229] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-60 hid=0 name=''
+[904367] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[914372] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[914620] [INF] [BLESPIKE] scan complete reason=0
+[914620] [INF] [BLESPIKE] state -> scanning
+[914624] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[914631] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-61 hid=0 name=''
+[914632] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-61 hid=0 name=''
+[914647] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-59 hid=0 name=''
+[914648] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-58 hid=0 name=''
+[914656] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[914656] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[914696] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-74 hid=0 name=''
+[914696] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-77 hid=0 name=''
+[914701] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-74 hid=0 name=''
+[914715] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-78 hid=0 name='N/A'
+[914739] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-85 hid=0 name=''
+[914739] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-85 hid=0 name=''
+[914778] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-61 hid=0 name=''
+[914831] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-71 hid=0 name=''
+[914852] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-65 hid=0 name=''
+[914852] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-65 hid=0 name=''
+[914865] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-95 hid=0 name=''
+[914868] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-90 hid=0 name=''
+[914891] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-75 hid=0 name=''
+[914903] [DBG] [BLESPIKE] adv de:d4:97:a2:5a:0d rssi=-70 hid=0 name=''
+[914995] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-75 hid=0 name=''
+[915108] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-90 hid=0 name=''
+[915109] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name='Cinder 44A6E5099218'
+[915243] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-89 hid=0 name=''
+[915495] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-96 hid=0 name=''
+[915788] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-68 hid=0 name=''
+[915789] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-69 hid=0 name=''
+[916242] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-72 hid=0 name=''
+[916846] [DBG] [BLESPIKE] adv c7:52:ff:cd:b6:32 rssi=-101 hid=0 name=''
+[916980] [DBG] [BLESPIKE] adv e3:f4:db:14:4a:5e rssi=-71 hid=0 name=''
+[917190] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-90 hid=0 name=''
+[918555] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-90 hid=0 name=''
+[918844] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-72 hid=0 name=''
+[918851] [DBG] [BLESPIKE] adv c7:52:ff:cd:b6:32 rssi=-101 hid=0 name=''
+[920414] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-75 hid=0 name=''
+[922008] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-96 hid=0 name=''
+[924377] [INF] [MEM] Free: 44112 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 40948 bytes
+[925002] [INF] [BLEEDIT] nothing to save
+[925005] [INF] [BLESPIKE] heap after nimble_port_deinit: 110056
+[925006] [INF] [BLEEDIT] SPIKE-HEAP P5-after-ble-teardown free=118764 minfree=14248 maxalloc=49140
+[925006] [DBG] [ACT] Exiting activity: BleEditor
+[925006] [DBG] [ACT] Popped from activity stack, new size = 1
+[925011] [DBG] [GFX] Time = 5 ms from clearScreen to displayBuffer
+[925530]   Wait complete: refresh (496 ms)
+[932331] [INF] [BLEEDIT] nothing to save
+[932331] [INF] [BLEEDIT] SPIKE-HEAP P5-after-ble-teardown free=134188 minfree=14248 maxalloc=94196
+[932331] [DBG] [ACT] Exiting activity: BleEditor
+[932331] [DBG] [ACT] Popped from activity stack, new size = 0
+[932339] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[932859]   Wait complete: refresh (496 ms)
+[933576] [DBG] [ACT] Pushed to activity stack, new size = 1
+[933576] [DBG] [ACT] Entering activity: BleEditor
+[933576] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=134188 minfree=14248 maxalloc=94196
+[933577] [INF] [BLESPIKE] heap before nimble_port_init: 124968
+[933583] [INF] [BLESPIKE] heap after nimble_port_init: 60168
+[933586] [INF] [BLESPIKE] state -> starting
+[933592] [INF] [BLESPIKE] host synced, own addr type=0
+[933592] [INF] [BLESPIKE] state -> scanning
+[933593] [INF] [BLESPIKE] heap after host task start: 53420
+[933594] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=53420 minfree=14248 maxalloc=49140
+[933599] [DBG] [GFX] Time = 5 ms from clearScreen to displayBuffer
+[933608] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-68 hid=0 name=''
+[933611] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-82 hid=0 name='N/A'
+[933616] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-70 hid=0 name=''
+[933616] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-70 hid=0 name=''
+[933640] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-74 hid=0 name=''
+[933640] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-74 hid=0 name=''
+[933649] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-92 hid=0 name=''
+[933649] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-93 hid=0 name=''
+[933701] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-88 hid=0 name=''
+[933702] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-89 hid=0 name=''
+[933712] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-88 hid=0 name=''
+[933713] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-89 hid=0 name=''
+[933742] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-73 hid=0 name=''
+[933754] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-70 hid=0 name=''
+[933755] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-69 hid=0 name=''
+[933785] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-92 hid=0 name=''
+[933786] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-92 hid=0 name='Cinder 44A6E5099218'
+[933879] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-71 hid=0 name=''
+[933880] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-72 hid=0 name=''
+[933899] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-89 hid=0 name=''
+[933962] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-90 hid=0 name=''
+[933962] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-90 hid=0 name=''
+[934109] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-97 hid=0 name=''
+[934122]   Wait complete: refresh (496 ms)
+[934275] [DBG] [BLESPIKE] adv e7:ee:82:87:8e:0c rssi=-71 hid=0 name=''
+[934384] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[934941] [DBG] [BLESPIKE] adv de:d4:97:a2:5a:0d rssi=-71 hid=0 name=''
+[935582] [DBG] [BLESPIKE] adv e3:f4:db:14:4a:5e rssi=-68 hid=0 name=''
+[935853] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-74 hid=0 name=''
+[936885] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-70 hid=0 name=''
+[936913] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-71 hid=0 name=''
+[936914] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-71 hid=0 name=''
+[937859] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-65 hid=0 name=''
+[938616] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-92 hid=0 name=''
+[938892] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-70 hid=0 name=''
+[939673] [DBG] [BLESPIKE] adv d6:89:ee:1a:70:d0 rssi=-95 hid=0 name=''
+[940503] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-84 hid=0 name=''
+[943467] [DBG] [BLESPIKE] adv 3c:dc:75:15:e6:ee rssi=-104 hid=0 name=''
+[944390] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[945709] [DBG] [BLESPIKE] adv cd:e1:2d:51:cd:14 rssi=-78 hid=0 name=''
+[946858] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-75 hid=0 name=''
+[946858] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-74 hid=0 name=''
+[952028] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-93 hid=0 name=''
+[954395] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[963594] [INF] [BLESPIKE] scan complete reason=0
+[963595] [INF] [BLESPIKE] state -> scanning
+[963613] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-85 hid=0 name=''
+[963614] [DBG] [BLESPIKE] adv 69:5c:a0:ce:d3:76 rssi=-85 hid=0 name=''
+[963622] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-56 hid=0 name=''
+[963635] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-88 hid=0 name=''
+[963678] [DBG] [BLESPIKE] adv 6c:0f:63:b9:2e:8e rssi=-74 hid=0 name=''
+[963688] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-74 hid=0 name=''
+[963688] [DBG] [BLESPIKE] adv 5c:97:75:1e:39:8c rssi=-74 hid=0 name=''
+[963694] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-59 hid=0 name=''
+[963694] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-59 hid=0 name=''
+[963697] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-59 hid=0 name=''
+[963744] [DBG] [BLESPIKE] adv cd:e1:2d:51:cd:14 rssi=-70 hid=0 name=''
+[963778] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-66 hid=0 name=''
+[963789] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-95 hid=0 name=''
+[963923] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-69 hid=0 name=''
+[963924] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-69 hid=0 name=''
+[963964] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-66 hid=0 name=''
+[963976] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-69 hid=0 name=''
+[963977] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-68 hid=0 name=''
+[963994] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-59 hid=0 name=''
+[963994] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-59 hid=0 name=''
+[963997] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-97 hid=0 name='Cinder 44A6E5099218'
+[964074] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-75 hid=0 name='N/A'
+[964142] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-96 hid=0 name=''
+[964383] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-98 hid=0 name=''
+[964400] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[964402] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-92 hid=0 name=''
+[964705] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-95 hid=0 name=''
+[964967] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-69 hid=0 name=''
+[965198] [DBG] [BLESPIKE] adv e3:f4:db:14:4a:5e rssi=-74 hid=0 name=''
+[966964] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-70 hid=0 name=''
+[966965] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-72 hid=0 name=''
+[966974] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-68 hid=0 name=''
+[967053] [DBG] [BLESPIKE] adv de:d4:97:a2:5a:0d rssi=-58 hid=0 name=''
+[970627] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-74 hid=0 name=''
+[974405] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[980188] [DBG] [BLESPIKE] adv 44:33:f0:d6:bd:f0 rssi=-84 hid=0 name=''
+[980188] [DBG] [BLESPIKE] adv 44:33:f0:d6:bd:f0 rssi=-84 hid=0 name=''
+[980237] [DBG] [BLESPIKE] adv 56:7e:06:ac:16:27 rssi=-76 hid=0 name=''
+[980237] [DBG] [BLESPIKE] adv 56:7e:06:ac:16:27 rssi=-76 hid=0 name=''
+[980592] [DBG] [BLESPIKE] adv 4a:3c:a6:86:10:ad rssi=-76 hid=0 name=''
+[984410] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[990714] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-97 hid=0 name=''
+[990715] [DBG] [BLESPIKE] adv 63:a6:84:96:6f:74 rssi=-97 hid=0 name=''
+[993596] [INF] [BLESPIKE] scan complete reason=0
+[993597] [INF] [BLESPIKE] state -> scanning
+[993608] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[993620] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-95 hid=0 name=''
+[993620] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-95 hid=0 name=''
+[993664] [DBG] [BLESPIKE] adv 4a:3c:a6:86:10:ad rssi=-74 hid=0 name=''
+[993719] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-61 hid=0 name=''
+[993730] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-62 hid=0 name=''
+[993737] [DBG] [BLESPIKE] adv 44:33:f0:d6:bd:f0 rssi=-75 hid=0 name=''
+[993741] [DBG] [BLESPIKE] adv e3:f4:db:14:4a:5e rssi=-63 hid=0 name=''
+[993749] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-62 hid=0 name=''
+[993750] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-62 hid=0 name=''
+[993751] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-60 hid=0 name=''
+[993751] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-60 hid=0 name=''
+[993758] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-75 hid=0 name=''
+[993770] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-89 hid=0 name='N/A'
+[993771] [DBG] [BLESPIKE] adv 56:7e:06:ac:16:27 rssi=-74 hid=0 name=''
+[993771] [DBG] [BLESPIKE] adv 56:7e:06:ac:16:27 rssi=-74 hid=0 name=''
+[993817] [DBG] [BLESPIKE] adv cd:e1:2d:51:cd:14 rssi=-72 hid=0 name=''
+[993928] [DBG] [BLESPIKE] adv 44:33:f0:d6:bd:f0 rssi=-76 hid=0 name=''
+[994014] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name=''
+[994015] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name='Cinder 44A6E5099218'
+[994023] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-70 hid=0 name=''
+[994153] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[994335] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-94 hid=0 name=''
+[994415] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[994473] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-71 hid=0 name=''
+[994474] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-71 hid=0 name=''
+[995004] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-71 hid=0 name=''
+[995044] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-68 hid=0 name=''
+[995045] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-68 hid=0 name=''
+[995139] [DBG] [BLESPIKE] adv de:d4:97:a2:5a:0d rssi=-56 hid=0 name=''
+[995464] [DBG] [BLESPIKE] adv 44:33:f0:d6:bd:f0 rssi=-73 hid=0 name=''
+[995658] [DBG] [BLESPIKE] adv 56:7e:06:ac:16:27 rssi=-73 hid=0 name=''
+[996801] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-94 hid=0 name=''
+[999013] [DBG] [BLESPIKE] adv c7:52:ff:cd:b6:32 rssi=-96 hid=0 name=''
+[1000039] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-88 hid=0 name=''
+[1001023] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-72 hid=0 name=''
+[1004420] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[1010796] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-78 hid=0 name=''
+[1012105] [DBG] [BLESPIKE] adv e1:94:10:48:51:a1 rssi=-92 hid=0 name=''
+[1014425] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[1019763] [DBG] [BLESPIKE] adv d6:89:ee:1a:70:d0 rssi=-99 hid=0 name=''
+[1023598] [INF] [BLESPIKE] scan complete reason=0
+[1023599] [INF] [BLESPIKE] state -> scanning
+[1023616] [DBG] [BLESPIKE] adv 44:33:f0:d6:bd:f0 rssi=-80 hid=0 name=''
+[1023624] [DBG] [BLESPIKE] adv ca:9a:e1:b6:4d:21 rssi=-55 hid=0 name=''
+[1023648] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-64 hid=0 name=''
+[1023667] [DBG] [BLESPIKE] adv 70:73:f4:d2:97:1e rssi=-76 hid=0 name=''
+[1023680] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-76 hid=0 name=''
+[1023687] [DBG] [BLESPIKE] adv 4a:3c:a6:86:10:ad rssi=-74 hid=0 name=''
+[1023694] [DBG] [BLESPIKE] adv 56:7e:06:ac:16:27 rssi=-74 hid=0 name=''
+[1023710] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-56 hid=0 name=''
+[1023711] [DBG] [BLESPIKE] adv 68:34:62:69:de:09 rssi=-56 hid=0 name=''
+[1023746] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-71 hid=0 name=''
+[1023747] [DBG] [BLESPIKE] adv 77:3d:2b:19:fe:8c rssi=-71 hid=0 name=''
+[1023747] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-90 hid=0 name=''
+[1023748] [DBG] [BLESPIKE] adv 69:05:07:da:91:68 rssi=-90 hid=0 name=''
+[1023750] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-76 hid=0 name='N/A'
+[1023800] [DBG] [BLESPIKE] adv 44:33:f0:d6:bd:f0 rssi=-80 hid=0 name=''
+[1023835] [DBG] [BLESPIKE] adv 7c:c4:67:5c:46:2c rssi=-66 hid=0 name=''
+[1023866] [DBG] [BLESPIKE] adv 54:55:a2:11:7f:8e rssi=-76 hid=0 name=''
+[1023881] [DBG] [BLESPIKE] adv 56:7e:06:ac:16:27 rssi=-74 hid=0 name=''
+[1023903] [DBG] [BLESPIKE] adv cd:e1:2d:51:cd:14 rssi=-68 hid=0 name=''
+[1023995] [DBG] [BLESPIKE] adv e3:f4:db:14:4a:5e rssi=-61 hid=0 name=''
+[1024092] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-67 hid=0 name=''
+[1024092] [DBG] [BLESPIKE] adv de:42:dd:1d:a0:86 rssi=-67 hid=0 name=''
+[1024298] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name=''
+[1024298] [DBG] [BLESPIKE] adv 44:a6:e5:09:92:18 rssi=-89 hid=0 name='Cinder 44A6E5099218'
+[1024431] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[1024875] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-91 hid=0 name=''
+[1024875] [DBG] [BLESPIKE] adv 44:b3:68:90:58:f6 rssi=-92 hid=0 name=''
+[1025074] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-71 hid=0 name=''
+[1025216] [DBG] [BLESPIKE] adv de:d4:97:a2:5a:0d rssi=-56 hid=0 name=''
+[1026893] [DBG] [BLESPIKE] adv e3:a5:2c:32:58:1e rssi=-93 hid=0 name=''
+[1027118] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-77 hid=0 name=''
+[1027118] [DBG] [BLESPIKE] adv ec:89:ca:02:4b:3f rssi=-77 hid=0 name=''
+[1029084] [DBG] [BLESPIKE] adv ce:ad:fb:2e:65:7f rssi=-73 hid=0 name=''
+[1030874] [DBG] [BLESPIKE] adv ed:7c:f3:b9:85:99 rssi=-93 hid=0 name=''
+[1030882] [DBG] [BLESPIKE] adv e8:fb:1c:0d:cc:7c rssi=-95 hid=0 name=''
+[1032656] [DBG] [BLESPIKE] adv 44:33:f0:d6:bd:f0 rssi=-76 hid=0 name=''
+[1033987] [DBG] [BLESPIKE] adv 56:7e:06:ac:16:27 rssi=-80 hid=0 name=''
+[1034436] [INF] [MEM] Free: 53272 bytes, Total: 251348 bytes, Min Free: 14248 bytes, MaxAlloc: 49140 bytes
+[12668] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[12675] [DBG] [ACT] Pushed to activity stack, new size = 1
+[12677] [DBG] [ACT] Entering activity: BleEditor
+[12680] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=95200 minfree=95152 maxalloc=73716
+[12684] [INF] [BLESPIKE] heap before nimble_port_init: 85980

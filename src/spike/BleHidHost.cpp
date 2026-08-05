@@ -21,6 +21,20 @@ extern "C" {
 // store/config/include is not on the framework's exported include path even
 // though the symbol is in libbt.a, so declare it rather than include it.
 void ble_store_config_init(void);
+
+// THE load-bearing symbol for this whole spike. initArduino() calls
+// esp_bt_controller_mem_release(ESP_BT_MODE_BTDM) at boot unless btInUse() is
+// true (esp32-hal-misc.c:345); the core's own definition is __attribute__((weak))
+// and returns false, and `lib_ignore = BLE` means nothing else overrides it.
+// Without this strong definition the controller's RAM is donated to the heap at
+// boot and btdm_controller_init() later executes into it: "Guru Meditation
+// Error: Core 0 panic'ed (Instruction access fault)", MEPC 0x00000000, RA in
+// r_lld_env_init. Observed on the X4, 2026-08-05.
+//
+// The release is IRREVERSIBLE until reboot, so this is a boot-time decision,
+// not a runtime one: a build that can ever start BLE pays the controller's RAM
+// for the whole boot session, whether or not the editor is opened.
+bool btInUse(void) { return true; }
 }
 
 namespace blespike {
@@ -322,13 +336,37 @@ void decodeReport(const uint8_t* rep, size_t len) {
 
 // --- GAP ---------------------------------------------------------------------
 
-bool advIsHidKeyboard(const ble_hs_adv_fields& fields) {
+bool advIsHidKeyboard(const ble_hs_adv_fields& fields, const char* name) {
   for (uint8_t i = 0; i < fields.num_uuids16; ++i) {
     if (ble_uuid_u16(&fields.uuids16[i].u) == UUID_HID_SERVICE) return true;
   }
+  // Solicited-services list: some peripherals ask the host for HID this way.
+  for (uint8_t i = 0; i < fields.sol_num_uuids16; ++i) {
+    if (ble_uuid_u16(&fields.sol_uuids16[i].u) == UUID_HID_SERVICE) return true;
+  }
   // Some keyboards omit the service UUID and advertise only the appearance.
   if (fields.appearance_is_present && (fields.appearance == 0x03C1 || fields.appearance == 0x03C0)) return true;
+  // Last resort for this spike: match the test keyboard by name. A keyboard
+  // that exposes HID only in its GATT table (not in the advertisement) is
+  // legal HOGP and would otherwise be invisible to a UUID-only scan.
+  if (name != nullptr && strstr(name, "eonix") != nullptr) return true;
   return false;
+}
+
+// One full payload dump per address, so a keyboard that never matches can still
+// be identified from what it actually broadcasts.
+constexpr size_t MAX_SEEN = 48;
+uint8_t gSeen[MAX_SEEN][6];
+size_t gSeenCount = 0;
+
+bool markSeen(const uint8_t* addr) {
+  for (size_t i = 0; i < gSeenCount; ++i) {
+    if (memcmp(gSeen[i], addr, 6) == 0) return false;
+  }
+  if (gSeenCount < MAX_SEEN) {
+    memcpy(gSeen[gSeenCount++], addr, 6);
+  }
+  return true;
 }
 
 int onGapEvent(ble_gap_event* event, void* /*arg*/) {
@@ -342,10 +380,23 @@ int onGapEvent(ble_gap_event* event, void* /*arg*/) {
         const size_t n = fields.name_len < sizeof(name) - 1 ? fields.name_len : sizeof(name) - 1;
         memcpy(name, fields.name, n);
       }
-      const bool isHid = advIsHidKeyboard(fields);
-      LOG_DBG(TAG, "adv %02x:%02x:%02x:%02x:%02x:%02x rssi=%d hid=%d name='%s'", event->disc.addr.val[5],
-              event->disc.addr.val[4], event->disc.addr.val[3], event->disc.addr.val[2], event->disc.addr.val[1],
-              event->disc.addr.val[0], event->disc.rssi, isHid ? 1 : 0, name);
+      const bool isHid = advIsHidKeyboard(fields, name);
+      if (markSeen(event->disc.addr.val)) {
+        // First sighting of this address: dump everything about it once.
+        char hex[3 * 31 + 1] = {0};
+        const uint8_t n = event->disc.length_data > 31 ? 31 : event->disc.length_data;
+        for (uint8_t i = 0; i < n; ++i) snprintf(hex + i * 3, 4, "%02x ", event->disc.data[i]);
+        char uuids[64] = {0};
+        int off = 0;
+        for (uint8_t i = 0; i < fields.num_uuids16 && off < (int)sizeof(uuids) - 8; ++i) {
+          off += snprintf(uuids + off, sizeof(uuids) - off, "%04x ", ble_uuid_u16(&fields.uuids16[i].u));
+        }
+        LOG_INF(TAG, "NEW %02x:%02x:%02x:%02x:%02x:%02x type=%u rssi=%d hid=%d name='%s' uuids16=[%s] appear=%04x/%u",
+                event->disc.addr.val[5], event->disc.addr.val[4], event->disc.addr.val[3], event->disc.addr.val[2],
+                event->disc.addr.val[1], event->disc.addr.val[0], event->disc.addr.type, event->disc.rssi,
+                isHid ? 1 : 0, name, uuids, fields.appearance, fields.appearance_is_present ? 1u : 0u);
+        LOG_INF(TAG, "    raw[%u]: %s", (unsigned)event->disc.length_data, hex);
+      }
       if (!isHid) return 0;
 
       LOG_INF(TAG, "HID peripheral found: '%s' rssi=%d", name, event->disc.rssi);

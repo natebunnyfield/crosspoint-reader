@@ -609,6 +609,14 @@ void setup() {
   lastActivityTime = millis();
   deepSleepInProgress = false;
 
+  // SPIKE: auto-sleep kills the USB CDC port mid-measurement (the device
+  // enumerates only while the firmware runs), so every 10-minute idle stranded
+  // the capture and needed a physical wake. Disabled for the spike only.
+  // NOT 0 — getSleepTimeoutMs() clamps small values up to MIN_SLEEP_TIMEOUT;
+  // only >= SLEEP_TIMEOUT_NEVER_MINUTES returns 0 ("never").
+  // In-RAM only: nothing here writes settings.json.
+  SETTINGS.sleepTimeoutMinutes = CrossPointSettings::SLEEP_TIMEOUT_NEVER_MINUTES;
+
   // SPIKE (branch spike/ble-editor): measurement point 1. Nothing BLE has been
   // initialised at this point, so this is the plain-firmware boot heap.
   LOG_INF("SPIKE", "SPIKE-HEAP P0-boot-no-ble free=%u total=%u minfree=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
@@ -644,6 +652,10 @@ void loop() {
         uint8_t* buf = display.getFrameBuffer();
         logSerial.write(buf, bufferSize);
         logSerial.printf("SCREENSHOT_END\n");
+      } else if (cmd == "BLEEDIT") {
+        // SPIKE: open the editor without needing anyone at the buttons.
+        LOG_INF("SPIKE", "CMD:BLEEDIT — opening BLE editor");
+        activityManager.goToBleEditor();
       }
     }
   }
