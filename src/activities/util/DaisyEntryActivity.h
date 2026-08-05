@@ -16,6 +16,8 @@
 // ring swap / OK, in that order -- backspace and OK deliberately non-adjacent).
 // Back cancels the entry. Returns the same KeyboardResult contract as
 // KeyboardEntryActivity so call sites can swap freely via the factory.
+// Buttons only -- no touch handling (ruling 2026-08-05: this fork never
+// supports touch or the X4 Pro).
 class DaisyEntryActivity : public Activity {
  public:
   explicit DaisyEntryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title = "Enter Text",
@@ -58,7 +60,6 @@ class DaisyEntryActivity : public Activity {
   void swapRing();
   void insertChar(char c);
   void backspace();
-  void handleTap(int x, int y);
   void slotCenter(int petal, int slot, int& outX, int& outY) const;
 
   void onComplete(std::string text);
