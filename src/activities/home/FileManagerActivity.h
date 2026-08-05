@@ -23,6 +23,10 @@ class FileManagerActivity final : public Activity {
   // release must not also act on the list below.
   bool lockNextConfirmRelease = false;
   bool lockNextBackRelease = false;
+  // True once a Confirm press edge was seen inside this activity; gates the
+  // long-press action menu so a press carried in from another screen can't
+  // trigger it.
+  bool confirmPressSeen = false;
 
   std::string basepath = "/";
   std::vector<std::string> files;  // directories carry a trailing '/'

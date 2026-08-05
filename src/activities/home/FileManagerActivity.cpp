@@ -426,6 +426,20 @@ void FileManagerActivity::loop() {
     return;
   }
 
+  // Long press CONFIRM (1s+): action menu, fired while the button is still
+  // held. Release-driven detection is not enough here: the simulator's
+  // getHeldTime() reads 0 on the release frame, and acting mid-hold gives
+  // feedback the moment the threshold is crossed. confirmPressSeen gates out
+  // presses carried in from the home menu or a child activity. The eventual
+  // release lands in the popup, which only acts on press edges.
+  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) confirmPressSeen = true;
+  if (confirmPressSeen && mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
+      mappedInput.getHeldTime() >= GO_HOME_MS) {
+    confirmPressSeen = false;
+    openActionMenu();
+    return;
+  }
+
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int pathReserved = renderer.getLineHeight(SMALL_FONT_ID) + metrics.verticalSpacing + statusLineReserved();
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, pathReserved);
@@ -469,6 +483,7 @@ void FileManagerActivity::loop() {
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    confirmPressSeen = false;
     activateSelected();
     return;
   }
