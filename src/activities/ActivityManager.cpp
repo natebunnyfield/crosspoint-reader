@@ -17,6 +17,7 @@
 #endif
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
+#include "util/BleEditorActivity.h"  // SPIKE
 #include "util/FullScreenMessageActivity.h"
 
 static portMUX_TYPE activityManagerSpinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -237,6 +238,11 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
   replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem));
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
+
+// SPIKE — pushed rather than replaced so Back returns to Home with its state.
+void ActivityManager::goToBleEditor() {
+  pushActivity(std::make_unique<BleEditorActivity>(renderer, mappedInput));
+}
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

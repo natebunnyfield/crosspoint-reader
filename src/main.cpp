@@ -608,6 +608,11 @@ void setup() {
   // what the simulator's in-process (longjmp) wake does not.
   lastActivityTime = millis();
   deepSleepInProgress = false;
+
+  // SPIKE (branch spike/ble-editor): measurement point 1. Nothing BLE has been
+  // initialised at this point, so this is the plain-firmware boot heap.
+  LOG_INF("SPIKE", "SPIKE-HEAP P0-boot-no-ble free=%u total=%u minfree=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
+          (unsigned)ESP.getHeapSize(), (unsigned)ESP.getMinFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 }
 
 void loop() {

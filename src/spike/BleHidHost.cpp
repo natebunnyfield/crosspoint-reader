@@ -1,0 +1,564 @@
+// SPIKE — throwaway. See BleHidHost.h.
+#include "BleHidHost.h"
+
+#include <Arduino.h>
+#include <Logging.h>
+#include <string.h>
+
+#include <atomic>
+
+extern "C" {
+#include "host/ble_gap.h"
+#include "host/ble_hs.h"
+#include "host/ble_hs_adv.h"
+#include "host/ble_hs_id.h"
+#include "host/ble_hs_mbuf.h"
+#include "host/ble_uuid.h"
+#include "host/util/util.h"
+#include "nimble/nimble_port.h"
+#include "nimble/nimble_port_freertos.h"
+
+// store/config/include is not on the framework's exported include path even
+// though the symbol is in libbt.a, so declare it rather than include it.
+void ble_store_config_init(void);
+}
+
+namespace blespike {
+namespace {
+
+constexpr const char* TAG = "BLESPIKE";
+
+constexpr uint16_t UUID_HID_SERVICE = 0x1812;
+constexpr uint16_t UUID_REPORT = 0x2A4D;
+constexpr uint16_t UUID_BOOT_KBD_INPUT = 0x2A22;
+constexpr uint16_t UUID_PROTOCOL_MODE = 0x2A4E;
+constexpr uint16_t UUID_CCCD = 0x2902;
+
+constexpr size_t MAX_CHRS = 16;    // HID services carry ~8-12 characteristics
+constexpr size_t MAX_REPORTS = 6;  // input reports we will subscribe to
+constexpr size_t RING_SIZE = 128;  // power of two
+
+struct ChrInfo {
+  uint16_t defHandle;
+  uint16_t valHandle;
+  uint16_t uuid16;
+  uint8_t properties;
+};
+
+struct ReportInfo {
+  uint16_t valHandle;
+  uint16_t cccdHandle;
+  uint16_t endHandle;
+};
+
+State gState = State::Off;
+bool gStarted = false;
+char gPeerName[32] = {0};
+
+uint8_t gOwnAddrType = 0;
+ble_addr_t gPeerAddr = {};
+bool gHavePeer = false;
+uint16_t gConnHandle = BLE_HS_CONN_HANDLE_NONE;
+
+uint16_t gSvcStart = 0;
+uint16_t gSvcEnd = 0;
+bool gSvcFound = false;
+
+ChrInfo gChrs[MAX_CHRS];
+size_t gChrCount = 0;
+ReportInfo gReports[MAX_REPORTS];
+size_t gReportCount = 0;
+size_t gDscIndex = 0;  // which report we are hunting a CCCD for
+size_t gSubIndex = 0;  // which report we are subscribing
+
+// Single-producer (host task) / single-consumer (main task) ring.
+char gRing[RING_SIZE];
+uint32_t gRingTs[RING_SIZE];
+std::atomic<uint16_t> gHead{0};
+std::atomic<uint16_t> gTail{0};
+std::atomic<uint32_t> gNotifies{0};
+std::atomic<uint32_t> gDropped{0};
+uint32_t gLastPoppedTs = 0;
+
+// Last report, so we emit only 0->1 key transitions (HOGP has no key-repeat;
+// the host is expected to synthesise it, and we do not want one per report).
+uint8_t gPrevKeys[6] = {0};
+
+// US layout, HID usage 0x04..0x38. Index = usage - 0x04.
+constexpr char KEYMAP_LOWER[] =
+    "abcdefghijklmnopqrstuvwxyz"  // 0x04..0x1D
+    "1234567890"                  // 0x1E..0x27
+    "\n\x1b\b\t "                 // 0x28..0x2C  enter esc bksp tab space
+    "-=[]\\#;'`,./";              // 0x2D..0x38  (0x32 is non-US '#')
+constexpr char KEYMAP_UPPER[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "!@#$%^&*()"
+    "\n\x1b\b\t "
+    "_+{}|~:\"~<>?";
+static_assert(sizeof(KEYMAP_LOWER) == sizeof(KEYMAP_UPPER), "keymap length mismatch");
+constexpr uint8_t KEY_FIRST = 0x04;
+constexpr uint8_t KEY_LAST = KEY_FIRST + sizeof(KEYMAP_LOWER) - 2;
+
+void setState(State s) {
+  gState = s;
+  LOG_INF(TAG, "state -> %s", stateName());
+}
+
+void ringPush(char c, uint32_t ts) {
+  const uint16_t head = gHead.load(std::memory_order_relaxed);
+  const uint16_t next = (head + 1) % RING_SIZE;
+  if (next == gTail.load(std::memory_order_acquire)) {
+    gDropped.fetch_add(1, std::memory_order_relaxed);
+    return;
+  }
+  gRing[head] = c;
+  gRingTs[head] = ts;
+  gHead.store(next, std::memory_order_release);
+}
+
+void startScan();
+
+// --- GATT: subscribe ---------------------------------------------------------
+
+int onCccdWrite(uint16_t connHandle, const ble_gatt_error* error, ble_gatt_attr* /*attr*/, void* /*arg*/);
+
+void subscribeNext() {
+  while (gSubIndex < gReportCount && gReports[gSubIndex].cccdHandle == 0) {
+    LOG_DBG(TAG, "report val=0x%04x has no CCCD, skipping", gReports[gSubIndex].valHandle);
+    ++gSubIndex;
+  }
+  if (gSubIndex >= gReportCount) {
+    LOG_INF(TAG, "subscribed to %u input report(s)", (unsigned)gReportCount);
+    setState(State::Ready);
+    return;
+  }
+  static const uint8_t enableNotify[2] = {0x01, 0x00};
+  const int rc = ble_gattc_write_flat(gConnHandle, gReports[gSubIndex].cccdHandle, enableNotify, sizeof(enableNotify),
+                                      onCccdWrite, nullptr);
+  if (rc != 0) {
+    LOG_ERR(TAG, "CCCD write start failed rc=%d", rc);
+    ++gSubIndex;
+    subscribeNext();
+  }
+}
+
+int onCccdWrite(uint16_t /*connHandle*/, const ble_gatt_error* error, ble_gatt_attr* /*attr*/, void* /*arg*/) {
+  if (error != nullptr && error->status != 0) {
+    LOG_ERR(TAG, "CCCD write failed for val=0x%04x status=%d", gReports[gSubIndex].valHandle, error->status);
+  } else {
+    LOG_INF(TAG, "subscribed: report val=0x%04x cccd=0x%04x", gReports[gSubIndex].valHandle,
+            gReports[gSubIndex].cccdHandle);
+  }
+  ++gSubIndex;
+  subscribeNext();
+  return 0;
+}
+
+// --- GATT: descriptors -------------------------------------------------------
+
+void discoverDescriptorsNext();
+
+int onDsc(uint16_t /*connHandle*/, const ble_gatt_error* error, uint16_t /*chrValHandle*/, const ble_gatt_dsc* dsc,
+          void* /*arg*/) {
+  if (error != nullptr && error->status == BLE_HS_EDONE) {
+    ++gDscIndex;
+    discoverDescriptorsNext();
+    return 0;
+  }
+  if (error != nullptr && error->status != 0) {
+    LOG_ERR(TAG, "descriptor discovery status=%d", error->status);
+    ++gDscIndex;
+    discoverDescriptorsNext();
+    return 0;
+  }
+  if (dsc == nullptr || gDscIndex >= gReportCount) return 0;
+  if (ble_uuid_u16(&dsc->uuid.u) == UUID_CCCD) {
+    gReports[gDscIndex].cccdHandle = dsc->handle;
+    LOG_DBG(TAG, "CCCD 0x%04x for report val=0x%04x", dsc->handle, gReports[gDscIndex].valHandle);
+  }
+  return 0;
+}
+
+void discoverDescriptorsNext() {
+  if (gDscIndex >= gReportCount) {
+    gSubIndex = 0;
+    subscribeNext();
+    return;
+  }
+  const uint16_t start = gReports[gDscIndex].valHandle + 1;
+  const uint16_t end = gReports[gDscIndex].endHandle;
+  if (start > end) {
+    ++gDscIndex;
+    discoverDescriptorsNext();
+    return;
+  }
+  const int rc = ble_gattc_disc_all_dscs(gConnHandle, start, end, onDsc, nullptr);
+  if (rc != 0) {
+    LOG_ERR(TAG, "disc_all_dscs rc=%d", rc);
+    ++gDscIndex;
+    discoverDescriptorsNext();
+  }
+}
+
+// --- GATT: characteristics ---------------------------------------------------
+
+void onCharsDone() {
+  // Report characteristic ranges end just before the next characteristic
+  // declaration (or at the end of the HID service for the last one).
+  gReportCount = 0;
+  for (size_t i = 0; i < gChrCount && gReportCount < MAX_REPORTS; ++i) {
+    const bool isReport = gChrs[i].uuid16 == UUID_REPORT || gChrs[i].uuid16 == UUID_BOOT_KBD_INPUT;
+    if (!isReport) continue;
+    if ((gChrs[i].properties & BLE_GATT_CHR_PROP_NOTIFY) == 0) continue;
+    uint16_t end = gSvcEnd;
+    for (size_t j = 0; j < gChrCount; ++j) {
+      if (gChrs[j].defHandle > gChrs[i].defHandle && gChrs[j].defHandle - 1 < end) {
+        end = gChrs[j].defHandle - 1;
+      }
+    }
+    gReports[gReportCount++] = ReportInfo{gChrs[i].valHandle, 0, end};
+  }
+  LOG_INF(TAG, "HID service: %u chrs, %u notifiable input report(s)", (unsigned)gChrCount, (unsigned)gReportCount);
+  if (gReportCount == 0) {
+    LOG_ERR(TAG, "no notifiable input reports — not a keyboard we can read");
+    setState(State::Failed);
+    return;
+  }
+  gDscIndex = 0;
+  discoverDescriptorsNext();
+}
+
+int onChr(uint16_t /*connHandle*/, const ble_gatt_error* error, const ble_gatt_chr* chr, void* /*arg*/) {
+  if (error != nullptr && error->status == BLE_HS_EDONE) {
+    onCharsDone();
+    return 0;
+  }
+  if (error != nullptr && error->status != 0) {
+    LOG_ERR(TAG, "chr discovery status=%d", error->status);
+    setState(State::Failed);
+    return 0;
+  }
+  if (chr == nullptr || gChrCount >= MAX_CHRS) return 0;
+  const uint16_t uuid16 = ble_uuid_u16(&chr->uuid.u);
+  gChrs[gChrCount++] = ChrInfo{chr->def_handle, chr->val_handle, uuid16, chr->properties};
+  LOG_DBG(TAG, "chr uuid=0x%04x val=0x%04x props=0x%02x", uuid16, chr->val_handle, chr->properties);
+  return 0;
+}
+
+int onSvc(uint16_t /*connHandle*/, const ble_gatt_error* error, const ble_gatt_svc* svc, void* /*arg*/) {
+  if (error != nullptr && error->status == BLE_HS_EDONE) {
+    if (!gSvcFound) {
+      LOG_ERR(TAG, "peer has no HID service (0x1812)");
+      setState(State::Failed);
+      return 0;
+    }
+    gChrCount = 0;
+    const int rc = ble_gattc_disc_all_chrs(gConnHandle, gSvcStart, gSvcEnd, onChr, nullptr);
+    if (rc != 0) {
+      LOG_ERR(TAG, "disc_all_chrs rc=%d", rc);
+      setState(State::Failed);
+    }
+    return 0;
+  }
+  if (error != nullptr && error->status != 0) {
+    LOG_ERR(TAG, "svc discovery status=%d", error->status);
+    setState(State::Failed);
+    return 0;
+  }
+  if (svc == nullptr || gSvcFound) return 0;
+  gSvcFound = true;
+  gSvcStart = svc->start_handle;
+  gSvcEnd = svc->end_handle;
+  LOG_INF(TAG, "HID service handles 0x%04x..0x%04x", gSvcStart, gSvcEnd);
+  return 0;
+}
+
+void startDiscovery() {
+  setState(State::Discovering);
+  gSvcFound = false;
+  gChrCount = 0;
+  gReportCount = 0;
+  const ble_uuid16_t hidUuid = BLE_UUID16_INIT(UUID_HID_SERVICE);
+  const int rc = ble_gattc_disc_svc_by_uuid(gConnHandle, &hidUuid.u, onSvc, nullptr);
+  if (rc != 0) {
+    LOG_ERR(TAG, "disc_svc_by_uuid rc=%d", rc);
+    setState(State::Failed);
+  }
+}
+
+// --- keystroke decode --------------------------------------------------------
+
+void decodeReport(const uint8_t* rep, size_t len) {
+  // Boot-protocol layout: [modifiers][reserved][6 keycodes]. Report-protocol
+  // keyboards use the same shape; a 9-byte report carries a leading report ID.
+  if (len < 8) return;
+  const size_t off = len - 8;
+  const uint8_t mods = rep[off];
+  const bool shift = (mods & 0x22) != 0;  // left or right shift
+  const uint8_t* keys = rep + off + 2;
+  const uint32_t now = millis();
+
+  for (size_t i = 0; i < 6; ++i) {
+    const uint8_t usage = keys[i];
+    if (usage == 0 || usage == 0x01 /* ErrorRollOver */) continue;
+    bool wasDown = false;
+    for (size_t j = 0; j < 6; ++j) {
+      if (gPrevKeys[j] == usage) {
+        wasDown = true;
+        break;
+      }
+    }
+    if (wasDown) continue;
+    if (usage < KEY_FIRST || usage > KEY_LAST) {
+      LOG_DBG(TAG, "unmapped usage 0x%02x", usage);
+      continue;
+    }
+    const char c = shift ? KEYMAP_UPPER[usage - KEY_FIRST] : KEYMAP_LOWER[usage - KEY_FIRST];
+    if (c == 0x1b) continue;  // Esc: not an editor character
+    ringPush(c, now);
+  }
+  memcpy(gPrevKeys, keys, 6);
+}
+
+// --- GAP ---------------------------------------------------------------------
+
+bool advIsHidKeyboard(const ble_hs_adv_fields& fields) {
+  for (uint8_t i = 0; i < fields.num_uuids16; ++i) {
+    if (ble_uuid_u16(&fields.uuids16[i].u) == UUID_HID_SERVICE) return true;
+  }
+  // Some keyboards omit the service UUID and advertise only the appearance.
+  if (fields.appearance_is_present && (fields.appearance == 0x03C1 || fields.appearance == 0x03C0)) return true;
+  return false;
+}
+
+int onGapEvent(ble_gap_event* event, void* /*arg*/) {
+  switch (event->type) {
+    case BLE_GAP_EVENT_DISC: {
+      ble_hs_adv_fields fields;
+      if (ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data) != 0) return 0;
+
+      char name[32] = {0};
+      if (fields.name != nullptr && fields.name_len > 0) {
+        const size_t n = fields.name_len < sizeof(name) - 1 ? fields.name_len : sizeof(name) - 1;
+        memcpy(name, fields.name, n);
+      }
+      const bool isHid = advIsHidKeyboard(fields);
+      LOG_DBG(TAG, "adv %02x:%02x:%02x:%02x:%02x:%02x rssi=%d hid=%d name='%s'", event->disc.addr.val[5],
+              event->disc.addr.val[4], event->disc.addr.val[3], event->disc.addr.val[2], event->disc.addr.val[1],
+              event->disc.addr.val[0], event->disc.rssi, isHid ? 1 : 0, name);
+      if (!isHid) return 0;
+
+      LOG_INF(TAG, "HID peripheral found: '%s' rssi=%d", name, event->disc.rssi);
+      strncpy(gPeerName, name[0] != 0 ? name : "(unnamed)", sizeof(gPeerName) - 1);
+      gPeerAddr = event->disc.addr;
+      gHavePeer = true;
+      ble_gap_disc_cancel();
+
+      setState(State::Connecting);
+      const int rc = ble_gap_connect(gOwnAddrType, &gPeerAddr, 10000, nullptr, onGapEvent, nullptr);
+      if (rc != 0) {
+        LOG_ERR(TAG, "ble_gap_connect rc=%d", rc);
+        startScan();
+      }
+      return 0;
+    }
+
+    case BLE_GAP_EVENT_DISC_COMPLETE:
+      LOG_INF(TAG, "scan complete reason=%d", event->disc_complete.reason);
+      if (gState == State::Scanning) startScan();
+      return 0;
+
+    case BLE_GAP_EVENT_CONNECT:
+      if (event->connect.status != 0) {
+        LOG_ERR(TAG, "connect failed status=%d", event->connect.status);
+        startScan();
+        return 0;
+      }
+      gConnHandle = event->connect.conn_handle;
+      LOG_INF(TAG, "connected, handle=%u — starting security", gConnHandle);
+      setState(State::Securing);
+      {
+        const int rc = ble_gap_security_initiate(gConnHandle);
+        if (rc != 0) {
+          LOG_ERR(TAG, "security_initiate rc=%d — trying discovery unencrypted", rc);
+          startDiscovery();
+        }
+      }
+      return 0;
+
+    case BLE_GAP_EVENT_ENC_CHANGE:
+      LOG_INF(TAG, "encryption change status=%d", event->enc_change.status);
+      if (event->enc_change.status == 0) {
+        startDiscovery();
+      } else {
+        LOG_ERR(TAG, "bonding failed — HOGP requires encryption");
+        setState(State::Failed);
+      }
+      return 0;
+
+    case BLE_GAP_EVENT_REPEAT_PAIRING: {
+      // Stale bond on one side. Drop ours and let pairing run again.
+      ble_gap_conn_desc desc;
+      if (ble_gap_conn_find(event->repeat_pairing.conn_handle, &desc) == 0) {
+        ble_store_util_delete_peer(&desc.peer_id_addr);
+      }
+      LOG_INF(TAG, "repeat pairing — old bond deleted");
+      return BLE_GAP_REPEAT_PAIRING_RETRY;
+    }
+
+    case BLE_GAP_EVENT_DISCONNECT:
+      LOG_INF(TAG, "disconnected reason=%d", event->disconnect.reason);
+      gConnHandle = BLE_HS_CONN_HANDLE_NONE;
+      memset(gPrevKeys, 0, sizeof(gPrevKeys));
+      startScan();
+      return 0;
+
+    case BLE_GAP_EVENT_NOTIFY_RX: {
+      uint8_t buf[24];
+      uint16_t copied = 0;
+      if (ble_hs_mbuf_to_flat(event->notify_rx.om, buf, sizeof(buf), &copied) != 0) return 0;
+      gNotifies.fetch_add(1, std::memory_order_relaxed);
+#if LOG_LEVEL >= 2
+      char hex[3 * sizeof(buf) + 1] = {0};
+      for (uint16_t i = 0; i < copied && i < sizeof(buf); ++i) snprintf(hex + i * 3, 4, "%02x ", buf[i]);
+      LOG_DBG(TAG, "notify h=0x%04x len=%u [%s]", event->notify_rx.attr_handle, (unsigned)copied, hex);
+#endif
+      decodeReport(buf, copied);
+      return 0;
+    }
+
+    case BLE_GAP_EVENT_MTU:
+      LOG_DBG(TAG, "MTU = %u", event->mtu.value);
+      return 0;
+
+    default:
+      return 0;
+  }
+}
+
+void startScan() {
+  setState(State::Scanning);
+  ble_gap_disc_params params = {};
+  params.itvl = 0;
+  params.window = 0;
+  params.filter_policy = BLE_HCI_SCAN_FILT_NO_WL;
+  params.limited = 0;
+  params.passive = 0;  // active: we want the scan response for the name
+  params.filter_duplicates = 1;
+  const int rc = ble_gap_disc(gOwnAddrType, 30000, &params, onGapEvent, nullptr);
+  if (rc != 0) {
+    LOG_ERR(TAG, "ble_gap_disc rc=%d", rc);
+    setState(State::Failed);
+  }
+}
+
+void onSync() {
+  if (ble_hs_util_ensure_addr(0) != 0) LOG_ERR(TAG, "ensure_addr failed");
+  if (ble_hs_id_infer_auto(0, &gOwnAddrType) != 0) {
+    LOG_ERR(TAG, "id_infer_auto failed");
+    setState(State::Failed);
+    return;
+  }
+  LOG_INF(TAG, "host synced, own addr type=%u", gOwnAddrType);
+  startScan();
+}
+
+void onReset(int reason) { LOG_ERR(TAG, "host reset, reason=%d", reason); }
+
+void hostTask(void* /*param*/) {
+  nimble_port_run();
+  nimble_port_freertos_deinit();
+}
+
+}  // namespace
+
+bool begin() {
+  if (gStarted) return true;
+
+  LOG_INF(TAG, "heap before nimble_port_init: %u", (unsigned)ESP.getFreeHeap());
+  const esp_err_t err = nimble_port_init();
+  if (err != ESP_OK) {
+    LOG_ERR(TAG, "nimble_port_init failed: %d", (int)err);
+    setState(State::Failed);
+    return false;
+  }
+  LOG_INF(TAG, "heap after nimble_port_init: %u", (unsigned)ESP.getFreeHeap());
+
+  ble_hs_cfg.sync_cb = onSync;
+  ble_hs_cfg.reset_cb = onReset;
+  ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+  ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;  // Just Works
+  ble_hs_cfg.sm_bonding = 1;
+  ble_hs_cfg.sm_mitm = 0;
+  ble_hs_cfg.sm_sc = 1;
+  ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+  ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+
+  ble_store_config_init();
+
+  gStarted = true;
+  setState(State::Starting);
+  nimble_port_freertos_init(hostTask);
+  LOG_INF(TAG, "heap after host task start: %u", (unsigned)ESP.getFreeHeap());
+  return true;
+}
+
+void end() {
+  if (!gStarted) return;
+  if (gConnHandle != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(gConnHandle, BLE_ERR_REM_USER_CONN_TERM);
+  ble_gap_disc_cancel();
+  const int rc = nimble_port_stop();
+  if (rc == 0) {
+    nimble_port_deinit();
+  } else {
+    LOG_ERR(TAG, "nimble_port_stop rc=%d", rc);
+  }
+  gStarted = false;
+  gConnHandle = BLE_HS_CONN_HANDLE_NONE;
+  gHavePeer = false;
+  gState = State::Off;
+  LOG_INF(TAG, "heap after nimble_port_deinit: %u", (unsigned)ESP.getFreeHeap());
+}
+
+State state() { return gState; }
+
+const char* stateName() {
+  switch (gState) {
+    case State::Off:
+      return "off";
+    case State::Starting:
+      return "starting";
+    case State::Scanning:
+      return "scanning";
+    case State::Connecting:
+      return "connecting";
+    case State::Securing:
+      return "pairing";
+    case State::Discovering:
+      return "discovering";
+    case State::Ready:
+      return "ready";
+    case State::Failed:
+      return "failed";
+  }
+  return "?";
+}
+
+const char* peerName() { return gPeerName; }
+
+int popChar() {
+  const uint16_t tail = gTail.load(std::memory_order_relaxed);
+  if (tail == gHead.load(std::memory_order_acquire)) return -1;
+  const char c = gRing[tail];
+  gLastPoppedTs = gRingTs[tail];
+  gTail.store((tail + 1) % RING_SIZE, std::memory_order_release);
+  return static_cast<unsigned char>(c);
+}
+
+uint32_t lastKeyMillis() { return gLastPoppedTs; }
+
+uint32_t notifyCount() { return gNotifies.load(std::memory_order_relaxed); }
+
+uint32_t droppedCount() { return gDropped.load(std::memory_order_relaxed); }
+
+}  // namespace blespike

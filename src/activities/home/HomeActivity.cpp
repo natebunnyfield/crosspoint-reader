@@ -191,6 +191,9 @@ void HomeActivity::loop() {
       case HomeMenuItem::SETTINGS_MENU:
         onSettingsOpen();
         break;
+      case HomeMenuItem::BLE_EDITOR:  // SPIKE
+        onBleEditorOpen();
+        break;
       default:
         break;
     }
@@ -351,12 +354,13 @@ void HomeActivity::render(RenderLock&&) {
 #ifndef CROSSPOINT_NO_NETWORK
                                           tr(STR_FILE_TRANSFER),
 #endif
-                                          tr(STR_MANAGE_FILES), tr(STR_SETTINGS_TITLE)};
+                                          tr(STR_MANAGE_FILES), tr(STR_SETTINGS_TITLE),
+                                          "BLE Editor (spike)"};
     std::vector<UIIcon> menuIcons = {Folder, Recent,
 #ifndef CROSSPOINT_NO_NETWORK
                                      Transfer,
 #endif
-                                     ManageFiles, Settings};
+                                     ManageFiles, Settings, Text};
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme
@@ -412,3 +416,5 @@ void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
 void HomeActivity::onManageFilesOpen() { activityManager.goToFileManager(); }
+
+void HomeActivity::onBleEditorOpen() { activityManager.goToBleEditor(); }  // SPIKE

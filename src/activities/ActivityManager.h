@@ -16,7 +16,8 @@
 class Activity;    // forward declaration
 class RenderLock;  // forward declaration
 
-enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, FILE_TRANSFER, MANAGE_FILES, SETTINGS_MENU };
+// BLE_EDITOR is a SPIKE entry (branch spike/ble-editor, never merged).
+enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, FILE_TRANSFER, MANAGE_FILES, SETTINGS_MENU, BLE_EDITOR };
 
 /**
  * ActivityManager
@@ -90,6 +91,7 @@ class ActivityManager {
   void goToBoot();
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();
+  void goToBleEditor();  // SPIKE
   void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE);
 
   // This will move current activity to stack instead of deleting it

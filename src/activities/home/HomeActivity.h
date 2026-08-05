@@ -46,6 +46,8 @@ class HomeActivity final : public Activity {
     if (item == HomeMenuItem::MANAGE_FILES) return i;
     ++i;
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
+    ++i;
+    if (item == HomeMenuItem::BLE_EDITOR) return i;  // SPIKE
     return 0;
   }
 
@@ -58,7 +60,8 @@ class HomeActivity final : public Activity {
     if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
 #endif
     if (idx == i++) return HomeMenuItem::MANAGE_FILES;
-    if (idx == i) return HomeMenuItem::SETTINGS_MENU;
+    if (idx == i++) return HomeMenuItem::SETTINGS_MENU;
+    if (idx == i) return HomeMenuItem::BLE_EDITOR;  // SPIKE
     return HomeMenuItem::NONE;
   }
   void onSelectBook(const std::string& path);
@@ -67,6 +70,7 @@ class HomeActivity final : public Activity {
   void onSettingsOpen();
   void onFileTransferOpen();
   void onManageFilesOpen();
+  void onBleEditorOpen();  // SPIKE
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image
