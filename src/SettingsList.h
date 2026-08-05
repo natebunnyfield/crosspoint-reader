@@ -328,6 +328,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Enum(StrId::STR_SYSTEM_FONT, &CrossPointSettings::systemFont,
                           {StrId::STR_UBUNTU, StrId::STR_NOTO_SANS, StrId::STR_NOTO_SERIF, StrId::STR_LIBRE_FRANKLIN},
                           "systemFont", StrId::STR_CAT_SYSTEM));
+    // Which text-entry keyboard every entry field opens (searches, WiFi
+    // passwords, owner name, renames). Order must match
+    // CrossPointSettings::KEYBOARD_LAYOUT -- the index IS the persisted value.
+    v.push_back(SettingInfo::Enum(StrId::STR_KEYBOARD, &CrossPointSettings::keyboardLayout,
+                                  {StrId::STR_KEYBOARD_DAISY, StrId::STR_KEYBOARD_GRID13, StrId::STR_KEYBOARD_QWERTY},
+                                  "keyboard", StrId::STR_CAT_SYSTEM));
     v.push_back(SettingInfo::Value(
         StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
         {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
