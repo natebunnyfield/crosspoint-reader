@@ -167,10 +167,15 @@ void FileManagerActivity::openActionMenu() {
     }
     options[count++] = tr(STR_RENAME);
     menuActions.push_back(MenuAction::Rename);
-    // Normalize to "Title - Author.ext" needs embedded metadata — epub/xtc only.
-    if (entry.back() != '/' && (FsHelpers::hasEpubExtension(entry) || FsHelpers::hasXtcExtension(entry))) {
-      options[count++] = tr(STR_NORMALIZE_NAME);
-      menuActions.push_back(MenuAction::Normalize);
+    // Rename using metadata ("Title - Author.ext") — only offered when the
+    // book's embedded metadata actually yields a usable title (ruling
+    // 2026-08-05: never show it just to error later).
+    if (entry.back() != '/') {
+      std::string title, author;
+      if (probeBookMetadata(entry, title, author)) {
+        options[count++] = tr(STR_NORMALIZE_NAME);
+        menuActions.push_back(MenuAction::Normalize);
+      }
     }
     options[count++] = tr(STR_MOVE);
     menuActions.push_back(MenuAction::Move);
@@ -276,11 +281,12 @@ void FileManagerActivity::startRename(const std::string& entry, const std::strin
                          });
 }
 
-void FileManagerActivity::startNormalize(const std::string& entry) {
+// True when `entry` is a book file whose embedded metadata yields a usable
+// (sanitized, non-empty) title. Outputs are sanitized for FAT names.
+bool FileManagerActivity::probeBookMetadata(const std::string& entry, std::string& title, std::string& author) {
+  title.clear();
+  author.clear();
   const std::string fullPath = fullPathOf(entry);
-
-  std::string title;
-  std::string author;
   if (FsHelpers::hasEpubExtension(entry)) {
     Epub epub(fullPath, "/.crosspoint");
     if (epub.load(false, true)) {
@@ -293,11 +299,18 @@ void FileManagerActivity::startNormalize(const std::string& entry) {
       title = xtc.getTitle();
       author = xtc.getAuthor();
     }
+  } else {
+    return false;
   }
-
   title = sanitizeFileName(title);
   author = sanitizeFileName(author);
-  if (title.empty()) {
+  return !title.empty();
+}
+
+void FileManagerActivity::startNormalize(const std::string& entry) {
+  std::string title;
+  std::string author;
+  if (!probeBookMetadata(entry, title, author)) {
     showError(tr(STR_NO_METADATA));
     return;
   }
@@ -461,9 +474,15 @@ void FileManagerActivity::loop() {
     const std::string& entry = files[selectorIndex];
     const bool isDirectory = entry.back() == '/';
 
-    // Long press: action menu for the entry (files get it on short press too).
-    if (mappedInput.getHeldTime() >= GO_HOME_MS || !isDirectory) {
+    // Long press: action menu. Normally fired mid-hold in loop(); this release
+    // path still catches a hold that completed inside a render stall.
+    if (mappedInput.getHeldTime() >= GO_HOME_MS) {
       openActionMenu();
+      return;
+    }
+
+    if (!isDirectory) {
+      viewFile(entry);
       return;
     }
 
@@ -615,8 +634,8 @@ void FileManagerActivity::render(RenderLock&&) {
 
   // Button hints
   const char* backLabel = (basepath == "/") ? tr(STR_HOME) : tr(STR_BACK);
-  // Folders: short press opens, long press = action menu — say both, or the
-  // menu on folders is undiscoverable (user request, 2026-08-04).
+  // Short press acts, long press = action menu — say both, or the menu is
+  // undiscoverable (user request, 2026-08-04; View-on-press ruling 2026-08-05).
   char confirmBuf[48];
   const char* confirmLabel;
   if (files.empty()) {
@@ -625,7 +644,8 @@ void FileManagerActivity::render(RenderLock&&) {
     snprintf(confirmBuf, sizeof(confirmBuf), "%s/%s", tr(STR_OPEN), tr(STR_MENU));
     confirmLabel = confirmBuf;
   } else {
-    confirmLabel = tr(STR_MENU);
+    snprintf(confirmBuf, sizeof(confirmBuf), "%s/%s", tr(STR_VIEW), tr(STR_MENU));
+    confirmLabel = confirmBuf;
   }
   const auto labels = mappedInput.mapLabels(backLabel, confirmLabel, files.empty() ? "" : tr(STR_DIR_UP),
                                             files.empty() ? "" : tr(STR_DIR_DOWN));

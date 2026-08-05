@@ -47,6 +47,7 @@ class FileManagerActivity final : public Activity {
 
   void openActionMenu();
   void runMenuAction(MenuAction action);
+  bool probeBookMetadata(const std::string& entry, std::string& title, std::string& author);
   void viewFile(const std::string& entry);
   // Opens the rename keyboard for `entry`. `seedName` pre-fills a proposed
   // name (used by Normalize); empty = seed with the current name.
