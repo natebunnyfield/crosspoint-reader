@@ -29,7 +29,9 @@ Rules settled in the session:
 - **Utility petal, top→bottom: ⌫ ⇄ OK** — ⌫ and OK non-adjacent (accidental-submit
   finding from the AAC literature). Utility petal is the last petal of each ring,
   wrap-adjacent to petal 1.
-- Touch (X4 Pro): tap petal = focus, tap char = type, hold char = uppercase.
+- ~~Touch (X4 Pro): tap petal = focus, tap char = type, hold char = uppercase.~~
+  **Superseded 2026-08-05: this fork never supports touch or the X4 Pro** — the
+  wheel is buttons-only.
 
 ## Rings
 
