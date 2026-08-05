@@ -1,0 +1,633 @@
+<title>Daisywheel — CrossPoint text entry playground</title>
+<style>
+  :root{
+    --ground:#F4F4F0; --ground2:#EBEBE5; --ink:#1C1C18; --ink2:#55554E;
+    --accent:#2B5876; --accent-soft:#2B587618;
+    --paper:#E8E7E1; --eink:#181815;
+    --card:#FFFFFF; --line:#D8D8CF; --good:#2E6B4F; --warn:#8A5A1E;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --serif:Charter,'Bitstream Charter',Georgia,'Times New Roman',serif;
+    --grot:-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ground:#22242A; --ground2:#1B1D22; --ink:#E6E6E0; --ink2:#9A9A90;
+      --accent:#7FA8C4; --accent-soft:#7FA8C422; --card:#2A2D34; --line:#3A3D45;
+      --good:#7FBE9E; --warn:#D2A868; }
+  }
+  :root[data-theme="dark"]{ --ground:#22242A; --ground2:#1B1D22; --ink:#E6E6E0; --ink2:#9A9A90;
+    --accent:#7FA8C4; --accent-soft:#7FA8C422; --card:#2A2D34; --line:#3A3D45;
+    --good:#7FBE9E; --warn:#D2A868; }
+  :root[data-theme="light"]{ --ground:#F4F4F0; --ground2:#EBEBE5; --ink:#1C1C18; --ink2:#55554E;
+    --accent:#2B5876; --accent-soft:#2B587618; --card:#FFFFFF; --line:#D8D8CF;
+    --good:#2E6B4F; --warn:#8A5A1E; }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--grot);line-height:1.45}
+  .wrap{max-width:1100px;margin:0 auto;padding:26px 20px 70px}
+  header h1{font-family:var(--serif);font-weight:600;font-size:clamp(24px,3.6vw,34px);margin:0 0 6px;text-wrap:balance}
+  header p{color:var(--ink2);margin:0;max-width:76ch;font-size:14.5px}
+  header b{color:var(--ink)}
+  kbd{display:inline-block;min-width:20px;text-align:center;padding:1px 5px;border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:4px;background:var(--card);color:var(--ink);
+    font-family:var(--mono);font-size:12px}
+
+  .stage{display:grid;grid-template-columns:520px minmax(0,1fr);gap:26px;margin-top:20px;align-items:start}
+  @media (max-width:980px){.stage{grid-template-columns:1fr}}
+
+  /* ---- device ---- */
+  .devwrap{overflow-x:auto;padding-bottom:4px}
+  .device{width:504px;background:#2A2A28;border-radius:14px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .screen{position:relative;width:480px;background:var(--paper);color:var(--eink);padding:12px 0 8px}
+  .field{margin:0 22px 6px;border-bottom:2px solid var(--eink);padding:4px 2px 3px;font-size:16px;min-height:27px;
+    font-family:var(--mono);white-space:pre;overflow:hidden}
+  .blockcur{display:inline-block;width:9px;height:17px;background:var(--eink);vertical-align:-3px}
+  .hintbar{display:flex;justify-content:center;gap:8px;margin:4px 20px 0;font-size:10px;opacity:.62;
+    text-transform:uppercase;letter-spacing:.04em;text-align:center}
+  .caption{font-family:var(--mono);font-size:11px;color:var(--ink2);margin-top:8px}
+  .toast{position:absolute;top:64px;left:50%;transform:translateX(-50%);background:var(--eink);color:var(--paper);
+    font-family:var(--mono);font-size:12px;padding:5px 12px;display:none;max-width:90%;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+
+  /* wheel — discrete states only, no transitions anywhere */
+  svg#wheel{display:block;margin:0 auto;user-select:none}
+  .wg .petal{fill:var(--paper);stroke:var(--eink);stroke-width:1.5;cursor:pointer}
+  .wg text{fill:var(--eink);font-size:16px;font-family:var(--grot);pointer-events:none}
+  .wg text.sp{font-size:11.5px;font-family:var(--mono)}
+  .wg text.row{font-size:12.5px;font-family:var(--mono);letter-spacing:.08em}
+  .wg.focus .petal{fill:var(--eink)}
+  .wg.focus text{fill:var(--paper);font-weight:700}
+  .wg.flash .petal{fill:var(--eink)} .wg.flash text{fill:var(--paper)}
+  .wg.focus.flash .petal{fill:var(--paper)} .wg.focus.flash text{fill:var(--eink)}
+  .hit{fill:rgba(0,0,0,0);cursor:pointer}
+  #ringtag{font-family:var(--mono);font-size:12px;letter-spacing:.2em;fill:var(--eink);opacity:.6}
+  #preview{font-family:var(--mono);font-size:18px;fill:var(--eink)}
+  #centercur{fill:var(--eink)}
+  text.hubc{font-size:21px;font-weight:600;font-family:var(--grot);fill:var(--eink)}
+  text.hubc.sp{font-size:14px;font-family:var(--mono);font-weight:400}
+
+  /* ---- panel ---- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:14px 18px;margin-bottom:14px}
+  .card h2{font-family:var(--serif);font-size:17px;margin:0 0 8px;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .chip{font-family:var(--mono);font-size:12px;padding:5px 9px;border:1px solid var(--line);border-radius:3px;
+    background:var(--card);color:var(--ink2);cursor:pointer}
+  .chip:hover,.chip:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+  .chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .optdesc{font-size:13.5px;color:var(--ink2);margin:0}
+  .optdesc b{color:var(--ink)}
+  .est{font-family:var(--mono);font-size:12px;color:var(--accent);margin-top:6px}
+  .tgt{font-family:var(--mono);font-size:15px;letter-spacing:.06em;word-break:break-all;line-height:1.9}
+  .tgt span{padding:1px 1px}
+  .tgt .done{background:var(--accent-soft);color:var(--ink)}
+  .tgt .bad{color:var(--warn);text-decoration:underline}
+  .tgt .cur{outline:1.5px solid var(--accent)}
+  .tgt .todo{color:var(--ink2)}
+  .hint{font-family:var(--mono);font-size:12px;color:var(--accent);margin-top:6px;min-height:16px}
+  .win{font-family:var(--mono);font-size:13px;color:var(--good);margin-top:6px;font-weight:600}
+  .custom{display:flex;gap:6px;margin-top:10px}
+  .custom input{flex:1;font-family:var(--mono);font-size:13px;padding:5px 8px;border:1px solid var(--line);
+    border-radius:3px;background:var(--card);color:var(--ink)}
+  .custom input:focus{outline:2px solid var(--accent);outline-offset:1px}
+
+  .odo{display:flex;gap:22px;align-items:baseline;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+  .odo .big{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1}
+  .odo .lbl{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink2);margin-top:4px}
+  .odosub{font-family:var(--mono);font-size:12px;color:var(--ink2);margin-top:10px}
+  .odosub b{color:var(--ink)}
+  .redraw{font-family:var(--mono);font-size:12px;color:var(--ink2);margin-top:4px}
+  .redraw b{color:var(--accent)}
+
+  .diagrow{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+  .legend{font-size:12.5px;flex:1;min-width:230px}
+  .legend div{margin:3px 0;color:var(--ink2)}
+  .legend b{color:var(--ink);font-weight:600}
+  #diag .btn{fill:var(--card);stroke:var(--ink);stroke-width:1.2;cursor:pointer}
+  #diag .btn:hover{fill:var(--accent-soft)}
+  #diag .btn.sel{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+  #diag text{fill:var(--ink);font-size:11px;font-family:var(--mono);pointer-events:none}
+  #diag .dim{fill:var(--ink2);font-size:9px}
+
+  #log{list-style:none;margin:0;padding:0;font-family:var(--mono);font-size:12px;max-height:190px;overflow-y:auto}
+  #log li{padding:2px 0;border-bottom:1px dashed var(--line);color:var(--ink2)}
+  #log li b{color:var(--ink);font-weight:600}
+  #log li .c{color:var(--accent)}
+
+  .notes{font-size:13px}
+  .notes li{margin:5px 0;color:var(--ink2)}
+  .notes b{color:var(--ink)}
+  .notes code{font-family:var(--mono);font-size:12px;background:var(--ground2);padding:1px 4px;border-radius:3px}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Daisywheel — vertical-column picks</h1>
+  <p>Every petal's letters read as a <b>vertical column, everywhere on the disc</b> —
+  <kbd>↑</kbd> (side&nbsp;Up) always takes the <b>top</b> letter, <kbd>⏎</kbd> (Select) the
+  <b>middle</b>, <kbd>↓</kbd> (side&nbsp;Down) the <b>bottom</b>, at every wedge angle. No icons on
+  the wheel. Hold a pick for uppercase — long-press means nothing else. <kbd>←</kbd><kbd>→</kbd>
+  (front Left/Right) rotate, <kbd>Esc</kbd> is Back. <b>Two rings: ABC ⇄ 123</b> — numbers and
+  symbols consolidated into one ring — and <b>flipping stays on the same petal</b>: press ⇄ on the
+  utility petal, land on the other ring's utility petal. Utility petal top→bottom: ⌫ ⇄ OK.
+  Three column arrangements mocked below — switch live, counters carry over. Redraws are
+  discrete — the flash is the partial refresh, not an animation.</p>
+</header>
+
+<div class="stage">
+  <div class="devcol">
+    <div class="devwrap">
+      <div class="device">
+        <div class="screen" id="screen">
+          <div class="field" id="field"><span id="fieldtext"></span><span class="blockcur"></span></div>
+          <svg id="wheel" width="452" height="440" viewBox="0 0 480 460"></svg>
+          <div class="hintbar">◀▶ rotate · ↑ ⏎ ↓ pick top·middle·bottom · hold pick: CASE · back: exit</div>
+          <div class="toast" id="toast"></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">480×800 e-ink, portrait · wheel ≈440 px · focus change redraws two wedges</div>
+  </div>
+
+  <div class="panel">
+    <div class="card">
+      <h2>Column arrangement — mock-up options</h2>
+      <div class="chips" id="varchips"></div>
+      <p class="optdesc" id="vardesc"></p>
+      <div class="est">≈3.5 actions/char uniform letters (avg 2.5 rotations over 10 petals + 1 pick) · one ⇄ toggle between the two rings, landing on the utility petal you pressed it from — cost identical across all three arrangements; they differ only in where the column reads.</div>
+    </div>
+
+    <div class="card">
+      <h2>Target phrase</h2>
+      <div class="chips" id="chips">
+        <button class="chip on" data-t="moby dick">search</button>
+        <button class="chip" data-t="Tr0ut-b0y!">password</button>
+        <button class="chip" data-t="192.168.1.50:8080/opds">server url</button>
+        <button class="chip" data-t="Caf3_P@ss%">wifi pass</button>
+        <button class="chip" data-t="">free type</button>
+        <button class="chip" id="reset">↺ reset</button>
+      </div>
+      <div class="tgt" id="tgt"></div>
+      <div class="hint" id="hint"></div>
+      <div class="win" id="win"></div>
+      <div class="custom">
+        <input id="custom" placeholder="custom target…" spellcheck="false" autocomplete="off">
+        <button class="chip" id="setcustom">set</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Odometer</h2>
+      <div class="odo">
+        <div><span class="big" id="o-total">0</span><span class="lbl">actions</span></div>
+        <div><span class="big" id="o-per">–</span><span class="lbl">per char</span></div>
+        <div><span class="big" id="o-chars">0</span><span class="lbl">chars</span></div>
+      </div>
+      <div class="odosub"><b id="o-rot">0</b> rotations · <b id="o-press">0</b> presses · <b id="o-long">0</b> long-presses
+        <span style="opacity:.7">(long = 2 actions)</span></div>
+      <div class="redraw">last redraw: <b id="o-redraw">—</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Buttons ↔ keys</h2>
+      <div class="diagrow">
+        <svg id="diag" viewBox="0 0 190 244" width="176">
+          <rect x="16" y="6" rx="14" width="130" height="232" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
+          <rect x="28" y="20" width="106" height="140" fill="var(--ground2)" stroke="var(--line)"/>
+          <text x="81" y="94" text-anchor="middle" class="dim">disc</text>
+          <!-- side rocker (right edge) = top / bottom pick -->
+          <rect class="btn sel" data-act="selU" x="143" y="52" width="8" height="30" rx="3"/>
+          <rect class="btn sel" data-act="selD" x="143" y="86" width="8" height="30" rx="3"/>
+          <text x="158" y="71" class="dim">↑</text>
+          <text x="158" y="105" class="dim">↓</text>
+          <text x="155" y="134" class="dim" transform="rotate(90 155 134)">pick top/bot</text>
+          <!-- two front rockers in a row -->
+          <rect x="29" y="182" width="50" height="20" rx="9" fill="none" stroke="var(--ink2)"/>
+          <rect class="btn" data-act="back" x="31" y="184" width="22" height="16" rx="7"/>
+          <rect class="btn sel" data-act="selM" x="55" y="184" width="22" height="16" rx="7"/>
+          <rect x="83" y="182" width="50" height="20" rx="9" fill="none" stroke="var(--ink2)"/>
+          <rect class="btn" data-act="rotL" x="85" y="184" width="22" height="16" rx="7"/>
+          <rect class="btn" data-act="rotR" x="107" y="184" width="22" height="16" rx="7"/>
+          <text x="42" y="196" text-anchor="middle" style="font-size:8px">esc</text>
+          <text x="66" y="196" text-anchor="middle">⏎</text>
+          <text x="96" y="196" text-anchor="middle">←</text>
+          <text x="118" y="196" text-anchor="middle">→</text>
+          <text x="54" y="216" text-anchor="middle" class="dim">back · select</text>
+          <text x="108" y="216" text-anchor="middle" class="dim">rotate</text>
+          <text x="81" y="230" text-anchor="middle" class="dim">front bezel — a row, not a cross</text>
+        </svg>
+        <div class="legend">
+          <div><kbd>←</kbd>/<kbd>→</kbd> <b>front Left/Right</b> — rotate disc (wraps, auto-repeats)</div>
+          <div><kbd>↑</kbd> <b>side Up</b> — pick top char · hold: uppercase</div>
+          <div><kbd>⏎</kbd> <b>Select</b> — pick middle char · hold: uppercase</div>
+          <div><kbd>↓</kbd> <b>side Down</b> — pick bottom char · hold: uppercase</div>
+          <div><kbd>Esc</kbd> <b>Back</b> — exit the wheel</div>
+          <div><kbd>⌫</kbd> playground shortcut for the ⌫ slot (still counted)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Action log</h2>
+      <ul id="log"></ul>
+    </div>
+
+    <div class="card notes">
+      <h2>Open items (for iteration — not settled)</h2>
+      <ul>
+        <li><b>Column arrangement</b> — the three mock-ups above; pick one.</li>
+        <li><b>Space home:</b> bottom slot of the yz petal (and of the *~ petal on 123). Alternative: Back short-press = space, exit moves elsewhere.</li>
+        <li><b>Petal order:</b> alphabetical vs frequency-grouped (etaoin petals adjacent) — cuts the 2.5-rotation average.</li>
+        <li><b>123-ring grouping</b> — digits then <code>. , - _ / : ; @ ' " ! ? &amp; ( ) + = # $ % * ~</code> in URL-ish clusters; full required set covered, ordering unreviewed.</li>
+        <li><b>Settled:</b> flip stays on the same petal (⇄ lands on the other ring's utility petal); utility petal order ⌫ ⇄ OK — ⌫ and OK non-adjacent per the accidental-submit finding.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+'use strict';
+// ------- geometry / constants -------
+var CX=240, CY=228, R1=82, R2=215;
+var SCREEN_PX=480*800;
+var HUB_PX=120*90;
+var TYPE_PX=480*34+Math.PI*R1*R1;
+var FULL_PX=Math.PI*R2*R2;
+var HOLD=450;
+var reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ------- ring data: 3 tokens per petal = [top, middle, bottom] -------
+function toTok(s){return s.split('');}
+var UTIL=['⌫','⇄','OK'];
+var RINGS=[
+  {tag:'ABC', petals:['abc','def','ghi','jkl','mno','pqr','stu','vwx','yz␣'].map(toTok).concat([UTIL])},
+  {tag:'123', petals:['123','456','789','0.,','-_/',':;@',"'\"!",'?&(',')+=','#$%','*~␣'].map(toTok).concat([UTIL])}
+];
+var SLOTNAME=['↑','⏎','↓'];
+
+// ------- display variants (cost-identical; differ in where the column reads) -------
+var VARIANTS={
+  '1':{name:'1 · columns in petals',
+       desc:'Every petal is an upright three-char column at its wedge — <b>top char = ↑ at every angle</b>. '+
+            'The hub holds only the ring tag and the live preview.'},
+  '2':{name:'2 · columns + hub echo',
+       desc:'Same disc as 1, plus the <b>focused petal’s column repeated large in the hub</b>, under the '+
+            'preview — the pick is readable without looking away from the center.'},
+  '3':{name:'3 · compact disc, column in hub',
+       desc:'Petals show their three chars as one small line; the <b>only vertical column lives fixed in the '+
+            'hub</b>. The disc becomes an index; the pick always reads in the same place.'}
+};
+var variant='1';
+
+// ------- state -------
+var ring=0, focus=0, typed='', charsEntered=0;
+var total=0, cRot=0, cPress=0, cLong=0;
+var target='moby dick', snapshot=null;
+var wgs=[];
+
+function petals(){return RINGS[ring].petals;}
+function wedge1(){return Math.PI*(R2*R2-R1*R1)/petals().length;}
+
+// ------- wheel build -------
+var NS='http://www.w3.org/2000/svg';
+var svg=document.getElementById('wheel');
+function el(n,attrs){var e=document.createElementNS(NS,n);for(var k in attrs)e.setAttribute(k,attrs[k]);return e;}
+function slotPos(n,i,j){
+  var am=(i/n)*2*Math.PI-Math.PI/2, rm=(R1+R2)/2;
+  return [CX+rm*Math.cos(am), CY+rm*Math.sin(am)+(j-1)*26];
+}
+function isSp(tok){return tok.length>1||'␣⌫⇄'.indexOf(tok)>=0;}
+function buildWheel(){
+  svg.textContent=''; wgs=[];
+  var ps=petals(), n=ps.length;
+  for(var i=0;i<n;i++){
+    var a0=(i/n)*2*Math.PI-Math.PI/2-Math.PI/n, a1=a0+2*Math.PI/n;
+    var g=el('g',{'class':'wg'+(i===focus?' focus':'')});
+    var x0=CX+R1*Math.cos(a0),y0=CY+R1*Math.sin(a0),x1=CX+R2*Math.cos(a0),y1=CY+R2*Math.sin(a0);
+    var x2=CX+R2*Math.cos(a1),y2=CY+R2*Math.sin(a1),x3=CX+R1*Math.cos(a1),y3=CY+R1*Math.sin(a1);
+    var p=el('path',{'class':'petal',d:'M'+x0+','+y0+' L'+x1+','+y1+' A'+R2+','+R2+' 0 0 1 '+x2+','+y2+
+      ' L'+x3+','+y3+' A'+R1+','+R1+' 0 0 0 '+x0+','+y0+'Z'});
+    (function(idx){p.addEventListener('pointerdown',function(ev){ev.preventDefault();tapFocus(idx);});})(i);
+    g.appendChild(p);
+    var am=(i/n)*2*Math.PI-Math.PI/2, rm=(R1+R2)/2;
+    var mx=CX+rm*Math.cos(am), my=CY+rm*Math.sin(am);
+    if(variant==='3'){
+      var t=el('text',{x:mx,y:my,'text-anchor':'middle','dominant-baseline':'middle','class':'row'});
+      t.textContent=ps[i].join(''); g.appendChild(t);
+      var c=el('circle',{'class':'hit',cx:mx,cy:my,r:30});
+      (function(idx,elc){
+        elc.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();tapFocus(idx);});
+      })(i,c);
+      g.appendChild(c);
+    }else{
+      for(var j=0;j<3;j++){
+        var tok=ps[i][j];
+        var pos=slotPos(n,i,j);
+        var t2=el('text',{x:pos[0],y:pos[1],'text-anchor':'middle','dominant-baseline':'middle',
+          'class':isSp(tok)?'sp':''});
+        t2.textContent=tok; g.appendChild(t2);
+      }
+      for(j=0;j<3;j++){
+        var pos2=slotPos(n,i,j);
+        var c2=el('circle',{'class':'hit',cx:pos2[0],cy:pos2[1],r:14});
+        (function(idx,dj,elc){
+          elc.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
+            down('t'+idx+'_'+dj,function(){tapSlot(idx,dj);},function(){tapSlotLong(idx,dj);});});
+          elc.addEventListener('pointerup',function(ev){ev.stopPropagation();up('t'+idx+'_'+dj);});
+          elc.addEventListener('pointerleave',function(){cancel('t'+idx+'_'+dj);});
+        })(i,j,c2);
+        g.appendChild(c2);
+      }
+    }
+    svg.appendChild(g); wgs.push(g);
+  }
+  // hub
+  var hubTop=variant==='1'?-40:-52;
+  var tag=el('text',{id:'ringtag',x:CX,y:CY+hubTop,'text-anchor':'middle'});
+  tag.textContent=RINGS[ring].tag+' RING'; svg.appendChild(tag);
+  var pvY=variant==='1'?4:-22;
+  var pv=el('text',{id:'preview',x:CX+34,y:CY+pvY,'text-anchor':'end'}); svg.appendChild(pv);
+  svg.appendChild(el('rect',{id:'centercur',x:CX+37,y:CY+pvY-15,width:10,height:19}));
+  if(variant!=='1'){
+    var ps2=petals()[focus];
+    for(var k=0;k<3;k++){
+      var ht=el('text',{x:CX,y:CY+8+k*26,'text-anchor':'middle','dominant-baseline':'middle',
+        'class':'hubc'+(isSp(ps2[k])?' sp':'')});
+      ht.textContent=ps2[k]; svg.appendChild(ht);
+      (function(dj,elh){
+        elh.style&&(elh.style.pointerEvents='none');
+      })(k,ht);
+    }
+  }
+  updateText();
+}
+
+// ------- rendering -------
+function updateText(){
+  var tail=typed.length>34?typed.slice(-34):typed;
+  document.getElementById('fieldtext').textContent=tail;
+  var pv=document.getElementById('preview');
+  if(pv)pv.textContent=(typed.length>9?typed.slice(-9):typed).replace(/ /g,' ');
+  renderTarget();
+}
+function updateOdo(label,px){
+  document.getElementById('o-total').textContent=total;
+  document.getElementById('o-per').textContent=charsEntered?(total/charsEntered).toFixed(2):'–';
+  document.getElementById('o-chars').textContent=charsEntered;
+  document.getElementById('o-rot').textContent=cRot;
+  document.getElementById('o-press').textContent=cPress;
+  document.getElementById('o-long').textContent=cLong;
+  if(label)document.getElementById('o-redraw').innerHTML='<b>'+label+'</b> · ~'+
+    Math.round(px/1000)+'k px · '+(100*px/SCREEN_PX).toFixed(1)+'% of screen';
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function addLog(cost,html){
+  var li=document.createElement('li');
+  li.innerHTML='<span class="c">+'+cost+'</span> '+html;
+  var log=document.getElementById('log');
+  log.insertBefore(li,log.firstChild);
+  while(log.children.length>30)log.removeChild(log.lastChild);
+}
+function flash(idxs){
+  if(reduceMotion)return;
+  var els=idxs.map(function(i){return wgs[i];}).filter(Boolean);
+  els.forEach(function(e){e.classList.add('flash');});
+  setTimeout(function(){els.forEach(function(e){e.classList.remove('flash');});},110);
+}
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.style.display='block';
+  clearTimeout(toast._t);toast._t=setTimeout(function(){t.style.display='none';},900);
+}
+function rotRedraw(){
+  if(variant==='1'){updateOdo('2 wedges',2*wedge1());}
+  else{updateOdo('2 wedges + hub column',2*wedge1()+HUB_PX);}
+}
+
+// ------- actions -------
+function rotate(d){
+  var n=petals().length, old=focus;
+  focus=(focus+d+n)%n;
+  cRot++; total++;
+  buildWheel(); flash([old,focus]);
+  rotRedraw();
+  addLog(1,'rot '+(d>0?'↻':'↺')+' → <b>'+esc(petals()[focus].join(''))+'</b>');
+}
+function tapFocus(i){
+  if(i===focus)return;
+  var old=focus; focus=i;
+  cRot++; total++;
+  buildWheel(); flash([old,focus]);
+  rotRedraw();
+  addLog(1,'tap petal → <b>'+esc(petals()[focus].join(''))+'</b>');
+}
+function flipRing(){
+  var wasUtil=focus===petals().length-1;
+  ring=(ring+1)%2;
+  var n=petals().length;
+  focus=wasUtil?n-1:Math.min(focus,n-1); // stay on the same petal: util lands on util
+  cPress++; total++;
+  buildWheel();
+  updateOdo('full wheel',FULL_PX);
+  addLog(1,'⇄ → <b>'+RINGS[ring].tag+' ring</b>');
+}
+function typeChar(ch){ typed+=ch; charsEntered++; updateText(); }
+function doDel(){
+  cPress++; total++;
+  if(typed){typed=typed.slice(0,-1);updateText();}
+  updateOdo('text + preview',TYPE_PX);
+  addLog(1,'<b>⌫ del</b>');
+}
+function doOk(){
+  cPress++; total++;
+  updateOdo(null,0);
+  addLog(1,'<b>OK</b>');
+  toast('OK ✓ — would submit "'+typed+'"');
+}
+function doExit(){ toast('Back — would close wheel'); }
+function sel(j){
+  var tok=petals()[focus][j];
+  if(tok==='⌫')return doDel();
+  if(tok==='⇄')return flipRing();
+  if(tok==='OK')return doOk();
+  cPress++; total++;
+  typeChar(tok==='␣'?' ':tok);
+  updateOdo('text + preview',TYPE_PX);
+  addLog(1,'pick '+SLOTNAME[j]+' → <b>'+(tok==='␣'?'␣':esc(tok))+'</b>');
+  checkDone();
+}
+function selLong(j){
+  var tok=petals()[focus][j];
+  cLong++; total+=2;
+  if(/^[a-z]$/.test(tok)){
+    typeChar(tok.toUpperCase());
+    updateOdo('text + preview',TYPE_PX);
+    addLog(2,'hold '+SLOTNAME[j]+' → <b>'+tok.toUpperCase()+'</b>');
+  }else{
+    addLog(2,'hold '+SLOTNAME[j]+': <b>'+esc(tok)+'</b> has no case — ignored');
+  }
+  checkDone();
+}
+function tapSlot(i,j){
+  if(i!==focus){var old=focus;focus=i;cRot++;total++;buildWheel();flash([old,focus]);}
+  sel(j);
+}
+function tapSlotLong(i,j){
+  if(i!==focus){var old=focus;focus=i;cRot++;total++;buildWheel();flash([old,focus]);}
+  selLong(j);
+}
+
+// ------- hold helper -------
+var holds={};
+function down(id,shortFn,longFn){
+  if(holds[id])return;
+  holds[id]={s:shortFn,t:setTimeout(function(){holds[id].fired=true;longFn();},HOLD)};
+}
+function up(id){
+  var h=holds[id]; if(!h)return;
+  clearTimeout(h.t); if(!h.fired)h.s();
+  delete holds[id];
+}
+function cancel(id){
+  var h=holds[id]; if(!h)return;
+  clearTimeout(h.t); delete holds[id];
+}
+window.addEventListener('blur',function(){for(var k in holds)cancel(k);});
+
+// ------- keyboard -------
+var KEYMAP={ArrowLeft:'rotL',ArrowRight:'rotR',
+  ArrowUp:'selU',Enter:'selM',ArrowDown:'selD',
+  Escape:'back',Backspace:'del'};
+var SELIDX={selU:0,selM:1,selD:2};
+function inputFocused(){var a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA');}
+function actDown(act){
+  if(act==='rotL')rotate(-1);
+  else if(act==='rotR')rotate(1);
+  else if(act in SELIDX){var j=SELIDX[act];down(act,function(){sel(j);},function(){selLong(j);});}
+  else if(act==='del')doDel();
+  else if(act==='back')doExit();
+}
+document.addEventListener('keydown',function(e){
+  if(inputFocused())return;
+  var act=KEYMAP[e.key]; if(!act)return;
+  e.preventDefault();
+  if(e.repeat){
+    if(act==='rotL'||act==='rotR')actDown(act); // rotation auto-repeats; holds never do
+    return;
+  }
+  actDown(act);
+});
+document.addEventListener('keyup',function(e){
+  var act=KEYMAP[e.key]; if(!act)return;
+  up(act);
+});
+
+// ------- diagram buttons -------
+document.querySelectorAll('#diag .btn').forEach(function(b){
+  var act=b.dataset.act;
+  b.addEventListener('pointerdown',function(ev){ev.preventDefault();actDown(act);});
+  b.addEventListener('pointerup',function(){up(act);});
+  b.addEventListener('pointerleave',function(){cancel(act);});
+});
+
+// ------- variant switching (display only; counters carry over) -------
+function setVariant(k){
+  variant=k;
+  document.getElementById('vardesc').innerHTML=VARIANTS[k].desc;
+  document.querySelectorAll('#varchips .chip').forEach(function(c){
+    c.classList.toggle('on',c.dataset.v===k);
+  });
+  buildWheel();
+}
+(function(){
+  var box=document.getElementById('varchips');
+  Object.keys(VARIANTS).forEach(function(k){
+    var b=document.createElement('button');
+    b.className='chip'; b.dataset.v=k; b.textContent=VARIANTS[k].name;
+    b.addEventListener('click',function(){setVariant(k);b.blur();});
+    box.appendChild(b);
+  });
+})();
+
+// ------- target / coach -------
+function renderTarget(){
+  var tg=document.getElementById('tgt');
+  if(!target){tg.innerHTML='<span class="todo">free typing — no target</span>';
+    document.getElementById('hint').textContent='';return;}
+  var html='';
+  for(var i=0;i<target.length;i++){
+    var c=target[i]===' '?'␣':esc(target[i]);
+    var cls=i<typed.length?(typed[i]===target[i]?'done':'bad'):(i===typed.length?'cur todo':'todo');
+    html+='<span class="'+cls+'">'+c+'</span>';
+  }
+  if(typed.length>target.length)html+=' <span class="bad">+'+(typed.length-target.length)+' extra</span>';
+  tg.innerHTML=html;
+  renderHint();
+}
+function findToken(ch){
+  var base=ch, upper=false;
+  if(/[A-Z]/.test(ch)){base=ch.toLowerCase();upper=true;}
+  if(ch===' ')base='␣';
+  for(var pass=0;pass<2;pass++){
+    var r=(ring+pass)%2;
+    var ps=RINGS[r].petals;
+    for(var i=0;i<ps.length;i++){
+      var j=ps[i].indexOf(base);
+      if(j>=0)return {ring:r,petal:i,slot:j,upper:upper};
+    }
+  }
+  return null;
+}
+function renderHint(){
+  var h=document.getElementById('hint');
+  if(!target||typed.length>=target.length||snapshot){h.textContent='';return;}
+  var ch=target[typed.length];
+  var f=findToken(ch);
+  if(!f){h.textContent='next '+ch+' : NOT REACHABLE on any ring';return;}
+  var parts=[], fFocus=focus;
+  if(f.ring!==ring){
+    var nn=RINGS[ring].petals.length, un=nn-1;
+    var dU=(un-fFocus+nn)%nn;
+    if(dU>nn/2)dU-=nn;
+    parts.push((dU?((dU>0?'→':'←')+' ×'+Math.abs(dU)+' · '):'')+'⏎⇄');
+    fFocus=RINGS[f.ring].petals.length-1; // flip lands on the other ring's utility petal
+  }
+  var n=RINGS[f.ring].petals.length;
+  var d=(f.petal-fFocus+n)%n; if(d>n/2)d-=n;
+  if(d!==0)parts.push((d>0?'→':'←')+' ×'+Math.abs(d));
+  parts.push((f.upper?'hold ':'')+SLOTNAME[f.slot]);
+  h.textContent='next '+(ch===' '?'␣':ch)+' : '+parts.join(' · ');
+}
+function checkDone(){
+  if(target&&!snapshot&&typed===target){
+    snapshot={total:total,per:(total/charsEntered).toFixed(2)};
+    document.getElementById('win').textContent=
+      '✓ done — '+snapshot.total+' actions · '+snapshot.per+' per char';
+  }
+}
+function resetRun(){
+  typed='';charsEntered=0;total=0;cRot=0;cPress=0;cLong=0;snapshot=null;
+  ring=0;focus=0;
+  document.getElementById('win').textContent='';
+  document.getElementById('log').innerHTML='';
+  buildWheel(); updateOdo(null,0);
+  document.getElementById('o-redraw').textContent='—';
+}
+document.querySelectorAll('#chips .chip[data-t]').forEach(function(c){
+  c.addEventListener('click',function(){
+    document.querySelectorAll('#chips .chip').forEach(function(x){x.classList.remove('on');});
+    c.classList.add('on');
+    target=c.dataset.t||null;
+    resetRun(); c.blur();
+  });
+});
+document.getElementById('reset').addEventListener('click',function(){resetRun();this.blur();});
+document.getElementById('setcustom').addEventListener('click',function(){
+  var v=document.getElementById('custom').value;
+  if(!v)return;
+  document.querySelectorAll('#chips .chip').forEach(function(x){x.classList.remove('on');});
+  target=v; resetRun(); this.blur();
+});
+
+// ------- init -------
+setVariant('1'); resetRun();
+</script>
