@@ -52,15 +52,26 @@ playground's headless test.
 - ≈3.5 actions/char on uniform letters (avg 2.5 rotations over 10 petals + 1 pick);
   long-press counts as 2 actions. Space: bottom slot of `yz␣` / `*~␣`.
 - Focus change redraws **two wedges only** (~11% of the 480×800 screen at 10 petals);
-  typing redraws the text field + hub preview; ring flip is the only full-wheel redraw.
+  typing redraws the text field only; ring flip is the only full-wheel redraw.
   No animation anywhere — discrete refresh.
-- Hub (inner circle): ring tag + live text preview with block cursor; column
-  arrangement variants 2/3 add the focused column in the hub (open item below).
+- ~~Hub (inner circle): ring tag + live text preview with block cursor.~~
+  **Superseded 2026-08-05: the hub is empty.** The underlined text field above the
+  wheel is the single preview; the active ring reads from the petals themselves
+  (the utility petal's swap slot names the *other* ring). The wheel screen also
+  draws no on-screen side-button hint chrome — the side rocker's pick role is
+  spec'd in the table above and learned once.
+- Petal char labels are sized to fit their wedge (ruled 2026-08-05): one UI font
+  step below the text field's, with the column's slot spacing clamped to the
+  wedge's tangential half-width at the label radius (`rm·sin(π/n)`) so the
+  top/bottom chars never cross a spoke — the 12-petal 123 ring is the narrowest
+  case.
 
 ## Open items
 
-1. **Column arrangement** — three mock-ups in the playground: columns in petals /
-   columns + hub echo / compact petals with the column fixed in the hub.
+1. ~~**Column arrangement** — three mock-ups in the playground: columns in petals /
+   columns + hub echo / compact petals with the column fixed in the hub.~~
+   **Resolved 2026-08-05: columns in petals** — the empty-hub ruling retires both
+   hub-echo variants.
 2. **Space home** — bottom of `yz␣` vs Back-short = space (space is ~1 char in 5).
 3. **Petal order** — alphabetical vs frequency-grouped.
 4. **123-ring grouping** — inventory settled, ordering unreviewed.

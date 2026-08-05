@@ -105,14 +105,28 @@ void DaisyEntryActivity::longPick(const int slot) {
   if (c >= 'a' && c <= 'z') insertChar(static_cast<char>(c - 'a' + 'A'));
 }
 
+int DaisyEntryActivity::slotSpacing() const {
+  // The tight case is a petal near 3/9 o'clock, where the upright column runs
+  // tangentially: the top/bottom line box must stay inside the wedge, whose
+  // tangential half-width at the label radius is rm*sin(step/2) (perpendicular
+  // distance from the petal's center line to its boundary spoke). Clamp the
+  // font's natural line advance to that minus half a line box and a 2px
+  // margin, so the column fits both rings (the 12-petal 123 ring is the
+  // narrowest) under any System font's metrics.
+  const int lineH = renderer.getLineHeight(UI_10_FONT_ID);
+  constexpr float rm = (RADIUS_HUB + RADIUS_OUTER) / 2.0f;
+  const float halfWedge = rm * sinf(petalStep(petalCount()) / 2.0f);
+  const int maxSpacing = static_cast<int>(halfWedge) - lineH / 2 - 2;
+  return maxSpacing < lineH ? maxSpacing : lineH;
+}
+
 void DaisyEntryActivity::slotCenter(const int petal, const int slot, int& outX, int& outY) const {
   const float step = petalStep(petalCount());
   const float theta = static_cast<float>(petal) * step;
-  const float rm = (RADIUS_HUB + RADIUS_OUTER) / 2.0f;
-  const int lineH = renderer.getLineHeight(UI_12_FONT_ID);
+  constexpr float rm = (RADIUS_HUB + RADIUS_OUTER) / 2.0f;
   outX = WHEEL_CX + static_cast<int>(rm * sinf(theta));
   // The column reads upright in every petal: top char at side-Up everywhere.
-  outY = WHEEL_CY - static_cast<int>(rm * cosf(theta)) + (slot - 1) * lineH;
+  outY = WHEEL_CY - static_cast<int>(rm * cosf(theta)) + (slot - 1) * slotSpacing();
 }
 
 void DaisyEntryActivity::loop() {
@@ -244,7 +258,7 @@ void DaisyEntryActivity::render(RenderLock&&) {
       slotCenter(i, slot, sx, sy);
       char buf[2] = {0, 0};
       const char* label = buf;
-      int fontId = UI_12_FONT_ID;
+      int fontId = UI_10_FONT_ID;
       if (utility) {
         label = slot == 0 ? tr(STR_KEY_DEL) : (slot == 1 ? swapLabel : tr(STR_OK_BUTTON));
         fontId = SMALL_FONT_ID;
@@ -262,27 +276,12 @@ void DaisyEntryActivity::render(RenderLock&&) {
     }
   }
 
-  // Hub: ring tag above a short tail preview with a block cursor.
-  {
-    const char* tag = ringIdx == 0 ? tr(STR_RING_ABC) : tr(STR_RING_123);
-    const int tagW = renderer.getTextWidth(SMALL_FONT_ID, tag);
-    renderer.drawText(SMALL_FONT_ID, WHEEL_CX - tagW / 2, WHEEL_CY - renderer.getLineHeight(SMALL_FONT_ID) - 10, tag,
-                      true);
-    std::string tail = displayText();
-    while (!tail.empty() && renderer.getTextWidth(UI_12_FONT_ID, tail.c_str()) > RADIUS_HUB * 2 - 30) {
-      size_t cut = 1;
-      while (cut < tail.length() && (static_cast<uint8_t>(tail[cut]) & 0xC0) == 0x80) cut++;
-      tail.erase(0, cut);
-    }
-    const int tailW = renderer.getTextWidth(UI_12_FONT_ID, tail.c_str());
-    const int tailX = WHEEL_CX - (tailW + 4) / 2;
-    renderer.drawText(UI_12_FONT_ID, tailX, WHEEL_CY, tail.c_str());
-    renderer.fillRect(tailX + tailW + 1, WHEEL_CY, 2, lineHeight, true);
-  }
+  // The hub stays empty (ruled 2026-08-05): the text field above is the one
+  // preview, and the active ring reads from the petals themselves (the utility
+  // petal's swap slot names the other ring).
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-  GUI.drawSideButtonHints(renderer, "^", "v");
 
   renderer.displayBuffer();
 }
