@@ -287,18 +287,21 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
   // Draw all items
   const auto pageStartIndex = selectedIndex / pageItems * pageItems;
+
+  // The value badge OVERLAYS the row text — see LyraTheme::drawList. It carves
+  // no column out of it, so a badge that appears and disappears with the
+  // selection cannot re-wrap the title or the subtitle under it.
+  const int rowTextWidth = contentWidth - BaseMetrics::values.contentSidePadding * 2;
+
   for (int i = pageStartIndex; i < itemCount && i < pageStartIndex + pageItems; i++) {
     const int itemY = rect.y + (i % pageItems) * rowHeight;
 
-    int rowTextWidth = contentWidth - BaseMetrics::values.contentSidePadding * 2;
     std::string valueText;
     if (rowValue != nullptr) {
       valueText = rowValue(i);
       if (!valueText.empty()) {
-        int maxValW = std::max(0, rowTextWidth - 40 - minValueGap);
+        const int maxValW = std::max(0, rowTextWidth - 40 - minValueGap);
         valueText = renderer.truncatedText(UI_10_FONT_ID, valueText.c_str(), maxValW);
-        int valueWidth = renderer.getTextWidth(UI_10_FONT_ID, valueText.c_str()) + minValueGap;
-        rowTextWidth -= valueWidth;
       }
     }
 
@@ -306,6 +309,9 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     auto font = UI_10_FONT_ID;
     auto item = renderer.truncatedText(font, itemName.c_str(), rowTextWidth);
     renderer.drawText(font, rect.x + BaseMetrics::values.contentSidePadding, itemY, item.c_str(), i != selectedIndex);
+    // Rightmost pixel this row's text reaches; the badge below only needs an
+    // outline when it is actually covering some of it.
+    int textRight = rect.x + BaseMetrics::values.contentSidePadding + renderer.getTextWidth(font, item.c_str());
 
     // Apply checkerboard dither to create gray text effect for dimmed items
     if (rowDimmed && rowDimmed(i) && i != selectedIndex) {
@@ -326,13 +332,15 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
         if (subtitleLines <= 1) {
           auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
           renderer.drawText(SMALL_FONT_ID, subtitleX, itemY + 22, subtitle.c_str(), i != selectedIndex);
+          textRight = std::max(textRight, subtitleX + renderer.getTextWidth(SMALL_FONT_ID, subtitle.c_str()));
         } else {
-          // The value badge ("Selected") only reserves width on the first line;
-          // wrapped lines run the full row width beneath it.
+          // Full row width: the badge is painted over these lines, not beside
+          // them, so the wrap points are the same whether the row carries one.
           const auto lines = renderer.wrappedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth, subtitleLines);
           int subtitleY = itemY + 22;
           for (const auto& line : lines) {
             renderer.drawText(SMALL_FONT_ID, subtitleX, subtitleY, line.c_str(), i != selectedIndex);
+            textRight = std::max(textRight, subtitleX + renderer.getTextWidth(SMALL_FONT_ID, line.c_str()));
             subtitleY += BaseMetrics::values.listSubtitleLineStep;
           }
         }
@@ -341,10 +349,19 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
     if (!valueText.empty()) {
       const auto valueTextWidth = renderer.getTextWidth(UI_10_FONT_ID, valueText.c_str());
-      int valueY = itemY;
-      if (rowSubtitle != nullptr) {
-        valueY = itemY + 10;
+      // Opaque backing first — the badge sits ON the row text now, so without
+      // it the label would be drawn over whatever line runs underneath. Matches
+      // the row's own background: black on the selected row, white elsewhere.
+      const int badgeX = rect.x + contentWidth - BaseMetrics::values.contentSidePadding - valueTextWidth;
+      renderer.fillRect(badgeX - minValueGap, itemY, valueTextWidth + minValueGap * 2, rowHeight, i == selectedIndex);
+      // Outline only when it covers something: on a row whose value sits in
+      // clear space this would be a box around nothing.
+      if (i != selectedIndex && textRight > badgeX - minValueGap) {
+        renderer.drawRect(badgeX - minValueGap, itemY, valueTextWidth + minValueGap * 2, rowHeight, true);
       }
+      // Centred in the row rather than pinned near its top, so the label stays
+      // put as extra subtitle lines make the row taller.
+      const int valueY = itemY + (rowHeight - renderer.getTextHeight(UI_10_FONT_ID)) / 2;
       renderer.drawText(UI_10_FONT_ID, rect.x + contentWidth - BaseMetrics::values.contentSidePadding - valueTextWidth,
                         valueY, valueText.c_str(), i != selectedIndex);
     }

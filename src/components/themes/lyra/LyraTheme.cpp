@@ -287,24 +287,33 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
   // Draw all items
   const auto pageStartIndex = selectedIndex / pageItems * pageItems;
+
   int iconY = (rowSubtitle != nullptr) ? 16 : 10;
   for (int i = pageStartIndex; i < itemCount && i < pageStartIndex + pageItems; i++) {
     const int itemY = rect.y + (i % pageItems) * rowHeight;
     int rowTextWidth = textWidth;
 
-    // Draw name
+    // The value badge OVERLAYS the row text; it does not carve a column out of
+    // it. Reserving width per row made the text column depend on whether that
+    // row happens to carry a badge, so a badge that comes and goes with the
+    // selection (the font picker's "Selected") re-wrapped the title and the
+    // colophon under it every time the highlight moved. The badge paints its
+    // own opaque backing below, so whatever it covers simply disappears under
+    // it and every row keeps the same wrap points.
     int valueWidth = 0;
     std::string valueText = "";
     if (rowValue != nullptr) {
       valueText = rowValue(i);
       valueText = renderer.truncatedText(UI_10_FONT_ID, valueText.c_str(), maxListValueWidth);
       valueWidth = renderer.getTextWidth(UI_10_FONT_ID, valueText.c_str()) + hPaddingInSelection;
-      rowTextWidth -= valueWidth;
     }
 
     auto itemName = rowTitle(i);
     auto item = renderer.truncatedText(UI_10_FONT_ID, itemName.c_str(), rowTextWidth);
     renderer.drawText(UI_10_FONT_ID, textX, itemY + 7, item.c_str(), true);
+    // Rightmost pixel any of this row's text reaches. Only used to decide
+    // whether the badge below is actually covering something.
+    int textRight = textX + renderer.getTextWidth(UI_10_FONT_ID, item.c_str());
 
     // Apply checkerboard dither to create gray text effect for dimmed items
     if (rowDimmed && rowDimmed(i) && i != selectedIndex) {
@@ -331,11 +340,13 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       if (subtitleLines <= 1) {
         auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
         renderer.drawText(SMALL_FONT_ID, textX, itemY + 30, subtitle.c_str(), true);
+        textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, subtitle.c_str()));
       } else {
         const auto lines = renderer.wrappedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth, subtitleLines);
         int subtitleY = itemY + 30;
         for (const auto& line : lines) {
           renderer.drawText(SMALL_FONT_ID, textX, subtitleY, line.c_str(), true);
+          textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, line.c_str()));
           subtitleY += LyraMetrics::values.listSubtitleLineStep;
         }
       }
@@ -343,16 +354,28 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
     // Draw value
     if (!valueText.empty()) {
-      if (i == selectedIndex && highlightValue) {
-        renderer.fillRoundedRect(
-            rect.x + contentWidth - LyraMetrics::values.contentSidePadding - hPaddingInSelection - valueWidth, itemY,
-            valueWidth + hPaddingInSelection, rowHeight, cornerRadius, Color::Black);
+      // ALWAYS filled, even when the badge is not the highlighted row's: the
+      // fill is what makes the overlay opaque. Without it the label would be
+      // drawn straight on top of the colophon line running underneath.
+      const bool inverted = (i == selectedIndex && highlightValue);
+      const Color badgeFill = inverted ? Color::Black : (i == selectedIndex) ? Color::LightGray : Color::White;
+      const int badgeX =
+          rect.x + contentWidth - LyraMetrics::values.contentSidePadding - hPaddingInSelection - valueWidth;
+      const int badgeW = valueWidth + hPaddingInSelection;
+      renderer.fillRoundedRect(badgeX, itemY, badgeW, rowHeight, cornerRadius, badgeFill);
+      // Outline ONLY when the badge actually covers text. The boundary is what
+      // stops a covered line from reading as a broken render — it just stops
+      // mid-word otherwise. On a settings row, where the value sits in clear
+      // space past a short label, an outline would be a box around nothing.
+      if (!inverted && textRight > badgeX) {
+        renderer.drawRoundedRect(badgeX, itemY, badgeW, rowHeight, 1, cornerRadius, true);
       }
 
-      int valueY = itemY + 6;
-      if (rowSubtitle != nullptr) {
-        valueY = itemY + 16;
-      }
+      // Centred in the row, not pinned near its top. The badge pill is drawn at
+      // the FULL row height, and a row grows with every extra subtitle line
+      // (the font picker's colophon wraps over two), so a fixed offset left the
+      // label riding high in a tall pill.
+      const int valueY = itemY + (rowHeight - renderer.getTextHeight(UI_10_FONT_ID)) / 2;
       renderer.drawText(UI_10_FONT_ID, rect.x + contentWidth - LyraMetrics::values.contentSidePadding - valueWidth,
                         valueY, valueText.c_str(), !(i == selectedIndex && highlightValue));
     }
