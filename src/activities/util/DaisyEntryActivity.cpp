@@ -115,45 +115,7 @@ void DaisyEntryActivity::slotCenter(const int petal, const int slot, int& outX, 
   outY = WHEEL_CY - static_cast<int>(rm * cosf(theta)) + (slot - 1) * lineH;
 }
 
-void DaisyEntryActivity::handleTap(const int x, const int y) {
-  const float dx = static_cast<float>(x - WHEEL_CX);
-  const float dy = static_cast<float>(y - WHEEL_CY);
-  const float r = sqrtf(dx * dx + dy * dy);
-  if (r < static_cast<float>(RADIUS_HUB) || r > static_cast<float>(RADIUS_OUTER)) return;
-  const int n = petalCount();
-  const float step = petalStep(n);
-  float theta = atan2f(dx, -dy);  // 0 at 12 o'clock, clockwise positive
-  if (theta < 0) theta += 2.0f * static_cast<float>(M_PI);
-  const int petal = static_cast<int>(theta / step + 0.5f) % n;
-  if (petal != petalIdx) {
-    petalIdx = petal;  // first tap focuses
-    requestUpdate();
-    return;
-  }
-  // Tap on the focused petal types the nearest char slot.
-  int bestSlot = 1;
-  long bestDist = -1;
-  for (int slot = 0; slot < 3; slot++) {
-    int sx = 0;
-    int sy = 0;
-    slotCenter(petal, slot, sx, sy);
-    const long dist = static_cast<long>(sx - x) * (sx - x) + static_cast<long>(sy - y) * (sy - y);
-    if (bestDist < 0 || dist < bestDist) {
-      bestDist = dist;
-      bestSlot = slot;
-    }
-  }
-  tapPick(bestSlot);
-}
-
 void DaisyEntryActivity::loop() {
-  int tx = 0;
-  int ty = 0;
-  if (mappedInput.wasScreenTapped(tx, ty)) {
-    handleTap(tx, ty);
-    return;
-  }
-
   buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Left}, [this] { rotate(-1); });
   buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Right}, [this] { rotate(1); });
 
