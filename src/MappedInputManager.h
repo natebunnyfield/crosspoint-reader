@@ -60,6 +60,12 @@ class MappedInputManager {
   // Horizontal variant for side-by-side button pairs (confirmation prompts).
   RowTouch colTouch(int& col, int left, int colStep, int colCount, int yStart, int yEnd, int colWidth = 0) const;
 
+  // Host keyboard text entry — see HalGPIO. Straight passthroughs: nothing
+  // here is directional, so there is no button mapping to do, and typed text
+  // is the one input that does not arrive as a Button. No-ops on device.
+  void setTextEntryActive(const bool active) const { gpio.setTextEntryActive(active); }
+  bool consumeTypedText(std::string& out) const { return gpio.consumeTypedText(out); }
+
   SwipeDir wasSwipe() const;
   bool wasHomeGesture() const;
   bool wasMenuGesture() const;
