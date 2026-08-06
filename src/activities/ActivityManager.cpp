@@ -187,6 +187,7 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
 }
 
 void ActivityManager::goToFileTransfer() {
+  lastHomeMenuItem = HomeMenuItem::FILE_TRANSFER;
 #ifndef CROSSPOINT_NO_NETWORK
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
 #else
@@ -194,17 +195,21 @@ void ActivityManager::goToFileTransfer() {
 #endif
 }
 
-void ActivityManager::goToSettings() { replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
+void ActivityManager::goToSettings() {
+  lastHomeMenuItem = HomeMenuItem::SETTINGS_MENU; replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToFileBrowser(std::string path) {
+  lastHomeMenuItem = HomeMenuItem::FILE_BROWSER;
   replaceActivity(std::make_unique<FileBrowserActivity>(renderer, mappedInput, std::move(path)));
 }
 
 void ActivityManager::goToFileManager() {
+  lastHomeMenuItem = HomeMenuItem::MANAGE_FILES;
   replaceActivity(std::make_unique<FileManagerActivity>(renderer, mappedInput));
 }
 
 void ActivityManager::goToRecentBooks() {
+  lastHomeMenuItem = HomeMenuItem::RECENTS;
   replaceActivity(std::make_unique<RecentBooksActivity>(renderer, mappedInput));
 }
 
@@ -224,18 +229,15 @@ void ActivityManager::goToFullScreenMessage(std::string message, EpdFontFamily::
 }
 
 void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
-  if (initialMenuItem == HomeMenuItem::NONE && currentActivity) {
-    const auto& activityName = currentActivity->name;
-    if (activityName == "FileBrowser") {
-      initialMenuItem = HomeMenuItem::FILE_BROWSER;
-    } else if (activityName == "RecentBooks") {
-      initialMenuItem = HomeMenuItem::RECENTS;
-    } else if (activityName == "CrossPointWebServer") {
-      initialMenuItem = HomeMenuItem::FILE_TRANSFER;
-    } else if (activityName == "Settings") {
-      initialMenuItem = HomeMenuItem::SETTINGS_MENU;
-    }
-  }
+  // Land the selector back on the row the user left from.
+  //
+  // This used to match on currentActivity->name against a hardcoded list of
+  // four strings. Any home row whose activity name was not in that list
+  // silently fell back to index 0 — which is what happened to Manage Files,
+  // Create Note and Claude. lastHomeMenuItem is set by the goTo* wrappers
+  // instead, so a new row gets this for free and there is no name list to
+  // forget to update.
+  if (initialMenuItem == HomeMenuItem::NONE) initialMenuItem = lastHomeMenuItem;
   replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem));
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
@@ -248,10 +250,12 @@ void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<Crash
 // returned 0. Replacing frees Home before BLE starts; Back still works because
 // popActivity() on an empty stack goes Home.
 void ActivityManager::goToNoteEditor(std::string path) {
+  lastHomeMenuItem = HomeMenuItem::CREATE_NOTE;
   replaceActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path)));
 }
 
-void ActivityManager::goToClaudeChat() { replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
+void ActivityManager::goToClaudeChat() {
+  lastHomeMenuItem = HomeMenuItem::CLAUDE; replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {
