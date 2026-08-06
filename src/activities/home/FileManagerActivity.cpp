@@ -150,7 +150,7 @@ void FileManagerActivity::onExit() {
 
 void FileManagerActivity::openActionMenu() {
   menuActions.clear();
-  const char* options[8];
+  const char* options[9];
   int count = 0;
   const bool hasEntry = !files.empty();
 
@@ -178,6 +178,13 @@ void FileManagerActivity::openActionMenu() {
       }
       options[count++] = tr(STR_DUPLICATE);
       menuActions.push_back(MenuAction::Duplicate);
+      // Tag for the host-side summarization pipeline (EPUB only — cheap
+      // extension gate, no metadata probe needed for a marker toggle).
+      if (FsHelpers::hasEpubExtension(entry)) {
+        const std::string marker = FsOps::summarizeMarkerFor(fullPathOf(entry));
+        options[count++] = Storage.exists(marker.c_str()) ? tr(STR_DONT_SUMMARIZE) : tr(STR_SUMMARIZE);
+        menuActions.push_back(MenuAction::Summarize);
+      }
     }
     options[count++] = tr(STR_MOVE);
     menuActions.push_back(MenuAction::Move);
@@ -272,6 +279,9 @@ void FileManagerActivity::runMenuAction(const MenuAction action) {
       break;
     case MenuAction::Duplicate:
       if (!files.empty()) duplicateFile(files[selectorIndex]);
+      break;
+    case MenuAction::Summarize:
+      if (!files.empty()) toggleSummarize(files[selectorIndex]);
       break;
     case MenuAction::Move:
       if (!files.empty()) armMove(files[selectorIndex]);
@@ -377,6 +387,38 @@ void FileManagerActivity::startNormalize(const std::string& entry) {
   std::string proposed = author.empty() ? title + ext : title + " - " + author + ext;
   LOG_DBG("FileManager", "normalize '%s' -> '%s'", entry.c_str(), proposed.c_str());
   startRename(entry, proposed);
+}
+
+// Toggle the summarization marker (`<cache dir>/summarize.tag`, content = the
+// book's full card path). The host pipeline scans these over WebDAV, generates
+// the summary EPUB, and deletes the marker (docs/manage-files.md).
+void FileManagerActivity::toggleSummarize(const std::string& entry) {
+  const std::string full = fullPathOf(entry);
+  const std::string marker = FsOps::summarizeMarkerFor(full);
+  if (marker.empty()) return;
+
+  if (Storage.exists(marker.c_str())) {
+    if (!Storage.remove(marker.c_str())) {
+      showError(tr(STR_SUMMARIZE_FAILED));
+      return;
+    }
+  } else {
+    // Cache dir may not exist yet (book never opened); mkdir fails on an
+    // existing dir, so guard with exists (same idiom as Epub::setupCacheDir).
+    const std::string cacheDir = FsOps::bookCacheDirFor(full);
+    if (!Storage.exists(cacheDir.c_str()) && !Storage.mkdir(cacheDir.c_str())) {
+      showError(tr(STR_SUMMARIZE_FAILED));
+      return;
+    }
+    HalFile file;
+    if (!Storage.openFileForWrite("FileManager", marker.c_str(), file)) {
+      showError(tr(STR_SUMMARIZE_FAILED));
+      return;
+    }
+    file.write(full.c_str(), full.size());
+    file.write('\n');
+  }
+  requestUpdate();
 }
 
 // Streamed copy to "<stem> copy<n><ext>" in the same directory. Files only

@@ -18,6 +18,11 @@ bool removeRecursiveWithCacheClear(const std::string& fullPath, char* nameBuffer
 // "" when the path is not a cacheable book type (epub/xtc/txt).
 std::string bookCacheDirFor(const std::string& path);
 
+// Summarization marker for a book file: `<cache dir>/summarize.tag`, whose
+// content is the book's full card path (consumed by the host-side pipeline
+// over WebDAV — see docs/manage-files.md). "" for non-book paths.
+std::string summarizeMarkerFor(const std::string& path);
+
 // After a successful rename/move of a single file: re-key its cache dir,
 // repoint its Recent Books entry, and repoint APP_STATE.openEpubPath. No-op
 // for non-book files. Cache-dir rename failure is logged and non-fatal.

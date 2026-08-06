@@ -12,7 +12,7 @@
 // the SD card — hidden files included — with rename, move (one-slot clipboard)
 // and delete via a per-item action menu.
 class FileManagerActivity final : public Activity {
-  enum class MenuAction : uint8_t { MoveHere, View, Rename, Normalize, Duplicate, Move, Delete };
+  enum class MenuAction : uint8_t { MoveHere, View, Rename, Normalize, Duplicate, Summarize, Move, Delete };
 
   ButtonNavigator buttonNavigator;
   OptionPopup popup;
@@ -55,6 +55,7 @@ class FileManagerActivity final : public Activity {
   // name (used by Normalize); empty = seed with the current name.
   void startRename(const std::string& entry, const std::string& seedName = "");
   void startNormalize(const std::string& entry);
+  void toggleSummarize(const std::string& entry);
   void armMove(const std::string& entry);
   void performMoveHere();
   void confirmDelete(const std::string& entry);
