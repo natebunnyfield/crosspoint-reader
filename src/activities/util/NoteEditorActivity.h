@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "activities/Activity.h"
+#include "notes/KeyboardPanel.h"
 #include "notes/TextBuffer.h"
 
 class NoteEditorActivity final : public Activity {
@@ -38,6 +39,13 @@ class NoteEditorActivity final : public Activity {
   int maxWidth = 0;
   int contentTop = 0;
 
+  // The on-screen keyboard is the DEFAULT input; a BLE keyboard is optional and
+  // only started when one is already bonded.
+  notes::KeyboardPanel panel;
+  int panelHeight = 0;
+  uint32_t sideHeldSince = 0;
+  bool sideHandled = false;
+
   bool dirty = false;
   bool bufferFull = false;
   size_t pendingChars = 0;
@@ -50,6 +58,8 @@ class NoteEditorActivity final : public Activity {
   void pageDown();
   size_t lineOfCursor() const;
   void handleKey(int key);
+  void handlePanelKey();
+  void pollPairingGestures();
   void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
   int advanceOf(const char* piece, EpdFontFamily::Style style) const;
   bool save();

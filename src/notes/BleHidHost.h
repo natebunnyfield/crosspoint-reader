@@ -30,6 +30,19 @@ enum class State : uint8_t {
 // discriminator is maxalloc, not free.
 bool canStart();
 
+// True when a keyboard bond is already stored in NVS. Create Note and Claude
+// use this to decide whether to bring the radio up at all: the on-screen
+// keyboard is the default, and BLE costs ~72 KB of heap plus a CPU-clock lock,
+// so an owner with no keyboard paired should never pay for it.
+bool hasBondedKeyboard();
+
+// Drop the link but KEEP the bond, so the keyboard reconnects next time.
+// Forgetting the bond entirely is a Settings action, not a gesture.
+void disconnectKeepingBond();
+
+// Erase every stored bond. Settings only.
+void forgetAllBonds();
+
 // Brings up the controller + NimBLE host and starts scanning. Idempotent.
 // Returns false if the stack failed to start, INCLUDING when canStart() is
 // false — in that case nothing is attempted, which is the point.

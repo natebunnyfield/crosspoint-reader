@@ -51,6 +51,9 @@ void pollInput() {
 }  // namespace
 
 bool canStart() { return true; }  // no radio to bring up
+bool hasBondedKeyboard() { return true; }  // the simulated keyboard is always "paired"
+void disconnectKeepingBond() {}
+void forgetAllBonds() {}
 
 bool begin() {
   gStarted = true;
@@ -760,6 +763,24 @@ void end() {
   gHavePeer = false;
   gState = State::Off;
   LOG_INF(TAG, "heap after nimble_port_deinit: %u", (unsigned)ESP.getFreeHeap());
+}
+
+bool hasBondedKeyboard() {
+  int count = 0;
+  if (ble_store_util_count(BLE_STORE_OBJ_TYPE_PEER_SEC, &count) != 0) return false;
+  return count > 0;
+}
+
+void disconnectKeepingBond() {
+  if (gConnHandle != BLE_HS_CONN_HANDLE_NONE) {
+    LOG_INF(TAG, "disconnecting, bond kept");
+    ble_gap_terminate(gConnHandle, BLE_ERR_REM_USER_CONN_TERM);
+  }
+}
+
+void forgetAllBonds() {
+  const int rc = ble_store_clear();
+  LOG_INF(TAG, "forget all bonds rc=%d", rc);
 }
 
 State state() { return gState; }

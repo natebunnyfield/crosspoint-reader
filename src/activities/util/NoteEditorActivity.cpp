@@ -44,9 +44,16 @@ int NoteEditorActivity::advanceOf(const char* piece, EpdFontFamily::Style style)
 void NoteEditorActivity::onEnter() {
   Activity::onEnter();
 
-  // BLE before the buffer: nimble_port_init() wants ~65 KB contiguous and hangs
-  // rather than failing when it cannot get it, so give it the roomiest heap.
-  blekbd::begin();
+  // The on-screen keyboard is the default input. BLE only comes up when a
+  // keyboard is already bonded — it costs ~72 KB of heap and a CPU-clock lock,
+  // which an owner with no keyboard paired should not pay. Long-press Up pairs
+  // one on demand.
+  if (blekbd::hasBondedKeyboard()) {
+    blekbd::begin();
+  } else {
+    LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (hold Up to pair)");
+  }
+  panel.begin();
 
   storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
   if (!storage) {
@@ -68,6 +75,12 @@ void NoteEditorActivity::onEnter() {
   maxLines = (contentBottom - contentTop) / lineHeight;
   if (maxLines < 1) maxLines = 1;
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
+
+  // Split screen: note above, keyboard below.
+  panelHeight = panel.preferredHeight(renderer);
+  const int textBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - panelHeight;
+  maxLines = (textBottom - contentTop) / lineHeight;
+  if (maxLines < 1) maxLines = 1;
 
   // Load an existing note so Edit-from-Manage-Files is a real edit, not a
   // silent overwrite. Anything past the cap is refused rather than truncated.
@@ -224,19 +237,94 @@ void NoteEditorActivity::handleKey(int key) {
   }
 }
 
+// Hold Up to pair a BLE keyboard, hold Down to disconnect one (the bond is
+// kept, so it reconnects next time; forgetting it entirely lives in Settings).
+// A short press of the same buttons still pages, so the gesture only fires once
+// the hold threshold passes and it swallows the release that follows.
+void NoteEditorActivity::pollPairingGestures() {
+  constexpr uint32_t HOLD_MS = 1500;
+  const bool up = mappedInput.isPressed(MappedInputManager::Button::Up);
+  const bool down = mappedInput.isPressed(MappedInputManager::Button::Down);
+
+  if (!up && !down) {
+    sideHeldSince = 0;
+    return;
+  }
+  if (sideHeldSince == 0) {
+    sideHeldSince = millis();
+    sideHandled = false;
+    return;
+  }
+  if (sideHandled || millis() - sideHeldSince < HOLD_MS) return;
+
+  sideHandled = true;
+  if (up) {
+    if (blekbd::state() == blekbd::State::Off) {
+      LOG_INF(TAG, "hold Up: starting BLE to pair");
+      blekbd::begin();
+    }
+  } else {
+    LOG_INF(TAG, "hold Down: disconnecting keyboard, bond kept");
+    blekbd::disconnectKeepingBond();
+  }
+  requestUpdate();
+}
+
+void NoteEditorActivity::handlePanelKey() {
+  const notes::KeyboardPanel::Result r = panel.activate();
+  switch (r.event) {
+    case notes::KeyboardPanel::Event::Character:
+      handleKey(static_cast<unsigned char>(r.ch));
+      break;
+    case notes::KeyboardPanel::Event::Backspace:
+      handleKey('\b');
+      break;
+    case notes::KeyboardPanel::Event::Enter:
+      handleKey('\n');
+      break;
+    case notes::KeyboardPanel::Event::Done:
+      finish();
+      return;
+    case notes::KeyboardPanel::Event::None:
+      break;
+  }
+  relayout();
+  ensureCursorVisible();
+  requestUpdate();
+}
+
 void NoteEditorActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     finish();
     return;
   }
-  // Side buttons page too, so the note is readable without a keyboard.
-  if (mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
-    pageUp();
+
+  pollPairingGestures();
+
+  // Front buttons drive the on-screen keyboard: Left/Right move along a row,
+  // Confirm types the selected key. Side buttons move between rows — a long
+  // hold on those is the pairing gesture, handled above.
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    handlePanelKey();
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+    panel.moveCol(-1);
     requestUpdate();
     return;
   }
-  if (mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
-    pageDown();
+  if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+    panel.moveCol(1);
+    requestUpdate();
+    return;
+  }
+  if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
+    panel.moveRow(-1);
+    requestUpdate();
+    return;
+  }
+  if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+    panel.moveRow(1);
     requestUpdate();
     return;
   }
@@ -338,13 +426,18 @@ void NoteEditorActivity::render(RenderLock&&) {
              onThisLine && buf ? buf->cursor() - dl.start : 0);
   }
 
+  // Split screen: the keyboard panel occupies the strip above the button hints,
+  // so the note stays visible while typing.
+  const int panelY = renderer.getScreenHeight() - metrics.buttonHintsHeight - panelHeight;
+  panel.render(renderer, metrics.contentSidePadding, panelY, pageWidth - metrics.contentSidePadding * 2, panelHeight);
+
   char status[96];
-  snprintf(status, sizeof(status), "%u ch%s  %s", (unsigned)(buf ? buf->size() : 0), bufferFull ? "  BUFFER FULL" : "",
+  snprintf(status, sizeof(status), "%u ch%s  kbd:%s", (unsigned)(buf ? buf->size() : 0), bufferFull ? "  FULL" : "",
            blekbd::stateName());
-  const int statusY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
+  const int statusY = panelY - renderer.getLineHeight(SMALL_FONT_ID);
   renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "PgUp", "PgDn");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Type", "Left", "Right");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

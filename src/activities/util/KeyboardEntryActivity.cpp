@@ -1,5 +1,8 @@
 #include "KeyboardEntryActivity.h"
 
+#include "notes/Grid13Layout.h"
+namespace grid13ns = grid13;
+
 #include <HalGPIO.h>
 #include <I18n.h>
 
@@ -94,39 +97,9 @@ const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("abc", fui::KeyKind::Mode, fui::
                                             UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2),
                                             UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 2)};
 
-// ---------------------------------------------------------------------------
-// 13-grid split-letters layout ("Class rows", ruled 2026-08-04). One layer:
-// numbers, symbols, a-m, n-z, Del/Space/OK -- no Shift, no symbols mode, full
-// printable ASCII (the number row gains - ' = so nothing is uneven). Every row
-// sums to 13 width units and the bottom row is 3+7+3, so the column-anchor
-// navigation in moveSelectionRow/Col is integer-exact. Letters carry no
-// explicit alt: keyboardAltOutputFor's case-flip supplies uppercase on
-// long-press without printing it on the key face (display ruling).
-// ---------------------------------------------------------------------------
-const fui::KeyboardKey SL_NUM[] = {UKA("1", "1", '1', "!"), UKA("2", "2", '2', "@"), UKA("3", "3", '3', "#"),
-                                   UKA("4", "4", '4', "$"), UKA("5", "5", '5', "%"), UKA("6", "6", '6', "^"),
-                                   UKA("7", "7", '7', "&"), UKA("8", "8", '8', "*"), UKA("9", "9", '9', "("),
-                                   UKA("0", "0", '0', ")"), UKA("-", "-", '-', "_"), UKA("'", "'", '\'', "\""),
-                                   UKA("=", "=", '=', "+")};
-const fui::KeyboardKey SL_SYM[] = {UKA(".", ".", '.', ">"), UKA(",", ",", ',', "<"), UKA("/", "/", '/', "\\"),
-                                   UKA(":", ":", ':', "|"), UK(";", ";", ';'),       UK("?", "?", '?'),
-                                   UK("!", "!", '!'),       UK("@", "@", '@'),       UK("&", "&", '&'),
-                                   UK("+", "+", '+'),       UKA("[", "[", '[', "{"), UKA("]", "]", ']', "}"),
-                                   UKA("`", "`", '`', "~")};
-const fui::KeyboardKey SL_AM[] = {UK("a", "a", 'a'), UK("b", "b", 'b'), UK("c", "c", 'c'), UK("d", "d", 'd'),
-                                  UK("e", "e", 'e'), UK("f", "f", 'f'), UK("g", "g", 'g'), UK("h", "h", 'h'),
-                                  UK("i", "i", 'i'), UK("j", "j", 'j'), UK("k", "k", 'k'), UK("l", "l", 'l'),
-                                  UK("m", "m", 'm')};
-const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), UK("p", "p", 'p'), UK("q", "q", 'q'),
-                                  UK("r", "r", 'r'), UK("s", "s", 's'), UK("t", "t", 't'), UK("u", "u", 'u'),
-                                  UK("v", "v", 'v'), UK("w", "w", 'w'), UK("x", "x", 'x'), UK("y", "y", 'y'),
-                                  UK("z", "z", 'z')};
-const fui::KeyboardKey SL_BOTTOM[] = {UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 3),
-                                      UKW(" ", " ", ' ', 7), UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 3)};
+// The 13-grid table moved to src/notes/Grid13Layout.h so the split-screen
+// KeyboardPanel renders the same one. Referenced via grid13::SL_LAYOUT below.
 
-const fui::KeyboardRow SL_ROWS[] = {
-    {SL_NUM, 13, 0}, {SL_SYM, 13, 0}, {SL_AM, 13, 0}, {SL_NZ, 13, 0}, {SL_BOTTOM, 3, 0}};
-const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 5};
 
 #undef UK
 #undef UKA
@@ -318,7 +291,7 @@ void KeyboardEntryActivity::onEnter() {
 void KeyboardEntryActivity::onExit() { Activity::onExit(); }
 
 const fui::KeyboardLayout& KeyboardEntryActivity::currentLayout() const {
-  if (grid13) return SL_LAYOUT;
+  if (grid13) return grid13ns::SL_LAYOUT;
   if (symbols) return fui::builtinKeyboardLayout(layoutId, shifted, true);
   if (inputType == InputType::Url) {
     if (urlPanel) return URL_SNIPPET_LAYOUT;
