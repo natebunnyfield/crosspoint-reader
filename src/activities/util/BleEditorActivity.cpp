@@ -9,6 +9,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "spike/BleHidHost.h"
+#include "spike/ClaudeChat.h"
 
 namespace {
 constexpr const char* TAG = "BLEEDIT";
@@ -71,9 +72,17 @@ void BleEditorActivity::loop() {
     return;
   }
 
+  // Confirm = send the buffer to Claude (ruling: front button, keyboard stays
+  // purely for text). Blocks this loop for the whole exchange — spike quality.
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && buf && len > 0) {
+    sendToClaude();
+    return;
+  }
+
   bool got = false;
   for (int c = blespike::popChar(); c >= 0; c = blespike::popChar()) {
     if (!buf) break;
+    if (!lastResponse.empty()) lastResponse.clear();  // typing resumes: dismiss the response view
     const uint32_t stamp = blespike::lastKeyMillis();
     if (!got && pendingChars == 0) pendingKeyStampMs = stamp;
     got = true;
@@ -155,9 +164,25 @@ void BleEditorActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
 
   char header[64];
-  snprintf(header, sizeof(header), "BLE %s%s%s", blespike::stateName(), blespike::peerName()[0] != 0 ? " - " : "",
-           blespike::peerName());
+  if (phaseText[0] != 0) {
+    snprintf(header, sizeof(header), "Claude: %s", phaseText);
+  } else {
+    snprintf(header, sizeof(header), "BLE %s%s%s", blespike::stateName(), blespike::peerName()[0] != 0 ? " - " : "",
+             blespike::peerName());
+  }
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, header);
+
+  // Response view: shown after an exchange until the next keystroke.
+  if (!lastResponse.empty()) {
+    const auto respLines = renderer.wrappedText(EDITOR_FONT_ID, lastResponse.c_str(), maxWidth, maxLines);
+    for (size_t n = 0; n < respLines.size(); ++n) {
+      renderer.drawText(EDITOR_FONT_ID, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
+                        respLines[n].c_str());
+    }
+    GUI.drawButtonHints(renderer, "Save+Exit", "", "response in /claude-chat.md - type to continue", "");
+    renderer.displayBuffer();
+    return;
+  }
 
   const size_t shown = lineTotal < static_cast<size_t>(maxLines) ? lineTotal : static_cast<size_t>(maxLines);
   const size_t firstLine = lineTotal - shown;
@@ -182,7 +207,7 @@ void BleEditorActivity::render(RenderLock&&) {
   snprintf(status, sizeof(status), "%u ch  heap %u  notif %u  drop %u  lat %ums", (unsigned)len,
            (unsigned)ESP.getFreeHeap(), (unsigned)blespike::notifyCount(), (unsigned)blespike::droppedCount(),
            (unsigned)lastLatencyMs);
-  GUI.drawButtonHints(renderer, "Save+Exit", "", status, "");
+  GUI.drawButtonHints(renderer, "Save+Exit", len > 0 ? "Send" : "", status, "");
 
   renderer.displayBuffer();
 
@@ -195,6 +220,40 @@ void BleEditorActivity::render(RenderLock&&) {
   if (heapMin != UINT32_MAX) {
     LOG_INF(TAG, "SPIKE-HEAP P4-typing minfree-observed=%u free=%u", (unsigned)heapMin, (unsigned)ESP.getFreeHeap());
   }
+}
+
+void BleEditorActivity::setPhase(const char* phase) {
+  snprintf(phaseText, sizeof(phaseText), "%s", phase);
+  LOG_INF(TAG, "phase: %s", phase);
+  // Paint synchronously so each phase is visible even though the exchange
+  // blocks this loop() the whole time.
+  requestUpdateAndWait();
+}
+
+void BleEditorActivity::sendToClaude() {
+  std::string prompt(buf.get(), len);
+
+  // The radios take turns: ~72 KB comes back from BLE, TLS wants ~40-50 KB.
+  setPhase("ble: shutting down");
+  blespike::end();
+
+  claudechat::Result r = claudechat::runExchange(
+      prompt, [](void* ctx, const char* p) { static_cast<BleEditorActivity*>(ctx)->setPhase(p); }, this);
+
+  // Re-arm the keyboard. Known risk from the earlier spike runs: below ~86 KB
+  // free this can hard-hang; heap here should be ~88 KB+ with WiFi fully off.
+  setPhase("ble: restarting");
+  blespike::begin();
+
+  if (r.ok) {
+    lastResponse = std::move(r.responseText);
+    len = 0;  // prompt consumed; /claude-chat.md is the durable record
+  } else {
+    lastResponse = "ERROR: " + r.error;  // buffer kept so the prompt can be retried
+  }
+  phaseText[0] = '\0';
+  layout();
+  requestUpdate();
 }
 
 void BleEditorActivity::save() {

@@ -30,6 +30,10 @@ class BleEditorActivity final : public Activity {
   int contentTop = 0;
 
   bool dirty = false;
+  // Response of the last Claude exchange, shown read-only until the next
+  // keystroke. Empty = normal typing view.
+  std::string lastResponse;
+  char phaseText[48] = {0};  // live phase line during an exchange
   size_t pendingChars = 0;
   uint32_t lastKeyMs = 0;
   uint32_t pendingKeyStampMs = 0;  // BLE-side stamp of the oldest unrendered key
@@ -39,6 +43,8 @@ class BleEditorActivity final : public Activity {
 
   void layout();
   void save();
+  void sendToClaude();
+  void setPhase(const char* phase);
 
  public:
   BleEditorActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
