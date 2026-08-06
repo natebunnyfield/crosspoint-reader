@@ -8,12 +8,21 @@
 #include <Logging.h>
 #include <SecureHttpClient.h>
 #include <WiFi.h>
+#include <time.h>
+
+#include <vector>
 
 #include "CrossPointSettings.h"
 #include "WifiCredentialStore.h"
 
 namespace claudechat {
 namespace {
+
+#ifdef SIMULATOR
+#define POST_COMPAT(s) String((s).c_str())
+#else
+#define POST_COMPAT(s) (s)
+#endif
 
 constexpr const char* TAG = "CLAUDE";
 // Fixed for the spike per ruling: REDACTED-SSID is the only test network.
@@ -23,23 +32,59 @@ constexpr const char* TRANSCRIPT_PATH = "/claude-chat.md";
 constexpr const char* MODEL = "claude-haiku-4-5";
 constexpr int MAX_TOKENS = 1024;
 constexpr uint32_t WIFI_TIMEOUT_MS = 20000;
+// Conversation memory for this editor session. In RAM only — /claude-chat.md is
+// the durable record, and re-parsing it would mean holding the whole file.
+// Both caps exist because history inflates the request body, which on device
+// competes with TLS for the same scarce heap.
+constexpr size_t MAX_HISTORY_TURNS = 6;
+constexpr size_t MAX_HISTORY_CHARS = 4000;
+
+struct Turn {
+  bool assistant;
+  std::string text;
+};
+std::vector<Turn> gHistory;
+
+// Drop oldest turns until both caps hold.
+void trimHistory() {
+  while (gHistory.size() > MAX_HISTORY_TURNS) gHistory.erase(gHistory.begin());
+  size_t total = 0;
+  for (const Turn& t : gHistory) total += t.text.size();
+  while (total > MAX_HISTORY_CHARS && !gHistory.empty()) {
+    total -= gHistory.front().text.size();
+    gHistory.erase(gHistory.begin());
+  }
+}
 
 void logHeap(const char* point) {
   LOG_INF(TAG, "SPIKE-HEAP %s free=%u maxalloc=%u", point, (unsigned)ESP.getFreeHeap(),
           (unsigned)ESP.getMaxAllocHeap());
 }
 
-// "2026-08-05 21:42 UTC" from the DS3231 (NTP-synced UTC), or a millis()
-// fallback so a transcript written before any sync is still ordered.
+// "2026-08-05 21:42 UTC". Three sources, best first:
+//   1. the DS3231 (NTP-synced UTC) — the device's real answer;
+//   2. the C library clock — set by syncFromNTP (which configures "UTC0") on
+//      device, and the host wall clock under the simulator, which has no RTC
+//      and would otherwise stamp every entry "uptime+16s";
+//   3. uptime, so a transcript written before any clock exists is still ordered.
 std::string timestamp() {
+  char buf[32];
+
   uint16_t y;
   uint8_t mo, d, h, mi;
   if (halClock.getDateTime(y, mo, d, h, mi)) {
-    char buf[24];
     snprintf(buf, sizeof(buf), "%04u-%02u-%02u %02u:%02u UTC", y, mo, d, h, mi);
     return buf;
   }
-  char buf[24];
+
+  const time_t now = time(nullptr);
+  if (now > 1700000000) {  // sanity: past 2023, so not an unset epoch clock
+    struct tm utc;
+    gmtime_r(&now, &utc);
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M UTC", &utc);
+    return buf;
+  }
+
   snprintf(buf, sizeof(buf), "uptime+%lus", millis() / 1000);
   return buf;
 }
@@ -136,15 +181,28 @@ Result runExchange(const std::string& prompt, void (*statusCb)(void* ctx, const 
   logHeap("P7-wifi-connected");
 
   // Request body via ArduinoJson so prompt quoting/newlines are escaped right.
+  //
+  // The API is stateless: a request carrying only the current prompt makes every
+  // turn a cold start, and the second question in a thread gets "I don't have
+  // context about what you're asking" (observed in the simulator). So replay the
+  // session's prior turns as messages. Capped in both directions because this
+  // grows the request body, and on device the body competes with TLS for heap.
   std::string payload;
   {
     JsonDocument doc;
     doc["model"] = MODEL;
     doc["max_tokens"] = MAX_TOKENS;
-    JsonObject msg = doc["messages"].add<JsonObject>();
+    JsonArray messages = doc["messages"].to<JsonArray>();
+    for (const Turn& t : gHistory) {
+      JsonObject m = messages.add<JsonObject>();
+      m["role"] = t.assistant ? "assistant" : "user";
+      m["content"] = t.text;
+    }
+    JsonObject msg = messages.add<JsonObject>();
     msg["role"] = "user";
     msg["content"] = prompt;
     serializeJson(doc, payload);
+    LOG_INF(TAG, "request: %u prior turn(s), %u byte body", (unsigned)gHistory.size(), (unsigned)payload.size());
   }
 
   statusCb(cbCtx, "api: TLS + POST");
@@ -163,7 +221,9 @@ Result runExchange(const std::string& prompt, void (*statusCb)(void* ctx, const 
       const uint32_t t0 = millis();
       // The simulator's SecureHttpClient shim speaks Arduino String, the
       // device's speaks std::string; String() converts cleanly for both.
-      const int status = http.POST(String(payload.c_str()));
+      // The device's SecureHttpClient takes std::string, the simulator's shim
+      // takes Arduino String. POST_COMPAT resolves to whichever this build has.
+      const int status = http.POST(POST_COMPAT(payload));
       const uint32_t elapsed = millis() - t0;
       logHeap("P8-after-post");
       LOG_INF(TAG, "POST status=%d in %lums, body=%u bytes", status, (unsigned long)elapsed,
@@ -196,6 +256,12 @@ Result runExchange(const std::string& prompt, void (*statusCb)(void* ctx, const 
   wifiOff();
 
   if (res.ok) {
+    // Only a completed exchange joins the history; a failed turn would leave a
+    // user message with no assistant reply and skew every later request.
+    gHistory.push_back({false, prompt});
+    gHistory.push_back({true, res.responseText});
+    trimHistory();
+
     std::string entry = "## " + timestamp() + " — claude (" + MODEL + ")\n\n" + res.responseText + "\n\n---\n\n";
     if (!appendToTranscript(entry)) {
       // The response survived the network but not the SD write — surface that.

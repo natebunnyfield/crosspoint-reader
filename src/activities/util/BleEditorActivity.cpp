@@ -181,7 +181,10 @@ void BleEditorActivity::render(RenderLock&&) {
     }
     const int noteY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
     renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, noteY, "saved to /claude-chat.md - type to continue");
-    GUI.drawButtonHints(renderer, "Save+Exit", "", "", "");
+    // Hints must go through mapLabels: front buttons are user-remappable, so
+    // hardcoded positional strings can label the wrong physical key.
+    const auto respLabels = mappedInput.mapLabels("Save+Exit", "", "", "");
+    GUI.drawButtonHints(renderer, respLabels.btn1, respLabels.btn2, respLabels.btn3, respLabels.btn4);
     renderer.displayBuffer();
     return;
   }
@@ -213,7 +216,8 @@ void BleEditorActivity::render(RenderLock&&) {
            (unsigned)lastLatencyMs);
   const int statusY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
   renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
-  GUI.drawButtonHints(renderer, "Save+Exit", len > 0 ? "Send" : "", "", "");
+  const auto labels = mappedInput.mapLabels("Save+Exit", len > 0 ? "Send" : "", "", "");
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();
 
