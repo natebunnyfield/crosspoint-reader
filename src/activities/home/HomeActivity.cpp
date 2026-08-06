@@ -4,6 +4,7 @@
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalClock.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Utf8.h>
@@ -11,6 +12,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ctime>
 #include <vector>
 
 #include "CrossPointSettings.h"
@@ -19,6 +21,11 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "notes/NoteNaming.h"
+
+// Where Create Note writes. Root keeps notes visible next to the other files
+// the owner browses in Manage Files.
+static constexpr const char* NOTES_DIR = "/";
 
 int HomeActivity::getMenuItemCount() const {
   // This count is what bounds selectorIndex — leave it stale after adding a
@@ -355,17 +362,21 @@ void HomeActivity::render(RenderLock&&) {
 
   if (showMenu) {
     // Build menu items dynamically
-    std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS),
+    // Order is the owner's ruling (2026-08-06). These two vectors and BOTH
+    // index maps in HomeActivity.h must stay in the same order — see the note
+    // there; they are four separate sources of truth for one list.
+    std::vector<const char*> menuItems = {tr(STR_MENU_RECENT_BOOKS), tr(STR_BROWSE_FILES),
+                                          tr(STR_MANAGE_FILES),
 #ifndef CROSSPOINT_NO_NETWORK
                                           tr(STR_FILE_TRANSFER),
 #endif
-                                          tr(STR_MANAGE_FILES), tr(STR_SETTINGS_TITLE),
-                                          tr(STR_CREATE_NOTE), "Claude"};
-    std::vector<UIIcon> menuIcons = {Folder, Recent,
+                                          tr(STR_CREATE_NOTE),       "Claude",
+                                          tr(STR_SETTINGS_TITLE)};
+    std::vector<UIIcon> menuIcons = {Recent,     Folder,     ManageFiles,
 #ifndef CROSSPOINT_NO_NETWORK
                                      Transfer,
 #endif
-                                     ManageFiles, Settings, CreateNote, ClaudeMark};
+                                     CreateNote, ClaudeMark, Settings};
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme
@@ -389,10 +400,11 @@ void HomeActivity::render(RenderLock&&) {
     // homeContinueReadingInMenu is a live metric, not a per-theme constant. On
     // page 1 of a split home this is selectorIndex - bookCount >= 0, i.e. the
     // row the selector is really on.
-    GUI.drawButtonMenu(renderer, menuRect, static_cast<int>(menuItems.size()),
-                       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - bookCount,
-                       [&menuItems](int index) { return std::string(menuItems[index]); },
-                       [&menuIcons](int index) { return menuIcons[index]; });
+    GUI.drawButtonMenu(
+        renderer, menuRect, static_cast<int>(menuItems.size()),
+        metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - bookCount,
+        [&menuItems](int index) { return std::string(menuItems[index]); },
+        [&menuIcons](int index) { return menuIcons[index]; });
   }
 
   const auto labels = mappedInput.mapLabels(recentBooks.empty() ? "" : tr(STR_RESUME), tr(STR_SELECT), tr(STR_DIR_UP),
@@ -422,6 +434,33 @@ void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
 void HomeActivity::onManageFilesOpen() { activityManager.goToFileManager(); }
 
-void HomeActivity::onCreateNoteOpen() { activityManager.goToNoteEditor("/note.md"); }
+// Create Note makes a NEW note every run — it must never reopen a fixed file.
+// Seconds come from the C library clock (set by syncFromNTP); the RTC only
+// resolves to minutes. With no synced clock at all the stamp repeats, so
+// uniqueNotePath's -N suffix is what actually guarantees a fresh file.
+void HomeActivity::onCreateNoteOpen() {
+  uint16_t y = 1970;
+  uint8_t mo = 1, d = 1, h = 0, mi = 0, sec = 0;
+
+  const time_t now = time(nullptr);
+  if (now > 1700000000) {  // past 2023, so a real clock rather than an unset one
+    struct tm utc;
+    gmtime_r(&now, &utc);
+    y = static_cast<uint16_t>(utc.tm_year + 1900);
+    mo = static_cast<uint8_t>(utc.tm_mon + 1);
+    d = static_cast<uint8_t>(utc.tm_mday);
+    h = static_cast<uint8_t>(utc.tm_hour);
+    mi = static_cast<uint8_t>(utc.tm_min);
+    sec = static_cast<uint8_t>(utc.tm_sec);
+  } else {
+    halClock.getDateTime(y, mo, d, h, mi);  // minutes only; seconds stay 0
+  }
+
+  const std::string stamp = notenaming::formatStamp(y, mo, d, h, mi, sec);
+  const std::string path =
+      notenaming::uniqueNotePath(NOTES_DIR, stamp, [](const char* p) { return Storage.exists(p); });
+  LOG_INF("HOME", "new note: %s", path.c_str());
+  activityManager.goToNoteEditor(path);
+}
 
 void HomeActivity::onClaudeOpen() { activityManager.goToClaudeChat(); }
