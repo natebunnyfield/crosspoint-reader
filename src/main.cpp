@@ -21,6 +21,7 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
+#include "WifiCredentialStore.h"  // SPIKE: CMD:WIFISAVE
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "SystemFont.h"
@@ -662,6 +663,21 @@ void loop() {
         // SPIKE: open the editor without needing anyone at the buttons.
         LOG_INF("SPIKE", "CMD:BLEEDIT — opening BLE editor");
         activityManager.goToBleEditor();
+      } else if (cmd.startsWith("WIFISAVE:")) {
+        // SPIKE: CMD:WIFISAVE:<ssid>:<password> — store a credential without
+        // walking the picker UI. Password is not echoed back.
+        const String rest = cmd.substring(9);
+        const int sep = rest.indexOf(':');
+        if (sep > 0) {
+          const String ssid = rest.substring(0, sep);
+          const String pass = rest.substring(sep + 1);
+          WIFI_STORE.loadFromFile();
+          WIFI_STORE.addCredential(ssid.c_str(), pass.c_str());
+          const bool saved = WIFI_STORE.saveToFile();
+          LOG_INF("SPIKE", "WIFISAVE '%s': %s", ssid.c_str(), saved ? "saved" : "SAVE FAILED");
+        } else {
+          LOG_ERR("SPIKE", "WIFISAVE: bad format, want CMD:WIFISAVE:<ssid>:<password>");
+        }
       }
     }
   }

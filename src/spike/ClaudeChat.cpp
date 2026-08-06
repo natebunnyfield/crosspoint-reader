@@ -115,8 +115,10 @@ Result runExchange(const std::string& prompt, void (*statusCb)(void* ctx, const 
   std::string apiKey;
   if (!readApiKey(apiKey)) {
     res.error = std::string("no API key at ") + KEY_PATH;
+    LOG_ERR(TAG, "%s (exists=%d)", res.error.c_str(), Storage.exists(KEY_PATH) ? 1 : 0);
     return res;
   }
+  LOG_INF(TAG, "API key loaded (%u chars)", (unsigned)apiKey.size());
 
   // The prompt goes into the transcript FIRST, so failed attempts are recorded.
   {

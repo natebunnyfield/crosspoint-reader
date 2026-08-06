@@ -195,6 +195,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Set once an NTP sync succeeds. Used to skip re-syncing on every WiFi connect.
   // Resetting to 0 (e.g. via the web UI) forces a re-sync on next WiFi connect.
   uint8_t clockHasBeenSynced = 0;
+  // SPIKE / owner ruling 2026-08-05: the EDITOR font group is separate from the
+  // reading S tier. Index into EDITOR_FONT_FAMILIES; the index IS the persisted
+  // value, so this list is append-only (see "Enum order is frozen" in CLAUDE.md).
+  uint8_t editorFont = 0;
+
   // Text rendering settings
   uint8_t extraParagraphSpacing = 1;
   // TEXT_ANTIALIASING value (0=Off, 1=Standard, 2=Crisp, 3=Dark). Non-zero

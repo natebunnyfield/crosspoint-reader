@@ -179,7 +179,9 @@ void BleEditorActivity::render(RenderLock&&) {
       renderer.drawText(EDITOR_FONT_ID, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
                         respLines[n].c_str());
     }
-    GUI.drawButtonHints(renderer, "Save+Exit", "", "response in /claude-chat.md - type to continue", "");
+    const int noteY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
+    renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, noteY, "saved to /claude-chat.md - type to continue");
+    GUI.drawButtonHints(renderer, "Save+Exit", "", "", "");
     renderer.displayBuffer();
     return;
   }
@@ -203,11 +205,15 @@ void BleEditorActivity::render(RenderLock&&) {
                       lineBuf);
   }
 
+  // Diagnostics on their own line ABOVE the hints. Passing this string as a
+  // button label rendered a several-hundred-px "button" (reported on-device).
   char status[96];
   snprintf(status, sizeof(status), "%u ch  heap %u  notif %u  drop %u  lat %ums", (unsigned)len,
            (unsigned)ESP.getFreeHeap(), (unsigned)blespike::notifyCount(), (unsigned)blespike::droppedCount(),
            (unsigned)lastLatencyMs);
-  GUI.drawButtonHints(renderer, "Save+Exit", len > 0 ? "Send" : "", status, "");
+  const int statusY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
+  renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
+  GUI.drawButtonHints(renderer, "Save+Exit", len > 0 ? "Send" : "", "", "");
 
   renderer.displayBuffer();
 
@@ -249,6 +255,7 @@ void BleEditorActivity::sendToClaude() {
     lastResponse = std::move(r.responseText);
     len = 0;  // prompt consumed; /claude-chat.md is the durable record
   } else {
+    LOG_ERR(TAG, "exchange failed: %s", r.error.c_str());
     lastResponse = "ERROR: " + r.error;  // buffer kept so the prompt can be retried
   }
   phaseText[0] = '\0';

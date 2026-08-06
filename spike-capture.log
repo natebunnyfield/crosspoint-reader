@@ -14482,3 +14482,1267 @@ b type=1 rssi=-79 hid=0 name='' uuids16=[] appear=0000/0
 [12685898] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
 [12695919] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
 [12705940] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12715961] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12725982] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12736003] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12746024] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12756045] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12766066] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12776087] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12786108] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12796129] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12806150] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12816171] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12826192] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12836213] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12846234] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12856255] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12866276] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12876297] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+[12886318] [INF] [MEM] Free: 94612 bytes, Total: 250980 bytes, Min Free: 13368 bytes, MaxAlloc: 63476 bytes
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40389bde
+waiting for download
+      ��      ��      ��      ��      ��      �
+�      ��      ��      ��      ��      �        �
+�      ��      ��      ��      ��      ��      ��      ��      �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c62c
+waiting for download
+       �
+�       �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a4
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x7 (TG0WDT_SYS_RST),boot:0xd (SPI_FAST_FLASH_BOOT)
+Saved PC:0x400462e2
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1010
+load:0x403cbf10,len:0x9f4
+load:0x403ce710,len:0x2e94
+entry 0x403cbf10
+[343] [XTDET] no NVS screenType; bus probe VER=FF FF FF FF FF FLG=FF -> default controller
+[344] [INF] [CLK] RTC not found
+[344] [INF] [MAIN] Hardware detect: X4
+[350] [SD] SD card detected
+[364] [DBG] [CPS] Settings loaded from file
+[383] [DBG] [RBS] Recent books loaded from file (4 entries)
+[384] [DBG] [MAIN] Starting CrossPoint version 1.5.0-BNY-dev-spike/ble-editor-1829c8d4
+[428]   Wait complete:  CMD_SOFT_RESET (2 ms)
+[433]   Wait complete:  CMD_AUTO_WRITE_BW_RAM (5 ms)
+[438]   Wait complete:  CMD_AUTO_WRITE_RED_RAM (5 ms)
+[438] [DBG] [MAIN] Display initialized
+[447] [DBG] [SDREG] Found family: Edgar (4 files) in /.fonts
+[454] [DBG] [SDREG] Found family: Rosarivo (4 files) in /.fonts
+[462] [DBG] [SDREG] Found family: TeXGyreSchola (4 files) in /.fonts
+[468] [DBG] [SDREG] Found family: Coelacanth (4 files) in /.fonts
+[476] [DBG] [SDREG] Found family: LibreFranklin (4 files) in /.fonts
+[516] [DBG] [SDREG] Fonts directory not found: /fonts
+[516] [DBG] [SDREG] Discovery complete: 5 families
+[533] [DBG] [SDCF] Loaded: /.fonts/Rosarivo/Rosarivo_16.cpfont (v4, 4 styles)
+[534] [DBG] [SDCF]   style[0]: 8 intervals, 982 glyphs, advY=51, asc=36, desc=-17, kernL=72, kernR=88, ligs=0
+[534] [DBG] [SDCF]   style[1]: 8 intervals, 982 glyphs, advY=51, asc=36, desc=-17, kernL=72, kernR=88, ligs=0
+[534] [DBG] [SDCF]   style[2]: 8 intervals, 982 glyphs, advY=51, asc=36, desc=-17, kernL=48, kernR=82, ligs=0
+[535] [DBG] [SDMGR] Loaded /.fonts/Rosarivo/Rosarivo_16.cpfont size=16 id=987132007 styles=4
+[535] [DBG] [SDFS] Rosarivo has no CJK coverage - skipping UI fallback sizes
+[535] [DBG] [SDFS] Loaded SD card font family: Rosarivo
+[535] [DBG] [SDFS] SD font system ready (5 families discovered)
+[535] [DBG] [MAIN] Fonts setup
+[535] [DBG] [ACT] Entering activity: Boot
+[539] [DBG] [GFX] Time = 3 ms from clearScreen to displayBuffer
+[2255]   Wait complete: refresh (1673 ms)
+[2299] [INF] [SPIKE] SPIKE-HEAP P0-boot-no-ble free=135572 total=250980 minfree=135572 maxalloc=114676
+[2304] [DBG] [ACT] Exiting activity: Boot
+[2304] [DBG] [ACT] Entering activity: Home
+[2349] [DBG] [GFX] Cropping 142x226 by 6x0 pix, is top-down
+[2349] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2409] [DBG] [GFX] Cropping 151x226 by 10x0 pix, is top-down
+[2409] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2473] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[2473] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2534] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[2535] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2593] [DBG] [GFX] Time = 257 ms from clearScreen to displayBuffer
+[3113]   Wait complete: refresh (497 ms)
+[3175] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[3695]   Wait complete: refresh (497 ms)
+[5301] [DBG] [PWR] Going to low-power mode
+[10010] [INF] [MEM] Free: 95424 bytes, Total: 250980 bytes, Min Free: 95096 bytes, MaxAlloc: 73716 bytes
+[20031] [INF] [MEM] Free: 95424 bytes, Total: 250980 bytes, Min Free: 95096 bytes, MaxAlloc: 73716 bytes
+[30052] [INF] [MEM] Free: 95424 bytes, Total: 250980 bytes, Min Free: 95096 bytes, MaxAlloc: 73716 bytes
+[40073] [INF] [MEM] Free: 95424 bytes, Total: 250980 bytes, Min Free: 95096 bytes, MaxAlloc: 73716 bytes
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40389bde
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c72a
+waiting for download
+�       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a4
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+�      ��      ��     ��      ��      ��      ��      ��      ��      ��      ��      ��      ��      �             ���      ��      ��      ��        ��      ��      ��      ��      ��      ��      ��      ��      ��      �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c50e
+waiting for download
+�      ��      ��       ��      ��      ��      ��      ��      ��      ���      ��      ��      �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c97e
+waiting for download
+�       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a8
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a8
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e0
+waiting for download
+   
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380022
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+�      ��      ��      �          � �      ��      ��      ��      ��       ��      ��      ��      ��      ��      ��     ��      ��      ��      ��      ��      ��      ��      ��      ��      ��          ��      ��      ��      �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c98c
+waiting for download
+�       �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380024
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+[2248]   Wait complete: refresh (1672 ms)
+[3102]   Wait complete: refresh (497 ms)
+[3677]   Wait complete: refresh (496 ms)
+[10055] [INF] [MEM] Free: 119524 bytes, Total: 274468 bytes, Min Free: 119196 bytes, MaxAlloc: 73716 bytes
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40384c56
+waiting for download
+�       �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380222
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40046c92
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380126
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+       
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380024
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+�       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x5 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a8
+waiting for download
+[343] [XTDET] no NVS screenType; bus probe VER=FF FF FF FF FF FLG=FF -> default controller
+[344] [INF] [CLK] RTC not found
+[344] [INF] [MAIN] Hardware detect: X4
+[375] [SD] SD card detected
+[926]   Wait complete:  CMD_SOFT_RESET (2 ms)
+[931]   Wait complete:  CMD_AUTO_WRITE_BW_RAM (5 ms)
+[936]   Wait complete:  CMD_AUTO_WRITE_RED_RAM (5 ms)
+[2745]   Wait complete: refresh (1673 ms)
+[4837]   Wait complete: refresh (1639 ms)
+[5056]   Wait complete: refresh (141 ms)
+[10041] [INF] [MEM] Free: 151712 bytes, Total: 274468 bytes, Min Free: 89892 bytes, MaxAlloc: 114676 bytes
+[20064] [INF] [MEM] Free: 151712 bytes, Total: 274468 bytes, Min Free: 89892 bytes, MaxAlloc: 114676 bytes
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40384c56
+waiting for download
+[2246]   Wait complete: refresh (1672 ms)
+[3099]   Wait complete: refresh (497 ms)
+[3675]   Wait complete: refresh (496 ms)
+[6574]   Wait complete: refresh (496 ms)
+[7148]   Wait complete: refresh (497 ms)
+[7718]   Wait complete: refresh (496 ms)
+[8289]   Wait complete: refresh (497 ms)
+[10006] [INF] [MEM] Free: 119500 bytes, Total: 274468 bytes, Min Free: 119172 bytes, MaxAlloc: 73716 bytes
+[10031]   Wait complete: refresh (497 ms)
+[10601]   Wait complete: refresh (497 ms)
+[11175]   Wait complete: refresh (496 ms)
+[12519]   Wait complete: refresh (496 ms)
+[13093]   Wait complete: refresh (497 ms)
+[13663]   Wait complete: refresh (496 ms)
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x420026da
+waiting for download
+ �      ��         ��      ��      ��      ��      ��      ��      �         ��      ��      ��      ��      �           ��    �   
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c97e
+waiting for download
+�       
+�       �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380222
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+�      ��      ��      ��      ��      ��      �
+�       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e0
+waiting for download
+�     
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a8
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+      
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a8
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+       
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380020
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x7 (TG0WDT_SYS_RST),boot:0xf (SPI_FAST_FLASH_BOOT)
+Saved PC:0x400462e2
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1010
+load:0x403cbf10,len:0x9f4
+load:0x403ce710,len:0x2e94
+entry 0x403cbf10
+E (376) esp_image: Checksum failed. Calculated 0x23 read 0x0
+E (376) boot: OTA app partition slot 0 is not bootable
+[343] [XTDET] no NVS screenType; bus probe VER=FF FF FF FF FF FLG=FF -> default controller
+[344] [INF] [CLK] RTC not found
+[344] [INF] [MAIN] Hardware detect: X4
+[350] [SD] SD card detected
+[427]   Wait complete:  CMD_SOFT_RESET (2 ms)
+[432]   Wait complete:  CMD_AUTO_WRITE_BW_RAM (5 ms)
+[437]   Wait complete:  CMD_AUTO_WRITE_RED_RAM (5 ms)
+[2245]   Wait complete: refresh (1672 ms)
+[3098]   Wait complete: refresh (497 ms)
+[3674]   Wait complete: refresh (496 ms)
+[10052] [INF] [MEM] Free: 119500 bytes, Total: 274468 bytes, Min Free: 119172 bytes, MaxAlloc: 73716 bytes
+[16925]   Wait complete: refresh (496 ms)
+[17500]   Wait complete: refresh (497 ms)
+[18071]   Wait complete: refresh (497 ms)
+[20063] [INF] [MEM] Free: 154984 bytes, Total: 274468 bytes, Min Free: 111848 bytes, MaxAlloc: 114676 bytes
+[20499]   Wait complete: refresh (497 ms)
+[21917]   Wait complete: refresh (497 ms)
+[22803]   Wait complete: refresh (496 ms)
+[23512]   Wait complete: refresh (497 ms)
+[24661]   Wait complete: refresh (496 ms)
+[26719]   Wait complete: refresh (1639 ms)
+[26939]   Wait complete: refresh (141 ms)
+[30084] [INF] [MEM] Free: 151592 bytes, Total: 274468 bytes, Min Free: 89780 bytes, MaxAlloc: 114676 bytes
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40384c56
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380160
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380020
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+      ��      ��      ��      ��      ��      �
+       
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403800f0
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+�       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380036
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+      
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403800f4
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+�      ��      ��      �      �   ��      ��      ��      �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c97e
+waiting for download
+       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHwaiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380020
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c98c
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380020
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4038003c
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c692
+waiting for download
+�      ��      ��      ��      ��      ��      ��      ��      �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c622
+waiting for download
+�       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Swaiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+�      ��      ��      ��      ��      ��      ��      ��      ��      ��           ��      ��      ��      ��      ��      ��      �
+�      ��      ��      ��      ��      ��      ��      ��      �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c98c
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380126
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462dc
+waiting for download
+     
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380162
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e0
+waiting for download
+      ��      ��      ��      ��      ��      �
+�      ��      ��      ��      ��      �       ��    �      ��      ��           ��      ��      ��      ��      ��      ��      ��      ��      ��      ��      ��      ��  �      ��      ��      ��      ��      ��      �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c51e
+waiting for download
+�       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403800f0
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e0
+waiting for download
+      
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380024
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x7 (TG0WDT_SYS_RST),boot:0xf (SPI_FAST_FLASH_BOOT)
+Saved PC:0x400462e2
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1010
+load:0x403cbf10,len:0x9f4
+load:0x403ce710,len:0x2e94
+entry 0x403cbf10
+E (376) esp_image: Checksum failed. Calculated 0x84 read 0x0
+E (376) boot: OTA app partition slot 0 is not bootable
+[343] [XTDET] no NVS screenType; bus probe VER=FF FF FF FF FF FLG=FF -> default controller
+[344] [INF] [CLK] RTC not found
+[344] [INF] [MAIN] Hardware detect: X4
+[350] [SD] SD card detected
+[427]   Wait complete:  CMD_SOFT_RESET (2 ms)
+[432]   Wait complete:  CMD_AUTO_WRITE_BW_RAM (5 ms)
+[437]   Wait complete:  CMD_AUTO_WRITE_RED_RAM (5 ms)
+[2245]   Wait complete: refresh (1672 ms)
+[3098]   Wait complete: refresh (497 ms)
+[3674]   Wait complete: refresh (496 ms)
+[7226]   Wait complete: refresh (496 ms)
+[7797]   Wait complete: refresh (497 ms)
+[8368]   Wait complete: refresh (497 ms)
+[8938]   Wait complete: refresh (496 ms)
+[10003] [INF] [MEM] Free: 119500 bytes, Total: 274468 bytes, Min Free: 119172 bytes, MaxAlloc: 73716 bytes
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40388830
+waiting for download
+      ��      ��      ��      ��      ��      �
+�
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403808a4
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x7 (TG0WDT_SYS_RST),boot:0xf (SPI_FAST_FLASH_BOOT)
+Saved PC:0x400462e2
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1010
+load:0x403cbf10,len:0x9f4
+load:0x403ce710,len:0x2e94
+entry 0x403cbf10
+E (376) esp_image: Checksum failed. Calculated 0x23 read 0x0
+E (376) boot: OTA app partition slot 0 is not bootable
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x403d03d8
+waiting for download
+�      ��      ��      ��      ��      �� �      ��      ��      ��      ��      ��      ��      ��      �      ��      ��      ��      ��      ��       ��      ��      �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c98c
+waiting for download
+Build:Feb  7 2021
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40380106
+waiting for download
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x7 (TG0WDT_SYS_RST),boot:0xf (SPI_FAST_FLASH_BOOT)
+Saved PC:0x400462e2
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1010
+load:0x403cbf10,len:0x9f4
+load:0x403ce710,len:0x2e94
+entry 0x403cbf10
+E (376) esp_image: Checksum failed. Calculated 0x84 read 0x0
+E (376) boot: OTA app partition slot 0 is not bootable
+[343] [XTDET] no NVS screenType; bus probe VER=FF FF FF FF FF FLG=FF -> default controller
+[344] [INF] [CLK] RTC not found
+[344] [INF] [MAIN] Hardware detect: X4
+[350] [SD] SD card detected
+[427]   Wait complete:  CMD_SOFT_RESET (2 ms)
+[432]   Wait complete:  CMD_AUTO_WRITE_BW_RAM (5 ms)
+[437]   Wait complete:  CMD_AUTO_WRITE_RED_RAM (5 ms)
+[2245]   Wait complete: refresh (1672 ms)
+[3098]   Wait complete: refresh (497 ms)
+[3674]   Wait complete: refresh (496 ms)
+[10052] [INF] [MEM] Free: 119500 bytes, Total: 274468 bytes, Min Free: 119172 bytes, MaxAlloc: 73716 bytes
+[20074] [INF] [MEM] Free: 119500 bytes, Total: 274468 bytes, Min Free: 119172 bytes, MaxAlloc: 73716 bytes
+[30095] [INF] [MEM] Free: 119500 bytes, Total: 274468 bytes, Min Free: 119172 bytes, MaxAlloc: 73716 bytes
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x40384c56
+waiting for download
+�      �      ��    ��      ��      ��      ��      �ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x4004c626
+waiting for download
+�       �
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(UwESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x7 (DOWNLOAD(USB/UART0/1))
+Saved PC:0x400462e2
+waiting for download
+�      �            ��    ��      ��      �
+[18638] [INF] [MEM] Free: 95440 bytes, Total: 250980 bytes, Min Free: 95112 bytes, MaxAlloc: 73716 bytes
+[20665] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[20671] [DBG] [ACT] Pushed to activity stack, new size = 1
+[20673] [DBG] [ACT] Entering activity: BleEditor
+[20676] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=94924 minfree=94876 maxalloc=73716
+[20679] [INF] [BLESPIKE] heap before nimble_port_init: free=94924 maxalloc=73716
+[4818]   Wait complete: refresh (496 ms)
+[5844] [DBG] [PWR] Going to low-power mode
+[6331] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[6338] [DBG] [ACT] Pushed to activity stack, new size = 1
+[6340] [DBG] [ACT] Entering activity: BleEditor
+[6343] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=94896 minfree=94848 maxalloc=73716
+[6346] [INF] [BLESPIKE] heap before nimble_port_init: free=94896 maxalloc=73716
+[2842] [INF] [SPIKE] SPIKE-HEAP P0-boot-no-ble free=135556 total=250980 minfree=135556 maxalloc=114676
+[2847] [DBG] [ACT] Exiting activity: Boot
+[2847] [DBG] [ACT] Entering activity: Home
+[2892] [DBG] [GFX] Cropping 142x226 by 6x0 pix, is top-down
+[2892] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[2952] [DBG] [GFX] Cropping 151x226 by 10x0 pix, is top-down
+[2952] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[3015] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[3016] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[3077] [DBG] [GFX] Cropping 150x226 by 9x0 pix, is top-down
+[3078] [DBG] [GFX] Scaling by 1.000000 - not scaled
+[3136] [DBG] [GFX] Time = 257 ms from clearScreen to displayBuffer
+[3655]   Wait complete: refresh (496 ms)
+[3718] [DBG] [GFX] Time = 9 ms from clearScreen to displayBuffer
+[4237]   Wait complete: refresh (496 ms)
+[4308] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[4819] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[4828]   Wait complete: refresh (496 ms)
+[4879] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[5398]   Wait complete: refresh (496 ms)
+[5441] [DBG] [ACT] Pushed to activity stack, new size = 1
+[5441] [DBG] [ACT] Entering activity: BleEditor
+[5441] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=94896 minfree=94780 maxalloc=73716
+[5442] [INF] [BLESPIKE] heap before nimble_port_init: free=94896 maxalloc=73716
+[5475] [INF] [BLESPIKE] heap after nimble_port_init: 29704
+[5480] [INF] [BLESPIKE] state -> starting
+[5490] [INF] [BLESPIKE] host synced, own addr type=0
+[5490] [INF] [BLESPIKE] state -> scanning
+[5491] [INF] [BLESPIKE] heap after host task start: 22956
+[5491] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=22956 minfree=22884 maxalloc=20468
+[5492] [INF] [BLEEDIT] SPIKE-HEAP P2b-after-editor-buffer free=14248 minfree=14248 maxalloc=11764
+[5492] [DBG] [LOOP] New max loop duration: 673 ms (activity: 673 ms)
+[5495] [INF] [BLESPIKE] NEW 45:d5:fc:f0:8b:de type=1 rssi=-62 hid=0 name='' uuids16=[] appear=0000/0
+[5495] [INF] [BLESPIKE]     raw[31]: 02 01 1a 1b ff 4c 00 0c 0e 00 f5 53 78 24 da ba 08 b1 69 34 42 e7 5c 10 06 41 1d 50 b1 1e 18
+[5499] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[5538] [INF] [BLESPIKE] NEW 44:a6:e5:09:92:18 type=0 rssi=-94 hid=0 name='' uuids16=[ff00 ] appear=0000/0
+[5538] [INF] [BLESPIKE]     raw[7]: 02 01 06 03 02 00 ff
+[5565] [INF] [BLESPIKE] NEW 65:0b:71:62:6a:68 type=1 rssi=-82 hid=0 name='' uuids16=[] appear=0000/0
+[5565] [INF] [BLESPIKE]     raw[17]: 02 01 1a 0d ff 4c 00 16 08 00 ad 5e be 47 56 f0 a2
+[5581] [INF] [BLESPIKE] NEW 78:cc:b0:d2:df:1b type=1 rssi=-83 hid=0 name='' uuids16=[] appear=0000/0
+[5581] [INF] [BLESPIKE]     raw[18]: 02 01 1a 02 0a 0c 0b ff 4c 00 10 06 04 1d 97 19 76 48
+[5584] [INF] [BLESPIKE] NEW 4c:be:a1:fe:0b:0f type=1 rssi=-82 hid=0 name='' uuids16=[] appear=0000/0
+[5584] [INF] [BLESPIKE]     raw[18]: 02 01 1a 02 0a 0c 0b ff 4c 00 10 06 04 1d 97 19 76 48
+[5618] [INF] [BLESPIKE] NEW e8:fb:1c:0d:cc:7c type=0 rssi=-74 hid=0 name='N/A' uuids16=[] appear=0000/1
+[5618] [INF] [BLESPIKE]     raw[12]: 03 19 00 00 02 0a 00 04 09 4e 2f 41
+[5625] [INF] [BLESPIKE] NEW 3c:dc:75:15:e6:ee type=0 rssi=-95 hid=0 name='' uuids16=[] appear=0000/0
+[5626] [INF] [BLESPIKE]     raw[0]:
+[5655] [INF] [BLESPIKE] NEW 66:fa:ad:a4:0d:e4 type=1 rssi=-66 hid=0 name='' uuids16=[] appear=0000/0
+[5656] [INF] [BLESPIKE]     raw[27]: 02 01 1a 17 ff 4c 00 09 08 13 04 c0 a8 01 e2 1b 58 16 08 00 6b bc ee 86 a1 b9 43
+[5667] [INF] [BLESPIKE] NEW 68:51:f8:2a:87:8d type=1 rssi=-65 hid=0 name='' uuids16=[] appear=0000/0
+[5667] [INF] [BLESPIKE]     raw[31]: 02 01 1a 1b ff 4c 00 0c 0e 00 f5 53 78 24 da ba 08 b1 69 34 42 e7 5c 10 06 41 1d 50 b1 1e 18
+[5788] [INF] [BLESPIKE] NEW 61:dc:82:a6:c8:40 type=1 rssi=-89 hid=0 name='' uuids16=[fe9f ] appear=0000/0
+[5788] [INF] [BLESPIKE]     raw[28]: 03 03 9f fe 17 16 9f fe 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[5852] [INF] [BLESPIKE] NEW 79:2c:c2:3c:96:8f type=1 rssi=-71 hid=0 name='' uuids16=[] appear=0000/0
+[5852] [INF] [BLESPIKE]     raw[17]: 02 01 1a 0a ff 4c 00 10 05 2d 98 d6 8f d6 02 0a 00
+[5905] [INF] [BLESPIKE] NEW 51:d6:6d:ec:ba:0f type=1 rssi=-83 hid=0 name='' uuids16=[] appear=0000/0
+[5905] [INF] [BLESPIKE]     raw[19]: 02 01 1a 0c ff 4c 00 10 07 37 1f ce 78 e1 14 38 02 0a 00
+[6019]   Wait complete: refresh (497 ms)
+[6065] [INF] [BLESPIKE] NEW ca:9a:e1:b6:4d:2f type=1 rssi=-64 hid=1 name='Geonix rev.2-2' uuids16=[1812 ] appear=03c1/1
+[6065] [INF] [BLESPIKE]     raw[27]: 02 01 06 03 03 12 18 03 19 c1 03 0f 09 47 65 6f 6e 69 78 20 72 65 76 2e 32 2d 32
+[6065] [INF] [BLESPIKE] HID peripheral found: 'Geonix rev.2-2' rssi=-64
+[6066] [INF] [BLESPIKE] state -> connecting
+[6643] [INF] [BLESPIKE] connected, handle=1 — starting security
+[6643] [INF] [BLESPIKE] state -> pairing
+[6643] [INF] [BLESPIKE] security already in progress (bonded) — waiting for ENC_CHANGE
+[7310] [INF] [BLESPIKE] encryption change status=0
+[7311] [INF] [BLESPIKE] state -> discovering
+[7493] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[7693] [DBG] [BLESPIKE] chr uuid=0x2a4e val=0x001b props=0x06
+[7693] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x001d props=0x12
+[7693] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0021 props=0x12
+[7793] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0025 props=0x12
+[7793] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0029 props=0x12
+[7794] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x002d props=0x12
+[7893] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0031 props=0x12
+[7893] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0035 props=0x0e
+[7894] [DBG] [BLESPIKE] chr uuid=0x2a4b val=0x0038 props=0x02
+[7993] [DBG] [BLESPIKE] chr uuid=0x2a22 val=0x003a props=0x12
+[7993] [DBG] [BLESPIKE] chr uuid=0x2a32 val=0x003d props=0x0e
+[7994] [DBG] [BLESPIKE] chr uuid=0x2a33 val=0x003f props=0x12
+[8093] [DBG] [BLESPIKE] chr uuid=0x2a4a val=0x0042 props=0x02
+[8093] [DBG] [BLESPIKE] chr uuid=0x2a4c val=0x0044 props=0x04
+[8193] [INF] [BLESPIKE] HID service: 14 chrs, 7 notifiable input report(s)
+[8793] [ERR] [BLESPIKE] disc_all_dscs rc=3
+[8793] [DBG] [BLESPIKE] report val=0x001d has no CCCD, skipping
+[8793] [DBG] [BLESPIKE] report val=0x0021 has no CCCD, skipping
+[8793] [DBG] [BLESPIKE] report val=0x0025 has no CCCD, skipping
+[8793] [DBG] [BLESPIKE] report val=0x0029 has no CCCD, skipping
+[8793] [DBG] [BLESPIKE] report val=0x002d has no CCCD, skipping
+[8794] [DBG] [BLESPIKE] report val=0x0031 has no CCCD, skipping
+[8794] [DBG] [BLESPIKE] report val=0x003a has no CCCD, skipping
+[8794] [INF] [BLESPIKE] subscribed to 7 input report(s)
+[10000] [INF] [MEM] Free: 13612 bytes, Total: 250980 bytes, Min Free: 13304 bytes, MaxAlloc: 10740 bytes
+[11548] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 04 00 00 00 00 00 ]
+[11698] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[11788] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 05 00 00 00 00 00 ]
+[11878] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[11908] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 06 00 00 00 00 00 ]
+[12043] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[12148] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[12268] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[12511] [DBG] [GFX] Time = 6 ms from clearScreen to displayBuffer
+[13031]   Wait complete: refresh (497 ms)
+[13075] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1527ms (render=570ms) chars=4 heap=13612
+[13075] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13612 free=13612
+[13648] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 07 00 00 00 00 00 ]
+[13723] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[13783] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 00 00 00 00 00 ]
+[13828] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 09 00 00 00 00 ]
+[13903] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 09 00 00 00 00 00 ]
+[13918] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[14023] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[14173] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[14278] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0a 00 00 00 00 00 ]
+[14368] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[14458] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0b 00 00 00 00 00 ]
+[14548] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0b 0c 00 00 00 00 ]
+[14578] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0c 00 00 00 00 00 ]
+[14638] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[14773] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[14878] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[15137] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[15656]   Wait complete: refresh (496 ms)
+[15701] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=2053ms (render=571ms) chars=12 heap=13612
+[15701] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13612 free=13612
+[20005] [INF] [MEM] Free: 13612 bytes, Total: 250980 bytes, Min Free: 13304 bytes, MaxAlloc: 10740 bytes
+[20543] [INF] [BLEEDIT] saved 12/12 bytes to /notes-spike.txt
+E (23028) NimBLE: ble_hs_stop: failed to terminate connection; rc=2
+
+[20547] [INF] [BLESPIKE] heap after nimble_port_deinit: 79516
+[20548] [INF] [BLEEDIT] SPIKE-HEAP P5-after-ble-teardown free=88224 minfree=13304 maxalloc=49140
+[20548] [DBG] [ACT] Exiting activity: BleEditor
+[20548] [DBG] [ACT] Popped from activity stack, new size = 0
+[20556] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[21076]   Wait complete: refresh (497 ms)
+[21680] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[22200]   Wait complete: refresh (496 ms)
+[22254] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[22774]   Wait complete: refresh (497 ms)
+[24708] [DBG] [ACT] Pushed to activity stack, new size = 1
+[24708] [DBG] [ACT] Entering activity: BleEditor
+[24708] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=93976 minfree=13304 maxalloc=63476
+[24709] [INF] [BLESPIKE] heap before nimble_port_init: free=93976 maxalloc=63476
+[24715] [INF] [BLESPIKE] heap after nimble_port_init: 29028
+[24721] [INF] [BLESPIKE] state -> starting
+[24730] [INF] [BLESPIKE] host synced, own addr type=0
+[24730] [INF] [BLESPIKE] state -> scanning
+[24731] [INF] [BLESPIKE] heap after host task start: 22280
+[24732] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=22280 minfree=13304 maxalloc=19444
+[24732] [INF] [BLEEDIT] SPIKE-HEAP P2b-after-editor-buffer free=13572 minfree=13304 maxalloc=11252
+[24740] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[25260]   Wait complete: refresh (496 ms)
+[26295] [INF] [BLESPIKE] NEW e4:eb:3f:b6:59:06 type=1 rssi=-78 hid=0 name='' uuids16=[] appear=0000/0
+[26295] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 10 00
+[26348] [INF] [BLESPIKE] NEW d8:9f:a5:f0:ae:e9 type=1 rssi=-65 hid=0 name='' uuids16=[] appear=0000/0
+[26349] [INF] [BLESPIKE]     raw[27]: 1a ff 4c 00 12 02 6e 01 07 11 06 75 83 a8 95 04 4c 2a f5 69 1e ab 27 d7 80 61 28
+[26572] [INF] [BLESPIKE] NEW f1:7d:07:81:83:dd type=1 rssi=-76 hid=0 name='' uuids16=[] appear=0000/0
+[26572] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 03
+[26713] [INF] [BLESPIKE] NEW d3:b8:a6:c5:70:76 type=1 rssi=-72 hid=0 name='' uuids16=[] appear=0000/0
+[26713] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 02
+[27245] [INF] [BLESPIKE] NEW c4:12:12:29:cd:2b type=1 rssi=-71 hid=0 name='' uuids16=[] appear=0000/0
+[27245] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 20 03
+[27358] [INF] [BLESPIKE] NEW c3:89:c4:26:10:93 type=1 rssi=-69 hid=0 name='' uuids16=[] appear=0000/0
+[27358] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 00 03
+[29580] [INF] [BLESPIKE] NEW 64:38:76:86:75:5f type=1 rssi=-95 hid=0 name='' uuids16=[fe9f ] appear=0000/0
+[29581] [INF] [BLESPIKE]     raw[28]: 03 03 9f fe 17 16 9f fe 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[30007] [INF] [MEM] Free: 13424 bytes, Total: 250980 bytes, Min Free: 13304 bytes, MaxAlloc: 10740 bytes
+[34327] [INF] [BLESPIKE] NEW ce:c9:93:38:c2:90 type=1 rssi=-96 hid=0 name='' uuids16=[] appear=0000/0
+[34328] [INF] [BLESPIKE]     raw[8]: 07 ff 4c 00 12 02 10 00
+[36526] [INF] [BLESPIKE] NEW e1:94:10:48:51:a1 type=1 rssi=-94 hid=0 name='' uuids16=[feaf ] appear=0000/0
+[36527] [INF] [BLESPIKE]     raw[31]: 02 01 06 03 02 af fe 17 16 af fe 13 03 b3 b9 e6 eb 22 38 e7 38 5a da d9 2d ca 4f f6 8d 71 ee
+[40012] [INF] [MEM] Free: 13424 bytes, Total: 250980 bytes, Min Free: 13304 bytes, MaxAlloc: 10740 bytes
+[43150] [INF] [BLESPIKE] NEW ca:9a:e1:b6:4d:30 type=1 rssi=-60 hid=1 name='Geonix rev.2-2' uuids16=[1812 ] appear=03c1/1
+[43150] [INF] [BLESPIKE]     raw[27]: 02 01 06 03 03 12 18 03 19 c1 03 0f 09 47 65 6f 6e 69 78 20 72 65 76 2e 32 2d 32
+[43150] [INF] [BLESPIKE] HID peripheral found: 'Geonix rev.2-2' rssi=-60
+[43151] [INF] [BLESPIKE] state -> connecting
+[43760] [INF] [BLESPIKE] connected, handle=1 — starting security
+[43760] [INF] [BLESPIKE] state -> pairing
+[43760] [INF] [BLESPIKE] security already in progress (bonded) — waiting for ENC_CHANGE
+[44427] [INF] [BLESPIKE] encryption change status=0
+[44427] [INF] [BLESPIKE] state -> discovering
+[44610] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[44810] [DBG] [BLESPIKE] chr uuid=0x2a4e val=0x001b props=0x06
+[44810] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x001d props=0x12
+[44810] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0021 props=0x12
+[44910] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0025 props=0x12
+[44910] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0029 props=0x12
+[44910] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x002d props=0x12
+[45010] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0031 props=0x12
+[45010] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0035 props=0x0e
+[45010] [DBG] [BLESPIKE] chr uuid=0x2a4b val=0x0038 props=0x02
+[45110] [DBG] [BLESPIKE] chr uuid=0x2a22 val=0x003a props=0x12
+[45110] [DBG] [BLESPIKE] chr uuid=0x2a32 val=0x003d props=0x0e
+[45110] [DBG] [BLESPIKE] chr uuid=0x2a33 val=0x003f props=0x12
+[45210] [DBG] [BLESPIKE] chr uuid=0x2a4a val=0x0042 props=0x02
+[45210] [DBG] [BLESPIKE] chr uuid=0x2a4c val=0x0044 props=0x04
+[45310] [INF] [BLESPIKE] HID service: 14 chrs, 7 notifiable input report(s)
+[45910] [ERR] [BLESPIKE] disc_all_dscs rc=3
+[45910] [DBG] [BLESPIKE] report val=0x001d has no CCCD, skipping
+[45910] [DBG] [BLESPIKE] report val=0x0021 has no CCCD, skipping
+[45910] [DBG] [BLESPIKE] report val=0x0025 has no CCCD, skipping
+[45910] [DBG] [BLESPIKE] report val=0x0029 has no CCCD, skipping
+[45911] [DBG] [BLESPIKE] report val=0x002d has no CCCD, skipping
+[45911] [DBG] [BLESPIKE] report val=0x0031 h[45912] [INF] [BLESPIKE] subscribed to 7 input report(s)
+[45912] [INF] [BLESPIKE] state -> ready
+[46910] [DBG] [BLESPIKE] notify h=0x0017 len=1 [59 ]
+[47355] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 1e 00 00 00 00 00 ]
+[47445] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 1e 21 00 00 00 00 ]
+[47490] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 21 00 00 00 00 00 ]
+[47535] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[47550] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 24 00 00 00 00 00 ]
+[47625] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 24 27 00 00 00 00 ]
+[47670] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 27 00 00 00 00 00 ]
+[47775] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[47988] [DBG] [GFX] Time = 6 ms from clearScreen to displayBuffer
+[48075] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[48210] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[48508]   Wait complete: refresh (497 ms)
+[48552] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=477ms (render=570ms) chars=5 heap=13244
+[48552] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13244 free=13244
+[48559] [DBG] [GFX] Time = 6 ms from clearScreen to displayBuffer
+[49078]   Wait complete: refresh (496 ms)
+[49123] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13244 free=13244
+[50017] [INF] [MEM] Free: 13244 bytes, Total: 250980 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[55815] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 1a 00 00 00 00 00 ]
+[55875] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 1a 0b 00 00 00 00 ]
+[55935] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0b 00 00 00 00 00 ]
+[55995] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[56025] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 04 00 00 00 00 00 ]
+[56115] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 04 17 00 00 00 00 ]
+[56160] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 17 00 00 00 00 00 ]
+[56220] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[56250] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2c 00 00 00 00 00 ]
+[56385] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[56609] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[56610] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 17 00 00 00 00 00 ]
+[56715] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[56730] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0c 00 00 00 00 00 ]
+[56805] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0c 10 00 00 00 00 ]
+[56820] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 10 00 00 00 00 00 ]
+[56925] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[56925] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 00 00 00 00 00 ]
+[57030] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 2c 00 00 00 00 ]
+[57060] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2c 00 00 00 00 00 ]
+[57129]   Wait complete: refresh (496 ms)
+[57135] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[57175] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1360ms (render=573ms) chars=15 heap=13244
+[57175] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13244 free=13244
+[57389] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[57909]   Wait complete: refresh (497 ms)
+[57953] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1343ms (render=571ms) chars=15 heap=13244
+[57953] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13244 free=13244
+[58290] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0c 00 00 00 00 00 ]
+[58380] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0c 16 00 00 00 00 ]
+[58410] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 16 00 00 00 00 00 ]
+[58470] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 16 2c 00 00 00 00 ]
+[58500] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2c 00 00 00 00 00 ]
+[58575] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[58635] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0c 00 00 00 00 00 ]
+[58725] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 0c 17 00 00 00 00 ]
+[58740] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 17 00 00 00 00 00 ]
+[58830] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[59070] [DBG] [BLESPIKE] notify h=0x001d len=8 [02 00 00 00 00 00 00 00 ]
+[59085] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[59145] [DBG] [BLESPIKE] notify h=0x001d len=8 [02 00 38 00 00 00 00 00 ]
+[59250] [DBG] [BLESPIKE] notify h=0x001d len=8 [02 00 00 00 00 00 00 00 ]
+[59280] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[59385] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[59505] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[59604]   Wait complete: refresh (496 ms)
+[59649] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1359ms (render=571ms) chars=22 heap=13244
+[59649] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13244 free=13244
+[59751] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[60024] [INF] [MEM] Free: 13244 bytes, Total: 250980 bytes, Min Free: 12924 bytes, MaxAlloc: 10740 bytes
+[60270]   Wait complete: refresh (496 ms)
+[60315] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1170ms (render=571ms) chars=22 heap=13244
+[60315] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13244 free=13244
+[65709] [INF] [BLEEDIT] phase: ble: shutting down
+[65717] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[66235]   Wait complete: refresh (496 ms)
+[66278] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13244 free=13204
+E (68763) NimBLE: ble_hs_stop: failed to terminate connection; rc=2
+
+[66283] [INF] [BLESPIKE] heap after nimble_port_deinit: 79328
+[66283] [INF] [CLAUDE] SPIKE-HEAP P6-exchange-start-ble-down free=79328 maxalloc=38900
+[66350] [INF] [BLEEDIT] phase: ble: restarting
+[66358] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[66876]   Wait complete: refresh (496 ms)
+[66919] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13244 free=84832
+[66920] [INF] [BLESPIKE] heap before nimble_port_init: free=84832 maxalloc=42996
+[66926] [INF] [BLESPIKE] heap after nimble_port_init: 19888
+[66931] [INF] [BLESPIKE] state -> starting
+[66941] [INF] [BLESPIKE] host synced, own addr type=0
+[66941] [INF] [BLESPIKE] state -> scanning
+[66942] [INF] [BLESPIKE] heap after host task start: 13140
+[66944] [DBG] [LOOP] New max loop duration: 1235 ms (activity: 1235 ms)
+[66957] [DBG] [GFX] Time = 13 ms from clearScreen to displayBuffer
+[67476]   Wait complete: refresh (496 ms)
+[70025] [INF] [MEM] Free: 13052 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[80030] [INF] [MEM] Free: 13052 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[90035] [INF] [MEM] Free: 13052 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[96943] [INF] [BLESPIKE] scan complete reason=0
+[96943] [INF] [BLESPIKE] state -> scanning
+[100040] [INF] [MEM] Free: 13052 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[110045] [INF] [MEM] Free: 13052 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[120050] [INF] [MEM] Free: 13052 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[126945] [INF] [BLESPIKE] scan complete reason=0
+[126945] [INF] [BLESPIKE] state -> scanning
+[130057] [INF] [MEM] Free: 13052 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[132426] [INF] [BLEEDIT] saved 22/22 bytes to /notes-spike.txt
+[132430] [INF] [BLESPIKE] heap after nimble_port_deinit: 79140
+[132430] [INF] [BLEEDIT] SPIKE-HEAP P5-after-ble-teardown free=87848 minfree=12508 maxalloc=27636
+[132431] [DBG] [ACT] Exiting activity: BleEditor
+[132431] [DBG] [ACT] Popped from activity stack, new size = 0
+[132439] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[132958]   Wait complete: refresh (496 ms)
+[133781] [DBG] [ACT] Pushed to activity stack, new size = 1
+[133781] [DBG] [ACT] Entering activity: BleEditor
+[133781] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=93696 minfree=12508 maxalloc=53236
+[133782] [INF] [BLESPIKE] heap before nimble_port_init: free=93696 maxalloc=53236
+[133788] [INF] [BLESPIKE] heap after nimble_port_init: 28736
+[133794] [INF] [BLESPIKE] state -> starting
+[133803] [INF] [BLESPIKE] host synced, own addr type=0
+[133803] [INF] [BLESPIKE] state -> scanning
+[133804] [INF] [BLESPIKE] heap after host task start: 21988
+[133805] [INF] [BLEEDIT] SPIKE-HEAP P2-after-ble-init free=21988 minfree=12508 maxalloc=19444
+[133805] [INF] [BLEEDIT] SPIKE-HEAP P2b-after-editor-buffer free=13280 minfree=12508 maxalloc=10740
+[133812] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[134331]   Wait complete: refresh (496 ms)
+[140065] [INF] [MEM] Free: 13132 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10740 bytes
+[144959] [INF] [BLESPIKE] NEW ca:9a:e1:b6:4d:31 type=1 rssi=-62 hid=1 name='Geonix rev.2-2' uuids16=[1812 ] appear=03c1/1
+[144959] [INF] [BLESPIKE]     raw[27]: 02 01 06 03 03 12 18 03 19 c1 03 0f 09 47 65 6f 6e 69 78 20 72 65 76 2e 32 2d 32
+[144959] [INF] [BLESPIKE] HID peripheral found: 'Geonix rev.2-2' rssi=-62
+[144960] [INF] [BLESPIKE] state -> connecting
+[145333] [INF] [BLESPIKE] connected, handle=1 — starting security
+[145333] [INF] [BLESPIKE] state -> pairing
+[145333] [INF] [BLESPIKE] security already in progress (bonded) — waiting for ENC_CHANGE
+[146003] [INF] [BLESPIKE] encryption change status=0
+[146003] [INF] [BLESPIKE] state -> discovering
+[146183] [INF] [BLESPIKE] HID service handles 0x0019..0x0044
+[146383] [DBG] [BLESPIKE] chr uuid=0x2a4e val=0x001b props=0x06
+[146383] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x001d props=0x12
+[146383] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0021 props=0x12
+[146483] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0025 props=0x12
+[146483] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0029 props=0x12
+[146484] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x002d props=0x12
+[146583] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0031 props=0x12
+[146583] [DBG] [BLESPIKE] chr uuid=0x2a4d val=0x0035 props=0x0e
+[146583] [DBG] [BLESPIKE] chr uuid=0x2a4b val=0x0038 props=0x02
+[146633] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 06 00 00 00 00 00 ]
+[146733] [DBG] [BLESPIKE] chr uuid=0x2a22 val=0x003a props=0x12
+[146733] [DBG] [BLESPIKE] chr uuid=0x2a32 val=0x003d props=0x0e
+[146734] [DBG] [BLESPIKE] chr uuid=0x2a33 val=0x003f props=0x12
+[146734] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 06 12 00 00 00 00 ]
+[146783] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 12 00 00 00 00 00 ]
+[146833] [DBG] [BLESPIKE] chr uuid=0x2a4a val=0x0042 props=0x02
+[146833] [DBG] [BLESPIKE] chr uuid=0x2a4c val=0x0044 props=0x04
+[146834] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[146883] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 11 00 00 00 00 00 ]
+[146933] [INF] [BLESPIKE] HID service: 14 chrs, 7 notifiable input report(s)
+[146934] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[146983] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 11 00 00 00 00 00 ]
+[147083] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[147134] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 00 00 00 00 00 ]
+[147183] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 06 00 00 00 00 ]
+[147234] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 06 00 00 00 00 00 ]
+[147283] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[147383] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 17 00 00 00 00 00 ]
+[147483] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+ [DBG] [BLESPIKE] report val=0x001d has no CCCD, skipping
+[147533] [DBG] [BLESPIKE] report val=0x0021 has no CCCD, skipping
+[147533] [DBG] [BLESPIKE] report val=0x0025 has no CCCD, skipping
+[147533] [DBG] [BLESPIKE] report val=0x0029 has no CCCD, skipping
+[147534] [DBG] [BLESPIKE] report val=0x002d has no CCCD, skippin[147535] [DBG] [BLESPIKE] report val=0x003a has no CCCD, skipping
+[147535] [INF] [BLESPIKE] subscribed to 7 input report(s)
+[147535] [INF] [BLESPIKE] state -> ready
+[147633] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[147733] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[148001] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[148483] [DBG] [BLESPIKE] notify h=0x0017 len=1 [59 ]
+[148520]   Wait complete: refresh (497 ms)
+[148564] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1931ms (render=570ms) chars=8 heap=13100
+[148564] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[150069] [INF] [MEM] Free: 13100 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[150553] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[150673] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[150778] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[150883] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[150958] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[151048] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[151138] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[151213] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[151303] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[151408] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[151468] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[151573] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[151648] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[151753] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[151828] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[151933] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[152008] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[152098] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[152173] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[152278] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[152353] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[152443] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[152533] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[152653] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[152698] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[152803] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[152968] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[153043] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 04 00 00 00 00 00 ]
+[153178] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[153238] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 2a 00 00 00 00 00 ]
+[153253] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2a 00 00 00 00 00 ]
+[153343] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[153600] [DBG] [GFX] Time = 6 ms from clearScreen to displayBuffer
+[154119]   Wait complete: refresh (496 ms)
+[154164] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=3610ms (render=569ms) chars=0 heap=13100
+[154164] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[156268] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 06 00 00 00 00 00 ]
+[156388] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 06 12 00 00 00 00 ]
+[156388] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 12 00 00 00 00 00 ]
+[156553] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 12 13 00 00 00 00 ]
+[156598] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 13 00 00 00 00 00 ]
+[156688] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 13 1c 00 00 00 00 ]
+[156733] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 1c 00 00 00 00 00 ]
+[156823] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[157051] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[157093] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[157213] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[157570]   Wait complete: refresh (497 ms)
+[157573] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[157615] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=522ms (render=571ms) chars=5 heap=13100
+[157616] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[157622] [DBG] [GFX] Time = 6 ms from clearScreen to displayBuffer
+[157648] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 04 00 00 00 00 00 ]
+[157753] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[157783] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 06 00 00 00 00 00 ]
+[157903] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[158113] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 19 00 00 00 00 00 ]
+[158142]   Wait complete: refresh (497 ms)
+[158173] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[158187] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[158278] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 19 00 00 00 00 00 ]
+[158353] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[158443] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 19 00 00 00 00 00 ]
+[158518] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[158608] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 19 00 00 00 00 00 ]
+[158683] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[158743] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 19 00 00 00 00 00 ]
+[158833] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[158983] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[159106] [DBG] [GFX] Time = 7 ms from clearScreen to displayBuffer
+[159625]   Wait complete: refresh (496 ms)
+[159670] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=2022ms (render=571ms) chars=12 heap=13100
+[159670] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[160074] [INF] [MEM] Free: 13100 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[160528] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[160708] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 19 00 00 00 00 00 ]
+[160783] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[160888] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 19 00 00 00 00 00 ]
+[160948] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[161023] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 19 00 00 00 00 00 ]
+[161113] [DBG] [BLESPIKE] notify h=0x001d len=8 [08 00 00 00 00 00 00 00 ]
+[161188] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[161381] [ERR] [GFX] !! Outside range (480, 775) -> (775, -1)
+[161382] [ERR] [GFX] !! Outside range (480, 776) -> (776, -1)
+[161382] [ERR] [GFX] !! Outside range (481, 776) -> (776, -2)
+[161382] [ERR] [GFX] !! Outside range (480, 779) -> (779, -1)
+[161382] [ERR] [GFX] !! Outside range (480, 780) -> (780, -1)
+[161382] [ERR] [GFX] !! Outside range (481, 780) -> (780, -2)
+[161382] [ERR] [GFX] !! Outside range (480, 781) -> (781, -1)
+[161383] [ERR] [GFX] !! Outside range (481, 781) -> (781, -2)
+[161383] [ERR] [GFX] !! Outside range (480, 782) -> (782, -1)
+[161383] [ERR] [GFX] !! Outside range (481, 782) -> (782, -2)
+[161383] [ERR] [GFX] !! Outside range (480, 783) -> [161428] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[161533] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[161638] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 28 00 00 00 00 00 ]
+[161683] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[161903]   Wait complete: refresh (496 ms)
+[161948] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1240ms (render=574ms) chars=17 heap=13100
+[161948] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[162006] [ERR] [GFX] !! Outside range (480, 776) -> (776, -1)
+[162006] [ERR] [GFX] !! Outside range (480, 780) -> (780, -1)
+[162007] [ERR] [GFX] !! Outside range (480, 781) -> (781, -1)
+[162007] [ERR] [GFX] !! Outside range (480, 782) -> (782, -1)
+[162007] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[162526]   Wait complete: refresh (496 ms)
+[162571] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1143ms (render=572ms) chars=17 heap=13100
+[162571] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[163273] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 11 00 00 00 00 00 ]
+[163378] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[163393] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 00 00 00 00 00 ]
+[163468] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[163558] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 00 00 00 00 00 ]
+[163633] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 08 07 00 00 00 00 ]
+[163663] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 07 00 00 00 00 00 ]
+[163708] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 07 16 00 00 00 00 ]
+[163738] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 16 00 00 00 00 00 ]
+[163828] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[163858] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2c 00 00 00 00 00 ]
+[163978] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[164222] [ERR] [GFX] !! Outside range (480, 776) -> (776, -1)
+[164222] [ERR] [GFX] !! Outside range (480, 780) -> (780, -1)
+[164222] [ERR] [GFX] !! Outside range (480, 781) -> (781, -1)
+[164222] [ERR] [GFX] !! Outside range (480, 782) -> (782, -1)
+[164222] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[164368] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 16 00 00 00 00 00 ]
+[164473] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 16 18 00 00 00 00 ]
+[164488] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 18 00 00 00 00 00 ]
+[164563] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 18 13 00 00 00 00 ]
+[164608] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 13 00 00 00 00 00 ]
+[164668] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[164742]   Wait complete: refresh (497 ms)
+[164743] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 13 00 00 00 00 00 ]
+[164787] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1514ms (render=573ms) chars=27 heap=13100
+[164787] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[164908] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 13 12 00 00 00 00 ]
+[164938] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 12 00 00 00 00 00 ]
+[164983] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 12 15 00 00 00 00 ]
+[164998] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 15 00 00 00 00 00 ]
+[165073] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 15 17 00 00 00 00 ]
+[165148] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 17 00 00 00 00 00 ]
+[165178] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 17 2c 00 00 00 00 ]
+[165193] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2c 00 00 00 00 00 ]
+[165313] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[165543] [DBG] [GFX] Time = 8 ms from clearScreen to displayBuffer
+[165673] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 09 00 00 00 00 00 ]
+[165763] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 09 12 00 00 00 00 ]
+[165778] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 12 00 00 00 00 00 ]
+[165853] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 12 15 00 00 00 00 ]
+[165883] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 15 00 00 00 00 00 ]
+[165943] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 15 2c 00 00 00 00 ]
+[165973] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2c 00 00 00 00 00 ]
+[166062]   Wait complete: refresh (496 ms)
+[166063] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[166107] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1739ms (render=572ms) chars=35 heap=13100
+[166108] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[166309] [ERR] [GFX] !! Outside range (480, 775) -> (775, -1)
+[166309] [ERR] [GFX] !! Outside range (481, 775) -> (775, -2)
+[166309] [ERR] [GFX] !! Outside range (480, 776) -> (776, -1)
+[166309] [ERR] [GFX] !! Outside range (481, 776) -> (776, -2)
+[166310] [ERR] [GFX] !! Outside range (482, 776) -> (776, -[166311] [ERR] [GFX] !! Outside range (481, 779) -> (779, -2)
+[166311] [ERR] [GFX] !! Outside range (480, 780) -> (780, -1)
+[166311] [ERR] [GFX] !! Outside range (481, 780) -> (780, -2)
+[166312] [ERR] [GFX] !! Outside range (482, 780) -> (780, -3)
+[166312] [ERR] [GFX] !! Outside range (481, 781) -> (781, -2)
+[166313] [ERR] [GFX] !! Outside range (481, 782) -> (782, -2)
+[166313] [ERR] [GFX] !! Outside range (482, 782) -> (782, -3)
+[166313] [ERR] [GFX] !! Outside range (480, 783) -> (783, -1)
+[166313] [ERR] [GFX] !! Outside range (481, 783) -> (783, -2)
+[166313] [DBG] [GFX] Time = 12 ms from clearScreen to displayBuffer
+[166832]   Wait complete: refresh (496 ms)
+[166877] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1203ms (render=575ms) chars=35 heap=13100
+[166877] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[169453] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 06 00 00 00 00 00 ]
+[169513] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 06 12 00 00 00 00 ]
+[169558] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 12 00 00 00 00 00 ]
+[169603] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[169663] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 10 00 00 00 00 00 ]
+[169768] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[169813] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 10 00 00 00 00 00 ]
+[169918] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[169918] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 04 00 00 00 00 00 ]
+[170038] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[170038] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 11 00 00 00 00 00 ]
+[170068] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 11 07 00 00 00 00 ]
+[170081] [INF] [MEM] Free: 13100 bytes, Total: 250980 bytes, Min Free: 12508 bytes, MaxAlloc: 10228 bytes
+[170128] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 07 00 00 00 00 00 ]
+[170188] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[170263] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 2c 00 00 00 00 00 ]
+[170398] [DBG] [BLESPIKE] notify h=0x001d len=8 [00 00 00 00 00 00 00 00 ]
+[170631] [ERR] [GFX] !! Outside range (480, 775) -> (775, -1)
+[170632] [ERR] [GFX] !! Outside range (481, 775) -> (775, -2)
+[170632] [ERR] [GFX] !! Outside range (480, 776) -> (776, -1)
+[170632] [ERR] [GFX] !! Outside range (481, 776) -> (776, -2)
+[170632] [ERR] [GFX] !! Outside range (482, 776) -> (776, -3)
+[170632] [ERR] [GFX] !! Outside range (480, 779) -> (779, -1)
+[170632] [ER[170633] [ERR] [GFX] !! Outside range (481, 780) -> (780, -2)
+[170633] [ERR] [GFX] !! Outside range (482, 780) -> (780, -3)
+[170633] [ERR] [GFX] !! Outside range (481, 781) -> (781, -2)
+[170634] [ERR] [GFX] !! Outside range (482, 781) -> (781, -3)
+[170634] [ERR] [GFX] !! Outside range (480, 782) -> (782, -1)
+[170635] [DBG] [GFX] Time = 11 ms from clearScreen to displayBuffer
+[171154]   Wait complete: refresh (496 ms)
+[171198] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=1745ms (render=574ms) chars=43 heap=13100
+[171198] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[171703] [DBG] [BLESPIKE] notify h=0x001d len=8 [02 00 00 00 00 00 00 00 ]
+[171778] [DBG] [BLESPIKE] notify h=0x001d len=8 [02 00 10 00 00 00 00 00 ]
+[171883] [DBG] [BLESPIKE] notify h=0x001d len=8 [02 00 00 00 00 00 00 00 ]
+[172150] [ERR] [GFX] !! Outside range (480, 775) -> (775, -1)
+[172150] [ERR] [GFX] !! Outside range (480, 776) -> (776, -1)
+[172150] [ERR] [GFX] !! Outside range (481, 776) -> (776, -2)
+[172150] [ERR] [GFX] !! Outside range (480, 779) -> (779, -1)
+[172150] [ERR] [GFX] !! Outside range (480, 780) -> (780, -1)
+[172150] [ERR] [GFX] !! Outside range (481, 780) -> (780, -2)
+[172150] [ERR] [GFX] !! Outside range (480, 781) -> (781, -1)
+[172151] [ERR] [GFX] !! Outside range (481, 781) -> (781, -2)
+[172151] [ERR] [GFX] !! Outside range (480, 782) -> (782, -1)
+[172151] [ERR] [GFX] !! Outside range (481, 782) -> (782, -2)[172153] [DBG] [GFX] Time = 11 ms from clearScreen to displayBuffer
+[172671]   Wait complete: refresh (496 ms)
+[172716] [INF] [BLEEDIT] SPIKE-LATENCY key->glyph=938ms (render=574ms) chars=44 heap=13100
+[172716] [INF] [BLEEDIT] SPIKE-HEAP P4-typing minfree-observed=13072 free=13100
+[27040] [DBG] [WCS] Added credentials for: REDACTED-SSID
+[27455] [INF] [SPIKE] WIFISAVE 'REDACTED-SSID': saved
+[27464] [DBG] [LOOP] New max loop duration: 461 ms (activity: 5 ms)
+[28007] [INF] [SPIKE] CMD:BLEEDIT — opening BLE editor
+[28013] [DBG] [ACT] Pushed to activity stack, new size = 1
+[28015] [DBG] [ACT] Entering activity: BleEditor
+[28018] [INF] [BLEEDIT] SPIKE-HEAP P1-editor-enter-before-ble free=94724 minfree=93764 maxalloc=73716
+[28022] [INF] [BLESPIKE] heap before nimble_port_init: free=94724 maxalloc=73716

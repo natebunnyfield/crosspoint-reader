@@ -739,6 +739,53 @@ families:
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexmono/IBMPlexMono-Italic.ttf"}
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexmono/IBMPlexMono-BoldItalic.ttf"}
 
+  # ── Editor group ───────────────────────────────────────────────────────────
+  # Owner ruling 2026-08-05: these live in their own EDITOR font group, chosen
+  # by a CrossPoint setting under Text Settings. They are NOT reading faces and
+  # do NOT join the six-family S tier — keep the two lists separate when
+  # deciding what goes on a card. IBM Plex Mono (above) is the fifth member.
+  # All OFL; iA's faces are the "S" (narrow) cuts from github.com/iaolo/iA-Fonts.
+
+  - name: iAWriterMono
+    description: "EDITOR GROUP. iA Writer Mono — true monospace (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Mono/Static/iAWriterMonoS-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Mono/Static/iAWriterMonoS-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Mono/Static/iAWriterMonoS-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Mono/Static/iAWriterMonoS-BoldItalic.ttf"}
+
+  - name: iAWriterDuo
+    description: "EDITOR GROUP. iA Writer Duo — duospace, wider i/l/j (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Duo/Static/iAWriterDuoS-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Duo/Static/iAWriterDuoS-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Duo/Static/iAWriterDuoS-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Duo/Static/iAWriterDuoS-BoldItalic.ttf"}
+
+  - name: iAWriterQuattro
+    description: "EDITOR GROUP. iA Writer Quattro — quattrospace, most proportional (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Quattro/Static/iAWriterQuattroS-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Quattro/Static/iAWriterQuattroS-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Quattro/Static/iAWriterQuattroS-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Quattro/Static/iAWriterQuattroS-BoldItalic.ttf"}
+
+  - name: SpaceMono
+    description: "EDITOR GROUP. Space Mono — geometric monospace with character (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spacemono/SpaceMono-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spacemono/SpaceMono-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spacemono/SpaceMono-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spacemono/SpaceMono-BoldItalic.ttf"}
+
   - name: SourceCodePro
     description: "Adobe monospace with excellent hinting (Latin)"
     intervals: latin-ext
