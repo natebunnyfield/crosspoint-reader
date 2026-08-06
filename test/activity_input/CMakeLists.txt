@@ -57,6 +57,7 @@ endif()
 
 add_executable(ActivityInputTest
   ActivityInputTest.cpp
+  TypedTextEntryTest.cpp
   HostHarness.cpp
   # activity + input layer under test
   ${REPO_ROOT}/src/MappedInputManager.cpp
@@ -64,6 +65,11 @@ add_executable(ActivityInputTest
   ${REPO_ROOT}/src/activities/settings/FontSelectionActivity.cpp
   ${REPO_ROOT}/src/ReaderFontSizes.cpp
   ${REPO_ROOT}/src/activities/util/IntervalSelectionActivity.cpp
+  # Host keyboard text entry (TypedTextEntryTest.cpp). The daisywheel is the
+  # text-entry activity that links host-side; the grid keyboard would drag the
+  # SDK keyboard component in with it, and is covered end-to-end by the
+  # simulator instead — that file says which half is tested where.
+  ${REPO_ROOT}/src/activities/util/DaisyEntryActivity.cpp
   ${REPO_ROOT}/src/util/ButtonNavigator.cpp
   # i18n (tr() is used by every activity above)
   ${REPO_ROOT}/lib/I18n/I18n.cpp

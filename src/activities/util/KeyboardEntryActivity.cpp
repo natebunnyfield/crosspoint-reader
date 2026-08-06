@@ -10,6 +10,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TypedTextInput.h"
 
 namespace fui = freeink::ui;
 
@@ -312,10 +313,17 @@ void KeyboardEntryActivity::onEnter() {
   touchRouter.holdMs = TOUCH_LONG_PRESS_MS;
   touchRouter.overrideHoldMs = TOUCH_DEL_LONG_PRESS_MS;
   interactionsReady = false;
+  // Tell the host a text field is open. No-op on device; on a simulator host
+  // it raises that host's keyboard (a phone's on-screen one) and takes the
+  // keyboard off the button map for as long as we are here.
+  mappedInput.setTextEntryActive(true);
   requestUpdate();
 }
 
-void KeyboardEntryActivity::onExit() { Activity::onExit(); }
+void KeyboardEntryActivity::onExit() {
+  mappedInput.setTextEntryActive(false);
+  Activity::onExit();
+}
 
 const fui::KeyboardLayout& KeyboardEntryActivity::currentLayout() const {
   if (grid13) return SL_LAYOUT;
@@ -704,6 +712,35 @@ fui::Rect KeyboardEntryActivity::keyboardRect() const {
 }
 
 void KeyboardEntryActivity::loop() {
+  // Host keyboard first, before touch or buttons. Nothing here competes with
+  // them: a host that has no keyboard never yields a chunk, and the grid stays
+  // fully usable on a host that does -- the two edit the same field and the
+  // same cursor, so a typist can still peck an accented key off the grid.
+  std::string typed;
+  if (mappedInput.consumeTypedText(typed)) {
+    const TypedTextInput::Outcome outcome = TypedTextInput::apply(
+        typed, [this](const std::string& run) { insertUtf8(run.c_str()); }, [this] { return backspaceUtf8(); });
+    switch (outcome) {
+      case TypedTextInput::Outcome::Committed:
+        onComplete(text);
+        return;
+      case TypedTextInput::Outcome::Cancelled:
+        onCancel();
+        return;
+      case TypedTextInput::Outcome::Changed:
+        // Typing is an edit, so it leaves the cursor-move mode the same way
+        // an on-screen key press does.
+        cursorMode = false;
+        togglePos = false;
+        hintVisible = false;
+        delPressCount = 0;
+        requestUpdate();
+        return;
+      case TypedTextInput::Outcome::None:
+        break;
+    }
+  }
+
   int tx = 0;
   int ty = 0;
 

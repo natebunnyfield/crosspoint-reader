@@ -22,6 +22,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 class HalGPIO {
  public:
@@ -70,7 +71,34 @@ class HalGPIO {
   bool isUsbConnected() const { return false; }
   bool wasUsbStateChanged() const { return false; }
 
+  // Host keyboard text entry. Real behaviour here rather than a hard false:
+  // this is the one HAL surface a host CAN implement, so the suite scripts it
+  // the same way it scripts buttons — simType() is the typist, and the flag
+  // records what the activity announced.
+  void setTextEntryActive(const bool active) {
+    textEntryActive_ = active;
+    typed_.clear();  // both edges drop the queue, as the simulator's does
+  }
+  bool consumeTypedText(std::string& out) {
+    if (typed_.empty()) return false;
+    out.assign(typed_);
+    typed_.clear();
+    return true;
+  }
+
+  static constexpr char TYPED_BACKSPACE = '\b';
+  static constexpr char TYPED_COMMIT = '\n';
+  static constexpr char TYPED_CANCEL = '\x1b';
+
   // ---- test-only scripting ----
+
+  // Queues host-typed bytes for the next consumeTypedText(). Dropped when no
+  // text field is open, which is what the simulator does and what keeps a
+  // mistimed test honest.
+  void simType(const std::string& utf8) {
+    if (textEntryActive_) typed_ += utf8;
+  }
+  bool simTextEntryActive() const { return textEntryActive_; }
 
   // Sets the RAW level. It becomes visible (and produces an edge) on the next
   // update(), i.e. at the next frame boundary — never mid-frame.
@@ -93,6 +121,8 @@ class HalGPIO {
     }
     heldTimeMs_ = 0;
     deviceType_ = DeviceType::X4;
+    textEntryActive_ = false;
+    typed_.clear();
   }
 
   // Button indices — same values as the real HAL and the SDK.
@@ -127,6 +157,8 @@ class HalGPIO {
   bool releaseEdge_[BTN_COUNT] = {};
   unsigned long heldTimeMs_ = 0;
   DeviceType deviceType_ = DeviceType::X4;
+  bool textEntryActive_ = false;
+  std::string typed_;
 };
 
 extern HalGPIO gpio;
