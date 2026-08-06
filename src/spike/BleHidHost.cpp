@@ -7,6 +7,8 @@
 
 #include <atomic>
 
+#include "HidKeymap.h"
+
 #ifdef SIMULATOR
 // The simulator has no BLE radio. HalGPIO owns all SDL polling there (adding
 // text input would mean editing the simulator repo), so typed text arrives
@@ -22,8 +24,8 @@ constexpr const char* INPUT_PATH = "/ble-input.txt";
 State gState = State::Off;
 bool gStarted = false;
 char gPeerName[32] = "simulated keyboard";
-std::string gPending;      // characters read but not yet popped
-uint32_t gConsumed = 0;    // bytes of INPUT_PATH already ingested
+std::string gPending;    // characters read but not yet popped
+uint32_t gConsumed = 0;  // bytes of INPUT_PATH already ingested
 uint32_t gNotifies = 0;
 uint32_t gLastTs = 0;
 unsigned long gLastPoll = 0;
@@ -79,9 +81,12 @@ int popChar() {
 
 const char* stateName() {
   switch (gState) {
-    case State::Off: return "off";
-    case State::Ready: return "ready (sim)";
-    default: return "sim";
+    case State::Off:
+      return "off";
+    case State::Ready:
+      return "ready (sim)";
+    default:
+      return "sim";
   }
 }
 
@@ -186,21 +191,6 @@ uint32_t gLastPoppedTs = 0;
 // Last report, so we emit only 0->1 key transitions (HOGP has no key-repeat;
 // the host is expected to synthesise it, and we do not want one per report).
 uint8_t gPrevKeys[6] = {0};
-
-// US layout, HID usage 0x04..0x38. Index = usage - 0x04.
-constexpr char KEYMAP_LOWER[] =
-    "abcdefghijklmnopqrstuvwxyz"  // 0x04..0x1D
-    "1234567890"                  // 0x1E..0x27
-    "\n\x1b\b\t "                 // 0x28..0x2C  enter esc bksp tab space
-    "-=[]\\#;'`,./";              // 0x2D..0x38  (0x32 is non-US '#')
-constexpr char KEYMAP_UPPER[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "!@#$%^&*()"
-    "\n\x1b\b\t "
-    "_+{}|~:\"~<>?";
-static_assert(sizeof(KEYMAP_LOWER) == sizeof(KEYMAP_UPPER), "keymap length mismatch");
-constexpr uint8_t KEY_FIRST = 0x04;
-constexpr uint8_t KEY_LAST = KEY_FIRST + sizeof(KEYMAP_LOWER) - 2;
 
 void setState(State s) {
   gState = s;
@@ -410,34 +400,15 @@ void startDiscovery() {
 
 void decodeReport(const uint8_t* rep, size_t len) {
   // Boot-protocol layout: [modifiers][reserved][6 keycodes]. Report-protocol
-  // keyboards use the same shape; a 9-byte report carries a leading report ID.
+  // keyboards use the same shape; a 9-byte report carries a leading report ID,
+  // so decode from the last 8 bytes. The decode itself lives in HidKeymap.h so
+  // it can be unit-tested on the host without a radio (test/ble_keymap).
   if (len < 8) return;
-  const size_t off = len - 8;
-  const uint8_t mods = rep[off];
-  const bool shift = (mods & 0x22) != 0;  // left or right shift
-  const uint8_t* keys = rep + off + 2;
+  const uint8_t* report = rep + (len - 8);
+  char decoded[6];
+  const size_t n = hidkeymap::decodeReport(report, gPrevKeys, decoded, sizeof(decoded));
   const uint32_t now = millis();
-
-  for (size_t i = 0; i < 6; ++i) {
-    const uint8_t usage = keys[i];
-    if (usage == 0 || usage == 0x01 /* ErrorRollOver */) continue;
-    bool wasDown = false;
-    for (size_t j = 0; j < 6; ++j) {
-      if (gPrevKeys[j] == usage) {
-        wasDown = true;
-        break;
-      }
-    }
-    if (wasDown) continue;
-    if (usage < KEY_FIRST || usage > KEY_LAST) {
-      LOG_DBG(TAG, "unmapped usage 0x%02x", usage);
-      continue;
-    }
-    const char c = shift ? KEYMAP_UPPER[usage - KEY_FIRST] : KEYMAP_LOWER[usage - KEY_FIRST];
-    if (c == 0x1b) continue;  // Esc: not an editor character
-    ringPush(c, now);
-  }
-  memcpy(gPrevKeys, keys, 6);
+  for (size_t i = 0; i < n; ++i) ringPush(decoded[i], now);
 }
 
 // --- GAP ---------------------------------------------------------------------

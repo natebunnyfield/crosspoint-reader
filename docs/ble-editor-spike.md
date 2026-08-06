@@ -196,6 +196,24 @@ remains in main.
    mostly `0x50`/`0x4f` (Left/Right arrow). Harmless here, but a real editor
    needs cursor movement, so the keymap must extend past 0x38.
 
+### A2. Editor TODO (owner request 2026-08-06)
+
+- **Pagination.** The editor shows only the tail of the buffer; there is no way
+  to page back through a note. Port the `TextViewerActivity` approach — keep the
+  page-start offsets so paging backwards replays exactly — and pair it with the
+  gap buffer, since paging plus a cursor is what turns this from a capture box
+  into an editor.
+- **Markdown awareness while editing.** Render a deliberately small subset in
+  place: `#`–`###` headings **bold** (and a size bump where the slot allows),
+  `_italics_` / `*italics*` italic, `**bold**` bold, `` `code` `` and fenced
+  blocks in the editor-group monospace face, `-`/`*`/`1.` list prefixes with a
+  hanging indent, `>` blockquote indented. The font styles already exist
+  (`EpdFontFamily::BOLD` / `ITALIC`), so this is a layout-and-span problem, not
+  a font problem. Tables and images stay unrendered.
+  Sequencing note: do the read-only viewer version first — the editor version
+  has to keep byte offsets and rendered spans in sync as the cursor moves, and
+  that is a materially harder problem than displaying a finished file.
+
 ### B. Remaining measurements
 
 4. **Bond persistence across reboot.** On reconnect the peer reported
@@ -392,6 +410,74 @@ Three routes, in order of nearness:
    built.
 
 ---
+
+## How to test and verify this firmware
+
+Three tiers, cheapest first. The rule that matters: **push every check down to
+the cheapest tier that can actually catch it**, and be honest that the top tier
+cannot be skipped for radios, TLS-at-real-heap, or e-ink timing.
+
+### 1. Host unit tests — seconds, no hardware, runs in CI
+
+```bash
+cmake -S test -B build/test -DCMAKE_BUILD_TYPE=Release
+cmake --build build/test
+ctest --test-dir build/test --output-on-failure -j
+```
+
+Pure logic only, but that is more of this spike than it looks. `test/ble_keymap`
+covers the HID decoder: shift tables, control characters, unmapped usages
+(arrow keys must produce nothing), held-key-emits-once, release-then-repress,
+and a real n-key-rollover capture from the Geonix. That suite exists because
+the decoder was extracted into `src/spike/HidKeymap.h` — free of Arduino and
+NimBLE — specifically so it could be tested without a radio.
+
+Still untested at this tier and worth adding: the word-wrap in `layout()`,
+transcript formatting and the timestamp fallback chain, and `trimHistory()`'s
+two caps.
+
+### 2. Headless simulator — a minute, no hardware, full activity flows
+
+```bash
+CROSSPOINT_SIM_INPUT_SCRIPT="2000:DOWN;...;5600:ENTER" \
+CROSSPOINT_SIM_SCREENSHOTS="8000:/tmp/shots/editor.bmp" \
+pio run -e simulator -t run_simulator
+```
+
+Drives real activities with scripted button presses and captures BMPs, so
+navigation, layout and end-to-end flow are verifiable without touching the
+device. Typed text goes in via `fs_/ble-input.txt` (see the SIMULATOR twin in
+`BleHidHost.cpp`), which makes the editor scriptable in a way the device path
+never can be. This tier caught two real bugs: `uptime+16s` timestamps and the
+missing conversation context.
+
+**Do not run a bare `pio run -e simulator` between a device build and a flash.**
+It omits the nimble `PLATFORMIO_BUILD_FLAGS`, which changes `project.checksum`
+and cleans *every* env's build directory — `firmware.bin` disappears.
+
+### 3. Device — minutes, the only place some things are real
+
+```bash
+./spike-build.sh upload          # or esptool directly; see below
+python3 spike-run-exchange.py    # single port owner: save wifi, open editor, stream
+```
+
+Only the device can verify: BLE scan/pair/GATT, wolfSSL TLS at real heap, the
+BLE↔WiFi handoff, e-ink refresh timing, and anything measured in bytes of free
+heap. Everything in the "Device-confirmed measurements" section above came from
+here and cannot be obtained anywhere else.
+
+**One serial port owner, always.** A background capture holding
+`/dev/cu.usbmodem*` resets the chip mid-write, which presents as
+"chip stopped responding" 1–3 % into every flash and looks exactly like failing
+hardware. This cost hours before it was identified; kill every capture process
+before flashing.
+
+### CI
+
+`.github/workflows/ci.yml` builds, `pr-formatting-check.yml` runs clang-format.
+Tier 1 is the only one of the three that CI can run today; tier 2 needs SDL and
+tier 3 needs hardware.
 
 ## Reproducing
 

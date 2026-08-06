@@ -60,3 +60,6 @@ sdkconfig.*
 # make_sleep_bmp.py's --out defaults to a bare "sleep.bmp" in the CWD, so
 # running it from the repo root or scripts/ drops a 48 KB build artifact here.
 sleep.bmp
+
+# SPIKE (branch spike/ble-editor): serial capture output, regenerated per run.
+spike-capture.log
