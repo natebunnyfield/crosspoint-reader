@@ -28,6 +28,7 @@ class ClaudeChatActivity final : public Activity {
   std::vector<std::string> answerLines;
   size_t answerTop = 0;  // pagination through a long answer
 
+  int editorFontId = 0;
   int lineHeight = 1;
   int maxLines = 1;
   int maxWidth = 0;

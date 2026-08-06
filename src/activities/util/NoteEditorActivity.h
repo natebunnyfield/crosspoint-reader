@@ -32,6 +32,7 @@ class NoteEditorActivity final : public Activity {
   std::vector<DisplayLine> lines;
   size_t topLine = 0;  // first display line on screen — this is the pagination
 
+  int editorFontId = 0;
   int lineHeight = 1;
   int maxLines = 1;
   int maxWidth = 0;

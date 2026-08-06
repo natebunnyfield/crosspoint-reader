@@ -8,14 +8,28 @@
 
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "CrossPointSettings.h"
 #include "spike/BleHidHost.h"
+#include "spike/EditorFonts.h"
 #include "spike/ClaudeChat.h"
 #include "spike/HidKeymap.h"
 #include "spike/MarkdownSpans.h"
 
 namespace {
 constexpr const char* TAG = "CLAUDEUI";
-constexpr int CHAT_FONT_ID = UI_10_FONT_ID;
+constexpr int CHAT_FONT_ID_FALLBACK = UI_10_FONT_ID;
+
+// The Editor Font setting picks from the editor-group families (see
+// src/spike/EditorFonts.h). If that family is not installed on the card the UI
+// face stands in, so the screen is never blank because of a missing font.
+int resolveEditorFont() {
+  const char* family = editorfonts::selectedFamily(SETTINGS.editorFont);
+  if (SETTINGS.sdFontIdResolver != nullptr) {
+    const int id = SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12);
+    if (id != 0) return id;
+  }
+  return CHAT_FONT_ID_FALLBACK;
+}
 }  // namespace
 
 void ClaudeChatActivity::onEnter() {
@@ -29,8 +43,9 @@ void ClaudeChatActivity::onEnter() {
   if (storage) buf = makeUniqueNoThrow<textbuf::TextBuffer>(storage.get(), BUF_SIZE);
   if (!buf) LOG_ERR(TAG, "OOM: %u byte prompt buffer", (unsigned)BUF_SIZE);
 
+  editorFontId = resolveEditorFont();
   const auto& metrics = UITheme::getInstance().getMetrics();
-  lineHeight = renderer.getLineHeight(CHAT_FONT_ID);
+  lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;
   contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing;
@@ -68,7 +83,7 @@ void ClaudeChatActivity::layoutAnswer() {
     if (para.empty()) {
       answerLines.emplace_back();
     } else {
-      const auto wrapped = renderer.wrappedText(CHAT_FONT_ID, para.c_str(), maxWidth, 200);
+      const auto wrapped = renderer.wrappedText(editorFontId, para.c_str(), maxWidth, 200);
       for (const auto& w : wrapped) answerLines.push_back(w);
     }
     if (nl >= answer.size()) break;
@@ -212,7 +227,7 @@ void ClaudeChatActivity::render(RenderLock&&) {
 
   if (view == View::Answer) {
     for (size_t n = 0; n < static_cast<size_t>(maxLines) && answerTop + n < answerLines.size(); ++n) {
-      renderer.drawText(CHAT_FONT_ID, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
+      renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
                         answerLines[answerTop + n].c_str());
     }
     char note[80];
@@ -226,7 +241,7 @@ void ClaudeChatActivity::render(RenderLock&&) {
   }
 
   if (view == View::Working) {
-    renderer.drawCenteredText(CHAT_FONT_ID, contentTop + lineHeight * 2, phaseText);
+    renderer.drawCenteredText(editorFontId, contentTop + lineHeight * 2, phaseText);
     renderer.displayBuffer();
     return;
   }
@@ -234,13 +249,13 @@ void ClaudeChatActivity::render(RenderLock&&) {
   // Prompt view.
   if (buf && !buf->empty()) {
     const std::string prompt(buf->data(), buf->size());
-    const auto wrapped = renderer.wrappedText(CHAT_FONT_ID, prompt.c_str(), maxWidth, maxLines);
+    const auto wrapped = renderer.wrappedText(editorFontId, prompt.c_str(), maxWidth, maxLines);
     for (size_t n = 0; n < wrapped.size(); ++n) {
-      renderer.drawText(CHAT_FONT_ID, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
+      renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
                         wrapped[n].c_str());
     }
   } else {
-    renderer.drawText(CHAT_FONT_ID, metrics.contentSidePadding, contentTop, "Type a question, then press Ask.");
+    renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop, "Type a question, then press Ask.");
   }
 
   char status[80];

@@ -240,12 +240,18 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 
-// Pushed rather than replaced so Back returns to Home with its state.
+// REPLACE, not push. Pushing keeps HomeActivity alive on the stack with its
+// recent-book cover buffers still allocated, which left ~94 KB free and a
+// 73,716-byte largest block — and nimble_port_init(), which wants ~65 KB
+// contiguous, HUNG at that level repeatedly (watchdog reboot, no panic). Opened
+// straight from boot instead, the same call saw 134,972 free / 114,676 and
+// returned 0. Replacing frees Home before BLE starts; Back still works because
+// popActivity() on an empty stack goes Home.
 void ActivityManager::goToNoteEditor(std::string path) {
-  pushActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path)));
+  replaceActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path)));
 }
 
-void ActivityManager::goToClaudeChat() { pushActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
+void ActivityManager::goToClaudeChat() { replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

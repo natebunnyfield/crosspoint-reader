@@ -8,13 +8,27 @@
 
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "CrossPointSettings.h"
 #include "spike/BleHidHost.h"
+#include "spike/EditorFonts.h"
 #include "spike/HidKeymap.h"
 #include "spike/MarkdownSpans.h"
 
 namespace {
 constexpr const char* TAG = "NOTEEDIT";
-constexpr int EDITOR_FONT_ID = UI_10_FONT_ID;
+constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
+
+// The Editor Font setting picks from the editor-group families (see
+// src/spike/EditorFonts.h). If that family is not installed on the card the UI
+// face stands in, so the screen is never blank because of a missing font.
+int resolveEditorFont() {
+  const char* family = editorfonts::selectedFamily(SETTINGS.editorFont);
+  if (SETTINGS.sdFontIdResolver != nullptr) {
+    const int id = SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12);
+    if (id != 0) return id;
+  }
+  return EDITOR_FONT_ID_FALLBACK;
+}
 }  // namespace
 
 // getTextWidth() does not count a TRAILING space, so measuring each styled span
@@ -24,7 +38,7 @@ constexpr int EDITOR_FONT_ID = UI_10_FONT_ID;
 int NoteEditorActivity::advanceOf(const char* piece, EpdFontFamily::Style style) const {
   char probe[200];
   snprintf(probe, sizeof(probe), "%s|", piece);
-  return renderer.getTextWidth(EDITOR_FONT_ID, probe, style) - renderer.getTextWidth(EDITOR_FONT_ID, "|", style);
+  return renderer.getTextWidth(editorFontId, probe, style) - renderer.getTextWidth(editorFontId, "|", style);
 }
 
 void NoteEditorActivity::onEnter() {
@@ -45,8 +59,9 @@ void NoteEditorActivity::onEnter() {
     return;
   }
 
+  editorFontId = resolveEditorFont();
   const auto& metrics = UITheme::getInstance().getMetrics();
-  lineHeight = renderer.getLineHeight(EDITOR_FONT_ID);
+  lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;
   contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing;
@@ -112,7 +127,7 @@ void NoteEditorActivity::relayout() {
       if (cand >= sizeof(probe)) break;
       memcpy(probe, text + start, cand);
       probe[cand] = '\0';
-      if (renderer.getTextWidth(EDITOR_FONT_ID, probe) > maxWidth) break;
+      if (renderer.getTextWidth(editorFontId, probe) > maxWidth) break;
       if (text[j] == ' ') lastBreak = j + 1;
       ++j;
     }
@@ -260,9 +275,9 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
   // editing. The numbered marker is copied from the text rather than invented,
   // so "3." and "12)" keep their real value.
   if (md.block == mdspans::Block::Bullet) {
-    renderer.drawText(EDITOR_FONT_ID, metrics.contentSidePadding, y, "-");
+    renderer.drawText(editorFontId, metrics.contentSidePadding, y, "-");
   } else if (md.block == mdspans::Block::Quote) {
-    renderer.drawText(EDITOR_FONT_ID, metrics.contentSidePadding, y, ">");
+    renderer.drawText(editorFontId, metrics.contentSidePadding, y, ">");
   } else if (md.block == mdspans::Block::Numbered) {
     char marker[8];
     size_t m = 0;
@@ -270,7 +285,7 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
       if (text[k] != ' ' && text[k] != '\t') marker[m++] = text[k];
     }
     marker[m] = '\0';
-    renderer.drawText(EDITOR_FONT_ID, metrics.contentSidePadding, y, marker);
+    renderer.drawText(editorFontId, metrics.contentSidePadding, y, marker);
   }
 
   char piece[192];
@@ -287,7 +302,7 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
     } else if (sp.style == mdspans::Style::Italic) {
       style = EpdFontFamily::ITALIC;
     }
-    renderer.drawText(EDITOR_FONT_ID, x, y, piece, true, style);
+    renderer.drawText(editorFontId, x, y, piece, true, style);
     x += advanceOf(piece, style);
   }
 
@@ -298,7 +313,7 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
     size_t n = cursorCol < sizeof(upto) - 1 ? cursorCol : sizeof(upto) - 1;
     memcpy(upto, text, n);
     upto[n] = '\0';
-    const int cx = metrics.contentSidePadding + renderer.getTextWidth(EDITOR_FONT_ID, upto);
+    const int cx = metrics.contentSidePadding + renderer.getTextWidth(editorFontId, upto);
     renderer.drawLine(cx, y, cx, y + lineHeight - 2, true);
   }
 }

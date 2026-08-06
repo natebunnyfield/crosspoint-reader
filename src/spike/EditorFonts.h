@@ -8,6 +8,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 namespace editorfonts {
 
@@ -23,5 +24,10 @@ inline constexpr Entry FAMILIES[] = {
     {"IBMPlexMono", "IBM Plex Mono"},
 };
 inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);
+
+// Family name for the current SETTINGS.editorFont, or the first entry when the
+// stored index is out of range (a settings.json written before a family was
+// removed from the list).
+const char* selectedFamily(uint8_t index);
 
 }  // namespace editorfonts

@@ -94,6 +94,8 @@ const char* stateName() {
 
 #else  // real device below
 
+#include <HalPowerManager.h>
+#include <esp_heap_caps.h>
 #include <esp_task_wdt.h>
 
 extern "C" {
@@ -625,17 +627,33 @@ void hostTask(void* /*param*/) {
 // and it hung. maxalloc is the discriminator.
 constexpr uint32_t MIN_MAXALLOC_FOR_INIT = 70000;
 
-bool canStart() { return ESP.getMaxAllocHeap() >= MIN_MAXALLOC_FOR_INIT; }
+// The controller allocates from INTERNAL, DMA-capable RAM
+// (CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y), which is NOT the pool
+// ESP.getMaxAllocHeap() reports. That mattered: the default-cap figure sat
+// rock-steady at 73,716 across runs that both succeeded and hung, because it
+// was measuring the wrong arena. Gate on the pool the controller actually uses.
+uint32_t largestInternalBlock() {
+  return static_cast<uint32_t>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+}
+
+bool canStart() { return largestInternalBlock() >= MIN_MAXALLOC_FOR_INIT; }
 
 bool begin() {
   if (gStarted) return true;
 
   if (!canStart()) {
+    // Give the idle task a moment first: a just-closed BLE session may still be
+    // holding a deleted host-task stack, and that alone can put maxalloc under
+    // the bar for a second or so.
+    for (int i = 0; i < 30 && !canStart(); ++i) vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  if (!canStart()) {
     // Attempting anyway is a guaranteed hang -> watchdog reboot -> crash
     // report, which is exactly what happened when the editor restarted BLE
     // straight after a Claude exchange. Refuse loudly instead.
-    LOG_ERR(TAG, "refusing nimble_port_init: maxalloc=%u < %u (free=%u) — heap too fragmented",
-            (unsigned)ESP.getMaxAllocHeap(), (unsigned)MIN_MAXALLOC_FOR_INIT, (unsigned)ESP.getFreeHeap());
+    LOG_ERR(TAG, "refusing nimble_port_init: internal-block=%u < %u (free=%u, default-maxalloc=%u)",
+            (unsigned)largestInternalBlock(), (unsigned)MIN_MAXALLOC_FOR_INIT, (unsigned)ESP.getFreeHeap(),
+            (unsigned)ESP.getMaxAllocHeap());
     setState(State::Failed);
     return false;
   }
@@ -643,8 +661,9 @@ bool begin() {
   // maxalloc matters more than free here: the controller wants one large
   // contiguous block, and this call has been seen to hang the device outright
   // when the heap is fragmented rather than merely small.
-  LOG_INF(TAG, "heap before nimble_port_init: free=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
-          (unsigned)ESP.getMaxAllocHeap());
+  LOG_INF(TAG, "heap before nimble_port_init: free=%u default-maxalloc=%u internal-block=%u internal-free=%u",
+          (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), (unsigned)largestInternalBlock(),
+          (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
 
   // nimble_port_init() can HANG outright (not panic, not return an error) —
   // observed repeatedly across the ~85-95 KB free range, including at 94,724
@@ -660,11 +679,28 @@ bool begin() {
       .idle_core_mask = 0,
       .trigger_panic = true,
   };
+  // Arduino may already have initialised the TWDT; reconfigure in that case
+  // rather than failing. Logged either side so a hang can be attributed to the
+  // right call — the previous instrumentation printed only BEFORE this block,
+  // so "hung in nimble_port_init" was an assumption, not an observation.
   const bool wdtReady = (esp_task_wdt_init(&wdtCfg) == ESP_OK || esp_task_wdt_reconfigure(&wdtCfg) == ESP_OK) &&
                         esp_task_wdt_add(nullptr) == ESP_OK;
   if (!wdtReady) LOG_ERR(TAG, "task WDT not armed; a hang here will need a power cycle");
+  // THE cause of the "nondeterministic" hang. HalPowerManager drops the CPU to
+  // LOW_POWER_FREQ (10 MHz) after 3 s idle, and the BT controller cannot bring
+  // its radio up at that clock — nimble_port_init() simply never returns.
+  //
+  // Every data point fits: the one run that succeeded called it 2.3 s after
+  // boot, before power saving engaged; every hang was at 10 s+, after it. The
+  // heap numbers I first blamed were a coincidence of when the screen settled,
+  // and it hung at 134,764 free / 114,676 contiguous — the roomiest heap
+  // measured — which is what finally ruled memory out.
+  HalPowerManager::Lock powerLock;  // full clock until BLE is up
+
+  LOG_INF(TAG, "WDT armed=%d, CPU at full clock — calling nimble_port_init()", wdtReady ? 1 : 0);
 
   const esp_err_t err = nimble_port_init();
+  LOG_INF(TAG, "nimble_port_init() returned %d", (int)err);
 
   if (wdtReady) {
     esp_task_wdt_reset();
@@ -706,6 +742,19 @@ void end() {
   } else {
     LOG_ERR(TAG, "nimble_port_stop rc=%d", rc);
   }
+
+  // The host task deletes itself from inside nimble_port_freertos_deinit(), and
+  // FreeRTOS reclaims a deleted task's stack in the IDLE task rather than
+  // synchronously. Returning immediately therefore leaves several KB still
+  // "used" and, worse, the heap too fragmented for the next
+  // nimble_port_init() — which showed up as: open Claude, go Back, reopen, and
+  // the keyboard is dead ("state -> failed") because canStart() refused.
+  // Yielding here lets idle run and hands the block back before we measure.
+  const uint32_t beforeYield = largestInternalBlock();
+  for (int i = 0; i < 20 && largestInternalBlock() < MIN_MAXALLOC_FOR_INIT; ++i) {
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  LOG_INF(TAG, "post-deinit internal-block %u -> %u", (unsigned)beforeYield, (unsigned)largestInternalBlock());
   gStarted = false;
   gConnHandle = BLE_HS_CONN_HANDLE_NONE;
   gHavePeer = false;
