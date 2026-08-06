@@ -244,6 +244,155 @@ remains in main.
 
 ---
 
+## Q&A: from spike to a real note editor (rulings pending, 2026-08-05)
+
+Owner questions after the spike completed, with grounded answers and next
+steps. Nothing here is committed work — each item that grows firmware surface
+needs its own scope ruling (Philosophy: dedicated e-reader, not a Swiss Army
+knife).
+
+### What remains for a fuller-featured note editor, and what are the memory concerns?
+
+The spike proves the input path; almost everything editor-shaped remains:
+
+- **Fix the CCCD discovery bug first** (item A.1 above) — without it, only
+  previously-bonded keyboards work.
+- **Cursor movement + editing beyond append/backspace.** Keymap stops at usage
+  0x38; arrows (0x4F–0x52), Home/End/Del, and an in-buffer cursor are needed.
+  The buffer should become a **gap buffer** — insertion at a cursor in a flat
+  array is O(n) per keystroke.
+- **Scrollback.** The line ring shows only the tail; paging up needs the
+  TextViewerActivity approach (page-start offsets).
+- **Open existing files.** Chunked load, and an explicit cap with a refusal
+  path for files larger than the buffer.
+- **Layout cost.** `layout()` re-wraps the whole buffer per refresh via
+  per-character `getTextWidth()` — fine at 8 KB, needs incremental relayout
+  (only the dirty line onward) for anything bigger.
+- **Save UX**: save-as (filename via `KeyboardEntryActivity`), autosave every
+  N chars, and save-on-disconnect.
+
+Memory concerns, in order of bite:
+
+1. **~72 KB while BLE is up** — the editor is a connect-on-demand surface and
+   can never coexist with an open book. Entering the editor from a reading
+   session must fully close the book's caches first.
+2. **`nimble_port_init()` needs measured contiguous headroom** or it hard-hangs
+   (no panic, power-cycle only). A shipped editor needs a
+   check-free-heap-else-refuse gate at entry.
+3. **~6 KB lost per BLE open/close cycle** — must be root-caused (item B.5).
+4. **Buffer growth**: 8 KB buffer + gap is fine; a 100 KB note is not. Cap
+   note size (e.g. 32 KB) rather than engineering a rope.
+5. While typing the whole system ran at **13,676 B free** — workable but with
+   no slack for feature creep inside the editor screen itself.
+
+### Can Edit be a Manage Files option? And New file?
+
+Yes — this is the natural home, and `docs/manage-files.md` already defers the
+editor to exactly this measurement. Concretely:
+
+- **Edit** joins the per-item action menu (`OptionPopup`) for `.txt`/`.md`
+  files: opens the editor seeded with the file (short-press View stays the
+  read-only path).
+- **New file** joins the folder context menu next to the deferred "New
+  folder": name via the existing rename keyboard, then straight into the
+  editor.
+- The editor stays one activity; Manage Files passes a path or empty-with-name.
+  BLE bring-up happens on editor entry (with the heap gate), not in Manage
+  Files itself.
+
+### Can vim be supported?
+
+Real vim: **no** — it is a POSIX process; the C3 has no processes, no MMU, no
+tty, and vim's runtime alone exceeds total RAM. Vim *keybindings*: **yes,
+cheaply** — a modal layer over the decoder (normal/insert modes; `hjkl`, `i`,
+`Esc`, `x`, `dd`, `w`/`b`, `0`/`$`, `o`). It is a state machine over already-
+decoded keys, costs no meaningful RAM, and suits e-ink well because normal-mode
+motions don't need per-key redraws. Scope ruling required; if approved, make it
+a setting defaulting off.
+
+### Can Space Mono be installed at hi-res for this?
+
+Two separate facts:
+
+- **Space Mono as an editor face: yes, trivially.** It is OFL on Google Fonts;
+  `sd-fonts.yaml` already has a Monospace section (IBM Plex Mono, Source Code
+  Pro) to copy a recipe from. Build `.cpfont` cuts, put them on the card, have
+  the editor request the family by name.
+- **"Hi-res" does not exist on the device.** The X4 panel is 1-bit 800×480 at
+  scale 1; the 2x companions exist for `CROSSPOINT_RENDER_SCALE=2` **host
+  builds** (desktop/iOS simulator). So: device gets the 1x cuts, and the 2x
+  companions make it crisp in the iOS app.
+- **S-tier note:** the installed-families ruling (six families) governs
+  *reading* faces. An editor monospace is a new surface — needs an explicit
+  ruling either extending S tier or declaring the editor font out of its scope.
+  Do not silently install a seventh family.
+
+### Can the iOS app support internal and external keyboards now?
+
+Yes, and more easily than the device did. The simulator has no BLE, so
+`BleHidHost` gets a `#ifdef SIMULATOR` twin with the same header: instead of
+GAP/GATT it feeds the same ring buffer from SDL events — external (hardware)
+keyboards arrive as normal SDL key events on iOS, and the internal on-screen
+keyboard appears when the app calls `SDL_StartTextInput()`. The editor activity
+is unchanged; it already consumes `popChar()`. This also makes the editor
+testable headlessly (scripted key events), which the device path never can be.
+
+### Can page turns be triggered over Bluetooth? Battery?
+
+**RAM blocks it before battery does.** A BLE page-turn remote needs the host
+resident *while reading* — that is the exact configuration the spike ruled out
+(~26 KB free before a book opens, vs the >50 KB bar). Do not plan this against
+the current heap.
+
+If the heap picture ever improves: battery cost has two parts. A maintained
+BLE connection at a long connection interval is small (low single-digit mA
+average on the C3, modem-sleep between events) — but it also forbids the deep
+sleeps an e-reader lives on, so the real cost is "device can never nap while a
+remote is paired". That is a lifestyle change for the battery, not a rounding
+error, and would need on-device measurement before any promise. Status:
+blocked, revisit only after a major heap reclamation.
+
+### Can markdown lists / "enough of markdown that Claude cares about" be supported?
+
+Storage-side: markdown **is** plain text — the editor already "supports" it by
+not mangling it, and that is all a file consumed by Claude needs. Rendering is
+the only real question, and a deliberately small subset is feasible in the
+viewer/editor: `#`–`###` headings (bold + size bump), `-`/`*`/`1.` list
+prefixes (hanging indent), `**bold**`/`*italic*` (font styles already exist),
+`` ` `` inline code and fenced blocks (monospace family — pairs with the Space
+Mono item), `>` blockquote (indent + rule). That subset covers what
+Claude-authored notes actually use. A full CommonMark renderer is out of scope;
+tables and images stay unrendered.
+
+Practical next step: render markdown-lite in the **viewer** first (read-only,
+no cursor math), keep the editor plain; promote to the editor only if the
+viewer version earns it.
+
+### Can I put prompts for Claude in a text file and get a response saved back?
+
+Three routes, in order of nearness:
+
+1. **Card-shuttle / sync (works with existing pieces).** Write `prompts/*.md`
+   in the editor; sync the card to the Mac (`scripts/sync-card.sh` WebDAV
+   mirror, or USB); a Mac-side watcher runs `claude -p "$(cat prompt.md)"` and
+   writes `prompt.answer.md` beside it; sync back; read the answer on-device
+   in the viewer. No firmware work at all — this can be tried today.
+2. **Wi-Fi transfer mode + watcher.** Same loop but over the device's existing
+   web server (File Transfer), so no card removal. Small watcher script; no
+   firmware change.
+3. **On-device API call (real feature, needs a ruling).** The firmware already
+   speaks TLS 1.3 via wolfSSL (OTA does HTTPS today), so a "Run prompt"
+   action POSTing to the Anthropic API and streaming the response to
+   `foo.answer.md` is technically feasible from a non-reading activity.
+   Concerns: TLS needs the same ~50 KB-free regime the MEMFIX work targets
+   (fine in a dedicated activity, never during reading); the API key would
+   live in plaintext on the SD card unless a settings-side secret store is
+   built; and it is the single clearest "is this still an e-reader?" scope
+   question on this list. Route 1 proves the workflow before any of this is
+   built.
+
+---
+
 ## Reproducing
 
 ```bash
