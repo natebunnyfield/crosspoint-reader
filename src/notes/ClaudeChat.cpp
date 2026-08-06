@@ -10,6 +10,7 @@
 #include <WiFi.h>
 #include <time.h>
 
+#include <optional>
 #include <vector>
 
 #include "CrossPointSettings.h"
@@ -118,7 +119,24 @@ bool connectWifi(std::string& outErr, void (*statusCb)(void*, const char*), void
   // does. This used to name one hardcoded SSID -- which meant the feature only
   // worked on its author's home network, and put that network's name in a public
   // repo. Nothing here should know any particular network.
-  const std::vector<WifiCredential>& creds = WIFI_STORE.getCredentials();
+  //
+  // Take a COPY of the saved networks before the connect loop. The loop below
+  // blocks for seconds at a time (WiFi.begin, then delay(100) polling), and the
+  // web server task can add or remove a credential in that window -- which
+  // reallocates the store's vector and would dangle a reference held across it.
+  // getCredentialAt() copies each entry under the store's mutex, so nothing
+  // here aliases store internals, and no index into the store survives a
+  // blocking call. At most MAX_NETWORKS (8) entries of two short strings each
+  // (~1 KB worst case), freed on return; a fixed stack array was rejected
+  // because std::string is heap-backed regardless.
+  const size_t savedCount = WIFI_STORE.getCredentialCount();
+  std::vector<WifiCredential> creds;
+  creds.reserve(savedCount);
+  for (size_t i = 0; i < savedCount; ++i) {
+    std::optional<WifiCredential> cred = WIFI_STORE.getCredentialAt(i);
+    if (!cred) break;  // store shrank between the count and the read; use what we got
+    creds.push_back(std::move(*cred));
+  }
   if (creds.empty()) {
     outErr = "no saved Wi-Fi network — connect once via File Transfer";
     return false;
