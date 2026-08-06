@@ -13,17 +13,36 @@ on hardware, whatever the code says.
 
 ## Verdict
 
+**The whole path works on hardware.** Scan → connect → bond → HID service
+discovery → subscribe → decoded keystrokes → glyphs on the panel, against a real
+BLE keyboard (Geonix rev.2 on profile 2). Device-confirmed 2026-08-05.
+
 **Resident BLE HID host: NO.** Home idle without BLE leaves 97,616 B free. BLE
-bring-up costs 71,548 B. That leaves ~26 KB *before a book is open*, against the
+bring-up costs ~72 KB. That leaves ~26 KB *before a book is open*, against the
 >50 KB-free-while-reading bar. Not viable.
 
-**Connect-on-demand: YES, and cheaper than expected.** The permanent cost of
-being a BLE-capable build is only ~2,340 B of total heap. The expensive 71,548 B
-is claimed at `nimble_port_init()` and returned at `nimble_port_deinit()`, so a
-reader session never pays it.
+**Connect-on-demand: YES, with two conditions.** The permanent cost of being a
+BLE-capable build is only ~2,340 B of total heap; the ~72 KB is claimed at
+`nimble_port_init()` and returned at `nimble_port_deinit()`, so a reader session
+never pays it. The conditions:
 
-Both conclusions rest on device-confirmed numbers. The typing half of the spike
-(pairing, keystroke decode, latency) is **UNCONFIRMED** — see Remaining work.
+1. **BLE must be initialised with contiguous headroom.** `nimble_port_init()` is
+   nondeterministic near ~86 KB free / ~73 KB maxalloc — observed succeeding at
+   85,976 and **hard-hanging** at 85,980 and 85,752, then succeeding at 94,972.
+   The failure mode is the dangerous one: not a panic, not a reboot, no crash
+   report. USB CDC stays enumerated and the firmware answers nothing, not even
+   `CMD:SCREENSHOT`. Only a power cycle recovers it. Initialising BLE *before*
+   the editor's 8 KB buffer was enough to clear the boundary in testing, but the
+   real fix is a measured minimum-headroom precondition, not luck.
+2. **~6 KB is not returned per open/close cycle** (94,972 before init → 88,972
+   after deinit). Leak or fragmentation is undetermined.
+
+**Latency: ~1 s from keypress to glyph, and that is a floor, not a defect.**
+Five samples: 927, 1121, 1127, 1641, 1689 ms, with the e-ink refresh a very
+stable 570–573 ms of each. The 350 ms keystroke-batching debounce plus a 570 ms
+refresh puts the floor at ~920 ms; the observed minimum was 927 ms. The longer
+samples are the first key of a burst waiting for the rest. Usable for jotting a
+note; not usable as typing feedback.
 
 ---
 
@@ -33,22 +52,54 @@ X4, `-e default`, LOG_LEVEL=2.
 
 ### Heap
 
+Final run, BLE initialised before the editor buffer:
+
 | Point | Free heap |
 |---|---|
 | P0 — boot, end of `setup()`, no BLE | 137,772 B (total 253,688, maxalloc 114,676) |
 | P0b — Home idle, covers painted | 97,616 B |
-| P1 — editor entered, before BLE (after the 8 KB buffer) | 124,968 B |
-| after `nimble_port_init()` | 60,168 B — **−64,800 B** |
-| P2 — after host task start | 53,420 B — **−6,748 B** |
-| P3 — steady-state scanning | 44,112 B (min 14,248, maxalloc 40,948) |
-| after `nimble_port_deinit()` | 80,300 B |
+| P1 — editor entered, before BLE | 94,972 B (maxalloc 73,716) |
+| after `nimble_port_init()` | 29,768 B — **−65,204 B** |
+| P2 — after host task start | 23,020 B — **−6,748 B** |
+| P2b — after the editor's 8 KB buffer | 14,312 B (maxalloc 11,764) |
+| P4 — while typing, connected + subscribed | 13,676 B |
+| P5 — after `nimble_port_deinit()` | 88,972 B (min seen 14,056) |
 
-The two independent open/close cycles produced **byte-identical** deltas
-(−64,800 and −6,748 both times), so these are not one-off readings.
-**Total BLE bring-up: 71,548 B.**
+The host-task delta was **byte-identical (−6,748 B) across every cycle**, and
+`nimble_port_init()` landed at 64,800–65,204 B, so these are not one-off
+readings. **Total BLE bring-up: ~72 KB.**
 
-Total heap with BLE reserved is 251,348 B vs 253,688 B without — the permanent
-price of a BLE-capable build is **2,340 B**.
+Total heap with BLE reserved is 250,980–251,348 B vs 253,688 B without — the
+permanent price of a BLE-capable build is **~2,340 B**.
+
+### Latency (keystroke → glyph)
+
+Timestamped inside the NimBLE notify callback and read again after
+`displayBuffer()` returns, so it measures real key-to-pixels.
+
+| Sample | key→glyph | of which render |
+|---|---|---|
+| 1 | 1121 ms | 570 ms |
+| 2 | 1127 ms | 571 ms |
+| 3 | **927 ms** (min) | 571 ms |
+| 4 | 1641 ms | 570 ms |
+| 5 | **1689 ms** (max) | 573 ms |
+
+Floor = 350 ms debounce + ~570 ms e-ink refresh = ~920 ms, and the observed
+minimum was 927 ms. Lowering the debounce trades directly against refresh count.
+
+### HID service of the test keyboard
+
+`0x0019..0x0044`, 14 characteristics, **7 notifiable input reports**: Protocol
+Mode `0x2A4E`, six notifiable `0x2A4D` reports (`0x001d 0x0021 0x0025 0x0029
+0x002d 0x0031`), a writable `0x2A4D` output report `0x0035`, Report Map `0x2A4B`,
+Boot Keyboard Input `0x2A22`, Boot Keyboard Output `0x2A32`, Boot Mouse Input
+`0x2A33`, HID Information `0x2A4A`, HID Control Point `0x2A4C`. Keystrokes arrive
+on `0x001d` as 8-byte boot-layout reports. Battery level also notifies on
+`0x0017` (outside the HID service).
+
+Advertisement: `02 01 06 03 03 12 18 03 19 c1 03 0f 09 "Geonix rev.2-2"` — flags,
+service 0x1812, appearance 0x03C1 (keyboard), complete local name.
 
 ### Build size
 
@@ -127,51 +178,65 @@ remains in main.
 
 ## Remaining work
 
-### A. Finish the spike (blocked on hardware/keyboard)
+### A. Bugs found but NOT fixed — these matter most
 
-1. **Power-cycle the X4.** It wedged after `heap before nimble_port_init: 85980`
-   with no USB enumeration for 100 s+ and auto-sleep disabled, so it is not
-   sleeping. The panic text was lost with the port.
-2. **Capture that panic.** Attach serial *before* sending `CMD:BLEEDIT` so the
-   Guru Meditation dump is not lost when CDC drops, then `addr2line` it. The same
-   call succeeded at 86,052 B free, so the 85,980 B failure is not obviously OOM
-   and must not be assumed to be.
-3. **Get the Geonix advertising HID.** The X4 saw 25+ distinct advertisers and
-   **zero** carrying service 0x1812. Cross-check with the Mac-side scanner
-   (`scratchpad/BleScan.app`) to establish whether this is the keyboard or the
-   scanner. If the keyboard advertises HID only in its GATT table and not in the
-   advertisement — legal HOGP — UUID-only scanning will never find it and the
-   host must connect first and discover second.
-4. **P3/P4 measurements**: heap while connected+bonded+subscribed, and while
-   typing.
-5. **Latency**: keystroke → glyph. Already instrumented — timestamped inside the
-   NimBLE notify callback and read again after `displayBuffer()` returns, so it
-   measures real key-to-pixels, not just render time.
-6. **Verify `/notes-spike.txt`** is written correctly on Back.
+1. **CCCD subscription is broken; notifications only worked because of a stale
+   bond.** `ble_gattc_disc_all_dscs()` returns `rc=3` (`BLE_HS_EINVAL`), so no
+   CCCD handle is ever found and **no CCCD is ever written** — the log says
+   "report val=0x… has no CCCD, skipping" for all 7 reports. Keystrokes still
+   arrived because the keyboard had persisted its CCCD from an earlier bonded
+   session, and HOGP peripherals store CCCD per bonded client. **A fresh,
+   never-bonded keyboard would connect, discover, and then deliver nothing.**
+   The per-characteristic handle range passed to `disc_all_dscs` is wrong; fix
+   it and re-test against a keyboard whose bond has been deleted on both sides.
+2. **`/notes-spike.txt` was never written** — the test ended with an empty
+   buffer, so `save()` correctly logged "nothing to save". The SD write path is
+   therefore **UNVERIFIED**. Type something and exit with Back.
+3. **Arrow keys and everything above usage 0x38 are unmapped** — 23 such events,
+   mostly `0x50`/`0x4f` (Left/Right arrow). Harmless here, but a real editor
+   needs cursor movement, so the keymap must extend past 0x38.
 
-### B. Must be resolved before this becomes a real feature
+### B. Remaining measurements
 
-7. **The ~5.7 KB not recovered per open/close cycle.** Teardown returned 80,300 B
-   against 86,052 B at entry. Genuine leak or heap fragmentation is unknown;
-   repeated open/close would compound either. Instrument N cycles and plot.
+4. **Bond persistence across reboot.** On reconnect the peer reported
+   `BLE_HS_EALREADY` and encryption completed in ~670 ms with no pairing
+   exchange, which *indicates* the NVS bond survived several X4 reboots — but
+   that was never isolated as its own test, so it is **UNCONFIRMED**.
+5. **The ~6 KB not recovered per open/close cycle** (94,972 B before init vs
+   88,972 B after deinit; an earlier cycle showed 5.7 KB). Leak or
+   fragmentation is undetermined. Instrument N cycles and plot.
    *This needs no keyboard — only the X4.*
-8. **Decide the boot-time posture.** Because the controller-memory release is
+6. **Find the real minimum-headroom precondition for `nimble_port_init()`.**
+   Ordering BLE before the editor buffer cleared the hang in testing, but the
+   boundary was only ever bracketed (hangs at 85,752/85,980, succeeds at
+   85,976/94,972). A shipped feature needs a measured threshold and a refusal
+   path, because the failure mode is an unrecoverable hang.
+
+### C. Product decisions
+
+7. **Decide the boot-time posture.** Because the controller-memory release is
    irreversible, the product choice is: always reserve 2,340 B (BLE available on
    demand), or never reserve (BLE impossible without a reboot into an editor
    mode). This is a user ruling, not an implementation detail.
-9. **Flash budget.** +222,310 B against a 6,553,600 B app partition currently
+8. **Flash budget.** +222,310 B against a 6,553,600 B app partition currently
    62.4% full. Fits, but it is the single largest feature addition on record here
    and should be an explicit ruling.
 
-### C. Known-incomplete in the spike code itself (throwaway quality, listed so nobody mistakes it for done)
+9. **Is ~1 s key-to-glyph acceptable?** It is a floor set by the e-ink refresh
+   (570 ms) plus the batching debounce (350 ms), not by BLE — the radio side is
+   negligible. Partial-region refresh instead of full-screen is the only real
+   lever, and that is its own piece of work.
+
+### D. Known-incomplete in the spike code itself (throwaway quality, listed so nobody mistakes it for done)
 
 10. US layout only; no key repeat, no modifiers beyond Shift, no dead keys, no
     non-ASCII. `tr()`, settings rows and theme polish deliberately skipped.
 11. Report-map parsing is skipped entirely — the code assumes the 8-byte boot
     keyboard layout and tolerates a 9-byte report-ID prefix. A keyboard using a
     different report descriptor would decode as garbage.
-12. Bond persistence is wired (`ble_store_config_init()`, NVS) but
-    **UNCONFIRMED** — never observed surviving a reboot.
+12. Keycap-to-glyph mapping was not validated: the decoder assumes US layout,
+    and a keyboard doing its own layout remapping in firmware will produce
+    letters that do not match its keycaps.
 13. Editor buffer is a flat 8 KB with no scrollback beyond the visible window and
     no cursor movement; Back is the only exit.
 14. `layout()` re-wraps the whole buffer on every burst by calling
