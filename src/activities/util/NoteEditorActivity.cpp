@@ -6,20 +6,20 @@
 #include <Logging.h>
 #include <Memory.h>
 
+#include "CrossPointSettings.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "CrossPointSettings.h"
-#include "spike/BleHidHost.h"
-#include "spike/EditorFonts.h"
-#include "spike/HidKeymap.h"
-#include "spike/MarkdownSpans.h"
+#include "notes/BleHidHost.h"
+#include "notes/EditorFonts.h"
+#include "notes/HidKeymap.h"
+#include "notes/MarkdownSpans.h"
 
 namespace {
 constexpr const char* TAG = "NOTEEDIT";
 constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
 
 // The Editor Font setting picks from the editor-group families (see
-// src/spike/EditorFonts.h). If that family is not installed on the card the UI
+// src/notes/EditorFonts.h). If that family is not installed on the card the UI
 // face stands in, so the screen is never blank because of a missing font.
 int resolveEditorFont() {
   const char* family = editorfonts::selectedFamily(SETTINGS.editorFont);
@@ -46,7 +46,7 @@ void NoteEditorActivity::onEnter() {
 
   // BLE before the buffer: nimble_port_init() wants ~65 KB contiguous and hangs
   // rather than failing when it cannot get it, so give it the roomiest heap.
-  blespike::begin();
+  blekbd::begin();
 
   storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
   if (!storage) {
@@ -95,7 +95,7 @@ void NoteEditorActivity::onEnter() {
 
 void NoteEditorActivity::onExit() {
   save();
-  blespike::end();
+  blekbd::end();
   buf.reset();
   storage.reset();
   Activity::onExit();
@@ -242,7 +242,7 @@ void NoteEditorActivity::loop() {
   }
 
   bool got = false;
-  for (int c = blespike::popChar(); c >= 0; c = blespike::popChar()) {
+  for (int c = blekbd::popChar(); c >= 0; c = blekbd::popChar()) {
     handleKey(c);
     got = true;
     ++pendingChars;
@@ -340,7 +340,7 @@ void NoteEditorActivity::render(RenderLock&&) {
 
   char status[96];
   snprintf(status, sizeof(status), "%u ch%s  %s", (unsigned)(buf ? buf->size() : 0), bufferFull ? "  BUFFER FULL" : "",
-           blespike::stateName());
+           blekbd::stateName());
   const int statusY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
   renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
 

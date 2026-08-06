@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "spike/MarkdownSpans.h"
+#include "notes/MarkdownSpans.h"
 
 namespace {
 

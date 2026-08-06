@@ -6,21 +6,21 @@
 #include <Logging.h>
 #include <Memory.h>
 
+#include "CrossPointSettings.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "CrossPointSettings.h"
-#include "spike/BleHidHost.h"
-#include "spike/EditorFonts.h"
-#include "spike/ClaudeChat.h"
-#include "spike/HidKeymap.h"
-#include "spike/MarkdownSpans.h"
+#include "notes/BleHidHost.h"
+#include "notes/ClaudeChat.h"
+#include "notes/EditorFonts.h"
+#include "notes/HidKeymap.h"
+#include "notes/MarkdownSpans.h"
 
 namespace {
 constexpr const char* TAG = "CLAUDEUI";
 constexpr int CHAT_FONT_ID_FALLBACK = UI_10_FONT_ID;
 
 // The Editor Font setting picks from the editor-group families (see
-// src/spike/EditorFonts.h). If that family is not installed on the card the UI
+// src/notes/EditorFonts.h). If that family is not installed on the card the UI
 // face stands in, so the screen is never blank because of a missing font.
 int resolveEditorFont() {
   const char* family = editorfonts::selectedFamily(SETTINGS.editorFont);
@@ -37,7 +37,7 @@ void ClaudeChatActivity::onEnter() {
 
   // BLE first: nimble_port_init() wants ~65 KB contiguous and hangs rather than
   // failing when the heap is fragmented, so claim it while the heap is widest.
-  blespike::begin();
+  blekbd::begin();
 
   storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
   if (storage) buf = makeUniqueNoThrow<textbuf::TextBuffer>(storage.get(), BUF_SIZE);
@@ -57,7 +57,7 @@ void ClaudeChatActivity::onEnter() {
 }
 
 void ClaudeChatActivity::onExit() {
-  blespike::end();
+  blekbd::end();
   buf.reset();
   storage.reset();
   Activity::onExit();
@@ -133,7 +133,7 @@ void ClaudeChatActivity::send() {
 
   // Radios take turns: BLE returns ~72 KB, and TLS needs a large slice of it.
   setPhase("closing keyboard");
-  blespike::end();
+  blekbd::end();
 
   claudechat::Result r = claudechat::runExchange(
       prompt, [](void* ctx, const char* p) { static_cast<ClaudeChatActivity*>(ctx)->setPhase(p); }, this);
@@ -152,8 +152,8 @@ void ClaudeChatActivity::send() {
   // Re-arm the keyboard only if the heap can take it. After a WiFi teardown the
   // largest free block is ~24 KB against the ~65 KB nimble_port_init() needs;
   // attempting it there hung the device and tripped the watchdog.
-  if (blespike::canStart()) {
-    blespike::begin();
+  if (blekbd::canStart()) {
+    blekbd::begin();
   } else {
     LOG_ERR(TAG, "not restarting BLE: heap too fragmented after the exchange");
   }
@@ -193,7 +193,7 @@ void ClaudeChatActivity::loop() {
   }
 
   bool got = false;
-  for (int c = blespike::popChar(); c >= 0; c = blespike::popChar()) {
+  for (int c = blekbd::popChar(); c >= 0; c = blekbd::popChar()) {
     if (view == View::Answer) {  // typing returns to the prompt
       view = View::Prompt;
       answer.clear();
@@ -259,7 +259,7 @@ void ClaudeChatActivity::render(RenderLock&&) {
   }
 
   char status[80];
-  snprintf(status, sizeof(status), "%u ch   keyboard: %s", (unsigned)(buf ? buf->size() : 0), blespike::stateName());
+  snprintf(status, sizeof(status), "%u ch   keyboard: %s", (unsigned)(buf ? buf->size() : 0), blekbd::stateName());
   renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), (buf && !buf->empty()) ? "Ask" : "", "", "");

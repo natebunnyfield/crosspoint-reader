@@ -1,4 +1,4 @@
-// SPIKE — throwaway. See ClaudeChat.h.
+// See ClaudeChat.h.
 #include "ClaudeChat.h"
 
 #include <Arduino.h>
@@ -25,7 +25,7 @@ namespace {
 #endif
 
 constexpr const char* TAG = "CLAUDE";
-// Fixed for the spike per ruling: REDACTED-SSID is the only test network.
+// Test network for this feature; see docs/notes-and-claude.md.
 constexpr const char* SPIKE_SSID = "REDACTED-SSID";
 constexpr const char* KEY_PATH = "/claude-key.txt";
 constexpr const char* TRANSCRIPT_PATH = "/claude-chat.md";

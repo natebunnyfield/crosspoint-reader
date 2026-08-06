@@ -1,4 +1,4 @@
-// SPIKE — throwaway. See BleHidHost.h.
+// See BleHidHost.h.
 #include "BleHidHost.h"
 
 #include <Arduino.h>
@@ -17,7 +17,7 @@
 // and the whole flow becomes scriptable.
 #include <HalStorage.h>
 
-namespace blespike {
+namespace blekbd {
 namespace {
 constexpr const char* TAG = "BLESPIKE";
 constexpr const char* INPUT_PATH = "/ble-input.txt";
@@ -90,7 +90,7 @@ const char* stateName() {
   }
 }
 
-}  // namespace blespike
+}  // namespace blekbd
 
 #else  // real device below
 
@@ -128,7 +128,7 @@ void ble_store_config_init(void);
 bool btInUse(void) { return true; }
 }
 
-namespace blespike {
+namespace blekbd {
 namespace {
 
 constexpr const char* TAG = "BLESPIKE";
@@ -803,6 +803,6 @@ uint32_t notifyCount() { return gNotifies.load(std::memory_order_relaxed); }
 
 uint32_t droppedCount() { return gDropped.load(std::memory_order_relaxed); }
 
-}  // namespace blespike
+}  // namespace blekbd
 
 #endif  // SIMULATOR

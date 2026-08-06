@@ -21,7 +21,6 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
-#include "WifiCredentialStore.h"  // SPIKE: CMD:WIFISAVE
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "SystemFont.h"
@@ -610,24 +609,15 @@ void setup() {
   lastActivityTime = millis();
   deepSleepInProgress = false;
 
-  // SPIKE: auto-sleep kills the USB CDC port mid-measurement (the device
-  // enumerates only while the firmware runs), so every 10-minute idle stranded
-  // the capture and needed a physical wake. Disabled for the spike only.
-  // NOT 0 — getSleepTimeoutMs() clamps small values up to MIN_SLEEP_TIMEOUT;
-  // only >= SLEEP_TIMEOUT_NEVER_MINUTES returns 0 ("never").
-  // In-RAM only: nothing here writes settings.json.
-  SETTINGS.sleepTimeoutMinutes = CrossPointSettings::SLEEP_TIMEOUT_NEVER_MINUTES;
-
-  // SPIKE: the panic text is lost when USB CDC drops with the crash, so replay
-  // the persisted record over serial on the next boot instead.
+  // A panic's serial output is lost when USB CDC drops with the crash, so
+  // replay the persisted record on the next boot instead. This is how the BLE
+  // watchdog reboots were diagnosed.
   if (HalSystem::isRebootFromPanic()) {
-    LOG_INF("SPIKE", "SPIKE-PANIC previous boot panicked: %s", HalSystem::getPanicInfo(true).c_str());
+    LOG_INF("MAIN", "Previous boot panicked: %s", HalSystem::getPanicInfo(true).c_str());
   }
 
-  // SPIKE (branch spike/ble-editor): measurement point 1. Nothing BLE has been
-  // initialised at this point, so this is the plain-firmware boot heap.
-  LOG_INF("SPIKE", "SPIKE-HEAP P0-boot-no-ble free=%u total=%u minfree=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
-          (unsigned)ESP.getHeapSize(), (unsigned)ESP.getMinFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+  LOG_INF("MEM", "Boot complete: free=%u total=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
+          (unsigned)ESP.getHeapSize(), (unsigned)ESP.getMaxAllocHeap());
 }
 
 void loop() {
@@ -659,28 +649,6 @@ void loop() {
         uint8_t* buf = display.getFrameBuffer();
         logSerial.write(buf, bufferSize);
         logSerial.printf("SCREENSHOT_END\n");
-      } else if (cmd == "BLEEDIT") {
-        // Test hook: open the note editor without needing anyone at the buttons.
-        LOG_INF("SPIKE", "CMD:BLEEDIT — opening note editor");
-        activityManager.goToNoteEditor("/note.md");
-      } else if (cmd == "CLAUDE") {
-        LOG_INF("SPIKE", "CMD:CLAUDE — opening Claude");
-        activityManager.goToClaudeChat();
-      } else if (cmd.startsWith("WIFISAVE:")) {
-        // SPIKE: CMD:WIFISAVE:<ssid>:<password> — store a credential without
-        // walking the picker UI. Password is not echoed back.
-        const String rest = cmd.substring(9);
-        const int sep = rest.indexOf(':');
-        if (sep > 0) {
-          const String ssid = rest.substring(0, sep);
-          const String pass = rest.substring(sep + 1);
-          WIFI_STORE.loadFromFile();
-          WIFI_STORE.addCredential(ssid.c_str(), pass.c_str());
-          const bool saved = WIFI_STORE.saveToFile();
-          LOG_INF("SPIKE", "WIFISAVE '%s': %s", ssid.c_str(), saved ? "saved" : "SAVE FAILED");
-        } else {
-          LOG_ERR("SPIKE", "WIFISAVE: bad format, want CMD:WIFISAVE:<ssid>:<password>");
-        }
       }
     }
   }

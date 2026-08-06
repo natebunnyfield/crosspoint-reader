@@ -3,7 +3,7 @@
 #include <cstring>
 #include <string>
 
-#include "spike/HidKeymap.h"
+#include "notes/HidKeymap.h"
 
 namespace {
 

@@ -1,5 +1,5 @@
-// SPIKE — throwaway. On-device Anthropic API exchange: BLE-typed prompt in,
-// timestamped transcript appended to /claude-chat.md on SD. Never merged.
+// On-device Anthropic API exchange: a typed prompt in, a timestamped
+// transcript appended to /claude-chat.md on the SD card.
 #pragma once
 
 #include <string>
@@ -7,7 +7,7 @@
 namespace claudechat {
 
 // Runs one full exchange while BLE is DOWN (the radios + TLS never fit in heap
-// together): connect the spike's fixed WiFi network, POST the prompt to the
+// together): connect the configured WiFi network, POST the prompt to the
 // Anthropic API, append both sides to the transcript, WiFi fully off.
 //
 // statusCb fires at each phase with a short human string for the screen.

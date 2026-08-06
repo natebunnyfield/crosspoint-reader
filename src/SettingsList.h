@@ -14,7 +14,7 @@
 #include "CrossPointSettings.h"
 #include "ReaderFontSizes.h"
 #include "activities/settings/SettingsActivity.h"
-#include "spike/EditorFonts.h"  // SPIKE: editor font group (owner ruling 2026-08-05)
+#include "notes/EditorFonts.h"  // Editor font group (owner ruling 2026-08-05)
 
 // Build the font family setting dynamically. When registry is non-null, SD card fonts
 // are appended after the built-in fonts. Otherwise only built-in fonts are listed.
@@ -270,7 +270,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT, StrId::STR_BOOK_S_STYLE},
         "paragraphAlignment", StrId::STR_CAT_READER));
     // EDITOR font group (owner ruling 2026-08-05). Its own list, separate from
-    // the reading families above; see src/spike/EditorFonts.h. Plain ENUM with
+    // the reading families above; see src/notes/EditorFonts.h. Plain ENUM with
     // valuePtr: the picker index IS the stored value, so it persists via
     // toJson/fromJson like any other byte — but the list is append-only.
     {

@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "activities/Activity.h"
-#include "spike/TextBuffer.h"
+#include "notes/TextBuffer.h"
 
 class NoteEditorActivity final : public Activity {
   static constexpr size_t BUF_SIZE = 8192;

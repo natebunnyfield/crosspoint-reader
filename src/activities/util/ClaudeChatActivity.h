@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "activities/Activity.h"
-#include "spike/TextBuffer.h"
+#include "notes/TextBuffer.h"
 
 class ClaudeChatActivity final : public Activity {
   static constexpr size_t BUF_SIZE = 2048;  // a prompt, not a document

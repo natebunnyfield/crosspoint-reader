@@ -1,5 +1,4 @@
-// SPIKE — throwaway. Measures the cost of a resident BLE HID (HOGP) host.
-// Never merged to main; see docs/manage-files.md "v2 plan".
+// BLE HID (HOGP) keyboard host: scan, bond, subscribe, decode.
 //
 // Uses the raw ESP-IDF NimBLE C API rather than NimBLE-Arduino: the host is
 // already linked into the stock arduino-esp32 libbt.a for the C3
@@ -11,7 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace blespike {
+namespace blekbd {
 
 enum class State : uint8_t {
   Off,          // nimble_port_init() not called yet — no BT RAM claimed
@@ -57,4 +56,4 @@ uint32_t lastKeyMillis();
 uint32_t notifyCount();
 uint32_t droppedCount();
 
-}  // namespace blespike
+}  // namespace blekbd

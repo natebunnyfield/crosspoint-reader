@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "spike/TextBuffer.h"
+#include "notes/TextBuffer.h"
 
 namespace {
 
