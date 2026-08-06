@@ -187,6 +187,67 @@ Build order: Phase 1 = interaction rework (short-press View, nav labels,
 go-home selection fix, icon fix, metadata-gated rename); Phase 2 = inline info
 + Duplicate; Phase 3 = viewer scrollbar + pretty modes.
 
+## Summarize tag (ruling 2026-08-05, second session)
+
+A per-book handshake with the host-side summarization pipeline
+(`scripts/summarize_books.py`): the action menu on an **EPUB** (cheap
+extension gate, no metadata probe) shows **Summarize** / **Don't summarize**,
+toggling a marker file `/.crosspoint/epub_<hash>/summarize.tag` whose content
+is the book's full card path plus `\n`. The book itself never moves. The host
+pipeline scans markers (over WebDAV — dot-paths are deliberately unprotected —
+or a local card tree), generates `<Title> — Summary.epub` into `/books/`
+(3/10/30-minute chapters), and deletes the marker on success.
+
+Marker lifecycle:
+
+| Event | Marker outcome |
+|---|---|
+| Toggle on | Created (cache dir mkdir'd first if the book was never opened) |
+| Toggle off / host success | Deleted |
+| Rename/Move (file or folder) | Survives — cache dir is re-keyed by `migrateBookRefs`, which now also rewrites the marker's content to the new path |
+| Duplicate | Not copied (Duplicate never touches `/.crosspoint`) — correct |
+| Delete | Dies with the cache dir — correct |
+| Settings → Clear Cache | **Lost by design** — the cache-clear loop stays dumb; re-toggle Summarize after clearing |
+
+With Summarize the action menu's worst case is 8 entries (armed move + all
+file actions on an epub); `openActionMenu`'s `options[]` was bumped to 9 so
+the unchecked `options[count++]` keeps headroom.
+
+Host side (`scripts/summarize_books.py`, stdlib only + the `claude` CLI):
+
+```bash
+python3 scripts/summarize_books.py --source fs_ --list   # what's tagged
+python3 scripts/summarize_books.py --source fs_          # local card tree
+python3 scripts/summarize_books.py --webdav http://crosspoint.local
+```
+
+It extracts the book's text, has `claude -p` research it (WebSearch) and write
+three self-contained summaries plus a colophon, validates word budgets
+(±15% of 690 / 2300 / 6900 words at 230 wpm) and XML well-formedness, retries
+once, then packages `<Title> - Summary.epub`. Two traps worth keeping:
+
+- **The child CLI's environment is a whitelist, and `USER` must not be in it.**
+  Run from inside a Claude Code session with the ambient environment and the
+  child fails with "OAuth session expired and could not be refreshed". Bisected
+  2026-08-05 against every variable: forwarding **`USER`** alone reproduces it
+  100%, dropping it fixes it 100% (`LOGNAME` carries the same value and is
+  harmless). Do not "restore" `USER` to the whitelist in `child_env()`.
+- **`--model` is explicit (default `opus`)** rather than inheriting the CLI's
+  configured model, which can be one the account has no credits for; the
+  failure then surfaces as a bare exit 1 with the real reason on *stdout*.
+
+Two output rules exist because of how this device paginates, and the script
+both prompts for them and repairs them before packaging: fragments must not
+open with a heading (section.bin v35 breaks the page before h1-h3, and the
+builder already emits the chapter title, so a leading heading costs a whole
+page), and named HTML entities (`&ldquo;`, `&mdash;`) are invalid — an EPUB is
+parsed as XML and the firmware builds with `XML_GE=0`, so they are rewritten
+to literal characters.
+
+Verification status: local `--source` mode verified end-to-end; `--webdav`
+verified against a mock DAV server (PROPFIND/GET/PUT/DELETE, spaces in
+filenames) but **not yet against real hardware**.
+
 ## TODO — deferred, explicitly wanted (ruling 2026-08-05)
 
 - **Folder duplicate** — recursive streamed copy + progress popup +

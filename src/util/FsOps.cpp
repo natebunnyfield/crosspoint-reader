@@ -17,7 +17,8 @@
 
 namespace {
 constexpr const char* CACHE_ROOT = "/.crosspoint";
-}
+constexpr const char* SUMMARIZE_MARKER = "/summarize.tag";
+}  // namespace
 
 namespace FsOps {
 
@@ -115,6 +116,14 @@ std::string bookCacheDirFor(const std::string& path) {
   return {};
 }
 
+std::string summarizeMarkerFor(const std::string& path) {
+  const std::string cacheDir = bookCacheDirFor(path);
+  if (cacheDir.empty()) {
+    return {};
+  }
+  return cacheDir + SUMMARIZE_MARKER;
+}
+
 void migrateBookRefs(const std::string& oldPath, const std::string& newPath) {
   const std::string oldCache = bookCacheDirFor(oldPath);
   if (oldCache.empty()) {
@@ -129,6 +138,19 @@ void migrateBookRefs(const std::string& oldPath, const std::string& newPath) {
       // book then re-parses cleanly at its new path.
       LOG_ERR("FsOps", "Failed to rename cache dir %s -> %s; deleting old cache", oldCache.c_str(), newCache.c_str());
       Storage.removeDir(oldCache.c_str());
+    }
+  }
+
+  // The summarize marker rode along with the cache-dir rename; its content
+  // (the book's card path, read by the host pipeline) must follow too.
+  const std::string marker = newCache + SUMMARIZE_MARKER;
+  if (Storage.exists(marker.c_str())) {
+    HalFile file;
+    if (Storage.openFileForWrite("FsOps", marker.c_str(), file)) {
+      file.write(newPath.c_str(), newPath.size());
+      file.write('\n');
+    } else {
+      LOG_ERR("FsOps", "Failed to rewrite summarize marker %s", marker.c_str());
     }
   }
 
