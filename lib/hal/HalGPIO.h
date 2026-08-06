@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <InputManager.h>
 
+#include <string>
+
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
 #define EPD_SCLK 8   // SPI Clock
 #define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
@@ -81,6 +83,33 @@ class HalGPIO {
   bool wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const;
   bool wasTouchActivity() const;
   void setSharedConfirmPowerShortPressEmitsPower(bool enabled);
+
+  // --- Host keyboard text entry -------------------------------------------
+  //
+  // No-ops here, and they stay no-ops: this board has seven buttons and no
+  // keyboard, which is why text entry pecks characters out of an on-screen
+  // grid. They exist so a text-entry activity can be written once and pick up
+  // a real keyboard wherever one exists -- today that is the simulator (the
+  // Mac's keyboard, an iPhone's software keyboard, a Bluetooth keyboard
+  // paired to the phone), where both are implemented for real.
+  //
+  // setTextEntryActive() is an announcement, not a request: the activity says
+  // a text field is open on enter and closed on exit. A host that owns a
+  // keyboard needs it for two things -- raising its on-screen one, and taking
+  // the keyboard back off the button map while a field is open, since there
+  // the letters P/S/H would otherwise be Power/Sleep/Home.
+  //
+  // consumeTypedText() drains whatever the host has typed since the last
+  // call. It is a byte stream, not a char stream: printable input is UTF-8
+  // and the three editing keys ride along as the control bytes below, so a
+  // consumer walks the chunk and splits it on those. util/TypedTextInput.h
+  // does exactly that, and is what both text-entry activities call.
+  void setTextEntryActive(bool /*active*/) {}
+  bool consumeTypedText(std::string& /*out*/) { return false; }
+
+  static constexpr char TYPED_BACKSPACE = '\b';
+  static constexpr char TYPED_COMMIT = '\n';
+  static constexpr char TYPED_CANCEL = '\x1b';
 
   // Verify power button was held long enough after wakeup.
   // Returns true if verification succeeded, false if device should return to sleep.

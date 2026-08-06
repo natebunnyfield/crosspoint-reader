@@ -9,6 +9,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TypedTextInput.h"
 
 namespace {
 
@@ -45,10 +46,16 @@ void DaisyEntryActivity::onEnter() {
   petalIdx = 0;
   activePick = -1;
   pickHandled = false;
+  // See KeyboardEntryActivity::onEnter -- the wheel is a text field too, and a
+  // host that has a real keyboard should be able to type into it.
+  mappedInput.setTextEntryActive(true);
   requestUpdate();
 }
 
-void DaisyEntryActivity::onExit() { Activity::onExit(); }
+void DaisyEntryActivity::onExit() {
+  mappedInput.setTextEntryActive(false);
+  Activity::onExit();
+}
 
 void DaisyEntryActivity::rotate(const int delta) {
   const int n = petalCount();
@@ -130,6 +137,41 @@ void DaisyEntryActivity::slotCenter(const int petal, const int slot, int& outX, 
 }
 
 void DaisyEntryActivity::loop() {
+  // Host keyboard first; see the same block in KeyboardEntryActivity::loop.
+  // The wheel has no cursor, so typed text appends at the end -- which is
+  // where the wheel's own picks land too.
+  std::string typed;
+  if (mappedInput.consumeTypedText(typed)) {
+    const TypedTextInput::Outcome outcome = TypedTextInput::apply(
+        typed,
+        [this](const std::string& run) {
+          // Whole-run length check rather than insertChar's per-byte one: a
+          // typed run can be multi-byte UTF-8 and must not be cut in half at
+          // the limit.
+          if (maxLength != 0 && text.length() + run.length() > maxLength) return;
+          text.append(run);
+          requestUpdate();
+        },
+        [this] {
+          const bool had = !text.empty();
+          backspace();
+          return had;
+        });
+    switch (outcome) {
+      case TypedTextInput::Outcome::Committed:
+        onComplete(text);
+        return;
+      case TypedTextInput::Outcome::Cancelled:
+        onCancel();
+        return;
+      case TypedTextInput::Outcome::Changed:
+        // insert/backspace already called requestUpdate().
+        return;
+      case TypedTextInput::Outcome::None:
+        break;
+    }
+  }
+
   buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Left}, [this] { rotate(-1); });
   buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Right}, [this] { rotate(1); });
 
