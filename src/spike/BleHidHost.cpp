@@ -48,6 +48,8 @@ void pollInput() {
 }
 }  // namespace
 
+bool canStart() { return true; }  // no radio to bring up
+
 bool begin() {
   gStarted = true;
   gState = State::Ready;
@@ -633,8 +635,26 @@ void hostTask(void* /*param*/) {
 
 }  // namespace
 
+// Measured on the X4: nimble_port_init() consumed 64,800-65,204 B, and every
+// success had maxalloc >= 73,716. The post-exchange restart had maxalloc 24,564
+// with free still 62,304 — free looked survivable, the contiguous block was not,
+// and it hung. maxalloc is the discriminator.
+constexpr uint32_t MIN_MAXALLOC_FOR_INIT = 70000;
+
+bool canStart() { return ESP.getMaxAllocHeap() >= MIN_MAXALLOC_FOR_INIT; }
+
 bool begin() {
   if (gStarted) return true;
+
+  if (!canStart()) {
+    // Attempting anyway is a guaranteed hang -> watchdog reboot -> crash
+    // report, which is exactly what happened when the editor restarted BLE
+    // straight after a Claude exchange. Refuse loudly instead.
+    LOG_ERR(TAG, "refusing nimble_port_init: maxalloc=%u < %u (free=%u) — heap too fragmented",
+            (unsigned)ESP.getMaxAllocHeap(), (unsigned)MIN_MAXALLOC_FOR_INIT, (unsigned)ESP.getFreeHeap());
+    setState(State::Failed);
+    return false;
+  }
 
   // maxalloc matters more than free here: the controller wants one large
   // contiguous block, and this call has been seen to hang the device outright

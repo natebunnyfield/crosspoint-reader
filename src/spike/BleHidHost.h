@@ -24,8 +24,16 @@ enum class State : uint8_t {
   Failed,
 };
 
+// True when there is enough CONTIGUOUS heap for nimble_port_init(). That call
+// wants ~65 KB in one block and HANGS rather than failing when it cannot get
+// it. After a WiFi teardown the heap is fragmented enough that maxalloc drops
+// to ~24 KB while free is still ~62 KB, which is a guaranteed hang — so the
+// discriminator is maxalloc, not free.
+bool canStart();
+
 // Brings up the controller + NimBLE host and starts scanning. Idempotent.
-// Returns false if the stack failed to start.
+// Returns false if the stack failed to start, INCLUDING when canStart() is
+// false — in that case nothing is attempted, which is the point.
 bool begin();
 
 // Tears the whole stack back down (nimble_port_deinit) and returns the RAM.

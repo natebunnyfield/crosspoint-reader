@@ -180,7 +180,12 @@ void BleEditorActivity::render(RenderLock&&) {
                         respLines[n].c_str());
     }
     const int noteY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
-    renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, noteY, "saved to /claude-chat.md - type to continue");
+    // Say plainly when the keyboard did not come back, rather than leaving the
+    // typist pressing keys at a dead radio.
+    const char* note = blespike::state() == blespike::State::Ready
+                           ? "saved to /claude-chat.md - type to continue"
+                           : "saved to /claude-chat.md - Back and re-open to type again";
+    renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, noteY, note);
     // Hints must go through mapLabels: front buttons are user-remappable, so
     // hardcoded positional strings can label the wrong physical key.
     const auto respLabels = mappedInput.mapLabels("Save+Exit", "", "", "");
@@ -250,10 +255,16 @@ void BleEditorActivity::sendToClaude() {
   claudechat::Result r = claudechat::runExchange(
       prompt, [](void* ctx, const char* p) { static_cast<BleEditorActivity*>(ctx)->setPhase(p); }, this);
 
-  // Re-arm the keyboard. Known risk from the earlier spike runs: below ~86 KB
-  // free this can hard-hang; heap here should be ~88 KB+ with WiFi fully off.
-  setPhase("ble: restarting");
-  blespike::begin();
+  // Re-arm the keyboard — but only if the heap can actually take it. A WiFi
+  // teardown leaves ~62 KB free with maxalloc ~24 KB, and nimble_port_init()
+  // wants ~65 KB contiguous: attempting it there hung the device and tripped
+  // the watchdog into a crash report. canStart() makes that a refusal.
+  if (blespike::canStart()) {
+    setPhase("ble: restarting");
+    blespike::begin();
+  } else {
+    LOG_ERR(TAG, "skipping BLE restart: heap too fragmented after the exchange");
+  }
 
   if (r.ok) {
     lastResponse = std::move(r.responseText);
