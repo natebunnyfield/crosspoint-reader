@@ -87,7 +87,7 @@ bool connectWifi(std::string& outErr, void (*statusCb)(void*, const char*), void
       WiFi.mode(WIFI_OFF);
       return false;
     }
-    vTaskDelay(pdMS_TO_TICKS(100));
+    delay(100);
   }
   LOG_INF(TAG, "wifi connected, ip=%s rssi=%d", WiFi.localIP().toString().c_str(), WiFi.RSSI());
 
@@ -161,15 +161,17 @@ Result runExchange(const std::string& prompt, void (*statusCb)(void* ctx, const 
       http.addHeader("anthropic-version", "2023-06-01");
       http.addHeader("content-type", "application/json");
       const uint32_t t0 = millis();
-      const int status = http.POST(payload);
+      // The simulator's SecureHttpClient shim speaks Arduino String, the
+      // device's speaks std::string; String() converts cleanly for both.
+      const int status = http.POST(String(payload.c_str()));
       const uint32_t elapsed = millis() - t0;
       logHeap("P8-after-post");
       LOG_INF(TAG, "POST status=%d in %lums, body=%u bytes", status, (unsigned long)elapsed,
-              (unsigned)http.getString().size());
+              (unsigned)std::string(http.getString().c_str()).size());
 
       if (status == 200) {
         JsonDocument doc;
-        const DeserializationError derr = deserializeJson(doc, http.getString());
+        const DeserializationError derr = deserializeJson(doc, std::string(http.getString().c_str()));
         if (derr) {
           res.error = std::string("JSON parse: ") + derr.c_str();
         } else {
@@ -184,7 +186,7 @@ Result runExchange(const std::string& prompt, void (*statusCb)(void* ctx, const 
       } else {
         // Keep the first line of the error body — it names the actual problem
         // (bad key, overloaded, bad request) without dumping KBs to the file.
-        std::string body = http.getString();
+        std::string body(http.getString().c_str());
         if (body.size() > 200) body.resize(200);
         res.error = "HTTP " + std::to_string(status) + ": " + body;
       }

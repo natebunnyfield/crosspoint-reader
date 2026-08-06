@@ -7,6 +7,88 @@
 
 #include <atomic>
 
+#ifdef SIMULATOR
+// The simulator has no BLE radio. HalGPIO owns all SDL polling there (adding
+// text input would mean editing the simulator repo), so typed text arrives
+// through a file instead: append to fs_/ble-input.txt and it is consumed as
+// keystrokes. Same ring, same popChar() contract, so the editor is unchanged
+// and the whole flow becomes scriptable.
+#include <HalStorage.h>
+
+namespace blespike {
+namespace {
+constexpr const char* TAG = "BLESPIKE";
+constexpr const char* INPUT_PATH = "/ble-input.txt";
+State gState = State::Off;
+bool gStarted = false;
+char gPeerName[32] = "simulated keyboard";
+std::string gPending;      // characters read but not yet popped
+uint32_t gConsumed = 0;    // bytes of INPUT_PATH already ingested
+uint32_t gNotifies = 0;
+uint32_t gLastTs = 0;
+unsigned long gLastPoll = 0;
+
+// Poll the input file for newly appended bytes. Cheap: one open + seek.
+void pollInput() {
+  if (millis() - gLastPoll < 200) return;
+  gLastPoll = millis();
+  HalFile f;
+  if (!Storage.openFileForRead(TAG, INPUT_PATH, f)) return;
+  const uint32_t size = static_cast<uint32_t>(f.size());
+  if (size <= gConsumed) return;
+  if (!f.seek(gConsumed)) return;
+  char buf[256];
+  const int n = f.read(buf, sizeof(buf));
+  if (n <= 0) return;
+  gPending.append(buf, n);
+  gConsumed += n;
+  gNotifies++;
+  gLastTs = millis();
+  LOG_DBG(TAG, "sim input: +%d chars", n);
+}
+}  // namespace
+
+bool begin() {
+  gStarted = true;
+  gState = State::Ready;
+  LOG_INF(TAG, "SIMULATOR: keystrokes read from %s (append to type)", INPUT_PATH);
+  return true;
+}
+
+void end() {
+  gStarted = false;
+  gState = State::Off;
+}
+
+State state() { return gState; }
+const char* peerName() { return gPeerName; }
+uint32_t lastKeyMillis() { return gLastTs; }
+uint32_t notifyCount() { return gNotifies; }
+uint32_t droppedCount() { return 0; }
+
+int popChar() {
+  if (!gStarted) return -1;
+  if (gPending.empty()) pollInput();
+  if (gPending.empty()) return -1;
+  const unsigned char c = static_cast<unsigned char>(gPending.front());
+  gPending.erase(gPending.begin());
+  return c;
+}
+
+const char* stateName() {
+  switch (gState) {
+    case State::Off: return "off";
+    case State::Ready: return "ready (sim)";
+    default: return "sim";
+  }
+}
+
+}  // namespace blespike
+
+#else  // real device below
+
+#include <esp_task_wdt.h>
+
 extern "C" {
 #include "host/ble_gap.h"
 #include "host/ble_hs.h"
@@ -559,7 +641,31 @@ bool begin() {
   // when the heap is fragmented rather than merely small.
   LOG_INF(TAG, "heap before nimble_port_init: free=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
           (unsigned)ESP.getMaxAllocHeap());
+
+  // nimble_port_init() can HANG outright (not panic, not return an error) —
+  // observed repeatedly across the ~85-95 KB free range, including at 94,724
+  // after the same call succeeded at 94,972. A hang leaves the device dead with
+  // USB still enumerated and only a physical power cycle recovers it, which
+  // makes unattended iteration impossible. Arm the task watchdog across the
+  // call so a hang becomes an automatic reboot instead: main.cpp replays the
+  // persisted panic as SPIKE-PANIC on the next boot, so the event is still
+  // visible. This is a spike workaround, NOT a fix — the nondeterminism itself
+  // is unexplained and is the biggest open risk in this work.
+  const esp_task_wdt_config_t wdtCfg = {
+      .timeout_ms = 15000,
+      .idle_core_mask = 0,
+      .trigger_panic = true,
+  };
+  const bool wdtReady = (esp_task_wdt_init(&wdtCfg) == ESP_OK || esp_task_wdt_reconfigure(&wdtCfg) == ESP_OK) &&
+                        esp_task_wdt_add(nullptr) == ESP_OK;
+  if (!wdtReady) LOG_ERR(TAG, "task WDT not armed; a hang here will need a power cycle");
+
   const esp_err_t err = nimble_port_init();
+
+  if (wdtReady) {
+    esp_task_wdt_reset();
+    esp_task_wdt_delete(nullptr);
+  }
   if (err != ESP_OK) {
     LOG_ERR(TAG, "nimble_port_init failed: %d", (int)err);
     setState(State::Failed);
@@ -645,3 +751,5 @@ uint32_t notifyCount() { return gNotifies.load(std::memory_order_relaxed); }
 uint32_t droppedCount() { return gDropped.load(std::memory_order_relaxed); }
 
 }  // namespace blespike
+
+#endif  // SIMULATOR
