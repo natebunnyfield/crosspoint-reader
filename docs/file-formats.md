@@ -153,6 +153,7 @@ before relying on any of them for a field layout:
 | 59 | (this commit) | justified hyphenating blocks are broken by Knuth-Plass total fit instead of greedy; no field changed, the breaks did (`docs/knuth-plass-line-breaking-2026-09-25.md` §13) |
 | 60 | (this commit) | "Just ship shrink": the Knuth-Plass breaker may narrow a justified line's gaps to 2/3 of a space, and extractLine paints the negative spare; breaks and painted x both move (§14) |
 | 61 | (this commit) | the automatic-justification default drops 40 → 34 characters, so the default 14 pt page justifies (`docs/auto-justification.md`, final section) |
+| 65 | upstream `046827fc3` (campaign 2026-11-08) | ruby edge overhangs reserved at layout instead of shifted at paint; ruby overhang widens the neighbor word; the breaker's DP prefers the longer line on a cost tie (`cost <= dp[i]`), so breaks move wherever two candidates tie. No field changed |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

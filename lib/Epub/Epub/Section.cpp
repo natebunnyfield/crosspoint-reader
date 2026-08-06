@@ -256,7 +256,13 @@ namespace {
 // COUNTER-clockwise turn (owner 2026-10-04: "the iphone would need to be turned
 // ccw not clockwise"; RotatedTablePlacement.h). A cached v63 section holds the
 // flipped positions, which the CCW draw would put off the page.
-constexpr uint8_t SECTION_FILE_VERSION = 64;
+// v65: upstream 046827fc3 (ruby/CJK line breaking). Ruby edge overhangs are
+// reserved at layout (extractLine) instead of shifted at paint, ruby overhang
+// widens the NEIGHBOR word rather than the ruby base, and the greedy breaker's
+// DP now prefers the longer line on a cost tie (`cost <= dp[i]`), which moves
+// line breaks in any book where two candidate breaks tie. Stale v64 caches
+// would keep the old breaks and paint positions.
+constexpr uint8_t SECTION_FILE_VERSION = 65;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
