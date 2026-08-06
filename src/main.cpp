@@ -660,9 +660,12 @@ void loop() {
         logSerial.write(buf, bufferSize);
         logSerial.printf("SCREENSHOT_END\n");
       } else if (cmd == "BLEEDIT") {
-        // SPIKE: open the editor without needing anyone at the buttons.
-        LOG_INF("SPIKE", "CMD:BLEEDIT — opening BLE editor");
-        activityManager.goToBleEditor();
+        // Test hook: open the note editor without needing anyone at the buttons.
+        LOG_INF("SPIKE", "CMD:BLEEDIT — opening note editor");
+        activityManager.goToNoteEditor("/note.md");
+      } else if (cmd == "CLAUDE") {
+        LOG_INF("SPIKE", "CMD:CLAUDE — opening Claude");
+        activityManager.goToClaudeChat();
       } else if (cmd.startsWith("WIFISAVE:")) {
         // SPIKE: CMD:WIFISAVE:<ssid>:<password> — store a credential without
         // walking the picker UI. Password is not echoed back.

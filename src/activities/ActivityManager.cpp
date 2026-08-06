@@ -17,7 +17,8 @@
 #endif
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
-#include "util/BleEditorActivity.h"  // SPIKE
+#include "util/ClaudeChatActivity.h"
+#include "util/NoteEditorActivity.h"
 #include "util/FullScreenMessageActivity.h"
 
 static portMUX_TYPE activityManagerSpinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -239,10 +240,12 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 
-// SPIKE — pushed rather than replaced so Back returns to Home with its state.
-void ActivityManager::goToBleEditor() {
-  pushActivity(std::make_unique<BleEditorActivity>(renderer, mappedInput));
+// Pushed rather than replaced so Back returns to Home with its state.
+void ActivityManager::goToNoteEditor(std::string path) {
+  pushActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path)));
 }
+
+void ActivityManager::goToClaudeChat() { pushActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

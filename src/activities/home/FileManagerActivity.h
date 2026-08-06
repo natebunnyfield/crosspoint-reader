@@ -12,7 +12,7 @@
 // the SD card — hidden files included — with rename, move (one-slot clipboard)
 // and delete via a per-item action menu.
 class FileManagerActivity final : public Activity {
-  enum class MenuAction : uint8_t { MoveHere, View, Rename, Normalize, Move, Delete };
+  enum class MenuAction : uint8_t { MoveHere, View, Edit, Rename, Normalize, Move, Delete };
 
   ButtonNavigator buttonNavigator;
   OptionPopup popup;

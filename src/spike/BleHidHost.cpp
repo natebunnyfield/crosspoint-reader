@@ -175,12 +175,11 @@ ChrInfo gChrs[MAX_CHRS];
 size_t gChrCount = 0;
 ReportInfo gReports[MAX_REPORTS];
 size_t gReportCount = 0;
-size_t gDscIndex = 0;  // which report we are hunting a CCCD for
 size_t gSubIndex = 0;  // which report we are subscribing
 bool gDiscoveryRunning = false;
 
 // Single-producer (host task) / single-consumer (main task) ring.
-char gRing[RING_SIZE];
+int gRing[RING_SIZE];
 uint32_t gRingTs[RING_SIZE];
 std::atomic<uint16_t> gHead{0};
 std::atomic<uint16_t> gTail{0};
@@ -197,7 +196,7 @@ void setState(State s) {
   LOG_INF(TAG, "state -> %s", stateName());
 }
 
-void ringPush(char c, uint32_t ts) {
+void ringPush(int c, uint32_t ts) {
   const uint16_t head = gHead.load(std::memory_order_relaxed);
   const uint16_t next = (head + 1) % RING_SIZE;
   if (next == gTail.load(std::memory_order_acquire)) {
@@ -250,47 +249,62 @@ int onCccdWrite(uint16_t /*connHandle*/, const ble_gatt_error* error, ble_gatt_a
 
 // --- GATT: descriptors -------------------------------------------------------
 
-void discoverDescriptorsNext();
-
+// Descriptor discovery runs ONCE over the whole HID service range, and each
+// CCCD is attributed to the report whose value handle most closely precedes it
+// — which is exactly the GATT layout rule (a characteristic's descriptors sit
+// between its value handle and the next declaration).
+//
+// The previous version ran one procedure per report over a computed
+// [valHandle+1, endHandle] window and got BLE_HS_EINVAL (rc=3) on the first
+// call; the remaining reports then silently fell out through the start>end
+// guard, so NO CCCD was ever written. Keystrokes still arrived, but only
+// because the test keyboard had a CCCD persisted from an earlier bond — a
+// never-bonded keyboard would have connected, discovered, and delivered
+// nothing. One pass removes the per-report window arithmetic entirely.
 int onDsc(uint16_t /*connHandle*/, const ble_gatt_error* error, uint16_t /*chrValHandle*/, const ble_gatt_dsc* dsc,
           void* /*arg*/) {
   if (error != nullptr && error->status == BLE_HS_EDONE) {
-    ++gDscIndex;
-    discoverDescriptorsNext();
+    size_t withCccd = 0;
+    for (size_t i = 0; i < gReportCount; ++i) {
+      if (gReports[i].cccdHandle != 0) ++withCccd;
+    }
+    LOG_INF(TAG, "descriptors done: %u/%u report(s) have a CCCD", (unsigned)withCccd, (unsigned)gReportCount);
+    gSubIndex = 0;
+    subscribeNext();
     return 0;
   }
   if (error != nullptr && error->status != 0) {
-    LOG_ERR(TAG, "descriptor discovery status=%d", error->status);
-    ++gDscIndex;
-    discoverDescriptorsNext();
+    LOG_ERR(TAG, "descriptor discovery status=%d — subscribing with what we have", error->status);
+    gSubIndex = 0;
+    subscribeNext();
     return 0;
   }
-  if (dsc == nullptr || gDscIndex >= gReportCount) return 0;
-  if (ble_uuid_u16(&dsc->uuid.u) == UUID_CCCD) {
-    gReports[gDscIndex].cccdHandle = dsc->handle;
-    LOG_DBG(TAG, "CCCD 0x%04x for report val=0x%04x", dsc->handle, gReports[gDscIndex].valHandle);
+  if (dsc == nullptr) return 0;
+  if (ble_uuid_u16(&dsc->uuid.u) != UUID_CCCD) return 0;
+
+  // Attach to the nearest preceding report value handle.
+  size_t best = gReportCount;
+  uint16_t bestHandle = 0;
+  for (size_t i = 0; i < gReportCount; ++i) {
+    const uint16_t vh = gReports[i].valHandle;
+    if (vh < dsc->handle && vh >= bestHandle) {
+      bestHandle = vh;
+      best = i;
+    }
+  }
+  if (best < gReportCount && gReports[best].cccdHandle == 0) {
+    gReports[best].cccdHandle = dsc->handle;
+    LOG_DBG(TAG, "CCCD 0x%04x -> report val=0x%04x", dsc->handle, gReports[best].valHandle);
   }
   return 0;
 }
 
 void discoverDescriptorsNext() {
-  if (gDscIndex >= gReportCount) {
+  const int rc = ble_gattc_disc_all_dscs(gConnHandle, gSvcStart, gSvcEnd, onDsc, nullptr);
+  if (rc != 0) {
+    LOG_ERR(TAG, "disc_all_dscs(0x%04x..0x%04x) rc=%d", gSvcStart, gSvcEnd, rc);
     gSubIndex = 0;
     subscribeNext();
-    return;
-  }
-  const uint16_t start = gReports[gDscIndex].valHandle + 1;
-  const uint16_t end = gReports[gDscIndex].endHandle;
-  if (start > end) {
-    ++gDscIndex;
-    discoverDescriptorsNext();
-    return;
-  }
-  const int rc = ble_gattc_disc_all_dscs(gConnHandle, start, end, onDsc, nullptr);
-  if (rc != 0) {
-    LOG_ERR(TAG, "disc_all_dscs rc=%d", rc);
-    ++gDscIndex;
-    discoverDescriptorsNext();
   }
 }
 
@@ -319,7 +333,6 @@ void onCharsDone() {
     setState(State::Failed);
     return;
   }
-  gDscIndex = 0;
   discoverDescriptorsNext();
 }
 
@@ -405,8 +418,8 @@ void decodeReport(const uint8_t* rep, size_t len) {
   // it can be unit-tested on the host without a radio (test/ble_keymap).
   if (len < 8) return;
   const uint8_t* report = rep + (len - 8);
-  char decoded[6];
-  const size_t n = hidkeymap::decodeReport(report, gPrevKeys, decoded, sizeof(decoded));
+  int decoded[6];
+  const size_t n = hidkeymap::decodeReport(report, gPrevKeys, decoded, 6);
   const uint32_t now = millis();
   for (size_t i = 0; i < n; ++i) ringPush(decoded[i], now);
 }
@@ -729,10 +742,10 @@ const char* peerName() { return gPeerName; }
 int popChar() {
   const uint16_t tail = gTail.load(std::memory_order_relaxed);
   if (tail == gHead.load(std::memory_order_acquire)) return -1;
-  const char c = gRing[tail];
+  const int c = gRing[tail];
   gLastPoppedTs = gRingTs[tail];
   gTail.store((tail + 1) % RING_SIZE, std::memory_order_release);
-  return static_cast<unsigned char>(c);
+  return c;
 }
 
 uint32_t lastKeyMillis() { return gLastPoppedTs; }

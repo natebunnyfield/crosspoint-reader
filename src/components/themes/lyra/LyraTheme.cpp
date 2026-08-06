@@ -28,6 +28,8 @@
 #include "components/icons/text24.h"
 #include "components/icons/transfer.h"
 #include "components/icons/wifi.h"
+#include "components/icons/claude.h"
+#include "components/icons/createnote.h"
 #include "fontIds.h"
 
 // Internal constants
@@ -80,6 +82,10 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return HotspotIcon;
       case UIIcon::ManageFiles:
         return ManageFiles32Icon;
+      case UIIcon::CreateNote:
+        return CreateNote32Icon;
+      case UIIcon::ClaudeMark:
+        return Claude32Icon;
       default:
         return nullptr;
     }

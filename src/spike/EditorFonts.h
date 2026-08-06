@@ -18,10 +18,8 @@ struct Entry {
 
 // All five are OFL. The iA faces are the "S" (narrow) cuts.
 inline constexpr Entry FAMILIES[] = {
-    {"iAWriterQuattro", "iA Writer Quattro"},
-    {"iAWriterDuo", "iA Writer Duo"},
-    {"iAWriterMono", "iA Writer Mono"},
-    {"SpaceMono", "Space Mono"},
+    {"iAWriterQuattro", "iA Writer Quattro"}, {"iAWriterDuo", "iA Writer Duo"},
+    {"iAWriterMono", "iA Writer Mono"},       {"SpaceMono", "Space Mono"},
     {"IBMPlexMono", "IBM Plex Mono"},
 };
 inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);

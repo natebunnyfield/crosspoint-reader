@@ -12,9 +12,11 @@ std::string typeReports(const std::vector<std::vector<uint8_t>>& reports) {
   uint8_t prev[6] = {0};
   std::string out;
   for (const auto& r : reports) {
-    char decoded[6];
+    int decoded[6];
     const size_t n = hidkeymap::decodeReport(r.data(), prev, decoded, sizeof(decoded));
-    out.append(decoded, n);
+    for (size_t i = 0; i < n; ++i) {
+      if (decoded[i] < 0x100) out.push_back(static_cast<char>(decoded[i]));
+    }
   }
   return out;
 }
@@ -50,9 +52,10 @@ TEST(BleKeymap, ControlCharacters) {
 // Arrow keys and everything past 0x38 are unmapped. 23 such events were logged
 // on the X4 (mostly 0x50/0x4F) and must not become garbage characters.
 TEST(BleKeymap, UnmappedUsagesProduceNothing) {
-  EXPECT_EQ(hidkeymap::usageToChar(0x4F, 0), 0);  // Right arrow
-  EXPECT_EQ(hidkeymap::usageToChar(0x50, 0), 0);  // Left arrow
+  EXPECT_EQ(hidkeymap::usageToChar(0x4F, 0), 0);  // Right arrow: no character
+  EXPECT_EQ(hidkeymap::usageToChar(0x50, 0), 0);  // Left arrow: no character
   EXPECT_EQ(hidkeymap::usageToChar(0x00, 0), 0);
+  // ...and they contribute no TEXT, though they now emit edit keys (below).
   EXPECT_EQ(typeReports({report(0, {0x50}), report(0, {0x4F})}), "");
 }
 
@@ -93,4 +96,29 @@ TEST(BleKeymap, EscapeIsNotAnEditorCharacter) { EXPECT_EQ(typeReports({report(0,
 
 TEST(BleKeymap, SixSimultaneousKeysAllDecode) {
   EXPECT_EQ(typeReports({report(0, {0x04, 0x05, 0x06, 0x07, 0x08, 0x09})}), "abcdef");
+}
+
+// Arrow/nav keys become EditKey codes rather than being dropped. 23 of these
+// were logged on the X4 with no cursor to move.
+TEST(BleKeymap, NavigationClusterBecomesEditKeys) {
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x4F), hidkeymap::KEY_RIGHT);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x50), hidkeymap::KEY_LEFT);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x51), hidkeymap::KEY_DOWN);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x52), hidkeymap::KEY_UP);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x4A), hidkeymap::KEY_HOME);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x4D), hidkeymap::KEY_END);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x4B), hidkeymap::KEY_PAGE_UP);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x4E), hidkeymap::KEY_PAGE_DOWN);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x4C), hidkeymap::KEY_DELETE);
+  EXPECT_EQ(hidkeymap::usageToEditKey(0x04), 0);  // 'a' is not a nav key
+}
+
+TEST(BleKeymap, EditKeysAreAboveAscii) {
+  uint8_t prev[6] = {0};
+  int out[6];
+  const auto r = report(0, {0x50});
+  const size_t n = hidkeymap::decodeReport(r.data(), prev, out, 6);
+  ASSERT_EQ(n, 1u);
+  EXPECT_EQ(out[0], hidkeymap::KEY_LEFT);
+  EXPECT_GE(out[0], 0x100);  // never collides with a character
 }

@@ -21,12 +21,12 @@
 #include "fontIds.h"
 
 int HomeActivity::getMenuItemCount() const {
-  // SPIKE: +1 for the BLE Editor row. This count is what bounds selectorIndex —
-  // leave it stale and the extra row renders but the selector cannot reach it.
+  // This count is what bounds selectorIndex — leave it stale after adding a
+  // menu row and the row renders but the selector can never reach it.
 #ifndef CROSSPOINT_NO_NETWORK
-  int count = 6;  // File Browser, Recents, File Transfer, Manage Files, Settings, BLE Editor
+  int count = 7;  // Browse, Recents, Transfer, Manage Files, Settings, Create Note, Claude
 #else
-  int count = 5;  // File Browser, Recents, Manage Files, Settings, BLE Editor (no File Transfer here)
+  int count = 6;  // Browse, Recents, Manage Files, Settings, Create Note, Claude (no File Transfer)
 #endif
   if (!recentBooks.empty()) {
     count += recentBooks.size();
@@ -193,8 +193,11 @@ void HomeActivity::loop() {
       case HomeMenuItem::SETTINGS_MENU:
         onSettingsOpen();
         break;
-      case HomeMenuItem::BLE_EDITOR:  // SPIKE
-        onBleEditorOpen();
+      case HomeMenuItem::CREATE_NOTE:
+        onCreateNoteOpen();
+        break;
+      case HomeMenuItem::CLAUDE:
+        onClaudeOpen();
         break;
       default:
         break;
@@ -357,12 +360,12 @@ void HomeActivity::render(RenderLock&&) {
                                           tr(STR_FILE_TRANSFER),
 #endif
                                           tr(STR_MANAGE_FILES), tr(STR_SETTINGS_TITLE),
-                                          "BLE Editor (spike)"};
+                                          tr(STR_CREATE_NOTE), "Claude"};
     std::vector<UIIcon> menuIcons = {Folder, Recent,
 #ifndef CROSSPOINT_NO_NETWORK
                                      Transfer,
 #endif
-                                     ManageFiles, Settings, Text};
+                                     ManageFiles, Settings, CreateNote, ClaudeMark};
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme
@@ -419,4 +422,6 @@ void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
 void HomeActivity::onManageFilesOpen() { activityManager.goToFileManager(); }
 
-void HomeActivity::onBleEditorOpen() { activityManager.goToBleEditor(); }  // SPIKE
+void HomeActivity::onCreateNoteOpen() { activityManager.goToNoteEditor("/note.md"); }
+
+void HomeActivity::onClaudeOpen() { activityManager.goToClaudeChat(); }
