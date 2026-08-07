@@ -50,9 +50,9 @@ ICONS = [
     ("Hotspot", "radio"),
     ("ManageFiles", "folder-cog"),
     ("CreateNote", "square-pen"),
-    # Not a Lucide icon: claude.h decodes to a near-solid blob at 32px because the
-    # starburst's rays merge. This is a stroke-based cut at Lucide's geometry.
-    # Lucide `bot` is the sanctioned fallback if the mark is ever unwanted.
+    # Not a Lucide icon: the real Claude mark, filled rather than stroked, because
+    # a stroked approximation of it reads as a generic snowflake and not as the
+    # mark. Lucide `bot` is the sanctioned fallback if the mark is ever unwanted.
     ("ClaudeMark", "claude-mark"),
 ]
 
