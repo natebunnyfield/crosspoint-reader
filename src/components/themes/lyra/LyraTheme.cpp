@@ -13,23 +13,8 @@
 
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
-#include "components/icons/book.h"
-#include "components/icons/book24.h"
 #include "components/icons/cover.h"
-#include "components/icons/file24.h"
-#include "components/icons/folder.h"
-#include "components/icons/folder24.h"
-#include "components/icons/hotspot.h"
-#include "components/icons/image24.h"
-#include "components/icons/library.h"
-#include "components/icons/managefiles.h"
-#include "components/icons/recent.h"
-#include "components/icons/settings2.h"
-#include "components/icons/text24.h"
-#include "components/icons/transfer.h"
-#include "components/icons/wifi.h"
-#include "components/icons/claude.h"
-#include "components/icons/createnote.h"
+#include "components/icons/lucide_icons.h"
 #include "fontIds.h"
 
 // Internal constants
@@ -44,51 +29,44 @@ constexpr int mainMenuColumns = 2;
 int coverWidth = 0;
 
 const uint8_t* iconForName(UIIcon icon, int size) {
-  if (size == 24) {
-    switch (icon) {
-      case UIIcon::Folder:
-        return Folder24Icon;
-      case UIIcon::Text:
-        return Text24Icon;
-      case UIIcon::Image:
-        return Image24Icon;
-      case UIIcon::Book:
-        return Book24Icon;
-      case UIIcon::File:
-        return File24Icon;
-      case UIIcon::ManageFiles:
-        // No 24px cut of folder-cog; the plain file glyph reads fine at list size.
-        return File24Icon;
-      default:
-        return nullptr;
-    }
-  } else if (size == 32) {
-    switch (icon) {
-      case UIIcon::Folder:
-        return FolderIcon;
-      case UIIcon::Book:
-        return BookIcon;
-      case UIIcon::Recent:
-        return RecentIcon;
-      case UIIcon::Settings:
-        return Settings2Icon;
-      case UIIcon::Transfer:
-        return TransferIcon;
-      case UIIcon::Library:
-        return LibraryIcon;
-      case UIIcon::Wifi:
-        return WifiIcon;
-      case UIIcon::Hotspot:
-        return HotspotIcon;
-      case UIIcon::ManageFiles:
-        return ManageFiles32Icon;
-      case UIIcon::CreateNote:
-        return CreateNote32Icon;
-      case UIIcon::ClaudeMark:
-        return Claude32Icon;
-      default:
-        return nullptr;
-    }
+  // Every UIIcon now exists at both sizes, so the 24px table no longer has to
+  // borrow a neighbouring glyph -- ManageFiles used to fall back to the plain
+  // file icon at list size because there was no 24px cut of folder-cog.
+  //
+  // Bitmaps come from scripts/gen_lucide_icons.py and are stored pre-rotated to
+  // cancel drawIcon's own 90 degree mapping. Do not hand-edit them.
+  const bool small = size == 24;
+  switch (icon) {
+    case UIIcon::Folder:
+      return small ? Folder24LucideIcon : Folder32LucideIcon;
+    case UIIcon::Text:
+      return small ? Text24LucideIcon : Text32LucideIcon;
+    case UIIcon::Image:
+      return small ? Image24LucideIcon : Image32LucideIcon;
+    case UIIcon::Book:
+      return small ? Book24LucideIcon : Book32LucideIcon;
+    case UIIcon::File:
+      return small ? File24LucideIcon : File32LucideIcon;
+    case UIIcon::Recent:
+      return small ? Recent24LucideIcon : Recent32LucideIcon;
+    case UIIcon::Settings:
+      return small ? Settings24LucideIcon : Settings32LucideIcon;
+    case UIIcon::Transfer:
+      return small ? Transfer24LucideIcon : Transfer32LucideIcon;
+    case UIIcon::Library:
+      return small ? Library24LucideIcon : Library32LucideIcon;
+    case UIIcon::Wifi:
+      return small ? Wifi24LucideIcon : Wifi32LucideIcon;
+    case UIIcon::Hotspot:
+      return small ? Hotspot24LucideIcon : Hotspot32LucideIcon;
+    case UIIcon::ManageFiles:
+      return small ? ManageFiles24LucideIcon : ManageFiles32LucideIcon;
+    case UIIcon::CreateNote:
+      return small ? CreateNote24LucideIcon : CreateNote32LucideIcon;
+    case UIIcon::ClaudeMark:
+      return small ? ClaudeMark24LucideIcon : ClaudeMark32LucideIcon;
+    case UIIcon::None:
+      break;
   }
   return nullptr;
 }
