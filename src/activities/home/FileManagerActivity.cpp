@@ -688,7 +688,21 @@ void FileManagerActivity::loop() {
     return;
   }
 
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) backPressSeen = true;
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+    // Only act on a release whose PRESS arrived here. TextViewerActivity exits
+    // on the Back release, so the edge that dismissed it can otherwise be read
+    // as a fresh Back by this screen -- and at the SD root the arm below calls
+    // onGoHome(), i.e. view a file, tap Back once, land on Home instead of the
+    // listing. Mirrors confirmPressSeen above.
+    //
+    // NOT done by arming lockNextBackRelease in the viewFile handler: that
+    // swallows the next release unconditionally, which eats a genuine second
+    // Back. Measured -- two taps left the listing on screen where the second
+    // should have gone Home.
+    if (!backPressSeen) return;
+    backPressSeen = false;
     if (lockNextBackRelease) {
       lockNextBackRelease = false;
       return;
