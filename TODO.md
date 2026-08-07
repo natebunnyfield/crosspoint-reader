@@ -64,6 +64,55 @@ device `gh_release` and desktop both build; 215/215 host tests.
 **Not confirmed on hardware** — rendering was checked on the desktop panel, not
 on e-ink.
 
+### [T-005] Cruft with zero references — ruling needed before anything is deleted
+**scope: repo hygiene · raised by the 2026-08-06 audit · re-verified 2026-08-07**
+
+Each of these exists and has no reference anywhere in `src/` or `lib/`:
+
+| Thing | Note |
+|---|---|
+| `spike-build.sh`, `spike-*.py` (4 files) | from the BLE spike; the spike itself landed |
+| `src/util/StringUtils.{h,cpp}`, `UrlUtils.*`, `HtmlToPlainText.*` | 6 files, referenced only by each other |
+| `qa_x4/`, `qa_x4b/`, `qa_sleep/`, `qa_west/`, `qa_west2/` | ~624 KB of old QA captures |
+| `docs/flared-semiserif.html` | 220 KB, linked from nowhere |
+
+**Not filed as a defect and not actioned, on purpose.** Zero references is not
+sufficient grounds to delete in this project — the standing rule is that a thing
+is removable only when it is also not user-facing, not relied on by an upstream
+consumer, and not persisted in settings. The QA directories and the HTML are
+plainly byproducts. The `src/util/` trio is the one to be careful with: it is
+library-shaped code that a future feature would plausibly reach for, and
+deleting it is a bet that nothing will.
+
+**Close by:** an owner ruling per row. Default if none comes: delete the QA
+directories and `docs/flared-semiserif.html`, keep the rest.
+
+### [T-006] `freeink-sdk` is 54 commits behind, and it is a clean fast-forward
+**scope: dependency · re-measured 2026-08-07**
+
+Submodule pin `e514a868` (2026-07-28); upstream `a485dc46` (2026-08-03).
+**0 ahead, 54 behind** — nothing local to preserve, so this is a pointer bump,
+not a merge. The audit measured 48 on 2026-08-06; it drifts by roughly a commit
+a day.
+
+The reason it is not just done here: the SDK is compiled into every device
+binary, so the bump has to be followed by a device build and a real
+read-a-book pass, not only a green compile. That is its own change with its own
+verification, not a line in someone else's commit.
+
+**Close by:** bump, build `gh_release`, run the host tests, and put it on a card.
+
+### [T-007] Upstream issue #2863 reproduces here and is tracked nowhere
+**scope: fork sync · raised 2026-08-06 · confirmed 2026-08-07**
+
+The short-press power behaviour upstream reports is present in this fork's code:
+`lib/hal/HalGPIO.cpp:207` carries a `TODO` describing the same thing. Upstream
+issues are not visible from this repo's tracker, so it would otherwise be
+rediscovered rather than remembered.
+
+**Close by:** decide whether the fork wants upstream's fix or its own behaviour,
+then either take the patch or write the divergence down in `docs/fork-sync.md`.
+
 ---
 
 ## Carried over, still owner decisions
