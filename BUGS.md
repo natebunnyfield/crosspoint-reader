@@ -12,81 +12,6 @@ was found, and what closing it requires.
 
 ## OPEN
 
-### [B-016] Daisywheel Select typed uppercase while the rotation button was held
-**severity: medium · scope: text entry · FIXED 2026-08-07 · `8aad57ec`**
-
-Reported as "Select is not selecting the middle character", in the Mac
-simulator's Device owner field. Reproduced exactly: hold Right to rotate, press
-Select during the hold, and the field takes `H` instead of `h` — `longPick()`
-ran instead of `tapPick()`.
-
-`MappedInputManager::getHeldTime()` **takes no button argument**
-(`src/MappedInputManager.h:74`). It reports the longest-held button on the
-device, so `DaisyEntryActivity`'s long-press check was asking "has anything been
-held past `LONG_PRESS_MS`", not "has THIS pick been held past it". Rotation
-auto-repeats — holding Left/Right is how the wheel is meant to be driven — so
-the threshold was already satisfied before the pick button went down, and the
-first frame fired the uppercase branch. Every pick made while rotating was
-uppercase, not only Select.
-
-Fixed by timing each pick locally with `millis()` at its press. Kept out of the
-HAL deliberately: the HAL surface mirrors the firmware's and this needs no new
-hardware concept.
-
-**Verified** in the simulator, three cases: a plain tap gives the lowercase
-middle char, a long press still gives uppercase (`bB` from tap-then-hold), and
-Select during a rotation hold now gives lowercase where it gave `H`. 215/215
-host tests; device `gh_release` builds.
-
-**Related, untouched:** `KeyboardEntryActivity.cpp:653,727,759,766` compare the
-same global `getHeldTime()` against per-button holds. Not reported and not
-reproduced — the grid keyboard's nav buttons may not repeat the same way — but
-it is the same shape and worth a look before trusting long-press there.
-
-### [B-015] Create Note displayed no text on iOS, while saving correctly
-**severity: high · scope: notes / iOS · FIXED 2026-08-07 · `bb614f73`**
-
-Reported as "Create Note (and possibly Claude) is not displaying text — it
-shows one pixel in the upper left instead. It saves fine though."
-
-The iOS target compiles `crosspoint_core` with `OMIT_FONTS`
-(`crosspoint-simulator/ios/CMakeLists.txt:178`), and `src/main.cpp:371-372`
-registers Space Mono and IBM Plex Mono inside `#ifndef OMIT_FONTS`. So on that
-build neither editor face is ever handed to the renderer.
-
-`editorfonts::builtinFontIdFor()` reads a **compile-time table**
-(`src/notes/EditorFonts.h:39-45`) and returns `SPACEMONO_12_FONT_ID` regardless
-— the constant lives in `fontIds.h` and is unaffected by `OMIT_FONTS`. The old
-`resolveEditorFont()` returned that at its FIRST branch without asking whether
-the renderer had it, so `drawText` was handed an id with no glyphs behind it.
-`fallbackFontId()` had the same flaw: it also picks Space Mono. **Every row of
-the Editor Font setting**, not just the shipped default, resolved to a face
-absent from the binary. The text buffer was never involved, which is exactly
-why saving worked.
-
-It existed twice: `resolveEditorFont()` was copy-pasted into
-`NoteEditorActivity.cpp` and `ClaudeChatActivity.cpp`, identical but for the
-final UI constant. (Claude chat is separately excluded from iOS by B-014, so
-on that target only Create Note was reachable — but the defect was in both.)
-
-**How it was found.** It does not reproduce on the desktop simulator, where the
-built-ins ARE registered. Ruled out first, each by running it: the default font
-path, an editor family present on the card, render scale 2, `editorFont = 3`
-(Space Mono, which is what the card was already set to), on-screen typing, and
-the text viewer. The `OMIT_FONTS` difference is visible in the iOS build's own
-`GCC_PREPROCESSOR_DEFINITIONS`.
-
-Fixed by consolidating the two copies into `editorfonts::resolve()`, which asks
-whether a font is registered before returning it and falls through to the UI
-face when the binary contains no editor face at all. Chrome is the wrong
-texture for a writing surface, but it is text on screen instead of a blank page.
-
-**Verified:** five new tests in `test/editor_fonts` covering the reported case,
-the same for every row, and the three orderings that must not regress; 215/215
-host tests; device `gh_release` and desktop canary both build; desktop
-rendering unchanged (it still resolves to Space Mono, because there it is
-really registered). **Not yet confirmed on the phone** — that needs build-35.
-
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
@@ -197,6 +122,81 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-015] Create Note displayed no text on iOS, while saving correctly
+**severity: high · scope: notes / iOS · FIXED 2026-08-07 · `bb614f73`**
+
+Reported as "Create Note (and possibly Claude) is not displaying text — it
+shows one pixel in the upper left instead. It saves fine though."
+
+The iOS target compiles `crosspoint_core` with `OMIT_FONTS`
+(`crosspoint-simulator/ios/CMakeLists.txt:178`), and `src/main.cpp:371-372`
+registers Space Mono and IBM Plex Mono inside `#ifndef OMIT_FONTS`. So on that
+build neither editor face is ever handed to the renderer.
+
+`editorfonts::builtinFontIdFor()` reads a **compile-time table**
+(`src/notes/EditorFonts.h:39-45`) and returns `SPACEMONO_12_FONT_ID` regardless
+— the constant lives in `fontIds.h` and is unaffected by `OMIT_FONTS`. The old
+`resolveEditorFont()` returned that at its FIRST branch without asking whether
+the renderer had it, so `drawText` was handed an id with no glyphs behind it.
+`fallbackFontId()` had the same flaw: it also picks Space Mono. **Every row of
+the Editor Font setting**, not just the shipped default, resolved to a face
+absent from the binary. The text buffer was never involved, which is exactly
+why saving worked.
+
+It existed twice: `resolveEditorFont()` was copy-pasted into
+`NoteEditorActivity.cpp` and `ClaudeChatActivity.cpp`, identical but for the
+final UI constant. (Claude chat is separately excluded from iOS by B-014, so
+on that target only Create Note was reachable — but the defect was in both.)
+
+**How it was found.** It does not reproduce on the desktop simulator, where the
+built-ins ARE registered. Ruled out first, each by running it: the default font
+path, an editor family present on the card, render scale 2, `editorFont = 3`
+(Space Mono, which is what the card was already set to), on-screen typing, and
+the text viewer. The `OMIT_FONTS` difference is visible in the iOS build's own
+`GCC_PREPROCESSOR_DEFINITIONS`.
+
+Fixed by consolidating the two copies into `editorfonts::resolve()`, which asks
+whether a font is registered before returning it and falls through to the UI
+face when the binary contains no editor face at all. Chrome is the wrong
+texture for a writing surface, but it is text on screen instead of a blank page.
+
+**Verified:** five new tests in `test/editor_fonts` covering the reported case,
+the same for every row, and the three orderings that must not regress; 215/215
+host tests; device `gh_release` and desktop canary both build; desktop
+rendering unchanged (it still resolves to Space Mono, because there it is
+really registered). **Not yet confirmed on the phone** — that needs build-35.
+
+### [B-016] Daisywheel Select typed uppercase while the rotation button was held
+**severity: medium · scope: text entry · FIXED 2026-08-07 · `8aad57ec`**
+
+Reported as "Select is not selecting the middle character", in the Mac
+simulator's Device owner field. Reproduced exactly: hold Right to rotate, press
+Select during the hold, and the field takes `H` instead of `h` — `longPick()`
+ran instead of `tapPick()`.
+
+`MappedInputManager::getHeldTime()` **takes no button argument**
+(`src/MappedInputManager.h:74`). It reports the longest-held button on the
+device, so `DaisyEntryActivity`'s long-press check was asking "has anything been
+held past `LONG_PRESS_MS`", not "has THIS pick been held past it". Rotation
+auto-repeats — holding Left/Right is how the wheel is meant to be driven — so
+the threshold was already satisfied before the pick button went down, and the
+first frame fired the uppercase branch. Every pick made while rotating was
+uppercase, not only Select.
+
+Fixed by timing each pick locally with `millis()` at its press. Kept out of the
+HAL deliberately: the HAL surface mirrors the firmware's and this needs no new
+hardware concept.
+
+**Verified** in the simulator, three cases: a plain tap gives the lowercase
+middle char, a long press still gives uppercase (`bB` from tap-then-hold), and
+Select during a rotation hold now gives lowercase where it gave `H`. 215/215
+host tests; device `gh_release` builds.
+
+**Related, untouched:** `KeyboardEntryActivity.cpp:653,727,759,766` compare the
+same global `getHeldTime()` against per-button holds. Not reported and not
+reproduced — the grid keyboard's nav buttons may not repeat the same way — but
+it is the same shape and worth a look before trusting long-press there.
 
 ### [B-014] The iOS Home menu listed Claude, which cannot work on a phone
 **severity: medium · scope: iOS app · FIXED 2026-08-07 · `641e463a`, simulator `422909f`**
