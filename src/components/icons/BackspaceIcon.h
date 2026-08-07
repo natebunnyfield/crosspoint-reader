@@ -21,6 +21,8 @@
 // bit 1 = transparent.
 #pragma once
 
+#include <GfxRenderer.h>  // CROSSPOINT_RENDER_SCALE (defaults to 1 in HalDisplay.h)
+
 #include <cstdint>
 
 namespace kbicon {
@@ -39,6 +41,10 @@ static_assert(sizeof(BACKSPACE_32) == BACKSPACE_32_PX * BACKSPACE_32_PX / 8, "ba
 
 // Only a supersampled host build draws at this size; on device the 32px art
 // above is the one that blits 1:1, and this array is never referenced.
+// GUARDED. Only a supersampled host build blits at this size, and leaving it
+// unconditional puts 512 bytes of art the device can never draw into device
+// flash, resting on the linker to notice it is unreferenced.
+#if CROSSPOINT_RENDER_SCALE > 1
 inline constexpr int BACKSPACE_64_PX = 64;
 inline constexpr uint8_t BACKSPACE_64[] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -70,5 +76,6 @@ inline constexpr uint8_t BACKSPACE_64[] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 };
 static_assert(sizeof(BACKSPACE_64) == BACKSPACE_64_PX * BACKSPACE_64_PX / 8, "backspace 64px size mismatch");
+#endif  // CROSSPOINT_RENDER_SCALE > 1
 
 }  // namespace kbicon

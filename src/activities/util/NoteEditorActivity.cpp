@@ -33,6 +33,11 @@ int resolveEditorFont() {
     const int id = SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12);
     if (id != 0) return id;
   }
+  // A card-only row whose family is not installed degrades to a built-in
+  // MONOSPACE face, not to the UI face. Index 0 is such a row and is the
+  // shipped default, so without this the editor still opened in 10 pt chrome
+  // on every out-of-the-box device.
+  if (const int mono = editorfonts::fallbackFontId(); mono != 0) return mono;
   return EDITOR_FONT_ID_FALLBACK;
 }
 }  // namespace

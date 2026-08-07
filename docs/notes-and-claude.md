@@ -117,6 +117,12 @@ flight. A redraw is therefore not just slow, it is exclusive.
 
 ### What this means for the delay setting
 
+Until 2026-08-06 the delay reached only Bluetooth typing: both editors read it
+inside the `blekbd` drain, while the on-screen keyboard repainted
+unconditionally. With no keyboard paired — the out-of-the-box state — the
+setting did nothing at all. Panel typing now takes the same path; layer switches
+and daisy ring swaps still repaint at once, since there is nothing to batch.
+
 The delay is a **batching** control, not a latency control. It decides how many
 keystrokes share one ~500 ms refresh:
 
@@ -224,6 +230,41 @@ and both symbols pages. Always go through `keyboardOutputFor()` /
 and sets an `overflowed_` flag nobody reads. Size N from the LARGEST layout the
 activity can show — 13-Grid is 55 keys, not QWERTY's 41 — or the trailing keys
 lose touch registration with no warning at build or run time.
+
+**An ENUM settings row must be sized with `enumCount()`, never
+`enumValues.size()`.** A row supplies EITHER translated `enumValues` or runtime
+`enumStringValues`, and a row of the second kind leaves `enumValues` EMPTY.
+Three places sized off it directly and all three saw zero for Typing Redraw
+Delay and Editor Font: the popup gate never opened a picker, the fall-through
+toggle computed `(v + 1) % 0` — undefined behaviour that on RISC-V returns the
+dividend rather than trapping, so the index walked past the label list until the
+value column rendered blank — and `fromJson`'s clamp `val < 0` was never true,
+so every boot discarded the saved byte. If you add a runtime-labelled row, the
+`valuePtr` branch also needs the `enumStringValues` overload of
+`OptionPopup::show`, or the picker opens empty.
+
+**A settings row is invisible unless its category is `STR_CAT_SYSTEM`.**
+`rebuildSettingsLists()` drops everything else. Editor Font carried
+`STR_CAT_READER` and so existed only in the web API — the row was real,
+persisted, and unreachable on an X4 or X3.
+
+**Editor fonts are BUILT IN, and the fallback is monospace.** Space Mono and IBM
+Plex Mono compile into the firmware: one size, 12 pt, four styles each, ~83 KB
+of glyph data. Not installed to `/fonts`, because `SdCardFontRegistry` has no
+exclusion mechanism — an install there would surface these writing faces in the
+READING picker, in the web reading enum, and in `cycleReaderFontFamily()`, where
+a side-button hold mid-book would rewrite `sdFontFamilyName` and invalidate the
+whole book's section cache. Three iA rows remain card-only; they resolve to a
+built-in mono rather than to the UI face, because index 0 is one of them and is
+the shipped default.
+
+**The device reads `/.crosspoint/settings.json`, not `settings.json` at the card
+root.** A file written to the root is silently ignored, which makes a settings
+change look like it did not apply.
+
+**Daisy never shows the backspace icon.** Its strip draws the literal text
+`del`, and `KeyboardPanel`'s daisy branch returns before the FreeInkUI target is
+even constructed. The backspace art only reaches 13-Grid and QWERTY.
 
 **`nimble_port_init()` needs the CPU at full clock.** `HalPowerManager` drops to
 10 MHz after 3 s idle and the BT controller cannot start there — the call never

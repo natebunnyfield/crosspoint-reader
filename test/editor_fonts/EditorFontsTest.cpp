@@ -106,4 +106,36 @@ TEST(EditorFonts, EveryRowHasANameAndALabel) {
   }
 }
 
+// The shipped default is index 0, a CARD-ONLY row, so before fallbackFontId()
+// existed the editor opened in the 10 pt UI face on every out-of-the-box
+// device. Compiling two faces in did not change that by itself: it fixed the
+// two new rows and left the default path untouched.
+TEST(EditorFonts, TheShippedDefaultResolvesToAMonospaceFace) {
+  // Index 0 has no built-in of its own...
+  EXPECT_EQ(builtinFontIdFor(0), 0) << "index 0 is expected to be a card-only row";
+  // ...so the fallback is what saves it, and it must be a real font id.
+  EXPECT_NE(fallbackFontId(), 0) << "no built-in family to fall back to: the default editor font is dead again";
+}
+
+// The fallback must name a family that is actually compiled in, not an
+// arbitrary constant.
+TEST(EditorFonts, FallbackIsOneOfTheBuiltinRows) {
+  const int fb = fallbackFontId();
+  ASSERT_NE(fb, 0);
+  bool found = false;
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    if (FAMILIES[i].builtinFontId == fb) found = true;
+  }
+  EXPECT_TRUE(found) << "fallbackFontId() returned an id no row carries";
+}
+
+// Every card-only row degrades to a writing face rather than to UI chrome.
+TEST(EditorFonts, EveryRowResolvesToSomeMonospaceFace) {
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    const int resolved =
+        builtinFontIdFor(static_cast<uint8_t>(i)) != 0 ? builtinFontIdFor(static_cast<uint8_t>(i)) : fallbackFontId();
+    EXPECT_NE(resolved, 0) << "row " << i << " (" << FAMILIES[i].family << ") resolves to nothing";
+  }
+}
+
 }  // namespace

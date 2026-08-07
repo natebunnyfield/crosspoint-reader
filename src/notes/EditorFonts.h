@@ -52,7 +52,24 @@ inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);
 const char* selectedFamily(uint8_t index);
 
 // Compiled-in font id for the current SETTINGS.editorFont, or 0 when that row
-// is card-only. Callers try this FIRST, then the SD resolver, then the UI face.
+// is card-only. Callers try this FIRST, then the SD resolver, then fallback().
 int builtinFontIdFor(uint8_t index);
+
+// The last resort, and it is a MONOSPACE face rather than the UI face.
+//
+// Three of the five rows are card-only, index 0 among them, so the shipped
+// default resolved to nothing and the editor came up in 10 pt Libre Franklin --
+// compiling two faces in fixed the two new rows and left the out-of-the-box
+// path exactly as broken as before. Falling back to a built-in mono means every
+// row lands on a writing face, and a card-only row degrades to a sibling in the
+// same group instead of to UI chrome.
+//
+// Deliberately NOT done by changing the default index: SETTINGS.editorFont is a
+// persisted position, every existing device already has 0 stored, and a device
+// that stored 0 could not have chosen it -- the row was unreachable in Settings.
+// Remapping the stored value would also overwrite a deliberate web-API choice.
+// Resolving at read time fixes fresh, upgraded and web-set devices alike and
+// touches no persisted state.
+int fallbackFontId();
 
 }  // namespace editorfonts
