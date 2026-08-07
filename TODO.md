@@ -15,45 +15,64 @@ started.
 ## OPEN
 
 ### [T-001] Switch all icons to the Lucide set
-**scope: UI · asked 2026-08-07**
+**scope: UI · asked 2026-08-07 · RULED 2026-08-07, not yet implemented**
 
-Move the icon set over to Lucide. **Where more than one Lucide icon fits a
-concept, present the options rather than picking one** — that is the explicit
-ask, and it is the part that needs owner input rather than a commit.
+### The rulings
 
-Where it stands today: 14 semantic values in `UIIcon`
-(`src/components/themes/BaseTheme.h:114`) — `Folder, Text, Image, Book, File,
-Recent, Settings, Transfer, Library, Wifi, Hotspot, ManageFiles, CreateNote,
-ClaudeMark` — backed by 18 headers in `src/components/icons/`, several of which
-are the same glyph at a second size (`book`/`book24`, `folder`/`folder24`,
-`file24`, `image24`, `text24`).
-
-Lucide is already vendored: `freeink-sdk/libs/assets/Icons/lucide`, **3,470
-icons**, so this needs no new dependency.
-
-Concepts where Lucide plainly offers several defensible choices, i.e. the ones
-that need a ruling rather than a lookup:
-
-| UIIcon | Lucide candidates |
+| UIIcon | Chosen |
 |---|---|
-| `Book` | `book`, `book-open`, `book-marked`, `library` |
-| `Recent` | `history`, `clock`, `rotate-ccw` |
-| `Settings` | `settings`, `settings-2`, `sliders-horizontal` |
-| `Transfer` | `send`, `share-2`, `upload-cloud`, `arrow-right-left` |
-| `ManageFiles` | `folder-cog`, `folder-tree`, `files` |
-| `CreateNote` | `file-plus`, `notebook-pen`, `square-pen` |
-| `Library` | `library`, `library-big`, `books` |
-| `Hotspot` | `radio`, `wifi`, `router` |
+| Transfer | `arrow-right-left` |
+| Folder | `folder` |
+| Book | `book` |
+| Recent | `clock` |
+| Settings | `settings-2` |
+| ManageFiles | `folder-cog` |
+| CreateNote | `square-pen` |
+| Library | `library-big` |
+| Wifi | `wifi` |
+| Hotspot | `radio` |
+| ClaudeMark | authored `claude-mark.svg`, `bot` as the fallback |
+| Text | `file-text` |
+| Image | `image` |
+| File | `file` |
 
-**Do not send a link for this.** Per the standing rule about visual decisions,
-the choices have to arrive inside the question — rendered at the real 1-bit size
-against the panel palette, since a vector preview in a browser says nothing
-about how a glyph reads dithered on e-ink at 24px.
+Chooser page (current vs candidates, both from the real assets):
+https://claude.ai/code/artifact/17ed9181-f110-4766-814a-0f595836535b
 
-**Done looks like:** every `UIIcon` resolves to a Lucide glyph, the duplicate
-size-variant headers are gone or generated, the multi-candidate rows above have
-a recorded ruling, and Home / Manage Files / Settings are screenshotted before
-and after so the change is judged on the panel rather than in the source.
+### The constraint that governs the implementation
+
+**Every converted icon must be stored PRE-ROTATED 90° CCW.** The renderer turns
+content 90° CCW into the landscape framebuffer for Portrait, so the existing
+headers are authored already turned — decode one literally and you get the panel
+image rotated 90° CCW. Confirmed by decoding `wifi.h`: as stored it is sideways,
+rotated 90° CW it is a correct wifi glyph.
+
+Convert a Lucide SVG straight to a bitmap and it ships sideways. That is exactly
+the `MoonIcon.h` bug the simulator's notes already record, and it is the single
+easiest way to get this migration wrong.
+
+### The Claude mark
+
+`claude.h` is the Anthropic starburst, and at 32×32 it decodes to a near-solid
+blob — the rays merge. `src/components/icons/claude-mark.svg` is a stroke-based
+version (10 rays, round caps, Lucide's 24×24 / stroke-width 2 geometry) that
+survives 1-bit at panel size. Lucide `bot` stays the fallback if the brand mark
+is ever unwanted.
+
+### Also in scope
+
+The duplicate size-variant headers — `book`/`book24`, `folder`/`folder24`,
+`file24`, `image24`, `text24`, 5 of the 18 — collapse as part of this. Three
+rows legitimately resolve to the same or adjacent Lucide glyphs (`Text`, `File`
+both near `file-text`), which is a consequence of that de-duplication rather
+than a mistake.
+
+### Done looks like
+
+Every `UIIcon` resolves to its chosen glyph, pre-rotated; the size-variant
+headers are gone or generated; and Home / Manage Files / Settings are
+screenshotted before and after, so it is judged on the panel rather than in the
+source.
 
 ---
 
