@@ -64,6 +64,9 @@ struct Counters {
   int goToReader = 0;  // ActivityManager::goToReader() calls
   int updates = 0;     // requestUpdate() calls
   int updateAndWaits = 0;
+  // requestUpdateAndWait() calls made with the render lock held: the real
+  // ActivityManager asserts and the process dies (ActivityManager.cpp:326).
+  int updateAndWaitsHoldingRenderLock = 0;
 };
 
 const Counters& counters();

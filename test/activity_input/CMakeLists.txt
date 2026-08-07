@@ -61,6 +61,7 @@ endif()
 add_executable(ActivityInputTest
   ActivityInputTest.cpp
   TypedTextEntryTest.cpp
+  ClaudeChatSendTest.cpp
   HostHarness.cpp
   # activity + input layer under test
   ${REPO_ROOT}/src/MappedInputManager.cpp
@@ -74,6 +75,15 @@ add_executable(ActivityInputTest
   # simulator instead — that file says which half is tested where.
   ${REPO_ROOT}/src/activities/util/DaisyEntryActivity.cpp
   ${REPO_ROOT}/src/util/ButtonNavigator.cpp
+  # Claude chat + its on-screen keyboard panel (ClaudeChatSendTest.cpp). This
+  # DOES drag the SDK keyboard component in, which is why the note above says
+  # the daisywheel was the cheap one — the OK-key defect is worth the tables.
+  # blekbd and claudechat::runExchange are doubled inside the test file; both
+  # reach ESP-IDF and neither is under test.
+  ${REPO_ROOT}/src/activities/util/ClaudeChatActivity.cpp
+  ${REPO_ROOT}/src/notes/KeyboardPanel.cpp
+  ${REPO_ROOT}/src/notes/EditorFonts.cpp
+  ${REPO_ROOT}/freeink-sdk/libs/ui/FreeInkUI/src/FreeInkUI.cpp
   # i18n (tr() is used by every activity above)
   ${REPO_ROOT}/lib/I18n/I18n.cpp
   ${REPO_ROOT}/lib/I18n/I18nStrings.cpp

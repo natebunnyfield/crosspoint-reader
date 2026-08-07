@@ -334,7 +334,16 @@ void ActivityManager::goToReader(std::string, bool) {
 
 void ActivityManager::requestUpdate(bool) { am().counters.updates++; }
 
-void ActivityManager::requestUpdateAndWait() { am().counters.updateAndWaits++; }
+// The real one asserts on three conditions (ActivityManager.cpp:319-326). Only
+// the third — "cannot call while holding RenderLock" — is reachable from an
+// activity's own task, and it fired on device: ClaudeChatActivity's OK key ran
+// send() under the lock it had taken to type. Recorded rather than aborted, so
+// a test can name the defect instead of dying inside the harness.
+void ActivityManager::requestUpdateAndWait() {
+  auto& s = am();
+  s.counters.updateAndWaits++;
+  if (RenderLock::peek()) s.counters.updateAndWaitsHoldingRenderLock++;
+}
 
 // ============================================================================
 // RenderLock — mirrors ActivityManager.cpp:311-342 over the host semaphore
