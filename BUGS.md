@@ -55,6 +55,42 @@ enter Settings and press Back (which saves), then read the file.
 
 ## OPEN
 
+### [B-017] Viewing a file could write emptiness back over it
+**severity: high · scope: data loss · FIXED 2026-08-07 · `e9fd4cce`**
+
+Reported as "some notes and bmp are being rewritten and emptied out sometimes
+when viewed". Two unrelated causes, which is why it looked intermittent.
+
+**BMP.** `BmpViewerActivity::doSetSleepCover()` opens the viewed file for read,
+then opens `/sleep.bmp` for write — and `openFileForWrite` is `O_TRUNC`. When
+the file being viewed **is** `/sleep.bmp`, the second open truncates the very
+file the first is reading. The next `read()` returns 0, the copy loop never
+runs, and `success` had already been set `true` *above* the loop — so it
+reported Done over a zero-byte sleep screen.
+
+Demonstrated at the syscall level with the same open sequence: 53,918 bytes → 0,
+first read after the truncate returns 0. `fs_/sleep.bmp` on the sim card was
+already sitting at 0 bytes when this was investigated.
+
+**NOTES.** `NoteEditorActivity::onEnter()` sets `loadRefused` only when the file
+exceeds the buffer. If `openFileForRead` **fails**, the load block is skipped
+entirely, the buffer stays empty, `loadRefused` stays false, and `onExit()`'s
+`save()` writes that emptiness back. B-013 fixed refused-to-load and left
+failed-to-open exposed.
+
+A file that does not exist is a different case — that is Create Note minting a
+new note, which must still save — so the guard is "exists but will not open",
+not "failed to open".
+
+**Plausible trigger for the notes half:** enough leaked directory handles reach
+`EMFILE` and opens start failing. That is S-006 in the simulator, fixed the same
+day; the device HAL is separate code and has not been audited for the same leak.
+Worth checking `lib/hal/HalStorage.cpp` before assuming this is fully closed.
+
+**Verified:** 215/215 host tests, device `gh_release` and desktop canary build.
+The BMP mechanism is proven; the notes half is a reasoned fix to a path that is
+hard to trigger on demand, so it is **not** reproduced end to end.
+
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
