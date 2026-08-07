@@ -24,6 +24,63 @@ namespace {
 
 using namespace editorfonts;
 
+// --- resolve(): the id in the table is not proof the font exists -------------
+//
+// THE BUG THESE EXIST FOR
+//
+// The iOS target compiles crosspoint_core with OMIT_FONTS, and main.cpp
+// registers Space Mono and IBM Plex Mono inside `#ifndef OMIT_FONTS`. But
+// builtinFontIdFor() reads a compile-time table, so it still handed back
+// SPACEMONO_12_FONT_ID -- and the old resolver returned it at its first branch
+// without asking anyone. drawText then had no glyphs, so Create Note rendered
+// nothing at all while still saving correctly.
+//
+// isRegistered is what the renderer would answer. Nothing here needs a
+// GfxRenderer, which is why the suite can keep its no-renderer rule.
+
+constexpr int kUiFallback = 4242;   // stands in for UI_10_FONT_ID
+constexpr int kSdId = 777;
+
+auto noneRegistered = [](int) { return false; };
+auto allRegistered = [](int) { return true; };
+auto noSdCard = [](const char*) { return 0; };
+
+// Index 3 is Space Mono, a compiled-in row -- when the build really has it.
+TEST(EditorFonts, BuiltinRowResolvesToItsFaceWhenRegistered) {
+  EXPECT_EQ(resolve(3, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(3));
+}
+
+// The regression: same row, but this build omitted the face. Returning the id
+// anyway is what drew a blank page.
+TEST(EditorFonts, BuiltinRowDoesNotResolveToAnUnregisteredFace) {
+  const int got = resolve(3, noneRegistered, noSdCard, kUiFallback);
+  EXPECT_NE(got, builtinFontIdFor(3)) << "returned a font id the renderer has no glyphs for";
+  EXPECT_EQ(got, kUiFallback) << "with no editor face in the binary, only the UI face can draw";
+}
+
+// Every row, not just the one that was reported. A card-only row falls through
+// the SD lookup to the mono fallback, which is equally absent under OMIT_FONTS.
+TEST(EditorFonts, NoRowResolvesToAnUnregisteredFace) {
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    const int got = resolve(static_cast<uint8_t>(i), noneRegistered, noSdCard, kUiFallback);
+    EXPECT_EQ(got, kUiFallback) << "row " << i << " resolved to an unregistered face";
+  }
+}
+
+// The card still wins over the UI fallback for a card-only row, and is trusted
+// without the isRegistered check: whatever registered it returned the id.
+TEST(EditorFonts, CardOnlyRowPrefersTheInstalledFamily) {
+  auto sdHasIt = [](const char*) { return kSdId; };
+  EXPECT_EQ(resolve(0, noneRegistered, sdHasIt, kUiFallback), kSdId);
+}
+
+// A built-in row that IS present must not be overridden by a same-named card
+// family -- the built-in is checked first on purpose.
+TEST(EditorFonts, BuiltinWinsOverTheCardWhenPresent) {
+  auto sdHasIt = [](const char*) { return kSdId; };
+  EXPECT_EQ(resolve(3, allRegistered, sdHasIt, kUiFallback), builtinFontIdFor(3));
+}
+
 // The two Google Fonts faces are built in; without this the setting is inert.
 TEST(EditorFonts, MonoFacesAreCompiledIn) {
   bool sawSpaceMono = false;

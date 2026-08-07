@@ -24,25 +24,6 @@ constexpr int CHAT_FONT_ID_FALLBACK = UI_10_FONT_ID;
 // The Editor Font setting picks from the editor-group families (see
 // src/notes/EditorFonts.h). If that family is not installed on the card the UI
 // face stands in, so the screen is never blank because of a missing font.
-int resolveEditorFont() {
-  // Built-in first. Space Mono and IBM Plex Mono are compiled in, so they need
-  // no card and cannot be missing; the card is only consulted for the iA rows.
-  // Before the built-ins existed this function fell through to the UI face for
-  // EVERY row, because no card carried any editor family — which is why the
-  // setting appeared to do nothing.
-  if (const int builtin = editorfonts::builtinFontIdFor(SETTINGS.editorFont); builtin != 0) return builtin;
-  const char* family = editorfonts::selectedFamily(SETTINGS.editorFont);
-  if (SETTINGS.sdFontIdResolver != nullptr) {
-    const int id = SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12);
-    if (id != 0) return id;
-  }
-  // A card-only row whose family is not installed degrades to a built-in
-  // MONOSPACE face, not to the UI face. Index 0 is such a row and is the
-  // shipped default, so without this the editor still opened in 10 pt chrome
-  // on every out-of-the-box device.
-  if (const int mono = editorfonts::fallbackFontId(); mono != 0) return mono;
-  return CHAT_FONT_ID_FALLBACK;
-}
 }  // namespace
 
 void ClaudeChatActivity::onEnter() {
@@ -58,7 +39,12 @@ void ClaudeChatActivity::onEnter() {
   }
   panel.begin(/*okIsDone=*/true);  // OK asks Claude here
 
-  editorFontId = resolveEditorFont();
+  editorFontId = editorfonts::resolve(
+      SETTINGS.editorFont, [this](int id) { return renderer.getFontMap().count(id) > 0; },
+      [](const char* family) {
+        return SETTINGS.sdFontIdResolver ? SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12) : 0;
+      },
+      CHAT_FONT_ID_FALLBACK);
   const auto& metrics = UITheme::getInstance().getMetrics();
   lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;

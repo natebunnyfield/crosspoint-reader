@@ -10,6 +10,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <functional>
+
 #include "fontIds.h"
 
 namespace editorfonts {
@@ -71,5 +73,25 @@ int builtinFontIdFor(uint8_t index);
 // Resolving at read time fixes fresh, upgraded and web-set devices alike and
 // touches no persisted state.
 int fallbackFontId();
+
+// The whole resolution chain, in one place, with the availability check the
+// two activities' copies of it did not have.
+//
+// builtinFontIdFor() reads a compile-time table, so it hands back
+// SPACEMONO_12_FONT_ID whether or not that family was ever registered with the
+// renderer. main.cpp registers it inside `#ifndef OMIT_FONTS`, which the iOS
+// target defines -- so on that build EVERY row resolved to an id the renderer
+// has no glyphs for. The editor drew nothing at all while still saving
+// correctly, which is exactly how it was reported: "not displaying text, shows
+// one pixel in the upper left, saves fine".
+//
+// Both lookups are injected rather than reached through globals, so this stays
+// testable without a GfxRenderer or a CrossPointSettings -- the editor-font
+// suite deliberately links neither.
+//   isRegistered : does the renderer actually have glyphs for this font id
+//   sdLookup     : resolve a family name to an SD font id at 12 pt, or 0
+//   uiFallbackId : the caller's own last resort, used only when nothing resolves
+int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
+            const std::function<int(const char*)>& sdLookup, int uiFallbackId);
 
 }  // namespace editorfonts
