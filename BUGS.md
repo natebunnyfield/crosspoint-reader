@@ -105,7 +105,21 @@ adding a headless assertion, since this is exactly the class of defect a
 screenshot hides and the log announces 1,756 times.
 
 ### [B-011] drawRect's lineWidth overload draws one pixel outside its rectangle
-**severity: low · scope: rendering primitives · found 2026-08-06**
+**severity: low · scope: rendering primitives · FIXED 2026-08-07 · `6d415094`**
+
+Fixed with `x + width - 1 - i` / `y + height - 1 - i`. Both call sites were
+checked and neither had been nudged to compensate, so both move toward their
+intent: the popup outline now matches the `fillRect` drawn at the same
+geometry one line below it, and adjacent daisy-keyboard cells stop
+overlapping by a pixel.
+
+**Verified RED first.** Two tests in `test/renderer_bounds` fail against the
+old arithmetic — 1324 escaped pixels for a full-screen bordered rect, 24 for
+one flush to the corner — and pass after. The second pins the two overloads to
+each other, so clamping instead of fixing the extent would not satisfy it.
+Full suite: 213/213.
+
+Original report below.
 
 The two overloads disagree about what the rectangle's extent means. The
 5-argument one is correct — `drawLine(x, y, x + width - 1, y, ...)`
