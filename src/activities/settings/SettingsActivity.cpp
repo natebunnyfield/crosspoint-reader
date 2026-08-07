@@ -1,5 +1,7 @@
 #include "SettingsActivity.h"
 
+#include "notes/BleHidHost.h"
+
 #include <BoardConfig.h>
 #include <GfxRenderer.h>
 #include <Logging.h>
@@ -60,6 +62,10 @@ void SettingsActivity::rebuildSettingsLists() {
 #ifndef CROSSPOINT_NO_NETWORK
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
 #endif
+  // Bluetooth keyboard: pairing lives here rather than only behind the
+  // long-press gesture in Create Note / Claude, so it is discoverable.
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_PAIR_BT_KEYBOARD, SettingAction::PairBluetoothKeyboard));
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_FORGET_BT_KEYBOARD, SettingAction::ForgetBluetoothKeyboard));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
 #ifndef CROSSPOINT_NO_NETWORK
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
@@ -276,6 +282,21 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
         break;
 #ifndef CROSSPOINT_NO_NETWORK
+      case SettingAction::PairBluetoothKeyboard: {
+        // Bring the radio up and scan. The host connects to the first HID
+        // keyboard it sees and bonds; NVS keeps the bond so Create Note and
+        // Claude reconnect on their own afterwards.
+        const bool started = blekbd::begin();
+        GUI.drawPopup(renderer, started ? tr(STR_PAIR_BT_SCANNING) : tr(STR_PAIR_BT_FAILED));
+        requestUpdate();
+        break;
+      }
+      case SettingAction::ForgetBluetoothKeyboard:
+        blekbd::forgetAllBonds();
+        blekbd::end();
+        GUI.drawPopup(renderer, tr(STR_FORGET_BT_DONE));
+        requestUpdate();
+        break;
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false), resultHandler);
         break;
