@@ -69,24 +69,6 @@ with different content defeats later verification.
 `.pio/build/gh_release_rc/firmware.bin` so both cards match. Requires the X4
 card mounted.
 
-### [B-004] Toggling CROSSPOINT_RC_HASH silently wipes every build directory
-**severity: medium · scope: build tooling · found 2026-08-03**
-
-`[env:gh_release_rc]` interpolates `${sysenv.CROSSPOINT_RC_HASH}` into
-`build_flags`, so setting or unsetting it changes the resolved config, which
-changes `.pio/build/project.checksum`, which makes the next `pio run` clean
-**all** env build dirs — not just the target env.
-
-Observed: a stamped `pio run -e gh_release_rc` deleted
-`.pio/build/simulator/program`, and a later headless simulator run died with
-`no such file or directory`, exit 127. It also caused B-005.
-
-**Close by:** either documenting it in the project guide next to the existing
-version-override section, or removing the sysenv interpolation in favour of a
-mechanism that does not perturb the checksum. Currently recorded only in
-agent memory, not in the repo. Workaround: hold the variable constant across
-every `pio run` in a session, including simulator builds.
-
 ### [B-003] Exploded `.epub` directories are probably unreadable on device
 **severity: low · scope: content · found 2026-08-03**
 
@@ -122,6 +104,45 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-004] Toggling CROSSPOINT_RC_HASH silently wipes every build directory
+**severity: medium · scope: build tooling · FIXED 2026-08-07 · `5dcaba15`**
+
+The sysenv interpolation is gone. `scripts/git_branch.py` — which already owned
+`CROSSPOINT_VERSION` for the dev env — now computes the RC stamp from the same
+variable, so the ini text never changes and `project.checksum` is stable.
+
+Doing it in Python also lets the value be **checked**, which an interpolation
+could not: an unset variable used to stamp a bare trailing `+` (that is B-006).
+It now warns with the exact command to re-run and stamps `-rc+unset`, which is
+greppable and obviously wrong rather than subtly wrong.
+
+**Verified — and the first test was wrong.** Checking the canary after the FIRST
+rc build in a fresh worktree reads as a failure, because adding an env to the
+build set legitimately re-checksums. Rebuilding the canary first, then toggling:
+hash `aaaa1111` → `cccc3333` survived, and set → unset survived with the warning
+firing. `gh_release` still stamps `1.5.0-BNY`; `default` still gets its git
+string.
+
+This also unblocks B-017: the NimBLE include paths were put in `spike-build.sh`
+specifically to avoid editing the ini, which that script's own header states.
+
+Original report below.
+
+`[env:gh_release_rc]` interpolates `${sysenv.CROSSPOINT_RC_HASH}` into
+`build_flags`, so setting or unsetting it changes the resolved config, which
+changes `.pio/build/project.checksum`, which makes the next `pio run` clean
+**all** env build dirs — not just the target env.
+
+Observed: a stamped `pio run -e gh_release_rc` deleted
+`.pio/build/simulator/program`, and a later headless simulator run died with
+`no such file or directory`, exit 127. It also caused B-005.
+
+**Close by:** either documenting it in the project guide next to the existing
+version-override section, or removing the sysenv interpolation in favour of a
+mechanism that does not perturb the checksum. Currently recorded only in
+agent memory, not in the repo. Workaround: hold the variable constant across
+every `pio run` in a session, including simulator builds.
 
 ### [B-015] Create Note displayed no text on iOS, while saving correctly
 **severity: high · scope: notes / iOS · FIXED 2026-08-07 · `bb614f73`**
