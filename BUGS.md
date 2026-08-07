@@ -67,7 +67,31 @@ desktop builds; not yet exercised on hardware. The failing sequence is
 Manage Files → a `.txt` book → Edit → Back, and the file should be untouched.
 
 ### [B-012] Home draws a line of content below the bottom of the screen, every paint
-**severity: medium · scope: Home / theme layout · found 2026-08-06**
+**severity: medium · scope: Home / theme layout · FIXED 2026-08-07 · `fc76342a`**
+
+**Missing precondition: Recents must be EMPTY.** With books present this does not
+reproduce at all — `splitPages` is `homeMenuOnSecondPage && bookCount > 0`, so a
+populated Home takes the split branch and a bare one does not. With the list
+emptied the report reproduces verbatim: 1756 escapes, x 40-175, y 837-862.
+
+**The suspect in the original report was wrong**, and so was the first fix built
+on it: correcting the non-split `menuRect` height changed the escape count by
+exactly zero. `drawButtonMenu` (both `LyraTheme` and `BaseTheme`) lays rows out at
+a fixed pitch from `rect.y` and never reads `rect.height`, so no rect correction
+could have helped. Instrumenting `drawText` to log any origin below y=760 named
+the culprit in one run: `Settings` at y=833.
+
+Empty Recents still reserves a full 312px cover tile — `drawEmptyRecents` paints
+the "No open book" panel there — leaving ~450px for 7 rows at a 72px pitch.
+
+Fixed by making `drawButtonMenu` fit the rect it is handed, compressing the gap
+first and then the tiles, so rows compress rather than vanish (Settings was the
+row being lost). The `menuRect` height is made consistent too.
+
+**Verified:** 1756 -> 0 with Recents empty, 0 -> 0 with nine books, all seven rows
+on-panel above the button hints in a screenshot, 213/213 host tests.
+
+Original report below.
 
 Home paints ink 37-62 pixels below the panel. It is dropped, so nothing is
 corrupted and the screen looks fine — but whatever that line is, the owner
