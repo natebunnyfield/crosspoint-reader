@@ -34,6 +34,7 @@ class ClaudeChatActivity final : public Activity {
   notes::KeyboardPanel panel;
   int panelHeight = 0;
   int panelTop = 0;
+  int statusHeight = 0;  // reserved band between text and panel
   uint32_t sideHeldSince = 0;
   uint32_t pickHeldSince = 0;
   int pickSlot = -1;

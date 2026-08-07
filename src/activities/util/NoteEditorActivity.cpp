@@ -60,7 +60,14 @@ void NoteEditorActivity::onEnter() {
 
   panelHeight = panel.preferredHeight(renderer);
   panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
-  maxLines = (panelTop - contentTop) / lineHeight;
+  // Vertical bands, top to bottom, each owning a disjoint range:
+  //   header | text | status | keyboard panel | button hints
+  // The status line sits BETWEEN the text and the panel and must be reserved
+  // here — computing maxLines against panelTop let the last line of text draw
+  // underneath it.
+  statusHeight = renderer.getLineHeight(SMALL_FONT_ID);
+  const int textBottom = panelTop - statusHeight;
+  maxLines = (textBottom - contentTop) / lineHeight;
   if (maxLines < 1) maxLines = 1;
 
   storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
@@ -506,7 +513,7 @@ void NoteEditorActivity::render(RenderLock&&) {
   char status[96];
   snprintf(status, sizeof(status), "%u ch%s  kbd:%s", (unsigned)(buf ? buf->size() : 0), bufferFull ? "  FULL" : "",
            blekbd::stateName());
-  const int statusY = panelTop - renderer.getLineHeight(SMALL_FONT_ID);
+  const int statusY = panelTop - statusHeight;
   renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Type", "Left", "Right");

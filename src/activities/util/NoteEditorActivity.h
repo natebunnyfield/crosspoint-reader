@@ -47,6 +47,7 @@ class NoteEditorActivity final : public Activity {
   // Top of the keyboard strip. Held rather than recomputed in render() so the
   // text area's bottom and the strip's top cannot drift apart.
   int panelTop = 0;
+  int statusHeight = 0;  // reserved band between text and panel
   uint32_t sideHeldSince = 0;
   uint32_t pickHeldSince = 0;
   int pickSlot = -1;
