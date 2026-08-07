@@ -144,8 +144,29 @@ void BmpViewerActivity::onExit() {
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
 
+namespace {
+// One name for the destination, so the guard above and the open below
+// cannot drift apart.
+constexpr const char* SLEEP_COVER_PATH = "/sleep.bmp";
+}  // namespace
+
 void BmpViewerActivity::doSetSleepCover() {
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
+
+  // Setting the sleep cover FROM the sleep cover destroys it. openFileForWrite
+  // is O_TRUNC, so opening /sleep.bmp for output truncated the very file inFile
+  // was reading: the read then returned 0, the copy loop never ran, and success
+  // had already been set to true above it -- so it reported Done and left a
+  // zero-byte sleep screen. Nothing to copy here anyway; the file already IS
+  // the cover, so just record the mode.
+  if (filePath == SLEEP_COVER_PATH) {
+    SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
+    SETTINGS.saveToFile();
+    GUI.drawPopup(renderer, tr(STR_DONE));
+    delay(1000);
+    onEnter();
+    return;
+  }
 
   bool success = false;
   HalFile inFile, outFile;
@@ -159,15 +180,22 @@ void BmpViewerActivity::doSetSleepCover() {
     const auto buffer = makeUniqueNoThrow<char[]>(COPY_BUFFER_SIZE);
     if (!buffer) {
       LOG_ERR("BMP", "OOM: %u byte sleep cover copy buffer", static_cast<unsigned>(COPY_BUFFER_SIZE));
-    } else if (Storage.openFileForWrite("BMP", "/sleep.bmp", outFile)) {
+    } else if (Storage.openFileForWrite("BMP", SLEEP_COVER_PATH, outFile)) {
+      // Count bytes rather than assuming. success used to be set before the
+      // loop, so a copy that moved NOTHING still reported Done -- which is how
+      // a zero-byte sleep screen looked like it had worked.
       int bytesRead;
-      success = true;
+      size_t copied = 0;
+      bool wrote = true;
       while ((bytesRead = inFile.read(buffer.get(), COPY_BUFFER_SIZE)) > 0) {
         if (outFile.write(buffer.get(), bytesRead) != bytesRead) {
-          success = false;
+          wrote = false;
           break;
         }
+        copied += static_cast<size_t>(bytesRead);
       }
+      success = wrote && copied > 0;
+      if (!success) LOG_ERR("BMP", "sleep cover copy moved %u bytes", (unsigned)copied);
       outFile.close();
     }
     inFile.close();

@@ -96,7 +96,18 @@ void NoteEditorActivity::onEnter() {
   // Load an existing note so Edit-from-Manage-Files is a real edit, not a
   // silent overwrite. Anything past the cap is refused rather than truncated.
   HalFile f;
-  if (Storage.openFileForRead(TAG, path, f)) {
+  // A file that EXISTS but will not open is the dangerous case: the load block
+  // below is skipped, the buffer stays empty, and onExit()'s save() writes that
+  // emptiness back over it. loadRefused only covered the too-big branch, so a
+  // transient open failure -- a flaky card, or EMFILE after enough directory
+  // handles leak -- silently emptied the note. A file that does NOT exist is
+  // just a new note from Create Note and must still save.
+  const bool existed = Storage.exists(path.c_str());
+  const bool opened = Storage.openFileForRead(TAG, path, f);
+  if (existed && !opened) {
+    LOG_ERR(TAG, "%s exists but will not open; refusing to overwrite it", path.c_str());
+    loadRefused = true;
+  } else if (opened) {
     const size_t size = static_cast<size_t>(f.size());
     if (size >= BUF_SIZE) {
       LOG_ERR(TAG, "%s is %u bytes, cap is %u — refusing to open", path.c_str(), (unsigned)size, (unsigned)BUF_SIZE);
