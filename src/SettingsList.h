@@ -255,9 +255,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
 
     // --- Reader ---
     // Built-in font-family entry. Replaced per-call with a registry-aware
-    // version when SD fonts are installed.
-    v.push_back(SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,
-                                  {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS}, "fontFamily", StrId::STR_CAT_READER));
+    // version when SD fonts are installed. Libre Franklin is the only built-in
+    // reading family, so with no SD fonts this is a one-entry list — kept so
+    // the picker can never be empty and the reader always has a face to name.
+    v.push_back(SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily, {StrId::STR_LIBRE_FRANKLIN},
+                                  "fontFamily", StrId::STR_CAT_READER));
     // Placeholder: the selectable sizes depend on the active font family, so
     // this entry is always replaced by buildFontSizeSetting() below. It only
     // fixes the setting's position in the Reader category.
@@ -373,10 +375,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // normalizeRetiredSettings() and the field initialiser already matches, so
     // fresh and upgraded devices agree.
     //
-    // The four choices stay listed because the index IS the persisted value: a
-    // settings.json holding 0..2 must still decode to the family it named, and
-    // applySystemFont() still resolves any of them. Nothing is deleted, it is
-    // just no longer offered.
+    // The four labels stay listed because the index IS the persisted value: a
+    // settings.json holding 0..2 must still decode for the web API until
+    // normalizeRetiredSettings() pins it to 3 on the next load. The Ubuntu and
+    // Noto font DATA is gone — applySystemFont() binds Libre Franklin
+    // regardless of the stored byte — so the labels are a decode surface, not
+    // an offer.
     v.push_back(
         SettingInfo::Enum(StrId::STR_SYSTEM_FONT, &CrossPointSettings::systemFont,
                           {StrId::STR_UBUNTU, StrId::STR_NOTO_SANS, StrId::STR_NOTO_SERIF, StrId::STR_LIBRE_FRANKLIN},

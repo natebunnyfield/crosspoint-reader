@@ -39,11 +39,11 @@
 #include <SdCardFont.h>
 #include <SdCardFontSystem.h>
 #include <builtinFonts/all.h>
+#include <sys/stat.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <sys/stat.h>
 
 #include "HalGPIO.h"
 #include "activities/boot_sleep/CalendarSleepScreen.h"
@@ -66,26 +66,19 @@ int loadSdFontByOrdinal(const char* familyName, uint8_t ordinal, GfxRenderer& re
 // family. Registering only regular+bold here would make italic silently fall
 // back inside EpdFontFamily::getFont(), so the sim would render something the
 // device does not.
-EpdFont notoserif12R(&notoserif_12_regular), notoserif12B(&notoserif_12_bold),
-    notoserif12I(&notoserif_12_italic), notoserif12BI(&notoserif_12_bolditalic);
-EpdFontFamily notoserif12Family(&notoserif12R, &notoserif12B, &notoserif12I, &notoserif12BI);
-EpdFont notoserif14R(&notoserif_14_regular), notoserif14B(&notoserif_14_bold),
-    notoserif14I(&notoserif_14_italic), notoserif14BI(&notoserif_14_bolditalic);
-EpdFontFamily notoserif14Family(&notoserif14R, &notoserif14B, &notoserif14I, &notoserif14BI);
-EpdFont notoserif18R(&notoserif_18_regular), notoserif18B(&notoserif_18_bold),
-    notoserif18I(&notoserif_18_italic), notoserif18BI(&notoserif_18_bolditalic);
-EpdFontFamily notoserif18Family(&notoserif18R, &notoserif18B, &notoserif18I, &notoserif18BI);
+EpdFont lfr12R(&librefranklin_reader_12_regular), lfr12B(&librefranklin_reader_12_bold),
+    lfr12I(&librefranklin_reader_12_italic), lfr12BI(&librefranklin_reader_12_bolditalic);
+EpdFontFamily lfReader12Family(&lfr12R, &lfr12B, &lfr12I, &lfr12BI);
+EpdFont lfr14R(&librefranklin_reader_14_regular), lfr14B(&librefranklin_reader_14_bold),
+    lfr14I(&librefranklin_reader_14_italic), lfr14BI(&librefranklin_reader_14_bolditalic);
+EpdFontFamily lfReader14Family(&lfr14R, &lfr14B, &lfr14I, &lfr14BI);
+EpdFont lfr18R(&librefranklin_reader_18_regular), lfr18B(&librefranklin_reader_18_bold),
+    lfr18I(&librefranklin_reader_18_italic), lfr18BI(&librefranklin_reader_18_bolditalic);
+EpdFontFamily lfReader18Family(&lfr18R, &lfr18B, &lfr18I, &lfr18BI);
 
-EpdFont notosans14R(&notosans_14_regular), notosans14B(&notosans_14_bold),
-    notosans14I(&notosans_14_italic), notosans14BI(&notosans_14_bolditalic);
-EpdFontFamily notosans14Family(&notosans14R, &notosans14B, &notosans14I, &notosans14BI);
-EpdFont notosans18R(&notosans_18_regular), notosans18B(&notosans_18_bold),
-    notosans18I(&notosans_18_italic), notosans18BI(&notosans_18_bolditalic);
-EpdFontFamily notosans18Family(&notosans18R, &notosans18B, &notosans18I, &notosans18BI);
-
-EpdFont smallFont(&notosans_8_regular);
+EpdFont smallFont(&librefranklin_8_regular);
 EpdFontFamily smallFamily(&smallFont);
-EpdFont ui12Regular(&ubuntu_12_regular), ui12Bold(&ubuntu_12_bold);
+EpdFont ui12Regular(&librefranklin_12_regular), ui12Bold(&librefranklin_12_bold);
 EpdFontFamily ui12Family(&ui12Regular, &ui12Bold);
 
 namespace {
@@ -120,24 +113,34 @@ bool writeMonoPortraitBmp(const char* path, const GfxRenderer& r) {
   const uint32_t fileSize = HEADER + pixelBytes;
 
   uint8_t hdr[HEADER] = {0};
-  hdr[0] = 'B'; hdr[1] = 'M';
-  hdr[2] = fileSize & 0xFF;         hdr[3] = (fileSize >> 8) & 0xFF;
-  hdr[4] = (fileSize >> 16) & 0xFF; hdr[5] = (fileSize >> 24) & 0xFF;
-  hdr[10] = HEADER & 0xFF;          hdr[11] = (HEADER >> 8) & 0xFF;
+  hdr[0] = 'B';
+  hdr[1] = 'M';
+  hdr[2] = fileSize & 0xFF;
+  hdr[3] = (fileSize >> 8) & 0xFF;
+  hdr[4] = (fileSize >> 16) & 0xFF;
+  hdr[5] = (fileSize >> 24) & 0xFF;
+  hdr[10] = HEADER & 0xFF;
+  hdr[11] = (HEADER >> 8) & 0xFF;
   hdr[14] = 40;
-  hdr[18] = W & 0xFF;  hdr[19] = (W >> 8) & 0xFF;
-  hdr[22] = H & 0xFF;  hdr[23] = (H >> 8) & 0xFF;   // positive => bottom-up
-  hdr[26] = 1; hdr[28] = 1;                          // 1 plane, 1 bpp
-  hdr[46] = 2;                                       // biClrUsed
-  hdr[58] = hdr[59] = hdr[60] = 0xFF;                // palette[1] = white
+  hdr[18] = W & 0xFF;
+  hdr[19] = (W >> 8) & 0xFF;
+  hdr[22] = H & 0xFF;
+  hdr[23] = (H >> 8) & 0xFF;  // positive => bottom-up
+  hdr[26] = 1;
+  hdr[28] = 1;                         // 1 plane, 1 bpp
+  hdr[46] = 2;                         // biClrUsed
+  hdr[58] = hdr[59] = hdr[60] = 0xFF;  // palette[1] = white
 
   FILE* f = fopen(path, "wb");
-  if (!f) { fprintf(stderr, "cannot open %s\n", path); return false; }
+  if (!f) {
+    fprintf(stderr, "cannot open %s\n", path);
+    return false;
+  }
   fwrite(hdr, 1, HEADER, f);
 
   const uint8_t* fb = r.getFrameBuffer();
   auto* row = static_cast<uint8_t*>(calloc(1, rowBytes));
-  for (int y = H - 1; y >= 0; --y) {           // BMP rows are bottom-up
+  for (int y = H - 1; y >= 0; --y) {  // BMP rows are bottom-up
     memset(row, 0, rowBytes);
     for (int x = 0; x < W; ++x) {
       if (logicalPixelIsWhite(fb, panelH, panelWB, x, y)) row[x >> 3] |= (0x80 >> (x & 7));
@@ -169,34 +172,32 @@ bool renderDaisyVariants(const char* outDir);
 // be attached first (mirrors src/main.cpp).
 bool simInit() {
   renderer.begin();
-  if (!fontDecompressor.init()) { fprintf(stderr, "decompressor init failed\n"); return false; }
+  if (!fontDecompressor.init()) {
+    fprintf(stderr, "decompressor init failed\n");
+    return false;
+  }
   fontCacheManager.setFontDecompressor(&fontDecompressor);
   renderer.setFontCacheManager(&fontCacheManager);
-  renderer.insertFont(NOTOSERIF_12_FONT_ID, notoserif12Family);
-  renderer.insertFont(NOTOSERIF_14_FONT_ID, notoserif14Family);
-  renderer.insertFont(NOTOSERIF_18_FONT_ID, notoserif18Family);
-  renderer.insertFont(NOTOSANS_14_FONT_ID, notosans14Family);
-  renderer.insertFont(NOTOSANS_18_FONT_ID, notosans18Family);
+  renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, lfReader12Family);
+  renderer.insertFont(LIBREFRANKLIN_READER_14_FONT_ID, lfReader14Family);
+  renderer.insertFont(LIBREFRANKLIN_READER_18_FONT_ID, lfReader18Family);
   renderer.insertFont(SMALL_FONT_ID, smallFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12Family);
   return true;
 }
 
 bool renderCalendar(int year, int month, int day, const char* outPath) {
-  calendar::CalendarSleepScreen::render(renderer, calendar::YMD{static_cast<uint16_t>(year),
-                                                                static_cast<uint8_t>(month),
-                                                                static_cast<uint8_t>(day)});
+  calendar::CalendarSleepScreen::render(
+      renderer, calendar::YMD{static_cast<uint16_t>(year), static_cast<uint8_t>(month), static_cast<uint8_t>(day)});
   if (!writeMonoPortraitBmp(outPath, renderer)) return false;
   printf("wrote %s\n", outPath);
   return true;
 }
 
 bool renderCalendarWestside(int year, int month, int day, const char* outPath) {
-  calendar::CalendarSleepScreen::render(renderer,
-                                        calendar::YMD{static_cast<uint16_t>(year),
-                                                      static_cast<uint8_t>(month),
-                                                      static_cast<uint8_t>(day)},
-                                        5, calendar::Style::WestsideEN);
+  calendar::CalendarSleepScreen::render(
+      renderer, calendar::YMD{static_cast<uint16_t>(year), static_cast<uint8_t>(month), static_cast<uint8_t>(day)}, 5,
+      calendar::Style::WestsideEN);
   if (!writeMonoPortraitBmp(outPath, renderer)) return false;
   printf("wrote %s\n", outPath);
   return true;
@@ -209,8 +210,7 @@ bool renderFontSpecimen(const char* famA, const char* famB, const char* outDir) 
     const int idA = sdFontSystem.loadForDisplay(famA, sizeEnum, renderer);
     const int idB = sdFontSystem.loadForDisplay(famB, sizeEnum, renderer);
     if (idA == 0 || idB == 0) {
-      fprintf(stderr, "missing family at size %u (%s=%d %s=%d)\n",
-              kPointSizes[sizeEnum], famA, idA, famB, idB);
+      fprintf(stderr, "missing family at size %u (%s=%d %s=%d)\n", kPointSizes[sizeEnum], famA, idA, famB, idB);
       return false;
     }
     auto itA = renderer.getSdCardFonts().find(idA);
@@ -224,8 +224,7 @@ bool renderFontSpecimen(const char* famA, const char* famB, const char* outDir) 
     int y = 6;
     const int margin = 10;
     char hdr[96];
-    snprintf(hdr, sizeof(hdr), "%upt  --  %s (top) vs %s (bottom)",
-             kPointSizes[sizeEnum], famA, famB);
+    snprintf(hdr, sizeof(hdr), "%upt  --  %s (top) vs %s (bottom)", kPointSizes[sizeEnum], famA, famB);
     renderer.drawText(UI_12_FONT_ID, margin, y, hdr, true, EpdFontFamily::BOLD);
     y += renderer.getLineHeight(UI_12_FONT_ID) + 4;
 
@@ -251,8 +250,8 @@ bool renderFontSpecimen(const char* famA, const char* famB, const char* outDir) 
       renderer.drawText(UI_12_FONT_ID, renderer.getScreenWidth() - 52, y, note);
       y += renderer.getLineHeight(idB) + 10;
 
-      printf("%2upt  %-26s  %s=%3dpx  %s=%3dpx  delta=%+d\n",
-             kPointSizes[sizeEnum], sample, famA, wA, famB, wB, wB - wA);
+      printf("%2upt  %-26s  %s=%3dpx  %s=%3dpx  delta=%+d\n", kPointSizes[sizeEnum], sample, famA, wA, famB, wB,
+             wB - wA);
     }
 
     char path[256];
@@ -281,15 +280,18 @@ namespace {
 // word-at-a-time is what the reader's own layout does. Draws from `y` down,
 // stops before `limit`, returns the y after the last line drawn and reports
 // how many lines it managed through `outLines` / `outTruncated`.
-int drawWrapped(int id, const char* text, EpdFontFamily::Style style, int x, int y, int colW,
-                int lineH, int limit, int* outLines, bool* outTruncated) {
+int drawWrapped(int id, const char* text, EpdFontFamily::Style style, int x, int y, int colW, int lineH, int limit,
+                int* outLines, bool* outTruncated) {
   char line[512] = {0};
   int lineLen = 0;
   int lines = 0;
   bool truncated = false;
   const char* p = text;
   while (*p != '\0') {
-    if (y + lineH > limit) { truncated = true; break; }
+    if (y + lineH > limit) {
+      truncated = true;
+      break;
+    }
     const char* sp = strchr(p, ' ');
     const size_t wordLen = sp != nullptr ? static_cast<size_t>(sp - p) : strlen(p);
     char cand[512];
@@ -326,8 +328,7 @@ bool renderReadingSpecimen(const char* family, const char* outDir) {
       "then 41,072, then a jump nobody had ever explained. Official policy said "
       "the difference was rounding. She did not believe it, and neither, she "
       "suspected, did the auditor who had signed off on it.";
-  static const char* kItalic =
-      "Every officer aboard knew the difference between quiet and silence.";
+  static const char* kItalic = "Every officer aboard knew the difference between quiet and silence.";
   static const char* kBold = "Chapter Nine: The Ledger of the Wharf";
   static const char* kHard = "Illinois 1lI0O · rn m · cl d · 3/8 5/6 · fjord ffi · ÄÖÜ Café";
   static const char* kAlphabet = "abcdefghijklmnopqrstuvwxyz";
@@ -369,8 +370,7 @@ bool renderReadingSpecimen(const char* family, const char* outDir) {
     y += renderer.getLineHeight(UI_12_FONT_ID) + 10;
 
     const int pageBottom = renderer.getScreenHeight() - bottom - 6;
-    y = drawWrapped(id, kBold, EpdFontFamily::BOLD, margin, y, colW, lineH, pageBottom, nullptr,
-                    nullptr);
+    y = drawWrapped(id, kBold, EpdFontFamily::BOLD, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
     y += lineH / 2;
 
     // The tail (italic sample + confusables) is the point of the page, so the
@@ -380,22 +380,19 @@ bool renderReadingSpecimen(const char* family, const char* outDir) {
 
     int lines = 0;
     bool truncated = false;
-    y = drawWrapped(id, kBody, EpdFontFamily::REGULAR, margin, y, colW, lineH, bodyLimit, &lines,
-                    &truncated);
+    y = drawWrapped(id, kBody, EpdFontFamily::REGULAR, margin, y, colW, lineH, bodyLimit, &lines, &truncated);
 
     y += lineH / 2;
-    y = drawWrapped(id, kItalic, EpdFontFamily::ITALIC, margin, y, colW, lineH, pageBottom, nullptr,
-                    nullptr);
+    y = drawWrapped(id, kItalic, EpdFontFamily::ITALIC, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
     y += lineH / 2;
-    y = drawWrapped(id, kHard, EpdFontFamily::REGULAR, margin, y, colW, lineH, pageBottom, nullptr,
-                    nullptr);
+    y = drawWrapped(id, kHard, EpdFontFamily::REGULAR, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
 
     // Set width is the other half of "readable" on a 528px column: a wider
     // face at the same x-height fits fewer words per line and so more page
     // turns per chapter. Report it rather than leaving it to the eye.
     const int alphaW = renderer.getTextWidth(id, kAlphabet);
-    printf("%-20s slot %u  line %2dpx  lc-alphabet %3dpx  body lines %2d%s  col %dpx\n",
-           family, sizeEnum, lineH, alphaW, lines, truncated ? " (cut)" : "", colW);
+    printf("%-20s slot %u  line %2dpx  lc-alphabet %3dpx  body lines %2d%s  col %dpx\n", family, sizeEnum, lineH,
+           alphaW, lines, truncated ? " (cut)" : "", colW);
 
     char path[256];
     snprintf(path, sizeof(path), "%s/reading_%s_%u.bmp", outDir, family, sizeEnum);
@@ -452,14 +449,24 @@ int main(int argc, char** argv) {
   // legacy bare "Y M D" that sweep.py and check_centering.py drive.
   int y = 2026, m = 7, d = 27;
   if (strcmp(mode, "calendar-westside") == 0) {
-    if (argc == 5) { y = atoi(argv[2]); m = atoi(argv[3]); d = atoi(argv[4]); }
-    else if (argc != 2) return usage(argv[0]);
+    if (argc == 5) {
+      y = atoi(argv[2]);
+      m = atoi(argv[3]);
+      d = atoi(argv[4]);
+    } else if (argc != 2)
+      return usage(argv[0]);
     return renderCalendarWestside(y, m, d, "./fs_/sleep.bmp") ? 0 : 1;
   } else if (strcmp(mode, "calendar") == 0) {
-    if (argc == 5) { y = atoi(argv[2]); m = atoi(argv[3]); d = atoi(argv[4]); }
-    else if (argc != 2) return usage(argv[0]);
+    if (argc == 5) {
+      y = atoi(argv[2]);
+      m = atoi(argv[3]);
+      d = atoi(argv[4]);
+    } else if (argc != 2)
+      return usage(argv[0]);
   } else if (argc == 4 && atoi(argv[1]) > 1000) {
-    y = atoi(argv[1]); m = atoi(argv[2]); d = atoi(argv[3]);
+    y = atoi(argv[1]);
+    m = atoi(argv[2]);
+    d = atoi(argv[3]);
   } else {
     return usage(argv[0]);
   }

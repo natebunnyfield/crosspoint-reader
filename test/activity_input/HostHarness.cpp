@@ -50,8 +50,8 @@ class Gfx {
     }
     cache_.setFontDecompressor(&decompressor_);
     renderer_.setFontCacheManager(&cache_);
-    renderer_.insertFont(NOTOSERIF_12_FONT_ID, notoserif12_);
-    renderer_.insertFont(NOTOSERIF_14_FONT_ID, notoserif14_);
+    renderer_.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, lfReader12_);
+    renderer_.insertFont(LIBREFRANKLIN_READER_14_FONT_ID, lfReader14_);
     renderer_.insertFont(UI_10_FONT_ID, ui10_);
     renderer_.insertFont(UI_12_FONT_ID, ui12_);
     renderer_.insertFont(SMALL_FONT_ID, small_);
@@ -62,17 +62,17 @@ class Gfx {
   FontDecompressor decompressor_;
   FontCacheManager cache_;
 
-  EpdFont ns12R_{&notoserif_12_regular}, ns12B_{&notoserif_12_bold}, ns12I_{&notoserif_12_italic},
-      ns12BI_{&notoserif_12_bolditalic};
-  EpdFontFamily notoserif12_{&ns12R_, &ns12B_, &ns12I_, &ns12BI_};
-  EpdFont ns14R_{&notoserif_14_regular}, ns14B_{&notoserif_14_bold}, ns14I_{&notoserif_14_italic},
-      ns14BI_{&notoserif_14_bolditalic};
-  EpdFontFamily notoserif14_{&ns14R_, &ns14B_, &ns14I_, &ns14BI_};
-  EpdFont ui10R_{&ubuntu_10_regular}, ui10B_{&ubuntu_10_bold};
+  EpdFont lfr12R_{&librefranklin_reader_12_regular}, lfr12B_{&librefranklin_reader_12_bold},
+      lfr12I_{&librefranklin_reader_12_italic}, lfr12BI_{&librefranklin_reader_12_bolditalic};
+  EpdFontFamily lfReader12_{&lfr12R_, &lfr12B_, &lfr12I_, &lfr12BI_};
+  EpdFont lfr14R_{&librefranklin_reader_14_regular}, lfr14B_{&librefranklin_reader_14_bold},
+      lfr14I_{&librefranklin_reader_14_italic}, lfr14BI_{&librefranklin_reader_14_bolditalic};
+  EpdFontFamily lfReader14_{&lfr14R_, &lfr14B_, &lfr14I_, &lfr14BI_};
+  EpdFont ui10R_{&librefranklin_10_regular}, ui10B_{&librefranklin_10_bold};
   EpdFontFamily ui10_{&ui10R_, &ui10B_};
-  EpdFont ui12R_{&ubuntu_12_regular}, ui12B_{&ubuntu_12_bold};
+  EpdFont ui12R_{&librefranklin_12_regular}, ui12B_{&librefranklin_12_bold};
   EpdFontFamily ui12_{&ui12R_, &ui12B_};
-  EpdFont small8_{&notosans_8_regular};
+  EpdFont small8_{&librefranklin_8_regular};
   EpdFontFamily small_{&small8_};
 };
 
@@ -452,7 +452,7 @@ void reset() {
   SETTINGS.frontButtonRight = CrossPointSettings::FRONT_HW_RIGHT;
   SETTINGS.sideButtonLayout = CrossPointSettings::PREV_NEXT;
   SETTINGS.fontSizeSlot = CrossPointSettings::DEFAULT_FONT_SIZE_SLOT;
-  SETTINGS.fontFamily = CrossPointSettings::NOTOSERIF;
+  SETTINGS.fontFamily = CrossPointSettings::BUILTIN_LIBRE_FRANKLIN;
   SETTINGS.sdFontFamilyName[0] = '\0';
 
   // Orientation is a compile-time constant now (GfxRenderer::orientation =

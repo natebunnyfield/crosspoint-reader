@@ -321,7 +321,7 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   strncpy(ownerName, own, sizeof(ownerName) - 1);
   ownerName[sizeof(ownerName) - 1] = '\0';
   if (storedFontFamily == LEGACY_OPENDYSLEXIC && sdFontFamilyName[0] == '\0') {
-    fontFamily = NOTOSERIF;
+    fontFamily = BUILTIN_LIBRE_FRANKLIN;
     strncpy(sdFontFamilyName, "OpenDyslexic", sizeof(sdFontFamilyName) - 1);
     sdFontFamilyName[sizeof(sdFontFamilyName) - 1] = '\0';
     needsResave = true;
@@ -364,41 +364,18 @@ ReaderRenderSpec CrossPointSettings::readerRenderSpec(const uint16_t viewportWid
 }
 
 float CrossPointSettings::getReaderLineCompression() const {
-  // SD card fonts use same compression as Bookerly (the most neutral values)
-  if (sdFontFamilyName[0] != '\0') {
-    switch (lineSpacing) {
-      case TIGHT:
-        return 0.95f;
-      case NORMAL:
-      default:
-        return 1.0f;
-      case WIDE:
-        return 1.1f;
-    }
-  }
-
-  switch (fontFamily) {
-    case NOTOSERIF:
+  // One ramp for every family. SD fonts always used these values ("the most
+  // neutral", tuned against Bookerly), and the built-in fallback is Libre
+  // Franklin, whose uniform-slot leading was derived under the same ramp — the
+  // separate Noto Sans ramp went with that family's removal.
+  switch (lineSpacing) {
+    case TIGHT:
+      return 0.95f;
+    case NORMAL:
     default:
-      switch (lineSpacing) {
-        case TIGHT:
-          return 0.95f;
-        case NORMAL:
-        default:
-          return 1.0f;
-        case WIDE:
-          return 1.1f;
-      }
-    case NOTOSANS:
-      switch (lineSpacing) {
-        case TIGHT:
-          return 0.90f;
-        case NORMAL:
-        default:
-          return 0.95f;
-        case WIDE:
-          return 1.0f;
-      }
+      return 1.0f;
+    case WIDE:
+      return 1.1f;
   }
 }
 
@@ -445,18 +422,20 @@ int CrossPointSettings::getReaderFontId() const {
   // carried over from an SD family may not be one of them. ensureLoaded()
   // normally persists the snap; snap again here (without allocating — this runs
   // in the page render loop) so rendering is correct even before it has run.
+  // Libre Franklin is the only built-in family; fontFamily no longer selects
+  // anything here. The 14 pt default is the one cut registered even in
+  // OMIT_FONTS builds (main.cpp), so this can always resolve.
   const uint8_t pt =
       snapToNearestPointSize(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), fontPointSize);
-  const bool sans = (fontFamily == NOTOSANS);
   switch (pt) {
     case 12:
-      return sans ? NOTOSANS_12_FONT_ID : NOTOSERIF_12_FONT_ID;
+      return LIBREFRANKLIN_READER_12_FONT_ID;
     case 16:
-      return sans ? NOTOSANS_16_FONT_ID : NOTOSERIF_16_FONT_ID;
+      return LIBREFRANKLIN_READER_16_FONT_ID;
     case 18:
-      return sans ? NOTOSANS_18_FONT_ID : NOTOSERIF_18_FONT_ID;
+      return LIBREFRANKLIN_READER_18_FONT_ID;
     case 14:
     default:
-      return sans ? NOTOSANS_14_FONT_ID : NOTOSERIF_14_FONT_ID;
+      return LIBREFRANKLIN_READER_14_FONT_ID;
   }
 }

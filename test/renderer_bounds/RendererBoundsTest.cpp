@@ -21,16 +21,14 @@
 // Deliberately NOT asserted: text placed partly off-screen on purpose. That is
 // legitimate clipping, and drawPixel dropping those pixels is correct.
 
-#include <gtest/gtest.h>
-
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
 #include <GfxRenderer.h>
+#include <Utf8.h>
 #include <builtinFonts/all.h>
+#include <gtest/gtest.h>
 
 #include <string>
-
-#include <Utf8.h>
 
 #include "fontIds.h"
 
@@ -58,9 +56,9 @@ class Gfx {
     }
     cache_.setFontDecompressor(&decompressor_);
     renderer_.setFontCacheManager(&cache_);
-    renderer_.insertFont(NOTOSERIF_12_FONT_ID, notoserif12_);
-    renderer_.insertFont(NOTOSERIF_14_FONT_ID, notoserif14_);
-    renderer_.insertFont(NOTOSERIF_18_FONT_ID, notoserif18_);
+    renderer_.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, lfReader12_);
+    renderer_.insertFont(LIBREFRANKLIN_READER_14_FONT_ID, lfReader14_);
+    renderer_.insertFont(LIBREFRANKLIN_READER_18_FONT_ID, lfReader18_);
     renderer_.insertFont(UI_10_FONT_ID, ui10_);
     renderer_.insertFont(UI_12_FONT_ID, ui12_);
     renderer_.insertFont(SMALL_FONT_ID, small_);
@@ -72,20 +70,20 @@ class Gfx {
   FontDecompressor decompressor_;
   FontCacheManager cache_;
 
-  EpdFont ns12R_{&notoserif_12_regular}, ns12B_{&notoserif_12_bold}, ns12I_{&notoserif_12_italic},
-      ns12BI_{&notoserif_12_bolditalic};
-  EpdFontFamily notoserif12_{&ns12R_, &ns12B_, &ns12I_, &ns12BI_};
-  EpdFont ns14R_{&notoserif_14_regular}, ns14B_{&notoserif_14_bold}, ns14I_{&notoserif_14_italic},
-      ns14BI_{&notoserif_14_bolditalic};
-  EpdFontFamily notoserif14_{&ns14R_, &ns14B_, &ns14I_, &ns14BI_};
-  EpdFont ns18R_{&notoserif_18_regular}, ns18B_{&notoserif_18_bold}, ns18I_{&notoserif_18_italic},
-      ns18BI_{&notoserif_18_bolditalic};
-  EpdFontFamily notoserif18_{&ns18R_, &ns18B_, &ns18I_, &ns18BI_};
-  EpdFont ui10R_{&ubuntu_10_regular}, ui10B_{&ubuntu_10_bold};
+  EpdFont lfr12R_{&librefranklin_reader_12_regular}, lfr12B_{&librefranklin_reader_12_bold},
+      lfr12I_{&librefranklin_reader_12_italic}, lfr12BI_{&librefranklin_reader_12_bolditalic};
+  EpdFontFamily lfReader12_{&lfr12R_, &lfr12B_, &lfr12I_, &lfr12BI_};
+  EpdFont lfr14R_{&librefranklin_reader_14_regular}, lfr14B_{&librefranklin_reader_14_bold},
+      lfr14I_{&librefranklin_reader_14_italic}, lfr14BI_{&librefranklin_reader_14_bolditalic};
+  EpdFontFamily lfReader14_{&lfr14R_, &lfr14B_, &lfr14I_, &lfr14BI_};
+  EpdFont lfr18R_{&librefranklin_reader_18_regular}, lfr18B_{&librefranklin_reader_18_bold},
+      lfr18I_{&librefranklin_reader_18_italic}, lfr18BI_{&librefranklin_reader_18_bolditalic};
+  EpdFontFamily lfReader18_{&lfr18R_, &lfr18B_, &lfr18I_, &lfr18BI_};
+  EpdFont ui10R_{&librefranklin_10_regular}, ui10B_{&librefranklin_10_bold};
   EpdFontFamily ui10_{&ui10R_, &ui10B_};
-  EpdFont ui12R_{&ubuntu_12_regular}, ui12B_{&ubuntu_12_bold};
+  EpdFont ui12R_{&librefranklin_12_regular}, ui12B_{&librefranklin_12_bold};
   EpdFontFamily ui12_{&ui12R_, &ui12B_};
-  EpdFont small8_{&notosans_8_regular};
+  EpdFont small8_{&librefranklin_8_regular};
   EpdFontFamily small_{&small8_};
   EpdFont sm12R_{&spacemono_12_regular}, sm12B_{&spacemono_12_bold};
   EpdFontFamily spacemono12_{&sm12R_, &sm12B_};
@@ -107,9 +105,8 @@ class RendererBounds : public ::testing::Test {
   ::testing::AssertionResult noEscapes() const {
     const auto& o = GfxRenderer::outOfRange;
     if (o.count == 0) return ::testing::AssertionSuccess();
-    return ::testing::AssertionFailure()
-           << o.count << " out-of-range pixel(s); last (" << o.lastX << ", " << o.lastY << ") -> (" << o.lastPhyX
-           << ", " << o.lastPhyY << ")";
+    return ::testing::AssertionFailure() << o.count << " out-of-range pixel(s); last (" << o.lastX << ", " << o.lastY
+                                         << ") -> (" << o.lastPhyX << ", " << o.lastPhyY << ")";
   }
 
   GfxRenderer* r = nullptr;
@@ -233,8 +230,8 @@ TEST_F(RendererBounds, ShortPaneLabelStaysInBounds) {
 TEST_F(RendererBounds, LargeFontLabelAtClampedOriginIsClean) {
   const int padding = 12;
   const int width = r->getScreenWidth() - padding * 2;
-  for (const int fontId : {UI_10_FONT_ID, UI_12_FONT_ID, NOTOSERIF_12_FONT_ID, NOTOSERIF_14_FONT_ID,
-                           NOTOSERIF_18_FONT_ID}) {
+  for (const int fontId : {UI_10_FONT_ID, UI_12_FONT_ID, LIBREFRANKLIN_READER_12_FONT_ID,
+                           LIBREFRANKLIN_READER_14_FONT_ID, LIBREFRANKLIN_READER_18_FONT_ID}) {
     const int h = r->getTextHeight(fontId);
     ASSERT_GT(h, 0) << "fontId " << fontId;
     (void)h;
@@ -264,7 +261,7 @@ TEST_F(RendererBounds, LargeFontLabelAtClampedOriginIsClean) {
 TEST_F(RendererBounds, BottomFlushTextEscapesBelowPanel_KnownDefect) {
   const int padding = 12;
   const int width = r->getScreenWidth() - padding * 2;
-  const int fontId = NOTOSERIF_18_FONT_ID;
+  const int fontId = LIBREFRANKLIN_READER_18_FONT_ID;
   const int h = r->getTextHeight(fontId);
   const std::string fitted = r->truncatedText(fontId, kCrashLabel, width);
 
@@ -287,17 +284,17 @@ TEST_F(RendererBounds, MissingGlyphsDoNotWalkThePenOffScreen) {
       "¿Qué tal? ¡Vaya! niño «cita» ¾ £100 …",  // the Almendra specimen set
       "\xE4\xB8\x80\xE4\xB8\x81\xE4\xB8\x82",   // CJK: certainly absent
       "\xF0\x9F\x98\x80\xF0\x9F\x8E\x89",       // emoji: certainly absent
-      "a\xE4\xB8\x80z",                          // absent glyph between present ones
-      "\xE4\xB8\x80",                            // absent glyph alone
+      "a\xE4\xB8\x80z",                         // absent glyph between present ones
+      "\xE4\xB8\x80",                           // absent glyph alone
   };
 
   const int padding = 12;
   const int width = r->getScreenWidth() - padding * 2;
 
   for (const char* s : specimens) {
-    for (const int fontId : {UI_10_FONT_ID, NOTOSERIF_14_FONT_ID, NOTOSERIF_18_FONT_ID}) {
-      for (const auto style : {EpdFontFamily::REGULAR, EpdFontFamily::BOLD, EpdFontFamily::ITALIC,
-                               EpdFontFamily::BOLD_ITALIC}) {
+    for (const int fontId : {UI_10_FONT_ID, LIBREFRANKLIN_READER_14_FONT_ID, LIBREFRANKLIN_READER_18_FONT_ID}) {
+      for (const auto style :
+           {EpdFontFamily::REGULAR, EpdFontFamily::BOLD, EpdFontFamily::ITALIC, EpdFontFamily::BOLD_ITALIC}) {
         // Fit in the SAME style it is drawn in — see the style-mismatch test.
         const std::string fitted = r->truncatedText(fontId, s, width, style);
         GfxRenderer::resetOutOfRange();
@@ -325,9 +322,9 @@ TEST_F(RendererBounds, FittedTextStaysInsideItsPane) {
   };
 
   for (const char* t : texts) {
-    for (const int fontId : {UI_10_FONT_ID, NOTOSERIF_14_FONT_ID, NOTOSERIF_18_FONT_ID}) {
-      for (const auto style : {EpdFontFamily::REGULAR, EpdFontFamily::BOLD, EpdFontFamily::ITALIC,
-                               EpdFontFamily::BOLD_ITALIC}) {
+    for (const int fontId : {UI_10_FONT_ID, LIBREFRANKLIN_READER_14_FONT_ID, LIBREFRANKLIN_READER_18_FONT_ID}) {
+      for (const auto style :
+           {EpdFontFamily::REGULAR, EpdFontFamily::BOLD, EpdFontFamily::ITALIC, EpdFontFamily::BOLD_ITALIC}) {
         GfxRenderer::resetOutOfRange();
         const std::string fitted = r->truncatedText(fontId, t, width, style);
         r->drawText(fontId, left, 300, fitted.c_str(), /*black=*/true, style);
@@ -353,25 +350,25 @@ TEST_F(RendererBounds, FittedTextStaysInsideItsPane) {
 TEST_F(RendererBounds, DegeneratePanesDrawNothingAndDoNotCrash) {
   for (const int width : {0, -1, -1000}) {
     GfxRenderer::resetOutOfRange();
-    const std::string fitted = r->truncatedText(NOTOSERIF_14_FONT_ID, kCrashLabel, width);
-    r->drawText(NOTOSERIF_14_FONT_ID, 12, 300, fitted.c_str());
+    const std::string fitted = r->truncatedText(LIBREFRANKLIN_READER_14_FONT_ID, kCrashLabel, width);
+    r->drawText(LIBREFRANKLIN_READER_14_FONT_ID, 12, 300, fitted.c_str());
     EXPECT_TRUE(noEscapes()) << "width " << width;
 
     GfxRenderer::resetOutOfRange();
-    const auto lines = r->wrappedText(NOTOSERIF_14_FONT_ID, kCrashLabel, width, 4);
+    const auto lines = r->wrappedText(LIBREFRANKLIN_READER_14_FONT_ID, kCrashLabel, width, 4);
     int y = 300;
     for (const auto& line : lines) {
-      r->drawText(NOTOSERIF_14_FONT_ID, 12, y, line.c_str());
-      y += r->getTextHeight(NOTOSERIF_14_FONT_ID) + 2;
+      r->drawText(LIBREFRANKLIN_READER_14_FONT_ID, 12, y, line.c_str());
+      y += r->getTextHeight(LIBREFRANKLIN_READER_14_FONT_ID) + 2;
     }
     EXPECT_TRUE(noEscapes()) << "wrapped width " << width;
   }
 
   // Zero/negative line counts and empty strings.
   GfxRenderer::resetOutOfRange();
-  EXPECT_TRUE(r->wrappedText(NOTOSERIF_14_FONT_ID, kCrashLabel, 200, 0).empty());
-  r->drawText(NOTOSERIF_14_FONT_ID, 12, 300, "");
-  r->drawText(NOTOSERIF_14_FONT_ID, 12, 300, nullptr);
+  EXPECT_TRUE(r->wrappedText(LIBREFRANKLIN_READER_14_FONT_ID, kCrashLabel, 200, 0).empty());
+  r->drawText(LIBREFRANKLIN_READER_14_FONT_ID, 12, 300, "");
+  r->drawText(LIBREFRANKLIN_READER_14_FONT_ID, 12, 300, nullptr);
   EXPECT_TRUE(noEscapes());
 }
 
@@ -403,7 +400,9 @@ TEST(MissingGlyph, ResolvesToAVisibleFallbackRatherThanNothing) {
 // character in it is unrepresentable. That is what silently corrupted wrapping.
 TEST_F(RendererBounds, TextWidthCountsUnrepresentableCharacters) {
   const int without = r->getTextWidth(SPACEMONO_12_FONT_ID, "ab");
-  const int with = r->getTextWidth(SPACEMONO_12_FONT_ID, "a\xF0\x9F\x98\x8A" "b");  // a + U+1F60A + b
+  const int with = r->getTextWidth(SPACEMONO_12_FONT_ID,
+                                   "a\xF0\x9F\x98\x8A"
+                                   "b");  // a + U+1F60A + b
   EXPECT_GT(with, without) << "the unrepresentable character contributed zero width";
 }
 

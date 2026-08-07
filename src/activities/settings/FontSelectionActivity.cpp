@@ -80,8 +80,8 @@ void FontSelectionActivity::onEnter() {
   // loads GTAlpinaCond for Home's titles, and loadForDisplay() evicts the reader
   // family to do it (SdCardFontSystem.h documents the eviction). Home always
   // renders between the reader and here, so without this the first preview draws
-  // with getReaderFontId()'s BUILT-IN fallback — Noto Sans or Noto Serif depending
-  // on SETTINGS.fontFamily — while the label above it still names the real family.
+  // with getReaderFontId()'s BUILT-IN fallback — Libre Franklin — while the
+  // label above it still names the real family.
   // The list build below also reads the registry, and ensureLoaded() may clear a
   // missing family, so this has to come first.
   {
@@ -112,14 +112,14 @@ void FontSelectionActivity::onEnter() {
   fonts_.clear();
   fonts_.reserve(sdFontCount > 0 ? sdFontCount : CrossPointSettings::BUILTIN_FONT_COUNT);
 
-  // The built-in Noto faces are hidden once the user has installed their own
-  // fonts, so this list shows only their set. They are still listed when no SD
-  // fonts are present — the picker must never be empty, and Noto remains the
-  // fallback CrossPointSettings::getReaderFontId() resolves to when a selected
-  // SD font cannot be loaded.
+  // The built-in Libre Franklin is hidden once the user has installed their own
+  // fonts, so this list shows only their set. It is still listed when no SD
+  // fonts are present — the picker must never be empty, and Libre Franklin is
+  // the fallback CrossPointSettings::getReaderFontId() resolves to when a
+  // selected SD font cannot be loaded.
   if (sdFontCount == 0) {
-    fonts_.push_back({I18N.get(StrId::STR_NOTO_SERIF), true, static_cast<uint8_t>(CrossPointSettings::NOTOSERIF)});
-    fonts_.push_back({I18N.get(StrId::STR_NOTO_SANS), true, static_cast<uint8_t>(CrossPointSettings::NOTOSANS)});
+    fonts_.push_back(
+        {I18N.get(StrId::STR_LIBRE_FRANKLIN), true, static_cast<uint8_t>(CrossPointSettings::BUILTIN_LIBRE_FRANKLIN)});
   }
 
   if (registry_) {
@@ -328,8 +328,8 @@ uint8_t FontSelectionActivity::resolvedPointSize() const {
     }
   }
 
-  // Built-in faces are compiled at a fixed ramp; the slot indexes straight into
-  // it for both NotoSerif and NotoSans.
+  // Built-in Libre Franklin is compiled at a fixed ramp; the slot indexes
+  // straight into it.
   return pointSizeForSlot(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), SETTINGS.fontSizeSlot);
 }
 

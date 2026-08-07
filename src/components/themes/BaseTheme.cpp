@@ -702,6 +702,122 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   }
 }
 
+namespace {
+// Decorrelates pattern choice from the raw path hash: std::hash of short
+// strings can leave structured low bits, and books added from one folder
+// would then all draw the same band.
+constexpr uint32_t mixCoverSeed(uint32_t s) {
+  s ^= s >> 16;
+  s *= 0x7feb352dU;
+  s ^= s >> 15;
+  s *= 0x846ca68bU;
+  s ^= s >> 16;
+  return s;
+}
+
+// The decorative band across the top of a generated cover. Every variant
+// draws only via fillRect/fillRectDither/fillPolygon with extents clamped to
+// the band, so nothing can spill into a neighbouring home-grid tile.
+void drawGeneratedCoverBand(const GfxRenderer& renderer, const int x, const int y, const int w, const int h,
+                            const uint32_t seed) {
+  const bool dense = (seed >> 8) % 2 == 0;
+  switch (seed % 5) {
+    case 0: {  // horizontal bars
+      const int bar = std::max(4, h / (dense ? 8 : 5));
+      for (int yy = y; yy < y + h; yy += 2 * bar) {
+        renderer.fillRect(x, yy, w, std::min(bar, y + h - yy), true);
+      }
+      break;
+    }
+    case 1: {  // vertical bars
+      const int bar = std::max(4, w / (dense ? 12 : 7));
+      for (int xx = x; xx < x + w; xx += 2 * bar) {
+        renderer.fillRect(xx, y, std::min(bar, x + w - xx), h, true);
+      }
+      break;
+    }
+    case 2: {  // checkerboard
+      const int cell = std::max(6, h / (dense ? 4 : 3));
+      for (int row = 0; row * cell < h; row++) {
+        for (int col = 0; col * cell < w; col++) {
+          if ((row + col) % 2 == 0) {
+            renderer.fillRect(x + col * cell, y + row * cell, std::min(cell, w - col * cell),
+                              std::min(cell, h - row * cell), true);
+          }
+        }
+      }
+      break;
+    }
+    case 3: {  // black-to-white dither fade
+      const int strip = std::max(1, h / 4);
+      renderer.fillRect(x, y, w, strip, true);
+      renderer.fillRectDither(x, y + strip, w, strip, Color::DarkGray);
+      renderer.fillRectDither(x, y + 2 * strip, w, h - 3 * strip, Color::LightGray);
+      break;
+    }
+    default: {  // zigzag teeth: apex-down triangles side by side
+      const int tw = std::max(10, w / (dense ? 8 : 5));
+      for (int x0 = x; x0 < x + w; x0 += tw) {
+        const int x1 = std::min(x0 + tw, x + w);
+        const int xPts[3] = {x0, x1, x0 + (x1 - x0) / 2};
+        const int yPts[3] = {y, y, y + h};
+        renderer.fillPolygon(xPts, yPts, 3, true);
+      }
+      break;
+    }
+  }
+}
+}  // namespace
+
+void BaseTheme::drawGeneratedCover(const GfxRenderer& renderer, const Rect rect, const char* title, const char* author,
+                                   const uint32_t seed) const {
+  if (rect.width <= 12 || rect.height <= 12) {
+    return;
+  }
+  const uint32_t mixed = mixCoverSeed(seed);
+
+  // Blank plate + frame.
+  renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
+  renderer.drawRect(rect.x, rect.y, rect.width, rect.height, true);
+
+  // Decorative band across the top ~30%, closed off by a rule.
+  const int ruleH = std::max(2, rect.height / 120);
+  const int bandH = rect.height * 3 / 10;
+  drawGeneratedCoverBand(renderer, rect.x + 1, rect.y + 1, rect.width - 2, bandH, mixed);
+  renderer.fillRect(rect.x + 1, rect.y + 1 + bandH, rect.width - 2, ruleH, true);
+
+  // Full-screen covers (sleep) get the large Libre Franklin reader cuts; home
+  // tiles the UI chrome faces. OMIT_FONTS builds drop the 18 pt cut —
+  // getLineHeight() returning 0 is the absence signal, and the chrome faces
+  // always exist.
+  int titleFontId = UI_12_FONT_ID;
+  int authorFontId = SMALL_FONT_ID;
+  if (rect.height >= 400 && renderer.getLineHeight(LIBREFRANKLIN_READER_18_FONT_ID) > 0) {
+    titleFontId = LIBREFRANKLIN_READER_18_FONT_ID;
+    authorFontId = LIBREFRANKLIN_READER_14_FONT_ID;
+  }
+
+  const int margin = std::max(6, std::min(rect.width, rect.height) / 24);
+  const int titleTop = rect.y + 1 + bandH + ruleH + margin;
+  const int titleBottom = rect.y + rect.height * 72 / 100;
+  const int authorTop = titleBottom;
+  const int authorBottom = rect.y + rect.height - margin;
+
+  if (title && *title && titleBottom > titleTop) {
+    const Rect titleBounds(rect.x + margin, titleTop, rect.width - 2 * margin, titleBottom - titleTop);
+    UITheme::drawCenteredWrappedText(renderer, titleBounds, titleFontId, title, 4, true, EpdFontFamily::BOLD);
+  }
+
+  if (author && *author && authorBottom > authorTop) {
+    // Short centred rule separating title and author blocks.
+    const int sepW = rect.width / 5;
+    renderer.fillRect(rect.x + (rect.width - sepW) / 2, authorTop, sepW, std::max(1, ruleH / 2), true);
+    const Rect authorBounds(rect.x + margin, authorTop + margin / 2, rect.width - 2 * margin,
+                            authorBottom - authorTop - margin / 2);
+    UITheme::drawCenteredWrappedText(renderer, authorBounds, authorFontId, author, 2);
+  }
+}
+
 void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                const std::function<std::string(int index)>& buttonLabel,
                                const std::function<UIIcon(int index)>& rowIcon) const {
@@ -740,8 +856,7 @@ void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
     const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, label);
     const int textX = rect.x + (rect.width - textWidth) / 2;
     const int lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
-    const int textY =
-        tileY + (rowHeight - lineHeight) / 2;  // vertically centered assuming y is top of text
+    const int textY = tileY + (rowHeight - lineHeight) / 2;  // vertically centered assuming y is top of text
     // Invert text when the tile is selected, to contrast with the filled background
     renderer.drawText(UI_10_FONT_ID, textX, textY, label, selectedIndex != i);
   }

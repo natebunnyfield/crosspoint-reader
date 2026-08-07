@@ -340,27 +340,27 @@ TEST_F(ActivityInput, HarnessReportsRenderLockStateHonestly) {
   EXPECT_FALSE(RenderLock::peek());
 }
 
-TEST_F(ActivityInput, ConfirmAppliesTheFontUnderTheRenderLock) {
+// Confirm has two meanings (FontSelectionActivity.cpp, cb98d4fa): on the row
+// that is ALREADY applied it swaps the specimen, on any other row it applies.
+// With Libre Franklin as the only built-in family, a null-registry picker has
+// exactly ONE row, so the apply arm is unreachable here — it needs SD fonts,
+// which this suite's registry does not provide. Its render-lock contract is
+// the same one SideButtonChangesFontSizeUnderTheRenderLock asserts on the
+// changeFontSize() path. What IS assertable without SD fonts: navigation on a
+// one-row list must not escape the row or turn Confirm into an apply.
+TEST_F(ActivityInput, OneRowListKeepsConfirmOnTheSpecimenSwap) {
   host::setRootActivity(makeFontSelection());
 
-  // Confirm has two meanings now (FontSelectionActivity.cpp:181-189, cb98d4fa),
-  // and the cursor position picks between them: on the row that is ALREADY
-  // applied it swaps the specimen, on any other row it applies. onEnter starts
-  // with the cursor on the applied row, so the cursor has to move off it before
-  // Confirm means "apply" at all.
-  //
-  // A front Right tap is the move: list navigation is bound to the front
-  // buttons only, on the RELEASE edge (FontSelectionActivity.cpp:223-235).
+  // A Right tap on a single-row list wraps back to the same row.
   host::tap(HalGPIO::BTN_RIGHT);
   host::resetCounters();
 
   host::pressFrame(HalGPIO::BTN_CONFIRM);
 
-  ASSERT_EQ(host::fontSystemCalls().ensureLoaded, 1) << "Confirm did not apply the selected font";
-  EXPECT_EQ(host::fontSystemCalls().ensureLoadedWithoutRenderLock, 0)
-      << "ensureLoaded() ran with no RenderLock held: it unloads the resident SdCardFont while the render "
-         "task may hold a reference into the font map";
-  EXPECT_EQ(host::currentActivityName(), "FontSelect") << "Confirm must apply and stay, not leave";
+  EXPECT_EQ(host::fontSystemCalls().ensureLoaded, 0)
+      << "Confirm applied on a one-row list: the only row is the applied font, so this was a full "
+         "unload/reload of the resident face for no change";
+  EXPECT_EQ(host::currentActivityName(), "FontSelect") << "Confirm must stay, not leave";
 }
 
 // The other half of that split. It is here because the apply test above is the

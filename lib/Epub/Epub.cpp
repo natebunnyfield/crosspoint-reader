@@ -126,6 +126,12 @@ bool Epub::parseContentOpf(BookMetadataCache::BookMetadata& bookMetadata, const 
     }
   }
 
+  // ZIP-enumeration fallback: many EPUBs ship a cover image without declaring
+  // it in metadata, manifest properties or the guide.
+  if (bookMetadata.coverItemHref.empty()) {
+    bookMetadata.coverItemHref = findCoverFromZipEntries();
+  }
+
   bookMetadata.textReferenceHref = opfParser.textReferenceHref;
 
   if (!opfParser.tocNcxPath.empty()) {
@@ -235,6 +241,66 @@ void Epub::discoverCssFilesFromZip() {
       })) {
     LOG_ERR("EBP", "Failed to enumerate ZIP file paths for CSS discovery");
   }
+}
+
+namespace {
+// Case-insensitive "cover" substring test. TOKEN is lowercase letters only, so
+// the ASCII lowercasing OR is a correct comparison for every input byte.
+bool containsCoverToken(const std::string_view path) {
+  constexpr std::string_view TOKEN = "cover";
+  if (path.size() < TOKEN.size()) {
+    return false;
+  }
+  for (size_t i = 0; i + TOKEN.size() <= path.size(); i++) {
+    size_t j = 0;
+    while (j < TOKEN.size() && (path[i + j] | 0x20) == TOKEN[j]) {
+      j++;
+    }
+    if (j == TOKEN.size()) {
+      return true;
+    }
+  }
+  return false;
+}
+}  // namespace
+
+std::string Epub::findCoverFromZipEntries() const {
+  // Compressed size ranks image candidates fairly: JPEG/PNG payloads are
+  // already compressed, so ZIP deflate barely changes their relative sizes.
+  // The floor keeps small ornaments and publisher logos from being promoted.
+  constexpr uint32_t minCompressedBytes = 8 * 1024;
+
+  ZipFile zf(filepath);
+  std::string namedCover;
+  std::string largestImage;
+  uint32_t largestSize = 0;
+
+  if (!zf.enumerateFileEntries([&](std::string_view path, uint32_t, uint32_t compressedSize) {
+        if (!FsHelpers::hasJpgExtension(path) && !FsHelpers::hasPngExtension(path)) {
+          return;
+        }
+        if (namedCover.empty() && containsCoverToken(path)) {
+          namedCover.assign(path);
+        }
+        if (compressedSize > largestSize) {
+          largestSize = compressedSize;
+          largestImage.assign(path);
+        }
+      })) {
+    LOG_ERR("EBP", "Failed to enumerate ZIP file paths for cover discovery");
+    return "";
+  }
+
+  if (!namedCover.empty()) {
+    LOG_DBG("EBP", "Found cover by name via ZIP enumeration: %s", namedCover.c_str());
+    return namedCover;
+  }
+  if (largestSize >= minCompressedBytes) {
+    LOG_DBG("EBP", "Using largest image as cover via ZIP enumeration: %s (%u bytes)", largestImage.c_str(),
+            largestSize);
+    return largestImage;
+  }
+  return "";
 }
 
 void Epub::parseCssFiles() const {

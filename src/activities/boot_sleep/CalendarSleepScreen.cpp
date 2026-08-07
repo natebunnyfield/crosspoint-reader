@@ -25,9 +25,10 @@
 // Vertical placement note that governs most of this file: GfxRenderer::drawText
 // treats its `y` as the TOP OF THE ASCENDER BOX and adds the ascender
 // internally to reach the baseline (GfxRenderer.cpp:477). The ascender is much
-// taller than most ink — Noto Sans 18's is 41px while digits are 28px — so
-// aligning anything to that `y` puts it visibly high. Everything here is
-// therefore positioned against measured glyph ink via inkBox()/topYForInkTop().
+// taller than most ink — an 18 pt face's ascender runs ~40px while digits ink
+// ~28px — so aligning anything to that `y` puts it visibly high. Everything
+// here is therefore positioned against measured glyph ink via
+// inkBox()/topYForInkTop().
 namespace calendar {
 namespace {
 
@@ -58,9 +59,8 @@ constexpr EpdFontFamily::Style LEGEND_STYLE = EpdFontFamily::REGULAR;
 // locale, replace these arrays and HolidayCalculator.cpp's HOLIDAY_TABLE
 // together.
 // ---------------------------------------------------------------------------
-constexpr const char* MONTHS_LONG[12] = {
-    "Enero",   "Febrero", "Marzo",      "Abril",   "Mayo",      "Junio",
-    "Julio",   "Agosto",  "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+constexpr const char* MONTHS_LONG[12] = {"Enero", "Febrero", "Marzo",      "Abril",   "Mayo",      "Junio",
+                                         "Julio", "Agosto",  "Septiembre", "Octubre", "Noviembre", "Diciembre"};
 constexpr const char* MONTHS_SHORT[12] = {"ene", "feb", "mar", "abr", "may", "jun",
                                           "jul", "ago", "sep", "oct", "nov", "dic"};
 // Capitalised abbreviations for the header fallback when full month names
@@ -71,9 +71,8 @@ constexpr const char* MONTHS_ABBR[12] = {"Ene", "Feb", "Mar", "Abr", "May", "Jun
 // ---------------------------------------------------------------------------
 // English month labels (WestsideEN style).
 // ---------------------------------------------------------------------------
-constexpr const char* MONTHS_LONG_EN[12] = {
-    "January", "February", "March",     "April",   "May",      "June",
-    "July",    "August",   "September", "October", "November", "December"};
+constexpr const char* MONTHS_LONG_EN[12] = {"January", "February", "March",     "April",   "May",      "June",
+                                            "July",    "August",   "September", "October", "November", "December"};
 constexpr const char* MONTHS_SHORT_EN[12] = {"jan", "feb", "mar", "apr", "may", "jun",
                                              "jul", "aug", "sep", "oct", "nov", "dec"};
 // Capitalised abbreviations for the header fallback in the WestsideEN path.
@@ -84,37 +83,37 @@ constexpr const char* MONTHS_ABBR_EN[12] = {"Jan", "Feb", "Mar", "Apr", "May", "
 // CR-only entries are nullptr and are never reached in the WestsideEN legend.
 // Order must match the HolidayId enum in HolidayCalculator.h exactly.
 static const char* const US_HOLIDAY_LABEL_EN[static_cast<size_t>(HolidayId::HolidayIdCount)] = {
-    "New Year's Day",          // AnoNuevo            CR+US
-    "MLK Jr. Day",             // DiaDeMlk            US
-    "Presidents' Day",         // DiaDeLosPresidentes US
-    nullptr,                   // JuevesSanto         CR only
-    nullptr,                   // ViernesSanto        CR only
-    nullptr,                   // JuanSantamaria      CR only
-    nullptr,                   // DiaDelTrabajoCR     CR only
-    "Memorial Day",            // DiaDeLosCaidos      US
-    "Juneteenth",              // Juneteenth          US
-    "Independence Day",        // IndependenciaUS     US
-    nullptr,                   // AnexionNicoya       CR only
-    nullptr,                   // VirgenDeLosAngeles  CR only
-    nullptr,                   // DiaDeLaMadre        CR only
-    nullptr,                   // DiaDeLaPersonaNegra CR only
-    "Labor Day",               // DiaDelTrabajoUS     US
-    nullptr,                   // IndependenciaCR     CR only
-    "Indigenous Peoples' Day", // DiaDeLosPueblosIndigenas US
-    nullptr,                   // EncuentroDeLasCulturas   CR only
-    "Veterans Day",            // DiaDeLosVeteranos   US
-    "Thanksgiving",            // AccionDeGracias     US
-    "Black Friday",            // ViernesNegro        US
-    nullptr,                   // AbolicionDelEjercito CR only
-    "Christmas Eve",           // NocheBuena          US
-    "Christmas",               // Navidad             CR+US
+    "New Year's Day",           // AnoNuevo            CR+US
+    "MLK Jr. Day",              // DiaDeMlk            US
+    "Presidents' Day",          // DiaDeLosPresidentes US
+    nullptr,                    // JuevesSanto         CR only
+    nullptr,                    // ViernesSanto        CR only
+    nullptr,                    // JuanSantamaria      CR only
+    nullptr,                    // DiaDelTrabajoCR     CR only
+    "Memorial Day",             // DiaDeLosCaidos      US
+    "Juneteenth",               // Juneteenth          US
+    "Independence Day",         // IndependenciaUS     US
+    nullptr,                    // AnexionNicoya       CR only
+    nullptr,                    // VirgenDeLosAngeles  CR only
+    nullptr,                    // DiaDeLaMadre        CR only
+    nullptr,                    // DiaDeLaPersonaNegra CR only
+    "Labor Day",                // DiaDelTrabajoUS     US
+    nullptr,                    // IndependenciaCR     CR only
+    "Indigenous Peoples' Day",  // DiaDeLosPueblosIndigenas US
+    nullptr,                    // EncuentroDeLasCulturas   CR only
+    "Veterans Day",             // DiaDeLosVeteranos   US
+    "Thanksgiving",             // AccionDeGracias     US
+    "Black Friday",             // ViernesNegro        US
+    nullptr,                    // AbolicionDelEjercito CR only
+    "Christmas Eve",            // NocheBuena          US
+    "Christmas",                // Navidad             CR+US
 };
 
 // ---------------------------------------------------------------------------
 // Font selection
 //
 // The calendar prefers GT Alpina Condensed from the SD card, falling back to
-// the built-in Noto Serif.
+// the built-in Libre Franklin.
 //
 // SdCardFontManager keeps exactly ONE family at ONE point size resident (see
 // SdCardFontManager.h) to bound interval/kern table memory, so an SD face can
@@ -155,10 +154,10 @@ CalendarFonts resolveFonts(GfxRenderer& renderer) {
   if (sdId != 0) {
     f.display = sdId;
   } else {
-    LOG_DBG("CAL", "%s unavailable; using Noto Serif", PREFERRED_SD_FAMILY);
-    f.display = firstAvailable(renderer, {NOTOSERIF_18_FONT_ID, NOTOSANS_18_FONT_ID});
+    LOG_DBG("CAL", "%s unavailable; using Libre Franklin", PREFERRED_SD_FAMILY);
+    f.display = firstAvailable(renderer, {LIBREFRANKLIN_READER_18_FONT_ID, LIBREFRANKLIN_READER_14_FONT_ID});
   }
-  f.legend = firstAvailable(renderer, {NOTOSERIF_12_FONT_ID, UI_12_FONT_ID});
+  f.legend = firstAvailable(renderer, {LIBREFRANKLIN_READER_12_FONT_ID, UI_12_FONT_ID});
   f.subscript = firstAvailable(renderer, {SMALL_FONT_ID, UI_12_FONT_ID});
   return f;
 }
@@ -176,15 +175,14 @@ struct InkBox {
   int height = 0;
 };
 
-InkBox inkBox(const GfxRenderer& renderer, int fontId, const char* text,
-              EpdFontFamily::Style style) {
+InkBox inkBox(const GfxRenderer& renderer, int fontId, const char* text, EpdFontFamily::Style style) {
   InkBox box;
   const auto& fontMap = renderer.getFontMap();
   const auto it = fontMap.find(fontId);
   if (it == fontMap.end()) return box;
 
-  int maxTop = 0;      // tallest ascent above the baseline
-  int maxBelow = 0;    // deepest descent below it
+  int maxTop = 0;    // tallest ascent above the baseline
+  int maxBelow = 0;  // deepest descent below it
   bool any = false;
   for (const char* p = text; *p; ++p) {
     // ASCII scan is enough: the strings measured here are digits and unaccented
@@ -205,8 +203,8 @@ InkBox inkBox(const GfxRenderer& renderer, int fontId, const char* text,
 }
 
 // `y` for drawText such that `text`'s ink is vertically centred on `centreY`.
-int topYForInkCentre(const GfxRenderer& renderer, int fontId, const char* text,
-                     EpdFontFamily::Style style, int centreY) {
+int topYForInkCentre(const GfxRenderer& renderer, int fontId, const char* text, EpdFontFamily::Style style,
+                     int centreY) {
   const InkBox box = inkBox(renderer, fontId, text, style);
   return centreY - box.height / 2 - box.topOffset;
 }
@@ -217,7 +215,7 @@ int topYForInkCentre(const GfxRenderer& renderer, int fontId, const char* text,
 struct Layout {
   CalendarFonts fonts;
   Style style;  // data source / locale selection
-  int rows;  // week rows in this render
+  int rows;     // week rows in this render
   int screenW;
   int screenH;
   int marginX;
@@ -231,7 +229,7 @@ struct Layout {
   // Legend geometry. Column x-positions are NOT fixed here: they depend on
   // which holidays are actually in view, so LegendColumns computes them per
   // render (see legendColumnsFor).
-  int legendTop;     // earliest the legend may start, i.e. just under the grid
+  int legendTop;      // earliest the legend may start, i.e. just under the grid
   int legendBottomY;  // usable bottom edge; the legend block is flush to this
   int legendRowH;
   int legendMaxRows;
@@ -241,13 +239,10 @@ struct Layout {
   // blockTop rather than legendTop: the legend is bottom-aligned, so its origin
   // depends on how many rows are actually in view and is only known at draw
   // time. See drawLegend().
-  int legendRowCentreY(int row, int blockTop) const {
-    return blockTop + row * legendRowH + legendRowH / 2;
-  }
+  int legendRowCentreY(int row, int blockTop) const { return blockTop + row * legendRowH + legendRowH / 2; }
 };
 
-Layout computeLayout(const GfxRenderer& renderer, const CalendarFonts& fonts, const int weeks,
-                     const Style style) {
+Layout computeLayout(const GfxRenderer& renderer, const CalendarFonts& fonts, const int weeks, const Style style) {
   Layout L{};
   L.fonts = fonts;
   L.style = style;
@@ -327,14 +322,12 @@ const char* regionTag(uint8_t regions) {
 // today, so the year is never genuinely in question, and dropping it removes
 // the two widest cases the old code had to degrade through (a full
 // "Diciembre 2026 – Febrero 2027" and its ’26/’27 last resort).
-void formatHeader(char* buf, size_t bufSize, const YMD& first, const YMD& last,
-                  const GfxRenderer& renderer, int displayFontId, int maxWidth, Style style) {
+void formatHeader(char* buf, size_t bufSize, const YMD& first, const YMD& last, const GfxRenderer& renderer,
+                  int displayFontId, int maxWidth, Style style) {
   const char* const* longNames = (style == Style::WestsideEN) ? MONTHS_LONG_EN : MONTHS_LONG;
   const char* const* abbrNames = (style == Style::WestsideEN) ? MONTHS_ABBR_EN : MONTHS_ABBR;
 
-  auto fits = [&](const char* s) {
-    return renderer.getTextWidth(displayFontId, s, HEADER_STYLE) <= maxWidth;
-  };
+  auto fits = [&](const char* s) { return renderer.getTextWidth(displayFontId, s, HEADER_STYLE) <= maxWidth; };
 
   // A December–February window spans two years but still reads as one month
   // range, so only the months are compared here.
@@ -343,27 +336,24 @@ void formatHeader(char* buf, size_t bufSize, const YMD& first, const YMD& last,
     return;
   }
 
-  std::snprintf(buf, bufSize, "%s \xe2\x80\x93 %s", longNames[first.month - 1],
-                longNames[last.month - 1]);
+  std::snprintf(buf, bufSize, "%s \xe2\x80\x93 %s", longNames[first.month - 1], longNames[last.month - 1]);
   if (fits(buf)) return;
-  std::snprintf(buf, bufSize, "%s \xe2\x80\x93 %s", abbrNames[first.month - 1],
-                abbrNames[last.month - 1]);
+  std::snprintf(buf, bufSize, "%s \xe2\x80\x93 %s", abbrNames[first.month - 1], abbrNames[last.month - 1]);
 }
 
 // ---------------------------------------------------------------------------
 // Drawing
 // ---------------------------------------------------------------------------
 
-void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const YMD& date,
-                 bool isToday, bool isHoliday, bool showMonthSubscript) {
+void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const YMD& date, bool isToday,
+                 bool isHoliday, bool showMonthSubscript) {
   const int cx = L.colCentreX(col);
   const int cy = L.rowCentreY(row);
 
   char numBuf[4];
   std::snprintf(numBuf, sizeof(numBuf), "%u", date.day);
   const int textW = renderer.getTextWidth(L.fonts.display, numBuf, DAY_STYLE);
-  const int numTopY =
-      topYForInkCentre(renderer, L.fonts.display, numBuf, DAY_STYLE, cy);
+  const int numTopY = topYForInkCentre(renderer, L.fonts.display, numBuf, DAY_STYLE, cy);
 
   // The square is centred on the same point as the digit ink, so the two
   // cannot drift apart.
@@ -381,8 +371,7 @@ void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const
   if (isToday || isHoliday) {
     renderer.fillRoundedRect(rectX, rectY, L.cellBoxSide, L.cellBoxSide, L.cellRadius,
                              isToday ? Color::Black : Color::LightGray);
-    renderer.drawRoundedRect(rectX, rectY, L.cellBoxSide, L.cellBoxSide, CELL_BORDER_PX,
-                             L.cellRadius, /*state=*/true);
+    renderer.drawRoundedRect(rectX, rectY, L.cellBoxSide, L.cellBoxSide, CELL_BORDER_PX, L.cellRadius, /*state=*/true);
   }
 
   renderer.drawText(L.fonts.display, cx - textW / 2, numTopY, numBuf,
@@ -390,8 +379,7 @@ void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const
 
   // Month-rollover subscript, below both the digit and the highlight square.
   if (showMonthSubscript) {
-    const char* mon = (L.style == Style::WestsideEN) ? MONTHS_SHORT_EN[date.month - 1]
-                                                     : MONTHS_SHORT[date.month - 1];
+    const char* mon = (L.style == Style::WestsideEN) ? MONTHS_SHORT_EN[date.month - 1] : MONTHS_SHORT[date.month - 1];
     const int subW = renderer.getTextWidth(L.fonts.subscript, mon);
     const InkBox sub = inkBox(renderer, L.fonts.subscript, mon, EpdFontFamily::REGULAR);
     const InkBox num = inkBox(renderer, L.fonts.display, numBuf, DAY_STYLE);
@@ -405,12 +393,9 @@ void drawHeader(GfxRenderer& renderer, const Layout& L, const YMD& first, const 
   char header[80];
   const int avail = L.screenW - 2 * L.marginX;
   formatHeader(header, sizeof(header), first, last, renderer, L.fonts.display, avail, L.style);
-  const std::string fitted =
-      renderer.truncatedText(L.fonts.display, header, avail, HEADER_STYLE);
-  const int y = topYForInkCentre(renderer, L.fonts.display, fitted.c_str(),
-                                 HEADER_STYLE, L.titleCentreY);
-  renderer.drawCenteredText(L.fonts.display, y, fitted.c_str(), /*black=*/true,
-                            HEADER_STYLE);
+  const std::string fitted = renderer.truncatedText(L.fonts.display, header, avail, HEADER_STYLE);
+  const int y = topYForInkCentre(renderer, L.fonts.display, fitted.c_str(), HEADER_STYLE, L.titleCentreY);
+  renderer.drawCenteredText(L.fonts.display, y, fitted.c_str(), /*black=*/true, HEADER_STYLE);
 }
 
 // Legend: one row per visible holiday, ordered by date, laid out as columns so
@@ -431,8 +416,7 @@ int drawLegend(GfxRenderer& renderer, const Layout& L, const YMD& first, const Y
   const uint16_t years[2] = {first.year, last.year};
   const int yearIterations = (first.year != last.year) ? 2 : 1;
   for (int yi = 0; yi < yearIterations; ++yi) {
-    for (uint8_t i = 0;
-         i < static_cast<uint8_t>(HolidayId::HolidayIdCount) && found_n < MAX_FOUND; ++i) {
+    for (uint8_t i = 0; i < static_cast<uint8_t>(HolidayId::HolidayIdCount) && found_n < MAX_FOUND; ++i) {
       const auto id = static_cast<HolidayId>(i);
       const YMD d = resolveHoliday(id, years[yi]);
       if (!dateLess(d, first) && !dateLess(last, d)) found[found_n++] = {d, id};
@@ -477,9 +461,8 @@ int drawLegend(GfxRenderer& renderer, const Layout& L, const YMD& first, const Y
     char dayBuf[4];
     std::snprintf(dayBuf, sizeof(dayBuf), "%u", found[i].date.day);
     dayW = std::max(dayW, renderer.getTextWidth(L.fonts.legend, dayBuf, LEGEND_STYLE));
-    monthW = std::max(monthW, renderer.getTextWidth(L.fonts.legend,
-                                                    MONTHS_SHORT[found[i].date.month - 1],
-                                                    LEGEND_STYLE));
+    monthW =
+        std::max(monthW, renderer.getTextWidth(L.fonts.legend, MONTHS_SHORT[found[i].date.month - 1], LEGEND_STYLE));
     const uint8_t regions = HOLIDAY_TABLE[static_cast<size_t>(found[i].id)].regions;
     tagW = std::max(tagW, renderer.getTextWidth(L.fonts.legend, regionTag(regions), LEGEND_STYLE));
   }
@@ -501,10 +484,8 @@ int drawLegend(GfxRenderer& renderer, const Layout& L, const YMD& first, const Y
     renderer.drawText(L.fonts.legend, dayRight - w, y, dayBuf, /*black=*/true, LEGEND_STYLE);
     renderer.drawText(L.fonts.legend, monthLeft, y, MONTHS_SHORT[found[i].date.month - 1],
                       /*black=*/true, LEGEND_STYLE);
-    renderer.drawText(L.fonts.legend, tagLeft, y, regionTag(he.regions), /*black=*/true,
-                      LEGEND_STYLE);
-    const std::string name =
-        renderer.truncatedText(L.fonts.legend, he.shortLabel, nameW, LEGEND_STYLE);
+    renderer.drawText(L.fonts.legend, tagLeft, y, regionTag(he.regions), /*black=*/true, LEGEND_STYLE);
+    const std::string name = renderer.truncatedText(L.fonts.legend, he.shortLabel, nameW, LEGEND_STYLE);
     renderer.drawText(L.fonts.legend, nameLeft, y, name.c_str(), /*black=*/true, LEGEND_STYLE);
   }
 
@@ -527,15 +508,13 @@ int drawLegend(GfxRenderer& renderer, const Layout& L, const YMD& first, const Y
 //
 // If a Westside entry and a US holiday share the same date, the Westside row
 // wins (it is more specific). Sorted chronologically; respects legendMaxRows.
-int drawLegendWestside(GfxRenderer& renderer, const Layout& L, const YMD& first,
-                       const YMD& last) {
+int drawLegendWestside(GfxRenderer& renderer, const Layout& L, const YMD& first, const YMD& last) {
   struct Entry {
     YMD date;
     const char* label;
     bool isWestside;  // used for dedup: Westside beats US holiday on same date
   };
-  constexpr int MAX_EN_FOUND = static_cast<int>(HolidayId::HolidayIdCount) +
-                               static_cast<int>(WESTSIDE_2026_2027_COUNT);
+  constexpr int MAX_EN_FOUND = static_cast<int>(HolidayId::HolidayIdCount) + static_cast<int>(WESTSIDE_2026_2027_COUNT);
   Entry found[MAX_EN_FOUND];
   int found_n = 0;
 
@@ -543,8 +522,7 @@ int drawLegendWestside(GfxRenderer& renderer, const Layout& L, const YMD& first,
   const uint16_t years[2] = {first.year, last.year};
   const int yearIterations = (first.year != last.year) ? 2 : 1;
   for (int yi = 0; yi < yearIterations; ++yi) {
-    for (uint8_t i = 0;
-         i < static_cast<uint8_t>(HolidayId::HolidayIdCount) && found_n < MAX_EN_FOUND; ++i) {
+    for (uint8_t i = 0; i < static_cast<uint8_t>(HolidayId::HolidayIdCount) && found_n < MAX_EN_FOUND; ++i) {
       const auto id = static_cast<HolidayId>(i);
       if (!(HOLIDAY_TABLE[i].regions & REGION_US)) continue;
       const char* lbl = US_HOLIDAY_LABEL_EN[i];
@@ -590,7 +568,10 @@ int drawLegendWestside(GfxRenderer& renderer, const Layout& L, const YMD& first,
       // Determine whether any entry in [i..j) is Westside.
       bool anyWest = false;
       for (int k = i; k < j; ++k) {
-        if (found[k].isWestside) { anyWest = true; break; }
+        if (found[k].isWestside) {
+          anyWest = true;
+          break;
+        }
       }
       for (int k = i; k < j; ++k) {
         if (!anyWest || found[k].isWestside) found[out++] = found[k];
@@ -612,9 +593,8 @@ int drawLegendWestside(GfxRenderer& renderer, const Layout& L, const YMD& first,
     char dayBuf[4];
     std::snprintf(dayBuf, sizeof(dayBuf), "%u", found[i].date.day);
     dayW = std::max(dayW, renderer.getTextWidth(L.fonts.legend, dayBuf, LEGEND_STYLE));
-    monthW = std::max(monthW, renderer.getTextWidth(L.fonts.legend,
-                                                    MONTHS_SHORT_EN[found[i].date.month - 1],
-                                                    LEGEND_STYLE));
+    monthW =
+        std::max(monthW, renderer.getTextWidth(L.fonts.legend, MONTHS_SHORT_EN[found[i].date.month - 1], LEGEND_STYLE));
   }
 
   const int dayRight = L.marginX + dayW;
@@ -632,8 +612,7 @@ int drawLegendWestside(GfxRenderer& renderer, const Layout& L, const YMD& first,
     renderer.drawText(L.fonts.legend, dayRight - w, y, dayBuf, /*black=*/true, LEGEND_STYLE);
     renderer.drawText(L.fonts.legend, monthLeft, y, MONTHS_SHORT_EN[found[i].date.month - 1],
                       /*black=*/true, LEGEND_STYLE);
-    const std::string name =
-        renderer.truncatedText(L.fonts.legend, found[i].label, nameW, LEGEND_STYLE);
+    const std::string name = renderer.truncatedText(L.fonts.legend, found[i].label, nameW, LEGEND_STYLE);
     renderer.drawText(L.fonts.legend, nameLeft, y, name.c_str(), /*black=*/true, LEGEND_STYLE);
   }
 
@@ -647,15 +626,13 @@ int drawLegendWestside(GfxRenderer& renderer, const Layout& L, const YMD& first,
   return rows;
 }
 
-
 }  // namespace
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_t weeks,
-                                Style style) {
+void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_t weeks, Style style) {
   if (!isValidDate(today.year, today.month, today.day)) {
     LOG_ERR("CAL", "invalid today: %u-%u-%u", today.year, today.month, today.day);
     return;
@@ -689,8 +666,7 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_
   if (auto* fcm = renderer.getFontCacheManager()) {
     char warm[128];
     const char* const* longNames = (style == Style::WestsideEN) ? MONTHS_LONG_EN : MONTHS_LONG;
-    std::snprintf(warm, sizeof(warm), "0123456789%s%s", longNames[anchor.month - 1],
-                  longNames[last.month - 1]);
+    std::snprintf(warm, sizeof(warm), "0123456789%s%s", longNames[anchor.month - 1], longNames[last.month - 1]);
     // Bit 0 (regular) for the day numbers, bit 2 (italic) for the header.
     fcm->prewarmCache(L.fonts.display, warm, 0x05);
   }
@@ -711,8 +687,8 @@ void CalendarSleepScreen::render(GfxRenderer& renderer, const YMD& today, uint8_
         if (!isHoliday) {
           for (size_t i = 0; i < WESTSIDE_2026_2027_COUNT; ++i) {
             const WestsideEvent& e = WESTSIDE_2026_2027[i];
-            if (e.shaded && e.year == cursor.year && e.month == cursor.month &&
-                cursor.day >= e.day && cursor.day <= e.endDay) {
+            if (e.shaded && e.year == cursor.year && e.month == cursor.month && cursor.day >= e.day &&
+                cursor.day <= e.endDay) {
               isHoliday = true;
               break;
             }

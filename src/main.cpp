@@ -58,12 +58,22 @@ static unsigned long allowSleepAt = 0;
 static unsigned long lastActivityTime = 0;
 
 // Fonts
-EpdFont notoserif14RegularFont(&notoserif_14_regular);
-EpdFont notoserif14BoldFont(&notoserif_14_bold);
-EpdFont notoserif14ItalicFont(&notoserif_14_italic);
-EpdFont notoserif14BoldItalicFont(&notoserif_14_bolditalic);
-EpdFontFamily notoserif14FontFamily(&notoserif14RegularFont, &notoserif14BoldFont, &notoserif14ItalicFont,
-                                    &notoserif14BoldItalicFont);
+//
+// Libre Franklin is the only built-in reading family (owner ruling 2026-08-07;
+// Noto Serif, Noto Sans and Ubuntu were removed outright). The reader cuts are
+// distinct symbols from the system-font matrix's 12 pt below — 2-bit
+// compressed with italics versus the chrome's plain 1-bit regular/bold — so
+// regenerating one can never silently downgrade the other, which was a real
+// trap when Noto shared its 12 pt cut between the two roles.
+//
+// 14 pt sits outside OMIT_FONTS because getReaderFontId()'s default answer
+// must resolve in every build, same as Noto Serif 14 always did.
+EpdFont lfReader14RegularFont(&librefranklin_reader_14_regular);
+EpdFont lfReader14BoldFont(&librefranklin_reader_14_bold);
+EpdFont lfReader14ItalicFont(&librefranklin_reader_14_italic);
+EpdFont lfReader14BoldItalicFont(&librefranklin_reader_14_bolditalic);
+EpdFontFamily librefranklinReader14FontFamily(&lfReader14RegularFont, &lfReader14BoldFont, &lfReader14ItalicFont,
+                                              &lfReader14BoldItalicFont);
 #ifndef OMIT_FONTS
 // Editor-group monospace (owner ruling 2026-08-06). Built in rather than read
 // from the card: the editor asks for one size in four styles, ~83 KB for both
@@ -83,61 +93,33 @@ EpdFont ibmplexmono12BoldItalicFont(&ibmplexmono_12_bolditalic);
 EpdFontFamily ibmplexmono12FontFamily(&ibmplexmono12RegularFont, &ibmplexmono12BoldFont, &ibmplexmono12ItalicFont,
                                       &ibmplexmono12BoldItalicFont);
 
-EpdFont notoserif12RegularFont(&notoserif_12_regular);
-EpdFont notoserif12BoldFont(&notoserif_12_bold);
-EpdFont notoserif12ItalicFont(&notoserif_12_italic);
-EpdFont notoserif12BoldItalicFont(&notoserif_12_bolditalic);
-EpdFontFamily notoserif12FontFamily(&notoserif12RegularFont, &notoserif12BoldFont, &notoserif12ItalicFont,
-                                    &notoserif12BoldItalicFont);
-EpdFont notoserif16RegularFont(&notoserif_16_regular);
-EpdFont notoserif16BoldFont(&notoserif_16_bold);
-EpdFont notoserif16ItalicFont(&notoserif_16_italic);
-EpdFont notoserif16BoldItalicFont(&notoserif_16_bolditalic);
-EpdFontFamily notoserif16FontFamily(&notoserif16RegularFont, &notoserif16BoldFont, &notoserif16ItalicFont,
-                                    &notoserif16BoldItalicFont);
-EpdFont notoserif18RegularFont(&notoserif_18_regular);
-EpdFont notoserif18BoldFont(&notoserif_18_bold);
-EpdFont notoserif18ItalicFont(&notoserif_18_italic);
-EpdFont notoserif18BoldItalicFont(&notoserif_18_bolditalic);
-EpdFontFamily notoserif18FontFamily(&notoserif18RegularFont, &notoserif18BoldFont, &notoserif18ItalicFont,
-                                    &notoserif18BoldItalicFont);
-
-EpdFont notosans12RegularFont(&notosans_12_regular);
-EpdFont notosans12BoldFont(&notosans_12_bold);
-EpdFont notosans12ItalicFont(&notosans_12_italic);
-EpdFont notosans12BoldItalicFont(&notosans_12_bolditalic);
-EpdFontFamily notosans12FontFamily(&notosans12RegularFont, &notosans12BoldFont, &notosans12ItalicFont,
-                                   &notosans12BoldItalicFont);
-EpdFont notosans14RegularFont(&notosans_14_regular);
-EpdFont notosans14BoldFont(&notosans_14_bold);
-EpdFont notosans14ItalicFont(&notosans_14_italic);
-EpdFont notosans14BoldItalicFont(&notosans_14_bolditalic);
-EpdFontFamily notosans14FontFamily(&notosans14RegularFont, &notosans14BoldFont, &notosans14ItalicFont,
-                                   &notosans14BoldItalicFont);
-EpdFont notosans16RegularFont(&notosans_16_regular);
-EpdFont notosans16BoldFont(&notosans_16_bold);
-EpdFont notosans16ItalicFont(&notosans_16_italic);
-EpdFont notosans16BoldItalicFont(&notosans_16_bolditalic);
-EpdFontFamily notosans16FontFamily(&notosans16RegularFont, &notosans16BoldFont, &notosans16ItalicFont,
-                                   &notosans16BoldItalicFont);
-EpdFont notosans18RegularFont(&notosans_18_regular);
-EpdFont notosans18BoldFont(&notosans_18_bold);
-EpdFont notosans18ItalicFont(&notosans_18_italic);
-EpdFont notosans18BoldItalicFont(&notosans_18_bolditalic);
-EpdFontFamily notosans18FontFamily(&notosans18RegularFont, &notosans18BoldFont, &notosans18ItalicFont,
-                                   &notosans18BoldItalicFont);
+EpdFont lfReader12RegularFont(&librefranklin_reader_12_regular);
+EpdFont lfReader12BoldFont(&librefranklin_reader_12_bold);
+EpdFont lfReader12ItalicFont(&librefranklin_reader_12_italic);
+EpdFont lfReader12BoldItalicFont(&librefranklin_reader_12_bolditalic);
+EpdFontFamily librefranklinReader12FontFamily(&lfReader12RegularFont, &lfReader12BoldFont, &lfReader12ItalicFont,
+                                              &lfReader12BoldItalicFont);
+EpdFont lfReader16RegularFont(&librefranklin_reader_16_regular);
+EpdFont lfReader16BoldFont(&librefranklin_reader_16_bold);
+EpdFont lfReader16ItalicFont(&librefranklin_reader_16_italic);
+EpdFont lfReader16BoldItalicFont(&librefranklin_reader_16_bolditalic);
+EpdFontFamily librefranklinReader16FontFamily(&lfReader16RegularFont, &lfReader16BoldFont, &lfReader16ItalicFont,
+                                              &lfReader16BoldItalicFont);
+EpdFont lfReader18RegularFont(&librefranklin_reader_18_regular);
+EpdFont lfReader18BoldFont(&librefranklin_reader_18_bold);
+EpdFont lfReader18ItalicFont(&librefranklin_reader_18_italic);
+EpdFont lfReader18BoldItalicFont(&librefranklin_reader_18_bolditalic);
+EpdFontFamily librefranklinReader18FontFamily(&lfReader18RegularFont, &lfReader18BoldFont, &lfReader18ItalicFont,
+                                              &lfReader18BoldItalicFont);
 
 #endif  // OMIT_FONTS
 
-// The UI faces used to be three fixed globals here (Noto Sans 8, Ubuntu 10 and
-// Ubuntu 12). They are now the Ubuntu column of the system-font matrix below --
-// byte-for-byte the same faces, still reachable, just no longer the default.
-
-// --- System font families ---------------------------------------------------
+// --- System font family -----------------------------------------------------
 //
-// The UI draws at three sizes and the System font setting swaps all three at
-// once, so each offered family is a 3x2 matrix: 8/10/12 pt, regular and bold.
-// Libre Franklin is the default; Ubuntu is what every build before this used.
+// The UI draws at three sizes -- a 3x2 matrix of 8/10/12 pt, regular and bold.
+// Libre Franklin is the only chrome family (owner ruling 2026-08-07); the
+// Ubuntu, Noto Sans and Noto Serif columns this matrix used to carry were
+// removed with the rest of those families' font data.
 //
 // SMALL (8 pt) has a bold face now where it previously had only regular. That
 // is additive -- nothing asked for bold at 8 pt before, and EpdFontFamily falls
@@ -151,75 +133,33 @@ EpdFontFamily notosans18FontFamily(&notosans18RegularFont, &notosans18BoldFont, 
   EpdFont sym##12R(&r12), sym##12B(&b12);             \
   EpdFontFamily sym##12(&sym##12R, &sym##12B)
 
-CP_UI_FAMILY(sysUbuntu, ubuntu_8_regular, ubuntu_8_bold, ubuntu_10_regular, ubuntu_10_bold, ubuntu_12_regular,
-             ubuntu_12_bold);
-CP_UI_FAMILY(sysNotoSans, notosans_8_regular, notosans_8_bold, notosans_10_regular, notosans_10_bold,
-             notosans_12_regular, notosans_12_bold);
-CP_UI_FAMILY(sysNotoSerif, notoserif_8_regular, notoserif_8_bold, notoserif_10_regular, notoserif_10_bold,
-             notoserif_12_regular, notoserif_12_bold);
 CP_UI_FAMILY(sysLibreFranklin, librefranklin_8_regular, librefranklin_8_bold, librefranklin_10_regular,
              librefranklin_10_bold, librefranklin_12_regular, librefranklin_12_bold);
 
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
 // The same matrix at double the ppem, for glyph blitting only. Named for the 1x
 // face each stands in for; their own point sizes are 16/20/24.
-CP_UI_FAMILY(sysUbuntu2x, ubuntu_8_regular_2x, ubuntu_8_bold_2x, ubuntu_10_regular_2x, ubuntu_10_bold_2x,
-             ubuntu_12_regular_2x, ubuntu_12_bold_2x);
-CP_UI_FAMILY(sysNotoSans2x, notosans_8_regular_2x, notosans_8_bold_2x, notosans_10_regular_2x, notosans_10_bold_2x,
-             notosans_12_regular_2x, notosans_12_bold_2x);
-CP_UI_FAMILY(sysNotoSerif2x, notoserif_8_regular_2x, notoserif_8_bold_2x, notoserif_10_regular_2x, notoserif_10_bold_2x,
-             notoserif_12_regular_2x, notoserif_12_bold_2x);
 CP_UI_FAMILY(sysLibreFranklin2x, librefranklin_8_regular_2x, librefranklin_8_bold_2x, librefranklin_10_regular_2x,
              librefranklin_10_bold_2x, librefranklin_12_regular_2x, librefranklin_12_bold_2x);
 #endif
 #undef CP_UI_FAMILY
 
-// One row per offered family, in CrossPointSettings::SYSTEM_FONT order, so the
-// setting's stored value indexes straight in. A table rather than an if-chain
-// because the 2x table below has to be selected by the SAME index: two parallel
-// chains let a family end up drawing one face's bitmaps against another's
-// metrics the first time someone extends one chain and not the other.
-static EpdFontFamily* const kSystemFonts[][3] = {
-    {&sysUbuntu8, &sysUbuntu10, &sysUbuntu12},
-    {&sysNotoSans8, &sysNotoSans10, &sysNotoSans12},
-    {&sysNotoSerif8, &sysNotoSerif10, &sysNotoSerif12},
-    {&sysLibreFranklin8, &sysLibreFranklin10, &sysLibreFranklin12},
-};
-static_assert(sizeof(kSystemFonts) / sizeof(kSystemFonts[0]) == CrossPointSettings::SYSTEM_FONT_COUNT,
-              "system font table and SYSTEM_FONT enum disagree");
-
-#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-static EpdFontFamily* const kSystemFonts2x[][3] = {
-    {&sysUbuntu2x8, &sysUbuntu2x10, &sysUbuntu2x12},
-    {&sysNotoSans2x8, &sysNotoSans2x10, &sysNotoSans2x12},
-    {&sysNotoSerif2x8, &sysNotoSerif2x10, &sysNotoSerif2x12},
-    {&sysLibreFranklin2x8, &sysLibreFranklin2x10, &sysLibreFranklin2x12},
-};
-static_assert(sizeof(kSystemFonts2x) / sizeof(kSystemFonts2x[0]) == CrossPointSettings::SYSTEM_FONT_COUNT,
-              "hi-res system font table and SYSTEM_FONT enum disagree");
-#endif
-
-// Swap every UI slot to the chosen family. Called at boot and again whenever the
-// System font setting changes, so the change lands without a restart:
-// replaceFont rebinds the entry the whole UI already draws through, and the next
-// render picks it up. Metrics come from these same families, so layout recomputes with
-// the new face rather than keeping the outgoing one's spacing.
+// Bind every UI slot to Libre Franklin. Called once at boot. SETTINGS.systemFont
+// is deliberately not consulted: the SYSTEM_FONT values naming other families
+// are retired -- their font data no longer exists -- and
+// normalizeRetiredSettings() pins the stored byte back to SYSTEM_FONT_LIBREFRANKLIN
+// on every load anyway.
 void applySystemFont(GfxRenderer& renderer) {
-  // A settings.json carried over from a build that offered fewer families can
-  // hold a value past the end of the table; fall back rather than index out.
-  const uint8_t choice = SETTINGS.systemFont < CrossPointSettings::SYSTEM_FONT_COUNT
-                             ? SETTINGS.systemFont
-                             : static_cast<uint8_t>(CrossPointSettings::SYSTEM_FONT_LIBREFRANKLIN);
-  // replaceFont, not insertFont: this runs again on every change of the setting,
-  // and insertFont refuses to overwrite an id it already holds.
-  renderer.replaceFont(SMALL_FONT_ID, *kSystemFonts[choice][0]);
-  renderer.replaceFont(UI_10_FONT_ID, *kSystemFonts[choice][1]);
-  renderer.replaceFont(UI_12_FONT_ID, *kSystemFonts[choice][2]);
+  // replaceFont, not insertFont: setupDisplayAndFonts can run more than once
+  // (simulator wake path), and insertFont refuses to overwrite an id it holds.
+  renderer.replaceFont(SMALL_FONT_ID, sysLibreFranklin8);
+  renderer.replaceFont(UI_10_FONT_ID, sysLibreFranklin10);
+  renderer.replaceFont(UI_12_FONT_ID, sysLibreFranklin12);
 
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-  renderer.registerHiResBuiltinFont(SMALL_FONT_ID, *kSystemFonts2x[choice][0]);
-  renderer.registerHiResBuiltinFont(UI_10_FONT_ID, *kSystemFonts2x[choice][1]);
-  renderer.registerHiResBuiltinFont(UI_12_FONT_ID, *kSystemFonts2x[choice][2]);
+  renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklin2x8);
+  renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklin2x10);
+  renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklin2x12);
 #endif
 }
 
@@ -357,16 +297,11 @@ void setupDisplayAndFonts(bool seamless = false) {
   }
   fontCacheManager.setFontDecompressor(&fontDecompressor);
   renderer.setFontCacheManager(&fontCacheManager);
-  renderer.insertFont(NOTOSERIF_14_FONT_ID, notoserif14FontFamily);
+  renderer.insertFont(LIBREFRANKLIN_READER_14_FONT_ID, librefranklinReader14FontFamily);
 #ifndef OMIT_FONTS
-  renderer.insertFont(NOTOSERIF_12_FONT_ID, notoserif12FontFamily);
-  renderer.insertFont(NOTOSERIF_16_FONT_ID, notoserif16FontFamily);
-  renderer.insertFont(NOTOSERIF_18_FONT_ID, notoserif18FontFamily);
-
-  renderer.insertFont(NOTOSANS_12_FONT_ID, notosans12FontFamily);
-  renderer.insertFont(NOTOSANS_14_FONT_ID, notosans14FontFamily);
-  renderer.insertFont(NOTOSANS_16_FONT_ID, notosans16FontFamily);
-  renderer.insertFont(NOTOSANS_18_FONT_ID, notosans18FontFamily);
+  renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, librefranklinReader12FontFamily);
+  renderer.insertFont(LIBREFRANKLIN_READER_16_FONT_ID, librefranklinReader16FontFamily);
+  renderer.insertFont(LIBREFRANKLIN_READER_18_FONT_ID, librefranklinReader18FontFamily);
 
   renderer.insertFont(SPACEMONO_12_FONT_ID, spacemono12FontFamily);
   renderer.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12FontFamily);

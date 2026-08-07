@@ -5,23 +5,27 @@ set -e
 cd "$(dirname "$0")"
 
 READER_FONT_STYLES=("Regular" "Italic" "Bold" "BoldItalic")
-NOTOSERIF_FONT_SIZES=(12 14 16 18)
-NOTOSANS_FONT_SIZES=(12 14 16 18)
 
-for size in ${NOTOSERIF_FONT_SIZES[@]}; do
-  for style in ${READER_FONT_STYLES[@]}; do
-    font_name="notoserif_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
-    font_path="../builtinFonts/source/NotoSerif/NotoSerif-${style}.ttf"
-    output_path="../builtinFonts/${font_name}.h"
-    python fontconvert.py $font_name $size $font_path --2bit --compress --pnum > $output_path
-    echo "Generated $output_path"
-  done
-done
+# --- Reader fallback family --------------------------------------------------
+#
+# Libre Franklin is the ONLY built-in reading family (owner ruling 2026-08-07;
+# Noto Serif, Noto Sans and Ubuntu were removed outright). These cuts back the
+# reader when no SD font resolves, so all four styles are real — the Italic and
+# BoldItalic statics in source/LibreFranklin were instanced from upstream's
+# LibreFranklin-Italic[wght].ttf at wght 400/700, the same way
+# build-sd-fonts.py cut the Regular/Bold from the roman VF. Committed as
+# statics so this script needs no network.
+#
+# The `librefranklin_reader_` prefix is deliberate: the system-font matrix
+# below emits plain 1-bit `librefranklin_` UI cuts, and distinct symbols mean
+# regenerating one set can never silently downgrade the other — the trap the
+# old shared Noto 12 pt cut carried.
+LIBREFRANKLIN_READER_SIZES=(12 14 16 18)
 
-for size in ${NOTOSANS_FONT_SIZES[@]}; do
+for size in ${LIBREFRANKLIN_READER_SIZES[@]}; do
   for style in ${READER_FONT_STYLES[@]}; do
-    font_name="notosans_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
-    font_path="../builtinFonts/source/NotoSans/NotoSans-${style}.ttf"
+    font_name="librefranklin_reader_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
+    font_path="../builtinFonts/source/LibreFranklin/LibreFranklin-${style}.ttf"
     output_path="../builtinFonts/${font_name}.h"
     python fontconvert.py $font_name $size $font_path --2bit --compress --pnum > $output_path
     echo "Generated $output_path"
@@ -68,18 +72,16 @@ UI_FONT_STYLES=("Regular" "Bold")
 
 # --- System-font matrix -----------------------------------------------------
 #
-# The chrome draws at three sizes -- 8, 10 and 12 pt -- and the System font
-# setting swaps all three to one family at once, so every offered family needs
-# regular and bold at each size. Plain 1-bit, no --compress: these are the UI
-# faces, and the decompressor cost is not worth paying on every list row.
+# The chrome draws at three sizes -- 8, 10 and 12 pt -- in regular and bold.
+# Libre Franklin is the only chrome family (owner ruling 2026-08-07). Plain
+# 1-bit, no --compress: these are the UI faces, and the decompressor cost is
+# not worth paying on every list row. Distinct symbols from the 2-bit
+# `librefranklin_reader_` cuts above -- see the note there.
 #
-# Libre Franklin is the odd one out in provenance. Upstream ships it as a
-# variable font; source/LibreFranklin holds the wght 400 and 700 instances cut
-# by build-sd-fonts.py, committed as statics so this script needs no network.
+# Upstream ships Libre Franklin as a variable font; source/LibreFranklin holds
+# the wght 400 and 700 instances cut by build-sd-fonts.py, committed as
+# statics so this script needs no network.
 UI_FAMILIES=(
-  "ubuntu:Ubuntu/Ubuntu"
-  "notosans:NotoSans/NotoSans"
-  "notoserif:NotoSerif/NotoSerif"
   "librefranklin:LibreFranklin/LibreFranklin"
 )
 
@@ -90,14 +92,6 @@ for entry in ${UI_FAMILIES[@]}; do
     for style in ${UI_FONT_STYLES[@]}; do
       font_name="${prefix}_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
       output_path="../builtinFonts/${font_name}.h"
-      # Noto Sans and Noto Serif at 12 pt are READER cuts, generated above at
-      # 2-bit with --compress --pnum, and the system-font matrix reuses those
-      # very symbols. Regenerating them here as plain 1-bit would silently
-      # downgrade the reader's 12 pt face.
-      if [ "$size" = "12" ] && { [ "$prefix" = "notosans" ] || [ "$prefix" = "notoserif" ]; }; then
-        echo "Skipping $output_path (reader cut, generated above)"
-        continue
-      fi
       python fontconvert.py $font_name $size "../builtinFonts/source/${stem}-${style}.ttf" > $output_path
       echo "Generated $output_path"
     done

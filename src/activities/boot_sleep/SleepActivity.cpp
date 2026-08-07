@@ -393,6 +393,12 @@ void SleepActivity::renderCoverSleepScreen() const {
 
     if (!lastEpub.generateCoverBmp(cropped)) {
       LOG_ERR("SLP", "Failed to generate cover bmp");
+      // COVER mode draws a generated typographic cover so the sleeping device
+      // still names the open book; COVER_CUSTOM keeps the user's chosen
+      // fallback image.
+      if (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::COVER) {
+        return renderGeneratedCoverSleepScreen(lastEpub.getTitle().c_str(), lastEpub.getAuthor().c_str());
+      }
       return (this->*renderNoCoverSleepScreen)();
     }
 
@@ -412,6 +418,14 @@ void SleepActivity::renderCoverSleepScreen() const {
   }
 
   return (this->*renderNoCoverSleepScreen)();
+}
+
+void SleepActivity::renderGeneratedCoverSleepScreen(const char* title, const char* author) const {
+  renderer.clearScreen();
+  const auto seed = static_cast<uint32_t>(std::hash<std::string>{}(APP_STATE.openEpubPath));
+  GUI.drawGeneratedCover(renderer, Rect(0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()), title, author,
+                         seed);
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
 
 void SleepActivity::renderLastScreenSleepScreen() const {

@@ -6,13 +6,13 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "components/UITheme.h"
-#include "components/icons/cover.h"
 #include "fontIds.h"
 
 // Internal constants
@@ -23,12 +23,15 @@ constexpr int cornerRadius = 6;
 //
 // Two lines, not Lyra Extended's three, because in a grid the row below is real
 // estate rather than empty screen. The arithmetic, with SMALL_FONT_ID
-// (notosans_8, advanceY = 23, see lib/EpdFont/builtinFonts/notosans_8_regular.h):
+// (librefranklin_8, advanceY = 20, see
+// lib/EpdFont/builtinFonts/librefranklin_8_regular.h):
 //
-//   8 (top strip) + 226 (cover) + 8 + 5 (gap) + 2 * 23 (text) = 293
+//   8 (top strip) + 226 (cover) + 8 + 5 (gap) + 2 * 20 (text) = 287
 //
-// which fits the 300px row with 7px to spare. Three lines would need 316 and
-// would paint the first row's titles over the second row's covers.
+// which fits the 300px row with room to spare. titleLinesThatFit() derives the
+// real budget from the measured line height, so a taller face degrades to one
+// line rather than painting the first row's titles over the second row's
+// covers.
 constexpr int titleMaxLinesCap = 2;
 constexpr int titleTopGap = 5;
 
@@ -116,10 +119,10 @@ void LyraSixTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const s
       renderer.drawRect(tileX + hPaddingInSelection, tileY + hPaddingInSelection, coverWidth, coverHeight, true);
 
       if (!hasCover) {
-        // Render empty cover
-        renderer.fillRect(tileX + hPaddingInSelection, tileY + hPaddingInSelection + (coverHeight / 3), coverWidth,
-                          2 * coverHeight / 3, true);
-        renderer.drawIcon(CoverIcon, tileX + hPaddingInSelection + 24, tileY + hPaddingInSelection + 24, 32);
+        drawGeneratedCover(renderer,
+                           Rect(tileX + hPaddingInSelection, tileY + hPaddingInSelection, coverWidth, coverHeight),
+                           recentBooks[i].title.c_str(), recentBooks[i].author.c_str(),
+                           static_cast<uint32_t>(std::hash<std::string>{}(recentBooks[i].path)));
       }
     }
 
@@ -175,8 +178,8 @@ void LyraSixTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const s
       renderer.fillRoundedRect(tileX, tileY, tileWidth, hPaddingInSelection, cornerRadius, true, true, false, false,
                                Color::LightGray);
       renderer.fillRectDither(tileX, tileY + hPaddingInSelection, hPaddingInSelection, coverHeight, Color::LightGray);
-      renderer.fillRectDither(tileX + tileWidth - hPaddingInSelection, tileY + hPaddingInSelection,
-                              hPaddingInSelection, coverHeight, Color::LightGray);
+      renderer.fillRectDither(tileX + tileWidth - hPaddingInSelection, tileY + hPaddingInSelection, hPaddingInSelection,
+                              coverHeight, Color::LightGray);
       renderer.fillRoundedRect(tileX, tileY + coverHeight + hPaddingInSelection, tileWidth, titleBoxHeight,
                                cornerRadius, false, false, true, true, Color::LightGray);
     }

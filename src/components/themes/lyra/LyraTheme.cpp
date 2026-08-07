@@ -8,12 +8,12 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
-#include "components/icons/cover.h"
 #include "components/icons/lucide_icons.h"
 #include "fontIds.h"
 
@@ -507,11 +507,11 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
                         LyraMetrics::values.homeCoverHeight, true);
 
       if (!hasCover) {
-        // Render empty cover
-        renderer.fillRect(tileX + hPaddingInSelection,
-                          tileY + hPaddingInSelection + (LyraMetrics::values.homeCoverHeight / 3), coverWidth,
-                          2 * LyraMetrics::values.homeCoverHeight / 3, true);
-        renderer.drawIcon(CoverIcon, tileX + hPaddingInSelection + 24, tileY + hPaddingInSelection + 24, 32);
+        drawGeneratedCover(renderer,
+                           Rect(tileX + hPaddingInSelection, tileY + hPaddingInSelection, coverWidth,
+                                LyraMetrics::values.homeCoverHeight),
+                           book.title.c_str(), book.author.c_str(),
+                           static_cast<uint32_t>(std::hash<std::string>{}(book.path)));
       }
 
       coverBufferStored = storeCoverBuffer();
@@ -592,8 +592,7 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
 
   for (int i = 0; i < buttonCount; ++i) {
     int tileWidth = rect.width - LyraMetrics::values.contentSidePadding * 2;
-    Rect tileRect =
-        Rect{rect.x + LyraMetrics::values.contentSidePadding, rect.y + i * pitch, tileWidth, rowHeight};
+    Rect tileRect = Rect{rect.x + LyraMetrics::values.contentSidePadding, rect.y + i * pitch, tileWidth, rowHeight};
 
     const bool selected = selectedIndex == i;
 
