@@ -841,11 +841,19 @@ void GfxRenderer::drawRect(const int x, const int y, const int width, const int 
 // Border is inside the rectangle
 void GfxRenderer::drawRect(const int x, const int y, const int width, const int height, const int lineWidth,
                            const bool state) const {
+  // -1 because width/height are extents, not the last coordinate: the far edge
+  // of an (x, width) rect is x + width - 1. The 5-argument overload above has
+  // always done this; this one did not, so every border landed one pixel right
+  // of and below the rect it was handed, contradicting the comment above. A
+  // caller drawing flush to the right or bottom edge would have had that side
+  // silently dropped by drawPixel's bounds check.
   for (int i = 0; i < lineWidth; i++) {
-    drawLine(x + i, y + i, x + width - i, y + i, state);
-    drawLine(x + width - i, y + i, x + width - i, y + height - i, state);
-    drawLine(x + width - i, y + height - i, x + i, y + height - i, state);
-    drawLine(x + i, y + height - i, x + i, y + i, state);
+    const int right = x + width - 1 - i;
+    const int bottom = y + height - 1 - i;
+    drawLine(x + i, y + i, right, y + i, state);
+    drawLine(right, y + i, right, bottom, state);
+    drawLine(right, bottom, x + i, bottom, state);
+    drawLine(x + i, bottom, x + i, y + i, state);
   }
 }
 

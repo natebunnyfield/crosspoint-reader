@@ -165,6 +165,34 @@ TEST_F(RendererBounds, ScreenEdgeRulesAreClean) {
   }
 }
 
+// B-011: the lineWidth overload of drawRect treated width/height as the last
+// coordinate rather than an extent, so its border landed one pixel right of and
+// below the rect it was handed -- while the 5-argument overload beside it, and
+// its own "Border is inside the rectangle" comment, said otherwise. Neither
+// shipped caller sat at a screen edge, so the symptom was a border 1px too
+// large rather than lost pixels; drawn flush right or bottom it escapes.
+TEST_F(RendererBounds, FullScreenRectWithLineWidthIsClean) {
+  r->drawRect(0, 0, r->getScreenWidth(), r->getScreenHeight(), 2, true);
+  EXPECT_TRUE(noEscapes());
+}
+
+// Both overloads must agree on what (x, width) means -- that is the actual
+// defect, and a clean full-screen draw alone would also pass if someone
+// "fixed" it by clamping instead. Drawn flush to the right and bottom edges,
+// the 5-argument form is known clean (ScreenEdgeRulesAreClean above), so the
+// lineWidth form must be clean at the identical geometry.
+TEST_F(RendererBounds, LineWidthOverloadMatchesPlainOverloadAtTheEdge) {
+  const int w = r->getScreenWidth();
+  const int h = r->getScreenHeight();
+
+  r->drawRect(w - 10, h - 10, 10, 10, true);  // plain: the reference
+  ASSERT_TRUE(noEscapes()) << "reference overload escaped; the test is wrong, not the code";
+
+  GfxRenderer::resetOutOfRange();
+  r->drawRect(w - 10, h - 10, 10, 10, 1, true);  // lineWidth: same rect
+  EXPECT_TRUE(noEscapes()) << "lineWidth overload treats width/height as the last coordinate";
+}
+
 // ---------------------------------------------------------------------------
 // Text drawing at hostile geometry.
 // ---------------------------------------------------------------------------
