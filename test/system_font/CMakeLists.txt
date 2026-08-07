@@ -60,4 +60,8 @@ target_link_libraries(SystemFontTest PRIVATE
   GTest::gtest_main
 )
 
-gtest_discover_tests(SystemFontTest WORKING_DIRECTORY ${REPO_ROOT})
+# Same SD-tree fallback as font_switch_churn, whose stubs this suite shares.
+gtest_discover_tests(SystemFontTest
+  WORKING_DIRECTORY ${REPO_ROOT}
+  PROPERTIES ENVIRONMENT "CROSSPOINT_TEST_SD=${CROSSPOINT_TEST_SD_DIR}"
+)

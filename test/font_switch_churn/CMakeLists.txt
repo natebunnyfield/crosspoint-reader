@@ -55,4 +55,10 @@ target_link_libraries(FontSwitchChurnTest PRIVATE
   GTest::gtest_main
 )
 
-gtest_discover_tests(FontSwitchChurnTest WORKING_DIRECTORY ${REPO_ROOT})
+# WORKING_DIRECTORY makes the stub's default "./fs_" the repo root's. That is
+# empty in a git worktree, so CROSSPOINT_TEST_SD points at wherever
+# test/CMakeLists.txt found an SD tree — normally the primary checkout's.
+gtest_discover_tests(FontSwitchChurnTest
+  WORKING_DIRECTORY ${REPO_ROOT}
+  PROPERTIES ENVIRONMENT "CROSSPOINT_TEST_SD=${CROSSPOINT_TEST_SD_DIR}"
+)

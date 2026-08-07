@@ -42,16 +42,15 @@ set(CP_PREVIEW "${REPO_ROOT}/tools/calendar_preview")
 # ArduinoJson comes from PlatformIO's lib_deps, not from the repo, so it only
 # exists under .pio/libdeps after a pio build has run. CrossPointSettings.h
 # includes it and MappedInputManager.cpp includes that, so this target cannot
-# compile without it -- it never could, which is why this test has been unbuildable.
-# Any env's copy will do; they are the same package.
-file(GLOB _cp_arduinojson_dirs "${REPO_ROOT}/.pio/libdeps/*/ArduinoJson/src")
-if(_cp_arduinojson_dirs)
-  list(GET _cp_arduinojson_dirs 0 _cp_arduinojson)
-else()
+# compile without it -- it never could, which is why this test has been
+# unbuildable. test/CMakeLists.txt resolves it, primary-checkout fallback
+# included.
+if(NOT CROSSPOINT_ARDUINOJSON_DIR)
   message(FATAL_ERROR
-    "ArduinoJson not found under ${REPO_ROOT}/.pio/libdeps/*/ArduinoJson/src.\n"
+    "ArduinoJson not found under .pio/libdeps/*/ArduinoJson/src (nor the primary checkout's).\n"
     "Run any PlatformIO build first, e.g.:  pio run -e simulator_x3")
 endif()
+set(_cp_arduinojson "${CROSSPOINT_ARDUINOJSON_DIR}")
 
 if(NOT EXISTS "${REPO_ROOT}/lib/I18n/I18nStrings.cpp")
   message(FATAL_ERROR

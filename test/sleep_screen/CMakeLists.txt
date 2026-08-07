@@ -12,15 +12,14 @@
 #
 # ArduinoJson comes from PlatformIO's lib_deps rather than the repo, so it only
 # exists once a pio build has run; CrossPointSettings.h includes it.
+# test/CMakeLists.txt resolves it, including the worktree fallback.
 
-file(GLOB _sleep_arduinojson_dirs "${REPO_ROOT}/.pio/libdeps/*/ArduinoJson/src")
-if(_sleep_arduinojson_dirs)
-  list(GET _sleep_arduinojson_dirs 0 _sleep_arduinojson)
-else()
+if(NOT CROSSPOINT_ARDUINOJSON_DIR)
   message(FATAL_ERROR
-    "ArduinoJson not found under ${REPO_ROOT}/.pio/libdeps/*/ArduinoJson/src.\n"
+    "ArduinoJson not found under .pio/libdeps/*/ArduinoJson/src (nor the primary checkout's).\n"
     "Run any PlatformIO build first, e.g.:  pio run -e simulator")
 endif()
+set(_sleep_arduinojson "${CROSSPOINT_ARDUINOJSON_DIR}")
 
 add_executable(SleepScreenPolicyTest
   SleepScreenPolicyTest.cpp

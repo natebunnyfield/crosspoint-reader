@@ -40,6 +40,62 @@ target_compile_options(crosspoint_test_common INTERFACE
 # supply.
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/HostThemeStack.cmake)
 
+# ---------------------------------------------------------------------------
+# Two things this tree needs are absent from a `git worktree` and present only
+# in the primary checkout, and BOTH fail silently rather than loudly:
+#
+#   .pio/libdeps  PlatformIO writes it per checkout. activity_input needs
+#                 ArduinoJson from it and FATAL_ERRORs without it, so at least
+#                 that one is loud.
+#   fs_           the SD-card tree, gitignored (.gitignore:6). font_switch_churn
+#                 and system_font GTEST_SKIP without fonts — nine tests quietly
+#                 stop running and the suite still reports 100% pass.
+#
+# So resolve the primary checkout and fall back to it for both. Symlinking would
+# also work but mutates the worktree, and a shared .pio/libdeps means a stray
+# `pio run` here writes into the primary checkout's package tree.
+find_package(Git QUIET)
+execute_process(
+  COMMAND ${GIT_EXECUTABLE} rev-parse --path-format=absolute --git-common-dir
+  WORKING_DIRECTORY ${REPO_ROOT}
+  OUTPUT_VARIABLE _cp_git_common
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+if(_cp_git_common)
+  # <primary>/.git -> <primary>. Identical to REPO_ROOT outside a worktree.
+  get_filename_component(CROSSPOINT_PRIMARY_ROOT "${_cp_git_common}" DIRECTORY)
+endif()
+
+# The SD-card tree the font suites read, exported to them as CROSSPOINT_TEST_SD.
+# Empty means "none found" — those suites then skip, which is the honest answer.
+set(CROSSPOINT_TEST_SD_DIR "")
+if(EXISTS "${REPO_ROOT}/fs_")
+  set(CROSSPOINT_TEST_SD_DIR "${REPO_ROOT}/fs_")
+elseif(CROSSPOINT_PRIMARY_ROOT AND EXISTS "${CROSSPOINT_PRIMARY_ROOT}/fs_")
+  set(CROSSPOINT_TEST_SD_DIR "${CROSSPOINT_PRIMARY_ROOT}/fs_")
+  message(STATUS "SD-card tree: borrowing ${CROSSPOINT_TEST_SD_DIR} (this worktree has no fs_)")
+endif()
+if(NOT CROSSPOINT_TEST_SD_DIR)
+  message(STATUS "SD-card tree: none found — the font suites will skip")
+endif()
+
+# ArduinoJson comes from PlatformIO's lib_deps, not the repo, so it exists only
+# under .pio/libdeps after a pio build has run. Header-only, so an include path
+# is all any suite needs; any env's copy will do, they are the same package.
+# Empty means "not found" — the suites that need it FATAL_ERROR themselves.
+file(GLOB _cp_arduinojson_dirs "${REPO_ROOT}/.pio/libdeps/*/ArduinoJson/src")
+if(NOT _cp_arduinojson_dirs AND CROSSPOINT_PRIMARY_ROOT)
+  file(GLOB _cp_arduinojson_dirs "${CROSSPOINT_PRIMARY_ROOT}/.pio/libdeps/*/ArduinoJson/src")
+  if(_cp_arduinojson_dirs)
+    message(STATUS "ArduinoJson: borrowing the primary checkout's (this worktree has no .pio)")
+  endif()
+endif()
+set(CROSSPOINT_ARDUINOJSON_DIR "")
+if(_cp_arduinojson_dirs)
+  list(GET _cp_arduinojson_dirs 0 CROSSPOINT_ARDUINOJSON_DIR)
+endif()
+
 enable_testing()
 include(GoogleTest)
 

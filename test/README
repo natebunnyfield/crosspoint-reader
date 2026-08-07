@@ -27,5 +27,18 @@ Shared pieces:
                               Arduino's String). Suite-specific seams — HalGPIO,
                               HalStorage — stay in each suite's own stubs/.
 
-test/activity_input additionally needs ArduinoJson, which comes from PlatformIO's
-lib_deps rather than the repo, so run any `pio run` once before configuring.
+Running from a git worktree:
+
+Two inputs live in the primary checkout and not in a worktree, and configure
+falls back to the primary checkout for both (it says so in the configure log):
+
+  .pio/libdeps  ArduinoJson, needed by activity_input and sleep_screen. It
+                comes from PlatformIO's lib_deps rather than the repo, so it
+                appears only after a `pio run`.
+  fs_           the SD-card font tree, gitignored. Without it
+                font_switch_churn and system_font SKIP nine tests and the
+                suite still reports 100% pass — the failure mode this
+                fallback exists to prevent.
+
+Override the SD tree explicitly with CROSSPOINT_TEST_SD=/path/to/fs_ when
+running a suite by hand; ctest already carries the resolved one.
