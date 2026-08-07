@@ -6,6 +6,7 @@
 #include <Memory.h>
 
 #include "Epub/converters/ImageDecoderFactory.h"
+#include "activities/RenderLock.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -104,7 +105,29 @@ int TextViewerActivity::byteAt(const uint32_t offset) {
 // Lays out one page of wrapped lines starting at byte `start`. Fills `lines`
 // and returns the byte offset the next page starts at (>= sourceSize at EOF).
 uint32_t TextViewerActivity::layoutPage(const uint32_t start) {
-  lines.clear();
+  // Lay out into a LOCAL vector and publish it under the render lock, rather
+  // than mutating `lines` in place.
+  //
+  // This runs on the activity task, from loop() via pageForward/pageBack, and
+  // ActivityManager::loop() deliberately holds no lock ("the loop() method must
+  // be responsible for acquire one if needed", ActivityManager.cpp:77). The
+  // render task meanwhile walks `lines` inside render(). Clearing it here freed
+  // the very strings render() was reading -- hold Down to page quickly and the
+  // two overlap.
+  //
+  // The publish is a swap, so the lock is held for O(1) and never across the
+  // file reads and text measurement below. The committer is RAII because this
+  // function returns from five places.
+  std::vector<std::string> built;
+  struct Publish {
+    TextViewerActivity* self;
+    std::vector<std::string>* built;
+    ~Publish() {
+      RenderLock lock;
+      self->lines.swap(*built);
+    }
+  } publish{this, &built};
+
   const uint32_t srcSize = sourceSize();
 
   std::string line;
@@ -117,11 +140,11 @@ uint32_t TextViewerActivity::layoutPage(const uint32_t start) {
 
   // Emits the completed line; returns true when the page is full.
   const auto emitLine = [&](std::string&& content) {
-    lines.push_back(std::move(content));
+    built.push_back(std::move(content));
     line.clear();
     lineWidth = 0;
     lastSpaceLen = -1;
-    return static_cast<int>(lines.size()) >= maxLines;
+    return static_cast<int>(built.size()) >= maxLines;
   };
 
   uint32_t offset = start;
@@ -202,7 +225,7 @@ uint32_t TextViewerActivity::layoutPage(const uint32_t start) {
     lineWidth += atomWidth;
   }
 
-  if (!line.empty()) lines.push_back(std::move(line));
+  if (!line.empty()) built.push_back(std::move(line));
   return srcSize;
 }
 

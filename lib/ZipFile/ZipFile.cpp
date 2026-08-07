@@ -388,6 +388,18 @@ uint8_t* ZipFile::readFileToMemory(const char* filename, size_t* size, const boo
 
   const auto deflatedDataSize = fileStat.compressedSize;
   const auto inflatedDataSize = fileStat.uncompressedSize;
+  // uncompressedSize is attacker-controlled in the sense that matters here: it
+  // is a number in a zip header on a card the owner did not author. Two things
+  // go wrong unbounded. At 0xFFFFFFFF the `+ 1` below wraps to zero, malloc(0)
+  // succeeds, and the terminator write at the end of this function lands at
+  // data[0xFFFFFFFF]. Short of that, any value past the heap just aborts.
+  // Nothing this firmware opens legitimately needs a single 16 MB member.
+  constexpr uint32_t MAX_MEMBER_BYTES = 16u * 1024 * 1024;
+  if (inflatedDataSize > MAX_MEMBER_BYTES) {
+    LOG_ERR("ZIP", "Refusing member of %lu bytes (cap %lu)", (unsigned long)inflatedDataSize,
+            (unsigned long)MAX_MEMBER_BYTES);
+    return nullptr;
+  }
   const auto dataSize = trailingNullByte ? inflatedDataSize + 1 : inflatedDataSize;
   const auto data = static_cast<uint8_t*>(malloc(dataSize));
   if (data == nullptr) {

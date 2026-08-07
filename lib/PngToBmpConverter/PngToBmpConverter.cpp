@@ -1,5 +1,7 @@
 #include "PngToBmpConverter.h"
 
+#include "PngBitDepth.h"
+
 #include <HalDisplay.h>
 #include <HalStorage.h>
 #include <InflateStream.h>
@@ -445,6 +447,18 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
 
   if (interlace != 0) {
     LOG_ERR("PNG", "Interlaced PNGs not supported");
+    return false;
+  }
+
+  // Validate the bit depth BEFORE anything divides by it. The row decoders
+  // compute `8 / ctx.bitDepth` for the packed depths, so a declared 0 is a
+  // division by zero, and 3/5/6/7 give a packing that reads crooked. The PNG
+  // spec allows only 1, 2, 4, 8 and 16, and restricts the sub-byte depths to
+  // grayscale and palette images. This mirrors isSupportedBitDepth() in
+  // lib/Epub/Epub/converters/PngToFramebufferConverter.cpp, which the in-book
+  // decoder has always had and this one never did.
+  if (!pngbitdepth::isValid(bitDepth, colorType)) {
+    LOG_ERR("PNG", "Unsupported bit depth %u for color type %u", bitDepth, colorType);
     return false;
   }
 

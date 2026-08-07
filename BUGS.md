@@ -55,76 +55,6 @@ enter Settings and press Back (which saves), then read the file.
 
 ## OPEN
 
-### [B-024] Unbounded allocations from untrusted cache and zip data
-**severity: high · scope: memory safety · found 2026-08-06 · verified 2026-08-07**
-
-Three sites size an allocation from a number read straight out of a file, with
-no bound:
-
-- `lib/Serialization/Serialization.h:46-51` — `readPod(file, len)` return value
-  is discarded, then `s.resize(len)`. On a short read `len` is uninitialized.
-- `src/activities/reader/TxtReaderActivity.cpp:511-516` — `readPod(f, numPages)`
-  then `pageOffsets.reserve(numPages)`, unvalidated.
-- `lib/ZipFile/ZipFile.cpp:389-392` — `inflatedDataSize = fileStat.uncompressedSize`
-  uncapped, and `:449` writes `data[inflatedDataSize] = '\0'`; at `0xFFFFFFFF`
-  the `+1` wraps to zero and the terminator lands wild.
-
-On a 380 KB device any of these aborts the process. The input is a `.crosspoint`
-cache or a zip header — both attacker-influenced in the sense that matters here,
-which is a corrupted file on an SD card the owner did not author.
-
-`lib/Xtc/Xtc/XtcParser.cpp` had the same shape and is already fixed: `:302-308`
-clamps `maxOffset` to the file bounds and `:316` derives the chapter count from
-the bounded remainder. That is the pattern to copy.
-
-**Close by:** bound each length against the actual bytes remaining before
-allocating, as XtcParser now does.
-
-### [B-023] Two out-of-bounds reads on untrusted image data
-**severity: high · scope: memory safety · found 2026-08-06 · verified 2026-08-07**
-
-**XTC plane indexing.** `lib/Xtc/Xtc.cpp:203` sizes each plane
-`(width * height + 7) / 8`, but `:206` computes `colBytes = (height + 7) / 8` and
-`:224-226` indexes `plane1[colIndex * colBytes + byteInCol]`. When `height % 8`
-is non-zero, `colBytes * width` exceeds `planeSize` and the last columns read
-past the buffer. The thumbnail path guards this; the main render path does not.
-
-**PNG bit depth.** `lib/PngToBmpConverter/PngToBmpConverter.cpp:339` and `:363`
-both compute `const int ppb = 8 / ctx.bitDepth` with no prior validation. A
-`bitDepth` of 0 divides by zero; 3, 5, 6 and 7 give a wrong packing and read
-crooked. The sibling decoder already has the guard —
-`lib/Epub/Epub/converters/PngToFramebufferConverter.cpp:113` defines
-`isSupportedBitDepth` and `:396` calls it — so this is a missing call, not a
-missing idea.
-
-Both are reachable from opening a book or loading a cover.
-
-**Close by:** bounds-check the XTC offset against `planeSize` at `:225`; call the
-existing `isSupportedBitDepth` before `:339`.
-
-### [B-022] Paging mutates `lines` outside the render lock while the render task walks it
-**severity: medium · scope: threading · found 2026-08-06 · verified 2026-08-07**
-
-`ActivityManager::loop()` deliberately runs without the render lock — its own
-comment at `src/activities/ActivityManager.cpp:77` reads *"do not hold a lock
-here, the loop() method must be responsible for acquire one if needed"*. That
-makes the lock opt-in per activity, and `TextViewerActivity` does not opt in:
-`loop()` (`:248`) reaches `pageForward()`/`pageBack()` (`:231`, `:239`) →
-`layoutCurrentPage()` (`:209`) → `layoutPage()`, which calls `lines.clear()` at
-`:107` and refills it. `render(RenderLock&&)` (`:348`) reads `lines[i].c_str()`
-at `:363` on the render task.
-
-So holding Down to page quickly can free the strings the render task is reading.
-`ClaudeChatActivity` has the same shape around `answer` — cleared in `loop()` and
-in the BLE drain, with the lock taken only afterwards.
-
-The window is narrow, which is why this has not obviously bitten yet. It is still
-a use-after-free.
-
-**Close by:** take a `RenderLock` across the mutation, or defer relayout until
-the render guard is held. Audit the other activities for the same pattern rather
-than fixing only these two.
-
 ### [B-021] A null check that cannot fire, in the tightest-memory path
 **severity: medium · scope: graceful degradation · found 2026-08-06 · verified 2026-08-07**
 
@@ -256,6 +186,114 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-024] Unbounded allocations from untrusted cache and zip data
+**severity: high · scope: memory safety · found 2026-08-06 · verified 2026-08-07** · FIXED 2026-08-07
+
+
+Three sites size an allocation from a number read straight out of a file, with
+no bound:
+
+- `lib/Serialization/Serialization.h:46-51` — `readPod(file, len)` return value
+  is discarded, then `s.resize(len)`. On a short read `len` is uninitialized.
+- `src/activities/reader/TxtReaderActivity.cpp:511-516` — `readPod(f, numPages)`
+  then `pageOffsets.reserve(numPages)`, unvalidated.
+- `lib/ZipFile/ZipFile.cpp:389-392` — `inflatedDataSize = fileStat.uncompressedSize`
+  uncapped, and `:449` writes `data[inflatedDataSize] = '\0'`; at `0xFFFFFFFF`
+  the `+1` wraps to zero and the terminator lands wild.
+
+On a 380 KB device any of these aborts the process. The input is a `.crosspoint`
+cache or a zip header — both attacker-influenced in the sense that matters here,
+which is a corrupted file on an SD card the owner did not author.
+
+`lib/Xtc/Xtc/XtcParser.cpp` had the same shape and is already fixed: `:302-308`
+clamps `maxOffset` to the file bounds and `:316` derives the chapter count from
+the bounded remainder. That is the pattern to copy.
+
+**Close by:** bound each length against the actual bytes remaining before
+allocating, as XtcParser now does.
+
+
+**Fixed.** All three sites bound the length against the bytes actually left:
+`readString` (both overloads) checks the remaining stream/file and yields an
+empty string, which every caller already handles because these are cache reads
+and an empty field fails the cache's own validation. `numPages` is checked
+against `numPages * sizeof(uint32_t) <= bytes remaining`. `ZipFile` caps a member
+at 16 MB, which also closes the `0xFFFFFFFF + 1` wrap that put the terminator
+write at `data[0xFFFFFFFF]`. `len` is now initialised too — `readPod` returns
+void, so a short read left it holding stack garbage. Five tests in
+`test/untrusted_input/`, three of which fail against the old code.
+
+### [B-023] Two out-of-bounds reads on untrusted image data
+**severity: high · scope: memory safety · found 2026-08-06 · verified 2026-08-07** · FIXED 2026-08-07
+
+
+**XTC plane indexing.** `lib/Xtc/Xtc.cpp:203` sizes each plane
+`(width * height + 7) / 8`, but `:206` computes `colBytes = (height + 7) / 8` and
+`:224-226` indexes `plane1[colIndex * colBytes + byteInCol]`. When `height % 8`
+is non-zero, `colBytes * width` exceeds `planeSize` and the last columns read
+past the buffer. The thumbnail path guards this; the main render path does not.
+
+**PNG bit depth.** `lib/PngToBmpConverter/PngToBmpConverter.cpp:339` and `:363`
+both compute `const int ppb = 8 / ctx.bitDepth` with no prior validation. A
+`bitDepth` of 0 divides by zero; 3, 5, 6 and 7 give a wrong packing and read
+crooked. The sibling decoder already has the guard —
+`lib/Epub/Epub/converters/PngToFramebufferConverter.cpp:113` defines
+`isSupportedBitDepth` and `:396` calls it — so this is a missing call, not a
+missing idea.
+
+Both are reachable from opening a book or loading a cover.
+
+**Close by:** bounds-check the XTC offset against `planeSize` at `:225`; call the
+existing `isSupportedBitDepth` before `:339`.
+
+
+**Fixed.** The XTC cover path now carries the same `byteOffset >= planeSize`
+guard the thumbnail path in the same file already had — the two disagreed, which
+is why only one of them was safe. The PNG bit depth is validated before anything
+divides by it, using `pngbitdepth::isValid`, extracted to
+`lib/PngToBmpConverter/PngBitDepth.h` so the rule is testable without a HalFile
+or a real PNG. It is the same rule `isSupportedBitDepth` has always applied on
+the in-book path. Seven tests in `test/untrusted_input/`, including three that
+pin the plane arithmetic so the guard is not later removed as redundant by
+someone who checks only the height-divisible-by-8 case.
+
+### [B-022] Paging mutates `lines` outside the render lock while the render task walks it
+**severity: medium · scope: threading · found 2026-08-06 · verified 2026-08-07** · FIXED 2026-08-07
+
+
+`ActivityManager::loop()` deliberately runs without the render lock — its own
+comment at `src/activities/ActivityManager.cpp:77` reads *"do not hold a lock
+here, the loop() method must be responsible for acquire one if needed"*. That
+makes the lock opt-in per activity, and `TextViewerActivity` does not opt in:
+`loop()` (`:248`) reaches `pageForward()`/`pageBack()` (`:231`, `:239`) →
+`layoutCurrentPage()` (`:209`) → `layoutPage()`, which calls `lines.clear()` at
+`:107` and refills it. `render(RenderLock&&)` (`:348`) reads `lines[i].c_str()`
+at `:363` on the render task.
+
+So holding Down to page quickly can free the strings the render task is reading.
+`ClaudeChatActivity` has the same shape around `answer` — cleared in `loop()` and
+in the BLE drain, with the lock taken only afterwards.
+
+The window is narrow, which is why this has not obviously bitten yet. It is still
+a use-after-free.
+
+**Close by:** take a `RenderLock` across the mutation, or defer relayout until
+the render guard is held. Audit the other activities for the same pattern rather
+than fixing only these two.
+
+
+**Fixed.** `TextViewerActivity::layoutPage` now lays out into a local vector and
+publishes it with `lines.swap()` under a `RenderLock`, so the lock is held for an
+O(1) swap rather than across the file reads and text measurement. The committer
+is RAII because the function returns from five places. `ClaudeChatActivity`'s two
+unguarded clears — Back from an answer, and typing over an answer — take the lock
+the same way the relayout path 150 lines above already did; the rule was written
+down in that file and these two sites had simply been missed.
+
+Not covered by a test: this is a race between two FreeRTOS tasks, and a
+deterministic host test for it would be testing the scheduler rather than the
+fix. Verified by reading every mutation path against `render()`.
 
 ### [B-018] One Back tap could be consumed twice, landing you on Home
 **severity: medium · scope: navigation · FIXED 2026-08-07 · `416e7f42`**

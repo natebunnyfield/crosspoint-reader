@@ -327,9 +327,15 @@ void ClaudeChatActivity::handlePanelKey(const int slot, const bool longPress) {
 void ClaudeChatActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     if (view == View::Answer) {  // Back from an answer returns to the prompt
-      view = View::Prompt;
-      answer.clear();
-      answerLines.clear();
+      {
+        // Same rule as relayoutAnswer() above: render() walks answer /
+        // answerLines / view on the render task, and loop() holds no lock of
+        // its own, so clearing them here frees strings mid-draw.
+        RenderLock lock;
+        view = View::Prompt;
+        answer.clear();
+        answerLines.clear();
+      }
       requestUpdate();
       return;
     }
@@ -416,6 +422,7 @@ void ClaudeChatActivity::loop() {
   bool got = false;
   for (int c = blekbd::popChar(); c >= 0; c = blekbd::popChar()) {
     if (view == View::Answer) {  // typing returns to the prompt
+      RenderLock lock;  // render() walks these on its own task; see loop() above
       view = View::Prompt;
       answer.clear();
       answerLines.clear();

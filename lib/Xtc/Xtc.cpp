@@ -222,6 +222,13 @@ bool Xtc::generateCoverBmp() const {
         const size_t bitInByte = 7 - (y % 8);  // MSB = topmost pixel
 
         const size_t byteOffset = colIndex * colBytes + byteInCol;
+        // planeSize is (width * height + 7) / 8 but the column-major layout
+        // addresses colBytes * width bytes, and colBytes rounds height UP to a
+        // byte. The two agree only when height is a multiple of 8; otherwise
+        // the last columns index past plane1 into plane2, and past plane2 off
+        // the end of the allocation entirely. Skip those samples rather than
+        // read them -- the same guard the thumbnail path below already has.
+        if (byteOffset >= planeSize) continue;
         const uint8_t bit1 = (plane1[byteOffset] >> bitInByte) & 1;
         const uint8_t bit2 = (plane2[byteOffset] >> bitInByte) & 1;
         const uint8_t pixelValue = (bit1 << 1) | bit2;

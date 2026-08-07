@@ -508,8 +508,19 @@ bool TxtReaderActivity::loadPageIndexCache() {
     return false;
   }
 
-  uint32_t numPages;
+  uint32_t numPages = 0;
   serialization::readPod(f, numPages);
+
+  // The count comes straight out of the cache file, and each entry that follows
+  // is a uint32_t -- so a corrupted header claiming millions of pages reserves
+  // megabytes on a 380 KB device and aborts before the loop below ever finds
+  // the file is short. Refuse anything that cannot physically be there.
+  const size_t bytesLeft = f.size() - f.position();
+  if (static_cast<uint64_t>(numPages) * sizeof(uint32_t) > bytesLeft) {
+    LOG_DBG("TRS", "Cache claims %u pages but only %u bytes remain, rebuilding", numPages,
+            static_cast<unsigned>(bytesLeft));
+    return false;
+  }
 
   // Read page offsets
   pageOffsets.clear();
