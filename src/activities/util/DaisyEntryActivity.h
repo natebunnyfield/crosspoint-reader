@@ -70,6 +70,10 @@ class DaisyEntryActivity : public Activity {
   // Vertical distance between adjacent slot centers: the font's line advance,
   // clamped so the column fits the current ring's wedge at every angle.
   int slotSpacing() const;
+  // Largest label font whose three-line column fits a wedge at the current
+  // petal count; see the note on labelFontId() in the .cpp.
+  int labelFontId() const;
+  bool columnFits(int lineH) const;
   void slotCenter(int petal, int slot, int& outX, int& outY) const;
 
   void onComplete(std::string text);
@@ -82,6 +86,12 @@ class DaisyEntryActivity : public Activity {
   // Wheel geometry (portrait 480x800; header + field above, hints below).
   static constexpr int WHEEL_CX = 240;
   static constexpr int WHEEL_CY = 440;
-  static constexpr int RADIUS_OUTER = 180;
-  static constexpr int RADIUS_HUB = 78;
+  // Enlarged 2026-08-06 (owner ruling) so the 16-petal 123 ring can hold three
+  // upright lines per wedge. The label radius rm = (HUB + OUTER)/2 sets the
+  // tangential room a petal has, and at 16 petals the old 78/180 gave 25 px
+  // against a 25 px line — the three slots drew straight through each other.
+  // 150/230 lifts rm to 190 and the wedge to 37 px. OUTER is bounded by the
+  // 480 px screen at WHEEL_CX 240, so this is close to the maximum.
+  static constexpr int RADIUS_OUTER = 230;
+  static constexpr int RADIUS_HUB = 150;
 };
