@@ -12,6 +12,37 @@ was found, and what closing it requires.
 
 ## OPEN
 
+### [B-016] Daisywheel Select typed uppercase while the rotation button was held
+**severity: medium · scope: text entry · FIXED 2026-08-07 · `8aad57ec`**
+
+Reported as "Select is not selecting the middle character", in the Mac
+simulator's Device owner field. Reproduced exactly: hold Right to rotate, press
+Select during the hold, and the field takes `H` instead of `h` — `longPick()`
+ran instead of `tapPick()`.
+
+`MappedInputManager::getHeldTime()` **takes no button argument**
+(`src/MappedInputManager.h:74`). It reports the longest-held button on the
+device, so `DaisyEntryActivity`'s long-press check was asking "has anything been
+held past `LONG_PRESS_MS`", not "has THIS pick been held past it". Rotation
+auto-repeats — holding Left/Right is how the wheel is meant to be driven — so
+the threshold was already satisfied before the pick button went down, and the
+first frame fired the uppercase branch. Every pick made while rotating was
+uppercase, not only Select.
+
+Fixed by timing each pick locally with `millis()` at its press. Kept out of the
+HAL deliberately: the HAL surface mirrors the firmware's and this needs no new
+hardware concept.
+
+**Verified** in the simulator, three cases: a plain tap gives the lowercase
+middle char, a long press still gives uppercase (`bB` from tap-then-hold), and
+Select during a rotation hold now gives lowercase where it gave `H`. 215/215
+host tests; device `gh_release` builds.
+
+**Related, untouched:** `KeyboardEntryActivity.cpp:653,727,759,766` compare the
+same global `getHeldTime()` against per-button holds. Not reported and not
+reproduced — the grid keyboard's nav buttons may not repeat the same way — but
+it is the same shape and worth a look before trusting long-press there.
+
 ### [B-015] Create Note displayed no text on iOS, while saving correctly
 **severity: high · scope: notes / iOS · FIXED 2026-08-07 · `bb614f73`**
 
