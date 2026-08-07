@@ -35,6 +35,20 @@ struct SettingInfo {
   std::vector<std::string> enumStringValues;  // runtime alternative to StrId enumValues (for SD card fonts etc.)
   SettingAction action = SettingAction::None;
 
+  // How many choices this ENUM row actually has. ALWAYS size an ENUM row with
+  // this, never with enumValues.size().
+  //
+  // A row supplies EITHER translated enumValues or runtime enumStringValues,
+  // and a row of the second kind leaves enumValues EMPTY. Code that reached for
+  // enumValues.size() directly therefore saw 0, and did three separate damaging
+  // things to the two rows built that way (Typing Redraw Delay, Editor Font):
+  // the popup gate `size() > 2` never opened a picker; the fall-through toggle
+  // evaluated `(v + 1) % 0`, undefined behaviour that on RISC-V returns the
+  // dividend, letting the stored index climb past the end of the label list
+  // until the value column rendered blank; and fromJson's clamp `val < 0` was
+  // never true, so the saved byte was discarded on every boot.
+  size_t enumCount() const { return enumStringValues.empty() ? enumValues.size() : enumStringValues.size(); }
+
   struct ValueRange {
     uint8_t min;
     uint8_t max;

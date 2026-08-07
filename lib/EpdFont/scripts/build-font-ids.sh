@@ -99,3 +99,24 @@ ruby -rdigest -e 'puts [
   "./notosans_8_regular.h",
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
+
+# Editor-group monospace, compiled in rather than loaded from the card. The
+# editor asks for ONE size (12) in four styles -- see resolveEditorFont() -- so
+# only the 12 pt cut of each family exists.
+echo "#define SPACEMONO_12_FONT_ID ($(
+ruby -rdigest -e 'puts [
+  "./spacemono_12_regular.h",
+  "./spacemono_12_bold.h",
+  "./spacemono_12_bolditalic.h",
+  "./spacemono_12_italic.h",
+].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
+))"
+
+echo "#define IBMPLEXMONO_12_FONT_ID ($(
+ruby -rdigest -e 'puts [
+  "./ibmplexmono_12_regular.h",
+  "./ibmplexmono_12_bold.h",
+  "./ibmplexmono_12_bolditalic.h",
+  "./ibmplexmono_12_italic.h",
+].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
+))"

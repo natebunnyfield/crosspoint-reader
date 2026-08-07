@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "CrossPointSettings.h"
+#include "components/KeyboardIconTarget.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "notes/DaisyRings.h"
@@ -275,7 +276,10 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
     return;
   }
 
-  fui::GfxRendererTarget target(renderer);
+  // Same substitution the full-screen keyboard uses: without it this strip
+  // draws the SDK 16px backspace mask upscaled 2x into a 32px box, which is
+  // what Create Note and Claude shipped.
+  kbicon::KeyboardIconTarget target(renderer);
   target.setFont(fui::GfxRendererTarget::FONT_SMALL, SMALL_FONT_ID);
   target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
   const fui::DeviceContext device = target.deviceContext();

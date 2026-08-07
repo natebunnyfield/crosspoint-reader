@@ -7,4 +7,9 @@ const char* selectedFamily(uint8_t index) {
   return FAMILIES[index].family;
 }
 
+int builtinFontIdFor(uint8_t index) {
+  if (index >= FAMILY_COUNT) return FAMILIES[0].builtinFontId;
+  return FAMILIES[index].builtinFontId;
+}
+
 }  // namespace editorfonts

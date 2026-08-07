@@ -155,6 +155,15 @@ void ensureOutDir(const char* dir) { mkdir(dir, 0755); }
 
 }  // namespace
 
+// The BMP writer above has internal linkage, which is right for it. This is the
+// one seam another translation unit in this tool needs (daisy_preview.cpp), so
+// it gets an explicit external wrapper rather than the whole anonymous
+// namespace being opened up.
+bool writeMonoPortraitBmpExternal(const char* path, const GfxRenderer& r) { return writeMonoPortraitBmp(path, r); }
+
+// Defined in daisy_preview.cpp (decision aid for the daisywheel ring redesign).
+bool renderDaisyVariants(const char* outDir);
+
 // Wire up the renderer and every builtin font family. Must run before any
 // drawText call; the builtin fonts are compressed, so the decompressor has to
 // be attached first (mirrors src/main.cpp).
@@ -428,6 +437,10 @@ int main(int argc, char** argv) {
   if (strcmp(mode, "fonts") == 0) {
     if (argc != 4) return usage(argv[0]);
     return renderFontSpecimen(argv[2], argv[3], "./fs_") ? 0 : 1;
+  }
+
+  if (strcmp(mode, "daisy") == 0) {
+    return renderDaisyVariants("./fs_") ? 0 : 1;
   }
 
   if (strcmp(mode, "reading") == 0) {

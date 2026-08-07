@@ -1,7 +1,5 @@
 #include "SettingsActivity.h"
 
-#include "notes/BleHidHost.h"
-
 #include <BoardConfig.h>
 #include <GfxRenderer.h>
 #include <Logging.h>
@@ -13,6 +11,7 @@
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
 #include "CrossPointSettings.h"
+#include "notes/BleHidHost.h"
 #ifndef CROSSPOINT_NO_NETWORK
 #include "FontDownloadActivity.h"
 #endif
@@ -224,23 +223,36 @@ void SettingsActivity::toggleCurrentSetting() {
     SETTINGS.*(setting.valuePtr) = !currentValue;
   } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
     const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
-    if (setting.enumValues.size() > 2) {
+    const size_t choiceCount = setting.enumCount();
+    if (choiceCount > 2) {
       const auto valuePtr = setting.valuePtr;
-      optionPopup.show(setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()),
-                       currentValue,
-                       [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged, systemFontChanged](int idx) {
-                         SETTINGS.*valuePtr = idx;
-                         // Before rebuildSettingsLists(), which measures rows with the UI
-                         // font and would otherwise size them against the outgoing face.
-                         if (systemFontChanged) applySystemFont(renderer);
-                         syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
-                         SETTINGS.saveToFile();
-                         rebuildSettingsLists();
-                       });
+      auto onSelect = [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged, systemFontChanged](int idx) {
+        SETTINGS.*valuePtr = idx;
+        // Before rebuildSettingsLists(), which measures rows with the UI
+        // font and would otherwise size them against the outgoing face.
+        if (systemFontChanged) applySystemFont(renderer);
+        syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
+        SETTINGS.saveToFile();
+        rebuildSettingsLists();
+      };
+      // A runtime-labelled row keeps its choices in enumStringValues and leaves
+      // enumValues EMPTY, so it needs the string overload. Reaching for the
+      // StrId overload regardless is what left Typing Redraw Delay with no
+      // picker: the gate above saw 0 choices and never got here at all.
+      if (!setting.enumStringValues.empty()) {
+        optionPopup.show(setting.nameId, setting.enumStringValues, currentValue, std::move(onSelect));
+      } else {
+        optionPopup.show(setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()),
+                         currentValue, std::move(onSelect));
+      }
       requestUpdate();
       return;
     }
-    SETTINGS.*(setting.valuePtr) = (currentValue + 1) % static_cast<uint8_t>(setting.enumValues.size());
+    // Guard the modulus. A row with no choices at all must not divide by zero:
+    // that is UB, and on RISC-V it does not trap — it returns the dividend, so
+    // the stored index just climbs until the value column renders blank.
+    if (choiceCount == 0) return;
+    SETTINGS.*(setting.valuePtr) = (currentValue + 1) % static_cast<uint8_t>(choiceCount);
   } else if (setting.type == SettingType::ENUM && setting.valueGetter && setting.valueSetter) {
     const uint8_t totalValues = setting.enumStringValues.empty()
                                     ? static_cast<uint8_t>(setting.enumValues.size())
@@ -333,17 +345,16 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::DeviceOwner:
         // Free-text owner name, shown on the sleep screens. Saved immediately:
         // sleep can power the device off, and an unsaved name would vanish.
-        startActivityForResult(
-            makeTextEntryActivity(renderer, mappedInput, tr(STR_DEVICE_OWNER), SETTINGS.ownerName,
-                                  sizeof(SETTINGS.ownerName) - 1, InputType::Text),
-            [this](const ActivityResult& result) {
-              if (!result.isCancelled) {
-                const auto& kb = std::get<KeyboardResult>(result.data);
-                strncpy(SETTINGS.ownerName, kb.text.c_str(), sizeof(SETTINGS.ownerName) - 1);
-                SETTINGS.ownerName[sizeof(SETTINGS.ownerName) - 1] = '\0';
-                SETTINGS.saveToFile();
-              }
-            });
+        startActivityForResult(makeTextEntryActivity(renderer, mappedInput, tr(STR_DEVICE_OWNER), SETTINGS.ownerName,
+                                                     sizeof(SETTINGS.ownerName) - 1, InputType::Text),
+                               [this](const ActivityResult& result) {
+                                 if (!result.isCancelled) {
+                                   const auto& kb = std::get<KeyboardResult>(result.data);
+                                   strncpy(SETTINGS.ownerName, kb.text.c_str(), sizeof(SETTINGS.ownerName) - 1);
+                                   SETTINGS.ownerName[sizeof(SETTINGS.ownerName) - 1] = '\0';
+                                   SETTINGS.saveToFile();
+                                 }
+                               });
         break;
       case SettingAction::None:
         // Do nothing

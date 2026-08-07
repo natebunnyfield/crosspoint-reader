@@ -65,6 +65,24 @@ EpdFont notoserif14BoldItalicFont(&notoserif_14_bolditalic);
 EpdFontFamily notoserif14FontFamily(&notoserif14RegularFont, &notoserif14BoldFont, &notoserif14ItalicFont,
                                     &notoserif14BoldItalicFont);
 #ifndef OMIT_FONTS
+// Editor-group monospace (owner ruling 2026-08-06). Built in rather than read
+// from the card: the editor asks for one size in four styles, ~83 KB for both
+// families, and a built-in face works on a blank card AND cannot appear in the
+// reading picker — an SD install into /fonts would do both the opposite ways.
+// All four styles are real: MarkdownSpans renders bold, italic and bold-italic.
+EpdFont spacemono12RegularFont(&spacemono_12_regular);
+EpdFont spacemono12BoldFont(&spacemono_12_bold);
+EpdFont spacemono12ItalicFont(&spacemono_12_italic);
+EpdFont spacemono12BoldItalicFont(&spacemono_12_bolditalic);
+EpdFontFamily spacemono12FontFamily(&spacemono12RegularFont, &spacemono12BoldFont, &spacemono12ItalicFont,
+                                    &spacemono12BoldItalicFont);
+EpdFont ibmplexmono12RegularFont(&ibmplexmono_12_regular);
+EpdFont ibmplexmono12BoldFont(&ibmplexmono_12_bold);
+EpdFont ibmplexmono12ItalicFont(&ibmplexmono_12_italic);
+EpdFont ibmplexmono12BoldItalicFont(&ibmplexmono_12_bolditalic);
+EpdFontFamily ibmplexmono12FontFamily(&ibmplexmono12RegularFont, &ibmplexmono12BoldFont, &ibmplexmono12ItalicFont,
+                                      &ibmplexmono12BoldItalicFont);
+
 EpdFont notoserif12RegularFont(&notoserif_12_regular);
 EpdFont notoserif12BoldFont(&notoserif_12_bold);
 EpdFont notoserif12ItalicFont(&notoserif_12_italic);
@@ -349,6 +367,9 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(NOTOSANS_14_FONT_ID, notosans14FontFamily);
   renderer.insertFont(NOTOSANS_16_FONT_ID, notosans16FontFamily);
   renderer.insertFont(NOTOSANS_18_FONT_ID, notosans18FontFamily);
+
+  renderer.insertFont(SPACEMONO_12_FONT_ID, spacemono12FontFamily);
+  renderer.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12FontFamily);
 #endif  // OMIT_FONTS
   // Fills SMALL / UI_10 / UI_12 from the chosen system font, and on a 2x build
   // registers the matching hi-res companions alongside them.

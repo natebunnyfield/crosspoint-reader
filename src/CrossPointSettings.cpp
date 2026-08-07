@@ -240,7 +240,13 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
       const uint8_t fieldDefault = s.*(info.valuePtr);  // struct-initializer default, read before we overwrite it
       uint8_t v = doc[info.key] | fieldDefault;
       if (info.type == SettingType::ENUM) {
-        v = clamp(v, (uint8_t)info.enumValues.size(), fieldDefault);
+        // enumCount(), not enumValues.size(): a runtime-labelled row keeps its
+        // choices in enumStringValues and leaves enumValues empty, so the old
+        // form clamped against 0. `val < 0` is never true, so EVERY load threw
+        // the saved byte away and substituted the default — which is why
+        // Typing Redraw Delay and Editor Font reverted on every single boot
+        // while settings.json plainly held the chosen value.
+        v = clamp(v, (uint8_t)info.enumCount(), fieldDefault);
       } else if (info.type == SettingType::TOGGLE) {
         v = clamp(v, (uint8_t)2, fieldDefault);
       } else if (info.type == SettingType::VALUE) {

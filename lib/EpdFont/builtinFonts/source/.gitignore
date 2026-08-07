@@ -19,3 +19,11 @@
 # convert-builtin-fonts.sh reproduces the UI headers without a network fetch.
 !LibreFranklin/
 !LibreFranklin/**
+# Editor-group monospace faces (owner ruling 2026-08-06). Compiled INTO the
+# firmware rather than shipped as .cpfont on the card: the editor asks for one
+# size (12) in four styles, which is only ~83 KB of flash, and a built-in face
+# cannot pollute the reading picker the way a /fonts install would.
+!SpaceMono/
+!SpaceMono/**
+!IBMPlexMono/
+!IBMPlexMono/**

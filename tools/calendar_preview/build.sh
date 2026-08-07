@@ -19,7 +19,7 @@ g++ -std=gnu++2a -O1 -include Arduino.h -o render_harness render_harness.cpp \
   "$R/lib/EpdFont/FontDecompressor.cpp" "$R/lib/EpdFont/SdCardFont.cpp" \
   "$R/lib/Utf8/Utf8.cpp" "$R/lib/MiniBidi/BidiUtils.cpp" "$R/lib/Memory/BuildScratch.cpp" \
   "$R"/lib/InflateReader/*.cpp tinflate.o minibidi.o uzlib_checksums.o \
-  "$R/src/activities/boot_sleep/CalendarSleepScreen.cpp" \
+  "$R/src/activities/boot_sleep/CalendarSleepScreen.cpp" daisy_preview.cpp \
   "$R/src/activities/boot_sleep/HolidayCalculator.cpp" sd_font_stub.cpp \
   -I. -I"$R/src" -I"$R/lib/GfxRenderer" -I"$R/lib/EpdFont" -I"$R/lib/Utf8" \
   -I"$R/lib/MiniBidi" -I"$R/lib/Memory" -I"$R/lib/InflateReader" -I"$R/lib/uzlib/src"

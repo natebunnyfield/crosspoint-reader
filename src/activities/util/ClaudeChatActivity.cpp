@@ -25,6 +25,12 @@ constexpr int CHAT_FONT_ID_FALLBACK = UI_10_FONT_ID;
 // src/notes/EditorFonts.h). If that family is not installed on the card the UI
 // face stands in, so the screen is never blank because of a missing font.
 int resolveEditorFont() {
+  // Built-in first. Space Mono and IBM Plex Mono are compiled in, so they need
+  // no card and cannot be missing; the card is only consulted for the iA rows.
+  // Before the built-ins existed this function fell through to the UI face for
+  // EVERY row, because no card carried any editor family — which is why the
+  // setting appeared to do nothing.
+  if (const int builtin = editorfonts::builtinFontIdFor(SETTINGS.editorFont); builtin != 0) return builtin;
   const char* family = editorfonts::selectedFamily(SETTINGS.editorFont);
   if (SETTINGS.sdFontIdResolver != nullptr) {
     const int id = SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12);
@@ -92,8 +98,13 @@ void ClaudeChatActivity::onExit() {
 }
 
 void ClaudeChatActivity::setPhase(const char* phase) {
-  snprintf(phaseText, sizeof(phaseText), "%s", phase);
-  view = View::Working;
+  {
+    // render() reads phaseText on the render task; the wait below must NOT be
+    // inside this scope (see handlePanelKey).
+    RenderLock lock;
+    snprintf(phaseText, sizeof(phaseText), "%s", phase);
+    view = View::Working;
+  }
   LOG_INF(TAG, "phase: %s", phase);
   requestUpdateAndWait();  // the exchange blocks loop(); paint each phase
 }
@@ -174,16 +185,20 @@ void ClaudeChatActivity::send() {
   claudechat::Result r = claudechat::runExchange(
       prompt, [](void* ctx, const char* p) { static_cast<ClaudeChatActivity*>(ctx)->setPhase(p); }, this);
 
-  if (r.ok) {
-    answer = std::move(r.responseText);
-    buf->clear();
-  } else {
-    answer = "Could not reach Claude.\n\n" + r.error + "\n\nYour prompt is kept — press Back, reopen, and try again.";
-    LOG_ERR(TAG, "exchange failed: %s", r.error.c_str());
+  if (!r.ok) LOG_ERR(TAG, "exchange failed: %s", r.error.c_str());
+  {
+    // answer / answerLines / view are walked by render() on its own task.
+    RenderLock lock;
+    if (r.ok) {
+      answer = std::move(r.responseText);
+      buf->clear();
+    } else {
+      answer = "Could not reach Claude.\n\n" + r.error + "\n\nYour prompt is kept — press Back, reopen, and try again.";
+    }
+    layoutAnswer();
+    phaseText[0] = '\0';
+    view = View::Answer;
   }
-  layoutAnswer();
-  phaseText[0] = '\0';
-  view = View::Answer;
 
   // Re-arm the keyboard only if the heap can take it. After a WiFi teardown the
   // largest free block is ~24 KB against the ~65 KB nimble_port_init() needs;
@@ -265,28 +280,55 @@ bool ClaudeChatActivity::repeatCol(const MappedInputManager::Button button, cons
 }
 
 void ClaudeChatActivity::handlePanelKey(const int slot, const bool longPress) {
-  RenderLock lock;
-  const notes::KeyboardPanel::Result r =
-      panel.isDaisy() ? panel.activateSlot(slot, longPress) : panel.activate(longPress);
-  switch (r.event) {
-    case notes::KeyboardPanel::Event::Character:
-      handleKey(static_cast<unsigned char>(r.ch));
-      break;
-    case notes::KeyboardPanel::Event::Backspace:
-      handleKey('\b');
-      break;
-    case notes::KeyboardPanel::Event::ClearAll:
-      if (buf) buf->clear();
-      break;
-    case notes::KeyboardPanel::Event::Enter:
-      handleKey('\n');
-      break;
-    case notes::KeyboardPanel::Event::Done:
-      // "OK" on the panel asks Claude, which is what a finished prompt means.
-      if (buf && !buf->empty()) send();
-      return;
-    case notes::KeyboardPanel::Event::None:
-      break;
+  bool askClaude = false;
+  bool textChanged = true;
+  {
+    RenderLock lock;
+    const notes::KeyboardPanel::Result r =
+        panel.isDaisy() ? panel.activateSlot(slot, longPress) : panel.activate(longPress);
+    switch (r.event) {
+      case notes::KeyboardPanel::Event::Character:
+        handleKey(static_cast<unsigned char>(r.ch));
+        break;
+      case notes::KeyboardPanel::Event::Backspace:
+        handleKey('\b');
+        break;
+      case notes::KeyboardPanel::Event::ClearAll:
+        if (buf) buf->clear();
+        break;
+      case notes::KeyboardPanel::Event::Enter:
+        handleKey('\n');
+        break;
+      case notes::KeyboardPanel::Event::Done:
+        // "OK" on the panel asks Claude, which is what a finished prompt means.
+        askClaude = buf && !buf->empty();
+        textChanged = false;
+        break;
+      case notes::KeyboardPanel::Event::None:
+        // Shift, symbols layer, daisy ring swap: the KEYBOARD changed, the text
+        // did not. Repaint now; deferring would leave the old layer on screen.
+        textChanged = false;
+        break;
+    }
+  }
+  // send() paints a phase per step via requestUpdateAndWait(), which waits on
+  // the render task — so it must run with the render lock RELEASED or the wait
+  // deadlocks. It asserted instead: "Cannot call requestUpdateAndWait() while
+  // holding RenderLock" (ActivityManager.cpp:326), on every press of the
+  // panel's OK key. send() takes the lock itself for the state it mutates.
+  if (askClaude) {
+    send();
+    return;
+  }
+
+  // Typed text takes the SAME debounce as the Bluetooth drain in loop(). This
+  // path used to repaint unconditionally, so Typing Redraw Delay only ever
+  // applied to BLE typing — with no keyboard paired it did nothing at all.
+  if (textChanged) {
+    lastKeyMs = millis();
+    dirty = true;
+    ++pendingChars;
+    return;
   }
   requestUpdate();
 }

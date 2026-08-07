@@ -22,6 +22,12 @@ constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
 // src/notes/EditorFonts.h). If that family is not installed on the card the UI
 // face stands in, so the screen is never blank because of a missing font.
 int resolveEditorFont() {
+  // Built-in first. Space Mono and IBM Plex Mono are compiled in, so they need
+  // no card and cannot be missing; the card is only consulted for the iA rows.
+  // Before the built-ins existed this function fell through to the UI face for
+  // EVERY row, because no card carried any editor family — which is why the
+  // setting appeared to do nothing.
+  if (const int builtin = editorfonts::builtinFontIdFor(SETTINGS.editorFont); builtin != 0) return builtin;
   const char* family = editorfonts::selectedFamily(SETTINGS.editorFont);
   if (SETTINGS.sdFontIdResolver != nullptr) {
     const int id = SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12);
@@ -323,6 +329,7 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
   // selected key, with long-press giving the alt output (uppercase).
   const notes::KeyboardPanel::Result r =
       panel.isDaisy() ? panel.activateSlot(slot, longPress) : panel.activate(longPress);
+  bool textChanged = true;
   switch (r.event) {
     case notes::KeyboardPanel::Event::Character:
       handleKey(static_cast<unsigned char>(r.ch));
@@ -340,11 +347,28 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
       finish();
       return;
     case notes::KeyboardPanel::Event::None:
+      // Shift, the symbols layer, a daisy ring swap: the KEYBOARD changed and
+      // the text did not. Repaint at once — deferring it would leave the old
+      // layer on screen for up to a second, and there is nothing to batch.
+      textChanged = false;
       break;
   }
-  relayout();
-  ensureCursorVisible();
-  requestUpdate();
+
+  if (!textChanged) {
+    relayout();
+    ensureCursorVisible();
+    requestUpdate();
+    return;
+  }
+
+  // Typed text goes through the SAME debounce as the Bluetooth drain in loop().
+  // It used to repaint here unconditionally, which meant Typing Redraw Delay
+  // only ever applied to BLE typing — so with no keyboard paired, the
+  // out-of-the-box state, the setting did nothing whatsoever and every
+  // on-screen keypress cost a full ~500 ms panel refresh.
+  lastKeyMs = millis();
+  dirty = true;
+  ++pendingChars;
 }
 
 void NoteEditorActivity::loop() {

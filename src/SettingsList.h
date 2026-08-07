@@ -294,7 +294,13 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       s.nameId = StrId::STR_EDITOR_FONT;
       s.type = SettingType::ENUM;
       s.key = "editorFont";
-      s.category = StrId::STR_CAT_READER;
+      // STR_CAT_SYSTEM, not STR_CAT_READER. The Reader category is WITHDRAWN
+      // from the device UI — rebuildSettingsLists() keeps STR_CAT_SYSTEM rows
+      // and drops the rest — so this row existed but was unreachable on an X4
+      // or X3, served only by the web settings API, which does not filter by
+      // category. It is not a reading setting either: it picks the writing
+      // face for Create Note and Claude.
+      s.category = StrId::STR_CAT_SYSTEM;
       s.valuePtr = &CrossPointSettings::editorFont;
       s.enumStringValues.reserve(editorfonts::FAMILY_COUNT);
       for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {

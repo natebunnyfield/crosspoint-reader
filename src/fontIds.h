@@ -13,6 +13,23 @@
 #define UI_12_FONT_ID (1635686837)
 #define SMALL_FONT_ID (674098198)
 
+// Editor-group monospace, compiled into the firmware rather than loaded from
+// the card (owner ruling 2026-08-06). resolveEditorFont() asks for ONE size,
+// 12 pt, in four styles, so only that cut of each family exists: ~83 KB of
+// flash for both, against an SD install that could not be relied on to be
+// present and would surface these writing faces in the READING font picker.
+//
+// Added by hand, NOT by build-font-ids.sh, and two things are worth knowing
+// before anyone regenerates: the script needs ruby, which is not configured
+// here (.tool-versions asks for 3.2.0), and the IDs it emits today do not
+// match the eleven above — the builtin headers have been regenerated since
+// fontIds.h was last built, so every hash has moved. The values are opaque
+// handles (insertFont/drawText keys; SdCardFontManager::computeFontId guards
+// collisions at runtime), so being stale is harmless, but a regen would churn
+// all of them for nothing. Both checked non-zero and non-colliding when added.
+#define SPACEMONO_12_FONT_ID (175568128)
+#define IBMPLEXMONO_12_FONT_ID (-1793317468)
+
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
 static_assert(NOTOSERIF_12_FONT_ID != 0, "Font ID collision with sentinel");
@@ -26,3 +43,5 @@ static_assert(NOTOSANS_18_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_10_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(SMALL_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(SPACEMONO_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(IBMPLEXMONO_12_FONT_ID != 0, "Font ID collision with sentinel");

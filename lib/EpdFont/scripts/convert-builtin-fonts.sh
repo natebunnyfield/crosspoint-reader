@@ -28,6 +28,36 @@ for size in ${NOTOSANS_FONT_SIZES[@]}; do
   done
 done
 
+# --- Editor-group monospace ------------------------------------------------
+#
+# Owner ruling 2026-08-06: Space Mono and IBM Plex Mono are compiled INTO the
+# firmware rather than shipped as .cpfont on the card. Two reasons. A built-in
+# face works on a blank card, where the previous card-only arrangement meant the
+# Editor Font setting silently did nothing on every device; and a built-in face
+# cannot appear in the READING picker, which an install into /fonts would cause,
+# since SdCardFontRegistry lists whatever family directories it finds there.
+#
+# ONE size only. resolveEditorFont() asks for 12 pt and nothing else, so the
+# 14/16/18 cuts the reading faces carry would be dead flash. All four styles are
+# real: MarkdownSpans renders bold, italic and bold-italic. 2-bit + compressed,
+# matching the reader cuts. ~83 KB total for both families.
+EDITOR_FAMILIES=(
+  "spacemono:SpaceMono/SpaceMono"
+  "ibmplexmono:IBMPlexMono/IBMPlexMono"
+)
+
+for entry in ${EDITOR_FAMILIES[@]}; do
+  prefix="${entry%%:*}"
+  stem="${entry#*:}"
+  for style in ${READER_FONT_STYLES[@]}; do
+    lc=$(echo $style | tr '[:upper:]' '[:lower:]')
+    font_name="${prefix}_12_${lc}"
+    output_path="../builtinFonts/${font_name}.h"
+    python fontconvert.py $font_name 12 "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
+    echo "Generated $output_path"
+  done
+done
+
 UI_FONT_SIZES=(10 12)
 UI_FONT_STYLES=("Regular" "Bold")
 
