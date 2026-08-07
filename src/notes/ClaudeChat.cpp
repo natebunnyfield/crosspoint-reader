@@ -25,13 +25,12 @@ namespace {
 #endif
 
 constexpr const char* TAG = "CLAUDE";
-// Test network for this feature; see docs/notes-and-claude.md.
-constexpr const char* SPIKE_SSID = "REDACTED-SSID";
 constexpr const char* KEY_PATH = "/claude-key.txt";
 constexpr const char* TRANSCRIPT_PATH = "/claude-chat.md";
 constexpr const char* MODEL = "claude-haiku-4-5";
 constexpr int MAX_TOKENS = 1024;
-constexpr uint32_t WIFI_TIMEOUT_MS = 20000;
+constexpr uint32_t WIFI_TIMEOUT_MS = 20000;  // whole-search budget
+constexpr uint32_t MIN_ATTEMPT_MS = 6000;   // per-network cap when several are saved
 // Conversation memory for this editor session. In RAM only — /claude-chat.md is
 // the durable record, and re-parsing it would mean holding the whole file.
 // Both caps exist because history inflates the request body, which on device
@@ -115,24 +114,46 @@ bool readApiKey(std::string& outKey) {
 
 bool connectWifi(std::string& outErr, void (*statusCb)(void*, const char*), void* ctx) {
   WIFI_STORE.loadFromFile();
-  const WifiCredential* cred = WIFI_STORE.findCredential(SPIKE_SSID);
-  if (cred == nullptr) {
-    outErr = std::string("no saved credential for ") + SPIKE_SSID + " — connect once via File Transfer";
+  // Try every saved network in turn, the way WifiSelectionActivity's auto-connect
+  // does. This used to name one hardcoded SSID -- which meant the feature only
+  // worked on its author's home network, and put that network's name in a public
+  // repo. Nothing here should know any particular network.
+  const std::vector<WifiCredential>& creds = WIFI_STORE.getCredentials();
+  if (creds.empty()) {
+    outErr = "no saved Wi-Fi network — connect once via File Transfer";
     return false;
   }
 
-  statusCb(ctx, "wifi: connecting");
   WiFi.mode(WIFI_STA);
-  WiFi.begin(cred->ssid.c_str(), cred->password.c_str());
-  const uint32_t start = millis();
-  while (WiFi.status() != WL_CONNECTED) {
-    if (millis() - start > WIFI_TIMEOUT_MS) {
-      outErr = "wifi: timeout joining " + cred->ssid;
-      WiFi.disconnect(true);
-      WiFi.mode(WIFI_OFF);
-      return false;
+  const uint32_t budgetStart = millis();
+  bool joined = false;
+  for (const WifiCredential& cred : creds) {
+    const uint32_t spent = millis() - budgetStart;
+    if (spent >= WIFI_TIMEOUT_MS) break;
+    // WIFI_TIMEOUT_MS is the budget for the WHOLE search, not per network, so a
+    // card with eight saved networks cannot stall the editor for minutes. A
+    // single saved network still gets the full original timeout.
+    uint32_t attemptMs = WIFI_TIMEOUT_MS - spent;
+    if (creds.size() > 1 && attemptMs > MIN_ATTEMPT_MS) attemptMs = MIN_ATTEMPT_MS;
+
+    statusCb(ctx, "wifi: connecting");
+    WiFi.begin(cred.ssid.c_str(), cred.password.c_str());
+    const uint32_t attemptStart = millis();
+    while (millis() - attemptStart <= attemptMs) {
+      if (WiFi.status() == WL_CONNECTED) {
+        joined = true;
+        break;
+      }
+      delay(100);
     }
-    delay(100);
+    if (joined) break;
+    WiFi.disconnect(true);
+  }
+  if (!joined) {
+    outErr = "wifi: could not join any saved network";
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    return false;
   }
   LOG_INF(TAG, "wifi connected, ip=%s rssi=%d", WiFi.localIP().toString().c_str(), WiFi.RSSI());
 

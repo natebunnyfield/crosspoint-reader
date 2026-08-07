@@ -32,7 +32,11 @@
 namespace {
 // Folders/files to hide from the web interface file browser
 // Note: Items starting with "." are automatically hidden
-constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
+// "claude-key.txt" is an Anthropic API key at the card root (ClaudeChat.cpp
+// KEY_PATH). Listing it here is what keeps it off the download + rename/delete/move
+// path. Note a leading dot would NOT be enough for WebDAV, which deliberately
+// serves dot-paths so a card mirror can sync /.crosspoint and /.fonts.
+constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache", "claude-key.txt"};
 constexpr uint16_t UDP_PORTS[] = {54982, 48123, 39001, 44044, 59678};
 constexpr uint16_t LOCAL_UDP_PORT = 8134;
 

@@ -11,7 +11,11 @@
 #include "util/TaskWatchdog.h"
 
 namespace {
-constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
+// "claude-key.txt" is an Anthropic API key at the card root (ClaudeChat.cpp
+// KEY_PATH). Listing it here is what keeps it off the WebDAV GET/PUT/DELETE + PROPFIND listing
+// path. Note a leading dot would NOT be enough for WebDAV, which deliberately
+// serves dot-paths so a card mirror can sync /.crosspoint and /.fonts.
+constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache", "claude-key.txt"};
 
 // RFC 1123 date format helper: "Sun, 06 Nov 1994 08:49:37 GMT"
 // ESP32 doesn't have real-time clock set by default, so we use a fixed epoch date
