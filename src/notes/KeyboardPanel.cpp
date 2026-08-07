@@ -41,6 +41,7 @@ void KeyboardPanel::begin() {
   symbols_ = false;
   row_ = 0;
   col_ = 0;
+  anchorUnit_ = 0;  // must track col_, or the first vertical move jumps
   petal_ = 0;
   ringIdx_ = 0;
 }
@@ -183,6 +184,9 @@ KeyboardPanel::Result KeyboardPanel::activate(const bool longPress) {
   switch (key.kind) {
     case fui::KeyKind::Shift:
       shift_ = !shift_;
+      // The shifted layer can differ in shape; clamp BOTH axes, not just the
+      // column, or a stale row indexes past the new layout.
+      row_ = std::min(row_, std::max(0, rowCount() - 1));
       col_ = std::min(col_, std::max(0, colsInRow(row_) - 1));
       return r;
     case fui::KeyKind::Mode:

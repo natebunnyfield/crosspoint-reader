@@ -245,6 +245,11 @@ void NoteEditorActivity::handleKey(int key) {
 // A short press of the same buttons still pages, so the gesture only fires once
 // the hold threshold passes and it swallows the release that follows.
 void NoteEditorActivity::pollPairingGestures() {
+  // In DAISY, Up/Down are the wheel's pick buttons and holding them means
+  // uppercase — so the pairing gesture cannot live there too, or one long press
+  // would type a capital AND start Bluetooth. Daisy users pair from Settings.
+  if (panel.isDaisy()) return;
+
   constexpr uint32_t HOLD_MS = 1500;
   const bool up = mappedInput.isPressed(MappedInputManager::Button::Up);
   const bool down = mappedInput.isPressed(MappedInputManager::Button::Down);

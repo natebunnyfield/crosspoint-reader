@@ -181,6 +181,11 @@ void ClaudeChatActivity::send() {
 // bond. Short presses of the same buttons still navigate, so the gesture only
 // fires past the hold threshold and swallows the release that follows.
 void ClaudeChatActivity::pollPairingGestures() {
+  // In DAISY, Up/Down are the wheel's pick buttons and holding them means
+  // uppercase — so the pairing gesture cannot live there too, or one long press
+  // would type a capital AND start Bluetooth. Daisy users pair from Settings.
+  if (panel.isDaisy()) return;
+
   constexpr uint32_t HOLD_MS = 1500;
   const bool up = mappedInput.isPressed(MappedInputManager::Button::Up);
   const bool down = mappedInput.isPressed(MappedInputManager::Button::Down);
