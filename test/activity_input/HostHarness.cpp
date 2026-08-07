@@ -461,6 +461,8 @@ const FontSystemCalls& fontSystemCalls() { return am().fontCalls; }
 
 void reset() {
   auto& s = am();
+
+
   // Destroy without onExit(): this is a between-tests teardown, not navigation.
   s.pending.reset();
   s.pendingAction = HostPending::None;

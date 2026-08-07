@@ -9,8 +9,10 @@
 // through the shared FreeInkUI keyboard component (the 13-grid table lives in
 // notes/Grid13Layout.h so the full-screen activity and this panel use ONE
 // definition). Daisy's wheel geometry assumes a full screen, so in a
-// half-height strip its character groups are laid out as flat rings and typed
-// with the same multi-tap idiom — same letters, same grouping, same order.
+// half-height strip its petals are laid out flat — same letters, same grouping,
+// same order. Selection is DIRECT, as in DaisyEntryActivity: a petal exposes
+// its three characters as three slots and you pick one. It is not a multi-tap
+// cycle; an earlier version of this panel invented that and was wrong.
 #pragma once
 
 #include <components/keyboard/keyboard.h>
@@ -80,10 +82,6 @@ class KeyboardPanel {
   bool daisy_ = false;
   int ringIdx_ = 0;  // 0 = abc ring, 1 = numbers/symbols
   int petal_ = 0;
-  // The multi-tap group currently being cycled. Cells come from one static
-  // table, so identity is the pointer; no cell text repeats.
-  const char* lastGroup_ = nullptr;
-  int groupIndex_ = 0;
 };
 
 }  // namespace notes

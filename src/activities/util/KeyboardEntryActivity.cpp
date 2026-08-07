@@ -101,7 +101,6 @@ const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("abc", fui::KeyKind::Mode, fui::
 // The 13-grid table moved to src/notes/Grid13Layout.h so the split-screen
 // KeyboardPanel renders the same one. Referenced via grid13::SL_LAYOUT below.
 
-
 #undef UK
 #undef UKA
 #undef UKW
@@ -1147,7 +1146,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
   const fui::DeviceContext device = target.deviceContext();
   const fui::InputSnapshot noInput{};
-  fui::Frame<48> frame(target, device, noInput, interactions);
+  fui::Frame<64> frame(target, device, noInput, interactions);
 
   fui::KeyboardProps props;
   const fui::KeyboardLayout& layout = currentLayout();

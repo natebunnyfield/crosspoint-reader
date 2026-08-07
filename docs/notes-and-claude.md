@@ -21,12 +21,21 @@ All three `SETTINGS.keyboardLayout` choices are honoured:
 |---|---|
 | QWERTY | the SDK's `builtinKeyboardLayout`, number row on |
 | 13-Grid | `grid13::SL_LAYOUT` — **extracted** to `src/notes/Grid13Layout.h` so the full-screen activity and the panel share ONE table |
-| Daisy | its character groups as flat rings, same multi-tap idiom |
+| Daisy | its petals laid out flat — rings **extracted** to `src/notes/DaisyRings.h`, shared with `DaisyEntryActivity` |
 
 Daisy is the one that is not literally the same UI: its wheel geometry assumes
 a full screen and does not fit a half-height strip. The letters, grouping and
 order are unchanged; only the arrangement differs. Full-screen text entry
 (rename, Wi-Fi password) still shows the real wheel.
+
+Selection within a petal is **direct** — its three characters are three slots
+and you pick one, exactly as the full-screen wheel works. An earlier version of
+this panel invented a press-repeatedly-to-cycle multi-tap instead, which is not
+how Daisy has ever worked here.
+
+Long-press Confirm types the **uppercase** of the selected key, on every layout
+(`fui::keyboardAltOutputFor`). On 13-Grid the number row's alts are its symbols,
+so long-press `1` gives `!` — the hint is printed in the key's corner.
 
 **Bluetooth is opt-in.** BLE only starts when a keyboard bond already exists,
 because bringing it up costs ~72 KB of heap and a CPU-clock lock — an owner
@@ -37,12 +46,18 @@ Buttons in Create Note / Claude:
 
 | Input | Action |
 |---|---|
-| Left / Right | move along the keyboard row |
+| Left / Right | move along the keyboard row; **auto-repeats** while held |
 | Confirm | type the selected key |
+| Confirm (hold) | type its uppercase / alternate |
 | Up / Down (short) | move between keyboard rows |
 | **Up (hold 1.5 s)** | start Bluetooth and pair a keyboard |
 | **Down (hold 1.5 s)** | disconnect the keyboard, **keeping** the bond |
 | Back | save and leave |
+
+Row navigation is bound to the **physical** Up/Down, not to PageBack/PageForward.
+That matters: those two return false when Side Buttons is set to Disabled, which
+left the default 13-Grid able to reach only its number row and nothing else, and
+made the pairing hold move the selector the wrong way under the NEXT_PREV swap.
 
 Forgetting a bond entirely is deliberately NOT a gesture — it is
 **Settings → Forget Bluetooth Keyboard**, alongside **Pair Bluetooth Keyboard**.
@@ -178,13 +193,14 @@ wired up and the key has somewhere better to live.
 | Editable buffer + cursor (host-tested) | `src/notes/TextBuffer.h` |
 | Markdown spans (host-tested) | `src/notes/MarkdownSpans.h` |
 | Note filenames (host-tested) | `src/notes/NoteNaming.h` |
-| On-screen keyboard panel | `src/notes/KeyboardPanel.{h,cpp}` |
+| On-screen keyboard panel (host-tested) | `src/notes/KeyboardPanel.{h,cpp}` |
 | 13-Grid layout table (shared) | `src/notes/Grid13Layout.h` |
+| Daisy rings (shared) | `src/notes/DaisyRings.h` |
 | Anthropic exchange | `src/notes/ClaudeChat.{h,cpp}` |
 | Editor font group | `src/notes/EditorFonts.{h,cpp}` |
 | Activities | `src/activities/util/{NoteEditor,ClaudeChat}Activity.{h,cpp}` |
 
-Host tests: `test/{ble_keymap,text_buffer,markdown_spans,note_naming}`.
+Host tests: `test/{ble_keymap,text_buffer,markdown_spans,note_naming,keyboard_panel}`.
 Run them with `ctest --test-dir build/test`; see the verification tiers in
 [ble-editor-spike.md](ble-editor-spike.md).
 
@@ -196,6 +212,18 @@ Run them with `ctest --test-dir build/test`; see the verification tiers in
 row renders but can never be selected. Also add
 `lastHomeMenuItem = HomeMenuItem::X;` to the row's `goTo*` wrapper, or Back
 will not return the selector to it.
+
+**A key's `output` field can be NULL on a key that still types.** The SDK's
+space key is `KeyKind::Space` with `output == nullptr`; `keyboardOutputFor()`
+synthesises the `" "`. Reading `key.output` directly therefore compiles, renders
+a perfect space bar, and types nothing — which is exactly what shipped in QWERTY
+and both symbols pages. Always go through `keyboardOutputFor()` /
+`keyboardAltOutputFor()`. Covered by `test/keyboard_panel`.
+
+**`InteractionBuffer<N>` overflows silently.** `addInteraction()` returns false
+and sets an `overflowed_` flag nobody reads. Size N from the LARGEST layout the
+activity can show — 13-Grid is 55 keys, not QWERTY's 41 — or the trailing keys
+lose touch registration with no warning at build or run time.
 
 **`nimble_port_init()` needs the CPU at full clock.** `HalPowerManager` drops to
 10 MHz after 3 s idle and the BT controller cannot start there — the call never

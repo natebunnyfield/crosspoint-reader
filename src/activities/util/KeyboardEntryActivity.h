@@ -50,9 +50,14 @@ class KeyboardEntryActivity : public Activity {
   bool urlPanel = false;  // URL snippet panel replaces the letter layer
 
   // Key hit rects registered by the keyboard component during render();
-  // loop() routes touch snapshots against them. 5-row EN layout registers 41
-  // keys, so 48 leaves headroom.
-  freeink::ui::InteractionBuffer<48> interactions;
+  // loop() routes touch snapshots against them. Must hold the LARGEST layout,
+  // not the QWERTY one this was sized for: 13-Grid (the default since
+  // 2026-08-04) registers 13*4 + 3 = 55 keys, so the old 48 overflowed and
+  // addInteraction() silently dropped the last seven — w x y z Del Space OK.
+  // Only touch registration was lost, since the selection highlight comes from
+  // props.selectedIndex rather than this buffer, and this fork does not use
+  // touch; the drop was invisible rather than harmless. ~18 B per slot.
+  freeink::ui::InteractionBuffer<64> interactions;
 
   // GPIO selection over the current layout grid (row/col in layout terms;
   // the bottom action row is just the last row).
