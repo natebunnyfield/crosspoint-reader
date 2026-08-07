@@ -53,7 +53,7 @@ inline const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), U
                                          UK("r", "r", 'r'), UK("s", "s", 's'), UK("t", "t", 't'), UK("u", "u", 'u'),
                                          UK("v", "v", 'v'), UK("w", "w", 'w'), UK("x", "x", 'x'), UK("y", "y", 'y'),
                                          UK("z", "z", 'z')};
-inline const fui::KeyboardKey SL_BOTTOM[] = {UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 3), UKSP(7),
+inline const fui::KeyboardKey SL_BOTTOM[] = {UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 3), UKSP(7),
                                              UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 3)};
 
 inline const fui::KeyboardRow SL_ROWS[] = {

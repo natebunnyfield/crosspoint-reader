@@ -47,6 +47,13 @@ Rules settled in the session:
   move when you swap. The 123 ring's last petal is `. , space`; the two above
   space are deliberate duplicates of the commonest characters in prose, since
   every character already has a home earlier in the ring.
+- **Special keys are UPPERCASE; characters are not** (owner ruling 2026-08-06).
+  `DEL`, `SPC`, `RET`, `ASK`, `SHIFT`, `ABC` — a lowercase `del` reads as three
+  letters you could type. Applies to any special key added later, and
+  `test/keyboard_panel` walks the shared layout tables to enforce it.
+  Space was the sharp end: the split-screen panel drew the literal `' '`
+  character for it, so the space slot rendered blank on both rings and looked
+  like a dead key.
 - **Utility petal, top→bottom: ⌫ ⇄ OK** — ⌫ and OK non-adjacent (accidental-submit
   finding from the AAC literature). Utility petal is the last petal of each ring,
   wrap-adjacent to petal 1.

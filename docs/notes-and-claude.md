@@ -231,6 +231,12 @@ and sets an `overflowed_` flag nobody reads. Size N from the LARGEST layout the
 activity can show — 13-Grid is 55 keys, not QWERTY's 41 — or the trailing keys
 lose touch registration with no warning at build or run time.
 
+**Special keys are UPPERCASE.** `DEL`, `SPC`, `RET`, `ASK`, `SHIFT`, `ABC` —
+lowercase reads as characters you could type. Any new special key follows it;
+`test/keyboard_panel` enforces it over the shared layout tables. Space needs an
+explicit label at every draw site, not the character itself: rendering `' '`
+draws nothing and the key looks dead.
+
 **An ENUM settings row must be sized with `enumCount()`, never
 `enumValues.size()`.** A row supplies EITHER translated `enumValues` or runtime
 `enumStringValues`, and a row of the second kind leaves `enumValues` EMPTY.

@@ -271,10 +271,19 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
           // The swap slot names the ring it takes you TO, so it read "123"
           // even while you were already on the number ring. The third slot
           // matches what it actually does in this host.
-          const char* const util[3] = {"del", ringIdx_ == 0 ? "123" : "abc", okIsDone_ ? "ask" : "ret"};
+          const char* const util[3] = {"DEL", ringIdx_ == 0 ? "123" : "ABC", okIsDone_ ? "ASK" : "RET"};
           snprintf(label, sizeof(label), "%s", util[slot]);
         } else {
-          snprintf(label, sizeof(label), "%c", slotChar(petal, slot));
+          // SPECIAL KEYS ARE UPPERCASE, characters are not (owner ruling
+          // 2026-08-06): a lowercase "del" reads as three letters you could
+          // type. Space is the sharp end of that — it used to draw the literal
+          // ' ' character, i.e. nothing at all, so the space slot looked like a
+          // dead key on both rings.
+          const char c = slotChar(petal, slot);
+          if (c == ' ')
+            snprintf(label, sizeof(label), "%s", "SPC");
+          else
+            snprintf(label, sizeof(label), "%c", c);
         }
         const int tw = renderer.getTextWidth(UI_12_FONT_ID, label);
         renderer.drawText(UI_12_FONT_ID, cx + (cellW - tw) / 2,
