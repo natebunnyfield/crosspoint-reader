@@ -12,6 +12,90 @@ was found, and what closing it requires.
 
 ## OPEN
 
+### [B-006] X4 running firmware carries an empty version stamp
+**severity: low · scope: device provisioning · found 2026-08-02**
+
+The X4 runs a build stamped `1.5.0-BNY-rc+` — empty suffix. `gh_release_rc`
+composes its version as `1.5.0-BNY-rc+${sysenv.CROSSPOINT_RC_HASH}`
+(`platformio.ini:186`), and the flash was run without that variable set. The
+code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
+feeds the OTA version comparison, and it makes the running build
+unidentifiable after the fact.
+
+**Close by:** reflashing with the variable set, or SD Firmware Update from the
+card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
+so a same-code reflash is accepted):
+```bash
+CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
+```
+
+### [B-005] The two SD cards hold different bytes under the same bin filename
+**severity: low · scope: device provisioning · found 2026-08-02**
+
+`crosspoint-880ba0f9.bin` is md5 `262f1d51…` on OWEN_BNF (X4) and `930747eb…`
+on REDACTED-SSID (X3). Same size, same `1.5.0-BNY-rc+880ba0f9` version stamp;
+they differ only in embedded `__TIME__`/`__DATE__` strings, because the build
+was relinked between the two copies (root cause is B-004). Identical filenames
+with different content defeats later verification.
+
+**Close by:** mounting OWEN_BNF and re-copying from
+`.pio/build/gh_release_rc/firmware.bin` so both cards match. Requires the X4
+card mounted.
+
+### [B-004] Toggling CROSSPOINT_RC_HASH silently wipes every build directory
+**severity: medium · scope: build tooling · found 2026-08-03**
+
+`[env:gh_release_rc]` interpolates `${sysenv.CROSSPOINT_RC_HASH}` into
+`build_flags`, so setting or unsetting it changes the resolved config, which
+changes `.pio/build/project.checksum`, which makes the next `pio run` clean
+**all** env build dirs — not just the target env.
+
+Observed: a stamped `pio run -e gh_release_rc` deleted
+`.pio/build/simulator/program`, and a later headless simulator run died with
+`no such file or directory`, exit 127. It also caused B-005.
+
+**Close by:** either documenting it in the project guide next to the existing
+version-override section, or removing the sysenv interpolation in favour of a
+mechanism that does not perturb the checksum. Currently recorded only in
+agent memory, not in the repo. Workaround: hold the variable constant across
+every `pio run` in a session, including simulator builds.
+
+### [B-003] Exploded `.epub` directories are probably unreadable on device
+**severity: low · scope: content · found 2026-08-03**
+
+The X3 card carried 10 entries named `*.epub` that are DIRECTORIES
+(`META-INF/`, `mimetype`, `OEBPS/`) rather than zip containers. Miniz is the
+firmware's only container library and `lib/Epub/Epub/Section.cpp` unzips at
+runtime, so these almost certainly do not open — but this was inferred from
+the container path, **not** confirmed by opening one on device or in the
+simulator.
+
+They are preserved at `~/crosspoint-books/_exploded/`. Also note
+`ls *.epub | wc -l` on such a card reports a wildly inflated count because it
+recurses into the directories (reported 510 for a real 76).
+
+**Close by:** opening one in the simulator to confirm the failure mode, then
+either re-zipping them as proper EPUBs (mimetype stored first, uncompressed)
+or discarding them.
+
+### [B-002] Two upstream commits unmerged, and unmergeable as-is
+**severity: low · scope: fork sync · by design, tracked not fixed**
+
+`9c48609f` (bookmarks survive re-pagination) and `0f747b82` (content-based
+EPUB sync positions) remain unmerged. `git merge upstream/develop` produces 18
+conflicts, six `modify/delete`, because both commits straddle live Epub engine
+code and subsystems this fork deleted on purpose.
+
+Not a defect so much as a standing cost. See [docs/fork-sync.md](docs/fork-sync.md).
+
+**Close by:** cherry-picking the live hunks only — the `Section`, `ParsedText`,
+`ChapterHtmlSlimParser`, `EpubReaderUtils.h` changes — and bumping the cache
+format version if layout output changes.
+
+---
+
+## FIXED
+
 ### [B-014] The iOS Home menu listed Claude, which cannot work on a phone
 **severity: medium · scope: iOS app · FIXED 2026-08-07 · `641e463a`, simulator `422909f`**
 
@@ -163,6 +247,43 @@ line per pixel (the B-010 mechanism).
 checking both call sites still look right — they may have been nudged to
 compensate.
 
+### [B-010] The Claude prompt hint ran off the right edge of the panel
+**severity: low · scope: Claude chat / text rendering · FIXED 2026-08-06 · `c512eef1`**
+
+Found twice the same evening, from opposite directions: by driving the daisy
+layout and looking at the screen, and in the log of the session that fixed the
+OK-key crash, whose 28-minute run carried 23 of these:
+
+```
+[1451261] [ERR] [GFX] !! Outside range (480, 120) -> (120, -1)
+…
+[1451261] [ERR] [GFX] !! Outside range (494, 131) -> (131, -14)
+```
+
+Reading them: the first pair is the logical coordinate, the second the
+post-rotation framebuffer one (`GfxRenderer.cpp:582`). Portrait maps
+`phyY = panelHeight - 1 - x` (`:224-225`), so on the X4's 480-wide logical
+screen a negative `phyY` means x ran past column 479 — here by 1 to 15 pixels,
+across rows 120-132, which is exactly one line of Space Mono 12 ink at
+`contentTop`. `drawPixel` drops the write before touching the framebuffer
+(`:574-583`), so nothing was corrupted; the glyph tails were simply cut off,
+and each lost pixel cost a log line.
+
+The string was `"Type a question, then press Ask."` — 32 characters drawn raw
+at `contentSidePadding`, with no wrap and no truncation. It fit while the
+editor borrowed the narrow 10 pt UI face and stopped fitting the moment the
+editor font became a real monospace face. The timestamp is 5 s after the
+answer arrived, i.e. Back to an emptied prompt, which is when the hint shows.
+
+Fixed by wrapping it to the `maxWidth` the prompt already computes, and by
+making it (plus NoteEditor's OOM message, same shape, two sites)
+`tr()`-translated instead of a hardcoded English literal.
+
+Verified independently of the fixing session: a headless run on `c512eef1`
+that walks Home to Claude and stops on the empty prompt logs **0**
+`Outside range` lines from `Entering activity: ClaudeChat` onward. (The same
+run logs 7,902 before it, all on Home — that is B-012, a different defect.)
+
 ### [B-009] An unrepresentable codepoint vanished and took its width with it
 **severity: low · scope: Claude chat / text rendering · FIXED 2026-08-07**
 
@@ -245,127 +366,6 @@ non-representable codepoints before layout keeps the line metrics honest;
 a system prompt would reduce but not eliminate them. Demoting the log to DEBUG
 is worth doing regardless — the firmware cannot control what a remote server
 sends, so this is not an error condition.
-
-### [B-006] X4 running firmware carries an empty version stamp
-**severity: low · scope: device provisioning · found 2026-08-02**
-
-The X4 runs a build stamped `1.5.0-BNY-rc+` — empty suffix. `gh_release_rc`
-composes its version as `1.5.0-BNY-rc+${sysenv.CROSSPOINT_RC_HASH}`
-(`platformio.ini:186`), and the flash was run without that variable set. The
-code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
-feeds the OTA version comparison, and it makes the running build
-unidentifiable after the fact.
-
-**Close by:** reflashing with the variable set, or SD Firmware Update from the
-card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
-so a same-code reflash is accepted):
-```bash
-CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
-```
-
-### [B-005] The two SD cards hold different bytes under the same bin filename
-**severity: low · scope: device provisioning · found 2026-08-02**
-
-`crosspoint-880ba0f9.bin` is md5 `262f1d51…` on OWEN_BNF (X4) and `930747eb…`
-on REDACTED-SSID (X3). Same size, same `1.5.0-BNY-rc+880ba0f9` version stamp;
-they differ only in embedded `__TIME__`/`__DATE__` strings, because the build
-was relinked between the two copies (root cause is B-004). Identical filenames
-with different content defeats later verification.
-
-**Close by:** mounting OWEN_BNF and re-copying from
-`.pio/build/gh_release_rc/firmware.bin` so both cards match. Requires the X4
-card mounted.
-
-### [B-004] Toggling CROSSPOINT_RC_HASH silently wipes every build directory
-**severity: medium · scope: build tooling · found 2026-08-03**
-
-`[env:gh_release_rc]` interpolates `${sysenv.CROSSPOINT_RC_HASH}` into
-`build_flags`, so setting or unsetting it changes the resolved config, which
-changes `.pio/build/project.checksum`, which makes the next `pio run` clean
-**all** env build dirs — not just the target env.
-
-Observed: a stamped `pio run -e gh_release_rc` deleted
-`.pio/build/simulator/program`, and a later headless simulator run died with
-`no such file or directory`, exit 127. It also caused B-005.
-
-**Close by:** either documenting it in the project guide next to the existing
-version-override section, or removing the sysenv interpolation in favour of a
-mechanism that does not perturb the checksum. Currently recorded only in
-agent memory, not in the repo. Workaround: hold the variable constant across
-every `pio run` in a session, including simulator builds.
-
-### [B-003] Exploded `.epub` directories are probably unreadable on device
-**severity: low · scope: content · found 2026-08-03**
-
-The X3 card carried 10 entries named `*.epub` that are DIRECTORIES
-(`META-INF/`, `mimetype`, `OEBPS/`) rather than zip containers. Miniz is the
-firmware's only container library and `lib/Epub/Epub/Section.cpp` unzips at
-runtime, so these almost certainly do not open — but this was inferred from
-the container path, **not** confirmed by opening one on device or in the
-simulator.
-
-They are preserved at `~/crosspoint-books/_exploded/`. Also note
-`ls *.epub | wc -l` on such a card reports a wildly inflated count because it
-recurses into the directories (reported 510 for a real 76).
-
-**Close by:** opening one in the simulator to confirm the failure mode, then
-either re-zipping them as proper EPUBs (mimetype stored first, uncompressed)
-or discarding them.
-
-### [B-002] Two upstream commits unmerged, and unmergeable as-is
-**severity: low · scope: fork sync · by design, tracked not fixed**
-
-`9c48609f` (bookmarks survive re-pagination) and `0f747b82` (content-based
-EPUB sync positions) remain unmerged. `git merge upstream/develop` produces 18
-conflicts, six `modify/delete`, because both commits straddle live Epub engine
-code and subsystems this fork deleted on purpose.
-
-Not a defect so much as a standing cost. See [docs/fork-sync.md](docs/fork-sync.md).
-
-**Close by:** cherry-picking the live hunks only — the `Section`, `ParsedText`,
-`ChapterHtmlSlimParser`, `EpubReaderUtils.h` changes — and bumping the cache
-format version if layout output changes.
-
----
-
-## FIXED
-
-### [B-010] The Claude prompt hint ran off the right edge of the panel
-**severity: low · scope: Claude chat / text rendering · FIXED 2026-08-06 · `c512eef1`**
-
-Found twice the same evening, from opposite directions: by driving the daisy
-layout and looking at the screen, and in the log of the session that fixed the
-OK-key crash, whose 28-minute run carried 23 of these:
-
-```
-[1451261] [ERR] [GFX] !! Outside range (480, 120) -> (120, -1)
-…
-[1451261] [ERR] [GFX] !! Outside range (494, 131) -> (131, -14)
-```
-
-Reading them: the first pair is the logical coordinate, the second the
-post-rotation framebuffer one (`GfxRenderer.cpp:582`). Portrait maps
-`phyY = panelHeight - 1 - x` (`:224-225`), so on the X4's 480-wide logical
-screen a negative `phyY` means x ran past column 479 — here by 1 to 15 pixels,
-across rows 120-132, which is exactly one line of Space Mono 12 ink at
-`contentTop`. `drawPixel` drops the write before touching the framebuffer
-(`:574-583`), so nothing was corrupted; the glyph tails were simply cut off,
-and each lost pixel cost a log line.
-
-The string was `"Type a question, then press Ask."` — 32 characters drawn raw
-at `contentSidePadding`, with no wrap and no truncation. It fit while the
-editor borrowed the narrow 10 pt UI face and stopped fitting the moment the
-editor font became a real monospace face. The timestamp is 5 s after the
-answer arrived, i.e. Back to an emptied prompt, which is when the hint shows.
-
-Fixed by wrapping it to the `maxWidth` the prompt already computes, and by
-making it (plus NoteEditor's OOM message, same shape, two sites)
-`tr()`-translated instead of a hardcoded English literal.
-
-Verified independently of the fixing session: a headless run on `c512eef1`
-that walks Home to Claude and stops on the empty prompt logs **0**
-`Outside range` lines from `Entering activity: ClaudeChat` onward. (The same
-run logs 7,902 before it, all on Home — that is B-012, a different defect.)
 
 ### [B-008] iOS app offers WiFi and web-server menus that cannot work
 **severity: medium · scope: iOS app · FIXED + VERIFIED 2026-08-03**
