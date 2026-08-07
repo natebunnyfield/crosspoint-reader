@@ -10,6 +10,7 @@
 #include "CrossPointSettings.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "notes/DaisyRings.h"
 #include "notes/Grid13Layout.h"
 
 namespace fui = freeink::ui;
@@ -30,42 +31,6 @@ namespace {
 // storage: 13-grid's number + symbol rows are the worst case at 26 keys
 // (QWERTY's digit row is 10). Static rather than a member because exactly one
 // activity — so one panel — is on screen at a time, and the render task is the
-// only caller; this keeps the mirror off the activity's heap allocation.
-constexpr int MAX_MIRRORED_KEYS = 26;
-constexpr int MAX_MIRRORED_ROWS = 6;
-
-const fui::KeyboardLayout& withoutAltHints(const fui::KeyboardLayout& src) {
-  static fui::KeyboardKey keys[MAX_MIRRORED_KEYS];
-  static fui::KeyboardRow rows[MAX_MIRRORED_ROWS];
-  static fui::KeyboardLayout mirrored{rows, 0};
-  static const fui::KeyboardLayout* cached = nullptr;
-
-  if (cached == &src) return mirrored;
-  // Anything that outgrows the pool keeps its hints rather than rendering a
-  // half-built layout.
-  if (src.rowCount > MAX_MIRRORED_ROWS) return src;
-
-  int pool = 0;
-  for (uint8_t r = 0; r < src.rowCount; ++r) {
-    const fui::KeyboardRow& row = src.rows[r];
-    bool hinted = false;
-    for (uint8_t c = 0; c < row.count && !hinted; ++c) hinted = row.keys[c].alt != nullptr;
-    if (!hinted || pool + row.count > MAX_MIRRORED_KEYS) {
-      rows[r] = row;
-      continue;
-    }
-    fui::KeyboardKey* dst = keys + pool;
-    for (uint8_t c = 0; c < row.count; ++c) {
-      dst[c] = row.keys[c];
-      dst[c].alt = nullptr;
-    }
-    rows[r] = fui::KeyboardRow{dst, row.count, row.insetUnits};
-    pool += row.count;
-  }
-  mirrored.rowCount = src.rowCount;
-  cached = &src;
-  return mirrored;
-}
 
 }  // namespace
 
@@ -77,7 +42,7 @@ void KeyboardPanel::begin() {
   row_ = 0;
   col_ = 0;
   petal_ = 0;
-  ring_ = 0;
+  ringIdx_ = 0;
 }
 
 const fui::KeyboardLayout& KeyboardPanel::layout() const {
@@ -85,7 +50,7 @@ const fui::KeyboardLayout& KeyboardPanel::layout() const {
   return fui::builtinKeyboardLayout(fui::KeyboardLayoutId::QwertyEn, shift_, symbols_, /*numberRow=*/true);
 }
 
-int KeyboardPanel::rowCount() const { return daisy_ ? DAISY_RINGS : layout().rowCount; }
+int KeyboardPanel::rowCount() const { return daisy_ ? 3 : layout().rowCount; }
 
 int KeyboardPanel::colsInRow(const int row) const {
   if (daisy_) return DAISY_PETALS;
@@ -94,74 +59,67 @@ int KeyboardPanel::colsInRow(const int row) const {
   return l.rows[row].count;
 }
 
-// The daisywheel's petals, as flat rings. The full-screen DaisyEntryActivity
-// draws an actual wheel; a half-height strip has no room for that geometry, so
-// the same character groups are laid out as rows here. Same letters, same
-// grouping, same order — only the arrangement differs.
-//
-// Flash-resident and returned by pointer: this is read once per cell per
-// render, and the previous std::vector<std::string> form churned twenty heap
-// allocations every time the panel repainted.
-const char* const* KeyboardPanel::daisyRing(const int ring) const {
-  static constexpr const char* RINGS[DAISY_RINGS][DAISY_PETALS] = {{"abc", "def", "ghi", "jkl", "mno"},
-                                                                   {"pqrs", "tuv", "wxyz", "0-9", ".,?!"},
-                                                                   {"Space", "Del", "Enter", "Shift", "OK"}};
-  return RINGS[ring < 0 || ring >= DAISY_RINGS ? DAISY_RINGS - 1 : ring];
+// Real daisywheel semantics, borrowed wholesale from DaisyEntryActivity: each
+// petal holds three characters and the three pick buttons choose top/middle/
+// bottom DIRECTLY. It is not a multi-tap cycle — an earlier version of this
+// panel cycled a group on repeated presses, which is not how the wheel works
+// and was rightly unusable. Left/Right rotate petals; the last petal is the
+// utility one (backspace / ring swap / OK).
+int KeyboardPanel::petalCount() const {
+  return (ringIdx_ == 0 ? daisyrings::ABC_CHAR_PETALS : daisyrings::NUM_CHAR_PETALS) + 1;
+}
+
+char KeyboardPanel::slotChar(const int petal, const int slot) const {
+  if (petal < 0 || slot < 0 || slot > 2 || petal >= petalCount() - 1) return '\0';
+  return ringIdx_ == 0 ? daisyrings::ABC_RING[petal][slot] : daisyrings::NUM_RING[petal][slot];
+}
+
+KeyboardPanel::Result KeyboardPanel::activateSlot(const int slot, const bool longPress) {
+  Result r;
+  if (!daisy_) return r;
+
+  if (petal_ == petalCount() - 1) {  // utility petal
+    if (slot == 0) {
+      r.event = Event::Backspace;
+    } else if (slot == 1) {
+      ringIdx_ ^= 1;  // swap rings, staying on the utility petal
+      petal_ = petalCount() - 1;
+    } else {
+      r.event = Event::Done;
+    }
+    return r;
+  }
+
+  const char c = slotChar(petal_, slot);
+  if (c == '\0') return r;
+  r.event = Event::Character;
+  // Long-press uppercases, exactly as the full-screen wheel does.
+  r.ch = longPress ? static_cast<char>(toupper(static_cast<unsigned char>(c))) : c;
+  return r;
 }
 
 void KeyboardPanel::moveRow(const int delta) {
+  if (daisy_) return;  // the wheel has no rows; Up/Down are pick buttons
   const int rows = rowCount();
   if (rows <= 0) return;
-  if (daisy_) {
-    ring_ = (ring_ + delta + rows) % rows;
-    petal_ = std::min(petal_, DAISY_PETALS - 1);
-    return;
-  }
   row_ = (row_ + delta + rows) % rows;
   col_ = std::min(col_, std::max(0, colsInRow(row_) - 1));
 }
 
 void KeyboardPanel::moveCol(const int delta) {
-  const int cols = colsInRow(daisy_ ? ring_ : row_);
-  if (cols <= 0) return;
-  if (daisy_) {
-    petal_ = (petal_ + delta + cols) % cols;
+  if (daisy_) {  // rotate the wheel
+    const int n = petalCount();
+    petal_ = (petal_ + delta + n) % n;
     return;
   }
+  const int cols = colsInRow(row_);
+  if (cols <= 0) return;
   col_ = (col_ + delta + cols) % cols;
 }
 
-KeyboardPanel::Result KeyboardPanel::activate() {
+KeyboardPanel::Result KeyboardPanel::activate(const bool longPress) {
   Result r;
-  if (daisy_) {
-    if (petal_ < 0 || petal_ >= DAISY_PETALS) return r;
-    const char* cell = daisyRing(ring_)[petal_];
-    if (strcmp(cell, "Space") == 0) {
-      r.event = Event::Character;
-      r.ch = ' ';
-    } else if (strcmp(cell, "Del") == 0) {
-      r.event = Event::Backspace;
-    } else if (strcmp(cell, "Enter") == 0) {
-      r.event = Event::Enter;
-    } else if (strcmp(cell, "Shift") == 0) {
-      shift_ = !shift_;
-    } else if (strcmp(cell, "OK") == 0) {
-      r.event = Event::Done;
-    } else {
-      // A group cell types its letters one at a time: repeated presses cycle
-      // through the group, matching the daisywheel's multi-tap idiom.
-      if (cell != lastGroup_) {
-        lastGroup_ = cell;
-        groupIndex_ = 0;
-      } else {
-        groupIndex_ = (groupIndex_ + 1) % static_cast<int>(strlen(cell));
-      }
-      r.event = Event::Character;
-      const char c = cell[groupIndex_];
-      r.ch = shift_ ? static_cast<char>(toupper(c)) : c;
-    }
-    return r;
-  }
+  if (daisy_) return r;  // the wheel is driven by activateSlot()
 
   const fui::KeyboardLayout& l = layout();
   if (row_ < 0 || row_ >= l.rowCount) return r;
@@ -191,9 +149,14 @@ KeyboardPanel::Result KeyboardPanel::activate() {
     default:
       break;
   }
-  if (key.output != nullptr && key.output[0] != '\0') {
+  // Long-press yields the alt output — uppercase for a letter, the corner hint
+  // for a key that declares one — matching KeyboardEntryActivity. Without this
+  // the panel could not type a capital except via Shift.
+  const char* out = longPress ? fui::keyboardAltOutputFor(l, key.value) : nullptr;
+  if (out == nullptr) out = key.output;
+  if (out != nullptr && out[0] != '\0') {
     r.event = Event::Character;
-    r.ch = key.output[0];
+    r.ch = out[0];
   }
   return r;
 }
@@ -217,31 +180,30 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
   const auto& metrics = UITheme::getInstance().getMetrics();
 
   if (daisy_) {
-    // Flat-ring rendering; see daisyRing(). Drawn to match what fui::keyboard()
-    // gives the other two layouts, so a key looks the same whichever layout is
-    // selected: no outline, black label on white, and the selected key a solid
-    // black block with the label knocked out. The full grid of 1px boxes this
-    // replaced read as a spreadsheet next to them.
-    //
-    // Ring cells are words rather than single glyphs, so borderless alone would
-    // run them together — hence the hairline rules BETWEEN cells (not around
-    // them), which separate without boxing.
-    const int rows = rowCount();
-    const int rowH = rows > 0 ? height / rows : height;
-    const int cellW = width / DAISY_PETALS;
-    const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
-    for (int rr = 0; rr < rows; ++rr) {
-      const char* const* ring = daisyRing(rr);
-      const int cy = y + rr * rowH;
-      for (int c = 0; c < DAISY_PETALS; ++c) {
-        const int cx = x + c * cellW;
-        // The last cell absorbs the division remainder so the strip ends flush.
-        const int w = c == DAISY_PETALS - 1 ? width - c * cellW : cellW;
-        const bool sel = rr == ring_ && c == petal_;
-        if (sel) renderer.fillRect(cx, cy, w, rowH, true);
-        if (c > 0 && !sel) renderer.drawLine(cx, cy + rowH / 4, cx, cy + rowH - rowH / 4, true);
-        const int tw = renderer.getTextWidth(UI_12_FONT_ID, ring[c]);
-        renderer.drawText(UI_12_FONT_ID, cx + (w - tw) / 2, cy + (rowH - lineHeight) / 2, ring[c], !sel);
+    // The wheel drawn as a strip: petals left-to-right, each showing its three
+    // characters stacked top/middle/bottom in the order the Up/Confirm/Down
+    // buttons pick them. A half-height band cannot hold a readable circle, but
+    // the mapping from button to character stays literal.
+    const int n = petalCount();
+    const int visible = n < 7 ? n : 7;
+    const int cellW = width / visible;
+    const int slotH = height / 3;
+    for (int i = 0; i < visible; ++i) {
+      const int petal = (petal_ - visible / 2 + i + n) % n;
+      const int cx = x + i * cellW;
+      const bool sel = petal == petal_;
+      if (sel) renderer.drawRect(cx, y, cellW, height, 2, true);
+      for (int slot = 0; slot < 3; ++slot) {
+        char label[8];
+        if (petal == n - 1) {
+          static const char* const UTIL[3] = {"del", "123", "ok"};
+          snprintf(label, sizeof(label), "%s", UTIL[slot]);
+        } else {
+          snprintf(label, sizeof(label), "%c", slotChar(petal, slot));
+        }
+        const int tw = renderer.getTextWidth(UI_12_FONT_ID, label);
+        renderer.drawText(UI_12_FONT_ID, cx + (cellW - tw) / 2,
+                          y + slot * slotH + (slotH - renderer.getLineHeight(UI_12_FONT_ID)) / 2, label);
       }
     }
     return;
@@ -256,7 +218,11 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
   fui::Frame<48> frame(target, device, noInput, interactions);
 
   fui::KeyboardProps props;
-  props.layout = &withoutAltHints(layout());
+  // Alt hints are shown again: the panel now HAS a long-press path
+  // (activate(longPress) -> keyboardAltOutputFor), so the corner hints
+  // advertise characters this surface can actually produce. They were
+  // suppressed while that path did not exist.
+  props.layout = &layout();
   // ASCII only: the UI face has no U+21B5, so a glyph label renders blank.
   props.okLabel = "Enter";
   props.shiftLabel = tr(STR_KEY_SHIFT);

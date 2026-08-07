@@ -45,10 +45,6 @@ void ClaudeChatActivity::onEnter() {
   }
   panel.begin();
 
-  storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
-  if (storage) buf = makeUniqueNoThrow<textbuf::TextBuffer>(storage.get(), BUF_SIZE);
-  if (!buf) LOG_ERR(TAG, "OOM: %u byte prompt buffer", (unsigned)BUF_SIZE);
-
   editorFontId = resolveEditorFont();
   const auto& metrics = UITheme::getInstance().getMetrics();
   lineHeight = renderer.getLineHeight(editorFontId);
@@ -64,6 +60,15 @@ void ClaudeChatActivity::onEnter() {
   panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
   maxLines = (panelTop - contentTop) / lineHeight;
   if (maxLines < 1) maxLines = 1;
+
+  // Allocate AFTER geometry, so an OOM cannot leave render() painting with an
+  // unset editorFontId (0 is the font-not-found sentinel).
+  storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
+  if (storage) buf = makeUniqueNoThrow<textbuf::TextBuffer>(storage.get(), BUF_SIZE);
+  if (!buf) {
+    LOG_ERR(TAG, "OOM: %u byte prompt buffer", (unsigned)BUF_SIZE);
+    oomFailed = true;
+  }
 
   requestUpdate();
 }
@@ -203,8 +208,18 @@ void ClaudeChatActivity::pollPairingGestures() {
   requestUpdate();
 }
 
-void ClaudeChatActivity::handlePanelKey() {
-  const notes::KeyboardPanel::Result r = panel.activate();
+// Re-wrap the prompt for display. Called from loop() under the render lock.
+void ClaudeChatActivity::relayoutPrompt() {
+  promptLines.clear();
+  if (!buf || buf->empty()) return;
+  const std::string prompt(buf->data(), buf->size());
+  promptLines = renderer.wrappedText(editorFontId, prompt.c_str(), maxWidth, maxLines);
+}
+
+void ClaudeChatActivity::handlePanelKey(const int slot, const bool longPress) {
+  RenderLock lock;
+  const notes::KeyboardPanel::Result r =
+      panel.isDaisy() ? panel.activateSlot(slot, longPress) : panel.activate(longPress);
   switch (r.event) {
     case notes::KeyboardPanel::Event::Character:
       handleKey(static_cast<unsigned char>(r.ch));
@@ -252,16 +267,50 @@ void ClaudeChatActivity::loop() {
     }
   }
 
+  if (oomFailed || !buf) return;  // Back above is the only thing that works
+
   pollPairingGestures();
 
   if (view == View::Prompt) {
     // Confirm types the selected key; the panel's OK key is what asks Claude.
     // Confirm was "Ask" before the on-screen keyboard existed — with a keyboard
     // on screen it has to be the type key, or there is no way to type at all.
-    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      handlePanelKey();
-      return;
+    // Pick buttons. In the GRIDS only Confirm types, and holding it yields the
+    // alt output (uppercase for a letter) exactly as the full-screen keyboard
+    // does. In DAISY the three buttons pick top/middle/bottom of the current
+    // petal, which is how the real wheel works.
+    {
+      constexpr uint32_t LONG_PRESS_MS = 500;
+      struct Pick {
+        MappedInputManager::Button button;
+        int slot;
+      };
+      const Pick picks[] = {{MappedInputManager::Button::Up, 0},
+                            {MappedInputManager::Button::Confirm, 1},
+                            {MappedInputManager::Button::Down, 2}};
+      for (const auto& pk : picks) {
+        // Up/Down only pick in daisy; elsewhere they page and long-hold pairs.
+        if (!panel.isDaisy() && pk.slot != 1) continue;
+
+        if (mappedInput.wasPressed(pk.button) && pickSlot < 0) {
+          pickSlot = pk.slot;
+          pickHeldSince = millis();
+          pickFired = false;
+        }
+        if (pickSlot == pk.slot && !pickFired && mappedInput.isPressed(pk.button) &&
+            millis() - pickHeldSince > LONG_PRESS_MS) {
+          handlePanelKey(pk.slot, /*longPress=*/true);
+          pickFired = true;
+        }
+        if (mappedInput.wasReleased(pk.button) && pickSlot == pk.slot) {
+          if (!pickFired) handlePanelKey(pk.slot, /*longPress=*/false);
+          pickSlot = -1;
+          pickFired = false;
+          return;
+        }
+      }
     }
+
     if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
       panel.moveCol(-1);
       requestUpdate();
@@ -272,12 +321,12 @@ void ClaudeChatActivity::loop() {
       requestUpdate();
       return;
     }
-    if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
+    if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
       panel.moveRow(-1);
       requestUpdate();
       return;
     }
-    if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+    if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
       panel.moveRow(1);
       requestUpdate();
       return;
@@ -303,6 +352,10 @@ void ClaudeChatActivity::loop() {
   if (dirty && (pendingChars >= FLUSH_CHARS || millis() - lastKeyMs >= SETTINGS.getDisplayDebounceMs())) {
     dirty = false;
     pendingChars = 0;
+    {
+      RenderLock lock;
+      relayoutPrompt();
+    }
     requestUpdate();
   }
 }

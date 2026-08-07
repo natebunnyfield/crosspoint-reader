@@ -37,8 +37,14 @@ class KeyboardPanel {
   void moveRow(int delta);
   void moveCol(int delta);
 
-  // Activate the selected key.
-  Result activate();
+  // Activate the selected key. longPress gives the alt output — which for a
+  // letter is its uppercase, matching the full-screen keyboard.
+  Result activate(bool longPress = false);
+
+  // Daisy only: the three pick buttons choose top/middle/bottom of the current
+  // petal directly. This is NOT a multi-tap cycle; see notes/DaisyRings.h.
+  Result activateSlot(int slot, bool longPress = false);
+  bool isDaisy() const { return daisy_; }
 
   // Height this panel wants for `rows` of keys at the theme's key spacing.
   int preferredHeight(const GfxRenderer& renderer) const;
@@ -53,9 +59,9 @@ class KeyboardPanel {
   int rowCount() const;
   int colsInRow(int row) const;
   int selectedLogicalIndex() const;
-  const char* const* daisyRing(int ring) const;
+  int petalCount() const;
+  char slotChar(int petal, int slot) const;
 
-  static constexpr int DAISY_RINGS = 3;
   static constexpr int DAISY_PETALS = 5;
 
   bool shift_ = false;
@@ -64,7 +70,7 @@ class KeyboardPanel {
   int col_ = 0;
   bool grid13_ = false;
   bool daisy_ = false;
-  int ring_ = 0;
+  int ringIdx_ = 0;  // 0 = abc ring, 1 = numbers/symbols
   int petal_ = 0;
   // The multi-tap group currently being cycled. Cells come from one static
   // table, so identity is the pointer; no cell text repeats.

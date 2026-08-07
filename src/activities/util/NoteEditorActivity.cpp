@@ -44,28 +44,13 @@ int NoteEditorActivity::advanceOf(const char* piece, EpdFontFamily::Style style)
 void NoteEditorActivity::onEnter() {
   Activity::onEnter();
 
-  // The on-screen keyboard is the default input. BLE only comes up when a
-  // keyboard is already bonded — it costs ~72 KB of heap and a CPU-clock lock,
-  // which an owner with no keyboard paired should not pay. Long-press Up pairs
-  // one on demand.
-  if (blekbd::hasBondedKeyboard()) {
-    blekbd::begin();
-  } else {
-    LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (hold Up to pair)");
-  }
   panel.begin();
 
-  storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
-  if (!storage) {
-    LOG_ERR(TAG, "OOM: %u bytes", (unsigned)BUF_SIZE);
-    return;
-  }
-  buf = makeUniqueNoThrow<textbuf::TextBuffer>(storage.get(), BUF_SIZE);
-  if (!buf) {
-    LOG_ERR(TAG, "OOM: TextBuffer");
-    return;
-  }
-
+  // Geometry FIRST, allocation second. render() runs on its own task and will
+  // paint this activity whatever happens here; returning early on OOM used to
+  // leave editorFontId at 0 — the "font not found" sentinel — plus lineHeight
+  // and panelHeight unset. Same shape as the NimBLE-before-init panic: a
+  // failure path that leaves the object half-built and still live.
   editorFontId = resolveEditorFont();
   const auto& metrics = UITheme::getInstance().getMetrics();
   lineHeight = renderer.getLineHeight(editorFontId);
@@ -73,14 +58,32 @@ void NoteEditorActivity::onEnter() {
   contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
 
-  // Split screen: note above, keyboard below. The strip stands off the button
-  // hints by the theme's spacing, the same clearance KeyboardEntryActivity
-  // gives its keyboard — flush against the bar, the bottom row of keys reads as
-  // part of it.
   panelHeight = panel.preferredHeight(renderer);
   panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
   maxLines = (panelTop - contentTop) / lineHeight;
   if (maxLines < 1) maxLines = 1;
+
+  storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
+  if (storage) buf = makeUniqueNoThrow<textbuf::TextBuffer>(storage.get(), BUF_SIZE);
+  if (!buf) {
+    // Say so on screen rather than presenting an editor that silently eats
+    // every keystroke.
+    LOG_ERR(TAG, "OOM: %u byte note buffer", (unsigned)BUF_SIZE);
+    oomFailed = true;
+    requestUpdate();
+    return;
+  }
+
+  // BLE comes up AFTER the note buffer, and only when a keyboard is already
+  // bonded. Ordering matters: BLE takes ~72 KB, so starting it first was a way
+  // to make the 8 KB buffer fail. It used to go first to give
+  // nimble_port_init() the roomiest heap — but that hang was the CPU dropping
+  // to 10 MHz, not memory, so the reason no longer holds.
+  if (blekbd::hasBondedKeyboard()) {
+    blekbd::begin();
+  } else {
+    LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (hold Up to pair)");
+  }
 
   // Load an existing note so Edit-from-Manage-Files is a real edit, not a
   // silent overwrite. Anything past the cap is refused rather than truncated.
@@ -270,8 +273,14 @@ void NoteEditorActivity::pollPairingGestures() {
   requestUpdate();
 }
 
-void NoteEditorActivity::handlePanelKey() {
-  const notes::KeyboardPanel::Result r = panel.activate();
+void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
+  // Everything below mutates buf/lines/topLine, all of which render() walks on
+  // its own task.
+  RenderLock lock;
+  // Daisy picks a slot within the current petal; the grids activate the
+  // selected key, with long-press giving the alt output (uppercase).
+  const notes::KeyboardPanel::Result r =
+      panel.isDaisy() ? panel.activateSlot(slot, longPress) : panel.activate(longPress);
   switch (r.event) {
     case notes::KeyboardPanel::Event::Character:
       handleKey(static_cast<unsigned char>(r.ch));
@@ -299,15 +308,49 @@ void NoteEditorActivity::loop() {
     return;
   }
 
+  if (oomFailed || !buf) return;  // Back above is the only thing that works
+
   pollPairingGestures();
 
   // Front buttons drive the on-screen keyboard: Left/Right move along a row,
   // Confirm types the selected key. Side buttons move between rows — a long
   // hold on those is the pairing gesture, handled above.
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    handlePanelKey();
-    return;
+  // Pick buttons. In the GRIDS only Confirm types, and holding it yields the
+  // alt output (uppercase for a letter) exactly as the full-screen keyboard
+  // does. In DAISY the three buttons pick top/middle/bottom of the current
+  // petal, which is how the real wheel works.
+  {
+    constexpr uint32_t LONG_PRESS_MS = 500;
+    struct Pick {
+      MappedInputManager::Button button;
+      int slot;
+    };
+    const Pick picks[] = {{MappedInputManager::Button::Up, 0},
+                          {MappedInputManager::Button::Confirm, 1},
+                          {MappedInputManager::Button::Down, 2}};
+    for (const auto& pk : picks) {
+      // Up/Down only pick in daisy; elsewhere they page and long-hold pairs.
+      if (!panel.isDaisy() && pk.slot != 1) continue;
+
+      if (mappedInput.wasPressed(pk.button) && pickSlot < 0) {
+        pickSlot = pk.slot;
+        pickHeldSince = millis();
+        pickFired = false;
+      }
+      if (pickSlot == pk.slot && !pickFired && mappedInput.isPressed(pk.button) &&
+          millis() - pickHeldSince > LONG_PRESS_MS) {
+        handlePanelKey(pk.slot, /*longPress=*/true);
+        pickFired = true;
+      }
+      if (mappedInput.wasReleased(pk.button) && pickSlot == pk.slot) {
+        if (!pickFired) handlePanelKey(pk.slot, /*longPress=*/false);
+        pickSlot = -1;
+        pickFired = false;
+        return;
+      }
+    }
   }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
     panel.moveCol(-1);
     requestUpdate();
@@ -318,12 +361,12 @@ void NoteEditorActivity::loop() {
     requestUpdate();
     return;
   }
-  if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
+  if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
     panel.moveRow(-1);
     requestUpdate();
     return;
   }
-  if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+  if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
     panel.moveRow(1);
     requestUpdate();
     return;
@@ -344,8 +387,14 @@ void NoteEditorActivity::loop() {
   if (dirty && (pendingChars >= FLUSH_CHARS || millis() - lastKeyMs >= SETTINGS.getDisplayDebounceMs())) {
     dirty = false;
     pendingChars = 0;
-    relayout();
-    ensureCursorVisible();
+    {
+      // render() runs on the ActivityManager's render task and walks `lines`
+      // and `buf`. relayout() clears and regrows that vector, so without the
+      // lock a repaint can hold a reference into a reallocated buffer.
+      RenderLock lock;
+      relayout();
+      ensureCursorVisible();
+    }
     requestUpdate();
   }
 }
@@ -416,6 +465,22 @@ void NoteEditorActivity::render(RenderLock&&) {
   const size_t pages = maxLines > 0 ? (lines.size() + maxLines - 1) / maxLines : 1;
   snprintf(header, sizeof(header), "%s  %u/%u", path.c_str(), (unsigned)page, (unsigned)(pages ? pages : 1));
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, header);
+
+  if (oomFailed || !buf) {
+    renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop, "Not enough memory to open the editor.");
+    const auto oomLabels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    GUI.drawButtonHints(renderer, oomLabels.btn1, oomLabels.btn2, oomLabels.btn3, oomLabels.btn4);
+    renderer.displayBuffer();
+    return;
+  }
+
+  if (oomFailed || !buf) {
+    renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop, "Not enough memory to open the editor.");
+    const auto oomLabels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    GUI.drawButtonHints(renderer, oomLabels.btn1, oomLabels.btn2, oomLabels.btn3, oomLabels.btn4);
+    renderer.displayBuffer();
+    return;
+  }
 
   const size_t cl = lineOfCursor();
   for (size_t n = 0; n < static_cast<size_t>(maxLines) && topLine + n < lines.size(); ++n) {

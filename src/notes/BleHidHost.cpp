@@ -3,12 +3,11 @@
 
 #include <Arduino.h>
 #include <Logging.h>
-
-#include "CrossPointSettings.h"
 #include <string.h>
 
 #include <atomic>
 
+#include "CrossPointSettings.h"
 #include "HidKeymap.h"
 
 #ifdef SIMULATOR
@@ -18,6 +17,8 @@
 // keystrokes. Same ring, same popChar() contract, so the editor is unchanged
 // and the whole flow becomes scriptable.
 #include <HalStorage.h>
+
+#include "CrossPointSettings.h"
 
 namespace blekbd {
 namespace {
@@ -52,8 +53,12 @@ void pollInput() {
 }
 }  // namespace
 
-bool canStart() { return true; }           // no radio to bring up
-bool hasBondedKeyboard() { return true; }  // the simulated keyboard is always "paired"
+bool canStart() { return true; }  // no radio to bring up
+// Reads the SAME flag as the device rather than answering true. The old
+// unconditional true meant the "no keyboard bonded" path — the one that skips
+// BLE entirely — was never exercised in the simulator, which is exactly how two
+// NimBLE-called-before-init panics reached hardware.
+bool hasBondedKeyboard() { return SETTINGS.btKeyboardPaired != 0; }
 void disconnectKeepingBond() {}
 void forgetAllBonds() {}
 
@@ -184,6 +189,9 @@ ReportInfo gReports[MAX_REPORTS];
 size_t gReportCount = 0;
 size_t gSubIndex = 0;  // which report we are subscribing
 bool gDiscoveryRunning = false;
+// Set when a Forget could not reach the bond store because the host would not
+// start; honoured on the next successful init.
+bool gForgetPending = false;
 
 // Single-producer (host task) / single-consumer (main task) ring.
 int gRing[RING_SIZE];
@@ -736,6 +744,12 @@ bool begin() {
 
   ble_store_config_init();
 
+  if (gForgetPending) {
+    const int frc = ble_store_clear();
+    LOG_INF(TAG, "applying deferred forget rc=%d", frc);
+    if (frc == 0) gForgetPending = false;
+  }
+
   gStarted = true;
   setState(State::Starting);
   nimble_port_freertos_init(hostTask);
@@ -782,19 +796,50 @@ bool hasBondedKeyboard() {
 }
 
 void disconnectKeepingBond() {
-  if (gConnHandle != BLE_HS_CONN_HANDLE_NONE) {
+  // gStarted guard: gConnHandle is only ever set while the host is up, but be
+  // explicit — every entry point here is reachable with BLE off.
+  if (gStarted && gConnHandle != BLE_HS_CONN_HANDLE_NONE) {
     LOG_INF(TAG, "disconnecting, bond kept");
     ble_gap_terminate(gConnHandle, BLE_ERR_REM_USER_CONN_TERM);
   }
 }
 
 void forgetAllBonds() {
+  // ble_store_clear() is a NimBLE host call and panics with the host down —
+  // the same defect that crashed Create Note. Settings -> Forget is reachable
+  // at any time, and BLE is normally NOT running, so bring the host up for the
+  // duration if needed rather than calling into nothing.
+  const bool wasRunning = gStarted;
+  if (!wasRunning) {
+    if (!begin()) {
+      // Cannot reach the bond store. Clear the flag anyway so the device stops
+      // starting BLE on entry, and wipe the bonds on the next successful init.
+      LOG_ERR(TAG, "cannot start host to clear bonds; clearing the paired flag only");
+      gForgetPending = true;
+      if (SETTINGS.btKeyboardPaired != 0) {
+        SETTINGS.btKeyboardPaired = 0;
+        SETTINGS.saveToFile();
+      }
+      return;
+    }
+  }
+
   const int rc = ble_store_clear();
   LOG_INF(TAG, "forget all bonds rc=%d", rc);
+  // Only call it done if the store actually cleared; otherwise leave the
+  // pending flag set so the next successful init retries, rather than
+  // reporting success while the bonds are still in NVS.
+  if (rc == 0) {
+    gForgetPending = false;
+  } else {
+    LOG_ERR(TAG, "bond store did not clear; will retry on next init");
+    gForgetPending = true;
+  }
   if (SETTINGS.btKeyboardPaired != 0) {
     SETTINGS.btKeyboardPaired = 0;
     SETTINGS.saveToFile();
   }
+  if (!wasRunning) end();  // leave the radio as we found it
 }
 
 State state() { return gState; }

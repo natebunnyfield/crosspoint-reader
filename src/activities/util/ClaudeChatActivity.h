@@ -26,7 +26,8 @@ class ClaudeChatActivity final : public Activity {
   char phaseText[48] = {0};
   std::string answer;
   std::vector<std::string> answerLines;
-  size_t answerTop = 0;  // pagination through a long answer
+  std::vector<std::string> promptLines;  // wrapped in loop(), never in render()
+  size_t answerTop = 0;                  // pagination through a long answer
 
   // On-screen keyboard is the default input here too; a BLE keyboard is
   // optional and only started when one is already bonded.
@@ -34,6 +35,9 @@ class ClaudeChatActivity final : public Activity {
   int panelHeight = 0;
   int panelTop = 0;
   uint32_t sideHeldSince = 0;
+  uint32_t pickHeldSince = 0;
+  int pickSlot = -1;
+  bool pickFired = false;
   bool sideHandled = false;
 
   int editorFontId = 0;
@@ -42,12 +46,15 @@ class ClaudeChatActivity final : public Activity {
   int maxWidth = 0;
   int contentTop = 0;
 
+  bool oomFailed = false;  // prompt buffer could not be allocated
   bool dirty = false;
   size_t pendingChars = 0;
   uint32_t lastKeyMs = 0;
 
   void handleKey(int key);
-  void handlePanelKey();
+  // slot is the daisy pick (0=top,1=middle,2=bottom); ignored by the grids.
+  void handlePanelKey(int slot = 1, bool longPress = false);
+  void relayoutPrompt();
   void pollPairingGestures();
   void send();
   void setPhase(const char* phase);

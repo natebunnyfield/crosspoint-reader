@@ -48,10 +48,14 @@ class NoteEditorActivity final : public Activity {
   // text area's bottom and the strip's top cannot drift apart.
   int panelTop = 0;
   uint32_t sideHeldSince = 0;
+  uint32_t pickHeldSince = 0;
+  int pickSlot = -1;
+  bool pickFired = false;
   bool sideHandled = false;
 
   bool dirty = false;
   bool bufferFull = false;
+  bool oomFailed = false;  // buffer could not be allocated; render says so
   size_t pendingChars = 0;
   uint32_t lastKeyMs = 0;
   bool savedOk = false;
@@ -62,7 +66,8 @@ class NoteEditorActivity final : public Activity {
   void pageDown();
   size_t lineOfCursor() const;
   void handleKey(int key);
-  void handlePanelKey();
+  // slot is the daisy pick (0=top,1=middle,2=bottom); ignored by the grids.
+  void handlePanelKey(int slot = 1, bool longPress = false);
   void pollPairingGestures();
   void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
   int advanceOf(const char* piece, EpdFontFamily::Style style) const;

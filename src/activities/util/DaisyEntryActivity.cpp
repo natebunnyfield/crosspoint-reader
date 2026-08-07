@@ -9,23 +9,17 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "notes/DaisyRings.h"
 #include "util/TypedTextInput.h"
 
 namespace {
 
-// Petals clockwise from 12 o'clock, each [top, middle, bottom]; the utility
-// petal (backspace / swap / OK) is appended as the last petal of each ring, so
-// it is wrap-adjacent to petal 1. Coverage: a-z (+ uppercase via long-press),
-// 0-9, . , - _ / : ; @ ' " ! ? & ( ) + = # $ % * ~ and space -- the full WiFi
-// password requirement per docs/daisywheel.md.
-constexpr int ABC_CHAR_PETALS = 9;
-constexpr char ABC_RING[ABC_CHAR_PETALS][3] = {{'a', 'b', 'c'}, {'d', 'e', 'f'}, {'g', 'h', 'i'},
-                                               {'j', 'k', 'l'}, {'m', 'n', 'o'}, {'p', 'q', 'r'},
-                                               {'s', 't', 'u'}, {'v', 'w', 'x'}, {'y', 'z', ' '}};
-constexpr int NUM_CHAR_PETALS = 11;
-constexpr char NUM_RING[NUM_CHAR_PETALS][3] = {{'1', '2', '3'}, {'4', '5', '6'}, {'7', '8', '9'},  {'0', '.', ','},
-                                               {'-', '_', '/'}, {':', ';', '@'}, {'\'', '"', '!'}, {'?', '&', '('},
-                                               {')', '+', '='}, {'#', '$', '%'}, {'*', '~', ' '}};
+// Ring tables moved to src/notes/DaisyRings.h so the split-screen panel picks
+// from the same petals. Referenced as daisyrings::ABC_RING / NUM_RING.
+using daisyrings::ABC_CHAR_PETALS;
+using daisyrings::ABC_RING;
+using daisyrings::NUM_CHAR_PETALS;
+using daisyrings::NUM_RING;
 
 // Screen-space angle helpers: theta = 0 at 12 o'clock, increasing clockwise.
 // Screen y grows downward, so a point at (r, theta) is (cx + r*sin, cy - r*cos).
