@@ -160,6 +160,19 @@ was added. That script caps it at 3 GB, evicting least-recently-used first
 `CROSSPOINT_BUILD_CACHE_MAX_MB`; `0` disables the cap but still keeps `.elf`s
 out of the cache.
 
+**The cache is shared across worktrees, via the environment.** `build_cache_dir`
+in the ini is a *relative* path, so every git worktree used to get its own
+private `.cache` — each honouring the 3 GB cap independently. Measured
+2026-08-06: 7.1 GB spread over seven worktree caches on top of the main
+checkout's 3 GB. The machine now exports
+`PLATFORMIO_BUILD_CACHE_DIR=$HOME/.platformio/build_cache` (in the personal
+dotfiles, not committed here), which PlatformIO honours over the ini
+(`platformio/project/options.py`, `sysenvvar`). Do **not** "fix" this by putting
+an absolute path in `platformio.local.ini`: that file is gitignored, so a newly
+created worktree would not have it and would silently fall back to a private
+cache — the exact bug. Sharing also lifts hit rates, since worktrees of one repo
+compile identical translation units.
+
 Two things about how it is wired, both of which cost a debugging cycle to find:
 
 * It is registered as **both `pre:` and `post:`**. During `pre:`, `PROGNAME` is
