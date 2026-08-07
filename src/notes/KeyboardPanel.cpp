@@ -50,6 +50,35 @@ const fui::KeyboardLayout& KeyboardPanel::layout() const {
   return fui::builtinKeyboardLayout(fui::KeyboardLayoutId::QwertyEn, shift_, symbols_, /*numberRow=*/true);
 }
 
+// Unit helpers mirroring KeyboardEntryActivity: 13-Grid rows all sum to 13
+// width units, so a column anchor expressed in UNITS survives a vertical move
+// exactly, and a wide key remembers which column it was entered from.
+int KeyboardPanel::keyIndexAtUnit(const int row, const int unit) const {
+  const fui::KeyboardLayout& l = layout();
+  if (row < 0 || row >= l.rowCount) return 0;
+  const fui::KeyboardRow& r = l.rows[row];
+  int acc = 0;
+  for (int i = 0; i < r.count; i++) {
+    acc += r.keys[i].widthUnits;
+    if (unit < acc) return i;
+  }
+  return r.count > 0 ? r.count - 1 : 0;
+}
+
+void KeyboardPanel::keyUnitSpan(const int row, const int keyIdx, int& start, int& end) const {
+  const fui::KeyboardLayout& l = layout();
+  start = 0;
+  end = 1;
+  if (row < 0 || row >= l.rowCount) return;
+  const fui::KeyboardRow& r = l.rows[row];
+  int acc = 0;
+  for (int i = 0; i < r.count && i <= keyIdx; i++) {
+    start = acc;
+    acc += r.keys[i].widthUnits;
+    end = acc;
+  }
+}
+
 int KeyboardPanel::rowCount() const { return daisy_ ? 3 : layout().rowCount; }
 
 int KeyboardPanel::colsInRow(const int row) const {
@@ -102,8 +131,23 @@ void KeyboardPanel::moveRow(const int delta) {
   if (daisy_) return;  // the wheel has no rows; Up/Down are pick buttons
   const int rows = rowCount();
   if (rows <= 0) return;
+
+  if (grid13_) {
+    // Column anchor in units: a vertical move never shifts the column, which
+    // is what makes the 3+7+3 bottom row navigable. Clamping instead (what
+    // this did before) dumped the selection onto Del every time.
+    row_ = (row_ + delta + rows) % rows;
+    col_ = keyIndexAtUnit(row_, anchorUnit_);
+    return;
+  }
+
+  // Proportional mapping keeps vertical travel intuitive between rows with
+  // different key counts — a 10-key letter row over a 6-key bottom row.
+  const int oldCols = colsInRow(row_);
   row_ = (row_ + delta + rows) % rows;
-  col_ = std::min(col_, std::max(0, colsInRow(row_) - 1));
+  const int newCols = colsInRow(row_);
+  if (oldCols > 0 && newCols > 0 && oldCols != newCols) col_ = col_ * newCols / oldCols;
+  col_ = std::min(std::max(col_, 0), std::max(0, newCols - 1));
 }
 
 void KeyboardPanel::moveCol(const int delta) {
@@ -115,6 +159,15 @@ void KeyboardPanel::moveCol(const int delta) {
   const int cols = colsInRow(row_);
   if (cols <= 0) return;
   col_ = (col_ + delta + cols) % cols;
+  if (grid13_) {
+    // Minimal movement of the anchor: a wide key remembers the column it was
+    // entered from and gives it back on exit.
+    int start = 0;
+    int end = 0;
+    keyUnitSpan(row_, col_, start, end);
+    if (anchorUnit_ < start) anchorUnit_ = start;
+    if (anchorUnit_ > end - 1) anchorUnit_ = end - 1;
+  }
 }
 
 KeyboardPanel::Result KeyboardPanel::activate(const bool longPress) {
@@ -138,7 +191,8 @@ KeyboardPanel::Result KeyboardPanel::activate(const bool longPress) {
       col_ = std::min(col_, std::max(0, colsInRow(row_) - 1));
       return r;
     case fui::KeyKind::Delete:
-      r.event = Event::Backspace;
+      // Held Del clears the lot, same as the full-screen keyboard.
+      r.event = longPress ? Event::ClearAll : Event::Backspace;
       return r;
     case fui::KeyKind::Ok:
       // In a hosted panel "OK" means newline, not "finish": the host activity
@@ -157,6 +211,9 @@ KeyboardPanel::Result KeyboardPanel::activate(const bool longPress) {
   if (out != nullptr && out[0] != '\0') {
     r.event = Event::Character;
     r.ch = out[0];
+    // Shift is one-shot, matching the full-screen keyboard. Without this,
+    // Shift latched and "Abc" came out "ABC".
+    if (shift_ && !symbols_) shift_ = false;
   }
   return r;
 }

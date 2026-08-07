@@ -288,6 +288,9 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
     case notes::KeyboardPanel::Event::Backspace:
       handleKey('\b');
       break;
+    case notes::KeyboardPanel::Event::ClearAll:
+      if (buf) buf->clear();
+      break;
     case notes::KeyboardPanel::Event::Enter:
       handleKey('\n');
       break;

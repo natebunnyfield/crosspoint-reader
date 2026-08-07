@@ -20,6 +20,11 @@ namespace grid13 {
   fui::KeyboardKey { label, output, fui::KeyKind::Normal, fui::StateNormal, value, units, true, nullptr }
 #define UKS(label, kind, value, units) \
   fui::KeyboardKey { label, nullptr, kind, fui::StateNormal, value, units, true, nullptr }
+// Space needs BOTH a Space kind (so the SDK draws its space-bar rule rather
+// than a blank key) and an output (so it still types). UKS nulls the output and
+// UKW forces Normal, hence a third form.
+#define UKSP(units) \
+  fui::KeyboardKey { " ", " ", fui::KeyKind::Space, fui::StateNormal, ' ', units, true, nullptr }
 
 // ---------------------------------------------------------------------------
 // 13-grid split-letters layout ("Class rows", ruled 2026-08-04). One layer:
@@ -48,8 +53,7 @@ inline const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), U
                                          UK("r", "r", 'r'), UK("s", "s", 's'), UK("t", "t", 't'), UK("u", "u", 'u'),
                                          UK("v", "v", 'v'), UK("w", "w", 'w'), UK("x", "x", 'x'), UK("y", "y", 'y'),
                                          UK("z", "z", 'z')};
-inline const fui::KeyboardKey SL_BOTTOM[] = {UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 3),
-                                             UKW(" ", " ", ' ', 7),
+inline const fui::KeyboardKey SL_BOTTOM[] = {UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 3), UKSP(7),
                                              UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 3)};
 
 inline const fui::KeyboardRow SL_ROWS[] = {
@@ -60,5 +64,6 @@ inline const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 5};
 #undef UKA
 #undef UKW
 #undef UKS
+#undef UKSP
 
 }  // namespace grid13

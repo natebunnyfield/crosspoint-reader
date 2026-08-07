@@ -24,7 +24,7 @@ namespace notes {
 class KeyboardPanel {
  public:
   // What a key press means to the host activity.
-  enum class Event : uint8_t { None, Character, Backspace, Enter, Done };
+  enum class Event : uint8_t { None, Character, Backspace, ClearAll, Enter, Done };
 
   struct Result {
     Event event = Event::None;
@@ -59,6 +59,8 @@ class KeyboardPanel {
   int rowCount() const;
   int colsInRow(int row) const;
   int selectedLogicalIndex() const;
+  int keyIndexAtUnit(int row, int unit) const;
+  void keyUnitSpan(int row, int keyIdx, int& start, int& end) const;
   int petalCount() const;
   char slotChar(int petal, int slot) const;
 
@@ -68,6 +70,7 @@ class KeyboardPanel {
   bool symbols_ = false;
   int row_ = 0;
   int col_ = 0;
+  int anchorUnit_ = 0;  // 13-Grid column anchor, in width units
   bool grid13_ = false;
   bool daisy_ = false;
   int ringIdx_ = 0;  // 0 = abc ring, 1 = numbers/symbols
