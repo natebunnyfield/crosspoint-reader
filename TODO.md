@@ -134,18 +134,44 @@ bans only browsers and feed readers), which is how it got in without anyone
 deciding. Keep it and amend the docs, gate it out of device builds, or retire
 it — but the docs should stop contradicting the binary either way.
 
-### [T-003] The published SSID and the API key
-`ClaudeChat.cpp:29` hardcodes a home SSID in a public repo, and
-`claude-key.txt` sits at the SD root where the file-transfer server lists and
-serves it — `isProtectedItemName` covers only dot-prefixed names plus
-`{"System Volume Information", "XTCache"}`, and only on rename/delete/move.
+### [T-003] The published SSID and the API key — DONE
+**scope: security · ruled and executed 2026-08-07**
 
-The code fix is small and unambiguous. **Scrubbing the SSID from published
-history is the part that needs a decision** — it means a force-push against a
-public fork.
+Both halves are closed.
 
-Note the exposure widened on 2026-08-07: before the network split, WebDAV was
-not compiled into iOS, so the key was not servable from the phone. Now it is.
+**The key.** `claude-key.txt` is in `HIDDEN_ITEMS` in both
+`src/network/CrossPointWebServer.cpp` and `src/network/WebDAVHandler.cpp` — two
+separate arrays, both needed. Measured against the running simulator before and
+after: the download endpoint and WebDAV GET each went from **200 with the key in
+the body** to 403, DELETE to 403, and the file left the listing, while a control
+file still transferred at 200. A leading dot would not have worked: WebDAV
+deliberately serves dot-paths so a card mirror can sync `/.crosspoint` and
+`/.fonts`.
+
+**The SSID.** Gone from the code — `connectWifi` walks saved credentials like
+the Wi-Fi picker's auto-connect — and scrubbed from published history on
+2026-08-07. 166 commits rewritten (2026-08-03 forward), force-pushed to the
+fork. Root commit, commit count and shared ancestry with `upstream/develop` all
+verified unchanged afterwards.
+
+**Two things worth remembering from doing it:**
+
+- `git filter-repo` strips GPG signatures. Run unscoped, it rewrote the *root*
+  commit — which upstream signed — and cascaded to all 1361 commits, severing
+  the fork from upstream entirely. Scope any future rewrite with
+  `--refs <first-bad>^..main --partial`.
+- `--replace-text` rewrites file contents only. Four commit **messages** still
+  carried the SSID until `--replace-message` was added with the same rules file.
+
+Cost paid: 7 of the rewritten commits were GPG-signed and are now unsigned.
+Pre-scrub history is preserved at
+`~/crosspoint-archive/crosspoint-reader-prescrub-20260807-1555.bundle` and as
+`refs/prescrub/main` locally.
+
+**Still outstanding, and it is not a code change:** the API key was served over
+the network by every build up to today, and the SSID was public from 2026-08-03.
+A scrub limits future exposure and retracts nothing — anyone who cloned still
+has both. **Rotate the Anthropic key.**
 
 ### [T-004] Make the simulator stop lying about the device
 `S-001` in the simulator's `BUGS.md` lists six places where it reports the

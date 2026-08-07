@@ -342,7 +342,7 @@ Both cards were mounted together and written in one `cpcards` pass, so they now
 carry a single identically-named, identically-hashed bin and nothing else:
 
 ```
-REDACTED-SSID  20260807T0709Z-crosspoint-e194ab7b.bin
+CARD-X3      20260807T0709Z-crosspoint-e194ab7b.bin
 OWEN_BNF     20260807T0709Z-crosspoint-e194ab7b.bin
 both sha256  564cd3cdd530494dcc7d01adb1ed83ea15e15edccfb24b1f6ffd12990120f14f
 ```
@@ -360,7 +360,7 @@ one `cpcards` run rather than one card per run.
 Original report below.
 
 `crosspoint-880ba0f9.bin` is md5 `262f1d51…` on OWEN_BNF (X4) and `930747eb…`
-on REDACTED-SSID (X3). Same size, same `1.5.0-BNY-rc+880ba0f9` version stamp;
+on CARD-X3. Same size, same `1.5.0-BNY-rc+880ba0f9` version stamp;
 they differ only in embedded `__TIME__`/`__DATE__` strings, because the build
 was relinked between the two copies (root cause is B-004). Identical filenames
 with different content defeats later verification.

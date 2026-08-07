@@ -311,7 +311,7 @@ TeXGyreSchola, LibreFranklin, QuattrocentoSans.** Buildable is not installed:
 everything else stays a recipe only. Every surface carries exactly these six —
 device SD cards, `fs_/fonts/`, and the iOS seed bundle
 (`crosspoint-simulator/ios/seedfonts/`), each with its `2x/` hi-res companions.
-An earlier sweep found one 16 KB cluster of `Rosarivo_16.cpfont` on REDACTED-SSID
+An earlier sweep found one 16 KB cluster of `Rosarivo_16.cpfont` on CARD-X3
 overwritten with foreign data, so compare hashes rather than filenames when
 checking a card.
 
@@ -323,7 +323,7 @@ rendering Rosarivo from double-resolution glyph tables since December. The
 filenames and the directory listing looked perfect; only hashing found it.
 Freight Sans (never on a card) was cut to C tier on 2026-08-04.
 
-**REDACTED-SSID (X3) is NOT verified, and the card looks unhealthy.** It dropped
+**CARD-X3 is NOT verified, and the card looks unhealthy.** It dropped
 off the bus twice during sustained reads on 2026-08-06, mid-verification both
 times, after smaller writes to it had completed and hash-verified. Treat a
 volume that disappears during a read as a hardware question, not a font
