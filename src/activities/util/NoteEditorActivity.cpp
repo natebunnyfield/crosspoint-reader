@@ -115,6 +115,7 @@ void NoteEditorActivity::onEnter() {
     if (size >= BUF_SIZE) {
       LOG_ERR(TAG, "%s is %u bytes, cap is %u — refusing to open", path.c_str(), (unsigned)size, (unsigned)BUF_SIZE);
       bufferFull = true;
+      loadRefused = true;
     } else {
       char chunk[256];
       int n;
@@ -592,6 +593,15 @@ void NoteEditorActivity::render(RenderLock&&) {
 
 bool NoteEditorActivity::save() {
   if (!buf) return false;
+  // onEnter refused to load this file, so the buffer never held its contents.
+  // Writing here would truncate it to zero -- openFileForWrite is O_TRUNC and
+  // an empty buffer is a legitimate save (see below), so nothing further down
+  // can tell the two apart. Opening a .txt book in the editor and pressing
+  // Back destroyed it.
+  if (loadRefused) {
+    LOG_INF(TAG, "not saving %s: it was never loaded", path.c_str());
+    return false;
+  }
   // An emptied note still saves: openFileForWrite truncates, so writing zero
   // bytes is the correct way to record "the owner deleted this text". Refusing
   // left the previous contents on the card.
