@@ -27,7 +27,7 @@
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "activities/boot_sleep/SleepScreenPolicy.h"
-#ifndef CROSSPOINT_NO_NETWORK
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #endif
 #include "components/UITheme.h"
@@ -541,7 +541,7 @@ void setup() {
   }
 
   if (recoveryFirmwareMode) {
-#ifndef CROSSPOINT_NO_NETWORK
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
     // Skip normal home/reader routing: jump straight into the SD firmware picker.
     activityManager.replaceActivity(
         std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInputManager, /*recoveryMode=*/true));

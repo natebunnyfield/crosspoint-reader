@@ -12,23 +12,19 @@
 #include "ClockOffsetActivity.h"
 #include "CrossPointSettings.h"
 #include "notes/BleHidHost.h"
-#ifndef CROSSPOINT_NO_NETWORK
 #include "FontDownloadActivity.h"
-#endif
 #include "FontSelectionActivity.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
 #include "SystemFont.h"
 #include "activities/boot_sleep/SleepScreenPolicy.h"
-#ifndef CROSSPOINT_NO_NETWORK
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "OtaUpdateActivity.h"
 #include "SdFirmwareUpdateActivity.h"
 #endif
 #include "SdCardFontSystem.h"
 #include "SettingsList.h"
-#ifndef CROSSPOINT_NO_NETWORK
 #include "activities/network/WifiSelectionActivity.h"
-#endif
 #include "activities/util/IntervalSelectionActivity.h"
 #include "activities/util/TextEntryFactory.h"
 #include "components/UITheme.h"
@@ -58,15 +54,13 @@ void SettingsActivity::rebuildSettingsLists() {
   }
 
   // Append device-only ACTION items
-#ifndef CROSSPOINT_NO_NETWORK
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
-#endif
   // Bluetooth keyboard: pairing lives here rather than only behind the
   // long-press gesture in Create Note / Claude, so it is discoverable.
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_PAIR_BT_KEYBOARD, SettingAction::PairBluetoothKeyboard));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_FORGET_BT_KEYBOARD, SettingAction::ForgetBluetoothKeyboard));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
-#ifndef CROSSPOINT_NO_NETWORK
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
 #endif
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
@@ -293,7 +287,6 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
         break;
         break;
-#ifndef CROSSPOINT_NO_NETWORK
       case SettingAction::PairBluetoothKeyboard: {
         // Bring the radio up and scan. The host connects to the first HID
         // keyboard it sees and bonds; NVS keeps the bond so Create Note and
@@ -312,17 +305,17 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false), resultHandler);
         break;
-#endif
       case SettingAction::ClearCache:
         startActivityForResult(std::make_unique<ClearCacheActivity>(renderer, mappedInput), resultHandler);
         break;
-#ifndef CROSSPOINT_NO_NETWORK
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
       case SettingAction::CheckForUpdates:
         startActivityForResult(std::make_unique<OtaUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::SdFirmwareUpdate:
         startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
+#endif
       case SettingAction::DownloadFonts:
         startActivityForResult(std::make_unique<FontDownloadActivity>(renderer, mappedInput),
                                [this](const ActivityResult&) {
@@ -330,7 +323,6 @@ void SettingsActivity::toggleCurrentSetting() {
                                  rebuildSettingsLists();
                                });
         break;
-#endif
       case SettingAction::TextSettings:
         startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                                [this](const ActivityResult&) {

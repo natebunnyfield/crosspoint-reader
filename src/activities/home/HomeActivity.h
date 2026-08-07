@@ -43,16 +43,12 @@ class HomeActivity final : public Activity {
     ++i;
     if (item == HomeMenuItem::MANAGE_FILES) return i;
     ++i;
-#ifndef CROSSPOINT_NO_NETWORK
     if (item == HomeMenuItem::FILE_TRANSFER) return i;
     ++i;
-#endif
     if (item == HomeMenuItem::CREATE_NOTE) return i;
     ++i;
-#ifndef CROSSPOINT_NO_NETWORK
     if (item == HomeMenuItem::CLAUDE) return i;
     ++i;
-#endif
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
     return 0;
   }
@@ -62,13 +58,9 @@ class HomeActivity final : public Activity {
     if (idx == i++) return HomeMenuItem::RECENTS;
     if (idx == i++) return HomeMenuItem::FILE_BROWSER;
     if (idx == i++) return HomeMenuItem::MANAGE_FILES;
-#ifndef CROSSPOINT_NO_NETWORK
     if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
-#endif
     if (idx == i++) return HomeMenuItem::CREATE_NOTE;
-#ifndef CROSSPOINT_NO_NETWORK
     if (idx == i++) return HomeMenuItem::CLAUDE;
-#endif
     if (idx == i) return HomeMenuItem::SETTINGS_MENU;
     return HomeMenuItem::NONE;
   }
@@ -79,9 +71,7 @@ class HomeActivity final : public Activity {
   void onFileTransferOpen();
   void onManageFilesOpen();
   void onCreateNoteOpen();
-#ifndef CROSSPOINT_NO_NETWORK
   void onClaudeOpen();
-#endif
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image

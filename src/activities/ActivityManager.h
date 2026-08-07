@@ -91,9 +91,7 @@ class ActivityManager {
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();
   void goToNoteEditor(std::string path);
-#ifndef CROSSPOINT_NO_NETWORK
   void goToClaudeChat();
-#endif
   void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE);
 
   // This will move current activity to stack instead of deleting it

@@ -12,14 +12,10 @@
 #include "home/FileManagerActivity.h"
 #include "home/HomeActivity.h"
 #include "home/RecentBooksActivity.h"
-#ifndef CROSSPOINT_NO_NETWORK
 #include "network/CrossPointWebServerActivity.h"
-#endif
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
-#ifndef CROSSPOINT_NO_NETWORK
 #include "util/ClaudeChatActivity.h"
-#endif
 #include "util/NoteEditorActivity.h"
 #include "util/FullScreenMessageActivity.h"
 
@@ -190,11 +186,7 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
 
 void ActivityManager::goToFileTransfer() {
   lastHomeMenuItem = HomeMenuItem::FILE_TRANSFER;
-#ifndef CROSSPOINT_NO_NETWORK
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
-#else
-  goHome();  // File Transfer is not available on this platform.
-#endif
 }
 
 void ActivityManager::goToSettings() {
@@ -256,10 +248,8 @@ void ActivityManager::goToNoteEditor(std::string path) {
   replaceActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path)));
 }
 
-#ifndef CROSSPOINT_NO_NETWORK
 void ActivityManager::goToClaudeChat() {
   lastHomeMenuItem = HomeMenuItem::CLAUDE; replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
-#endif
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {
