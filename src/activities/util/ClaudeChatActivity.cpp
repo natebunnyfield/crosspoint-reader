@@ -498,7 +498,15 @@ void ClaudeChatActivity::render(RenderLock&&) {
                         wrapped[n].c_str());
     }
   } else {
-    renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop, "Type a question, then press Ask.");
+    // WRAPPED, and to the same maxWidth the prompt uses. Drawn raw it ran off
+    // the right edge the moment the editor font became a real monospace face:
+    // the string was sized by eye against the narrower UI face it used to
+    // borrow. Also tr() — it was a hardcoded English literal.
+    const auto hint = renderer.wrappedText(editorFontId, tr(STR_CLAUDE_PROMPT_HINT), maxWidth, 3);
+    for (size_t n = 0; n < hint.size(); ++n) {
+      renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
+                        hint[n].c_str());
+    }
   }
 
   panel.render(renderer, metrics.contentSidePadding, panelTop, pageWidth - metrics.contentSidePadding * 2, panelHeight);

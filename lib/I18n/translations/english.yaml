@@ -88,6 +88,8 @@ STR_FONT_PREVIEW_PROSE: "Handgloves on the radiator, quinces in a bowl, a jug of
 STR_FONT_PREVIEW_PROSE_ITALIC: "Set it in metal or set it in light — the sentence still has to breathe."
 STR_FONT_FAMILY: "Reader Font Family"
 STR_EDITOR_FONT: "Editor Font"
+STR_CLAUDE_PROMPT_HINT: "Type a question, then press Ask."
+STR_EDITOR_OOM: "Not enough memory to open the editor."
 STR_CREATE_NOTE: "Create Note"
 STR_EDIT: "Edit"
 STR_ENTER_KEY: "Enter"
