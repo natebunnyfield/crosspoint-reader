@@ -57,6 +57,10 @@ class NoteEditorActivity final : public Activity {
 
   bool dirty = false;
   bool bufferFull = false;
+  // The file was too big to load, so the buffer holds nothing that came from
+  // it. Distinct from bufferFull, which also means "typing hit the cap" -- that
+  // buffer holds real edits and MUST still be written.
+  bool loadRefused = false;
   bool oomFailed = false;  // buffer could not be allocated; render says so
   size_t pendingChars = 0;
   uint32_t lastKeyMs = 0;

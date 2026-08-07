@@ -17,7 +17,9 @@
 #endif
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
+#ifndef CROSSPOINT_NO_NETWORK
 #include "util/ClaudeChatActivity.h"
+#endif
 #include "util/NoteEditorActivity.h"
 #include "util/FullScreenMessageActivity.h"
 
@@ -254,8 +256,10 @@ void ActivityManager::goToNoteEditor(std::string path) {
   replaceActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path)));
 }
 
+#ifndef CROSSPOINT_NO_NETWORK
 void ActivityManager::goToClaudeChat() {
   lastHomeMenuItem = HomeMenuItem::CLAUDE; replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
+#endif
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

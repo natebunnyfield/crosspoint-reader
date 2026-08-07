@@ -33,7 +33,11 @@ int HomeActivity::getMenuItemCount() const {
 #ifndef CROSSPOINT_NO_NETWORK
   int count = 7;  // Browse, Recents, Transfer, Manage Files, Settings, Create Note, Claude
 #else
-  int count = 6;  // Browse, Recents, Manage Files, Settings, Create Note, Claude (no File Transfer)
+  // Claude chat goes with the network build: it needs a saved Wi-Fi credential
+  // and an API key off the card, and WifiCredentialStore is not compiled for
+  // the phone at all. Leaving the row in gave iOS a menu entry that opened a
+  // screen which could never do anything -- the B-008 defect, again.
+  int count = 5;  // Browse, Recents, Manage Files, Settings, Create Note (no File Transfer, no Claude)
 #endif
   if (!recentBooks.empty()) {
     count += recentBooks.size();
@@ -203,9 +207,11 @@ void HomeActivity::loop() {
       case HomeMenuItem::CREATE_NOTE:
         onCreateNoteOpen();
         break;
+#ifndef CROSSPOINT_NO_NETWORK
       case HomeMenuItem::CLAUDE:
         onClaudeOpen();
         break;
+#endif
       default:
         break;
     }
@@ -370,13 +376,20 @@ void HomeActivity::render(RenderLock&&) {
 #ifndef CROSSPOINT_NO_NETWORK
                                           tr(STR_FILE_TRANSFER),
 #endif
-                                          tr(STR_CREATE_NOTE),       "Claude",
+                                          tr(STR_CREATE_NOTE),
+#ifndef CROSSPOINT_NO_NETWORK
+                                          "Claude",
+#endif
                                           tr(STR_SETTINGS_TITLE)};
     std::vector<UIIcon> menuIcons = {Recent,     Folder,     ManageFiles,
 #ifndef CROSSPOINT_NO_NETWORK
                                      Transfer,
 #endif
-                                     CreateNote, ClaudeMark, Settings};
+                                     CreateNote,
+#ifndef CROSSPOINT_NO_NETWORK
+                                     ClaudeMark,
+#endif
+                                     Settings};
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme
@@ -463,4 +476,6 @@ void HomeActivity::onCreateNoteOpen() {
   activityManager.goToNoteEditor(path);
 }
 
+#ifndef CROSSPOINT_NO_NETWORK
 void HomeActivity::onClaudeOpen() { activityManager.goToClaudeChat(); }
+#endif
