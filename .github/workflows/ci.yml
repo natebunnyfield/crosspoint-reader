@@ -2,7 +2,10 @@ name: CI (build)
 
 on:
   push:
-    branches: [master]
+    # This fork's default branch is `main` (renamed from `develop` 2026-08-04).
+    # Upstream still uses `master`, so this line was inherited and matched
+    # nothing here -- no push to this repo has ever triggered CI.
+    branches: [main]
   pull_request:
 
 permissions:
