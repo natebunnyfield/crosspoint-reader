@@ -55,6 +55,129 @@ enter Settings and press Back (which saves), then read the file.
 
 ## OPEN
 
+### [B-024] Unbounded allocations from untrusted cache and zip data
+**severity: high · scope: memory safety · found 2026-08-06 · verified 2026-08-07**
+
+Three sites size an allocation from a number read straight out of a file, with
+no bound:
+
+- `lib/Serialization/Serialization.h:46-51` — `readPod(file, len)` return value
+  is discarded, then `s.resize(len)`. On a short read `len` is uninitialized.
+- `src/activities/reader/TxtReaderActivity.cpp:511-516` — `readPod(f, numPages)`
+  then `pageOffsets.reserve(numPages)`, unvalidated.
+- `lib/ZipFile/ZipFile.cpp:389-392` — `inflatedDataSize = fileStat.uncompressedSize`
+  uncapped, and `:449` writes `data[inflatedDataSize] = '\0'`; at `0xFFFFFFFF`
+  the `+1` wraps to zero and the terminator lands wild.
+
+On a 380 KB device any of these aborts the process. The input is a `.crosspoint`
+cache or a zip header — both attacker-influenced in the sense that matters here,
+which is a corrupted file on an SD card the owner did not author.
+
+`lib/Xtc/Xtc/XtcParser.cpp` had the same shape and is already fixed: `:302-308`
+clamps `maxOffset` to the file bounds and `:316` derives the chapter count from
+the bounded remainder. That is the pattern to copy.
+
+**Close by:** bound each length against the actual bytes remaining before
+allocating, as XtcParser now does.
+
+### [B-023] Two out-of-bounds reads on untrusted image data
+**severity: high · scope: memory safety · found 2026-08-06 · verified 2026-08-07**
+
+**XTC plane indexing.** `lib/Xtc/Xtc.cpp:203` sizes each plane
+`(width * height + 7) / 8`, but `:206` computes `colBytes = (height + 7) / 8` and
+`:224-226` indexes `plane1[colIndex * colBytes + byteInCol]`. When `height % 8`
+is non-zero, `colBytes * width` exceeds `planeSize` and the last columns read
+past the buffer. The thumbnail path guards this; the main render path does not.
+
+**PNG bit depth.** `lib/PngToBmpConverter/PngToBmpConverter.cpp:339` and `:363`
+both compute `const int ppb = 8 / ctx.bitDepth` with no prior validation. A
+`bitDepth` of 0 divides by zero; 3, 5, 6 and 7 give a wrong packing and read
+crooked. The sibling decoder already has the guard —
+`lib/Epub/Epub/converters/PngToFramebufferConverter.cpp:113` defines
+`isSupportedBitDepth` and `:396` calls it — so this is a missing call, not a
+missing idea.
+
+Both are reachable from opening a book or loading a cover.
+
+**Close by:** bounds-check the XTC offset against `planeSize` at `:225`; call the
+existing `isSupportedBitDepth` before `:339`.
+
+### [B-022] Paging mutates `lines` outside the render lock while the render task walks it
+**severity: medium · scope: threading · found 2026-08-06 · verified 2026-08-07**
+
+`ActivityManager::loop()` deliberately runs without the render lock — its own
+comment at `src/activities/ActivityManager.cpp:77` reads *"do not hold a lock
+here, the loop() method must be responsible for acquire one if needed"*. That
+makes the lock opt-in per activity, and `TextViewerActivity` does not opt in:
+`loop()` (`:248`) reaches `pageForward()`/`pageBack()` (`:231`, `:239`) →
+`layoutCurrentPage()` (`:209`) → `layoutPage()`, which calls `lines.clear()` at
+`:107` and refills it. `render(RenderLock&&)` (`:348`) reads `lines[i].c_str()`
+at `:363` on the render task.
+
+So holding Down to page quickly can free the strings the render task is reading.
+`ClaudeChatActivity` has the same shape around `answer` — cleared in `loop()` and
+in the BLE drain, with the lock taken only afterwards.
+
+The window is narrow, which is why this has not obviously bitten yet. It is still
+a use-after-free.
+
+**Close by:** take a `RenderLock` across the mutation, or defer relayout until
+the render guard is held. Audit the other activities for the same pattern rather
+than fixing only these two.
+
+### [B-021] A null check that cannot fire, in the tightest-memory path
+**severity: medium · scope: graceful degradation · found 2026-08-06 · verified 2026-08-07**
+
+`lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp:759-762` does
+`self->currentPage.reset(new Page())` and then tests `if (!self->currentPage)`,
+logging "Failed to create new page". The build sets `-fno-exceptions`
+(`platformio.ini:65`), so a failed `new` aborts the process — the pointer is
+never null and the branch is dead. The log line has never been emitted and
+cannot be.
+
+This is the clearest instance because the comment shows the misunderstanding
+outright, but bare `new` is used broadly in the layout path, which is exactly
+where a 380 KB device runs out.
+
+**Close by:** either route these through a nothrow allocator and handle null, or
+delete the dead guards and state plainly that OOM aborts by design. The current
+code claims a degradation path it does not have, which is worse than either.
+
+### [B-020] `BleHidHost` says the hang is unexplained twenty lines above naming its cause
+**severity: low · scope: stale comment · found 2026-08-06 · verified 2026-08-07**
+
+`src/notes/BleHidHost.cpp:687-695` describes the `nimble_port_init()` hang as
+nondeterministic, correlates it with free heap, and closes *"This is a spike
+workaround, NOT a fix — the nondeterminism itself is unexplained and is the
+biggest open risk in this work."*
+
+`:708-716` in the same function then says *"THE cause of the 'nondeterministic'
+hang"* — `HalPowerManager` drops the CPU to 10 MHz after 3 s idle and the BT
+controller cannot start its radio at that clock — explicitly retracts the heap
+theory, and `:717` takes `HalPowerManager::Lock powerLock` to hold full clock
+across init. That is the fix, and it is in place.
+
+Only the first comment is wrong. An audit read it as a live unfixed hang, which
+is what a stale comment costs.
+
+**Close by:** rewrite `:687-695` to describe the watchdog as belt-and-braces
+behind the clock lock, and drop the "unexplained" claim.
+
+### [B-019] `clockFormat` is a visible setting that nothing reads
+**severity: medium · scope: lying control · found 2026-08-06 · filed 2026-08-07**
+
+`src/SettingsList.h:463-464` registers a 24H/12H enum bound to
+`CrossPointSettings::clockFormat`, under `StrId::STR_CAT_SYSTEM` — the only
+category the device UI renders. `src/CrossPointSettings.h:194` declares the
+field. Those three lines are the *complete* set of references in `src/` and
+`lib/`: nothing consumes it. The owner can toggle a live row that changes
+nothing, which is the same defect class as B-001, rated high.
+
+**Close by:** implementing it in the clock rendering paths, or hiding the row.
+Do **not** silently delete the field — it round-trips through `toJson`/`fromJson`
+and the web settings API, so dropping it would strip the key from `settings.json`
+on every card already in the field.
+
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
@@ -78,31 +201,51 @@ so a same-code reflash is accepted):
 CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
 ```
 
-### [B-003] Exploded `.epub` directories are probably unreadable on device
-**severity: low · scope: content · found 2026-08-03**
+### [B-003] Exploded `.epub` directories present as folders, never as books
+**severity: low · scope: content · found 2026-08-03 · mechanism corrected 2026-08-07**
 
 The X3 card carried 10 entries named `*.epub` that are DIRECTORIES
-(`META-INF/`, `mimetype`, `OEBPS/`) rather than zip containers. Miniz is the
-firmware's only container library and `lib/Epub/Epub/Section.cpp` unzips at
-runtime, so these almost certainly do not open — but this was inferred from
-the container path, **not** confirmed by opening one on device or in the
-simulator.
+(`META-INF/`, `mimetype`, `OEBPS/`) rather than zip containers.
+
+They never reach the zip layer at all. `FileBrowserActivity::loadFiles` marks a
+directory by appending `/` (`src/activities/home/FileBrowserActivity.cpp:46-47`),
+and `activateSelected` branches on `entry.back() == '/'` (`:139`) to **navigate
+into** it (`:194-197`) instead of calling `onSelectBook` (`:200`). So an exploded
+`foo.epub/` is a browsable folder holding `META-INF/` and `OEBPS/`, with
+`mimetype` hidden for having no matching extension in the filter. There is no
+error and no failure mode to observe — the book simply cannot be opened.
+
+An earlier version of this entry said they "almost certainly do not open"
+because miniz is the only container library and `lib/Epub/Epub/Section.cpp`
+unzips at runtime. Both halves were wrong: the zip layer is
+`lib/ZipFile/ZipFile.cpp`, reached from `lib/Epub/Epub.cpp:218`, and
+`Section.cpp` contains no zip call at all — only two comments mentioning
+"unzipped". The conclusion held; the reasoning behind it did not.
 
 They are preserved at `~/crosspoint-books/_exploded/`. Also note
 `ls *.epub | wc -l` on such a card reports a wildly inflated count because it
 recurses into the directories (reported 510 for a real 76).
 
-**Close by:** opening one in the simulator to confirm the failure mode, then
-either re-zipping them as proper EPUBs (mimetype stored first, uncompressed)
-or discarding them.
+**Close by:** re-zipping them as proper EPUBs (mimetype stored first,
+uncompressed) or discarding them. Opening one to "confirm the failure mode" is
+no longer a useful step — the branch above is unambiguous.
 
-### [B-002] Two upstream commits unmerged, and unmergeable as-is
+### [B-002] Upstream commits unmerged, and unmergeable as-is
 **severity: low · scope: fork sync · by design, tracked not fixed**
 
-`9c48609f` (bookmarks survive re-pagination) and `0f747b82` (content-based
-EPUB sync positions) remain unmerged. `git merge upstream/develop` produces 18
-conflicts, six `modify/delete`, because both commits straddle live Epub engine
-code and subsystems this fork deleted on purpose.
+Both named commits — `9c48609f` (bookmarks survive re-pagination) and
+`0f747b82` (content-based EPUB sync positions) — are still unmerged, but the
+"two" in the title has been stale for a while. As of 2026-08-07
+`git rev-list --left-right --count main...upstream/develop` reports **255 ahead
+/ 13 behind**: twelve more upstream commits have landed since this was filed.
+`git merge upstream/develop` produces 18 conflicts, six `modify/delete`,
+because the named commits straddle live Epub engine code and subsystems this
+fork deleted on purpose.
+
+Of the thirteen, roughly five apply cleanly to live fork code, three apply
+partially, and three are genuinely N/A because the subsystems were deleted
+(bookmarks, dictionary, translations). Re-measure before acting rather than
+trusting this breakdown — it ages the same way the "two" did.
 
 Not a defect so much as a standing cost. See [docs/fork-sync.md](docs/fork-sync.md).
 
