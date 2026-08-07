@@ -364,10 +364,23 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // settings.json already holds by omission.
     // Order must match CrossPointSettings::SYSTEM_FONT -- the index IS the
     // persisted value.
+    // WITHDRAWN from the device Settings UI on 2026-08-07 (owner ruling): Libre
+    // Franklin is the only System font now. STR_CAT_DISPLAY is a retired
+    // category, so rebuildSettingsLists() drops this row while getSettingsList()
+    // still carries it — deleting the entry instead would stop systemFont
+    // persisting at all and remove it from the web settings API, which is the
+    // trap documented in CLAUDE.md. The value is pinned in
+    // normalizeRetiredSettings() and the field initialiser already matches, so
+    // fresh and upgraded devices agree.
+    //
+    // The four choices stay listed because the index IS the persisted value: a
+    // settings.json holding 0..2 must still decode to the family it named, and
+    // applySystemFont() still resolves any of them. Nothing is deleted, it is
+    // just no longer offered.
     v.push_back(
         SettingInfo::Enum(StrId::STR_SYSTEM_FONT, &CrossPointSettings::systemFont,
                           {StrId::STR_UBUNTU, StrId::STR_NOTO_SANS, StrId::STR_NOTO_SERIF, StrId::STR_LIBRE_FRANKLIN},
-                          "systemFont", StrId::STR_CAT_SYSTEM));
+                          "systemFont", StrId::STR_CAT_DISPLAY));
     // Which text-entry keyboard every entry field opens (searches, WiFi
     // passwords, owner name, renames). Order must match
     // CrossPointSettings::KEYBOARD_LAYOUT -- the index IS the persisted value.

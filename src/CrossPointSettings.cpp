@@ -159,6 +159,14 @@ void CrossPointSettings::normalizeRetiredSettings() {
   shortPwrBtn = SHORT_PWRBTN::SLEEP;
   longPressButtonBehavior = FONT_SIZE_STEP;
 
+  // Libre Franklin is the only System font (owner ruling 2026-08-07) and its row
+  // is withdrawn from the device UI, so a save written while the picker still
+  // existed must not keep the chrome on Ubuntu or a Noto face forever. The field
+  // initialiser in CrossPointSettings.h is already SYSTEM_FONT_LIBREFRANKLIN, so
+  // a fresh install and an upgraded one now agree — pinning without that would
+  // leave them disagreeing, which is the half-fix CLAUDE.md warns about.
+  systemFont = SYSTEM_FONT_LIBREFRANKLIN;
+
   // The Reader tab was withdrawn from the device Settings UI (2026-08-04). Two
   // of its rows survived and moved to System — the Text Settings action (font
   // family and size) and Screen Margin — so neither appears here: pinning a
