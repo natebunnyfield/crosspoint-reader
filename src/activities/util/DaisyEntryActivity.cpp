@@ -106,19 +106,42 @@ void DaisyEntryActivity::longPick(const int slot) {
   if (c >= 'a' && c <= 'z') insertChar(static_cast<char>(c - 'a' + 'A'));
 }
 
-int DaisyEntryActivity::slotSpacing() const {
-  // The tight case is a petal near 3/9 o'clock, where the upright column runs
-  // tangentially: the top/bottom line box must stay inside the wedge, whose
-  // tangential half-width at the label radius is rm*sin(step/2) (perpendicular
-  // distance from the petal's center line to its boundary spoke). Clamp the
-  // font's natural line advance to that minus half a line box and a 2px
-  // margin, so the column fits both rings (the 12-petal 123 ring is the
-  // narrowest) under any System font's metrics.
-  const int lineH = renderer.getLineHeight(UI_10_FONT_ID);
+// The largest label font whose three-line column actually fits a wedge.
+//
+// This is a FUNCTION rather than a constant because the fit depends on three
+// things that all move: the petal count (10 on abc, 16 on 123), the wheel
+// radius, and the System font, which the owner can change and whose advanceY
+// ranges 23..28 across the four choices. Hardcoding a size is what broke it:
+// the wheel was tuned when the default was Ubuntu and the ring had 12 petals,
+// and it silently started overlapping when neither of those was true.
+//
+// Picking the font instead of clamping the spacing is the point. slotSpacing()
+// used to return a value SMALLER than the line height when the wedge was tight,
+// which does not avoid the collision — it guarantees one.
+int DaisyEntryActivity::labelFontId() const {
+  // Largest first. UI_10 is the reading size; SMALL is the fallback.
+  for (const int id : {UI_10_FONT_ID, SMALL_FONT_ID}) {
+    if (columnFits(renderer.getLineHeight(id))) return id;
+  }
+  // Nothing fits: take the smallest and let it overlap rather than draw
+  // nothing, but say so — this means the geometry needs revisiting, not that
+  // the owner did something wrong.
+  LOG_ERR("DAISY", "no label font fits %d petals; wheel geometry needs revisiting", petalCount());
+  return SMALL_FONT_ID;
+}
+
+// Three upright lines of lineH centred on the petal, inside a wedge whose
+// tangential half-width at the label radius is rm*sin(step/2).
+bool DaisyEntryActivity::columnFits(const int lineH) const {
   constexpr float rm = (RADIUS_HUB + RADIUS_OUTER) / 2.0f;
   const float halfWedge = rm * sinf(petalStep(petalCount()) / 2.0f);
-  const int maxSpacing = static_cast<int>(halfWedge) - lineH / 2 - 2;
-  return maxSpacing < lineH ? maxSpacing : lineH;
+  return static_cast<int>(halfWedge) - lineH / 2 - 2 >= lineH;
+}
+
+int DaisyEntryActivity::slotSpacing() const {
+  // Always the font's own line advance now. labelFontId() has already
+  // guaranteed it fits, so there is nothing left to clamp against.
+  return renderer.getLineHeight(labelFontId());
 }
 
 void DaisyEntryActivity::slotCenter(const int petal, const int slot, int& outX, int& outY) const {
@@ -299,7 +322,7 @@ void DaisyEntryActivity::render(RenderLock&&) {
       slotCenter(i, slot, sx, sy);
       char buf[2] = {0, 0};
       const char* label = buf;
-      int fontId = UI_10_FONT_ID;
+      int fontId = labelFontId();
       if (utility) {
         label = slot == 0 ? tr(STR_KEY_DEL) : (slot == 1 ? swapLabel : tr(STR_OK_BUTTON));
         fontId = SMALL_FONT_ID;
