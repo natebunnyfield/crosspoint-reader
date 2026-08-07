@@ -416,7 +416,13 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
                            const bool pixelState, const EpdFontFamily::Style style) {
   const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
   if (!glyph) {
-    LOG_ERR("GFX", "No glyph for codepoint %d", cp);
+    // DBG, not ERR: the firmware does not control what codepoints reach it. An
+    // EPUB, a BLE-typed note, or a model answer can all carry an emoji no
+    // built-in face represents (none carries U+FFFD either, so getGlyph cannot
+    // even fall back). At ERR this fired once per character PER PAINT and fed
+    // the RTC_NOINIT crash ring, pushing real panic history out of a 16-entry
+    // buffer -- a missing glyph is a content fact, not a fault. B-009.
+    LOG_DBG("GFX", "No glyph for codepoint %d", cp);
     return;
   }
 

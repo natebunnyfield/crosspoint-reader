@@ -164,7 +164,23 @@ checking both call sites still look right — they may have been nudged to
 compensate.
 
 ### [B-009] Emoji in a Claude answer vanish and log an error per paint
-**severity: low · scope: Claude chat / text rendering · found 2026-08-06**
+**severity: low · scope: Claude chat / text rendering · PARTIALLY ADDRESSED 2026-08-07**
+
+Done: the log is demoted `LOG_ERR` -> `LOG_DBG` (`GfxRenderer.cpp:425`), the one
+step this entry called worth doing regardless. It removes the per-character,
+per-paint spam and stops it feeding the `RTC_NOINIT` crash ring, which was the
+second-order harm — real panic history was being pushed out of a 16-entry buffer
+by a content fact the firmware cannot control.
+
+**Still open, and an owner call:** where to intervene on the character itself.
+The three options in the report (add U+FFFD to the four faces for a visible ▯;
+strip non-representable codepoints before layout to keep line metrics honest;
+a system prompt) trade differently and none is obviously right, so none was
+picked. The zero-advance shift at `GfxRenderer.cpp:726` is untouched too —
+whether it is a real shift depends on whether `getTextWidth` and the renderer
+agree about a missing glyph's advance, which was not measured.
+
+Original report below.
 
 The API answers with emoji unprompted. No font in this firmware can represent
 one, so the character disappears and the render logs an error every time the
