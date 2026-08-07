@@ -786,14 +786,15 @@ void BaseTheme::drawGeneratedCover(const GfxRenderer& renderer, const Rect rect,
   drawGeneratedCoverBand(renderer, rect.x + 1, rect.y + 1, rect.width - 2, bandH, mixed);
   renderer.fillRect(rect.x + 1, rect.y + 1 + bandH, rect.width - 2, ruleH, true);
 
-  // Full-screen covers (sleep) get the built-in serif; home tiles the UI
-  // chrome faces. OMIT_FONTS builds drop the serif families — getLineHeight()
-  // returning 0 is the absence signal, and the chrome faces always exist.
+  // Full-screen covers (sleep) get the large Libre Franklin reader cuts; home
+  // tiles the UI chrome faces. OMIT_FONTS builds drop the 18 pt cut —
+  // getLineHeight() returning 0 is the absence signal, and the chrome faces
+  // always exist.
   int titleFontId = UI_12_FONT_ID;
   int authorFontId = SMALL_FONT_ID;
-  if (rect.height >= 400 && renderer.getLineHeight(NOTOSERIF_18_FONT_ID) > 0) {
-    titleFontId = NOTOSERIF_18_FONT_ID;
-    authorFontId = NOTOSERIF_14_FONT_ID;
+  if (rect.height >= 400 && renderer.getLineHeight(LIBREFRANKLIN_READER_18_FONT_ID) > 0) {
+    titleFontId = LIBREFRANKLIN_READER_18_FONT_ID;
+    authorFontId = LIBREFRANKLIN_READER_14_FONT_ID;
   }
 
   const int margin = std::max(6, std::min(rect.width, rect.height) / 24);

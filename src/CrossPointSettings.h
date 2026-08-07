@@ -66,8 +66,12 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Default: Up = Previous, Down = Next
   enum SIDE_BUTTON_LAYOUT { PREV_NEXT = 0, NEXT_PREV = 1, SIDE_BUTTONS_DISABLED = 2, SIDE_BUTTON_LAYOUT_COUNT };
 
-  // Font family options (built-in fonts only; SD card fonts use sdFontFamilyName)
-  enum FONT_FAMILY { NOTOSERIF = 0, NOTOSANS = 1, FONT_FAMILY_COUNT };
+  // Font family options (built-in fonts only; SD card fonts use sdFontFamilyName).
+  // Libre Franklin is the only built-in reading family (owner ruling
+  // 2026-08-07). Index 0 used to be Noto Serif and 1 Noto Sans; both were
+  // removed, and fromJson()'s clamp maps any stored 1 back to 0, so an old
+  // settings.json migrates on its first load.
+  enum FONT_FAMILY { BUILTIN_LIBRE_FRANKLIN = 0, FONT_FAMILY_COUNT };
   static constexpr uint8_t LEGACY_OPENDYSLEXIC = 2;
   static constexpr uint8_t BUILTIN_FONT_COUNT = FONT_FAMILY_COUNT;
   // Reader font size is a SLOT (S/M/L/XL) again — see fontSizeSlot. 1.5 stored an
@@ -252,7 +256,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t frontButtonLeft = FRONT_HW_LEFT;
   uint8_t frontButtonRight = FRONT_HW_RIGHT;
   // Reader font settings
-  uint8_t fontFamily = NOTOSERIF;
+  uint8_t fontFamily = BUILTIN_LIBRE_FRANKLIN;
   // Reader font size, as a slot into the active family's ascending size ramp.
   // THIS is the persisted truth; it is family-independent, so switching family
   // keeps the apparent size instead of dragging an absolute pt across ramps.

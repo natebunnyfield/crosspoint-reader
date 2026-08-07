@@ -50,20 +50,20 @@ class Gfx {
     }
     cache_.setFontDecompressor(&decompressor_);
     renderer_.setFontCacheManager(&cache_);
-    renderer_.insertFont(NOTOSERIF_12_FONT_ID, notoserif12_);
-    renderer_.insertFont(NOTOSERIF_18_FONT_ID, notoserif18_);
+    renderer_.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, lfReader12_);
+    renderer_.insertFont(LIBREFRANKLIN_READER_18_FONT_ID, lfReader18_);
   }
 
   GfxRenderer renderer_;
   FontDecompressor decompressor_;
   FontCacheManager cache_;
 
-  EpdFont ns12R_{&notoserif_12_regular}, ns12B_{&notoserif_12_bold}, ns12I_{&notoserif_12_italic},
-      ns12BI_{&notoserif_12_bolditalic};
-  EpdFontFamily notoserif12_{&ns12R_, &ns12B_, &ns12I_, &ns12BI_};
-  EpdFont ns18R_{&notoserif_18_regular}, ns18B_{&notoserif_18_bold}, ns18I_{&notoserif_18_italic},
-      ns18BI_{&notoserif_18_bolditalic};
-  EpdFontFamily notoserif18_{&ns18R_, &ns18B_, &ns18I_, &ns18BI_};
+  EpdFont lfr12R_{&librefranklin_reader_12_regular}, lfr12B_{&librefranklin_reader_12_bold},
+      lfr12I_{&librefranklin_reader_12_italic}, lfr12BI_{&librefranklin_reader_12_bolditalic};
+  EpdFontFamily lfReader12_{&lfr12R_, &lfr12B_, &lfr12I_, &lfr12BI_};
+  EpdFont lfr18R_{&librefranklin_reader_18_regular}, lfr18B_{&librefranklin_reader_18_bold},
+      lfr18I_{&librefranklin_reader_18_italic}, lfr18BI_{&librefranklin_reader_18_bolditalic};
+  EpdFontFamily lfReader18_{&lfr18R_, &lfr18B_, &lfr18I_, &lfr18BI_};
 };
 
 // The specimen: plain prose plus accents and deliberately long words so a
@@ -200,7 +200,7 @@ std::string wordAt(const std::map<uint32_t, std::string>& expect, const uint32_t
 TEST(WordAnchor, AnchorsAreSourceWordStartsAndMonotone) {
   const auto expect = expectedAnchorMap();
   for (const bool hyphenate : {false, true}) {
-    const auto lines = layout(NOTOSERIF_12_FONT_ID, 400, hyphenate);
+    const auto lines = layout(LIBREFRANKLIN_READER_12_FONT_ID, 400, hyphenate);
     ASSERT_GT(lines.size(), 20u) << "specimen did not span enough lines";
     uint32_t prev = 0;
     for (const auto& line : lines) {
@@ -227,10 +227,10 @@ TEST(WordAnchor, AnchorsIdentifySameWordAcrossReflows) {
     int fontId;
     uint16_t width;
   };
-  const Cfg cfgs[] = {{NOTOSERIF_12_FONT_ID, 440},
-                      {NOTOSERIF_12_FONT_ID, 300},
-                      {NOTOSERIF_18_FONT_ID, 440},
-                      {NOTOSERIF_18_FONT_ID, 300}};
+  const Cfg cfgs[] = {{LIBREFRANKLIN_READER_12_FONT_ID, 440},
+                      {LIBREFRANKLIN_READER_12_FONT_ID, 300},
+                      {LIBREFRANKLIN_READER_18_FONT_ID, 440},
+                      {LIBREFRANKLIN_READER_18_FONT_ID, 300}};
   std::map<uint32_t, std::string> seen;  // anchor -> source word, across all layouts
   for (const auto& cfg : cfgs) {
     const auto lines = layout(cfg.fontId, cfg.width, true);

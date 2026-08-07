@@ -175,7 +175,7 @@ Consequences worth knowing before reprovisioning:
   the only installed sans. Quattrocento Sans was promoted into that cell on
   2026-08-04 and is the obvious way to fill it again.
 - **A selected family that is no longer installed does not fall back to another
-  SD family.** `getReaderFontId()` falls back to the built-in Noto Serif, which
+  SD family.** `getReaderFontId()` falls back to the built-in Libre Franklin, which
   is a visible change of face, so repoint `SETTINGS.sdFontFamilyName` when
   removing a family a surface is actually using. Both were in use when this
   ruling landed: the simulator was on Quattrocento Sans and the X4 card on
