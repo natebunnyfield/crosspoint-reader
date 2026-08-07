@@ -12,6 +12,50 @@ was found, and what closing it requires.
 
 ## OPEN
 
+### [B-015] Create Note displayed no text on iOS, while saving correctly
+**severity: high · scope: notes / iOS · FIXED 2026-08-07 · `bb614f73`**
+
+Reported as "Create Note (and possibly Claude) is not displaying text — it
+shows one pixel in the upper left instead. It saves fine though."
+
+The iOS target compiles `crosspoint_core` with `OMIT_FONTS`
+(`crosspoint-simulator/ios/CMakeLists.txt:178`), and `src/main.cpp:371-372`
+registers Space Mono and IBM Plex Mono inside `#ifndef OMIT_FONTS`. So on that
+build neither editor face is ever handed to the renderer.
+
+`editorfonts::builtinFontIdFor()` reads a **compile-time table**
+(`src/notes/EditorFonts.h:39-45`) and returns `SPACEMONO_12_FONT_ID` regardless
+— the constant lives in `fontIds.h` and is unaffected by `OMIT_FONTS`. The old
+`resolveEditorFont()` returned that at its FIRST branch without asking whether
+the renderer had it, so `drawText` was handed an id with no glyphs behind it.
+`fallbackFontId()` had the same flaw: it also picks Space Mono. **Every row of
+the Editor Font setting**, not just the shipped default, resolved to a face
+absent from the binary. The text buffer was never involved, which is exactly
+why saving worked.
+
+It existed twice: `resolveEditorFont()` was copy-pasted into
+`NoteEditorActivity.cpp` and `ClaudeChatActivity.cpp`, identical but for the
+final UI constant. (Claude chat is separately excluded from iOS by B-014, so
+on that target only Create Note was reachable — but the defect was in both.)
+
+**How it was found.** It does not reproduce on the desktop simulator, where the
+built-ins ARE registered. Ruled out first, each by running it: the default font
+path, an editor family present on the card, render scale 2, `editorFont = 3`
+(Space Mono, which is what the card was already set to), on-screen typing, and
+the text viewer. The `OMIT_FONTS` difference is visible in the iOS build's own
+`GCC_PREPROCESSOR_DEFINITIONS`.
+
+Fixed by consolidating the two copies into `editorfonts::resolve()`, which asks
+whether a font is registered before returning it and falls through to the UI
+face when the binary contains no editor face at all. Chrome is the wrong
+texture for a writing surface, but it is text on screen instead of a blank page.
+
+**Verified:** five new tests in `test/editor_fonts` covering the reported case,
+the same for every row, and the three orderings that must not regress; 215/215
+host tests; device `gh_release` and desktop canary both build; desktop
+rendering unchanged (it still resolves to Space Mono, because there it is
+really registered). **Not yet confirmed on the phone** — that needs build-35.
+
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
