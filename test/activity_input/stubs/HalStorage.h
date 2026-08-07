@@ -60,8 +60,7 @@ class HalFile {
     if (f) fclose(f);
   }
   HalFile(HalFile&& o) noexcept
-      : f(o.f), isDir_(o.isDir_), name_(std::move(o.name_)), entries_(std::move(o.entries_)),
-        nextEntry_(o.nextEntry_) {
+      : f(o.f), isDir_(o.isDir_), name_(std::move(o.name_)), entries_(std::move(o.entries_)), nextEntry_(o.nextEntry_) {
     o.f = nullptr;
   }
   HalFile& operator=(HalFile&& o) noexcept {
@@ -141,6 +140,13 @@ class HalStorage {
     if (!fp) return false;
     out = HalFile(fp);
     return true;
+  }
+  // The real HalStorage overloads on const char* / std::string / String
+  // (lib/hal/HalStorage.h:40-42). The theme's cover paths are std::string
+  // (BaseTheme.cpp:497, LyraSixTheme.cpp:93 and siblings), so that overload has
+  // to exist here too or those TUs will not compile.
+  bool openFileForRead(const char* moduleName, const std::string& p, HalFile& out) {
+    return openFileForRead(moduleName, p.c_str(), out);
   }
   HalFile open(const char* p) {
     const std::string host = halStoragePath(p);

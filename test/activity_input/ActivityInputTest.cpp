@@ -47,6 +47,8 @@
 #include "activities/RenderLock.h"
 #include "activities/settings/FontSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
+#include "components/UITheme.h"
+#include "components/themes/lyra/LyraTheme.h"
 
 namespace {
 
@@ -92,34 +94,21 @@ class ReaderParentDouble final : public Activity {
 
 using ActivityFactory = std::unique_ptr<Activity> (*)();
 
-// Why every FontSelection case below is skipped rather than run.
+// A note on the FontSelection cases, because they spent a while not running.
 //
-// This suite's UITheme double leaves `currentTheme` null on purpose — linking
-// the real one needs BaseTheme.cpp, which reaches HalClock/HalPowerManager/
-// BoardConfig and from there ESP-IDF's <driver/gpio.h>. HostHarness.cpp states
-// the resulting invariant: GUI (== getTheme()) is a null dereference, so only
-// render() may touch it, and nothing here calls render().
+// This suite used to double UITheme with a null `currentTheme`, so GUI (==
+// getTheme()) was a null dereference and only render() — which the harness
+// never calls — was allowed to touch it. cb98d4fa ("prose specimen, 3-row list,
+// overlaid badge") broke that by adding `GUI.getListRowStep(...)` to
+// FontSelectionActivity::onEnter (FontSelectionActivity.cpp:105), which DOES
+// run here: all seven FontSelection cases segfaulted before their bodies ran,
+// reporting as failures with no assertion output, and 536020e7 then skipped
+// them to make that visible.
 //
-// cb98d4fa ("prose specimen, 3-row list, overlaid badge") broke that invariant
-// by adding `GUI.getListRowStep(...)` to FontSelectionActivity::onEnter
-// (FontSelectionActivity.cpp:105). onEnter DOES run here, so all seven cases
-// segfaulted before their bodies ran — reporting as failures with no assertion
-// output, which is how they stayed unnoticed. Verified pre-existing: the same
-// seven crash at d3a96f4d, before any of the keyboard work.
-//
-// Skipping is not a fix, it is honesty: they were already not executing. The
-// fix is to move them to test/renderer_bounds, which links the real theme
-// stack's collaborators and can construct a theme.
-constexpr bool kThemeBackedActivitiesRunnable = false;
-
-#define SKIP_WITHOUT_THEME()                                                             \
-  do {                                                                                   \
-    if (!kThemeBackedActivitiesRunnable)                                                 \
-      GTEST_SKIP() << "FontSelectionActivity::onEnter calls a GUI virtual and this "     \
-                      "suite's UITheme double has a null currentTheme; see the comment " \
-                      "above makeFontSelection().";                                      \
-  } while (0)
-
+// They execute again because the suite links the REAL theme stack now
+// (crosspoint_add_theme_stack, test/cmake/HostThemeStack.cmake), so
+// getListRowStep is LyraTheme's genuine override. The activity was not changed
+// to dodge the virtual — it legitimately needs it.
 std::unique_ptr<Activity> makeFontSelection() {
   // Null registry: no SD fonts installed, so the list is the two built-in Noto
   // faces (FontSelectionActivity.cpp:96-99) and nothing touches the SD card.
@@ -152,11 +141,47 @@ class ActivityInput : public ::testing::Test {
 };
 
 // ===========================================================================
+// The theme this suite links is the REAL one, and this is what says so.
+//
+// Every FontSelection case below runs an onEnter that calls GUI.getListRowStep
+// — a virtual with two live implementations. Against the old null-currentTheme
+// double that was a segfault; against a hypothetical future double that
+// answered from BaseMetrics it would silently be the wrong number, and the list
+// under test would be sized by a theme the device does not ship. So pin the
+// value to LyraMetrics, which BaseMetrics does not match on any of the three
+// fields involved (30/50/16 vs 40/60/18).
+// ===========================================================================
+
+TEST_F(ActivityInput, TheLinkedThemeIsTheRealLyraChain) {
+  EXPECT_EQ(GUI.getListRowStep(false), LyraMetrics::values.listRowHeight);
+  EXPECT_EQ(GUI.getListRowStep(true, 1), LyraMetrics::values.listWithSubtitleRowHeight);
+  EXPECT_EQ(GUI.getListRowStep(true, 3),
+            LyraMetrics::values.listWithSubtitleRowHeight + 2 * LyraMetrics::values.listSubtitleLineStep);
+
+  // ...and it is not BaseTheme's, which is what a metrics-only double resolves
+  // to and what the numbers above would degrade into unnoticed.
+  EXPECT_NE(GUI.getListRowStep(false), BaseMetrics::values.listRowHeight);
+}
+
+// render() used to be out of bounds in this suite — the null-currentTheme double
+// made GUI a null dereference, so the harness deliberately never rendered a
+// frame. With the real theme linked it is just another call, and this is the
+// case that keeps it that way: it drives the whole draw path (header, list,
+// preview pane, button hints, and the grayscale store/restore the single-buffer
+// mode needs) against the real GfxRenderer.
+//
+// It asserts nothing about pixels. Its job is to fail loudly if the theme is
+// ever unwired again, at the strongest point rather than in an onEnter.
+TEST_F(ActivityInput, RenderDrawsAFullFrameThroughTheRealTheme) {
+  host::setRootActivity(makeFontSelection());
+  host::currentActivity()->render(RenderLock{});
+}
+
+// ===========================================================================
 // (a) The exact regression: FontSelectionActivity must not finish on the press.
 // ===========================================================================
 
 TEST_F(ActivityInput, FontSelectionSurvivesTheBackPressAndLeavesOnTheRelease) {
-  SKIP_WITHOUT_THEME();
   host::setRootActivity(makeFontSelection());
   ASSERT_EQ(host::currentActivityName(), "FontSelect");
   host::resetCounters();
@@ -181,9 +206,6 @@ TEST_F(ActivityInput, FontSelectionSurvivesTheBackPressAndLeavesOnTheRelease) {
 class BackEdgeConvention : public ActivityInput, public ::testing::WithParamInterface<BackEdgeCase> {};
 
 TEST_P(BackEdgeConvention, OnePhysicalBackPressCausesExactlyOneTransition) {
-  // Only the FontSelection param constructs a theme-touching onEnter; the
-  // IntervalSelection param runs normally and still covers the convention.
-  if (std::string(GetParam().label) == "FontSelection") SKIP_WITHOUT_THEME();
   g_parentObs = ParentObservations{};
   auto parentOwned = std::make_unique<ReaderParentDouble>(host::renderer(), host::input());
   auto* parent = parentOwned.get();
@@ -217,9 +239,6 @@ TEST_P(BackEdgeConvention, OnePhysicalBackPressCausesExactlyOneTransition) {
 }
 
 TEST_P(BackEdgeConvention, DoesNotFinishOnTheBackPressEdge) {
-  // Only the FontSelection param constructs a theme-touching onEnter; the
-  // IntervalSelection param runs normally and still covers the convention.
-  if (std::string(GetParam().label) == "FontSelection") SKIP_WITHOUT_THEME();
   host::setRootActivity(GetParam().factory());
   const std::string childName = host::currentActivityName();
   host::resetCounters();
@@ -268,7 +287,6 @@ TEST_F(ActivityInput, LogicalBackFollowsTheUserRemap) {
 }
 
 TEST_F(ActivityInput, FontSelectionLeavesViaTheRemappedBackButton) {
-  SKIP_WITHOUT_THEME();
   SETTINGS.frontButtonBack = CrossPointSettings::FRONT_HW_RIGHT;
   SETTINGS.frontButtonRight = CrossPointSettings::FRONT_HW_BACK;
 
@@ -290,7 +308,6 @@ TEST_F(ActivityInput, FontSelectionLeavesViaTheRemappedBackButton) {
 // ===========================================================================
 
 TEST_F(ActivityInput, HoldingBackDoesNotRepeatTheExit) {
-  SKIP_WITHOUT_THEME();
   host::setRootActivity(makeFontSelection());
   host::resetCounters();
 
@@ -324,11 +341,19 @@ TEST_F(ActivityInput, HarnessReportsRenderLockStateHonestly) {
 }
 
 TEST_F(ActivityInput, ConfirmAppliesTheFontUnderTheRenderLock) {
-  SKIP_WITHOUT_THEME();
   host::setRootActivity(makeFontSelection());
+
+  // Confirm has two meanings now (FontSelectionActivity.cpp:181-189, cb98d4fa),
+  // and the cursor position picks between them: on the row that is ALREADY
+  // applied it swaps the specimen, on any other row it applies. onEnter starts
+  // with the cursor on the applied row, so the cursor has to move off it before
+  // Confirm means "apply" at all.
+  //
+  // A front Right tap is the move: list navigation is bound to the front
+  // buttons only, on the RELEASE edge (FontSelectionActivity.cpp:223-235).
+  host::tap(HalGPIO::BTN_RIGHT);
   host::resetCounters();
 
-  // applySelectedFont is bound to the Confirm PRESS (FontSelectionActivity.cpp:139).
   host::pressFrame(HalGPIO::BTN_CONFIRM);
 
   ASSERT_EQ(host::fontSystemCalls().ensureLoaded, 1) << "Confirm did not apply the selected font";
@@ -338,8 +363,24 @@ TEST_F(ActivityInput, ConfirmAppliesTheFontUnderTheRenderLock) {
   EXPECT_EQ(host::currentActivityName(), "FontSelect") << "Confirm must apply and stay, not leave";
 }
 
+// The other half of that split. It is here because the apply test above is the
+// kind that quietly stops testing anything: if Confirm ever went back to always
+// applying, this case fails and says so, rather than the tap above silently
+// becoming pointless.
+TEST_F(ActivityInput, ConfirmOnTheAppliedRowSwapsTheSpecimenInsteadOfReapplying) {
+  host::setRootActivity(makeFontSelection());
+  host::resetCounters();
+
+  // Cursor is on the applied row straight out of onEnter.
+  host::pressFrame(HalGPIO::BTN_CONFIRM);
+
+  EXPECT_EQ(host::fontSystemCalls().ensureLoaded, 0)
+      << "Confirm re-applied the font that was already applied: that is an ensureLoaded() — a full unload and "
+         "reload of the resident face — for no change";
+  EXPECT_EQ(host::currentActivityName(), "FontSelect");
+}
+
 TEST_F(ActivityInput, SideButtonChangesFontSizeUnderTheRenderLock) {
-  SKIP_WITHOUT_THEME();
   host::setRootActivity(makeFontSelection());
   ASSERT_EQ(SETTINGS.fontSizeSlot, CrossPointSettings::DEFAULT_FONT_SIZE_SLOT);
   host::resetCounters();

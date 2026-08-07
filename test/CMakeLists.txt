@@ -35,6 +35,11 @@ target_compile_options(crosspoint_test_common INTERFACE
   -pedantic
 )
 
+# crosspoint_add_theme_stack(): links the real UITheme + Lyra theme chain
+# host-side. See test/cmake/HostThemeStack.cmake for what a caller must still
+# supply.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/HostThemeStack.cmake)
+
 enable_testing()
 include(GoogleTest)
 

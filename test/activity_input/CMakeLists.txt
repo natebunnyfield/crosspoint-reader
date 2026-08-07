@@ -1,10 +1,11 @@
 # Activity / input-edge suite.
 #
-# Links the REAL activities, the REAL MappedInputManager and the REAL
-# ButtonNavigator host-side, following test/renderer_bounds' pattern for the
-# renderer + font stack (and its -include Arduino.h trick, CXX only, because the
-# firmware sources assume the Arduino prelude is in scope while minibidi.c /
-# tinflate.c / uzlib_checksums.c are C).
+# Links the REAL activities, the REAL MappedInputManager, the REAL
+# ButtonNavigator and the REAL UITheme + Lyra theme chain host-side, following
+# test/renderer_bounds' pattern for the renderer + font stack (and its
+# -include Arduino.h trick, CXX only, because the firmware sources assume the
+# Arduino prelude is in scope while minibidi.c / tinflate.c /
+# uzlib_checksums.c are C).
 #
 # What is a double rather than the real thing, and why — full rationale in
 # HostHarness.cpp:
@@ -12,16 +13,19 @@
 #                        dragging in Boot/Home/Crash/Sleep/Reader/Settings
 #                        vtables. loop()'s deferred push/pop semantics, which the
 #                        suite depends on, are mirrored exactly.
-#   * UITheme          — its ctor constructs all four themes (BaseTheme + Lyra +
-#                        Lyra3Covers + RoundedRaff -> HalClock, HalPowerManager,
-#                        RecentBooksStore, icon tables). Metrics come from the
-#                        genuine BaseMetrics::values. Activity::render() must
-#                        therefore not be called; the harness never renders.
 #   * CrossPointSettings — real class and real field defaults, but the .cpp is
 #                        not linked (JsonSettingsIO / ArduinoJson / file I/O).
 #   * SdCardFontSystem — doubled so ensureLoaded() can be observed, which is how
 #                        the RenderLock tests check the lock is actually held.
 #   * HalGPIO          — stubs/HalGPIO.h, the scriptable input seam.
+#   * HalClock / HalPowerManager — test/host_stubs/, headers only. They exist
+#                        solely because BaseTheme.cpp includes them and their
+#                        real versions reach ESP-IDF; nothing here reads a clock
+#                        and only the battery icon reads the power manager.
+#
+# UITheme was a double until the theme stack became linkable (see
+# crosspoint_add_theme_stack at the bottom of this file). It is the real one
+# now, so render() is a legal call here.
 #
 # stubs/ is FIRST on the include path so its HalGPIO / HalStorage / freertos
 # headers supersede tools/calendar_preview's and the real lib/hal ones.
@@ -133,5 +137,11 @@ target_link_libraries(ActivityInputTest PRIVATE
   crosspoint_test_common
   GTest::gtest
 )
+
+# The REAL UITheme + BaseTheme/Lyra/Lyra3Covers/LyraSix chain. Activities read
+# the theme outside render() — FontSelectionActivity::onEnter sizes its list
+# with GUI.getListRowStep(), a virtual LyraTheme overrides — so the old null-
+# currentTheme double could not run those tests at all.
+crosspoint_add_theme_stack(ActivityInputTest ${REPO_ROOT})
 
 gtest_discover_tests(ActivityInputTest)

@@ -13,3 +13,19 @@ Run a single suite directly:
 
 Google Test is fetched via CMake FetchContent on first configure; the pinned
 version lives in test/CMakeLists.txt.
+
+Shared pieces:
+
+  cmake/HostThemeStack.cmake  crosspoint_add_theme_stack(target repo_root) links
+                              the REAL UITheme + BaseTheme/Lyra/Lyra3Covers/
+                              LyraSix chain host-side. Needed by any suite whose
+                              code reads GUI — which includes activity onEnter/
+                              loop paths, not just render().
+  host_stubs/                 The headers that chain needs and only that:
+                              HalClock.h, HalPowerManager.h (their real versions
+                              reach ESP-IDF) and WString.h (FsHelpers.h wants
+                              Arduino's String). Suite-specific seams — HalGPIO,
+                              HalStorage — stay in each suite's own stubs/.
+
+test/activity_input additionally needs ArduinoJson, which comes from PlatformIO's
+lib_deps rather than the repo, so run any `pio run` once before configuring.

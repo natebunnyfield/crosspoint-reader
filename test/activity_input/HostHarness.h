@@ -1,10 +1,11 @@
 // Host harness for the activity/input layer.
 //
 // Owns every global the firmware expects to already exist (display, gpio,
-// renderer, mappedInput, activityManager, UITheme::instance,
-// CrossPointSettings::instance, sdFontSystem) plus the frame driver that
-// reproduces src/main.cpp's loop shape. Implementation and rationale for each
-// test double: HostHarness.cpp.
+// renderer, mappedInput, activityManager, CrossPointSettings::instance,
+// sdFontSystem) plus the frame driver that reproduces src/main.cpp's loop
+// shape. UITheme is NOT among them — the real one is linked
+// (crosspoint_add_theme_stack). Implementation and rationale for each test
+// double: HostHarness.cpp.
 #pragma once
 
 #include <cstdint>

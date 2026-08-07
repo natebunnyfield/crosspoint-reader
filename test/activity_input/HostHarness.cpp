@@ -6,7 +6,6 @@
 #include <HalGPIO.h>
 #include <builtinFonts/all.h>
 
-#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -16,8 +15,6 @@
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
-#include "components/UITheme.h"
-#include "components/themes/BaseTheme.h"
 #include "fontIds.h"
 #include "util/ButtonNavigator.h"
 
@@ -138,76 +135,33 @@ class HostPlaceholderActivity final : public Activity {
 // function-local static; no out-of-line member definition is needed.)
 
 int CrossPointSettings::getReaderFontId() const {
-  // Only reachable from FontSelectionActivity::render(), which this suite never
-  // drives (see the UITheme double below). 0 means "no font", which
-  // renderPreviewPane already treats as "draw nothing".
+  // Reachable only from FontSelectionActivity::render(). 0 means "no font",
+  // which renderPreviewPane already treats as "draw nothing" — the right answer
+  // here, since the real one resolves against an SD registry this suite does not
+  // have.
   return 0;
 }
 
 // ============================================================================
-// UITheme double.
+// UITheme is the REAL one now.
 //
-// The real UITheme.cpp cannot be linked: its constructor make_unique's
-// LyraSixTheme, which drags in BaseTheme + LyraTheme + Lyra3CoversTheme and,
-// behind them, HalClock, HalPowerManager, RecentBooksStore and the icon
-// tables. So the metrics — the only part activity *logic* reads — are
-// wired to the genuine BaseMetrics::values from BaseTheme.h, and `currentTheme`
-// is left null.
+// It used to be a double with a null `currentTheme`, which made GUI (==
+// getTheme()) a null dereference and put render() out of bounds for this
+// suite. That was tolerable only until an activity read the theme OUTSIDE
+// render: cb98d4fa added GUI.getListRowStep() to FontSelectionActivity::onEnter
+// (FontSelectionActivity.cpp:105), and every FontSelection case here started
+// segfaulting in onEnter.
 //
-// CONSEQUENCE, and the one real limit of this suite: GUI (== getTheme()) is a
-// null dereference, so Activity::render() MUST NOT be called. Nothing calls it
-// — the harness never starts the render task and never notifies one. A test
-// that wants render() coverage belongs in test/renderer_bounds, which links the
-// real theme stack's collaborators.
+// src/components/UITheme.cpp and the BaseTheme -> LyraTheme -> Lyra3CoversTheme
+// -> LyraSixTheme chain are linked by crosspoint_add_theme_stack() (see
+// test/cmake/HostThemeStack.cmake). The only thing that had ever blocked it was
+// BaseTheme.cpp's <HalClock.h> / <HalPowerManager.h> include chain reaching
+// ESP-IDF; test/host_stubs/ shadows those two headers.
+//
+// So GUI is a live LyraSixTheme here, and render() is no longer forbidden — the
+// harness still never starts a render task, but a test may now call
+// activity.render() directly if it wants pixel coverage.
 // ============================================================================
-
-UITheme UITheme::instance;
-
-UITheme::UITheme() : currentMetrics(&BaseMetrics::values) {}
-
-const ThemeMetrics& UITheme::getMetrics() const { return *currentMetrics; }
-
-// Copied from src/components/UITheme.cpp:52-70. Self-contained — metrics plus
-// the renderer — so this is the real computation, not an approximation.
-// FontSelectionActivity::loop() calls it every frame to size a page jump.
-int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader, bool hasTabBar, bool hasButtonHints,
-                                     bool hasSubtitle, int extraReservedHeight, int subtitleLines) {
-  const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
-  const auto orientation = renderer.getOrientation();
-  int reservedHeight = metrics.topPadding;
-  if (hasHeader) {
-    reservedHeight += metrics.headerHeight + metrics.verticalSpacing;
-  }
-  if (hasTabBar) {
-    reservedHeight += metrics.tabBarHeight;
-  }
-  if (hasButtonHints && orientation != GfxRenderer::Orientation::LandscapeClockwise &&
-      orientation != GfxRenderer::Orientation::LandscapeCounterClockwise) {
-    reservedHeight += metrics.verticalSpacing + metrics.buttonHintsHeight;
-  }
-  const int availableHeight = renderer.getScreenHeight() - reservedHeight - extraReservedHeight;
-  // Mirrors BaseTheme::getListRowStep + getListPageItems, including both clamps
-  // — a zero rowStep would divide by zero, and a page of zero items would hang
-  // any caller paging through a list.
-  int rowStep = metrics.listRowHeight;
-  if (hasSubtitle) {
-    const int extraLines = std::max(0, subtitleLines - 1);
-    rowStep = metrics.listWithSubtitleRowHeight + extraLines * metrics.listSubtitleLineStep;
-  }
-  if (rowStep <= 0) return 1;
-  return std::max(1, availableHeight / rowStep);
-}
-
-// Render-path only (EpubReaderMenuActivity::render, EpubReaderPercentSelection
-// Activity::render). Defined for the linker; the full-screen rect is not used
-// for any assertion.
-Rect UITheme::getScreenSafeArea(const GfxRenderer& renderer, bool, bool) {
-  return Rect{0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()};
-}
-
-void UITheme::drawCenteredText(const GfxRenderer&, Rect, int, int, const char*, bool, EpdFontFamily::Style) {
-  // Render-path only; see getScreenSafeArea.
-}
 
 // ============================================================================
 // SdCardFontSystem double.
@@ -217,8 +171,8 @@ void UITheme::drawCenteredText(const GfxRenderer&, Rect, int, int, const char*, 
 // may be mid-read of, which is why both call sites hold a RenderLock
 // (FontSelectionActivity.cpp:200-220, 229-234). The double records whether the
 // lock was actually held so a future edit that drops it fails a test instead of
-// panicking on a device. begin()/resolveFontId()/loadForDisplay() are not
-// referenced by anything linked here, so they are left undefined.
+// panicking on a device. begin()/resolveFontId() are not referenced by anything
+// linked here, so they are left undefined.
 // ============================================================================
 
 SdCardFontSystem sdFontSystem;
@@ -228,6 +182,12 @@ void SdCardFontSystem::ensureLoaded(GfxRenderer&) {
   s.fontCalls.ensureLoaded++;
   if (!RenderLock::peek()) s.fontCalls.ensureLoadedWithoutRenderLock++;
 }
+
+// Referenced by LyraSixTheme::drawRecentBookCover (LyraSixTheme.cpp:135) for
+// the Home title face. Nothing host-side installs SD fonts, and 0 is what the
+// real one returns for a family that is not present — the theme then falls back
+// to the built-in title font.
+int SdCardFontSystem::loadForDisplay(const char*, uint8_t, GfxRenderer&) { return 0; }
 
 // ============================================================================
 // ActivityManager double.
@@ -248,7 +208,9 @@ void ActivityManager::begin() {
 void ActivityManager::renderTaskLoop() {
   // Defined because it is the vtable's key function (first non-inline virtual),
   // so constructing an ActivityManager needs it. Reaching it would mean a test
-  // started a render task, which the UITheme double cannot survive.
+  // started a FreeRTOS render task, which the host shim has no scheduler for —
+  // a test that wants pixels calls Activity::render() directly instead (see
+  // RenderDrawsAFullFrameThroughTheRealTheme).
   std::fprintf(stderr, "[harness] renderTaskLoop() must never run host-side\n");
   std::abort();
 }
@@ -461,7 +423,6 @@ const FontSystemCalls& fontSystemCalls() { return am().fontCalls; }
 
 void reset() {
   auto& s = am();
-
 
   // Destroy without onExit(): this is a between-tests teardown, not navigation.
   s.pending.reset();
