@@ -263,7 +263,15 @@ reproduced — the grid keyboard's nav buttons may not repeat the same way — b
 it is the same shape and worth a look before trusting long-press there.
 
 ### [B-014] The iOS Home menu listed Claude, which cannot work on a phone
-**severity: medium · scope: iOS app · FIXED 2026-08-07 · `641e463a`, simulator `422909f`**
+**severity: medium · scope: iOS app · FIXED 2026-08-07 · `641e463a` · SUPERSEDED same day**
+
+> **Superseded by S-010 / `f1459353`.** Claude is BACK on iOS and that is correct.
+> The premise here — that `WifiCredentialStore` is not compiled for the phone —
+> stopped being true when `CROSSPOINT_NO_NETWORK` was split: the credential store
+> is in the iOS build again, so the link failure this entry describes cannot
+> recur. Do not re-apply the guard. What was genuinely right about this entry is
+> the rule, not the remedy: a row that opens a screen which cannot work is a
+> defect. Claude can work now.
 
 The iOS build defines `CROSSPOINT_NO_NETWORK`, and `HomeActivity.cpp:36` still
 counted Claude in the menu — so the row rendered, was selectable, and opened a
@@ -534,7 +542,18 @@ is worth doing regardless — the firmware cannot control what a remote server
 sends, so this is not an error condition.
 
 ### [B-008] iOS app offers WiFi and web-server menus that cannot work
-**severity: medium · scope: iOS app · FIXED + VERIFIED 2026-08-03**
+**severity: medium · scope: iOS app · FIXED + VERIFIED 2026-08-03 · SUPERSEDED 2026-08-07**
+
+> **Superseded by S-010 / `f1459353`.** Wi-Fi Networks and File Transfer are BACK
+> on iOS and that is correct. This entry's diagnosis was exact for its moment —
+> `WiFi.scanNetworks()` returned a synthetic list and `localIP()` was hardcoded to
+> `127.0.0.1`, so the screen drew a QR code pointing at loopback. Simulator
+> `4a98ba8` then gave the target a real radio (NetworkExtension, in-process HTTP,
+> Bonjour, servers bound to all interfaces), which removed the premise. Keeping
+> the guard after that suppressed features that work.
+>
+> Still true and still enforced: SD Firmware Update and OTA remain hidden on iOS,
+> now under `CROSSPOINT_NO_DEVICE_FLASH`. Those write an ESP32 partition.
 
 Fixed by `CROSSPOINT_NO_NETWORK` guards (firmware `5bce63bf`) plus iOS TU
 exclusions (simulator `ac8cdef`).
