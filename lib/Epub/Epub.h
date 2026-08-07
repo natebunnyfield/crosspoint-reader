@@ -35,6 +35,9 @@ class Epub {
   bool parseTocNcxFile() const;
   bool parseTocNavFile() const;
   void discoverCssFilesFromZip();
+  // Last-resort cover discovery for EPUBs whose metadata and guide declare no
+  // cover: scan the ZIP central directory for a plausible cover image.
+  std::string findCoverFromZipEntries() const;
   void parseCssFiles() const;
 
  public:
