@@ -12,6 +12,109 @@ was found, and what closing it requires.
 
 ## OPEN
 
+### [B-012] Home draws a line of content below the bottom of the screen, every paint
+**severity: medium · scope: Home / theme layout · found 2026-08-06**
+
+Home paints ink 37-62 pixels below the panel. It is dropped, so nothing is
+corrupted and the screen looks fine — but whatever that line is, the owner
+never sees it, and each lost pixel costs an ERR log line. A 1.5-second boot
+produced **1,756** of them.
+
+Reproduce, no interaction needed (X4 profile, 480x800 logical in portrait):
+
+```bash
+SDL_VIDEODRIVER=dummy CROSSPOINT_SIM_INPUT_SCRIPT='2000:HOME;3500:QUIT' \
+  .pio/build/simulator/program 2>&1 | grep -c 'Outside range'
+```
+
+The pixels form one band: x 40-175, y **837-862**, against a last valid row of
+799. It repeats on every Home repaint (69, 571, 238, 466, 412 … per paint in a
+20-second run), and it happens both with a real `state.json` and with a
+minimal one, so it is not an artifact of missing reader state. Only
+`drawText` / `drawLine` / `drawIcon` / glyph ink can log this — `fillRect` and
+friends clip in logical space — and a 136x26 sparse box is the shape of a text
+line, not a rule or a box.
+
+**Culprit not identified.** The leading suspect is the non-split `menuRect` in
+`HomeActivity.cpp:389-394`: its `y` starts at
+`homeTopPadding + coverAreaHeight + homeMenuTopOffset` while its `height`
+subtracts `headerHeight` instead of `coverAreaHeight`, so the rect's bottom
+lands at `pageHeight + coverAreaHeight - headerHeight - verticalSpacing -
+buttonHintsHeight` — past the screen whenever the cover area is taller than
+that sum, which on Lyra Six it is. `drawButtonMenu` then has room it does not
+have for the last row. This arithmetic has NOT been confirmed against the
+observed band; it is where to look first, not the answer.
+
+**Close by:** instrumenting `drawText` to print the string when the origin is
+out of range (or bisecting the Home render), then fixing the geometry — and
+adding a headless assertion, since this is exactly the class of defect a
+screenshot hides and the log announces 1,756 times.
+
+### [B-011] drawRect's lineWidth overload draws one pixel outside its rectangle
+**severity: low · scope: rendering primitives · found 2026-08-06**
+
+The two overloads disagree about what the rectangle's extent means. The
+5-argument one is correct — `drawLine(x, y, x + width - 1, y, ...)`
+(`GfxRenderer.cpp:834-839`). The 6-argument one, which takes a `lineWidth`,
+uses `x + width` and `y + height` (`GfxRenderer.cpp:842-849`), so its border
+lands one pixel right of and one pixel below the rect it was handed — despite
+the comment above it reading "Border is inside the rectangle".
+
+Two callers: the popup progress-bar outline (`BaseTheme.cpp:781`) and the
+daisy keyboard's selected-cell box (`KeyboardPanel.cpp:267`). Neither sits at
+a screen edge today, so the symptom is a border 1px larger than intended
+rather than lost pixels; a caller that ever draws flush right or bottom would
+have that edge silently dropped by `drawPixel`'s bounds check and would log a
+line per pixel (the B-010 mechanism).
+
+**Close by:** using `x + width - 1 - i` / `y + height - 1 - i` in the loop, then
+checking both call sites still look right — they may have been nudged to
+compensate.
+
+### [B-009] Emoji in a Claude answer vanish and log an error per paint
+**severity: low · scope: Claude chat / text rendering · found 2026-08-06**
+
+The API answers with emoji unprompted. No font in this firmware can represent
+one, so the character disappears and the render logs an error every time the
+text is painted:
+
+```
+[1446176] [ERR] [GFX] No glyph for codepoint 128522     (U+1F60A 😊)
+```
+
+Confirmed chain. `renderCharImpl` looks the glyph up and bails
+(`GfxRenderer.cpp:417-420`); `EpdFont::getGlyph` had already fallen back to
+U+FFFD and returned nullptr (`EpdFont.cpp:181-189`), which only happens when
+the face carries neither the codepoint nor the replacement character. The
+answer is painted in Space Mono 12 — `SETTINGS.editorFont` defaults to the
+card-only iA Writer row, so `resolveEditorFont` falls through to the built-in
+mono — and `grep -c 0xFFFD spacemono_12_regular.h` is **0**. Same for
+ibmplexmono, librefranklin and ubuntu, i.e. both editor faces and the UI
+chrome faces. The built-in converter never requests a codepoint above U+FFFD
+(`lib/EpdFont/scripts/fontconvert.py`), and no SD interval preset includes an
+emoji block (`fontconvert_sdcard.py`), so this cannot be fixed by installing a
+family.
+
+Two consequences beyond the missing character. `prevAdvanceFP = glyph ? ... : 0`
+(`GfxRenderer.cpp:726`) advances the cursor by zero on a miss, so the rest of
+the line shifts left into the gap rather than leaving a space — wrap widths
+were computed with the emoji present, so the line ends short. And LOG_ERR
+feeds the RTC_NOINIT crash ring, so a long answer full of emoji can push real
+history out of a 16-entry buffer.
+
+Nothing sanitises the response: `ClaudeChat.cpp` stores the model's bytes
+verbatim, `layoutAnswer` only splits and soft-wraps, and the request carries no
+system prompt that would ask for plain text.
+
+Not Claude-specific — an EPUB or a BLE-typed note with emoji or CJK takes the
+same path. Claude is just the surface that produces them daily.
+
+**Close by:** deciding where to intervene. Adding U+FFFD to the four faces
+turns silence into a visible ▯ and costs one glyph each; stripping
+non-representable codepoints before layout keeps the line metrics honest;
+a system prompt would reduce but not eliminate them. Demoting the log to DEBUG
+is worth doing regardless — the firmware cannot control what a remote server
+sends, so this is not an error condition.
 
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
@@ -96,6 +199,43 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-010] The Claude prompt hint ran off the right edge of the panel
+**severity: low · scope: Claude chat / text rendering · FIXED 2026-08-06 · `c512eef1`**
+
+Found twice the same evening, from opposite directions: by driving the daisy
+layout and looking at the screen, and in the log of the session that fixed the
+OK-key crash, whose 28-minute run carried 23 of these:
+
+```
+[1451261] [ERR] [GFX] !! Outside range (480, 120) -> (120, -1)
+…
+[1451261] [ERR] [GFX] !! Outside range (494, 131) -> (131, -14)
+```
+
+Reading them: the first pair is the logical coordinate, the second the
+post-rotation framebuffer one (`GfxRenderer.cpp:582`). Portrait maps
+`phyY = panelHeight - 1 - x` (`:224-225`), so on the X4's 480-wide logical
+screen a negative `phyY` means x ran past column 479 — here by 1 to 15 pixels,
+across rows 120-132, which is exactly one line of Space Mono 12 ink at
+`contentTop`. `drawPixel` drops the write before touching the framebuffer
+(`:574-583`), so nothing was corrupted; the glyph tails were simply cut off,
+and each lost pixel cost a log line.
+
+The string was `"Type a question, then press Ask."` — 32 characters drawn raw
+at `contentSidePadding`, with no wrap and no truncation. It fit while the
+editor borrowed the narrow 10 pt UI face and stopped fitting the moment the
+editor font became a real monospace face. The timestamp is 5 s after the
+answer arrived, i.e. Back to an emptied prompt, which is when the hint shows.
+
+Fixed by wrapping it to the `maxWidth` the prompt already computes, and by
+making it (plus NoteEditor's OOM message, same shape, two sites)
+`tr()`-translated instead of a hardcoded English literal.
+
+Verified independently of the fixing session: a headless run on `c512eef1`
+that walks Home to Claude and stops on the empty prompt logs **0**
+`Outside range` lines from `Entering activity: ClaudeChat` onward. (The same
+run logs 7,902 before it, all on Home — that is B-012, a different defect.)
 
 ### [B-008] iOS app offers WiFi and web-server menus that cannot work
 **severity: medium · scope: iOS app · FIXED + VERIFIED 2026-08-03**
