@@ -12,6 +12,60 @@ was found, and what closing it requires.
 
 ## OPEN
 
+### [B-014] The iOS Home menu listed Claude, which cannot work on a phone
+**severity: medium · scope: iOS app · FIXED 2026-08-07 · `641e463a`, simulator `422909f`**
+
+The iOS build defines `CROSSPOINT_NO_NETWORK`, and `HomeActivity.cpp:36` still
+counted Claude in the menu — so the row rendered, was selectable, and opened a
+screen that could never do anything. `claudechat` needs a saved Wi-Fi
+credential (`ClaudeChat.cpp:118` calls `WIFI_STORE.findCredential`) and an API
+key read off the SD card; `src/WifiCredentialStore.cpp` is not compiled for iOS
+at all.
+
+This is the same lying-control class as B-008, and it also had teeth: once the
+notes TUs entered the generated iOS source set, `ClaudeChat.cpp` failed to link
+against the excluded credential store and **took the build-30 archive down**
+with `ld: symbol(s) not found for architecture arm64`.
+
+Fixed by guarding the row under `CROSSPOINT_NO_NETWORK` across all four sources
+of truth the header warns about — `getMenuItemCount`, both index maps, and the
+label/icon vectors — plus the dispatch arm, `onClaudeOpen`, `goToClaudeChat`
+and the `ClaudeChatActivity` include; and by adding `src/notes/ClaudeChat.cpp`
+and `src/activities/util/ClaudeChatActivity.cpp` to
+`CROSSPOINT_IOS_EXCLUDED_FW_SOURCES`.
+
+**Verified:** device `gh_release` still builds (the network path is unchanged),
+the desktop canary builds and boots, and the iOS configure reports
+`20 iOS exclusions all resolve`. Device-side behaviour of the network build is
+unchanged by construction — nothing outside `#ifdef CROSSPOINT_NO_NETWORK` moved.
+
+### [B-013] Opening an oversized `.txt` in the note editor destroyed it
+**severity: high · scope: data loss · FIXED 2026-08-07 · `641e463a`**
+
+`NoteEditorActivity::onEnter` refuses a file at or over the 8 KB cap
+(`:115-118`), logs it, and sets `bufferFull` — but leaves `buf` allocated and
+**empty**. `onExit` (`:136`) then calls `save()` unconditionally, and `save()`
+never consulted the flag. `openFileForWrite` is `O_TRUNC`, and an empty buffer
+is a legitimate save (the comment in `save()` says so: it is how "the owner
+deleted this text" is recorded), so nothing downstream could tell the two apart.
+
+Manage Files offers Edit for `.md` **and `.txt`**
+(`FileManagerActivity.cpp:172-174`), and a `.txt` book is routinely far larger
+than 8 KB. Open one, read "refusing to open" on screen, press Back — the file
+is now zero bytes. Unrecoverable, and it is the owner's own content.
+
+The OOM sibling path was safe only by accident: there `buf` is null, so
+`save()` returns at its first line.
+
+`bufferFull` could not be the guard, because `:260` sets it again when typing
+hits the cap — that buffer holds real edits and must still be written. Fixed
+with a separate `loadRefused` flag, set only on the refuse-to-load path and
+checked at the top of `save()`.
+
+**Close-out note:** verified by reading the path end to end and by the device +
+desktop builds; not yet exercised on hardware. The failing sequence is
+Manage Files → a `.txt` book → Edit → Back, and the file should be untouched.
+
 ### [B-012] Home draws a line of content below the bottom of the screen, every paint
 **severity: medium · scope: Home / theme layout · found 2026-08-06**
 
