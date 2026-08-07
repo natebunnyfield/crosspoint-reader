@@ -133,10 +133,13 @@
 installed_families:
   - Edgar
   - Coelacanth
-  - Rosarivo
   - TeXGyreSchola
   - LibreFranklin
-  - QuattrocentoSans
+# Rosarivo and QuattrocentoSans were A tier'd on 2026-08-07 (owner ruling) and
+# deleted from every surface. Their recipes below stay buildable and their
+# picker labels stay in src/FontDisplayNames.h, exactly as for the C tier cuts —
+# a card provisioned before the ruling still carries them. Putting either back
+# in this list is a regression, not a restoration; it needs a fresh ruling.
 
 families:
   # ── Serif ──────────────────────────────────────────────────────────────

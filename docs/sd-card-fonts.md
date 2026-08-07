@@ -3,19 +3,19 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; sans added 2026-08-03, resolved to two 2026-08-04)
+## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07)
 
-The installed set on this fork is exactly six families — **Edgar, Coelacanth,
-Rosarivo, TeXGyreSchola, LibreFranklin, QuattrocentoSans** — on every surface:
-both device SD cards, the simulator's `fs_/fonts/`, and the iOS app's bundled
-seed set (`crosspoint-simulator/ios/seedfonts/`). The other curated families
-remain fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
+The installed set on this fork is exactly four families — **Edgar, Coelacanth,
+TeXGyreSchola, LibreFranklin** — on every surface: both device SD cards, the
+simulator's `fs_/fonts/`, and the iOS app's bundled seed set
+(`crosspoint-simulator/ios/seedfonts/`). The other curated families remain
+fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these six and nothing else.
+surface or reprovisioning a card, install these four and nothing else.
 
-Two of the six are sans, one per cell of the taxonomy: **Libre Franklin**, the
-text grotesque, from `lib/EpdFont/scripts/grotesque-candidates.yaml`; and
-**Quattrocento Sans**, the humanist, promoted 2026-08-04.
+One of the four is a sans: **Libre Franklin**, the text grotesque, from
+`lib/EpdFont/scripts/grotesque-candidates.yaml`. The humanist cell is empty
+since Quattrocento Sans went to A tier.
 
 **Archivo and Host Grotesk were cut on 2026-08-04**, promoting Libre Franklin to
 the single text grotesque. The bench they came off answered "which grotesque",
@@ -55,7 +55,10 @@ Both were built on 2026-08-04, both are humanist sans, and both therefore fill
 one cell of the taxonomy — the same "three answers to one question" that cut
 Archivo and Host Grotesk that morning. The tier takes one.
 
-**Quattrocento Sans is S tier and installed on every surface.** Pablo Impallari
+**Quattrocento Sans won the humanist-sans cell here, and went to A tier on
+2026-08-07 — the section below supersedes this one on where it is installed. The
+comparison it won still stands; it is simply no longer on any surface.** Pablo
+Impallari
 and Igino Marini's humanist companion to the Quattrocento serif, OFL, all four
 styles real. It won on everything outside the page:
 
@@ -150,6 +153,34 @@ The iOS app needs no equivalent list. `CrossPointFsPrep.cpp::seedOneFontDirector
 seeds whatever `crosspoint-simulator/ios/seedfonts/` contains and prunes files
 the bundle no longer carries, so that directory is its own source of truth —
 keep it holding exactly these six.
+
+## A tier (fork ruling, 2026-08-07)
+
+**Rosarivo and Quattrocento Sans.** Removed from every surface — both device SD
+cards, `fs_/fonts/`, and the iOS seed bundle — and taken out of
+`installed_families:`. Recipes stay buildable and picker labels stay in
+`src/FontDisplayNames.h`, the same treatment every cut family gets, because a
+card provisioned before this ruling still carries them.
+
+A tier is not C tier. C means a comparison was run and the family lost it —
+Freight Sans lost the humanist-sans cell to Quattrocento Sans on evidence, and
+re-adding it needs a fresh ruling because the evidence still says no. A means
+the family is good and simply is not installed: the set is being kept small, and
+these are the first candidates if a slot opens. Nothing was found wrong with
+either face.
+
+Consequences worth knowing before reprovisioning:
+
+- **The humanist-sans cell is now empty.** Libre Franklin, a text grotesque, is
+  the only installed sans. Quattrocento Sans was promoted into that cell on
+  2026-08-04 and is the obvious way to fill it again.
+- **A selected family that is no longer installed does not fall back to another
+  SD family.** `getReaderFontId()` falls back to the built-in Noto Serif, which
+  is a visible change of face, so repoint `SETTINGS.sdFontFamilyName` when
+  removing a family a surface is actually using. Both were in use when this
+  ruling landed: the simulator was on Quattrocento Sans and the X4 card on
+  Rosarivo. They were repointed to Libre Franklin and Coelacanth respectively —
+  nearest surviving family of the same class.
 
 ## Installing Fonts
 
