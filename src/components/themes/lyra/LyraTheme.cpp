@@ -591,11 +591,31 @@ void LyraTheme::drawEmptyRecents(const GfxRenderer& renderer, const Rect rect) c
 void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                const std::function<std::string(int index)>& buttonLabel,
                                const std::function<UIIcon(int index)>& rowIcon) const {
+  // Rows must fit the rect they are handed. This used to lay out at a fixed
+  // pitch from rect.y and never read rect.height, so a caller with less room
+  // than buttonCount needs pushed its last row off the panel -- Home with no
+  // recent books still reserves a full cover tile, which put "Settings" at
+  // y=833 on an 800px screen and cost 1756 dropped-pixel ERR lines per paint
+  // (B-012). Compress the gap first, then the tiles, so every row stays
+  // reachable rather than silently vanishing.
+  const int naturalPitch = LyraMetrics::values.menuRowHeight + LyraMetrics::values.menuSpacing;
+  int rowHeight = LyraMetrics::values.menuRowHeight;
+  int pitch = naturalPitch;
+  if (buttonCount > 1 && rect.height > 0) {
+    const int needed = (buttonCount - 1) * naturalPitch + rowHeight;
+    if (needed > rect.height) {
+      pitch = (rect.height - rowHeight) / (buttonCount - 1);
+      if (pitch <= rowHeight) {
+        pitch = rect.height / buttonCount;
+        rowHeight = pitch > LyraMetrics::values.menuSpacing ? pitch - LyraMetrics::values.menuSpacing : pitch;
+      }
+    }
+  }
+
   for (int i = 0; i < buttonCount; ++i) {
     int tileWidth = rect.width - LyraMetrics::values.contentSidePadding * 2;
-    Rect tileRect = Rect{rect.x + LyraMetrics::values.contentSidePadding,
-                         rect.y + i * (LyraMetrics::values.menuRowHeight + LyraMetrics::values.menuSpacing), tileWidth,
-                         LyraMetrics::values.menuRowHeight};
+    Rect tileRect =
+        Rect{rect.x + LyraMetrics::values.contentSidePadding, rect.y + i * pitch, tileWidth, rowHeight};
 
     const bool selected = selectedIndex == i;
 
@@ -607,7 +627,7 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
     const char* label = labelStr.c_str();
     int textX = tileRect.x + 16;
     const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
-    const int textY = tileRect.y + (LyraMetrics::values.menuRowHeight - lineHeight) / 2;
+    const int textY = tileRect.y + (rowHeight - lineHeight) / 2;
 
     if (rowIcon != nullptr) {
       UIIcon icon = rowIcon(i);

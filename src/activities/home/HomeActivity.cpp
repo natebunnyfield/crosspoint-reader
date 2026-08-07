@@ -403,8 +403,16 @@ void HomeActivity::render(RenderLock&&) {
         splitPages ? Rect{0, metrics.homeTopPadding + metrics.homeMenuTopOffset, pageWidth,
                           pageHeight - (metrics.homeTopPadding + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)}
                    : Rect{0, metrics.homeTopPadding + coverAreaHeight + metrics.homeMenuTopOffset, pageWidth,
-                          pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
-                                        metrics.homeMenuTopOffset + metrics.buttonHintsHeight)};
+                          // Subtract the SAME terms the y offset added, so the rect ends at
+                          // pageHeight - buttonHintsHeight exactly, like the split branch above.
+                          // This used to subtract headerHeight + verticalSpacing instead of
+                          // coverAreaHeight -- a leftover from when the menu sat under a header
+                          // rather than under the covers. On Lyra Six (cover tile 312, header 84,
+                          // spacing 16, hints 40) that put the rect's bottom at 972 on an 800px
+                          // screen, so drawButtonMenu laid out a row that fell off the panel and
+                          // drawPixel dropped it one ERR line at a time -- 1756 per Home paint.
+                          pageHeight - (metrics.homeTopPadding + coverAreaHeight + metrics.homeMenuTopOffset +
+                                        metrics.buttonHintsHeight)};
 
     // Menu-relative selection. A theme that folds Continue Reading INTO the
     // menu gives that row index 0, so selectorIndex is already menu-relative;
