@@ -17,6 +17,8 @@
 #endif
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
+#include "util/ClaudeChatActivity.h"
+#include "util/NoteEditorActivity.h"
 #include "util/FullScreenMessageActivity.h"
 
 static portMUX_TYPE activityManagerSpinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -185,6 +187,7 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
 }
 
 void ActivityManager::goToFileTransfer() {
+  lastHomeMenuItem = HomeMenuItem::FILE_TRANSFER;
 #ifndef CROSSPOINT_NO_NETWORK
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
 #else
@@ -192,17 +195,21 @@ void ActivityManager::goToFileTransfer() {
 #endif
 }
 
-void ActivityManager::goToSettings() { replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
+void ActivityManager::goToSettings() {
+  lastHomeMenuItem = HomeMenuItem::SETTINGS_MENU; replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToFileBrowser(std::string path) {
+  lastHomeMenuItem = HomeMenuItem::FILE_BROWSER;
   replaceActivity(std::make_unique<FileBrowserActivity>(renderer, mappedInput, std::move(path)));
 }
 
 void ActivityManager::goToFileManager() {
+  lastHomeMenuItem = HomeMenuItem::MANAGE_FILES;
   replaceActivity(std::make_unique<FileManagerActivity>(renderer, mappedInput));
 }
 
 void ActivityManager::goToRecentBooks() {
+  lastHomeMenuItem = HomeMenuItem::RECENTS;
   replaceActivity(std::make_unique<RecentBooksActivity>(renderer, mappedInput));
 }
 
@@ -222,23 +229,33 @@ void ActivityManager::goToFullScreenMessage(std::string message, EpdFontFamily::
 }
 
 void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
-  if (initialMenuItem == HomeMenuItem::NONE && currentActivity) {
-    const auto& activityName = currentActivity->name;
-    if (activityName == "FileBrowser") {
-      initialMenuItem = HomeMenuItem::FILE_BROWSER;
-    } else if (activityName == "RecentBooks") {
-      initialMenuItem = HomeMenuItem::RECENTS;
-    } else if (activityName == "CrossPointWebServer") {
-      initialMenuItem = HomeMenuItem::FILE_TRANSFER;
-    } else if (activityName == "FileManager") {
-      initialMenuItem = HomeMenuItem::MANAGE_FILES;
-    } else if (activityName == "Settings") {
-      initialMenuItem = HomeMenuItem::SETTINGS_MENU;
-    }
-  }
+  // Land the selector back on the row the user left from.
+  //
+  // This used to match currentActivity->name against a hardcoded list of
+  // activity-name strings. Any home row whose name was missing from that list
+  // silently fell back to index 0 — Manage Files did exactly that until it was
+  // added, and Create Note and Claude would have repeated it. lastHomeMenuItem
+  // is set by the goTo* wrappers instead, so a new row inherits this and there
+  // is no name list left to forget.
+  if (initialMenuItem == HomeMenuItem::NONE) initialMenuItem = lastHomeMenuItem;
   replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem));
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
+
+// REPLACE, not push. Pushing keeps HomeActivity alive on the stack with its
+// recent-book cover buffers still allocated, which left ~94 KB free and a
+// 73,716-byte largest block — and nimble_port_init(), which wants ~65 KB
+// contiguous, HUNG at that level repeatedly (watchdog reboot, no panic). Opened
+// straight from boot instead, the same call saw 134,972 free / 114,676 and
+// returned 0. Replacing frees Home before BLE starts; Back still works because
+// popActivity() on an empty stack goes Home.
+void ActivityManager::goToNoteEditor(std::string path) {
+  lastHomeMenuItem = HomeMenuItem::CREATE_NOTE;
+  replaceActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path)));
+}
+
+void ActivityManager::goToClaudeChat() {
+  lastHomeMenuItem = HomeMenuItem::CLAUDE; replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

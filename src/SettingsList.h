@@ -14,6 +14,7 @@
 #include "CrossPointSettings.h"
 #include "ReaderFontSizes.h"
 #include "activities/settings/SettingsActivity.h"
+#include "notes/EditorFonts.h"  // Editor font group (owner ruling 2026-08-05)
 
 // Build the font family setting dynamically. When registry is non-null, SD card fonts
 // are appended after the built-in fonts. Otherwise only built-in fonts are listed.
@@ -268,6 +269,39 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
         {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT, StrId::STR_BOOK_S_STYLE},
         "paragraphAlignment", StrId::STR_CAT_READER));
+    // How long typing settles before the screen redraws. Labels are built from
+    // the same table the getter reads, so the list and the values cannot drift.
+    {
+      SettingInfo s;
+      s.nameId = StrId::STR_DISPLAY_DEBOUNCE;
+      s.type = SettingType::ENUM;
+      s.key = "displayDebounce";
+      s.category = StrId::STR_CAT_SYSTEM;
+      s.valuePtr = &CrossPointSettings::displayDebounce;
+      s.enumStringValues.reserve(CrossPointSettings::DISPLAY_DEBOUNCE_COUNT);
+      for (uint8_t i = 0; i < CrossPointSettings::DISPLAY_DEBOUNCE_COUNT; i++) {
+        s.enumStringValues.emplace_back(std::to_string(CrossPointSettings::DISPLAY_DEBOUNCE_MS[i]) + " ms");
+      }
+      v.push_back(std::move(s));
+    }
+
+    // EDITOR font group (owner ruling 2026-08-05). Its own list, separate from
+    // the reading families above; see src/notes/EditorFonts.h. Plain ENUM with
+    // valuePtr: the picker index IS the stored value, so it persists via
+    // toJson/fromJson like any other byte — but the list is append-only.
+    {
+      SettingInfo s;
+      s.nameId = StrId::STR_EDITOR_FONT;
+      s.type = SettingType::ENUM;
+      s.key = "editorFont";
+      s.category = StrId::STR_CAT_READER;
+      s.valuePtr = &CrossPointSettings::editorFont;
+      s.enumStringValues.reserve(editorfonts::FAMILY_COUNT);
+      for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
+        s.enumStringValues.emplace_back(editorfonts::FAMILIES[i].label);
+      }
+      v.push_back(std::move(s));
+    }
     v.push_back(SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &CrossPointSettings::embeddedStyle, "embeddedStyle",
                                     StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled,

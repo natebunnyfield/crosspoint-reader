@@ -608,6 +608,16 @@ void setup() {
   // what the simulator's in-process (longjmp) wake does not.
   lastActivityTime = millis();
   deepSleepInProgress = false;
+
+  // A panic's serial output is lost when USB CDC drops with the crash, so
+  // replay the persisted record on the next boot instead. This is how the BLE
+  // watchdog reboots were diagnosed.
+  if (HalSystem::isRebootFromPanic()) {
+    LOG_INF("MAIN", "Previous boot panicked: %s", HalSystem::getPanicInfo(true).c_str());
+  }
+
+  LOG_INF("MEM", "Boot complete: free=%u total=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
+          (unsigned)ESP.getHeapSize(), (unsigned)ESP.getMaxAllocHeap());
 }
 
 void loop() {

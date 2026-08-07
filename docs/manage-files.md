@@ -260,3 +260,23 @@ filenames) but **not yet against real hardware**.
 - **Free space** readout (path bar or list footer).
 - **"Set as sleep screen"** on bmp files from the action menu —
   `BmpViewerActivity` already has the machinery.
+
+## v2 candidates (explicitly deferred)
+
+New folder, Details popup (size/path/has-cache), mark-mode multi-select batch
+operations.
+
+## Editor + BT keyboard — SHIPPED (2026-08-06)
+
+No longer deferred. The BLE HID host was measured, the editor was built, and
+both landed as **Create Note** and **Claude** on the home screen, plus an
+**Edit** action here for `.md`/`.txt`.
+
+- Feature and behaviour: [notes-and-claude.md](notes-and-claude.md)
+- The measurements that justified it, and what is still unverified:
+  [ble-editor-spike.md](ble-editor-spike.md)
+
+Headline: a resident BLE host does NOT fit (~72 KB against the reader's
+budget), so the on-screen keyboard is the default and BLE starts only when a
+keyboard is already bonded.
+

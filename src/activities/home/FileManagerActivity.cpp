@@ -150,7 +150,7 @@ void FileManagerActivity::onExit() {
 
 void FileManagerActivity::openActionMenu() {
   menuActions.clear();
-  const char* options[9];
+  const char* options[10];
   int count = 0;
   const bool hasEntry = !files.empty();
 
@@ -164,6 +164,15 @@ void FileManagerActivity::openActionMenu() {
     if (entry.back() != '/') {
       options[count++] = tr(STR_VIEW);
       menuActions.push_back(MenuAction::View);
+      // Edit opens the note editor over the BLE keyboard. Offered for text-ish
+      // files only: the editor loads the whole file into an 8 KB buffer, so
+      // pointing it at an epub would refuse on open and read as a broken menu.
+      const size_t dot = entry.rfind('.');
+      const std::string ext = dot == std::string::npos ? "" : entry.substr(dot);
+      if (ext == ".md" || ext == ".txt") {
+        options[count++] = tr(STR_EDIT);
+        menuActions.push_back(MenuAction::Edit);
+      }
     }
     options[count++] = tr(STR_RENAME);
     menuActions.push_back(MenuAction::Rename);
@@ -264,6 +273,11 @@ std::vector<std::string> FileManagerActivity::buildInfoLines(const std::string& 
 }
 
 void FileManagerActivity::runMenuAction(const MenuAction action) {
+  if (action == MenuAction::Edit) {
+    if (files.empty()) return;
+    activityManager.goToNoteEditor(fullPathOf(files[selectorIndex]));
+    return;
+  }
   switch (action) {
     case MenuAction::MoveHere:
       performMoveHere();

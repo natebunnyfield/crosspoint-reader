@@ -195,6 +195,35 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Set once an NTP sync succeeds. Used to skip re-syncing on every WiFi connect.
   // Resetting to 0 (e.g. via the web UI) forces a re-sync on next WiFi connect.
   uint8_t clockHasBeenSynced = 0;
+  // How long typing settles before the screen redraws, as an INDEX into
+  // DISPLAY_DEBOUNCE_MS. Index, not milliseconds: an ENUM row persists the
+  // picker index, so storing the raw value here would reinterpret every saved
+  // settings.json (see "An ENUM row persists its INDEX" in CLAUDE.md).
+  // Order is the persisted encoding — append only.
+  static constexpr uint16_t DISPLAY_DEBOUNCE_MS[] = {25, 50, 100, 250, 500, 1000};
+  static constexpr uint8_t DISPLAY_DEBOUNCE_COUNT = sizeof(DISPLAY_DEBOUNCE_MS) / sizeof(DISPLAY_DEBOUNCE_MS[0]);
+  // 250 ms (owner ruling 2026-08-06: optimise for typing feel). This is the
+  // value that collapses a normal typing burst into ONE ~500 ms panel refresh.
+  // Shorter settings do not make a character appear sooner -- the waveform is
+  // ~500 ms regardless -- they just queue refreshes back to back, which costs
+  // panel energy and accelerates ghosting for no throughput gain.
+  static constexpr uint8_t DEFAULT_DISPLAY_DEBOUNCE = 3;  // 250 ms
+  uint8_t displayDebounce = DEFAULT_DISPLAY_DEBOUNCE;
+
+  // Milliseconds of quiet after the last keystroke before the panel redraws.
+  // Low values refresh more often; on e-ink the refresh itself is ~570 ms, so
+  // anything under that trades battery and flicker for immediacy rather than
+  // actually feeling faster.
+  unsigned long getDisplayDebounceMs() const {
+    const uint8_t i = displayDebounce < DISPLAY_DEBOUNCE_COUNT ? displayDebounce : DEFAULT_DISPLAY_DEBOUNCE;
+    return DISPLAY_DEBOUNCE_MS[i];
+  }
+
+  // Owner ruling 2026-08-05: the EDITOR font group is separate from the
+  // reading S tier. Index into EDITOR_FONT_FAMILIES; the index IS the persisted
+  // value, so this list is append-only (see "Enum order is frozen" in CLAUDE.md).
+  uint8_t editorFont = 0;
+
   // Text rendering settings
   uint8_t extraParagraphSpacing = 1;
   // TEXT_ANTIALIASING value (0=Off, 1=Standard, 2=Crisp, 3=Dark). Non-zero

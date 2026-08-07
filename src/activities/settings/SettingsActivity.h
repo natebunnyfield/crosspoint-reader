@@ -23,6 +23,8 @@ enum class SettingAction {
   DeviceOwner,
   DownloadFonts,
   TextSettings,
+  PairBluetoothKeyboard,
+  ForgetBluetoothKeyboard,
 };
 
 struct SettingInfo {

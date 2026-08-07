@@ -32,32 +32,39 @@ class HomeActivity final : public Activity {
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
 
-  // Convert HomeMenuItem to menu index (used in onEnter)
+  // Menu order, owner ruling 2026-08-06. FOUR things encode this list: these
+  // two maps and the menuItems/menuIcons vectors in HomeActivity.cpp. They must
+  // agree; a mismatch shows up as the wrong screen opening, not as an error.
   static int menuItemToIndex(HomeMenuItem item) {
     int i = 0;
+    if (item == HomeMenuItem::RECENTS) return i;
+    ++i;
     if (item == HomeMenuItem::FILE_BROWSER) return i;
     ++i;
-    if (item == HomeMenuItem::RECENTS) return i;
+    if (item == HomeMenuItem::MANAGE_FILES) return i;
     ++i;
 #ifndef CROSSPOINT_NO_NETWORK
     if (item == HomeMenuItem::FILE_TRANSFER) return i;
     ++i;
 #endif
-    if (item == HomeMenuItem::MANAGE_FILES) return i;
+    if (item == HomeMenuItem::CREATE_NOTE) return i;
+    ++i;
+    if (item == HomeMenuItem::CLAUDE) return i;
     ++i;
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
     return 0;
   }
 
-  // Convert menu index to HomeMenuItem (used in loop)
   static HomeMenuItem indexToMenuItem(int idx) {
     int i = 0;
-    if (idx == i++) return HomeMenuItem::FILE_BROWSER;
     if (idx == i++) return HomeMenuItem::RECENTS;
+    if (idx == i++) return HomeMenuItem::FILE_BROWSER;
+    if (idx == i++) return HomeMenuItem::MANAGE_FILES;
 #ifndef CROSSPOINT_NO_NETWORK
     if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
 #endif
-    if (idx == i++) return HomeMenuItem::MANAGE_FILES;
+    if (idx == i++) return HomeMenuItem::CREATE_NOTE;
+    if (idx == i++) return HomeMenuItem::CLAUDE;
     if (idx == i) return HomeMenuItem::SETTINGS_MENU;
     return HomeMenuItem::NONE;
   }
@@ -67,6 +74,8 @@ class HomeActivity final : public Activity {
   void onSettingsOpen();
   void onFileTransferOpen();
   void onManageFilesOpen();
+  void onCreateNoteOpen();
+  void onClaudeOpen();
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image

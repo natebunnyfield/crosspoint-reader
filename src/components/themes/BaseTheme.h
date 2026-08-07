@@ -124,7 +124,9 @@ enum UIIcon {
   Library,
   Wifi,
   Hotspot,
-  ManageFiles
+  ManageFiles,
+  CreateNote,
+  ClaudeMark
 };
 
 // Base of the single theme, NOT a theme itself. Lyra Six is the only theme

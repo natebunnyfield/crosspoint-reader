@@ -16,7 +16,7 @@
 class Activity;    // forward declaration
 class RenderLock;  // forward declaration
 
-enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, FILE_TRANSFER, MANAGE_FILES, SETTINGS_MENU };
+enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, FILE_TRANSFER, MANAGE_FILES, SETTINGS_MENU, CREATE_NOTE, CLAUDE };
 
 /**
  * ActivityManager
@@ -90,6 +90,8 @@ class ActivityManager {
   void goToBoot();
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();
+  void goToNoteEditor(std::string path);
+  void goToClaudeChat();
   void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE);
 
   // This will move current activity to stack instead of deleting it
@@ -98,6 +100,12 @@ class ActivityManager {
   // Remove the currentActivity, returning the last one on stack
   // Note: if popActivity() on last activity on the stack, we will goHome()
   void popActivity();
+
+  // The home row that launched whatever is on screen. goHome() with no argument
+  // returns the selector there, so Back always lands on the row you left from
+  // instead of jumping to the top of the list. Set by the goTo* wrappers, so a
+  // new home row inherits the behaviour without having to remember anything.
+  HomeMenuItem lastHomeMenuItem = HomeMenuItem::NONE;
 
   bool preventAutoSleep() const;
   bool isReaderActivity() const;
