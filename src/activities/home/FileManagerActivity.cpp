@@ -273,12 +273,13 @@ std::vector<std::string> FileManagerActivity::buildInfoLines(const std::string& 
 }
 
 void FileManagerActivity::runMenuAction(const MenuAction action) {
-  if (action == MenuAction::Edit) {
-    if (files.empty()) return;
-    activityManager.goToNoteEditor(fullPathOf(files[selectorIndex]));
-    return;
-  }
   switch (action) {
+    case MenuAction::Edit:
+      // Was an early return above this switch, which left 'Edit' unhandled here
+      // and -Wswitch firing -- so the compiler stopped checking the rest of the
+      // enum for this function. Same behaviour, in the place that gets checked.
+      if (!files.empty()) activityManager.goToNoteEditor(fullPathOf(files[selectorIndex]));
+      break;
     case MenuAction::MoveHere:
       performMoveHere();
       break;

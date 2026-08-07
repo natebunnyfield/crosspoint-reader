@@ -848,7 +848,12 @@ void WifiSelectionActivity::render(RenderLock&&) {
       renderNetworkList(&screen, &metrics);
       break;
     case WifiSelectionState::HIDDEN_SSID_ENTRY:
-      // Transitioning to/from the SSID keyboard subactivity - nothing to draw
+    case WifiSelectionState::PASSWORD_ENTRY:
+      // Transitioning to/from a keyboard subactivity - nothing to draw. Both
+      // states are the same situation; PASSWORD_ENTRY was simply never added,
+      // so it fell out of the switch and painted a bare header. Same pixels
+      // either way, but -Wswitch had been firing on this file, which costs the
+      // exhaustiveness check for every OTHER state in the enum.
       break;
     case WifiSelectionState::CONNECTING:
       renderConnecting(&screen, &metrics);
