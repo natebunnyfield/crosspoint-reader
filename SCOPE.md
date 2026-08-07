@@ -1,5 +1,35 @@
 # Project Vision & Scope: CrossPoint Reader
 
+> ### Fork note — this is the bunnyfield fork
+>
+> Everything below is **upstream's** scope and contribution policy, kept verbatim
+> so it stays mergeable. This fork deliberately ships two things that policy
+> excludes, and the divergence is intentional rather than an oversight:
+>
+> * **A note editor** (`src/notes/`, Create Note) — excluded by *Interactive
+>   Apps* and *Writing / Authoring Tools* below.
+> * **Claude chat** (`src/notes/ClaudeChat.cpp`) — a note editor that can also
+>   ask a question over Wi-Fi, on demand.
+>
+> Both are in every device binary: `build_src_filter` appears only on the
+> simulator envs, so PlatformIO's `+<*>` default compiles `src/notes/` into
+> `default`, `gh_release`, `gh_release_rc`, `slim` and `sticky`.
+>
+> Upstream's own wording is what makes this coherent: it says these features
+> "belong in other forks" and that it "generally defers to that fork." This is
+> one of those forks. Nothing here is a proposal to change upstream's policy, and
+> none of it should be sent upstream as a PR.
+>
+> On connectivity specifically, upstream's three passages do not agree with each
+> other — §3 calls the freeze on new network connectors temporary, the
+> Out-of-Scope list bans RSS/news/browsers as a class, and ROADMAP bans "active
+> connectivity features" outright. This fork reads the *narrow* version: no
+> always-on background radio, no feed readers. Wi-Fi that the owner starts, does
+> one thing with, and stops — file transfer, font download, a Claude question —
+> is in scope here.
+>
+> See [docs/fork-sync.md](docs/fork-sync.md).
+
 The goal of CrossPoint Reader is to create an efficient, open-source reading experience for ESP32-based e-reader devices. Xteink hardware (X3, X4) is where the project started and remains a primary target, but CrossPoint is explicitly broadening to support the wider ecosystem of small ESP32 e-ink readers. We believe a dedicated e-reader should do one thing exceptionally well: **facilitate focused reading.**
 
 ## 1. Core Mission
@@ -57,6 +87,9 @@ If you are unsure whether your idea falls into one of these categories, open a D
 * **Writing / Authoring Tools:** No typed notes, journals, or editors. Input hardware and RAM are wrong for this, and other forks already explore this space. 
 * **Active Connectivity:** No RSS readers, news aggregators, or web browsers. Background Wi-Fi drains the battery and complicates the single-core CPU. 
 * **PDF Rendering:** PDFs are fixed-layout documents, so rendering them requires displaying pages as images rather than reflowable text, resulting in constant panning and zooming that makes for a poor reading experience on e-ink. Out of scope on the current hardware class.
+
+> **Fork divergence from the two bullets above.** The note editor and Claude
+> chat ship on device in this fork. See the fork note at the top of this file.
 
 ## 5. Calls to Action
 

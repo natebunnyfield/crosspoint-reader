@@ -120,19 +120,26 @@ then either take the patch or write the divergence down in `docs/fork-sync.md`.
 These were raised in the audit and have not been ruled on. They are not defects,
 so they are not in `BUGS.md`.
 
-### [T-002] `src/notes/` versus `SCOPE.md`
-`SCOPE.md:56-57` bans "notepads" and "typed notes, journals, or editors" by
-name; `ROADMAP.md:75-76` repeats it. The note editor and Claude chat ship in
-every device binary — `build_src_filter` appears only on the simulator envs, so
-PlatformIO's `+<*>` default compiles `src/notes/` into `default`, `gh_release`,
-`gh_release_rc`, `slim` and `sticky`.
+### [T-002] `src/notes/` versus `SCOPE.md` — DONE
+**scope: docs · ruled 2026-08-07 · keep the capability, amend the docs**
 
-Not a removal proposal: this is capability that was deliberately built. But the
-docs currently give three different answers about the bar (`ROADMAP.md:77` bans
-connectivity outright, `SCOPE.md:35` calls it a temporary freeze, `SCOPE.md:58`
-bans only browsers and feed readers), which is how it got in without anyone
-deciding. Keep it and amend the docs, gate it out of device builds, or retire
-it — but the docs should stop contradicting the binary either way.
+Ruling: notes and Claude chat stay in device builds. Nothing about the binary
+changed; the documentation was what was wrong.
+
+`SCOPE.md` and `ROADMAP.md` are **upstream's** contribution policy, and they now
+say so, with a fork banner naming the two divergences and the reason. Upstream's
+own words are what make it coherent — it says these features "belong in other
+forks" and that it "generally defers to that fork." This is one of those forks.
+
+Upstream's text is left verbatim under the banner rather than edited in place.
+Rewritten bullets would conflict on every upstream change to those sections, and
+until someone noticed, this repo would be publishing a distorted copy of another
+project's policy under that project's filename.
+
+The three-way contradiction is resolved by picking the narrow reading and
+writing it down: no always-on radio and no feed readers, but Wi-Fi the owner
+starts, uses once and stops is in scope here. Recorded in
+[docs/fork-sync.md](docs/fork-sync.md) so a later sync does not "fix" it back.
 
 ### [T-003] The published SSID and the API key — DONE
 **scope: security · ruled and executed 2026-08-07**

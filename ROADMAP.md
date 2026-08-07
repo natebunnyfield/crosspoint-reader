@@ -1,5 +1,35 @@
 # CrossPoint Reader Roadmap
 
+> ### Fork note — this is the bunnyfield fork
+>
+> Everything below is **upstream's** scope and contribution policy, kept verbatim
+> so it stays mergeable. This fork deliberately ships two things that policy
+> excludes, and the divergence is intentional rather than an oversight:
+>
+> * **A note editor** (`src/notes/`, Create Note) — excluded by *Interactive
+>   Apps* and *Writing / Authoring Tools* below.
+> * **Claude chat** (`src/notes/ClaudeChat.cpp`) — a note editor that can also
+>   ask a question over Wi-Fi, on demand.
+>
+> Both are in every device binary: `build_src_filter` appears only on the
+> simulator envs, so PlatformIO's `+<*>` default compiles `src/notes/` into
+> `default`, `gh_release`, `gh_release_rc`, `slim` and `sticky`.
+>
+> Upstream's own wording is what makes this coherent: it says these features
+> "belong in other forks" and that it "generally defers to that fork." This is
+> one of those forks. Nothing here is a proposal to change upstream's policy, and
+> none of it should be sent upstream as a PR.
+>
+> On connectivity specifically, upstream's three passages do not agree with each
+> other — §3 calls the freeze on new network connectors temporary, the
+> Out-of-Scope list bans RSS/news/browsers as a class, and ROADMAP bans "active
+> connectivity features" outright. This fork reads the *narrow* version: no
+> always-on background radio, no feed readers. Wi-Fi that the owner starts, does
+> one thing with, and stops — file transfer, font download, a Claude question —
+> is in scope here.
+>
+> See [docs/fork-sync.md](docs/fork-sync.md).
+
 This roadmap describes how CrossPoint is moving through the tighter scope defined in [SCOPE.md](SCOPE.md). It is
 intentionally phased: Phase 0 closed out the commitments already in flight before locking down to the stricter
 "fill gaps the stock firmware leaves" delineator.
@@ -78,6 +108,10 @@ up here:
 * PDF rendering as a first-class format.
 
 See [SCOPE.md](SCOPE.md) for the full rationale.
+
+**Fork divergence:** interactive apps and authoring tools are excluded upstream
+and shipped here — a note editor and Claude chat, in every device binary. See
+the fork note at the top of this file.
 
 ---
 

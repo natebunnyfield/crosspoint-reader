@@ -16,6 +16,24 @@ it has never fired on this fork.
 Run `scripts/repo-status.sh` to see where everything stands. It only reports;
 it never merges.
 
+
+## Intentional divergences from upstream's scope
+
+These are deliberate. They are listed here so a future sync does not "fix" them
+back, and so nobody sends them upstream as a PR.
+
+| What | Upstream says | Why it is here |
+|---|---|---|
+| `src/notes/` note editor (Create Note) | Out-of-scope: *Interactive Apps*, *Writing / Authoring Tools* | Built on purpose; ships in every device binary |
+| `src/notes/ClaudeChat.cpp` | Out-of-scope: as above, plus the connectivity freeze | On-demand only — the owner starts it, it asks one question, it stops |
+| Reading of the connectivity rule | Three upstream passages disagree: §3 "temporary freeze", Out-of-Scope "RSS/news/browsers", ROADMAP "active connectivity features" | This fork takes the narrow one: no always-on radio, no feed readers; owner-initiated Wi-Fi is fine |
+
+`SCOPE.md` and `ROADMAP.md` carry upstream's text verbatim with a fork banner at
+the top, rather than edits threaded through the body. That is deliberate: a
+banner conflicts once and obviously, whereas rewritten bullets conflict on every
+upstream change to that section and quietly misrepresent upstream's policy in
+the meantime.
+
 ## Never blind-merge upstream
 
 This fork has **deleted whole subsystems** that upstream still develops:
