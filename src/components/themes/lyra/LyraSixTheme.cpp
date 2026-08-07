@@ -6,13 +6,13 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "components/UITheme.h"
-#include "components/icons/cover.h"
 #include "fontIds.h"
 
 // Internal constants
@@ -116,10 +116,10 @@ void LyraSixTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const s
       renderer.drawRect(tileX + hPaddingInSelection, tileY + hPaddingInSelection, coverWidth, coverHeight, true);
 
       if (!hasCover) {
-        // Render empty cover
-        renderer.fillRect(tileX + hPaddingInSelection, tileY + hPaddingInSelection + (coverHeight / 3), coverWidth,
-                          2 * coverHeight / 3, true);
-        renderer.drawIcon(CoverIcon, tileX + hPaddingInSelection + 24, tileY + hPaddingInSelection + 24, 32);
+        drawGeneratedCover(renderer,
+                           Rect(tileX + hPaddingInSelection, tileY + hPaddingInSelection, coverWidth, coverHeight),
+                           recentBooks[i].title.c_str(), recentBooks[i].author.c_str(),
+                           static_cast<uint32_t>(std::hash<std::string>{}(recentBooks[i].path)));
       }
     }
 
@@ -175,8 +175,8 @@ void LyraSixTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const s
       renderer.fillRoundedRect(tileX, tileY, tileWidth, hPaddingInSelection, cornerRadius, true, true, false, false,
                                Color::LightGray);
       renderer.fillRectDither(tileX, tileY + hPaddingInSelection, hPaddingInSelection, coverHeight, Color::LightGray);
-      renderer.fillRectDither(tileX + tileWidth - hPaddingInSelection, tileY + hPaddingInSelection,
-                              hPaddingInSelection, coverHeight, Color::LightGray);
+      renderer.fillRectDither(tileX + tileWidth - hPaddingInSelection, tileY + hPaddingInSelection, hPaddingInSelection,
+                              coverHeight, Color::LightGray);
       renderer.fillRoundedRect(tileX, tileY + coverHeight + hPaddingInSelection, tileWidth, titleBoxHeight,
                                cornerRadius, false, false, true, true, Color::LightGray);
     }

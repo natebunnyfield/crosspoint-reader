@@ -4,12 +4,12 @@
 #include <HalStorage.h>
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
-#include "components/icons/cover.h"
 #include "fontIds.h"
 
 // Internal constants
@@ -67,12 +67,11 @@ void Lyra3CoversTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, con
                           Lyra3CoversMetrics::values.homeCoverHeight, true);
 
         if (!hasCover) {
-          // Render empty cover
-          renderer.fillRect(tileX + hPaddingInSelection,
-                            tileY + hPaddingInSelection + (Lyra3CoversMetrics::values.homeCoverHeight / 3),
-                            tileWidth - 2 * hPaddingInSelection, 2 * Lyra3CoversMetrics::values.homeCoverHeight / 3,
-                            true);
-          renderer.drawIcon(CoverIcon, tileX + hPaddingInSelection + 24, tileY + hPaddingInSelection + 24, 32);
+          drawGeneratedCover(renderer,
+                             Rect(tileX + hPaddingInSelection, tileY + hPaddingInSelection,
+                                  tileWidth - 2 * hPaddingInSelection, Lyra3CoversMetrics::values.homeCoverHeight),
+                             recentBooks[i].title.c_str(), recentBooks[i].author.c_str(),
+                             static_cast<uint32_t>(std::hash<std::string>{}(recentBooks[i].path)));
         }
       }
 
