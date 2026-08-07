@@ -195,6 +195,15 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Set once an NTP sync succeeds. Used to skip re-syncing on every WiFi connect.
   // Resetting to 0 (e.g. via the web UI) forces a re-sync on next WiFi connect.
   uint8_t clockHasBeenSynced = 0;
+  // Set once a Bluetooth keyboard has bonded, cleared by Forget.
+  //
+  // This exists because the bond count can only be read from the NimBLE host,
+  // and Create Note / Claude need the answer BEFORE deciding whether to start
+  // the host at all. Calling ble_store_util_count() with the stack down panics
+  // the device (reset reason 4, immediately on entering the editor) — which is
+  // exactly what shipped in 190fe423.
+  uint8_t btKeyboardPaired = 0;
+
   // How long typing settles before the screen redraws, as an INDEX into
   // DISPLAY_DEBOUNCE_MS. Index, not milliseconds: an ENUM row persists the
   // picker index, so storing the raw value here would reinterpret every saved

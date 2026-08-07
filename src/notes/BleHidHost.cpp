@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 #include <Logging.h>
+
+#include "CrossPointSettings.h"
 #include <string.h>
 
 #include <atomic>
@@ -540,6 +542,12 @@ int onGapEvent(ble_gap_event* event, void* /*arg*/) {
     case BLE_GAP_EVENT_ENC_CHANGE:
       LOG_INF(TAG, "encryption change status=%d", event->enc_change.status);
       if (event->enc_change.status == 0) {
+        // Remember that a keyboard is paired so the next Create Note / Claude
+        // can start BLE without asking the (not yet running) host.
+        if (SETTINGS.btKeyboardPaired == 0) {
+          SETTINGS.btKeyboardPaired = 1;
+          SETTINGS.saveToFile();  // guarded: only on change, per the SPIFFS rule
+        }
         startDiscovery();
       } else {
         LOG_ERR(TAG, "bonding failed — HOGP requires encryption");
@@ -766,9 +774,11 @@ void end() {
 }
 
 bool hasBondedKeyboard() {
-  int count = 0;
-  if (ble_store_util_count(BLE_STORE_OBJ_TYPE_PEER_SEC, &count) != 0) return false;
-  return count > 0;
+  // Deliberately does NOT ask NimBLE. Callers use this to decide whether to
+  // bring the host up, so it must be answerable while the host is DOWN, and
+  // ble_store_util_count() panics in that state. The flag is written when a
+  // bond completes and cleared by Forget.
+  return SETTINGS.btKeyboardPaired != 0;
 }
 
 void disconnectKeepingBond() {
@@ -781,6 +791,10 @@ void disconnectKeepingBond() {
 void forgetAllBonds() {
   const int rc = ble_store_clear();
   LOG_INF(TAG, "forget all bonds rc=%d", rc);
+  if (SETTINGS.btKeyboardPaired != 0) {
+    SETTINGS.btKeyboardPaired = 0;
+    SETTINGS.saveToFile();
+  }
 }
 
 State state() { return gState; }
