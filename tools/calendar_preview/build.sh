@@ -8,7 +8,7 @@ set -euo pipefail
 R="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$(dirname "$0")"
 
-gcc -c -O1 -I"$R/lib/uzlib/src" "$R/lib/uzlib/src/tinflate.c" -o tinflate.o
+gcc -c -O1 -I"$R/lib/uzlib/src" -I"$R/freeink-sdk/libs/ui/FreeInkUI/include" "$R/lib/uzlib/src/tinflate.c" -o tinflate.o
 gcc -c -O1 -I"$R/lib/MiniBidi" "$R/lib/MiniBidi/minibidi.c" -o minibidi.o
 gcc -c -O1 uzlib_checksums.c -o uzlib_checksums.o
 
@@ -22,7 +22,7 @@ g++ -std=gnu++2a -O1 -include Arduino.h -o render_harness render_harness.cpp \
   "$R/src/activities/boot_sleep/CalendarSleepScreen.cpp" daisy_preview.cpp \
   "$R/src/activities/boot_sleep/HolidayCalculator.cpp" sd_font_stub.cpp \
   -I. -I"$R/src" -I"$R/lib/GfxRenderer" -I"$R/lib/EpdFont" -I"$R/lib/Utf8" \
-  -I"$R/lib/MiniBidi" -I"$R/lib/Memory" -I"$R/lib/InflateReader" -I"$R/lib/uzlib/src"
+  -I"$R/lib/MiniBidi" -I"$R/lib/Memory" -I"$R/lib/InflateReader" -I"$R/lib/uzlib/src" -I"$R/freeink-sdk/libs/ui/FreeInkUI/include"
 
 mkdir -p fs_
 echo "built ./render_harness"

@@ -26,9 +26,38 @@ Rules settled in the session:
 - **Ring flip stays on the same petal**: ⇄ is pressed on the utility petal and lands on
   the other ring's utility petal (defensive rule for other paths: index preserved,
   clamped to the last petal).
+- **Two rings, abc and 123** (owner ruling 2026-08-06). Coverage is now every
+  printable ASCII character: a-z with uppercase on long-press, 0-9, all 32
+  punctuation marks, and space. The wheel previously had no
+  `< > [ ] { } \ | ^` and no backtick at all, and `(` and `)` were two
+  rotations apart — so a bracket could not be matched without crossing the ring,
+  and a WiFi password containing one was untypable.
+- **The 123 ring is ordered by QWERTY, left to right.** Digits lead, then the
+  symbols follow the keyboard: the `` ` `` key, the shifted number row, then
+  `- = ; ' , . /` in the order your hand finds them. Not alphabetical, not
+  frequency — an order you can predict from a keyboard you already know.
+- **Bracket petals keep a pair together: open above close.** Up types the open
+  bracket, Down the close, and Confirm a related character — so a pair is always
+  one button apart. The related character is the QWERTY-adjacent key, which for
+  three of the four is simply the next one right: `[ ] \`, `{ } |`, `< > ?`.
+  `( )` is the exception: the key right of `)` is `- _`, already its own pair,
+  so it takes `*` from the immediate left, which is also far more useful beside
+  parentheses in markdown.
+- **Both rings end in SPACE in the bottom slot**, so the space target does not
+  move when you swap. The 123 ring's last petal is `. , space`; the two above
+  space are deliberate duplicates of the commonest characters in prose, since
+  every character already has a home earlier in the ring.
 - **Utility petal, top→bottom: ⌫ ⇄ OK** — ⌫ and OK non-adjacent (accidental-submit
   finding from the AAC literature). Utility petal is the last petal of each ring,
   wrap-adjacent to petal 1.
+- **The third slot follows the HOST in the split-screen panel**: it reads `ret`
+  and types a newline in Create Note, `ask` in Claude, and stays `ok` on the
+  full-screen wheel, which is a single-line field. Before that it was `ok`
+  everywhere and always meant Done, which is why the daisywheel had no way to
+  type a line break — and made OK in the note editor look like it discarded
+  work. Back still saves and leaves.
+- **The ⇄ label names the ring it takes you to.** It was hardcoded to `123`, so
+  it still said `123` while you were already on the number ring.
 - ~~Touch (X4 Pro): tap petal = focus, tap char = type, hold char = uppercase.~~
   **Superseded 2026-08-05: this fork never supports touch or the X4 Pro** — the
   wheel is buttons-only.

@@ -118,7 +118,12 @@ KeyboardPanel::Result KeyboardPanel::activateSlot(const int slot, const bool lon
       ringIdx_ ^= 1;  // swap rings, staying on the utility petal
       petal_ = petalCount() - 1;
     } else {
-      r.event = Event::Done;
+      // The Return slot, and it follows the HOST (owner ruling 2026-08-06):
+      // a newline in Create Note, Ask in Claude. It used to be Done for both,
+      // which is how the daisywheel ended up with no way to type a line break
+      // at all — and made OK in the note editor look like it discarded work,
+      // since Done exits. Back still saves and leaves.
+      r.event = okIsDone_ ? Event::Done : Event::Enter;
     }
     return r;
   }
@@ -263,8 +268,11 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
       for (int slot = 0; slot < 3; ++slot) {
         char label[8];
         if (petal == n - 1) {
-          static const char* const UTIL[3] = {"del", "123", "ok"};
-          snprintf(label, sizeof(label), "%s", UTIL[slot]);
+          // The swap slot names the ring it takes you TO, so it read "123"
+          // even while you were already on the number ring. The third slot
+          // matches what it actually does in this host.
+          const char* const util[3] = {"del", ringIdx_ == 0 ? "123" : "abc", okIsDone_ ? "ask" : "ret"};
+          snprintf(label, sizeof(label), "%s", util[slot]);
         } else {
           snprintf(label, sizeof(label), "%c", slotChar(petal, slot));
         }

@@ -15,7 +15,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "daisy_variants.h"
+#include "notes/DaisyRings.h"
 #include "fontIds.h"
 
 extern GfxRenderer renderer;
@@ -24,8 +24,19 @@ extern bool writeMonoPortraitBmpExternal(const char* path, const GfxRenderer& r)
 
 namespace {
 
-using daisyvariants::Ring;
-using daisyvariants::Util;
+// Was daisy_variants.h, which carried three competing ring proposals. The owner
+// ruled on 2026-08-06, so the proposals are gone and this renders the SHIPPED
+// table from src/notes/DaisyRings.h directly.
+struct Ring {
+  const char* name;
+  const char (*petals)[3];
+  int count;
+};
+struct Util {
+  const char* top;
+  const char* mid;
+  const char* bottom;
+};
 
 // KeyboardPanel::render's daisy branch, verbatim in geometry.
 void drawStrip(const Ring& ring, const Util& util, int selectedPetal, int x, int y, int width, int height) {
@@ -92,41 +103,6 @@ bool renderDaisySheet(const char* outPath, const char* title, const Ring* rings,
 }
 
 
-// The Return question on its own, since the utility petal is where it lands.
-// Rendered rather than described because the label has to be ASCII: the UI font
-// has no U+23CE, so an arrow glyph draws nothing at all.
-bool renderReturnOptions(const char* outPath) {
-  using namespace daisyvariants;
-  renderer.clearScreen();
-  const int W = renderer.getScreenWidth();
-  const int stripH = 108;
-  int y = 18;
-
-  caption(y, "WHERE RETURN LIVES");
-  y += 40;
-
-  caption(y, "1. contextual: utility petal, 3rd slot");
-  y += 30;
-  const Util ctxEditor{"del", "123", "ret"};
-  drawStrip({"abc", CUR_ABC, 9}, ctxEditor, 0, 8, y, W - 16, stripH);
-  y += stripH + 12;
-  caption(y, "   same slot says ask in Claude, ok in WiFi");
-  y += 40;
-
-  caption(y, "2. dedicated ret petal, next to space");
-  y += 30;
-  // y z spc | ret _ _ | del 123 ok  -- one more petal to rotate past, every ring.
-  static constexpr char RET_ABC[10][3] = {{'a', 'b', 'c'}, {'d', 'e', 'f'}, {'g', 'h', 'i'}, {'j', 'k', 'l'},
-                                          {'m', 'n', 'o'}, {'p', 'q', 'r'}, {'s', 't', 'u'}, {'v', 'w', 'x'},
-                                          {'y', 'z', ' '}, {'\n', '\n', '\n'}};
-  const Util plainOk{"del", "123", "ok"};
-  drawStrip({"abc", RET_ABC, 10}, plainOk, 9, 8, y, W - 16, stripH);
-  y += stripH + 12;
-  caption(y, "   ret petal selected; costs a petal on every ring");
-
-  return writeMonoPortraitBmpExternal(outPath, renderer);
-}
-
 // Specimen for the two built-in editor monospace faces. Proves the generated
 // glyph data actually rasterises — a header that compiles and links says
 // nothing at all about whether the bitmaps are right.
@@ -145,8 +121,6 @@ bool renderEditorFontSpecimen(const char* outPath) {
   caption(y, "EDITOR FONTS (built in, 12 pt)");
   y += 40;
 
-  // The characters that actually matter in a monospace writing face: the 0/O
-  // and 1/l/I confusables, the bracket pairs, and the markdown markers.
   const char* lines[] = {
       "The quick brown fox jumps",
       "0O1lI {} [] () <> #*_`~ |/",
@@ -168,7 +142,6 @@ bool renderEditorFontSpecimen(const char* outPath) {
       renderer.drawText(face.id, 12, y, l);
       y += lh;
     }
-    // All four styles, every one of which MarkdownSpans can ask for.
     y += 10;
     renderer.drawText(face.id, 12, y, "regular", true, EpdFontFamily::REGULAR);
     renderer.drawText(face.id, 120, y, "bold", true, EpdFontFamily::BOLD);
@@ -181,35 +154,32 @@ bool renderEditorFontSpecimen(const char* outPath) {
 }
 
 bool renderDaisyVariants(const char* outDir) {
-  using namespace daisyvariants;
   char path[256];
+  // The SHIPPED rings, straight from src/notes/DaisyRings.h — not a copy, so
+  // this sheet cannot drift from what the device draws.
+  const Util utilEditor{"del", "123", "ret"};
+  const Ring rings[] = {{"abc", daisyrings::ABC_RING, daisyrings::ABC_CHAR_PETALS},
+                        {"123", daisyrings::NUM_RING, daisyrings::NUM_CHAR_PETALS}};
+  snprintf(path, sizeof(path), "%s/daisy_shipped.bmp", outDir);
+  if (!renderDaisySheet(path, "DAISY RINGS (shipped)", rings, 2, utilEditor)) return false;
 
-  // The utility petal. "ret" not an arrow glyph: the UI font has no U+23CE, so
-  // an arrow renders blank — the same trap that already broke the side-button
-  // hints on this branch.
-  const Util kUtilToday{"del", "123", "ok"};
-  const Util kUtilEditor{"del", "123", "ret"};
-  const Util kUtilCycle{"del", "sym", "ret"};
-
-  const Ring today[] = {{"abc", CUR_ABC, 9}, {"123", CUR_NUM, 11}};
-  snprintf(path, sizeof(path), "%s/daisy_today.bmp", outDir);
-  if (!renderDaisySheet(path, "TODAY: no Return; ( and ) split", today, 2, kUtilToday))
-    return false;
-
-  const Ring optA[] = {{"abc", A_ABC, 9}, {"123", A_NUM, 8}, {"sym", A_SYM, 7}};
-  snprintf(path, sizeof(path), "%s/daisy_optionA.bmp", outDir);
-  if (!renderDaisySheet(path, "OPTION A: three rings", optA, 3, kUtilCycle)) return false;
-
-  const Ring optB[] = {{"abc", B_ABC, 9}, {"123", B_NUM, 15}};
-  snprintf(path, sizeof(path), "%s/daisy_optionB.bmp", outDir);
-  if (!renderDaisySheet(path, "OPTION B: two rings", optB, 2, kUtilEditor)) return false;
-
-  snprintf(path, sizeof(path), "%s/daisy_return.bmp", outDir);
-  if (!renderReturnOptions(path)) return false;
+  // The four bracket petals and the space petal, centred so they are readable.
+  renderer.clearScreen();
+  const int W = renderer.getScreenWidth();
+  int y = 18;
+  caption(y, "BRACKET PETALS  up=open  mid=related  down=close");
+  y += 40;
+  drawStrip(rings[1], utilEditor, 11, 8, y, W - 16, 108);
+  y += 130;
+  caption(y, "...and the space petal, bottom slot like abc");
+  y += 32;
+  drawStrip(rings[1], utilEditor, 14, 8, y, W - 16, 108);
+  snprintf(path, sizeof(path), "%s/daisy_brackets.bmp", outDir);
+  if (!writeMonoPortraitBmpExternal(path, renderer)) return false;
 
   snprintf(path, sizeof(path), "%s/editor_fonts.bmp", outDir);
   if (!renderEditorFontSpecimen(path)) return false;
 
-  printf("wrote daisy_today.bmp, daisy_optionA.bmp, daisy_optionB.bmp to %s\n", outDir);
+  printf("wrote daisy_shipped.bmp, daisy_brackets.bmp, editor_fonts.bmp to %s\n", outDir);
   return true;
 }

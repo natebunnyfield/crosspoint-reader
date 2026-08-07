@@ -3,7 +3,10 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "notes/DaisyRings.h"
 #include "notes/Grid13Layout.h"
@@ -20,6 +23,75 @@ const freeink::ui::KeyboardKey* findKey(const freeink::ui::KeyboardLayout& l, co
     }
   }
   return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// Daisy ring layout (owner rulings, 2026-08-06). These pin the four decisions
+// so a later edit to DaisyRings.h cannot quietly undo them.
+// ---------------------------------------------------------------------------
+
+namespace {
+// Every character in petals 1..N-1 of the number ring. The last petal is
+// convenience duplicates plus space and is deliberately excluded.
+std::vector<char> numCoreChars() {
+  std::vector<char> out;
+  for (int p = 0; p < daisyrings::NUM_CHAR_PETALS - 1; ++p) {
+    for (int s = 0; s < 3; ++s) out.push_back(daisyrings::NUM_RING[p][s]);
+  }
+  return out;
+}
+}  // namespace
+
+// The wheel was missing < > [ ] { } \ | ^ and the backtick entirely, so a WiFi
+// password containing one could not be typed at all. Every printable ASCII
+// character must now have exactly one home.
+TEST(DaisyRings, CoversEveryPrintableAsciiExactlyOnce) {
+  std::set<char> seen;
+  for (int p = 0; p < daisyrings::ABC_CHAR_PETALS; ++p) {
+    for (int s = 0; s < 3; ++s) seen.insert(daisyrings::ABC_RING[p][s]);
+  }
+  for (const char c : numCoreChars()) seen.insert(c);
+
+  for (char c = 0x21; c < 0x7F; ++c) {   // printable, excluding space
+    if (c >= 'A' && c <= 'Z') continue;  // uppercase comes from long-press
+    EXPECT_TRUE(seen.count(c) == 1) << "printable character missing from the wheel: '" << c << "'";
+  }
+  EXPECT_TRUE(seen.count(' ') == 1) << "space missing";
+}
+
+// Petals 1..N-1 carry no duplicates: a character with two homes means one of
+// them is wasted and the ring is longer than it needs to be.
+TEST(DaisyRings, NumberRingCoreHasNoDuplicates) {
+  const std::vector<char> core = numCoreChars();
+  const std::set<char> unique(core.begin(), core.end());
+  EXPECT_EQ(core.size(), unique.size()) << "a character appears twice in petals 1..N-1";
+}
+
+// Owner ruling: top = open, bottom = close, middle = related. A pair must be
+// ONE button apart, never on opposite sides of the ring as ( and ) were.
+TEST(DaisyRings, BracketPairsSitOpenAboveCloseOnOnePetal) {
+  const std::pair<char, char> pairs[] = {{'(', ')'}, {'[', ']'}, {'{', '}'}, {'<', '>'}};
+  for (const auto& [open, close] : pairs) {
+    bool found = false;
+    for (int p = 0; p < daisyrings::NUM_CHAR_PETALS; ++p) {
+      if (daisyrings::NUM_RING[p][0] != open) continue;
+      found = true;
+      EXPECT_EQ(daisyrings::NUM_RING[p][2], close)
+          << "'" << open << "' must have '" << close << "' directly below it (Up opens, Down closes)";
+    }
+    EXPECT_TRUE(found) << "no petal leads with '" << open << "'";
+  }
+}
+
+// Space sits in the SAME slot on both rings, so the target does not move when
+// you swap. Bottom of the last petal, matching {y, z, space}.
+TEST(DaisyRings, BothRingsEndWithSpaceInTheBottomSlot) {
+  EXPECT_EQ(daisyrings::ABC_RING[daisyrings::ABC_CHAR_PETALS - 1][2], ' ');
+  EXPECT_EQ(daisyrings::NUM_RING[daisyrings::NUM_CHAR_PETALS - 1][2], ' ');
+  // ...and the two slots above space are real characters, not blanks: an
+  // all-space petal was the earlier draft and wasted two thirds of a rotation.
+  EXPECT_NE(daisyrings::NUM_RING[daisyrings::NUM_CHAR_PETALS - 1][0], ' ');
+  EXPECT_NE(daisyrings::NUM_RING[daisyrings::NUM_CHAR_PETALS - 1][1], ' ');
 }
 
 }  // namespace
