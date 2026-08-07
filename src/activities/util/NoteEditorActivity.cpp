@@ -71,15 +71,15 @@ void NoteEditorActivity::onEnter() {
   lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;
   contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing;
-  maxLines = (contentBottom - contentTop) / lineHeight;
-  if (maxLines < 1) maxLines = 1;
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
 
-  // Split screen: note above, keyboard below.
+  // Split screen: note above, keyboard below. The strip stands off the button
+  // hints by the theme's spacing, the same clearance KeyboardEntryActivity
+  // gives its keyboard — flush against the bar, the bottom row of keys reads as
+  // part of it.
   panelHeight = panel.preferredHeight(renderer);
-  const int textBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - panelHeight;
-  maxLines = (textBottom - contentTop) / lineHeight;
+  panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
+  maxLines = (panelTop - contentTop) / lineHeight;
   if (maxLines < 1) maxLines = 1;
 
   // Load an existing note so Edit-from-Manage-Files is a real edit, not a
@@ -341,7 +341,7 @@ void NoteEditorActivity::loop() {
     dirty = true;
   }
 
-  if (dirty && (pendingChars >= FLUSH_CHARS || millis() - lastKeyMs >= DEBOUNCE_MS)) {
+  if (dirty && (pendingChars >= FLUSH_CHARS || millis() - lastKeyMs >= SETTINGS.getDisplayDebounceMs())) {
     dirty = false;
     pendingChars = 0;
     relayout();
@@ -428,13 +428,12 @@ void NoteEditorActivity::render(RenderLock&&) {
 
   // Split screen: the keyboard panel occupies the strip above the button hints,
   // so the note stays visible while typing.
-  const int panelY = renderer.getScreenHeight() - metrics.buttonHintsHeight - panelHeight;
-  panel.render(renderer, metrics.contentSidePadding, panelY, pageWidth - metrics.contentSidePadding * 2, panelHeight);
+  panel.render(renderer, metrics.contentSidePadding, panelTop, pageWidth - metrics.contentSidePadding * 2, panelHeight);
 
   char status[96];
   snprintf(status, sizeof(status), "%u ch%s  kbd:%s", (unsigned)(buf ? buf->size() : 0), bufferFull ? "  FULL" : "",
            blekbd::stateName());
-  const int statusY = panelY - renderer.getLineHeight(SMALL_FONT_ID);
+  const int statusY = panelTop - renderer.getLineHeight(SMALL_FONT_ID);
   renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Type", "Left", "Right");

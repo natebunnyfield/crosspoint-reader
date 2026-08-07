@@ -17,8 +17,9 @@
 
 class NoteEditorActivity final : public Activity {
   static constexpr size_t BUF_SIZE = 8192;
-  // E-ink: batch keystrokes rather than refreshing per key.
-  static constexpr uint32_t DEBOUNCE_MS = 350;
+  // How long typing settles before a redraw is Settings -> Typing Redraw Delay
+  // (SETTINGS.getDisplayDebounceMs()); e-ink batches keystrokes rather than
+  // refreshing per key. See docs/notes-and-claude.md for why.
   static constexpr size_t FLUSH_CHARS = 24;
 
   std::unique_ptr<char[]> storage;
@@ -43,6 +44,9 @@ class NoteEditorActivity final : public Activity {
   // only started when one is already bonded.
   notes::KeyboardPanel panel;
   int panelHeight = 0;
+  // Top of the keyboard strip. Held rather than recomputed in render() so the
+  // text area's bottom and the strip's top cannot drift apart.
+  int panelTop = 0;
   uint32_t sideHeldSince = 0;
   bool sideHandled = false;
 

@@ -16,8 +16,6 @@
 #include <components/keyboard/keyboard.h>
 
 #include <cstdint>
-#include <string>
-#include <vector>
 
 class GfxRenderer;
 
@@ -55,9 +53,10 @@ class KeyboardPanel {
   int rowCount() const;
   int colsInRow(int row) const;
   int selectedLogicalIndex() const;
-  std::vector<std::string> daisyRing(int ring) const;
+  const char* const* daisyRing(int ring) const;
 
   static constexpr int DAISY_RINGS = 3;
+  static constexpr int DAISY_PETALS = 5;
 
   bool shift_ = false;
   bool symbols_ = false;
@@ -67,7 +66,9 @@ class KeyboardPanel {
   bool daisy_ = false;
   int ring_ = 0;
   int petal_ = 0;
-  std::string lastGroup_;
+  // The multi-tap group currently being cycled. Cells come from one static
+  // table, so identity is the pointer; no cell text repeats.
+  const char* lastGroup_ = nullptr;
   int groupIndex_ = 0;
 };
 

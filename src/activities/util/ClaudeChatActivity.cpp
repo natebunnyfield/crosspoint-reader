@@ -35,9 +35,15 @@ int resolveEditorFont() {
 void ClaudeChatActivity::onEnter() {
   Activity::onEnter();
 
-  // BLE first: nimble_port_init() wants ~65 KB contiguous and hangs rather than
-  // failing when the heap is fragmented, so claim it while the heap is widest.
-  blekbd::begin();
+  // The on-screen keyboard is the default. BLE only comes up when a keyboard is
+  // already bonded — it costs ~72 KB of heap and a CPU-clock lock, which an
+  // owner with none paired should not pay. Hold Up to pair on demand.
+  if (blekbd::hasBondedKeyboard()) {
+    blekbd::begin();
+  } else {
+    LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (hold Up to pair)");
+  }
+  panel.begin();
 
   storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
   if (storage) buf = makeUniqueNoThrow<textbuf::TextBuffer>(storage.get(), BUF_SIZE);
@@ -52,6 +58,12 @@ void ClaudeChatActivity::onEnter() {
   maxLines = (contentBottom - contentTop) / lineHeight;
   if (maxLines < 1) maxLines = 1;
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
+
+  // Split screen: prompt/answer above, keyboard below.
+  panelHeight = panel.preferredHeight(renderer);
+  panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
+  maxLines = (panelTop - contentTop) / lineHeight;
+  if (maxLines < 1) maxLines = 1;
 
   requestUpdate();
 }
@@ -160,6 +172,59 @@ void ClaudeChatActivity::send() {
   requestUpdate();
 }
 
+// Hold Up to pair a BLE keyboard, hold Down to disconnect one keeping the
+// bond. Short presses of the same buttons still navigate, so the gesture only
+// fires past the hold threshold and swallows the release that follows.
+void ClaudeChatActivity::pollPairingGestures() {
+  constexpr uint32_t HOLD_MS = 1500;
+  const bool up = mappedInput.isPressed(MappedInputManager::Button::Up);
+  const bool down = mappedInput.isPressed(MappedInputManager::Button::Down);
+  if (!up && !down) {
+    sideHeldSince = 0;
+    return;
+  }
+  if (sideHeldSince == 0) {
+    sideHeldSince = millis();
+    sideHandled = false;
+    return;
+  }
+  if (sideHandled || millis() - sideHeldSince < HOLD_MS) return;
+
+  sideHandled = true;
+  if (up) {
+    if (blekbd::state() == blekbd::State::Off) {
+      LOG_INF(TAG, "hold Up: starting BLE to pair");
+      blekbd::begin();
+    }
+  } else {
+    LOG_INF(TAG, "hold Down: disconnecting keyboard, bond kept");
+    blekbd::disconnectKeepingBond();
+  }
+  requestUpdate();
+}
+
+void ClaudeChatActivity::handlePanelKey() {
+  const notes::KeyboardPanel::Result r = panel.activate();
+  switch (r.event) {
+    case notes::KeyboardPanel::Event::Character:
+      handleKey(static_cast<unsigned char>(r.ch));
+      break;
+    case notes::KeyboardPanel::Event::Backspace:
+      handleKey('\b');
+      break;
+    case notes::KeyboardPanel::Event::Enter:
+      handleKey('\n');
+      break;
+    case notes::KeyboardPanel::Event::Done:
+      // "OK" on the panel asks Claude, which is what a finished prompt means.
+      if (buf && !buf->empty()) send();
+      return;
+    case notes::KeyboardPanel::Event::None:
+      break;
+  }
+  requestUpdate();
+}
+
 void ClaudeChatActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     if (view == View::Answer) {  // Back from an answer returns to the prompt
@@ -187,9 +252,36 @@ void ClaudeChatActivity::loop() {
     }
   }
 
-  if (view == View::Prompt && mappedInput.wasReleased(MappedInputManager::Button::Confirm) && buf && !buf->empty()) {
-    send();
-    return;
+  pollPairingGestures();
+
+  if (view == View::Prompt) {
+    // Confirm types the selected key; the panel's OK key is what asks Claude.
+    // Confirm was "Ask" before the on-screen keyboard existed — with a keyboard
+    // on screen it has to be the type key, or there is no way to type at all.
+    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      handlePanelKey();
+      return;
+    }
+    if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+      panel.moveCol(-1);
+      requestUpdate();
+      return;
+    }
+    if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+      panel.moveCol(1);
+      requestUpdate();
+      return;
+    }
+    if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
+      panel.moveRow(-1);
+      requestUpdate();
+      return;
+    }
+    if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+      panel.moveRow(1);
+      requestUpdate();
+      return;
+    }
   }
 
   bool got = false;
@@ -208,7 +300,7 @@ void ClaudeChatActivity::loop() {
     lastKeyMs = millis();
     dirty = true;
   }
-  if (dirty && (pendingChars >= FLUSH_CHARS || millis() - lastKeyMs >= DEBOUNCE_MS)) {
+  if (dirty && (pendingChars >= FLUSH_CHARS || millis() - lastKeyMs >= SETTINGS.getDisplayDebounceMs())) {
     dirty = false;
     pendingChars = 0;
     requestUpdate();
@@ -258,11 +350,15 @@ void ClaudeChatActivity::render(RenderLock&&) {
     renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop, "Type a question, then press Ask.");
   }
 
-  char status[80];
-  snprintf(status, sizeof(status), "%u ch   keyboard: %s", (unsigned)(buf ? buf->size() : 0), blekbd::stateName());
-  renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
+  panel.render(renderer, metrics.contentSidePadding, panelTop, pageWidth - metrics.contentSidePadding * 2, panelHeight);
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), (buf && !buf->empty()) ? "Ask" : "", "", "");
+  char status[80];
+  snprintf(status, sizeof(status), "%u ch   kbd:%s   OK asks Claude", (unsigned)(buf ? buf->size() : 0),
+           blekbd::stateName());
+  renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, panelTop - renderer.getLineHeight(SMALL_FONT_ID),
+                    status);
+
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Type", "Left", "Right");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

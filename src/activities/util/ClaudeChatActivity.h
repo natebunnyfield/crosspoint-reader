@@ -10,11 +10,11 @@
 #include <vector>
 
 #include "activities/Activity.h"
+#include "notes/KeyboardPanel.h"
 #include "notes/TextBuffer.h"
 
 class ClaudeChatActivity final : public Activity {
   static constexpr size_t BUF_SIZE = 2048;  // a prompt, not a document
-  static constexpr uint32_t DEBOUNCE_MS = 350;
   static constexpr size_t FLUSH_CHARS = 24;
 
   enum class View : uint8_t { Prompt, Working, Answer };
@@ -28,6 +28,14 @@ class ClaudeChatActivity final : public Activity {
   std::vector<std::string> answerLines;
   size_t answerTop = 0;  // pagination through a long answer
 
+  // On-screen keyboard is the default input here too; a BLE keyboard is
+  // optional and only started when one is already bonded.
+  notes::KeyboardPanel panel;
+  int panelHeight = 0;
+  int panelTop = 0;
+  uint32_t sideHeldSince = 0;
+  bool sideHandled = false;
+
   int editorFontId = 0;
   int lineHeight = 1;
   int maxLines = 1;
@@ -39,6 +47,8 @@ class ClaudeChatActivity final : public Activity {
   uint32_t lastKeyMs = 0;
 
   void handleKey(int key);
+  void handlePanelKey();
+  void pollPairingGestures();
   void send();
   void setPhase(const char* phase);
   void layoutAnswer();

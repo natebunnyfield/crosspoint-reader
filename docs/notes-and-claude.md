@@ -69,7 +69,7 @@ file larger than the 8 KB buffer is refused on open rather than truncated.
 ## E-ink refresh limits, and what the redraw delay can and cannot do
 
 **Settings → Typing Redraw Delay** (25 / 50 / 100 / 250 / 500 / 1000 ms,
-default 50) sets how long typing must go quiet before the panel redraws. It is
+default 250) sets how long typing must go quiet before the panel redraws. It is
 worth understanding what it actually controls, because the intuition from an
 LCD does not transfer.
 
@@ -119,9 +119,10 @@ character typed, ghosting accumulating faster (so the 1.7 s full refreshes come
 round sooner), and no throughput gain, because ~500 ms per refresh is a hard
 floor regardless of how eagerly it is requested.
 
-The default is 50 ms per owner ruling. 250 ms is the value that batches a
-normal typing burst into a single refresh; try it if fast typing feels like it
-is fighting the screen.
+The default is **250 ms**: the value that collapses a normal typing burst into
+one refresh, chosen for typing feel over apparent immediacy. Shorter values are
+there if you want them, but they buy responsiveness that the panel cannot
+actually deliver.
 
 ### The lever that would actually help
 

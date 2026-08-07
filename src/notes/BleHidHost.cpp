@@ -50,7 +50,7 @@ void pollInput() {
 }
 }  // namespace
 
-bool canStart() { return true; }  // no radio to bring up
+bool canStart() { return true; }           // no radio to bring up
 bool hasBondedKeyboard() { return true; }  // the simulated keyboard is always "paired"
 void disconnectKeepingBond() {}
 void forgetAllBonds() {}

@@ -5,6 +5,7 @@
 #include <I18n.h>
 
 #include <algorithm>
+#include <cstring>
 
 #include "CrossPointSettings.h"
 #include "components/UITheme.h"
@@ -14,6 +15,59 @@
 namespace fui = freeink::ui;
 
 namespace notes {
+namespace {
+
+// The panel types on Confirm RELEASE (NoteEditorActivity::handlePanelKey), so
+// activate() can only ever emit KeyboardKey::output — there is no long-press
+// path here at all. Drawing the SDK's corner alt hints would advertise
+// characters this surface cannot produce, and at panel key sizes they crowd the
+// label besides. So the panel renders a mirror of the layout with `alt`
+// cleared; the tables themselves are untouched, which matters because
+// grid13::SL_LAYOUT is SHARED with the full-screen KeyboardEntryActivity, and
+// that one does have long-press and must keep its hints.
+//
+// Rows with no alt are aliased to the original, so only the hinted rows cost
+// storage: 13-grid's number + symbol rows are the worst case at 26 keys
+// (QWERTY's digit row is 10). Static rather than a member because exactly one
+// activity — so one panel — is on screen at a time, and the render task is the
+// only caller; this keeps the mirror off the activity's heap allocation.
+constexpr int MAX_MIRRORED_KEYS = 26;
+constexpr int MAX_MIRRORED_ROWS = 6;
+
+const fui::KeyboardLayout& withoutAltHints(const fui::KeyboardLayout& src) {
+  static fui::KeyboardKey keys[MAX_MIRRORED_KEYS];
+  static fui::KeyboardRow rows[MAX_MIRRORED_ROWS];
+  static fui::KeyboardLayout mirrored{rows, 0};
+  static const fui::KeyboardLayout* cached = nullptr;
+
+  if (cached == &src) return mirrored;
+  // Anything that outgrows the pool keeps its hints rather than rendering a
+  // half-built layout.
+  if (src.rowCount > MAX_MIRRORED_ROWS) return src;
+
+  int pool = 0;
+  for (uint8_t r = 0; r < src.rowCount; ++r) {
+    const fui::KeyboardRow& row = src.rows[r];
+    bool hinted = false;
+    for (uint8_t c = 0; c < row.count && !hinted; ++c) hinted = row.keys[c].alt != nullptr;
+    if (!hinted || pool + row.count > MAX_MIRRORED_KEYS) {
+      rows[r] = row;
+      continue;
+    }
+    fui::KeyboardKey* dst = keys + pool;
+    for (uint8_t c = 0; c < row.count; ++c) {
+      dst[c] = row.keys[c];
+      dst[c].alt = nullptr;
+    }
+    rows[r] = fui::KeyboardRow{dst, row.count, row.insetUnits};
+    pool += row.count;
+  }
+  mirrored.rowCount = src.rowCount;
+  cached = &src;
+  return mirrored;
+}
+
+}  // namespace
 
 void KeyboardPanel::begin() {
   grid13_ = SETTINGS.keyboardLayout == CrossPointSettings::KEYBOARD_GRID13;
@@ -34,7 +88,7 @@ const fui::KeyboardLayout& KeyboardPanel::layout() const {
 int KeyboardPanel::rowCount() const { return daisy_ ? DAISY_RINGS : layout().rowCount; }
 
 int KeyboardPanel::colsInRow(const int row) const {
-  if (daisy_) return static_cast<int>(daisyRing(row).size());
+  if (daisy_) return DAISY_PETALS;
   const fui::KeyboardLayout& l = layout();
   if (row < 0 || row >= l.rowCount) return 0;
   return l.rows[row].count;
@@ -44,15 +98,15 @@ int KeyboardPanel::colsInRow(const int row) const {
 // draws an actual wheel; a half-height strip has no room for that geometry, so
 // the same character groups are laid out as rows here. Same letters, same
 // grouping, same order — only the arrangement differs.
-std::vector<std::string> KeyboardPanel::daisyRing(const int ring) const {
-  switch (ring) {
-    case 0:
-      return {"abc", "def", "ghi", "jkl", "mno"};
-    case 1:
-      return {"pqrs", "tuv", "wxyz", "0-9", ".,?!"};
-    default:
-      return {"Space", "Del", "Enter", "Shift", "OK"};
-  }
+//
+// Flash-resident and returned by pointer: this is read once per cell per
+// render, and the previous std::vector<std::string> form churned twenty heap
+// allocations every time the panel repainted.
+const char* const* KeyboardPanel::daisyRing(const int ring) const {
+  static constexpr const char* RINGS[DAISY_RINGS][DAISY_PETALS] = {{"abc", "def", "ghi", "jkl", "mno"},
+                                                                   {"pqrs", "tuv", "wxyz", "0-9", ".,?!"},
+                                                                   {"Space", "Del", "Enter", "Shift", "OK"}};
+  return RINGS[ring < 0 || ring >= DAISY_RINGS ? DAISY_RINGS - 1 : ring];
 }
 
 void KeyboardPanel::moveRow(const int delta) {
@@ -60,7 +114,7 @@ void KeyboardPanel::moveRow(const int delta) {
   if (rows <= 0) return;
   if (daisy_) {
     ring_ = (ring_ + delta + rows) % rows;
-    petal_ = std::min(petal_, static_cast<int>(daisyRing(ring_).size()) - 1);
+    petal_ = std::min(petal_, DAISY_PETALS - 1);
     return;
   }
   row_ = (row_ + delta + rows) % rows;
@@ -80,19 +134,18 @@ void KeyboardPanel::moveCol(const int delta) {
 KeyboardPanel::Result KeyboardPanel::activate() {
   Result r;
   if (daisy_) {
-    const auto ring = daisyRing(ring_);
-    if (petal_ < 0 || petal_ >= static_cast<int>(ring.size())) return r;
-    const std::string& cell = ring[petal_];
-    if (cell == "Space") {
+    if (petal_ < 0 || petal_ >= DAISY_PETALS) return r;
+    const char* cell = daisyRing(ring_)[petal_];
+    if (strcmp(cell, "Space") == 0) {
       r.event = Event::Character;
       r.ch = ' ';
-    } else if (cell == "Del") {
+    } else if (strcmp(cell, "Del") == 0) {
       r.event = Event::Backspace;
-    } else if (cell == "Enter") {
+    } else if (strcmp(cell, "Enter") == 0) {
       r.event = Event::Enter;
-    } else if (cell == "Shift") {
+    } else if (strcmp(cell, "Shift") == 0) {
       shift_ = !shift_;
-    } else if (cell == "OK") {
+    } else if (strcmp(cell, "OK") == 0) {
       r.event = Event::Done;
     } else {
       // A group cell types its letters one at a time: repeated presses cycle
@@ -101,7 +154,7 @@ KeyboardPanel::Result KeyboardPanel::activate() {
         lastGroup_ = cell;
         groupIndex_ = 0;
       } else {
-        groupIndex_ = (groupIndex_ + 1) % static_cast<int>(cell.size());
+        groupIndex_ = (groupIndex_ + 1) % static_cast<int>(strlen(cell));
       }
       r.event = Event::Character;
       const char c = cell[groupIndex_];
@@ -147,11 +200,13 @@ KeyboardPanel::Result KeyboardPanel::activate() {
 
 int KeyboardPanel::preferredHeight(const GfxRenderer& renderer) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  // A row needs room for the glyph plus padding on both sides AND the gap to
-  // the next row. Sizing from the glyph alone left the bottom row (Del/Space/
-  // OK) squeezed to a sliver against the button hints.
-  const int keyH = renderer.getLineHeight(UI_12_FONT_ID) + metrics.keyboardKeySpacing * 4;
-  const int wanted = keyH * rowCount() + metrics.keyboardKeySpacing * 2;
+  // Same key height as the full-screen KeyboardEntryActivity, so a key is the
+  // same size wherever the owner meets one. Sizing from the glyph's line height
+  // instead gave 30px rows against that keyboard's 48, which left no air around
+  // the label and pushed the number row's alt hints into it.
+  const int rows = rowCount();
+  const int gap = metrics.keyboardKeySpacing;
+  const int wanted = rows * metrics.keyboardKeyHeight + (rows > 1 ? (rows - 1) * gap : 0);
   // Never eat more than 45% of the screen: the note is the point, the keyboard
   // is the tool.
   const int cap = renderer.getScreenHeight() * 45 / 100;
@@ -162,21 +217,31 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
   const auto& metrics = UITheme::getInstance().getMetrics();
 
   if (daisy_) {
-    // Flat-ring rendering; see daisyRing().
+    // Flat-ring rendering; see daisyRing(). Drawn to match what fui::keyboard()
+    // gives the other two layouts, so a key looks the same whichever layout is
+    // selected: no outline, black label on white, and the selected key a solid
+    // black block with the label knocked out. The full grid of 1px boxes this
+    // replaced read as a spreadsheet next to them.
+    //
+    // Ring cells are words rather than single glyphs, so borderless alone would
+    // run them together — hence the hairline rules BETWEEN cells (not around
+    // them), which separate without boxing.
     const int rows = rowCount();
     const int rowH = rows > 0 ? height / rows : height;
+    const int cellW = width / DAISY_PETALS;
+    const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
     for (int rr = 0; rr < rows; ++rr) {
-      const auto ring = daisyRing(rr);
-      const int cellW = ring.empty() ? width : width / static_cast<int>(ring.size());
-      for (size_t c = 0; c < ring.size(); ++c) {
-        const int cx = x + static_cast<int>(c) * cellW;
-        const int cy = y + rr * rowH;
-        const bool sel = (rr == ring_ && static_cast<int>(c) == petal_);
-        if (sel) renderer.fillRect(cx + 1, cy + 1, cellW - 2, rowH - 2, true);
-        renderer.drawRect(cx, cy, cellW, rowH, true);
-        const int tw = renderer.getTextWidth(UI_12_FONT_ID, ring[c].c_str());
-        renderer.drawText(UI_12_FONT_ID, cx + (cellW - tw) / 2, cy + (rowH - renderer.getLineHeight(UI_12_FONT_ID)) / 2,
-                          ring[c].c_str(), !sel);
+      const char* const* ring = daisyRing(rr);
+      const int cy = y + rr * rowH;
+      for (int c = 0; c < DAISY_PETALS; ++c) {
+        const int cx = x + c * cellW;
+        // The last cell absorbs the division remainder so the strip ends flush.
+        const int w = c == DAISY_PETALS - 1 ? width - c * cellW : cellW;
+        const bool sel = rr == ring_ && c == petal_;
+        if (sel) renderer.fillRect(cx, cy, w, rowH, true);
+        if (c > 0 && !sel) renderer.drawLine(cx, cy + rowH / 4, cx, cy + rowH - rowH / 4, true);
+        const int tw = renderer.getTextWidth(UI_12_FONT_ID, ring[c]);
+        renderer.drawText(UI_12_FONT_ID, cx + (w - tw) / 2, cy + (rowH - lineHeight) / 2, ring[c], !sel);
       }
     }
     return;
@@ -191,8 +256,7 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
   fui::Frame<48> frame(target, device, noInput, interactions);
 
   fui::KeyboardProps props;
-  const fui::KeyboardLayout& l = layout();
-  props.layout = &l;
+  props.layout = &withoutAltHints(layout());
   // ASCII only: the UI face has no U+21B5, so a glyph label renders blank.
   props.okLabel = "Enter";
   props.shiftLabel = tr(STR_KEY_SHIFT);

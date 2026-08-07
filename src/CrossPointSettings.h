@@ -202,7 +202,12 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Order is the persisted encoding — append only.
   static constexpr uint16_t DISPLAY_DEBOUNCE_MS[] = {25, 50, 100, 250, 500, 1000};
   static constexpr uint8_t DISPLAY_DEBOUNCE_COUNT = sizeof(DISPLAY_DEBOUNCE_MS) / sizeof(DISPLAY_DEBOUNCE_MS[0]);
-  static constexpr uint8_t DEFAULT_DISPLAY_DEBOUNCE = 1;  // 50 ms
+  // 250 ms (owner ruling 2026-08-06: optimise for typing feel). This is the
+  // value that collapses a normal typing burst into ONE ~500 ms panel refresh.
+  // Shorter settings do not make a character appear sooner -- the waveform is
+  // ~500 ms regardless -- they just queue refreshes back to back, which costs
+  // panel energy and accelerates ghosting for no throughput gain.
+  static constexpr uint8_t DEFAULT_DISPLAY_DEBOUNCE = 3;  // 250 ms
   uint8_t displayDebounce = DEFAULT_DISPLAY_DEBOUNCE;
 
   // Milliseconds of quiet after the last keystroke before the panel redraws.
