@@ -22,6 +22,12 @@ code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
 feeds the OTA version comparison, and it makes the running build
 unidentifiable after the fact.
 
+**Now staged:** both cards carry `20260807T0709Z-crosspoint-e194ab7b.bin`, a
+`gh_release` build stamped `1.5.0-BNY` with no empty `+` suffix (confirmed by
+`strings` on the binary), so SD Firmware Update from the card will replace the
+badly-stamped firmware. Still OPEN because that is an on-device action nobody
+has performed yet.
+
 **Close by:** reflashing with the variable set, or SD Firmware Update from the
 card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
 so a same-code reflash is accepted):
@@ -30,7 +36,28 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 ```
 
 ### [B-005] The two SD cards hold different bytes under the same bin filename
-**severity: low · scope: device provisioning · found 2026-08-02**
+**severity: low · scope: device provisioning · FIXED 2026-08-07**
+
+Both cards were mounted together and written in one `cpcards` pass, so they now
+carry a single identically-named, identically-hashed bin and nothing else:
+
+```
+REDACTED-SSID  20260807T0709Z-crosspoint-e194ab7b.bin
+OWEN_BNF     20260807T0709Z-crosspoint-e194ab7b.bin
+both sha256  564cd3cdd530494dcc7d01adb1ed83ea15e15edccfb24b1f6ffd12990120f14f
+```
+
+Verified by hashing the two cards separately and comparing. `cpcards` deletes
+superseded `*crosspoint*.bin` before copying, so the three older bins that had
+accumulated across the two cards are gone — that divergence had no way to be
+noticed while only one card was ever mounted at a time, which is the actual
+reason this bug existed.
+
+Root cause B-004 is untouched, so the condition can recur: hold
+`CROSSPOINT_RC_HASH` constant across a session, and prefer writing every card in
+one `cpcards` run rather than one card per run.
+
+Original report below.
 
 `crosspoint-880ba0f9.bin` is md5 `262f1d51…` on OWEN_BNF (X4) and `930747eb…`
 on REDACTED-SSID (X3). Same size, same `1.5.0-BNY-rc+880ba0f9` version stamp;
