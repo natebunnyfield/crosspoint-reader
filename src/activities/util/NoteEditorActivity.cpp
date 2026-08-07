@@ -56,7 +56,11 @@ void NoteEditorActivity::onEnter() {
   lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;
   contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
+  // Reserve the right gutter: the side-button hints are drawn there whenever
+  // row navigation is available, and wrapped text would otherwise run under
+  // them. Daisy draws no hints, so it keeps the full width.
+  const int sideGutter = panel.isDaisy() ? 0 : metrics.sideButtonHintsWidth;
+  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2 - sideGutter;
 
   panelHeight = panel.preferredHeight(renderer);
   panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
@@ -106,7 +110,9 @@ void NoteEditorActivity::onEnter() {
       while ((n = f.read(chunk, sizeof(chunk))) > 0) {
         for (int i = 0; i < n; ++i) buf->insert(chunk[i]);
       }
-      buf->cursorTo(0);
+      // END, not 0: insert() writes AT the cursor, so opening at byte 0 made
+      // every keystroke prepend to the top of the file and made Del a no-op.
+      buf->cursorTo(buf->size());
       LOG_INF(TAG, "loaded %u bytes from %s", (unsigned)buf->size(), path.c_str());
     }
   }
@@ -285,6 +291,30 @@ void NoteEditorActivity::pollPairingGestures() {
   requestUpdate();
 }
 
+// One column step on press, then repeats while held. Returns true when it
+// consumed the button this tick.
+bool NoteEditorActivity::repeatCol(const MappedInputManager::Button button, const int delta) {
+  constexpr uint32_t FIRST_REPEAT_MS = 450;
+  constexpr uint32_t NEXT_REPEAT_MS = 140;
+  if (mappedInput.wasPressed(button)) {
+    panel.moveCol(delta);
+    colRepeatAt = millis() + FIRST_REPEAT_MS;
+    requestUpdate();
+    return true;
+  }
+  if (mappedInput.isPressed(button) && colRepeatAt != 0 && millis() >= colRepeatAt) {
+    panel.moveCol(delta);
+    colRepeatAt = millis() + NEXT_REPEAT_MS;
+    requestUpdate();
+    return true;
+  }
+  if (mappedInput.wasReleased(button)) {
+    colRepeatAt = 0;
+    return true;
+  }
+  return false;
+}
+
 void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
   // Everything below mutates buf/lines/topLine, all of which render() walks on
   // its own task.
@@ -366,22 +396,16 @@ void NoteEditorActivity::loop() {
     }
   }
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
-    panel.moveCol(-1);
-    requestUpdate();
-    return;
-  }
-  if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
-    panel.moveCol(1);
-    requestUpdate();
-    return;
-  }
-  if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
+  // Auto-repeat: a 13-Grid row is 13 keys, and one move per RELEASE meant
+  // twelve presses (and twelve e-ink repaints) to cross it.
+  if (repeatCol(MappedInputManager::Button::Left, -1)) return;
+  if (repeatCol(MappedInputManager::Button::Right, 1)) return;
+  if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Up)) {
     panel.moveRow(-1);
     requestUpdate();
     return;
   }
-  if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+  if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Down)) {
     panel.moveRow(1);
     requestUpdate();
     return;
@@ -516,16 +540,18 @@ void NoteEditorActivity::render(RenderLock&&) {
   const int statusY = panelTop - statusHeight;
   renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Type", "Left", "Right");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  // Row navigation lives on the side buttons and is otherwise undiscoverable.
+  if (!panel.isDaisy()) GUI.drawSideButtonHints(renderer, ">", "<");  // same convention as the full-screen keyboard
   renderer.displayBuffer();
 }
 
 bool NoteEditorActivity::save() {
-  if (!buf || buf->empty()) {
-    LOG_INF(TAG, "nothing to save");
-    return false;
-  }
+  if (!buf) return false;
+  // An emptied note still saves: openFileForWrite truncates, so writing zero
+  // bytes is the correct way to record "the owner deleted this text". Refusing
+  // left the previous contents on the card.
   HalFile f;
   if (!Storage.openFileForWrite(TAG, path, f)) {
     LOG_ERR(TAG, "cannot open %s for write", path.c_str());

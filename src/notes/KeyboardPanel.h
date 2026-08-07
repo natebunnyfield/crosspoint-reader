@@ -31,7 +31,11 @@ class KeyboardPanel {
     char ch = 0;  // valid when event == Character
   };
 
-  void begin();  // pick the layout from settings; reset selection
+  // okIsDone: what the OK key means. Claude asks; the note editor inserts a
+  // newline. Without this the grids always meant newline, and Claude's only
+  // route to send() was the daisy strip's OK — so on the DEFAULT keyboard
+  // Claude could not be asked anything at all.
+  void begin(bool okIsDone = false);
 
   // Navigation from the host's buttons.
   void moveRow(int delta);
@@ -72,6 +76,7 @@ class KeyboardPanel {
   int col_ = 0;
   int anchorUnit_ = 0;  // 13-Grid column anchor, in width units
   bool grid13_ = false;
+  bool okIsDone_ = false;
   bool daisy_ = false;
   int ringIdx_ = 0;  // 0 = abc ring, 1 = numbers/symbols
   int petal_ = 0;

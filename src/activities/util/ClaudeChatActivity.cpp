@@ -6,6 +6,8 @@
 #include <Logging.h>
 #include <Memory.h>
 
+#include <algorithm>
+
 #include "CrossPointSettings.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -43,7 +45,7 @@ void ClaudeChatActivity::onEnter() {
   } else {
     LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (hold Up to pair)");
   }
-  panel.begin();
+  panel.begin(/*okIsDone=*/true);  // OK asks Claude here
 
   editorFontId = resolveEditorFont();
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -51,9 +53,11 @@ void ClaudeChatActivity::onEnter() {
   if (lineHeight < 1) lineHeight = 1;
   contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing;
-  maxLines = (contentBottom - contentTop) / lineHeight;
-  if (maxLines < 1) maxLines = 1;
-  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
+  // Reserve the right gutter: the side-button hints are drawn there whenever
+  // row navigation is available, and wrapped text would otherwise run under
+  // them. Daisy draws no hints, so it keeps the full width.
+  const int sideGutter = panel.isDaisy() ? 0 : metrics.sideButtonHintsWidth;
+  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2 - sideGutter;
 
   // Split screen: prompt/answer above, keyboard below.
   panelHeight = panel.preferredHeight(renderer);
@@ -92,6 +96,14 @@ void ClaudeChatActivity::setPhase(const char* phase) {
   view = View::Working;
   LOG_INF(TAG, "phase: %s", phase);
   requestUpdateAndWait();  // the exchange blocks loop(); paint each phase
+}
+
+// Lines the answer view can show: it has no keyboard panel, so it runs from
+// contentTop down to the status line.
+int ClaudeChatActivity::answerLinesOnScreen() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int statusY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
+  return std::max(1, (statusY - contentTop) / lineHeight);
 }
 
 void ClaudeChatActivity::layoutAnswer() {
@@ -228,6 +240,30 @@ void ClaudeChatActivity::relayoutPrompt() {
   promptLines = renderer.wrappedText(editorFontId, prompt.c_str(), maxWidth, maxLines);
 }
 
+// One column step on press, then repeats while held. Returns true when it
+// consumed the button this tick.
+bool ClaudeChatActivity::repeatCol(const MappedInputManager::Button button, const int delta) {
+  constexpr uint32_t FIRST_REPEAT_MS = 450;
+  constexpr uint32_t NEXT_REPEAT_MS = 140;
+  if (mappedInput.wasPressed(button)) {
+    panel.moveCol(delta);
+    colRepeatAt = millis() + FIRST_REPEAT_MS;
+    requestUpdate();
+    return true;
+  }
+  if (mappedInput.isPressed(button) && colRepeatAt != 0 && millis() >= colRepeatAt) {
+    panel.moveCol(delta);
+    colRepeatAt = millis() + NEXT_REPEAT_MS;
+    requestUpdate();
+    return true;
+  }
+  if (mappedInput.wasReleased(button)) {
+    colRepeatAt = 0;
+    return true;
+  }
+  return false;
+}
+
 void ClaudeChatActivity::handlePanelKey(const int slot, const bool longPress) {
   RenderLock lock;
   const notes::KeyboardPanel::Result r =
@@ -268,14 +304,18 @@ void ClaudeChatActivity::loop() {
     return;
   }
 
+  pollPairingGestures();
+
   if (view == View::Answer) {
-    const size_t step = static_cast<size_t>(maxLines) > 1 ? maxLines - 1 : 1;
-    if (mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+    // Step by what the ANSWER view shows, not the prompt view's smaller count,
+    // or paging skips lines it never displayed.
+    const size_t step = answerLinesOnScreen() > 1 ? answerLinesOnScreen() - 1 : 1;
+    if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Down)) {
       if (answerTop + step < answerLines.size()) answerTop += step;
       requestUpdate();
       return;
     }
-    if (mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
+    if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Up)) {
       answerTop = answerTop > step ? answerTop - step : 0;
       requestUpdate();
       return;
@@ -283,8 +323,6 @@ void ClaudeChatActivity::loop() {
   }
 
   if (oomFailed || !buf) return;  // Back above is the only thing that works
-
-  pollPairingGestures();
 
   if (view == View::Prompt) {
     // Confirm types the selected key; the panel's OK key is what asks Claude.
@@ -326,22 +364,16 @@ void ClaudeChatActivity::loop() {
       }
     }
 
-    if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
-      panel.moveCol(-1);
-      requestUpdate();
-      return;
-    }
-    if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
-      panel.moveCol(1);
-      requestUpdate();
-      return;
-    }
-    if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
+    // Auto-repeat: a 13-Grid row is 13 keys, and one move per RELEASE meant
+    // twelve presses (and twelve e-ink repaints) to cross it.
+    if (repeatCol(MappedInputManager::Button::Left, -1)) return;
+    if (repeatCol(MappedInputManager::Button::Right, 1)) return;
+    if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Up)) {
       panel.moveRow(-1);
       requestUpdate();
       return;
     }
-    if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+    if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Down)) {
       panel.moveRow(1);
       requestUpdate();
       return;
@@ -386,7 +418,11 @@ void ClaudeChatActivity::render(RenderLock&&) {
   const int statusY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
 
   if (view == View::Answer) {
-    for (size_t n = 0; n < static_cast<size_t>(maxLines) && answerTop + n < answerLines.size(); ++n) {
+    // The answer view draws no keyboard, so it gets the whole height down to
+    // the status line. Reusing the prompt view's maxLines showed ~8 lines on a
+    // screen that fits far more, with the bottom half blank.
+    const int shown = answerLinesOnScreen();
+    for (size_t n = 0; n < static_cast<size_t>(shown) && answerTop + n < answerLines.size(); ++n) {
       renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
                         answerLines[answerTop + n].c_str());
     }
@@ -425,7 +461,9 @@ void ClaudeChatActivity::render(RenderLock&&) {
            blekbd::stateName());
   renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, panelTop - statusHeight, status);
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Type", "Left", "Right");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  // Row navigation lives on the side buttons and is otherwise undiscoverable.
+  if (!panel.isDaisy()) GUI.drawSideButtonHints(renderer, ">", "<");  // same convention as the full-screen keyboard
   renderer.displayBuffer();
 }

@@ -5,6 +5,7 @@
 #include <I18n.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 
 #include "CrossPointSettings.h"
@@ -34,7 +35,8 @@ namespace {
 
 }  // namespace
 
-void KeyboardPanel::begin() {
+void KeyboardPanel::begin(const bool okIsDone) {
+  okIsDone_ = okIsDone;
   grid13_ = SETTINGS.keyboardLayout == CrossPointSettings::KEYBOARD_GRID13;
   daisy_ = SETTINGS.keyboardLayout == CrossPointSettings::KEYBOARD_DAISY;
   shift_ = false;
@@ -191,6 +193,9 @@ KeyboardPanel::Result KeyboardPanel::activate(const bool longPress) {
       return r;
     case fui::KeyKind::Mode:
       symbols_ = !symbols_;
+      // builtinKeyboardLayout overloads `shifted` as "second symbols page"
+      // inside the symbols layer, so a latched shift would open page 2.
+      shift_ = false;
       row_ = std::min(row_, std::max(0, rowCount() - 1));
       col_ = std::min(col_, std::max(0, colsInRow(row_) - 1));
       return r;
@@ -199,10 +204,7 @@ KeyboardPanel::Result KeyboardPanel::activate(const bool longPress) {
       r.event = longPress ? Event::ClearAll : Event::Backspace;
       return r;
     case fui::KeyKind::Ok:
-      // In a hosted panel "OK" means newline, not "finish": the host activity
-      // owns finishing (Back saves), and a multi-line note needs Enter far more
-      // than it needs a second way to leave.
-      r.event = Event::Enter;
+      r.event = okIsDone_ ? Event::Done : Event::Enter;
       return r;
     default:
       break;
@@ -211,7 +213,10 @@ KeyboardPanel::Result KeyboardPanel::activate(const bool longPress) {
   // for a key that declares one — matching KeyboardEntryActivity. Without this
   // the panel could not type a capital except via Shift.
   const char* out = longPress ? fui::keyboardAltOutputFor(l, key.value) : nullptr;
-  if (out == nullptr) out = key.output;
+  // keyboardOutputFor, NOT key.output: the SDK's space key is KeyKind::Space
+  // with a NULL output, so reading the field directly meant the space bar typed
+  // nothing at all in QWERTY and in both symbols pages.
+  if (out == nullptr) out = fui::keyboardOutputFor(l, key.value);
   if (out != nullptr && out[0] != '\0') {
     r.event = Event::Character;
     r.ch = out[0];
@@ -275,8 +280,8 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
   target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
   const fui::DeviceContext device = target.deviceContext();
   const fui::InputSnapshot noInput{};
-  fui::InteractionBuffer<48> interactions;
-  fui::Frame<48> frame(target, device, noInput, interactions);
+  fui::InteractionBuffer<1> interactions;  // no keyAction set, so nothing registers
+  fui::Frame<1> frame(target, device, noInput, interactions);
 
   fui::KeyboardProps props;
   // Alt hints are shown again: the panel now HAS a long-press path
@@ -285,7 +290,7 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
   // suppressed while that path did not exist.
   props.layout = &layout();
   // ASCII only: the UI face has no U+21B5, so a glyph label renders blank.
-  props.okLabel = "Enter";
+  props.okLabel = okIsDone_ ? tr(STR_OK_BUTTON) : tr(STR_ENTER_KEY);
   props.shiftLabel = tr(STR_KEY_SHIFT);
   props.modeLabel = symbols_ ? tr(STR_KEY_MODE_ABC) : tr(STR_KEY_MODE_SYMBOLS);
   props.selectedIndex = static_cast<int16_t>(selectedLogicalIndex());

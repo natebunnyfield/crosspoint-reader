@@ -50,6 +50,7 @@ class NoteEditorActivity final : public Activity {
   int statusHeight = 0;  // reserved band between text and panel
   uint32_t sideHeldSince = 0;
   uint32_t pickHeldSince = 0;
+  uint32_t colRepeatAt = 0;
   int pickSlot = -1;
   bool pickFired = false;
   bool sideHandled = false;
@@ -69,6 +70,7 @@ class NoteEditorActivity final : public Activity {
   void handleKey(int key);
   // slot is the daisy pick (0=top,1=middle,2=bottom); ignored by the grids.
   void handlePanelKey(int slot = 1, bool longPress = false);
+  bool repeatCol(MappedInputManager::Button button, int delta);
   void pollPairingGestures();
   void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
   int advanceOf(const char* piece, EpdFontFamily::Style style) const;

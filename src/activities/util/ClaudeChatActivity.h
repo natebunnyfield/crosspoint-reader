@@ -37,6 +37,7 @@ class ClaudeChatActivity final : public Activity {
   int statusHeight = 0;  // reserved band between text and panel
   uint32_t sideHeldSince = 0;
   uint32_t pickHeldSince = 0;
+  uint32_t colRepeatAt = 0;
   int pickSlot = -1;
   bool pickFired = false;
   bool sideHandled = false;
@@ -55,11 +56,13 @@ class ClaudeChatActivity final : public Activity {
   void handleKey(int key);
   // slot is the daisy pick (0=top,1=middle,2=bottom); ignored by the grids.
   void handlePanelKey(int slot = 1, bool longPress = false);
+  bool repeatCol(MappedInputManager::Button button, int delta);
   void relayoutPrompt();
   void pollPairingGestures();
   void send();
   void setPhase(const char* phase);
   void layoutAnswer();
+  int answerLinesOnScreen() const;
 
  public:
   ClaudeChatActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
