@@ -8,5 +8,7 @@ It is written for software developers who may be new to embedded development.
 - [Development Workflow](./development-workflow.md)
 - [Testing and Debugging](./testing-debugging.md)
 - [Touch and UI Development](./touch-and-ui.md)
+- [Device Builds From a Clean Tree](./device-build-from-a-clean-tree.md) — read
+  this if a fresh clone or `git worktree` will not build for the device
 
 If you are new, start with [Getting Started](./getting-started.md).

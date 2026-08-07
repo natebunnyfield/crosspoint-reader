@@ -128,6 +128,28 @@ dirs, not only the one being built. Do not edit it mid-task to tweak a flag —
 prefer an env var or an existing env — or finished device builds vanish and you
 pay a full rebuild.
 
+**Never add `lib_ignore = BLE` (or `bluetooth`, `bluetoothserial`, `simpleble`,
+`esp-nimble-cpp`).** It reads as "skip an Arduino library we do not use", which
+sounds free. pioarduino does not treat it as a library name:
+`component_manager.py:899-903` maps any of those tokens onto the ESP-IDF
+**component** `bt`, and the lib_ignore handler then regex-deletes all 55 `bt`
+CPPPATH entries from the framework package's `pioarduino-build.py` — including
+the one `-I` that resolves `<host/ble_gap.h>`. `src/notes/BleHidHost.cpp` then
+cannot compile, and because `-lbt` survives the strip it fails as a **missing
+header with no link error**, which reads as a broken ESP-IDF core rather than a
+one-line config entry. This shipped as a real bug and cost a whole session
+before `7fee9a8c` removed it; `platformio.ini` now carries a comment saying so.
+
+**A device build from a fresh clone or worktree needs four things nobody
+documented** — a cleared rebuild scaffold, a `tool-cmake` package that actually
+resolves, a `mkdir -p .cache`, and the submodule. Each fails with its own
+unrelated error message. See
+[docs/contributing/device-build-from-a-clean-tree.md](docs/contributing/device-build-from-a-clean-tree.md)
+before debugging one of them from scratch. That file also records the verify
+step: a green build is not proof the BLE path compiled — check
+`.pio/build/<env>/src/notes/BleHidHost.cpp.o` exists and that its `.d` carries
+the nimble include trail.
+
 **The build cache is capped now.** `build_cache_dir = .cache` is a
 content-addressed SCons CacheDir with no eviction of its own — it reached
 **11 GB in ten days** (19,781 entries) before `scripts/build_cache_policy.py`
@@ -274,10 +296,19 @@ An earlier sweep found one 16 KB cluster of `Rosarivo_16.cpfont` on REDACTED-SSI
 overwritten with foreign data, so compare hashes rather than filenames when
 checking a card.
 
-**The device SD cards are one family behind.** Quattrocento Sans was promoted on
-2026-08-04 and installed on `fs_/fonts/` and the iOS seed bundle; the physical
-cards still hold the old five, and Freight Sans (never on a card) was cut to C
-the same day. Reprovision the cards from `fs_/fonts/` to close the gap.
+**Card status, 2026-08-06.** OWEN_BNF (X4) carries all six S-tier families,
+hash-verified 48/48 against `fs_/fonts` — Quattrocento Sans added and a broken
+Rosarivo repaired. That break is the cautionary one: `.fonts/Rosarivo/` held the
+**2x** cuts in the 1x slots with no `2x/` directory at all, so the X4 had been
+rendering Rosarivo from double-resolution glyph tables since December. The
+filenames and the directory listing looked perfect; only hashing found it.
+Freight Sans (never on a card) was cut to C tier on 2026-08-04.
+
+**REDACTED-SSID (X3) is NOT verified, and the card looks unhealthy.** It dropped
+off the bus twice during sustained reads on 2026-08-06, mid-verification both
+times, after smaller writes to it had completed and hash-verified. Treat a
+volume that disappears during a read as a hardware question, not a font
+question — re-seat, re-verify by hash, and consider retiring it.
 
 **Freight Sans was cut to C tier on 2026-08-04**, the same ruling that promoted
 Quattrocento Sans to S. Both are humanist sans filling one cell of the taxonomy,

@@ -42,3 +42,15 @@ falls back to the primary checkout for both (it says so in the configure log):
 
 Override the SD tree explicitly with CROSSPOINT_TEST_SD=/path/to/fs_ when
 running a suite by hand; ctest already carries the resolved one.
+
+After switching branches, regenerate the i18n headers:
+
+  python3 scripts/gen_i18n.py lib/I18n/translations lib/I18n/
+
+I18nKeys.h / I18nStrings.h / I18nStrings.cpp are generated and gitignored, so
+they do NOT follow a branch switch. Picking up a branch that added a string
+gives a compile error naming the new key, e.g.
+
+  error: no member named 'STR_CLAUDE_PROMPT_HINT' in 'StrId'
+
+which looks like the test tree is broken rather than merely stale.

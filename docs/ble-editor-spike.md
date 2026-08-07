@@ -133,8 +133,13 @@ adding it means a `lib_deps` line and a full wipe.
 **`btInUse()` is load-bearing and its absence is a hard crash.** `initArduino()`
 calls `esp_bt_controller_mem_release(ESP_BT_MODE_BTDM)` at boot unless
 `btInUse()` returns true (`esp32-hal-misc.c:345`). The core's definition is
-`__attribute__((weak))` and returns false, and `lib_ignore = BLE` means nothing
-overrides it. Without a strong override the controller's RAM is donated to the
+`__attribute__((weak))` and returns false, and nothing else in the build defines
+it — verified by grep over the whole framework after `lib_ignore = BLE` was
+removed in `7fee9a8c`: the only other definition is the weak one at
+`esp32-hal-bt.c:26`, so the strong override at `BleHidHost.cpp:138` still wins.
+(The original wording credited `lib_ignore = BLE` for that exclusivity. It never
+provided it — the Arduino BLE library was never in the LDF graph anyway, since
+nothing includes `BLEDevice.h`.) Without a strong override the controller's RAM is donated to the
 heap at boot and `btdm_controller_init()` later executes into it:
 
 ```
@@ -145,11 +150,20 @@ MEPC 0x00000000   RA -> r_lld_env_init   T0 -> btdm_controller_init
 The release is **irreversible until reboot**, so BLE-capability is a boot-time
 decision, not a runtime one.
 
-**PlatformIO does not put the `bt/` include dirs on the compile line for project
-sources** — 325 `-I` flags reach a project TU and none is nimble, even though
-`flags/includes` lists them. `spike-build.sh` injects them via
-`PLATFORMIO_BUILD_FLAGS`, which feeds `project.checksum`: hold it constant across
-a session or every build rebuilds from scratch.
+**~~PlatformIO does not put the `bt/` include dirs on the compile line for
+project sources~~ — SOLVED 2026-08-06, cause found.** The observation was right
+(325 `-I` flags reached a project TU and none was nimble, even though
+`flags/includes` listed them) but it was not PlatformIO being unhelpful: it was
+`lib_ignore = BLE` in `[base]`. pioarduino maps that token onto the ESP-IDF
+component `bt` (`component_manager.py:899-903`) and regex-deletes all 55 `bt`
+CPPPATH entries from the framework's `pioarduino-build.py`. `-lbt` survives the
+strip, so it presents as a missing header with no link error.
+
+`7fee9a8c` removed the entry, so the nimble includes now reach project sources
+on every device env with no wrapper. **`spike-build.sh`'s
+`PLATFORMIO_BUILD_FLAGS` injection is superseded and should be deleted from
+that script** — it is now ten redundant `-I` flags that still feed
+`project.checksum`, so leaving it in costs a full rebuild whenever it changes.
 
 **Auto-sleep destroys unattended measurement.** Deep sleep drops the USB CDC
 port, so a 10-minute idle strands any capture and needs a physical wake. The
