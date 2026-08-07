@@ -182,9 +182,14 @@ void DaisyEntryActivity::loop() {
     if (mappedInput.wasPressed(pick.button) && activePick < 0) {
       activePick = pick.slot;
       pickHandled = false;
+      pickPressedAt = millis();
     }
+    // Time THIS button, not whatever has been held longest. getHeldTime() is
+    // global, so pressing Select while still holding Right to rotate reported a
+    // hold of however long the rotation had run and fired the uppercase pick
+    // immediately -- Select stopped producing the plain middle character.
     if (activePick == pick.slot && !pickHandled && mappedInput.isPressed(pick.button) &&
-        mappedInput.getHeldTime() > LONG_PRESS_MS) {
+        millis() - pickPressedAt > LONG_PRESS_MS) {
       longPick(pick.slot);
       pickHandled = true;
     }

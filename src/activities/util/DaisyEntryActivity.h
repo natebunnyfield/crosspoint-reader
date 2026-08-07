@@ -51,6 +51,12 @@ class DaisyEntryActivity : public Activity {
   // release before it commits the plain char.
   int activePick = -1;
   bool pickHandled = false;
+  // When the ACTIVE pick button went down. MappedInputManager::getHeldTime()
+  // takes no button and reports the longest-held button on the device, so
+  // holding Left/Right to rotate -- which auto-repeats, i.e. holding is how the
+  // wheel is meant to be driven -- already exceeded LONG_PRESS_MS before the
+  // pick was even pressed, and every pick fired as uppercase.
+  unsigned long pickPressedAt = 0;
 
   int petalCount() const;
   bool isUtilityPetal() const { return petalIdx == petalCount() - 1; }
