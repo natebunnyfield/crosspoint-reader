@@ -94,6 +94,24 @@ TEST(DaisyRings, BothRingsEndWithSpaceInTheBottomSlot) {
   EXPECT_NE(daisyrings::NUM_RING[daisyrings::NUM_CHAR_PETALS - 1][1], ' ');
 }
 
+// Special keys are UPPERCASE; characters are not (owner ruling 2026-08-06).
+// A lowercase "del" reads as three letters you could type. This walks the
+// shared layout tables so a new special key cannot be added in lowercase.
+TEST(KeyboardLabels, SpecialKeysAreUppercase) {
+  const fui::KeyboardLayout& l = grid13::SL_LAYOUT;
+  for (uint8_t r = 0; r < l.rowCount; ++r) {
+    for (uint8_t k = 0; k < l.rows[r].count; ++k) {
+      const fui::KeyboardKey& key = l.rows[r].keys[k];
+      if (key.kind == fui::KeyKind::Normal || key.label == nullptr) continue;
+      for (const char* c = key.label; *c; ++c) {
+        EXPECT_FALSE(*c >= 'a' && *c <= 'z')
+            << "special key \"" << key.label << "\" has a lowercase letter; special keys are uppercase so they do "
+            << "not read as characters you could type";
+      }
+    }
+  }
+}
+
 }  // namespace
 
 // The SDK's space key carries output == nullptr and KeyKind::Space. Reading

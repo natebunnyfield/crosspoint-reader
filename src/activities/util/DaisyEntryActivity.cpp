@@ -301,7 +301,9 @@ void DaisyEntryActivity::render(RenderLock&&) {
       } else {
         const char c = slotChar(i, slot);
         if (c == ' ') {
-          label = "sp";
+          // UPPERCASE, like every other special key: a lowercase label reads as
+          // characters you could type (owner ruling 2026-08-06).
+          label = "SPC";
           fontId = SMALL_FONT_ID;
         } else {
           buf[0] = c;

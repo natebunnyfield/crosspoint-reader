@@ -58,7 +58,7 @@ void drawStrip(const Ring& ring, const Util& util, int selectedPetal, int x, int
         // A space slot draws as an underscore rule so the target is visible;
         // the shipped panel draws a literal blank, which reads as "no key".
         if (c == ' ')
-          snprintf(label, sizeof(label), "%s", "spc");
+          snprintf(label, sizeof(label), "%s", "SPC");
         else if (c == '\n')
           snprintf(label, sizeof(label), "%s", "ret");
         else
@@ -157,7 +157,7 @@ bool renderDaisyVariants(const char* outDir) {
   char path[256];
   // The SHIPPED rings, straight from src/notes/DaisyRings.h — not a copy, so
   // this sheet cannot drift from what the device draws.
-  const Util utilEditor{"del", "123", "ret"};
+  const Util utilEditor{"DEL", "123", "RET"};
   const Ring rings[] = {{"abc", daisyrings::ABC_RING, daisyrings::ABC_CHAR_PETALS},
                         {"123", daisyrings::NUM_RING, daisyrings::NUM_CHAR_PETALS}};
   snprintf(path, sizeof(path), "%s/daisy_shipped.bmp", outDir);

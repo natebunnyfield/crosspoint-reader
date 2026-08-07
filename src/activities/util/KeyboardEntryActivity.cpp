@@ -51,7 +51,7 @@ const fui::KeyboardKey URL_ROW1[] = {UK("q", "q", 'q'), UK("w", "w", 'w'), UK("e
 const fui::KeyboardKey URL_ROW2[] = {UK("a", "a", 'a'), UK("s", "s", 's'), UK("d", "d", 'd'),
                                      UK("f", "f", 'f'), UK("g", "g", 'g'), UK("h", "h", 'h'),
                                      UK("j", "j", 'j'), UK("k", "k", 'k'), UK("l", "l", 'l')};
-const fui::KeyboardKey URL_ROW3[] = {UKS("Shift", fui::KeyKind::Shift, fui::QWERTY_KEY_SHIFT, 2),
+const fui::KeyboardKey URL_ROW3[] = {UKS("SHIFT", fui::KeyKind::Shift, fui::QWERTY_KEY_SHIFT, 2),
                                      UK("z", "z", 'z'),
                                      UK("x", "x", 'x'),
                                      UK("c", "c", 'c'),
@@ -59,7 +59,7 @@ const fui::KeyboardKey URL_ROW3[] = {UKS("Shift", fui::KeyKind::Shift, fui::QWER
                                      UK("b", "b", 'b'),
                                      UK("n", "n", 'n'),
                                      UK("m", "m", 'm'),
-                                     UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2)};
+                                     UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2)};
 // URLs have no spaces, so the URL bottom row spends the space slot on ":",
 // "/", "." and the snippet-panel toggle instead (the legacy keyboard did the
 // same with its "URL" key).
@@ -76,7 +76,7 @@ const fui::KeyboardKey URL_SHIFT_ROW1[] = {UK("Q", "Q", 'Q'), UK("W", "W", 'W'),
 const fui::KeyboardKey URL_SHIFT_ROW2[] = {UK("A", "A", 'A'), UK("S", "S", 'S'), UK("D", "D", 'D'),
                                            UK("F", "F", 'F'), UK("G", "G", 'G'), UK("H", "H", 'H'),
                                            UK("J", "J", 'J'), UK("K", "K", 'K'), UK("L", "L", 'L')};
-const fui::KeyboardKey URL_SHIFT_ROW3[] = {UKS("Shift", fui::KeyKind::Shift, fui::QWERTY_KEY_SHIFT, 2),
+const fui::KeyboardKey URL_SHIFT_ROW3[] = {UKS("SHIFT", fui::KeyKind::Shift, fui::QWERTY_KEY_SHIFT, 2),
                                            UK("Z", "Z", 'Z'),
                                            UK("X", "X", 'X'),
                                            UK("C", "C", 'C'),
@@ -84,7 +84,7 @@ const fui::KeyboardKey URL_SHIFT_ROW3[] = {UKS("Shift", fui::KeyKind::Shift, fui
                                            UK("B", "B", 'B'),
                                            UK("N", "N", 'N'),
                                            UK("M", "M", 'M'),
-                                           UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2)};
+                                           UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2)};
 
 // Snippet keys: multi-character outputs, stable ids above the localized-key
 // range so they never collide with layout key ids.
@@ -94,9 +94,9 @@ const fui::KeyboardKey URL_SNIP_ROW2[] = {UK("http://", "http://", 2004), UK("19
                                           UK(".org", ".org", 2006)};
 const fui::KeyboardKey URL_SNIP_ROW3[] = {UK("/opds", "/opds", 2007), UK(":8080", ":8080", 2008),
                                           UK(".net", ".net", 2009)};
-const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("abc", fui::KeyKind::Mode, fui::QWERTY_KEY_MODE, 2),
+const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("ABC", fui::KeyKind::Mode, fui::QWERTY_KEY_MODE, 2),
                                             UKW("URL", nullptr, URL_PANEL_VALUE, 2),
-                                            UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2),
+                                            UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2),
                                             UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 2)};
 
 // The 13-grid table moved to src/notes/Grid13Layout.h so the split-screen
