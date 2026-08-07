@@ -3,6 +3,10 @@
 #include <cstdint>
 #include <string>
 #define REPLACEMENT_GLYPH 0xFFFD
+// What a face substitutes when it carries neither the codepoint nor U+FFFD.
+// Not every face has a replacement character — the editor and UI monospace
+// faces do not — and '?' is present in every text face. See EpdFont::getGlyph.
+#define FALLBACK_GLYPH 0x3F  // '?'
 
 uint32_t utf8NextCodepoint(const unsigned char** string);
 // Appends a Unicode codepoint to a std::string in UTF-8 encoding.

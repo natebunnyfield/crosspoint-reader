@@ -163,22 +163,44 @@ line per pixel (the B-010 mechanism).
 checking both call sites still look right — they may have been nudged to
 compensate.
 
-### [B-009] Emoji in a Claude answer vanish and log an error per paint
-**severity: low · scope: Claude chat / text rendering · PARTIALLY ADDRESSED 2026-08-07**
+### [B-009] An unrepresentable codepoint vanished and took its width with it
+**severity: low · scope: Claude chat / text rendering · FIXED 2026-08-07**
 
-Done: the log is demoted `LOG_ERR` -> `LOG_DBG` (`GfxRenderer.cpp:425`), the one
-step this entry called worth doing regardless. It removes the per-character,
-per-paint spam and stops it feeding the `RTC_NOINIT` crash ring, which was the
-second-order harm — real panic history was being pushed out of a 16-entry buffer
-by a content fact the firmware cannot control.
+Done in two steps. First the log was demoted `LOG_ERR` -> `LOG_DBG`
+(`GfxRenderer.cpp:425`), removing the per-character, per-paint spam that fed the
+`RTC_NOINIT` crash ring and pushed real panic history out of a 16-entry buffer.
 
-**Still open, and an owner call:** where to intervene on the character itself.
-The three options in the report (add U+FFFD to the four faces for a visible ▯;
-strip non-representable codepoints before layout to keep line metrics honest;
-a system prompt) trade differently and none is obviously right, so none was
-picked. The zero-advance shift at `GfxRenderer.cpp:726` is untouched too —
-whether it is a real shift depends on whether `getTextWidth` and the renderer
-agree about a missing glyph's advance, which was not measured.
+Then the character itself, which was left as an owner call between three
+options. The pick is **the fallback chain**, because it is the only one that
+fixes the metrics half as a side effect and needs no font rebuild:
+`EpdFont::getGlyph` now tries U+FFFD and then `'?'` (`FALLBACK_GLYPH`,
+`Utf8.h`). U+FFFD alone was not enough — only 52 of the 84 built-in faces carry
+one, and the four that do not are exactly the editor and UI-chrome faces.
+
+That also closes the zero-advance shift the entry flagged as unmeasured: it was
+real. `drawText` reads `glyph ? glyph->advanceX : 0` (`GfxRenderer.cpp:726`), so
+before the fix an unrepresentable character contributed **zero width** and the
+rest of the line slid left into its place — a string measured with the emoji
+present no longer matched what was drawn. A resolved `'?'` restores the advance.
+
+Both substitutes are excluded from recursing, not just the one being asked for:
+U+FFFD -> `'?'` -> U+FFFD is a cycle, and a face missing both overflowed the
+stack. Found by the existing `EpdFont` cases in `test/differential_rounding`
+segfaulting on the first attempt; their synthetic font carries neither.
+
+**Verified RED first**, two new cases in `test/renderer_bounds`: the unit one
+(`getGlyph(0x1F60A)` resolves to the same glyph as `'?'`, with a non-zero
+advance) and the metric one (`getTextWidth("a😊b") > getTextWidth("ab")`). Both
+fail against the old chain. Full suite 215/215, desktop canary green.
+
+**Verified on screen too**, since a substitution nobody can see is not a fix: a
+file named `emoji 😊 test.md` in the SD root, listed by Browse Files, renders as
+`emoji ? test` — one glyph wide, spacing intact, in the UI face that has no
+U+FFFD either.
+
+A visible `▯` would be nicer than `?` and is one `#define` away
+(`FALLBACK_GLYPH` in `Utf8.h`) — but it needs a glyph in every face first, which
+is the font-rebuild option this deliberately avoided.
 
 Original report below.
 

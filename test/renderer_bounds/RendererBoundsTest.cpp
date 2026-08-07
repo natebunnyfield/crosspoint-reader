@@ -30,6 +30,8 @@
 
 #include <string>
 
+#include <Utf8.h>
+
 #include "fontIds.h"
 
 HalDisplay display;
@@ -62,6 +64,8 @@ class Gfx {
     renderer_.insertFont(UI_10_FONT_ID, ui10_);
     renderer_.insertFont(UI_12_FONT_ID, ui12_);
     renderer_.insertFont(SMALL_FONT_ID, small_);
+    // The editor/Claude face, and the one that carries no U+FFFD (B-009).
+    renderer_.insertFont(SPACEMONO_12_FONT_ID, spacemono12_);
   }
 
   GfxRenderer renderer_;
@@ -83,6 +87,8 @@ class Gfx {
   EpdFontFamily ui12_{&ui12R_, &ui12B_};
   EpdFont small8_{&notosans_8_regular};
   EpdFontFamily small_{&small8_};
+  EpdFont sm12R_{&spacemono_12_regular}, sm12B_{&spacemono_12_bold};
+  EpdFontFamily spacemono12_{&sm12R_, &sm12B_};
 };
 
 // Fixture: a zeroed counter per test. The renderer is portrait-only now —
@@ -367,6 +373,38 @@ TEST_F(RendererBounds, DegeneratePanesDrawNothingAndDoNotCrash) {
   r->drawText(NOTOSERIF_14_FONT_ID, 12, 300, "");
   r->drawText(NOTOSERIF_14_FONT_ID, 12, 300, nullptr);
   EXPECT_TRUE(noEscapes());
+}
+
+// B-009. A codepoint no face can draw must still occupy space.
+//
+// Space Mono carries neither U+1F60A nor U+FFFD, and it is what the Claude
+// answer and the note editor are painted in — SETTINGS.editorFont defaults to
+// the card-only iA Writer row, so resolveEditorFont falls through to the
+// built-in mono. Before the fallback chain, getGlyph returned nullptr,
+// renderCharImpl drew nothing, and drawText advanced the cursor by ZERO
+// (`prevAdvanceFP = glyph ? glyph->advanceX : 0`). The character did not just
+// vanish: the rest of the line slid left into its place, so a width measured
+// with the emoji present no longer matched what was drawn.
+TEST(MissingGlyph, ResolvesToAVisibleFallbackRatherThanNothing) {
+  EpdFont mono{&spacemono_12_regular};
+  // hasCodepoint is the raw coverage question — no substitution — so it still
+  // reports the truth about this face after the fallback chain exists.
+  ASSERT_FALSE(mono.hasCodepoint(REPLACEMENT_GLYPH))
+      << "this face is supposed to lack U+FFFD; if it gained one, this test no longer exercises the fallback";
+  ASSERT_FALSE(mono.hasCodepoint(0x1F60A));
+
+  const EpdGlyph* emoji = mono.getGlyph(0x1F60A);  // the smiley the API sent
+  ASSERT_NE(emoji, nullptr) << "a codepoint with neither a glyph nor U+FFFD must still resolve to something";
+  EXPECT_EQ(emoji, mono.getGlyph('?')) << "the documented last resort is '?'";
+  EXPECT_GT(emoji->advanceX, 0) << "a fallback with no advance is the metrics half of the bug";
+}
+
+// The same property one layer up: a string must not measure NARROWER because a
+// character in it is unrepresentable. That is what silently corrupted wrapping.
+TEST_F(RendererBounds, TextWidthCountsUnrepresentableCharacters) {
+  const int without = r->getTextWidth(SPACEMONO_12_FONT_ID, "ab");
+  const int with = r->getTextWidth(SPACEMONO_12_FONT_ID, "a\xF0\x9F\x98\x8A" "b");  // a + U+1F60A + b
+  EXPECT_GT(with, without) << "the unrepresentable character contributed zero width";
 }
 
 // A zero-height and a negative-height pane, driven through the same geometry

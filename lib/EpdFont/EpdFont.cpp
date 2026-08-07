@@ -183,8 +183,25 @@ const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
     if (loaded) return loaded;
   }
 
-  if (cp != REPLACEMENT_GLYPH) {
-    return getGlyph(REPLACEMENT_GLYPH);
+  // Last resorts, in order: U+FFFD, then '?'. B-009.
+  //
+  // U+FFFD alone was not enough. Only 52 of the 84 built-in faces carry one, and
+  // the four that do not -- spacemono, ibmplexmono, librefranklin, ubuntu -- are
+  // exactly the editor and UI-chrome faces, i.e. the screens most likely to meet
+  // a stray codepoint (a Claude answer, a BLE-typed note). Returning nullptr
+  // there lost more than the character: drawText reads
+  // `glyph ? glyph->advanceX : 0`, so the pen did not move, the rest of the line
+  // slid left into the gap, and a width measured before the draw no longer
+  // matched it. '?' exists in every text face and keeps the metrics honest.
+  //
+  // A face carrying neither still returns nullptr and callers must keep handling
+  // it: an icon-only face has no business substituting punctuation.
+  // Both substitutes are excluded from recursing, not just the one being asked
+  // for: U+FFFD -> '?' -> U+FFFD is a cycle, and a face missing both overflows
+  // the stack rather than returning nullptr.
+  if (cp != REPLACEMENT_GLYPH && cp != FALLBACK_GLYPH) {
+    if (const EpdGlyph* replacement = getGlyph(REPLACEMENT_GLYPH)) return replacement;
+    return getGlyph(FALLBACK_GLYPH);
   }
   return nullptr;
 }
