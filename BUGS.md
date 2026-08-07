@@ -55,42 +55,6 @@ enter Settings and press Back (which saves), then read the file.
 
 ## OPEN
 
-### [B-017] Viewing a file could write emptiness back over it
-**severity: high · scope: data loss · FIXED 2026-08-07 · `e9fd4cce`**
-
-Reported as "some notes and bmp are being rewritten and emptied out sometimes
-when viewed". Two unrelated causes, which is why it looked intermittent.
-
-**BMP.** `BmpViewerActivity::doSetSleepCover()` opens the viewed file for read,
-then opens `/sleep.bmp` for write — and `openFileForWrite` is `O_TRUNC`. When
-the file being viewed **is** `/sleep.bmp`, the second open truncates the very
-file the first is reading. The next `read()` returns 0, the copy loop never
-runs, and `success` had already been set `true` *above* the loop — so it
-reported Done over a zero-byte sleep screen.
-
-Demonstrated at the syscall level with the same open sequence: 53,918 bytes → 0,
-first read after the truncate returns 0. `fs_/sleep.bmp` on the sim card was
-already sitting at 0 bytes when this was investigated.
-
-**NOTES.** `NoteEditorActivity::onEnter()` sets `loadRefused` only when the file
-exceeds the buffer. If `openFileForRead` **fails**, the load block is skipped
-entirely, the buffer stays empty, `loadRefused` stays false, and `onExit()`'s
-`save()` writes that emptiness back. B-013 fixed refused-to-load and left
-failed-to-open exposed.
-
-A file that does not exist is a different case — that is Create Note minting a
-new note, which must still save — so the guard is "exists but will not open",
-not "failed to open".
-
-**Plausible trigger for the notes half:** enough leaked directory handles reach
-`EMFILE` and opens start failing. That is S-006 in the simulator, fixed the same
-day; the device HAL is separate code and has not been audited for the same leak.
-Worth checking `lib/hal/HalStorage.cpp` before assuming this is fully closed.
-
-**Verified:** 215/215 host tests, device `gh_release` and desktop canary build.
-The BMP mechanism is proven; the notes half is a reasoned fix to a path that is
-hard to trigger on demand, so it is **not** reproduced end to end.
-
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
@@ -149,6 +113,84 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-018] One Back tap could be consumed twice, landing you on Home
+**severity: medium · scope: navigation · FIXED 2026-08-07 · `416e7f42`**
+
+Reported as: viewing an `.md` in Manage Files kicks you to Home instead of back
+to the listing.
+
+`TextViewerActivity` exits on the Back **release**. `FileManagerActivity` also
+acts on the Back release, and at the SD root that arm calls `onGoHome()`. So one
+physical tap could be read by both: the viewer dismisses on it, and the screen
+underneath treats the same edge as a fresh Back. It is the invariant
+`test/activity_input/ActivityInputTest.cpp` already pins for the
+FontSelection/EpubReader pair, seen from the parent's side.
+
+`viewFile`'s handler looked like it covered this but could not: it arms
+`lockLongPressBack` from `isPressed(Back)`, and a child that exits on the
+release has already let the button go, so the lock never armed.
+
+Fixed by gating the release on `backPressSeen`, mirroring the `confirmPressSeen`
+directly above it — a release with no matching press belongs to whatever ran
+before this screen.
+
+**A rejected first attempt is worth recording.** Arming `lockNextBackRelease`
+unconditionally in the handler also stops the double-consume, but swallows the
+next release whether or not it is genuine: measured, view → Back → Back left the
+listing on screen where the second tap should have reached Home. Gating on the
+press costs nothing.
+
+**NOT REPRODUCED on the desktop simulator** — tested at the root and one folder
+deep; both return correctly, because the SDL path clears the edge between
+frames. The leak depends on input timing, which differs on the iOS pad and the
+device. This is a fix to a mechanism that demonstrably exists in the code, not
+to an observed desktop failure, so whether it resolves the reported symptom is
+unconfirmed until it runs where it was seen.
+
+**Audit done alongside it.** All 28 activities that handle Back were mapped for
+press-vs-release. The pairing rule is: a child that finishes on the PRESS,
+launched from a parent that acts on the RELEASE, leaves the release for the
+parent. `FileManagerActivity` → rename/normalize → `DaisyEntry`/`KeyboardEntry`
+is that shape, but it IS guarded — those children exit on the press, so Back is
+still held when the handler runs and `lockLongPressBack` arms correctly. The
+view path was the one where the guard could not fire.
+
+### [B-017] Viewing a file could write emptiness back over it
+**severity: high · scope: data loss · FIXED 2026-08-07 · `e9fd4cce`**
+
+Reported as "some notes and bmp are being rewritten and emptied out sometimes
+when viewed". Two unrelated causes, which is why it looked intermittent.
+
+**BMP.** `BmpViewerActivity::doSetSleepCover()` opens the viewed file for read,
+then opens `/sleep.bmp` for write — and `openFileForWrite` is `O_TRUNC`. When
+the file being viewed **is** `/sleep.bmp`, the second open truncates the very
+file the first is reading. The next `read()` returns 0, the copy loop never
+runs, and `success` had already been set `true` *above* the loop — so it
+reported Done over a zero-byte sleep screen.
+
+Demonstrated at the syscall level with the same open sequence: 53,918 bytes → 0,
+first read after the truncate returns 0. `fs_/sleep.bmp` on the sim card was
+already sitting at 0 bytes when this was investigated.
+
+**NOTES.** `NoteEditorActivity::onEnter()` sets `loadRefused` only when the file
+exceeds the buffer. If `openFileForRead` **fails**, the load block is skipped
+entirely, the buffer stays empty, `loadRefused` stays false, and `onExit()`'s
+`save()` writes that emptiness back. B-013 fixed refused-to-load and left
+failed-to-open exposed.
+
+A file that does not exist is a different case — that is Create Note minting a
+new note, which must still save — so the guard is "exists but will not open",
+not "failed to open".
+
+**Plausible trigger for the notes half:** enough leaked directory handles reach
+`EMFILE` and opens start failing. That is S-006 in the simulator, fixed the same
+day; the device HAL is separate code and has not been audited for the same leak.
+Worth checking `lib/hal/HalStorage.cpp` before assuming this is fully closed.
+
+**Verified:** 215/215 host tests, device `gh_release` and desktop canary build.
+The BMP mechanism is proven; the notes half is a reasoned fix to a path that is
+hard to trigger on demand, so it is **not** reproduced end to end.
 
 ### [B-005] The two SD cards hold different bytes under the same bin filename
 **severity: low · scope: device provisioning · FIXED 2026-08-07**
