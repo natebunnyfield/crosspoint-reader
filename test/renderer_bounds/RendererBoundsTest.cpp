@@ -422,3 +422,42 @@ TEST_F(RendererBounds, ZeroAndNegativeHeightPanesProduceNoDraw) {
 }
 
 }  // namespace
+
+// ── B-025: a trailing space is under-counted ────────────────────────────────
+//
+// NoteEditorActivity measures the caret from the source text before the cursor.
+// The instant the typist presses space that text ends in one -- and the raw
+// measurement gives a trailing space almost none of its advance, so the caret
+// crawled a pixel instead of a space-width and read as stuck.
+//
+// Measured with LibreFranklin 12: "ab" = 28, "ab " = 29, "ab  " = 34. An
+// interior space is 5px; a trailing one counts 1. advanceOf()'s sentinel
+// recovers the full advance, which is why the caret must go through it.
+
+namespace {
+int sentinelWidth(GfxRenderer& r, int fontId, const char* s) {
+  char probe[200];
+  snprintf(probe, sizeof(probe), "%s|", s);
+  return r.getTextWidth(fontId, probe) - r.getTextWidth(fontId, "|");
+}
+}  // namespace
+
+TEST_F(RendererBounds, RawMeasurementUnderCountsATrailingSpace) {
+  const int fontId = LIBREFRANKLIN_READER_12_FONT_ID;
+  ASSERT_GT(r->getTextWidth(fontId, "ab"), 0) << "font not loaded; this would pass on zeros";
+  const int rawDelta = r->getTextWidth(fontId, "ab ") - r->getTextWidth(fontId, "ab");
+  const int trueDelta = sentinelWidth(*r, fontId, "ab ") - sentinelWidth(*r, fontId, "ab");
+  EXPECT_GT(trueDelta, 0) << "a space must have some advance";
+  EXPECT_LT(rawDelta, trueDelta) << "if these now agree, getTextWidth counts trailing spaces "
+                                    "fully and NoteEditorActivity::advanceOf can be retired";
+}
+
+TEST_F(RendererBounds, SentinelMeasurementRecoversTheFullSpaceAdvance) {
+  const int fontId = LIBREFRANKLIN_READER_12_FONT_ID;
+  ASSERT_GT(sentinelWidth(*r, fontId, "ab"), 0) << "font not loaded; this would pass on zeros";
+  // An interior space and a trailing space must advance by the same amount --
+  // that equality is what makes the caret land where the glyph will go.
+  const int interior = r->getTextWidth(fontId, "a b") - r->getTextWidth(fontId, "ab");
+  const int trailing = sentinelWidth(*r, fontId, "ab ") - sentinelWidth(*r, fontId, "ab");
+  EXPECT_EQ(trailing, interior) << "the caret must advance by a full space when one is typed";
+}

@@ -445,7 +445,11 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
         }
         bookMetadataCache.reset();
         parseCssFiles();
-        bookMetadataCache.reset(new BookMetadataCache(cachePath));
+        bookMetadataCache.reset(new (std::nothrow) BookMetadataCache(cachePath));
+        if (!bookMetadataCache) {
+          LOG_ERR("EBP", "Out of memory allocating metadata cache");
+          return false;
+        }
         if (!bookMetadataCache->load()) {
           LOG_ERR("EBP", "Failed to reload cache after CSS rebuild");
           return false;
@@ -557,7 +561,11 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
   }
 
   // Reload the cache from disk so it's in the correct state
-  bookMetadataCache.reset(new BookMetadataCache(cachePath));
+  bookMetadataCache.reset(new (std::nothrow) BookMetadataCache(cachePath));
+  if (!bookMetadataCache) {
+    LOG_ERR("EBP", "Out of memory allocating metadata cache");
+    return false;
+  }
   if (!bookMetadataCache->load()) {
     LOG_ERR("EBP", "Failed to reload cache after writing");
     return false;

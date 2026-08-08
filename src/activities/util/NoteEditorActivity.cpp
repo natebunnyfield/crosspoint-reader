@@ -516,7 +516,14 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
     size_t n = cursorCol < sizeof(upto) - 1 ? cursorCol : sizeof(upto) - 1;
     memcpy(upto, text, n);
     upto[n] = '\0';
-    const int cx = metrics.contentSidePadding + renderer.getTextWidth(editorFontId, upto);
+    // Must go through advanceOf(), not getTextWidth() directly. A TRAILING
+    // space gets almost none of its advance from the raw call -- measured with
+    // LibreFranklin 12, "ab" is 28, "ab " is 29, "ab  " is 34, so an interior
+    // space is 5px and a trailing one counts 1. `upto` ends in a space the
+    // instant the typist presses one, so the caret crawled a pixel instead of a
+    // space-width and read as stuck. advanceOf's sentinel recovers the full
+    // advance.
+    const int cx = metrics.contentSidePadding + advanceOf(upto, EpdFontFamily::REGULAR);
     renderer.drawLine(cx, y, cx, y + lineHeight - 2, true);
   }
 }

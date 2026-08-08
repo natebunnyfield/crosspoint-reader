@@ -1,4 +1,5 @@
 #include "ClockOffsetActivity.h"
+#include <HalClock.h>
 
 #include <GfxRenderer.h>
 #include <I18n.h>
@@ -168,7 +169,16 @@ void ClockOffsetActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_CLOCK_UTC_OFFSET));
 
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
+  // Live preview of the wall-clock time the highlighted row would produce, so
+  // the offset can be checked against a watch instead of worked out. Upstream
+  // has this on its own offset screen; this fork's rewrite as a timezone list
+  // dropped it, which also left SETTINGS.clockFormat with no reader at all --
+  // a 24H/12H row that changed nothing (B-019). Reserve a line for it only when
+  // there is a clock to read.
+  const bool showPreview = halClock.isAvailable();
+  const int previewHeight = showPreview ? metrics.listRowHeight + metrics.verticalSpacing : 0;
+  const int contentHeight =
+      pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing - previewHeight;
   const uint8_t stored = SETTINGS.clockUtcOffsetQ;
   GUI.drawList(
       renderer, Rect{0, contentTop, pageWidth, contentHeight}, itemCount, selectedIndex,
@@ -187,6 +197,16 @@ void ClockOffsetActivity::render(RenderLock&&) {
         return formatUtcOffset(TIMEZONES[index].offsetQ);
       },
       true);
+
+  if (showPreview) {
+    const uint8_t previewQ = selectedIndex < TZ_COUNT ? TIMEZONES[selectedIndex].offsetQ : customOffsetQ;
+    char timeBuf[16];
+    if (halClock.formatTime(timeBuf, sizeof(timeBuf), previewQ, SETTINGS.clockFormat == 1)) {
+      char preview[64];
+      snprintf(preview, sizeof(preview), "%s %s", tr(STR_CURRENT_TIME), timeBuf);
+      renderer.drawCenteredText(UI_10_FONT_ID, contentTop + contentHeight + metrics.verticalSpacing, preview);
+    }
+  }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

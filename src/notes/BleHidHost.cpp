@@ -684,15 +684,20 @@ bool begin() {
           (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), (unsigned)largestInternalBlock(),
           (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
 
-  // nimble_port_init() can HANG outright (not panic, not return an error) —
-  // observed repeatedly across the ~85-95 KB free range, including at 94,724
-  // after the same call succeeded at 94,972. A hang leaves the device dead with
-  // USB still enumerated and only a physical power cycle recovers it, which
-  // makes unattended iteration impossible. Arm the task watchdog across the
-  // call so a hang becomes an automatic reboot instead: main.cpp replays the
-  // persisted panic as SPIKE-PANIC on the next boot, so the event is still
-  // visible. This is a spike workaround, NOT a fix — the nondeterminism itself
-  // is unexplained and is the biggest open risk in this work.
+  // nimble_port_init() could HANG outright (not panic, not return an error),
+  // leaving the device dead with USB still enumerated and only a physical power
+  // cycle recovering it.
+  //
+  // THE CAUSE IS KNOWN AND FIXED twenty lines below: the CPU had dropped to
+  // LOW_POWER_FREQ and the BT controller cannot start its radio at that clock.
+  // `HalPowerManager::Lock powerLock` holds full clock across the call. The
+  // heap-range correlation this comment used to describe was a coincidence of
+  // when the screen settled, and is not the mechanism.
+  //
+  // The watchdog below stays as belt-and-braces, not as the fix: if the radio
+  // ever fails to come up for some other reason, a hang becomes an automatic
+  // reboot rather than a dead device, and main.cpp replays the persisted panic
+  // as SPIKE-PANIC on the next boot so the event is still visible.
   const esp_task_wdt_config_t wdtCfg = {
       .timeout_ms = 15000,
       .idle_core_mask = 0,

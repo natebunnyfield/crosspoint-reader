@@ -55,85 +55,6 @@ enter Settings and press Back (which saves), then read the file.
 
 ## OPEN
 
-### [B-025] The editor caret does not move when you type a space
-**severity: medium · scope: text entry · reported 2026-08-07**
-
-Reported as: cursor does not move on space in the text editor.
-
-Cause found, and it is written down in the same file. `advanceOf()`
-(`src/activities/util/NoteEditorActivity.cpp:29`) exists precisely because
-*"getTextWidth() does not count a TRAILING space"* — its comment at `:25-28`
-explains that measuring spans without a sentinel rendered "Plain **bold** and"
-as "Plainbold and". Every span of drawn text goes through it (`:509`).
-
-The caret does not. `:519` measures with a bare
-`renderer.getTextWidth(editorFontId, upto)`, where `upto` is the raw source text
-before the cursor. When the typist has just pressed space, `upto` ends in one —
-exactly the case `getTextWidth` drops — so the measured width is unchanged and
-the caret stays put. It catches up as soon as the next visible character is
-typed, which is why this reads as "space does nothing" rather than as a
-persistent offset.
-
-Only the caret is affected; the text itself is laid out correctly.
-
-**Close by:** measure the caret through `advanceOf()` like everything else in
-this function, rather than calling `getTextWidth` directly. One line. Worth a
-test that pins caret x after a trailing space, since the identical mistake was
-already made once and fixed once in this file.
-
-### [B-021] A null check that cannot fire, in the tightest-memory path
-**severity: medium · scope: graceful degradation · found 2026-08-06 · verified 2026-08-07**
-
-`lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp:759-762` does
-`self->currentPage.reset(new Page())` and then tests `if (!self->currentPage)`,
-logging "Failed to create new page". The build sets `-fno-exceptions`
-(`platformio.ini:65`), so a failed `new` aborts the process — the pointer is
-never null and the branch is dead. The log line has never been emitted and
-cannot be.
-
-This is the clearest instance because the comment shows the misunderstanding
-outright, but bare `new` is used broadly in the layout path, which is exactly
-where a 380 KB device runs out.
-
-**Close by:** either route these through a nothrow allocator and handle null, or
-delete the dead guards and state plainly that OOM aborts by design. The current
-code claims a degradation path it does not have, which is worse than either.
-
-### [B-020] `BleHidHost` says the hang is unexplained twenty lines above naming its cause
-**severity: low · scope: stale comment · found 2026-08-06 · verified 2026-08-07**
-
-`src/notes/BleHidHost.cpp:687-695` describes the `nimble_port_init()` hang as
-nondeterministic, correlates it with free heap, and closes *"This is a spike
-workaround, NOT a fix — the nondeterminism itself is unexplained and is the
-biggest open risk in this work."*
-
-`:708-716` in the same function then says *"THE cause of the 'nondeterministic'
-hang"* — `HalPowerManager` drops the CPU to 10 MHz after 3 s idle and the BT
-controller cannot start its radio at that clock — explicitly retracts the heap
-theory, and `:717` takes `HalPowerManager::Lock powerLock` to hold full clock
-across init. That is the fix, and it is in place.
-
-Only the first comment is wrong. An audit read it as a live unfixed hang, which
-is what a stale comment costs.
-
-**Close by:** rewrite `:687-695` to describe the watchdog as belt-and-braces
-behind the clock lock, and drop the "unexplained" claim.
-
-### [B-019] `clockFormat` is a visible setting that nothing reads
-**severity: medium · scope: lying control · found 2026-08-06 · filed 2026-08-07**
-
-`src/SettingsList.h:463-464` registers a 24H/12H enum bound to
-`CrossPointSettings::clockFormat`, under `StrId::STR_CAT_SYSTEM` — the only
-category the device UI renders. `src/CrossPointSettings.h:194` declares the
-field. Those three lines are the *complete* set of references in `src/` and
-`lib/`: nothing consumes it. The owner can toggle a live row that changes
-nothing, which is the same defect class as B-001, rated high.
-
-**Close by:** implementing it in the clock rendering paths, or hiding the row.
-Do **not** silently delete the field — it round-trips through `toJson`/`fromJson`
-and the web settings API, so dropping it would strip the key from `settings.json`
-on every card already in the field.
-
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
@@ -212,6 +133,134 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-019] `clockFormat` is a visible setting that nothing reads
+**severity: medium · scope: lying control · found 2026-08-06 · filed 2026-08-07** · FIXED 2026-08-07
+
+
+`src/SettingsList.h:463-464` registers a 24H/12H enum bound to
+`CrossPointSettings::clockFormat`, under `StrId::STR_CAT_SYSTEM` — the only
+category the device UI renders. `src/CrossPointSettings.h:194` declares the
+field. Those three lines are the *complete* set of references in `src/` and
+`lib/`: nothing consumes it. The owner can toggle a live row that changes
+nothing, which is the same defect class as B-001, rated high.
+
+**Close by:** implementing it in the clock rendering paths, or hiding the row.
+Do **not** silently delete the field — it round-trips through `toJson`/`fromJson`
+and the web settings API, so dropping it would strip the key from `settings.json`
+on every card already in the field.
+
+
+**Fixed — by giving it a reader, not by hiding the row.** Checking upstream
+first is what decided it: upstream reads `clockFormat` in `ClockOffsetActivity`,
+`ClockSyncActivity` and a whole `StatusBarSettingsActivity`, via
+`halClock.formatTime(..., clock12h)`. This fork still HAS that function, with the
+`use12Hour` parameter, and had zero callers.
+
+The cause was a capability this fork dropped, not a setting it never wired.
+Upstream's offset screen carries a live wall-clock preview — its comment says
+*"so users can verify against a watch"* — and this fork's rewrite of that screen
+as a timezone list left the preview behind. That is what stranded `clockFormat`.
+
+Restored on `ClockOffsetActivity`, tracking the HIGHLIGHTED row rather than the
+saved setting, which is what makes it a preview: you can see what a timezone
+would give you before selecting it. Verified on the panel — UTC-5 shows
+"Current time: 8:40 PM", moving two rows to UTC+0 shows "1:41 AM", and both
+render 12-hour with the setting on 12-hour. The line is reserved only when
+`halClock.isAvailable()`, so devices without an RTC lose no list space.
+
+The field was never touched, per the close condition: it round-trips through
+`toJson`/`fromJson` and the web settings API, so deleting it would have stripped
+the key from `settings.json` on cards already in the field.
+
+### [B-020] `BleHidHost` says the hang is unexplained twenty lines above naming its cause
+**severity: low · scope: stale comment · found 2026-08-06 · verified 2026-08-07** · FIXED 2026-08-07
+
+
+`src/notes/BleHidHost.cpp:687-695` describes the `nimble_port_init()` hang as
+nondeterministic, correlates it with free heap, and closes *"This is a spike
+workaround, NOT a fix — the nondeterminism itself is unexplained and is the
+biggest open risk in this work."*
+
+`:708-716` in the same function then says *"THE cause of the 'nondeterministic'
+hang"* — `HalPowerManager` drops the CPU to 10 MHz after 3 s idle and the BT
+controller cannot start its radio at that clock — explicitly retracts the heap
+theory, and `:717` takes `HalPowerManager::Lock powerLock` to hold full clock
+across init. That is the fix, and it is in place.
+
+Only the first comment is wrong. An audit read it as a live unfixed hang, which
+is what a stale comment costs.
+
+**Close by:** rewrite `:687-695` to describe the watchdog as belt-and-braces
+behind the clock lock, and drop the "unexplained" claim.
+
+
+**Fixed.** The comment at `:687-695` now says the cause is known and points at
+the `HalPowerManager::Lock` twenty lines below that fixes it, and describes the
+watchdog as belt-and-braces rather than as the workaround. The heap-range
+correlation it used to assert is gone — the file's own later comment had already
+retracted it.
+
+### [B-021] A null check that cannot fire, in the tightest-memory path
+**severity: medium · scope: graceful degradation · found 2026-08-06 · verified 2026-08-07** · FIXED 2026-08-07
+
+
+`lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp:759-762` does
+`self->currentPage.reset(new Page())` and then tests `if (!self->currentPage)`,
+logging "Failed to create new page". The build sets `-fno-exceptions`
+(`platformio.ini:65`), so a failed `new` aborts the process — the pointer is
+never null and the branch is dead. The log line has never been emitted and
+cannot be.
+
+This is the clearest instance because the comment shows the misunderstanding
+outright, but bare `new` is used broadly in the layout path, which is exactly
+where a 380 KB device runs out.
+
+**Close by:** either route these through a nothrow allocator and handle null, or
+delete the dead guards and state plainly that OOM aborts by design. The current
+code claims a degradation path it does not have, which is worse than either.
+
+
+**Fixed.** Six sites, two shapes. `ChapterHtmlSlimParser.cpp:759` and `:766`
+were true dead guards — `new Page()` with an `if (!currentPage)` that cannot
+fire — and three other `Page()` allocations in the same file already used
+`new (std::nothrow)`, so this was an inconsistency inside one file rather than a
+missing idea. `Epub.cpp:448`/`:560` and the two image converters had no null
+check at all: they dereferenced the result immediately, so a failed `new` aborted
+before anything could look. All six now use `new (std::nothrow)` via the
+`makeUniqueNoThrow` idiom already in `lib/Memory/Memory.h`, with a real check and
+the failure path that already existed (`return false` / `return nullptr`).
+
+Deliberately not a sweep of every bare `new` in the tree. These are the ones
+where a caller already had somewhere sensible to fail to.
+
+### [B-025] The editor caret barely moves when you type a space
+**severity: medium · scope: text entry · reported 2026-08-07 · FIXED 2026-08-07**
+
+Reported as: cursor does not move on space in the text editor.
+
+Measured, because the first diagnosis was wrong. `getTextWidth` does not *drop*
+a trailing space, as the comment at
+`src/activities/util/NoteEditorActivity.cpp:25-28` and the first version of this
+entry both said — it under-counts it. With LibreFranklin 12: `"ab"` is 28,
+`"ab "` is 29, `"ab  "` is 34. An interior space advances 5px; a trailing one
+contributes 1.
+
+So the caret did move on space — by a single pixel, then jumped the remaining
+4 when the next visible character arrived. That is indistinguishable from "space
+does nothing" at reading distance, and the report was exactly right.
+
+`advanceOf()` (`:29`) exists to work around this and every drawn span goes
+through it (`:509`). The caret at `:519` was the one measurement that called
+`getTextWidth` directly.
+
+**Fixed** by measuring the caret through `advanceOf()` like everything else.
+Two tests in `test/renderer_bounds/` pin it: that the raw call under-counts a
+trailing space, and that the sentinel recovers exactly the interior-space
+advance. The second is the one that matters — it asserts the caret lands where
+the next glyph will actually be drawn — and it is written so that if a future
+font change makes `getTextWidth` count trailing spaces properly, the first test
+fails and the workaround gets retired deliberately rather than by accident.
 
 ### [B-024] Unbounded allocations from untrusted cache and zip data
 **severity: high · scope: memory safety · found 2026-08-06 · verified 2026-08-07** · FIXED 2026-08-07
