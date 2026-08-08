@@ -5,6 +5,7 @@
 #include <FontCacheManager.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -186,6 +187,10 @@ void EpubReaderActivity::onEnter() {
 
 void EpubReaderActivity::onExit() {
   Activity::onExit();
+
+  // "No page": tells a read-aloud consumer to stop speech. Inline no-op on
+  // device.
+  gpio.publishReadAloudPage(nullptr, 0, nullptr, 0);
 
   // The extractor holds a raw pointer to this activity's epub; drop it before
   // the activity (and the shared_ptr) goes away.
@@ -1423,11 +1428,124 @@ bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
   }
   return EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, paragraphIndex, wordAnchor);
 }
+
+namespace {
+// Read-aloud capture: walk the display list of the page being shown and
+// publish its logical text plus per-word rects over the HAL channel. Called
+// only from renderContents — the one site that renders the DISPLAYED page —
+// never from Page::render itself, which the idle prewarm also runs against
+// the NEXT page ("scan only, no pixels") and which would capture the wrong
+// text. On device readAloudCaptureWanted() is inline false and this whole
+// function folds away. Contract: the simulator's src/ReadAloudChannel.h.
+
+bool tokenIsBlank(const char* t) {
+  for (; *t; ++t)
+    if (*t != ' ') return false;
+  return true;
+}
+
+// The stored words may carry soft hyphens (U+00AD); the renderer never draws
+// them, and spoken text must not contain them.
+void appendStrippingSoftHyphens(std::string& out, const char* t) {
+  for (const char* p = t; *p;) {
+    if (static_cast<unsigned char>(p[0]) == 0xC2 && static_cast<unsigned char>(p[1]) == 0xAD) {
+      p += 2;
+      continue;
+    }
+    out.push_back(*p++);
+  }
+}
+
+void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const int fontId, const int xOffset,
+                          const int yOffset) {
+  if (!gpio.readAloudCaptureWanted()) return;
+  std::string text;
+  std::vector<ReadAloudWordRect> rects;
+  const int ascender = renderer.getFontAscenderSize(fontId);
+  const int lineH = renderer.getLineHeight(fontId);
+  const int spaceW = renderer.getSpaceWidth(fontId);
+  const auto clampU16 = [](const int v) {
+    return static_cast<uint16_t>(v < 0 ? 0 : (v > 0xFFFF ? 0xFFFF : v));
+  };
+  // A word the layout hyphen-split across lines arrives as two tokens whose
+  // prefix ends in '-' at the end of its line (ParsedText appends the visible
+  // hyphen to the stored prefix). The TextBlock arena carries no source
+  // anchors, so reuniting them is a display-list heuristic: a line-final '-'
+  // joins to the next line's first word, dropping the hyphen; the joined
+  // word's fragments publish one rect each, sharing its byte range. Known
+  // false positive: a paragraph-final real hyphen. Rare, and the capture
+  // audit (gate G0) watches for it.
+  bool pendingHyphenJoin = false;
+  for (const auto& el : page.elements) {
+    if (el->getTag() != TAG_PageLine) {
+      pendingHyphenJoin = false;
+      continue;
+    }
+    const auto& line = static_cast<const PageLine&>(*el);
+    const auto& block = line.getBlock();
+    if (!block || !block->valid() || block->isEmpty()) continue;
+    const int lineX = line.xPos + xOffset;
+    // yPos is the baseline handed to drawText; the rect wants the line's top.
+    const int lineTop = line.yPos + yOffset - ascender;
+    const uint16_t n = block->wordCount();
+    bool firstRunOnLine = true;
+    uint16_t i = 0;
+    while (i < n) {
+      if (tokenIsBlank(block->wordText(i))) {
+        i++;
+        continue;
+      }
+      // A glue run: consecutive tokens the layout placed with no visible gap
+      // (punctuation slices, focus splits, CJK segments) captured as one
+      // word, judged by pixel gap because the layout's attach flags are not
+      // in the arena either.
+      const int runX = lineX + block->wordXpos(i);
+      int runEndX = runX;
+      std::string runText;
+      while (true) {
+        appendStrippingSoftHyphens(runText, block->wordText(i));
+        runEndX = lineX + block->wordXpos(i) +
+                  renderer.getTextAdvanceX(fontId, block->wordText(i), block->wordStyle(i));
+        i++;
+        if (i >= n || tokenIsBlank(block->wordText(i))) break;
+        if (lineX + block->wordXpos(i) - runEndX > spaceW / 2) break;
+      }
+      if (runText.empty()) continue;  // tokens that were nothing but soft hyphens
+      const uint16_t rx = clampU16(runX);
+      const uint16_t ry = clampU16(lineTop);
+      const uint16_t rw = clampU16(runEndX - runX);
+      const uint16_t rh = clampU16(lineH);
+      if (pendingHyphenJoin && firstRunOnLine && !rects.empty() && !text.empty() && text.back() == '-') {
+        text.pop_back();
+        const uint32_t off = rects.back().byteOffset;
+        text += runText;
+        const uint16_t newLen = static_cast<uint16_t>(std::min<size_t>(text.size() - off, 0xFFFF));
+        for (auto it = rects.rbegin(); it != rects.rend() && it->byteOffset == off; ++it) it->byteLen = newLen;
+        rects.push_back({rx, ry, rw, rh, off, newLen});
+      } else {
+        if (!text.empty()) text.push_back(' ');
+        const uint32_t off = static_cast<uint32_t>(text.size());
+        text += runText;
+        rects.push_back({rx, ry, rw, rh, off, static_cast<uint16_t>(std::min<size_t>(runText.size(), 0xFFFF))});
+      }
+      firstRunOnLine = false;
+    }
+    pendingHyphenJoin = !text.empty() && text.back() == '-';
+  }
+  gpio.publishReadAloudPage(text.c_str(), text.size(), rects.data(), rects.size());
+}
+}  // namespace
+
 void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int orientedMarginTop,
                                         const int orientedMarginRight, const int orientedMarginBottom,
                                         const int orientedMarginLeft) {
   const auto t0 = millis();
   const int fontId = SETTINGS.getReaderFontId();
+
+  // Read-aloud capture, before any pixel work: the page's element list is
+  // already final here, and this function is the commitment that this page is
+  // the one being displayed.
+  captureReadAloudPage(*page, renderer, fontId, orientedMarginLeft, orientedMarginTop);
 
   // The image pixel-cache RAM slot lives for exactly one page render (it feeds
   // the BW double-refresh and every grayscale band pass); release it on every

@@ -40,6 +40,20 @@
 #define QMI8658_WHO_AM_I_REG 0x00    // WHO_AM_I command code
 #define QMI8658_WHO_AM_I_VALUE 0x05  // WHO_AM_I expected value
 
+// One word's rect in the read-aloud capture (see the channel note inside the
+// class). Namespace scope, not a member, because the simulator defines the
+// identical POD at namespace scope in its src/ReadAloudChannel.h and the
+// capture code in the reader references it unqualified — the two definitions
+// must stay field-identical. Coordinates are logical portrait panel pixels;
+// byteOffset/byteLen index the published UTF-8 page text; a word the layout
+// wrapped across lines publishes one rect per visual fragment, all sharing
+// the word's range.
+struct ReadAloudWordRect {
+  uint16_t x, y, w, h;
+  uint32_t byteOffset;
+  uint16_t byteLen;
+};
+
 class HalGPIO {
 #if CROSSPOINT_EMULATED == 0
   InputManager inputMgr;
@@ -110,6 +124,21 @@ class HalGPIO {
   static constexpr char TYPED_BACKSPACE = '\b';
   static constexpr char TYPED_COMMIT = '\n';
   static constexpr char TYPED_CANCEL = '\x1b';
+
+  // --- Read-aloud page channel --------------------------------------------
+  //
+  // No-ops here for the mirror-image reason the keyboard channel above is:
+  // this board has no speaker, and every host running the simulator has one.
+  // The EPUB reader asks readAloudCaptureWanted() when it renders a page for
+  // display and, when true, publishes that page's text and per-word rects
+  // (ReadAloudWordRect above) through publishReadAloudPage() — and publishes
+  // nullptr on exit ("no page", consumers stop speech). Here wanted is
+  // constant false, so the capture branch folds away to nothing. The
+  // simulator implements both for real and speaks the pages; the full
+  // contract lives in its src/ReadAloudChannel.h.
+  bool readAloudCaptureWanted() const { return false; }
+  void publishReadAloudPage(const char* /*utf8*/, size_t /*utf8Len*/, const ReadAloudWordRect* /*rects*/,
+                            size_t /*rectCount*/) {}
 
   // Verify power button was held long enough after wakeup.
   // Returns true if verification succeeded, false if device should return to sleep.
