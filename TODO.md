@@ -14,6 +14,42 @@ started.
 
 ## OPEN
 
+### [T-009] A 0 ms redraw delay for iOS, and a look at the update path
+**scope: iOS display · asked 2026-08-08**
+
+Add 0 to the Typing Redraw Delay options and check what the display update path
+actually does on a phone.
+
+The setting exists because e-ink is slow: `DISPLAY_DEBOUNCE_MS` is
+`{25, 50, 100, 250, 500, 1000}` and the comment above it
+(`CrossPointSettings.h:216-228`) explains the reasoning — a panel refresh is
+~570 ms, so a shorter debounce "trades battery and flicker for immediacy rather
+than actually feeling faster", and 250 ms was ruled the value that collapses a
+typing burst into one refresh.
+
+**None of that is true on a phone.** There is no waveform, no ghosting and no
+battery cost to a redraw; the panel is an SDL texture upload. So the floor the
+device needs is a floor iOS is paying for nothing, and typing feels laggier than
+the hardware requires.
+
+Two things to work out, and the second is the real question:
+
+1. **The option itself.** The list is append-only — the index IS the persisted
+   value (`SettingsList.h:280`, and "Enum order is frozen" in CLAUDE.md) — so
+   0 ms has to be APPENDED, not inserted at the front where it belongs
+   numerically. A device that reads a 0 written by a phone must also behave:
+   the whole point of the debounce is a device constraint, so a device seeing
+   0 probably wants to clamp rather than obey.
+2. **Whether the debounce is the thing making it feel slow at all.** Worth
+   measuring before adding a setting: how often the iOS path actually presents,
+   whether a keystroke coalesces into the next frame, and whether the render
+   task or `requestUpdate` is the real limit. If the answer is that a redraw
+   already costs ~1 frame, a 0 ms option changes nothing and the fix is
+   somewhere else.
+
+**Close by:** measuring the present rate on the phone first, then adding the
+option if the debounce is genuinely the limit.
+
 ### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
 **scope: verification · opened 2026-08-07**
 
