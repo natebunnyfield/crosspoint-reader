@@ -12,7 +12,6 @@
 #include <string>
 #include <utility>
 
-#include "EndOfBookOptions.h"
 #include "activities/Activity.h"
 
 class XtcReaderActivity final : public Activity {
@@ -20,9 +19,6 @@ class XtcReaderActivity final : public Activity {
 
   uint32_t currentPage = 0;
   int pagesUntilFullRefresh = 0;
-  // Next-book suggestion menu for the End-of-Book screen
-  EndOfBookOptions endOfBookOptions;
-
 
   void renderPage();
   // Opens chapter selection when the book has chapters (short-press Confirm); no-op otherwise
