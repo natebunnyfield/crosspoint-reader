@@ -29,6 +29,16 @@ constexpr int CHAT_FONT_ID_FALLBACK = UI_10_FONT_ID;
 void ClaudeChatActivity::onEnter() {
   Activity::onEnter();
 
+// The host keyboard channel. Announcing text entry is what raises an iPhone's
+// on-screen keyboard (the harness calls SDL_StartTextInput on this flag), and
+// it is also what suppresses the scancode->button map -- without it every "p"
+// typed here would press POWER and every "s" would sleep the device.
+//
+// KeyboardEntryActivity and DaisyEntryActivity have always done this; the two
+// editors never did, so on the phone Create Note and Claude had no keyboard at
+// all and a paired one fought the button map.
+  mappedInput.setTextEntryActive(true);
+
   // The on-screen keyboard is the default. BLE only comes up when a keyboard is
   // already bonded — it costs ~72 KB of heap and a CPU-clock lock, which an
   // owner with none paired should not pay. Hold Up to pair on demand.
@@ -82,6 +92,7 @@ void ClaudeChatActivity::onEnter() {
 }
 
 void ClaudeChatActivity::onExit() {
+  mappedInput.setTextEntryActive(false);
   blekbd::end();
   buf.reset();
   storage.reset();
@@ -420,6 +431,38 @@ void ClaudeChatActivity::loop() {
   }
 
   bool got = false;
+
+  // Host-typed text (an iPhone's on-screen keyboard, or one paired to it),
+  // drained the same way as BLE and folded into the same debounce. Return is a
+  // newline here, as it is on the panel; Escape never reaches this stream
+  // because HalGPIO leaves it mapped to BTN_BACK.
+  std::string typedHost;
+  if (mappedInput.consumeTypedText(typedHost)) {
+    for (const char c : typedHost) {
+      if (view == View::Answer) {  // typing returns to the prompt
+        RenderLock lock;
+        view = View::Prompt;
+        answer.clear();
+        answerLines.clear();
+      }
+      switch (c) {
+        case HalGPIO::TYPED_COMMIT:
+          handleKey('\n');
+          break;
+        case HalGPIO::TYPED_BACKSPACE:
+          handleKey('\b');
+          break;
+        case HalGPIO::TYPED_CANCEL:
+          break;
+        default:
+          handleKey(static_cast<unsigned char>(c));
+          break;
+      }
+      got = true;
+      ++pendingChars;
+    }
+  }
+
   for (int c = blekbd::popChar(); c >= 0; c = blekbd::popChar()) {
     if (view == View::Answer) {  // typing returns to the prompt
       RenderLock lock;  // render() walks these on its own task; see loop() above

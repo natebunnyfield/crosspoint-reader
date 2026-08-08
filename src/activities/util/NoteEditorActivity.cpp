@@ -36,6 +36,16 @@ int NoteEditorActivity::advanceOf(const char* piece, EpdFontFamily::Style style)
 void NoteEditorActivity::onEnter() {
   Activity::onEnter();
 
+// The host keyboard channel. Announcing text entry is what raises an iPhone's
+// on-screen keyboard (the harness calls SDL_StartTextInput on this flag), and
+// it is also what suppresses the scancode->button map -- without it every "p"
+// typed here would press POWER and every "s" would sleep the device.
+//
+// KeyboardEntryActivity and DaisyEntryActivity have always done this; the two
+// editors never did, so on the phone Create Note and Claude had no keyboard at
+// all and a paired one fought the button map.
+  mappedInput.setTextEntryActive(true);
+
   panel.begin();
 
   // Geometry FIRST, allocation second. render() runs on its own task and will
@@ -132,6 +142,7 @@ void NoteEditorActivity::onEnter() {
 }
 
 void NoteEditorActivity::onExit() {
+  mappedInput.setTextEntryActive(false);
   save();
   blekbd::end();
   buf.reset();
@@ -381,6 +392,40 @@ void NoteEditorActivity::loop() {
   }
 
   if (oomFailed || !buf) return;  // Back above is the only thing that works
+
+  // Host-typed text, before the on-screen panel: a host with no keyboard never
+  // yields a chunk, and both edit the same buffer and cursor.
+  //
+  // NOT TypedTextInput::apply(), which the single-line fields use: it reports
+  // Return as Committed and STOPS the walk. This is a multi-line editor, where
+  // Return is a newline and a pasted paragraph is full of them. Escape never
+  // reaches this stream at all -- HalGPIO leaves it mapped to BTN_BACK, which
+  // the Back handler above already treats as "leave".
+  std::string typed;
+  if (mappedInput.consumeTypedText(typed)) {
+    for (const char c : typed) {
+      switch (c) {
+        case HalGPIO::TYPED_COMMIT:
+          handleKey('\n');
+          break;
+        case HalGPIO::TYPED_BACKSPACE:
+          handleKey('\b');
+          break;
+        case HalGPIO::TYPED_CANCEL:
+          break;  // arrives as BTN_BACK; nothing to do here
+        default:
+          handleKey(static_cast<unsigned char>(c));
+          break;
+      }
+    }
+    if (!typed.empty()) {
+      // Same debounce as the BLE drain, so Typing Redraw Delay applies to a
+      // phone keyboard exactly as it does to a Bluetooth one.
+      lastKeyMs = millis();
+      dirty = true;
+      pendingChars += static_cast<int>(typed.size());
+    }
+  }
 
   pollPairingGestures();
 
