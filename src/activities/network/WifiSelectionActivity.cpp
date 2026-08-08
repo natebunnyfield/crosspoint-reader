@@ -51,8 +51,6 @@ void WifiSelectionActivity::onEnter() {
   connectionError.clear();
   enteredPassword.clear();
   usedSavedPassword = false;
-  savePromptSelection = 0;
-  forgetPromptSelection = 0;
   autoConnecting = false;
   manualNetworkListRequested = false;
   autoAttemptedSsids.clear();
@@ -242,6 +240,42 @@ void WifiSelectionActivity::selectNetwork(const int index) {
     // Connect directly for open networks
     attemptConnection();
   }
+}
+
+void WifiSelectionActivity::showSavePrompt() {
+  state = WifiSelectionState::SAVE_PROMPT;
+  const char* options[] = {tr(STR_YES), tr(STR_NO)};
+  optionPopup.show(tr(STR_SAVE_PASSWORD), options, 2, 0 /* default to "Yes" */, [this](const int idx) {
+    if (idx == 0) {
+      // User chose "Yes" - save the password
+      RenderLock lock(*this);
+      WIFI_STORE.addCredential(selectedSSID, enteredPassword);
+    }
+    // Complete either way - parent will start web server
+    onComplete(true);
+  });
+  requestUpdate();
+}
+
+void WifiSelectionActivity::showForgetPrompt() {
+  state = WifiSelectionState::FORGET_PROMPT;
+  const char* options[] = {tr(STR_CANCEL), tr(STR_FORGET_BUTTON)};
+  optionPopup.show(tr(STR_FORGET_AND_REMOVE), options, 2, 0 /* default to "Cancel" */, [this](const int idx) {
+    if (idx == 1) {
+      RenderLock lock(*this);
+      // User chose "Forget network" - forget the network
+      WIFI_STORE.removeCredential(selectedSSID);
+      // Update the network list to reflect the change
+      const auto network = find_if(networks.begin(), networks.end(),
+                                   [this](const WifiNetworkInfo& net) { return net.ssid == selectedSSID; });
+      if (network != networks.end()) {
+        network->hasSavedPassword = false;
+      }
+    }
+    // Go back to network list (whether Cancel or Forget network was selected)
+    startWifiScan();
+  });
+  requestUpdate();
 }
 
 void WifiSelectionActivity::promptPasswordEntry() {
@@ -443,9 +477,7 @@ void WifiSelectionActivity::checkConnectionStatus() {
     // If we entered a new password, ask if user wants to save it
     // Otherwise, immediately complete so parent can start web server
     if (!usedSavedPassword && !enteredPassword.empty()) {
-      state = WifiSelectionState::SAVE_PROMPT;
-      savePromptSelection = 0;  // Default to "Yes"
-      requestUpdate();
+      showSavePrompt();
     } else {
       // Using saved password or open network - complete immediately
       LOG_DBG("WIFI",
@@ -571,128 +603,20 @@ void WifiSelectionActivity::loop() {
     return;
   }
 
-  // Handle save prompt state
+  // Handle save prompt state - delegated to the in-place OptionPopup shown by showSavePrompt()
   if (state == WifiSelectionState::SAVE_PROMPT) {
-    {
-      const Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-      const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-      const int buttonY = screen.y + (screen.height - height * 3) / 2 + 80;
-      constexpr int buttonWidth = 60;
-      constexpr int buttonSpacing = 30;
-      const int startX = screen.x + (screen.width - (buttonWidth * 2 + buttonSpacing)) / 2;
-      int touchedOption = -1;
-      const auto touch = mappedInput.colTouch(touchedOption, startX - 8, buttonWidth + buttonSpacing, 2, buttonY - 8,
-                                              buttonY + height + 8, buttonWidth + 16);
-      if (touch == MappedInputManager::RowTouch::Down) {
-        if (savePromptSelection != touchedOption) {
-          savePromptSelection = touchedOption;
-          requestUpdate();
-        }
-        return;
-      }
-      if (touch == MappedInputManager::RowTouch::Tap) {
-        savePromptSelection = touchedOption;
-        if (savePromptSelection == 0) {
-          RenderLock lock(*this);
-          WIFI_STORE.addCredential(selectedSSID, enteredPassword);
-        }
-        onComplete(true);
-        return;
-      }
-    }
-
-    if (mappedInput.wasPressed(MappedInputManager::Button::Up) ||
-        mappedInput.wasPressed(MappedInputManager::Button::Left)) {
-      if (savePromptSelection > 0) {
-        savePromptSelection--;
-        requestUpdate();
-      }
-    } else if (mappedInput.wasPressed(MappedInputManager::Button::Down) ||
-               mappedInput.wasPressed(MappedInputManager::Button::Right)) {
-      if (savePromptSelection < 1) {
-        savePromptSelection++;
-        requestUpdate();
-      }
-    } else if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-      if (savePromptSelection == 0) {
-        // User chose "Yes" - save the password
-        RenderLock lock(*this);
-        WIFI_STORE.addCredential(selectedSSID, enteredPassword);
-      }
-      // Complete - parent will start web server
-      onComplete(true);
-    } else if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-      // Skip saving, complete anyway
-      onComplete(true);
-    }
+    if (optionPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+    // Popup dismissed without a selection (Back / tap outside): same as "No" - skip saving, complete anyway.
+    onComplete(true);
     return;
   }
 
-  // Handle forget prompt state (connection failed with saved credentials)
+  // Handle forget prompt state (connection failed with saved credentials) -
+  // delegated to the in-place OptionPopup shown by showForgetPrompt()
   if (state == WifiSelectionState::FORGET_PROMPT) {
-    {
-      const Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-      const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-      const int buttonY = screen.y + (screen.height - height * 3) / 2 + 80;
-      constexpr int buttonWidth = 120;
-      constexpr int buttonSpacing = 30;
-      const int startX = screen.x + (screen.width - (buttonWidth * 2 + buttonSpacing)) / 2;
-      int touchedOption = -1;
-      const auto touch = mappedInput.colTouch(touchedOption, startX - 8, buttonWidth + buttonSpacing, 2, buttonY - 8,
-                                              buttonY + height + 8, buttonWidth + 16);
-      if (touch == MappedInputManager::RowTouch::Down) {
-        if (forgetPromptSelection != touchedOption) {
-          forgetPromptSelection = touchedOption;
-          requestUpdate();
-        }
-        return;
-      }
-      if (touch == MappedInputManager::RowTouch::Tap) {
-        forgetPromptSelection = touchedOption;
-        if (forgetPromptSelection == 1) {
-          RenderLock lock(*this);
-          WIFI_STORE.removeCredential(selectedSSID);
-          const auto network = find_if(networks.begin(), networks.end(),
-                                       [this](const WifiNetworkInfo& net) { return net.ssid == selectedSSID; });
-          if (network != networks.end()) {
-            network->hasSavedPassword = false;
-          }
-        }
-        startWifiScan();
-        return;
-      }
-    }
-
-    if (mappedInput.wasPressed(MappedInputManager::Button::Up) ||
-        mappedInput.wasPressed(MappedInputManager::Button::Left)) {
-      if (forgetPromptSelection > 0) {
-        forgetPromptSelection--;
-        requestUpdate();
-      }
-    } else if (mappedInput.wasPressed(MappedInputManager::Button::Down) ||
-               mappedInput.wasPressed(MappedInputManager::Button::Right)) {
-      if (forgetPromptSelection < 1) {
-        forgetPromptSelection++;
-        requestUpdate();
-      }
-    } else if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-      if (forgetPromptSelection == 1) {
-        RenderLock lock(*this);
-        // User chose "Forget network" - forget the network
-        WIFI_STORE.removeCredential(selectedSSID);
-        // Update the network list to reflect the change
-        const auto network = find_if(networks.begin(), networks.end(),
-                                     [this](const WifiNetworkInfo& net) { return net.ssid == selectedSSID; });
-        if (network != networks.end()) {
-          network->hasSavedPassword = false;
-        }
-      }
-      // Go back to network list (whether Cancel or Forget network was selected)
-      startWifiScan();
-    } else if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-      // Skip forgetting, go back to network list
-      startWifiScan();
-    }
+    if (optionPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+    // Popup dismissed without a selection (Back / tap outside): same as "Cancel" - go back to network list.
+    startWifiScan();
     return;
   }
 
@@ -712,13 +636,12 @@ void WifiSelectionActivity::loop() {
       // the network
       if (autoConnecting || usedSavedPassword) {
         autoConnecting = false;
-        state = WifiSelectionState::FORGET_PROMPT;
-        forgetPromptSelection = 0;  // Default to "Cancel"
+        showForgetPrompt();
       } else {
         // Go back to network list on failure for non-saved credentials
         state = WifiSelectionState::NETWORK_LIST;
+        requestUpdate();
       }
-      requestUpdate();
       return;
     }
   }
@@ -751,9 +674,7 @@ void WifiSelectionActivity::loop() {
       const bool hasSavedPassword = !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword;
       if (hasSavedPassword) {
         selectedSSID = networks[selectedNetworkIndex].ssid;
-        state = WifiSelectionState::FORGET_PROMPT;
-        forgetPromptSelection = 0;  // Default to "Cancel"
-        requestUpdate();
+        showForgetPrompt();
         return;
       }
     }
@@ -862,14 +783,16 @@ void WifiSelectionActivity::render(RenderLock&&) {
       renderConnected(&screen, &metrics);
       break;
     case WifiSelectionState::SAVE_PROMPT:
+      // renderSavePrompt() flushes the buffer itself via OptionPopup::processRender()
       renderSavePrompt(&screen, &metrics);
-      break;
+      return;
     case WifiSelectionState::CONNECTION_FAILED:
       renderConnectionFailed(&screen, &metrics);
       break;
     case WifiSelectionState::FORGET_PROMPT:
+      // renderForgetPrompt() flushes the buffer itself via OptionPopup::processRender()
       renderForgetPrompt(&screen, &metrics);
-      break;
+      return;
   }
 
   renderer.displayBuffer();
@@ -980,34 +903,8 @@ void WifiSelectionActivity::renderSavePrompt(const Rect* screen, const ThemeMetr
   }
   UITheme::drawCenteredText(renderer, *screen, UI_10_FONT_ID, top, ssidInfo.c_str());
 
-  UITheme::drawCenteredText(renderer, *screen, UI_10_FONT_ID, top + 40, tr(STR_SAVE_PASSWORD));
-
-  // Draw Yes/No buttons
-  const int buttonY = top + 80;
-  constexpr int buttonWidth = 60;
-  constexpr int buttonSpacing = 30;
-  constexpr int totalWidth = buttonWidth * 2 + buttonSpacing;
-  const int startX = screen->x + (screen->width - totalWidth) / 2;
-
-  // Draw "Yes" button
-  if (savePromptSelection == 0) {
-    std::string text = "[" + std::string(tr(STR_YES)) + "]";
-    renderer.drawText(UI_10_FONT_ID, startX, buttonY, text.c_str());
-  } else {
-    renderer.drawText(UI_10_FONT_ID, startX + 4, buttonY, tr(STR_YES));
-  }
-
-  // Draw "No" button
-  if (savePromptSelection == 1) {
-    std::string text = "[" + std::string(tr(STR_NO)) + "]";
-    renderer.drawText(UI_10_FONT_ID, startX + buttonWidth + buttonSpacing, buttonY, text.c_str());
-  } else {
-    renderer.drawText(UI_10_FONT_ID, startX + buttonWidth + buttonSpacing + 4, buttonY, tr(STR_NO));
-  }
-
-  // Use centralized button hints
-  const auto labels = mappedInput.mapLabels(tr(STR_CANCEL), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  // "Save password?" (STR_SAVE_PASSWORD) is now the popup's own title.
+  optionPopup.processRender(renderer, mappedInput);
 }
 
 void WifiSelectionActivity::renderConnectionFailed(const Rect* screen, const ThemeMetrics* metrics) const {
@@ -1036,34 +933,8 @@ void WifiSelectionActivity::renderForgetPrompt(const Rect* screen, const ThemeMe
   }
   UITheme::drawCenteredText(renderer, *screen, UI_10_FONT_ID, top, ssidInfo.c_str());
 
-  UITheme::drawCenteredText(renderer, *screen, UI_10_FONT_ID, top + 40, tr(STR_FORGET_AND_REMOVE));
-
-  // Draw Cancel/Forget network buttons
-  const int buttonY = top + 80;
-  constexpr int buttonWidth = 120;
-  constexpr int buttonSpacing = 30;
-  constexpr int totalWidth = buttonWidth * 2 + buttonSpacing;
-  const int startX = screen->x + (screen->width - totalWidth) / 2;
-
-  // Draw "Cancel" button
-  if (forgetPromptSelection == 0) {
-    std::string text = "[" + std::string(tr(STR_CANCEL)) + "]";
-    renderer.drawText(UI_10_FONT_ID, startX, buttonY, text.c_str());
-  } else {
-    renderer.drawText(UI_10_FONT_ID, startX + 4, buttonY, tr(STR_CANCEL));
-  }
-
-  // Draw "Forget network" button
-  if (forgetPromptSelection == 1) {
-    std::string text = "[" + std::string(tr(STR_FORGET_BUTTON)) + "]";
-    renderer.drawText(UI_10_FONT_ID, startX + buttonWidth + buttonSpacing, buttonY, text.c_str());
-  } else {
-    renderer.drawText(UI_10_FONT_ID, startX + buttonWidth + buttonSpacing + 4, buttonY, tr(STR_FORGET_BUTTON));
-  }
-
-  // Use centralized button hints
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  // "Forget and remove password?" (STR_FORGET_AND_REMOVE) is now the popup's own title.
+  optionPopup.processRender(renderer, mappedInput);
 }
 
 void WifiSelectionActivity::onComplete(const bool connected) {
