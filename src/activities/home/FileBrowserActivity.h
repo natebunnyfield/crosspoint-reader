@@ -7,6 +7,7 @@
 
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
 class FileBrowserActivity final : public Activity {
@@ -37,6 +38,7 @@ class FileBrowserActivity final : public Activity {
   }
 
   ButtonNavigator buttonNavigator;
+  OptionPopup deletePopup;
 
   size_t selectorIndex = 0;
 

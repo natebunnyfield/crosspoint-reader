@@ -7,11 +7,13 @@
 
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
 class RecentBooksActivity final : public Activity {
  private:
   ButtonNavigator buttonNavigator;
+  OptionPopup removePopup;
 
   size_t selectorIndex = 0;
 

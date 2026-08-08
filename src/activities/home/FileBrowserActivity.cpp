@@ -10,7 +10,6 @@
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
-#include "activities/util/ConfirmationActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/FsOps.h"
@@ -106,6 +105,11 @@ void FileBrowserActivity::onExit() {
 }
 
 void FileBrowserActivity::loop() {
+  if (deletePopup.isActive()) {
+    deletePopup.handleInput(mappedInput, [this] { requestUpdate(); });
+    return;
+  }
+
   // Long press BACK (1s+) goes to root folder (Books mode only).
   // In firmware-pick mode we keep navigation simple: short Back = up dir / cancel.
   if (mode == Mode::Books && mappedInput.isPressed(MappedInputManager::Button::Back) &&
@@ -156,13 +160,15 @@ void FileBrowserActivity::loop() {
       if (cleanBasePath.back() != '/') cleanBasePath += "/";
       const std::string fullPath = cleanBasePath + entry;
 
-      auto handler = [this, fullPath](const ActivityResult& res) {
+      std::string heading = tr(STR_DELETE) + std::string("? ");
+      const char* options[] = {tr(STR_CANCEL), tr(STR_CONFIRM)};
+      deletePopup.show(heading.c_str(), options, 2, 0, [this, fullPath](int idx) {
         // The confirmation popup acts on button press; if that button is still
         // held when we resume, swallow its release so it doesn't also act here
         // (Back would go up a directory, Confirm would open the selection).
         lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
         lockNextConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
-        if (!res.isCancelled) {
+        if (idx == 1) {
           LOG_DBG("FileBrowser", "Attempting to delete: %s", fullPath.c_str());
           if (FsOps::removeRecursiveWithCacheClear(fullPath, fileNameBuffer.get(), NAME_BUFFER_SIZE)) {
             LOG_DBG("FileBrowser", "Deleted successfully");
@@ -181,11 +187,9 @@ void FileBrowserActivity::loop() {
         } else {
           LOG_DBG("FileBrowser", "Delete cancelled by user");
         }
-      };
-
-      std::string heading = tr(STR_DELETE) + std::string("? ");
-
-      startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, entry), handler);
+      });
+      deletePopup.setInfoLines({entry});
+      requestUpdate();
       return;
     } else {
       // --- SHORT PRESS ACTION: OPEN/NAVIGATE ---
@@ -359,6 +363,8 @@ void FileBrowserActivity::render(RenderLock&&) {
   // STR_SELECT instead. Directories in the same picker still descend, so keep STR_OPEN there.
   const bool selectingFirmwareFile = mode == Mode::PickFirmware && !files.empty() && files[selectorIndex].back() != '/';
   const char* confirmLabel = files.empty() ? "" : (selectingFirmwareFile ? tr(STR_SELECT) : tr(STR_OPEN));
+  if (deletePopup.processRender(renderer, mappedInput)) return;
+
   const auto labels = mappedInput.mapLabels(backLabel, confirmLabel, files.empty() ? "" : tr(STR_DIR_UP),
                                             files.empty() ? "" : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

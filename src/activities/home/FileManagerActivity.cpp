@@ -11,7 +11,6 @@
 #include <cstring>
 
 #include "MappedInputManager.h"
-#include "activities/util/ConfirmationActivity.h"
 #include "activities/util/TextEntryFactory.h"
 #include "activities/util/TextViewerActivity.h"
 #include "components/UITheme.h"
@@ -556,12 +555,14 @@ void FileManagerActivity::performMoveHere() {
 void FileManagerActivity::confirmDelete(const std::string& entry) {
   const std::string fullPath = fullPathOf(entry);
 
-  auto handler = [this, fullPath](const ActivityResult& res) {
+  const std::string heading = tr(STR_DELETE) + std::string("? ");
+  const char* options[] = {tr(STR_CANCEL), tr(STR_CONFIRM)};
+  popup.show(heading.c_str(), options, 2, 0, [this, fullPath](int idx) {
     // The confirmation popup acts on button press; if that button is still
     // held when we resume, swallow its release so it doesn't also act here.
     lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
     lockNextConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
-    if (res.isCancelled) return;
+    if (idx != 1) return;
 
     if (!FsOps::removeRecursiveWithCacheClear(fullPath, fileNameBuffer.get(), NAME_BUFFER_SIZE)) {
       LOG_ERR("FileManager", "Failed to delete: %s", fullPath.c_str());
@@ -580,11 +581,9 @@ void FileManagerActivity::confirmDelete(const std::string& entry) {
       selectorIndex = files.size() - 1;
     }
     requestUpdate(true);
-  };
-
-  startActivityForResult(
-      std::make_unique<ConfirmationActivity>(renderer, mappedInput, tr(STR_DELETE) + std::string("? "), entry),
-      handler);
+  });
+  popup.setInfoLines({entry});
+  requestUpdate();
 }
 
 void FileManagerActivity::showError(const char* message) {

@@ -52,9 +52,9 @@ Action menu options (title = the item's name):
   **Move here**, which `Storage.rename()`s the source into the current
   directory. Same-directory move is a no-op; moving a directory into its own
   subtree is rejected before starting.
-- **Delete** → existing `ConfirmationActivity`, then recursive delete (the
-  iterative-stack implementation extracted from `FileBrowserActivity`, which
-  clears book caches as it goes).
+- **Delete** → in-place `OptionPopup` confirmation (the activity's existing
+  `popup` member), then recursive delete (the iterative-stack implementation
+  extracted from `FileBrowserActivity`, which clears book caches as it goes).
 
 Empty directory + armed clipboard: Confirm still opens the menu (Move here is
 the only entry), so a move into an empty folder works.

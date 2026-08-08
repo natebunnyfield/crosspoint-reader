@@ -3,6 +3,7 @@
 #include <string>
 
 #include "activities/Activity.h"
+#include "components/OptionPopup.h"
 
 /**
  * SD-card based firmware update activity.
@@ -10,7 +11,7 @@
  * Flow:
  *  1) onEnter -> push FileBrowserActivity in PickFirmware mode (only .bin files visible).
  *  2) On result: validate the .bin (header magic, size fits OTA partition).
- *  3) Push ConfirmationActivity ("Update firmware?").
+ *  3) Show an in-place OptionPopup ("Update firmware?").
  *  4) On confirm: stream the file into the OTA partition via the Arduino Update API,
  *     drawing a progress bar; on success ESP.restart().
  *
@@ -53,6 +54,7 @@ class SdFirmwareUpdateActivity : public Activity {
   size_t writtenBytes = 0;
   unsigned int lastRenderedPercent = 101;
   std::string errorMessage;
+  OptionPopup confirmPopup;
 
   void launchPicker();
   void beginValidateAndConfirm();

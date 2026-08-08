@@ -9,7 +9,6 @@
 
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
-#include "activities/util/ConfirmationActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -42,6 +41,11 @@ void RecentBooksActivity::onExit() {
 }
 
 void RecentBooksActivity::loop() {
+  if (removePopup.isActive()) {
+    removePopup.handleInput(mappedInput, [this] { requestUpdate(); });
+    return;
+  }
+
   const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, true);
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
@@ -126,8 +130,9 @@ void RecentBooksActivity::loop() {
 }
 
 void RecentBooksActivity::promptRemoveBook(const std::string& path, const std::string& title) {
-  auto handler = [this, path](const ActivityResult& res) {
-    if (res.isCancelled) {
+  const char* options[] = {tr(STR_CANCEL), tr(STR_CONFIRM)};
+  removePopup.show(tr(STR_REMOVE_FROM_RECENTS), options, 2, 0, [this, path](int idx) {
+    if (idx != 1) {
       LOG_DBG("RBA", "Remove from recents cancelled");
       return;
     }
@@ -141,11 +146,9 @@ void RecentBooksActivity::promptRemoveBook(const std::string& path, const std::s
       }
       requestUpdate(true);
     }
-  };
-
-  startActivityForResult(
-      std::make_unique<ConfirmationActivity>(renderer, mappedInput, tr(STR_REMOVE_FROM_RECENTS), title),
-      std::move(handler));
+  });
+  removePopup.setInfoLines({title});
+  requestUpdate();
 }
 
 void RecentBooksActivity::render(RenderLock&&) {
@@ -169,6 +172,8 @@ void RecentBooksActivity::render(RenderLock&&) {
         [this](int index) { return recentBooks[index].title; }, [this](int index) { return recentBooks[index].author; },
         [this](int index) { return UITheme::getFileIcon(recentBooks[index].path); });
   }
+
+  if (removePopup.processRender(renderer, mappedInput)) return;
 
   // Help text
   const auto labels = mappedInput.mapLabels(tr(STR_HOME), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
