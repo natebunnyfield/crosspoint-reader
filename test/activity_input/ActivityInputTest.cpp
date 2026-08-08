@@ -1,6 +1,6 @@
 // Activity / input-edge suite.
 //
-// THE BUG THIS EXISTS FOR
+// THE BUG THIS SUITE EXISTS FOR (now fixed at the root)
 //
 // A single Back tap inside Text Settings threw the user out of their book to
 // Home. FontSelectionActivity finished on the Back PRESS, so it was already
@@ -8,15 +8,21 @@
 // then current again — acts on the Back release (short press -> onGoHome) and
 // took it as its own. Measured on device: Back at t=13000 -> FontSelect exited
 // t+13ms (the press), EpubReader exited t+80ms (the release).
-// See FontSelectionActivity.cpp:116-137.
 //
-// One physical press therefore produced TWO activity transitions. That is the
-// invariant under test here, and it is a property of the whole
-// launcher/child contract, not of one screen:
+// CENTRALISED FIX: ActivityManager::loop() calls MappedInputManager::
+// swallowUntilIdle() at every activity swap (pop AND push AND replace). The
+// swallow suppresses wasPressed()/wasReleased() until all physical buttons are
+// idle, so the incoming activity never sees edges the outgoing one consumed.
 //
-//   A child activity launched from a parent that acts on the Back RELEASE must
-//   consume the RELEASE itself. Consuming the press leaves the release
-//   unconsumed for the parent.
+// CONSEQUENCE FOR CHILDREN: all child activities now exit on Back PRESS
+// (press-exit semantics). The invariant under test is unchanged:
+//
+//   One physical Back press must produce exactly one activity transition.
+//
+// The mechanism that enforces it changed: children consume the press; the
+// central swallow covers the trailing release. The "acts on Back release"
+// parent double still models the hazard correctly — it fires on wasReleased,
+// and the suite verifies it never sees a release it shouldn't.
 //
 // WHY IT IS MODELLED RATHER THAN DRIVEN END-TO-END
 //
@@ -178,29 +184,34 @@ TEST_F(ActivityInput, RenderDrawsAFullFrameThroughTheRealTheme) {
 }
 
 // ===========================================================================
-// (a) The exact regression: FontSelectionActivity must not finish on the press.
+// (a) FontSelectionActivity exits on the Back PRESS (press-exit semantics).
+//     swallowUntilIdle() arms at the pop so the parent never sees the release.
 // ===========================================================================
 
-TEST_F(ActivityInput, FontSelectionSurvivesTheBackPressAndLeavesOnTheRelease) {
+TEST_F(ActivityInput, FontSelectionExitsOnTheBackPress) {
   host::setRootActivity(makeFontSelection());
   ASSERT_EQ(host::currentActivityName(), "FontSelect");
   host::resetCounters();
 
-  // Frame 1: the press edge, and only the press edge.
+  // Frame 1: the press edge — activity must exit here.
   host::pressFrame(HalGPIO::BTN_BACK);
-  EXPECT_EQ(host::currentActivityName(), "FontSelect")
-      << "finished on the Back PRESS: the release edge is now orphaned and lands on whoever is current next";
-  EXPECT_EQ(host::counters().pops, 0);
-
-  // Frame 2: the release edge — now it may leave.
-  host::releaseFrame(HalGPIO::BTN_BACK);
-  EXPECT_EQ(host::counters().pops, 1) << "did not finish on the Back RELEASE either";
+  EXPECT_EQ(host::counters().pops, 1) << "did not finish on the Back PRESS";
   EXPECT_NE(host::currentActivityName(), "FontSelect");
+
+  // Frame 2: the release edge must be swallowed; whoever is current now must
+  // NOT see it as their own Back (swallowUntilIdle covers it).
+  const int popsBeforeRelease = host::counters().pops;
+  host::releaseFrame(HalGPIO::BTN_BACK);
+  EXPECT_EQ(host::counters().pops, popsBeforeRelease) << "release leaked to the successor";
 }
 
 // ===========================================================================
 // (b) + (c) The general guard, table-driven over every linkable child of a
 // release-edge launcher: one physical press, one transition.
+//
+// Children now exit on Back PRESS (press-exit semantics). ActivityManager calls
+// swallowUntilIdle() at every swap so the parent never sees the trailing
+// release — one tap still produces exactly one transition.
 // ===========================================================================
 
 class BackEdgeConvention : public ActivityInput, public ::testing::WithParamInterface<BackEdgeCase> {};
@@ -238,17 +249,22 @@ TEST_P(BackEdgeConvention, OnePhysicalBackPressCausesExactlyOneTransition) {
   EXPECT_EQ(g_parentObs.childResults, 1) << childName << ": result was not delivered to the launcher";
 }
 
-TEST_P(BackEdgeConvention, DoesNotFinishOnTheBackPressEdge) {
+TEST_P(BackEdgeConvention, ExitsOnTheBackPressAndSwallowsTheRelease) {
   host::setRootActivity(GetParam().factory());
   const std::string childName = host::currentActivityName();
   host::resetCounters();
 
+  // Press: child must exit immediately (press-exit semantics).
   host::pressFrame(HalGPIO::BTN_BACK);
+  EXPECT_EQ(host::counters().pops, 1)
+      << childName << " did not finish on the Back PRESS (press-exit semantics).";
+  EXPECT_NE(host::currentActivityName(), childName);
 
-  EXPECT_EQ(host::counters().pops, 0)
-      << childName << " finished on the Back PRESS. Its launcher (the reader) acts on the RELEASE, "
-      << "so that release will be delivered to the launcher as a second Back — see FontSelectionActivity.cpp:116.";
-  EXPECT_EQ(host::currentActivityName(), childName);
+  // Release: must be swallowed by the central swallow so the successor screen
+  // does not see it as a fresh Back.
+  const int popsAfterPress = host::counters().pops;
+  host::releaseFrame(HalGPIO::BTN_BACK);
+  EXPECT_EQ(host::counters().pops, popsAfterPress) << childName << ": release leaked to the successor";
 }
 
 INSTANTIATE_TEST_SUITE_P(ReleaseEdgeChildren, BackEdgeConvention, ::testing::ValuesIn(kBackEdgeCases),
@@ -294,10 +310,13 @@ TEST_F(ActivityInput, FontSelectionLeavesViaTheRemappedBackButton) {
   ASSERT_EQ(host::currentActivityName(), "FontSelect");
   host::resetCounters();
 
+  // Press-exit: exits on the press of the remapped Back button.
   host::pressFrame(HalGPIO::BTN_RIGHT);
-  EXPECT_EQ(host::currentActivityName(), "FontSelect");
-  host::releaseFrame(HalGPIO::BTN_RIGHT);
   EXPECT_EQ(host::counters().pops, 1);
+  // Release is swallowed by swallowUntilIdle; no second pop.
+  const int popsAfterPress = host::counters().pops;
+  host::releaseFrame(HalGPIO::BTN_RIGHT);
+  EXPECT_EQ(host::counters().pops, popsAfterPress);
 }
 
 // ===========================================================================
@@ -307,16 +326,21 @@ TEST_F(ActivityInput, FontSelectionLeavesViaTheRemappedBackButton) {
 // (OpdsBookBrowserActivity.h:40) also guards against.
 // ===========================================================================
 
-TEST_F(ActivityInput, HoldingBackDoesNotRepeatTheExit) {
+TEST_F(ActivityInput, HoldingBackExitsOnceAndReleaseIsSwallowed) {
   host::setRootActivity(makeFontSelection());
   host::resetCounters();
 
+  // Press: exit immediately on the press edge.
   host::pressFrame(HalGPIO::BTN_BACK);
-  host::frames(5);  // still held: no new edges
-  EXPECT_EQ(host::counters().pops, 0) << "a held Back produced an exit without a release";
+  EXPECT_EQ(host::counters().pops, 1) << "did not exit on the Back press";
 
+  // Continued hold: no additional exits (wasPressed fires only once per press).
+  host::frames(5);
+  EXPECT_EQ(host::counters().pops, 1) << "exit repeated while Back was held";
+
+  // Release: swallowed by swallowUntilIdle — successor does not see it.
   host::releaseFrame(HalGPIO::BTN_BACK);
-  EXPECT_EQ(host::counters().pops, 1);
+  EXPECT_EQ(host::counters().pops, 1) << "release leaked to the successor and triggered a second pop";
 }
 
 // ===========================================================================

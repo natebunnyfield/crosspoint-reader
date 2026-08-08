@@ -277,7 +277,7 @@ void FileManagerActivity::runMenuAction(const MenuAction action) {
       // Was an early return above this switch, which left 'Edit' unhandled here
       // and -Wswitch firing -- so the compiler stopped checking the rest of the
       // enum for this function. Same behaviour, in the place that gets checked.
-      if (!files.empty()) activityManager.goToNoteEditor(fullPathOf(files[selectorIndex]));
+      if (!files.empty()) activityManager.goToNoteEditor(fullPathOf(files[selectorIndex]), basepath);
       break;
     case MenuAction::MoveHere:
       performMoveHere();
@@ -310,10 +310,9 @@ void FileManagerActivity::viewFile(const std::string& entry) {
   if (entry.empty() || entry.back() == '/') return;
   startActivityForResult(std::make_unique<TextViewerActivity>(renderer, mappedInput, fullPathOf(entry), entry),
                          [this](const ActivityResult&) {
-                           // The viewer exits on a button release; if that button is still held
-                           // when we resume, swallow its release so it doesn't also act here.
+                           // swallowUntilIdle() covers press/release edges. Keep lockLongPressBack:
+                           // it guards isPressed(Back) long-press, which swallow does not suppress.
                            lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
-                           lockNextConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
                          });
 }
 
@@ -325,8 +324,9 @@ void FileManagerActivity::startRename(const std::string& entry, const std::strin
   startActivityForResult(makeTextEntryActivity(renderer, mappedInput, tr(STR_NEW_NAME),
                                                seedName.empty() ? oldName : seedName, MAX_RENAME_LEN),
                          [this, oldFull, oldName, isDirectory](const ActivityResult& res) {
+                           // swallowUntilIdle() covers press/release edges. Keep lockLongPressBack:
+                           // isPressed(Back) long-press is not suppressed by swallow.
                            lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
-                           lockNextConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
                            if (res.isCancelled) return;
                            const auto* kb = std::get_if<KeyboardResult>(&res.data);
                            if (!kb) return;
@@ -687,21 +687,10 @@ void FileManagerActivity::loop() {
     return;
   }
 
-  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) backPressSeen = true;
-
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    // Only act on a release whose PRESS arrived here. TextViewerActivity exits
-    // on the Back release, so the edge that dismissed it can otherwise be read
-    // as a fresh Back by this screen -- and at the SD root the arm below calls
-    // onGoHome(), i.e. view a file, tap Back once, land on Home instead of the
-    // listing. Mirrors confirmPressSeen above.
-    //
-    // NOT done by arming lockNextBackRelease in the viewFile handler: that
-    // swallows the next release unconditionally, which eats a genuine second
-    // Back. Measured -- two taps left the listing on screen where the second
-    // should have gone Home.
-    if (!backPressSeen) return;
-    backPressSeen = false;
+    // TextViewerActivity now exits on press; swallowUntilIdle() covers the
+    // trailing release. lockNextBackRelease still guards popup-close leaks
+    // (popup closes on press within this activity, release stays in this frame).
     if (lockNextBackRelease) {
       lockNextBackRelease = false;
       return;

@@ -256,6 +256,8 @@ void ActivityManager::loop() {
       s.current = std::move(s.stack.back());
       s.stack.pop_back();
       s.currentName = s.current->name;
+      // Mirror ActivityManager.cpp: swallow stale edges for the restored parent.
+      mappedInput.swallowUntilIdle();
 
       if (s.current->resultHandler) {
         auto handler = std::move(s.current->resultHandler);
@@ -288,6 +290,8 @@ void ActivityManager::loop() {
       s.pendingAction = HostPending::None;
       s.current = std::move(s.pending);
       s.currentName = s.current->name;
+      // Mirror ActivityManager.cpp: swallow stale edges for the new activity.
+      mappedInput.swallowUntilIdle();
 
       lock.unlock();  // onEnter may acquire its own
       s.current->onEnter();
@@ -443,6 +447,7 @@ void reset() {
   s.fontCalls = FontSystemCalls{};
 
   gpio.simReset();
+  mappedInputSingleton().resetSwallow();
 
   // Restore the settings fields these tests write, so ordering between tests
   // cannot matter.

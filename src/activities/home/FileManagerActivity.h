@@ -27,10 +27,6 @@ class FileManagerActivity final : public Activity {
   // long-press action menu so a press carried in from another screen can't
   // trigger it.
   bool confirmPressSeen = false;
-  // Same idea for Back. A release whose press this screen never saw belongs to
-  // whatever ran before it -- the file viewer exits on the Back RELEASE, so
-  // without this the trailing edge could be acted on here as a fresh Back.
-  bool backPressSeen = false;
 
   std::string basepath = "/";
   std::vector<std::string> files;  // directories carry a trailing '/'
@@ -66,8 +62,10 @@ class FileManagerActivity final : public Activity {
   void showError(const char* message);
 
  public:
-  explicit FileManagerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : Activity("FileManager", renderer, mappedInput) {}
+  // startPath: directory to open initially (empty = SD root "/").
+  explicit FileManagerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                               std::string startPath = {})
+      : Activity("FileManager", renderer, mappedInput), basepath(startPath.empty() ? "/" : std::move(startPath)) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

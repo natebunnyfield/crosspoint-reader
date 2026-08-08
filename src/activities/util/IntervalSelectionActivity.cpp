@@ -79,7 +79,7 @@ void IntervalSelectionActivity::loop() {
     return;
   }
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     ActivityResult result;
     result.isCancelled = true;
     setResult(std::move(result));
@@ -87,7 +87,7 @@ void IntervalSelectionActivity::loop() {
     return;
   }
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     setResult(IntervalResult{static_cast<uint32_t>(value)});
     finish();
     return;

@@ -85,6 +85,16 @@ class MappedInputManager {
   // everything renders portrait; kept so the nav call sites stay readable as direction questions.
   [[nodiscard]] bool isNavDirectionSwapped() const;
 
+  // After an activity swap (pop, push, or replace) the incoming activity must
+  // not see stale press/release edges from the button(s) the outgoing activity
+  // consumed. Call this once at the transition; wasPressed()/wasReleased() will
+  // return false until all physical buttons are idle for one complete frame.
+  void swallowUntilIdle();
+
+  // Pair for test tear-down: clears the flag so a between-test reset does not
+  // leave swallow active into the next case.
+  void resetSwallow() { swallowActive_ = false; }
+
  private:
   HalGPIO& gpio;
   // Logical-to-physical button mapping depends on what the user is actually looking at: when the
@@ -107,4 +117,9 @@ class MappedInputManager {
   mutable bool touchHeldOverrideValid = false;
   mutable unsigned long touchHeldOverrideMs = 0;
   mutable unsigned long touchHeldOverrideAt = 0;
+
+  // When true, wasPressed()/wasReleased() return false and are cleared only once
+  // all physical buttons are observed idle. Set by swallowUntilIdle().
+  mutable bool swallowActive_ = false;
+  bool isAnyPhysicalButtonHeld() const;
 };
