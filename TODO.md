@@ -14,28 +14,30 @@ started.
 
 ## OPEN
 
-### [T-010] settings.json / state.json writes are not atomic
-**scope: data durability · found by the 2026-08-08 P0 audit**
+### [T-010] settings.json / state.json writes are not atomic — FIXED
+**scope: data durability · found by the 2026-08-08 P0 audit · fixed 2026-08-08**
 
-`SDCardManager::writeFile` (freeink-sdk, `SDCardManager.cpp:252`) does
-`remove(path)` then opens `O_TRUNC` and writes. Every settings/state save goes
-through it (`PersistableStore::writeDocToFile` → `Storage.writeFile`). Power
-pulled between the remove and the flush loses the file; a corrupt read then
-falls back to in-memory defaults with no recovery, so the device boots having
-forgotten Wi-Fi credentials, reading position and owner name.
+Every settings and state save went through `SDCardManager::writeFile`, which
+removes the target and then opens it `O_TRUNC` — so power lost in that window
+left NO file, and the device booted having forgotten its Wi-Fi, reading position
+and owner name.
 
-**Classified P1, not a deploy blocker, on purpose.** It is SDK code that
-predates all recent work — every build ever shipped has had it — the window is
-sub-millisecond, and the outcome is recoverable (defaults, not a brick). It is
-also a DEVICE failure mode: on iOS the host OS flushes normally, so the phone
-build this was audited alongside is near-zero risk.
+Fixed at the fork's `PersistableStore`, not in the submodule. FAT cannot replace
+a file in one step (SdFat's rename fails if the destination exists), so the order
+is: write the temp in full, remove the target, rename the temp over it. The
+window shrinks to the remove→rename gap, and — the part that matters — a
+COMPLETE copy of the data is on the card throughout it.
 
-**Close by:** make the write atomic at the fork's `PersistableStore` level —
-serialize to `<path>.tmp`, fsync/close, then rename over `<path>` — rather than
-patching the submodule. Confirm SdFat's rename replaces an existing entry
-atomically enough on FAT/exFAT; if not, the temp+rename still shrinks the loss
-window to the rename itself. Worth a test that a half-written temp file never
-becomes the live file.
+`readDocFromFile` is what makes that recoverable rather than merely narrower: a
+temp beside a missing target is promoted, a temp beside an intact target is
+stale and deleted. A promoted temp is parsed first, because a crash during the
+temp write itself leaves a truncated one and promoting that would turn a
+recoverable state into a corrupt file.
+
+**Verified against the simulator, all three paths:** a normal save leaves no
+temp; a complete temp with the target deleted is recovered with the data intact
+(`deviceOwner = RECOVERED-FROM-TEMP`, which under the old code would simply have
+been gone); a truncated temp is discarded and not promoted. 235 host tests.
 
 ### [T-009] A 0 ms redraw delay for iOS, and a look at the update path
 **scope: iOS display · asked 2026-08-08**

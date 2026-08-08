@@ -4,18 +4,72 @@
 #include <Logging.h>
 #include <ObfuscationUtils.h>
 
+// Every settings and state save lands here. The write is staged through a temp
+// file because the layer underneath is not atomic: SDCardManager::writeFile
+// removes the target and THEN opens it O_TRUNC, so power lost in that window
+// leaves no file at all and the device boots having forgotten its Wi-Fi, its
+// reading position and its owner name.
+//
+// FAT cannot replace a file in one step -- SdFat's rename fails if the
+// destination exists -- so the order is: write the temp in full, remove the
+// target, rename the temp over it. The remaining window is between the remove
+// and the rename, and unlike before, a COMPLETE copy of the data exists on the
+// card throughout it. readDocFromFile() promotes that copy, which is what turns
+// a narrower window into an actually recoverable one.
+static String tempPathFor(const char* path) { return String(path) + ".tmp"; }
+
 bool PersistableStoreBase::writeDocToFile(const char* path, const JsonDocument& doc) {
   Storage.mkdir("/.crosspoint");
   String json;
   serializeJson(doc, json);
-  if (!Storage.writeFile(path, json)) {
-    LOG_ERR("PERSIST", "Failed to write %s", path);
+
+  const String tmp = tempPathFor(path);
+  if (!Storage.writeFile(tmp.c_str(), json)) {
+    LOG_ERR("PERSIST", "Failed to write %s", tmp.c_str());
+    Storage.remove(tmp.c_str());  // never leave a half-written temp to be promoted
+    return false;
+  }
+  if (Storage.exists(path) && !Storage.remove(path)) {
+    LOG_ERR("PERSIST", "Failed to remove %s before rename", path);
+    Storage.remove(tmp.c_str());
+    return false;
+  }
+  if (!Storage.rename(tmp.c_str(), path)) {
+    // The target is gone and the temp is still there and complete. Do NOT
+    // delete it: readDocFromFile() promotes it on the next boot, which is the
+    // whole point of writing it first.
+    LOG_ERR("PERSIST", "Failed to rename %s -> %s; the temp holds the data", tmp.c_str(), path);
     return false;
   }
   return true;
 }
 
 bool PersistableStoreBase::readDocFromFile(const char* path, JsonDocument& doc) {
+  // Recover an interrupted write. A temp beside the target means a save was in
+  // flight; which one to trust depends on whether the target survived.
+  const String tmp = tempPathFor(path);
+  if (Storage.exists(tmp.c_str())) {
+    if (!Storage.exists(path)) {
+      // Crashed between the remove and the rename. The temp is the only copy of
+      // the data -- but only promote it if it actually parses, because a crash
+      // during the temp write itself leaves a truncated one, and promoting that
+      // would turn a recoverable state into a corrupt file.
+      String candidate = Storage.readFile(tmp.c_str());
+      JsonDocument probe;
+      if (!candidate.isEmpty() && !deserializeJson(probe, candidate)) {
+        LOG_INF("PERSIST", "Recovering %s from an interrupted write", path);
+        Storage.rename(tmp.c_str(), path);
+      } else {
+        LOG_ERR("PERSIST", "Discarding a truncated %s", tmp.c_str());
+        Storage.remove(tmp.c_str());
+      }
+    } else {
+      // Target intact: the temp is left over from a write that failed before it
+      // touched anything. Stale by definition.
+      Storage.remove(tmp.c_str());
+    }
+  }
+
   if (!Storage.exists(path)) {
     return false;  // Expected on first boot — not an error.
   }
