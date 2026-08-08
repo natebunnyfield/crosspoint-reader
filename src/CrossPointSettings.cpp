@@ -108,7 +108,7 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
     doc["ownerName"] = ownerName;
   }
 
-  // Language -- managed by LanguageSelectActivity, not in SettingsList.
+  // Language -- picked via the in-place option popup in SettingsActivity, not in SettingsList.
   // Stored as ISO code string ("EN", "DE", ...) for stability across enum reorders.
   doc["language"] = (language < getLanguageCount()) ? LANGUAGE_CODES[language] : "EN";
 }
