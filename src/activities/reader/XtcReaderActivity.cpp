@@ -74,8 +74,8 @@ void XtcReaderActivity::loop() {
   const bool atEndOfBook = currentPage >= xtc->getPageCount();
 
   // On the end-of-book screen Confirm goes home.
-  if (atEndOfBook && (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
-                      ReaderUtils::isTouchMenuGesture(mappedInput))) {
+  if (atEndOfBook &&
+      (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput))) {
     onGoHome();
     return;
   }
@@ -358,4 +358,3 @@ void XtcReaderActivity::loadProgress() {
     f.close();
   }
 }
-

@@ -277,9 +277,8 @@ void CrossPointWebServerActivity::loop() {
     if (pending_firmware::waiting()) {
       const std::string image = pending_firmware::take();
       LOG_INF("WEBACT", "offering uploaded firmware: %s", image.c_str());
-      startActivityForResult(
-          std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput, false, image),
-          [](const ActivityResult&) {});
+      startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput, false, image),
+                             [](const ActivityResult&) {});
       return;
     }
 #endif

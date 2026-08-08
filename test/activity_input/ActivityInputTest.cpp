@@ -256,8 +256,7 @@ TEST_P(BackEdgeConvention, ExitsOnTheBackPressAndSwallowsTheRelease) {
 
   // Press: child must exit immediately (press-exit semantics).
   host::pressFrame(HalGPIO::BTN_BACK);
-  EXPECT_EQ(host::counters().pops, 1)
-      << childName << " did not finish on the Back PRESS (press-exit semantics).";
+  EXPECT_EQ(host::counters().pops, 1) << childName << " did not finish on the Back PRESS (press-exit semantics).";
   EXPECT_NE(host::currentActivityName(), childName);
 
   // Release: must be swallowed by the central swallow so the successor screen

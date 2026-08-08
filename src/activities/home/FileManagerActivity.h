@@ -63,8 +63,7 @@ class FileManagerActivity final : public Activity {
 
  public:
   // startPath: directory to open initially (empty = SD root "/").
-  explicit FileManagerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                               std::string startPath = {})
+  explicit FileManagerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string startPath = {})
       : Activity("FileManager", renderer, mappedInput), basepath(startPath.empty() ? "/" : std::move(startPath)) {}
   void onEnter() override;
   void onExit() override;

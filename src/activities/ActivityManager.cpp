@@ -16,8 +16,8 @@
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
 #include "util/ClaudeChatActivity.h"
-#include "util/NoteEditorActivity.h"
 #include "util/FullScreenMessageActivity.h"
+#include "util/NoteEditorActivity.h"
 
 static portMUX_TYPE activityManagerSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -196,7 +196,9 @@ void ActivityManager::goToFileTransfer() {
 }
 
 void ActivityManager::goToSettings() {
-  lastHomeMenuItem = HomeMenuItem::SETTINGS_MENU; replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
+  lastHomeMenuItem = HomeMenuItem::SETTINGS_MENU;
+  replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput));
+}
 
 void ActivityManager::goToFileBrowser(std::string path) {
   lastHomeMenuItem = HomeMenuItem::FILE_BROWSER;
@@ -255,7 +257,9 @@ void ActivityManager::goToNoteEditor(std::string path, std::string returnDir) {
 }
 
 void ActivityManager::goToClaudeChat() {
-  lastHomeMenuItem = HomeMenuItem::CLAUDE; replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
+  lastHomeMenuItem = HomeMenuItem::CLAUDE;
+  replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput));
+}
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

@@ -336,8 +336,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // settings API. Category is not persisted, so this change has no impact on
     // saved settings.json files.
     v.push_back(SettingInfo::Enum(StrId::STR_SIDE_BTN_LAYOUT, &CrossPointSettings::sideButtonLayout,
-                                  {StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV, StrId::STR_DISABLED},
-                                  "sideButtonLayout", StrId::STR_CAT_CONTROLS));
+                                  {StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV, StrId::STR_DISABLED}, "sideButtonLayout",
+                                  StrId::STR_CAT_CONTROLS));
     v.push_back(SettingInfo::Enum(StrId::STR_TOUCH_READER_CONTROLS, &CrossPointSettings::touchReaderControls,
                                   {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "touchReaderControls",
                                   StrId::STR_CAT_CONTROLS));

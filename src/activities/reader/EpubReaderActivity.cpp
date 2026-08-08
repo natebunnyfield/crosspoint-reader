@@ -1429,9 +1429,7 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
   std::vector<ReadAloudWordRect> rects;
   const int lineH = renderer.getLineHeight(fontId);
   const int spaceW = renderer.getSpaceWidth(fontId);
-  const auto clampU16 = [](const int v) {
-    return static_cast<uint16_t>(v < 0 ? 0 : (v > 0xFFFF ? 0xFFFF : v));
-  };
+  const auto clampU16 = [](const int v) { return static_cast<uint16_t>(v < 0 ? 0 : (v > 0xFFFF ? 0xFFFF : v)); };
   // A word the layout hyphen-split across lines arrives as two tokens whose
   // prefix ends in '-' at the end of its line (ParsedText appends the visible
   // hyphen to the stored prefix). The TextBlock arena carries no source
@@ -1477,8 +1475,8 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
       std::string runText;
       while (true) {
         appendStrippingSoftHyphens(runText, block->wordText(i));
-        runEndX = lineX + block->wordXpos(i) +
-                  renderer.getTextAdvanceX(fontId, block->wordText(i), block->wordStyle(i));
+        runEndX =
+            lineX + block->wordXpos(i) + renderer.getTextAdvanceX(fontId, block->wordText(i), block->wordStyle(i));
         i++;
         if (i >= n || tokenIsBlank(block->wordText(i))) break;
         if (lineX + block->wordXpos(i) - runEndX > spaceW / 2) break;

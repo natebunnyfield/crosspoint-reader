@@ -126,8 +126,8 @@ void XtcReaderChapterSelectionActivity::render(RenderLock&&) {
   if (chapters.empty()) {
     renderer.drawText(UI_10_FONT_ID, screen.x + metrics.contentSidePadding, contentTop + 20, tr(STR_NO_CHAPTERS));
   } else {
-    GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight},
-                 static_cast<int>(chapters.size()), selectorIndex, [this](int index) {
+    GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, static_cast<int>(chapters.size()),
+                 selectorIndex, [this](int index) {
                    const auto& item = xtc->getChapters()[index];
                    return item.name.empty() ? std::string(tr(STR_UNNAMED)) : item.name;
                  });

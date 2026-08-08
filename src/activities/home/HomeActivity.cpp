@@ -359,13 +359,10 @@ void HomeActivity::render(RenderLock&&) {
     // Order is the owner's ruling (2026-08-06). These two vectors and BOTH
     // index maps in HomeActivity.h must stay in the same order — see the note
     // there; they are four separate sources of truth for one list.
-    std::vector<const char*> menuItems = {tr(STR_MENU_RECENT_BOOKS), tr(STR_BROWSE_FILES),
-                                          tr(STR_MANAGE_FILES),
-                                          tr(STR_FILE_TRANSFER),
-                                          tr(STR_CREATE_NOTE),       "Claude",
+    std::vector<const char*> menuItems = {tr(STR_MENU_RECENT_BOOKS), tr(STR_BROWSE_FILES), tr(STR_MANAGE_FILES),
+                                          tr(STR_FILE_TRANSFER),     tr(STR_CREATE_NOTE),  "Claude",
                                           tr(STR_SETTINGS_TITLE)};
-    std::vector<UIIcon> menuIcons = {Recent,     Folder,     ManageFiles,
-                                     Transfer,   CreateNote, ClaudeMark, Settings};
+    std::vector<UIIcon> menuIcons = {Recent, Folder, ManageFiles, Transfer, CreateNote, ClaudeMark, Settings};
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme

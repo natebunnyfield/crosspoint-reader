@@ -104,11 +104,11 @@ void EpubReaderFootnotesActivity::render(RenderLock&&) {
     return;
   }
 
-  GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight},
-              static_cast<int>(footnotes.size()), selectedIndex, [this](int index) {
-                std::string label = footnotes[index].number;
-                return label.empty() ? std::string(tr(STR_LINK)) : label;
-              });
+  GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, static_cast<int>(footnotes.size()),
+               selectedIndex, [this](int index) {
+                 std::string label = footnotes[index].number;
+                 return label.empty() ? std::string(tr(STR_LINK)) : label;
+               });
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

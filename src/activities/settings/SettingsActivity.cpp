@@ -10,11 +10,11 @@
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
 #include "CrossPointSettings.h"
-#include "notes/BleHidHost.h"
 #include "FontSelectionActivity.h"
 #include "MappedInputManager.h"
 #include "SystemFont.h"
 #include "activities/boot_sleep/SleepScreenPolicy.h"
+#include "notes/BleHidHost.h"
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "SdFirmwareUpdateActivity.h"
 #endif
