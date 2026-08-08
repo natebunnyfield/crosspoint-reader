@@ -1,6 +1,8 @@
 #include "WebDAVHandler.h"
 
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "PendingFirmware.h"
+#endif
 
 #include <FsHelpers.h>
 #include <HalStorage.h>
@@ -399,11 +401,13 @@ void WebDAVHandler::handlePut(WebServer& s) {
   // has only just been queued, and flashing ends in a reboot: doing it inline
   // drops the connection mid-request, so the sender cannot distinguish a failed
   // upload from a successful one. See PendingFirmware.h.
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
   const std::string finalPath(path.c_str());
   if (pending_firmware::isUpdatePath(finalPath)) {
     LOG_INF("DAV", "firmware image uploaded, awaiting confirmation: %s", finalPath.c_str());
     pending_firmware::set(finalPath.c_str());
   }
+#endif
 }
 
 // ── DELETE ───────────────────────────────────────────────────────────────────

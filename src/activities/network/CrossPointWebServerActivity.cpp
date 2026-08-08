@@ -11,8 +11,10 @@
 #include "MappedInputManager.h"
 #include "NetworkModeSelectionActivity.h"
 #include "SilentRestart.h"
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #include "network/PendingFirmware.h"
+#endif
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -265,6 +267,11 @@ void CrossPointWebServerActivity::loop() {
     // is an open network, so a press on the device is the only thing standing
     // between "anyone in radio range" and permanently running their own code
     // on it. take() clears the slot, so a decline does not re-prompt forever.
+    // Not on iOS: SdFirmwareUpdateActivity.cpp is excluded from that build
+    // (cmake/CrossPointIOSExclusions.cmake) because a phone has no OTA
+    // partition to flash, so calling it here would be an undefined symbol at
+    // link time -- which is exactly how this guard came to be written.
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
     if (pending_firmware::waiting()) {
       const std::string image = pending_firmware::take();
       LOG_INF("WEBACT", "offering uploaded firmware: %s", image.c_str());
@@ -273,6 +280,7 @@ void CrossPointWebServerActivity::loop() {
           [](const ActivityResult&) {});
       return;
     }
+#endif
 
     // Handle DNS requests for captive portal (AP mode only)
     if (isApMode && dnsServer) {
