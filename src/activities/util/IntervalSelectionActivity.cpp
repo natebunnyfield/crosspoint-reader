@@ -130,7 +130,9 @@ void IntervalSelectionActivity::loop() {
 void IntervalSelectionActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
-  renderer.drawCenteredText(UI_12_FONT_ID, 15, I18N.get(titleId), true, EpdFontFamily::BOLD);
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto pageWidth = renderer.getScreenWidth();
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, I18N.get(titleId));
 
   char formattedValue[32];
   if (maxBoundaryLabelId != StrId::STR_NONE_OPT && value == maxValue) {

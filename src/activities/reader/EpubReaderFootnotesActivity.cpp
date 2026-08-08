@@ -40,43 +40,30 @@ void EpubReaderFootnotesActivity::loop() {
   }
 
   if (!footnotes.empty()) {
-    const auto orientation = renderer.getOrientation();
-    const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
-    const bool isLandscapeCcw = orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
-    const bool isPortraitInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
-    const int hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? 30 : 0;
-    const int contentX = isLandscapeCw ? hintGutterWidth : 0;
-    const int contentWidth = renderer.getScreenWidth() - hintGutterWidth;
-    const int contentY = isPortraitInverted ? 50 : 0;
-    constexpr int lineHeight = 36;
-    const int listTop = 60 + contentY;
-    const int visibleCount = std::max(1, (renderer.getScreenHeight() - listTop) / lineHeight);
-    int row = -1;
-    const auto touch = mappedInput.rowTouch(row, listTop, lineHeight, visibleCount, contentX, contentX + contentWidth);
-    if (touch != MappedInputManager::RowTouch::None) {
-      const int touched = scrollOffset + row;
-      if (touched >= 0 && touched < static_cast<int>(footnotes.size())) {
-        if (touch == MappedInputManager::RowTouch::Down) {
-          if (selectedIndex != touched) {
-            selectedIndex = touched;
-            requestUpdate();
-          }
-        } else {
-          selectedIndex = touched;
-          selectFootnote();
-        }
+    auto metrics = UITheme::getInstance().getMetrics();
+    Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+    const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
+    const int totalItems = static_cast<int>(footnotes.size());
+    switch (handleListTouch(selectedIndex, totalItems, contentTop, contentHeight, false)) {
+      case ListTouchResult::Activated:
+        selectFootnote();
         return;
-      }
+      case ListTouchResult::Consumed:
+        return;
+      case ListTouchResult::None:
+        break;
     }
 
+    const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, false);
     const auto swipe = mappedInput.wasSwipe();
     if (swipe == MappedInputManager::SwipeDir::Up) {
-      selectedIndex = std::min(static_cast<int>(footnotes.size()) - 1, selectedIndex + visibleCount);
+      selectedIndex = std::min(totalItems - 1, selectedIndex + pageItems);
       requestUpdate();
       return;
     }
     if (swipe == MappedInputManager::SwipeDir::Down) {
-      selectedIndex = std::max(0, selectedIndex - visibleCount);
+      selectedIndex = std::max(0, selectedIndex - pageItems);
       requestUpdate();
       return;
     }
@@ -100,57 +87,28 @@ void EpubReaderFootnotesActivity::loop() {
 void EpubReaderFootnotesActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto orientation = renderer.getOrientation();
-  // Landscape orientation: reserve a horizontal gutter for button hints.
-  const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
-  const bool isLandscapeCcw = orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
-  // Inverted portrait: reserve vertical space for hints at the top.
-  const bool isPortraitInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
-  const int hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? 30 : 0;
-  // Landscape CW places hints on the left edge; CCW keeps them on the right.
-  const int contentX = isLandscapeCw ? hintGutterWidth : 0;
-  const int contentWidth = pageWidth - hintGutterWidth;
-  const int hintGutterHeight = isPortraitInverted ? 50 : 0;
-  const int contentY = hintGutterHeight;
+  auto metrics = UITheme::getInstance().getMetrics();
+  Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
 
-  // Manual centering to honor content gutters.
-  const int titleX =
-      contentX + (contentWidth - renderer.getTextWidth(UI_12_FONT_ID, tr(STR_FOOTNOTES), EpdFontFamily::BOLD)) / 2;
-  renderer.drawText(UI_12_FONT_ID, titleX, 15 + contentY, tr(STR_FOOTNOTES), true, EpdFontFamily::BOLD);
+  GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
+                 tr(STR_FOOTNOTES));
+
+  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
 
   if (footnotes.empty()) {
-    renderer.drawCenteredText(UI_10_FONT_ID, 90 + contentY, tr(STR_NO_FOOTNOTES));
+    renderer.drawCenteredText(UI_10_FONT_ID, contentTop + 30, tr(STR_NO_FOOTNOTES));
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     renderer.displayBuffer();
     return;
   }
 
-  constexpr int lineHeight = 36;
-  const int screenWidth = renderer.getScreenWidth();
-  const int marginLeft = contentX + 20;
-  const int listTop = 60 + contentY;
-
-  const int visibleCount = std::max(1, (renderer.getScreenHeight() - listTop) / lineHeight);
-  if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
-  if (selectedIndex >= scrollOffset + visibleCount) scrollOffset = selectedIndex - visibleCount + 1;
-
-  for (int i = scrollOffset; i < static_cast<int>(footnotes.size()) && i < scrollOffset + visibleCount; i++) {
-    const int y = listTop + (i - scrollOffset) * lineHeight;
-    const bool isSelected = (i == selectedIndex);
-
-    if (isSelected) {
-      renderer.fillRect(0, y, screenWidth, lineHeight, true);
-    }
-
-    // Show footnote number and abbreviated href
-    std::string label = footnotes[i].number;
-    if (label.empty()) {
-      label = tr(STR_LINK);
-    }
-    renderer.drawText(UI_10_FONT_ID, marginLeft, y + 4, label.c_str(), !isSelected);
-  }
+  GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight},
+              static_cast<int>(footnotes.size()), selectedIndex, [this](int index) {
+                std::string label = footnotes[index].number;
+                return label.empty() ? std::string(tr(STR_LINK)) : label;
+              });
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
