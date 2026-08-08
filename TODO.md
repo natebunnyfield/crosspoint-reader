@@ -162,14 +162,31 @@ starts, uses once and stops is in scope here. Recorded in
 
 Both halves are closed.
 
-**The key.** `claude-key.txt` is in `HIDDEN_ITEMS` in both
-`src/network/CrossPointWebServer.cpp` and `src/network/WebDAVHandler.cpp` — two
-separate arrays, both needed. Measured against the running simulator before and
-after: the download endpoint and WebDAV GET each went from **200 with the key in
-the body** to 403, DELETE to 403, and the file left the listing, while a control
-file still transferred at 200. A leading dot would not have worked: WebDAV
-deliberately serves dot-paths so a card mirror can sync `/.crosspoint` and
-`/.fonts`.
+**The key — protected, then deliberately UNprotected.** `claude-key.txt` was
+added to `HIDDEN_ITEMS` in both `src/network/CrossPointWebServer.cpp` and
+`src/network/WebDAVHandler.cpp`, which took the download endpoint and WebDAV GET
+from **200 with the key in the body** to 403, took DELETE to 403, and removed it
+from the listing.
+
+**That was then reverted on owner ruling the same day, and the file is servable
+again by design.** The ruling: the key being readable over Wi-Fi is acceptable,
+and it will be rotated as needed. What decided it was measuring the cost —
+`HIDDEN_ITEMS` blocks `PUT` too (403, against 201 for an ordinary file), so the
+protection removed the only way to WRITE a rotated key over File Transfer.
+Rotation would have meant pulling the SD card. Blocking the write while the read
+is acceptable is pure cost.
+
+Recorded rather than dropped because the exposure is real and someone will
+rediscover it: the file transfer server has **no authentication of any kind**,
+and AP mode is an open network (`AP_SSID = "CrossPoint-Reader"`,
+`AP_PASSWORD = nullptr`, "Open network for ease of use"). Anyone in Wi-Fi range
+can join and read the key while the File Transfer screen is up. That is a known,
+accepted risk on this fork — not an oversight. Do not "fix" it without asking.
+
+For reference if it is ever revisited: a leading dot would NOT protect it, since
+WebDAV deliberately serves dot-paths so a card mirror can sync `/.crosspoint`
+and `/.fonts`. `HIDDEN_ITEMS` is the only list that covers WebDAV. A write-only
+arrangement (PUT allowed, GET blocked) was offered and declined.
 
 **The SSID.** Gone from the code — `connectWifi` walks saved credentials like
 the Wi-Fi picker's auto-connect — and scrubbed from published history on
