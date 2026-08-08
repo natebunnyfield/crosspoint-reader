@@ -7,18 +7,15 @@
 #include <cstdio>
 #include <cstring>
 
-#include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
 #include "CrossPointSettings.h"
 #include "notes/BleHidHost.h"
-#include "FontDownloadActivity.h"
 #include "FontSelectionActivity.h"
 #include "MappedInputManager.h"
 #include "SystemFont.h"
 #include "activities/boot_sleep/SleepScreenPolicy.h"
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
-#include "OtaUpdateActivity.h"
 #include "SdFirmwareUpdateActivity.h"
 #endif
 #include "SdCardFontSystem.h"
@@ -284,12 +281,6 @@ void SettingsActivity::toggleCurrentSetting() {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
     switch (setting.action) {
-      case SettingAction::RemapFrontButtons:
-        startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput), resultHandler);
-        break;
-        break;
-        break;
-        break;
       case SettingAction::PairBluetoothKeyboard: {
         // Bring the radio up and scan. The host connects to the first HID
         // keyboard it sees and bonds; NVS keeps the bond so Create Note and
@@ -312,20 +303,10 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::make_unique<ClearCacheActivity>(renderer, mappedInput), resultHandler);
         break;
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
-      case SettingAction::CheckForUpdates:
-        startActivityForResult(std::make_unique<OtaUpdateActivity>(renderer, mappedInput), resultHandler);
-        break;
       case SettingAction::SdFirmwareUpdate:
         startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
 #endif
-      case SettingAction::DownloadFonts:
-        startActivityForResult(std::make_unique<FontDownloadActivity>(renderer, mappedInput),
-                               [this](const ActivityResult&) {
-                                 SETTINGS.saveToFile();
-                                 rebuildSettingsLists();
-                               });
-        break;
       case SettingAction::TextSettings:
         startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                                [this](const ActivityResult&) {

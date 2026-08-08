@@ -29,9 +29,8 @@ CrossPoint is open-source e-reader firmware - community-built, fully hackable, f
   - WebDAV handler
   - AP mode (hotspot) and STA mode (join existing Wi-Fi), both with QR helpers
   - NTP clock sync on connect
-  - OTA update checks and installs from GitHub releases
 
-- **Customization**: sleep screen modes, front/side button remapping, power-button behavior, refresh cadence, reading typeface and size, and more. The interface itself is a single theme (Lyra Six) — the other four were removed on 2026-08-04.
+- **Customization**: sleep screen modes, side button swap (Prev/Next), power-button behavior, refresh cadence, reading typeface and size, and more. The interface itself is a single theme (Lyra Six) — the other four were removed on 2026-08-04. Firmware updates are installed via SD card (Settings > Device > SD Firmware Update); the wireless OTA-check screen was removed on 2026-08-08 as unreachable (no menu entry launched it).
 
 - **Localization**: English and Spanish.
 
@@ -59,8 +58,10 @@ USB port or browser before assuming the device is locked. Only reach for the unl
 > **The only officially supported firmwares in the unlock tool are CrossPoint and CrossInk.**
 > 
 > Flashing any other firmware on a USB-locked device may **permanently brick the device** or leave it **permanently
-> stuck on that firmware with no recovery path**. Once USB flashing is re-locked, your only way back is via OTA, and if
-> the firmware you flashed doesn't support OTA, **there is no way out**.
+> stuck on that firmware with no recovery path**. Once USB flashing is re-locked, your only way back is a firmware
+> update mechanism the flashed firmware still exposes (for CrossPoint, that's the SD-card firmware update in
+> Settings — its wireless OTA-check screen was removed 2026-08-08), and if the firmware you flashed exposes neither,
+> **there is no way out**.
 
 ## Install firmware
 
