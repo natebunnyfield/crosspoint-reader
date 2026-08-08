@@ -1461,7 +1461,6 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
   if (!gpio.readAloudCaptureWanted()) return;
   std::string text;
   std::vector<ReadAloudWordRect> rects;
-  const int ascender = renderer.getFontAscenderSize(fontId);
   const int lineH = renderer.getLineHeight(fontId);
   const int spaceW = renderer.getSpaceWidth(fontId);
   const auto clampU16 = [](const int v) {
@@ -1486,7 +1485,15 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
     if (!block || !block->valid() || block->isEmpty()) continue;
     const int lineX = line.xPos + xOffset;
     // yPos is the baseline handed to drawText; the rect wants the line's top.
-    const int lineTop = line.yPos + yOffset - ascender;
+    // PageLine::yPos is the line's TOP, not its baseline -- it is handed to
+    // block->render() as the y origin (Page.cpp:24), and measuring the rendered
+    // panel confirms it: with yOffset=9 and lineH=36, lines at yPos 0/54/90/126
+    // put their ink at y 15/68/104/137, i.e. yPos + yOffset plus a few px of
+    // internal leading above cap height. Subtracting the ascender (26 px) here
+    // lifted every rect a full line, so the highlight sat one line above the
+    // word being spoken -- and on the first line it clamped to 0 and hid the
+    // error. Checked across two fonts (the bigger heading face agrees).
+    const int lineTop = line.yPos + yOffset;
     const uint16_t n = block->wordCount();
     bool firstRunOnLine = true;
     uint16_t i = 0;
