@@ -631,6 +631,13 @@ sdkApiThatTakesOwnership(obj);  // SDK calls delete
 
 ## UI Guidelines
 
+**Read [docs/ui-conventions.md](docs/ui-conventions.md) before adding any
+screen, popup, or setting.** It rules on which shape of choice gets which
+surface (toggle / OptionPopup / dedicated screen), the navigation contracts
+(exit on Back press; ActivityManager swallows transition edges — never add a
+per-activity release latch for child-exit leakage), and lists the activities
+the 2026-08-08 consistency audit deleted so they are not resurrected.
+
 ### Screen Geometry
 * No Hardcoding: Never assume 800 or 480. Use renderer.getScreenWidth() and renderer.getScreenHeight().
 * Viewable Area: Use renderer.getOrientedViewableTRBL() to stay within physical bezel margins.

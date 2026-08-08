@@ -16,7 +16,16 @@
 class Activity;    // forward declaration
 class RenderLock;  // forward declaration
 
-enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, FILE_TRANSFER, MANAGE_FILES, SETTINGS_MENU, CREATE_NOTE, CLAUDE };
+enum class HomeMenuItem {
+  NONE,
+  FILE_BROWSER,
+  RECENTS,
+  FILE_TRANSFER,
+  MANAGE_FILES,
+  SETTINGS_MENU,
+  CREATE_NOTE,
+  CLAUDE
+};
 
 /**
  * ActivityManager
@@ -83,14 +92,16 @@ class ActivityManager {
   void goToFileTransfer();
   void goToSettings();
   void goToFileBrowser(std::string path = {});
-  void goToFileManager();
+  // startPath: the directory to open initially (empty = SD root "/").
+  void goToFileManager(std::string startPath = {});
   void goToRecentBooks();
   void goToReader(std::string path, bool allowFastInitialRefresh = false);
   void goToSleep(bool fromTimeout = false);
   void goToBoot();
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();
-  void goToNoteEditor(std::string path);
+  // returnDir: non-empty = launched from FileManager; Back/Done routes back there.
+  void goToNoteEditor(std::string path, std::string returnDir = {});
   void goToClaudeChat();
   void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE);
 

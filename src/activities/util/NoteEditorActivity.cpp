@@ -150,6 +150,14 @@ void NoteEditorActivity::onExit() {
   Activity::onExit();
 }
 
+void NoteEditorActivity::exitEditor() {
+  if (returnDir.empty()) {
+    finish();
+  } else {
+    activityManager.goToFileManager(returnDir);
+  }
+}
+
 // Rebuild the soft-wrapped display lines. O(n) over the buffer, and only run
 // when the text actually changes — not per render.
 void NoteEditorActivity::relayout() {
@@ -358,7 +366,7 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
       handleKey('\n');
       break;
     case notes::KeyboardPanel::Event::Done:
-      finish();
+      exitEditor();
       return;
     case notes::KeyboardPanel::Event::None:
       // Shift, the symbols layer, a daisy ring swap: the KEYBOARD changed and
@@ -386,8 +394,8 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
 }
 
 void NoteEditorActivity::loop() {
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    finish();
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+    exitEditor();
     return;
   }
 

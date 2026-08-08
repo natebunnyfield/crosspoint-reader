@@ -10,6 +10,7 @@
 #include <algorithm>
 
 #include "CrossPointSettings.h"
+#include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -233,8 +234,8 @@ void BmpViewerActivity::loop() {
     return true;
   };
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    activityManager.goToFileBrowser(filePath);
+  if (ReaderUtils::handleBackNavigation(mappedInput, activityManager, filePath.c_str(),
+                                        {nullptr, [](void*) { activityManager.goHome(); }})) {
     return;
   }
 

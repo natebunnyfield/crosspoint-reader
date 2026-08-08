@@ -149,22 +149,13 @@ void FontSelectionActivity::onEnter() {
 void FontSelectionActivity::onExit() { Activity::onExit(); }
 
 void FontSelectionActivity::loop() {
-  // Back on RELEASE, not press. This screen is reachable from the reader as
-  // well as from Settings, and EpubReaderActivity acts on the Back RELEASE
-  // (short press -> onGoHome, EpubReaderActivity.cpp). Finishing on the press
-  // left the release edge unconsumed: the reader resumed mid-gesture, saw it,
-  // and threw the user out of the book to Home on a single Back tap.
-  //
-  // Measured before the fix: Back at t=13000 -> FontSelect exited t+13ms (the
-  // press), EpubReader exited t+80ms (the release). The two other activities
-  // the reader opens — EpubReaderMenuActivity and
-  // EpubReaderPercentSelectionActivity — both already use wasReleased for
-  // exactly this reason; this now matches them.
-  //
-  // Safe from the Settings side too: SettingsActivity keys off the press,
-  // which is consumed here while this activity is still current, so it sees
-  // neither edge.
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+  // Back on PRESS. ActivityManager::swallowUntilIdle() is called at every
+  // activity swap, so the outgoing activity's press edge is never visible to
+  // the incoming one. FontSelectionActivity is launched only from Settings
+  // (not from the reader), so the old concern about EpubReaderActivity seeing
+  // a leaked release no longer applies. Exiting on press gives immediate
+  // feedback and matches every other settings sub-screen.
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     // Choices apply as they are made, so Back just leaves. There is no
     // separate confirm step and nothing to roll back.
     finish();

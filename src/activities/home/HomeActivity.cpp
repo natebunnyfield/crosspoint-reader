@@ -248,13 +248,11 @@ void HomeActivity::loop() {
     return;
   }
 
-  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) backPressSeen = true;
-
   // Back is otherwise unused on the home menu: open the most recently read
   // book directly (recentBooks is most-recent-first and already pruned of
-  // files missing from the SD card). backPressSeen guards against the stale
-  // release of the Back press that closed the previous activity.
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back) && backPressSeen && !recentBooks.empty()) {
+  // files missing from the SD card). swallowUntilIdle() in ActivityManager
+  // covers the stale release from the previous activity's exit press.
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back) && !recentBooks.empty()) {
     onSelectBook(recentBooks[0].path);
     return;
   }
@@ -361,13 +359,10 @@ void HomeActivity::render(RenderLock&&) {
     // Order is the owner's ruling (2026-08-06). These two vectors and BOTH
     // index maps in HomeActivity.h must stay in the same order — see the note
     // there; they are four separate sources of truth for one list.
-    std::vector<const char*> menuItems = {tr(STR_MENU_RECENT_BOOKS), tr(STR_BROWSE_FILES),
-                                          tr(STR_MANAGE_FILES),
-                                          tr(STR_FILE_TRANSFER),
-                                          tr(STR_CREATE_NOTE),       "Claude",
+    std::vector<const char*> menuItems = {tr(STR_MENU_RECENT_BOOKS), tr(STR_BROWSE_FILES), tr(STR_MANAGE_FILES),
+                                          tr(STR_FILE_TRANSFER),     tr(STR_CREATE_NOTE),  "Claude",
                                           tr(STR_SETTINGS_TITLE)};
-    std::vector<UIIcon> menuIcons = {Recent,     Folder,     ManageFiles,
-                                     Transfer,   CreateNote, ClaudeMark, Settings};
+    std::vector<UIIcon> menuIcons = {Recent, Folder, ManageFiles, Transfer, CreateNote, ClaudeMark, Settings};
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme

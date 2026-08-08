@@ -184,23 +184,18 @@ Consequences worth knowing before reprovisioning:
 
 ## Installing Fonts
 
-There are three ways to install fonts:
+There are two ways to install fonts. (An earlier on-device "Manage Fonts"
+downloader was removed on 2026-08-08 — it had no menu entry launching it and
+was unreachable; SD firmware updates remain the on-device update path.)
 
-### Option 1: Download from device (recommended)
-
-1. Connect your CrossPoint reader to Wi-Fi
-2. Go to **Settings > System > Manage Fonts**
-3. Browse available font families and tap to download
-4. Downloaded fonts appear immediately in **Settings > Reader > Font Family**
-
-### Option 2: Upload via web browser
+### Option 1: Upload via web browser
 
 1. Start **File Transfer** and connect through **Join Network** or **Create Hotspot**
 2. Open the web interface URL shown on the reader
 3. Navigate to the **Fonts** tab
 4. Upload `.cpfont` files using the upload form
 
-### Option 3: Manual SD card copy
+### Option 2: Manual SD card copy
 
 1. Download font files from the
    [crosspoint-fonts repository](https://github.com/crosspoint-reader/crosspoint-fonts)

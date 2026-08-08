@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "activities/Activity.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
 struct Rect;
@@ -85,9 +86,8 @@ class WifiSelectionActivity final : public Activity {
   // Saved SSIDs already attempted during the current auto-connect session.
   std::vector<std::string> autoAttemptedSsids;
 
-  // Save/forget prompt selection (0 = Yes, 1 = No)
-  int savePromptSelection = 0;
-  int forgetPromptSelection = 0;
+  // Shared in-place modal for the save/forget prompts (mutually exclusive states)
+  OptionPopup optionPopup;
 
   // Connection timeout. The connect path uses WIFI_ALL_CHANNEL_SCAN, which
   // alone takes ~2-4s before association even starts; add the WPA handshake
@@ -108,6 +108,8 @@ class WifiSelectionActivity final : public Activity {
   void renderConnectionFailed(const Rect* screen, const ThemeMetrics* metrics) const;
   void renderForgetPrompt(const Rect* screen, const ThemeMetrics* metrics) const;
 
+  void showSavePrompt();
+  void showForgetPrompt();
   void startWifiScan(bool autoScan = false);
   void processWifiScanResults();
   void appendHiddenNetworkEntry();

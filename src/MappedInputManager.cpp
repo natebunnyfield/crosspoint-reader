@@ -298,12 +298,40 @@ bool MappedInputManager::wasHomeGesture() const {
   return false;
 }
 
+bool MappedInputManager::isAnyPhysicalButtonHeld() const {
+  // Check all seven physical button indices.  The swallow must stay active
+  // while any button is held down, even if no edge is pending, because the
+  // activity that just became current might contain long-press checks on
+  // isPressed() that would misfireotherwise.
+  for (uint8_t i = 0; i <= HalGPIO::BTN_POWER; ++i) {
+    if (gpio.isPressed(i)) return true;
+  }
+  return false;
+}
+
+void MappedInputManager::swallowUntilIdle() {
+  // Only arm if a button is actually held. If nothing is held at swap time there
+  // are no stale edges to protect against, and arming would swallow the NEXT
+  // legitimate press (which may arrive immediately in tests or UI combos).
+  if (isAnyPhysicalButtonHeld()) swallowActive_ = true;
+}
+
 bool MappedInputManager::wasPressed(const Button button) const {
+  if (swallowActive_) {
+    // Suppress the edge. Clear the flag only once all buttons are idle so
+    // the release frame following an exit-on-press is also suppressed.
+    if (!isAnyPhysicalButtonHeld()) swallowActive_ = false;
+    return false;
+  }
   if (button == Button::Back && wasBackGesture()) return true;
   return mapButton(button, &HalGPIO::wasPressed);
 }
 
 bool MappedInputManager::wasReleased(const Button button) const {
+  if (swallowActive_) {
+    if (!isAnyPhysicalButtonHeld()) swallowActive_ = false;
+    return false;
+  }
   if (button == Button::Back && wasBackGesture()) return true;
   return mapButton(button, &HalGPIO::wasReleased);
 }

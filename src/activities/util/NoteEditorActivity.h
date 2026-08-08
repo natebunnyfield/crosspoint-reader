@@ -25,6 +25,9 @@ class NoteEditorActivity final : public Activity {
   std::unique_ptr<char[]> storage;
   std::unique_ptr<textbuf::TextBuffer> buf;
   std::string path;
+  // Non-empty when launched from FileManagerActivity: Back/Done navigates back
+  // there (at that directory) instead of going home.
+  std::string returnDir;
 
   // Soft-wrapped display lines, rebuilt only when the text changes.
   struct DisplayLine {
@@ -79,10 +82,14 @@ class NoteEditorActivity final : public Activity {
   void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
   int advanceOf(const char* piece, EpdFontFamily::Style style) const;
   bool save();
+  // Shared exit for Back and keyboard Done: saves, then routes to FileManager
+  // (when launched from there) or goes home.
+  void exitEditor();
 
  public:
-  NoteEditorActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string filePath)
-      : Activity("NoteEditor", renderer, mappedInput), path(std::move(filePath)) {}
+  NoteEditorActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string filePath,
+                     std::string returnDir = {})
+      : Activity("NoteEditor", renderer, mappedInput), path(std::move(filePath)), returnDir(std::move(returnDir)) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

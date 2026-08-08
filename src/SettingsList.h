@@ -330,11 +330,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           "imageRendering", StrId::STR_CAT_READER));
 
     // --- Controls ---
+    // Category is STR_CAT_CONTROLS (not STR_CAT_SYSTEM), so rebuildSettingsLists()
+    // drops these rows from the device UI — Controls is a withdrawn tab. They
+    // stay in getSettingsList() for persistence (fromJson/toJson) and the web
+    // settings API. Category is not persisted, so this change has no impact on
+    // saved settings.json files.
     v.push_back(SettingInfo::Enum(StrId::STR_SIDE_BTN_LAYOUT, &CrossPointSettings::sideButtonLayout,
-                                  {StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV, StrId::STR_DISABLED},
-                                  "sideButtonLayout"));
+                                  {StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV, StrId::STR_DISABLED}, "sideButtonLayout",
+                                  StrId::STR_CAT_CONTROLS));
     v.push_back(SettingInfo::Enum(StrId::STR_TOUCH_READER_CONTROLS, &CrossPointSettings::touchReaderControls,
-                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "touchReaderControls"));
+                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "touchReaderControls",
+                                  StrId::STR_CAT_CONTROLS));
     // Third label = stored value 2 = FONT_SIZE_STEP. The order of this array IS
     // the persisted encoding, so append only — see LONG_PRESS_BUTTON_BEHAVIOR in
     // CrossPointSettings.h for why the retired ORIENTATION_CHANGE slot was reused
@@ -342,22 +348,22 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_LONG_PRESS_BEHAVIOR, &CrossPointSettings::longPressButtonBehavior,
                                   {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
                                    StrId::STR_LONG_PRESS_BEHAVIOR_FONT_SIZE},
-                                  "longPressButtonBehavior"));
+                                  "longPressButtonBehavior", StrId::STR_CAT_CONTROLS));
     v.push_back(SettingInfo::Enum(
         StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
         {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH, StrId::STR_FOOTNOTES},
-        "shortPwrBtn"));
+        "shortPwrBtn", StrId::STR_CAT_CONTROLS));
     v.push_back(SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &CrossPointSettings::pwrBtnFootnoteBack,
-                                    "pwrBtnFootnoteBack"));
+                                    "pwrBtnFootnoteBack", StrId::STR_CAT_CONTROLS));
     v.push_back(SettingInfo::Toggle(StrId::STR_BACK_SHORT_TO_FILE_BROWSER, &CrossPointSettings::backShortToFileBrowser,
-                                    "backShortToFileBrowser"));
+                                    "backShortToFileBrowser", StrId::STR_CAT_CONTROLS));
 
     // --- System ---
-    // Screen margin leads the System block because it is one of the two rows
-    // the withdrawn Reader tab kept (the other is the Text Settings action,
-    // which SettingsActivity inserts above this one), and the two belong
-    // together at the top of the only list the device now shows: they are what
-    // a page of a book looks like. Everything below is about the device.
+    // The System block is contributed to the device list in the order below.
+    // Typing Redraw Delay and Editor Font (both STR_CAT_SYSTEM) already appear
+    // above in the Reader section so they sort to their natural position; Screen
+    // Margin follows them. Text Settings — the device-only action — is inserted
+    // above the whole shared list by SettingsActivity::rebuildSettingsLists().
     v.push_back(buildScreenMarginSetting());
     // The typeface the chrome itself is drawn in. Filed under System rather than
     // Reader because it is not about books: it changes headers, list rows,

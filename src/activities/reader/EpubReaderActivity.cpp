@@ -27,7 +27,6 @@
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
-#include "activities/settings/FontSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -398,43 +397,6 @@ void EpubReaderActivity::loop() {
 
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
 
-  // While the end screen suggestion menu is showing it owns Confirm/Back/navigation
-  // input. Anything it doesn't handle (e.g. long-press Back to the file browser) falls
-  // through to the regular handlers below; page turns are absorbed by the end-of-book
-  // block. A Confirm release after a chord fired is left
-  // to the regular Confirm handler below, which consumes it via ignoreNextConfirmRelease.
-  // `!sideChordConsumed` for the same reason as the ignoreNextConfirmRelease term beside
-  // it: a leftover edge from a gesture already acted on must not be dispatched again here.
-  // This block sits AHEAD of the chord gating, and EndOfBookOptions::triggered() is
-  // release-based with NavNext/NavPrevious including the side buttons — so a Confirm+side
-  // chord would step the line spacing on the press and then ALSO move this menu's selector
-  // on the release. One gesture, two actions. The latch is set on the press frame and is
-  // still set when that release arrives, so testing it here closes the window; the swallow
-  // block below then clears it.
-  if (atEndOfBook && endOfBookOptions.menuActive() && !sideChordConsumed &&
-      !(ignoreNextConfirmRelease && mappedInput.wasReleased(MappedInputManager::Button::Confirm))) {
-    std::string openPath;
-    switch (endOfBookOptions.handleMenuInput(mappedInput, &openPath)) {
-      case EndOfBookOptions::Action::OpenBook:
-        activityManager.goToReader(openPath);
-        return;
-      case EndOfBookOptions::Action::GoHome:
-        onGoHome();
-        return;
-      case EndOfBookOptions::Action::LastPage:
-        currentSpineIndex = std::max(epub->getSpineItemsCount() - 1, 0);
-        nextPageNumber = 0;
-        pendingPageJump = std::numeric_limits<uint16_t>::max();
-        requestUpdate();
-        return;
-      case EndOfBookOptions::Action::Redraw:
-        requestUpdate();
-        return;
-      case EndOfBookOptions::Action::None:
-        break;
-    }
-  }
-
   // ---- CONFIRM AS A MODIFIER KEY (Confirm held + side button tap = line spacing) ----
   //
   // Read here, ahead of every Confirm and side-button handler below, because a chord must
@@ -471,12 +433,16 @@ void EpubReaderActivity::loop() {
 
   // Chapter select on short-press Confirm or a downward swipe from the top edge. There is no
   // reader menu — jumping to a chapter is the one thing Confirm does.
+  // On the end-of-book screen Confirm goes home instead.
   //
   // A long-press that fired a bound function (KOReader sync) sets ignoreNextConfirmRelease so
   // the release ending the hold does not also open chapter select; so does a line-spacing chord.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput)) {
     if (ignoreNextConfirmRelease) {
       ignoreNextConfirmRelease = false;
+    } else if (atEndOfBook) {
+      onGoHome();
+      return;
     } else {
       openChapterSelection();
     }
@@ -486,6 +452,12 @@ void EpubReaderActivity::loop() {
   // SETTINGS.sideButtonLayout is SIDE_BUTTONS_DISABLED — that setting withdraws side PAGING,
   // not the side buttons themselves, and the chord has to be reachable wherever the font
   // gestures are.
+  // On the end-of-book screen a short Back goes home (same as Confirm and PageForward).
+  if (atEndOfBook && mappedInput.wasReleased(MappedInputManager::Button::Back) &&
+      mappedInput.getHeldTime() < ReaderUtils::GO_BACK_OR_HOME_MS) {
+    onGoHome();
+    return;
+  }
   // Short press Back restores position when viewing a footnote (takes priority over navigation)
   if (footnoteDepth > 0 && mappedInput.wasReleased(MappedInputManager::Button::Back) &&
       mappedInput.getHeldTime() < ReaderUtils::GO_BACK_OR_HOME_MS) {
@@ -629,14 +601,8 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  // At end of the book with no suggestion menu, forward button goes home and back
-  // button returns to last page
+  // At end of the book: forward goes home, back returns to last page
   if (currentSpineIndex > 0 && currentSpineIndex >= epub->getSpineItemsCount()) {
-    if (endOfBookOptions.menuActive()) {
-      // Selection movement was handled above; absorb leftover page-turn triggers so
-      // e.g. "previous" at the top of the list doesn't jump back into the book
-      return;
-    }
     if (nextTriggered) {
       onGoHome();
     } else {
@@ -975,11 +941,11 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 
   // Show end of book screen
   if (currentSpineIndex == epub->getSpineItemsCount()) {
-    // Sole load site: runs on the render task (serialized by RenderLock); the main
-    // task only reads the suggestions once the loaded flag is published
-    endOfBookOptions.loadOnce(epub->getPath());
     renderer.clearScreen();
-    endOfBookOptions.render(renderer, mappedInput);
+    // 3/8 of the screen height matches the previous fixed position on the 480x800 panel
+    // and scales to other resolutions.
+    renderer.drawCenteredText(UI_12_FONT_ID, renderer.getScreenHeight() * 3 / 8, tr(STR_END_OF_BOOK), true,
+                              EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
   }
@@ -1463,9 +1429,7 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
   std::vector<ReadAloudWordRect> rects;
   const int lineH = renderer.getLineHeight(fontId);
   const int spaceW = renderer.getSpaceWidth(fontId);
-  const auto clampU16 = [](const int v) {
-    return static_cast<uint16_t>(v < 0 ? 0 : (v > 0xFFFF ? 0xFFFF : v));
-  };
+  const auto clampU16 = [](const int v) { return static_cast<uint16_t>(v < 0 ? 0 : (v > 0xFFFF ? 0xFFFF : v)); };
   // A word the layout hyphen-split across lines arrives as two tokens whose
   // prefix ends in '-' at the end of its line (ParsedText appends the visible
   // hyphen to the stored prefix). The TextBlock arena carries no source
@@ -1511,8 +1475,8 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
       std::string runText;
       while (true) {
         appendStrippingSoftHyphens(runText, block->wordText(i));
-        runEndX = lineX + block->wordXpos(i) +
-                  renderer.getTextAdvanceX(fontId, block->wordText(i), block->wordStyle(i));
+        runEndX =
+            lineX + block->wordXpos(i) + renderer.getTextAdvanceX(fontId, block->wordText(i), block->wordStyle(i));
         i++;
         if (i >= n || tokenIsBlank(block->wordText(i))) break;
         if (lineX + block->wordXpos(i) - runEndX > spaceW / 2) break;

@@ -7,19 +7,15 @@
 #include <cstdio>
 #include <cstring>
 
-#include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
 #include "CrossPointSettings.h"
-#include "notes/BleHidHost.h"
-#include "FontDownloadActivity.h"
 #include "FontSelectionActivity.h"
-#include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
 #include "SystemFont.h"
 #include "activities/boot_sleep/SleepScreenPolicy.h"
+#include "notes/BleHidHost.h"
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
-#include "OtaUpdateActivity.h"
 #include "SdFirmwareUpdateActivity.h"
 #endif
 #include "SdCardFontSystem.h"
@@ -66,8 +62,8 @@ void SettingsActivity::rebuildSettingsLists() {
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
   // Text Settings leads the list: it is the reading screen's own settings
-  // (font family, size, live preview), and Screen Margin sits directly under it
-  // as the first entry the shared list contributes.
+  // (font family, size, live preview). Typing Redraw Delay and Editor Font are
+  // the first System entries the shared list contributes; Screen Margin follows.
   deviceSettings.insert(deviceSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
   // Manage Fonts is withdrawn. SD card fonts are still discovered and
@@ -169,8 +165,8 @@ void SettingsActivity::loop() {
 
   // A held Up/Down used to switch category. There are no categories left, so it
   // pages the list instead — the same thing a hold does on every other list
-  // screen (LanguageSelectActivity.cpp) — rather than becoming a dead gesture on
-  // what is now the longest list in the firmware.
+  // screen — rather than becoming a dead gesture on what is now the longest
+  // list in the firmware.
   buttonNavigator.onNextContinuous([this, settingsPageItems] {
     selectedSettingIndex = ButtonNavigator::nextPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
     requestUpdate();
@@ -218,7 +214,7 @@ void SettingsActivity::toggleCurrentSetting() {
   } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
     const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
     const size_t choiceCount = setting.enumCount();
-    if (choiceCount > 2) {
+    if (choiceCount > 1) {
       const auto valuePtr = setting.valuePtr;
       auto onSelect = [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged, systemFontChanged](int idx) {
         SETTINGS.*valuePtr = idx;
@@ -252,7 +248,7 @@ void SettingsActivity::toggleCurrentSetting() {
                                     ? static_cast<uint8_t>(setting.enumValues.size())
                                     : static_cast<uint8_t>(setting.enumStringValues.size());
     const uint8_t cur = setting.valueGetter();
-    if (totalValues > 2) {
+    if (totalValues > 1) {
       const auto valueSetter = setting.valueSetter;
       auto onSelect = [this, valueSetter, sleepScreenChanged, quickResumeTimeoutChanged](int idx) {
         valueSetter(idx);
@@ -269,6 +265,10 @@ void SettingsActivity::toggleCurrentSetting() {
       requestUpdate();
       return;
     }
+    // Guard the modulus. A row with no choices at all must not divide by zero:
+    // that is UB, and on RISC-V it does not trap — it returns the dividend, so
+    // the stored index just climbs until the value column renders blank.
+    if (totalValues == 0) return;
     setting.valueSetter((cur + 1) % totalValues);
   } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
     const int8_t currentValue = SETTINGS.*(setting.valuePtr);
@@ -281,12 +281,6 @@ void SettingsActivity::toggleCurrentSetting() {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
     switch (setting.action) {
-      case SettingAction::RemapFrontButtons:
-        startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput), resultHandler);
-        break;
-        break;
-        break;
-        break;
       case SettingAction::PairBluetoothKeyboard: {
         // Bring the radio up and scan. The host connects to the first HID
         // keyboard it sees and bonds; NVS keeps the bond so Create Note and
@@ -309,20 +303,10 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::make_unique<ClearCacheActivity>(renderer, mappedInput), resultHandler);
         break;
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
-      case SettingAction::CheckForUpdates:
-        startActivityForResult(std::make_unique<OtaUpdateActivity>(renderer, mappedInput), resultHandler);
-        break;
       case SettingAction::SdFirmwareUpdate:
         startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
 #endif
-      case SettingAction::DownloadFonts:
-        startActivityForResult(std::make_unique<FontDownloadActivity>(renderer, mappedInput),
-                               [this](const ActivityResult&) {
-                                 SETTINGS.saveToFile();
-                                 rebuildSettingsLists();
-                               });
-        break;
       case SettingAction::TextSettings:
         startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                                [this](const ActivityResult&) {
@@ -331,9 +315,35 @@ void SettingsActivity::toggleCurrentSetting() {
                                  rebuildSettingsLists();
                                });
         break;
-      case SettingAction::Language:
-        startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
+      case SettingAction::Language: {
+        // Show the language list in the in-place option popup rather than
+        // pushing a full sub-screen. Only two languages exist, so this avoids
+        // the cost of an extra activity for what is a two-item pick.
+        const uint8_t langCount = getLanguageCount();
+        std::vector<std::string> langNames;
+        langNames.reserve(langCount);
+        for (uint8_t i = 0; i < langCount; i++) {
+          langNames.emplace_back(I18N.getLanguageName(static_cast<Language>(SORTED_LANGUAGE_INDICES[i])));
+        }
+        const uint8_t currentLang = static_cast<uint8_t>(I18N.getLanguage());
+        int currentLangIdx = 0;
+        for (int i = 0; i < static_cast<int>(langCount); i++) {
+          if (SORTED_LANGUAGE_INDICES[i] == currentLang) {
+            currentLangIdx = i;
+            break;
+          }
+        }
+        optionPopup.show(StrId::STR_LANGUAGE, langNames, currentLangIdx, [this](int idx) {
+          const uint8_t langIndex = SORTED_LANGUAGE_INDICES[idx];
+          I18N.setLanguage(static_cast<Language>(langIndex));
+          SETTINGS.language = langIndex;
+          SETTINGS.saveToFile();
+          // Rebuild so all row labels re-translate in the new language.
+          rebuildSettingsLists();
+        });
+        requestUpdate();
         break;
+      }
       case SettingAction::DeviceOwner:
         // Free-text owner name, shown on the sleep screens. Saved immediately:
         // sleep can power the device off, and an unsaved name would vanish.
@@ -464,19 +474,14 @@ void SettingsActivity::render(RenderLock&&) {
       },
       true);
 
-  // Draw help text. Rows that open a screen say "Select", not "Toggle" --
-  // Confirm on them does not cycle a value. (Upstream's status bar screen used a
-  // blanket "Toggle" hint for every row; this fork already made the distinction
-  // for Time to Sleep, and the offset row behaves the same way.)
-  //
-  // ACTION rows are the same case and were saying "Toggle": every one of them
-  // opens a screen. Text Settings — the row this list now leads with — is one.
-  //
-  // There is no category name in this hint any more. It named the tab Confirm
-  // would switch to, and there is no second tab to switch to.
+  // Draw help text. Rows that open a popup or a sub-screen say "Select";
+  // rows that toggle a value in place say "Toggle". There is no category name
+  // in this hint — there is no second tab to switch to.
   auto opensSubScreen = [](const SettingInfo& setting) {
-    return setting.type == SettingType::ACTION || setting.nameId == StrId::STR_TIME_TO_SLEEP ||
-           setting.nameId == StrId::STR_CLOCK_UTC_OFFSET;
+    if (setting.type == SettingType::ACTION) return true;
+    if (setting.nameId == StrId::STR_TIME_TO_SLEEP || setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) return true;
+    if (setting.type == SettingType::ENUM && setting.enumCount() > 1) return true;
+    return false;
   };
   const bool onRow = selectedSettingIndex >= 0 && selectedSettingIndex < settingsCount;
   const auto confirmLabel = (onRow && opensSubScreen(settings[selectedSettingIndex])) ? tr(STR_SELECT) : tr(STR_TOGGLE);

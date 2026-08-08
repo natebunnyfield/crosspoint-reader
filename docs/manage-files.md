@@ -52,9 +52,9 @@ Action menu options (title = the item's name):
   **Move here**, which `Storage.rename()`s the source into the current
   directory. Same-directory move is a no-op; moving a directory into its own
   subtree is rejected before starting.
-- **Delete** → existing `ConfirmationActivity`, then recursive delete (the
-  iterative-stack implementation extracted from `FileBrowserActivity`, which
-  clears book caches as it goes).
+- **Delete** → in-place `OptionPopup` confirmation (the activity's existing
+  `popup` member), then recursive delete (the iterative-stack implementation
+  extracted from `FileBrowserActivity`, which clears book caches as it goes).
 
 Empty directory + armed clipboard: Confirm still opens the menu (Move here is
 the only entry), so a move into an empty folder works.
@@ -88,8 +88,16 @@ and progress restarts. Sim-verified by pre-blocking the destination hash dir.
 - **Self-nesting move** (folder into its own subtree) must be rejected by path
   prefix check before calling rename; SdFat behavior for it is not trusted.
 - **Held-release leak**: any activity entered while Confirm/Back is held must
-  swallow that button's next release (`lockNextConfirmRelease` pattern from
-  `FileBrowserActivity`) or the first list item self-activates.
+  swallow that button's next release, or the first list item self-activates.
+  This is now handled centrally: `ActivityManager::loop()` calls
+  `MappedInputManager::swallowUntilIdle()` at every activity swap (pop, push,
+  replace), which suppresses `wasPressed`/`wasReleased` until all physical
+  buttons are idle. Per-screen `lockNextConfirmRelease` latches set in
+  `onEnter()` (FileBrowserActivity, FileManagerActivity) are therefore redundant
+  and have been removed; the inline popup latches
+  (`lockNextConfirmRelease`/`lockNextBackRelease` set inside popup callbacks)
+  are NOT covered — the popup acts on press within the same activity frame with
+  no swap, so the release leaks within that same activity; those latches remain.
 - **i18n**: labels are `STR_*` keys in `lib/I18n/translations/english.yaml`;
   generated headers are gitignored and rebuilt by `scripts/gen_i18n.py`.
 - **Deleting a book does not remove it from Recents** (pre-existing behavior);
@@ -125,13 +133,12 @@ uses) — worth one manual check on device.
 ### Traps found while building/verifying
 
 - **Popup close leaks a button release.** `OptionPopup` acts on button *press*;
-  every list screen in this codebase acts on *release*. A popup living inside
-  an activity (not wrapped in its own activity) closes on the press and the
-  release then fires the list action underneath — the manager swallows it via
-  `lockNextConfirmRelease` / `lockNextBackRelease` set right after
-  `popup.handleInput()` reports the popup closed. Press-driven activities
-  (SettingsActivity) never see this, which is why the pattern isn't visible in
-  the existing popup call sites.
+  list screens act on *release*. A popup living inside an activity (not wrapped
+  in its own activity) closes on the press; the release leaks to the list below.
+  No activity swap occurs here, so `swallowUntilIdle()` does NOT cover this.
+  The manager swallows it via `lockNextConfirmRelease` / `lockNextBackRelease`
+  set immediately after `popup.handleInput()` reports the popup closed. These
+  latches remain even after the central swallow was added.
 - **Headless QA scripts: `.crosspoint/` materializes and shifts every row.**
   The first sim run creates `.crosspoint/` on the test card; in a
   show-everything list it then occupies row 0 at the root, so a DOWN-count

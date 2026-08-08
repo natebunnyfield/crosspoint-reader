@@ -16,8 +16,8 @@
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
 #include "util/ClaudeChatActivity.h"
-#include "util/NoteEditorActivity.h"
 #include "util/FullScreenMessageActivity.h"
+#include "util/NoteEditorActivity.h"
 
 static portMUX_TYPE activityManagerSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -105,6 +105,9 @@ void ActivityManager::loop() {
         currentActivity = std::move(stackActivities.back());
         stackActivities.pop_back();
         LOG_DBG("ACT", "Popped from activity stack, new size = %zu", stackActivities.size());
+        // Swallow any press/release edges that the outgoing activity consumed
+        // so they do not leak into the incoming activity's first loop().
+        mappedInput.swallowUntilIdle();
         // Handle result if necessary
         if (currentActivity->resultHandler) {
           LOG_DBG("ACT", "Handling result for popped activity");
@@ -144,6 +147,9 @@ void ActivityManager::loop() {
       }
       pendingAction = PendingAction::None;
       currentActivity = std::move(pendingActivity);
+      // Swallow edges so the new activity's first loop() does not see the
+      // press/release that triggered this push or replace.
+      mappedInput.swallowUntilIdle();
 
       lock.unlock();  // onEnter may acquire its own lock
       currentActivity->onEnter();
@@ -190,16 +196,18 @@ void ActivityManager::goToFileTransfer() {
 }
 
 void ActivityManager::goToSettings() {
-  lastHomeMenuItem = HomeMenuItem::SETTINGS_MENU; replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
+  lastHomeMenuItem = HomeMenuItem::SETTINGS_MENU;
+  replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput));
+}
 
 void ActivityManager::goToFileBrowser(std::string path) {
   lastHomeMenuItem = HomeMenuItem::FILE_BROWSER;
   replaceActivity(std::make_unique<FileBrowserActivity>(renderer, mappedInput, std::move(path)));
 }
 
-void ActivityManager::goToFileManager() {
+void ActivityManager::goToFileManager(std::string startPath) {
   lastHomeMenuItem = HomeMenuItem::MANAGE_FILES;
-  replaceActivity(std::make_unique<FileManagerActivity>(renderer, mappedInput));
+  replaceActivity(std::make_unique<FileManagerActivity>(renderer, mappedInput, std::move(startPath)));
 }
 
 void ActivityManager::goToRecentBooks() {
@@ -243,13 +251,15 @@ void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<Crash
 // straight from boot instead, the same call saw 134,972 free / 114,676 and
 // returned 0. Replacing frees Home before BLE starts; Back still works because
 // popActivity() on an empty stack goes Home.
-void ActivityManager::goToNoteEditor(std::string path) {
+void ActivityManager::goToNoteEditor(std::string path, std::string returnDir) {
   lastHomeMenuItem = HomeMenuItem::CREATE_NOTE;
-  replaceActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path)));
+  replaceActivity(std::make_unique<NoteEditorActivity>(renderer, mappedInput, std::move(path), std::move(returnDir)));
 }
 
 void ActivityManager::goToClaudeChat() {
-  lastHomeMenuItem = HomeMenuItem::CLAUDE; replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput)); }
+  lastHomeMenuItem = HomeMenuItem::CLAUDE;
+  replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput));
+}
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

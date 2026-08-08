@@ -269,7 +269,7 @@ void TextViewerActivity::pageBack() {
 }
 
 void TextViewerActivity::loop() {
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
   }

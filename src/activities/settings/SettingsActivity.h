@@ -14,14 +14,11 @@ enum class SettingType { TOGGLE, ENUM, ACTION, VALUE, STRING };
 
 enum class SettingAction {
   None,
-  RemapFrontButtons,
   Network,
   ClearCache,
-  CheckForUpdates,
   SdFirmwareUpdate,
   Language,
   DeviceOwner,
-  DownloadFonts,
   TextSettings,
   PairBluetoothKeyboard,
   ForgetBluetoothKeyboard,

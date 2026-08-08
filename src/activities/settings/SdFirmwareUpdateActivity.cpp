@@ -9,7 +9,6 @@
 
 #include "MappedInputManager.h"
 #include "activities/home/FileBrowserActivity.h"
-#include "activities/util/ConfirmationActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "network/FirmwareFlasher.h"
@@ -135,8 +134,14 @@ void SdFirmwareUpdateActivity::promptConfirmation() {
   const auto pos = body.find_last_of('/');
   if (pos != std::string::npos) body = body.substr(pos + 1);
 
-  startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, body),
-                         [this](const ActivityResult& result) { onConfirmationResult(result); });
+  const char* options[] = {tr(STR_CANCEL), tr(STR_CONFIRM)};
+  confirmPopup.show(heading.c_str(), options, 2, 0, [this](int idx) {
+    ActivityResult res;
+    res.isCancelled = (idx != 1);
+    onConfirmationResult(res);
+  });
+  confirmPopup.setInfoLines({body});
+  requestUpdate();
 }
 
 void SdFirmwareUpdateActivity::onConfirmationResult(const ActivityResult& result) {
@@ -197,6 +202,11 @@ void SdFirmwareUpdateActivity::performUpdate() {
 }
 
 void SdFirmwareUpdateActivity::loop() {
+  if (state == State::CONFIRMING) {
+    confirmPopup.handleInput(mappedInput, [this] { requestUpdate(); });
+    return;
+  }
+
   if (state == State::FAILED) {
     int x = 0;
     int y = 0;
@@ -262,8 +272,10 @@ void SdFirmwareUpdateActivity::render(RenderLock&&) {
     }
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  } else if (state == State::CONFIRMING) {
+    if (confirmPopup.processRender(renderer, mappedInput)) return;
   } else {
-    // PICKING / CONFIRMING: a sub-activity is on top, nothing to draw.
+    // PICKING: a sub-activity (file browser) is on top, nothing to draw.
     if (recoveryMode) {
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_RECOVERY_MODE_HINT));
     }
