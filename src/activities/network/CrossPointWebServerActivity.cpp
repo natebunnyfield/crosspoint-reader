@@ -9,7 +9,6 @@
 #include <cstddef>
 
 #include "MappedInputManager.h"
-#include "NetworkModeSelectionActivity.h"
 #include "SilentRestart.h"
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "activities/settings/SdFirmwareUpdateActivity.h"
@@ -84,18 +83,11 @@ void CrossPointWebServerActivity::onEnter() {
   connectedIP.clear();
   connectedSSID.clear();
   lastHandleClientTime = 0;
-  requestUpdate();
 
-  // Launch network mode selection subactivity
-  LOG_DBG("WEBACT", "Launching NetworkModeSelectionActivity...");
-  startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
-                         [this](const ActivityResult& result) {
-                           if (result.isCancelled) {
-                             onGoHome();
-                           } else {
-                             onNetworkModeSelected(std::get<NetworkModeResult>(result.data).mode);
-                           }
-                         });
+  // Show the network mode choice in place, rather than pushing a whole activity for it.
+  LOG_DBG("WEBACT", "Showing network mode popup...");
+  showNetworkModePopup();
+  requestUpdate();
 }
 
 void CrossPointWebServerActivity::onExit() {
@@ -167,16 +159,16 @@ void CrossPointWebServerActivity::onWifiSelectionComplete(const bool connected) 
   } else {
     // User cancelled - go back to mode selection
     state = WebServerActivityState::MODE_SELECTION;
-
-    startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
-                           [this](const ActivityResult& result) {
-                             if (result.isCancelled) {
-                               onGoHome();
-                             } else {
-                               onNetworkModeSelected(std::get<NetworkModeResult>(result.data).mode);
-                             }
-                           });
+    showNetworkModePopup();
+    requestUpdate();
   }
+}
+
+void CrossPointWebServerActivity::showNetworkModePopup() {
+  static constexpr StrId MODE_OPTIONS[] = {StrId::STR_JOIN_NETWORK, StrId::STR_CREATE_HOTSPOT};
+  networkModePopup.show(StrId::STR_FILE_TRANSFER, MODE_OPTIONS, 2, 0, [this](int index) {
+    onNetworkModeSelected(index == 0 ? NetworkMode::JOIN_NETWORK : NetworkMode::CREATE_HOTSPOT);
+  });
 }
 
 void CrossPointWebServerActivity::startAccessPoint() {
@@ -256,6 +248,16 @@ void CrossPointWebServerActivity::startWebServer() {
 }
 
 void CrossPointWebServerActivity::loop() {
+  if (state == WebServerActivityState::MODE_SELECTION) {
+    networkModePopup.handleInput(mappedInput, [this] { requestUpdate(); });
+    if (!networkModePopup.isActive() && state == WebServerActivityState::MODE_SELECTION) {
+      // Dismissed (Back / tap outside) without a selection -- same cancel path
+      // the old NetworkModeSelectionActivity took.
+      onGoHome();
+    }
+    return;
+  }
+
   // Handle different states
   if (state == WebServerActivityState::SERVER_RUNNING) {
     // A firmware image arrived over WebDAV. The PUT handler only recorded it --
@@ -378,6 +380,16 @@ void CrossPointWebServerActivity::loop() {
 }
 
 void CrossPointWebServerActivity::render(RenderLock&&) {
+  if (state == WebServerActivityState::MODE_SELECTION) {
+    renderer.clearScreen();
+    const auto& metrics = UITheme::getInstance().getMetrics();
+    const auto pageWidth = renderer.getScreenWidth();
+    GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_FILE_TRANSFER));
+    if (networkModePopup.processRender(renderer, mappedInput)) return;
+    renderer.displayBuffer();
+    return;
+  }
+
   // Only render our own UI when server is running
   // Subactivities handle their own rendering
   if (state == WebServerActivityState::SERVER_RUNNING || state == WebServerActivityState::AP_STARTING) {

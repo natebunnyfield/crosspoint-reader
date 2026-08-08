@@ -4,9 +4,11 @@
 #include <memory>
 #include <string>
 
-#include "NetworkModeSelectionActivity.h"
 #include "activities/Activity.h"
+#include "components/OptionPopup.h"
 #include "network/CrossPointWebServer.h"
+
+enum class NetworkMode { JOIN_NETWORK, CREATE_HOTSPOT };
 
 // Web server activity states
 enum class WebServerActivityState {
@@ -34,6 +36,9 @@ class CrossPointWebServerActivity final : public Activity {
   NetworkMode networkMode = NetworkMode::JOIN_NETWORK;
   bool isApMode = false;
 
+  // In-place replacement for the old NetworkModeSelectionActivity screen.
+  OptionPopup networkModePopup;
+
   // Web server - owned by this activity
   std::unique_ptr<CrossPointWebServer> webServer;
 
@@ -55,6 +60,7 @@ class CrossPointWebServerActivity final : public Activity {
   void renderServerRunning() const;
   void renderWifiIndicator(int subHeaderTop) const;
 
+  void showNetworkModePopup();
   void onNetworkModeSelected(NetworkMode mode);
   void onWifiSelectionComplete(bool connected);
   void startAccessPoint();
