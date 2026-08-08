@@ -14,6 +14,40 @@ started.
 
 ## OPEN
 
+### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
+**scope: verification · opened 2026-08-07**
+
+Build, package and TestFlight are DONE. The device half is not, and the two keep
+getting reported together, so this entry exists to keep them apart.
+
+**Done 2026-08-07, from a clean tree at `91b4a8fc`:**
+
+| Artifact | State |
+|---|---|
+| `gh_release` firmware | built, staged at `~/crosspoint-archive/staged/20260808T0201Z-crosspoint-91b4a8fc.bin`, sha256 `96f77816…` |
+| Mac app (`CrossPointX3.app`) | packaged and `verify`-clean (all 3 purpose strings); NOT TestFlighted, per owner ruling |
+| iOS TestFlight | **build-38 uploaded**, 19,545,915 bytes, delivery `d3e7a3ba` |
+
+**Not done — needs the hardware in hand:**
+
+- **The SD cards.** None were mounted, so `cpcards` never ran. They are still on
+  `bb614f73`, roughly forty commits back. This is the only step blocked on a
+  physical act.
+- **Confirm on device**, since it will be in hand anyway: the seven Lucide icons
+  on Home, the caret advancing a full space in Create Note, the clock preview on
+  the offset screen, and the WebDAV update flow — that last one matters most,
+  because its erase-write-reboot step is the ONLY part that cannot be exercised
+  off-device at all.
+- **Older debt, still unconfirmed:** power-off-while-typing (build-33+), iOS file
+  transfer (build-37), B-018 back-nav, B-017's notes half.
+
+**What this loop taught, worth keeping:** the iOS archive found a link error that
+neither the device nor the desktop build could see — `SdFirmwareUpdateActivity`
+is excluded from the iOS source set, and a new call into it from a shared TU only
+fails when that target links. The iOS archive belongs IN the loop, not after it.
+`xcodebuild -target CrossPointX3 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO` is
+the cheap version and needs no keychain.
+
 ### [T-005] Cruft with zero references — ruling needed before anything is deleted
 **scope: repo hygiene · raised by the 2026-08-06 audit · re-verified 2026-08-07**
 
