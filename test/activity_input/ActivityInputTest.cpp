@@ -110,8 +110,8 @@ using ActivityFactory = std::unique_ptr<Activity> (*)();
 // getListRowStep is LyraTheme's genuine override. The activity was not changed
 // to dodge the virtual — it legitimately needs it.
 std::unique_ptr<Activity> makeFontSelection() {
-  // Null registry: no SD fonts installed, so the list is the two built-in Noto
-  // faces (FontSelectionActivity.cpp:96-99) and nothing touches the SD card.
+  // Null registry: no SD fonts installed, so the list is the single built-in
+  // Libre Franklin row and nothing touches the SD card.
   return std::make_unique<FontSelectionActivity>(host::renderer(), host::input(), nullptr);
 }
 

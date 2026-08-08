@@ -715,13 +715,74 @@ constexpr uint32_t mixCoverSeed(uint32_t s) {
   return s;
 }
 
+// --- Clipped-span helpers ---------------------------------------------------
+//
+// The circle-built patterns (seigaiha, shippo) place discs whose bounding
+// boxes cross the band edges, so they cannot use drawRoundedRect/drawArc —
+// those clip to the screen, not to the band, and at home the pixels past the
+// band edge belong to a neighbouring tile. Everything rasterises through
+// hspanClipped instead.
+
+// Integer sqrt (Newton). The ESP32-C3 is RV32IMC: hardware divide, no FPU.
+int isqrt32(int v) {
+  if (v <= 0) return 0;
+  int c = v, n = (c + 1) / 2;
+  while (n < c) {
+    c = n;
+    n = (c + v / c) / 2;
+  }
+  return c;
+}
+
+struct BandClip {
+  int x0, y0, x1, y1;  // inclusive
+};
+
+void hspanClipped(const GfxRenderer& renderer, const BandClip& c, int xa, int xb, const int yy, const bool state) {
+  if (yy < c.y0 || yy > c.y1) return;
+  xa = std::max(xa, c.x0);
+  xb = std::min(xb, c.x1);
+  if (xb >= xa) renderer.fillRect(xa, yy, xb - xa + 1, 1, state);
+}
+
+void fillDiscClipped(const GfxRenderer& renderer, const BandClip& c, const int cx, const int cy, const int rad,
+                     const bool state) {
+  for (int dy = -rad; dy <= rad; dy++) {
+    const int half = isqrt32(rad * rad - dy * dy);
+    hspanClipped(renderer, c, cx - half, cx + half, cy + dy, state);
+  }
+}
+
+void ringClipped(const GfxRenderer& renderer, const BandClip& c, const int cx, const int cy, const int rad,
+                 const int thickness, const bool state) {
+  const int ri = std::max(0, rad - thickness);
+  for (int dy = -rad; dy <= rad; dy++) {
+    const int ho = isqrt32(rad * rad - dy * dy);
+    if (dy > -ri && dy < ri) {
+      const int hi = isqrt32(ri * ri - dy * dy);
+      hspanClipped(renderer, c, cx - ho, cx - hi - 1, cy + dy, state);
+      hspanClipped(renderer, c, cx + hi + 1, cx + ho, cy + dy, state);
+    } else {
+      hspanClipped(renderer, c, cx - ho, cx + ho, cy + dy, state);
+    }
+  }
+}
+
+constexpr int COVER_BAND_PATTERN_COUNT = 12;
+
 // The decorative band across the top of a generated cover. Every variant
-// draws only via fillRect/fillRectDither/fillPolygon with extents clamped to
-// the band, so nothing can spill into a neighbouring home-grid tile.
+// draws only via fillRect/fillRectDither/fillPolygon/hspanClipped with
+// extents clamped to the band, so nothing can spill into a neighbouring
+// home-grid tile. The set mixes plain geometry with traditional motifs —
+// Japanese wagara (ichimatsu, seigaiha, shippo, yagasuri, uroko), the Greek
+// meander, kente-inspired stripe blocks and an Andean step motif — all of
+// which reduce to bold 1-bit shapes that survive both the ~67px home tile
+// band and the ~240px sleep-screen band.
 void drawGeneratedCoverBand(const GfxRenderer& renderer, const int x, const int y, const int w, const int h,
                             const uint32_t seed) {
   const bool dense = (seed >> 8) % 2 == 0;
-  switch (seed % 5) {
+  const BandClip clip{x, y, x + w - 1, y + h - 1};
+  switch (seed % COVER_BAND_PATTERN_COUNT) {
     case 0: {  // horizontal bars
       const int bar = std::max(4, h / (dense ? 8 : 5));
       for (int yy = y; yy < y + h; yy += 2 * bar) {
@@ -736,7 +797,7 @@ void drawGeneratedCoverBand(const GfxRenderer& renderer, const int x, const int 
       }
       break;
     }
-    case 2: {  // checkerboard
+    case 2: {  // checkerboard (ichimatsu)
       const int cell = std::max(6, h / (dense ? 4 : 3));
       for (int row = 0; row * cell < h; row++) {
         for (int col = 0; col * cell < w; col++) {
@@ -755,13 +816,133 @@ void drawGeneratedCoverBand(const GfxRenderer& renderer, const int x, const int 
       renderer.fillRectDither(x, y + 2 * strip, w, h - 3 * strip, Color::LightGray);
       break;
     }
-    default: {  // zigzag teeth: apex-down triangles side by side
+    case 4: {  // zigzag teeth: apex-down triangles side by side
       const int tw = std::max(10, w / (dense ? 8 : 5));
       for (int x0 = x; x0 < x + w; x0 += tw) {
         const int x1 = std::min(x0 + tw, x + w);
         const int xPts[3] = {x0, x1, x0 + (x1 - x0) / 2};
         const int yPts[3] = {y, y, y + h};
         renderer.fillPolygon(xPts, yPts, 3, true);
+      }
+      break;
+    }
+    case 5: {  // seigaiha: overlapping wave fans of concentric arcs
+      const int rad = std::max(10, h / (dense ? 3 : 2));
+      const int stroke = std::max(1, rad / 9);
+      // Rows march down half a radius at a time; each lower row blanks the
+      // bottom of the row above, which is what turns full discs into fans.
+      int rowIdx = 0;
+      for (int cy = y; cy < y + h + rad; cy += std::max(4, rad / 2), rowIdx++) {
+        const int off = (rowIdx % 2 == 0) ? 0 : rad;
+        for (int cx = x - rad + off; cx < x + w + rad; cx += 2 * rad) {
+          fillDiscClipped(renderer, clip, cx, cy, rad, false);
+          ringClipped(renderer, clip, cx, cy, rad, stroke, true);
+          ringClipped(renderer, clip, cx, cy, rad * 2 / 3, stroke, true);
+          ringClipped(renderer, clip, cx, cy, rad / 3, stroke, true);
+          fillDiscClipped(renderer, clip, cx, cy, std::max(1, rad / 9), true);
+        }
+      }
+      break;
+    }
+    case 6: {  // shippo: interlocking circle lattice (four-petal lenses)
+      const int rad = std::max(12, h / (dense ? 3 : 2));
+      const int stroke = std::max(1, rad / 8);
+      const int pitch = rad * 141 / 100;  // r*sqrt(2): rims meet at neighbours' centres
+      for (int cy = y; cy - rad <= y + h; cy += pitch) {
+        for (int cx = x; cx - rad <= x + w; cx += pitch) {
+          ringClipped(renderer, clip, cx, cy, rad, stroke, true);
+          ringClipped(renderer, clip, cx + pitch / 2, cy + pitch / 2, rad, stroke, true);
+        }
+      }
+      break;
+    }
+    case 7: {  // yagasuri: arrow-fletching chevron columns
+      const int cw = std::max(10, w / (dense ? 8 : 5));
+      const int drop = cw / 2;                 // how far the V dips
+      const int stripe = std::max(2, cw / 4);  // chevron stroke
+      const int step = std::max(drop + stripe, cw);
+      for (int col = 0; col * cw < w; col++) {
+        const int cx0 = x + col * cw;
+        const int cx1 = std::min(cx0 + cw, x + w);
+        const int cxm = (cx0 + cx1) / 2;
+        const int phase = (col % 2 == 0) ? 0 : step / 2;
+        for (int ry = y - step + phase; ry < y + h; ry += step) {
+          int xs[6] = {cx0, cxm, cx1, cx1, cxm, cx0};
+          int ys[6] = {ry, ry + drop, ry, ry + stripe, ry + drop + stripe, ry + stripe};
+          for (int& v : ys) v = std::clamp(v, y, y + h);
+          renderer.fillPolygon(xs, ys, 6, true);
+        }
+      }
+      break;
+    }
+    case 8: {  // uroko: staggered rows of scale triangles
+      const int th = std::max(6, h / (dense ? 4 : 3));
+      const int tw = 2 * th;
+      for (int row = 0; row * th < h; row++) {
+        const int ry = y + row * th;
+        const int rb = std::min(ry + th, y + h);
+        const int off = (row % 2 == 0) ? 0 : tw / 2;
+        for (int cx = x - tw + off; cx < x + w; cx += tw) {
+          int xs[3] = {cx, cx + tw, cx + tw / 2};
+          for (int& v : xs) v = std::clamp(v, x, x + w);
+          const int ys[3] = {rb, rb, ry};
+          renderer.fillPolygon(xs, ys, 3, true);
+        }
+      }
+      break;
+    }
+    case 9: {  // Greek meander (fret) strips
+      // One key cell on a 5x5 grid of stroke units; tiles seamlessly sideways.
+      static constexpr int KEY_RECTS[][4] = {
+          {0, 0, 5, 1}, {4, 0, 1, 5}, {0, 2, 3, 1}, {0, 2, 1, 3}, {2, 3, 1, 2}, {2, 4, 3, 1},
+      };
+      const int t = std::max(2, h / (dense ? 18 : 12));
+      const int cell = 5 * t;
+      for (int ry = y + t; ry + cell <= y + h; ry += cell + 2 * t) {
+        for (int cx = x; cx < x + w; cx += cell) {
+          for (const auto& rct : KEY_RECTS) {
+            const int rx = cx + rct[0] * t;
+            const int rw = std::min(rct[2] * t, x + w - rx);
+            if (rw > 0) renderer.fillRect(rx, ry + rct[1] * t, rw, rct[3] * t, true);
+          }
+        }
+      }
+      break;
+    }
+    case 10: {  // kente-inspired stripe blocks: weave direction alternates
+      const int bs = std::max(10, h / (dense ? 3 : 2));
+      const int bar = std::max(2, bs / 5);
+      for (int br = 0; br * bs < h; br++) {
+        for (int bc = 0; bc * bs < w; bc++) {
+          const int bx = x + bc * bs, by = y + br * bs;
+          const int bw = std::min(bs, x + w - bx), bh = std::min(bs, y + h - by);
+          if ((br + bc) % 2 == 0) {
+            for (int yy = by; yy < by + bh; yy += 2 * bar) {
+              renderer.fillRect(bx, yy, bw, std::min(bar, by + bh - yy), true);
+            }
+          } else {
+            for (int xx = bx; xx < bx + bw; xx += 2 * bar) {
+              renderer.fillRect(xx, by, std::min(bar, bx + bw - xx), bh, true);
+            }
+          }
+        }
+      }
+      break;
+    }
+    default: {                                          // Andean stepped diamonds
+      const int levels = dense ? 4 : 3;                 // step rows per half
+      const int s = std::max(3, h / (2 * levels + 1));  // one square step
+      const int diaH = 2 * levels * s;
+      const int topY = y + (h - diaH) / 2;
+      const int pitch = diaH + 2 * s;
+      for (int cx = x + pitch / 2; cx - diaH / 2 < x + w + diaH; cx += pitch) {
+        for (int i = 0; i < 2 * levels; i++) {
+          const int halfSteps = (i < levels) ? (i + 1) : (2 * levels - i);
+          const int rx = std::max(cx - halfSteps * s, x);
+          const int rw = std::min(cx + halfSteps * s, x + w) - rx;
+          const int ry = topY + i * s;
+          if (rw > 0) renderer.fillRect(rx, ry, rw, std::min(s, y + h - ry), true);
+        }
       }
       break;
     }
