@@ -472,8 +472,9 @@ and cleans *every* env's build directory — `firmware.bin` disappears.
 ### 3. Device — minutes, the only place some things are real
 
 ```bash
-./spike-build.sh upload          # or esptool directly; see below
-python3 spike-run-exchange.py    # single port owner: save wifi, open editor, stream
+pio run -e default -t upload     # or esptool directly; see below
+# spike-run-exchange.py drove the whole exchange from one port owner (save wifi,
+# open the editor, stream). Deleted 2026-08-08 — see Reproducing above.
 ```
 
 Only the device can verify: BLE scan/pair/GATT, wolfSSL TLS at real heap, the
@@ -495,11 +496,23 @@ tier 3 needs hardware.
 
 ## Reproducing
 
+The four `spike-*` helpers this section used to invoke were **deleted on
+2026-08-08** (owner ruling, TODO T-005). What each did, so it can be rebuilt if
+the work resumes:
+
+| Script | What it did | Why it went |
+|---|---|---|
+| `spike-build.sh` | injected the ten NimBLE `-I` paths through `PLATFORMIO_BUILD_FLAGS`, then built/uploaded | **Superseded.** `7fee9a8c` removed the `lib_ignore = BLE` entry, so those includes now reach project sources on every device env with no wrapper — see above. A plain `pio run -e default -t upload` is the whole thing now |
+| `spike-capture.py` | blocked until the USB CDC port appeared, uploaded, then logged every line to a file — the headless half of `scripts/debugging_monitor.py`, which opens a matplotlib window and is useless unattended | still worked; removed as spike scaffolding |
+| `spike-drive.py` | opened the port, waited out the boot, sent `CMD:BLEEDIT`, streamed the log live | still worked; removed as spike scaffolding |
+| `spike-run-exchange.py` | drove one Claude request/response over the serial link | still worked; removed as spike scaffolding |
+
+The last three were working device automation, not dead code. They are one
+`git revert` away if unattended capture is wanted again; the build wrapper is
+the only one that would be wrong to restore.
+
 ```bash
-./spike-build.sh                 # build
-./spike-build.sh upload          # build + flash the USB-connected X4
-python3 spike-capture.py         # wait for the port, flash, log to spike-capture.log
-python3 spike-drive.py 600       # send CMD:BLEEDIT and stream the log
+pio run -e default -t upload     # build + flash the USB-connected X4
 ```
 
 `CMD:BLEEDIT` over serial opens the editor without anyone at the buttons; the

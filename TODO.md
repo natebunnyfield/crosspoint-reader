@@ -48,28 +48,33 @@ fails when that target links. The iOS archive belongs IN the loop, not after it.
 `xcodebuild -target CrossPointX3 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO` is
 the cheap version and needs no keychain.
 
-### [T-005] Cruft with zero references — ruling needed before anything is deleted
-**scope: repo hygiene · raised by the 2026-08-06 audit · re-verified 2026-08-07**
+### [T-005] Cruft with zero references — RULED and actioned
+**scope: repo hygiene · raised 2026-08-06 · ruled 2026-08-08**
 
-Each of these exists and has no reference anywhere in `src/` or `lib/`:
+Ruling: delete the QA captures and the spike scripts, keep the rest.
+
+**Deleted:**
 
 | Thing | Note |
 |---|---|
-| `spike-build.sh`, `spike-*.py` (4 files) | from the BLE spike; the spike itself landed |
-| `src/util/StringUtils.{h,cpp}`, `UrlUtils.*`, `HtmlToPlainText.*` | 6 files, referenced only by each other |
-| `qa_x4/`, `qa_x4b/`, `qa_sleep/`, `qa_west/`, `qa_west2/` | ~624 KB of old QA captures |
-| `docs/flared-semiserif.html` | 220 KB, linked from nowhere |
+| `qa_x4/`, `qa_x4b/`, `qa_sleep/`, `qa_west/`, `qa_west2/` | 492 KB of PNGs from one debugging session on 2026-08-03. Byproducts of a run |
+| `spike-build.sh`, `spike-capture.py`, `spike-drive.py`, `spike-run-exchange.py` | BLE spike scaffolding |
 
-**Not filed as a defect and not actioned, on purpose.** Zero references is not
-sufficient grounds to delete in this project — the standing rule is that a thing
-is removable only when it is also not user-facing, not relied on by an upstream
-consumer, and not persisted in settings. The QA directories and the HTML are
-plainly byproducts. The `src/util/` trio is the one to be careful with: it is
-library-shaped code that a future feature would plausibly reach for, and
-deleting it is a bet that nothing will.
+**Kept:**
 
-**Close by:** an owner ruling per row. Default if none comes: delete the QA
-directories and `docs/flared-semiserif.html`, keep the rest.
+| Thing | Why |
+|---|---|
+| `src/util/StringUtils`, `UrlUtils`, `HtmlToPlainText` | library-shaped and small; `HtmlToPlainText` is what an OPDS description or a Claude response would want |
+| `docs/flared-semiserif.html` | a typography specimen, not a byproduct — 220 KB because the faces are embedded |
+
+**The one thing worth saying about the deletion:** only `spike-build.sh` was
+actually superseded — `7fee9a8c` removed the `lib_ignore = BLE` entry that made
+its `-I` injection necessary, and `docs/ble-editor-spike.md` had already
+recommended deleting it. The other three were **working device automation**
+(unattended capture, driving `CMD:BLEEDIT`, running a whole Claude exchange from
+one port owner), removed as spike scaffolding rather than as dead code. What
+each did is recorded in that doc's Reproducing section, and they are one
+`git revert` away if unattended capture is wanted again.
 
 ### [T-006] `freeink-sdk` is 54 commits behind, and it is a clean fast-forward
 **scope: dependency · re-measured 2026-08-07**
