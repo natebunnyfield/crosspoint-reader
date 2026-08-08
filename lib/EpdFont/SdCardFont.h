@@ -8,10 +8,10 @@
 #include "EpdFont.h"
 #include "EpdFontData.h"
 
-// On-disk binary format version for .cpfont files. Defined as a preprocessor
-// macro (rather than a constexpr) so it can be stringified into the SD-fonts
-// release URL — see FONT_MANIFEST_URL in FontDownloadActivity.h. No integer
-// suffix because stringification would include it (e.g. `4U` → `"4U"`).
+// On-disk binary format version for .cpfont files. Kept as a preprocessor
+// macro with no integer suffix so it can be stringified into URLs or labels
+// (`4U` would stringify as "4U"); the on-device download UI that did so was
+// removed 2026-08-08.
 //
 // The canonical version for the build tooling lives in
 // lib/EpdFont/scripts/cpfont_version.py. This firmware-side copy must be
