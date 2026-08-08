@@ -23,6 +23,8 @@ target_include_directories(UntrustedInputTest PRIVATE
   ${REPO_ROOT}/lib/Serialization
   ${REPO_ROOT}/lib/PngToBmpConverter
   ${REPO_ROOT}/lib/hal
+  ${REPO_ROOT}/src
+  ${REPO_ROOT}/src/network
 )
 
 target_link_libraries(UntrustedInputTest PRIVATE

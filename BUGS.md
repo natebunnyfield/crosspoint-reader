@@ -55,6 +55,32 @@ enter Settings and press Back (which saves), then read the file.
 
 ## OPEN
 
+### [B-025] The editor caret does not move when you type a space
+**severity: medium · scope: text entry · reported 2026-08-07**
+
+Reported as: cursor does not move on space in the text editor.
+
+Cause found, and it is written down in the same file. `advanceOf()`
+(`src/activities/util/NoteEditorActivity.cpp:29`) exists precisely because
+*"getTextWidth() does not count a TRAILING space"* — its comment at `:25-28`
+explains that measuring spans without a sentinel rendered "Plain **bold** and"
+as "Plainbold and". Every span of drawn text goes through it (`:509`).
+
+The caret does not. `:519` measures with a bare
+`renderer.getTextWidth(editorFontId, upto)`, where `upto` is the raw source text
+before the cursor. When the typist has just pressed space, `upto` ends in one —
+exactly the case `getTextWidth` drops — so the measured width is unchanged and
+the caret stays put. It catches up as soon as the next visible character is
+typed, which is why this reads as "space does nothing" rather than as a
+persistent offset.
+
+Only the caret is affected; the text itself is laid out correctly.
+
+**Close by:** measure the caret through `advanceOf()` like everything else in
+this function, rather than calling `getTextWidth` directly. One line. Worth a
+test that pins caret x after a trailing space, since the identical mistake was
+already made once and fixed once in this file.
+
 ### [B-021] A null check that cannot fire, in the tightest-memory path
 **severity: medium · scope: graceful degradation · found 2026-08-06 · verified 2026-08-07**
 

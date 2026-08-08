@@ -18,6 +18,15 @@ void SdFirmwareUpdateActivity::onEnter() {
   Activity::onEnter();
   // Build-identity marker — confirms which firmware build owns the SD update flow.
   LOG_INF("FW", "SdFirmwareUpdateActivity build=%s %s recovery=%d", __DATE__, __TIME__, recoveryMode ? 1 : 0);
+  if (!preselectedPath.empty()) {
+    // Arrived by upload rather than by picking. The confirmation prompt is the
+    // gate that matters here: the transfer server has no authentication, so
+    // without it anyone who can reach the device could reflash it unattended.
+    firmwarePath = preselectedPath;
+    LOG_INF("FW", "preselected firmware: %s", firmwarePath.c_str());
+    beginValidateAndConfirm();
+    return;
+  }
   state = State::PICKING;
   launchPicker();
 }
@@ -48,7 +57,10 @@ void SdFirmwareUpdateActivity::onPickerResult(const ActivityResult& result) {
   }
   firmwarePath = path->path;
   LOG_DBG("FW", "Selected: %s", firmwarePath.c_str());
+  beginValidateAndConfirm();
+}
 
+void SdFirmwareUpdateActivity::beginValidateAndConfirm() {
   {
     RenderLock lock(*this);
     state = State::VALIDATING;

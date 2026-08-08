@@ -144,3 +144,50 @@ TEST(XtcPlaneGeometry, TheGuardRejectsExactlyTheOutOfRangeSamples) {
   EXPECT_GT(skipped, 0u) << "if nothing is skipped the guard is untested here";
   EXPECT_GT(kept, skipped) << "the guard must not throw away most of the image";
 }
+
+// ── The /firmware/ upload trigger ────────────────────────────────────────────
+//
+// A PUT that matches this reflashes the device (after an on-device confirm), so
+// the rule needs to be exactly as narrow as intended. Everything that is merely
+// a file the owner is storing must NOT match.
+
+#include "PendingFirmware.h"
+
+TEST(PendingFirmwarePath, MatchesABinDirectlyInTheReservedDirectory) {
+  EXPECT_TRUE(pending_firmware::isUpdatePath("/firmware/20260807T0709Z-crosspoint-e194ab7b.bin"));
+  EXPECT_TRUE(pending_firmware::isUpdatePath("/firmware/a.bin"));
+  EXPECT_TRUE(pending_firmware::isUpdatePath("/firmware/A.BIN"));
+}
+
+TEST(PendingFirmwarePath, IgnoresNonBinFiles) {
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware/notes.txt"));
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware/book.epub"));
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware/readme"));
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware/.bin"));  // no stem
+}
+
+TEST(PendingFirmwarePath, IgnoresBinsAnywhereElse) {
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/x.bin"));
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/books/x.bin"));
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware.bin"));
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/.firmware/x.bin"));
+}
+
+TEST(PendingFirmwarePath, IsNotRecursive) {
+  // A .bin the owner parked in a subfolder is storage, not an install.
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware/old/x.bin"));
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware/a/b/c.bin"));
+}
+
+TEST(PendingFirmwarePath, IgnoresTheDirectoryItself) {
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware/"));
+  EXPECT_FALSE(pending_firmware::isUpdatePath("/firmware"));
+}
+
+TEST(PendingFirmwareSlot, TakeClearsSoAdeclinedUpdateDoesNotRePrompt) {
+  pending_firmware::set("/firmware/x.bin");
+  EXPECT_TRUE(pending_firmware::waiting());
+  EXPECT_EQ(pending_firmware::take(), "/firmware/x.bin");
+  EXPECT_FALSE(pending_firmware::waiting()) << "a declined update must not re-trigger every tick";
+  EXPECT_TRUE(pending_firmware::take().empty());
+}

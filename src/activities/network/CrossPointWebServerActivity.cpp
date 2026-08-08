@@ -11,6 +11,8 @@
 #include "MappedInputManager.h"
 #include "NetworkModeSelectionActivity.h"
 #include "SilentRestart.h"
+#include "activities/settings/SdFirmwareUpdateActivity.h"
+#include "network/PendingFirmware.h"
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -254,6 +256,24 @@ void CrossPointWebServerActivity::startWebServer() {
 void CrossPointWebServerActivity::loop() {
   // Handle different states
   if (state == WebServerActivityState::SERVER_RUNNING) {
+    // A firmware image arrived over WebDAV. The PUT handler only recorded it --
+    // flashing there would have killed the connection mid-response -- so the
+    // hand-off completes here, one tick later, with the 201 already sent.
+    //
+    // It goes through the normal confirm-then-flash activity rather than
+    // flashing outright: the transfer server has no authentication and AP mode
+    // is an open network, so a press on the device is the only thing standing
+    // between "anyone in radio range" and permanently running their own code
+    // on it. take() clears the slot, so a decline does not re-prompt forever.
+    if (pending_firmware::waiting()) {
+      const std::string image = pending_firmware::take();
+      LOG_INF("WEBACT", "offering uploaded firmware: %s", image.c_str());
+      startActivityForResult(
+          std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput, false, image),
+          [](const ActivityResult&) {});
+      return;
+    }
+
     // Handle DNS requests for captive portal (AP mode only)
     if (isApMode && dnsServer) {
       dnsServer->processNextRequest();

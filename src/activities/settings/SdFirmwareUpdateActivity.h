@@ -28,8 +28,14 @@ class SdFirmwareUpdateActivity : public Activity {
     FAILED,
   };
 
-  explicit SdFirmwareUpdateActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool recoveryMode = false)
-      : Activity("SdFirmwareUpdate", renderer, mappedInput), recoveryMode(recoveryMode) {}
+  // `preselectedPath` skips the picker and goes straight to validate +
+  // confirm. Used by the file-transfer screen when a firmware image arrives
+  // over WebDAV: the file has already been chosen, by uploading it.
+  explicit SdFirmwareUpdateActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool recoveryMode = false,
+                                    std::string preselectedPath = "")
+      : Activity("SdFirmwareUpdate", renderer, mappedInput),
+        recoveryMode(recoveryMode),
+        preselectedPath(std::move(preselectedPath)) {}
 
   void onEnter() override;
   void loop() override;
@@ -41,6 +47,7 @@ class SdFirmwareUpdateActivity : public Activity {
   State state = State::PICKING;
   bool recoveryMode = false;
 
+  std::string preselectedPath;
   std::string firmwarePath;
   size_t firmwareSize = 0;
   size_t writtenBytes = 0;
@@ -48,6 +55,7 @@ class SdFirmwareUpdateActivity : public Activity {
   std::string errorMessage;
 
   void launchPicker();
+  void beginValidateAndConfirm();
   void onPickerResult(const ActivityResult& result);
   bool validateFirmware();
   void promptConfirmation();

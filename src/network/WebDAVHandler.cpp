@@ -1,5 +1,7 @@
 #include "WebDAVHandler.h"
 
+#include "PendingFirmware.h"
+
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
@@ -391,6 +393,17 @@ void WebDAVHandler::handlePut(WebServer& s) {
   clearBookCache(path.c_str());
   s.send(_putExisted ? 204 : 201);
   LOG_DBG("DAV", "PUT complete: %s", path.c_str());
+
+  // A .bin landing in /firmware/ is an update request. Record it and let the
+  // file-transfer activity offer it -- do NOT flash here. The response above
+  // has only just been queued, and flashing ends in a reboot: doing it inline
+  // drops the connection mid-request, so the sender cannot distinguish a failed
+  // upload from a successful one. See PendingFirmware.h.
+  const std::string finalPath(path.c_str());
+  if (pending_firmware::isUpdatePath(finalPath)) {
+    LOG_INF("DAV", "firmware image uploaded, awaiting confirmation: %s", finalPath.c_str());
+    pending_firmware::set(finalPath.c_str());
+  }
 }
 
 // ── DELETE ───────────────────────────────────────────────────────────────────
