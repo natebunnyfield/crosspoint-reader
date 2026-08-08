@@ -48,6 +48,37 @@ fails when that target links. The iOS archive belongs IN the loop, not after it.
 `xcodebuild -target CrossPointX3 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO` is
 the cheap version and needs no keychain.
 
+### [T-007] Upstream issue #2863 reproduces here and is tracked nowhere
+**scope: fork sync · raised 2026-08-06 · confirmed 2026-08-07**
+
+The short-press power behaviour upstream reports is present in this fork's code:
+`lib/hal/HalGPIO.cpp:207` carries a `TODO` describing the same thing. Upstream
+issues are not visible from this repo's tracker, so it would otherwise be
+rediscovered rather than remembered.
+
+**Close by:** decide whether the fork wants upstream's fix or its own behaviour,
+then either take the patch or write the divergence down in `docs/fork-sync.md`.
+
+---
+
+## Carried over, still owner decisions
+
+These were raised in the audit and have not been ruled on. They are not defects,
+so they are not in `BUGS.md`.
+
+### [T-004] Make the simulator stop lying about the device
+`S-001` in the simulator's `BUGS.md` lists six places where it reports the
+opposite of the hardware. The 1 MB free-heap constant is the one that matters:
+every graceful-degradation path on a 380 KB device is unreachable in the only
+pre-device gate the project has.
+
+Scoped as its own piece of work, not a cleanup. A budgeted fake heap would reach
+most of the dead branches.
+
+---
+
+## DONE
+
 ### [T-005] Cruft with zero references — RULED and actioned
 **scope: repo hygiene · raised 2026-08-06 · ruled 2026-08-08**
 
@@ -122,36 +153,6 @@ tempting failure here is a green run being read as "verified". Both guards were
 tested: the non-fast-forward refusal fires, and the render comparison is the
 gate that would catch a layout regression.
 
-### [T-007] Upstream issue #2863 reproduces here and is tracked nowhere
-**scope: fork sync · raised 2026-08-06 · confirmed 2026-08-07**
-
-The short-press power behaviour upstream reports is present in this fork's code:
-`lib/hal/HalGPIO.cpp:207` carries a `TODO` describing the same thing. Upstream
-issues are not visible from this repo's tracker, so it would otherwise be
-rediscovered rather than remembered.
-
-**Close by:** decide whether the fork wants upstream's fix or its own behaviour,
-then either take the patch or write the divergence down in `docs/fork-sync.md`.
-
----
-
-## Carried over, still owner decisions
-
-These were raised in the audit and have not been ruled on. They are not defects,
-so they are not in `BUGS.md`.
-
-### [T-004] Make the simulator stop lying about the device
-`S-001` in the simulator's `BUGS.md` lists six places where it reports the
-opposite of the hardware. The 1 MB free-heap constant is the one that matters:
-every graceful-degradation path on a 380 KB device is unreachable in the only
-pre-device gate the project has.
-
-Scoped as its own piece of work, not a cleanup. A budgeted fake heap would reach
-most of the dead branches.
-
----
-
-## DONE
 
 Kept for the reasoning, not the status. Each records something that would
 otherwise have to be rediscovered.
