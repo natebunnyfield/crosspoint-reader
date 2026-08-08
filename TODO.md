@@ -76,20 +76,51 @@ one port owner), removed as spike scaffolding rather than as dead code. What
 each did is recorded in that doc's Reproducing section, and they are one
 `git revert` away if unattended capture is wanted again.
 
-### [T-006] `freeink-sdk` is 54 commits behind, and it is a clean fast-forward
-**scope: dependency · re-measured 2026-08-07**
+### [T-006] `freeink-sdk` bumped, and made repeatable — DONE (host half)
+**scope: dependency · ruled and actioned 2026-08-08**
 
-Submodule pin `e514a868` (2026-07-28); upstream `a485dc46` (2026-08-03).
-**0 ahead, 54 behind** — nothing local to preserve, so this is a pointer bump,
-not a merge. The audit measured 48 on 2026-08-06; it drifts by roughly a commit
-a day.
+Pin moved `e514a868` → `24fbab75`: **71 commits, 79 files, +17.3k lines**, a
+clean fast-forward with nothing local to preserve. (It was 54 when filed two
+days earlier — it drifts about a commit a day, which is the argument for
+`scripts/update_sdk.sh` rather than for doing this by hand.)
 
-The reason it is not just done here: the SDK is compiled into every device
-binary, so the bump has to be followed by a device build and a real
-read-a-book pass, not only a green compile. That is its own change with its own
-verification, not a line in someone else's commit.
+Several of them are fixes this fork wants: *"Fix grayscale waveform LUTs for
+CrossPoint rendering"*, *"fix(x3): one forced full sync after begin(), not
+two"*, *"preserve pixels outside partial-width image blits"*, *"correct
+voltage-to-percentage conversion for battery"*. There is also new hardware
+support (M5Stack Paper Mono, UC8279 for X4 800x480) which is purely additive
+here.
 
-**Close by:** bump, build `gh_release`, run the host tests, and put it on a card.
+**Verified off-device:** `gh_release` and `simulator_x3` build, 235 host tests,
+9 simulator tests, `test_read_aloud_capture` including the rect-geometry
+assertion — and Home and a book page render **pixel-identical** before and
+after (0 of 418,176 differ).
+
+**NOT verified, and this is most of what the bump carries:** waveform LUTs, the
+GPIO/PWM ordering change, holding the display RESET pin high in deep sleep, and
+the battery curve. None of those execute on a host at all. Flash it, read a few
+pages watching for ghosting or a changed refresh, sleep and wake, and look at
+the battery reading.
+
+### [T-006a] Submodule bumps are now one command
+**scope: process · added 2026-08-08**
+
+[scripts/update_sdk.sh](scripts/update_sdk.sh) — `--dry-run` to see the gap and
+what it touches, no argument to fast-forward and prove it, or a ref to pin
+somewhere specific.
+
+It gates on: submodule initialised (a fresh worktree does not inherit it),
+submodule clean, **fast-forward only** (a pin ahead of the target means someone
+committed to the SDK locally — that is a merge with a decision in it, and the
+script refuses), device build, desktop build, host tests, and a pixel diff of
+Home and a book page against a pre-bump reference. Any failure puts the pin back
+where it was.
+
+What it deliberately does NOT do is claim success. It ends by naming what a host
+gate cannot execute and listing what to look at on hardware, because the
+tempting failure here is a green run being read as "verified". Both guards were
+tested: the non-fast-forward refusal fires, and the render comparison is the
+gate that would catch a layout regression.
 
 ### [T-007] Upstream issue #2863 reproduces here and is tracked nowhere
 **scope: fork sync · raised 2026-08-06 · confirmed 2026-08-07**
