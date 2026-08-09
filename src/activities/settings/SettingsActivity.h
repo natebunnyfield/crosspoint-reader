@@ -23,6 +23,7 @@ enum class SettingAction {
   TextSettings,
   PairBluetoothKeyboard,
   ForgetBluetoothKeyboard,
+  Colophon,
 };
 
 struct SettingInfo {
