@@ -9,6 +9,7 @@
 #include <algorithm>
 
 #include "CrossPointSettings.h"
+#include "SdCardFontSystem.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "notes/BleHidHost.h"
@@ -51,8 +52,23 @@ void ClaudeChatActivity::onEnter() {
 
   editorFontId = editorfonts::resolve(
       SETTINGS.editorFont, [this](int id) { return renderer.getFontMap().count(id) > 0; },
-      [](const char* family) {
-        return SETTINGS.sdFontIdResolver ? SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12) : 0;
+      [this](const char* family) {
+        // loadForDisplay(), NOT SETTINGS.sdFontIdResolver. The resolver is
+        // resolveFontId(), which returns a font id only when that family is the
+        // family the READER currently has resident -- it never loads anything.
+        // So every card-only editor face resolved to 0 unless the owner
+        // happened to be reading in that same family, and resolve() fell
+        // through to the compiled-in mono. Measured on the simulator with all
+        // three iA families installed: the text band of a note rendered with
+        // editorFont=iAWriterQuattro was BYTE-IDENTICAL to one rendered with
+        // editorFont=SpaceMono. Three of the five rows did nothing at all.
+        //
+        // loadForDisplay does load it, at the editor's 12 pt, the same way the
+        // Lyra theme loads its title face and CalendarSleepScreen loads 18 pt.
+        // It can evict the reader family; that is safe and already routine --
+        // the reader re-asserts through sdFontSystem.ensureLoaded() on entry,
+        // which is exactly why FontSelectionActivity::onEnter does the same.
+        return sdFontSystem.loadForDisplay(family, 12, renderer);
       },
       CHAT_FONT_ID_FALLBACK);
   const auto& metrics = UITheme::getInstance().getMetrics();
