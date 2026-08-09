@@ -314,8 +314,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
         s.enumStringValues.emplace_back(editorfonts::FAMILIES[i].label);
       }
-      // Compiled-in faces first, card-only ones after. See
-      // editorfonts::displayOrder().
+      // Reverse chronological by lineage, exactly like Text Settings' reading
+      // list (owner ruling 2026-08-09). See editorfonts::displayOrder().
       s.withDisplayOrder(editorfonts::displayOrder());
       v.push_back(std::move(s));
     }

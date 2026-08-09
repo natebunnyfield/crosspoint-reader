@@ -74,12 +74,27 @@ EpdFont lfReader14ItalicFont(&librefranklin_reader_14_italic);
 EpdFont lfReader14BoldItalicFont(&librefranklin_reader_14_bolditalic);
 EpdFontFamily librefranklinReader14FontFamily(&lfReader14RegularFont, &lfReader14BoldFont, &lfReader14ItalicFont,
                                               &lfReader14BoldItalicFont);
-#ifndef OMIT_FONTS
+
 // Editor-group monospace (owner ruling 2026-08-06). Built in rather than read
 // from the card: the editor asks for one size in four styles, ~83 KB for both
 // families, and a built-in face works on a blank card AND cannot appear in the
 // reading picker — an SD install into /fonts would do both the opposite ways.
 // All four styles are real: MarkdownSpans renders bold, italic and bold-italic.
+//
+// OUTSIDE OMIT_FONTS, for the same reason Libre Franklin 14 pt is: these two
+// are the answer resolveEditorFont() must be able to give in EVERY build. They
+// were inside it until 2026-08-09, and the only build that defines the macro is
+// iOS (crosspoint-simulator/ios/CMakeLists.txt), so on the phone the whole
+// Editor Font setting collapsed — builtinFontIdFor() handed back ids the
+// renderer had no glyphs for, every row failed its getFontMap() availability
+// check, and resolve()'s built-in-mono fallback was absent too, so all five
+// rows fell through to UI_10 chrome. "Built in" has to mean built into the
+// binary that ships, not into the desktop one.
+//
+// Costing it the other way round: OMIT_FONTS exists to shrink a build, and
+// these eight headers are ~83 KB of 2-bit compressed glyph data against an iOS
+// binary that carries no such ceiling. The three iA faces stay card-only and
+// are unaffected — they have no built-in form to exempt.
 EpdFont spacemono12RegularFont(&spacemono_12_regular);
 EpdFont spacemono12BoldFont(&spacemono_12_bold);
 EpdFont spacemono12ItalicFont(&spacemono_12_italic);
@@ -93,6 +108,7 @@ EpdFont ibmplexmono12BoldItalicFont(&ibmplexmono_12_bolditalic);
 EpdFontFamily ibmplexmono12FontFamily(&ibmplexmono12RegularFont, &ibmplexmono12BoldFont, &ibmplexmono12ItalicFont,
                                       &ibmplexmono12BoldItalicFont);
 
+#ifndef OMIT_FONTS
 EpdFont lfReader12RegularFont(&librefranklin_reader_12_regular);
 EpdFont lfReader12BoldFont(&librefranklin_reader_12_bold);
 EpdFont lfReader12ItalicFont(&librefranklin_reader_12_italic);
@@ -298,13 +314,17 @@ void setupDisplayAndFonts(bool seamless = false) {
   fontCacheManager.setFontDecompressor(&fontDecompressor);
   renderer.setFontCacheManager(&fontCacheManager);
   renderer.insertFont(LIBREFRANKLIN_READER_14_FONT_ID, librefranklinReader14FontFamily);
+  // Registered unguarded, matching where the families are now defined. The
+  // Editor Font picker's availability mark is literally
+  // renderer.getFontMap().count(id), so a face defined but never inserted here
+  // still reports "Not on card" — the definition and the insert have to leave
+  // OMIT_FONTS together or the move buys nothing.
+  renderer.insertFont(SPACEMONO_12_FONT_ID, spacemono12FontFamily);
+  renderer.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12FontFamily);
 #ifndef OMIT_FONTS
   renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, librefranklinReader12FontFamily);
   renderer.insertFont(LIBREFRANKLIN_READER_16_FONT_ID, librefranklinReader16FontFamily);
   renderer.insertFont(LIBREFRANKLIN_READER_18_FONT_ID, librefranklinReader18FontFamily);
-
-  renderer.insertFont(SPACEMONO_12_FONT_ID, spacemono12FontFamily);
-  renderer.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12FontFamily);
 #endif  // OMIT_FONTS
   // Fills SMALL / UI_10 / UI_12 from the chosen system font, and on a 2x build
   // registers the matching hi-res companions alongside them.

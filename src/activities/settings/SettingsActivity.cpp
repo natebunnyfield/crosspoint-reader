@@ -9,6 +9,7 @@
 
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
+#include "ColophonActivity.h"
 #include "CrossPointSettings.h"
 #include "EditorFontSelectionActivity.h"
 #include "FontSelectionActivity.h"
@@ -62,6 +63,9 @@ void SettingsActivity::rebuildSettingsLists() {
 #endif
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
+  // Informational, so it sits last: who wrote this firmware and what it is
+  // built out of. Nothing here changes a setting.
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_COLOPHON, SettingAction::Colophon));
   // Text Settings leads the list: it is the reading screen's own settings
   // (font family, size, live preview). Typing Redraw Delay and Editor Font are
   // the first System entries the shared list contributes; Screen Margin follows.
@@ -393,6 +397,10 @@ void SettingsActivity::toggleCurrentSetting() {
                                    SETTINGS.saveToFile();
                                  }
                                });
+        break;
+      case SettingAction::Colophon:
+        // Read-only screen: nothing to persist, so it takes no result handler.
+        startActivityForResult(std::make_unique<ColophonActivity>(renderer, mappedInput), nullptr);
         break;
       case SettingAction::None:
         // Do nothing
