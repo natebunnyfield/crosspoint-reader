@@ -61,6 +61,71 @@ then either take the patch or write the divergence down in `docs/fork-sync.md`.
 
 ---
 
+## Finished
+
+### [T-010] settings.json / state.json writes are not atomic — FIXED
+**scope: data durability · found by the 2026-08-08 P0 audit · fixed 2026-08-08**
+
+Every settings and state save went through `SDCardManager::writeFile`, which
+removes the target and then opens it `O_TRUNC` — so power lost in that window
+left NO file, and the device booted having forgotten its Wi-Fi, reading position
+and owner name.
+
+Fixed at the fork's `PersistableStore`, not in the submodule. FAT cannot replace
+a file in one step (SdFat's rename fails if the destination exists), so the order
+is: write the temp in full, remove the target, rename the temp over it. The
+window shrinks to the remove→rename gap, and — the part that matters — a
+COMPLETE copy of the data is on the card throughout it.
+
+`readDocFromFile` is what makes that recoverable rather than merely narrower: a
+temp beside a missing target is promoted, a temp beside an intact target is
+stale and deleted. A promoted temp is parsed first, because a crash during the
+temp write itself leaves a truncated one and promoting that would turn a
+recoverable state into a corrupt file.
+
+**Verified against the simulator, all three paths:** a normal save leaves no
+temp; a complete temp with the target deleted is recovered with the data intact
+(`deviceOwner = RECOVERED-FROM-TEMP`, which under the old code would simply have
+been gone); a truncated temp is discarded and not promoted. 235 host tests.
+
+### [T-009] A 0 ms redraw delay for iOS — DONE (option), measurement still owed
+**scope: iOS display · asked 2026-08-08 · shipped 2026-08-08**
+
+`Typing Redraw Delay` now offers **0 ms**, and it is honoured off-device only.
+
+Two things this had to get right, both recorded here because they are the traps:
+
+- **0 is appended, not inserted.** The INDEX is what `settings.json` persists,
+  so putting 0 at the front — where it belongs numerically — would silently
+  re-map every card in the field, turning a saved 250 ms into 100 ms. The picker
+  reading `… 500 ms, 1000 ms, 0 ms` is the price of not corrupting settings.
+- **The device clamps it.** On e-ink a refresh is ~570 ms with a real waveform,
+  ghosting and battery cost, so 0 would mean a full refresh per keystroke. A
+  card carrying 0 (written on a phone, then moved to hardware) is clamped to the
+  shortest real step rather than obeyed. Verified per platform: index 6 resolves
+  to 0 ms in the simulator and 25 ms on device, the 250 ms default is unchanged
+  on both, and an out-of-range index still falls back to the default.
+
+**Still owed, and deliberately not claimed:** the measurement half of this entry
+— whether the debounce is what makes typing feel slow on the phone at all. If a
+keystroke already coalesces into the next frame, 0 ms changes nothing and the
+lag is elsewhere. The option is now there to A/B against, which is the cheapest
+way to answer it.
+
+### [T-004] Make the simulator stop lying about the device — TRACKED IN S-001
+**scope: simulator fidelity · closed as duplicate 2026-08-08**
+
+This entry and `S-001` in the simulator's [BUGS.md](../crosspoint-simulator/BUGS.md)
+are the same work, tracked twice in two repos. S-001 carries the actual table of
+six reversals and their status, so it is the one to read. Two are now fixed (the
+heap, and battery/USB); four remain (async refresh, the panic path, the OTA
+partition stub, the pinned OTA check).
+
+Closed here rather than kept in parallel, because two trackers for one piece of
+work is how a thing gets half-done twice.
+
+---
+
 ## Carried over, still owner decisions
 
 These were raised in the audit and have not been ruled on. They are not defects,
