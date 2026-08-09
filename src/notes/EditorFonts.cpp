@@ -77,6 +77,14 @@ std::string rowSubtitle(uint8_t storedIndex, bool available, const char* unavail
   return std::string(marker) + " \xE2\x80\x94 " + colophon;
 }
 
+bool isWritingOnlyFamily(const char* family) {
+  if (family == nullptr) return false;
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    if (strcasecmp(family, FAMILIES[i].family) == 0) return !FAMILIES[i].alsoReading;
+  }
+  return false;
+}
+
 int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
             const std::function<int(const char*)>& sdLookup, int uiFallbackId) {
   // Built-in first -- but only if this build actually compiled it in. A font id

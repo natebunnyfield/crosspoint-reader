@@ -25,6 +25,12 @@ struct Entry {
   // Zero means card-only: the family must be present in /fonts or /.fonts, or
   // the editor falls back to the UI face.
   int builtinFontId;
+  // Also offered as a READING face in Text Settings (owner ruling
+  // 2026-08-09). The ruling at the top of this file -- writing faces are not
+  // reading faces -- still holds for the rest; Quattro is the exception the
+  // owner asked for, and a flag on the row is how an exception stays visible
+  // instead of becoming a special case buried in the filter.
+  bool alsoReading;
 };
 
 // All five are OFL. The iA faces are the "S" (narrow) cuts.
@@ -42,11 +48,11 @@ struct Entry {
 // deleting a row would silently re-point every saved settings.json at a
 // different family.
 inline constexpr Entry FAMILIES[] = {
-    {"iAWriterQuattro", "iA Writer Quattro", 0},
-    {"iAWriterDuo", "iA Writer Duo", 0},
-    {"iAWriterMono", "iA Writer Mono", 0},
-    {"SpaceMono", "Space Mono", SPACEMONO_12_FONT_ID},
-    {"IBMPlexMono", "IBM Plex Mono", IBMPLEXMONO_12_FONT_ID},
+    {"iAWriterQuattro", "iA Writer Quattro", 0, /*alsoReading=*/true},
+    {"iAWriterDuo", "iA Writer Duo", 0, false},
+    {"iAWriterMono", "iA Writer Mono", 0, false},
+    {"SpaceMono", "Space Mono", SPACEMONO_12_FONT_ID, false},
+    {"IBMPlexMono", "IBM Plex Mono", IBMPLEXMONO_12_FONT_ID, false},
 };
 inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);
 
@@ -107,6 +113,11 @@ int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
 // Case-insensitive, because the family name comes from a directory on a FAT
 // card and the recipe's spelling is not what necessarily lands there.
 bool isEditorFamily(const char* family);
+
+// Should the READING picker hide this family? True for editor faces that are
+// writing-only. The reading picker asks this, not isEditorFamily, so a face
+// offered for both shows up in both.
+bool isWritingOnlyFamily(const char* family);
 
 // The order the PICKER lists these in: display position -> stored index.
 //

@@ -147,16 +147,16 @@ inline constexpr Entry kEntries[] = {
     // for historical models (1470 Venice, 1722 London); a contemporary
     // derivation by a different hand is its own start. docs/font-dates.md
     // carries the citations and records this as a decision.
-    {"SpaceMono", "Space Mono", "Colophon Foundry", "2016 London", 2016},
-    {"IBMPlexMono", "IBM Plex Mono", "Mike Abbink & Bold Monday", "2017 New York & Eindhoven", 2017},
+    {"SpaceMono", "Space Mono", "Benjamin Critton, Colophon", "2016 London", 2016},
+    {"IBMPlexMono", "IBM Plex Mono", "Mike Abbink & Bold Monday", "2017 New York & The Hague", 2017},
     // Dates from iA's own announcement, "A Typographic Christmas" (ia.net,
     // 14 Dec 2018): Mono is "the classic Nitti, designed by Bold Monday";
     // "last year we added iA Writer Duo ... based on IBM Plex"; "this year we
     // add a third font ... called iA Writer Quattro". So the three are NOT one
     // year -- Nitti long predates the others, which is why Mono carries its
     // two-stage lineage the way the reading families do.
-    {"iAWriterQuattro", "iA Writer Quattro", "iA & Bold Monday", "2018 Zurich & The Hague", 2018},
-    {"iAWriterDuo", "iA Writer Duo", "iA & Bold Monday", "2017 Zurich & The Hague", 2017},
+    {"iAWriterQuattro", "iA Writer Quattro", "Oliver Reichenstein & Bold Monday", "2018 Zurich & The Hague", 2018},
+    {"iAWriterDuo", "iA Writer Duo", "Oliver Reichenstein & Bold Monday", "2017 Zurich & The Hague", 2017},
     {"iAWriterMono", "iA Writer Mono", "Pieter van Rosmalen, Bold Monday", "2009 The Hague; 2018 Zurich", 2009},
 };
 

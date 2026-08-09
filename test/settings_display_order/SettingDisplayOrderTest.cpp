@@ -154,10 +154,18 @@ TEST(SettingDisplayOrder, EditorFontStoredIndicesDoNotMove) {
 TEST(SettingDisplayOrder, EditorFamiliesAreRecognisedByName) {
   for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
     EXPECT_TRUE(editorfonts::isEditorFamily(editorfonts::FAMILIES[i].family))
-        << editorfonts::FAMILIES[i].family << " must be filtered out of the READING picker";
+        << editorfonts::FAMILIES[i].family << " must be recognised as an editor face";
+    // What the READING picker actually asks. Quattro is offered for both
+    // (owner ruling 2026-08-09); the rest stay writing-only, so a card
+    // carrying them does not grow phantom reading families.
+    const bool writingOnly = editorfonts::isWritingOnlyFamily(editorfonts::FAMILIES[i].family);
+    EXPECT_EQ(writingOnly, !editorfonts::FAMILIES[i].alsoReading)
+        << editorfonts::FAMILIES[i].family << ": reading-picker visibility must follow alsoReading";
   }
   // Case-insensitive: the name comes from a directory on a FAT card.
   EXPECT_TRUE(editorfonts::isEditorFamily("iawriterquattro"));
+  EXPECT_FALSE(editorfonts::isWritingOnlyFamily("iawriterquattro")) << "Quattro is offered for reading too";
+  EXPECT_TRUE(editorfonts::isWritingOnlyFamily("iAWriterDuo")) << "Duo stays writing-only";
   EXPECT_TRUE(editorfonts::isEditorFamily("IAWRITERMONO"));
 
   // Reading families and junk must NOT be filtered.
