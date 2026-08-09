@@ -66,7 +66,8 @@ jobs:
       - name: Run cppcheck
         run: pio check --fail-on-defect low --fail-on-defect medium --fail-on-defect high
 
-  build:
+  build-default:
+    name: Build default
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -108,14 +109,14 @@ jobs:
           uv pip install --python ~/.platformio/penv/bin/python "pioarduino==6.1.19"
           ~/.platformio/penv/bin/pio --version
 
-      - name: Build CrossPoint
-        # Both envs in ONE pio invocation: a second `pio run` can wipe the whole
-        # .pio/build tree (project-checksum mismatch after the S3 toolchain
-        # installs into the restored cache), deleting the default firmware.bin
-        # before the artifact upload.
+      - name: Build default firmware
+        # sticky builds in its own job (build-sticky, upstream d4733bfc6), so this
+        # runner never installs the S3 toolchain. The old one-invocation rule
+        # ("a second `pio run` can wipe the whole .pio/build tree") was about
+        # two envs sharing ONE runner; separate runners cannot collide.
         run: |
           set -euo pipefail
-          pio run -e default -e sticky | tee pio.log
+          pio run -e default | tee pio.log
 
       - name: Extract firmware stats
 
@@ -178,8 +179,61 @@ jobs:
           path: .pio/build/default/firmware.bin
           if-no-files-found: error
 
-  # BOOX Picco (ESP32-S3, octal PSRAM). Its own job, never added to the
-  # `pio run -e default -e sticky` line above: picco and sticky share the
+  build-sticky:
+    name: Build sticky
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Install PlatformIO Core
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-v2-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-v2-${{ runner.os }}-
+
+      - name: Pin pioarduino core inside the platform penv
+        # Same reason as build-default's step of this name (custom_sdkconfig
+        # envs run a nested `pio run` from ~/.platformio/penv).
+        run: |
+          set -euo pipefail
+          pio pkg install -e sticky
+          uv pip install --python ~/.platformio/penv/bin/python "pioarduino==6.1.19"
+          ~/.platformio/penv/bin/pio --version
+
+      - name: Build sticky firmware
+        run: |
+          set -euo pipefail
+          pio run -e sticky | tee pio.log
+
+      - name: Extract firmware stats
+        run: |
+          set -euo pipefail
+          ram_line="$(grep -E "RAM:\\s" -m1 pio.log || true)"
+          flash_line="$(grep -E "Flash:\\s" -m1 pio.log || true)"
+          {
+            echo "## Sticky firmware build stats"
+            if [ -n "$ram_line" ]; then echo "- ${ram_line}"; else echo "- RAM: not found"; fi
+            if [ -n "$flash_line" ]; then echo "- ${flash_line}"; else echo "- Flash: not found"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # BOOX Picco (ESP32-S3, octal PSRAM). Its own job, never folded into the
+  # sticky job: picco and sticky share the
   # custom-sdkconfig hash (same sdkconfig text, same MCU), so in one tree the
   # second env compiles against one memory type's sdkconfig.h and links the
   # other's core libs. The image builds SUCCESS and never initializes PSRAM
@@ -293,7 +347,8 @@ jobs:
   test-status:
     name: Test Status
     needs:
-      - build
+      - build-default
+      - build-sticky
       - build-picco
       - clang-format
       - cppcheck
