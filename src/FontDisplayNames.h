@@ -126,6 +126,32 @@ inline constexpr Entry kEntries[] = {
     {"QuattrocentoSans", "Quattrocento Sans", "Pablo Impallari & Igino Marini",
      "2011 Rosario, Argentina & Osimo, Italy", 2011},
     {"Venetian301", "Venetian 301", "Bruce Rogers", "1914 New York; 1990 Cambridge, Mass.", 1914},
+    // --- The editor (writing) group ---------------------------------------
+    // Colophons for the Editor Font picker, which presents and sorts its list
+    // identically to Text Settings (owner ruling 2026-08-09). The keys are the
+    // same on-card directory names editorfonts::Entry::family already carries
+    // (EditorFonts.h:21), so this needs no second key space and no parallel
+    // table — which is what a parallel table would have cost: two tables keyed
+    // on the same frozen directory names, free to drift.
+    //
+    // These five are WRITING faces, not reading families, and listing them here
+    // cannot grow the reading picker by a row. Two independent reasons:
+    // kEntries is never enumerated — find() at :149 is its only reader — and
+    // FontSelectionActivity builds its list from the SD registry, skipping
+    // editor families by name before any lookup reaches here
+    // (FontSelectionActivity.cpp:128, editorfonts::isEditorFamily).
+    //
+    // The three iA faces are drawn from IBM Plex Mono — iA says so, and the
+    // proportions show it — but they are dated at their OWN 2018 design year,
+    // one stage, not model-dated at Plex's 2017. Model-dating in this table is
+    // for historical models (1470 Venice, 1722 London); a contemporary
+    // derivation by a different hand is its own start. docs/font-dates.md
+    // carries the citations and records this as a decision.
+    {"SpaceMono", "Space Mono", "Colophon Foundry", "2016 London", 2016},
+    {"IBMPlexMono", "IBM Plex Mono", "Mike Abbink & Bold Monday", "2017 New York & Eindhoven", 2017},
+    {"iAWriterQuattro", "iA Writer Quattro", "iA (Oliver Reichenstein) & Bold Monday", "2018 Zurich & Tokyo", 2018},
+    {"iAWriterDuo", "iA Writer Duo", "iA (Oliver Reichenstein) & Bold Monday", "2018 Zurich & Tokyo", 2018},
+    {"iAWriterMono", "iA Writer Mono", "iA (Oliver Reichenstein) & Bold Monday", "2018 Zurich & Tokyo", 2018},
 };
 
 inline const Entry* find(const char* directory) {

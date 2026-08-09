@@ -27,10 +27,12 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "FontDisplayNames.h"
 #include "activities/settings/SettingDisplayOrder.h"
 #include "notes/EditorFonts.h"
 
@@ -91,29 +93,50 @@ TEST(SettingDisplayOrder, SleepScreenPutsNoneFirstAndKeepsCalendarsTogether) {
   EXPECT_EQ(pickRow(order, labels.size(), /*stored=*/0, /*position=*/0), 5);
 }
 
-TEST(SettingDisplayOrder, EditorFontListsCompiledInFacesFirst) {
+TEST(SettingDisplayOrder, EditorFontSortsLikeTextSettings) {
+  // Owner ruling 2026-08-09: the Editor Font list presents and sorts exactly
+  // like the reading picker -- reverse chronological by each family's EARLIEST
+  // (creation) year from FontDisplayNames, ties broken by the row's own title.
+  // The previous compiled-in-faces-first grouping is gone on purpose, and this
+  // test replaces the one that pinned it.
   const auto order = editorfonts::displayOrder();
   ASSERT_EQ(order.size(), editorfonts::FAMILY_COUNT) << "every face must appear exactly once";
   EXPECT_TRUE(settingorder::isPermutation(order, editorfonts::FAMILY_COUNT));
 
-  // Compiled-in faces come first; card-only ones follow. Asserted as the
-  // property, not as fixed positions, so compiling another face in does not
-  // break the test -- it is the point of it.
-  bool seenCardOnly = false;
-  for (const uint8_t idx : order) {
-    const bool builtin = editorfonts::FAMILIES[idx].builtinFontId != 0;
-    if (!builtin) seenCardOnly = true;
-    EXPECT_FALSE(builtin && seenCardOnly) << "a compiled-in face must not sit below a card-only one: "
-                                          << editorfonts::FAMILIES[idx].label;
+  // The property, asserted the same way FontSelectionActivity.cpp:136-141
+  // states it.
+  for (size_t i = 1; i < order.size(); i++) {
+    const auto& prev = editorfonts::FAMILIES[order[i - 1]];
+    const auto& cur = editorfonts::FAMILIES[order[i]];
+    const uint16_t yPrev = FontDisplayNames::earliestYear(prev.family);
+    const uint16_t yCur = FontDisplayNames::earliestYear(cur.family);
+    EXPECT_GE(yPrev, yCur) << "newer lineage must come first: " << prev.family << " before " << cur.family;
+    if (yPrev == yCur) {
+      EXPECT_LT(std::string(prev.label), std::string(cur.label)) << "a year tie must fall back to the row title";
+    }
   }
 
-  // Within each group the table's own order survives.
-  std::vector<uint8_t> builtinsInOrder;
+  // Every editor face must be DATED, or it sorts to the bottom as an unknown
+  // and the parity is a lie for that row. This is what a new face added to
+  // FAMILIES without a FontDisplayNames entry would trip.
   for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
-    if (editorfonts::FAMILIES[i].builtinFontId != 0) builtinsInOrder.push_back(static_cast<uint8_t>(i));
+    EXPECT_GT(FontDisplayNames::earliestYear(editorfonts::FAMILIES[i].family), 0)
+        << editorfonts::FAMILIES[i].family << " has no colophon entry, so it cannot sort by lineage";
   }
-  ASSERT_GE(order.size(), builtinsInOrder.size());
-  EXPECT_TRUE(std::equal(builtinsInOrder.begin(), builtinsInOrder.end(), order.begin()));
+
+  // The tie-break reads FAMILIES[].label because that is the string the row
+  // DRAWS. It agrees with FontDisplayNames::displayName today; pin that, since
+  // a drift would sort the list by something invisible.
+  for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
+    EXPECT_EQ(FontDisplayNames::displayName(editorfonts::FAMILIES[i].family), std::string(editorfonts::FAMILIES[i].label))
+        << "picker label and colophon display name must not drift: " << editorfonts::FAMILIES[i].family;
+  }
+
+  // And the concrete shipped order, so a colophon-data edit that silently
+  // reshuffles the picker trips something: the three 2018 iA faces
+  // alphabetically, then IBM Plex Mono (2017), then Space Mono (2016).
+  const std::vector<uint8_t> want = {1, 2, 0, 4, 3};
+  EXPECT_EQ(order, want) << "iA Writer Duo, iA Writer Mono, iA Writer Quattro, IBM Plex Mono, Space Mono";
 }
 
 TEST(SettingDisplayOrder, EditorFontStoredIndicesDoNotMove) {
