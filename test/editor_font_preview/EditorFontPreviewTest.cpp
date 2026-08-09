@@ -155,3 +155,53 @@ TEST(EditorFontPreview, OutOfRangeRowIsNotAvailable) {
   EXPECT_FALSE(isAvailable(editorfonts::FAMILY_COUNT, yes, onCard));
   EXPECT_FALSE(isAvailable(200, yes, onCard));
 }
+
+// --- Row presentation: parity with Text Settings ----------------------------
+//
+// Owner ruling 2026-08-09: this picker presents its list identically to the
+// reading picker -- typeface-name title, "Designer · YEAR PLACE" colophon
+// subtitle over two lines. The subtitle used to be the availability note alone,
+// so every one of these is new behaviour.
+
+constexpr const char* kNotOnCard = "Not on card";
+
+TEST(EditorFontPreview, AvailableRowShowsTheColophonAndNothingElse) {
+  for (uint8_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
+    const std::string sub = editorfonts::rowSubtitle(i, /*available=*/true, kNotOnCard);
+    EXPECT_FALSE(sub.empty()) << editorfonts::FAMILIES[i].label << " must carry a colophon like a reading family";
+    EXPECT_EQ(sub.find(kNotOnCard), std::string::npos)
+        << "a reachable row must not be marked: a badge on four rows out of five is noise";
+    // The reading picker's shape: designer, one middle dot, then the lineage.
+    EXPECT_NE(sub.find("\xC2\xB7"), std::string::npos) << "subtitle must separate designer from lineage: " << sub;
+  }
+}
+
+TEST(EditorFontPreview, UnavailableRowLeadsWithTheMarkSoItCannotBeEllipsized) {
+  // PREPENDED, not appended. The theme wraps the subtitle over kColophonLines
+  // and truncates the overflow, so a mark on the tail of a two-line colophon is
+  // exactly what gets cut -- and the one fact the owner needs is the one that
+  // would vanish. rfind(..., 0) == 0 is "starts with".
+  for (uint8_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
+    const std::string sub = editorfonts::rowSubtitle(i, /*available=*/false, kNotOnCard);
+    EXPECT_EQ(sub.rfind(kNotOnCard, 0), 0u) << "the availability mark must lead the subtitle: " << sub;
+    // and the colophon is still there, after it -- the mark ADDS to the row,
+    // it does not replace what the reading picker would have shown.
+    EXPECT_GT(sub.size(), std::strlen(kNotOnCard)) << "the mark must not replace the colophon";
+    EXPECT_NE(sub.find(editorfonts::rowSubtitle(i, /*available=*/true, kNotOnCard)), std::string::npos)
+        << "the full colophon must survive the mark: " << sub;
+    EXPECT_EQ(sub.find(editorfonts::FAMILIES[i].label), std::string::npos)
+        << "the title line already carries the face name; repeating it in the subtitle wastes both lines";
+  }
+}
+
+TEST(EditorFontPreview, RowSubtitleDegradesRatherThanShowingPunctuationAlone) {
+  // No marker supplied (or an empty one) must not leave a dangling separator,
+  // and an out-of-range stored index -- a settings.json written against a
+  // longer table -- must produce nothing rather than read past the array.
+  const std::string noMarker = editorfonts::rowSubtitle(0, /*available=*/false, "");
+  EXPECT_EQ(noMarker, editorfonts::rowSubtitle(0, /*available=*/true, ""));
+  EXPECT_EQ(editorfonts::rowSubtitle(0, /*available=*/false, nullptr), noMarker);
+
+  EXPECT_EQ(editorfonts::rowSubtitle(editorfonts::FAMILY_COUNT, false, kNotOnCard), "");
+  EXPECT_EQ(editorfonts::rowSubtitle(200, true, kNotOnCard), "");
+}

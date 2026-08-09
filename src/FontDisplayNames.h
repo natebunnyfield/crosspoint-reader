@@ -126,6 +126,38 @@ inline constexpr Entry kEntries[] = {
     {"QuattrocentoSans", "Quattrocento Sans", "Pablo Impallari & Igino Marini",
      "2011 Rosario, Argentina & Osimo, Italy", 2011},
     {"Venetian301", "Venetian 301", "Bruce Rogers", "1914 New York; 1990 Cambridge, Mass.", 1914},
+    // --- The editor (writing) group ---------------------------------------
+    // Colophons for the Editor Font picker, which presents and sorts its list
+    // identically to Text Settings (owner ruling 2026-08-09). The keys are the
+    // same on-card directory names editorfonts::Entry::family already carries
+    // (EditorFonts.h:21), so this needs no second key space and no parallel
+    // table — which is what a parallel table would have cost: two tables keyed
+    // on the same frozen directory names, free to drift.
+    //
+    // These five are WRITING faces, not reading families, and listing them here
+    // cannot grow the reading picker by a row. Two independent reasons:
+    // kEntries is never enumerated — find() at :149 is its only reader — and
+    // FontSelectionActivity builds its list from the SD registry, skipping
+    // editor families by name before any lookup reaches here
+    // (FontSelectionActivity.cpp:128, editorfonts::isEditorFamily).
+    //
+    // The three iA faces are drawn from IBM Plex Mono — iA says so, and the
+    // proportions show it — but they are dated at their OWN 2018 design year,
+    // one stage, not model-dated at Plex's 2017. Model-dating in this table is
+    // for historical models (1470 Venice, 1722 London); a contemporary
+    // derivation by a different hand is its own start. docs/font-dates.md
+    // carries the citations and records this as a decision.
+    {"SpaceMono", "Space Mono", "Benjamin Critton, Colophon", "2016 London", 2016},
+    {"IBMPlexMono", "IBM Plex Mono", "Mike Abbink & Bold Monday", "2017 New York & The Hague", 2017},
+    // Dates from iA's own announcement, "A Typographic Christmas" (ia.net,
+    // 14 Dec 2018): Mono is "the classic Nitti, designed by Bold Monday";
+    // "last year we added iA Writer Duo ... based on IBM Plex"; "this year we
+    // add a third font ... called iA Writer Quattro". So the three are NOT one
+    // year -- Nitti long predates the others, which is why Mono carries its
+    // two-stage lineage the way the reading families do.
+    {"iAWriterQuattro", "iA Writer Quattro", "Oliver Reichenstein & Bold Monday", "2018 Zurich & The Hague", 2018},
+    {"iAWriterDuo", "iA Writer Duo", "Oliver Reichenstein & Bold Monday", "2017 Zurich & The Hague", 2017},
+    {"iAWriterMono", "iA Writer Mono", "Pieter van Rosmalen, Bold Monday", "2009 The Hague; 2018 Zurich", 2009},
 };
 
 inline const Entry* find(const char* directory) {

@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include <functional>
+#include <string>
 #include <vector>
 
 #include "fontIds.h"
@@ -24,6 +25,12 @@ struct Entry {
   // Zero means card-only: the family must be present in /fonts or /.fonts, or
   // the editor falls back to the UI face.
   int builtinFontId;
+  // Also offered as a READING face in Text Settings (owner ruling
+  // 2026-08-09). The ruling at the top of this file -- writing faces are not
+  // reading faces -- still holds for the rest; Quattro is the exception the
+  // owner asked for, and a flag on the row is how an exception stays visible
+  // instead of becoming a special case buried in the filter.
+  bool alsoReading;
 };
 
 // All five are OFL. The iA faces are the "S" (narrow) cuts.
@@ -41,11 +48,11 @@ struct Entry {
 // deleting a row would silently re-point every saved settings.json at a
 // different family.
 inline constexpr Entry FAMILIES[] = {
-    {"iAWriterQuattro", "iA Writer Quattro", 0},
-    {"iAWriterDuo", "iA Writer Duo", 0},
-    {"iAWriterMono", "iA Writer Mono", 0},
-    {"SpaceMono", "Space Mono", SPACEMONO_12_FONT_ID},
-    {"IBMPlexMono", "IBM Plex Mono", IBMPLEXMONO_12_FONT_ID},
+    {"iAWriterQuattro", "iA Writer Quattro", 0, /*alsoReading=*/true},
+    {"iAWriterDuo", "iA Writer Duo", 0, false},
+    {"iAWriterMono", "iA Writer Mono", 0, false},
+    {"SpaceMono", "Space Mono", SPACEMONO_12_FONT_ID, false},
+    {"IBMPlexMono", "IBM Plex Mono", IBMPLEXMONO_12_FONT_ID, false},
 };
 inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);
 
@@ -107,15 +114,45 @@ int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
 // card and the recipe's spelling is not what necessarily lands there.
 bool isEditorFamily(const char* family);
 
+// Should the READING picker hide this family? True for editor faces that are
+// writing-only. The reading picker asks this, not isEditorFamily, so a face
+// offered for both shows up in both.
+bool isWritingOnlyFamily(const char* family);
+
 // The order the PICKER lists these in: display position -> stored index.
 //
 // FAMILIES itself is APPEND ONLY (its index IS SETTINGS.editorFont), so the
-// compiled-in faces ended up below three card-only ones that do nothing until
-// an owner installs them. This puts the ones that always work first, each group
-// keeping its table order, without moving a single stored value.
+// on-screen order has to be a separate permutation or nothing can ever be
+// reordered again. Nothing here moves a stored value.
 //
-// Derived from the table rather than written out, so a face added later lands
-// in the right group by itself instead of leaving a stale list behind.
+// Owner ruling 2026-08-09: this list presents and sorts IDENTICALLY to Text
+// Settings. That is the reading picker's comparator, restated —
+// FontSelectionActivity.cpp:136-141 — reverse chronological by each family's
+// earliest (creation) year from FontDisplayNames, undated families last, ties
+// broken by the row's own displayed title.
+//
+// It supersedes the previous compiled-in-faces-first grouping, and it does put
+// the three card-only iA faces above the two that always work: they are the
+// newest lineage (2018) and the sort has one key. rowSubtitle() carries the
+// "Not on card" mark that makes that legible, and resolve() still degrades a
+// card-only row to a built-in mono, so the ordering costs nothing functional.
+//
+// Derived from the table rather than written out, so a face added later sorts
+// itself instead of leaving a stale list behind.
 std::vector<uint8_t> displayOrder();
+
+// The picker's subtitle for one row: the same "Designer · YEAR PLACE" colophon
+// the reading picker draws (FontDisplayNames::subtitle), with the availability
+// mark PREPENDED when the face cannot be reached.
+//
+// Prepended, not appended: the theme wraps a subtitle over kColophonLines and
+// ellipsizes the overflow (LyraTheme.cpp:275-281 via renderer.wrappedText), so
+// a mark on the tail of a two-line colophon is exactly the thing that gets cut.
+// The one fact the owner must not miss cannot live where it can be truncated.
+//
+// `unavailableMarker` is injected rather than read through I18N so this stays
+// linkable without the translation tables — the three editor-font suites link
+// this file and nothing else. Pass tr(STR_FONT_NOT_ON_CARD).
+std::string rowSubtitle(uint8_t storedIndex, bool available, const char* unavailableMarker);
 
 }  // namespace editorfonts

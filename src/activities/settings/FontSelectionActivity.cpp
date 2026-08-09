@@ -116,16 +116,15 @@ void FontSelectionActivity::onEnter() {
   if (registry_) {
     const auto& families = registry_->getFamilies();
     for (int i = 0; i < static_cast<int>(families.size()); i++) {
-      // Editor faces are writing faces, not reading faces (the ruling at the
-      // top of src/notes/EditorFonts.h). They live on the card the same way a
+      // Writing-only editor faces stay out: they live on the card exactly as a
       // reading family does, so without this a card carrying them grew extra
-      // reading families -- installing the three iA Writer recipes took this
-      // picker from four families to seven.
+      // reading families. iA Writer Quattro is the deliberate exception (owner
+      // ruling 2026-08-09) and carries alsoReading, so it appears here too.
       //
       // settingIndex still counts EVERY registry family, skipped ones included:
       // it addresses the registry, and renumbering it here would re-point
       // SETTINGS.sdFontFamilyName's resolution at a different family.
-      if (editorfonts::isEditorFamily(families[i].name.c_str())) continue;
+      if (editorfonts::isWritingOnlyFamily(families[i].name.c_str())) continue;
       fonts_.push_back({families[i].name, false, static_cast<uint8_t>(CrossPointSettings::BUILTIN_FONT_COUNT + i)});
     }
     // Reverse chronological by lineage: newest EARLIEST (creation) year first,

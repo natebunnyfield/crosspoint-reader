@@ -28,12 +28,21 @@ using namespace editorfonts;
 //
 // THE BUG THESE EXIST FOR
 //
-// The iOS target compiles crosspoint_core with OMIT_FONTS, and main.cpp
-// registers Space Mono and IBM Plex Mono inside `#ifndef OMIT_FONTS`. But
+// The iOS target compiles crosspoint_core with OMIT_FONTS, and main.cpp used to
+// register Space Mono and IBM Plex Mono inside `#ifndef OMIT_FONTS`. But
 // builtinFontIdFor() reads a compile-time table, so it still handed back
 // SPACEMONO_12_FONT_ID -- and the old resolver returned it at its first branch
 // without asking anyone. drawText then had no glyphs, so Create Note rendered
 // nothing at all while still saving correctly.
+//
+// Both halves of that were fixed, at different layers, and BOTH are still
+// needed. On 2026-08-09 the two families and their insertFont() calls moved
+// outside OMIT_FONTS (main.cpp, alongside Libre Franklin 14 pt), so on iOS the
+// glyphs are now really there. That is the fix for the phone; it is not a
+// reason to trust the table. A font id remains just an int, OMIT_FONTS is still
+// a supported build, and any future consumer that defines it -- or any face
+// that has not yet been moved out -- lands back on this exact failure. These
+// tests pin the resolver's refusal to hand back an id nobody registered.
 //
 // isRegistered is what the renderer would answer. Nothing here needs a
 // GfxRenderer, which is why the suite can keep its no-renderer rule.

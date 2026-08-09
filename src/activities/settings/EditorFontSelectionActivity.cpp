@@ -16,13 +16,20 @@
 #include "notes/MarkdownRender.h"
 
 namespace {
-// One subtitle line: the availability note. Reading families carry a two-line
-// designer colophon; these faces have no such data and do not want it.
-constexpr int kSubtitleLines = 1;
+// Two subtitle lines, the same as the reading picker's kColophonLines, and for
+// the same reason: the rows carry a "Designer · YEAR PLACE" colophon that does
+// not fit on one. Both the page stride and drawList have to be told, or paging
+// skips rows.
+//
+// Owner ruling 2026-08-09: this list presents and sorts identically to Text
+// Settings. The subtitle used to be the availability note alone; it is now the
+// colophon with that note prepended (editorfonts::rowSubtitle).
+constexpr int kColophonLines = 2;
 
 // Faces visible at once. Five rows is the whole list, so the pane takes
 // whatever they leave rather than the list being capped like the reading
-// picker's.
+// picker's. A two-line row is taller, so the clamp below (whole rows only,
+// bounded by the space that exists) is what actually decides it.
 constexpr int kVisibleRows = 5;
 
 // The editor asks the SD resolver for this and nothing else
@@ -50,7 +57,7 @@ void EditorFontSelectionActivity::onEnter() {
   // never drawn clipped. Same ordering as FontSelectionActivity, and the same
   // reason: the row count is the fixed quantity.
   const int listBudget = std::max(0, usableHeight - metrics_.verticalSpacing);
-  const int rowStep = GUI.getListRowStep(true, kSubtitleLines);
+  const int rowStep = GUI.getListRowStep(true, kColophonLines);
   listHeight = rowStep > 0 ? std::min(rowStep * kVisibleRows, (listBudget / rowStep) * rowStep)
                            : usableHeight * (100 - metrics_.previewHeightPercent) / 100;
   previewHeight = usableHeight - metrics_.verticalSpacing - listHeight;
@@ -140,7 +147,7 @@ void EditorFontSelectionActivity::loop() {
 
   const int listSize = static_cast<int>(rows_.size());
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true,
-                                                         previewHeight + metrics_.verticalSpacing, kSubtitleLines);
+                                                         previewHeight + metrics_.verticalSpacing, kColophonLines);
 
   // FRONT buttons only, like the reading picker: ButtonNavigator's Nav* aliases
   // also resolve to the side buttons, which would make them move the selection.
@@ -263,16 +270,19 @@ void EditorFontSelectionActivity::render(RenderLock&&) {
 
   GUI.drawList(
       renderer, Rect{0, listTop, pageWidth, listHeight}, static_cast<int>(rows_.size()), selectedIndex_,
+      // Title: the typeface name alone, exactly as the reading picker draws it.
       [this](int index) -> std::string { return editorfonts::FAMILIES[rows_[index]].label; },
-      // Subtitle carries the availability note and nothing else. A row that is
-      // reachable says nothing -- a "present" badge on four rows out of five is
-      // noise, while the absent one needs to stand out.
+      // Subtitle: the reading picker's "Designer · YEAR PLACE" colophon, with
+      // the availability note prepended on a row that cannot be reached. A row
+      // that IS reachable says nothing about it -- a "present" badge on four
+      // rows out of five is noise, while the absent one needs to stand out.
       [this](int index) -> std::string {
-        return isAvailable(rows_[index]) ? "" : std::string(I18N.get(StrId::STR_FONT_NOT_ON_CARD));
+        const uint8_t stored = rows_[index];
+        return editorfonts::rowSubtitle(stored, isAvailable(stored), I18N.get(StrId::STR_FONT_NOT_ON_CARD));
       },
       nullptr,
       [this](int index) -> std::string { return index == appliedIndex_ ? tr(STR_SELECTED) : ""; }, true, nullptr,
-      kSubtitleLines);
+      kColophonLines);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

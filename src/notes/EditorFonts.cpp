@@ -1,6 +1,11 @@
 #include "EditorFonts.h"
 
-#include <strings.h>
+#include <strings.h>  // strcasecmp — POSIX, not in <cstring>
+
+#include <algorithm>
+#include <cstring>
+
+#include "FontDisplayNames.h"
 
 namespace editorfonts {
 
@@ -32,15 +37,52 @@ bool isEditorFamily(const char* family) {
 }
 
 std::vector<uint8_t> displayOrder() {
-  std::vector<uint8_t> order;
-  order.reserve(FAMILY_COUNT);
-  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    if (FAMILIES[i].builtinFontId != 0) order.push_back(static_cast<uint8_t>(i));
-  }
-  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    if (FAMILIES[i].builtinFontId == 0) order.push_back(static_cast<uint8_t>(i));
-  }
+  std::vector<uint8_t> order(FAMILY_COUNT);
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) order[i] = static_cast<uint8_t>(i);
+  // The reading picker's comparator, restated (FontSelectionActivity.cpp:136-141):
+  // newest earliest (creation) year first, undated families (earliestYear 0)
+  // last, ties broken by the row's title.
+  //
+  // The tie-break reads FAMILIES[].label, not FontDisplayNames::displayName, so
+  // it compares the exact string the row DRAWS (see the drawList title lambda in
+  // EditorFontSelectionActivity::render). The two tables agree today and a test
+  // pins that, but if they ever drifted, sorting on the one the owner cannot see
+  // would put the list in an order that looks simply wrong on screen.
+  //
+  // stable_sort so a pair that tied on both keys would still land in table
+  // order rather than at the sort's discretion.
+  std::stable_sort(order.begin(), order.end(), [](uint8_t a, uint8_t b) {
+    const uint16_t ya = FontDisplayNames::earliestYear(FAMILIES[a].family);
+    const uint16_t yb = FontDisplayNames::earliestYear(FAMILIES[b].family);
+    if (ya != yb) return ya > yb;
+    return std::strcmp(FAMILIES[a].label, FAMILIES[b].label) < 0;
+  });
   return order;
+}
+
+std::string rowSubtitle(uint8_t storedIndex, bool available, const char* unavailableMarker) {
+  if (storedIndex >= FAMILY_COUNT) return "";
+  const std::string colophon = FontDisplayNames::subtitle(FAMILIES[storedIndex].family);
+  if (available) return colophon;
+
+  const char* marker = unavailableMarker != nullptr ? unavailableMarker : "";
+  if (marker[0] == '\0') return colophon;
+  if (colophon.empty()) return marker;
+
+  // Marker first, then an em dash — the same pairing the preview pane's label
+  // already uses for "<face> — Not on card"
+  // (EditorFontSelectionActivity.cpp:237). A middle dot would not do: the
+  // colophon spends its one middle dot separating designer from lineage
+  // (FontDisplayNames.h:170-183), and a second would read as one more stage.
+  return std::string(marker) + " \xE2\x80\x94 " + colophon;
+}
+
+bool isWritingOnlyFamily(const char* family) {
+  if (family == nullptr) return false;
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    if (strcasecmp(family, FAMILIES[i].family) == 0) return !FAMILIES[i].alsoReading;
+  }
+  return false;
 }
 
 int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
