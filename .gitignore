@@ -100,3 +100,4 @@ spike-capture.log
 # untracked on 2026-08-28 and they would have gone into a font commit.
 tools/words_per_page/*.o
 tools/words_per_page/wpp[0-9]
+flake.*
