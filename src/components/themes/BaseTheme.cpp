@@ -166,6 +166,16 @@ void BaseTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
   if (gpio.hasTouch()) {
     return;
   }
+#ifdef CROSSPOINT_NO_PHYSICAL_SIDE_BUTTONS
+  // No side buttons on the chassis (the iOS harness draws its own on-screen
+  // pad instead), so the bracket hints label controls that do not exist -- and
+  // on a tablet they land inside the text column, running through the note
+  // being typed. Owner ruling 2026-08-09: remove them from the visual UI.
+  (void)renderer;
+  (void)topBtn;
+  (void)bottomBtn;
+  return;
+#else
 
   const int screenWidth = renderer.getScreenWidth();
   constexpr int buttonWidth = BaseMetrics::values.sideButtonHintsWidth;  // Width on screen (height when rotated)
@@ -229,6 +239,7 @@ void BaseTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
       }
     }
   }
+#endif
 }
 
 int BaseTheme::getListRowStep(bool hasSubtitle, int subtitleLines) const {

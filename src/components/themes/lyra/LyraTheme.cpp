@@ -356,6 +356,13 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
 }
 
 void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* topBtn, const char* bottomBtn) const {
+#ifdef CROSSPOINT_NO_PHYSICAL_SIDE_BUTTONS
+  // See BaseTheme::drawSideButtonHints -- same ruling, same reason.
+  (void)renderer;
+  (void)topBtn;
+  (void)bottomBtn;
+  return;
+#endif
   if (gpio.hasTouch()) {
     return;
   }
