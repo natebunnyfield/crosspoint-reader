@@ -133,10 +133,14 @@ TEST(SettingDisplayOrder, EditorFontSortsLikeTextSettings) {
   }
 
   // And the concrete shipped order, so a colophon-data edit that silently
-  // reshuffles the picker trips something: the three 2018 iA faces
-  // alphabetically, then IBM Plex Mono (2017), then Space Mono (2016).
-  const std::vector<uint8_t> want = {1, 2, 0, 4, 3};
-  EXPECT_EQ(order, want) << "iA Writer Duo, iA Writer Mono, iA Writer Quattro, IBM Plex Mono, Space Mono";
+  // reshuffles the picker trips something. Reverse-chronological by earliest
+  // year, ties by the drawn label:
+  //   Quattro 2018; IBM Plex Mono and Duo both 2017 (tie broken byte-wise, so
+  //   'IBM' precedes 'iA'); Space Mono 2016; iA Writer Mono 2009, because it
+  //   is Nitti -- iA's own announcement calls it "the classic Nitti, designed
+  //   by Bold Monday", long predating the Plex-derived pair.
+  const std::vector<uint8_t> want = {0, 4, 1, 3, 2};
+  EXPECT_EQ(order, want) << "iA Writer Quattro, IBM Plex Mono, iA Writer Duo, Space Mono, iA Writer Mono";
 }
 
 TEST(SettingDisplayOrder, EditorFontStoredIndicesDoNotMove) {
