@@ -49,7 +49,18 @@ DEFAULT_OUTPUT = SCRIPT_DIR / "output"
 DOWNLOAD_DIR = SCRIPT_DIR / "downloaded_fonts"
 INSTANCE_DIR = SCRIPT_DIR / "instanced_fonts"
 PATCHED_DIR = SCRIPT_DIR / "patched_fonts"
-DEFAULT_FALLBACK_FONT = EPDFONTS_DIR / "builtinFonts/source/NotoSans/NotoSans-Regular.ttf"
+# Libre Franklin, not Noto Sans (owner ruling 2026-08-08). Noto Sans was
+# removed from this fork as a built-in UI face in b8023ff8, but it stayed
+# wired in here as the fallback glyph source -- so that commit left every SD
+# font build failing on a file the repo no longer carries. Libre Franklin is
+# the fork's built-in face and IS committed (the wght 400/700 statics), which
+# makes it the one face guaranteed to be present.
+#
+# Coverage note: Libre Franklin is Latin-only, so a family that leans on the
+# fallback for non-Latin gets nothing instead of a Noto glyph. Every family
+# currently built is latin/latin-ext. A future CJK, Arabic or Hebrew family
+# needs its own fallback passed per-family, not this default.
+DEFAULT_FALLBACK_FONT = EPDFONTS_DIR / "builtinFonts/source/LibreFranklin/LibreFranklin-Regular.ttf"
 
 
 _orig_getaddrinfo = socket.getaddrinfo
