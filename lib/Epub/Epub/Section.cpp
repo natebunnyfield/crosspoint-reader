@@ -262,7 +262,10 @@ namespace {
 // DP now prefers the longer line on a cost tie (`cost <= dp[i]`), which moves
 // line breaks in any book where two candidate breaks tie. Stale v64 caches
 // would keep the old breaks and paint positions.
-constexpr uint8_t SECTION_FILE_VERSION = 65;
+// v66: upstream 1582e70ef/596f0d3f7. FOOTNOTE_HREF_LEN grew 96 -> 256, so each
+// serialized footnote record grew 128 -> 288 bytes. A STRUCTURAL change: a v65
+// page's footnotes would be read with the wrong stride.
+constexpr uint8_t SECTION_FILE_VERSION = 66;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
