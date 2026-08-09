@@ -16,6 +16,7 @@
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "notes/EditorFonts.h"
 
 namespace {
 constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
@@ -112,19 +113,19 @@ void FontSelectionActivity::onEnter() {
   fonts_.clear();
   fonts_.reserve(sdFontCount > 0 ? sdFontCount : CrossPointSettings::BUILTIN_FONT_COUNT);
 
-  // The built-in Libre Franklin is hidden once the user has installed their own
-  // fonts, so this list shows only their set. It is still listed when no SD
-  // fonts are present — the picker must never be empty, and Libre Franklin is
-  // the fallback CrossPointSettings::getReaderFontId() resolves to when a
-  // selected SD font cannot be loaded.
-  if (sdFontCount == 0) {
-    fonts_.push_back(
-        {I18N.get(StrId::STR_LIBRE_FRANKLIN), true, static_cast<uint8_t>(CrossPointSettings::BUILTIN_LIBRE_FRANKLIN)});
-  }
-
   if (registry_) {
     const auto& families = registry_->getFamilies();
     for (int i = 0; i < static_cast<int>(families.size()); i++) {
+      // Editor faces are writing faces, not reading faces (the ruling at the
+      // top of src/notes/EditorFonts.h). They live on the card the same way a
+      // reading family does, so without this a card carrying them grew extra
+      // reading families -- installing the three iA Writer recipes took this
+      // picker from four families to seven.
+      //
+      // settingIndex still counts EVERY registry family, skipped ones included:
+      // it addresses the registry, and renumbering it here would re-point
+      // SETTINGS.sdFontFamilyName's resolution at a different family.
+      if (editorfonts::isEditorFamily(families[i].name.c_str())) continue;
       fonts_.push_back({families[i].name, false, static_cast<uint8_t>(CrossPointSettings::BUILTIN_FONT_COUNT + i)});
     }
     // Reverse chronological by lineage: newest EARLIEST (creation) year first,
@@ -138,6 +139,21 @@ void FontSelectionActivity::onEnter() {
       if (ya != yb) return ya > yb;
       return FontDisplayNames::displayName(a.name) < FontDisplayNames::displayName(b.name);
     });
+  }
+
+  // The built-in Libre Franklin is hidden once the user has installed their own
+  // READING fonts, so the list shows only their set. It is listed whenever
+  // nothing else is — the picker must never be empty, and Libre Franklin is the
+  // fallback CrossPointSettings::getReaderFontId() resolves to when a selected
+  // SD font cannot be loaded.
+  //
+  // Keyed on the built list, not on sdFontCount: a card can now carry families
+  // this picker skips, so "the registry found something" stopped meaning "this
+  // picker has a row". A card holding ONLY the editor faces left it empty --
+  // no rows, no selection, and no way back to a working reading font.
+  if (fonts_.empty()) {
+    fonts_.push_back(
+        {I18N.get(StrId::STR_LIBRE_FRANKLIN), true, static_cast<uint8_t>(CrossPointSettings::BUILTIN_LIBRE_FRANKLIN)});
   }
 
   selectedIndex_ = findCurrentFontIndex(fonts_, registry_, SETTINGS.sdFontFamilyName, SETTINGS.fontFamily);

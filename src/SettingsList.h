@@ -284,6 +284,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       for (uint8_t i = 0; i < CrossPointSettings::DISPLAY_DEBOUNCE_COUNT; i++) {
         s.enumStringValues.emplace_back(std::to_string(CrossPointSettings::DISPLAY_DEBOUNCE_MS[i]) + " ms");
       }
+      // Ascending, so "0 ms" reads first instead of after "1000 ms". The table
+      // itself cannot be re-sorted -- the stored setting is the INDEX into it,
+      // so 0 was appended rather than prepended to keep saved settings.json
+      // files pointing at the delay they picked. Sorting the DISPLAY costs
+      // nothing and moves no stored value.
+      s.withDisplayOrder({6, 0, 1, 2, 3, 4, 5});
       v.push_back(std::move(s));
     }
 
@@ -308,6 +314,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
         s.enumStringValues.emplace_back(editorfonts::FAMILIES[i].label);
       }
+      // Compiled-in faces first, card-only ones after. See
+      // editorfonts::displayOrder().
+      s.withDisplayOrder(editorfonts::displayOrder());
       v.push_back(std::move(s));
     }
     v.push_back(SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &CrossPointSettings::embeddedStyle, "embeddedStyle",
@@ -422,8 +431,18 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // selected (SleepActivity::renderBitmapSleepScreen). Surfacing the parent
     // without them would let an owner pick Cover and then be unable to choose
     // fit/crop or a filter.
+    // "None" first (it is the off switch for this whole row), then the two
+    // plain screens, the custom image, the two cover modes, Quick Resume, and
+    // the calendars last as a block. The enum values are frozen by persistence
+    // -- BLANK is 5 and stays 5 -- so this reorders only what the picker draws.
     v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
-                                  std::move(sleepScreenValues), "sleepScreen", StrId::STR_CAT_SYSTEM));
+                                  std::move(sleepScreenValues), "sleepScreen", StrId::STR_CAT_SYSTEM)
+                    .withDisplayOrder({CrossPointSettings::BLANK, CrossPointSettings::DARK,
+                                       CrossPointSettings::LIGHT, CrossPointSettings::CUSTOM,
+                                       CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
+                                       CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
+                                       CrossPointSettings::CALENDAR_FOUR, CrossPointSettings::CALENDAR_FIVE,
+                                       CrossPointSettings::CALENDAR_SIX, CrossPointSettings::CALENDAR_WESTSIDE}));
     v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
                                   {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_SYSTEM));
     v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,

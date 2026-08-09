@@ -7,6 +7,7 @@
 
 #include "CrossPointSettings.h"
 #include "activities/Activity.h"
+#include "activities/settings/SettingDisplayOrder.h"
 #include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
@@ -45,6 +46,44 @@ struct SettingInfo {
   // until the value column rendered blank; and fromJson's clamp `val < 0` was
   // never true, so the saved byte was discarded on every boot.
   size_t enumCount() const { return enumStringValues.empty() ? enumValues.size() : enumStringValues.size(); }
+
+  // The order the PICKER lists the choices in, as display position -> stored
+  // index. Empty means identity: display position IS the stored index.
+  //
+  // An ENUM setting persists the row's INDEX, so for years the only way to keep
+  // saved settings.json files pointing at the same thing was to freeze the list
+  // order -- new choices had to be appended, whatever they meant. That is why
+  // Typing Redraw Delay read "25, 50, 100, 250, 500, 1000, 0 ms" with the zero
+  // last, why the sleep-screen picker had "None" sitting between "Cover Custom"
+  // and "Quick Resume", and why the two editor fonts that need no SD card came
+  // after the three that do nothing until one is installed.
+  //
+  // This decouples the two. The stored index never moves; only the order it is
+  // presented in does, so the reader-facing order can be fixed at any time
+  // without a migration and without re-pointing anyone's saved settings.
+  std::vector<uint8_t> displayOrder;
+
+  // See SettingDisplayOrder.h for what these do and why a bad table degrades to
+  // identity instead of hiding a choice.
+  std::vector<uint8_t> resolvedDisplayOrder() const { return settingorder::resolve(displayOrder, enumCount()); }
+
+  size_t positionOfStored(uint8_t stored) const {
+    return settingorder::positionOf(displayOrder, enumCount(), stored);
+  }
+
+  // Labels in display order. The row renderer does NOT use these -- it indexes
+  // the raw vectors by the stored value, which is unaffected by presentation
+  // order -- so these exist only for the picker.
+  std::vector<StrId> orderedEnumValues() const { return settingorder::reorder(displayOrder, enumValues); }
+
+  std::vector<std::string> orderedEnumStringValues() const {
+    return settingorder::reorder(displayOrder, enumStringValues);
+  }
+
+  SettingInfo& withDisplayOrder(std::vector<uint8_t> order) {
+    displayOrder = std::move(order);
+    return *this;
+  }
 
   struct ValueRange {
     uint8_t min;

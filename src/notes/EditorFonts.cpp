@@ -1,5 +1,7 @@
 #include "EditorFonts.h"
 
+#include <strings.h>
+
 namespace editorfonts {
 
 const char* selectedFamily(uint8_t index) {
@@ -19,6 +21,26 @@ int fallbackFontId() {
     if (FAMILIES[i].builtinFontId != 0) return FAMILIES[i].builtinFontId;
   }
   return 0;  // no built-in family at all; caller keeps its own UI-face fallback
+}
+
+bool isEditorFamily(const char* family) {
+  if (family == nullptr) return false;
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    if (strcasecmp(family, FAMILIES[i].family) == 0) return true;
+  }
+  return false;
+}
+
+std::vector<uint8_t> displayOrder() {
+  std::vector<uint8_t> order;
+  order.reserve(FAMILY_COUNT);
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    if (FAMILIES[i].builtinFontId != 0) order.push_back(static_cast<uint8_t>(i));
+  }
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    if (FAMILIES[i].builtinFontId == 0) order.push_back(static_cast<uint8_t>(i));
+  }
+  return order;
 }
 
 int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,

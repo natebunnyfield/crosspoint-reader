@@ -216,8 +216,15 @@ void SettingsActivity::toggleCurrentSetting() {
     const size_t choiceCount = setting.enumCount();
     if (choiceCount > 1) {
       const auto valuePtr = setting.valuePtr;
-      auto onSelect = [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged, systemFontChanged](int idx) {
-        SETTINGS.*valuePtr = idx;
+      // The picker lists choices in DISPLAY order; the setting stores an INDEX.
+      // Carry the mapping into the callback by value -- capturing `setting` by
+      // reference would dangle, because onSelect calls rebuildSettingsLists()
+      // and that replaces the vector this reference points into.
+      const std::vector<uint8_t> order = setting.resolvedDisplayOrder();
+      auto onSelect = [this, valuePtr, order, sleepScreenChanged, quickResumeTimeoutChanged,
+                       systemFontChanged](int idx) {
+        if (idx < 0 || idx >= static_cast<int>(order.size())) return;
+        SETTINGS.*valuePtr = order[static_cast<size_t>(idx)];
         // Before rebuildSettingsLists(), which measures rows with the UI
         // font and would otherwise size them against the outgoing face.
         if (systemFontChanged) applySystemFont(renderer);
@@ -229,11 +236,13 @@ void SettingsActivity::toggleCurrentSetting() {
       // enumValues EMPTY, so it needs the string overload. Reaching for the
       // StrId overload regardless is what left Typing Redraw Delay with no
       // picker: the gate above saw 0 choices and never got here at all.
+      const int currentPos = static_cast<int>(setting.positionOfStored(currentValue));
       if (!setting.enumStringValues.empty()) {
-        optionPopup.show(setting.nameId, setting.enumStringValues, currentValue, std::move(onSelect));
+        optionPopup.show(setting.nameId, setting.orderedEnumStringValues(), currentPos, std::move(onSelect));
       } else {
-        optionPopup.show(setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()),
-                         currentValue, std::move(onSelect));
+        const std::vector<StrId> ordered = setting.orderedEnumValues();
+        optionPopup.show(setting.nameId, ordered.data(), static_cast<int>(ordered.size()), currentPos,
+                         std::move(onSelect));
       }
       requestUpdate();
       return;
@@ -250,16 +259,22 @@ void SettingsActivity::toggleCurrentSetting() {
     const uint8_t cur = setting.valueGetter();
     if (totalValues > 1) {
       const auto valueSetter = setting.valueSetter;
-      auto onSelect = [this, valueSetter, sleepScreenChanged, quickResumeTimeoutChanged](int idx) {
-        valueSetter(idx);
+      // Same display-order mapping as the valuePtr path above, and captured by
+      // value for the same reason.
+      const std::vector<uint8_t> order = setting.resolvedDisplayOrder();
+      auto onSelect = [this, valueSetter, order, sleepScreenChanged, quickResumeTimeoutChanged](int idx) {
+        if (idx < 0 || idx >= static_cast<int>(order.size())) return;
+        valueSetter(order[static_cast<size_t>(idx)]);
         syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
         SETTINGS.saveToFile();
         rebuildSettingsLists();
       };
+      const int currentPos = static_cast<int>(setting.positionOfStored(cur));
       if (!setting.enumStringValues.empty()) {
-        optionPopup.show(setting.nameId, setting.enumStringValues, cur, std::move(onSelect));
+        optionPopup.show(setting.nameId, setting.orderedEnumStringValues(), currentPos, std::move(onSelect));
       } else {
-        optionPopup.show(setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()), cur,
+        const std::vector<StrId> ordered = setting.orderedEnumValues();
+        optionPopup.show(setting.nameId, ordered.data(), static_cast<int>(ordered.size()), currentPos,
                          std::move(onSelect));
       }
       requestUpdate();

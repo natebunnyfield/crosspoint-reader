@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include <functional>
+#include <vector>
 
 #include "fontIds.h"
 
@@ -93,5 +94,28 @@ int fallbackFontId();
 //   uiFallbackId : the caller's own last resort, used only when nothing resolves
 int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
             const std::function<int(const char*)>& sdLookup, int uiFallbackId);
+
+// Is `family` (an on-card directory name) one of these writing faces?
+//
+// The reading font picker lists whatever SdCardFontRegistry discovered, so a
+// card carrying the editor faces used to grow extra reading families -- exactly
+// what the ruling at the top of this file says must not happen. Installing them
+// is what surfaces it: build the three iA Writer recipes onto a card and the
+// reading picker goes from four families to seven.
+//
+// Case-insensitive, because the family name comes from a directory on a FAT
+// card and the recipe's spelling is not what necessarily lands there.
+bool isEditorFamily(const char* family);
+
+// The order the PICKER lists these in: display position -> stored index.
+//
+// FAMILIES itself is APPEND ONLY (its index IS SETTINGS.editorFont), so the
+// compiled-in faces ended up below three card-only ones that do nothing until
+// an owner installs them. This puts the ones that always work first, each group
+// keeping its table order, without moving a single stored value.
+//
+// Derived from the table rather than written out, so a face added later lands
+// in the right group by itself instead of leaving a stale list behind.
+std::vector<uint8_t> displayOrder();
 
 }  // namespace editorfonts
