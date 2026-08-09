@@ -14,55 +14,6 @@ started.
 
 ## OPEN
 
-### [T-010] settings.json / state.json writes are not atomic — FIXED
-**scope: data durability · found by the 2026-08-08 P0 audit · fixed 2026-08-08**
-
-Every settings and state save went through `SDCardManager::writeFile`, which
-removes the target and then opens it `O_TRUNC` — so power lost in that window
-left NO file, and the device booted having forgotten its Wi-Fi, reading position
-and owner name.
-
-Fixed at the fork's `PersistableStore`, not in the submodule. FAT cannot replace
-a file in one step (SdFat's rename fails if the destination exists), so the order
-is: write the temp in full, remove the target, rename the temp over it. The
-window shrinks to the remove→rename gap, and — the part that matters — a
-COMPLETE copy of the data is on the card throughout it.
-
-`readDocFromFile` is what makes that recoverable rather than merely narrower: a
-temp beside a missing target is promoted, a temp beside an intact target is
-stale and deleted. A promoted temp is parsed first, because a crash during the
-temp write itself leaves a truncated one and promoting that would turn a
-recoverable state into a corrupt file.
-
-**Verified against the simulator, all three paths:** a normal save leaves no
-temp; a complete temp with the target deleted is recovered with the data intact
-(`deviceOwner = RECOVERED-FROM-TEMP`, which under the old code would simply have
-been gone); a truncated temp is discarded and not promoted. 235 host tests.
-
-### [T-009] A 0 ms redraw delay for iOS — DONE (option), measurement still owed
-**scope: iOS display · asked 2026-08-08 · shipped 2026-08-08**
-
-`Typing Redraw Delay` now offers **0 ms**, and it is honoured off-device only.
-
-Two things this had to get right, both recorded here because they are the traps:
-
-- **0 is appended, not inserted.** The INDEX is what `settings.json` persists,
-  so putting 0 at the front — where it belongs numerically — would silently
-  re-map every card in the field, turning a saved 250 ms into 100 ms. The picker
-  reading `… 500 ms, 1000 ms, 0 ms` is the price of not corrupting settings.
-- **The device clamps it.** On e-ink a refresh is ~570 ms with a real waveform,
-  ghosting and battery cost, so 0 would mean a full refresh per keystroke. A
-  card carrying 0 (written on a phone, then moved to hardware) is clamped to the
-  shortest real step rather than obeyed. Verified per platform: index 6 resolves
-  to 0 ms in the simulator and 25 ms on device, the 250 ms default is unchanged
-  on both, and an out-of-range index still falls back to the default.
-
-**Still owed, and deliberately not claimed:** the measurement half of this entry
-— whether the debounce is what makes typing feel slow on the phone at all. If a
-keystroke already coalesces into the next frame, 0 ms changes nothing and the
-lag is elsewhere. The option is now there to A/B against, which is the cheapest
-way to answer it.
-
 ### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
 **scope: verification · opened 2026-08-07**
 
@@ -114,19 +65,6 @@ then either take the patch or write the divergence down in `docs/fork-sync.md`.
 
 These were raised in the audit and have not been ruled on. They are not defects,
 so they are not in `BUGS.md`.
-
-### [T-004] Make the simulator stop lying about the device
-`S-001` in the simulator's `BUGS.md` lists six places where it reports the
-opposite of the hardware. The 1 MB free-heap constant is the one that matters:
-every graceful-degradation path on a 380 KB device is unreachable in the only
-pre-device gate the project has.
-
-Scoped as its own piece of work, not a cleanup. A budgeted fake heap would reach
-most of the dead branches.
-
----
-
-## DONE
 
 ### [T-005] Cruft with zero references — RULED and actioned
 **scope: repo hygiene · raised 2026-08-06 · ruled 2026-08-08**
