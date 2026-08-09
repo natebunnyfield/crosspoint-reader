@@ -39,41 +39,29 @@ temp; a complete temp with the target deleted is recovered with the data intact
 (`deviceOwner = RECOVERED-FROM-TEMP`, which under the old code would simply have
 been gone); a truncated temp is discarded and not promoted. 235 host tests.
 
-### [T-009] A 0 ms redraw delay for iOS, and a look at the update path
-**scope: iOS display · asked 2026-08-08**
+### [T-009] A 0 ms redraw delay for iOS — DONE (option), measurement still owed
+**scope: iOS display · asked 2026-08-08 · shipped 2026-08-08**
 
-Add 0 to the Typing Redraw Delay options and check what the display update path
-actually does on a phone.
+`Typing Redraw Delay` now offers **0 ms**, and it is honoured off-device only.
 
-The setting exists because e-ink is slow: `DISPLAY_DEBOUNCE_MS` is
-`{25, 50, 100, 250, 500, 1000}` and the comment above it
-(`CrossPointSettings.h:216-228`) explains the reasoning — a panel refresh is
-~570 ms, so a shorter debounce "trades battery and flicker for immediacy rather
-than actually feeling faster", and 250 ms was ruled the value that collapses a
-typing burst into one refresh.
+Two things this had to get right, both recorded here because they are the traps:
 
-**None of that is true on a phone.** There is no waveform, no ghosting and no
-battery cost to a redraw; the panel is an SDL texture upload. So the floor the
-device needs is a floor iOS is paying for nothing, and typing feels laggier than
-the hardware requires.
+- **0 is appended, not inserted.** The INDEX is what `settings.json` persists,
+  so putting 0 at the front — where it belongs numerically — would silently
+  re-map every card in the field, turning a saved 250 ms into 100 ms. The picker
+  reading `… 500 ms, 1000 ms, 0 ms` is the price of not corrupting settings.
+- **The device clamps it.** On e-ink a refresh is ~570 ms with a real waveform,
+  ghosting and battery cost, so 0 would mean a full refresh per keystroke. A
+  card carrying 0 (written on a phone, then moved to hardware) is clamped to the
+  shortest real step rather than obeyed. Verified per platform: index 6 resolves
+  to 0 ms in the simulator and 25 ms on device, the 250 ms default is unchanged
+  on both, and an out-of-range index still falls back to the default.
 
-Two things to work out, and the second is the real question:
-
-1. **The option itself.** The list is append-only — the index IS the persisted
-   value (`SettingsList.h:280`, and "Enum order is frozen" in CLAUDE.md) — so
-   0 ms has to be APPENDED, not inserted at the front where it belongs
-   numerically. A device that reads a 0 written by a phone must also behave:
-   the whole point of the debounce is a device constraint, so a device seeing
-   0 probably wants to clamp rather than obey.
-2. **Whether the debounce is the thing making it feel slow at all.** Worth
-   measuring before adding a setting: how often the iOS path actually presents,
-   whether a keystroke coalesces into the next frame, and whether the render
-   task or `requestUpdate` is the real limit. If the answer is that a redraw
-   already costs ~1 frame, a 0 ms option changes nothing and the fix is
-   somewhere else.
-
-**Close by:** measuring the present rate on the phone first, then adding the
-option if the debounce is genuinely the limit.
+**Still owed, and deliberately not claimed:** the measurement half of this entry
+— whether the debounce is what makes typing feel slow on the phone at all. If a
+keystroke already coalesces into the next frame, 0 ms changes nothing and the
+lag is elsewhere. The option is now there to A/B against, which is the cheapest
+way to answer it.
 
 ### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
 **scope: verification · opened 2026-08-07**

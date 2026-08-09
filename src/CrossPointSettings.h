@@ -213,7 +213,12 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // picker index, so storing the raw value here would reinterpret every saved
   // settings.json (see "An ENUM row persists its INDEX" in CLAUDE.md).
   // Order is the persisted encoding — append only.
-  static constexpr uint16_t DISPLAY_DEBOUNCE_MS[] = {25, 50, 100, 250, 500, 1000};
+  // 0 IS LAST, not first, even though it belongs at the front numerically: the
+  // INDEX is what settings.json persists, so inserting at the head would
+  // silently re-map every card in the field (a saved 250 ms would come back as
+  // 100 ms). Append-only is the rule; the picker showing "0 ms" after "1000 ms"
+  // is the price of not corrupting existing settings.
+  static constexpr uint16_t DISPLAY_DEBOUNCE_MS[] = {25, 50, 100, 250, 500, 1000, 0};
   static constexpr uint8_t DISPLAY_DEBOUNCE_COUNT = sizeof(DISPLAY_DEBOUNCE_MS) / sizeof(DISPLAY_DEBOUNCE_MS[0]);
   // 250 ms (owner ruling 2026-08-06: optimise for typing feel). This is the
   // value that collapses a normal typing burst into ONE ~500 ms panel refresh.
@@ -227,9 +232,21 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Low values refresh more often; on e-ink the refresh itself is ~570 ms, so
   // anything under that trades battery and flicker for immediacy rather than
   // actually feeling faster.
+  //
+  // 0 ms is offered for the SIMULATOR AND THE PHONE ONLY, where a "refresh" is
+  // a texture upload with no waveform, no ghosting and no battery cost -- the
+  // entire reason this setting exists does not apply there. On real e-ink 0
+  // would mean a full refresh per keystroke, so the device clamps it to the
+  // shortest real step instead of obeying it. A card carrying 0 (written on a
+  // phone, then moved to hardware) therefore behaves sanely rather than
+  // thrashing the panel.
   unsigned long getDisplayDebounceMs() const {
     const uint8_t i = displayDebounce < DISPLAY_DEBOUNCE_COUNT ? displayDebounce : DEFAULT_DISPLAY_DEBOUNCE;
-    return DISPLAY_DEBOUNCE_MS[i];
+    const uint16_t ms = DISPLAY_DEBOUNCE_MS[i];
+#ifndef SIMULATOR
+    if (ms == 0) return DISPLAY_DEBOUNCE_MS[0];  // clamp on real e-ink
+#endif
+    return ms;
   }
 
   // Owner ruling 2026-08-05: the EDITOR font group is separate from the

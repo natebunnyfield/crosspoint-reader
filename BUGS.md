@@ -65,6 +65,13 @@ code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
 feeds the OTA version comparison, and it makes the running build
 unidentifiable after the fact.
 
+**Root cause fixed and verified 2026-08-08.** `platformio.ini` no longer
+interpolates `${sysenv.CROSSPOINT_RC_HASH}`; `scripts/git_branch.py` owns the
+version and, with the variable unset, warns loudly and stamps `-rc+unset`.
+Confirmed by building `gh_release_rc` with the variable removed from the
+environment: the binary contains `1.5.0-BNY-rc+unset`, so the empty suffix that
+produced this entry cannot recur.
+
 **Now staged:** both cards carry `20260807T0709Z-crosspoint-e194ab7b.bin`, a
 `gh_release` build stamped `1.5.0-BNY` with no empty `+` suffix (confirmed by
 `strings` on the binary), so SD Firmware Update from the card will replace the
