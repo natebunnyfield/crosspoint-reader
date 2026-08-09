@@ -7,11 +7,13 @@
 #include <Memory.h>
 
 #include "CrossPointSettings.h"
+#include "SdCardFontSystem.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "notes/BleHidHost.h"
 #include "notes/EditorFonts.h"
 #include "notes/HidKeymap.h"
+#include "notes/MarkdownRender.h"
 #include "notes/MarkdownSpans.h"
 
 namespace {
@@ -23,14 +25,10 @@ constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
 // face stands in, so the screen is never blank because of a missing font.
 }  // namespace
 
-// getTextWidth() does not count a TRAILING space, so measuring each styled span
-// on its own loses the gap before the next one — "Plain **bold** and" rendered
-// as "Plainbold and". Measuring with a sentinel appended keeps the space's
-// advance, then subtracts the sentinel back off.
+// Thin bind of the shared measurement to this editor's font. The trailing-space
+// correction and why it exists live in notes/MarkdownRender.h.
 int NoteEditorActivity::advanceOf(const char* piece, EpdFontFamily::Style style) const {
-  char probe[200];
-  snprintf(probe, sizeof(probe), "%s|", piece);
-  return renderer.getTextWidth(editorFontId, probe, style) - renderer.getTextWidth(editorFontId, "|", style);
+  return mdrender::advanceOf(renderer, editorFontId, piece, style);
 }
 
 void NoteEditorActivity::onEnter() {
@@ -55,8 +53,23 @@ void NoteEditorActivity::onEnter() {
   // failure path that leaves the object half-built and still live.
   editorFontId = editorfonts::resolve(
       SETTINGS.editorFont, [this](int id) { return renderer.getFontMap().count(id) > 0; },
-      [](const char* family) {
-        return SETTINGS.sdFontIdResolver ? SETTINGS.sdFontIdResolver(SETTINGS.sdFontResolverCtx, family, 12) : 0;
+      [this](const char* family) {
+        // loadForDisplay(), NOT SETTINGS.sdFontIdResolver. The resolver is
+        // resolveFontId(), which returns a font id only when that family is the
+        // family the READER currently has resident -- it never loads anything.
+        // So every card-only editor face resolved to 0 unless the owner
+        // happened to be reading in that same family, and resolve() fell
+        // through to the compiled-in mono. Measured on the simulator with all
+        // three iA families installed: the text band of a note rendered with
+        // editorFont=iAWriterQuattro was BYTE-IDENTICAL to one rendered with
+        // editorFont=SpaceMono. Three of the five rows did nothing at all.
+        //
+        // loadForDisplay does load it, at the editor's 12 pt, the same way the
+        // Lyra theme loads its title face and CalendarSleepScreen loads 18 pt.
+        // It can evict the reader family; that is safe and already routine --
+        // the reader re-asserts through sdFontSystem.ensureLoaded() on entry,
+        // which is exactly why FontSelectionActivity::onEnter does the same.
+        return sdFontSystem.loadForDisplay(family, 12, renderer);
       },
       EDITOR_FONT_ID_FALLBACK);
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -518,49 +531,15 @@ void NoteEditorActivity::loop() {
   }
 }
 
-// Draw one display line with markdown styling. Spans come from MarkdownSpans
-// (host-tested); this function only turns them into draw calls.
+// Draw one display line with markdown styling, then the caret.
+//
+// The styling half is mdrender::drawLine -- shared with the Editor Font
+// picker's specimen, so what that pane previews is what this draws, not an
+// imitation of it. The caret stays here: it is measured in the RAW source text
+// rather than the styled spans, because that is what the typist is editing.
 void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool showCursor, size_t cursorCol) {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const mdspans::Line md = mdspans::analyze(text, len);
-
-  int x = metrics.contentSidePadding + md.indent * (lineHeight);
-  const char* body = text + md.bodyStart;
-
-  // List/quote markers stay visible so the source is still recognisable while
-  // editing. The numbered marker is copied from the text rather than invented,
-  // so "3." and "12)" keep their real value.
-  if (md.block == mdspans::Block::Bullet) {
-    renderer.drawText(editorFontId, metrics.contentSidePadding, y, "-");
-  } else if (md.block == mdspans::Block::Quote) {
-    renderer.drawText(editorFontId, metrics.contentSidePadding, y, ">");
-  } else if (md.block == mdspans::Block::Numbered) {
-    char marker[8];
-    size_t m = 0;
-    for (size_t k = 0; k < md.bodyStart && m < sizeof(marker) - 1; ++k) {
-      if (text[k] != ' ' && text[k] != '\t') marker[m++] = text[k];
-    }
-    marker[m] = '\0';
-    renderer.drawText(editorFontId, metrics.contentSidePadding, y, marker);
-  }
-
-  char piece[192];
-  for (size_t i = 0; i < md.spanCount; ++i) {
-    const mdspans::Span& sp = md.spans[i];
-    size_t n = sp.len;
-    if (n > sizeof(piece) - 1) n = sizeof(piece) - 1;
-    memcpy(piece, body + sp.start, n);
-    piece[n] = '\0';
-
-    EpdFontFamily::Style style = EpdFontFamily::REGULAR;
-    if (mdspans::blockIsBold(md.block) || sp.style == mdspans::Style::Bold) {
-      style = EpdFontFamily::BOLD;
-    } else if (sp.style == mdspans::Style::Italic) {
-      style = EpdFontFamily::ITALIC;
-    }
-    renderer.drawText(editorFontId, x, y, piece, true, style);
-    x += advanceOf(piece, style);
-  }
+  mdrender::drawLine(renderer, editorFontId, lineHeight, metrics.contentSidePadding, y, text, len);
 
   if (showCursor) {
     // Caret drawn at the cursor's column, measured in the raw source text so it
