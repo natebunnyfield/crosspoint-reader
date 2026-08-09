@@ -10,6 +10,7 @@
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
 #include "CrossPointSettings.h"
+#include "EditorFontSelectionActivity.h"
 #include "FontSelectionActivity.h"
 #include "MappedInputManager.h"
 #include "SystemFont.h"
@@ -192,6 +193,26 @@ void SettingsActivity::toggleCurrentSetting() {
 
   if (setting.nameId == StrId::STR_TIME_TO_SLEEP) {
     openSleepTimeoutPicker();
+    return;
+  }
+
+  if (setting.nameId == StrId::STR_EDITOR_FONT) {
+    // Confirm opens the picker with its specimen pane rather than a five-name
+    // popup. These faces differ only in glyph-width behaviour, which no list of
+    // names can convey.
+    //
+    // The row stays an ENUM in getSettingsList() on purpose: that list is also
+    // what fromJson()/toJson() and the web settings API iterate, so turning it
+    // into an ACTION would stop editorFont persisting and drop it from the web
+    // UI. Only the way the DEVICE reaches it changes. Same shape as the clock
+    // offset row below.
+    startActivityForResult(std::make_unique<EditorFontSelectionActivity>(renderer, mappedInput),
+                           [this](const ActivityResult&) {
+                             // The picker applies and saves as it goes; this
+                             // just refreshes the row's rendered value.
+                             rebuildSettingsLists();
+                             requestUpdate();
+                           });
     return;
   }
 
