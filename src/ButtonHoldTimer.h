@@ -57,9 +57,10 @@ struct Timer {
         releasedHeldMs[i] = started[i] ? nowMs - pressStartMs[i] : 0;
         // The press is spent. Without this, `started` covered only a
         // button's FIRST unseen press: a later level with no press edge
-        // (one consumed by a gpio.update() outside the pump -- the boot-time
-        // waitForPowerRelease poll, which on iOS survives the longjmp reboot
-        // together with this timer) read now minus the PREVIOUS press's
+        // (one consumed by a gpio.update() outside the pump -- setup()'s
+        // boot-time polls; the wake-hold drain waitForPowerRelease was one
+        // until upstream e4aae7bae removed it -- which on iOS survive the
+        // longjmp reboot together with this timer) read now minus the PREVIOUS press's
         // stamp. Adversarial review 2026-09-04, latent.
         started[i] = false;
       }
