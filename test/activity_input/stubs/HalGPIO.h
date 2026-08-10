@@ -75,8 +75,12 @@ class HalGPIO {
   // this is the one HAL surface a host CAN implement, so the suite scripts it
   // the same way it scripts buttons — simType() is the typist, and the flag
   // records what the activity announced.
-  void setTextEntryActive(const bool active) {
+  enum class TextEntryLines : uint8_t { Single, Multi };
+  void setTextEntryActive(const bool active, const TextEntryLines lines = TextEntryLines::Single) {
     textEntryActive_ = active;
+    // Recorded, not acted on: on a host this is what decides who owns Return,
+    // and the activity announcing the wrong shape is the whole of ST-006.
+    textEntryLines_ = active ? lines : TextEntryLines::Single;
     typed_.clear();  // both edges drop the queue, as the simulator's does
   }
   bool consumeTypedText(std::string& out) {
@@ -99,6 +103,7 @@ class HalGPIO {
     if (textEntryActive_) typed_ += utf8;
   }
   bool simTextEntryActive() const { return textEntryActive_; }
+  TextEntryLines simTextEntryLines() const { return textEntryLines_; }
 
   // Sets the RAW level. It becomes visible (and produces an edge) on the next
   // update(), i.e. at the next frame boundary — never mid-frame.
@@ -122,6 +127,7 @@ class HalGPIO {
     heldTimeMs_ = 0;
     deviceType_ = DeviceType::X4;
     textEntryActive_ = false;
+    textEntryLines_ = TextEntryLines::Single;
     typed_.clear();
   }
 
@@ -158,6 +164,7 @@ class HalGPIO {
   unsigned long heldTimeMs_ = 0;
   DeviceType deviceType_ = DeviceType::X4;
   bool textEntryActive_ = false;
+  TextEntryLines textEntryLines_ = TextEntryLines::Single;
   std::string typed_;
 };
 

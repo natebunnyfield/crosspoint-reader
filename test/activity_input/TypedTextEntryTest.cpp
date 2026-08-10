@@ -103,6 +103,17 @@ TEST_F(TypedTextEntry, AnnouncesTheOpenFieldToTheHostAndStandsDownAfterwards) {
       << "the flag outlived the field -- the host would keep the keyboard off the button map";
 }
 
+// A one-line field must announce itself as one, because that is what leaves
+// Return meaning BTN_CONFIRM on the host -- Select on the daisywheel, the key
+// that types the highlighted character. Announcing Multi here would hand
+// Return to the text and reinstate "Select exits instead of typing".
+TEST_F(TypedTextEntry, AnnouncesASingleLineFieldAsSingleLine) {
+  openField();
+  EXPECT_EQ(host::buttons().simTextEntryLines(), HalGPIO::TextEntryLines::Single)
+      << "a one-line entry announced itself as multi-line -- a host would stop "
+         "treating Return as Select and the wheel could no longer type";
+}
+
 TEST_F(TypedTextEntry, TypedRunLandsInTheFieldAndCommitReturnsIt) {
   openField();
   type("Ada Lovelace");

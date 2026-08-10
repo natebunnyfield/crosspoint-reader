@@ -42,7 +42,14 @@ void NoteEditorActivity::onEnter() {
 // KeyboardEntryActivity and DaisyEntryActivity have always done this; the two
 // editors never did, so on the phone Create Note and Claude had no keyboard at
 // all and a paired one fought the button map.
-  mappedInput.setTextEntryActive(true);
+//
+// Multi, because this is an editor and not a field: a host keyboard's Return
+// is a line break here, exactly as a paired Bluetooth keyboard's Enter already
+// is (notes/HidKeymap.h decodes usage 0x28 to '\n', and the drain below turns
+// TYPED_COMMIT into the same). Announcing Single left the host treating Return
+// as the Confirm button, so it pressed Select on the on-screen panel instead
+// of breaking the line -- ST-006.
+  mappedInput.setTextEntryActive(true, HalGPIO::TextEntryLines::Multi);
 
   panel.begin();
 
