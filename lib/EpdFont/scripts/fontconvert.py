@@ -59,10 +59,13 @@ intervals = [
     # European diacritical variants, Romanian (Ș/ș/Ț/ț)
     (0x01C4, 0x021F),
     ### Vietnamese Extended ###
-    # All precomposed Vietnamese characters with tone marks
-    # Ả Ấ Ầ Ẩ Ẫ Ậ Ắ Ằ Ẳ Ẵ Ặ Ẹ Ẻ Ẽ Ế Ề Ể Ễ Ệ Ỉ Ị Ọ Ỏ Ố Ồ Ổ Ỗ Ộ Ớ Ờ Ở Ỡ Ợ Ụ Ủ Ứ Ừ Ử Ữ Ự Ỳ Ỵ Ỷ Ỹ
-    # (Removed: Vietnamese translation deleted in commit 08d5bdee)
-    # (0x1EA0, 0x1EF9),
+    # All precomposed Vietnamese characters with tone marks.
+    # RESTORED 2026-08-09 (owner ruling). Dropping it with the Vietnamese UI
+    # translation confused two different things: what the MENUS say, and what a
+    # BOOK -- or a contributor's name -- contains. A Latin-alphabet reader
+    # collides with these constantly; the colophon renders "Phạm Bình An"
+    # wrongly without them.
+    (0x1EA0, 0x1EF9),
     ### General Punctuation (core subset) ###
     # Smart quotes, en dash, em dash, ellipsis, NO-BREAK SPACE
     (0x2000, 0x206F),
@@ -77,12 +80,21 @@ intervals = [
     # Needed for proper rendering of many extended Latin languages
     (0x0300, 0x036F),
     ### Greek & Coptic ###
-    # Used in science, maths, philosophy, some academic texts
-    # (0x0370, 0x03FF),
+    # Used in science, maths, philosophy, some academic texts. ENABLED
+    # 2026-08-09: this reader's own font recipes call out "scifi/popsci" as a
+    # target, and those texts carry Greek letters in ordinary prose.
+    (0x0370, 0x03FF),
     ### Cyrillic ###
-    # Russian, Ukrainian, Bulgarian, etc.
-    # (Removed: Russian/Ukrainian translations deleted in commit 08d5bdee)
-    # (0x0400, 0x04FF),
+    # Russian, Ukrainian, Bulgarian, etc. RESTORED 2026-08-09 (owner ruling),
+    # same reasoning as Vietnamese above: it was removed because the UI
+    # translations were, but a reader still meets Cyrillic in quotations, names
+    # and titles. Libre Franklin has always carried these glyphs -- this was a
+    # subsetting decision, not a missing typeface.
+    (0x0400, 0x04FF),
+    ### Number Forms ###
+    # Vulgar fractions -- 1/2 3/4 1/3 -- which appear in recipes, measurements
+    # and older prose, and render as nothing today.
+    (0x2150, 0x218F),
     ### Math Symbols (common subset) ###
     # Superscripts and Subscripts
     (0x2070, 0x209F),
