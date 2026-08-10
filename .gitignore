@@ -48,6 +48,11 @@ tools/calendar_preview/fs_/
 # read), so they are what gets dropped.
 qa_*/*.bmp
 qa/*.bmp
+# ...and the PNGs they get converted to. The simulator writes BMP; every way of
+# actually LOOKING at one (sips -s format png) leaves a PNG beside it, so
+# ignoring only the source left the derived copy staged-by-accident.
+qa_*/*.png
+qa/*.png
 
 # Packaged .app bundles from packaging/macos. Build output, tens of MB, and
 # rebuilt from a tagged commit whenever it is actually needed.
