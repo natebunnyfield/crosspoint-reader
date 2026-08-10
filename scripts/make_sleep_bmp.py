@@ -6,7 +6,7 @@ Floyd-Steinberg dithered to 1bpp BI_RGB (the exact format
 lib/GfxRenderer/Bitmap.cpp accepts).
 
 Default is a plain resize with NO caption: the art is cover-scaled and
-centre-cropped so it fills the panel edge to edge, because a sleep screen that
+center-cropped so it fills the panel edge to edge, because a sleep screen that
 letterboxes reads as a rendering fault rather than a design. Most source art
 already carries its own title treatment, so adding text on top of it is the
 exception, not the rule.
@@ -63,7 +63,7 @@ def main() -> int:
     fit = args.fit or bool(args.name)
 
     if not fit:
-        # Fill: cover-scale, then centre-crop the overflow. Edge to edge.
+        # Fill: cover-scale, then center-crop the overflow. Edge to edge.
         scale = max(W / src.width, H / src.height)
         art = src.resize((round(src.width * scale), round(src.height * scale)), Image.LANCZOS)
         # Parenthesise the floor division BEFORE negating: -(57) // 2 is -29, not

@@ -130,7 +130,7 @@ int DaisyEntryActivity::labelFontId() const {
   return SMALL_FONT_ID;
 }
 
-// Three upright lines of lineH centred on the petal, inside a wedge whose
+// Three upright lines of lineH centered on the petal, inside a wedge whose
 // tangential half-width at the label radius is rm*sin(step/2).
 bool DaisyEntryActivity::columnFits(const int lineH) const {
   constexpr float rm = (RADIUS_HUB + RADIUS_OUTER) / 2.0f;

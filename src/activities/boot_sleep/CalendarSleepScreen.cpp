@@ -169,7 +169,7 @@ CalendarFonts resolveFonts(GfxRenderer& renderer) {
 // Ink extent of `text` relative to the `y` handed to drawText.
 // `topOffset` is the gap from that y down to the first inked row; `height` is
 // the inked height. Both are 0 when metrics are unavailable, which degrades to
-// the old ascender-box behaviour instead of mispositioning.
+// the old ascender-box behavior instead of mispositioning.
 struct InkBox {
   int topOffset = 0;
   int height = 0;
@@ -202,7 +202,7 @@ InkBox inkBox(const GfxRenderer& renderer, int fontId, const char* text, EpdFont
   return box;
 }
 
-// `y` for drawText such that `text`'s ink is vertically centred on `centreY`.
+// `y` for drawText such that `text`'s ink is vertically centered on `centreY`.
 int topYForInkCentre(const GfxRenderer& renderer, int fontId, const char* text, EpdFontFamily::Style style,
                      int centreY) {
   const InkBox box = inkBox(renderer, fontId, text, style);
@@ -219,7 +219,7 @@ struct Layout {
   int screenW;
   int screenH;
   int marginX;
-  int titleCentreY;  // ink centre of the header
+  int titleCentreY;  // ink center of the header
   int gridTop;
   int rowH;
   int colW;
@@ -355,7 +355,7 @@ void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const
   const int textW = renderer.getTextWidth(L.fonts.display, numBuf, DAY_STYLE);
   const int numTopY = topYForInkCentre(renderer, L.fonts.display, numBuf, DAY_STYLE, cy);
 
-  // The square is centred on the same point as the digit ink, so the two
+  // The square is centered on the same point as the digit ink, so the two
   // cannot drift apart.
   const int half = L.cellBoxSide / 2;
   const int rectX = cx - half;
@@ -364,7 +364,7 @@ void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const
   // Every marked cell is the same square with the same hairline border; only
   // the fill differs, so the shapes read as one family:
   //   today    -> solid black fill, number knocked out in white
-  //   holiday  -> mid-grey fill (dithered on the 1-bit panel), black number
+  //   holiday  -> mid-gray fill (dithered on the 1-bit panel), black number
   // Today wins when a day is both, since black is the stronger fill and the
   // date still appears in the legend as a holiday.
   const bool inverted = isToday;

@@ -6,7 +6,7 @@
 // new choice goes on the end whatever it means, because moving one would
 // re-point every saved settings.json at something else. Three pickers ended up
 // ordered by when each choice was added rather than by anything a reader would
-// recognise -- "0 ms" after "1000 ms" in Typing Redraw Delay, "None" wedged
+// recognize -- "0 ms" after "1000 ms" in Typing Redraw Delay, "None" wedged
 // between "Cover Custom" and "Quick Resume" in Sleep Screen, and the two editor
 // fonts that need no SD card sitting below three that do nothing until one is
 // installed.

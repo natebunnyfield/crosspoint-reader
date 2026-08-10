@@ -152,7 +152,7 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // effect while the progress bar is drawn, and it is not a visibility control.
 
   // The Controls tab was withdrawn from the device Settings UI, so these two have
-  // no on-device control left and are pinned to the behaviour the owner wants
+  // no on-device control left and are pinned to the behavior the owner wants
   // rather than left wherever an older save happened to leave them. They stay
   // live and web-settable: the reader reads shortPwrBtn every frame and
   // longPressButtonBehavior gates the font-size gesture.
@@ -192,7 +192,7 @@ void CrossPointSettings::normalizeRetiredSettings() {
   lineSpacing = NORMAL;
   paragraphAlignment = JUSTIFIED;
   embeddedStyle = 1;
-  // OFF, unlike its neighbours: the owner named it as the exception.
+  // OFF, unlike its neighbors: the owner named it as the exception.
   focusReadingEnabled = 0;
   hyphenationEnabled = 1;
   extraParagraphSpacing = 1;
@@ -248,7 +248,7 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
       const uint8_t fieldDefault = s.*(info.valuePtr);  // struct-initializer default, read before we overwrite it
       uint8_t v = doc[info.key] | fieldDefault;
       if (info.type == SettingType::ENUM) {
-        // enumCount(), not enumValues.size(): a runtime-labelled row keeps its
+        // enumCount(), not enumValues.size(): a runtime-labeled row keeps its
         // choices in enumStringValues and leaves enumValues empty, so the old
         // form clamped against 0. `val < 0` is never true, so EVERY load threw
         // the saved byte away and substituted the default — which is why

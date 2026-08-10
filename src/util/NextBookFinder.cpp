@@ -59,7 +59,7 @@ std::vector<std::string> NextBookFinder::findNextBooks(const std::string& curren
     file.getName(nameBuffer.get(), NAME_BUFFER_SIZE);
     // Hidden files are never books. Was gated on SETTINGS.showHiddenFiles,
     // which had no settings row and so could only ever be 0 (removed
-    // 2026-08-04) — this is the behaviour that always ran.
+    // 2026-08-04) — this is the behavior that always ran.
     if (nameBuffer[0] == '.') {
       continue;
     }

@@ -678,7 +678,7 @@ constexpr uint32_t mixCoverSeed(uint32_t s) {
 // The circle-built patterns (seigaiha, shippo) place discs whose bounding
 // boxes cross the band edges, so they cannot use drawRoundedRect/drawArc —
 // those clip to the screen, not to the band, and at home the pixels past the
-// band edge belong to a neighbouring tile. Everything rasterises through
+// band edge belong to a neighboring tile. Everything rasterises through
 // hspanClipped instead.
 
 // Integer sqrt (Newton). The ESP32-C3 is RV32IMC: hardware divide, no FPU.
@@ -730,7 +730,7 @@ constexpr int COVER_BAND_PATTERN_COUNT = 12;
 
 // The decorative band across the top of a generated cover. Every variant
 // draws only via fillRect/fillRectDither/fillPolygon/hspanClipped with
-// extents clamped to the band, so nothing can spill into a neighbouring
+// extents clamped to the band, so nothing can spill into a neighboring
 // home-grid tile. The set mixes plain geometry with traditional motifs —
 // Japanese wagara (ichimatsu, seigaiha, shippo, yagasuri, uroko), the Greek
 // meander, kente-inspired stripe blocks and an Andean step motif — all of
@@ -805,7 +805,7 @@ void drawGeneratedCoverBand(const GfxRenderer& renderer, const int x, const int 
     case 6: {  // shippo: interlocking circle lattice (four-petal lenses)
       const int rad = std::max(12, h / (dense ? 3 : 2));
       const int stroke = std::max(1, rad / 8);
-      const int pitch = rad * 141 / 100;  // r*sqrt(2): rims meet at neighbours' centres
+      const int pitch = rad * 141 / 100;  // r*sqrt(2): rims meet at neighbors' centres
       for (int cy = y; cy - rad <= y + h; cy += pitch) {
         for (int cx = x; cx - rad <= x + w; cx += pitch) {
           ringClipped(renderer, clip, cx, cy, rad, stroke, true);
@@ -948,7 +948,7 @@ void BaseTheme::drawGeneratedCover(const GfxRenderer& renderer, const Rect rect,
   }
 
   if (author && *author && authorBottom > authorTop) {
-    // Short centred rule separating title and author blocks.
+    // Short centered rule separating title and author blocks.
     const int sepW = rect.width / 5;
     renderer.fillRect(rect.x + (rect.width - sepW) / 2, authorTop, sepW, std::max(1, ruleH / 2), true);
     const Rect authorBounds(rect.x + margin, authorTop + margin / 2, rect.width - 2 * margin,

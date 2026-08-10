@@ -40,7 +40,7 @@ void SdFirmwareUpdateActivity::launchPicker() {
 void SdFirmwareUpdateActivity::onPickerResult(const ActivityResult& result) {
   if (result.isCancelled) {
     if (recoveryMode) {
-      // Recovery mode: re-launch the picker so the user cannot escape into a half-initialised UI.
+      // Recovery mode: re-launch the picker so the user cannot escape into a half-initialized UI.
       launchPicker();
       return;
     }

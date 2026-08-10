@@ -6,7 +6,7 @@
 // (FreeInkUICore.h:1443). keyboard.h sizes the delete glyph from the label
 // font's advanceY and snaps it to a multiple of 16, which lands on 32 for all
 // four System faces, then blits the 16px art into that 32px box with
-// nearest-neighbour sampling (FreeInkUICore.h:365-380). So every device draws
+// nearest-neighbor sampling (FreeInkUICore.h:365-380). So every device draws
 // the backspace key at HALF the resolution of the text beside it: 2x2 blocks,
 // a staircased arrow tip and an X whose diagonals do not join.
 //

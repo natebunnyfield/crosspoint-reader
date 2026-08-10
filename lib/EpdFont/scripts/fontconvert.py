@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description="Generate a header file from a font
 parser.add_argument("name", action="store", help="name of the font.")
 parser.add_argument("size", type=int, help="font size to use.")
 parser.add_argument("fontstack", action="store", nargs='+', help="list of font files, ordered by descending priority.")
-parser.add_argument("--2bit", dest="is2Bit", action="store_true", help="generate 2-bit greyscale bitmap instead of 1-bit black and white.")
+parser.add_argument("--2bit", dest="is2Bit", action="store_true", help="generate 2-bit grayscale bitmap instead of 1-bit black and white.")
 parser.add_argument("--additional-intervals", dest="additional_intervals", action="append", help="Additional code point intervals to export as min,max. This argument can be repeated.")
 parser.add_argument("--compress", dest="compress", action="store_true", help="Compress glyph bitmaps using DEFLATE with group-based compression.")
 parser.add_argument("--force-autohint", dest="force_autohint", action="store_true", help="Force FreeType auto-hinter instead of native font hinting. Improves stem width consistency for fonts with weak or no native TrueType hints.")
@@ -289,7 +289,7 @@ for i_start, i_end in intervals:
         face = load_glyph(code_point)
         bitmap = face.glyph.bitmap
 
-        # Build out 4-bit greyscale bitmap
+        # Build out 4-bit grayscale bitmap
         pixels4g = []
         px = 0
         for i, v in enumerate(bitmap.buffer):
@@ -307,7 +307,7 @@ for i_start, i_end in intervals:
                 px = 0
 
         if is2Bit:
-            # 0-3 white, 4-7 light grey, 8-11 dark grey, 12-15 black
+            # 0-3 white, 4-7 light gray, 8-11 dark gray, 12-15 black
             # Downsample to 2-bit bitmap
             pixels2b = []
             px = 0

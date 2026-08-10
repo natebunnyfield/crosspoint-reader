@@ -15,7 +15,7 @@
 // the BMP path, which never had it.
 namespace pngbitdepth {
 
-// Colour-type values from the PNG spec, matching PngToBmpConverter's enum.
+// Color-type values from the PNG spec, matching PngToBmpConverter's enum.
 constexpr uint8_t kGrayscale = 0;
 constexpr uint8_t kPalette = 3;
 

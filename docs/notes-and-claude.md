@@ -15,7 +15,7 @@ the screen (`src/notes/KeyboardPanel.{h,cpp}`) with the note text above, so you
 see what you type in context — unlike `KeyboardEntryActivity`, which owns the
 whole screen and returns a single string.
 
-All three `SETTINGS.keyboardLayout` choices are honoured:
+All three `SETTINGS.keyboardLayout` choices are honored:
 
 | Layout | In the panel |
 |---|---|
@@ -242,10 +242,10 @@ draws nothing and the key looks dead.
 `enumStringValues`, and a row of the second kind leaves `enumValues` EMPTY.
 Three places sized off it directly and all three saw zero for Typing Redraw
 Delay and Editor Font: the popup gate never opened a picker, the fall-through
-toggle computed `(v + 1) % 0` — undefined behaviour that on RISC-V returns the
+toggle computed `(v + 1) % 0` — undefined behavior that on RISC-V returns the
 dividend rather than trapping, so the index walked past the label list until the
 value column rendered blank — and `fromJson`'s clamp `val < 0` was never true,
-so every boot discarded the saved byte. If you add a runtime-labelled row, the
+so every boot discarded the saved byte. If you add a runtime-labeled row, the
 `valuePtr` branch also needs the `enumStringValues` overload of
 `OptionPopup::show`, or the picker opens empty.
 

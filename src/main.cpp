@@ -54,7 +54,7 @@ static unsigned long allowSleepAt = 0;
 // post-wake loop() sees a stale timestamp already past the timeout and sleeps
 // again immediately — the device looks unwakeable. setup() resets this
 // explicitly; on real hardware that is a no-op, since a chip reset would have
-// re-initialised it anyway.
+// re-initialized it anyway.
 static unsigned long lastActivityTime = 0;
 
 // Fonts
@@ -139,7 +139,7 @@ EpdFontFamily librefranklinReader18FontFamily(&lfReader18RegularFont, &lfReader1
 //
 // SMALL (8 pt) has a bold face now where it previously had only regular. That
 // is additive -- nothing asked for bold at 8 pt before, and EpdFontFamily falls
-// back to regular for a style it lacks, so the old single-face behaviour is
+// back to regular for a style it lacks, so the old single-face behavior is
 // still what an 8pt bold request gets on any family that has no bold cut.
 #define CP_UI_FAMILY(sym, r8, b8, r10, b10, r12, b12) \
   EpdFont sym##8R(&r8), sym##8B(&b8);                 \

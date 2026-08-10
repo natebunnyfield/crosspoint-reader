@@ -308,7 +308,7 @@ inline constexpr ColophonTech COLOPHON_TECH[] = {
     {"Wi-Fi status", "Network NWPathMonitor and NetworkExtension NEHotspotNetwork"},
     {nullptr, "Written with"},
     {"Claude, by Anthropic", "Named in the commit trailers as Opus 5, Fable 5, Opus 4.8, Opus 4.7, Sonnet 4.6 and Opus 4.6"},
-    {nullptr, "Licence"},
+    {nullptr, "License"},
     {"Firmware", "MIT. Copyright (c) 2025 Dave Allie"},
     {"Simulator", "MIT. Copyright (c) 2026 Julia Nguyen"},
     {"freeink-sdk", "MIT. Copyright (c) 2026 FreeInk"},

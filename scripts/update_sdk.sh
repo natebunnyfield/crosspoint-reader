@@ -22,7 +22,7 @@
 # WHAT IT CANNOT DO, AND WHY IT STILL ASKS YOU TO READ A BOOK
 #
 # Everything below runs on the host. A green run means the bump did not change
-# layout, geometry or any tested behaviour -- it says nothing about waveforms,
+# layout, geometry or any tested behavior -- it says nothing about waveforms,
 # refresh artefacts, sleep current or battery reporting. Those need the device.
 # The script prints that reminder at the end rather than claiming success.
 set -uo pipefail
@@ -45,7 +45,7 @@ done
 die() { echo "FAIL: $*" >&2; exit 1; }
 step() { printf '\n=== %s\n' "$1"; }
 
-[[ -d "$SDK/.git" || -f "$SDK/.git" ]] || die "freeink-sdk is not initialised. A fresh worktree does NOT inherit
+[[ -d "$SDK/.git" || -f "$SDK/.git" ]] || die "freeink-sdk is not initialized. A fresh worktree does NOT inherit
       submodules -- run: git submodule update --init --recursive"
 
 # A dirty submodule means someone is mid-something in there; a bump would bury it.
@@ -170,7 +170,7 @@ cat <<EOF
 The pin is moved but NOT committed — 'git add freeink-sdk' when you are happy.
 
 WHAT THIS RUN DID NOT PROVE. Every gate above is a host gate. It shows the bump
-changes nothing the simulator renders and breaks no tested behaviour. It cannot
+changes nothing the simulator renders and breaks no tested behavior. It cannot
 execute a waveform LUT, a GPIO ordering change, a deep-sleep pin state or a
 battery curve — and those are most of what an SDK bump actually carries.
 

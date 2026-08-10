@@ -541,7 +541,7 @@ bool CssParser::loadFromStream(HalFile& source) {
   }
 
   // Parsing buffers live in one transient heap block (see ParseScratch above);
-  // value-initialised, so every StackBuffer starts with len == 0 exactly as the
+  // value-initialized, so every StackBuffer starts with len == 0 exactly as the
   // former locals did.
   auto scratch = makeUniqueNoThrow<ParseScratch>();
   if (!scratch) {

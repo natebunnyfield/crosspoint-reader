@@ -12,7 +12,7 @@
 //
 // It replaces a five-name OptionPopup. These faces are a monospace, a duospace,
 // a quattrospace and two true monos, and the whole difference between them is
-// glyph-width behaviour -- which is precisely what a name cannot tell you.
+// glyph-width behavior -- which is precisely what a name cannot tell you.
 //
 // Two things make it different from FontSelectionActivity:
 //

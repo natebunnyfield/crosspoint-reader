@@ -2,7 +2,7 @@
 // redesign decision. Decision aid only — see daisy_variants.h.
 //
 // Geometry is lifted verbatim from KeyboardPanel::render's daisy branch: a
-// 7-petal window centred on the selected petal, each petal three slots stacked
+// 7-petal window centered on the selected petal, each petal three slots stacked
 // in the order Up / Confirm / Down pick them, selection drawn as a 2px rect.
 // So these are the device's own pixels, not an artist's impression.
 //
@@ -163,7 +163,7 @@ bool renderDaisyVariants(const char* outDir) {
   snprintf(path, sizeof(path), "%s/daisy_shipped.bmp", outDir);
   if (!renderDaisySheet(path, "DAISY RINGS (shipped)", rings, 2, utilEditor)) return false;
 
-  // The four bracket petals and the space petal, centred so they are readable.
+  // The four bracket petals and the space petal, centered so they are readable.
   renderer.clearScreen();
   const int W = renderer.getScreenWidth();
   int y = 18;

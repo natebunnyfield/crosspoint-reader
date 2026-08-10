@@ -257,7 +257,7 @@ can&#x2019;t afford sloppy fit.&#x201D;</p>
 
 <p>&#x201C;Exactly!&#x201D; Avery slapped the desk. &#x201C;We&#x2019;ll need to revisit every pair:
 AV, AW, AT, AY, FA, Fe, LT, LV, LW, LY, PA, TA, Te, To, Tu, Tw, VA,
-Ve, Vo, WA, Wa, YA, Ya &#x2014; the whole catalogue. I want this volume to be
+Ve, Vo, WA, Wa, YA, Ya &#x2014; the whole catalog. I want this volume to be
 flawless.&#x201D;</p>
 
 <p>He leaned back and stared at the ceiling. Forty-seven years of
@@ -783,7 +783,7 @@ right-side bearing abutted the unusual shape of the ĳ.</p>
 
 <h2>Extended-A Kerning Glossary</h2>
 
-<p>Avery appended a supplementary glossary to his earlier catalogue:</p>
+<p>Avery appended a supplementary glossary to his earlier catalog:</p>
 
 <p><b>T&#x11B;</b> &#x2014; As in T&#x11B;&#x161;&#xED;n, t&#x11B;&#x17E;k&#xFD;, t&#x11B;lo.<br/>
 <b>T&#x159;</b> &#x2014; As in T&#x159;eb&#xED;&#x10D;, t&#x159;&#xED;da, t&#x159;i.<br/>
@@ -954,7 +954,7 @@ each needed individual spacing. On the closing side, &#x440;&#xBB; and
 
 <h2>Cyrillic Kerning Glossary</h2>
 
-<p>Avery appended the Cyrillic pairs to his growing catalogue:</p>
+<p>Avery appended the Cyrillic pairs to his growing catalog:</p>
 
 <p><b>&#x413;&#x430;</b> &#x2014; &#x413;&#x430;&#x43B;&#x438;&#x43B;&#x435;&#x44F;, &#x433;&#x430;&#x437;&#x435;&#x442;&#x430;.<br/>
 <b>&#x413;&#x435;</b> &#x2014; &#x413;&#x435;&#x43D;&#x435;&#x440;&#x430;&#x43B;, &#x433;&#x435;&#x440;&#x43E;&#x439;.<br/>
@@ -1122,7 +1122,7 @@ needs rechecking.&#x201D;</p>
 
 <h2>Extended-B Kerning Glossary</h2>
 
-<p>Avery appended to his catalogue:</p>
+<p>Avery appended to his catalog:</p>
 
 <p><b>&#x21A;a</b> &#x2014; As in &#x21A;ara, &#x21B;ar&#x103;.<br/>
 <b>&#x21A;e</b> &#x2014; As in &#x21A;es&#x103;tura, &#x21B;esut.<br/>
@@ -1274,7 +1274,7 @@ any book that discusses physics, mathematics, or engineering.&#x201D;</p>
 
 <h2>Greek Kerning Glossary</h2>
 
-<p>Avery added the final appendix to his growing catalogue:</p>
+<p>Avery added the final appendix to his growing catalog:</p>
 
 <p><b>&#x393;&#x3B1;</b> &#x2014; &#x393;&#x3B1;&#x3BB;&#x3AE;&#x3BD;&#x3B7;, &#x3B3;&#x3B1;&#x3BB;&#x3B1;&#x3BE;&#x3AF;&#x3B1;&#x3C2;.<br/>
 <b>&#x393;&#x3B5;</b> &#x2014; &#x393;&#x3B5;&#x3C9;&#x3C1;&#x3B3;&#x3AF;&#x3B1;, &#x3B3;&#x3B5;&#x3C1;&#x3CC;&#x3C2;.<br/>
@@ -1335,10 +1335,10 @@ followed by one or more combining diacritical marks.&#x201D;</p>
 send o&#x0308;? And instead of &#xE9;, they send e&#x0301;?&#x201D;</p>
 
 <p>&#x201C;Exactly. The renderer has to overlay the combining mark onto
-the preceding base character &#x2014; centred horizontally, with proper
+the preceding base character &#x2014; centered horizontally, with proper
 vertical clearance, and without advancing the cursor. If it gets any
 of that wrong, the diacritics float off into space or crash into
-neighbouring letters.&#x201D;</p>
+neighboring letters.&#x201D;</p>
 
 <h2>Single Combining Marks</h2>
 
@@ -1352,7 +1352,7 @@ c&#x0327; (c + cedilla), e&#x0328; (e + ogonek), z&#x030C; (z + caron),
 o&#x030B; (o + double acute), a&#x0304; (a + macron),
 e&#x0306; (e + breve), z&#x0307; (z + dot above).</i></p>
 
-<p>&#x201C;Each mark must sit centred over its base character,&#x201D; Avery
+<p>&#x201C;Each mark must sit centered over its base character,&#x201D; Avery
 said, &#x201C;with at least a pixel of clearance between the top of the
 base glyph and the bottom of the combining mark. If the mark drifts
 left or right, the reader sees a broken letter.&#x201D;</p>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""For every highlight box in the render, compare the box centre to the
-centre of the digit ink inside it. Catches vertical/horizontal drift that is
+"""For every highlight box in the render, compare the box center to the
+center of the digit ink inside it. Catches vertical/horizontal drift that is
 hard to judge by eye."""
 import sys, subprocess, shutil, os, datetime
 import numpy as np
@@ -13,7 +13,7 @@ def render(y,m,d):
     return np.array(Image.open('fs_/sleep.bmp').convert('L'))
 
 def blobs(mask, minpx):
-    """Connected components (4-neighbour), iterative flood fill."""
+    """Connected components (4-neighbor), iterative flood fill."""
     seen = np.zeros_like(mask, dtype=bool); out=[]
     H,W = mask.shape
     for y in range(H):
@@ -34,7 +34,7 @@ def blobs(mask, minpx):
 
 def check(datestr, y,m,d, tol=2):
     a = render(y,m,d)
-    # The dithered grey fill is a checkerboard of black/white; the *border* is
+    # The dithered gray fill is a checkerboard of black/white; the *border* is
     # solid black. Find filled cells by locating the solid rounded-rect borders.
     black = a < 128
     # A holiday/today box border encloses a region ~40-70px square in the grid area.
@@ -49,12 +49,12 @@ def check(datestr, y,m,d, tol=2):
         if ix1<=ix0 or iy1<=iy0: continue
         interior = black[iy0:iy1+1, ix0:ix1+1]
         # Today's cell is inverted (black fill, white digit); holiday cells are
-        # grey dither with a black digit. Detect polarity from the fill density
-        # and measure whichever colour the digit actually is.
+        # gray dither with a black digit. Detect polarity from the fill density
+        # and measure whichever color the digit actually is.
         inverted = interior.mean() > 0.75
         ink = ~interior if inverted else interior
-        # The grey dither is a regular 50% checkerboard; digit strokes are solid
-        # runs. Keep pixels whose 4-neighbours are also ink (erosion) to drop dither.
+        # The gray dither is a regular 50% checkerboard; digit strokes are solid
+        # runs. Keep pixels whose 4-neighbors are also ink (erosion) to drop dither.
         er = (ink[1:-1,1:-1] & ink[:-2,1:-1] & ink[2:,1:-1]
               & ink[1:-1,:-2] & ink[1:-1,2:])
         ys,xs = np.where(er)
@@ -69,7 +69,7 @@ def check(datestr, y,m,d, tol=2):
         status = "ok" if (abs(dx)<=tol and abs(dy)<=tol) else "OFF"
         if status=="OFF":
             problems.append(f"  box ({x0},{y0}) {bw}x{bh}: digit offset dx={dx:+.1f} dy={dy:+.1f}")
-        kind = "INVERTED(today)" if inverted else "grey(holiday)"
+        kind = "INVERTED(today)" if inverted else "gray(holiday)"
         print(f"    box@({x0:3d},{y0:3d}) {bw}x{bh} {kind:15s} digit dx={dx:+5.1f} dy={dy:+5.1f}  {status}")
     return problems
 
@@ -84,4 +84,4 @@ if __name__=='__main__':
     print()
     if allprob:
         print("PROBLEMS:"); [print(p) for p in allprob]; sys.exit(1)
-    print("all highlight boxes: digit centred within 2px ✓")
+    print("all highlight boxes: digit centered within 2px ✓")

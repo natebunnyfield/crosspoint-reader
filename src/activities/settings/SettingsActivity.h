@@ -42,7 +42,7 @@ struct SettingInfo {
   // enumValues.size() directly therefore saw 0, and did three separate damaging
   // things to the two rows built that way (Typing Redraw Delay, Editor Font):
   // the popup gate `size() > 2` never opened a picker; the fall-through toggle
-  // evaluated `(v + 1) % 0`, undefined behaviour that on RISC-V returns the
+  // evaluated `(v + 1) % 0`, undefined behavior that on RISC-V returns the
   // dividend, letting the stored index climb past the end of the label list
   // until the value column rendered blank; and fromJson's clamp `val < 0` was
   // never true, so the saved byte was discarded on every boot.

@@ -14,7 +14,7 @@
 //
 // Deliberately a plain slot rather than a queue: one pending image at a time is
 // the whole requirement, and a later upload replacing an earlier one is the
-// behaviour you want anyway.
+// behavior you want anyway.
 namespace pending_firmware {
 
 // Set by the WebDAV PUT handler. Empty when nothing is waiting.

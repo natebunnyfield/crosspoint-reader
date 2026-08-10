@@ -30,7 +30,7 @@ int coverWidth = 0;
 
 const uint8_t* iconForName(UIIcon icon, int size) {
   // Every UIIcon now exists at both sizes, so the 24px table no longer has to
-  // borrow a neighbouring glyph -- ManageFiles used to fall back to the plain
+  // borrow a neighboring glyph -- ManageFiles used to fall back to the plain
   // file icon at list size because there was no 24px cut of folder-cog.
   //
   // Bitmaps come from scripts/gen_lucide_icons.py and are stored pre-rotated to

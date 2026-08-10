@@ -12,7 +12,7 @@ this script is how the list is justified.
 Two passes, because neither alone is sufficient:
 
   1. Duplicate outlines. Two codepoints sharing one outline is the signature of
-     a shifted glyph-id range (¼ drawn as ﬀ). Mechanical, no judgement needed —
+     a shifted glyph-id range (¼ drawn as ﬀ). Mechanical, no judgment needed —
      but blind to a codepoint aliased onto a glyph that has no cmap entry of its
      own (± drawn as ℗).
   2. A contact sheet, this font over a reference font, one column per codepoint.

@@ -712,7 +712,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 
             bitmap = f.glyph.bitmap
 
-            # Build 4-bit greyscale bitmap (same logic as fontconvert.py).
+            # Build 4-bit grayscale bitmap (same logic as fontconvert.py).
             #
             # FreeType returns the buffer with bitmap.pitch as the row stride
             # in bytes, which can be negative when the bitmap is stored
@@ -915,7 +915,7 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     MAGIC = b"CPFONT\x00\x00"
     HEADER_SIZE = 32
     STYLE_TOC_ENTRY_SIZE = 32
-    flags = 1  # always 2-bit greyscale
+    flags = 1  # always 2-bit grayscale
     style_count = len(style_fonts)
 
     # Rasterize each style

@@ -172,7 +172,7 @@ private `.cache` — each honouring the 3 GB cap independently. Measured
 2026-08-06: 7.1 GB spread over seven worktree caches on top of the main
 checkout's 3 GB. The machine now exports
 `PLATFORMIO_BUILD_CACHE_DIR=$HOME/.platformio/build_cache` (in the personal
-dotfiles, not committed here), which PlatformIO honours over the ini
+dotfiles, not committed here), which PlatformIO honors over the ini
 (`platformio/project/options.py`, `sysenvvar`). Do **not** "fix" this by putting
 an absolute path in `platformio.local.ini`: that file is gitignored, so a newly
 created worktree would not have it and would silently fall back to a private
@@ -469,11 +469,11 @@ did, mid-task, while a shipping binary was being built from it.
 ### ESP32-C3 Platform Pitfalls
 
 #### `std::string_view` and Null Termination
-`string_view` is *not* null-terminated. Passing `.data()` to any C-style API (`drawText`, `snprintf`, `strcmp`, SdFat file paths) is undefined behaviour when the view is a substring or a view of a non-null-terminated buffer.
+`string_view` is *not* null-terminated. Passing `.data()` to any C-style API (`drawText`, `snprintf`, `strcmp`, SdFat file paths) is undefined behavior when the view is a substring or a view of a non-null-terminated buffer.
 
 **Rule**: `string_view` is safe only when passing to C++ APIs that accept `string_view`. For any C API boundary, convert explicitly:
 ```cpp
-// WRONG - undefined behaviour if view is a substring:
+// WRONG - undefined behavior if view is a substring:
 renderer.drawText(font, x, y, myView.data(), true);
 
 // CORRECT - guaranteed null-terminated:
@@ -726,7 +726,7 @@ Add an explicit line to BOTH `toJson` and `fromJson`, the way `fontFamily`,
 the setting persisting at all and drops it from the web API. Withdraw it at the
 UI layer instead — filter by category in `rebuildSettingsLists()`, exactly as the
 retired Display and Reader categories are — and pin its value in
-`normalizeRetiredSettings()` so behaviour is fixed rather than merely hidden.
+`normalizeRetiredSettings()` so behavior is fixed rather than merely hidden.
 
 **Pinning in `normalizeRetiredSettings()` is only half.** A fresh install never
 runs `fromJson()`, so a pin alone leaves fresh and upgraded devices disagreeing.

@@ -51,12 +51,12 @@ the cheap version and needs no keychain.
 ### [T-007] Upstream issue #2863 reproduces here and is tracked nowhere
 **scope: fork sync · raised 2026-08-06 · confirmed 2026-08-07**
 
-The short-press power behaviour upstream reports is present in this fork's code:
+The short-press power behavior upstream reports is present in this fork's code:
 `lib/hal/HalGPIO.cpp:207` carries a `TODO` describing the same thing. Upstream
 issues are not visible from this repo's tracker, so it would otherwise be
 rediscovered rather than remembered.
 
-**Close by:** decide whether the fork wants upstream's fix or its own behaviour,
+**Close by:** decide whether the fork wants upstream's fix or its own behavior,
 then either take the patch or write the divergence down in `docs/fork-sync.md`.
 
 ---
@@ -91,7 +91,7 @@ been gone); a truncated temp is discarded and not promoted. 235 host tests.
 ### [T-009] A 0 ms redraw delay for iOS — DONE (option), measurement still owed
 **scope: iOS display · asked 2026-08-08 · shipped 2026-08-08**
 
-`Typing Redraw Delay` now offers **0 ms**, and it is honoured off-device only.
+`Typing Redraw Delay` now offers **0 ms**, and it is honored off-device only.
 
 Two things this had to get right, both recorded here because they are the traps:
 
@@ -192,7 +192,7 @@ the battery reading.
 what it touches, no argument to fast-forward and prove it, or a ref to pin
 somewhere specific.
 
-It gates on: submodule initialised (a fresh worktree does not inherit it),
+It gates on: submodule initialized (a fresh worktree does not inherit it),
 submodule clean, **fast-forward only** (a pin ahead of the target means someone
 committed to the SDK locally — that is a merge with a decision in it, and the
 script refuses), device build, desktop build, host tests, and a pixel diff of

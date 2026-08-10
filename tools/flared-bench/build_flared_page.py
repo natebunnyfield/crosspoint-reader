@@ -53,7 +53,7 @@ FACES = [
      "terminating flat, drawn for text rather than for titling. Also the only candidate with Cyrillic, "
      "which matters if the interval preset ever widens."),
     ("Federo", "Federo", "federo/Federo-Regular.ttf", "candidate",
-     "Flared, and unusually even in colour for this class — the flare is restrained enough that it does not "
+     "Flared, and unusually even in color for this class — the flare is restrained enough that it does not "
      "read as decoration at a paragraph's worth of text. Cyreal drew it for screen."),
     ("TenorSans", "Tenor Sans", "tenorsans/TenorSans-Regular.ttf", "candidate",
      "The subtlest flare of the set, and a 0.50 x-height that already sits where the reader's slots want it. "
@@ -81,7 +81,7 @@ FACES = [
 
 INSTALLED = ("LibreFranklin", "Libre Franklin", "librefranklin/LibreFranklin%5Bwght%5D.ttf", "installed",
              "The installed sans, S tier. It is not flared and does not pretend to be — it is here for scale "
-             "and colour. A flared face that merely matches it has not earned a slot, because shipping it "
+             "and color. A flared face that merely matches it has not earned a slot, because shipping it "
              "costs a card slot and a download.")
 
 SPECIMEN = ("Whereof one cannot speak, thereof one must be silent. The quick brown fox "
@@ -218,7 +218,7 @@ serif-like weight distribution, no actual serifs. The canonical text face is Opt
 <p><b>Optima is not on this page, and cannot be.</b> It is Monotype's, there is no libre cut, and nothing
 here is a metric clone of it. Every face below is an OFL face that reaches for the same idea from its own
 direction. If the answer to this cell turns out to be "buy Optima", that is a legitimate outcome of the
-bench — three of the catalogue's families are already commercial or webfont cuts that build from
+bench — three of the catalog's families are already commercial or webfont cuts that build from
 <code>local_fonts/</code>.</p>
 </div>
 
@@ -235,7 +235,7 @@ candidate.</p>
 <p>Set so every face shows the same x-height, which is how <code>sans-candidates.yaml</code> and
 <code>grotesque-candidates.yaml</code> were judged — comparing at equal point size compares nothing, because
 a 0.42 and a 0.65 x-height at 16&nbsp;pt are different sizes of type. The four targets are the reader's own
-slots. Colour, set width and how far the flare survives shrinking are the things to look at.</p>
+slots. Color, set width and how far the flare survives shrinking are the things to look at.</p>
 
 <div class="controls">
   <label>x-height
@@ -319,7 +319,7 @@ document.querySelectorAll('[data-xh]').forEach(b => b.onclick = () => {
 });
 document.getElementById('hideControls').onchange = render;
 document.getElementById('eink').onchange = e => {
-  // Not a simulation of the panel — just removes the browser's colour and
+  // Not a simulation of the panel — just removes the browser's color and
   // contrast flattery so the shapes carry themselves.
   document.body.style.filter = e.target.checked ? 'grayscale(1) contrast(1.35)' : '';
 };

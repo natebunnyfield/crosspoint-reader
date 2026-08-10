@@ -199,7 +199,7 @@ void FontSelectionActivity::loop() {
   // size it will actually be read at.
   //
   // PageBack/PageForward (rather than Up/Down) so the user's side-button swap
-  // preference is honoured, consistent with page turns in the reader. Note
+  // preference is honored, consistent with page turns in the reader. Note
   // that this means the size control is unavailable when side buttons are set
   // to Disabled — the same tradeoff page turning already makes.
   if (mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
@@ -433,7 +433,7 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
   const int lineStep = lineH + 2;
   const int maxLines = std::max(1, innerHeight / lineStep);
 
-  // Lines are COLLECTED first and drawn second, so the block can be centred in
+  // Lines are COLLECTED first and drawn second, so the block can be centered in
   // the pane. The pane is now around half the screen (the list below it is
   // capped at kVisibleFontRows), and a four-line style grid pinned to the top
   // left a band of white between the specimen and its label.
@@ -450,7 +450,7 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
   if (proseSpecimen_) {
     // Prose specimen: continuous text, word-wrapped to the pane, closing with
     // an italic sentence. The style grid shows what the four cuts look like;
-    // this shows what the face READS like — colour on the page, word-space
+    // this shows what the face READS like — color on the page, word-space
     // rhythm, how the eye moves line to line — which a pangram cannot tell you.
     // Wrapped (not one string per line) so it stays honest at every size slot:
     // at XL the same passage simply shows fewer lines of itself.
@@ -496,7 +496,7 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
     }
   } else {
     // Translations that have not been given a multi-line specimen are a single
-    // string and keep the original wrap-in-regular behaviour, so nothing breaks
+    // string and keep the original wrap-in-regular behavior, so nothing breaks
     // for the other 28 languages.
     for (auto& line : renderer.wrappedText(fontId, previewText, width, maxLines)) {
       lines.push_back({std::move(line), EpdFontFamily::REGULAR, 0});

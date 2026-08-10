@@ -10,7 +10,7 @@
 // backspace key was half the resolution of the text next to it.
 //
 // The SDK gives no injection point — KeyboardProps has no icon field — so the
-// bitmap is recognised by DATA POINTER. lucideDeleteIcon16()'s array is a
+// bitmap is recognized by DATA POINTER. lucideDeleteIcon16()'s array is a
 // function-local static inside an inline function, so ODR guarantees one object
 // program-wide and the comparison is sound. It is also fragile: if a future
 // freeink-sdk bump makes that array non-inline, or the keyboard grows a second
@@ -68,7 +68,7 @@ class KeyboardIconTarget final : public freeink::ui::DrawTarget {
 #else
       // Device path. Hand the SDK the 32px art and let its own sampler run:
       // the icon rect is 32 logical px, so this is a 1:1 blit and the
-      // nearest-neighbour loop reduces to a copy. Same rect, same Contain
+      // nearest-neighbor loop reduces to a copy. Same rect, same Contain
       // semantics, so layout and hit rects are untouched.
       inner.bitmap(
           rect,

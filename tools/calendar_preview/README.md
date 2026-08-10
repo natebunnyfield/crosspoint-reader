@@ -37,7 +37,7 @@ to end, or ship to TestFlight. Use this harness to *measure a rendering*.
 | good for | pixel-exact layout + kerning regressions | interaction, flows, shipping |
 
 The precision difference is the reason both exist: `check_centering.py` asserts
-digits sit within 2 **device** pixels of their box centre, which only means
+digits sit within 2 **device** pixels of their box center, which only means
 something against the real framebuffer, not a Retina-scaled screenshot of it.
 
 ## Build
@@ -94,7 +94,7 @@ edges — this is what caught the cross-year header overflow
 ## Centring check
 
 `check_centering.py` renders several dates and, for every highlight box,
-measures the offset between the box centre and the centre of the digit ink
+measures the offset between the box center and the center of the digit ink
 inside it. This is the check that would have caught the original
 baseline-vs-box-top bug, where digits sat ~8px low because `drawText`'s `y` is
 the top of the ascender box (41px for Noto Sans 18) while digits are only 28px

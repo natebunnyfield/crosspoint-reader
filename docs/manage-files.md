@@ -279,7 +279,7 @@ No longer deferred. The BLE HID host was measured, the editor was built, and
 both landed as **Create Note** and **Claude** on the home screen, plus an
 **Edit** action here for `.md`/`.txt`.
 
-- Feature and behaviour: [notes-and-claude.md](notes-and-claude.md)
+- Feature and behavior: [notes-and-claude.md](notes-and-claude.md)
 - The measurements that justified it, and what is still unverified:
   [ble-editor-spike.md](ble-editor-spike.md)
 

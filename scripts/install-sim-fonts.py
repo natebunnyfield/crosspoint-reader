@@ -12,7 +12,7 @@ which is the set installed on every surface (both device SD cards, fs_/fonts/,
 and the iOS seed bundle). It defaulted to "every curated family sd-fonts.yaml
 can build" until 2026-08-03; once all 15 became buildable that meant a routine
 re-run silently reinstalled the eleven the ruling excludes, so the default now
-follows the ruling and --all-curated opts back into the old behaviour.
+follows the ruling and --all-curated opts back into the old behavior.
 
 Either way the list is intersected with the ACTIVE families in sd-fonts.yaml —
 commented blocks (e.g. commercial fonts whose sources live only in gitignored
@@ -60,7 +60,7 @@ def installed_families() -> list[str]:
     """The S-tier set: what actually ships on every surface.
 
     Falls back to the curated FontDisplayNames set if the key is ever removed,
-    so this script degrades to its pre-2026-08-03 behaviour rather than
+    so this script degrades to its pre-2026-08-03 behavior rather than
     installing nothing.
     """
     declared = _yaml_config().get("installed_families")

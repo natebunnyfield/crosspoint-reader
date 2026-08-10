@@ -26,7 +26,7 @@ BLE-capable build is only ~2,340 B of total heap; the ~72 KB is claimed at
 `nimble_port_init()` and returned at `nimble_port_deinit()`, so a reader session
 never pays it. The conditions:
 
-1. **BLE must be initialised with contiguous headroom.** `nimble_port_init()` is
+1. **BLE must be initialized with contiguous headroom.** `nimble_port_init()` is
    nondeterministic near ~86 KB free / ~73 KB maxalloc — observed succeeding at
    85,976 and **hard-hanging** at 85,980 and 85,752, then succeeding at 94,972.
    The failure mode is the dangerous one: not a panic, not a reboot, no crash
@@ -52,7 +52,7 @@ X4, `-e default`, LOG_LEVEL=2.
 
 ### Heap
 
-Final run, BLE initialised before the editor buffer:
+Final run, BLE initialized before the editor buffer:
 
 | Point | Free heap |
 |---|---|

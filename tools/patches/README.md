@@ -1,9 +1,9 @@
 # tools/patches — fixes for code that lives outside this repository
 
-Two input-timing defects were confirmed while tracing long-press behaviour. Neither
+Two input-timing defects were confirmed while tracing long-press behavior. Neither
 one is in this repository's own sources, so neither can be fixed by a commit here.
 Both are carried as unified diffs against their real home, with the defect, the
-behaviour they must match, and the test recipe in the patch header.
+behavior they must match, and the test recipe in the patch header.
 
 | Patch | Target repo | Fixes |
 |---|---|---|
@@ -58,7 +58,7 @@ the simulator.
   demonstrate before/after — the reviewer needs no device.
 * **0002** → PR against `Free-Ink/freeink-sdk`, branch `main` (base `e7d3361`,
   the commit this repo pins). Additive only: `getHeldTime()` keeps its exact
-  current behaviour, a new `getHeldTime(buttonIndex)` overload is added, so no
+  current behavior, a new `getHeldTime(buttonIndex)` overload is added, so no
   SDK consumer changes when it lands. After it lands, bump the submodule here and
   migrate call sites individually — the list is in the patch header.
 
@@ -71,7 +71,7 @@ redefine `getHeldTime()`, and do not treat the existing locks as the fix.**
   button") would retarget ~20 call sites at once, including continuous
   list-scroll repeat (`src/util/ButtonNavigator.cpp:70`) and the multi-stage
   keyboard holds (`src/activities/util/KeyboardEntryActivity.cpp:200,294,323,332`),
-  on behaviour that cannot be validated without hardware. It would also change
+  on behavior that cannot be validated without hardware. It would also change
   meaning for every other freeink-sdk consumer.
 * The existing ad-hoc locks are **not** workarounds for this defect and must not
   be removed when it is fixed:
@@ -97,6 +97,6 @@ redefine `getHeldTime()`, and do not treat the existing locks as the fix.**
   does not own, and it duplicates timing state per activity — which is why the
   SDK accessor is the better destination.
 
-Every call site whose behaviour would change once migrated to
+Every call site whose behavior would change once migrated to
 `getHeldTime(buttonIndex)`, and the three that need extra plumbing first, are
 enumerated at the end of `0002-freeink-sdk-inputmanager-per-button-held-time.patch`.

@@ -276,7 +276,7 @@ void FileManagerActivity::runMenuAction(const MenuAction action) {
     case MenuAction::Edit:
       // Was an early return above this switch, which left 'Edit' unhandled here
       // and -Wswitch firing -- so the compiler stopped checking the rest of the
-      // enum for this function. Same behaviour, in the place that gets checked.
+      // enum for this function. Same behavior, in the place that gets checked.
       if (!files.empty()) activityManager.goToNoteEditor(fullPathOf(files[selectorIndex]), basepath);
       break;
     case MenuAction::MoveHere:

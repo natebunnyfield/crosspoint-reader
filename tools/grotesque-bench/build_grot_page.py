@@ -28,13 +28,13 @@ FAMS = [
      "Impallari Type, after Morris Fuller Benton's Franklin Gothic (1902)",
      "The best-rounded grotesque in the bench and the only one that matches "
      "Lexica on every axis at once: counters intact, 99% of Latin Extended-A, "
-     "a real drawn italic, and a normalised set width of 23.8 against Lexica's "
+     "a real drawn italic, and a normalized set width of 23.8 against Lexica's "
      "23.9. It is also the ancestor of Public Sans, which came LAST on width in "
      "the sans bench — the difference is Public Sans's wider optical fitting, "
      "not the skeleton."),
     ("FamiljenGrotesk", "Familjen Grotesk", "grotesque",
      "Letters from Sweden",
-     "Narrowest set in the bench once x-height is normalised (23.8), and by a "
+     "Narrowest set in the bench once x-height is normalized (23.8), and by a "
      "wide margin the most open 'a' of anything measured here — 27 counter "
      "pixels at a 12px x-height against Lexica's 8 and Edgar's 17. Costs "
      "letterform conventionality: the forms are idiosyncratic enough to read as "
@@ -45,7 +45,7 @@ FAMS = [
      "counters back it up — the most open 'o' in the bench at 40 pixels. Then "
      "it loses on the two things that decide this: 80% of Latin Extended-A, so "
      "a fifth of accented European text falls back to Noto glyphs, and a set "
-     "width of 26.1 normalised, joint-widest here."),
+     "width of 26.1 normalized, joint-widest here."),
     ("HankenGrotesk", "Hanken Grotesk", "grotesque",
      "Hanken Design Co.",
      "Competent and unremarkable, which for body text is not an insult. "
@@ -55,11 +55,11 @@ FAMS = [
     ("HostGrotesk", "Host Grotesk", "grotesque",
      "Host",
      "Open counters and a clean roman, undercut by 88% Latin Extended-A "
-     "coverage and a normalised width of 25.8 — wider than the installed sans "
+     "coverage and a normalized width of 25.8 — wider than the installed sans "
      "with nothing to show for it."),
     ("InstrumentSans", "Instrument Sans", "grotesque",
      "Instrument",
-     "Widest tie in the bench at 26.1 normalised, and the thinnest coverage of "
+     "Widest tie in the bench at 26.1 normalized, and the thinnest coverage of "
      "anything here: 77% of Latin Extended-A. Its counters are excellent — the "
      "largest 'e' eye measured, 13 pixels — but a face that hands a quarter of "
      "its accented characters to Noto is not a reading face for this device."),
@@ -67,7 +67,7 @@ FAMS = [
      "Christian Robertson for Google, 2011",
      "The neo-grotesque everybody has read a million words in, and it holds up "
      "better than its reputation suggests: 100% Extended-A, counters intact, "
-     "a tight 25.0 normalised. What it does not have is a drawn italic — the "
+     "a tight 25.0 normalized. What it does not have is a drawn italic — the "
      "slope is close enough to a sloped roman that emphasis reads as a tilt "
      "rather than a change of voice."),
     ("Archivo", "Archivo", "disqualified",
@@ -105,39 +105,39 @@ PAID = [
      "Kris Sowersby's grotesque with a real optical Text size rather than a "
      "lighter weight pretending to be one. Wider apertures and sturdier joins "
      "than the regular cut.",
-     "Desktop licence; Klim sells app/device embedding separately."),
+     "Desktop license; Klim sells app/device embedding separately."),
     ("Söhne / Söhne Buch", "Klim Type Foundry",
      "Akzidenz-Grotesk as remembered rather than as drawn. Buch is the reading "
      "weight and the relevant one here.",
-     "Desktop licence; embedding priced separately."),
+     "Desktop license; embedding priced separately."),
     ("National 2", "Klim Type Foundry",
      "A grotesque built for editorial text families, with the widest range of "
      "text-usable weights of anything on this list.",
-     "Desktop licence."),
+     "Desktop license."),
     ("GT America", "Grilli Type",
      "The American-gothic-meets-Swiss grotesque, in six widths. Worth noting "
      "this fork already licenses GT Alpina, so the foundry relationship exists.",
-     "Desktop licence; Grilli sells embedding tiers."),
+     "Desktop license; Grilli sells embedding tiers."),
     ("Aktiv Grotesk", "Dalton Maag",
      "Drawn explicitly as a Helvetica/Univers replacement without their small-"
      "size failures — closed apertures opened, tight fitting loosened.",
-     "Dalton Maag licence; embedding negotiated."),
+     "Dalton Maag license; embedding negotiated."),
     ("Basis Grotesque", "Colophon Foundry",
      "A British grotesque with unusually large counters for the genre, which "
      "is exactly the variable this bench measures.",
-     "Desktop licence."),
+     "Desktop license."),
     ("Untitled Sans", "Klim Type Foundry",
      "Sowersby's deliberately ordinary grotesque, drawn from the 'default' "
      "faces of the 1970s. Neutral in the way body text wants.",
-     "Desktop licence."),
+     "Desktop license."),
     ("Suisse Int'l", "Swiss Typefaces",
      "The purest Akzidenz descendant on this list, and the tightest — likely "
      "the worst fit for a hard threshold, listed for completeness.",
-     "Desktop licence."),
+     "Desktop license."),
     ("ABC Diatype", "Dinamo",
      "A contemporary grotesque with a genuine text cut and unusually generous "
      "sidebearings for the genre.",
-     "Dinamo licence; embedding is a named tier."),
+     "Dinamo license; embedding is a named tier."),
     ("Trade Gothic Next", "Monotype",
      "Jackson Burke's Trade Gothic redrawn by Akira Kobayashi with the text "
      "sizes actually fixed.",
@@ -145,7 +145,7 @@ PAID = [
     ("ATF Franklin Gothic", "ATF Collection",
      "The authoritative Franklin Gothic revival — the paid answer to what "
      "Libre Franklin approximates, and Libre Franklin was this bench's winner.",
-     "Desktop licence."),
+     "Desktop license."),
 ]
 
 SOURCES = [
@@ -429,7 +429,7 @@ footer {{ margin-top:72px; padding-top:22px; border-top:1px solid var(--rule);
     thresholded it.</p>
   <div class="byline eyebrow">
     <span>9 candidates + 5 controls</span>
-    <span>set width normalised per x-height pixel</span>
+    <span>set width normalized per x-height pixel</span>
     <span>bench: lib/EpdFont/scripts/grotesque-candidates.yaml</span>
   </div>
 </header>
@@ -451,7 +451,7 @@ footer {{ margin-top:72px; padding-top:22px; border-top:1px solid var(--rule);
     <h2>And the width edge is a mirage</h2>
     <p><span class="big">0.4%</span>The best grotesque beats the installed sans by four parts
       in a thousand on width. Two candidates looked much narrower until their x-height was
-      normalised; they were simply set smaller.</p>
+      normalized; they were simply set smaller.</p>
   </div>
 </div>
 
@@ -462,14 +462,14 @@ footer {{ margin-top:72px; padding-top:22px; border-top:1px solid var(--rule);
     x-height, not 12: the hinter skips the pixel value that would put it on target, so the
     face is set smaller and of course measures narrower. Schibsted Grotesk does the same.
     Every width number on this page is therefore divided by the x-height it was actually
-    rendered at, and that normalised figure — pixels of alphabet per pixel of x-height — is
+    rendered at, and that normalized figure — pixels of alphabet per pixel of x-height — is
     what the rail and the table sort by. Under it Archivo is 24.8 against Lexica's 23.9:
     not narrower, <em>wider</em>.</p>
 </section>
 
 <section>
   <h2>The bench</h2>
-  <p class="lede">Pick a face and a size slot. The number beside each name is the normalised
+  <p class="lede">Pick a face and a size slot. The number beside each name is the normalized
     set width; lower is more text per line. Struck-through names failed the counter test.</p>
   <div class="bench">
     <nav class="rail" aria-label="Typefaces"><ul role="tablist">{rail}</ul></nav>
@@ -514,7 +514,7 @@ footer {{ margin-top:72px; padding-top:22px; border-top:1px solid var(--rule);
 
 <section>
   <h2>Measurements</h2>
-  <p class="lede">Sorted by normalised set width. The counter columns are enclosed white
+  <p class="lede">Sorted by normalized set width. The counter columns are enclosed white
     pixels surviving the panel's threshold at a 12&thinsp;px x-height, measured on the same
     FreeType render the converter stores, with a flood fill from outside separating an
     enclosed counter from an open aperture. For <span class="mono">a</span>,
@@ -567,7 +567,7 @@ footer {{ margin-top:72px; padding-top:22px; border-top:1px solid var(--rule);
     <div class="runner">
       <span class="rank">If the brief ever changes to voice</span>
       <h4>Familjen Grotesk</h4>
-      <p>The narrowest normalised set in the bench and the most open <span class="mono">a</span>
+      <p>The narrowest normalized set in the bench and the most open <span class="mono">a</span>
         of anything measured, Edgar included. It reads as a designed choice rather than a
         default, which is a reason to pick it and a reason not to.</p>
     </div>
@@ -587,9 +587,9 @@ footer {{ margin-top:72px; padding-top:22px; border-top:1px solid var(--rule);
 </section>
 
 <section>
-  <h2>Paid grotesques worth the licence</h2>
+  <h2>Paid grotesques worth the license</h2>
   <p class="lede">Same posture as the sans round: converting a licensed font to
-    <code>.cpfont</code> bitmaps for your own card is normally within a desktop licence;
+    <code>.cpfont</code> bitmaps for your own card is normally within a desktop license;
     redistributing those bitmaps is not. This fork already works that way for Edgar, GT Alpina,
     Venetian&nbsp;301 and Caledonia&nbsp;CC — recipe committed, font files never. Every entry
     below would ship the same way. Prices are not listed because they were not verified.</p>

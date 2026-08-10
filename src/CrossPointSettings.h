@@ -220,7 +220,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // is the price of not corrupting existing settings.
   static constexpr uint16_t DISPLAY_DEBOUNCE_MS[] = {25, 50, 100, 250, 500, 1000, 0};
   static constexpr uint8_t DISPLAY_DEBOUNCE_COUNT = sizeof(DISPLAY_DEBOUNCE_MS) / sizeof(DISPLAY_DEBOUNCE_MS[0]);
-  // 250 ms (owner ruling 2026-08-06: optimise for typing feel). This is the
+  // 250 ms (owner ruling 2026-08-06: optimize for typing feel). This is the
   // value that collapses a normal typing burst into ONE ~500 ms panel refresh.
   // Shorter settings do not make a character appear sooner -- the waveform is
   // ~500 ms regardless -- they just queue refreshes back to back, which costs
@@ -259,7 +259,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // TEXT_ANTIALIASING value (0=Off, 1=Standard, 2=Crisp, 3=Dark). Non-zero
   // still reads as "AA enabled" everywhere the old toggle was tested as a bool.
   uint8_t textAntiAliasing = TEXT_AA_STANDARD;
-  // Short power button click behaviour
+  // Short power button click behavior
   uint8_t shortPwrBtn = IGNORE;
   // EPUB reading orientation settings
   // 0 = portrait (default), 1 = landscape clockwise, 2 = inverted, 3 = landscape counter-clockwise

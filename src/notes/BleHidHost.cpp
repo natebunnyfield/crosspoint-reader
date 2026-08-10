@@ -190,7 +190,7 @@ size_t gReportCount = 0;
 size_t gSubIndex = 0;  // which report we are subscribing
 bool gDiscoveryRunning = false;
 // Set when a Forget could not reach the bond store because the host would not
-// start; honoured on the next successful init.
+// start; honored on the next successful init.
 bool gForgetPending = false;
 
 // Single-producer (host task) / single-consumer (main task) ring.
@@ -703,7 +703,7 @@ bool begin() {
       .idle_core_mask = 0,
       .trigger_panic = true,
   };
-  // Arduino may already have initialised the TWDT; reconfigure in that case
+  // Arduino may already have initialized the TWDT; reconfigure in that case
   // rather than failing. Logged either side so a hang can be attributed to the
   // right call — the previous instrumentation printed only BEFORE this block,
   // so "hung in nimble_port_init" was an assumption, not an observation.

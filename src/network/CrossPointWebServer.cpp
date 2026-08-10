@@ -459,7 +459,7 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
     // Skip hidden items (starting with "."). Was gated on
     // SETTINGS.showHiddenFiles, which had no row in SettingsList.h and so was
     // neither settable nor persisted — it could only ever be 0, which is this.
-    // Removed 2026-08-04; behaviour here is unchanged.
+    // Removed 2026-08-04; behavior here is unchanged.
     bool shouldHide = fileName.startsWith(".");
 
     // Check against explicitly hidden items list

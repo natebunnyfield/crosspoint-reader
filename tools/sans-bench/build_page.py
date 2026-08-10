@@ -24,7 +24,7 @@ for line in open(os.path.join(HERE, "measurements.txt")):
             "line": int(lh), "alpha": int(aw), "lines": int(bl), "cut": bool(cut)}
 
 FAMS = [
-    # key, display name, group, designer/origin, licence, note
+    # key, display name, group, designer/origin, license, note
     ("AtkinsonNext", "Atkinson Hyperlegible Next", "access",
      "Braille Institute with Applied Design Works, 2025", "OFL",
      "The best-known accessibility brief in type: every letterform drawn to be "
@@ -91,12 +91,12 @@ FAMS = [
     ("PTSans", "PT Sans", "humanist",
      "ParaType (Korolkova, Yefimov, Matveeva), 2009", "OFL",
      "Compact and even — third-narrowest — and drawn for a public-signage "
-     "programme, so the letterforms are conservative in a useful way. Latin "
+     "program, so the letterforms are conservative in a useful way. Latin "
      "Extended-A is only 78% covered, which is the reason it is not higher."),
     ("Inter", "Inter", "control",
      "Rasmus Andersson, 2016–", "OFL",
      "CONTROL, not a proposal. The default screen-UI sans of the last decade, "
-     "so it is the texture most readers will recognise. It reads as interface "
+     "so it is the texture most readers will recognize. It reads as interface "
      "rather than book — tight spacing, closed apertures, uniform rhythm."),
     ("NotoSans", "Noto Sans", "control",
      "Monotype for Google", "OFL",
@@ -119,7 +119,7 @@ PAID = [
      "specifically for low-resolution printers and displays — large x-height "
      "(~53% of body), open counters, simplified forms chosen to survive coarse "
      "rasterisation. Everything this bench measures, Lucida was drawn to win.",
-     "Desktop licence; conversion to bitmaps for your own devices is the "
+     "Desktop license; conversion to bitmaps for your own devices is the "
      "normal reading, redistribution is not."),
     ("Neue Frutiger", "Monotype / Linotype", "linotype.com",
      "The wayfinding legibility benchmark, and one of the five comparison "
@@ -130,12 +130,12 @@ PAID = [
      "Built for dense editorial text and data — large x-height, sturdy joins, "
      "and a Pan-European cut whose Latin Extended coverage would remove the "
      "Noto-fallback problem that limits Atkinson and PT Sans here.",
-     "Per-style desktop licence; ask Rosetta directly about device embedding."),
+     "Per-style desktop license; ask Rosetta directly about device embedding."),
     ("Adelle Sans", "TypeTogether", "type-together.com",
      "A book-and-magazine sans with real italics from a foundry whose whole "
-     "catalogue is aimed at long-form reading. The closest paid analogue to "
+     "catalog is aimed at long-form reading. The closest paid analogue to "
      "what Alegreya Sans attempts for free, with the weight to survive 1-bit.",
-     "Desktop licence; TypeTogether sells app/device embedding separately."),
+     "Desktop license; TypeTogether sells app/device embedding separately."),
     ("Fedra Sans", "Typotheque", "typotheque.com",
      "Explicitly drawn to hold up under bad screen rendering — the brief was a "
      "corporate face that would not fall apart on low-resolution output.",
@@ -143,11 +143,11 @@ PAID = [
     ("Whitney", "Hoefler &amp; Co.", "typography.com",
      "Drawn for museum signage and small-size text at once: narrow enough to "
      "be economical, open enough to stay legible small.",
-     "H&amp;Co desktop licence; embedding requires a separate agreement."),
+     "H&amp;Co desktop license; embedding requires a separate agreement."),
     ("Benton Sans", "Font Bureau", "fontbureau.com",
      "News Gothic rebuilt for screen text — the newspaper answer to the same "
      "question this bench asks.",
-     "Desktop licence."),
+     "Desktop license."),
     ("FF Meta", "Monotype (FontFont)", "fontshop.com",
      "Spiekermann's small-size legibility classic, drawn for the German post "
      "office because Helvetica failed at small sizes on bad paper. Fira Sans "
@@ -158,7 +158,7 @@ PAID = [
      "unambiguous. Verdana is arguably still the most legible face ever made "
      "for a low-resolution raster. Very wide, so pages get longer.",
      "Bundled with operating systems but NOT licensed for redistribution or "
-     "embedding — this is the trap. A separate Monotype licence is required."),
+     "embedding — this is the trap. A separate Monotype license is required."),
     ("Amazon Ember", "Amazon", "not licensable",
      "The Kindle's own sans. Listed only to close the question: Amazon does "
      "not license it, and Bookerly was pulled from this project's font list "
@@ -166,7 +166,7 @@ PAID = [
      "Cannot be licensed. Do not ship it."),
     ("APHont", "American Printing House for the Blind", "aph.org",
      "Free, drawn for low-vision readers, and genuinely good at it — but the "
-     "licence restricts redistribution, so it behaves like a paid face for "
+     "license restricts redistribution, so it behaves like a paid face for "
      "this project's purposes.",
      "Free download, restricted redistribution."),
 ]
@@ -288,7 +288,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 
 :root {{
   color-scheme: light dark;
-  /* Neutrals biased toward the panel's own warm grey-green, not pure grey. */
+  /* Neutrals biased toward the panel's own warm gray-green, not pure gray. */
   --paper:      #FBFAF6;
   --paper-2:    #F2F1EA;
   --rule:       #DCDACE;
@@ -523,10 +523,10 @@ footer {{ margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--rule)
 <div class="constraint">
   <div>
     <h2>Why a sans is worth testing at all</h2>
-    <p>The panel has no grey. A glyph is rasterised by FreeType with antialiasing,
+    <p>The panel has no gray. A glyph is rasterised by FreeType with antialiasing,
       stored in the <code>.cpfont</code> at two bits per pixel, and then, in the reader's
       normal black-and-white mode, <strong>every pixel carrying any ink at all is painted
-      solid black</strong>. Partial coverage does not become grey; it becomes a full pixel.</p>
+      solid black</strong>. Partial coverage does not become gray; it becomes a full pixel.</p>
     <p>That single line of code is the whole argument. Hairlines fatten to full stems, tight
       counters fill in, and delicate serif brackets turn into blobs — while sturdy, open,
       low-contrast letterforms come through nearly intact. It is also why comparing faces at
@@ -580,7 +580,7 @@ if (renderMode == GfxRenderer::BW &amp;&amp; bmpVal &lt; 3) {{
             <dt>Set width</dt><dd id="rSet">—</dd>
             <dt>x-height</dt><dd id="rX">—</dd>
             <dt>Latin-1 / Ext-A</dt><dd id="rCov">—</dd>
-            <dt>Licence</dt><dd id="rLic">—</dd>
+            <dt>License</dt><dd id="rLic">—</dd>
           </dl>
           <p class="note" id="rNote">—</p>
           <div class="live">
@@ -615,7 +615,7 @@ if (renderMode == GfxRenderer::BW &amp;&amp; bmpVal &lt; 3) {{
           <th scope="col">Latin-1 %</th>
           <th scope="col">Ext-A %</th>
           <th scope="col">Punct %</th>
-          <th scope="col">Licence</th>
+          <th scope="col">License</th>
         </tr>
       </thead>
       <tbody>{rows}</tbody>
@@ -674,12 +674,12 @@ if (renderMode == GfxRenderer::BW &amp;&amp; bmpVal &lt; 3) {{
 </section>
 
 <section>
-  <h2>Paid faces worth the licence</h2>
+  <h2>Paid faces worth the license</h2>
   <p class="lede">Read this first: converting a licensed font into <code>.cpfont</code> bitmaps and
-    putting them on your own SD card is normally within a desktop licence; <strong>redistributing
+    putting them on your own SD card is normally within a desktop license; <strong>redistributing
     those bitmaps is not</strong>. That is already how this fork treats Edgar, GT Alpina, Venetian 301
     and Caledonia CC — the recipe is committed, the font files never are. Any face below would
-    ship the same way: buildable by whoever holds the licence, absent for everyone else.</p>
+    ship the same way: buildable by whoever holds the license, absent for everyone else.</p>
   <div class="scroller">
     <table class="paid">
       <thead>

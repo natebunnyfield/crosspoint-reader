@@ -115,7 +115,7 @@ class ActivityManager {
   // The home row that launched whatever is on screen. goHome() with no argument
   // returns the selector there, so Back always lands on the row you left from
   // instead of jumping to the top of the list. Set by the goTo* wrappers, so a
-  // new home row inherits the behaviour without having to remember anything.
+  // new home row inherits the behavior without having to remember anything.
   HomeMenuItem lastHomeMenuItem = HomeMenuItem::NONE;
 
   bool preventAutoSleep() const;

@@ -302,7 +302,7 @@ empty string, which every caller already handles because these are cache reads
 and an empty field fails the cache's own validation. `numPages` is checked
 against `numPages * sizeof(uint32_t) <= bytes remaining`. `ZipFile` caps a member
 at 16 MB, which also closes the `0xFFFFFFFF + 1` wrap that put the terminator
-write at `data[0xFFFFFFFF]`. `len` is now initialised too — `readPod` returns
+write at `data[0xFFFFFFFF]`. `len` is now initialized too — `readPod` returns
 void, so a short read left it holding stack garbage. Five tests in
 `test/untrusted_input/`, three of which fail against the old code.
 
@@ -523,7 +523,7 @@ Observed: a stamped `pio run -e gh_release_rc` deleted
 `no such file or directory`, exit 127. It also caused B-005.
 
 **Close by:** either documenting it in the project guide next to the existing
-version-override section, or removing the sysenv interpolation in favour of a
+version-override section, or removing the sysenv interpolation in favor of a
 mechanism that does not perturb the checksum. Currently recorded only in
 agent memory, not in the repo. Workaround: hold the variable constant across
 every `pio run` in a session, including simulator builds.
@@ -635,7 +635,7 @@ and `src/activities/util/ClaudeChatActivity.cpp` to
 
 **Verified:** device `gh_release` still builds (the network path is unchanged),
 the desktop canary builds and boots, and the iOS configure reports
-`20 iOS exclusions all resolve`. Device-side behaviour of the network build is
+`20 iOS exclusions all resolve`. Device-side behavior of the network build is
 unchanged by construction — nothing outside `#ifdef CROSSPOINT_NO_NETWORK` moved.
 
 ### [B-013] Opening an oversized `.txt` in the note editor destroyed it

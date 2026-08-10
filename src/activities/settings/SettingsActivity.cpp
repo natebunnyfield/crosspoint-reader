@@ -202,7 +202,7 @@ void SettingsActivity::toggleCurrentSetting() {
 
   if (setting.nameId == StrId::STR_EDITOR_FONT) {
     // Confirm opens the picker with its specimen pane rather than a five-name
-    // popup. These faces differ only in glyph-width behaviour, which no list of
+    // popup. These faces differ only in glyph-width behavior, which no list of
     // names can convey.
     //
     // The row stays an ENUM in getSettingsList() on purpose: that list is also
@@ -257,7 +257,7 @@ void SettingsActivity::toggleCurrentSetting() {
         SETTINGS.saveToFile();
         rebuildSettingsLists();
       };
-      // A runtime-labelled row keeps its choices in enumStringValues and leaves
+      // A runtime-labeled row keeps its choices in enumStringValues and leaves
       // enumValues EMPTY, so it needs the string overload. Reaching for the
       // StrId overload regardless is what left Typing Redraw Delay with no
       // picker: the gate above saw 0 choices and never got here at all.

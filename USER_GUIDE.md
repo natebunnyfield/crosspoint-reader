@@ -264,7 +264,7 @@ Changing the font, font size, or line spacing keeps your reading position: the r
 
 - **Dictionary**: Select the StarDict dictionary used for word lookups while reading, or "None" to disable lookups. *(Only shown when at least one dictionary folder exists under `/dictionaries/` on the SD card — see [docs/dictionary.md](docs/dictionary.md) for setup and usage.)*
 
-- **Text Anti-Aliasing**: Whether to show smooth grey edges (anti-aliasing) on text in reading mode. Note this slows down page turns slightly.
+- **Text Anti-Aliasing**: Whether to show smooth gray edges (anti-aliasing) on text in reading mode. Note this slows down page turns slightly.
 
 - **Images**: Whether to display embedded images (JPG/PNG) found in EPUB files; options are "ON" (default) or "OFF".
 

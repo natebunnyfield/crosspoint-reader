@@ -122,7 +122,7 @@ def make_cover_png() -> bytes:
     cover = Image.new('RGB', (COVER_W, COVER_H), color=(255, 255, 255))
     draw = ImageDraw.Draw(cover)
 
-    # Paste logo centred at ~35% down the canvas
+    # Paste logo centered at ~35% down the canvas
     with Image.open(LOGO_PNG) as logo_raw:
         if logo_raw.mode in ('RGBA', 'LA', 'P'):
             bg = Image.new('RGB', logo_raw.size, (255, 255, 255))

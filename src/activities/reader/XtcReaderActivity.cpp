@@ -204,7 +204,7 @@ void XtcReaderActivity::renderPage() {
     // - 8 vertical pixels per byte (MSB = topmost pixel in group)
     // - First plane: Bit1, Second plane: Bit2
     // - Pixel value = (bit1 << 1) | bit2
-    // - Grayscale: 0=White, 1=Dark Grey, 2=Light Grey, 3=Black
+    // - Grayscale: 0=White, 1=Dark Gray, 2=Light Gray, 3=Black
 
     const size_t planeSize = (static_cast<size_t>(pageWidth) * pageHeight + 7) / 8;
     const uint8_t* plane1 = pageBuffer;              // Bit1 plane
@@ -263,7 +263,7 @@ void XtcReaderActivity::renderPage() {
     renderer.clearScreen(0x00);
     for (uint16_t y = 0; y < pageHeight; y++) {
       for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) == 1) {  // Dark grey only
+        if (getPixelValue(x, y) == 1) {  // Dark gray only
           renderer.drawPixel(x, y, false);
         }
       }
@@ -276,7 +276,7 @@ void XtcReaderActivity::renderPage() {
     for (uint16_t y = 0; y < pageHeight; y++) {
       for (uint16_t x = 0; x < pageWidth; x++) {
         const uint8_t pv = getPixelValue(x, y);
-        if (pv == 1 || pv == 2) {  // Dark grey or Light grey
+        if (pv == 1 || pv == 2) {  // Dark gray or Light gray
           renderer.drawPixel(x, y, false);
         }
       }

@@ -39,7 +39,7 @@ inline void writeString(HalFile& file, const std::string& s) {
 // Both readString overloads size an allocation from a number that came out of a
 // file, so both bound it against the bytes actually left to read. On a device
 // with 380 KB and no PSRAM, a corrupted cache header claiming a 4 GB string is
-// not a bad read -- it is an abort. `len` is also initialised, because readPod
+// not a bad read -- it is an abort. `len` is also initialized, because readPod
 // returns void: a short read leaves it holding whatever was on the stack.
 //
 // A refusal yields an EMPTY string rather than an error, which every caller

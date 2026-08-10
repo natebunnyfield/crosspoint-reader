@@ -193,7 +193,7 @@ Each is alone 2x the protocol limit. A shared helper (or
 
 - **The reason is mandatory.** An entry without `# reason` is rejected *and fails
   the gate* — an exemption nobody had to justify is how a budget dies.
-- **The budget is a cap, not a licence.** It is the size measured when the entry
+- **The budget is a cap, not a license.** It is the size measured when the entry
   was added. If the frame grows past it, the gate fails as a `REGRESSION`.
 - **Keyed on file + signature, never line number.** Line numbers move whenever
   anything above the function is edited; keying on them would rot the file on
