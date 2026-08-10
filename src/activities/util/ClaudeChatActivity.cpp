@@ -38,7 +38,11 @@ void ClaudeChatActivity::onEnter() {
 // KeyboardEntryActivity and DaisyEntryActivity have always done this; the two
 // editors never did, so on the phone Create Note and Claude had no keyboard at
 // all and a paired one fought the button map.
-  mappedInput.setTextEntryActive(true);
+//
+// Multi: the prompt is a multi-line composer, so a host keyboard's Return is a
+// newline here as it is on the panel (the drain below turns TYPED_COMMIT into
+// handleKey('\n')). Sending is the panel's own OK key, not Return.
+  mappedInput.setTextEntryActive(true, HalGPIO::TextEntryLines::Multi);
 
   // The on-screen keyboard is the default. BLE only comes up when a keyboard is
   // already bonded — it costs ~72 KB of heap and a CPU-clock lock, which an

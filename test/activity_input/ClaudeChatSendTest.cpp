@@ -136,4 +136,21 @@ TEST_F(ClaudeChatSend, TypingAKeyNeverWaitsOnTheRenderTask) {
   EXPECT_EQ(host::counters().updateAndWaitsHoldingRenderLock, 0);
 }
 
+// ST-006. The prompt is a multi-line composer, and the host has one Return key
+// to split between the text and the Confirm button. It can only tell them
+// apart from what the activity announces, and an editor that says "Single"
+// gets Return routed to BTN_CONFIRM — so pressing it on a hardware keyboard
+// presses Select on the on-screen panel instead of breaking the line.
+//
+// The same one-line announcement is what NoteEditorActivity makes; it is not
+// linked in this target (MarkdownRender, TextBuffer and BleHidHost come with
+// it), and is covered end-to-end by the simulator instead — the simulator
+// repo's tests/test_text_entry.sh drives a real Return through Create Note.
+TEST_F(ClaudeChatSend, AnnouncesTheComposerAsMultiLineSoReturnBreaksTheLine) {
+  ASSERT_TRUE(host::buttons().simTextEntryActive()) << "the composer never announced an open field at all";
+  EXPECT_EQ(host::buttons().simTextEntryLines(), HalGPIO::TextEntryLines::Multi)
+      << "a multi-line editor announced itself as a one-line field: a host keyboard's "
+         "Return would press Select instead of inserting a newline (ST-006)";
+}
+
 }  // namespace

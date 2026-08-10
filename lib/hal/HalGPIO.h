@@ -118,7 +118,17 @@ class HalGPIO {
   // and the three editing keys ride along as the control bytes below, so a
   // consumer walks the chunk and splits it on those. util/TypedTextInput.h
   // does exactly that, and is what both text-entry activities call.
-  void setTextEntryActive(bool /*active*/) {}
+  //
+  // TextEntryLines says whether the open field is one line or many. A host
+  // needs it because it has ONE Return key and this board has two separate
+  // inputs: Confirm is a GPIO button here, while a paired keyboard's Enter
+  // arrives as '\n' through the HID path (notes/HidKeymap.h maps usage 0x28).
+  // The host has to choose between them per field -- Select on a single-line
+  // grid, a line break in a multi-line editor -- and only the activity knows
+  // which it opened. Nothing on this board reads it; it is announced for the
+  // same reason the flag itself is.
+  enum class TextEntryLines : uint8_t { Single, Multi };
+  void setTextEntryActive(bool /*active*/, TextEntryLines /*lines*/ = TextEntryLines::Single) {}
   bool consumeTypedText(std::string& /*out*/) { return false; }
 
   static constexpr char TYPED_BACKSPACE = '\b';
