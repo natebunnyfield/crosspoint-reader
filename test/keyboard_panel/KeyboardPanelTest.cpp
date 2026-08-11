@@ -167,10 +167,10 @@ TEST(KeyboardPanel, Grid13RowsAllSumTo13Units) {
   }
 }
 
-// The owner rulings that reshaped this layout on 2026-08-10: the thirteen
-// characters the number row used to hide got faces of their own, the leftovers
-// collapsed onto one symbol row, and then ~ and ; were promoted off that row's
-// alts too -- leaving three, all brackets-or-strokes.
+// The owner rulings that reshaped this layout: the thirteen characters the
+// number row used to hide got faces of their own (2026-08-10), and the
+// leftovers collapsed onto one symbol row where six ride as alts so that Del,
+// Space and Return could take the freed cells (2026-08-11).
 //
 // Pinned as an EXACT SET, not a count. The failure this guards is a character
 // that stops being typeable at all, and that happens by an alt quietly moving
@@ -186,7 +186,8 @@ TEST(KeyboardPanel, Grid13SecondaryCharactersAreExactlyTheShiftPairs) {
   }
   // Each is the shifted partner of its key on a real keyboard, which is the
   // whole reason these five are the ones that may hide.
-  const std::set<std::pair<std::string, std::string>> want{{"\\", "|"}, {"[", "{"}, {"]", "}"}};
+  const std::set<std::pair<std::string, std::string>> want{{"`", "~"}, {":", ";"},  {"/", "?"},
+                                                          {"\\", "|"}, {"[", "{"}, {"]", "}"}};
   EXPECT_EQ(pairs, want);
 }
 

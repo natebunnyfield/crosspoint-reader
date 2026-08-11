@@ -85,17 +85,32 @@ void resetExchanges() { g_exchanges = 0; }
 
 namespace {
 
-// 13-Grid is the default layout and its bottom row is {Del, Space, OK}, so OK
-// is reachable by a fixed walk from the panel's start position (row 0, col 0):
-// down to the last row, then two columns right. The column-anchor rules in
-// KeyboardPanel::moveRow are what make that walk exact.
+// 13-Grid is the default layout, so Ok is reachable by a fixed walk from the
+// panel's start position (row 0, col 0): down to Ok's row, then right to its
+// column. The column-anchor rules in KeyboardPanel::moveRow are what make that
+// walk exact, and every row is a full 13 cells so column 0 survives the descent.
 //
-// DERIVED from the layout, not written down: this was `4` until the symbol
-// rows landed (2026-08-10) and every long-press alternate got a key of its
-// own, and a stale count does not fail as "the layout grew" -- it fails as
-// "OK did not reach send()", pointing at the code under test.
-const int kRowsDownToBottom = grid13::SL_LAYOUT.rowCount - 1;
-constexpr int kColsRightToOk = 2;
+// BOTH COORDINATES ARE DERIVED. They were hardcoded 4 and 2, which broke twice
+// in two days -- once when the symbol rows landed and once when Ok moved off a
+// bottom row of its own onto the end of the symbol row. A stale count does not
+// fail as "the layout moved"; it fails as "OK did not reach send()", pointing
+// at the code under test.
+struct OkCell {
+  int row = 0;
+  int col = 0;
+};
+inline OkCell findOk() {
+  for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
+    const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
+    for (int c = 0; c < row.count; ++c) {
+      if (row.keys[c].kind == fui::KeyKind::Ok) return OkCell{r, c};
+    }
+  }
+  return OkCell{-1, -1};
+}
+const OkCell kOk = findOk();
+const int kRowsDownToBottom = kOk.row;
+const int kColsRightToOk = kOk.col;
 
 class ClaudeChatSend : public ::testing::Test {
  protected:

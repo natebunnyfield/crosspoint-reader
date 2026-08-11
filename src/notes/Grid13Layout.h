@@ -33,8 +33,9 @@ namespace grid13 {
 // column-anchor navigation in moveSelectionRow/Col is integer-exact; a row with
 // fewer keys pays the difference in insetUnits and stays centred.
 //
-// EVERY KEY IS ONE CELL. Del, Space and Return were 3/7/3 slabs until
-// 2026-08-11 -- the only keys that were not a grid cell.
+// EVERY KEY IS ONE CELL, including Del, Space and Return -- 3/7/3 slabs on a
+// row of their own until 2026-08-11, now three cells at the end of the symbol
+// row. Nothing in the layout is a special size.
 //
 // ONLY THREE KEYS CARRY A SECONDARY CHARACTER, all on the symbol row, and each
 // is the shifted partner of the key it hangs off on a real keyboard. The
@@ -73,26 +74,31 @@ inline const fui::KeyboardKey SL_NUM[] = {UK("1", "1", '1'), UK("2", "2", '2'), 
                                           UK("0", "0", '0'), UK("-", "-", '-'),   UK("'", "'", '\''),
                                           UK("=", "=", '=')};
 // The 16 symbols that are neither a digit's shifted face nor on the number row,
-// on ONE row (owner ruling 2026-08-10, which also fixed the key order). Thirteen
-// get a face -- the row is exactly 13 units, no inset -- and the three that do
-// not are each the SHIFTED PARTNER of the key they hang off on a real keyboard:
-// | on \, { on [, } on ]. The pairing is one people already know rather than
-// one to memorise, and all three partners are brackets-or-strokes, which is why
-// these are the three that survived: ~ and ; were promoted to faces of their
-// own (owner, same day) because neither reads as a variant of its neighbour.
+// plus Del, Space and Return -- one row, 13 cells (owner ruling 2026-08-11).
 //
-// Each promoted key sits beside its former host, so the pair stays adjacent
-// whichever way you reach for it.
+// Six characters ride as alts, and each is the SHIFTED PARTNER of the key it
+// hangs off on a real keyboard: ~ on `, ; on :, ? on /, | on \, { on [, } on ].
+// The pairing is one people already know rather than one to memorise, and
+// hiding those three is what freed the cells for Del, Space and Return.
 //
-// This is the only row in the layout with an alt, and the SDK bands a row that
-// hints anything, so all thirteen labels stay on one baseline.
-inline const fui::KeyboardKey SL_SYM[] = {UK("`", "`", '`'),          UK("~", "~", '~'),
-                                          UK(".", ".", '.'),          UK(",", ",", ','),
-                                          UK("?", "?", '?'),          UK(":", ":", ':'),
-                                          UK(";", ";", ';'),          UK("/", "/", '/'),
-                                          UKA("\\", "\\", '\\', "|"), UKA("[", "[", '[', "{"),
-                                          UKA("]", "]", ']', "}"),    UK("<", "<", '<'),
-                                          UK(">", ">", '>')};
+// The three sit together at the right end, so button navigation reaches them as
+// one cluster and a thumb finds them where a keyboard's are.
+//
+// This is the only row in the layout carrying an alt, and the SDK bands a row
+// that hints anything, so all thirteen labels stay on one baseline.
+inline const fui::KeyboardKey SL_SYM[] = {UKA("`", "`", '`', "~"),
+                                          UK(".", ".", '.'),
+                                          UK(",", ",", ','),
+                                          UKA(":", ":", ':', ";"),
+                                          UKA("/", "/", '/', "?"),
+                                          UKA("\\", "\\", '\\', "|"),
+                                          UKA("[", "[", '[', "{"),
+                                          UKA("]", "]", ']', "}"),
+                                          UK("<", "<", '<'),
+                                          UK(">", ">", '>'),
+                                          UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1),
+                                          UKSP(1),
+                                          UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1)};
 inline const fui::KeyboardKey SL_AM[] = {UK("a", "a", 'a'), UK("b", "b", 'b'), UK("c", "c", 'c'), UK("d", "d", 'd'),
                                          UK("e", "e", 'e'), UK("f", "f", 'f'), UK("g", "g", 'g'), UK("h", "h", 'h'),
                                          UK("i", "i", 'i'), UK("j", "j", 'j'), UK("k", "k", 'k'), UK("l", "l", 'l'),
@@ -101,23 +107,14 @@ inline const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), U
                                          UK("r", "r", 'r'), UK("s", "s", 's'), UK("t", "t", 't'), UK("u", "u", 'u'),
                                          UK("v", "v", 'v'), UK("w", "w", 'w'), UK("x", "x", 'x'), UK("y", "y", 'y'),
                                          UK("z", "z", 'z')};
-// Del, Space and Return are ONE UNIT EACH, like every other key (owner ruling
-// 2026-08-11: "fold space del and return into square grid"). They were 3/7/3
-// slabs -- the only keys in the layout that were not a grid cell, and the only
-// row that did not read as part of the same grid.
-//
-// Neither Del nor Space draws its label: the SDK renders a delete glyph for
-// KeyKind::Delete and a space rule for KeyKind::Space, both sized from the key,
-// so both survive the shrink as artwork rather than as clipped text.
-inline const fui::KeyboardKey SL_BOTTOM[] = {UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1), UKSP(1),
-                                             UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1)};
-
-// Every key in the layout is now one grid cell. The bottom row's three sit
-// centred, paying the remaining ten units as insetUnits (3 + 2*5 = 13) -- a row
-// that does not reach 13 breaks the column-anchor arithmetic.
-inline const fui::KeyboardRow SL_ROWS[] = {{SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0}, {SL_SYM, 13, 0},
-                                           {SL_AM, 13, 0},       {SL_NZ, 13, 0},  {SL_BOTTOM, 3, 5}};
-inline const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 6};
+// Five rows, every one of them a full 13 cells with no inset. There is no
+// separate bottom row any more: Del, Space and Return ride the symbol row, and
+// the row they used to occupy is now the gap keyboardRect() leaves under the
+// keyboard.
+inline const fui::KeyboardRow SL_ROWS[] = {{SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0},
+                                           {SL_SYM, 13, 0},      {SL_AM, 13, 0},
+                                           {SL_NZ, 13, 0}};
+inline const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 5};
 
 #undef UK
 #undef UKA

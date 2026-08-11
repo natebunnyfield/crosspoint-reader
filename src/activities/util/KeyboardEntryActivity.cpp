@@ -567,8 +567,15 @@ fui::Rect KeyboardEntryActivity::keyboardRect() const {
   const int height = rows * metrics.keyboardKeyHeight + (rows > 1 ? (rows - 1) * gap : 0);
   const int width = pageWidth * metrics.keyboardWidthPercent / 100;
   const int x = (pageWidth - width) / 2;
-  const int y =
-      pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing - height + metrics.keyboardVerticalOffset;
+  // A row's worth of air under the last row (owner ruling 2026-08-11: "move
+  // symbols up so there is some bottom border gap"). The rect is anchored to
+  // the BOTTOM, so folding Del/Space/Return into the symbol row would otherwise
+  // have slid the whole keyboard down into the space it freed rather than
+  // leaving any. Sized from the key height so the gap reads as the row that is
+  // no longer there.
+  const int bottomGap = metrics.keyboardKeyHeight;
+  const int y = pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing - bottomGap - height +
+                metrics.keyboardVerticalOffset;
   return fui::Rect{static_cast<int16_t>(x), static_cast<int16_t>(y), static_cast<int16_t>(width),
                    static_cast<int16_t>(height)};
 }
