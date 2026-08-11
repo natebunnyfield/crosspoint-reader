@@ -38,6 +38,7 @@
 #include "activities/util/ClaudeChatActivity.h"
 #include "notes/BleHidHost.h"
 #include "notes/ClaudeChat.h"
+#include "notes/Grid13Layout.h"
 
 // ---------------------------------------------------------------------------
 // Doubles for the two radios. Header signatures, no stack behind them.
@@ -86,9 +87,14 @@ namespace {
 
 // 13-Grid is the default layout and its bottom row is {Del, Space, OK}, so OK
 // is reachable by a fixed walk from the panel's start position (row 0, col 0):
-// four rows down, two columns right. Grid13Layout.h:57 and the column-anchor
-// rules in KeyboardPanel::moveRow are what make that walk exact.
-constexpr int kRowsDownToBottom = 4;
+// down to the last row, then two columns right. The column-anchor rules in
+// KeyboardPanel::moveRow are what make that walk exact.
+//
+// DERIVED from the layout, not written down: this was `4` until the symbol
+// rows landed (2026-08-10) and every long-press alternate got a key of its
+// own, and a stale count does not fail as "the layout grew" -- it fails as
+// "OK did not reach send()", pointing at the code under test.
+const int kRowsDownToBottom = grid13::SL_LAYOUT.rowCount - 1;
 constexpr int kColsRightToOk = 2;
 
 class ClaudeChatSend : public ::testing::Test {

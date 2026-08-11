@@ -154,10 +154,54 @@ TEST(KeyboardPanel, Grid13SpaceIsARealSpaceKey) {
 // Every 13-Grid row must sum to 13 width units, or the column anchor that makes
 // vertical navigation exact silently stops being exact.
 TEST(KeyboardPanel, Grid13RowsAllSumTo13Units) {
+  // insetUnits COUNTS, on both sides -- this is the SDK's own arithmetic
+  // (keyboard.h: `units = insetUnits * 2 + sum(widthUnits)`), and summing only
+  // the widths is a weaker claim than the renderer makes. A short centred row
+  // (9 keys + 2 either side, 7 + 3) is exactly as valid as a full one; what
+  // breaks the column-anchor navigation is a row that does not reach 13.
   for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
-    int units = 0;
-    for (int c = 0; c < grid13::SL_LAYOUT.rows[r].count; ++c) units += grid13::SL_LAYOUT.rows[r].keys[c].widthUnits;
+    const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
+    int units = row.insetUnits * 2;
+    for (int c = 0; c < row.count; ++c) units += row.keys[c].widthUnits;
     EXPECT_EQ(units, 13) << "row " << r;
+  }
+}
+
+// The owner ruling that replaced long-press symbols with rows of their own
+// (2026-08-10): "get rid of secondary characters by adding more rows".
+//
+// Two halves, and the second is the one that rots quietly. Adding a key is
+// visible; leaving an `alt` behind is not, and a single surviving one puts the
+// corner hint and its reserved band back on that key alone -- one digit sitting
+// higher than the twelve beside it.
+TEST(KeyboardPanel, Grid13HasNoSecondaryCharacters) {
+  for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
+    const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
+    for (int c = 0; c < row.count; ++c) {
+      EXPECT_EQ(row.keys[c].alt, nullptr)
+          << "row " << r << " key '" << (row.keys[c].label ? row.keys[c].label : "?")
+          << "' still carries a long-press alternate; give it a key instead";
+    }
+  }
+}
+
+TEST(KeyboardPanel, Grid13CoversEveryPrintableAsciiCharacter) {
+  // Space is the bottom row's Space key, which carries its own kind rather than
+  // a printable label, so it is checked separately by Grid13SpaceIsARealSpaceKey.
+  std::set<char> seen;
+  for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
+    const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
+    for (int c = 0; c < row.count; ++c) {
+      const fui::KeyboardKey& k = row.keys[c];
+      if (k.kind != fui::KeyKind::Normal || !k.output) continue;
+      if (std::strlen(k.output) == 1) seen.insert(k.output[0]);
+    }
+  }
+  // Letters are lowercase on the face; uppercase comes from the long-press
+  // case flip, which AltOutputGivesUppercaseForLetters covers.
+  for (char ch = '!'; ch <= '~'; ++ch) {
+    if (ch >= 'A' && ch <= 'Z') continue;
+    EXPECT_EQ(seen.count(ch), 1u) << "no key types '" << ch << "'";
   }
 }
 

@@ -40,10 +40,16 @@ constexpr fui::ActionId ACTION_KEY = 1;
 
 constexpr int16_t URL_PANEL_VALUE = -3;  // mirrors KeyboardEntryActivity::URL_PANEL_KEY
 
-const fui::KeyboardKey URL_NUM_ROW[] = {UKA("1", "1", '1', "!"), UKA("2", "2", '2', "@"), UKA("3", "3", '3', "#"),
-                                        UKA("4", "4", '4', "$"), UKA("5", "5", '5', "%"), UKA("6", "6", '6', "^"),
-                                        UKA("7", "7", '7', "&"), UKA("8", "8", '8', "*"), UKA("9", "9", '9', "("),
-                                        UKA("0", "0", '0', ")")};
+// Shifted faces above the digits they belong to, same rule as the 13-grid: no
+// key carries a secondary character any more (owner ruling 2026-08-10).
+const fui::KeyboardKey URL_NUMSHIFT_ROW[] = {UK("!", "!", '!'), UK("@", "@", '@'), UK("#", "#", '#'),
+                                             UK("$", "$", '$'), UK("%", "%", '%'), UK("^", "^", '^'),
+                                             UK("&", "&", '&'), UK("*", "*", '*'), UK("(", "(", '('),
+                                             UK(")", ")", ')')};
+const fui::KeyboardKey URL_NUM_ROW[] = {UK("1", "1", '1'), UK("2", "2", '2'), UK("3", "3", '3'),
+                                        UK("4", "4", '4'), UK("5", "5", '5'), UK("6", "6", '6'),
+                                        UK("7", "7", '7'), UK("8", "8", '8'), UK("9", "9", '9'),
+                                        UK("0", "0", '0')};
 
 const fui::KeyboardKey URL_ROW1[] = {UK("q", "q", 'q'), UK("w", "w", 'w'), UK("e", "e", 'e'), UK("r", "r", 'r'),
                                      UK("t", "t", 't'), UK("y", "y", 'y'), UK("u", "u", 'u'), UK("i", "i", 'i'),
@@ -107,15 +113,15 @@ const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("ABC", fui::KeyKind::Mode, fui::
 #undef UKW
 #undef UKS
 
-const fui::KeyboardRow URL_ROWS[] = {
-    {URL_NUM_ROW, 10, 0}, {URL_ROW1, 10, 0}, {URL_ROW2, 9, 1}, {URL_ROW3, 9, 0}, {URL_BOTTOM, 6, 0}};
-const fui::KeyboardRow URL_SHIFT_ROWS[] = {
-    {URL_NUM_ROW, 10, 0}, {URL_SHIFT_ROW1, 10, 0}, {URL_SHIFT_ROW2, 9, 1}, {URL_SHIFT_ROW3, 9, 0}, {URL_BOTTOM, 6, 0}};
+const fui::KeyboardRow URL_ROWS[] = {{URL_NUMSHIFT_ROW, 10, 0}, {URL_NUM_ROW, 10, 0}, {URL_ROW1, 10, 0},
+                                     {URL_ROW2, 9, 1},        {URL_ROW3, 9, 0},     {URL_BOTTOM, 6, 0}};
+const fui::KeyboardRow URL_SHIFT_ROWS[] = {{URL_NUMSHIFT_ROW, 10, 0}, {URL_NUM_ROW, 10, 0}, {URL_SHIFT_ROW1, 10, 0},
+                                           {URL_SHIFT_ROW2, 9, 1},   {URL_SHIFT_ROW3, 9, 0}, {URL_BOTTOM, 6, 0}};
 const fui::KeyboardRow URL_SNIP_ROWS[] = {
     {URL_SNIP_ROW1, 3, 0}, {URL_SNIP_ROW2, 3, 0}, {URL_SNIP_ROW3, 3, 0}, {URL_SNIP_BOTTOM, 4, 0}};
 
-const fui::KeyboardLayout URL_LAYOUT{URL_ROWS, 5};
-const fui::KeyboardLayout URL_SHIFT_LAYOUT{URL_SHIFT_ROWS, 5};
+const fui::KeyboardLayout URL_LAYOUT{URL_ROWS, 6};
+const fui::KeyboardLayout URL_SHIFT_LAYOUT{URL_SHIFT_ROWS, 6};
 const fui::KeyboardLayout URL_SNIPPET_LAYOUT{URL_SNIP_ROWS, 4};
 
 fui::KeyboardLayoutId layoutForLanguage(const Language language) {
@@ -996,15 +1002,10 @@ void KeyboardEntryActivity::render(RenderLock&&) {
         drawTip(tr(STR_KB_HINT_CLEAR_TEXT), y);
       }
     } else {
-      const char* altCharTip;
-      if (inputType == InputType::Url && !grid13) {
-        altCharTip = tr(STR_KB_HINT_SECONDARY_CHAR);
-      } else if (shifted) {
-        altCharTip = tr(STR_KB_HINT_LOWER_SECONDARY);
-      } else {
-        altCharTip = tr(STR_KB_HINT_UPPER_SECONDARY);
-      }
-      drawTip(altCharTip, y);
+      // Long-press has exactly one output left: the case flip on letters.
+      // Every symbol has its own key now, so there is no "secondary char" to
+      // advertise and the URL layout no longer needs a tip of its own.
+      drawTip(shifted ? tr(STR_KB_HINT_LOWERCASE) : tr(STR_KB_HINT_UPPERCASE), y);
       y += tipsLh;
       if (inputType == InputType::Url && !grid13) {
         drawTip(tr(STR_KB_HINT_URL_SNIPPETS), y);
