@@ -9,6 +9,7 @@
 #include <Utf8.h>
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "FontCacheManager.h"
 
@@ -831,7 +832,34 @@ void GfxRenderer::drawLine(int x1, int y1, int x2, int y2, const bool state) con
   }
 }
 
+// Thickness grows along the run's MINOR axis, so it is perpendicular to the
+// line rather than always downward.
+//
+// This used to offset in y unconditionally, which thickens a horizontal line
+// correctly and does nothing at all to a vertical one: with x1 == x2 the loop
+// redraws the same column lineWidth times, so the line never widens -- it just
+// ends up lineWidth-1 px LONGER at the bottom. Callers had no way to see that
+// from the call site, and it shipped: the keyboard's Return arrow is a vertical
+// riser plus a horizontal shaft, and raising its stroke moved the shaft while
+// leaving the riser at 1 px; the Space bracket has the same split, a 3 px base
+// between two 1 px ridges; FreeInkUI's stepper-row draws a plus sign with both
+// strokes at 2 and gets a 2 px bar crossed by a 1 px one.
+//
+// A 45-degree diagonal is deliberately left as it was. dy > dx is false when
+// they are equal, so it keeps taking the y offset and renders identically --
+// its perpendicular thickness stays width/sqrt(2), about 0.7x. That is a real
+// inaccuracy, but it is the OLD inaccuracy, and correcting it would change
+// every chevron, tick and X mark in the UI to fix nothing anyone reported.
+// Every horizontal caller is likewise untouched, by the same equality.
 void GfxRenderer::drawLine(int x1, int y1, int x2, int y2, const int lineWidth, const bool state) const {
+  const int dx = std::abs(x2 - x1);
+  const int dy = std::abs(y2 - y1);
+  if (dy > dx) {
+    for (int i = 0; i < lineWidth; i++) {
+      drawLine(x1 + i, y1, x2 + i, y2, state);
+    }
+    return;
+  }
   for (int i = 0; i < lineWidth; i++) {
     drawLine(x1, y1 + i, x2, y2 + i, state);
   }
