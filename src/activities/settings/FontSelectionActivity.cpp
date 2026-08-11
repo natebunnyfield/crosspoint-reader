@@ -16,6 +16,7 @@
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "ReadingFontList.h"
 #include "notes/EditorFonts.h"
 
 namespace {
@@ -116,15 +117,17 @@ void FontSelectionActivity::onEnter() {
   if (registry_) {
     const auto& families = registry_->getFamilies();
     for (int i = 0; i < static_cast<int>(families.size()); i++) {
-      // Writing-only editor faces stay out: they live on the card exactly as a
-      // reading family does, so without this a card carrying them grew extra
-      // reading families. iA Writer Quattro is the deliberate exception (owner
-      // ruling 2026-08-09) and carries alsoReading, so it appears here too.
+      // ONE predicate, shared with the in-book cycle (src/ReadingFontList.h).
+      // It withholds writing-only editor faces -- they live on the card exactly
+      // as a reading family does, so without this a card carrying them grew
+      // extra reading families; iA Writer Quattro is the deliberate exception
+      // (owner ruling 2026-08-09) and carries alsoReading -- and retired
+      // families a card may still carry from before their ruling.
       //
       // settingIndex still counts EVERY registry family, skipped ones included:
       // it addresses the registry, and renumbering it here would re-point
       // SETTINGS.sdFontFamilyName's resolution at a different family.
-      if (editorfonts::isWritingOnlyFamily(families[i].name.c_str())) continue;
+      if (!readingfonts::offeredForReading(families[i].name.c_str())) continue;
       fonts_.push_back({families[i].name, false, static_cast<uint8_t>(CrossPointSettings::BUILTIN_FONT_COUNT + i)});
     }
     // Reverse chronological by lineage: newest EARLIEST (creation) year first,

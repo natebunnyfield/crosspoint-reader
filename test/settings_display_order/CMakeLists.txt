@@ -4,6 +4,7 @@
 add_executable(SettingDisplayOrderTest
   SettingDisplayOrderTest.cpp
   ${REPO_ROOT}/src/notes/EditorFonts.cpp
+  ${REPO_ROOT}/src/ReadingFontList.cpp
 )
 target_include_directories(SettingDisplayOrderTest PRIVATE
   ${REPO_ROOT}/src

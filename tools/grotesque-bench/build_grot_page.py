@@ -582,7 +582,7 @@ footer {{ margin-top:72px; padding-top:22px; border-top:1px solid var(--rule);
   <ol class="steps">
     <li>Rebuild the bench: <code>python3 lib/EpdFont/scripts/build-sd-fonts.py --config lib/EpdFont/scripts/grotesque-candidates.yaml --output-dir out/</code></li>
     <li>Re-render a specimen: <code>CPFONT_DIR=/fonts ./render_harness reading LibreFranklin</code> from <code>tools/calendar_preview</code></li>
-    <li><code>installed_families:</code> is unchanged at five — Edgar, Coelacanth, Rosarivo, TeX&nbsp;Gyre&nbsp;Schola, LexicaUltralegible.</li>
+    <li><code>installed_families:</code> is four — Edgar, Coelacanth, TeX&nbsp;Gyre&nbsp;Schola, Libre&nbsp;Franklin. Rosarivo was A-tier'd out on 2026-08-07.</li>
   </ol>
 </section>
 

@@ -4,8 +4,10 @@
 # family here is built to the SAME apparent size and leading as the curated
 # serif tier, so the only variable left between two specimens is the typeface.
 # Nothing here is installed anywhere; sd-fonts.yaml's `installed_families:`
-# still rules that (Edgar, Coelacanth, Rosarivo, TeXGyreSchola,
-# LexicaUltralegible — promoted out of this bench on 2026-08-03).
+# still rules that (Edgar, Coelacanth, TeXGyreSchola, LibreFranklin). Rosarivo
+# was A-tier'd out on 2026-08-07 and LexicaUltralegible — promoted out of this
+# bench on 2026-08-03 — is not in the shipped list either; check the yaml
+# rather than this comment.
 #
 #   python3 lib/EpdFont/scripts/build-sd-fonts.py \
 #     --config lib/EpdFont/scripts/sans-candidates.yaml --output-dir out/

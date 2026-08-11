@@ -29,7 +29,7 @@
 #include "SdCardFontSystem.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "notes/EditorFonts.h"
+#include "ReadingFontList.h"
 
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
@@ -816,7 +816,7 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
   std::vector<int> readable;
   readable.reserve(families.size());
   for (int i = 0; i < static_cast<int>(families.size()); i++) {
-    if (editorfonts::isWritingOnlyFamily(families[i].name.c_str())) continue;
+    if (!readingfonts::offeredForReading(families[i].name.c_str())) continue;
     readable.push_back(i);
   }
   const int sdCount = static_cast<int>(readable.size());

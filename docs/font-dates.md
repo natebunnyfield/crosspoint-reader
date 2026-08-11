@@ -43,9 +43,11 @@ Every family carries an explicit tier. The column used to be blank for all but
 two rows, which made "demote everything below S" ambiguous — blank was doing
 double duty as both "unranked" and "the curated baseline". It no longer is.
 
-- **S** — the reading faces: Coelacanth, Edgar, Rosarivo and TeX Gyre Schola for
-  serif work; Libre Franklin (grotesque) and Quattrocento Sans (humanist) for
-  sans. New work, previews and screenshots use Edgar or Coelacanth unless a sans
+- **S** — the reading faces: Coelacanth, Edgar and TeX Gyre Schola for serif
+  work; Libre Franklin (grotesque) for sans. Rosarivo and Quattrocento Sans were
+  A-tier'd on 2026-08-07 and are no longer shipped; Rosarivo is additionally
+  withheld from the reader's list (src/ReadingFontList.cpp) because cards
+  provisioned before that ruling still carry it. New work, previews and screenshots use Edgar or Coelacanth unless a sans
   is called for. As of 2026-08-04 these six are exactly the six in
   `installed_families` — that is a consequence of the rulings, not a rule: the
   two lists are still maintained separately, and A and C families are
@@ -97,7 +99,7 @@ reader sees.
 | S | Edgar | Edgar | Tobias Frere-Jones & Nina Stössinger | 1722 London; 2025 Brooklyn | London, England (model: William Caslon's types, 1722) | Brooklyn, New York, USA (Frere-Jones Type, 126 13th St) | Release 2025-10-01 ([Typecache](https://typecache.com/news/6518/)); studio ([frerejones.com](https://frerejones.com/)) |
 | B | LibreCaslonText | Libre Caslon Text | Pablo Impallari & Rodrigo Fuenzalida | 1722 London; 2012 Rosario, Argentina | London, England (William Caslon's foundry) | Rosario, Argentina (Impallari); Fuenzalida: Venezuela, city uncertain (Caracas-trained) | Initial release 2012-11-08 ([FONTLOG](https://github.com/impallari/Libre-Caslon-Text/blob/master/FONTLOG.txt)); [Caslon](https://en.wikipedia.org/wiki/William_Caslon); [Impallari Behance](https://www.behance.net/impallari) |
 | B | Junicode | Junicode SemiCond | Peter S. Baker | 1703 Oxford; 1998, 2023 Charlottesville, Virginia | Oxford, England (Oxford University Press — the "Pica Roman" purchased 1692, printed in Hickes' Thesaurus 1703–05) | Charlottesville, Virginia, USA (Baker, University of Virginia — both 1998 and 2023 eras) | [Junicode design history](https://junicode.sourceforge.io/design.html); Junicode 2 2023-08-18 ([Wikipedia](https://en.wikipedia.org/wiki/Junicode)); [Baker at UVA](https://english.as.virginia.edu/people/peter-baker). Note: Baker says the model "looks more like" the 1692 Pica Roman than a Fell/Walpergen type |
-| S | Rosarivo | Rosarivo | Pablo Ugerman | 1470 Venice; 2011 Buenos Aires | Venice, Italy (model: Nicolas Jenson's roman, 1470) | Buenos Aires, Argentina (Ugerman, UBA postgrad program) | [Font Squirrel](https://www.fontsquirrel.com/fonts/rosarivo) |
+| A | Rosarivo | Rosarivo | Pablo Ugerman | 1470 Venice; 2011 Buenos Aires | Venice, Italy (model: Nicolas Jenson's roman, 1470) | Buenos Aires, Argentina (Ugerman, UBA postgrad program) | [Font Squirrel](https://www.fontsquirrel.com/fonts/rosarivo) |
 | B | InknutAntiqua62 | Inknut Antiqua | Claus Eggers Sørensen | 1469 Venice; 2014 Amsterdam | Venice, Italy (model: Johannes de Spira's roman, 1469) | Amsterdam, Netherlands (Sørensen, Danish, based in Amsterdam) | [GitHub](https://github.com/clauseggers/Inknut-Antiqua); [FontsArena](https://fontsarena.com/inknut-antiqua-by-claus-eggers-sorensen/) |
 | B | Almendra | Almendra | Ana Sanfelippo | 1350 London; 2011 Buenos Aires | London, England (model: English chancery hand, ~1350) | Buenos Aires, Argentina (Sanfelippo, CDT UBA postgrad program) | [Font Squirrel](https://www.fontsquirrel.com/fonts/almendra); [METADATA.pb](https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/METADATA.pb) |
 

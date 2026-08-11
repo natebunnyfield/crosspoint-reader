@@ -19,6 +19,7 @@
 #include <set>
 #include <string>
 
+#include "ReadingFontList.h"
 #include "notes/EditorFonts.h"
 
 namespace {
@@ -239,7 +240,7 @@ TEST(EditorFonts, TheInBookFontCycleAppliesTheWritingOnlyFilter) {
     // code.
     const size_t slashes = line.find("//");
     const std::string code = slashes == std::string::npos ? line : line.substr(0, slashes);
-    if (code.find("isWritingOnlyFamily(") != std::string::npos) sawCall = true;
+    if (code.find("offeredForReading(") != std::string::npos) sawCall = true;
     for (const char c : code) {
       if (c == '{') depth++;
       if (c == '}') depth--;
@@ -248,6 +249,33 @@ TEST(EditorFonts, TheInBookFontCycleAppliesTheWritingOnlyFilter) {
   }
   ASSERT_TRUE(inCycle) << "cycleReaderFontFamily not found -- this test has stopped guarding anything";
   EXPECT_TRUE(sawCall)
-      << "cycleReaderFontFamily does not CALL editorfonts::isWritingOnlyFamily, so holding a side "
+      << "cycleReaderFontFamily does not CALL readingfonts::offeredForReading, so holding a side "
          "button can select a font Text Settings does not list";
+}
+
+// Retired families are withheld from reading. Rosarivo was A-tier'd on
+// 2026-08-07 and still appeared in Text Settings on 2026-08-11, because that
+// ruling reached sd-fonts.yaml's installed_families -- what a NEW card is given
+// -- and nothing that governs a card already provisioned.
+TEST(ReadingFontList, RetiredFamiliesAreNotOfferedForReading) {
+  EXPECT_TRUE(readingfonts::isRetired("Rosarivo"));
+  EXPECT_TRUE(readingfonts::isRetired("rosarivo")) << "the card's directory name is matched case-insensitively";
+  EXPECT_FALSE(readingfonts::offeredForReading("Rosarivo"));
+
+  // Still shipped, and must stay offered.
+  for (const char* keep : {"Edgar", "Coelacanth", "TeXGyreSchola", "LibreFranklin"}) {
+    EXPECT_TRUE(readingfonts::offeredForReading(keep)) << keep << " is in installed_families and must be offered";
+  }
+  // A face nobody has heard of is offered, not hidden -- the fallback
+  // FontDisplayNames documents.
+  EXPECT_TRUE(readingfonts::offeredForReading("SomeUserInstalledFace"));
+  EXPECT_FALSE(readingfonts::offeredForReading(nullptr));
+}
+
+// The writing-only rule still applies through the same predicate.
+TEST(ReadingFontList, WritingOnlyFacesAreNotOfferedForReading) {
+  EXPECT_FALSE(readingfonts::offeredForReading("SpaceMono"));
+  EXPECT_FALSE(readingfonts::offeredForReading("IBMPlexMono"));
+  EXPECT_TRUE(readingfonts::offeredForReading("iAWriterQuattro"))
+      << "Quattro carries alsoReading (owner ruling 2026-08-09)";
 }

@@ -53,6 +53,8 @@ qa/*.bmp
 # ignoring only the source left the derived copy staged-by-accident.
 qa_*/*.png
 qa/*.png
+qa/**/*.png
+qa/**/*.bmp
 
 # Packaged .app bundles from packaging/macos. Build output, tens of MB, and
 # rebuilt from a tagged commit whenever it is actually needed.

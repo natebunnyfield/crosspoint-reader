@@ -83,6 +83,7 @@ add_executable(ActivityInputTest
   ${REPO_ROOT}/src/activities/util/ClaudeChatActivity.cpp
   ${REPO_ROOT}/src/notes/KeyboardPanel.cpp
   ${REPO_ROOT}/src/notes/EditorFonts.cpp
+  ${REPO_ROOT}/src/ReadingFontList.cpp
   ${REPO_ROOT}/freeink-sdk/libs/ui/FreeInkUI/src/FreeInkUI.cpp
   # i18n (tr() is used by every activity above)
   ${REPO_ROOT}/lib/I18n/I18n.cpp

@@ -5,6 +5,7 @@
 add_executable(EditorFontPreviewTest
   EditorFontPreviewTest.cpp
   ${REPO_ROOT}/src/notes/EditorFonts.cpp
+  ${REPO_ROOT}/src/ReadingFontList.cpp
 )
 target_include_directories(EditorFontPreviewTest PRIVATE
   ${REPO_ROOT}/src
