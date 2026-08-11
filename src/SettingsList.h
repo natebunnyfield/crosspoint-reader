@@ -16,20 +16,23 @@
 #include "activities/settings/SettingsActivity.h"
 #include "notes/EditorFonts.h"  // Editor font group (owner ruling 2026-08-05)
 
-// Build the font family setting dynamically. When registry is non-null, SD card fonts
-// are appended after the built-in fonts. Otherwise only built-in fonts are listed.
-// The built-in Noto Serif / Noto Sans faces are hidden from the reader font
-// picker whenever SD card fonts are installed, so the list shows only the
-// user's own curated set.
+// Build the reader font-family picker dynamically. getSettingsList() swaps this
+// in only when a registry with at least one family is present (see below), and
+// the result lists ONLY those SD card families — the built-in Libre Franklin
+// entry is not appended alongside them.
 //
-// They are NOT removed from the firmware: they remain the UI faces, and
-// CrossPointSettings::getReaderFontId() still falls back to Noto Serif when a
-// selected SD font cannot be resolved (card pulled, .cpfont deleted). Hiding
-// them is therefore a menu-only change with a working safety net behind it.
+// The built-in Libre Franklin face is hidden from the reader font picker whenever
+// SD card fonts are installed, so the list shows only the user's own curated set.
+//
+// It is NOT removed from the firmware: it remains the reader's built-in face, and
+// CrossPointSettings::getReaderFontId() still falls back to Libre Franklin when a
+// selected SD font cannot be resolved (card pulled, .cpfont deleted). Hiding it
+// is therefore a menu-only change with a working safety net behind it.
 //
 // When NO SD fonts are installed this function is not used at all — see
-// getSettingsList() below, which keeps the two built-in entries so the picker
-// can never be empty and leave the reader with nothing to render text in.
+// getSettingsList() below, which keeps the single built-in entry (Libre Franklin)
+// so the picker can never be empty and leave the reader with nothing to render
+// text in.
 inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   // SD card family names, in registry order. These are the only options shown.
   std::vector<std::string> sdFamilyNames;

@@ -17,8 +17,10 @@
 // CrossPointSettings::fontPointSize remains as the RESOLVED size for the active
 // family, so the render loop still has a plain point size to hand.
 
-// The built-in Noto Serif / Noto Sans families are compiled in at exactly these
-// point sizes (see the global font objects in main.cpp).
+// The built-in Libre Franklin Reader family is compiled in at exactly these
+// point sizes (see the global font objects in main.cpp). Only the 14 pt cut
+// survives OMIT_FONTS; the other three sizes' EpdFont objects sit under
+// #ifndef OMIT_FONTS (main.cpp:111-131).
 inline constexpr uint8_t BUILTIN_READER_POINT_SIZES[] = {12, 14, 16, 18};
 
 // Point sizes selectable for the active reader font, ascending: the SD family's
