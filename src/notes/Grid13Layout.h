@@ -31,10 +31,10 @@ namespace grid13 {
 // shifted faces, numbers, symbols, a-m, n-z, Del/Space/OK -- no Shift, no
 // symbols mode, full printable ASCII. Every row sums to 13 width units and the
 // bottom row is 3+7+3, so the column-anchor navigation in moveSelectionRow/Col
-// is integer-exact; a short row pays for the difference in insetUnits (11 keys
-// + 1 either side) and stays centred.
+// is integer-exact; a short row would pay for the difference in insetUnits and
+// stay centred, but no row is short any more.
 //
-// ONLY FIVE KEYS CARRY A SECONDARY CHARACTER, all on the symbol row, and each
+// ONLY THREE KEYS CARRY A SECONDARY CHARACTER, all on the symbol row, and each
 // is the shifted partner of the key it hangs off on a real keyboard. The
 // thirteen that the number row used to hide -- ! @ # $ % ^ & * ( ) _ " + --
 // have faces of their own now (owner ruling 2026-08-10), because reaching them
@@ -71,18 +71,25 @@ inline const fui::KeyboardKey SL_NUM[] = {UK("1", "1", '1'), UK("2", "2", '2'), 
                                           UK("0", "0", '0'), UK("-", "-", '-'),   UK("'", "'", '\''),
                                           UK("=", "=", '=')};
 // The 16 symbols that are neither a digit's shifted face nor on the number row,
-// on ONE row (owner ruling 2026-08-10, which also fixed the key order). Eleven
-// get a face; the five that do not are each the SHIFTED PARTNER of the key they
-// hang off on a real keyboard -- ; on :, | on \, { on [, } on ], ~ on ` -- so
-// the pairing is one people already know rather than one to memorise.
+// on ONE row (owner ruling 2026-08-10, which also fixed the key order). Thirteen
+// get a face -- the row is exactly 13 units, no inset -- and the three that do
+// not are each the SHIFTED PARTNER of the key they hang off on a real keyboard:
+// | on \, { on [, } on ]. The pairing is one people already know rather than
+// one to memorise, and all three partners are brackets-or-strokes, which is why
+// these are the three that survived: ~ and ; were promoted to faces of their
+// own (owner, same day) because neither reads as a variant of its neighbour.
+//
+// Each promoted key sits beside its former host, so the pair stays adjacent
+// whichever way you reach for it.
 //
 // This is the only row in the layout with an alt, and the SDK bands a row that
-// hints anything, so all eleven labels stay on one baseline.
-inline const fui::KeyboardKey SL_SYM[] = {UKA("`", "`", '`', "~"),   UK(".", ".", '.'),
-                                          UK(",", ",", ','),        UK("?", "?", '?'),
-                                          UKA(":", ":", ':', ";"),  UK("/", "/", '/'),
+// hints anything, so all thirteen labels stay on one baseline.
+inline const fui::KeyboardKey SL_SYM[] = {UK("`", "`", '`'),          UK("~", "~", '~'),
+                                          UK(".", ".", '.'),          UK(",", ",", ','),
+                                          UK("?", "?", '?'),          UK(":", ":", ':'),
+                                          UK(";", ";", ';'),          UK("/", "/", '/'),
                                           UKA("\\", "\\", '\\', "|"), UKA("[", "[", '[', "{"),
-                                          UKA("]", "]", ']', "}"),  UK("<", "<", '<'),
+                                          UKA("]", "]", ']', "}"),    UK("<", "<", '<'),
                                           UK(">", ">", '>')};
 inline const fui::KeyboardKey SL_AM[] = {UK("a", "a", 'a'), UK("b", "b", 'b'), UK("c", "c", 'c'), UK("d", "d", 'd'),
                                          UK("e", "e", 'e'), UK("f", "f", 'f'), UK("g", "g", 'g'), UK("h", "h", 'h'),
@@ -95,9 +102,10 @@ inline const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), U
 inline const fui::KeyboardKey SL_BOTTOM[] = {UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 3), UKSP(7),
                                              UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 3)};
 
-// The symbol row carries insetUnits so it still measures 13 units (11 + 2*1)
-// and stays centred; anything else breaks the column-anchor arithmetic.
-inline const fui::KeyboardRow SL_ROWS[] = {{SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0}, {SL_SYM, 11, 1},
+// Every row is a full 13 units now; only the bottom one (3+7+3) differs in how
+// it spends them. Any row that does not reach 13 breaks the column-anchor
+// arithmetic, and a short row would have to pay the difference in insetUnits.
+inline const fui::KeyboardRow SL_ROWS[] = {{SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0}, {SL_SYM, 13, 0},
                                            {SL_AM, 13, 0},       {SL_NZ, 13, 0},  {SL_BOTTOM, 3, 0}};
 inline const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 6};
 
