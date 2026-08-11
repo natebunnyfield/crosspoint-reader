@@ -23,6 +23,7 @@
 #include "EpubReaderFootnotesActivity.h"
 #include "EpubReaderUtils.h"
 #include "MappedInputManager.h"
+#include "ReadAloudCapture.h"
 #include "ReaderFontSizes.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
@@ -1425,106 +1426,106 @@ namespace {
 // the NEXT page ("scan only, no pixels") and which would capture the wrong
 // text. On device readAloudCaptureWanted() is inline false and this whole
 // function folds away. Contract: the simulator's src/ReadAloudChannel.h.
+//
+// The grouping itself — glue runs, hyphen joins, byte offsets, and the guards
+// that keep a non-resident font from collapsing the page — lives in
+// ReadAloudCapture.h so it can be host-tested (test/read_aloud_capture). This
+// adapter only reads the display list and measures each token's advance.
 
-bool tokenIsBlank(const char* t) {
-  for (; *t; ++t)
-    if (*t != ' ') return false;
-  return true;
-}
-
-// The stored words may carry soft hyphens (U+00AD); the renderer never draws
-// them, and spoken text must not contain them.
-void appendStrippingSoftHyphens(std::string& out, const char* t) {
-  for (const char* p = t; *p;) {
-    if (static_cast<unsigned char>(p[0]) == 0xC2 && static_cast<unsigned char>(p[1]) == 0xAD) {
-      p += 2;
-      continue;
+// A line height to stamp on rects when the reader font is not resident, so a
+// font-less page still yields rects with a real height instead of the
+// zero-height sliver getLineHeight() returns for an absent font. Borrowed from
+// a built-in reader face nearest the current point size: main.cpp registers
+// those at boot and never evicts them (getReaderFontId() falls back to the same
+// family), so this is a real height even when the SD reader font is gone.
+int fallbackReaderLineHeight(const GfxRenderer& renderer) {
+  struct BuiltinReader {
+    uint8_t pt;
+    int id;
+  };
+  static const BuiltinReader kBuiltins[] = {{12, LIBREFRANKLIN_READER_12_FONT_ID},
+                                            {14, LIBREFRANKLIN_READER_14_FONT_ID},
+                                            {16, LIBREFRANKLIN_READER_16_FONT_ID},
+                                            {18, LIBREFRANKLIN_READER_18_FONT_ID}};
+  const int wantPt = SETTINGS.fontPointSize;
+  // Nearest built-in size that actually reports a height. OMIT_FONTS builds
+  // register only the 14 pt cut, so a plain nearest-by-size pick could land on a
+  // size that is not present and report 0 — skip those.
+  int best = 0;
+  int bestDelta = 1000;
+  for (const auto& b : kBuiltins) {
+    const int h = renderer.getLineHeight(b.id);
+    if (h <= 0) continue;
+    const int d = b.pt > wantPt ? b.pt - wantPt : wantPt - b.pt;
+    if (d < bestDelta) {
+      bestDelta = d;
+      best = h;
     }
-    out.push_back(*p++);
   }
+  return best > 0 ? best : 24;  // 24 px: an absolute backstop if no built-in is resident
 }
 
 void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const int fontId, const int xOffset,
                           const int yOffset) {
   if (!gpio.readAloudCaptureWanted()) return;
-  std::string text;
-  std::vector<ReadAloudWordRect> rects;
-  const int lineH = renderer.getLineHeight(fontId);
-  const int spaceW = renderer.getSpaceWidth(fontId);
-  const auto clampU16 = [](const int v) { return static_cast<uint16_t>(v < 0 ? 0 : (v > 0xFFFF ? 0xFFFF : v)); };
-  // A word the layout hyphen-split across lines arrives as two tokens whose
-  // prefix ends in '-' at the end of its line (ParsedText appends the visible
-  // hyphen to the stored prefix). The TextBlock arena carries no source
-  // anchors, so reuniting them is a display-list heuristic: a line-final '-'
-  // joins to the next line's first word, dropping the hyphen; the joined
-  // word's fragments publish one rect each, sharing its byte range. Known
-  // false positive: a paragraph-final real hyphen. Rare, and the capture
-  // audit (gate G0) watches for it.
-  bool pendingHyphenJoin = false;
+
+  // Flatten the display list into the pure grouping's inputs. Token text points
+  // straight into the block arena (valid for this call), and each token's
+  // advance is measured HERE so the grouping in ReadAloudCapture.h stays pure
+  // and host-testable — and so the value that goes to 0 for a non-resident font
+  // is passed in as data rather than re-queried where it cannot be seen.
+  std::vector<readaloud::CaptureToken> tokens;
+  struct LineSpan {
+    int x;
+    int yTop;
+    size_t begin;
+    size_t count;
+    bool barrierBefore;
+  };
+  std::vector<LineSpan> spans;
+  bool sawNonLineSinceLastLine = false;
   for (const auto& el : page.elements) {
     if (el->getTag() != TAG_PageLine) {
-      pendingHyphenJoin = false;
+      // A non-line element (image, rule) breaks any pending hyphen join.
+      sawNonLineSinceLastLine = true;
       continue;
     }
     const auto& line = static_cast<const PageLine&>(*el);
     const auto& block = line.getBlock();
     if (!block || !block->valid() || block->isEmpty()) continue;
-    const int lineX = line.xPos + xOffset;
-    // yPos is the baseline handed to drawText; the rect wants the line's top.
-    // PageLine::yPos is the line's TOP, not its baseline -- it is handed to
-    // block->render() as the y origin (Page.cpp:24), and measuring the rendered
-    // panel confirms it: with yOffset=9 and lineH=36, lines at yPos 0/54/90/126
-    // put their ink at y 15/68/104/137, i.e. yPos + yOffset plus a few px of
-    // internal leading above cap height. Subtracting the ascender (26 px) here
-    // lifted every rect a full line, so the highlight sat one line above the
-    // word being spoken -- and on the first line it clamped to 0 and hid the
-    // error. Checked across two fonts (the bigger heading face agrees).
-    const int lineTop = line.yPos + yOffset;
+    const size_t begin = tokens.size();
     const uint16_t n = block->wordCount();
-    bool firstRunOnLine = true;
-    uint16_t i = 0;
-    while (i < n) {
-      if (tokenIsBlank(block->wordText(i))) {
-        i++;
-        continue;
-      }
-      // A glue run: consecutive tokens the layout placed with no visible gap
-      // (punctuation slices, focus splits, CJK segments) captured as one
-      // word, judged by pixel gap because the layout's attach flags are not
-      // in the arena either.
-      const int runX = lineX + block->wordXpos(i);
-      int runEndX = runX;
-      std::string runText;
-      while (true) {
-        appendStrippingSoftHyphens(runText, block->wordText(i));
-        runEndX =
-            lineX + block->wordXpos(i) + renderer.getTextAdvanceX(fontId, block->wordText(i), block->wordStyle(i));
-        i++;
-        if (i >= n || tokenIsBlank(block->wordText(i))) break;
-        if (lineX + block->wordXpos(i) - runEndX > spaceW / 2) break;
-      }
-      if (runText.empty()) continue;  // tokens that were nothing but soft hyphens
-      const uint16_t rx = clampU16(runX);
-      const uint16_t ry = clampU16(lineTop);
-      const uint16_t rw = clampU16(runEndX - runX);
-      const uint16_t rh = clampU16(lineH);
-      if (pendingHyphenJoin && firstRunOnLine && !rects.empty() && !text.empty() && text.back() == '-') {
-        text.pop_back();
-        const uint32_t off = rects.back().byteOffset;
-        text += runText;
-        const uint16_t newLen = static_cast<uint16_t>(std::min<size_t>(text.size() - off, 0xFFFF));
-        for (auto it = rects.rbegin(); it != rects.rend() && it->byteOffset == off; ++it) it->byteLen = newLen;
-        rects.push_back({rx, ry, rw, rh, off, newLen});
-      } else {
-        if (!text.empty()) text.push_back(' ');
-        const uint32_t off = static_cast<uint32_t>(text.size());
-        text += runText;
-        rects.push_back({rx, ry, rw, rh, off, static_cast<uint16_t>(std::min<size_t>(runText.size(), 0xFFFF))});
-      }
-      firstRunOnLine = false;
+    for (uint16_t i = 0; i < n; i++) {
+      const char* t = block->wordText(i);
+      const int adv = readaloud::tokenIsBlank(t) ? 0 : renderer.getTextAdvanceX(fontId, t, block->wordStyle(i));
+      tokens.push_back({t, block->wordXpos(i), adv});
     }
-    pendingHyphenJoin = !text.empty() && text.back() == '-';
+    // yPos is the line's TOP, not its baseline — it is handed to block->render()
+    // as the y origin (Page.cpp:24), and measuring the rendered panel confirms
+    // it: with yOffset=9 and lineH=36, lines at yPos 0/54/90/126 put their ink
+    // at y 15/68/104/137, i.e. yPos + yOffset plus a few px of internal leading
+    // above cap height. Subtracting the ascender lifted every rect a full line,
+    // so the highlight sat one line above the word being spoken.
+    spans.push_back(
+        {line.xPos + xOffset, line.yPos + yOffset, begin, tokens.size() - begin, sawNonLineSinceLastLine});
+    sawNonLineSinceLastLine = false;
   }
+
+  // `tokens` is complete and will not reallocate; now point the lines at it.
+  std::vector<readaloud::CaptureLine> lines;
+  lines.reserve(spans.size());
+  for (const auto& s : spans) {
+    lines.push_back({s.x, s.yTop, tokens.data() + s.begin, s.count, s.barrierBefore});
+  }
+
+  readaloud::CaptureMetrics metrics;
+  metrics.lineHeight = renderer.getLineHeight(fontId);
+  metrics.spaceWidth = renderer.getSpaceWidth(fontId);
+  metrics.fallbackLineHeight = fallbackReaderLineHeight(renderer);
+
+  std::string text;
+  std::vector<ReadAloudWordRect> rects;
+  readaloud::buildCapture(lines.data(), lines.size(), metrics, text, rects);
   gpio.publishReadAloudPage(text.c_str(), text.size(), rects.data(), rects.size());
 }
 }  // namespace
