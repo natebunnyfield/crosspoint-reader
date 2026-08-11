@@ -614,7 +614,12 @@ void FileManagerActivity::loop() {
     return;
   }
 
-  if (lockLongPressBack && mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+  // Use a level read (!isPressed) instead of wasReleased: the edge read has a
+  // side effect of clearing the swallowUntilIdle() latch, which then lets the
+  // short-press wasReleased check below fire in the same frame and cause a
+  // second navigation (the B-018 double-consume regression that re-surfaced
+  // when the central swallow replaced backPressSeen — see BUGS.md).
+  if (lockLongPressBack && !mappedInput.isPressed(MappedInputManager::Button::Back)) {
     lockLongPressBack = false;
     return;
   }

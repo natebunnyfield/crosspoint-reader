@@ -292,7 +292,7 @@ inline bool handleBackNavigation(const MappedInputManager& mappedInput, Activity
     if (SETTINGS.backShortToFileBrowser) {
       activityManager.goToFileBrowser(filePath);
     } else {
-      goHome.fn(goHome.ctx);
+      activityManager.popActivity();
     }
     return true;
   }

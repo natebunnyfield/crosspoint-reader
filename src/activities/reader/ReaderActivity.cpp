@@ -123,25 +123,27 @@ void ReaderActivity::goToLibrary(const std::string& fromBookPath) {
 void ReaderActivity::onGoToEpubReader(std::unique_ptr<Epub> epub) {
   const auto epubPath = epub->getPath();
   currentBookPath = epubPath;
-  activityManager.replaceActivity(
+  // replaceCurrentActivity preserves the stack so a caller (e.g. FileBrowserActivity)
+  // survives the ReaderActivity → concrete-reader swap and Back pops back to it.
+  activityManager.replaceCurrentActivity(
       std::make_unique<EpubReaderActivity>(renderer, mappedInput, std::move(epub), initialRefreshCountdown()));
 }
 
 void ReaderActivity::onGoToBmpViewer(const std::string& path) {
-  activityManager.replaceActivity(std::make_unique<BmpViewerActivity>(renderer, mappedInput, path));
+  activityManager.replaceCurrentActivity(std::make_unique<BmpViewerActivity>(renderer, mappedInput, path));
 }
 
 void ReaderActivity::onGoToXtcReader(std::unique_ptr<Xtc> xtc) {
   const auto xtcPath = xtc->getPath();
   currentBookPath = xtcPath;
-  activityManager.replaceActivity(
+  activityManager.replaceCurrentActivity(
       std::make_unique<XtcReaderActivity>(renderer, mappedInput, std::move(xtc), initialRefreshCountdown()));
 }
 
 void ReaderActivity::onGoToTxtReader(std::unique_ptr<Txt> txt) {
   const auto txtPath = txt->getPath();
   currentBookPath = txtPath;
-  activityManager.replaceActivity(
+  activityManager.replaceCurrentActivity(
       std::make_unique<TxtReaderActivity>(renderer, mappedInput, std::move(txt), initialRefreshCountdown()));
 }
 

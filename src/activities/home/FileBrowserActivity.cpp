@@ -10,6 +10,7 @@
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "activities/reader/ReaderActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/FsOps.h"
@@ -200,7 +201,9 @@ void FileBrowserActivity::loop() {
         selectorIndex = 0;
         requestUpdate();
       } else {
-        onSelectBook(basepath + entry);
+        // Push rather than replace so FileBrowserActivity stays on the stack;
+        // Back from the reader pops back here with the selection intact.
+        activityManager.pushActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, basepath + entry, false));
       }
     }
     return;

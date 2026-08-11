@@ -91,7 +91,7 @@ MappedInputManager& mappedInputSingleton() {
 // protected `name`, `result` and `resultHandler` the navigation contract needs.
 // ---------------------------------------------------------------------------
 
-enum class HostPending { None, Push, Pop, Replace };
+enum class HostPending { None, Push, Pop, Replace, ReplaceCurrentOnly };
 
 struct AmState {
   std::unique_ptr<Activity> current;
@@ -282,6 +282,10 @@ void ActivityManager::loop() {
           s.stack.pop_back();
         }
         s.counters.replaces++;
+      } else if (s.pendingAction == HostPending::ReplaceCurrentOnly) {
+        // Destroy current without clearing the stack (mirrors ActivityManager.cpp).
+        exitActivity(lock);
+        s.counters.replaces++;
       } else if (s.pendingAction == HostPending::Push) {
         s.stack.push_back(std::move(s.current));
         s.counters.pushes++;
@@ -316,6 +320,12 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
     s.counters.transitions++;
     s.current->onEnter();
   }
+}
+
+void ActivityManager::replaceCurrentActivity(std::unique_ptr<Activity>&& newActivity) {
+  auto& s = am();
+  s.pending = std::move(newActivity);
+  s.pendingAction = HostPending::ReplaceCurrentOnly;
 }
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {

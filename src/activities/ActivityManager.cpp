@@ -140,6 +140,11 @@ void ActivityManager::loop() {
           stackActivities.back()->onExit();
           stackActivities.pop_back();
         }
+      } else if (pendingAction == PendingAction::ReplaceCurrentOnly) {
+        // Destroy current activity but leave the stack intact.
+        // Used when ReaderActivity swaps in the concrete reader so a caller
+        // on the stack (e.g. FileBrowserActivity) survives the swap.
+        exitActivity(lock);
       } else if (pendingAction == PendingAction::Push) {
         // Move current activity to stack
         stackActivities.push_back(std::move(currentActivity));
@@ -188,6 +193,13 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
     currentActivity = std::move(newActivity);
     currentActivity->onEnter();
   }
+}
+
+void ActivityManager::replaceCurrentActivity(std::unique_ptr<Activity>&& newActivity) {
+  // Like replaceActivity() but does NOT clear the stack, so activities below
+  // (e.g. FileBrowserActivity that pushed a ReaderActivity) survive the swap.
+  pendingActivity = std::move(newActivity);
+  pendingAction = PendingAction::ReplaceCurrentOnly;
 }
 
 void ActivityManager::goToFileTransfer() {

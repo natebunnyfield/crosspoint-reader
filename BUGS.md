@@ -241,6 +241,28 @@ the failure path that already existed (`return false` / `return nullptr`).
 Deliberately not a sweep of every bare `new` in the tree. These are the ones
 where a caller already had somewhere sensible to fail to.
 
+### [B-026] Browse Files Back exits to Home instead of the file listing; Manage Files double-navigates on Back
+**severity: medium · scope: navigation · reported 2026-08-11 · FIXED 2026-08-11**
+
+Two related navigation regressions, fixed together.
+
+**Browse Files (FileBrowserActivity) — Back exits to Home.**
+Opening a file from Browse Files called `onSelectBook()` → `activityManager.goToReader()` → `replaceActivity(ReaderActivity)`. `replaceActivity` destroys FileBrowserActivity and clears the stack, so when the reader's short-press Back called the `goHome` callback (or `activityManager.popActivity()` on an empty stack), the user was sent Home rather than back to the listing. Selection at the opened file was also lost.
+
+**Manage Files (FileManagerActivity) — Back from a viewed file navigates twice.**
+B-018 filed this symptom (2026-08-07). It was fixed by `backPressSeen`, then that guard was removed by commit `ce652c05` ("centralize child-exit input swallow"), which assumed `swallowUntilIdle()` would cover the release. It does — except that `FileManagerActivity::loop()` called `wasReleased(Back)` twice in one frame. The first call (in the `lockLongPressBack &&` guard) consumed the swallow latch and returned false; the second call (the short-press handler) saw the latch already cleared and returned the real edge value — true, because Back had just been released. At the SD root that second `wasReleased` arm calls `onGoHome()`, so the user saw: TextViewerActivity disappears, then Manage Files flashes, then Home.
+
+**How fixed.**
+- `FileBrowserActivity`: opening a file now uses `activityManager.pushActivity(new ReaderActivity(...))` instead of `onSelectBook()`, so FileBrowserActivity stays on the stack. Selection (`selectorIndex`) was already pointing at the opened file, so it is restored automatically on pop.
+- `ReaderActivity`: all four sub-reader dispatches (`onGoToEpubReader`, `onGoToXtcReader`, `onGoToTxtReader`, `onGoToBmpViewer`) now call `activityManager.replaceCurrentActivity()` instead of `replaceActivity()`, so the stack entry for FileBrowserActivity survives the ReaderActivity → concrete-reader swap.
+- `handleBackNavigation` (ReaderUtils.h): the short-press default now calls `activityManager.popActivity()` instead of the `goHome` callback. `popActivity` on an empty stack already calls `goHome()`, so the path from Home or any non-Browser launcher is unchanged.
+- `FileManagerActivity`: the `lockLongPressBack` clear uses `!isPressed(Back)` (level read) instead of `wasReleased(Back)` (edge read). The level read has no swallow-clearing side effect, so the short-press handler sees the swallow still active and correctly returns false.
+- New `ActivityManager::replaceCurrentActivity()` method added (replaces current without clearing the stack). Covered by `ActivityInput.ReplaceCurrentActivityPreservesStack`.
+
+**End-of-book back is unchanged.** EpubReaderActivity still calls `onGoHome()` at the end of a book, which uses `replaceActivity(HomeActivity)` and clears the stack. A user who finishes a book lands on Home, not Browse Files; that is the intended behavior.
+
+**Audit note.** RecentBooksActivity also uses `onSelectBook()` (replaceActivity). Books opened from Recents replace the stack intentionally — the owner never asked for Recents to be a browse-and-return context — so no change was made there.
+
 ### [B-025] The editor caret barely moves when you type a space
 **severity: medium · scope: text entry · reported 2026-08-07 · FIXED 2026-08-07**
 
@@ -378,7 +400,7 @@ deterministic host test for it would be testing the scheduler rather than the
 fix. Verified by reading every mutation path against `render()`.
 
 ### [B-018] One Back tap could be consumed twice, landing you on Home
-**severity: medium · scope: navigation · FIXED 2026-08-07 · `416e7f42`**
+**severity: medium · scope: navigation · FIXED 2026-08-07 · `416e7f42`; re-introduced by `ce652c05` (2026-08-08); re-fixed 2026-08-11 — see B-026**
 
 Reported as: viewing an `.md` in Manage Files kicks you to Home instead of back
 to the listing.

@@ -54,7 +54,7 @@ class ActivityManager {
 
   // Pending activity to be launched on next loop iteration
   std::unique_ptr<Activity> pendingActivity;
-  enum class PendingAction { None, Push, Pop, Replace };
+  enum class PendingAction { None, Push, Pop, Replace, ReplaceCurrentOnly };
   PendingAction pendingAction = PendingAction::None;
 
   // Task to render and display the activity
@@ -87,6 +87,12 @@ class ActivityManager {
 
   // Will replace currentActivity and drop all activities on stack
   void replaceActivity(std::unique_ptr<Activity>&& newActivity);
+
+  // Replaces currentActivity WITHOUT clearing the stack.
+  // Used by ReaderActivity when dispatching to the concrete reader
+  // (EpubReader/TxtReader/XtcReader/BmpViewer) so a caller on the stack
+  // (e.g. FileBrowserActivity) survives the swap.
+  void replaceCurrentActivity(std::unique_ptr<Activity>&& newActivity);
 
   // goTo... functions are convenient wrapper for replaceActivity()
   void goToFileTransfer();

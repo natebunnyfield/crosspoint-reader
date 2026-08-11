@@ -90,6 +90,13 @@ class ReaderParentDouble final : public Activity {
   }
 };
 
+// Idle placeholder useful when a test needs a named activity with no behaviour.
+class NamedDouble final : public Activity {
+ public:
+  NamedDouble(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput)
+      : Activity(name, renderer, mappedInput) {}
+};
+
 // ---------------------------------------------------------------------------
 // The activities under test: every one that (a) links host-side and (b) is
 // opened by a launcher that acts on the Back release. FontSelectionActivity is
@@ -270,6 +277,45 @@ INSTANTIATE_TEST_SUITE_P(ReleaseEdgeChildren, BackEdgeConvention, ::testing::Val
                          [](const ::testing::TestParamInfo<BackEdgeCase>& info) {
                            return std::string(info.param.label);
                          });
+
+// ===========================================================================
+// replaceCurrentActivity preserves the stack so Back returns to the original
+// caller rather than going Home.
+//
+// Covers the Browse Files → reader → Back → Browse Files path. The mechanism:
+// FileBrowserActivity uses pushActivity (not replaceActivity), and ReaderActivity
+// uses replaceCurrentActivity to swap in the concrete reader; the stack entry for
+// FileBrowserActivity survives both swaps, so Back pops back to it.
+// ===========================================================================
+
+TEST_F(ActivityInput, ReplaceCurrentActivityPreservesStack) {
+  // Seed a parent on the stack (simulates FileBrowserActivity).
+  g_parentObs = ParentObservations{};
+  auto parentOwned = std::make_unique<ReaderParentDouble>(host::renderer(), host::input());
+  host::setRootActivity(std::move(parentOwned));
+  host::frame();
+  ASSERT_EQ(host::currentActivityName(), "TestReaderParent");
+
+  // Push a placeholder (simulates ReaderActivity being pushed by FileBrowserActivity).
+  activityManager.pushActivity(std::make_unique<NamedDouble>("ReaderActivity", host::renderer(), host::input()));
+  host::frame();
+  ASSERT_EQ(host::currentActivityName(), "ReaderActivity") << "pushActivity did not install the placeholder";
+
+  // replaceCurrentActivity (simulates ReaderActivity swapping in the concrete reader).
+  activityManager.replaceCurrentActivity(makeFontSelection());
+  host::frame();
+  ASSERT_EQ(host::currentActivityName(), "FontSelect") << "replaceCurrentActivity did not install the reader";
+
+  host::resetCounters();
+  // Back tap: FontSelection exits on press; swallow covers release; parent restored.
+  host::tap(HalGPIO::BTN_BACK);
+  host::frames(2);
+
+  EXPECT_EQ(host::counters().goHome, 0) << "Back from reader must not go Home when FileBrowser is on the stack";
+  EXPECT_EQ(host::currentActivityName(), "TestReaderParent")
+      << "Back must restore FileBrowserActivity (TestReaderParent), not replace it with Home";
+  EXPECT_EQ(g_parentObs.backReleasesSeen, 0) << "parent must not see the child's Back release";
+}
 
 // ===========================================================================
 // The seam itself: MappedInputManager's logical -> physical mapping. If Back
