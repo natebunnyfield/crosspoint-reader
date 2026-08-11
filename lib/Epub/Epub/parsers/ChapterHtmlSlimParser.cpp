@@ -491,13 +491,27 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     self->tableDepth += 1;
     self->tableRowIndex = 0;
     self->tableColIndex = 0;
+    self->tableInHead = false;
+    self->tableColCount = 0;
+    self->tableColLabels.clear();
+    self->tableRowLabel.clear();
+    self->tableLabelCapture.clear();
+    self->tableCapturingLabel = false;
+    self->tableEmittedDataCell = false;
     self->depth += 1;
     return;
+  }
+
+  // Deliberately does not return: <thead> had no handler before and fell
+  // through to the generic path, and it should keep doing so.
+  if (self->tableDepth == 1 && strcmp(name, "thead") == 0) {
+    self->tableInHead = true;
   }
 
   if (self->tableDepth == 1 && strcmp(name, "tr") == 0) {
     self->tableRowIndex += 1;
     self->tableColIndex = 0;
+    self->tableRowLabel.clear();
     self->depth += 1;
     return;
   }
@@ -507,6 +521,21 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       self->flushPartWordBuffer();
     }
     self->tableColIndex += 1;
+    if (self->tableRowIndex <= 1) {
+      self->tableColCount = static_cast<size_t>(self->tableColIndex);
+    }
+
+    // A <thead> cell names its column instead of being read out. Divert its
+    // text; nothing is emitted for it, and the name reappears in front of every
+    // cell below it.
+    if (self->tableInHead) {
+      self->tableLabelCapture.clear();
+      self->tableCapturingLabel = true;
+      self->depth += 1;
+      return;
+    }
+
+    self->tableEmittedDataCell = true;
 
     auto tableCellBlockStyle = BlockStyle();
     tableCellBlockStyle.textAlignDefined = true;
@@ -515,27 +544,55 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                            : static_cast<CssTextAlign>(self->paragraphAlignment);
     tableCellBlockStyle.alignment = align;
     self->startNewTextBlock(tableCellBlockStyle);
-
-    const std::string headerText =
-        "Tab Row " + std::to_string(self->tableRowIndex) + ", Cell " + std::to_string(self->tableColIndex) + ":";
-    StyleStackEntry headerStyle;
-    headerStyle.depth = self->depth;
-    headerStyle.hasBold = true;
-    headerStyle.bold = false;
-    headerStyle.hasItalic = true;
-    headerStyle.italic = true;
-    self->inlineStyleStack.push_back(headerStyle);
-    self->updateEffectiveInlineStyle();
-    const CssTextDecoration savedTextDecoration = self->effectiveTextDecoration;
-    self->effectiveTextDecoration = CssTextDecoration::None;
-    self->characterData(userData, headerText.c_str(), static_cast<int>(headerText.length()));
-    if (self->partWordBufferIndex > 0) {
-      self->flushPartWordBuffer();
-    }
-    self->effectiveTextDecoration = savedTextDecoration;
+    // Unconditional: a cell always begins a new word. Emitting the label used
+    // to be the only thing that reset this, and a two-column cell emits no
+    // label, so its first word would attach to the previous cell's last one.
     self->nextWordContinues = false;
-    self->inlineStyleStack.pop_back();
-    self->updateEffectiveInlineStyle();
+
+    // The first cell of a row is that row's name, so it is teed into
+    // tableRowLabel on its way out and set bold — the pair of a two-column
+    // table then reads as a term and its definition.
+    const bool isRowLabelCell = self->tableColIndex <= 1;
+    if (isRowLabelCell) {
+      self->tableLabelCapture.clear();
+      self->tableCapturingLabel = true;
+    }
+
+    const std::string headerText = TableCellLabel::forCell(
+        self->tableColLabels, self->tableRowLabel, static_cast<size_t>(self->tableColIndex), self->tableColCount);
+    if (!headerText.empty()) {
+      StyleStackEntry headerStyle;
+      headerStyle.depth = self->depth;
+      headerStyle.hasBold = true;
+      headerStyle.bold = isRowLabelCell;
+      headerStyle.hasItalic = true;
+      headerStyle.italic = !isRowLabelCell;
+      self->inlineStyleStack.push_back(headerStyle);
+      self->updateEffectiveInlineStyle();
+      const CssTextDecoration savedTextDecoration = self->effectiveTextDecoration;
+      self->effectiveTextDecoration = CssTextDecoration::None;
+      // The label must not be teed back into the row name it is built from.
+      const bool savedCapturing = self->tableCapturingLabel;
+      self->tableCapturingLabel = false;
+      self->characterData(userData, headerText.c_str(), static_cast<int>(headerText.length()));
+      if (self->partWordBufferIndex > 0) {
+        self->flushPartWordBuffer();
+      }
+      self->tableCapturingLabel = savedCapturing;
+      self->effectiveTextDecoration = savedTextDecoration;
+      self->nextWordContinues = false;
+      self->inlineStyleStack.pop_back();
+      self->updateEffectiveInlineStyle();
+    }
+
+    if (isRowLabelCell) {
+      StyleStackEntry rowNameStyle;
+      rowNameStyle.depth = self->depth;
+      rowNameStyle.hasBold = true;
+      rowNameStyle.bold = true;
+      self->inlineStyleStack.push_back(rowNameStyle);
+      self->updateEffectiveInlineStyle();
+    }
 
     self->depth += 1;
     return;
@@ -1150,6 +1207,19 @@ void XMLCALL ChapterHtmlSlimParser::characterData(void* userData, const XML_Char
     return;
   }
 
+  // Table labels. A <thead> cell is captured INSTEAD of being emitted; the
+  // first cell of a body row is captured AS WELL, since it is both the row's
+  // name and content the reader still wants to see. The cap is on the buffer,
+  // not the cell — a long cell keeps rendering, only its label is bounded.
+  if (self->tableCapturingLabel) {
+    if (self->tableLabelCapture.size() < TableCellLabel::kMaxLabelLen * 2) {
+      self->tableLabelCapture.append(s, static_cast<size_t>(len));
+    }
+    if (self->tableInHead) {
+      return;
+    }
+  }
+
   // Collect footnote link display text (for the number label)
   // Skip whitespace and brackets to normalize noterefs like "[1]" → "1"
   if (self->insideFootnoteLink) {
@@ -1433,7 +1503,23 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   }
 
   if (self->tableDepth == 1 && (strcmp(name, "td") == 0 || strcmp(name, "th") == 0)) {
+    if (self->tableCapturingLabel) {
+      std::string label = TableCellLabel::normalize(self->tableLabelCapture);
+      if (self->tableInHead) {
+        if (self->tableColLabels.size() < TableCellLabel::kMaxCols) {
+          self->tableColLabels.push_back(std::move(label));
+        }
+      } else {
+        self->tableRowLabel = std::move(label);
+      }
+      self->tableLabelCapture.clear();
+      self->tableCapturingLabel = false;
+    }
     self->nextWordContinues = false;
+  }
+
+  if (self->tableDepth == 1 && strcmp(name, "thead") == 0) {
+    self->tableInHead = false;
   }
 
   if (self->tableDepth == 1 && (strcmp(name, "tr") == 0)) {
@@ -1441,9 +1527,39 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   }
 
   if (self->tableDepth == 1 && strcmp(name, "table") == 0) {
+    // A table whose only row was its <thead> would otherwise render as nothing,
+    // because head cells are captured rather than emitted.
+    if (!self->tableEmittedDataCell && !self->tableColLabels.empty()) {
+      auto headOnlyStyle = BlockStyle();
+      headOnlyStyle.textAlignDefined = true;
+      headOnlyStyle.alignment = (self->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
+                                    ? CssTextAlign::Justify
+                                    : static_cast<CssTextAlign>(self->paragraphAlignment);
+      self->startNewTextBlock(headOnlyStyle);
+      std::string joined;
+      for (const auto& label : self->tableColLabels) {
+        if (label.empty()) continue;
+        if (!joined.empty()) joined += " \xc2\xb7 ";  // U+00B7 MIDDLE DOT
+        joined += label;
+      }
+      if (!joined.empty()) {
+        self->characterData(userData, joined.c_str(), static_cast<int>(joined.length()));
+        if (self->partWordBufferIndex > 0) {
+          self->flushPartWordBuffer();
+        }
+      }
+    }
+
     self->tableDepth -= 1;
     self->tableRowIndex = 0;
     self->tableColIndex = 0;
+    self->tableInHead = false;
+    self->tableColCount = 0;
+    self->tableColLabels.clear();
+    self->tableRowLabel.clear();
+    self->tableLabelCapture.clear();
+    self->tableCapturingLabel = false;
+    self->tableEmittedDataCell = false;
     self->nextWordContinues = false;
   }
 
