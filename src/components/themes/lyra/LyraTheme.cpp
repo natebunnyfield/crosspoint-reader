@@ -201,9 +201,15 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       rect.width -
       (totalPages > 1 ? (LyraMetrics::values.scrollBarWidth + LyraMetrics::values.scrollBarRightOffset) : 1);
   if (selectedIndex >= 0) {
+    // Highlight is capped at 1.5 × the base single-line row height so it
+    // stays compact when a row is tall due to multi-line subtitles (e.g. the
+    // font picker's 2-line colophon), then centred vertically in the full row.
+    // The row height, text layout, and hit-target are unchanged.
+    const int highlightH = std::min(rowHeight, LyraMetrics::values.listRowHeight * 3 / 2);
+    const int highlightY = rect.y + selectedIndex % pageItems * rowHeight + (rowHeight - highlightH) / 2;
     renderer.fillRoundedRect(
-        rect.x + LyraMetrics::values.contentSidePadding, rect.y + selectedIndex % pageItems * rowHeight,
-        contentWidth - LyraMetrics::values.contentSidePadding * 2, rowHeight, cornerRadius, Color::LightGray);
+        rect.x + LyraMetrics::values.contentSidePadding, highlightY,
+        contentWidth - LyraMetrics::values.contentSidePadding * 2, highlightH, cornerRadius, Color::LightGray);
   }
 
   int textX = rect.x + LyraMetrics::values.contentSidePadding + hPaddingInSelection;
