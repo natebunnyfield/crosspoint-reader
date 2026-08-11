@@ -63,16 +63,16 @@ namespace grid13 {
 // commit, and a screenshot of the note editor to prove it.
 // ---------------------------------------------------------------------------
 // Column-for-column the shifted face of SL_NUM below it.
-inline const fui::KeyboardKey SL_NUMSHIFT[] = {UK("!", "!", '!'),  UK("@", "@", '@'), UK("#", "#", '#'),
-                                               UK("$", "$", '$'),  UK("%", "%", '%'), UK("^", "^", '^'),
-                                               UK("&", "&", '&'),  UK("*", "*", '*'), UK("(", "(", '('),
-                                               UK(")", ")", ')'),  UK("_", "_", '_'), UK("\"", "\"", '"'),
+inline const fui::KeyboardKey SL_NUMSHIFT[] = {UK("!", "!", '!'), UK("@", "@", '@'), UK("#", "#", '#'),
+                                               UK("$", "$", '$'), UK("%", "%", '%'), UK("^", "^", '^'),
+                                               UK("&", "&", '&'), UK("*", "*", '*'), UK("(", "(", '('),
+                                               UK(")", ")", ')'), UK(";", ";", ';'), UK("?", "?", '?'),
                                                UK("+", "+", '+')};
 inline const fui::KeyboardKey SL_NUM[] = {UK("1", "1", '1'), UK("2", "2", '2'),   UK("3", "3", '3'),
                                           UK("4", "4", '4'), UK("5", "5", '5'),   UK("6", "6", '6'),
                                           UK("7", "7", '7'), UK("8", "8", '8'),   UK("9", "9", '9'),
-                                          UK("0", "0", '0'), UK("-", "-", '-'),   UK("'", "'", '\''),
-                                          UK("=", "=", '=')};
+                                          UK("0", "0", '0'), UKA("-", "-", '-', "_"),
+                                          UKA("'", "'", '\'', "\""), UK("=", "=", '=')};
 // The 16 symbols that are neither a digit's shifted face nor on the number row,
 // plus Del, Space and Return -- one row, 13 cells (owner ruling 2026-08-11).
 //
@@ -89,8 +89,8 @@ inline const fui::KeyboardKey SL_NUM[] = {UK("1", "1", '1'), UK("2", "2", '2'), 
 inline const fui::KeyboardKey SL_SYM[] = {UKA("`", "`", '`', "~"),
                                           UK(".", ".", '.'),
                                           UK(",", ",", ','),
-                                          UKA(":", ":", ':', ";"),
-                                          UKA("/", "/", '/', "?"),
+                                          UK(":", ":", ':'),
+                                          UK("/", "/", '/'),
                                           UKA("\\", "\\", '\\', "|"),
                                           UKA("[", "[", '[', "{"),
                                           UKA("]", "]", ']', "}"),

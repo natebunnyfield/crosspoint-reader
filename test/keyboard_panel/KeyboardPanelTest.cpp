@@ -186,29 +186,38 @@ TEST(KeyboardPanel, Grid13SecondaryCharactersAreExactlyTheShiftPairs) {
   }
   // Each is the shifted partner of its key on a real keyboard, which is the
   // whole reason these five are the ones that may hide.
-  const std::set<std::pair<std::string, std::string>> want{{"`", "~"}, {":", ";"},  {"/", "?"},
+  const std::set<std::pair<std::string, std::string>> want{{"-", "_"}, {"'", "\""},  {"`", "~"},
                                                           {"\\", "|"}, {"[", "{"}, {"]", "}"}};
   EXPECT_EQ(pairs, want);
 }
 
-// One row, one baseline. The SDK reserves the hint band per ROW, so a row that
-// hints anything bands every key in it -- but only if the alts actually sit on
-// a single row. Spread them over two and each row bands independently, which
-// is fine; spread them so that a row has one alt and twelve plain keys and it
-// still looks right. What this pins is the layout decision itself: the alts
-// were put on one row deliberately.
-TEST(KeyboardPanel, Grid13AltsAllLiveOnOneRow) {
-  int rowsWithAlts = 0;
+// No alt may duplicate a character that already has a key of its own.
+//
+// This is the promotion mistake, and it is silent both ways: the SDK suppresses
+// the hint for an alt that has its own face (so the long-press still works but
+// nothing advertises it), while the key it hangs off keeps its reserved band and
+// sits lower than a plain neighbour for a hint that is never drawn. ; and ? were
+// exactly this case on 2026-08-11 -- promoted to faces, and their old alts had
+// to come off : and / in the same edit.
+TEST(KeyboardPanel, Grid13NoAltDuplicatesAKeyFace) {
+  std::set<std::string> faces;
   for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
     const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
-    bool any = false;
     for (int c = 0; c < row.count; ++c) {
       const fui::KeyboardKey& k = row.keys[c];
-      if (k.kind == fui::KeyKind::Normal && k.alt) any = true;
+      if (k.kind == fui::KeyKind::Normal && k.output) faces.insert(k.output);
     }
-    if (any) ++rowsWithAlts;
   }
-  EXPECT_EQ(rowsWithAlts, 1);
+  for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
+    const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
+    for (int c = 0; c < row.count; ++c) {
+      const fui::KeyboardKey& k = row.keys[c];
+      if (k.kind != fui::KeyKind::Normal || !k.alt) continue;
+      EXPECT_EQ(faces.count(k.alt), 0u)
+          << "'" << k.alt << "' is both a key and the long-press of '" << (k.output ? k.output : "?")
+          << "' -- the hint is suppressed, so that alt is unreachable-looking and its host is banded for nothing";
+    }
+  }
 }
 
 TEST(KeyboardPanel, Grid13CoversEveryPrintableAsciiCharacter) {
