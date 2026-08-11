@@ -187,8 +187,7 @@ TEST(KeyboardPanel, Grid13SecondaryCharactersAreExactlyTheShiftPairs) {
   // Each is the shifted partner of its key on a real keyboard, which is the
   // whole reason these five are the ones that may hide.
   const std::set<std::pair<std::string, std::string>> want{{".", ">"}, {",", "<"}, {"'", "\""},
-                                                          {";", ":"}, {"/", "?"}, {"[", "{"},
-                                                          {"]", "}"}, {"\\", "|"}};
+                                                          {"[", "{"}, {"]", "}"}, {"\\", "|"}};
   EXPECT_EQ(pairs, want);
 }
 
@@ -220,19 +219,39 @@ TEST(KeyboardPanel, Grid13AltsAllLiveOnOneRow) {
 }
 
 // Rows 1 and 2 are a real keyboard's number row and its shifted face, column for
-// column. That parity is the whole reason the arrangement is learnable, and it
-// is one careless insertion away from being lost -- ; and ? sat in this row for
-// a day and broke two of the pairs.
-TEST(KeyboardPanel, Grid13ShiftedFaceRowIsColumnParallelToTheNumberRow) {
+// column, EXCEPT the last -- which carries Del over Space, with Return under
+// them on row 3, so the three read as one right-hand column (owner ruling
+// 2026-08-11: "delete key needs to be in the upper right and space key needs to
+// one row below that").
+//
+// Both halves are pinned. The parity is the reason the arrangement is learnable
+// and is one careless insertion from being lost (; and ? sat in that row for a
+// day and broke two pairs); the right column is an explicit ruling that a later
+// reshuffle would otherwise quietly undo.
+TEST(KeyboardPanel, Grid13NumberRowsAreColumnParallelExceptTheSpecialColumn) {
   const fui::KeyboardRow& shifted = grid13::SL_LAYOUT.rows[0];
   const fui::KeyboardRow& digits = grid13::SL_LAYOUT.rows[1];
-  ASSERT_EQ(shifted.count, digits.count);
-  const char* want[] = {"~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"};
-  const char* base[] = {"`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="};
-  for (int c = 0; c < shifted.count; ++c) {
+  const fui::KeyboardRow& symbols = grid13::SL_LAYOUT.rows[2];
+  ASSERT_EQ(shifted.count, 13);
+  ASSERT_EQ(digits.count, 13);
+  ASSERT_EQ(symbols.count, 13);
+
+  const char* want[] = {"~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_"};
+  const char* base[] = {"`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"};
+  for (int c = 0; c < 12; ++c) {
     EXPECT_STREQ(shifted.keys[c].output, want[c]) << "shifted face, column " << c;
     EXPECT_STREQ(digits.keys[c].output, base[c]) << "number row, column " << c;
   }
+
+  // The right column, top to bottom.
+  EXPECT_EQ(shifted.keys[12].kind, fui::KeyKind::Delete);
+  EXPECT_EQ(digits.keys[12].kind, fui::KeyKind::Space);
+  EXPECT_EQ(symbols.keys[12].kind, fui::KeyKind::Ok);
+  // ...and they must line up, which only holds while all three rows are a full
+  // 13 cells with no inset. An inset row would shift Return out from under Space.
+  EXPECT_EQ(shifted.insetUnits, 0);
+  EXPECT_EQ(digits.insetUnits, 0);
+  EXPECT_EQ(symbols.insetUnits, 0);
 }
 
 TEST(KeyboardPanel, Grid13NoAltDuplicatesAKeyFace) {

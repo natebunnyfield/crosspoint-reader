@@ -62,41 +62,41 @@ namespace grid13 {
 // which fit with nothing to spare. An eighth needs the cap raised in the same
 // commit, and a screenshot of the note editor to prove it.
 // ---------------------------------------------------------------------------
-// Rows 1 and 2 ARE a real keyboard's number row and its shifted face, column
-// for column: ~ over `, ! over 1, ... _ over -, + over =. Thirteen keys is
-// exactly what that row has, so it lands without compromise.
+// Rows 1 and 2 are a real keyboard's number row and its shifted face, column for
+// column: ~ over `, ! over 1, ... _ over -. Only the LAST column departs, and
+// deliberately -- Del sits at the top right with Space directly beneath it and
+// Return beneath that (owner ruling 2026-08-11), so the three read as one
+// right-hand column the way they do on a keyboard. Their displaced pair, = and
+// +, moves down to row 3.
 inline const fui::KeyboardKey SL_NUMSHIFT[] = {UK("~", "~", '~'), UK("!", "!", '!'), UK("@", "@", '@'),
                                                UK("#", "#", '#'), UK("$", "$", '$'), UK("%", "%", '%'),
                                                UK("^", "^", '^'), UK("&", "&", '&'), UK("*", "*", '*'),
                                                UK("(", "(", '('), UK(")", ")", ')'), UK("_", "_", '_'),
-                                               UK("+", "+", '+')};
+                                               UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1)};
 inline const fui::KeyboardKey SL_NUM[] = {UK("`", "`", '`'), UK("1", "1", '1'), UK("2", "2", '2'),
                                           UK("3", "3", '3'), UK("4", "4", '4'), UK("5", "5", '5'),
                                           UK("6", "6", '6'), UK("7", "7", '7'), UK("8", "8", '8'),
                                           UK("9", "9", '9'), UK("0", "0", '0'), UK("-", "-", '-'),
-                                          UK("=", "=", '=')};
-// Everything a real keyboard keeps OUTSIDE its number row, each key carrying its
-// true shift partner as the alt -- and every alt in the layout is on this row
-// (owner ruling 2026-08-11: "move all alts to row 3").
+                                          UKSP(1)};
+// Everything a keyboard keeps outside its number row, and every alt in the
+// layout (owner ruling: "move all alts to row 3").
 //
-// Ordered by frequency, not by where the key sits on a QWERTY board, while
-// keeping the pairs a board puts together adjacent: . and , travel together as
-// they do on the bottom row, ' and ; as they do on the home row, and the
-// bracket-and-stroke group stays in its own order at the end where it is
-// reached least.
-//
-// Del, Space and Return finish the row. Eleven keys with one unit of inset
-// either side still measures 13.
+// Which characters hide is decided by frequency: a shift partner you reach for
+// often gets a face of its own -- ; and :, / and ?, = and + are all here twice --
+// while the six rarest ride as alts on the key a keyboard pairs them with.
+// Ordered frequent-first, with the keyboard's own groupings kept together.
 inline const fui::KeyboardKey SL_SYM[] = {UKA(".", ".", '.', ">"),
                                           UKA(",", ",", ',', "<"),
                                           UKA("'", "'", '\'', "\""),
-                                          UKA(";", ";", ';', ":"),
-                                          UKA("/", "/", '/', "?"),
+                                          UK(";", ";", ';'),
+                                          UK(":", ":", ':'),
+                                          UK("/", "/", '/'),
+                                          UK("?", "?", '?'),
                                           UKA("[", "[", '[', "{"),
                                           UKA("]", "]", ']', "}"),
                                           UKA("\\", "\\", '\\', "|"),
-                                          UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1),
-                                          UKSP(1),
+                                          UK("=", "=", '='),
+                                          UK("+", "+", '+'),
                                           UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1)};
 inline const fui::KeyboardKey SL_AM[] = {UK("a", "a", 'a'), UK("b", "b", 'b'), UK("c", "c", 'c'), UK("d", "d", 'd'),
                                          UK("e", "e", 'e'), UK("f", "f", 'f'), UK("g", "g", 'g'), UK("h", "h", 'h'),
@@ -111,7 +111,7 @@ inline const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), U
 // the row they used to occupy is now the gap keyboardRect() leaves under the
 // keyboard.
 inline const fui::KeyboardRow SL_ROWS[] = {{SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0},
-                                           {SL_SYM, 11, 1},      {SL_AM, 13, 0},
+                                           {SL_SYM, 13, 0},      {SL_AM, 13, 0},
                                            {SL_NZ, 13, 0}};
 inline const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 5};
 
