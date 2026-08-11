@@ -15,6 +15,7 @@
 #include "Epub/blocks/TextBlock.h"
 #include "Epub/css/CssParser.h"
 #include "Epub/css/CssStyle.h"
+#include "TableCellLabel.h"
 
 class Page;
 class GfxRenderer;
@@ -89,7 +90,20 @@ class ChapterHtmlSlimParser {
   int tableDepth = 0;
   int tableRowIndex = 0;
   int tableColIndex = 0;
-  bool listItemBulletOnly = false;  // true when currentTextBlock has only the <li> bullet
+  // Table cell labelling — see TableCellLabel.h. A <thead> row is captured as
+  // column names rather than emitted (every data cell then carries its column
+  // name, so nothing is lost), and the first cell of each body row is teed into
+  // tableRowLabel as it streams past. Only an explicit <thead> counts: guessing
+  // that row one is a header would swallow real content from the many books
+  // that open a table with data.
+  bool tableInHead = false;  // inside <thead> of the outermost table
+  size_t tableColCount = 0;  // cells counted in the table's first row
+  std::vector<std::string> tableColLabels;
+  std::string tableRowLabel;      // first cell of the row being emitted
+  std::string tableLabelCapture;  // accumulates a cell's text for the two above
+  bool tableCapturingLabel = false;
+  bool tableEmittedDataCell = false;  // guards a <thead>-only table losing its head
+  bool listItemBulletOnly = false;    // true when currentTextBlock has only the <li> bullet
 
   // Anchor-to-page mapping: tracks which page each HTML id attribute lands on
   int completedPageCount = 0;
