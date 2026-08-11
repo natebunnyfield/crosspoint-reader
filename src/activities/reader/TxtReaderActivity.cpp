@@ -14,6 +14,8 @@
 #include "ProgressFile.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
+#include "SdCardFontSystem.h"
+#include "notes/EditorFonts.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -89,8 +91,25 @@ void TxtReaderActivity::initializeReader() {
     return;
   }
 
-  // Store current settings for cache validation
-  cachedFontId = SETTINGS.getReaderFontId();
+  // Store current settings for cache validation.
+  //
+  // THE EDITOR FONT, not the reading font (owner ruling 2026-08-11: "for txt,
+  // json and other unstyled files, use the selected editor font"). A .txt or
+  // .json has no styling of its own -- no headings, no italics, nothing the
+  // reading faces were chosen to render well -- and its alignment matters:
+  // indented JSON and log columns only line up in a mono. That is exactly what
+  // the Editor Font setting already selects, so this reads the same setting the
+  // note editor does rather than inventing a second one.
+  //
+  // Same resolve() call and the same two lambdas as NoteEditorActivity, and for
+  // the same reasons documented there -- in particular loadForDisplay rather
+  // than SETTINGS.sdFontIdResolver, because the resolver only answers for the
+  // family the READER happens to have resident, which silently made three of
+  // the five editor rows do nothing.
+  cachedFontId = editorfonts::resolve(
+      SETTINGS.editorFont, [this](int id) { return renderer.getFontMap().count(id) > 0; },
+      [this](const char* family) { return sdFontSystem.loadForDisplay(family, 12, renderer); },
+      editorfonts::fallbackFontId());
   cachedScreenMargin = SETTINGS.screenMargin;
   cachedParagraphAlignment = SETTINGS.paragraphAlignment;
 

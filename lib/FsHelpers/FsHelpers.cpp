@@ -171,6 +171,15 @@ bool hasXtcExtension(std::string_view fileName) {
 
 bool hasTxtExtension(std::string_view fileName) { return checkFileExtension(fileName, ".txt"); }
 
+bool hasPlainTextExtension(std::string_view fileName) {
+  static constexpr const char* kPlainText[] = {".txt", ".json", ".log",  ".csv",  ".xml",
+                                               ".yaml", ".yml", ".ini",  ".cfg",  ".conf"};
+  for (const char* ext : kPlainText) {
+    if (checkFileExtension(fileName, ext)) return true;
+  }
+  return false;
+}
+
 bool hasMarkdownExtension(std::string_view fileName) { return checkFileExtension(fileName, ".md"); }
 
 bool hasCssExtension(std::string_view fileName) { return checkFileExtension(fileName, ".css"); }

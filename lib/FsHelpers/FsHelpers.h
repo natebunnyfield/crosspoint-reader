@@ -57,6 +57,22 @@ bool hasXtcExtension(std::string_view fileName);
 
 // Check for .txt extension (case-insensitive)
 bool hasTxtExtension(std::string_view fileName);
+
+// Plain, UNSTYLED text: .txt plus the config/data formats that are just text
+// with no markup of their own -- json, log, csv, xml, yaml/yml, ini, cfg, conf.
+//
+// A NAMED LIST, not "anything that is not a known binary". Falling back to
+// text for unknown extensions would happily open a .zip or a font file as a
+// screenful of mojibake; a list can only be wrong by omission, which is a
+// missing file rather than a garbage one. Add to it when a format turns up.
+//
+// These render in the EDITOR font (owner ruling 2026-08-11) -- they have no
+// styling to justify a reading face, and json and log columns only line up in
+// a mono.
+bool hasPlainTextExtension(std::string_view fileName);
+inline bool hasPlainTextExtension(const String& fileName) {
+  return hasPlainTextExtension(std::string_view{fileName.c_str(), fileName.length()});
+}
 inline bool hasTxtExtension(const String& fileName) {
   return hasTxtExtension(std::string_view{fileName.c_str(), fileName.length()});
 }

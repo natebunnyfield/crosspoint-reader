@@ -22,7 +22,11 @@
 bool ReaderActivity::isXtcFile(const std::string& path) { return FsHelpers::hasXtcExtension(path); }
 
 bool ReaderActivity::isTxtFile(const std::string& path) {
-  return FsHelpers::hasTxtExtension(path) ||
+  // hasPlainTextExtension covers .txt and the other unstyled formats -- json,
+  // log, csv, xml, yaml, ini, cfg, conf (owner ruling 2026-08-11). Before this
+  // only .txt and .md opened at all, so asking for json to use the editor font
+  // would have changed nothing: the file could not be viewed.
+  return FsHelpers::hasPlainTextExtension(path) ||
          FsHelpers::hasMarkdownExtension(path);  // Treat .md as txt files (until we have a markdown reader)
 }
 
