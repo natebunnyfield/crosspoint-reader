@@ -29,6 +29,7 @@
 #include "SdCardFontSystem.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "notes/EditorFonts.h"
 
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
@@ -800,8 +801,25 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
   // different set of fonts than the picker shows. That list is: the installed SD families
   // if there are any, and ONLY otherwise the two built-in Noto faces
   // (FontSelectionActivity.cpp, onEnter).
+  //
+  // THE WRITING-ONLY FILTER IS PART OF THAT LIST and was missing here. The picker skips
+  // editor faces that are not also reading faces (FontSelectionActivity.cpp, the
+  // isWritingOnlyFamily continue); this cycle walked the raw registry, so holding a side
+  // button stepped onto Space Mono, IBM Plex Mono and the iA monos -- families Text
+  // Settings will not list, and therefore cannot show you as current or let you leave by
+  // the same route you arrived. Owner bug report 2026-08-11: "only fonts in Text Settings
+  // list should be selected."
+  //
+  // Indices into the registry, not a copy of the names: SETTINGS.sdFontFamilyName resolves
+  // against registry position elsewhere, so renumbering here would re-point it.
   const auto& families = sdFontSystem.registry().getFamilies();
-  const int sdCount = static_cast<int>(families.size());
+  std::vector<int> readable;
+  readable.reserve(families.size());
+  for (int i = 0; i < static_cast<int>(families.size()); i++) {
+    if (editorfonts::isWritingOnlyFamily(families[i].name.c_str())) continue;
+    readable.push_back(i);
+  }
+  const int sdCount = static_cast<int>(readable.size());
 
   // Cycles at both ends, as asked: the modulo is written to work for delta = -1 too, since
   // (-1 % n) is negative in C++.
@@ -838,16 +856,20 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
     } else {
       // An empty sdFontFamilyName means a built-in is selected while SD fonts exist (the
       // picker does not list built-ins then), so start from the first SD family.
+      // A family that is no longer offered -- a writing-only face the reader was already
+      // sitting on from before this filter existed -- matches nothing here, so `current`
+      // stays 0 and the step lands on a listed family. That is the wanted behaviour: the
+      // first move off an unlisted font brings you back into the list.
       int current = 0;
       if (SETTINGS.sdFontFamilyName[0] != '\0') {
         for (int i = 0; i < sdCount; i++) {
-          if (families[i].name == SETTINGS.sdFontFamilyName) {
+          if (families[readable[i]].name == SETTINGS.sdFontFamilyName) {
             current = i;
             break;
           }
         }
       }
-      const std::string& picked = families[wrap(current + delta, sdCount)].name;
+      const std::string& picked = families[readable[wrap(current + delta, sdCount)]].name;
       strncpy(SETTINGS.sdFontFamilyName, picked.c_str(), sizeof(SETTINGS.sdFontFamilyName) - 1);
       SETTINGS.sdFontFamilyName[sizeof(SETTINGS.sdFontFamilyName) - 1] = '\0';
     }

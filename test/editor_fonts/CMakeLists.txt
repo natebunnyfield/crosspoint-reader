@@ -8,5 +8,10 @@ add_executable(EditorFontsTest
 target_include_directories(EditorFontsTest PRIVATE
   ${REPO_ROOT}/src
 )
+# The in-book cycle lives in an activity that cannot be linked here (Arduino,
+# SdFat, the device stack), so one test reads its source instead -- same call
+# OmitFontsTest makes, for the same reason.
+target_compile_definitions(EditorFontsTest PRIVATE
+  CROSSPOINT_EPUB_READER_CPP="${REPO_ROOT}/src/activities/reader/EpubReaderActivity.cpp")
 target_link_libraries(EditorFontsTest PRIVATE GTest::gtest_main)
 add_test(NAME EditorFontsTest COMMAND EditorFontsTest)

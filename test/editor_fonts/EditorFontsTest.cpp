@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <fstream>
 #include <set>
 #include <string>
 
@@ -205,3 +206,48 @@ TEST(EditorFonts, EveryRowResolvesToSomeMonospaceFace) {
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// The reading list has TWO consumers, and they must offer the same families.
+// ---------------------------------------------------------------------------
+
+// Text Settings lists the SD families minus the writing-only editor faces
+// (FontSelectionActivity.cpp). Holding a side button inside a book cycles the
+// reader font through what is meant to be the SAME list -- and did not: it
+// walked the raw registry, so it stepped onto Space Mono, IBM Plex Mono and the
+// iA monos, families the picker will not show and therefore cannot display as
+// current. Owner bug report 2026-08-11: "only fonts in Text Settings list
+// should be selected."
+//
+// Parsing the source is deliberate, the same call OmitFontsTest makes: both
+// consumers live in activities that drag in Arduino, SdFat and the whole device
+// stack, so neither can be linked into a host test. The invariant is genuinely
+// textual -- it is about whether a call is present in a function.
+TEST(EditorFonts, TheInBookFontCycleAppliesTheWritingOnlyFilter) {
+  std::ifstream in(CROSSPOINT_EPUB_READER_CPP);
+  ASSERT_TRUE(in.good()) << "cannot read " << CROSSPOINT_EPUB_READER_CPP;
+  std::string line;
+  bool inCycle = false;
+  bool sawCall = false;
+  int depth = 0;
+  while (std::getline(in, line)) {
+    if (!inCycle && line.find("::cycleReaderFontFamily") == std::string::npos) continue;
+    inCycle = true;
+    // COMMENTS ARE STRIPPED FIRST. The first version of this test matched the
+    // bare name, and the explanatory comment inside this very function contains
+    // it -- so deleting the call left the test green. Match the CALL only, on
+    // code.
+    const size_t slashes = line.find("//");
+    const std::string code = slashes == std::string::npos ? line : line.substr(0, slashes);
+    if (code.find("isWritingOnlyFamily(") != std::string::npos) sawCall = true;
+    for (const char c : code) {
+      if (c == '{') depth++;
+      if (c == '}') depth--;
+    }
+    if (depth <= 0 && code.find('}') != std::string::npos) break;
+  }
+  ASSERT_TRUE(inCycle) << "cycleReaderFontFamily not found -- this test has stopped guarding anything";
+  EXPECT_TRUE(sawCall)
+      << "cycleReaderFontFamily does not CALL editorfonts::isWritingOnlyFamily, so holding a side "
+         "button can select a font Text Settings does not list";
+}
