@@ -186,8 +186,9 @@ TEST(KeyboardPanel, Grid13SecondaryCharactersAreExactlyTheShiftPairs) {
   }
   // Each is the shifted partner of its key on a real keyboard, which is the
   // whole reason these five are the ones that may hide.
-  const std::set<std::pair<std::string, std::string>> want{{"-", "_"}, {"'", "\""},  {"`", "~"},
-                                                          {"\\", "|"}, {"[", "{"}, {"]", "}"}};
+  const std::set<std::pair<std::string, std::string>> want{{".", ">"}, {",", "<"}, {"'", "\""},
+                                                          {";", ":"}, {"/", "?"}, {"[", "{"},
+                                                          {"]", "}"}, {"\\", "|"}};
   EXPECT_EQ(pairs, want);
 }
 
@@ -199,6 +200,41 @@ TEST(KeyboardPanel, Grid13SecondaryCharactersAreExactlyTheShiftPairs) {
 // sits lower than a plain neighbour for a hint that is never drawn. ; and ? were
 // exactly this case on 2026-08-11 -- promoted to faces, and their old alts had
 // to come off : and / in the same edit.
+// Every alt in the layout lives on ONE row (owner ruling 2026-08-11: "move all
+// alts to row 3"). The band is reserved per row, so alts scattered across rows
+// drop those rows' labels and leave the rest full-height -- which is legible but
+// not what was asked, and drifts silently the moment a character is promoted or
+// demoted without checking where its partner ended up.
+TEST(KeyboardPanel, Grid13AltsAllLiveOnOneRow) {
+  int rowsWithAlts = 0;
+  for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
+    const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
+    bool any = false;
+    for (int c = 0; c < row.count; ++c) {
+      const fui::KeyboardKey& k = row.keys[c];
+      if (k.kind == fui::KeyKind::Normal && k.alt) any = true;
+    }
+    if (any) ++rowsWithAlts;
+  }
+  EXPECT_EQ(rowsWithAlts, 1);
+}
+
+// Rows 1 and 2 are a real keyboard's number row and its shifted face, column for
+// column. That parity is the whole reason the arrangement is learnable, and it
+// is one careless insertion away from being lost -- ; and ? sat in this row for
+// a day and broke two of the pairs.
+TEST(KeyboardPanel, Grid13ShiftedFaceRowIsColumnParallelToTheNumberRow) {
+  const fui::KeyboardRow& shifted = grid13::SL_LAYOUT.rows[0];
+  const fui::KeyboardRow& digits = grid13::SL_LAYOUT.rows[1];
+  ASSERT_EQ(shifted.count, digits.count);
+  const char* want[] = {"~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"};
+  const char* base[] = {"`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="};
+  for (int c = 0; c < shifted.count; ++c) {
+    EXPECT_STREQ(shifted.keys[c].output, want[c]) << "shifted face, column " << c;
+    EXPECT_STREQ(digits.keys[c].output, base[c]) << "number row, column " << c;
+  }
+}
+
 TEST(KeyboardPanel, Grid13NoAltDuplicatesAKeyFace) {
   std::set<std::string> faces;
   for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {

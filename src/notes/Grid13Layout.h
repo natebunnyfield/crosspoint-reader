@@ -62,40 +62,39 @@ namespace grid13 {
 // which fit with nothing to spare. An eighth needs the cap raised in the same
 // commit, and a screenshot of the note editor to prove it.
 // ---------------------------------------------------------------------------
-// Column-for-column the shifted face of SL_NUM below it.
-inline const fui::KeyboardKey SL_NUMSHIFT[] = {UK("!", "!", '!'), UK("@", "@", '@'), UK("#", "#", '#'),
-                                               UK("$", "$", '$'), UK("%", "%", '%'), UK("^", "^", '^'),
-                                               UK("&", "&", '&'), UK("*", "*", '*'), UK("(", "(", '('),
-                                               UK(")", ")", ')'), UK(";", ";", ';'), UK("?", "?", '?'),
+// Rows 1 and 2 ARE a real keyboard's number row and its shifted face, column
+// for column: ~ over `, ! over 1, ... _ over -, + over =. Thirteen keys is
+// exactly what that row has, so it lands without compromise.
+inline const fui::KeyboardKey SL_NUMSHIFT[] = {UK("~", "~", '~'), UK("!", "!", '!'), UK("@", "@", '@'),
+                                               UK("#", "#", '#'), UK("$", "$", '$'), UK("%", "%", '%'),
+                                               UK("^", "^", '^'), UK("&", "&", '&'), UK("*", "*", '*'),
+                                               UK("(", "(", '('), UK(")", ")", ')'), UK("_", "_", '_'),
                                                UK("+", "+", '+')};
-inline const fui::KeyboardKey SL_NUM[] = {UK("1", "1", '1'), UK("2", "2", '2'),   UK("3", "3", '3'),
-                                          UK("4", "4", '4'), UK("5", "5", '5'),   UK("6", "6", '6'),
-                                          UK("7", "7", '7'), UK("8", "8", '8'),   UK("9", "9", '9'),
-                                          UK("0", "0", '0'), UKA("-", "-", '-', "_"),
-                                          UKA("'", "'", '\'', "\""), UK("=", "=", '=')};
-// The 16 symbols that are neither a digit's shifted face nor on the number row,
-// plus Del, Space and Return -- one row, 13 cells (owner ruling 2026-08-11).
+inline const fui::KeyboardKey SL_NUM[] = {UK("`", "`", '`'), UK("1", "1", '1'), UK("2", "2", '2'),
+                                          UK("3", "3", '3'), UK("4", "4", '4'), UK("5", "5", '5'),
+                                          UK("6", "6", '6'), UK("7", "7", '7'), UK("8", "8", '8'),
+                                          UK("9", "9", '9'), UK("0", "0", '0'), UK("-", "-", '-'),
+                                          UK("=", "=", '=')};
+// Everything a real keyboard keeps OUTSIDE its number row, each key carrying its
+// true shift partner as the alt -- and every alt in the layout is on this row
+// (owner ruling 2026-08-11: "move all alts to row 3").
 //
-// Six characters ride as alts, and each is the SHIFTED PARTNER of the key it
-// hangs off on a real keyboard: ~ on `, ; on :, ? on /, | on \, { on [, } on ].
-// The pairing is one people already know rather than one to memorise, and
-// hiding those three is what freed the cells for Del, Space and Return.
+// Ordered by frequency, not by where the key sits on a QWERTY board, while
+// keeping the pairs a board puts together adjacent: . and , travel together as
+// they do on the bottom row, ' and ; as they do on the home row, and the
+// bracket-and-stroke group stays in its own order at the end where it is
+// reached least.
 //
-// The three sit together at the right end, so button navigation reaches them as
-// one cluster and a thumb finds them where a keyboard's are.
-//
-// This is the only row in the layout carrying an alt, and the SDK bands a row
-// that hints anything, so all thirteen labels stay on one baseline.
-inline const fui::KeyboardKey SL_SYM[] = {UKA("`", "`", '`', "~"),
-                                          UK(".", ".", '.'),
-                                          UK(",", ",", ','),
-                                          UK(":", ":", ':'),
-                                          UK("/", "/", '/'),
-                                          UKA("\\", "\\", '\\', "|"),
+// Del, Space and Return finish the row. Eleven keys with one unit of inset
+// either side still measures 13.
+inline const fui::KeyboardKey SL_SYM[] = {UKA(".", ".", '.', ">"),
+                                          UKA(",", ",", ',', "<"),
+                                          UKA("'", "'", '\'', "\""),
+                                          UKA(";", ";", ';', ":"),
+                                          UKA("/", "/", '/', "?"),
                                           UKA("[", "[", '[', "{"),
                                           UKA("]", "]", ']', "}"),
-                                          UK("<", "<", '<'),
-                                          UK(">", ">", '>'),
+                                          UKA("\\", "\\", '\\', "|"),
                                           UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1),
                                           UKSP(1),
                                           UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1)};
@@ -112,7 +111,7 @@ inline const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), U
 // the row they used to occupy is now the gap keyboardRect() leaves under the
 // keyboard.
 inline const fui::KeyboardRow SL_ROWS[] = {{SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0},
-                                           {SL_SYM, 13, 0},      {SL_AM, 13, 0},
+                                           {SL_SYM, 11, 1},      {SL_AM, 13, 0},
                                            {SL_NZ, 13, 0}};
 inline const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 5};
 
