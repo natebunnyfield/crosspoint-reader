@@ -1002,10 +1002,29 @@ void KeyboardEntryActivity::render(RenderLock&&) {
         drawTip(tr(STR_KB_HINT_CLEAR_TEXT), y);
       }
     } else {
-      // Long-press has exactly one output left: the case flip on letters.
-      // Every symbol has its own key now, so there is no "secondary char" to
-      // advertise and the URL layout no longer needs a tip of its own.
-      drawTip(shifted ? tr(STR_KB_HINT_LOWERCASE) : tr(STR_KB_HINT_UPPERCASE), y);
+      // DERIVED from the layout on screen, not from which layout it is. Long
+      // press always case-flips a letter; whether it also yields a secondary
+      // character depends entirely on whether any key in this layout carries an
+      // alt, and that has now changed three times in two days. Asking the table
+      // cannot go stale.
+      bool layoutHasAlt = false;
+      const fui::KeyboardLayout& tipLayout = currentLayout();
+      for (int r = 0; r < tipLayout.rowCount && !layoutHasAlt; ++r) {
+        const fui::KeyboardRow& tipRow = tipLayout.rows[r];
+        for (int c = 0; c < tipRow.count; ++c) {
+          if (tipRow.keys[c].kind == fui::KeyKind::Normal && tipRow.keys[c].alt) {
+            layoutHasAlt = true;
+            break;
+          }
+        }
+      }
+      const char* altCharTip;
+      if (layoutHasAlt) {
+        altCharTip = shifted ? tr(STR_KB_HINT_LOWER_SECONDARY) : tr(STR_KB_HINT_UPPER_SECONDARY);
+      } else {
+        altCharTip = shifted ? tr(STR_KB_HINT_LOWERCASE) : tr(STR_KB_HINT_UPPERCASE);
+      }
+      drawTip(altCharTip, y);
       y += tipsLh;
       if (inputType == InputType::Url && !grid13) {
         drawTip(tr(STR_KB_HINT_URL_SNIPPETS), y);

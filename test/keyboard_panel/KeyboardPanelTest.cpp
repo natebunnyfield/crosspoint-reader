@@ -167,22 +167,47 @@ TEST(KeyboardPanel, Grid13RowsAllSumTo13Units) {
   }
 }
 
-// The owner ruling that replaced long-press symbols with rows of their own
-// (2026-08-10): "get rid of secondary characters by adding more rows".
+// The owner rulings that reshaped this layout on 2026-08-10: the thirteen
+// characters the number row used to hide got faces of their own, and the
+// leftovers collapsed onto one symbol row where five keep an alt.
 //
-// Two halves, and the second is the one that rots quietly. Adding a key is
-// visible; leaving an `alt` behind is not, and a single surviving one puts the
-// corner hint and its reserved band back on that key alone -- one digit sitting
-// higher than the twelve beside it.
-TEST(KeyboardPanel, Grid13HasNoSecondaryCharacters) {
+// Pinned as an EXACT SET, not a count. The failure this guards is a character
+// that stops being typeable at all, and that happens by an alt quietly moving
+// or disappearing while the totals still look right.
+TEST(KeyboardPanel, Grid13SecondaryCharactersAreExactlyTheShiftPairs) {
+  std::set<std::pair<std::string, std::string>> pairs;
   for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
     const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
     for (int c = 0; c < row.count; ++c) {
-      EXPECT_EQ(row.keys[c].alt, nullptr)
-          << "row " << r << " key '" << (row.keys[c].label ? row.keys[c].label : "?")
-          << "' still carries a long-press alternate; give it a key instead";
+      const fui::KeyboardKey& k = row.keys[c];
+      if (k.kind == fui::KeyKind::Normal && k.alt) pairs.insert({k.output ? k.output : k.label, k.alt});
     }
   }
+  // Each is the shifted partner of its key on a real keyboard, which is the
+  // whole reason these five are the ones that may hide.
+  const std::set<std::pair<std::string, std::string>> want{
+      {":", ";"}, {"\\", "|"}, {"[", "{"}, {"]", "}"}, {"`", "~"}};
+  EXPECT_EQ(pairs, want);
+}
+
+// One row, one baseline. The SDK reserves the hint band per ROW, so a row that
+// hints anything bands every key in it -- but only if the alts actually sit on
+// a single row. Spread them over two and each row bands independently, which
+// is fine; spread them so that a row has one alt and twelve plain keys and it
+// still looks right. What this pins is the layout decision itself: the alts
+// were put on one row deliberately.
+TEST(KeyboardPanel, Grid13AltsAllLiveOnOneRow) {
+  int rowsWithAlts = 0;
+  for (int r = 0; r < grid13::SL_LAYOUT.rowCount; ++r) {
+    const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
+    bool any = false;
+    for (int c = 0; c < row.count; ++c) {
+      const fui::KeyboardKey& k = row.keys[c];
+      if (k.kind == fui::KeyKind::Normal && k.alt) any = true;
+    }
+    if (any) ++rowsWithAlts;
+  }
+  EXPECT_EQ(rowsWithAlts, 1);
 }
 
 TEST(KeyboardPanel, Grid13CoversEveryPrintableAsciiCharacter) {
@@ -193,8 +218,10 @@ TEST(KeyboardPanel, Grid13CoversEveryPrintableAsciiCharacter) {
     const fui::KeyboardRow& row = grid13::SL_LAYOUT.rows[r];
     for (int c = 0; c < row.count; ++c) {
       const fui::KeyboardKey& k = row.keys[c];
-      if (k.kind != fui::KeyKind::Normal || !k.output) continue;
-      if (std::strlen(k.output) == 1) seen.insert(k.output[0]);
+      if (k.kind != fui::KeyKind::Normal) continue;
+      if (k.output && std::strlen(k.output) == 1) seen.insert(k.output[0]);
+      // A long-press alternate is typeable too -- that is the point of it.
+      if (k.alt && std::strlen(k.alt) == 1) seen.insert(k.alt[0]);
     }
   }
   // Letters are lowercase on the face; uppercase comes from the long-press
