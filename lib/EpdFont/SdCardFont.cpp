@@ -32,8 +32,10 @@ uint32_t fnv1a(const uint8_t* data, size_t len, uint32_t hash = FNV_OFFSET) {
 
 // .cpfont magic bytes
 constexpr char CPFONT_MAGIC[8] = {'C', 'P', 'F', 'O', 'N', 'T', '\0', '\0'};
-// CPFONT_VERSION is defined as a #define in SdCardFont.h so it can be
-// stringified into FONT_MANIFEST_URL.
+// CPFONT_VERSION is a #define in SdCardFont.h. It was a #define so it could be
+// stringified into FONT_MANIFEST_URL; that URL went with the device-side font
+// download (removed 2026-08-10) and the #define is kept only because the
+// build tooling's copy in cpfont_version.py must be able to match it.
 constexpr uint32_t HEADER_SIZE = 32;
 constexpr uint32_t STYLE_TOC_ENTRY_SIZE = 32;
 

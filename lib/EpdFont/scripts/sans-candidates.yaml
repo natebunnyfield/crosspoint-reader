@@ -11,7 +11,7 @@
 #     --config lib/EpdFont/scripts/sans-candidates.yaml --output-dir out/
 #
 # Why a separate file: adding these to sd-fonts.yaml would put 13 unranked
-# candidates into the device's font-download manifest.
+# candidates into the shipped font set.
 #
 # Slot uniformity (same rule as sd-fonts.yaml, derived 2026-08-03):
 #   x-height  12 / 14 / 16 / 18 px   (slots 0-3, regular, hinted, 150 DPI)

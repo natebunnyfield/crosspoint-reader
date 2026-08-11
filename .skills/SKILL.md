@@ -360,7 +360,7 @@ and Host Grotesk because all three grotesques fill the same cell of the taxonomy
 then Lexica Ultralegible. Libre Franklin was briefly the only installed sans,
 until Quattrocento Sans was promoted later that day as the humanist half of the
 pair. All three cut faces keep their recipes and picker labels. Bench families are NOT installed and
-live in their own YAMLs so they stay out of the device's font-download manifest.
+live in their own YAMLs so they stay out of the shipped font set.
 
 **Archivo needs `force_autohint: true` and it is load-bearing.** Under the
 font's native hinting no point size renders a 12 px x-height at all — it jumps

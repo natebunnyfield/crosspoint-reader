@@ -5,7 +5,10 @@
 #include <cstddef>
 #include <cstdint>
 
-/// Shared utility for font installation (device download + browser upload).
+/// Shared utility for font installation over the browser upload / WebDAV path.
+/// It once also served a device-initiated download; that feature was removed on
+/// 2026-08-10 (it could never install a family completely), so this is now the
+/// only writer of the SD font roots besides the card itself.
 /// Handles directory creation, file validation, deletion, and registry refresh.
 class FontInstaller {
  public:

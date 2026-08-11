@@ -184,9 +184,16 @@ Consequences worth knowing before reprovisioning:
 
 ## Installing Fonts
 
-There are two ways to install fonts. (An earlier on-device "Manage Fonts"
-downloader was removed on 2026-08-08 — it had no menu entry launching it and
-was unreachable; SD firmware updates remain the on-device update path.)
+There are two ways to install fonts, and both put the files there from off the
+device.
+
+An on-device "Manage Fonts" downloader used to be a third. Its screen was
+removed on 2026-08-08 (nothing launched it, so it was unreachable), and the rest
+of it — the `fonts.json` manifest, its generator, and the "stable" release tag
+devices fetched from — on 2026-08-10, on the owner's ruling that fonts cannot be
+installed completely by downloading them on the device. Do not rebuild it
+without solving that first. SD firmware updates remain the on-device update path
+for firmware itself.
 
 ### Option 1: Upload via web browser
 

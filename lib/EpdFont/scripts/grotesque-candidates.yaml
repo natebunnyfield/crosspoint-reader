@@ -1,9 +1,8 @@
 # Text-grotesque candidates for CrossPoint (evaluation set)
 #
 # NOT a shipping list, and a sibling of sans-candidates.yaml rather than an
-# addition to sd-fonts.yaml — that file feeds the device's font-download
-# manifest, which is no place for unranked candidates. installed_families:
-# still rules what ships.
+# addition to sd-fonts.yaml — that file feeds the shipped font set, which is no
+# place for unranked candidates. installed_families: still rules what ships.
 #
 #   python3 lib/EpdFont/scripts/build-sd-fonts.py \
 #     --config lib/EpdFont/scripts/grotesque-candidates.yaml --output-dir out/

@@ -1,9 +1,14 @@
 name: Build & Publish SD Card Fonts
 
 # Fonts change rarely — run manually when font sources or the conversion
-# pipeline are updated.  Publishes .cpfont files + fonts.json manifest as
-# GitHub Release assets on the crosspoint-fonts repo so font releases don't
-# clutter the firmware releases page.
+# pipeline are updated.  Publishes .cpfont files as GitHub Release assets on
+# the crosspoint-fonts repo so font releases don't clutter the firmware
+# releases page.
+#
+# No fonts.json manifest and no "stable" tag any more: both existed only for
+# the device-side font download, removed 2026-08-10 because it could never
+# install a family completely. Fonts are installed by copying .cpfont files to
+# the SD card, or over WiFi through File Transfer.
 #
 # Requires a repository secret FONTS_REPO_TOKEN — a fine-grained PAT (or
 # classic PAT) with contents:write permission on the target fonts repo.
@@ -63,14 +68,6 @@ jobs:
           echo "revision=$NEXT" >> "$GITHUB_OUTPUT"
           echo "versioned=${BASE}-r${NEXT}" >> "$GITHUB_OUTPUT"
 
-      - name: Generate manifest
-        run: |
-          python3 scripts/generate-font-manifest.py \
-            --input dist \
-            --base-url "https://github.com/${{ env.FONTS_REPO }}/releases/download/${{ steps.tags.outputs.base }}/" \
-            --output dist/fonts.json \
-            --descriptions-from lib/EpdFont/scripts/sd-fonts.yaml
-
       - name: Publish versioned release to fonts repo
         env:
           GH_TOKEN: ${{ secrets.FONTS_REPO_TOKEN }}
@@ -83,24 +80,6 @@ jobs:
             --title "$TITLE" \
             --notes "Pre-built \`.cpfont\` font files for CrossPoint Reader.
 
-          Download individual files or use **Settings > System > Manage Fonts** on the device.
+          Download the \`.cpfont\` files and copy them into a \`fonts/\` folder on the SD card, or send them over WiFi with **File Transfer**.
 
           See [SD Card Fonts documentation](https://github.com/${{ github.repository }}/blob/main/docs/sd-card-fonts.md) for details."
-
-      - name: Update stable tag for device downloads
-        env:
-          GH_TOKEN: ${{ secrets.FONTS_REPO_TOKEN }}
-        run: |
-          BASE="${{ steps.tags.outputs.base }}"
-
-          # Delete the old stable release for this m/b pair (the versioned releases are kept)
-          gh release delete "$BASE" --repo "${{ env.FONTS_REPO }}" --yes 2>/dev/null || true
-
-          gh release create "$BASE" dist/* \
-            --repo "${{ env.FONTS_REPO }}" \
-            --title "SD Card Fonts (${BASE#sd-fonts-})" \
-            --notes "Current font build for manifest v${{ steps.versions.outputs.metadata }}, binary format v${{ steps.versions.outputs.binary }}. Devices with this firmware version download from this release.
-
-          This is revision **${{ steps.tags.outputs.revision }}** — see [\`${{ steps.tags.outputs.versioned }}\`](https://github.com/${{ env.FONTS_REPO }}/releases/tag/${{ steps.tags.outputs.versioned }}) for the immutable copy.
-
-          Download individual files or use **Settings > System > Manage fonts** on the device."
