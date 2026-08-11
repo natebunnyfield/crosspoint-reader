@@ -29,10 +29,12 @@ namespace grid13 {
 // ---------------------------------------------------------------------------
 // 13-grid split-letters layout ("Class rows", ruled 2026-08-04). One layer:
 // shifted faces, numbers, symbols, a-m, n-z, Del/Space/OK -- no Shift, no
-// symbols mode, full printable ASCII. Every row sums to 13 width units and the
-// bottom row is 3+7+3, so the column-anchor navigation in moveSelectionRow/Col
-// is integer-exact; a short row would pay for the difference in insetUnits and
-// stay centred, but no row is short any more.
+// symbols mode, full printable ASCII. Every row measures 13 width units, so the
+// column-anchor navigation in moveSelectionRow/Col is integer-exact; a row with
+// fewer keys pays the difference in insetUnits and stays centred.
+//
+// EVERY KEY IS ONE CELL. Del, Space and Return were 3/7/3 slabs until
+// 2026-08-11 -- the only keys that were not a grid cell.
 //
 // ONLY THREE KEYS CARRY A SECONDARY CHARACTER, all on the symbol row, and each
 // is the shifted partner of the key it hangs off on a real keyboard. The
@@ -99,14 +101,22 @@ inline const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), U
                                          UK("r", "r", 'r'), UK("s", "s", 's'), UK("t", "t", 't'), UK("u", "u", 'u'),
                                          UK("v", "v", 'v'), UK("w", "w", 'w'), UK("x", "x", 'x'), UK("y", "y", 'y'),
                                          UK("z", "z", 'z')};
-inline const fui::KeyboardKey SL_BOTTOM[] = {UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 3), UKSP(7),
-                                             UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 3)};
+// Del, Space and Return are ONE UNIT EACH, like every other key (owner ruling
+// 2026-08-11: "fold space del and return into square grid"). They were 3/7/3
+// slabs -- the only keys in the layout that were not a grid cell, and the only
+// row that did not read as part of the same grid.
+//
+// Neither Del nor Space draws its label: the SDK renders a delete glyph for
+// KeyKind::Delete and a space rule for KeyKind::Space, both sized from the key,
+// so both survive the shrink as artwork rather than as clipped text.
+inline const fui::KeyboardKey SL_BOTTOM[] = {UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1), UKSP(1),
+                                             UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1)};
 
-// Every row is a full 13 units now; only the bottom one (3+7+3) differs in how
-// it spends them. Any row that does not reach 13 breaks the column-anchor
-// arithmetic, and a short row would have to pay the difference in insetUnits.
+// Every key in the layout is now one grid cell. The bottom row's three sit
+// centred, paying the remaining ten units as insetUnits (3 + 2*5 = 13) -- a row
+// that does not reach 13 breaks the column-anchor arithmetic.
 inline const fui::KeyboardRow SL_ROWS[] = {{SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0}, {SL_SYM, 13, 0},
-                                           {SL_AM, 13, 0},       {SL_NZ, 13, 0},  {SL_BOTTOM, 3, 0}};
+                                           {SL_AM, 13, 0},       {SL_NZ, 13, 0},  {SL_BOTTOM, 3, 5}};
 inline const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 6};
 
 #undef UK
