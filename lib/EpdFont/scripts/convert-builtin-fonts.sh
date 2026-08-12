@@ -44,10 +44,23 @@ done
 # ONE size only. resolveEditorFont() asks for 12 pt and nothing else, so the
 # 14/16/18 cuts the reading faces carry would be dead flash. All four styles are
 # real: MarkdownSpans renders bold, italic and bold-italic. 2-bit + compressed,
-# matching the reader cuts. ~83 KB total for both families.
+# matching the reader cuts.
+#
+# Flash cost: ~83 KB for SpaceMono + IBMPlexMono, ~216 KB for the three iA
+# Writer families (owner ruling 2026-08-11). The iA faces are the "S" (narrow)
+# cuts; their URL-fetch recipes live in sd-fonts.yaml "Editor group", and the
+# source TTFs for the builtin cuts are in builtinFonts/source/iAWriterXxx/.
+#
+# iA Writer font file name differs from the family name: the on-disk file is
+# iAWriterQuattroS (with the S suffix for narrow), but we strip it for the
+# source directory and internal symbol names to match sd-fonts.yaml's family
+# name (iAWriterQuattro).
 EDITOR_FAMILIES=(
   "spacemono:SpaceMono/SpaceMono"
   "ibmplexmono:IBMPlexMono/IBMPlexMono"
+  "iawriterquattro:iAWriterQuattro/iAWriterQuattro"
+  "iawriterduo:iAWriterDuo/iAWriterDuo"
+  "iawritermono:iAWriterMono/iAWriterMono"
 )
 
 for entry in ${EDITOR_FAMILIES[@]}; do
@@ -58,6 +71,30 @@ for entry in ${EDITOR_FAMILIES[@]}; do
     font_name="${prefix}_12_${lc}"
     output_path="../builtinFonts/${font_name}.h"
     python fontconvert.py $font_name 12 "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
+    echo "Generated $output_path"
+  done
+done
+
+# --- Hi-res companions for the editor fonts ----------------------------------
+#
+# One 2x cut (24 pt = 12 * 2) per style, per family. Same 2-bit compressed
+# flags as the 1x cut: the renderer blits whichever bitmap it has (1x or 2x)
+# through the same path, so the bit-depth must match. Named for the 1x face
+# each stands in for (same convention as the system UI 2x matrix above).
+#
+# On device RENDER_SCALE=1 and --gc-sections strips these arrays; they are
+# present only in simulator / iOS builds that run at RENDER_SCALE=2. The
+# companion is what stops NoteEditorActivity and ClaudeChatActivity from
+# rendering editor text at 1x resolution on a 2x build — drawText() checks
+# getHiResFamily() for any font id it is handed.
+for entry in ${EDITOR_FAMILIES[@]}; do
+  prefix="${entry%%:*}"
+  stem="${entry#*:}"
+  for style in ${READER_FONT_STYLES[@]}; do
+    lc=$(echo $style | tr '[:upper:]' '[:lower:]')
+    font_name="${prefix}_12_${lc}_2x"
+    output_path="../builtinFonts/${font_name}.h"
+    python fontconvert.py $font_name 24 "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
     echo "Generated $output_path"
   done
 done

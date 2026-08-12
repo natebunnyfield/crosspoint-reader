@@ -92,21 +92,36 @@ TEST(EditorFonts, BuiltinWinsOverTheCardWhenPresent) {
   EXPECT_EQ(resolve(3, allRegistered, sdHasIt, kUiFallback), builtinFontIdFor(3));
 }
 
-// The two Google Fonts faces are built in; without this the setting is inert.
-TEST(EditorFonts, MonoFacesAreCompiledIn) {
-  bool sawSpaceMono = false;
-  bool sawPlex = false;
+// All five faces are built in (monos: ruling 2026-08-06; iA faces: ruling
+// 2026-08-11). Without this the setting is inert for that row.
+TEST(EditorFonts, AllFacesAreCompiledIn) {
+  bool sawQuattro = false, sawDuo = false, sawMono = false;
+  bool sawSpaceMono = false, sawPlex = false;
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    if (std::strcmp(FAMILIES[i].family, "iAWriterQuattro") == 0) {
+      sawQuattro = true;
+      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "iA Writer Quattro must be compiled in";
+    }
+    if (std::strcmp(FAMILIES[i].family, "iAWriterDuo") == 0) {
+      sawDuo = true;
+      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "iA Writer Duo must be compiled in";
+    }
+    if (std::strcmp(FAMILIES[i].family, "iAWriterMono") == 0) {
+      sawMono = true;
+      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "iA Writer Mono must be compiled in";
+    }
     if (std::strcmp(FAMILIES[i].family, "SpaceMono") == 0) {
       sawSpaceMono = true;
-      EXPECT_NE(FAMILIES[i].builtinFontId, 0)
-          << "Space Mono must be compiled in; a 0 here is the inert-setting bug returning";
+      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "Space Mono must be compiled in";
     }
     if (std::strcmp(FAMILIES[i].family, "IBMPlexMono") == 0) {
       sawPlex = true;
       EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "IBM Plex Mono must be compiled in";
     }
   }
+  EXPECT_TRUE(sawQuattro);
+  EXPECT_TRUE(sawDuo);
+  EXPECT_TRUE(sawMono);
   EXPECT_TRUE(sawSpaceMono);
   EXPECT_TRUE(sawPlex);
 }
@@ -174,15 +189,16 @@ TEST(EditorFonts, EveryRowHasANameAndALabel) {
   }
 }
 
-// The shipped default is index 0, a CARD-ONLY row, so before fallbackFontId()
-// existed the editor opened in the 10 pt UI face on every out-of-the-box
-// device. Compiling two faces in did not change that by itself: it fixed the
-// two new rows and left the default path untouched.
+// The shipped default is index 0 (iAWriterQuattro). It was card-only until
+// 2026-08-11 (ruling: all five families compiled in), so before that the editor
+// opened in the 10 pt UI face on every out-of-the-box device. Now index 0 has
+// its own built-in id and resolves without the fallback.
 TEST(EditorFonts, TheShippedDefaultResolvesToAMonospaceFace) {
-  // Index 0 has no built-in of its own...
-  EXPECT_EQ(builtinFontIdFor(0), 0) << "index 0 is expected to be a card-only row";
-  // ...so the fallback is what saves it, and it must be a real font id.
-  EXPECT_NE(fallbackFontId(), 0) << "no built-in family to fall back to: the default editor font is dead again";
+  // Index 0 is now compiled in (iAWriterQuattro, owner ruling 2026-08-11).
+  EXPECT_NE(builtinFontIdFor(0), 0) << "index 0 (iAWriterQuattro) must be compiled in";
+  // fallbackFontId() must still return a real id for the remaining resolution
+  // chain (OMIT_FONTS builds, future card-only additions).
+  EXPECT_NE(fallbackFontId(), 0) << "no built-in family to fall back to: the editor fallback is dead";
 }
 
 // The fallback must name a family that is actually compiled in, not an

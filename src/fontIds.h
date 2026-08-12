@@ -14,11 +14,14 @@
 #define UI_12_FONT_ID (1635686837)
 #define SMALL_FONT_ID (674098198)
 
-// Editor-group monospace, compiled into the firmware rather than loaded from
-// the card (owner ruling 2026-08-06). resolveEditorFont() asks for ONE size,
-// 12 pt, in four styles, so only that cut of each family exists: ~83 KB of
-// flash for both, against an SD install that could not be relied on to be
-// present and would surface these writing faces in the READING font picker.
+// Editor-group fonts, compiled into the firmware rather than loaded from the
+// card. resolveEditorFont() asks for ONE size, 12 pt, in four styles, so only
+// that cut of each family exists. Flash cost, compressed: ~83 KB for the two
+// Google Fonts monos (SpaceMono + IBMPlexMono, owner ruling 2026-08-06) plus
+// ~216 KB for the three iA Writer families (owner ruling 2026-08-11). The _2x
+// companions (~818 KB compressed total) are dead flash on device where
+// RENDER_SCALE=1 and are stripped by --gc-sections; they are present only for
+// the simulator / iOS builds that run at RENDER_SCALE=2.
 //
 // Added by hand, NOT by build-font-ids.sh, and two things are worth knowing
 // before anyone regenerates: the script needs ruby, which is not configured
@@ -27,9 +30,12 @@
 // fontIds.h was last built, so every hash has moved. The values are opaque
 // handles (insertFont/drawText keys; SdCardFontManager::computeFontId guards
 // collisions at runtime), so being stale is harmless, but a regen would churn
-// all of them for nothing. Both checked non-zero and non-colliding when added.
+// all of them for nothing. All checked non-zero and non-colliding when added.
 #define SPACEMONO_12_FONT_ID (175568128)
 #define IBMPLEXMONO_12_FONT_ID (-1793317468)
+#define IAWRITERQUATTRO_12_FONT_ID (491272101)
+#define IAWRITERDUO_12_FONT_ID (-672455302)
+#define IAWRITERMONO_12_FONT_ID (1291847533)
 
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
@@ -42,3 +48,6 @@ static_assert(UI_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(SMALL_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(SPACEMONO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IBMPLEXMONO_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(IAWRITERQUATTRO_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(IAWRITERDUO_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(IAWRITERMONO_12_FONT_ID != 0, "Font ID collision with sentinel");

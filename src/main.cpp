@@ -81,20 +81,18 @@ EpdFontFamily librefranklinReader14FontFamily(&lfReader14RegularFont, &lfReader1
 // reading picker — an SD install into /fonts would do both the opposite ways.
 // All four styles are real: MarkdownSpans renders bold, italic and bold-italic.
 //
-// OUTSIDE OMIT_FONTS, for the same reason Libre Franklin 14 pt is: these two
-// are the answer resolveEditorFont() must be able to give in EVERY build. They
-// were inside it until 2026-08-09, and the only build that defines the macro is
-// iOS (crosspoint-simulator/ios/CMakeLists.txt), so on the phone the whole
-// Editor Font setting collapsed — builtinFontIdFor() handed back ids the
-// renderer had no glyphs for, every row failed its getFontMap() availability
-// check, and resolve()'s built-in-mono fallback was absent too, so all five
-// rows fell through to UI_10 chrome. "Built in" has to mean built into the
-// binary that ships, not into the desktop one.
+// OUTSIDE OMIT_FONTS, for the same reason Libre Franklin 14 pt is: all five
+// editor rows must resolve in EVERY build. They were inside it until 2026-08-09
+// (the two monos) and 2026-08-11 (the three iA faces), and the only build that
+// defines the macro is iOS (crosspoint-simulator/ios/CMakeLists.txt), so on the
+// phone the whole Editor Font setting collapsed — builtinFontIdFor() handed
+// back ids the renderer had no glyphs for, and resolve() fell through to
+// UI_10 chrome. "Built in" has to mean built into the binary that ships.
 //
-// Costing it the other way round: OMIT_FONTS exists to shrink a build, and
-// these eight headers are ~83 KB of 2-bit compressed glyph data against an iOS
-// binary that carries no such ceiling. The three iA faces stay card-only and
-// are unaffected — they have no built-in form to exempt.
+// Flash cost: ~83 KB for SpaceMono + IBMPlexMono (ruling 2026-08-06), ~216 KB
+// for the three iA families (ruling 2026-08-11). The _2x companions are dead
+// flash on device (RENDER_SCALE=1, stripped by --gc-sections); they are present
+// only for the simulator / iOS builds that run at RENDER_SCALE=2.
 EpdFont spacemono12RegularFont(&spacemono_12_regular);
 EpdFont spacemono12BoldFont(&spacemono_12_bold);
 EpdFont spacemono12ItalicFont(&spacemono_12_italic);
@@ -107,6 +105,61 @@ EpdFont ibmplexmono12ItalicFont(&ibmplexmono_12_italic);
 EpdFont ibmplexmono12BoldItalicFont(&ibmplexmono_12_bolditalic);
 EpdFontFamily ibmplexmono12FontFamily(&ibmplexmono12RegularFont, &ibmplexmono12BoldFont, &ibmplexmono12ItalicFont,
                                       &ibmplexmono12BoldItalicFont);
+EpdFont iawriterquattro12RegularFont(&iawriterquattro_12_regular);
+EpdFont iawriterquattro12BoldFont(&iawriterquattro_12_bold);
+EpdFont iawriterquattro12ItalicFont(&iawriterquattro_12_italic);
+EpdFont iawriterquattro12BoldItalicFont(&iawriterquattro_12_bolditalic);
+EpdFontFamily iawriterquattro12FontFamily(&iawriterquattro12RegularFont, &iawriterquattro12BoldFont,
+                                          &iawriterquattro12ItalicFont, &iawriterquattro12BoldItalicFont);
+EpdFont iawriterduo12RegularFont(&iawriterduo_12_regular);
+EpdFont iawriterduo12BoldFont(&iawriterduo_12_bold);
+EpdFont iawriterduo12ItalicFont(&iawriterduo_12_italic);
+EpdFont iawriterduo12BoldItalicFont(&iawriterduo_12_bolditalic);
+EpdFontFamily iawriterduo12FontFamily(&iawriterduo12RegularFont, &iawriterduo12BoldFont, &iawriterduo12ItalicFont,
+                                      &iawriterduo12BoldItalicFont);
+EpdFont iawritermono12RegularFont(&iawritermono_12_regular);
+EpdFont iawritermono12BoldFont(&iawritermono_12_bold);
+EpdFont iawritermono12ItalicFont(&iawritermono_12_italic);
+EpdFont iawritermono12BoldItalicFont(&iawritermono_12_bolditalic);
+EpdFontFamily iawritermono12FontFamily(&iawritermono12RegularFont, &iawritermono12BoldFont, &iawritermono12ItalicFont,
+                                       &iawritermono12BoldItalicFont);
+
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
+// 2x companions for all five editor fonts. Named for the 1x face each stands
+// in for (same convention as the system UI 2x matrix). drawText() checks
+// getHiResFamily() for any font id it is handed, so without a registered
+// companion the editor text renders at 1x resolution on a 2x build.
+EpdFont spacemono12Regular2xFont(&spacemono_12_regular_2x);
+EpdFont spacemono12Bold2xFont(&spacemono_12_bold_2x);
+EpdFont spacemono12Italic2xFont(&spacemono_12_italic_2x);
+EpdFont spacemono12BoldItalic2xFont(&spacemono_12_bolditalic_2x);
+EpdFontFamily spacemono12HiResFontFamily(&spacemono12Regular2xFont, &spacemono12Bold2xFont,
+                                         &spacemono12Italic2xFont, &spacemono12BoldItalic2xFont);
+EpdFont ibmplexmono12Regular2xFont(&ibmplexmono_12_regular_2x);
+EpdFont ibmplexmono12Bold2xFont(&ibmplexmono_12_bold_2x);
+EpdFont ibmplexmono12Italic2xFont(&ibmplexmono_12_italic_2x);
+EpdFont ibmplexmono12BoldItalic2xFont(&ibmplexmono_12_bolditalic_2x);
+EpdFontFamily ibmplexmono12HiResFontFamily(&ibmplexmono12Regular2xFont, &ibmplexmono12Bold2xFont,
+                                           &ibmplexmono12Italic2xFont, &ibmplexmono12BoldItalic2xFont);
+EpdFont iawriterquattro12Regular2xFont(&iawriterquattro_12_regular_2x);
+EpdFont iawriterquattro12Bold2xFont(&iawriterquattro_12_bold_2x);
+EpdFont iawriterquattro12Italic2xFont(&iawriterquattro_12_italic_2x);
+EpdFont iawriterquattro12BoldItalic2xFont(&iawriterquattro_12_bolditalic_2x);
+EpdFontFamily iawriterquattro12HiResFontFamily(&iawriterquattro12Regular2xFont, &iawriterquattro12Bold2xFont,
+                                               &iawriterquattro12Italic2xFont, &iawriterquattro12BoldItalic2xFont);
+EpdFont iawriterduo12Regular2xFont(&iawriterduo_12_regular_2x);
+EpdFont iawriterduo12Bold2xFont(&iawriterduo_12_bold_2x);
+EpdFont iawriterduo12Italic2xFont(&iawriterduo_12_italic_2x);
+EpdFont iawriterduo12BoldItalic2xFont(&iawriterduo_12_bolditalic_2x);
+EpdFontFamily iawriterduo12HiResFontFamily(&iawriterduo12Regular2xFont, &iawriterduo12Bold2xFont,
+                                           &iawriterduo12Italic2xFont, &iawriterduo12BoldItalic2xFont);
+EpdFont iawritermono12Regular2xFont(&iawritermono_12_regular_2x);
+EpdFont iawritermono12Bold2xFont(&iawritermono_12_bold_2x);
+EpdFont iawritermono12Italic2xFont(&iawritermono_12_italic_2x);
+EpdFont iawritermono12BoldItalic2xFont(&iawritermono_12_bolditalic_2x);
+EpdFontFamily iawritermono12HiResFontFamily(&iawritermono12Regular2xFont, &iawritermono12Bold2xFont,
+                                            &iawritermono12Italic2xFont, &iawritermono12BoldItalic2xFont);
+#endif
 
 #ifndef OMIT_FONTS
 EpdFont lfReader12RegularFont(&librefranklin_reader_12_regular);
@@ -321,6 +374,19 @@ void setupDisplayAndFonts(bool seamless = false) {
   // OMIT_FONTS together or the move buys nothing.
   renderer.insertFont(SPACEMONO_12_FONT_ID, spacemono12FontFamily);
   renderer.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12FontFamily);
+  renderer.insertFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12FontFamily);
+  renderer.insertFont(IAWRITERDUO_12_FONT_ID, iawriterduo12FontFamily);
+  renderer.insertFont(IAWRITERMONO_12_FONT_ID, iawritermono12FontFamily);
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
+  // Hi-res companions for all five editor fonts. drawText() checks
+  // getHiResFamily() for any font id, so without these the editor activities
+  // (NoteEditorActivity, ClaudeChatActivity) render at 1x on a 2x build.
+  renderer.registerHiResBuiltinFont(SPACEMONO_12_FONT_ID, spacemono12HiResFontFamily);
+  renderer.registerHiResBuiltinFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12HiResFontFamily);
+  renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12HiResFontFamily);
+  renderer.registerHiResBuiltinFont(IAWRITERDUO_12_FONT_ID, iawriterduo12HiResFontFamily);
+  renderer.registerHiResBuiltinFont(IAWRITERMONO_12_FONT_ID, iawritermono12HiResFontFamily);
+#endif
 #ifndef OMIT_FONTS
   renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, librefranklinReader12FontFamily);
   renderer.insertFont(LIBREFRANKLIN_READER_16_FONT_ID, librefranklinReader16FontFamily);

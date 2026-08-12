@@ -35,22 +35,28 @@ struct Entry {
 
 // All five are OFL. The iA faces are the "S" (narrow) cuts.
 //
-// Space Mono and IBM Plex Mono are BUILT IN (owner ruling 2026-08-06). Before
-// that every entry was card-only, and since no card carried any of them this
-// setting did nothing whatsoever: resolveEditorFont() got 0 back from the SD
-// resolver and fell through to the 10 pt UI face no matter which row you
-// picked. Compiling the two mono faces in costs ~83 KB of flash (one size, 12
-// pt, four styles each) and makes the setting work on a blank card.
+// All five families are now BUILT IN (monos: owner ruling 2026-08-06; iA
+// faces: owner ruling 2026-08-11). Before 2026-08-06 every entry was
+// card-only, and since no card carried any of them this setting did nothing
+// whatsoever: resolveEditorFont() got 0 back from the SD resolver and fell
+// through to the 10 pt UI face no matter which row you picked.
 //
-// The three iA faces stay card-only on purpose. They are not fetchable by URL
-// the way the Google Fonts pair is, and keeping the rows listed keeps the
-// persisted indices stable — SETTINGS.editorFont stores this POSITION, so
-// deleting a row would silently re-point every saved settings.json at a
-// different family.
+// The "not fetchable by URL" claim that appeared here previously was stale.
+// lib/EpdFont/scripts/sd-fonts.yaml has had URL-fetch recipes for all three
+// iA Writer families (raw.githubusercontent.com/iaolo/iA-Fonts) since those
+// recipes were added — the same mechanism as the Google Fonts pair.
+//
+// Flash cost: ~83 KB for SpaceMono + IBMPlexMono, ~216 KB for the three iA
+// families (all at 12 pt, four styles each, 2-bit compressed). The _2x
+// companions (~818 KB compressed) are dead flash on device where RENDER_SCALE=1
+// and are stripped by --gc-sections; they ship only in the simulator/iOS
+// binaries that run at RENDER_SCALE=2.
+//
+// Rows may only be APPENDED — SETTINGS.editorFont persists this POSITION.
 inline constexpr Entry FAMILIES[] = {
-    {"iAWriterQuattro", "iA Writer Quattro", 0, /*alsoReading=*/true},
-    {"iAWriterDuo", "iA Writer Duo", 0, false},
-    {"iAWriterMono", "iA Writer Mono", 0, false},
+    {"iAWriterQuattro", "iA Writer Quattro", IAWRITERQUATTRO_12_FONT_ID, /*alsoReading=*/true},
+    {"iAWriterDuo", "iA Writer Duo", IAWRITERDUO_12_FONT_ID, false},
+    {"iAWriterMono", "iA Writer Mono", IAWRITERMONO_12_FONT_ID, false},
     {"SpaceMono", "Space Mono", SPACEMONO_12_FONT_ID, false},
     {"IBMPlexMono", "IBM Plex Mono", IBMPLEXMONO_12_FONT_ID, false},
 };

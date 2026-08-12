@@ -101,17 +101,12 @@ int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
   // MONOSPACE face rather than to UI chrome -- again only if it is really there.
   if (const int mono = fallbackFontId(); mono != 0 && isRegistered && isRegistered(mono)) return mono;
 
-  // Reached only by a genuinely card-only family -- one of the three iA faces,
-  // the rows with no built-in form (builtinFontId 0) -- that is also missing from
-  // the card, so neither the built-in check nor the SD lookup above could serve
-  // it. NOT "OMIT_FONTS builds" wholesale: since 63ea6e6b Space Mono and IBM Plex
-  // Mono are compiled into every binary, OMIT_FONTS/iOS included, so a build no
-  // longer lacks editor faces outright. The built-in mono fallback on the line
-  // above (Space Mono, registered in every build) in fact already catches that
-  // iA-on-a-blank-card case, so this final return is effectively dead outside the
-  // editor-font tests that stub isRegistered to deny the mono. The caller's UI
-  // face is the last resort then -- the wrong texture for a writing surface, but
-  // text on screen instead of a blank page.
+  // Reached only by a row whose built-in is not registered in this build
+  // (isRegistered returned false) AND the SD card has no matching family. Since
+  // all five rows are compiled into every binary as of 2026-08-11 (ruling), this
+  // path is effectively dead outside the editor-font tests that stub isRegistered
+  // to deny all fonts. The caller's UI face is the last resort then -- the wrong
+  // texture for a writing surface, but text on screen instead of a blank page.
   return uiFallbackId;
 }
 

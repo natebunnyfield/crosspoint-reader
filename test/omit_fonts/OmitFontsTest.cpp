@@ -78,16 +78,21 @@ const char* kMainCpp = CROSSPOINT_MAIN_CPP;
 
 }  // namespace
 
-TEST(OmitFonts, TheEditorMonosSurviveAStrippedBuild) {
+TEST(OmitFonts, TheEditorFacesSurviveAStrippedBuild) {
   const auto survive = fontsSurvivingOmitFonts(kMainCpp);
-  // These two ARE the editor's fallback on a card with no fonts installed
-  // (editorfonts::fallbackFontId picks the first compiled-in family). Inside
-  // the guard they vanish on iOS and every Editor Font row dies silently.
+  // All five editor faces must survive OMIT_FONTS: they are the answer every
+  // Editor Font row must resolve to in every build, iOS included. Inside the
+  // guard they vanish on iOS and every row dies silently.
   EXPECT_TRUE(survive.count("SPACEMONO_12_FONT_ID"))
-      << "Space Mono must register even with OMIT_FONTS -- it is the editor's "
-         "blank-card fallback, and the iOS build is the one that strips fonts";
+      << "Space Mono must register even with OMIT_FONTS -- editor blank-card fallback";
   EXPECT_TRUE(survive.count("IBMPLEXMONO_12_FONT_ID"))
       << "IBM Plex Mono must register even with OMIT_FONTS, same reason";
+  EXPECT_TRUE(survive.count("IAWRITERQUATTRO_12_FONT_ID"))
+      << "iA Writer Quattro must register even with OMIT_FONTS (ruling 2026-08-11)";
+  EXPECT_TRUE(survive.count("IAWRITERDUO_12_FONT_ID"))
+      << "iA Writer Duo must register even with OMIT_FONTS (ruling 2026-08-11)";
+  EXPECT_TRUE(survive.count("IAWRITERMONO_12_FONT_ID"))
+      << "iA Writer Mono must register even with OMIT_FONTS (ruling 2026-08-11)";
 }
 
 TEST(OmitFonts, TheReaderDefaultSurvivesAStrippedBuild) {
@@ -107,6 +112,9 @@ TEST(OmitFonts, TheSurvivingSetIsExactlyWhatWeIntend) {
       "LIBREFRANKLIN_READER_14_FONT_ID",
       "SPACEMONO_12_FONT_ID",
       "IBMPLEXMONO_12_FONT_ID",
+      "IAWRITERQUATTRO_12_FONT_ID",
+      "IAWRITERDUO_12_FONT_ID",
+      "IAWRITERMONO_12_FONT_ID",
   };
   EXPECT_EQ(fontsSurvivingOmitFonts(kMainCpp), want);
 }
