@@ -3,19 +3,33 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07)
+## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12)
 
-The installed set on this fork is exactly four families — **Edgar, Coelacanth,
-TeXGyreSchola, LibreFranklin** — on every surface: both device SD cards, the
-simulator's `fs_/fonts/`, and the iOS app's bundled seed set
+The installed set on this fork is exactly five families — **Edgar, Coelacanth,
+TeXGyreSchola, LibreFranklin, LibrisADF** — on every surface: both device SD
+cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed set
 (`crosspoint-simulator/ios/seedfonts/`). The other curated families remain
 fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these four and nothing else.
+surface or reprovisioning a card, install these five and nothing else.
 
-One of the four is a sans: **Libre Franklin**, the text grotesque, from
-`lib/EpdFont/scripts/grotesque-candidates.yaml`. The humanist cell is empty
-since Quattrocento Sans went to A tier.
+**Physical device SD cards (OWEN_BNF, CARD-X3) are not part of this ruling's
+execution** — no hardware was attached to this session. Reprovision them by
+hand before relying on LibrisADF being present on a physical card.
+
+Two of the five are sans, as of a 2026-08-12 owner ruling: **Libre Franklin**,
+the text grotesque, from `lib/EpdFont/scripts/grotesque-candidates.yaml`, and
+**Libris** (`LibrisADF`), a calligraphic humanist sans reclassified out of the
+Serif section it was originally promoted into — see below. Both stay installed
+permanently, not provisionally: **there is no head-to-head between them,
+because a head-to-head only runs WITHIN one classification cell** — the
+grotesque bench compared grotesques, the humanist/accessibility bench compared
+humanist/accessibility faces, and neither ever pitted a grotesque against a
+humanist sans. Libre Franklin is a 19th-century-grotesque revival; Libris is a
+calligraphic humanist sans in Lydian's mold — different cells. The humanist
+cell was empty since Quattrocento Sans went to A tier; Libris fills it, on the
+same footing Libre Franklin holds in the grotesque cell. Owner ruling
+2026-08-12; no bench is pending or expected.
 
 **Archivo and Host Grotesk were cut on 2026-08-04**, promoting Libre Franklin to
 the single text grotesque. The bench they came off answered "which grotesque",
@@ -122,6 +136,82 @@ For the record, not as the stated reason: of the bench's fourteen, Almendra
 needed the widest metrics span (1520) and is the one slot-3 miss, advY
 32/39/45/54 against target 34/40/46/51 — 3 px over at the largest size, where
 every other candidate lands within 1 px.
+
+### Merriweather, Accanthis and Spectral are C tier (owner ruling, 2026-08-12)
+
+Cut from `tools/blind-bench/blind-candidates.yaml`'s keepers list the same day
+LibrisADF (below) was promoted out of it to S tier — the bench's fourteen is
+now eight. None of the three were ever in `installed_families:`, so nothing
+needed deleting from a surface. Merriweather already had a recipe in
+`sd-fonts.yaml` (predating the blind bench); Accanthis and Spectral got one
+added alongside the cut, same treatment as every other C-tier family — the
+recipe stays so the bench that ruled against them can be re-run, and the
+picker label stays unassigned since none of the three ever shipped and never
+had one.
+
+For the record, not as the stated reason: against the uniform target
+(xh 12/14/16/18 px, advY 34/40/46/51 px) the three each miss by 1 px somewhere
+in the advY ramp — Merriweather 34/41/45/51, Accanthis 34/39/45/52, Spectral
+33/41/47/50 — all within the tier's usual rounding tolerance, none a
+Almendra-style 3 px miss.
+
+Treat those three advY rows as indicative, not settled. They come from
+`tools/blind-bench/blind_slots.json`, whose advY column is **computed from the
+span rather than read back from a built `.cpfont`** — and the one row since
+checked against real files was wrong: it predicted 34/40/46/51 for LibrisADF at
+the bench's span, where the built files measure 34/39/45/51 (LibrisADF hits the
+target exactly only at the different span it ended up shipping with, which the
+bench never tried). Whether the same gap affects these three is unknown; nobody
+has re-measured them either way.
+
+### LibrisADF is S tier (owner ruling, 2026-08-12)
+
+Promoted out of `tools/blind-bench/blind-candidates.yaml` straight to S tier —
+the only blind-bench candidate to skip A tier entirely, on the strength of the
+cleanest ramp of the bench's fourteen: the family as shipped hits the uniform
+target (xh 12/14/16/18 px, advY 34/40/46/51 px) exactly on all four slots. That
+is measured off the built `.cpfont` files at the span it ships with (ascent
+1050, descent -319), not off the bench's sweep — at the span the bench itself
+tried, the built files measure advY 34/39/45/51. `sd-fonts.yaml`'s `LibrisADF`
+block records how the shipping span was found.
+
+Hirwen Harendal's **Libris**, from Arkandis Digital Foundry: a 2011 French
+digitisation of Warren Chappell's 1938 Lydian, which the font's own name table
+names as its model. GPL v2+ with font exception, sourced by URL from
+salsa.debian.org, so like TeX Gyre Schola it needs nothing in gitignored
+`local_fonts/` and rebuilds on any machine. All four styles are real cuts
+(v1.007); coverage is printable ASCII + Latin-1 100% but Latin Extended-A only
+11/128, the same shape of gap Quattrocento Sans and Freight Sans carry — Western
+European text stays in one texture, Polish and Czech fall back to Noto. It
+appears in the picker as "Libris", dropping the foundry suffix the frozen
+directory name keeps. See `docs/font-dates.md` for the full lineage and
+citations, and `src/FontDisplayNames.h` for the picker entry.
+
+**Resolved, owner ruling 2026-08-12: Libris is a sans, and it moved.** It came
+off `tools/blind-bench`, which is explicitly a blind *serif* bench, and was
+first filed in `sd-fonts.yaml`'s Serif section on that basis — but the face
+itself says otherwise: its own name table (ID 10) reads "Libris is a sans
+serif font intented to mimic Lydian typeface" [sic], and rendering it beside
+TeX Gyre Schola and Coelacanth shows flared calligraphic stem endings and no
+serifs. `sd-fonts.yaml`'s `LibrisADF` block now lives in the Sans-serif
+section, beside Libre Franklin.
+
+This does NOT settle the "which sans" question the way the grotesque and
+humanist/accessibility benches settled theirs — those benches each compared
+candidates WITHIN one classification cell, and Libris never competed against
+Libre Franklin at anything; it won a serif bench. **There is no head-to-head
+between them and none is coming: a head-to-head only runs within a single
+classification cell, and Libre Franklin (grotesque) and Libris (humanist) are
+different cells** — owner ruling 2026-08-12. Both stay installed permanently
+on that basis, the same way Libre Franklin already held the grotesque cell
+alone. The S tier ships two sans against the "one installed sans" argument
+written above for Archivo/Host Grotesk/Lexica Ultralegible — those cuts were
+about redundant candidates in the SAME cell; this isn't that, so the argument
+doesn't apply here.
+
+Cap-I and lowercase-l are the same bare stem in Libris, so "Ill" renders as
+three identical vertical bars with nothing to tell them apart. Noted and ruled
+fine — owner call 2026-08-12: not a blocker, not worth acting on.
 
 The 2x hi-res companions (`<Family>/2x/<same 1x filename>`, built at doubled
 point sizes for `CROSSPOINT_RENDER_SCALE=2`) are part of the set: every

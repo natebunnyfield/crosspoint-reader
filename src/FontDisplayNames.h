@@ -83,6 +83,13 @@ inline constexpr Entry kEntries[] = {
     {"TeXGyreSchola", "TeX Gyre Schola", "Bogus\xC5\x82"
                                          "aw Jackowski & Janusz M. Nowacki",
      "1918 Jersey City; 2007 Gda\xC5\x84sk", 1918},
+    // The directory keeps Arkandis' foundry suffix because it is frozen; the
+    // display name drops it, which is what the face calls itself. Model-dated
+    // at Warren Chappell's Lydian, the 1938 typeface the font's own name table
+    // says it mimics — New York, where Chappell ran his own studio, not ATF's
+    // Jersey City plant, since he drew it independently rather than as staff.
+    // Digitisation place is bare "France": ADF publishes no city.
+    {"LibrisADF", "Libris", "Hirwen Harendal", "1938 New York; 2011 France", 1938},
     {"Junicode", "Junicode SemiCond", "Peter S. Baker",
      "1703 Oxford; 1998, 2023 Charlottesville, Virginia", 1703},
     // Model-dated like the rest of the table, not born-digital: the lineage
