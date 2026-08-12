@@ -44,14 +44,17 @@ two rows, which made "demote everything below S" ambiguous — blank was doing
 double duty as both "unranked" and "the curated baseline". It no longer is.
 
 - **S** — the reading faces: Coelacanth, Edgar and TeX Gyre Schola for serif
-  work; Libre Franklin (grotesque) for sans. Rosarivo and Quattrocento Sans were
-  A-tier'd on 2026-08-07 and are no longer shipped; Rosarivo is additionally
-  withheld from the reader's list (src/ReadingFontList.cpp) because cards
-  provisioned before that ruling still carry it. New work, previews and screenshots use Edgar or Coelacanth unless a sans
-  is called for. As of 2026-08-04 these six are exactly the six in
-  `installed_families` — that is a consequence of the rulings, not a rule: the
-  two lists are still maintained separately, and A and C families are
-  deliberately curated-but-not-shipped.
+  work; Libre Franklin (grotesque) and Libris (humanist, added 2026-08-12) for
+  sans — two sans, permanently, because they fill different classification
+  cells and a head-to-head only runs within one cell; owner ruling 2026-08-12,
+  see docs/sd-card-fonts.md. Rosarivo and Quattrocento Sans were A-tier'd on
+  2026-08-07 and are no longer shipped; Rosarivo is additionally withheld from
+  the reader's list (src/ReadingFontList.cpp) because cards provisioned before
+  that ruling still carry it. New work, previews and screenshots use Edgar or
+  Coelacanth unless a sans is called for. These five are exactly the five in
+  `installed_families` as of 2026-08-12 — that is a consequence of the
+  rulings, not a rule: the two lists are still maintained separately, and A
+  and C families are deliberately curated-but-not-shipped.
 - **A** — previously S. Still curated, buildable and supported, but **not
   necessarily installed**. Whether a family ships is decided by
   `installed_families` in `lib/EpdFont/scripts/sd-fonts.yaml`, not by this
@@ -87,6 +90,7 @@ reader sees.
 | B | GTAlpinaCond | GT Alpina | Reto Moser | 2011 Bern; 2020 Lucerne, Switzerland | Bern, Switzerland (Moser lives/works in Bern) | Lucerne, Switzerland (Grilli Type foundry) | Design start 2011 ([Fonts In Use](https://fontsinuse.com/typefaces/102321/gt-alpina)); release 2020 ([It's Nice That](https://www.itsnicethat.com/articles/grilli-type-gt-alpina-graphic-design-030220)); places ([Grilli Type](https://www.grillitype.com/about)) |
 | B | Lora | Lora | Olga Karpushina | 2011, 2019 Moscow | — (born digital) | Moscow, Russia (Karpushina; Cyreal foundry, Russia) | First release 2011 ([GitHub](https://github.com/cyrealtype/Lora-Cyrillic)); variable 2019 ([Cyreal](https://www.cyreal.org/fonts/lora/)); [Behance](https://www.behance.net/OlgaKarpushina) |
 | A | CaledoniaCC | Caledonia CC | W.A. Dwiggins | 1938 Hingham, Mass.; 1988, 1994, 2026 Cambridge, Mass. | Hingham, Massachusetts, USA (Dwiggins' studio; for Mergenthaler Linotype, Brooklyn NY) | Cambridge, Massachusetts, USA (Carter & Cone: 1994 Time Caledonia, 2026 CC). 1988 New Caledonia: David Berlow, Adobe (USA) / Linotype AG (Germany) | 1938 design ([Wikipedia](https://en.wikipedia.org/wiki/Caledonia_(typeface))); 1988 = New Caledonia PostScript ([Wikipedia](https://en.wikipedia.org/wiki/Caledonia_(typeface))); 1994 = Time Caledonia by Matthew Carter; CC release April 2026 ([Carter & Cone](https://carterandcone.com/font/caledonia/), [Creative Boom](https://www.creativeboom.com/resources/the-best-new-typefaces-for-april-2026/)); Dwiggins in Hingham 1906–56 ([Britannica](https://www.britannica.com/biography/W-A-Dwiggins)) |
+| S | LibrisADF | Libris | Hirwen Harendal | 1938 New York; 2011 France | New York City, USA (model: Lydian, Warren Chappell, cut and cast by American Type Founders) | France (Arkandis Digital Foundry; no city published) | Model named by the shipped font itself: name table ID 10 reads "Libris is a sans serif font intented to mimic Lydian typeface" [sic], and upstream's NOTICE.txt calls it "The Libris collection". Lydian 1938 ([Wikipedia](https://en.wikipedia.org/wiki/Lydian_(typeface)), [Typewolf](https://www.typewolf.com/lydian)); [Fonts In Use](https://fontsinuse.com/typefaces/6/lydian) dates the release "1938-40", collapsed to the design year by the adjacent-year rule. Creation place is New York rather than ATF's Jersey City plant because Chappell designed independently — Koch's pupil at Offenbach 1931–32, then his own studio in New York City until just before the war ([Wikipedia](https://en.wikipedia.org/wiki/Warren_Chappell)) — unlike the Benton-for-ATF models behind Franklin Gothic and Century Schoolbook, which do take Jersey City. Digitisation 2011: upstream's release directory is `Libris-Std-20110117`, 2011-01-17 ([salsa.debian.org](https://salsa.debian.org/fonts-team/fonts-adf/-/tree/master/Libris-Std-20110117)), and the shipped v1.007 OTF's `head.created` is 2011-10-24, the same year. Designer and foundry from the name table (ID 8 "Arkandis Digital Foundry", ID 9 "HARENDAL Hirwen"), corroborated by [Luc Devroye](https://luc.devroye.org/fonts-47797.html); ADF is French but neither [its own site](https://arkandis.tuxfamily.org/) nor Debian's `debian/copyright` gives a city, so the digital place is bare "France", the same treatment Host Grotesk gets. Licence GPL v2+ with font exception (upstream NOTICE.txt; Debian `debian/copyright` "GPL-2+ with Font exception", © 1998–2019 Hirwen Harendal, Arkandis Digital Foundry), so like TeX Gyre Schola it needs no gitignored local files and rebuilds from URLs anywhere. All four styles are real cuts, v1.007 |
 | S | TeXGyreSchola | TeX Gyre Schola | Bogusław Jackowski & Janusz M. Nowacki | 1918 Jersey City; 2007 Gdańsk | Jersey City, New Jersey, USA (model: Century Schoolbook, Morris Fuller Benton for American Type Founders, roman 1918) | Gdańsk / Grudziądz, Poland (GUST e-foundry, seated in Toruń; via URW Century Schoolbook L) | First stable v0.996 2007-01-14, final v2.005 2009 ([CTAN README](http://ftp.math.utah.edu/pub/tex/historic/fonts/tex-gyre/schola/0.996/README-TeX-Gyre-Schola.txt), [GUST](https://www.gust.org.pl/projects/e-foundry/tex-gyre/schola)); Benton/ATF ([Wikipedia](https://en.wikipedia.org/wiki/Century_type_family), [ATF](https://en.wikipedia.org/wiki/American_Type_Founders)); designers ([Typoteka: Jackowski](https://typoteka.pl/en/designer/boguslaw-jackowski), [Nowacki](https://typoteka.pl/en/designer/janusz-marian-nowacki)) |
 | S | Coelacanth | Coelacanth | Ben Whitmore | 1914 New York; 2014 Waiheke Island, New Zealand | New York, USA (Centaur: Bruce Rogers for the Metropolitan Museum of Art; matrices cut in Chicago) | Waiheke Island (Auckland), New Zealand | Centaur 1914 ([Wikipedia](https://en.wikipedia.org/wiki/Centaur_(typeface))); release 2014-08-29 ([Font Library](https://fontlibrary.org/en/font/coelacanth)); "Ben Whitmore from Waiheke, New Zealand" ([ben-whitmore.com](http://ben-whitmore.com/coelacanth-type-family/)) |
 | B | Venetian301 | Venetian 301 | Bruce Rogers | 1914 New York; 1990 Cambridge, Mass. | New York, USA (Centaur: Rogers for the Metropolitan Museum of Art) | Cambridge, Massachusetts, USA (Bitstream's city at the time; later Marlborough MA) | Centaur 1914 ([Wikipedia](https://en.wikipedia.org/wiki/Centaur_(typeface))); Bitstream © 1990 ([Bitstream key](http://www.sanskritweb.net/forgers/bitstream2.pdf)); Cambridge-era Bitstream ([Wikipedia](https://en.wikipedia.org/wiki/Bitstream_Inc.)) |
@@ -135,6 +139,9 @@ sourced working notes and do NOT reach the device.
   America`, the upstream Atkinson copyright, not a Lexica date.
 - **Atkinson Hyperlegible Next 2025** — a separate family from the one Lexica
   forked, and not installed here.
+- **Libris' FontForge `FFTM` source-created stamp (2010-01-11)** — tooling
+  metadata from when the file was started, not a release. The 2011 stage is
+  dated from upstream's own `Libris-Std-20110117` release directory.
 - **Caslon IV's 1816 sans (the first one cut)** — the earlier date, and the one
   a purist would pick for the style's origin. Passed over for 1832 because the
   other model-dated entries here take the year the model was *published as the

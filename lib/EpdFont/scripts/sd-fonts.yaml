@@ -135,6 +135,11 @@ installed_families:
   - Coelacanth
   - TeXGyreSchola
   - LibreFranklin
+  - LibrisADF
+# LibrisADF joined on 2026-08-12 (owner ruling; see docs/sd-card-fonts.md),
+# promoted straight out of tools/blind-bench as the best of that bench's
+# fourteen, in the same ruling that cut Merriweather, Accanthis and Spectral
+# to C.
 # Rosarivo and QuattrocentoSans were A tier'd on 2026-08-07 (owner ruling) and
 # deleted from every surface. Their recipes below stay buildable and their
 # picker labels stay in src/FontDisplayNames.h, exactly as for the C tier cuts —
@@ -180,7 +185,17 @@ families:
   - name: Merriweather
     description: "Warm serif for long-form reading (Latin, Cyrillic)"
     intervals: latin-ext,cyrillic
-    sizes: [12, 14, 16, 18]
+    # Uniform slots: xh 12/14/16/18 (exact), advY 34/41/45/51 (+1 at slot 1).
+    # From tools/blind-bench/sweep_blind.py; see blind_slots.json. Its advY
+    # column is COMPUTED from the span, not read back from a built .cpfont, and
+    # the one row since checked against real files was wrong (LibrisADF's,
+    # predicted 34/40/46/51 at the bench's span, built files measure
+    # 34/39/45/51). This row has not been re-measured either way.
+    # C tier (owner ruling 2026-08-12): cut from tools/blind-bench/
+    # blind-candidates.yaml's 14-family keepers list when LibrisADF went to
+    # S tier.
+    sizes: [10, 12, 13, 15]
+    metrics: {ascent: 1102, descent: -522, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-Regular.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-Bold.ttf"}
@@ -522,6 +537,41 @@ families:
       bold:       {from: regular, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
       bolditalic: {from: italic, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
 
+  - name: Accanthis
+    description: "Arkandis Digital Foundry Garalde, cut from the blind serif bench (Latin)"
+    intervals: latin-ext
+    # Uniform slots: xh 12/14/16/18 (exact), advY 34/39/45/52 (+1 over target
+    # at slot 3). From tools/blind-bench/sweep_blind.py; see blind_slots.json,
+    # and the caveat on Merriweather above — that advY column is computed from
+    # the span rather than read back from a built .cpfont, was wrong for
+    # LibrisADF, and has not been re-measured for this family.
+    # C tier (owner ruling 2026-08-12): cut from
+    # tools/blind-bench/blind-candidates.yaml's 14-family keepers list when
+    # LibrisADF went to S tier.
+    sizes: [13, 15, 17, 20]
+    metrics: {ascent: 928, descent: -315, linegap: 0}
+    styles:
+      regular:    {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-Regular.otf"}
+      bold:       {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-Bold.otf"}
+      italic:     {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-Italic.otf"}
+      bolditalic: {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-BoldItalic.otf"}
+
+  - name: Spectral
+    description: "Production Type's screen-optimized old-style, cut from the blind serif bench (Latin)"
+    intervals: latin-ext
+    # Uniform slots: xh 12/14/16/18 (exact), advY 33/41/47/50 (+-1 rounding).
+    # From tools/blind-bench/sweep_blind.py; see blind_slots.json, and the same
+    # caveat on that computed advY column as Merriweather and Accanthis above.
+    # C tier (owner ruling 2026-08-12): same cut and same reason as Accanthis
+    # above.
+    sizes: [12, 15, 17, 18]
+    metrics: {ascent: 941, descent: -366, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-BoldItalic.ttf"}
+
   # ── Sans-serif ─────────────────────────────────────────────────────────
 
   # The text grotesques (2026-08-03), promoted out of grotesque-candidates.yaml
@@ -564,6 +614,61 @@ families:
       bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 700}}
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+
+  - name: LibrisADF
+    description: "ADF's Lydian revival, calligraphic humanist sans — winner of the blind serif bench, reclassified sans (Latin)"
+    # RECLASSIFIED HERE from the Serif section (owner ruling 2026-08-12,
+    # same day as the S-tier promotion below): this face won a SERIF bench
+    # (tools/blind-bench/) but its own name table says otherwise — nameID 10,
+    # "Libris is a sans serif font intented to mimic Lydian typeface" [sic] —
+    # and rendering it beside TeX Gyre Schola and Coelacanth confirms it: bare
+    # flared stem endings, no serifs. Lydian is a calligraphic humanist sans,
+    # not the 19th-century-grotesque style Libre Franklin/Archivo/HostGrotesk
+    # are. So this sits beside Libre Franklin as a SECOND installed sans, not
+    # because it beat Libre Franklin at anything — it never competed against
+    # it — but because the two fill different classification cells (grotesque
+    # vs humanist) and a head-to-head only runs within one cell. No bench is
+    # pending or expected; both stay installed permanently, same footing.
+    intervals: latin-ext
+    # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — both rows exact on all
+    # four, read back from the BUILT .cpfont files and again through
+    # render_harness, not computed. The hinted x-height is exactly 1 px per
+    # point from 8 to 19 pt at 150 DPI (0.480 of ppem at every one of those
+    # sizes), so the slot sizes ARE the slot x-heights; the ramp only breaks at
+    # 20 pt, well above slot 3. Nothing to gain from a bigger ramp: 13/15/17/20
+    # measures xh 13/15/17/22 and 14/16/18/20 measures 14/16/18/22, both worse
+    # on x-height AND on leading, and neither clears accented capitals.
+    sizes: [12, 14, 16, 18]
+    # Span 1369 (ascent 1050 = accented-cap top 985 + the 65/1000 pad exactly;
+    # descent -319 against an ink bottom of -200). NOT the 1351 the bench's
+    # sweep computed: 1351 is right under the header's ceil() formula but the
+    # BUILT file measures advY 34/39/45/51, because FreeType rounds
+    # face.size.height to whole pixels before norm_ceil sees it — the exact trap
+    # the "read the shipped files" note at the top of this file warns about.
+    # Sweeping spans and measuring the built .cpfont instead puts the
+    # zero-error band at 1365-1373; 1369 is its centre, so a FreeType version
+    # bump has 4 units of slack either way. Unlike Edgar and TeX Gyre Schola,
+    # which share these four point sizes and whose slots 1-2 no span can fix,
+    # here one can.
+    metrics: {ascent: 1050, descent: -319, linegap: 0}
+    # GPL v2+ with font exception (Libris-Std-20110117/NOTICE.txt), so like
+    # TeX Gyre Schola this one needs no local files and rebuilds on any machine.
+    # All four styles are real cuts. Coverage: printable ASCII + Latin-1 100%,
+    # Latin Extended-A 11/128 — the same shape of gap Quattrocento Sans and
+    # Freight Sans carry, so Western European text stays in one texture and
+    # Polish or Czech comes from the fallback. `latin-ext` rather than
+    # `reading` for that reason: `reading` would add Greek, Cyrillic and the
+    # math blocks, none of which the face has, and the fallback is Libre
+    # Franklin.
+    #
+    # Cap-I and lowercase-l are the same bare stem, so "Ill" renders as three
+    # identical bars. Noted and ruled fine (owner call 2026-08-12) — not worth
+    # acting on.
+    styles:
+      regular:    {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf"}
+      bold:       {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Bold.otf"}
+      italic:     {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Italic.otf"}
+      bolditalic: {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-BoldItalic.otf"}
 
   - name: HostGrotesk
     description: "Host Grotesk, Element Type's contemporary grotesque (Latin)"
