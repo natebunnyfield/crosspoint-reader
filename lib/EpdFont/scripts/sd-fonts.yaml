@@ -388,6 +388,44 @@ families:
       italic:     {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-italic.otf"}
       bolditalic: {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-bolditalic.otf"}
 
+  # C TIER since 2026-08-12 (owner ruling): cut, recipe only. Never in
+  # installed_families:, so there is nothing to strip from a surface — it was
+  # never on one. The cut is not a finding against the face: it ran deep in the
+  # blind serif bench (tools/blind-bench/), further than most of that field, and
+  # round 4's page names it among the three that "didn't make round 3's cut",
+  # alongside Spectral and Merriweather Light. Libris ADF won that bench and
+  # took the slot. Beaten, not defective.
+  #
+  # The recipe stays so the comparison can be re-run, and the picker label in
+  # src/FontDisplayNames.h stays for attribution even though the family never
+  # ships. Adding it to installed_families: — or to any surface — is a
+  # regression, not a restoration; it needs a fresh ruling.
+  - name: Antpolt
+    description: "GUST's revival of Adam Półtawski's Polish national serif (Latin)"
+    # Same GUST e-foundry team as TeX Gyre Schola above (Jackowski & Nowacki).
+    # cmap coverage: Latin-1 100%, Latin Ext-A 97%, Vietnamese block 100%; no
+    # Cyrillic (2/256) and only sparse Greek (54/144, symbol-adjacent) despite
+    # `reading` requesting both — those fall back to Noto same as any gap.
+    intervals: reading
+    sizes: [13, 15, 17, 20]
+    # Uniform-slot sweep (tools/ methodology, see docs/sd-card-fonts.md): xh
+    # 12/14/16/18 exact. advY lands 34/39/45/52, not the 34/40/46/51 target —
+    # no span in [1230,1275] hits slots 2 and 3 together (45 arrives at 1257,
+    # 51 never arrives, 52 does at the same span); same hinting-skip shape as
+    # Edgar/TeX Gyre Schola's 34/39/45/51, just overshooting on the last slot
+    # instead of undershooting. Ascent floor (969) clears accented capitals
+    # (Ä top 902/1000 em + the tier's 65/1000 em pad).
+    metrics: {ascent: 969, descent: -289, linegap: 0}
+    # Freely licensed (GUST Font License), so this one needs no local files and
+    # rebuilds on any machine. Source: CTAN `poltawski` package v1.101, the
+    # "normal" (10pt) optical size — antpoltcond/antpoltexpd etc. in the same
+    # directory are the other four optical sizes this face ships, unused here.
+    styles:
+      regular:    {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-regular.otf"}
+      bold:       {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-bold.otf"}
+      italic:     {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-italic.otf"}
+      bolditalic: {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-bolditalic.otf"}
+
   - name: Junicode
     description: "Medievalist scholarly serif, semi-condensed (Latin)"
     intervals: latin-ext
