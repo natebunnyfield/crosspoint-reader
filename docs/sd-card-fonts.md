@@ -108,6 +108,21 @@ in gitignored `lib/EpdFont/local_fonts/`, never committed or distributed.
 Putting it back into `installed_families:` — or back onto a surface — is a
 regression, not a restoration; it needs a fresh ruling.
 
+### Almendra is C tier (owner ruling, 2026-08-11)
+
+Called out of `tools/blind-bench/` — a real-device-render blind read, same rig
+as the sans and grotesque benches (`render_harness reading`, uniform 12/14/16/18
+px x-height slots). Was never in `installed_families:`; the recipe stays in
+`sd-fonts.yaml` and the picker label stays in `src/FontDisplayNames.h`, same
+treatment as the other C-tier cuts, so nothing needs deleting from a surface it
+was never on. Putting it into `installed_families:` is a regression, not a
+restoration; it needs a fresh ruling.
+
+For the record, not as the stated reason: of the bench's fourteen, Almendra
+needed the widest metrics span (1520) and is the one slot-3 miss, advY
+32/39/45/54 against target 34/40/46/51 — 3 px over at the largest size, where
+every other candidate lands within 1 px.
+
 The 2x hi-res companions (`<Family>/2x/<same 1x filename>`, built at doubled
 point sizes for `CROSSPOINT_RENDER_SCALE=2`) are part of the set: every
 installed family carries one, and `install-sim-fonts.py` cannot regenerate them

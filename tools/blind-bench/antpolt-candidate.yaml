@@ -1,0 +1,11 @@
+families:
+  - name: AntykwaPoltawskiegoBench
+    description: "Blind bench candidate (Antykwa Poltawskiego)"
+    intervals: latin-ext
+    sizes: [13, 15, 17, 20]
+    metrics: {ascent: 928, descent: -315, linegap: 0}
+    styles:
+      regular:    {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-regular.otf"}
+      bold:       {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-bold.otf"}
+      italic:     {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-italic.otf"}
+      bolditalic: {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-bolditalic.otf"}

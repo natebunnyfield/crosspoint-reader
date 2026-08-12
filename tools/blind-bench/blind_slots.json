@@ -1,0 +1,436 @@
+{
+  "Accanthis": {
+    "sizes": [
+      13,
+      15,
+      17,
+      20
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 928,
+      "descent": -315,
+      "linegap": 0
+    },
+    "advY": [
+      34,
+      39,
+      45,
+      52
+    ],
+    "span": 1243,
+    "floor_span": 1130.0,
+    "clears_accents": true
+  },
+  "Almendra": {
+    "sizes": [
+      10,
+      12,
+      14,
+      17
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 950,
+      "descent": -570,
+      "linegap": 0
+    },
+    "advY": [
+      32,
+      39,
+      45,
+      54
+    ],
+    "span": 1520,
+    "floor_span": 1107.0,
+    "clears_accents": true
+  },
+  "BaskervilleF": {
+    "sizes": [
+      13,
+      15,
+      18,
+      20
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 919,
+      "descent": -300,
+      "linegap": 0
+    },
+    "advY": [
+      34,
+      39,
+      46,
+      51
+    ],
+    "span": 1219,
+    "floor_span": 1114.0,
+    "clears_accents": true
+  },
+  "BerenisADF": {
+    "sizes": [
+      14,
+      17,
+      19,
+      22
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 847,
+      "descent": -265,
+      "linegap": 0
+    },
+    "advY": [
+      33,
+      40,
+      45,
+      51
+    ],
+    "span": 1112,
+    "floor_span": 1071.0,
+    "clears_accents": false
+  },
+  "BodoniLibre": {
+    "sizes": [
+      13,
+      15,
+      17,
+      19
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 880,
+      "descent": -391,
+      "linegap": 0
+    },
+    "advY": [
+      35,
+      40,
+      46,
+      51
+    ],
+    "span": 1271,
+    "floor_span": 1260.0,
+    "clears_accents": false
+  },
+  "GaromandQT": {
+    "sizes": [
+      14,
+      15,
+      17,
+      20
+    ],
+    "xheights": [
+      12,
+      13,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 924,
+      "descent": -293,
+      "linegap": 0
+    },
+    "advY": [
+      36,
+      39,
+      44,
+      51
+    ],
+    "span": 1217,
+    "floor_span": 1072.0,
+    "clears_accents": true
+  },
+  "IbarraRealNova": {
+    "sizes": [
+      13,
+      15,
+      17,
+      20
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 894,
+      "descent": -349,
+      "linegap": 0
+    },
+    "advY": [
+      34,
+      39,
+      45,
+      52
+    ],
+    "span": 1243,
+    "floor_span": 1166.0,
+    "clears_accents": true
+  },
+  "LibrisADF": {
+    "sizes": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 1050,
+      "descent": -301,
+      "linegap": 0
+    },
+    "advY": [
+      34,
+      40,
+      46,
+      51
+    ],
+    "span": 1351,
+    "floor_span": 1070.0,
+    "clears_accents": true
+  },
+  "Merriweather": {
+    "sizes": [
+      10,
+      12,
+      13,
+      15
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 1102,
+      "descent": -522,
+      "linegap": 0
+    },
+    "advY": [
+      34,
+      41,
+      45,
+      51
+    ],
+    "span": 1625,
+    "floor_span": 1306.0,
+    "clears_accents": true
+  },
+  "MerriweatherLight": {
+    "sizes": [
+      10,
+      12,
+      13,
+      15
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 1094,
+      "descent": -531,
+      "linegap": 0
+    },
+    "advY": [
+      34,
+      41,
+      45,
+      51
+    ],
+    "span": 1625,
+    "floor_span": 1305.0,
+    "clears_accents": true
+  },
+  "PunkNova": {
+    "sizes": [
+      9,
+      11,
+      13,
+      15
+    ],
+    "xheights": [
+      12,
+      13,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 987,
+      "descent": -675,
+      "linegap": 0
+    },
+    "advY": [
+      32,
+      39,
+      46,
+      52
+    ],
+    "span": 1662,
+    "floor_span": 1349.0,
+    "clears_accents": true
+  },
+  "SchoolCenturyQT": {
+    "sizes": [
+      12,
+      13,
+      16,
+      18
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 1045,
+      "descent": -322,
+      "linegap": 0
+    },
+    "advY": [
+      35,
+      38,
+      46,
+      52
+    ],
+    "span": 1367,
+    "floor_span": 1086.0,
+    "clears_accents": true
+  },
+  "Spectral": {
+    "sizes": [
+      12,
+      15,
+      17,
+      18
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 941,
+      "descent": -366,
+      "linegap": 0
+    },
+    "advY": [
+      33,
+      41,
+      47,
+      50
+    ],
+    "span": 1307,
+    "floor_span": 1120.0,
+    "clears_accents": true
+  },
+  "SpectralLight": {
+    "sizes": [
+      12,
+      15,
+      17,
+      18
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 939,
+      "descent": -368,
+      "linegap": 0
+    },
+    "advY": [
+      33,
+      41,
+      47,
+      50
+    ],
+    "span": 1307,
+    "floor_span": 1120.0,
+    "clears_accents": true
+  },
+  "AntykwaPoltawskiegoBench": {
+    "sizes": [
+      13,
+      15,
+      17,
+      20
+    ],
+    "xheights": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 928,
+      "descent": -315,
+      "linegap": 0
+    },
+    "advY": [
+      34,
+      39,
+      45,
+      52
+    ],
+    "span": 1243,
+    "floor_span": 1130.0,
+    "clears_accents": true
+  },
+  "Edgar": {
+    "sizes": [
+      12,
+      14,
+      16,
+      18
+    ],
+    "metrics": {
+      "ascent": 1031,
+      "descent": -320,
+      "linegap": 0
+    },
+    "note": "shipped S-tier cut, prebuilt .cpfont reused as-is"
+  }
+}

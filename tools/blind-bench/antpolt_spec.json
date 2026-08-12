@@ -1,0 +1,7 @@
+{
+  "name": "AntykwaPoltawskiegoBench",
+  "regular": "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-regular.otf",
+  "italic": "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-italic.otf",
+  "bold": "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-bold.otf",
+  "bolditalic": "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-bolditalic.otf"
+}

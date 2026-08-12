@@ -1,0 +1,159 @@
+# Blind serif bench: 14 owner-picked keepers from the bold-italic bake-off.
+# NOT a shipping list -- same status as sans-candidates.yaml / grotesque-candidates.yaml.
+#   python3 lib/EpdFont/scripts/build-sd-fonts.py \
+#     --config tools/blind-bench/blind-candidates.yaml --output-dir out/
+
+families:
+  - name: Accanthis
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [13, 15, 17, 20]
+    metrics: {ascent: 928, descent: -315, linegap: 0}
+    styles:
+      regular:    {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-Regular.otf"}
+      bold:       {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-Bold.otf"}
+      italic:     {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-Italic.otf"}
+      bolditalic: {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-BoldItalic.otf"}
+
+  - name: Almendra
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 17]
+    metrics: {ascent: 950, descent: -570, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/Almendra-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/Almendra-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/Almendra-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/Almendra-BoldItalic.ttf"}
+
+  - name: BaskervilleF
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [13, 15, 18, 20]
+    metrics: {ascent: 919, descent: -300, linegap: 0}
+    styles:
+      regular:    {url: "https://mirrors.ibiblio.org/CTAN/fonts/baskervillef/opentype/BaskervilleF-Regular.otf"}
+      bold:       {url: "https://mirrors.ibiblio.org/CTAN/fonts/baskervillef/opentype/BaskervilleF-Bold.otf"}
+      italic:     {url: "https://mirrors.ibiblio.org/CTAN/fonts/baskervillef/opentype/BaskervilleF-Italic.otf"}
+      bolditalic: {url: "https://mirrors.ibiblio.org/CTAN/fonts/baskervillef/opentype/BaskervilleF-BoldItalic.otf"}
+
+  - name: BerenisADF
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [14, 17, 19, 22]
+    metrics: {ascent: 847, descent: -265, linegap: 0}
+    styles:
+      regular:    {url: "https://mirrors.ibiblio.org/CTAN/fonts/berenisadf/opentype/BerenisADFPro-Regular.otf"}
+      bold:       {url: "https://mirrors.ibiblio.org/CTAN/fonts/berenisadf/opentype/BerenisADFPro-Bold.otf"}
+      italic:     {url: "https://mirrors.ibiblio.org/CTAN/fonts/berenisadf/opentype/BerenisADFPro-Italic.otf"}
+      bolditalic: {url: "https://mirrors.ibiblio.org/CTAN/fonts/berenisadf/opentype/BerenisADFPro-BoldItalic.otf"}
+
+  - name: BodoniLibre
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [13, 15, 17, 19]
+    metrics: {ascent: 880, descent: -391, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/impallari/Libre-Bodoni/master/fonts/v2002%20-%20Nhung%20edtis%20v2/LibreBodoniv2002-Regular.otf"}
+      bold:       {url: "https://raw.githubusercontent.com/impallari/Libre-Bodoni/master/fonts/v2002%20-%20Nhung%20edtis%20v2/LibreBodoniv2002-Bold.otf"}
+      italic:     {url: "https://raw.githubusercontent.com/impallari/Libre-Bodoni/master/fonts/v2002%20-%20Nhung%20edtis%20v2/LibreBodoniv2002-Italic.otf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/impallari/Libre-Bodoni/master/fonts/v2002%20-%20Nhung%20edtis%20v2/LibreBodoniv2002-BoldItalic.otf"}
+
+  - name: GaromandQT
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [14, 15, 17, 20]
+    metrics: {ascent: 924, descent: -293, linegap: 0}
+    styles:
+      regular:    {url: "https://ctan.csail.mit.edu/fonts/qualitype/opentype/QTGaromand.otf"}
+      bold:       {url: "https://ctan.csail.mit.edu/fonts/qualitype/opentype/QTGaromand-Bold.otf"}
+      italic:     {url: "https://ctan.csail.mit.edu/fonts/qualitype/opentype/QTGaromand-Italic.otf"}
+      bolditalic: {url: "https://ctan.csail.mit.edu/fonts/qualitype/opentype/QTGaromand-BoldItalic.otf"}
+
+  - name: IbarraRealNova
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [13, 15, 17, 20]
+    metrics: {ascent: 894, descent: -349, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/googlefonts/ibarrareal/main/fonts/ttf/IbarraRealNova-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/googlefonts/ibarrareal/main/fonts/ttf/IbarraRealNova-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/googlefonts/ibarrareal/main/fonts/ttf/IbarraRealNova-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/googlefonts/ibarrareal/main/fonts/ttf/IbarraRealNova-BoldItalic.ttf"}
+
+  - name: LibrisADF
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    metrics: {ascent: 1050, descent: -301, linegap: 0}
+    styles:
+      regular:    {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf"}
+      bold:       {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Bold.otf"}
+      italic:     {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Italic.otf"}
+      bolditalic: {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-BoldItalic.otf"}
+
+  - name: Merriweather
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [10, 12, 13, 15]
+    metrics: {ascent: 1102, descent: -522, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-BoldItalic.ttf"}
+
+  - name: MerriweatherLight
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [10, 12, 13, 15]
+    metrics: {ascent: 1094, descent: -531, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-Light.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-LightItalic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/SorkinType/Merriweather/master/fonts/ttf/Merriweather-BoldItalic.ttf"}
+
+  - name: PunkNova
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [9, 11, 13, 15]
+    metrics: {ascent: 987, descent: -675, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/aliftype/punk-otf/main/punknova-regular.otf"}
+      bold:       {url: "https://raw.githubusercontent.com/aliftype/punk-otf/main/punknova-bold.otf"}
+      italic:     {url: "https://raw.githubusercontent.com/aliftype/punk-otf/main/punknova-slanted.otf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/aliftype/punk-otf/main/punknova-boldslanted.otf"}
+
+  - name: SchoolCenturyQT
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [12, 13, 16, 18]
+    metrics: {ascent: 1045, descent: -322, linegap: 0}
+    styles:
+      regular:    {url: "https://ctan.csail.mit.edu/fonts/qualitype/opentype/QTSchoolCentury.otf"}
+      bold:       {url: "https://ctan.csail.mit.edu/fonts/qualitype/opentype/QTSchoolCentury-Bold.otf"}
+      italic:     {url: "https://ctan.csail.mit.edu/fonts/qualitype/opentype/QTSchoolCentury-Italic.otf"}
+      bolditalic: {url: "https://ctan.csail.mit.edu/fonts/qualitype/opentype/QTSchoolCentury-BoldItalic.otf"}
+
+  - name: Spectral
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [12, 15, 17, 18]
+    metrics: {ascent: 941, descent: -366, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-BoldItalic.ttf"}
+
+  - name: SpectralLight
+    description: "Blind bench candidate"
+    intervals: latin-ext
+    sizes: [12, 15, 17, 18]
+    metrics: {ascent: 939, descent: -368, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Light.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-LightItalic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-BoldItalic.ttf"}

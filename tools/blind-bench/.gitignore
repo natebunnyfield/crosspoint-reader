@@ -1,0 +1,13 @@
+# Generated: fetched font sources, real-device renders, and the base64-inlined
+# page built from them. Rebuild with sweep_blind.py -> build-sd-fonts.py ->
+# render_harness reading -> build_blind_page.py. blind_slots.json (the
+# measurements) and blind-candidates.yaml (the recipe) are committed.
+sources/
+png/
+png_blind/
+out/
+out_2x/
+out_blind.html
+candidates_data.json
+chrome_fonts.json
+__pycache__/
