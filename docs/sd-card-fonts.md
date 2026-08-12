@@ -164,6 +164,22 @@ target exactly only at the different span it ended up shipping with, which the
 bench never tried). Whether the same gap affects these three is unknown; nobody
 has re-measured them either way.
 
+### Antpolt is C tier (owner ruling, 2026-08-12)
+
+Antykwa Półtawskiego, GUST's revival of the 1931 Polish national serif — same
+Jackowski/Nowacki team as the installed TeX Gyre Schola. Cut on the same day
+Libris ADF won `tools/blind-bench/` and was promoted to S: this face ran deep in
+that bench, further than most of the field, and round 4's page names it among
+the three that "didn't make round 3's cut", alongside Spectral and Merriweather
+Light. Beaten, not defective — nothing was found wrong with it on the page.
+
+It was never in `installed_families:`, so nothing needs deleting from a surface
+it was never on. The recipe stays in `sd-fonts.yaml` so the comparison can be
+re-run and the picker label stays in `src/FontDisplayNames.h` for attribution,
+the same treatment every other C-tier cut gets. Adding it to
+`installed_families:` — or to any surface — is a regression, not a restoration;
+it needs a fresh ruling.
+
 ### LibrisADF is S tier (owner ruling, 2026-08-12)
 
 Promoted out of `tools/blind-bench/blind-candidates.yaml` straight to S tier —

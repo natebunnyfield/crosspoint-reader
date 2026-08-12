@@ -83,6 +83,16 @@ inline constexpr Entry kEntries[] = {
     {"TeXGyreSchola", "TeX Gyre Schola", "Bogus\xC5\x82"
                                          "aw Jackowski & Janusz M. Nowacki",
      "1918 Jersey City; 2007 Gda\xC5\x84sk", 1918},
+    // Same GUST e-foundry duo as TeX Gyre Schola above. Original: Adam
+    // Półtawski's Antykwa Półtawskiego, first cast at Jan Idzkowski's
+    // foundry, Warsaw, 1931. Digitized copyright years (2003, 2009) are the
+    // font's own name-table string; the CTAN v1.101 release (Oct 2010) is one
+    // year of lag and collapses under the adjacent-year rule.
+    {"Antpolt", "Antykwa Po\xC5\x82"
+                "tawskiego",
+     "Bogus\xC5\x82"
+     "aw Jackowski & Janusz M. Nowacki",
+     "1931 Warsaw; 2003, 2009 Gda\xC5\x84sk", 1931},
     // The directory keeps Arkandis' foundry suffix because it is frozen; the
     // display name drops it, which is what the face calls itself. Model-dated
     // at Warren Chappell's Lydian, the 1938 typeface the font's own name table
