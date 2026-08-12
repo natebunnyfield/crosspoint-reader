@@ -237,19 +237,14 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       valueWidth = renderer.getTextWidth(UI_10_FONT_ID, valueText.c_str()) + hPaddingInSelection;
     }
 
-    // Reserve the badge's footprint out of THIS row's text column, so a wrapped
-    // subtitle re-wraps clear of the badge rather than running under its opaque
-    // backing (the font pickers' two-line colophon had "Jersey" hidden behind
-    // the "Selected" pill). Per-row, but it does NOT re-wrap as the highlight
-    // moves: the badge marks the APPLIED font, not the cursor
-    // (FontSelectionActivity draws it for previewFontIndex_,
-    // EditorFontSelectionActivity for appliedIndex_), so the badge row is fixed
-    // while navigating. The badge still paints its backing below; its outline
-    // there now only fires if text somehow still reaches it. The trailing
-    // hPaddingInSelection is the gap between the text and the badge.
-    if (!valueText.empty()) {
-      rowTextWidth = std::max(0, rowTextWidth - valueWidth - hPaddingInSelection);
-    }
+    // The value badge OVERLAPS the row text; it does NOT reserve a column out of
+    // it (owner ruling: do not reflow the text when a row is Selected -- overlap
+    // instead, the same call as the keyboard overlapping the page rather than
+    // shrinking it). Reserving the badge's width per row made a row's wrap points
+    // depend on whether it carried a badge, so the "Selected" pill -- which marks
+    // the APPLIED font, not the cursor -- re-wrapped the title and the two-line
+    // colophon under it. Text keeps its full width; the badge paints its own
+    // opaque backing below and outlines whatever it covers.
 
     auto itemName = rowTitle(i);
     auto item = renderer.truncatedText(UI_10_FONT_ID, itemName.c_str(), rowTextWidth);

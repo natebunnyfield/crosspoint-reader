@@ -299,30 +299,22 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   // Draw all items
   const auto pageStartIndex = selectedIndex / pageItems * pageItems;
 
-  // The value badge sits at the row's right edge — see LyraTheme::drawList. On a
-  // row that carries one its footprint is reserved out of THAT row's text column
-  // below, so a wrapped subtitle re-wraps clear of the badge rather than running
-  // under its opaque backing (the font pickers' two-line colophon). Per-row, but
-  // the "Selected" badge marks the APPLIED font, not the cursor, so the badge
-  // row does not move with the highlight and nothing re-wraps during navigation.
-  const int baseTextWidth = contentWidth - BaseMetrics::values.contentSidePadding * 2;
+  // The value badge OVERLAPS the row text; it carves no column out of it (owner
+  // ruling: do not reflow the text when a row is Selected -- overlap instead).
+  // A badge that appears and disappears with the selection therefore cannot
+  // re-wrap the title or the subtitle under it. LyraTheme is the live path and
+  // carries the same rule.
+  const int rowTextWidth = contentWidth - BaseMetrics::values.contentSidePadding * 2;
 
   for (int i = pageStartIndex; i < itemCount && i < pageStartIndex + pageItems; i++) {
     const int itemY = rect.y + (i % pageItems) * rowHeight;
 
-    int rowTextWidth = baseTextWidth;
     std::string valueText;
     if (rowValue != nullptr) {
       valueText = rowValue(i);
       if (!valueText.empty()) {
-        // Truncate the value against the FULL width; its own cap should not
-        // depend on the text column it is about to shrink.
-        const int maxValW = std::max(0, baseTextWidth - 40 - minValueGap);
+        const int maxValW = std::max(0, rowTextWidth - 40 - minValueGap);
         valueText = renderer.truncatedText(UI_10_FONT_ID, valueText.c_str(), maxValW);
-        // Pull the text column in by the badge footprint plus a gap each side,
-        // so title and subtitle stop before the badge instead of under it.
-        const int valueTextWidth = renderer.getTextWidth(UI_10_FONT_ID, valueText.c_str());
-        rowTextWidth = std::max(0, baseTextWidth - valueTextWidth - minValueGap * 2);
       }
     }
 
