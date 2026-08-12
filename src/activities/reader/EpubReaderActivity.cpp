@@ -1148,7 +1148,11 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     // past the word anchor, getPageForWordAnchor refuses, the anchor stays
     // armed, and the completion-time applyDeferredReposition() finishes the
     // job (cachedChapterTotalPageCount is deliberately left non-zero).
-    if (pendingWordAnchor) {
+    // The spine guard is the same one applyDeferredReposition() carries: an anchor
+    // captured in another chapter resolves to *some* page here rather than failing,
+    // so applying it across a chapter change silently rewinds to a heading or page 0.
+    // Leave it armed instead — it becomes valid again if that chapter is re-entered.
+    if (pendingWordAnchor && currentSpineIndex == cachedSpineIndex) {
       if (const auto page = section->getPageForWordAnchor(*pendingWordAnchor)) {
         LOG_DBG("ERS", "Reposition by word anchor %u: page %d -> %u", *pendingWordAnchor, section->currentPage, *page);
         section->currentPage = static_cast<int>(*page);
@@ -1162,7 +1166,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
         pendingWordAnchor.reset();
       }
     }
-    if (!pendingWordAnchor && pendingParagraphAnchor) {
+    if (!pendingWordAnchor && pendingParagraphAnchor && currentSpineIndex == cachedSpineIndex) {
       if (const auto page = section->getPageForParagraphIndex(*pendingParagraphAnchor)) {
         LOG_DBG("ERS", "Reposition by paragraph %u: page %d -> %u", *pendingParagraphAnchor, section->currentPage,
                 *page);
