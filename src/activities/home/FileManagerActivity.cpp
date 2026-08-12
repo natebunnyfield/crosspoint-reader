@@ -634,7 +634,11 @@ void FileManagerActivity::loop() {
   if (confirmPressSeen && mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
       mappedInput.getHeldTime() >= GO_HOME_MS) {
     confirmPressSeen = false;
-    openActionMenu();
+    if (!moveSourcePath.empty()) {
+      performMoveHere();
+    } else {
+      openActionMenu();
+    }
     return;
   }
 
@@ -651,18 +655,23 @@ void FileManagerActivity::loop() {
       return;
     }
     if (files.empty()) {
-      // Empty folder: the menu is still reachable so an armed move can land here.
-      if (!moveSourcePath.empty()) openActionMenu();
+      // Empty folder: while armed, paste directly (consistent with non-empty case).
+      if (!moveSourcePath.empty()) performMoveHere();
       return;
     }
 
     const std::string& entry = files[selectorIndex];
     const bool isDirectory = entry.back() == '/';
 
-    // Long press: action menu. Normally fired mid-hold in loop(); this release
-    // path still catches a hold that completed inside a render stall.
+    // Long press: while armed, paste directly; otherwise open action menu.
+    // Normally fired mid-hold in loop(); this release path still catches a hold
+    // that completed inside a render stall.
     if (mappedInput.getHeldTime() >= GO_HOME_MS) {
-      openActionMenu();
+      if (!moveSourcePath.empty()) {
+        performMoveHere();
+      } else {
+        openActionMenu();
+      }
       return;
     }
 
@@ -829,12 +838,14 @@ void FileManagerActivity::render(RenderLock&&) {
   char confirmBuf[48];
   const char* confirmLabel;
   if (files.empty()) {
-    confirmLabel = moveSourcePath.empty() ? "" : tr(STR_MENU);
+    confirmLabel = moveSourcePath.empty() ? "" : tr(STR_MOVE_HERE);
   } else if (files[selectorIndex].back() == '/') {
-    snprintf(confirmBuf, sizeof(confirmBuf), "%s/%s", tr(STR_OPEN), tr(STR_MENU));
+    snprintf(confirmBuf, sizeof(confirmBuf), "%s/%s", tr(STR_OPEN),
+             moveSourcePath.empty() ? tr(STR_MENU) : tr(STR_MOVE_HERE));
     confirmLabel = confirmBuf;
   } else {
-    snprintf(confirmBuf, sizeof(confirmBuf), "%s/%s", tr(STR_VIEW), tr(STR_MENU));
+    snprintf(confirmBuf, sizeof(confirmBuf), "%s/%s", tr(STR_VIEW),
+             moveSourcePath.empty() ? tr(STR_MENU) : tr(STR_MOVE_HERE));
     confirmLabel = confirmBuf;
   }
   const auto labels = mappedInput.mapLabels(backLabel, confirmLabel, files.empty() ? "" : tr(STR_DIR_UP),
