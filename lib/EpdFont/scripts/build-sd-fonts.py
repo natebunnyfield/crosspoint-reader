@@ -150,7 +150,21 @@ def extract_static_instance(source_path: Path, axes: dict, family_name: str, sty
     #                          so the work would be wasted.
     source_font = TTFont(str(source_path))
     try:
-        font = instantiateVariableFont(source_font, axes, updateFontNames=True, optimize=False)
+        # updateFontNames=True rewrites the name table from the STAT axis-value
+        # records, which only exist for NAMED instances -- it raises
+        # "Cannot find Axis Values {...}" the moment you pin an axis to a
+        # coordinate the foundry did not name. Pinning an unnamed coordinate is
+        # the entire point of a variable font (Junicode's ENLA x-height axis is
+        # continuous 0-100 with no named stops at all), so fall back to leaving
+        # the names alone. Nothing downstream reads them: the family name comes
+        # from the yaml and the converter reads outlines.
+        try:
+            font = instantiateVariableFont(source_font, axes, updateFontNames=True, optimize=False)
+        except Exception as name_err:  # noqa: BLE001 - reported, then retried
+            print(f"  (unnamed axis position, keeping source names: {name_err})")
+            source_font.close()
+            source_font = TTFont(str(source_path))
+            font = instantiateVariableFont(source_font, axes, updateFontNames=False, optimize=False)
         try:
             font.save(str(tmp_path))
         finally:
@@ -445,6 +459,18 @@ def build_family(
     try:
         resolved_styles = {}
         synth_flags = {}
+        space_flags = {}
+        # Advance-only spacing, collected over EVERY style. Flat keys rather
+        # than a nested map, and deliberately NOT folded into the `from:` pass
+        # below the way `synthetic:` is: a synthetic style borrows another
+        # style's file, whereas tracking applies to a style that has its own.
+        # Reading it in that pass silently skips every real-source style, which
+        # is every style that normally wants it.
+        for style_name, style_spec in styles.items():
+            space = {k: style_spec[k] for k in ("tracking_em", "word_space_em")
+                     if k in style_spec}
+            if space:
+                space_flags[style_name] = ",".join(f"{k}={v}" for k, v in sorted(space.items()))
         for style_name, style_spec in styles.items():
             if "from" in style_spec:
                 continue
@@ -488,6 +514,7 @@ def build_family(
             if synth:
                 synth_flags[style_name] = ",".join(
                     f"{k}={v}" for k, v in sorted(synth.items()))
+
     except (FileNotFoundError, RuntimeError) as e:
         return name, False, str(e)
 
@@ -512,6 +539,8 @@ def build_family(
 
     for style_name, spec in synth_flags.items():
         cmd.extend([f"--synth-{style_name}", spec])
+    for style_name, spec in space_flags.items():
+        cmd.extend([f"--space-{style_name}", spec])
 
     cmd.extend(["--intervals", intervals])
     cmd.extend(["--sizes", sizes])

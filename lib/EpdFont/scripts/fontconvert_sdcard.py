@@ -589,13 +589,38 @@ def synth_params_for_size(synthetic, size):
     return x_strength, y_strength, shear_xy
 
 
+def spacing_params_for_size(spacing, ppem):
+    """Per-size advance deltas, in FreeType 16.16, from an em-relative spec.
+
+    Returns (tracking, word_space): tracking is added to EVERY glyph's advance,
+    word_space additionally to U+0020/U+00A0 only. Both are advance-only --
+    outlines and bitmaps are untouched, so this letterspaces a face without
+    distorting a single letterform.
+
+    Exists for MIXED-SOURCE families. A borrowed italic keeps its own donor's
+    fit and word space, which are drawn against a different roman: Junicode's
+    space measures 0.32 em against Inknut's 0.28, so an italic phrase inside an
+    Inknut sentence opens up at every word boundary while the letters sit right.
+    Neither `scale:` nor the wdth axis can fix that -- both move the space in
+    proportion with everything else.
+    """
+    if not spacing:
+        return 0, 0
+    track = int(round(spacing.get("tracking_em", 0.0) * ppem * 65536))
+    word = int(round(spacing.get("word_space_em", 0.0) * ppem * 65536))
+    return track, word
+
+
 def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=False,
-                         fallback_fontfile=None, synthetic=None):
+                         fallback_fontfile=None, synthetic=None, spacing=None):
     """Rasterize all glyphs for one font style. Returns StyleRasterData.
 
     `synthetic`, when set, is a dict (see synth_params_for_size) describing a
     build-time synthetic style: glyph outlines are emboldened and/or sheared
     before rendering, per docs/synthetic-font-styles.md.
+
+    `spacing`, when set, is a dict (see spacing_params_for_size) of advance-only
+    tracking and word-space deltas.
     """
     import freetype
 
@@ -617,6 +642,11 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # Synthetic styles must split load from render so the outline can be
     # modified in between; real styles keep the single-call FT_LOAD_RENDER
     # fast path.
+    track_adv, word_adv = spacing_params_for_size(spacing, face.size.x_ppem)
+    if track_adv or word_adv:
+        print(f"  [{style_label}] Spacing: tracking={track_adv / 65536:.2f} px, "
+              f"word space {word_adv / 65536:+.2f} px (advance only)", file=sys.stderr)
+
     synth_x, synth_y, synth_shear = (0, 0, 0)
     if synthetic:
         synth_x, synth_y, synth_shear = synth_params_for_size(synthetic, size)
@@ -776,10 +806,20 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             # x-strength to the advance (FreeType and KOReader both do;
             # skipping it is what makes faux bold look cramped). The
             # strength is 26.6, linearHoriAdvance is 16.16: << 10 converts.
+            # Advance-only spacing. Tracking lands on every glyph; the word-space
+            # delta only on the two space characters, so the two knobs stay
+            # independent -- tracking a face tighter must not also close its word
+            # gaps. Clamped at zero: a negative advance would walk the cursor
+            # backwards and overprint the previous glyph.
+            spacing_adv = track_adv
+            if code_point in (0x20, 0xA0):
+                spacing_adv += word_adv
+            advance_16_16 = max(0, f.glyph.linearHoriAdvance + (synth_x << 10) + spacing_adv)
+
             glyph = GlyphProps(
                 width=bitmap.width,
                 height=bitmap.rows,
-                advance_x=fp4_from_ft16_16(f.glyph.linearHoriAdvance + (synth_x << 10)),
+                advance_x=fp4_from_ft16_16(advance_16_16),
                 left=f.glyph.bitmap_left,
                 top=f.glyph.bitmap_top,
                 data_length=len(packed),
@@ -903,7 +943,7 @@ def style_sections_total_size(sections):
 
 def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
                                force_autohint=False, fallback_style_fonts=None,
-                               synth_specs=None):
+                               synth_specs=None, spacing_specs=None):
     """Generate a multi-style v4 .cpfont file.
 
     style_fonts: dict of {style_id: fontfile_path} e.g. {0: "Regular.ttf", 2: "Italic.ttf"}
@@ -922,6 +962,7 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     raster_data = {}  # style_id -> StyleRasterData
     fallback_style_fonts = fallback_style_fonts or {}
     synth_specs = synth_specs or {}
+    spacing_specs = spacing_specs or {}
     for style_id in sorted(style_fonts.keys()):
         fontfile = style_fonts[style_id]
         fallback_fontfile = fallback_style_fonts.get(style_id)
@@ -930,7 +971,8 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
             fontfile, size, intervals, style_id=style_id,
             force_autohint=force_autohint,
             fallback_fontfile=fallback_fontfile,
-            synthetic=synth_specs.get(style_id))
+            synthetic=synth_specs.get(style_id),
+            spacing=spacing_specs.get(style_id))
 
     # Pack binary sections for each style
     packed_sections = {}  # style_id -> tuple of section bytearrays
@@ -1060,6 +1102,16 @@ def main():
     parser.add_argument("--synth-italic", dest="synth_italic", help=SYNTH_HELP)
     parser.add_argument("--synth-bolditalic", dest="synth_bolditalic", help=SYNTH_HELP)
 
+    # Advance-only spacing: comma-separated key=value pairs, e.g.
+    # "tracking_em=0.012,word_space_em=-0.04". Keys: tracking_em, word_space_em.
+    SPACE_HELP = ("Advance-only spacing for this style: comma-separated "
+                  "key=value pairs (tracking_em, word_space_em), em-relative. "
+                  "Outlines are untouched.")
+    parser.add_argument("--space-regular", dest="space_regular", help=SPACE_HELP)
+    parser.add_argument("--space-bold", dest="space_bold", help=SPACE_HELP)
+    parser.add_argument("--space-italic", dest="space_italic", help=SPACE_HELP)
+    parser.add_argument("--space-bolditalic", dest="space_bolditalic", help=SPACE_HELP)
+
     args = parser.parse_args()
 
     if args.list_presets:
@@ -1090,38 +1142,43 @@ def main():
     if args.fallback_bolditalic:
         fallback_style_fonts[3] = args.fallback_bolditalic
 
-    def parse_synth_spec(spec_str, style_label):
-        allowed = {"embolden_em", "y_ratio", "slant_deg"}
+    def parse_kv_spec(spec_str, style_label, allowed, flag):
         spec = {}
         for part in spec_str.split(","):
             part = part.strip()
             if not part:
                 continue
             if "=" not in part:
-                print(f"Error: --synth-{style_label}: expected key=value, got '{part}'",
+                print(f"Error: --{flag}-{style_label}: expected key=value, got '{part}'",
                       file=sys.stderr)
                 sys.exit(1)
             key, _, value = part.partition("=")
             key = key.strip()
             if key not in allowed:
-                print(f"Error: --synth-{style_label}: unknown key '{key}' "
+                print(f"Error: --{flag}-{style_label}: unknown key '{key}' "
                       f"(allowed: {', '.join(sorted(allowed))})", file=sys.stderr)
                 sys.exit(1)
             try:
                 spec[key] = float(value)
             except ValueError:
-                print(f"Error: --synth-{style_label}: '{key}' value '{value}' is not a number",
+                print(f"Error: --{flag}-{style_label}: '{key}' value '{value}' is not a number",
                       file=sys.stderr)
                 sys.exit(1)
         return spec
 
+    SYNTH_KEYS = {"embolden_em", "y_ratio", "slant_deg"}
+    SPACE_KEYS = {"tracking_em", "word_space_em"}
     synth_specs = {}
-    for style_id, style_label, spec_str in ((0, "regular", args.synth_regular),
-                                            (1, "bold", args.synth_bold),
-                                            (2, "italic", args.synth_italic),
-                                            (3, "bolditalic", args.synth_bolditalic)):
-        if spec_str:
-            synth_specs[style_id] = parse_synth_spec(spec_str, style_label)
+    spacing_specs = {}
+    for style_id, style_label, synth_str, space_str in (
+            (0, "regular", args.synth_regular, args.space_regular),
+            (1, "bold", args.synth_bold, args.space_bold),
+            (2, "italic", args.synth_italic, args.space_italic),
+            (3, "bolditalic", args.synth_bolditalic, args.space_bolditalic)):
+        if synth_str:
+            synth_specs[style_id] = parse_kv_spec(synth_str, style_label, SYNTH_KEYS, "synth")
+        if space_str:
+            spacing_specs[style_id] = parse_kv_spec(space_str, style_label, SPACE_KEYS, "space")
 
     is_multistyle = len(style_fonts) > 0
     fontfile = args.fontfile
@@ -1192,7 +1249,8 @@ def main():
             style_fonts, sz, intervals, output_path,
             force_autohint=args.force_autohint,
             fallback_style_fonts=fallback_style_fonts,
-            synth_specs=synth_specs)
+            synth_specs=synth_specs,
+            spacing_specs=spacing_specs)
     print(f"\nTotal: {len(sizes)} files, {total_size / 1024 / 1024:.2f} MB", file=sys.stderr)
 
 
