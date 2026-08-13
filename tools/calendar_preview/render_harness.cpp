@@ -397,8 +397,15 @@ int drawInlineParagraph(int id, const std::vector<StyledWord>& words, int x, int
   // one unbroken string. Subtracting the two glyph widths from the spaced pair
   // leaves the space advance plus whatever kerning the pair carries, which is
   // what a word gap actually costs.
-  const int spaceW = renderer.getTextWidth(id, "n n", EpdFontFamily::REGULAR) -
-                     2 * renderer.getTextWidth(id, "n", EpdFontFamily::REGULAR);
+  // ...and PER STYLE, matching the reader: ParsedText.cpp:755 asks for the gap
+  // with `wordStyles[j - 1]`, the style of the word to the LEFT of it. A single
+  // REGULAR-measured gap reused for every run made the italic's own space
+  // advance unreachable, so `word_space_em:` moved the .cpfont and changed
+  // nothing on the page -- the whole word-space ladder rendered pixel-identical
+  // and the knob looked dead when it was the rig that was wrong.
+  const auto gapFor = [&](const EpdFontFamily::Style style) {
+    return renderer.getTextWidth(id, "n n", style) - 2 * renderer.getTextWidth(id, "n", style);
+  };
   // Wrap on CLUSTERS, not words: a cluster is a word plus everything glued to
   // it, so `rounding` + `,` measure and break as one unit.
   for (size_t i = 0; i < words.size();) {
@@ -409,6 +416,7 @@ int drawInlineParagraph(int id, const std::vector<StyledWord>& words, int x, int
       ++end;
     }
     if (y + lineH > limit) break;
+    const int spaceW = gapFor(words[i > 0 ? i - 1 : i].style);
     if (curX > x && curX + spaceW + clusterW > x + colW) {
       y += lineH;
       curX = x;
@@ -444,6 +452,20 @@ bool renderInlineSpecimen(const char* family, const char* outDir) {
       "She read the entry aloud: <i>thirty thousand eight hundred sixty-five</i>, and then "
       "again, slower. The auditor had signed <b>Approved</b> in a hand that sloped the wrong "
       "way, as though <i>he</i> had been the one in a hurry.";
+  // Metric-adjacency proof line. Roman and italic alternate letter by letter with
+  // no space between them, so a cap-height or x-height mismatch reads as a step
+  // in the top edge rather than something you have to measure to see. Caps
+  // first, then x-height letters, then a mixed word.
+  static const char* kPara4 =
+      "MM<i>MM</i>MM<i>MM</i> HH<i>HH</i> xx<i>xx</i>xx<i>xx</i> nn<i>nn</i> Mx<i>Mx</i>Mx<i>Mx</i>";
+  // Word-space proof. The SAME sentence roman then italic, set on consecutive
+  // lines, because a word-space delta is invisible unless there are word gaps
+  // to move: the prose below contains exactly one multi-word italic phrase, so
+  // a 1-2 px change per space had almost nothing to act on and every value
+  // read identical. Here every gap in the line is the one under test, and the
+  // roman directly above it is the reference to read the italic against.
+  static const char* kPara5 = "the sum of the parts is not the whole of it";
+  static const char* kPara6 = "<i>the sum of the parts is not the whole of it</i>";
 
   for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
     const int id = loadSdFontByOrdinal(family, sizeEnum, renderer);
@@ -460,7 +482,7 @@ bool renderInlineSpecimen(const char* family, const char* outDir) {
     // One prewarm for the whole page, all four style bits: the mini kern matrix
     // is per-page and per-style, and a stale one measures an unkerned font.
     char page[2048];
-    snprintf(page, sizeof(page), "%s %s %s", kPara1, kPara2, kPara3);
+    snprintf(page, sizeof(page), "%s %s %s %s %s %s", kPara1, kPara2, kPara3, kPara4, kPara5, kPara6);
     it->second->prewarm(page, 0x0F, /*metadataOnly=*/false);
 
     int top, right, bottom, left;
@@ -478,7 +500,7 @@ bool renderInlineSpecimen(const char* family, const char* outDir) {
     y += renderer.getLineHeight(UI_12_FONT_ID) + 10;
 
     const int pageBottom = renderer.getScreenHeight() - bottom - 6;
-    for (const char* para : {kPara1, kPara2, kPara3}) {
+    for (const char* para : {kPara4, kPara5, kPara6, kPara1, kPara2, kPara3}) {
       if (y + lineH > pageBottom) break;
       y = drawInlineParagraph(id, parseInlineMarkup(para), margin, y, colW, lineH, pageBottom);
       y += lineH / 2;
