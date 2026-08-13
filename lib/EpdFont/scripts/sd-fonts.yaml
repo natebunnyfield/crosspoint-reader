@@ -479,55 +479,18 @@ families:
     # not the Google Fonts OFL mirror — same license (OFL 1.1), but the
     # foundry repo carries the full 7-weight ladder (Light, Regular, Medium,
     # SemiBold, Bold, ExtraBold, Black) the Google mirror truncates to just
-    # Regular+Bold. Still only using Regular and Bold here: both are real
-    # weight files, never a synthesized embolden. The family has no italics
-    # at all anywhere in the foundry repo either, so obliques still shear the
-    # REAL weights (regular -> italic, bold -> bolditalic) at a gentle 10°.
-    styles:
-      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
-      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
-      italic:     {from: regular, synthetic: {slant_deg: 10}}
-      bolditalic: {from: bold, synthetic: {slant_deg: 10}}
-
-  # ── InknutAntiqua exploratory weight-pair variants (2026-08-12) ──────────
-  # NOT in installed_families. Comparison builds for sideloading on device.
-  # iCloud deliverables: ~/Library/Mobile Documents/com~apple~CloudDocs/CrossPoint Fonts/
-  #   InknutAntiqua62RegularExtraBold/ and InknutAntiqua62LightBold/
-  # Measured metrics (x-height of 'x' glyph, advanceY) at sizes [10,12,14,16]:
-  #   advY: 32/39/45/51 px (both variants; same override, same unitsPerEm=1000)
-  #   x-height regular: 13/15/17/19 px (identical across Regular, Light, ExtraBold
-  #     at 10–14pt; ExtraBold bold-style 16pt is 20px vs 19px on all others)
-  #   No force_autohint needed — hinted x-height ramp is smooth for all weights.
-  # Kerning/GSUB: all four weights (Light/Regular/Bold/ExtraBold) carry identical
-  #   GSUB feature sets (liga, dlig, calt, etc.); kern is class-based in the cpfont
-  #   (Light/ExtraBold class counts differ slightly from Regular/Bold — expected).
-  #   No kern cells in the source TTFs (font uses GPOS, not kern table) — the
-  #   cpfont kern comes from GPOS, handled by fontconvert_sdcard.py.
-
-  - name: InknutAntiqua62RegularExtraBold
-    description: "Inknut Antiqua weight-pair variant: Regular (400) body + ExtraBold (800) emphasis (Latin)"
-    intervals: latin-ext
-    # Same sizes and metrics as InknutAntiqua62. All weights share unitsPerEm=1000
-    # so the override produces the same advanceY. x-height measured: 13/15/17/19 px
-    # (regular style all slots); ExtraBold bold-style reads 20 px at 16pt (1px
-    # over Regular's 19 px at that slot — heavier optics, not a hinting skip).
-    sizes: [10, 12, 14, 16]
-    metrics: {ascent: 1203, descent: -340, linegap: 0}
-    styles:
-      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
-      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-ExtraBold.ttf"}
-      italic:     {from: regular, synthetic: {slant_deg: 10}}
-      bolditalic: {from: bold, synthetic: {slant_deg: 10}}
-
-  - name: InknutAntiqua62LightBold
-    description: "Inknut Antiqua weight-pair variant: Light (300) body + Bold (700) emphasis (Latin)"
-    intervals: latin-ext
-    # Same sizes and metrics as InknutAntiqua62. x-height measured: 13/15/17/19 px
-    # (both regular/Light and bold/Bold styles at all slots — identical to shipped
-    # Regular+Bold pair, as expected given near-identical sxHeight in font units:
-    # Light=530, Regular=531, Bold=539, ExtraBold=541 out of 1000 upem).
-    sizes: [10, 12, 14, 16]
-    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    # Regular+Bold. The family has no italics at all anywhere in the foundry
+    # repo, so obliques shear the REAL weights (regular -> italic, bold ->
+    # bolditalic) at a gentle 10°.
+    #
+    # Regular/bold pair is Light (300) + Bold (700), not Regular (400) + Bold
+    # — owner ruling 2026-08-12 after building and reading three pairings on
+    # device: shipped Regular+Bold, an exploratory Regular+ExtraBold, and an
+    # exploratory Light+Bold. Light+Bold won. Both weights are real files,
+    # never a synthesized embolden. Metrics/sizes below are unchanged by the
+    # swap: Light measured to the same 13/15/17/19 px x-height ramp as
+    # Regular at every slot (sxHeight 530/1000 upem vs 531/1000), so the
+    # existing {ascent: 1203, descent: -340} override still applies exactly.
     styles:
       regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
