@@ -475,12 +475,17 @@ families:
     # same idea against the uniform slot targets. Without an override the
     # family reads with ~60% extra leading.
     metrics: {ascent: 1203, descent: -340, linegap: 0}
-    # The family has no italics at all; obliques shear the REAL weights
-    # (regular -> italic, bold -> bolditalic) at a gentle 10° — sturdy antiqua,
-    # so no embolden is ever synthesized on top of the real Bold.
+    # Sourced from the foundry repo (github.com/clauseggers/Inknut-Antiqua),
+    # not the Google Fonts OFL mirror — same license (OFL 1.1), but the
+    # foundry repo carries the full 7-weight ladder (Light, Regular, Medium,
+    # SemiBold, Bold, ExtraBold, Black) the Google mirror truncates to just
+    # Regular+Bold. Still only using Regular and Bold here: both are real
+    # weight files, never a synthesized embolden. The family has no italics
+    # at all anywhere in the foundry repo either, so obliques still shear the
+    # REAL weights (regular -> italic, bold -> bolditalic) at a gentle 10°.
     styles:
-      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inknutantiqua/InknutAntiqua-Regular.ttf"}
-      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inknutantiqua/InknutAntiqua-Bold.ttf"}
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
       italic:     {from: regular, synthetic: {slant_deg: 10}}
       bolditalic: {from: bold, synthetic: {slant_deg: 10}}
 
