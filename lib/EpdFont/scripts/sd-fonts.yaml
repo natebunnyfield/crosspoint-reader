@@ -513,55 +513,75 @@ families:
     description: "Exploratory: Inknut Light/Bold + Junicode's real italics (Latin)"
     intervals: latin-ext
     # NOT in installed_families. Regular/bold = Inknut's shipped Light/Bold
-    # (same source files as InknutAntiqua62). Italic/bolditalic borrowed from
-    # Junicode instead of synthetic slant, since Junicode ships real cut
-    # italics (SemiCondLightItalic/SemiCondMediumItalic) and Inknut's foundry
-    # repo has none at all, for any weight. Metrics/sizes forced to Inknut's
-    # values so advanceY matches exactly regardless of source file — see
-    # docs/sd-card-fonts.md, "The 2x hi-res companions" section's sibling rule
-    # for hand-derived metrics overrides. x-height/set-width match is NOT
-    # guaranteed by the override (that only fixes vertical line metrics, not
-    # glyph outlines) and Junicode is SemiCondensed by design — this is
-    # exploratory precisely to find out whether that reads as a seam at the
-    # regular-to-italic boundary. See tools/calendar_preview `reading` output.
+    # (same source files as InknutAntiqua62). Italic/bolditalic are borrowed
+    # from Junicode, which ships real cut italics where Inknut's foundry repo
+    # has none at any weight.
     #
-    # SemiBold italic at x1.33 -- owner ruling 2026-08-12, off four rendered
-    # benches read inline (italic mid-sentence, the only arrangement that shows
-    # whether a borrowed italic belongs to its roman;
-    # `render_harness inline <FAMILY>`).
+    # ── SETTLED 2026-08-13, owner rulings off rendered inline benches ────────
     #
-    # WEIGHT. Junicode's SemiCondensed italics all carry the SAME x-height (416
-    # units per 1000 upem) and cap height (666) -- only the stroke changes --
-    # so weight and size are independent knobs here. A 2x2 of the two showed
-    # weight mattered more: the Light italic (300) read thin beside Inknut's
-    # roman even at matched x-height. SemiBold (600) is the heaviest italic in
-    # the SemiCondensed width, which is why it fills the bolditalic slot too --
-    # reaching into the full-width cuts would change set width mid-family, and
-    # a bold-italic run is rare enough in reading text not to justify that.
+    #   width    Expanded (wdth 125). Condensed and SemiCondensed are OUT OF
+    #            SCOPE by ruling, not merely unranked.
+    #   weight   SemiBold (600) italic; Bold (700) bolditalic.
+    #   ENLA     14
+    #   scale    x1.25
+    #   tracking 0 -- swept 0 to 0.05 em at 0.005 and rejected; the Expanded
+    #            cut already sets at 100% of the roman's lowercase alphabet, so
+    #            there is nothing for it to close.
+    #   word sp. -0.09 em  (see below -- this one is not an eye ruling)
     #
-    # SCALE. Inknut Light measures 530 against Junicode's 416, so x-height
-    # PARITY is x1.274 -- and parity still read small, because a chancery
-    # italic carries more of its character in the extenders than in the
-    # x-height. x1.45 overshot; a x1.30/x1.35/x1.40 bench narrowed it to the
-    # bottom of that range, and a final x1.31/x1.32/x1.33 bench took x1.33.
-    # Those last three steps are finer than a pixel at reading sizes (1% of a
-    # 22 px x-height is 0.2 px), so they differ by at most 1 px of x-height and
-    # 0-2 px on a ~120 px italic word; do not re-derive this by measurement
-    # alone, it was an eye ruling on rendered pages.
+    # Built from VAR/JunicodeVF-Italic.ttf rather than the named statics for
+    # one reason: the statics are all ENLA 0, and ENLA is the axis that carries
+    # the ruling. Same width and weight masters either way -- wdth 125 / wght
+    # 600 IS Junicode-ExpSemiBoldItalic, wght 700 IS Junicode-ExpBoldItalic.
     #
-    # Set width is NOT matched, deliberately: Junicode is SemiCondensed, an
-    # italic is narrower than its roman anyway, and stretching one axis to
-    # force a width match would distort the letterforms. Caps do overshoot --
-    # Junicode's cap-to-x ratio is 1.60 against Inknut's 1.48 -- which is an
-    # accepted consequence of sizing on the x-height, the metric that governs
-    # apparent size in running text.
+    # BOLDITALIC IS wght 700 NOW, where it used to repeat the SemiBold. The old
+    # reason was real but width-specific: SemiCondensed ships no Bold Italic at
+    # all, and reaching into a wider cut would have changed set width mid-family.
+    # At Expanded the Bold Italic exists at the family's own width, so the slot
+    # gets a genuinely heavier face instead of a repeat.
+    #
+    # ── WORD SPACE: -0.09 em, derived not judged ────────────────────────────
+    # Junicode's space is 0.3555 em after the x1.25 scale against Inknut's
+    # 0.2840, so an italic phrase inside an Inknut sentence opened up at every
+    # word boundary while the letters sat right. Neither `scale:` nor the width
+    # axis can fix that -- both move the space in proportion with everything
+    # else. Rendered gap in device px:
+    #
+    #     word_space_em   10pt  12pt  14pt  16pt
+    #     roman             6     7     8     9
+    #     0 (as drawn)      7     9    10    12
+    #     -0.06             6     7     9    10
+    #     -0.09             6     7     8     9   <- parity at every size
+    #     -0.12             5     6     7     8
+    #
+    # The gap snaps to a whole pixel, so -0.06 and -0.09 are indistinguishable
+    # at 10 and 12 pt and only separate at 14 and 16. Do not "simplify" this to
+    # -0.06 off a 12 pt proof; that is exactly the reading that missed.
+    #
+    # CAUTION for anyone re-running this comparison: the word-space ladder
+    # rendered PIXEL-IDENTICAL at first, because render_harness.cpp measured one
+    # word gap in REGULAR and reused it for every run. The reader does not --
+    # ParsedText.cpp:755 asks per word style. The harness is fixed; if a spacing
+    # change ever appears to do nothing, diff the frames before believing it.
+    #
+    # ── Superseded, kept so the path is legible ─────────────────────────────
+    # Rounds 1-3 shipped SemiCondensed SemiBold at x1.33, sized on x-height
+    # parity (x1.274 read small). Round 4 re-derived x1.171 from the M for exact
+    # cap parity, which made the italic read short AND narrow -- one constraint,
+    # two symptoms -- and rounds 7-12 let it go again. Caps now sit ~5% over the
+    # roman's, accepted: Inknut's counters are small for its size, so bowl
+    # parity and height parity cannot both hold, and height won.
     sizes: [10, 12, 14, 16]
     metrics: {ascent: 1203, descent: -340, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
-      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.33}
-      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.33}
+      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
+                   member: "Junicode/VAR/JunicodeVF-Italic.ttf",
+                   variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
+                   member: "Junicode/VAR/JunicodeVF-Italic.ttf",
+                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
 
   - name: LibreCaslonText
     description: "Caslon revival tuned for body text (Latin)"
