@@ -489,6 +489,51 @@ families:
       italic:     {from: regular, synthetic: {slant_deg: 10}}
       bolditalic: {from: bold, synthetic: {slant_deg: 10}}
 
+  # ── InknutAntiqua exploratory weight-pair variants (2026-08-12) ──────────
+  # NOT in installed_families. Comparison builds for sideloading on device.
+  # iCloud deliverables: ~/Library/Mobile Documents/com~apple~CloudDocs/CrossPoint Fonts/
+  #   InknutAntiqua62RegularExtraBold/ and InknutAntiqua62LightBold/
+  # Measured metrics (x-height of 'x' glyph, advanceY) at sizes [10,12,14,16]:
+  #   advY: 32/39/45/51 px (both variants; same override, same unitsPerEm=1000)
+  #   x-height regular: 13/15/17/19 px (identical across Regular, Light, ExtraBold
+  #     at 10–14pt; ExtraBold bold-style 16pt is 20px vs 19px on all others)
+  #   No force_autohint needed — hinted x-height ramp is smooth for all weights.
+  # Kerning/GSUB: all four weights (Light/Regular/Bold/ExtraBold) carry identical
+  #   GSUB feature sets (liga, dlig, calt, etc.); kern is class-based in the cpfont
+  #   (Light/ExtraBold class counts differ slightly from Regular/Bold — expected).
+  #   No kern cells in the source TTFs (font uses GPOS, not kern table) — the
+  #   cpfont kern comes from GPOS, handled by fontconvert_sdcard.py.
+
+  - name: InknutAntiqua62RegularExtraBold
+    description: "Inknut Antiqua weight-pair variant: Regular (400) body + ExtraBold (800) emphasis (Latin)"
+    intervals: latin-ext
+    # Same sizes and metrics as InknutAntiqua62. All weights share unitsPerEm=1000
+    # so the override produces the same advanceY. x-height measured: 13/15/17/19 px
+    # (regular style all slots); ExtraBold bold-style reads 20 px at 16pt (1px
+    # over Regular's 19 px at that slot — heavier optics, not a hinting skip).
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-ExtraBold.ttf"}
+      italic:     {from: regular, synthetic: {slant_deg: 10}}
+      bolditalic: {from: bold, synthetic: {slant_deg: 10}}
+
+  - name: InknutAntiqua62LightBold
+    description: "Inknut Antiqua weight-pair variant: Light (300) body + Bold (700) emphasis (Latin)"
+    intervals: latin-ext
+    # Same sizes and metrics as InknutAntiqua62. x-height measured: 13/15/17/19 px
+    # (both regular/Light and bold/Bold styles at all slots — identical to shipped
+    # Regular+Bold pair, as expected given near-identical sxHeight in font units:
+    # Light=530, Regular=531, Bold=539, ExtraBold=541 out of 1000 upem).
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
+      italic:     {from: regular, synthetic: {slant_deg: 10}}
+      bolditalic: {from: bold, synthetic: {slant_deg: 10}}
+
   - name: LibreCaslonText
     description: "Caslon revival tuned for body text (Latin)"
     intervals: latin-ext
