@@ -60,6 +60,28 @@ real `GfxRenderer` / `SdCardFont` path rather than a host reimplementation.
     CPFONT_DIR=/.fonts ./render_harness fonts RosarivoV1 Rosarivo
     # -> ./fs_/kern_specimen_{12,14,16,18}.bmp, plus per-line widths on stdout
 
+## Inline italic specimen
+
+    ./render_harness inline InknutJunicode
+    # -> ./fs_/inline_<FAMILY>_{0,1,2,3}.bmp, one per ordinal size slot
+
+Renders three paragraphs with italic (and one bold) set **inline, mid-sentence**
+rather than as their own block. That distinction is the whole point: `reading`
+draws each style as a separate paragraph, so an italic is judged against
+nothing, while an italic beside the roman word touching it is judged against
+the thing it has to match. It is the mode that settled the Inknut/Junicode
+pairing — a borrowed italic from another typeface looked fine as a block and
+obviously wrong inline.
+
+The paragraph source uses `<i>`/`<b>` markers, which may sit inside a word so
+punctuation stays with the roman (`<i>rounding</i>,`). A word butted straight
+against the previous one across a tag is *glued*: no space, and the pair wraps
+as one unit so a comma can never start a line alone. Word gaps are measured
+differentially (`"n n"` minus two `"n"`) because `getTextWidth(" ")` returns 0
+through this path — measuring it directly ran every word together into one
+unbroken string. Kerning is not applied across a style boundary, matching how a
+styled run is laid out in the reader rather than being a shortcut here.
+
 Families live under `./fs_/.fonts/<Family>/` **and** `./fs_/fonts/<Family>/` —
 `SdCardFontRegistry` scans both roots and dedupes by name, hidden first, and the
 installed set routinely straddles the two (locally-sourced families in `.fonts`,

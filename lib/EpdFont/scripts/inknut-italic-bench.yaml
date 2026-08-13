@@ -1,0 +1,1330 @@
+# Inknut + Junicode italic-pairing bench (evaluation set)
+#
+# NOT a shipping list, and nothing here is installed anywhere —
+# `installed_families:` in sd-fonts.yaml still rules that. Separate file for
+# the same reason sans-candidates.yaml and grotesque-candidates.yaml are
+# separate: these are unranked variants of one question, and putting them in
+# sd-fonts.yaml would drop them into the shipped font set.
+#
+#   python3 lib/EpdFont/scripts/build-sd-fonts.py \
+#     --config lib/EpdFont/scripts/inknut-italic-bench.yaml --output-dir out/
+#
+# ── ROUND 3, 2026-08-13: width ─────────────────────────────────────────────
+#
+# "All options from SemiBold to widest / most expanded / most extra bold, and
+# nothing condensed at all" — owner, 2026-08-13. The shipped InknutJunicode is
+# SemiCondensed (wdth 87.5), which that rules out, so every family here sits at
+# wdth 100 or wider.
+#
+# THE CEILING IS REAL AND IT IS wght 700 / wdth 125. Junicode's variable italic
+# (VAR/JunicodeVF-Italic.ttf) declares wght 300–700 and wdth 75–125, and the
+# statics are just named instances of it — so there is **no ExtraBold or Black
+# italic to reach for**, at any width. "Most extra bold" tops out at Bold (700).
+# Cond and SemiCond ship no Bold Italic static at all, which is why the earlier
+# rounds could not offer one.
+#
+# Built from the VARIABLE font rather than the statics, because the corner this
+# asks for is a 3×2 grid and only four of its six cells exist as named statics.
+# Pinning wght/wdth off the VF gives all six from one source, and `scale:` then
+# applies on top of the instanced file.
+#
+#   width   wdth    name          set width of the lc alphabet, units
+#   ------  ------  ------------  ----------------------------------
+#   normal  100     (unmarked)     ~11 100
+#   SemiExp 112.5   SemiExp        ~11 700
+#   Exp     125     Exp            ~12 355   ← widest
+#
+# Scale stays at ×1.33, the value ruled on 2026-08-12, so width is the only
+# variable across these six. Worth knowing where that lands: Exp at ×1.33 gives
+# a lowercase alphabet of ~16 400 units against Inknut Light's 16 219 — the
+# widest option is very nearly an exact set-width match to the roman, which
+# none of the condensed ones could be.
+#
+# bolditalic is wght 700 at the family's own width throughout — the heaviest
+# italic that exists — so the SemiBold families still get a real bold italic
+# rather than repeating their own weight.
+#
+# ── THE ENLA AXIS, measured 2026-08-13, NOT used below ────────────────────
+#
+# Junicode's third axis, ENLA (0–100), is an X-HEIGHT axis, and it is the
+# cleaner tool for this whole problem:
+#
+#   ENLA    0    50   100          cap height stays 666 at every value
+#   x-height  416   546   676
+#
+# Scaling raises x-height and cap height together, which is why every scaled
+# build in these benches overshoots the capitals — Junicode's cap-to-x ratio is
+# 1.60 against Inknut's 1.48. ENLA raises the x-height ALONE. Solving both at
+# once against Inknut Light (x-height 530, cap 786): scale ×1.18 matches the
+# cap exactly (786/666), and ENLA ≈ 13 then brings the x-height to 530. That
+# would match BOTH metrics rather than trading one off against the other.
+#
+# Deliberately not built here: this round is the width question that was asked,
+# and folding in a second change would make the six specimens unreadable
+# against each other. Worth its own bench.
+#
+# ── Rounds 1–2, settled ───────────────────────────────────────────────────
+#
+# Inknut Antiqua's foundry repo ships no italic at any weight, so the shipped
+# InknutAntiqua62 slants its own roman 10°. Junicode ships real cut italics
+# drawn for a different typeface: x-height 416 units per 1000 upem against
+# Inknut Light's 530.
+#   - Weight: SemiBold (600) beat Light (300); at every width Junicode's
+#     italics share one x-height and cap height, so weight and size are
+#     independent knobs.
+#   - Scale: ×1.274 is exact x-height parity and read small; ×1.45 overshot;
+#     ×1.30/×1.35/×1.40 then ×1.31/×1.32/×1.33 settled on ×1.33.
+# Both were eye rulings on rendered inline pages, not measurements.
+#
+# Roman/bold are Inknut Light + Bold throughout, identical to the shipped
+# InknutAntiqua62, so any difference you see is the italic and nothing else.
+#
+# Render inline (italic mid-sentence, the only arrangement that answers this):
+#   tools/calendar_preview/render_harness inline <FAMILY>
+
+_junicode_vf: &vf "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip"
+_vf_member: &vfm "Junicode/VAR/JunicodeVF-Italic.ttf"
+_inknut_light: &light "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"
+_inknut_bold: &bold "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"
+
+families:
+  # ── SemiBold (600) ───────────────────────────────────────────────────────
+  - name: InknutJunicodeSB100
+    description: "Bench: Junicode SemiBold italic, normal width (wdth 100) at x1.33"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 100, ENLA: 0}, scale: 1.33}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 100, ENLA: 0}, scale: 1.33}
+
+  - name: InknutJunicodeSB1125
+    description: "Bench: Junicode SemiBold italic, SemiExpanded (wdth 112.5) at x1.33"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 0}, scale: 1.33}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 0}, scale: 1.33}
+
+  - name: InknutJunicodeSB125
+    description: "Bench: Junicode SemiBold italic, Expanded (wdth 125) at x1.33"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 0}, scale: 1.33}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 0}, scale: 1.33}
+
+  # ── Bold (700) — the heaviest italic that exists at any width ────────────
+  - name: InknutJunicodeB100
+    description: "Bench: Junicode Bold italic, normal width (wdth 100) at x1.33"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 100, ENLA: 0}, scale: 1.33}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 100, ENLA: 0}, scale: 1.33}
+
+  - name: InknutJunicodeB1125
+    description: "Bench: Junicode Bold italic, SemiExpanded (wdth 112.5) at x1.33"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 0}, scale: 1.33}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 0}, scale: 1.33}
+
+  # The corner: heaviest and widest italic Junicode can produce.
+  - name: InknutJunicodeB125
+    description: "Bench: Junicode Bold italic, Expanded (wdth 125) at x1.33 — the ceiling"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 0}, scale: 1.33}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 0}, scale: 1.33}
+
+  # ── ROUND 4, 2026-08-13: match the M, then set the x-height ──────────────
+  #
+  # The right way round, and it makes the earlier scale hunt look like the
+  # wrong question. Measured INK (not OS/2 fields, which disagree with the
+  # outlines here), em-relative:
+  #
+  #             M ink    x ink    x/M
+  #   Inknut    0.7880   0.5320   0.675   <- the roman we must sit beside
+  #   Junicode  0.6730   0.4290   0.637   at ENLA 0
+  #
+  # M IS INVARIANT UNDER ENLA — 0.6730 em at ENLA 0, 5, 10, 25, 50 and 100,
+  # measured. So the two knobs are orthogonal and solve in order, exactly:
+  #
+  #   1. scale  = 0.7880 / 0.6730 = 1.171   -> caps match, by construction
+  #   2. ENLA   = 9.8                       -> x-height 0.4544 em pre-scale,
+  #                                            which is 0.5320 em after it
+  #
+  # Confirmation the solution is real rather than arithmetic: Junicode at
+  # ENLA 10 has x/M = 0.676 against Inknut's 0.675. The two faces end up with
+  # the same cap-to-x proportion, which is the thing that was actually wrong.
+  #
+  # Every earlier round scaled the whole glyph, which raises caps and x-height
+  # together and so could never fix the 1.60-vs-1.48 cap-to-x mismatch — it
+  # only chose which of the two to get wrong. ×1.33 (shipped) overshoots the
+  # caps by 13%; ×1.171 lands them dead on.
+  #
+  # Width is left open at three values, since that ruling has not been made.
+
+  - name: InknutJunicodeM100
+    description: "Bench: M-matched + ENLA x-height, normal width (wdth 100)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 100, ENLA: 9.8}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 100, ENLA: 9.8}, scale: 1.171}
+
+  - name: InknutJunicodeM1125
+    description: "Bench: M-matched + ENLA x-height, SemiExpanded (wdth 112.5)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 9.8}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 9.8}, scale: 1.171}
+
+  - name: InknutJunicodeM125
+    description: "Bench: M-matched + ENLA x-height, Expanded (wdth 125)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 9.8}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 9.8}, scale: 1.171}
+
+  # Same geometry as InknutJunicodeM1125, but both faces on the AUTOHINTER.
+  # The M-matched build proved its outlines exact (italic M 0.7881 em against
+  # the roman's 0.7880, x/M 0.675 on both) and STILL rendered the italic
+  # x-height 2 px short — because Inknut's native hints snap ~20.7 px of x ink
+  # up to 22 px and Junicode's, now sitting on a rescaled upem, do not. Native
+  # hinting is per-face and there is no per-style switch, so the only way to
+  # make two faces round the same way is to put both on the same hinter.
+  - name: InknutJunicodeM1125AH
+    description: "Bench: M-matched + ENLA, SemiExpanded, force_autohint (both faces)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    force_autohint: true
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 9.8}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 9.8}, scale: 1.171}
+
+  # ── ROUND 5: x-height ladder above parity, caps held ─────────────────────
+  # "The Junicode x-height is too low still" — owner, 2026-08-13, looking at
+  # the ENLA 9.8 build. That build is exact GEOMETRIC parity (x 0.5316 em
+  # against the roman's 0.5320), so "too low" is a judgement that parity is
+  # not enough — the same finding as round 2, where x-height parity by scale
+  # also read small.
+  #
+  # This is where ENLA earns its place: scale stays at x1.171 so the CAPS
+  # STAY MATCHED, and only the x-height moves. Every earlier attempt to raise
+  # the x-height dragged the caps up with it. Rendered x-height at 12 pt
+  # against the roman's 22 px is the number to read.
+
+  - name: InknutJunicodeE15
+    description: "Bench: caps matched (x1.171), x-height at ENLA 15"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 15}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 15}, scale: 1.171}
+
+  - name: InknutJunicodeE20
+    description: "Bench: caps matched (x1.171), x-height at ENLA 20"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 20}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 20}, scale: 1.171}
+
+  # ── ROUND 6, 2026-08-13: judged by ink, not by geometry ──────────────────
+  # "We're going for a visual match, not geometric ... maybe look at area
+  # inside counters, amount of pixels covered" — owner. So the ladder is
+  # re-measured on what the panel actually paints, by
+  # tools/italic-bench/measure_enla.py: BW mode blacks every non-zero glyph
+  # level (GfxRenderer.cpp:512), so ink is level >= 1 and a counter is only
+  # the level-0 pixels left fully enclosed.
+  #
+  # Bowl counter area against the roman (o b d p q — the only letters drawn to
+  # the same plan in both faces; Junicode's italic a and g are single-storey
+  # where Inknut's are double, so their counters differ by design):
+  #
+  #   ENLA      10 pt   12 pt   14 pt   16 pt      ink/glyph, 12-16 pt
+  #     20       95%     95%     93%     91%        95 / 93 / 93 %
+  #     23      101%     98%     96%     91%        96 / 95 / 94 %
+  #     25      106%     97%     96%    100%        97 / 95 / 98 %
+  #     27      107%     99%    103%    102%        97 / 98 / 99 %
+  #     30      110%    109%    107%    104%        98 / 99 / 100 %
+  #     33      110%    116%    109%    111%       102 / 101 / 100 %
+  #
+  # 27 is the value that lands nearest parity on BOTH measures at every size,
+  # and it is a genuine interior optimum rather than the top of the range that
+  # was asked about: 30 and 33 overshoot the bowls without buying back much
+  # ink. E30 is built alongside as the one-notch-more reference.
+  #
+  # The one thing 27 does not fix: 'n' still renders 1 px short of the roman at
+  # every slot. Nothing below ENLA 33 closes that, and 33 costs 16% oversized
+  # bowls at 12 pt — a worse trade than the missing pixel.
+
+  - name: InknutJunicodeE23
+    description: "Bench: caps matched (x1.171), x-height at ENLA 23"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 23}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 23}, scale: 1.171}
+
+  - name: InknutJunicodeE25
+    description: "Bench: caps matched (x1.171), x-height at ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 25}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 25}, scale: 1.171}
+
+  - name: InknutJunicodeE27
+    description: "Bench: caps matched (x1.171), x-height at ENLA 27"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 27}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 27}, scale: 1.171}
+
+  - name: InknutJunicodeE35
+    description: "Bench: caps matched (x1.171), x-height at ENLA 35"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 35}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 35}, scale: 1.171}
+
+  - name: InknutJunicodeE30
+    description: "Bench: caps matched (x1.171), x-height at ENLA 30 — one notch past the measured optimum"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 30}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 30}, scale: 1.171}
+
+  # ── ROUND 7, 2026-08-13: width review at the bumped italic scale ──────────
+  # Owner rulings this round: ENLA 25; no non-proportional stretching of the
+  # letterform; word space fixed by trial and error ("italic does not sit in
+  # roman well"); and "the overall italics are smaller than needed".
+  #
+  # That last one moves the primary knob. x1.171 existed only to pin the caps
+  # to the roman's, and it is what made the italic BOTH small and narrow --
+  # one cause, two symptoms. Measured at ENLA 25 / wdth 112.5:
+  #
+  #   scale   caps    set width   12pt x/n   16pt x/n   bowls
+  #   1.171   100%      92%        14/14      19/19      97-100%
+  #   1.20    102%      94%        14/14      19/19     103-107%
+  #   1.23    105%      97%        15/15      20/20     109-114%
+  #   1.27    108%     100%        15/15      20/20     112-115%
+  #   roman     --      100%       15/15      19/20        100%
+  #
+  # x1.23 is where the italic stops rendering a pixel short at every slot, so
+  # it is the scale these three carry. The cost is caps 5% over the roman's
+  # and bowls ~12% over -- at this scale Inknut's small counters make bowl
+  # parity and height parity mutually exclusive, and the owner's ruling puts
+  # height first. Round 6's bowl-first priority is deliberately inverted here.
+  #
+  # Width is the question these three ask, and nothing else differs. Junicode's
+  # wdth is a DRAWN axis (the masters behind its Cond/SemiCond/Exp statics),
+  # not a synthetic stretch, so all three are real cuts:
+  #
+  #   wdth    named        lc alphabet set width, % of Inknut Light at x1.23
+  #   100     (normal)      86%
+  #   112.5   SemiExpanded  93%   <- where rounds 4-6 were measured
+  #   125     Expanded      99%   <- reaches roman set width with no tracking
+  #
+  # Whatever wins here sets how much work the tracking knob has left to do.
+  # ENLA gets re-confirmed against the winner, since width moves the bowls too.
+
+  - name: InknutJunicodeWD100
+    description: "Bench: italic at x1.23, ENLA 25, wdth 100 (normal)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 100, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 100, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJunicodeWD1125
+    description: "Bench: italic at x1.23, ENLA 25, wdth 112.5 (SemiExpanded)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJunicodeWD125
+    description: "Bench: italic at x1.23, ENLA 25, wdth 125 (Expanded)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  # ── ROUND 8, 2026-08-13: the width sweep, from non-condensed upward ───────
+  #
+  # WHERE ROUNDS 1-7 GOT TO, so the state is not lost when the width question
+  # reopens it:
+  #
+  #   weight   wght 600 (SemiBold) beat Light; eye ruling on inline pages.
+  #   scale    x1.274 (x-height parity) read small; x1.33 shipped; then round 4
+  #            re-derived x1.171 from the M for exact cap parity, and round 7
+  #            let it go again to x1.23 because cap-matching is precisely what
+  #            made the italic read short AND narrow. x1.23 puts x and n on the
+  #            roman exactly at all four slots. Caps end 5% over.
+  #   ENLA     owner ruling: 25. Solved for bowls at x1.171 (round 6 measured
+  #            27 as the bowl optimum; 25 was the call). At x1.23 the bowls run
+  #            over, and that is accepted -- Inknut's counters are small for its
+  #            size, so bowl parity and height parity cannot both hold, and
+  #            height won. ENLA is re-confirmed once the width lands.
+  #   width    the open question. The SHIPPED InknutJunicode is SemiCondensed
+  #            (wdth 87.5). Owner 2026-08-13: start over from non-condensed and
+  #            sweep everything wider -- so 87.5 and below are out of scope, not
+  #            merely unranked.
+  #   open     tracking and a word-space override, neither built yet. The
+  #            italic's word space measures 119-125% of the roman's across this
+  #            ladder, which is most of "the italic does not sit in roman well";
+  #            no width setting fixes it, since the space scales with everything
+  #            else. Both go in fontconvert_sdcard.py beside the synthetic-
+  #            embolden advance compensation.
+  #
+  # The sweep itself. wdth is a DRAWN axis (the masters behind Junicode's
+  # Cond/SemiCond/Exp statics), so every step is a real cut and none of it is
+  # synthetic stretching. Five steps, the three named stops plus the midpoints:
+  #
+  #   wdth      named           lc alphabet, % of Inknut Light   bowls, 12/16 pt
+  #   100       (normal)         90%                              101 / 101 %
+  #   106.25    --               93%                              108 / 106 %
+  #   112.5     SemiExpanded     97%                              114 / 112 %
+  #   118.75    --              100%                              120 / 118 %
+  #   125       Expanded        103%                              127 / 125 %
+  #
+  # x and n hold at roman parity across the whole ladder (15/15 at 12 pt,
+  # 20/20 at 16), so width trades set-width fit against counter size and
+  # nothing else -- which is the cleanest single-variable sweep this bench has
+  # had. Wherever it lands sets how much the tracking knob has left to close.
+
+  - name: InknutJunicodeWD10625
+    description: "Bench: italic at x1.23, ENLA 25, wdth 106.25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 106.25, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 106.25, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJunicodeWD11875
+    description: "Bench: italic at x1.23, ENLA 25, wdth 118.75"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 118.75, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 118.75, ENLA: 25}, scale: 1.23}
+
+  # ── ROUND 9, 2026-08-13: SemiExpanded and Expanded, across the weights ────
+  #
+  # "I am explicitly asking for expanded and semiexpanded. this is the third
+  # time." — owner. Rounds 3, 7 and 8 each contained wdth 112.5 and 125, but
+  # always as two rungs of a wider ladder led by something narrower, never as
+  # the pair being proofed. This round is the two of them and nothing else,
+  # swept across weight the way the SemiBold-vs-Light ruling was made.
+  #
+  # Junicode ships both widths as real named italic statics at four weights:
+  #   Junicode-SemiExpItalic / SemiExpMediumItalic / SemiExpSemiBoldItalic /
+  #   SemiExpBoldItalic, and the same four under Exp.
+  # They are built here off VAR/JunicodeVF-Italic.ttf at the identical width
+  # and weight coordinates rather than from those files, for ONE reason: the
+  # statics are all ENLA 0, and ENLA 25 is a standing owner ruling. Pinning the
+  # axis is the only way to have the named cut AND the ruled x-height. The
+  # width and weight masters are the same either way.
+  #
+  # Everything else held: italic scale x1.23, ENLA 25, roman Inknut Light.
+  # bolditalic is wght 700 at the family's own width throughout — the heaviest
+  # italic Junicode draws at any width.
+
+  - name: InknutJuniSE400
+    description: "Bench: Junicode-SemiExpItalic (SemiExpanded Regular) at x1.23, ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 400, wdth: 112.5, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniSE500
+    description: "Bench: Junicode-SemiExpMediumItalic (SemiExpanded Medium) at x1.23, ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 500, wdth: 112.5, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniSE600
+    description: "Bench: Junicode-SemiExpSemiBoldItalic (SemiExpanded SemiBold) at x1.23, ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 112.5, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniSE700
+    description: "Bench: Junicode-SemiExpBoldItalic (SemiExpanded Bold) at x1.23, ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 112.5, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniEX400
+    description: "Bench: Junicode-ExpItalic (Expanded Regular) at x1.23, ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 400, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniEX500
+    description: "Bench: Junicode-ExpMediumItalic (Expanded Medium) at x1.23, ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 500, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniEX600
+    description: "Bench: Junicode-ExpSemiBoldItalic (Expanded SemiBold) at x1.23, ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniEX700
+    description: "Bench: Junicode-ExpBoldItalic (Expanded Bold) at x1.23, ENLA 25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  # Probe for the new advance-only spacing knobs: deliberately huge values, so
+  # a rendered width that does NOT move proves the plumbing is dead.
+  - name: InknutJuniSPACEPROBE
+    description: "Probe: EX SemiBold italic with tracking +0.04 em, word space -0.06 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23,
+                   tracking_em: 0.04, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23,
+                   tracking_em: 0.04, word_space_em: -0.06}
+
+  # ── ROUND 10, 2026-08-13: every remaining variable, one ladder each ───────
+  #
+  # CONSTRAINED, per owner: the pairing is now FIXED at Inknut Antiqua Light
+  # roman + Junicode Expanded SemiBold Italic (wdth 125, wght 600). Width and
+  # weight are no longer variables. Everything below moves ONE knob off the
+  # baseline (ENLA 25, scale x1.23, no spacing deltas, native hinting,
+  # 10/12/14/16, metrics 1203/-340) and holds the rest.
+  #
+  # TWO CANDIDATE VARIABLES ARE DELIBERATELY ABSENT, not overlooked:
+  #   synthetic slant (slant_deg) and synthetic embolden (embolden_em). Both
+  #   distort the letterform non-proportionally -- a shear and a stem-fattening
+  #   applied to outlines never drawn for it -- which the owner ruled out on
+  #   2026-08-13 ("do not stretch the letterform non-proportionally"). Weight is
+  #   fixed at SemiBold and Junicode draws real Medium and Bold, so there is no
+  #   case for faking one either.
+  #
+  # NEW THIS ROUND: `tracking_em:` and `word_space_em:`, advance-only spacing
+  # knobs in fontconvert_sdcard.py + build-sd-fonts.py. Advance only -- no
+  # outline is touched, which is what makes them the sanctioned way to fix fit.
+  # Both were verified against prediction BEFORE anything was built on them
+  # (ppem 25: tracking +0.04 em moved every advance +1.00 px; word_space
+  # -0.06 em moved the space -1.50 px and nothing else).
+  #
+  # Worth recording why the first attempt rendered byte-identical output: the
+  # spec was read inside build-sd-fonts' `from:`-only pass, next to
+  # `synthetic:`, so it silently skipped every style with a real source --
+  # which is every style that wants tracking. It has its own pass now.
+  #
+  # Baseline to sweep against (Expanded SemiBold, x1.23, ENLA 25, vs roman):
+  # set width 103%, word space 125%, bowls 127/125% at 12/16 pt, ink 110/109%,
+  # x/n 15/15 and 20/20. Note the SIGN: at Expanded the italic sets WIDER than
+  # the roman, so tracking wants to go negative -- the opposite of what it
+  # wanted at SemiExpanded.
+
+  - name: InknutJuniVE00
+    description: "Var sweep: ENLA 0"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 0}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 0}, scale: 1.23}
+
+  - name: InknutJuniVE10
+    description: "Var sweep: ENLA 10"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 10}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 10}, scale: 1.23}
+
+  - name: InknutJuniVE15
+    description: "Var sweep: ENLA 15"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 15}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 15}, scale: 1.23}
+
+  - name: InknutJuniVE20
+    description: "Var sweep: ENLA 20"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 20}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 20}, scale: 1.23}
+
+  - name: InknutJuniVS1171
+    description: "Var sweep: italic scale x1.171"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.171}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.171}
+
+  - name: InknutJuniVS120
+    description: "Var sweep: italic scale x1.2"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.2}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.2}
+
+  - name: InknutJuniVS126
+    description: "Var sweep: italic scale x1.26"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.26}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.26}
+
+  - name: InknutJuniVTm20
+    description: "Var sweep: tracking -0.02 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23, tracking_em: -0.02}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23, tracking_em: -0.02}
+
+  - name: InknutJuniVTm10
+    description: "Var sweep: tracking -0.01 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23, tracking_em: -0.01}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23, tracking_em: -0.01}
+
+  - name: InknutJuniVTp10
+    description: "Var sweep: tracking +0.01 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23, tracking_em: 0.01}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23, tracking_em: 0.01}
+
+  - name: InknutJuniVWm60
+    description: "Var sweep: word space -0.06 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniVWm40
+    description: "Var sweep: word space -0.04 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23, word_space_em: -0.04}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23, word_space_em: -0.04}
+
+  - name: InknutJuniVWm20
+    description: "Var sweep: word space -0.02 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23, word_space_em: -0.02}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23, word_space_em: -0.02}
+
+  - name: InknutJuniVAH
+    description: "Var sweep: force_autohint on both faces"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    force_autohint: true
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniVLTIGHT
+    description: "Var sweep: leading 1130/-320"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1130, descent: -320, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniVLLOOSE
+    description: "Var sweep: leading 1290/-370"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1290, descent: -370, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  - name: InknutJuniVSZUP
+    description: "Var sweep: size ramp 11/13/15/17"
+    intervals: latin-ext
+    sizes: [11, 13, 15, 17]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 25}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 25}, scale: 1.23}
+
+  # ── ROUND 11, 2026-08-13: the chosen combination, and its neighbours ──────
+  #
+  # Owner ruling from the round-10 sweep: ENLA 12, italic scale x1.23, tracking
+  # 0, word space -0.06 em, NATIVE hinting, leading unchanged at 1203/-340,
+  # size ramp 10/12/14/16. Pairing still fixed at Inknut Antiqua Light +
+  # Junicode Expanded SemiBold Italic (wdth 125, wght 600).
+  #
+  # ENLA 12 was not one of the rungs built in round 10 (0/10/15/20/25) -- it is
+  # an interpolation between the two that bracketed it, and the axis is
+  # continuous, so it builds like any other value.
+  #
+  # WHY THE NEIGHBOURS ARE REBUILT RATHER THAN REUSED: every round-10 variant
+  # carries word space 0, because that knob did not exist when they were
+  # specified. Flicking between one of those and the chosen build would move
+  # TWO things at once and prove nothing. Each family below is the chosen
+  # combination with exactly ONE knob displaced, so a flick-comparison isolates
+  # that knob and only that knob.
+  #
+  # FINWS0 is the control: it reverts the word-space fix and nothing else, so
+  # the deck can show what that -0.06 em is actually buying.
+
+  - name: InknutJuniFIN
+    description: "Chosen combo"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniFINE10
+    description: "Chosen combo: ENLA 10 instead of 12"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 10}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 10}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniFINE15
+    description: "Chosen combo: ENLA 15 instead of 12"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 15}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 15}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniFINS120
+    description: "Chosen combo: scale x1.20 instead of x1.23"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.2, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.2, word_space_em: -0.06}
+
+  - name: InknutJuniFINS126
+    description: "Chosen combo: scale x1.26 instead of x1.23"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.26, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.26, word_space_em: -0.06}
+
+  - name: InknutJuniFINTm10
+    description: "Chosen combo: tracking -0.01 em instead of 0"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: -0.01, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: -0.01, word_space_em: -0.06}
+
+  - name: InknutJuniFINTm20
+    description: "Chosen combo: tracking -0.02 em instead of 0"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: -0.02, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: -0.02, word_space_em: -0.06}
+
+  - name: InknutJuniFINWS0
+    description: "Chosen combo: word space as drawn instead of -0.06 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23}
+
+  - name: InknutJuniFINAH
+    description: "Chosen combo: force_autohint instead of native"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    force_autohint: true
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.06}
+
+  # ── ROUND 12, 2026-08-13: fine sweeps, one variable per section ───────────
+  #
+  # Owner rulings after the round-11 deck:
+  #   - force_autohint DROPPED outright. Not a candidate, not a variable.
+  #   - ENLA swept 10-15 at 1, scale 1.20-1.25 at 0.01, tracking from 0 at
+  #     0.005, word space pushed further negative than -0.06.
+  #   - "this interface sucks because it is shared and prevents A/B
+  #     comparison": one independent deck PER VARIABLE, so a section can be
+  #     parked on one value while another is flicked.
+  #
+  # WHY WORD SPACE READ IDENTICAL, which was the real complaint: not the value,
+  # the specimen. render_harness's inline page contained exactly ONE multi-word
+  # italic phrase, so a delta of 1-2 px per space had almost nothing to act on.
+  # kPara5/kPara6 now set the SAME sentence roman then italic on consecutive
+  # lines, so every gap on the line is the one under test with its own
+  # reference directly above it.
+  #
+  # Tracking is swept 0 -> 0.05 em at 0.005 (the design range: 0.005 em is
+  # 0.125 px per glyph at 12 pt, which the 12.4 fixed-point advance carries and
+  # accumulates across a line) and then 0.1 / 0.2 / 0.5 em, because the ask
+  # read "0-.5" and in the units on screen 0.5 em is 12.5 px of air per letter.
+  # The far end is built so the unit can be confirmed by eye rather than argued.
+  #
+  # Baseline for every section is the round-11 choice: ENLA 12, x1.23,
+  # tracking 0, word space -0.06 em, native hinting, 1203/-340, 10/12/14/16 --
+  # built as InknutJuniFIN, and reused as the in-range member of all four
+  # sections rather than duplicated.
+
+  - name: InknutJuniRE10
+    description: "R12 ENLA 10"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 10}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 10}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniRE11
+    description: "R12 ENLA 11"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 11}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 11}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniRE13
+    description: "R12 ENLA 13"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 13}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 13}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniRE14
+    description: "R12 ENLA 14"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniRE15
+    description: "R12 ENLA 15"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 15}, scale: 1.23, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 15}, scale: 1.23, word_space_em: -0.06}
+
+  - name: InknutJuniRS12
+    description: "R12 scale x1.2"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.2, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.2, word_space_em: -0.06}
+
+  - name: InknutJuniRS121
+    description: "R12 scale x1.21"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.21, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.21, word_space_em: -0.06}
+
+  - name: InknutJuniRS122
+    description: "R12 scale x1.22"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.22, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.22, word_space_em: -0.06}
+
+  - name: InknutJuniRS124
+    description: "R12 scale x1.24"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.24, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.24, word_space_em: -0.06}
+
+  - name: InknutJuniRS125
+    description: "R12 scale x1.25"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.25, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.25, word_space_em: -0.06}
+
+  - name: InknutJuniRT0005
+    description: "R12 tracking 0.005 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.005, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.005, word_space_em: -0.06}
+
+  - name: InknutJuniRT0010
+    description: "R12 tracking 0.01 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.01, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.01, word_space_em: -0.06}
+
+  - name: InknutJuniRT0015
+    description: "R12 tracking 0.015 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.015, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.015, word_space_em: -0.06}
+
+  - name: InknutJuniRT0020
+    description: "R12 tracking 0.02 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.02, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.02, word_space_em: -0.06}
+
+  - name: InknutJuniRT0025
+    description: "R12 tracking 0.025 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.025, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.025, word_space_em: -0.06}
+
+  - name: InknutJuniRT0030
+    description: "R12 tracking 0.03 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.03, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.03, word_space_em: -0.06}
+
+  - name: InknutJuniRT0035
+    description: "R12 tracking 0.035 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.035, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.035, word_space_em: -0.06}
+
+  - name: InknutJuniRT0040
+    description: "R12 tracking 0.04 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.04, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.04, word_space_em: -0.06}
+
+  - name: InknutJuniRT0045
+    description: "R12 tracking 0.045 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.045, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.045, word_space_em: -0.06}
+
+  - name: InknutJuniRT0050
+    description: "R12 tracking 0.05 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.05, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.05, word_space_em: -0.06}
+
+  - name: InknutJuniRT0100
+    description: "R12 tracking 0.1 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.1, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.1, word_space_em: -0.06}
+
+  - name: InknutJuniRT0200
+    description: "R12 tracking 0.2 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.2, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.2, word_space_em: -0.06}
+
+  - name: InknutJuniRT0500
+    description: "R12 tracking 0.5 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.5, word_space_em: -0.06}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, tracking_em: 0.5, word_space_em: -0.06}
+
+  - name: InknutJuniRW009
+    description: "R12 word space -0.09 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.09}
+
+  - name: InknutJuniRW012
+    description: "R12 word space -0.12 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.12}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.12}
+
+  - name: InknutJuniRW015
+    description: "R12 word space -0.15 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.15}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.15}
+
+  - name: InknutJuniRW018
+    description: "R12 word space -0.18 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.18}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.18}
+
+  - name: InknutJuniRW021
+    description: "R12 word space -0.21 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.21}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 12}, scale: 1.23, word_space_em: -0.21}
+
+  # ── ROUND 13, 2026-08-13: owner rulings, and a rig bug that invalidated a
+  #    whole round of word-space proofs ──────────────────────────────────────
+  #
+  # WINNERS from the round-12 decks: ENLA 14, scale x1.25, tracking 0.
+  #
+  # WORD SPACE IS REOPENED, because "word space has no effect" was correct
+  # about the images and wrong about the font, and the fault was mine.
+  # Diffing the frames on request: 0 differing pixels across the entire
+  # word-space ladder, while the .cpfont files and the whole-page BMPs all
+  # differed. The only differing pixels on the page were rows 21-41 -- the
+  # family-name header.
+  #
+  # Cause, render_harness.cpp:400. The inline specimen computed ONE word gap:
+  #     getTextWidth(id, "n n", EpdFontFamily::REGULAR) - 2 * getTextWidth(...)
+  # and reused it for every gap regardless of the run's style, so the italic's
+  # own space advance was never consulted. The real reader does not do this --
+  # ParsedText.cpp:755 asks getSpaceAdvance() with `wordStyles[j - 1]`, the
+  # style of the word to the LEFT of the gap. The harness now matches.
+  #
+  # The knob itself was fine and had been unit-checked at the converter (ppem
+  # 25: word_space -0.06 em moved the space advance -1.50 px and nothing else).
+  # A green unit test on the font plus a rendered page that never exercises the
+  # value is exactly the shape of a false pass.
+  #
+  # WHAT THE CORRECTED NUMBERS SAY. The gap snaps to a whole pixel, so the
+  # ladder's real resolution is coarser than its steps -- -0.06 and -0.09 both
+  # render 7 px at 12 pt, -0.18 and -0.21 both render 4 px. Rendered gap, px:
+  #
+  #     word_space_em   10pt  12pt  14pt  16pt
+  #     roman            6     7     8     9
+  #     0 (as drawn)     7     9    10    12
+  #     -0.06            6     7     9    10
+  #     -0.09            6     7     8     9   <- roman parity at EVERY size
+  #     -0.12            5     6     7     8
+  #
+  # -0.09 em is the value that matches the roman's word gap at all four sizes.
+  # -0.06 matches at 10 and 12 pt and runs a pixel wide at 14 and 16, which is
+  # why it looked right on a 12 pt proof.

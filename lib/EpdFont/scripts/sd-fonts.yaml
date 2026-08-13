@@ -29,6 +29,18 @@
 #                entirely rather than fallen back. Not a styling knob; requires
 #                a rendered contact sheet showing the wrong letter.
 #   styles:      Map of style name -> font source
+#                  scale: (optional) multiplier on rendered glyph size for THIS
+#                    style only -- 1.27 renders every glyph 27% bigger at a
+#                    given point size. Shrinks head.unitsPerEm and touches
+#                    nothing else, so outlines, advances and GPOS kern keep
+#                    their proportions and grow together. For MIXED-SOURCE
+#                    families whose roman and italic come from different
+#                    typefaces and so were never drawn to a shared x-height;
+#                    `metrics:` cannot do this, as it sets line spacing rather
+#                    than glyph size. Applied before drops/metrics, and
+#                    inherited by any `from:` style. Not a styling knob:
+#                    requires a measured x-height mismatch against the style
+#                    it sits beside.
 #                  path: relative to lib/EpdFont (for committed fonts)
 #                  url:  download URL (for fonts not in the repo)
 #                  zip + member: release-archive URL plus the font's path inside
@@ -513,14 +525,101 @@ families:
     # same idea against the uniform slot targets. Without an override the
     # family reads with ~60% extra leading.
     metrics: {ascent: 1203, descent: -340, linegap: 0}
-    # The family has no italics at all; obliques shear the REAL weights
-    # (regular -> italic, bold -> bolditalic) at a gentle 10° — sturdy antiqua,
-    # so no embolden is ever synthesized on top of the real Bold.
+    # Sourced from the foundry repo (github.com/clauseggers/Inknut-Antiqua),
+    # not the Google Fonts OFL mirror — same license (OFL 1.1), but the
+    # foundry repo carries the full 7-weight ladder (Light, Regular, Medium,
+    # SemiBold, Bold, ExtraBold, Black) the Google mirror truncates to just
+    # Regular+Bold. The family has no italics at all anywhere in the foundry
+    # repo, so obliques shear the REAL weights (regular -> italic, bold ->
+    # bolditalic) at a gentle 10°.
+    #
+    # Regular/bold pair is Light (300) + Bold (700), not Regular (400) + Bold
+    # — owner ruling 2026-08-12 after building and reading three pairings on
+    # device: shipped Regular+Bold, an exploratory Regular+ExtraBold, and an
+    # exploratory Light+Bold. Light+Bold won. Both weights are real files,
+    # never a synthesized embolden. Metrics/sizes below are unchanged by the
+    # swap: Light measured to the same 13/15/17/19 px x-height ramp as
+    # Regular at every slot (sxHeight 530/1000 upem vs 531/1000), so the
+    # existing {ascent: 1203, descent: -340} override still applies exactly.
     styles:
-      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inknutantiqua/InknutAntiqua-Regular.ttf"}
-      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inknutantiqua/InknutAntiqua-Bold.ttf"}
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
       italic:     {from: regular, synthetic: {slant_deg: 10}}
       bolditalic: {from: bold, synthetic: {slant_deg: 10}}
+
+  - name: InknutJunicode
+    description: "Exploratory: Inknut Light/Bold + Junicode's real italics (Latin)"
+    intervals: latin-ext
+    # NOT in installed_families. Regular/bold = Inknut's shipped Light/Bold
+    # (same source files as InknutAntiqua62). Italic/bolditalic are borrowed
+    # from Junicode, which ships real cut italics where Inknut's foundry repo
+    # has none at any weight.
+    #
+    # ── SETTLED 2026-08-13, owner rulings off rendered inline benches ────────
+    #
+    #   width    Expanded (wdth 125). Condensed and SemiCondensed are OUT OF
+    #            SCOPE by ruling, not merely unranked.
+    #   weight   SemiBold (600) italic; Bold (700) bolditalic.
+    #   ENLA     14
+    #   scale    x1.25
+    #   tracking 0 -- swept 0 to 0.05 em at 0.005 and rejected; the Expanded
+    #            cut already sets at 100% of the roman's lowercase alphabet, so
+    #            there is nothing for it to close.
+    #   word sp. -0.09 em  (see below -- this one is not an eye ruling)
+    #
+    # Built from VAR/JunicodeVF-Italic.ttf rather than the named statics for
+    # one reason: the statics are all ENLA 0, and ENLA is the axis that carries
+    # the ruling. Same width and weight masters either way -- wdth 125 / wght
+    # 600 IS Junicode-ExpSemiBoldItalic, wght 700 IS Junicode-ExpBoldItalic.
+    #
+    # BOLDITALIC IS wght 700 NOW, where it used to repeat the SemiBold. The old
+    # reason was real but width-specific: SemiCondensed ships no Bold Italic at
+    # all, and reaching into a wider cut would have changed set width mid-family.
+    # At Expanded the Bold Italic exists at the family's own width, so the slot
+    # gets a genuinely heavier face instead of a repeat.
+    #
+    # ── WORD SPACE: -0.09 em, derived not judged ────────────────────────────
+    # Junicode's space is 0.3555 em after the x1.25 scale against Inknut's
+    # 0.2840, so an italic phrase inside an Inknut sentence opened up at every
+    # word boundary while the letters sat right. Neither `scale:` nor the width
+    # axis can fix that -- both move the space in proportion with everything
+    # else. Rendered gap in device px:
+    #
+    #     word_space_em   10pt  12pt  14pt  16pt
+    #     roman             6     7     8     9
+    #     0 (as drawn)      7     9    10    12
+    #     -0.06             6     7     9    10
+    #     -0.09             6     7     8     9   <- parity at every size
+    #     -0.12             5     6     7     8
+    #
+    # The gap snaps to a whole pixel, so -0.06 and -0.09 are indistinguishable
+    # at 10 and 12 pt and only separate at 14 and 16. Do not "simplify" this to
+    # -0.06 off a 12 pt proof; that is exactly the reading that missed.
+    #
+    # CAUTION for anyone re-running this comparison: the word-space ladder
+    # rendered PIXEL-IDENTICAL at first, because render_harness.cpp measured one
+    # word gap in REGULAR and reused it for every run. The reader does not --
+    # ParsedText.cpp:755 asks per word style. The harness is fixed; if a spacing
+    # change ever appears to do nothing, diff the frames before believing it.
+    #
+    # ── Superseded, kept so the path is legible ─────────────────────────────
+    # Rounds 1-3 shipped SemiCondensed SemiBold at x1.33, sized on x-height
+    # parity (x1.274 read small). Round 4 re-derived x1.171 from the M for exact
+    # cap parity, which made the italic read short AND narrow -- one constraint,
+    # two symptoms -- and rounds 7-12 let it go again. Caps now sit ~5% over the
+    # roman's, accepted: Inknut's counters are small for its size, so bowl
+    # parity and height parity cannot both hold, and height won.
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
+      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
+                   member: "Junicode/VAR/JunicodeVF-Italic.ttf",
+                   variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
+                   member: "Junicode/VAR/JunicodeVF-Italic.ttf",
+                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
 
   - name: LibreCaslonText
     description: "Caslon revival tuned for body text (Latin)"

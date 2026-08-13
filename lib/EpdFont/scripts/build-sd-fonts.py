@@ -50,6 +50,7 @@ DEFAULT_OUTPUT = SCRIPT_DIR / "output"
 DOWNLOAD_DIR = SCRIPT_DIR / "downloaded_fonts"
 INSTANCE_DIR = SCRIPT_DIR / "instanced_fonts"
 PATCHED_DIR = SCRIPT_DIR / "patched_fonts"
+SCALED_DIR = SCRIPT_DIR / "scaled_fonts"
 # Libre Franklin, not Noto Sans (owner ruling 2026-08-08). Noto Sans was
 # removed from this fork as a built-in UI face in b8023ff8, but it stayed
 # wired in here as the fallback glyph source -- so that commit left every SD
@@ -149,7 +150,21 @@ def extract_static_instance(source_path: Path, axes: dict, family_name: str, sty
     #                          so the work would be wasted.
     source_font = TTFont(str(source_path))
     try:
-        font = instantiateVariableFont(source_font, axes, updateFontNames=True, optimize=False)
+        # updateFontNames=True rewrites the name table from the STAT axis-value
+        # records, which only exist for NAMED instances -- it raises
+        # "Cannot find Axis Values {...}" the moment you pin an axis to a
+        # coordinate the foundry did not name. Pinning an unnamed coordinate is
+        # the entire point of a variable font (Junicode's ENLA x-height axis is
+        # continuous 0-100 with no named stops at all), so fall back to leaving
+        # the names alone. Nothing downstream reads them: the family name comes
+        # from the yaml and the converter reads outlines.
+        try:
+            font = instantiateVariableFont(source_font, axes, updateFontNames=True, optimize=False)
+        except Exception as name_err:  # noqa: BLE001 - reported, then retried
+            print(f"  (unnamed axis position, keeping source names: {name_err})")
+            source_font.close()
+            source_font = TTFont(str(source_path))
+            font = instantiateVariableFont(source_font, axes, updateFontNames=False, optimize=False)
         try:
             font.save(str(tmp_path))
         finally:
@@ -291,6 +306,75 @@ def apply_metrics_override(source_path: Path, metrics: dict, family_name: str, s
     return cached
 
 
+def apply_upem_scale(source_path: Path, scale: float, family_name: str, style_name: str) -> Path:
+    """Render a face larger or smaller relative to the em, without touching outlines.
+
+    `scale` is a plain multiplier on rendered glyph size: 1.27 makes every
+    glyph 27% bigger at a given point size. Implemented by shrinking
+    `head.unitsPerEm` (new = old / scale) and changing NOTHING else -- outline
+    coordinates, advance widths and GPOS kern values are all in font units, so
+    they keep their proportions to each other and all grow together relative to
+    the em. That is why this is a one-field edit rather than a transform:
+    scaling the outlines instead would round every coordinate and every kern
+    value, and would need hmtx and GPOS rewritten to match.
+
+    Exists for MIXED-SOURCE families -- one where the roman and the italic come
+    from different typefaces, so their x-heights were never drawn to agree.
+    A metrics override cannot fix that: it rewrites hhea/OS2 line metrics only,
+    which sets line spacing, not glyph size. Junicode's italic measures 0.416 em
+    x-height against Inknut's 0.530, so an unscaled pairing renders the italic
+    visibly smaller than the roman it sits beside.
+
+    Caveat worth knowing: TrueType hinting instructions are compiled against the
+    original upem, so they fire at a different ppem after this. Check the
+    rendered x-height ramp for skipped pixel sizes rather than assuming, and
+    reach for family-level `force_autohint` if the native hints misbehave.
+
+    Cached in SCALED_DIR/<family>/, keyed on the scale + source mtime.
+    """
+    from fontTools.ttLib import TTFont
+
+    if scale <= 0:
+        raise ValueError(f"{family_name}/{style_name}: scale must be positive, got {scale}")
+
+    mtime = int(source_path.stat().st_mtime)
+    cache_name = f"{style_name}_s{scale:g}_{mtime}{source_path.suffix}"
+    cached = SCALED_DIR / family_name / cache_name
+    if cached.exists():
+        return cached
+
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    for old in cached.parent.glob(f"{style_name}_*{source_path.suffix}"):
+        old.unlink()
+
+    # recalcBBoxes=False for the same reason apply_metrics_override needs it:
+    # re-walking charstrings crashes on CFF fonts using the deprecated
+    # two-argument endchar, and nothing here invalidates the stored bounds
+    # (they are in font units, which do not change).
+    font = TTFont(str(source_path), recalcBBoxes=False, recalcTimestamp=False)
+    try:
+        old_upem = font["head"].unitsPerEm
+        new_upem = round(old_upem / scale)
+        if new_upem < 16:
+            raise ValueError(
+                f"{family_name}/{style_name}: scale {scale} would drop unitsPerEm to "
+                f"{new_upem}, below any sane floor")
+        print(f"  Scaling {family_name}/{style_name} x{scale:g}: upem {old_upem} -> {new_upem}")
+        font["head"].unitsPerEm = new_upem
+        tmp_fd, tmp_name = tempfile.mkstemp(suffix=source_path.suffix, dir=cached.parent)
+        os.close(tmp_fd)
+        tmp_path = Path(tmp_name)
+        try:
+            font.save(str(tmp_path))
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
+    finally:
+        font.close()
+    tmp_path.replace(cached)
+    return cached
+
+
 def extract_zip_member(url: str, member: str, family_name: str) -> Path:
     """Fetch a release archive and pull one font file out of it.
 
@@ -375,10 +459,33 @@ def build_family(
     try:
         resolved_styles = {}
         synth_flags = {}
+        space_flags = {}
+        # Advance-only spacing, collected over EVERY style. Flat keys rather
+        # than a nested map, and deliberately NOT folded into the `from:` pass
+        # below the way `synthetic:` is: a synthetic style borrows another
+        # style's file, whereas tracking applies to a style that has its own.
+        # Reading it in that pass silently skips every real-source style, which
+        # is every style that normally wants it.
+        for style_name, style_spec in styles.items():
+            space = {k: style_spec[k] for k in ("tracking_em", "word_space_em")
+                     if k in style_spec}
+            if space:
+                space_flags[style_name] = ",".join(f"{k}={v}" for k, v in sorted(space.items()))
         for style_name, style_spec in styles.items():
             if "from" in style_spec:
                 continue
             resolved_styles[style_name] = resolve_font_path(style_spec, name, style_name)
+        # Per-style glyph scale, FIRST in the chain. Before the metrics
+        # override because that one computes its font-unit values as
+        # `ascent * upem/1000` -- running it second keeps the line metrics
+        # em-relative and so identical across scaled and unscaled styles,
+        # which is the whole point (one advanceY for the whole family).
+        # Before `from:` aliasing too, so a synthetic inherits the scale.
+        for style_name, style_spec in styles.items():
+            if "from" in style_spec or "scale" not in style_spec:
+                continue
+            resolved_styles[style_name] = apply_upem_scale(
+                resolved_styles[style_name], float(style_spec["scale"]), name, style_name)
         # Family-level cmap drops, before the metrics patch so the two chain
         # (drops -> metrics -> conversion) and before `from:` aliasing so
         # synthetics inherit both.
@@ -407,6 +514,7 @@ def build_family(
             if synth:
                 synth_flags[style_name] = ",".join(
                     f"{k}={v}" for k, v in sorted(synth.items()))
+
     except (FileNotFoundError, RuntimeError) as e:
         return name, False, str(e)
 
@@ -431,6 +539,8 @@ def build_family(
 
     for style_name, spec in synth_flags.items():
         cmd.extend([f"--synth-{style_name}", spec])
+    for style_name, spec in space_flags.items():
+        cmd.extend([f"--space-{style_name}", spec])
 
     cmd.extend(["--intervals", intervals])
     cmd.extend(["--sizes", sizes])
