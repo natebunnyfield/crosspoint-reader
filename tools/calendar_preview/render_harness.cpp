@@ -44,6 +44,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "HalGPIO.h"
 #include "activities/boot_sleep/CalendarSleepScreen.h"
@@ -317,7 +319,179 @@ int drawWrapped(int id, const char* text, EpdFontFamily::Style style, int x, int
   return y;
 }
 
+// One word plus the style it is set in. The `inline` specimen exists because
+// drawWrapped() takes ONE style for a whole block, which is the wrong shape for
+// the question "does this italic belong to this roman" — an italic in its own
+// paragraph is judged against nothing, while an italic mid-sentence is judged
+// against the roman word touching it. Mixed-source families (a roman from one
+// typeface, an italic from another) can only be assessed this way.
+struct StyledWord {
+  std::string text;
+  EpdFontFamily::Style style;
+  // No space before this word: it butted straight against the previous one in
+  // the source, separated only by a tag. That is how `<i>rounding</i>,` keeps
+  // its comma tight instead of rendering as "rounding ," — and glued words
+  // wrap as one unit, so a comma can never start a line by itself.
+  bool glue;
+};
+
+// Split `<i>`-marked text into styled words. Markers may sit inside a word
+// (`<i>quiet</i>,`) so punctuation stays with the roman where it belongs.
+std::vector<StyledWord> parseInlineMarkup(const char* src) {
+  std::vector<StyledWord> out;
+  std::string cur;
+  EpdFontFamily::Style style = EpdFontFamily::REGULAR;
+  EpdFontFamily::Style curStyle = style;
+  bool sawSpace = true;  // start of paragraph: nothing to glue to
+  bool curGlue = false;
+  auto flush = [&]() {
+    if (!cur.empty()) {
+      out.push_back({cur, curStyle, curGlue});
+      cur.clear();
+    }
+  };
+  for (const char* p = src; *p != '\0';) {
+    if (strncmp(p, "<i>", 3) == 0) {
+      flush();
+      style = EpdFontFamily::ITALIC;
+      p += 3;
+    } else if (strncmp(p, "</i>", 4) == 0) {
+      flush();
+      style = EpdFontFamily::REGULAR;
+      p += 4;
+    } else if (strncmp(p, "<b>", 3) == 0) {
+      flush();
+      style = EpdFontFamily::BOLD;
+      p += 3;
+    } else if (strncmp(p, "</b>", 4) == 0) {
+      flush();
+      style = EpdFontFamily::REGULAR;
+      p += 4;
+    } else if (*p == ' ') {
+      flush();
+      sawSpace = true;
+      ++p;
+    } else {
+      if (cur.empty()) {
+        curStyle = style;
+        curGlue = !sawSpace && !out.empty();
+        sawSpace = false;
+      }
+      cur.push_back(*p);
+      ++p;
+    }
+  }
+  flush();
+  return out;
+}
+
+// Draw styled words as one flowing paragraph, wrapping at colW. Advances x per
+// word by that word's own width in its own style; kerning is therefore NOT
+// applied across a style boundary, which matches how a styled run is laid out
+// in the reader (each run is measured and drawn in its own face) rather than
+// being a shortcut taken here.
+int drawInlineParagraph(int id, const std::vector<StyledWord>& words, int x, int y, int colW, int lineH, int limit) {
+  int curX = x;
+  // Measured differentially, NOT as getTextWidth(" "): a lone space measures 0
+  // through this path, which ran every word of the first build together into
+  // one unbroken string. Subtracting the two glyph widths from the spaced pair
+  // leaves the space advance plus whatever kerning the pair carries, which is
+  // what a word gap actually costs.
+  const int spaceW = renderer.getTextWidth(id, "n n", EpdFontFamily::REGULAR) -
+                     2 * renderer.getTextWidth(id, "n", EpdFontFamily::REGULAR);
+  // Wrap on CLUSTERS, not words: a cluster is a word plus everything glued to
+  // it, so `rounding` + `,` measure and break as one unit.
+  for (size_t i = 0; i < words.size();) {
+    size_t end = i + 1;
+    int clusterW = renderer.getTextWidth(id, words[i].text.c_str(), words[i].style);
+    while (end < words.size() && words[end].glue) {
+      clusterW += renderer.getTextWidth(id, words[end].text.c_str(), words[end].style);
+      ++end;
+    }
+    if (y + lineH > limit) break;
+    if (curX > x && curX + spaceW + clusterW > x + colW) {
+      y += lineH;
+      curX = x;
+      if (y + lineH > limit) break;
+    } else if (curX > x) {
+      curX += spaceW;
+    }
+    for (size_t k = i; k < end; ++k) {
+      renderer.drawText(id, curX, y, words[k].text.c_str(), true, words[k].style);
+      curX += renderer.getTextWidth(id, words[k].text.c_str(), words[k].style);
+    }
+    i = end;
+  }
+  return y + lineH;
+}
+
 }  // namespace
+
+// Inline-mixed specimen: italic set WITHIN roman body text, which is the only
+// arrangement that shows whether a borrowed italic matches the roman it serves.
+bool renderInlineSpecimen(const char* family, const char* outDir) {
+  static const char* kPara1 =
+      "The lamp flickered once and held. Marjorie had copied the column out of the "
+      "<i>Illinois</i> office three months earlier — 30,865 tons, then 41,072, then a jump "
+      "nobody explained. Official policy called the difference <i>rounding</i>, and she did "
+      "not believe it.";
+  static const char* kPara2 =
+      "Every officer aboard knew the difference between <i>quiet</i> and <i>silence</i>. The "
+      "first was the absence of noise; the second, as the bosun put it, was <i>the absence of "
+      "anyone willing to make any</i>. She wrote both words in the margin and underlined "
+      "neither.";
+  static const char* kPara3 =
+      "She read the entry aloud: <i>thirty thousand eight hundred sixty-five</i>, and then "
+      "again, slower. The auditor had signed <b>Approved</b> in a hand that sloped the wrong "
+      "way, as though <i>he</i> had been the one in a hurry.";
+
+  for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
+    const int id = loadSdFontByOrdinal(family, sizeEnum, renderer);
+    if (id == 0) {
+      fprintf(stderr, "%s: missing at slot %u\n", family, sizeEnum);
+      return false;
+    }
+    auto it = renderer.getSdCardFonts().find(id);
+    if (it == renderer.getSdCardFonts().end()) {
+      fprintf(stderr, "%s: not registered at slot %u\n", family, sizeEnum);
+      return false;
+    }
+
+    // One prewarm for the whole page, all four style bits: the mini kern matrix
+    // is per-page and per-style, and a stale one measures an unkerned font.
+    char page[2048];
+    snprintf(page, sizeof(page), "%s %s %s", kPara1, kPara2, kPara3);
+    it->second->prewarm(page, 0x0F, /*metadataOnly=*/false);
+
+    int top, right, bottom, left;
+    renderer.getOrientedViewableTRBL(&top, &right, &bottom, &left);
+    const int margin = left + 14;
+    const int colW = renderer.getScreenWidth() - margin - (right + 14);
+    const int lineH = renderer.getLineHeight(id);
+
+    renderer.clearScreen(0xFF);
+    int y = top + 6;
+
+    char hdr[160];
+    snprintf(hdr, sizeof(hdr), "%s  --  slot %u  --  inline italic", family, sizeEnum);
+    renderer.drawText(UI_12_FONT_ID, margin, y, hdr, true, EpdFontFamily::BOLD);
+    y += renderer.getLineHeight(UI_12_FONT_ID) + 10;
+
+    const int pageBottom = renderer.getScreenHeight() - bottom - 6;
+    for (const char* para : {kPara1, kPara2, kPara3}) {
+      if (y + lineH > pageBottom) break;
+      y = drawInlineParagraph(id, parseInlineMarkup(para), margin, y, colW, lineH, pageBottom);
+      y += lineH / 2;
+    }
+
+    printf("%-20s slot %u  line %2dpx  col %dpx\n", family, sizeEnum, lineH, colW);
+
+    char path[256];
+    snprintf(path, sizeof(path), "%s/inline_%s_%u.bmp", outDir, family, sizeEnum);
+    if (!writeMonoPortraitBmp(path, renderer)) return false;
+  }
+  return true;
+}
 
 bool renderReadingSpecimen(const char* family, const char* outDir) {
   static const char* kBody =
@@ -413,10 +587,11 @@ int usage(const char* argv0) {
           "  %s calendar-westside [YYYY MM DD]        render Westside/EN sleep screen -> fs_/sleep.bmp\n"
           "  %s fonts FAMILY_A FAMILY_B               A-B two SD font families -> fs_/kern_specimen_*.bmp\n"
           "  %s reading FAMILY                        a wrapped body-text page -> fs_/reading_FAMILY_*.bmp\n"
+          "  %s inline FAMILY                         italic set INLINE with roman -> fs_/inline_FAMILY_*.bmp\n"
           "  %s YYYY MM DD                            legacy calendar form\n\n"
-          "fonts and reading modes read CPFONT_DIR (use /.fonts), a DEVICE-style\n"
-          "path; the stub HalStorage prefixes ./fs_ to it.\n",
-          argv0, argv0, argv0, argv0, argv0);
+          "fonts, reading and inline modes read CPFONT_DIR (use /.fonts), a\n"
+          "DEVICE-style path; the stub HalStorage prefixes ./fs_ to it.\n",
+          argv0, argv0, argv0, argv0, argv0, argv0);
   return 2;
 }
 
@@ -438,6 +613,11 @@ int main(int argc, char** argv) {
 
   if (strcmp(mode, "daisy") == 0) {
     return renderDaisyVariants("./fs_") ? 0 : 1;
+  }
+
+  if (strcmp(mode, "inline") == 0) {
+    if (argc != 3) return usage(argv[0]);
+    return renderInlineSpecimen(argv[2], "./fs_") ? 0 : 1;
   }
 
   if (strcmp(mode, "reading") == 0) {

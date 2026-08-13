@@ -525,23 +525,43 @@ families:
     # exploratory precisely to find out whether that reads as a seam at the
     # regular-to-italic boundary. See tools/calendar_preview `reading` output.
     #
-    # The italics carry a `scale:` because the first build proved the seam is
-    # real and large. Measured OS/2 x-height, source units per 1000 upem:
-    # Inknut Light 530, Inknut Bold 539, both Junicode italics 416 -- so an
-    # unscaled Junicode renders 21% shorter than the roman beside it, which
-    # read as a different, smaller typeface rather than an italic of this one.
-    # Each italic is scaled to its own counterpart's x-height: 530/416 = 1.274
-    # for the roman's italic, 539/416 = 1.296 for the bold's. Set width is NOT
-    # matched and deliberately so -- Junicode is SemiCondensed, an italic is
-    # narrower than its roman anyway, and stretching one axis to force a width
-    # match would distort the letterforms.
+    # SemiBold italic at x1.33 -- owner ruling 2026-08-12, off four rendered
+    # benches read inline (italic mid-sentence, the only arrangement that shows
+    # whether a borrowed italic belongs to its roman;
+    # `render_harness inline <FAMILY>`).
+    #
+    # WEIGHT. Junicode's SemiCondensed italics all carry the SAME x-height (416
+    # units per 1000 upem) and cap height (666) -- only the stroke changes --
+    # so weight and size are independent knobs here. A 2x2 of the two showed
+    # weight mattered more: the Light italic (300) read thin beside Inknut's
+    # roman even at matched x-height. SemiBold (600) is the heaviest italic in
+    # the SemiCondensed width, which is why it fills the bolditalic slot too --
+    # reaching into the full-width cuts would change set width mid-family, and
+    # a bold-italic run is rare enough in reading text not to justify that.
+    #
+    # SCALE. Inknut Light measures 530 against Junicode's 416, so x-height
+    # PARITY is x1.274 -- and parity still read small, because a chancery
+    # italic carries more of its character in the extenders than in the
+    # x-height. x1.45 overshot; a x1.30/x1.35/x1.40 bench narrowed it to the
+    # bottom of that range, and a final x1.31/x1.32/x1.33 bench took x1.33.
+    # Those last three steps are finer than a pixel at reading sizes (1% of a
+    # 22 px x-height is 0.2 px), so they differ by at most 1 px of x-height and
+    # 0-2 px on a ~120 px italic word; do not re-derive this by measurement
+    # alone, it was an eye ruling on rendered pages.
+    #
+    # Set width is NOT matched, deliberately: Junicode is SemiCondensed, an
+    # italic is narrower than its roman anyway, and stretching one axis to
+    # force a width match would distort the letterforms. Caps do overshoot --
+    # Junicode's cap-to-x ratio is 1.60 against Inknut's 1.48 -- which is an
+    # accepted consequence of sizing on the x-height, the metric that governs
+    # apparent size in running text.
     sizes: [10, 12, 14, 16]
     metrics: {ascent: 1203, descent: -340, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
-      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondLightItalic.ttf", scale: 1.274}
-      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondMediumItalic.ttf", scale: 1.296}
+      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.33}
+      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.33}
 
   - name: LibreCaslonText
     description: "Caslon revival tuned for body text (Latin)"

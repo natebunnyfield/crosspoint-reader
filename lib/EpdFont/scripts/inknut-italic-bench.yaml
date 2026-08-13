@@ -1,0 +1,91 @@
+# Inknut + Junicode italic-pairing bench (evaluation set)
+#
+# NOT a shipping list, and nothing here is installed anywhere —
+# `installed_families:` in sd-fonts.yaml still rules that. Separate file for
+# the same reason sans-candidates.yaml and grotesque-candidates.yaml are
+# separate: these are unranked variants of one question, and putting them in
+# sd-fonts.yaml would drop them into the shipped font set.
+#
+#   python3 lib/EpdFont/scripts/build-sd-fonts.py \
+#     --config lib/EpdFont/scripts/inknut-italic-bench.yaml --output-dir out/
+#
+# THE QUESTION. Inknut Antiqua's foundry repo ships no italic at any weight, so
+# the shipped InknutAntiqua62 slants its own roman 10°. Junicode ships real cut
+# italics, but they were drawn for a different typeface: x-height 416 units per
+# 1000 upem against Inknut Light's 530, and much lighter in the stroke.
+#
+# SETTLED, 2026-08-12, owner rulings off two rendered benches:
+#   - Weight: SemiBold (600), not Light (300). Light read thin beside Inknut's
+#     roman even at matched x-height; a 2×2 of scale against weight showed the
+#     weight axis mattered more than the size axis.
+#   - Scale: past exact x-height parity. ×1.274 IS parity (530/416) and still
+#     read small — a chancery italic carries more of its character in the
+#     extenders than in the x-height. ×1.45 overshot.
+# So the remaining question was only how far past parity. A ×1.30/×1.35/×1.40
+# bench narrowed it to the bottom of that range, and this file is the final
+# three it was settled from: ×1.31, ×1.32, ×1.33.
+#
+# **CLOSED, 2026-08-12: ×1.33 won.** It is now the shipped InknutJunicode entry
+# in sd-fonts.yaml, SemiBold italic in both italic slots. This file is kept as
+# the record of how that number was reached — re-run it before proposing a
+# different scale, rather than re-deriving from measurements.
+#
+# These steps are FINER THAN A PIXEL at reading sizes — a 1% scale change on a
+# 22 px x-height is 0.2 px — so the three differ by at most 1 px of x-height
+# and 0–2 px across a ~120 px italic word. Every framebuffer hashes distinctly,
+# but the ruling was an eye call on rendered pages, not a measurement, and
+# cannot be reproduced by measuring alone.
+#
+# WEIGHT IS FIXED HERE. Every SemiCondensed italic Junicode ships — Light 300,
+# Regular 400, Medium 500, SemiBold 600 — carries the SAME x-height (416) and
+# cap height (666); only the stroke changes. SemiBold is the heaviest italic in
+# the SemiCondensed width, which is why it fills the bolditalic slot too:
+# reaching into the full-width cuts would change set width mid-family.
+#
+# SCALE. `scale:` shrinks head.unitsPerEm and touches nothing else, so outlines,
+# advances and GPOS kern keep their proportions — see the field's own docs in
+# sd-fonts.yaml. It runs before the metrics override, which is em-relative, so
+# advanceY is identical across all three families below and the only variable
+# between two specimens is the italic's size.
+#
+# Roman/bold are Inknut Light + Bold throughout, identical to the shipped
+# InknutAntiqua62, so any difference you see is the italic and nothing else.
+# Sizes and metrics are Inknut's, unchanged, for the same reason.
+#
+# Render them inline (italic mid-sentence, the only arrangement that answers
+# this) with:
+#   tools/calendar_preview/render_harness inline <FAMILY>
+
+families:
+  - name: InknutJunicodeSB131
+    description: "Bench: Inknut Light/Bold + Junicode SemiBold italic at x1.31 (Latin)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
+      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.31}
+      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.31}
+
+  - name: InknutJunicodeSB132
+    description: "Bench: Inknut Light/Bold + Junicode SemiBold italic at x1.32 (Latin)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
+      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.32}
+      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.32}
+
+  - name: InknutJunicodeSB133
+    description: "Bench: Inknut Light/Bold + Junicode SemiBold italic at x1.33 (Latin)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
+      italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.33}
+      bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondSemiBoldItalic.ttf", scale: 1.33}
