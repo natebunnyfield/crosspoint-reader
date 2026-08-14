@@ -51,18 +51,79 @@ DOWNLOAD_DIR = SCRIPT_DIR / "downloaded_fonts"
 INSTANCE_DIR = SCRIPT_DIR / "instanced_fonts"
 PATCHED_DIR = SCRIPT_DIR / "patched_fonts"
 SCALED_DIR = SCRIPT_DIR / "scaled_fonts"
-# Libre Franklin, not Noto Sans (owner ruling 2026-08-08). Noto Sans was
-# removed from this fork as a built-in UI face in b8023ff8, but it stayed
-# wired in here as the fallback glyph source -- so that commit left every SD
-# font build failing on a file the repo no longer carries. Libre Franklin is
-# the fork's built-in face and IS committed (the wght 400/700 statics), which
-# makes it the one face guaranteed to be present.
+# Every codepoint a family's own cmap misses is filled from a fallback face, so
+# the fallback's coverage IS the shipped coverage for whatever `intervals:` asks
+# for beyond the face -- see the "so the Noto fallback supplies them" notes
+# throughout sd-fonts.yaml. The fallback is therefore chosen PER FAMILY, from
+# what that family's intervals request, not one global default:
 #
-# Coverage note: Libre Franklin is Latin-only, so a family that leans on the
-# fallback for non-Latin gets nothing instead of a Noto glyph. Every family
-# currently built is latin/latin-ext. A future CJK, Arabic or Hebrew family
-# needs its own fallback passed per-family, not this default.
-DEFAULT_FALLBACK_FONT = EPDFONTS_DIR / "builtinFonts/source/LibreFranklin/LibreFranklin-Regular.ttf"
+#   Latin-only intervals  -> Libre Franklin, committed, no network needed
+#   anything wider        -> Noto Sans, downloaded into the gitignored cache
+#
+# History. b8023ff8 deleted Noto Sans from the fork (built-in UI face ruling)
+# including its source TTFs, but left it wired in here, so every SD font build
+# died at startup on the missing file. 77a5901b repointed the ONE global default
+# at the committed Libre Franklin because that was "the one face guaranteed to
+# be present"; it measured the cost on one latin-ext family (iA Writer Quattro)
+# and ruled the loss acceptable there, which it is. What it could not cover with
+# that measurement is the families whose intervals ask for Greek, Cyrillic, math
+# and symbols: Libre Franklin is Latin-only, so those came back EMPTY, and a
+# routine `install-sim-fonts.py` rebuild silently shipped a worse font than the
+# cards already carry -- TeXGyreSchola 1683 -> 997 glyphs per style, Coelacanth
+# 1642 -> 1415, LibreFranklin 1676 -> 895, with no error at any point.
+#
+# Its own coverage note pointed here: "A future CJK, Arabic or Hebrew family
+# needs its own fallback passed per-family, not this default." Selecting per
+# family fixes the coverage loss without paying for it on the Latin-only
+# families, where filling Latin Extended-B and exotic punctuation from Noto adds
+# ~385 glyphs per style and ~50% file size for glyphs 77a5901b already ruled
+# unnecessary (measured on iA Writer Quattro and Libris ADF, 2026-08-12).
+#
+# Noto is fetched rather than committed: it is the mechanism sd-fonts.yaml
+# already uses for nearly every family source, and the one lib/EpdFont/
+# builtinFonts/source/.gitignore describes ("Fonts like NotoSansCJK are
+# downloaded on demand by build-sd-fonts.py"). This URL's cmap is
+# codepoint-identical to the repo copy b8023ff8 deleted over the `reading`,
+# `latin-ext,greek,cyrillic` and `latin-ext` interval sets (verified
+# 2026-08-12), so a rebuild reproduces the shipped .cpfonts' coverage exactly.
+#
+# Noto Sans is still Latin+Greek+Cyrillic+symbols only. A future CJK, Arabic or
+# Hebrew family needs its own fallback named in its recipe, not either of these.
+LATIN_FALLBACK_FONT = EPDFONTS_DIR / "builtinFonts/source/LibreFranklin/LibreFranklin-Regular.ttf"
+BROAD_FALLBACK_URL = (
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/"
+    "main/fonts/NotoSans/unhinted/ttf/NotoSans-Regular.ttf"
+)
+BROAD_FALLBACK_FONT = DOWNLOAD_DIR / "_fallback" / "NotoSans-Regular.ttf"
+
+# The blocks Libre Franklin is qualified to serve: Latin proper, its phonetic
+# and combining companions, the Latin Extended Additional/Vietnamese block,
+# General Punctuation and the f-ligatures -- exactly the reach 77a5901b measured
+# it over. `latin-ext` resolves inside this set; `reading`, `greek`, `cyrillic`,
+# `symbols` and the rest do not.
+LATIN_FALLBACK_RANGES = [
+    (0x0000, 0x024F),  # ASCII, Latin-1, Latin Extended-A/B
+    (0x02B0, 0x02FF),  # Spacing modifier letters
+    (0x0300, 0x036F),  # Combining diacritics
+    (0x1E00, 0x1EFF),  # Latin Extended Additional (Vietnamese)
+    (0x2000, 0x206F),  # General punctuation
+    (0xFB00, 0xFB06),  # f-ligatures
+    (0xFFFD, 0xFFFD),  # Replacement char, appended to every interval set
+]
+
+
+def fallback_font_for(intervals: str) -> Path:
+    """Pick the fallback face for one family, from its `intervals:` string.
+
+    Libre Franklin when every requested codepoint is Latin (committed, offline,
+    and what 77a5901b measured); Noto Sans otherwise.
+    """
+    from fontconvert_sdcard import resolve_intervals
+
+    for start, end in resolve_intervals(intervals):
+        if not any(lo <= start and end <= hi for lo, hi in LATIN_FALLBACK_RANGES):
+            return BROAD_FALLBACK_FONT
+    return LATIN_FALLBACK_FONT
 
 
 _orig_getaddrinfo = socket.getaddrinfo
@@ -450,6 +511,7 @@ def build_family(
     styles = family.get("styles", {})
     intervals = family["intervals"]
     sizes = ",".join(str(s) for s in family["sizes"])
+    fallback_font = fallback_font_for(intervals)
 
     # Resolve all font file paths (downloads as needed).
     # Two passes: styles with real sources first, then `from:` styles, which
@@ -537,14 +599,14 @@ def build_family(
         # Multi-style mode
         for style_name, font_path in resolved_styles.items():
             cmd.extend([f"--{style_name}", str(font_path)])
-            cmd.extend([f"--fallback-{style_name}", str(DEFAULT_FALLBACK_FONT)])
+            cmd.extend([f"--fallback-{style_name}", str(fallback_font)])
     else:
         # Single-style mode
         style_name = next(iter(resolved_styles))
         font_path = resolved_styles[style_name]
         cmd.append(str(font_path))
         cmd.extend(["--style", style_name])
-        cmd.extend([f"--fallback-{style_name}", str(DEFAULT_FALLBACK_FONT)])
+        cmd.extend([f"--fallback-{style_name}", str(fallback_font)])
 
     for style_name, spec in synth_flags.items():
         cmd.extend([f"--synth-{style_name}", spec])
@@ -648,15 +710,6 @@ def main():
         print("ERROR: No families defined in config", file=sys.stderr)
         sys.exit(1)
 
-    if not DEFAULT_FALLBACK_FONT.exists() or not DEFAULT_FALLBACK_FONT.is_file():
-        print(
-            "ERROR: Missing default fallback font: "
-            f"{DEFAULT_FALLBACK_FONT}\n"
-            "This font is required for fallback glyphs in SD font builds.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     # Filter if --only specified
     if args.only:
         only_names = set(args.only.split(","))
@@ -675,6 +728,36 @@ def main():
         shutil.rmtree(output_base)
 
     output_base.mkdir(parents=True, exist_ok=True)
+
+    # Resolve the fallback faces this run needs, before the parallel build
+    # phase: workers would otherwise race on the same download cache path. Fail
+    # loudly rather than build without one — a missing fallback costs hundreds
+    # of glyphs per style and raises no other error anywhere.
+    chosen_fallbacks: dict[Path, list[str]] = {}
+    for f in families:
+        chosen_fallbacks.setdefault(fallback_font_for(f["intervals"]), []).append(f["name"])
+    needed_fallbacks = set(chosen_fallbacks)
+    for path, names in chosen_fallbacks.items():
+        print(f"Fallback glyphs from {path.name}: {', '.join(sorted(names))}")
+    if LATIN_FALLBACK_FONT in needed_fallbacks and not LATIN_FALLBACK_FONT.is_file():
+        print(
+            f"ERROR: Missing Latin fallback font: {LATIN_FALLBACK_FONT}\n"
+            "It is committed to this repo; a checkout is incomplete.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if BROAD_FALLBACK_FONT in needed_fallbacks:
+        try:
+            download_font(BROAD_FALLBACK_URL, BROAD_FALLBACK_FONT)
+        except Exception as e:  # noqa: BLE001 - reported and fatal
+            print(
+                f"ERROR: could not obtain the broad-coverage fallback font: {e}\n"
+                f"Expected at {BROAD_FALLBACK_FONT}, from {BROAD_FALLBACK_URL}.\n"
+                "Families asking for Greek, Cyrillic, math or symbols fill those "
+                "from it; building without it silently ships reduced coverage.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # Download phase (sequential — avoids hammering servers)
     print(f"\n=== Resolving {len(families)} font families ===\n")
