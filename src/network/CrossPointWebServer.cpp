@@ -30,6 +30,39 @@
 #include "util/TaskWatchdog.h"
 
 namespace {
+// Arduino's WebServer keeps the parsed request arguments allocated until the
+// NEXT request is parsed (Parsing.cpp:301-324 deletes and reallocates
+// _currentArgs at the head of _parseArguments), so between requests the heap
+// still holds the previous one. For a JSON POST that includes the entire
+// "plain" body. Exposing a narrowly scoped release lets us drop it as soon as
+// the handler has returned, instead of retaining it across the idle period
+// where WebDAV transfers and SD reads are competing for the same heap.
+//
+// Releasing early is safe: every WebServer delete path null-checks the pointer
+// first, and every accessor is bounded by the counts we zero here.
+class CrossPointHttpServer final : public WebServer {
+ public:
+  explicit CrossPointHttpServer(uint16_t port) : WebServer(port) {}
+
+  void releaseRequestArguments() {
+    if (_currentArgs) {
+      delete[] _currentArgs;
+      _currentArgs = nullptr;
+    }
+    _currentArgCount = 0;
+
+    if (_postArgs) {
+      delete[] _postArgs;
+      _postArgs = nullptr;
+    }
+    _postArgsLen = 0;
+  }
+};
+
+void releaseRequestArguments(WebServer* server) {
+  static_cast<CrossPointHttpServer*>(server)->releaseRequestArguments();
+}
+
 // Folders/files to hide from the web interface file browser
 // Note: Items starting with "." are automatically hidden
 constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
@@ -115,7 +148,7 @@ void CrossPointWebServer::begin() {
   LOG_DBG("WEB", "Network mode: %s", apMode ? "AP" : "STA");
 
   LOG_DBG("WEB", "Creating web server on port %d...", port);
-  server.reset(new WebServer(port));
+  server.reset(new CrossPointHttpServer(port));
 
   // Disable WiFi sleep to improve responsiveness and prevent 'unreachable' errors.
   // This is critical for reliable web server operation on ESP32.
@@ -302,6 +335,10 @@ void CrossPointWebServer::handleClient() {
   }
 
   server->handleClient();
+  // The handler has returned, so the request's arguments are no longer
+  // observable. Release them now rather than letting a JSON body stay resident
+  // until the next request arrives.
+  releaseRequestArguments(server.get());
 
   // Handle WebSocket events
   if (wsServer) {
