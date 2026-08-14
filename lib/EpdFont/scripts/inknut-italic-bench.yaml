@@ -2010,3 +2010,158 @@ families:
       bold:       {url: *bold}
       italic:     {zip: *vf, member: *vfm, variable: {wght: 562, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
       bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  # ── ROUND 19, 2026-08-14: making 1x and 2x agree ─────────────────────────
+  #
+  # Owner: "is there any way to make 1x and 2x render in a more unified and
+  # similar way." They disagree because the HINTER pushes the two faces in
+  # opposite directions at low ppem. x-height px, 2x column halved so the two
+  # cuts compare directly:
+  #
+  #     Inknut Regular   1x 13 15 17 19   2x/2 12.0 14.0 16.0 18.5   drift +1 +1 +1 +0.5
+  #     Junicode x1.2    1x 10 14 16 18   2x/2 11.5 14.0 16.0 18.5   drift -1.5 0 0 -0.5
+  #
+  # At 10 pt the roman hints UP a pixel and the italic hints DOWN 1.5, so the
+  # two cuts disagree by 2.5 px there and a scale ruled on one does not hold on
+  # the other. Within 1x it is worse: roman 13/15/17/19 against italic
+  # 10/14/16/18 -- the italic is THREE pixels short at the smallest size, which
+  # is a hinting artifact and not the design.
+  #
+  # force_autohint WAS TRIED FIRST AND IT FAILS. It fixes 1x beautifully (diff
+  # 0/0/0/+1) and re-breaks 2x, because it shrinks the ROMAN at 2x as well
+  # (24/28/32/37 -> 22/26/31/35), leaving the italic +7.2% on x-height and
+  # +3.8% on caps -- worse than the x1.25 that started this whole thread. It is
+  # also family-level (build-sd-fonts.py:392), so it cannot be aimed at the
+  # borrowed italic alone. Kept as a chip in the deck so the failure is visible
+  # rather than asserted.
+  #
+  # ENLA is the knob that works, and it is italic-only: it raises x-height
+  # WITHOUT touching cap height, which is exactly the axis of the mismatch.
+  #
+  #     ENLA  wght   1x diff vs roman      2x x-height   2x cap
+  #     14    601    -3  -1  -1  -1         -1.0%        +1.2%    <- shipped
+  #     16    576    (built for the deck)
+  #     17    579    -1  -1  -1  -1         +1.3%        +1.2%
+  #     20    563    -1  -1  -1   0         +3.8%        +1.2%
+  #     14+AH 601     0   0   0  +1         +7.2%        +3.8%    <- the failure
+  #
+  # ENLA 17 removes the 10 pt collapse and makes the 1x mismatch UNIFORM at one
+  # pixel, for 2.3 points of 2x x-height. Cap height does not move at any ENLA,
+  # which is the point of the axis.
+  #
+  # Weight is re-solved per ENLA to hold the ruled 98% colour, because raising
+  # x-height adds ink: 601 at ENLA 14, 579 at 17, 563 at 20. Scale stays x1.2
+  # and word space -0.07, both ruled in round 17.
+
+
+  - name: IJ19E14
+    description: "ENLA 14, wght 601 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 601, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E14X2
+    description: "ENLA 14, wght 601 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 601, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E16
+    description: "ENLA 16, wght 576 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 576, wdth: 125, ENLA: 16}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 16}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E16X2
+    description: "ENLA 16, wght 576 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 576, wdth: 125, ENLA: 16}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 16}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E17
+    description: "ENLA 17, wght 579 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 579, wdth: 125, ENLA: 17}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 17}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E17X2
+    description: "ENLA 17, wght 579 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 579, wdth: 125, ENLA: 17}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 17}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E20
+    description: "ENLA 20, wght 563 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 563, wdth: 125, ENLA: 20}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 20}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E20X2
+    description: "ENLA 20, wght 563 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 563, wdth: 125, ENLA: 20}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 20}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E14AH
+    description: "ENLA 14, wght 601, autohint — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    force_autohint: true
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 601, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ19E14AHX2
+    description: "ENLA 14, wght 601, autohint — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    force_autohint: true
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 601, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}

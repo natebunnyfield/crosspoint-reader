@@ -94,11 +94,15 @@ namespace {
 
 constexpr uint8_t kPointSizes[] = {12, 14, 16, 18};
 
+// Kern-pair probes for the A-B `fonts` mode. Words first, pairs second: a
+// mis-fitted pair is far easier to see inside a real word than in a pair list,
+// and "People"/"does"/"Froggy" are here because a kerning fault that only shows
+// on T and Y reads as a T-and-Y problem when it is usually the whole matrix.
 const char* kSamples[] = {
-    "Fjord waffle",
-    "Tree Try Trust Yttrium",
-    "backdrop Kydd Wry Vamp",
-    "AVATAR Wavy Yak Toy",
+    "People",
+    "does",
+    "Froggy",
+    "Tools You",
 };
 
 // Read one PHYSICAL portrait pixel out of the physical landscape framebuffer.
