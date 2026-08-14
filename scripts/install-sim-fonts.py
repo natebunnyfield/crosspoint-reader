@@ -22,7 +22,13 @@ never an error. That way the same command keeps working as families are added.
 Installation mirrors the iOS bundle-seeding rules (crosspoint-simulator
 ios/CrossPointFsPrep.cpp): a family directory under fs_/fonts/ is made to
 contain exactly the freshly built size set — stale sizes from an older ramp
-are removed, families not being installed are never touched.
+are removed.
+
+A full run additionally removes whole family directories a tier ruling has
+CUT from installed_families: (see prune_cut_families below for exactly which
+names are eligible). Until 2026-08-12 it only ever pruned sizes WITHIN a
+family it was installing, so a demoted family sat on the card forever and had
+to be deleted by hand.
 """
 
 import argparse
@@ -35,6 +41,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / "lib/EpdFont/scripts"
 DISPLAY_NAMES = REPO / "src/FontDisplayNames.h"
+EDITOR_FONTS = REPO / "src/notes/EditorFonts.h"
 
 
 def displayname_families() -> list[str]:
@@ -43,6 +50,20 @@ def displayname_families() -> list[str]:
     body = text[text.index("kEntries[]"):]
     body = body[: body.index("};")]
     return re.findall(r'\{"([^"]+)"', body)
+
+
+def editor_families() -> set[str]:
+    """The EDITOR font group — writing faces, a separate list from the S tier.
+
+    Owner ruling 2026-08-05 (src/notes/EditorFonts.h): these are chosen by
+    SETTINGS.editorFont and never join the reading tier, so they are legitimately
+    on a card while absent from installed_families:. Pruning must skip them or a
+    card-only row (builtinFontId == 0) loses its face.
+    """
+    text = EDITOR_FONTS.read_text(encoding="utf-8")
+    body = text[text.index("FAMILIES[] = {"):]
+    body = body[: body.index("};")]
+    return set(re.findall(r'\{"([^"]+)"', body))
 
 
 def _yaml_config() -> dict:
@@ -67,6 +88,36 @@ def installed_families() -> list[str]:
     return list(declared) if declared else displayname_families()
 
 
+def prune_cut_families(fs_dir: Path, keep: set[str], known: set[str]) -> None:
+    """Delete family directories a tier ruling has cut from the installed set.
+
+    Only a FULL run calls this — a `--families <subset>` run installs a subset
+    deliberately and must not read as "everything else is cut."
+
+    Three fences, because this deletes recursively:
+      * `known` is sd-fonts.yaml's `families:`. A directory the yaml has no
+        recipe for is the owner's own font, or a family whose block is commented
+        out, and this script has no opinion about it — never touched.
+      * `keep` is the reference set for this run PLUS the editor group. It is the
+        DECLARED list, not the buildable intersection, so a family this checkout
+        cannot rebuild (commercial sources in gitignored local_fonts/) keeps the
+        copy already on the card instead of losing an unregenerable build.
+      * Both scan roots, since /.fonts and /fonts are equally live
+        (SdCardFontRegistry::discover) and a cut family in either still shows up
+        in the picker.
+    A family's `2x/` companions live inside its directory and go with it.
+    """
+    for root_name in ("fonts", ".fonts"):
+        root = fs_dir / root_name
+        if not root.is_dir():
+            continue
+        for entry in sorted(root.iterdir()):
+            if not entry.is_dir() or entry.name in keep or entry.name not in known:
+                continue
+            shutil.rmtree(entry)
+            print(f"  pruned cut family {entry.relative_to(fs_dir)}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -87,6 +138,9 @@ def main() -> int:
     args = parser.parse_args()
 
     buildable = active_yaml_families()
+    # The set this run claims to be the whole installed set — None for a
+    # deliberate subset, which is what gates stale-family pruning below.
+    reference: set[str] | None = None
     if args.families:
         wanted = [f.strip() for f in args.families.split(",") if f.strip()]
         missing = [f for f in wanted if f not in buildable]
@@ -101,6 +155,7 @@ def main() -> int:
                   "with the device cards and the iOS seed bundle.")
         else:
             curated = installed_families()
+        reference = set(curated)
         families = [f for f in curated if f in buildable]
         skipped = [f for f in curated if f not in buildable]
         if skipped:
@@ -176,6 +231,9 @@ def main() -> int:
                     print(f"  salvaged {len(salvaged)} hi-res files from {hidden_hires.relative_to(fonts_root.parent)}")
             shutil.rmtree(hidden)
             print(f"  removed shadowing stale copy {hidden.relative_to(fonts_root.parent)}")
+
+    if reference is not None:
+        prune_cut_families(Path(args.fs_dir), reference | editor_families(), buildable)
 
     print("\nDone. Launch the simulator; the families appear in Text Settings.")
     return 0
