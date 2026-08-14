@@ -101,3 +101,49 @@ consumes it even though no firmware code does.
   truncated; bottom-aligning moves which line is line 1 on screen, so re-read
   that comment before changing it.
 
+
+- **Side buttons should page, not repeat the front buttons.** Owner ask,
+  2026-08-14: "make side buttons be page up and page down, when they are
+  identical functionality to front buttons, like on the home screen."
+
+  They are identical today, and it is one place, not many:
+  `MappedInputManager.cpp:89-96` defines the logical pair as
+
+      NavNext     = side Down  OR front Right
+      NavPrevious = side Up    OR front Left
+
+  and `ButtonNavigator::getNextButtons/getPreviousButtons`
+  (`ButtonNavigator.h:49-50`) returns exactly those two. Every list screen goes
+  through `ButtonNavigator::onNext/onPrevious`, so the four buttons collapse to
+  two behaviours everywhere at once — the home screen is just where it is most
+  obvious, since a press of side-Down and a press of front-Right move the
+  selector by the same single row.
+
+  The change wants a THIRD logical pair (`Button::PageNext` / `PagePrevious`)
+  bound to the side buttons, with `NavNext`/`NavPrevious` narrowed to the front
+  pair — not a special case inside HomeActivity. Doing it in the mapper keeps
+  every list consistent and keeps activities using logical buttons, per the HAL
+  rule above. The reader is already separate and must not be touched: it uses
+  `Button::PageBack`/`PageForward`, which have their own swap setting
+  (`SETTINGS.sideButtonLayout`).
+
+  Open questions, worth settling before writing code:
+
+  1. **What is a page in a list?** Most lists scroll rather than paginate, so
+     "page" has to mean the visible row count for that screen. `LyraTheme`
+     already knows its rows-per-screen from `getListRowStep(...)`, so the number
+     exists — but it differs per theme metric and per whether rows carry
+     subtitles, and no shared accessor exposes it yet.
+  2. **Which screens?** A list shorter than one screen has no page to turn, and
+     side buttons would go dead there. Either fall back to item-stepping when
+     the list fits, or accept dead buttons on short lists.
+  3. **Ends: wrap or clamp?** `HomeActivity.cpp:210-217` already clamps for the
+     Lyra Six two-page home and wraps everywhere else, deliberately. Paging
+     probably wants clamp everywhere, which would make that special case
+     redundant — check before removing it.
+  4. **Held-button repeat.** `ButtonNavigator::onContinuous` repeats while held.
+     A held side button paging a screenful at a time is a very different feel
+     from a held front button stepping rows; decide whether page repeat is
+     wanted at all.
+
+  Not started. No branch.
