@@ -144,10 +144,16 @@ consumes it even though no firmware code does.
      there is no page there is no action. Consequence to handle deliberately —
      `ButtonNavigator::onContinuous` must not fire either, or a held side button
      on a short list burns a redraw per repeat doing nothing.
-  3. **Ends: wrap or clamp?** `HomeActivity.cpp:210-217` already clamps for the
-     Lyra Six two-page home and wraps everywhere else, deliberately. Paging
-     probably wants clamp everywhere, which would make that special case
-     redundant — check before removing it.
+  3. ~~**Ends: wrap or clamp?**~~ **RULED 2026-08-14: clamp.** Paging stops at
+     the ends; the last page stays on the last page. This is what
+     `HomeActivity.cpp:210-217` already does for the Lyra Six two-page home, and
+     for the reason given there — the ends of a list should be perceptible, and
+     a press should move one step in the direction pressed rather than teleport.
+     Two consequences to handle: that HomeActivity special case likely becomes
+     redundant once paging clamps everywhere (verify before deleting it, since
+     it governs the FRONT pair too), and side and front will now differ at the
+     boundary — front keeps wrapping via `ButtonNavigator::nextIndex`, which is
+     shared with many activities and stays untouched.
   4. **Held-button repeat.** `ButtonNavigator::onContinuous` repeats while held.
      A held side button paging a screenful at a time is a very different feel
      from a held front button stepping rows; decide whether page repeat is
