@@ -154,9 +154,18 @@ consumes it even though no firmware code does.
      it governs the FRONT pair too), and side and front will now differ at the
      boundary — front keeps wrapping via `ButtonNavigator::nextIndex`, which is
      shared with many activities and stays untouched.
-  4. **Held-button repeat.** `ButtonNavigator::onContinuous` repeats while held.
-     A held side button paging a screenful at a time is a very different feel
-     from a held front button stepping rows; decide whether page repeat is
-     wanted at all.
+  4. ~~**Held-button repeat.**~~ **RULED 2026-08-14: repeat, at the same rate as
+     the front buttons.** A held side button keeps paging on the existing
+     interval — no second timing constant. `onNext`/`onPrevious` already wire
+     press and continuous together (`ButtonNavigator.cpp:5-13`), so the page
+     pair gets this for free by being built the same way.
 
-  Not started. No branch.
+     This makes question 2's ruling load-bearing rather than cosmetic: on a list
+     that fits one screen the side buttons are dead, and with repeat enabled a
+     held button would otherwise fire `onContinuous` several times a second
+     against a list that cannot move. Suppress it at the source — the page
+     callback should return early when there is no page to turn, before any
+     `requestUpdate()`, so a held button on a short list costs nothing rather
+     than burning a redraw per repeat.
+
+  All four questions are now settled. Not started. No branch.
