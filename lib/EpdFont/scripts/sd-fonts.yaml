@@ -617,14 +617,31 @@ families:
     # roman's, accepted: Inknut's counters are small for its size, so bowl
     # parity and height parity cannot both hold, and height won.
     #
-    # ── BOLDITALIC WEIGHT STEP: lighter than roman pair, accepted ───────────
-    # The italic→bolditalic step is x1.08 on ink; Inknut Light→Bold is x1.40.
-    # Junicode's italic weight axis tops out at wght 700 (stem 0.1000 em),
-    # and matching the roman step would need 0.1314 em -- so the gap cannot
-    # be closed by the axis alone, only by synthetic embolden. The owner
-    # rejected synthetic embolden on 2026-08-13 (round 14). The bolditalic
-    # is deliberately a lighter step than the roman pair; this is a known
-    # accepted tradeoff, not an oversight.
+    # ── BOLDITALIC: wght 700 PLUS a synthetic embolden ─────────────────────
+    # Owner ruling 2026-08-13, reversing the round-14 decline once the cause
+    # was measured. wght 700 alone produced NO VISIBLE BOLD: read out of the
+    # built .cpfont, wght 600 and 700 render the SAME whole-pixel stem at
+    # three of the four reading sizes (2/3/4/4 px against the italic's
+    # 2/3/3/4), because post-scale the axis moves the stem only 0.0187 em =
+    # 0.39-0.62 px across this ppem range. The rasteriser rounds that away.
+    # Inknut's own Light->Bold moves 0.0600 em, 1.25-2.0 px, clears a pixel
+    # everywhere, and so always reads as bold.
+    #
+    # That sets a hard floor no wght value can reach: gaining a pixel at the
+    # SMALLEST size needs 1/20.8 ppem = 0.048 em of extra stem, which is 2.5x
+    # the entire 600->700 range. Hence synthesis, applied on top of 700 so it
+    # only covers the gap the axis cannot rather than faking the whole step.
+    #
+    # 0.042 em chosen off a five-value bench (0.030/0.042/0.050/0.060, plus
+    # 0.050 at y_ratio 0.35). It gains a pixel at ALL FOUR sizes -- 4/4/5/5 --
+    # and lands the ink step on the roman's: x1.39 against Inknut's x1.40 at
+    # 12 pt, x1.46 against x1.46 at 16. 0.050 with y_ratio 0.35 matched the
+    # ink too; 0.042 won as the smaller intervention on outlines never drawn
+    # for it.
+    #
+    # y_ratio is left at its 0.5 default: the horizontal stem grows twice as
+    # fast as the vertical, which is what stops a faux bold eating its own
+    # x-height. Do not raise it without re-measuring the x-height ramp.
     sizes: [10, 12, 14, 16]
     metrics: {ascent: 1203, descent: -340, linegap: 0}
     styles:
@@ -635,7 +652,8 @@ families:
                    variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
       bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
-                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09,
+                   synthetic: {embolden_em: 0.042}}
 
   - name: LibreCaslonText
     description: "Caslon revival tuned for body text (Latin)"
