@@ -130,10 +130,14 @@ inline constexpr Entry kEntries[] = {
     // foundry, Warsaw, 1931. Digitized copyright years (2003, 2009) are the
     // font's own name-table string; the CTAN v1.101 release (Oct 2010) is one
     // year of lag and collapses under the adjacent-year rule.
+    // Display name had lost its o-acute: "Po\xC5\x82tawskiego" rendered
+    // "Poltawskiego". It is Po\xC3\xB3\xC5\x82tawskiego, spelled that way
+    // throughout docs/font-dates.md.
     {"Antpolt",
-     "Antykwa Po\xC5\x82"
+     "Antykwa P\xC3\xB3\xC5\x82"
      "tawskiego",
-     "Bogus\xC5\x82"
+     "Adam P\xC3\xB3\xC5\x82"
+     "tawski; Bogus\xC5\x82"
      "aw Jackowski & Janusz M. Nowacki",
      "1931 Warsaw; 2003, 2009 Gda\xC5\x84sk", 1931},
     // The directory keeps Arkandis' foundry suffix because it is frozen; the
@@ -168,7 +172,13 @@ inline constexpr Entry kEntries[] = {
     // Atkinson Hyperlegible, either of which would be a change of attribution
     // rather than a placement, so it awaits an owner ruling and the studio name
     // stays exactly as the table has it.
-    {"LexicaUltralegible", "Lexica Ultralegible", "; Applied Design Works; Jacob Perez",
+    // Stage 2 credits the people, not the studio: docs/font-dates.md's own
+    // Designer-column rule says only individuals belong there, and the row's
+    // Basis names them — Elliott Scott led the 2019 Atkinson Hyperlegible with
+    // Craig Dobie as creative director. Same shape as Newsreader's pairing of a
+    // designer with a director. 1832 stays empty: no individual is recorded for
+    // the Figgins-specimen model.
+    {"LexicaUltralegible", "Lexica Ultralegible", "; Elliott Scott & Craig Dobie; Jacob Perez",
      "1832 London; 2019 New York; 2024 El Paso, Texas", 1832},
     // The text grotesques. Libre Franklin is the installed one; Host Grotesk and
     // Archivo are recipe-only since 2026-08-04 but keep their labels, because a
@@ -245,7 +255,12 @@ inline constexpr Entry kEntries[] = {
     // two-stage lineage the way the reading families do.
     {"iAWriterQuattro", "iA Writer Quattro", "Oliver Reichenstein & Bold Monday", "2018 Zurich & The Hague", 2018},
     {"iAWriterDuo", "iA Writer Duo", "Oliver Reichenstein & Bold Monday", "2017 Zurich & The Hague", 2017},
-    {"iAWriterMono", "iA Writer Mono", "Pieter van Rosmalen, Bold Monday", "2009 The Hague; 2018 Zurich", 2009},
+    // Stage 2 is iA's own adaptation in Zurich, credited the way the sibling
+    // Duo and Quattro entries already credit it. NOTE: iAWriterMono has no row
+    // in docs/font-dates.md, so unlike the other splits this one rests on the
+    // comment above plus those siblings, not on a cited table row.
+    {"iAWriterMono", "iA Writer Mono", "Pieter van Rosmalen, Bold Monday; Oliver Reichenstein",
+     "2009 The Hague; 2018 Zurich", 2009},
 };
 
 inline const Entry* find(const char* directory) {
