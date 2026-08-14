@@ -2,6 +2,7 @@
 
 #include <BoardConfig.h>
 #include <GfxRenderer.h>
+#include <HalDisplay.h>
 #include <Logging.h>
 
 #include <cstdio>
@@ -194,6 +195,10 @@ void SettingsActivity::toggleCurrentSetting() {
   // The system font has to be pushed into the renderer before anything repaints,
   // otherwise the popup closes onto a screen still drawn in the old face.
   const bool systemFontChanged = setting.valuePtr == &CrossPointSettings::systemFont;
+  // Panel polarity has to reach the driver before this screen repaints, or the
+  // settings list redraws in the outgoing polarity and the row reads "on" over
+  // a still-white page until something else forces a refresh.
+  const bool darkModeChanged = setting.valuePtr == &CrossPointSettings::darkMode;
 
   if (setting.nameId == StrId::STR_TIME_TO_SLEEP) {
     openSleepTimeoutPicker();
@@ -236,6 +241,7 @@ void SettingsActivity::toggleCurrentSetting() {
     // Toggle the boolean value using the member pointer
     const bool currentValue = SETTINGS.*(setting.valuePtr);
     SETTINGS.*(setting.valuePtr) = !currentValue;
+    if (darkModeChanged) display.setInverted(SETTINGS.darkMode != 0);
   } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
     const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
     const size_t choiceCount = setting.enumCount();

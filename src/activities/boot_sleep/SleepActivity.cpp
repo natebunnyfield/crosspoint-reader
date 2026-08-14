@@ -4,6 +4,7 @@
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
+#include <HalDisplay.h>
 #include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
@@ -30,8 +31,18 @@ void SleepActivity::onEnter() {
       sleepscreen::shouldQuickResume(SETTINGS.sleepScreen, SETTINGS.quickResumeSleepScreen, fromTimeout);
 
   if (renderQuickResume) {
+    // Deliberately BEFORE the polarity reset below: this path keeps whatever is
+    // already on the panel and only adds a moon, so it must stay in the polarity
+    // that page was drawn in. main.cpp re-applies the same mode before
+    // re-displaying the saved frame on the next boot, so the two agree.
     return renderLastScreenSleepScreen();
   }
+
+  // A DRAWN sleep screen is always normal polarity. It already carries its own
+  // light/dark choice in SETTINGS.sleepScreen, and inverting on top of that
+  // would make "Dark" render light. This frame also stays on the panel with the
+  // device powered off, so it must not depend on a runtime flag to look right.
+  display.setInverted(false);
 
   // Show popup with reader orientation only when going to sleep from reader
   if (APP_STATE.lastSleepFromReader) {

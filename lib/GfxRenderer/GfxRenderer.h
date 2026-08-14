@@ -276,6 +276,11 @@ class GfxRenderer {
   // fadingFix isn't forcing the blocking path. Callers can skip overlap
   // scaffolding (e.g. whole-plane grayscale buffers) when false.
   bool supportsAsyncRefresh() const;
+  // True when the panel output is being inverted (dark mode). Render paths use
+  // it to skip work the SDK would discard: every grayscale entry point is a
+  // no-op while inverted (FreeInkDisplay.cpp:779-859), so rendering AA planes
+  // would cost a 48 KB buffer and two full page renders for nothing.
+  bool isDisplayInverted() const;
   // EXPERIMENTAL: Windowed update - display only a rectangular region
   // void displayWindow(int x, int y, int width, int height) const;
   void invertScreen() const;
@@ -342,6 +347,21 @@ class GfxRenderer {
   void drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, float cropX = 0,
                   float cropY = 0) const;
   void drawBitmap1Bit(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight) const;
+  // Counter-invert a just-drawn CONTENT image (book cover, EPUB illustration) in
+  // the framebuffer so that the output inversion HalDisplay::setInverted()
+  // applies on the way to the panel lands on it twice and cancels out. A
+  // photograph in dark mode would otherwise read as a negative — faces as
+  // ghosts — which is the one thing a whole-screen polarity flip gets wrong.
+  //
+  // No-op unless the display is actually inverted, so the light-mode path is a
+  // single predictable branch. Deliberately NOT applied to UI chrome
+  // (drawImage/drawIcon): icons are line art that belongs to the page and must
+  // flip with it.
+  //
+  // Takes LOGICAL coordinates, like every other public draw call. The rectangle
+  // is the image's bounding box; the drawBitmap paths derive it from the source
+  // dimensions and the fit scale, so it is exact rather than an estimate.
+  void preserveImagePolarity(int x, int y, int width, int height) const;
   void fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state = true) const;
 
   // Snapshot / restore a screen-coordinate framebuffer region (byte-aligned in

@@ -377,6 +377,16 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // Margin follows them. Text Settings — the device-only action — is inserted
     // above the whole shared list by SettingsActivity::rebuildSettingsLists().
     v.push_back(buildScreenMarginSetting());
+    // Whole-screen polarity. A TOGGLE rather than a Light/Dark ENUM because the
+    // decision is boolean and docs/ui-conventions.md files boolean preferences
+    // as toggle rows; a two-option enum would open a popup to show one
+    // alternative. STR_CAT_SYSTEM, not STR_CAT_DISPLAY — Display is a retired
+    // category that rebuildSettingsLists() drops, so the row would persist and
+    // serve the web API but be invisible on the device, which is the whole
+    // point of adding it. SettingsActivity pushes the new value into the
+    // display driver as soon as it flips.
+    v.push_back(
+        SettingInfo::Toggle(StrId::STR_DARK_MODE, &CrossPointSettings::darkMode, "darkMode", StrId::STR_CAT_SYSTEM));
     // The typeface the chrome itself is drawn in. Filed under System rather than
     // Reader because it is not about books: it changes headers, list rows,
     // button hints, popups and the battery readout, and leaves the reader's body

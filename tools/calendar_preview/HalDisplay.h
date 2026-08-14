@@ -35,6 +35,11 @@ class HalDisplay {
   void displayBufferAsync(RefreshMode = FAST_REFRESH) {}
   void waitRefreshComplete() {}
   bool supportsAsyncRefresh() const { return false; }
+  // Output polarity. Real enough for the host harness: GfxRenderer reads it to
+  // decide whether to counter-invert content images, so a test can set it and
+  // exercise preserveImagePolarity without a panel.
+  void setInverted(bool v) { inverted = v; }
+  bool isInverted() const { return inverted; }
   void refreshDisplay(RefreshMode = FAST_REFRESH, bool = false) {}
   void displayGrayscaleBase(RefreshMode = HALF_REFRESH, bool = false) {}
   void copyGrayscaleBuffers(const uint8_t*, const uint8_t*) {}
@@ -48,5 +53,8 @@ class HalDisplay {
   bool supportsStripGrayscale() const { return false; }
   void preconditionGrayscale(int = 0, int = 0, int = 0, int = 0) {}
   void deepSleep() {}
+
+ private:
+  bool inverted = false;
 };
 extern HalDisplay display;

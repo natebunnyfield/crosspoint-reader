@@ -357,6 +357,11 @@ void ImageBlock::render(GfxRenderer& renderer, const int x, const int y) {
   // Try to render from cache first
   std::string cachePath = getCachePath(imagePath);
   if (renderFromCache(renderer, cachePath, x, y, width, height)) {
+    // Both image paths write pixels directly (DirectPixelWriter / the decoder),
+    // never through GfxRenderer::drawBitmap, so neither inherits that path's
+    // polarity preservation. Apply it here or an illustration reads as a
+    // negative in dark mode. No-op unless the display is inverted.
+    renderer.preserveImagePolarity(x, y, width, height);
     return;  // Successfully rendered from cache
   }
 
@@ -419,6 +424,7 @@ void ImageBlock::render(GfxRenderer& renderer, const int x, const int y) {
     return;
   }
 
+  renderer.preserveImagePolarity(x, y, width, height);
   LOG_DBG("IMG", "Decode successful");
 }
 

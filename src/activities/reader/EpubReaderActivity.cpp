@@ -1569,8 +1569,14 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // retained frame after a silent restart (for example, when returning from
   // KOReader sync), leaving the old UI mixed with the image.
   const bool cleanImageBasePending = manualRefreshPending || pagesUntilFullRefresh <= 1;
-  const bool needsTextGrayscale = SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF;
-  const bool needsAnyGrayscale = needsTextGrayscale || pageHasImages;
+  // Dark mode renders a crisp BW page: the SDK drops every grayscale write while
+  // the output is inverted (FreeInkDisplay.cpp:779, :797, :826-839), so without
+  // this gate the passes below would still run — a 48 KB storeBwBuffer and two
+  // extra full-page renders per page turn, producing pixels nothing ever
+  // displays.
+  const bool grayscaleAvailable = !renderer.isDisplayInverted();
+  const bool needsTextGrayscale = SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF && grayscaleAvailable;
+  const bool needsAnyGrayscale = (needsTextGrayscale || pageHasImages) && grayscaleAvailable;
   // Pick the glyph-gray -> plane mapping for every grayscale pass below (text
   // only; drawBitmap's image mapping is fixed).
   renderer.setGrayscaleAaStrength(ReaderUtils::textAaStrength());

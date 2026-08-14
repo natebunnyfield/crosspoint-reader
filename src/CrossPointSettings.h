@@ -175,6 +175,14 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     TEXT_ANTIALIASING_COUNT
   };
 
+  // Output polarity: white-on-black instead of black-on-white. Applied by the
+  // display driver on the way to the panel, so the framebuffer stays logical
+  // and no drawing code changes (HalDisplay::setInverted). A DRAWN sleep screen
+  // is the one exception and is always normal polarity: it carries its own
+  // light/dark choice in `sleepScreen` below, and it stays on the panel while
+  // the device is powered off, where no runtime flag is left to interpret it.
+  uint8_t darkMode = 0;
+
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings

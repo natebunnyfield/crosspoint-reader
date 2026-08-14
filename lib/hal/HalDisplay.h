@@ -57,6 +57,18 @@ class HalDisplay {
   void drawImageTransparent(const uint8_t* imageData, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                             bool fromProgmem = false) const;
 
+  // Output polarity ("dark mode"). The framebuffer stays logical — 1 is still
+  // white — and the SDK flips the bytes on their way to the panel
+  // (FreeInkDisplay.cpp:577-579). Nothing in the drawing layer has to know,
+  // except the image paths, which counter-invert so photographs and covers do
+  // not come out as negatives (GfxRenderer::preserveImagePolarity).
+  //
+  // Cost to know about: while inverted the SDK takes the blocking refresh path
+  // and disables every grayscale path outright (FreeInkDisplay.cpp:557-559,
+  // :609-612, :779, :859), so pages render as crisp BW with no antialiasing.
+  void setInverted(bool inverted);
+  bool isInverted() const;
+
   void displayBuffer(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
   // Non-blocking refresh (shadow-free): starts the panel waveform and returns
   // while the panel refreshes on its own. The framebuffer must stay untouched

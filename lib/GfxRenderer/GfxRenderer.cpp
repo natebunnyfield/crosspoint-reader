@@ -1587,6 +1587,14 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
 
   free(outputRow);
   free(rowBytes);
+
+  // Bounding box actually painted above: the loops walk `source` pixels and map
+  // pixel i to floor(i * scale), so the last one lands at floor((source-1)*scale).
+  const int sourceWidth = bitmap.getWidth() - cropPixX * 2;
+  const int sourceHeight = bitmap.getHeight() - cropPixY * 2;
+  const int renderedWidth = isScaled ? static_cast<int>(std::floor((sourceWidth - 1) * scale)) + 1 : sourceWidth;
+  const int renderedHeight = isScaled ? static_cast<int>(std::floor((sourceHeight - 1) * scale)) + 1 : sourceHeight;
+  preserveImagePolarity(x, y, renderedWidth, renderedHeight);
 }
 
 void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y, const int maxWidth,
@@ -1656,6 +1664,63 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
 
   free(outputRow);
   free(rowBytes);
+
+  const int renderedWidth =
+      isScaled ? static_cast<int>(std::floor((bitmap.getWidth() - 1) * scale)) + 1 : bitmap.getWidth();
+  const int renderedHeight =
+      isScaled ? static_cast<int>(std::floor((bitmap.getHeight() - 1) * scale)) + 1 : bitmap.getHeight();
+  preserveImagePolarity(x, y, renderedWidth, renderedHeight);
+}
+
+void GfxRenderer::preserveImagePolarity(const int x, const int y, const int width, const int height) const {
+  if (width <= 0 || height <= 0 || !frameBuffer) return;
+  // Only the BW pass owns the framebuffer's polarity. The grayscale planes are
+  // never reached while inverted anyway (FreeInkDisplay.cpp:779, :859) and a
+  // strip target points at a scratch band, not the frame.
+  if (renderMode != BW || _stripActive) return;
+  if (!display.isInverted()) return;
+
+  // Clip in logical space, then rotate the two opposing corners into physical
+  // framebuffer space, exactly as fillRectImpl does. Rotation is rigid, so the
+  // bounding box of the two rotated corners IS the rectangle.
+  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int lx0 = std::max(0, x);
+  const int ly0 = std::max(0, y);
+  const int lx1 = std::min(getScreenWidth(), x + width);
+  const int ly1 = std::min(getScreenHeight(), y + height);
+  if (lx0 >= lx1 || ly0 >= ly1) return;
+
+  int ax, ay, bx, by;
+  rotateCoordinates(orientation, lx0 * S, ly0 * S, &ax, &ay, panelWidth, panelHeight);
+  rotateCoordinates(orientation, lx1 * S - 1, ly1 * S - 1, &bx, &by, panelWidth, panelHeight);
+
+  const int left = std::max(0, std::min(ax, bx));
+  const int right = std::min(static_cast<int>(panelWidth) - 1, std::max(ax, bx));
+  const int top = std::max(0, std::min(ay, by));
+  const int bottom = std::min(static_cast<int>(panelHeight) - 1, std::max(ay, by));
+  if (left > right || top > bottom) return;
+
+  // MSB-first within a byte, so column c is bit (7 - (c & 7)). Head and tail
+  // masks cover only the in-rect bits of the first and last byte; everything
+  // between flips whole bytes.
+  const int byteStart = left >> 3;
+  const int byteEnd = right >> 3;  // inclusive
+  const uint8_t headMask = static_cast<uint8_t>(0xFFu >> (left & 7));
+  const uint8_t tailMask = static_cast<uint8_t>(0xFFu << (7 - (right & 7)));
+  const int32_t panelStride = static_cast<int32_t>(panelWidthBytes);
+
+  for (int row = top; row <= bottom; row++) {
+    uint8_t* rowData = frameBuffer + static_cast<int32_t>(row) * panelStride;
+    if (byteStart == byteEnd) {
+      rowData[byteStart] ^= static_cast<uint8_t>(headMask & tailMask);
+      continue;
+    }
+    rowData[byteStart] ^= headMask;
+    for (int b = byteStart + 1; b < byteEnd; b++) {
+      rowData[b] ^= static_cast<uint8_t>(0xFFu);
+    }
+    rowData[byteEnd] ^= tailMask;
+  }
 }
 
 void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state) const {
@@ -1799,6 +1864,8 @@ void GfxRenderer::displayBufferAsync(const HalDisplay::RefreshMode refreshMode) 
 void GfxRenderer::waitRefreshComplete() const { display.waitRefreshComplete(); }
 
 bool GfxRenderer::supportsAsyncRefresh() const { return !fadingFix && display.supportsAsyncRefresh(); }
+
+bool GfxRenderer::isDisplayInverted() const { return display.isInverted(); }
 
 size_t GfxRenderer::readFramebufferRegion(int x, int y, int w, int h, uint8_t* dst, size_t dstCapacity) const {
   if (dst == nullptr || w <= 0 || h <= 0) return 0;

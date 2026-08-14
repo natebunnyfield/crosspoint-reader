@@ -528,6 +528,19 @@ void setup() {
 
   setupDisplayAndFonts(resume != BootResume::Splash);
 
+  // Restore the stored polarity BEFORE the first paint of any kind. The
+  // framebuffer is always logical (1 = white) whichever mode is active, so the
+  // retained quick-resume frame carries no polarity of its own — it renders in
+  // whatever mode is live when it is re-displayed. Setting the flag here is what
+  // makes a dark-mode reader wake straight back into a dark page instead of
+  // flashing a full-brightness white one and correcting on the next refresh.
+  //
+  // Cost: setInverted() marks the inversion dirty, which promotes the first
+  // refresh from FAST to HALF (~1.7s, FreeInkDisplay.cpp:573-575). Only on the
+  // boot that turns it on — a light-mode device sets false over false, which the
+  // SDK drops as a no-op.
+  display.setInverted(SETTINGS.darkMode != 0);
+
   switch (resume) {
     case BootResume::Silent:
       // Splash skipped: the routing block below picks the target activity; the
