@@ -26,7 +26,7 @@ constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
 // entry that carries a two-stage lineage — "Bogusław Jackowski & Janusz M.
 // Nowacki · 1918 Jersey…" cut off exactly the half the credit exists to show.
 // Both the page stride and drawList have to be told, or paging skips rows.
-constexpr int kColophonLines = 2;
+constexpr int kColophonLines = 4;
 
 // Families visible at once. Three, not "as many as fit": five rows left the
 // specimen pane at 30% of the usable height, which is a four-line sample and

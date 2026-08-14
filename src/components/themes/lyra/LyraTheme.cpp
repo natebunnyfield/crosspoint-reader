@@ -280,12 +280,30 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
         renderer.drawText(SMALL_FONT_ID, textX, itemY + 30, subtitle.c_str(), true);
         textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, subtitle.c_str()));
       } else {
-        const auto lines = renderer.wrappedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth, subtitleLines);
+        // A newline in the subtitle is an EXPLICIT line break, not whitespace:
+        // the font picker pairs each lineage stage with its own designer
+        // ("Original author · YEAR PLACE" over "Digitizer · YEAR PLACE"), and
+        // word-wrapping that as one run puts the break wherever the words run
+        // out — mid-stage, splitting a year from its place. Each segment still
+        // wraps within the remaining budget, so a long stage degrades instead
+        // of overflowing, and the total is capped at subtitleLines.
         int subtitleY = itemY + 30;
-        for (const auto& line : lines) {
-          renderer.drawText(SMALL_FONT_ID, textX, subtitleY, line.c_str(), true);
-          textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, line.c_str()));
-          subtitleY += LyraMetrics::values.listSubtitleLineStep;
+        int drawn = 0;
+        size_t segStart = 0;
+        while (segStart <= subtitleText.size() && drawn < subtitleLines) {
+          const size_t nl = subtitleText.find('\n', segStart);
+          const std::string segment =
+              subtitleText.substr(segStart, nl == std::string::npos ? std::string::npos : nl - segStart);
+          const auto lines = renderer.wrappedText(SMALL_FONT_ID, segment.c_str(), rowTextWidth, subtitleLines - drawn);
+          for (const auto& line : lines) {
+            if (drawn >= subtitleLines) break;
+            renderer.drawText(SMALL_FONT_ID, textX, subtitleY, line.c_str(), true);
+            textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, line.c_str()));
+            subtitleY += LyraMetrics::values.listSubtitleLineStep;
+            ++drawn;
+          }
+          if (nl == std::string::npos) break;
+          segStart = nl + 1;
         }
       }
     }
