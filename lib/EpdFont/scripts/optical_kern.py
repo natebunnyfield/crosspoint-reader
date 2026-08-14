@@ -2,8 +2,15 @@
 """Optical autokerning: fill a font's kerning gaps without overriding its designer.
 
 Writes synthesised pairs into a legacy `kern` table. fontconvert_sdcard.py reads
-both legacy and GPOS and SUMS them (fontconvert_sdcard.py:283 and :212), so the
-emitted values compose with whatever the designer already specified.
+both legacy and GPOS and OVERLAYS them with GPOS winning per pair
+(extract_kerning_fonttools, "GPOS supersedes the legacy table"), so a
+synthesised pair reaches the .cpfont exactly when the designer left that pair
+alone — which is the only case this script emits one (see emit() below).
+
+It used to SUM the two instead, and this script's docstring used to say so. That
+was a bug, not a contract: a face shipping the same pairs in both tables — an
+old OpenType cut like LibrisADF — got the designer's own correction applied
+twice.
 
     python3 optical_kern.py IN.ttf OUT.ttf              # synthesise
     python3 optical_kern.py IN.ttf --validate           # check the metric first

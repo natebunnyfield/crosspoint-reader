@@ -317,8 +317,24 @@ def extract_kerning_fonttools(font_path, codepoints, ppem):
     # Flat dict for membership checks and subtable extraction (uses keys only)
     glyph_to_cp = glyph_to_cps
 
-    # Collect raw kerning values in font design units
-    raw_kern = {}  # (left_glyph_name, right_glyph_name) -> design_units
+    # Collect raw kerning values in font design units.
+    #
+    # The two sources are collected SEPARATELY and then overlaid, GPOS winning,
+    # rather than summed into one dict. A font that predates OpenType layout
+    # commonly ships the SAME pairs twice — once in the legacy `kern` table for
+    # non-OT clients, once in GPOS — and summing them applies the designer's
+    # correction twice. LibrisADF is such a font: `kern` and the GPOS kern
+    # feature carry byte-identical pair sets (1053 pairs, regular), so T+o came
+    # out at -214/1000 em instead of -107 and every T/Y pair saturated the
+    # int8_t 4.4 floor (-8.0 px) at 18 pt. Overlaying is also what the OpenType
+    # spec asks for: where both exist, GPOS supersedes `kern`.
+    #
+    # Legacy-ONLY pairs still survive the overlay, which is what
+    # optical_kern.py depends on — it writes its synthesised pairs into a fresh
+    # `kern` table and never emits a pair the designer already ruled on in GPOS
+    # (optical_kern.py:390-393), so nothing it produces is shadowed here.
+    raw_kern = {}   # (left_glyph_name, right_glyph_name) -> design_units
+    gpos_kern = {}  # same, GPOS only — overlaid onto raw_kern below
 
     # 1. Legacy kern table
     if 'kern' in font:
@@ -358,13 +374,21 @@ def extract_kerning_fonttools(font_path, codepoints, ppem):
                     # type instead of the outer type is what makes those
                     # lookups actually reach the extractor.
                     if effective_type == 2:
-                        _extract_pairpos_subtable(actual, glyph_to_cp, raw_kern)
+                        _extract_pairpos_subtable(actual, glyph_to_cp, gpos_kern)
                     else:
                         print(f"  Debug: skipping unsupported GPOS kern lookupType="
                               f"{effective_type} (outer={lookup.LookupType}, Format={actual.Format})",
                               file=sys.stderr)
 
     font.close()
+
+    # GPOS supersedes the legacy table pair-for-pair; legacy-only pairs remain.
+    shadowed = sum(1 for k in gpos_kern if k in raw_kern)
+    if shadowed:
+        print(f"  Debug: {shadowed} pair(s) present in BOTH the legacy kern table and "
+              f"GPOS; GPOS wins (summing them would double the designer's correction)",
+              file=sys.stderr)
+    raw_kern.update(gpos_kern)
 
     # Scale design-unit kerning values to 4.4 fixed-point pixels.
     # Expand glyph aliases: if multiple codepoints share a glyph, emit kern

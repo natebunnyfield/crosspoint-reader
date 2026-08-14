@@ -922,6 +922,18 @@ families:
     # Cap-I and lowercase-l are the same bare stem, so "Ill" renders as three
     # identical bars. Noted and ruled fine (owner call 2026-08-12) — not worth
     # acting on.
+    #
+    # KERNING: this is the ONE installed family that ships its pairs TWICE —
+    # 1053 byte-identical pairs in both the legacy `kern` table and the GPOS
+    # kern feature (verified across all four styles). extract_kerning_fonttools
+    # used to SUM the two, so every kerned pair came out at 2x the designer's
+    # value: T+o -214/1000 em instead of -107, and at 18 pt To/Yo/Ta/Te/Tr/Ya/Ye
+    # ALL saturated the int8_t 4.4 floor at -8.0 px. Fixed in the converter
+    # (GPOS now overlays the legacy table instead of summing), NOT here — the
+    # recipe is unchanged. **Any LibrisADF .cpfont built before that fix is
+    # wrong and must be rebuilt**; a card carrying one cannot be told apart by
+    # filename or size, only by reading its kern matrix back. Bench comparison:
+    # lib/EpdFont/scripts/libris-kern-bench.yaml.
     styles:
       regular:    {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf"}
       bold:       {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Bold.otf"}

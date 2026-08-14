@@ -1,0 +1,53 @@
+# LibrisADF kerning bench (verification set)
+#
+# NOT a shipping list, and nothing here is installed anywhere —
+# `installed_families:` in sd-fonts.yaml still rules that. Separate file for the
+# same reason sans-candidates.yaml, grotesque-candidates.yaml and
+# inknut-italic-bench.yaml are separate: this is one family under one changed
+# variable, and putting it in sd-fonts.yaml would drop it into the shipped set.
+#
+#   python3 lib/EpdFont/scripts/build-sd-fonts.py \
+#     --config lib/EpdFont/scripts/libris-kern-bench.yaml \
+#     --only LibrisKernFix --output-dir tools/calendar_preview/fs_/.fonts
+#
+# ── WHY THIS EXISTS ────────────────────────────────────────────────────────
+#
+# LibrisADF kerns T+o and Y+o about twice as hard as its designer asked. The
+# source ships the SAME 1053 pairs twice — once in the legacy `kern` table for
+# pre-OpenType clients, once in the GPOS kern feature — and
+# extract_kerning_fonttools used to SUM the two sources into one dict, so every
+# pair the designer touched was corrected twice:
+#
+#   LibrisADFStd-Regular.otf  T+o = -107/1000 em, Y+o = -117/1000 em
+#   shipped fs_/fonts LibrisADF_12  T+o = -86 (4.4 fp) — exactly 2 x -43
+#
+# At 18 pt the doubled value overruns the int8_t 4.4 floor, so To/Yo/Ta/Te/Tr/
+# Ya/Ye ALL land on -128 (-8.0 px) — identical, which destroys their relative
+# fit as well as their absolute one. The 2x companions saturate at every size.
+#
+# The fix is in fontconvert_sdcard.py, not in the recipe: the two sources are
+# now OVERLAID with GPOS winning per pair rather than summed. This family is
+# the same recipe as sd-fonts.yaml's LibrisADF, under a different name, so the
+# corrected build can sit beside the shipped one in
+# tools/calendar_preview/fs_/.fonts and be compared through render_harness
+# without touching an installed surface.
+#
+# LibrisADF is the ONLY installed family that ships both tables — verified
+# across every cached source in downloaded_fonts/ and patched_fonts/; the other
+# two that do (GoudyBookletter1911, QuattrocentoSans) are not installed. So
+# this file goes away once the corrected LibrisADF is rebuilt onto the cards.
+
+families:
+  - name: LibrisKernFix
+    description: "LibrisADF with the legacy-kern double-count removed (bench only, NOT installed)"
+    intervals: latin-ext
+    # Identical to sd-fonts.yaml's LibrisADF entry — sizes, span, sources. Only
+    # the converter's kern merge differs, so any delta measured against the
+    # shipped LibrisADF is attributable to that one change.
+    sizes: [12, 14, 16, 18]
+    metrics: {ascent: 1050, descent: -319, linegap: 0}
+    styles:
+      regular:    {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf"}
+      bold:       {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Bold.otf"}
+      italic:     {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Italic.otf"}
+      bolditalic: {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-BoldItalic.otf"}
