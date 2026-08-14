@@ -133,10 +133,17 @@ consumes it even though no firmware code does.
      "page" has to mean the visible row count for that screen. `LyraTheme`
      already knows its rows-per-screen from `getListRowStep(...)`, so the number
      exists — but it differs per theme metric and per whether rows carry
-     subtitles, and no shared accessor exposes it yet.
-  2. **Which screens?** A list shorter than one screen has no page to turn, and
-     side buttons would go dead there. Either fall back to item-stepping when
-     the list fits, or accept dead buttons on short lists.
+     subtitles, and no shared accessor exposes it yet. Settled by implication
+     from question 2's ruling below: a page is one screenful of rows. Flagged
+     as an inference rather than a spoken ruling, so say otherwise if the intent
+     was "jump to the next section" (books ↔ menu on Home).
+  2. ~~**Which screens?**~~ **RULED 2026-08-14: dead.** A list that fits on one
+     screen has no page to turn, and the side buttons simply do nothing there —
+     they do NOT fall back to stepping one row. This is the cheaper rule to
+     reason about and the honest one: a side button means "page", and where
+     there is no page there is no action. Consequence to handle deliberately —
+     `ButtonNavigator::onContinuous` must not fire either, or a held side button
+     on a short list burns a redraw per repeat doing nothing.
   3. **Ends: wrap or clamp?** `HomeActivity.cpp:210-217` already clamps for the
      Lyra Six two-page home and wraps everywhere else, deliberately. Paging
      probably wants clamp everywhere, which would make that special case
