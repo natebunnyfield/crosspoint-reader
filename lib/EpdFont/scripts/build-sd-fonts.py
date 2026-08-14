@@ -471,6 +471,15 @@ def build_family(
                      if k in style_spec}
             if space:
                 space_flags[style_name] = ",".join(f"{k}={v}" for k, v in sorted(space.items()))
+            # `synthetic:` on a style that has its OWN source, rather than only
+            # on a `from:` alias. A synthetic style borrows another style's file
+            # because the family ships no such cut; a real cut can still want an
+            # embolden on top of it, when the axis it rides runs out before the
+            # target does. Collected here so both cases work; the `from:` pass
+            # below still handles aliases and would otherwise be the only path.
+            if "from" not in style_spec and "synthetic" in style_spec:
+                synth_flags[style_name] = ",".join(
+                    f"{k}={v}" for k, v in sorted(style_spec["synthetic"].items()))
         for style_name, style_spec in styles.items():
             if "from" in style_spec:
                 continue

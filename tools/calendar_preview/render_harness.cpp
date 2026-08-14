@@ -340,6 +340,15 @@ struct StyledWord {
 std::vector<StyledWord> parseInlineMarkup(const char* src) {
   std::vector<StyledWord> out;
   std::string cur;
+  // Bold and italic COMPOSE, so <b><i>x</i></b> reaches BOLD_ITALIC (= 3, the
+  // bit union of BOLD and ITALIC). The tags used to assign the style
+  // absolutely, which made the last tag win and left the bolditalic face
+  // unreachable from any markup — so the inline specimen could not show the
+  // one style a bold-italic bench exists to judge.
+  bool bold = false, italic = false;
+  auto compose = [&] {
+    return static_cast<EpdFontFamily::Style>((bold ? EpdFontFamily::BOLD : 0) | (italic ? EpdFontFamily::ITALIC : 0));
+  };
   EpdFontFamily::Style style = EpdFontFamily::REGULAR;
   EpdFontFamily::Style curStyle = style;
   bool sawSpace = true;  // start of paragraph: nothing to glue to
@@ -353,19 +362,23 @@ std::vector<StyledWord> parseInlineMarkup(const char* src) {
   for (const char* p = src; *p != '\0';) {
     if (strncmp(p, "<i>", 3) == 0) {
       flush();
-      style = EpdFontFamily::ITALIC;
+      italic = true;
+      style = compose();
       p += 3;
     } else if (strncmp(p, "</i>", 4) == 0) {
       flush();
-      style = EpdFontFamily::REGULAR;
+      italic = false;
+      style = compose();
       p += 4;
     } else if (strncmp(p, "<b>", 3) == 0) {
       flush();
-      style = EpdFontFamily::BOLD;
+      bold = true;
+      style = compose();
       p += 3;
     } else if (strncmp(p, "</b>", 4) == 0) {
       flush();
-      style = EpdFontFamily::REGULAR;
+      bold = false;
+      style = compose();
       p += 4;
     } else if (*p == ' ') {
       flush();
@@ -464,6 +477,9 @@ bool renderInlineSpecimen(const char* family, const char* outDir) {
   // a 1-2 px change per space had almost nothing to act on and every value
   // read identical. Here every gap in the line is the one under test, and the
   // roman directly above it is the reference to read the italic against.
+  // All four styles on one line, so the bold-italic step is judged against the
+  // roman step directly above it rather than from memory.
+  static const char* kPara7 = "the sum <b>the sum</b> <i>the sum</i> <b><i>the sum</i></b>";
   static const char* kPara5 = "the sum of the parts is not the whole of it";
   static const char* kPara6 = "<i>the sum of the parts is not the whole of it</i>";
 
@@ -500,7 +516,7 @@ bool renderInlineSpecimen(const char* family, const char* outDir) {
     y += renderer.getLineHeight(UI_12_FONT_ID) + 10;
 
     const int pageBottom = renderer.getScreenHeight() - bottom - 6;
-    for (const char* para : {kPara4, kPara5, kPara6, kPara1, kPara2, kPara3}) {
+    for (const char* para : {kPara7, kPara4, kPara5, kPara6, kPara1, kPara2, kPara3}) {
       if (y + lineH > pageBottom) break;
       y = drawInlineParagraph(id, parseInlineMarkup(para), margin, y, colW, lineH, pageBottom);
       y += lineH / 2;
