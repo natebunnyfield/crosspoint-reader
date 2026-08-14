@@ -75,6 +75,21 @@ inline constexpr Entry kEntries[] = {
      "2014, 2021 Santa Clara, California", 2014},
     {"GTAlpinaCond", "GT Alpina", "Reto Moser", "2011 Bern; 2020 Lucerne, Switzerland", 2011},
     {"InknutAntiqua62", "Inknut Antiqua", "Claus Eggers S\xC3\xB8rensen", "1469 Venice; 2014 Amsterdam", 1469},
+    // TWO TYPEFACES, credited roman-first: Inknut Antiqua sets regular and
+    // bold, Junicode supplies the real cut italics Inknut's foundry repo has
+    // at no weight. Both fields carry both hands in that order, and the
+    // lineage runs Inknut's two stages then Junicode's.
+    //
+    // Junicode's stage is compressed to its initial release. Its own entry
+    // below reads "1998, 2023 Charlottesville, Virginia"; the full
+    // concatenation measures 947 px at 8 pt against this list's 472 px line,
+    // so it wraps to three lines where the picker allows two
+    // (FontSelectionActivity.cpp:29) and the Junicode half is precisely what
+    // gets truncated. Dropping the 2023 revision rather than the 1998 original
+    // follows the "," convention documented above. Measured, not guessed —
+    // "restoring" the full string silently loses the second typeface.
+    {"InknutJunicode", "Inknut Antiqua + Junicode", "Claus Eggers S\xC3\xB8rensen; Peter S. Baker",
+     "1469 Venice; 2014 Amsterdam; 1703 Oxford; 1998 Charlottesville", 1469},
     {"LibreCaslonText", "Libre Caslon Text", "Pablo Impallari & Rodrigo Fuenzalida",
      "1722 London; 2012 Rosario, Argentina", 1722},
     {"Lora", "Lora", "Olga Karpushina", "2011, 2019 Moscow", 2011},
