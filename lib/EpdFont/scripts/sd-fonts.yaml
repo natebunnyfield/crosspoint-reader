@@ -557,16 +557,19 @@ families:
   - name: InknutJunicode
     description: "Inknut Antiqua with Junicode's real cut italics (Latin)"
     intervals: latin-ext
-    # INSTALLED (owner ruling 2026-08-13). Regular/bold = Inknut's shipped Light/Bold
-    # (same source files as InknutAntiqua62). Italic/bolditalic are borrowed
-    # from Junicode, which ships real cut italics where Inknut's foundry repo
-    # has none at any weight.
+    # INSTALLED (owner ruling 2026-08-13). Regular = Inknut Regular, bold =
+    # Inknut Bold. Italic/bolditalic are borrowed from Junicode, which ships
+    # real cut italics where Inknut's foundry repo has none at any weight.
+    #
+    # THE ROMAN IS **Regular**, NOT Light, since 2026-08-13 -- "inknut thin is
+    # too thin", owner, off a rendered roman ladder. InknutAntiqua62 still ships
+    # Light and is a different family; do not "restore" this one to match it.
     #
     # ── SETTLED 2026-08-13, owner rulings off rendered inline benches ────────
     #
     #   width    Expanded (wdth 125). Condensed and SemiCondensed are OUT OF
     #            SCOPE by ruling, not merely unranked.
-    #   weight   SemiBold (600) italic; Bold (700) bolditalic.
+    #   weight   565 italic; Bold (700) + embolden bolditalic.
     #   ENLA     14
     #   scale    x1.25
     #   tracking 0 -- swept 0 to 0.05 em at 0.005 and rejected; the Expanded
@@ -575,9 +578,51 @@ families:
     #   word sp. -0.09 em  (see below -- this one is not an eye ruling)
     #
     # Built from VAR/JunicodeVF-Italic.ttf rather than the named statics for
-    # one reason: the statics are all ENLA 0, and ENLA is the axis that carries
-    # the ruling. Same width and weight masters either way -- wdth 125 / wght
-    # 600 IS Junicode-ExpSemiBoldItalic, wght 700 IS Junicode-ExpBoldItalic.
+    # two reasons now: the statics are all ENLA 0, and ENLA is the axis that
+    # carries the ruling; and 565 is not a named instance at all. wdth 125 /
+    # wght 700 IS Junicode-ExpBoldItalic, which is what bolditalic rides.
+    #
+    # ── THE ITALIC IS wght 565, and the roman move is why ───────────────────
+    # Rounds 15-16, 2026-08-13. Moving the roman Light -> Regular changes what
+    # the italic has to match, so the italic was re-derived against it rather
+    # than carried over. Measured on the .cpfont rasterisation (FreeType 150
+    # dpi, the converter's quantisation, BW ink = level >= 1), ink per advance
+    # against Inknut Regular:
+    #
+    #     wght    500     545     565     590     645     700
+    #     ink    93.2%   96.9%   98.4%  100.7%  105.2%  109.5%
+    #
+    # Colour parity sits at ~590 and the owner ruled 565 off the rendered deck,
+    # a hair light of parity. That is a REVERSAL of the old relationship, not a
+    # nudge: wght 600 against Inknut Light ran 106.4% of its roman's ink, so
+    # italic phrases used to sit darker than the text around them and now sit
+    # slightly lighter.
+    #
+    # Colour is the metric, not stem width. Stem parity with Inknut Regular's
+    # 0.1172 em would put the italic at ~667 -- but the page renders BW with no
+    # antialiasing (GfxRenderer.cpp:512), so ink coverage is what the eye gets,
+    # and design-unit stem parity is not preserved by the rasteriser.
+    #
+    # DO NOT re-derive this by nudging the axis: 545-575 is 30 wght units =
+    # ~0.0047 em of stem = 0.10-0.16 px at these ppem, and four of the five
+    # round-16 candidates render the IDENTICAL stem tuple. Adjacent steps
+    # differ by ~2 000 pixels a frame while the two ends differ by 3 747 --
+    # the pixels flicker rather than accumulate. Anything inside that band is
+    # an eye ruling on edge quantisation and cannot be argued from numbers.
+    #
+    # Carried over from the Light era, and checked rather than assumed: Inknut's
+    # x-height does not move with weight (Light and Regular both 0.5320 em, cap
+    # 0.7870 vs 0.7860), so `scale: 1.25` and `ENLA: 14` still hold; and the
+    # roman's space advance renders to the same 6/7/8/9 px at the four sizes
+    # (0.2840 -> 0.2790 em), so `word_space_em: -0.09` needed no re-derivation.
+    #
+    # KNOWN MISMATCH, left as ruled: bolditalic keeps embolden 0.042, which
+    # round 14 chose to land the italic->bolditalic step on the roman pair's.
+    # It no longer does. Against the new pair the roman steps Regular->Bold
+    # x1.296 while the italic steps 565->bolditalic x1.449; `embolden_em: 0.024`
+    # would restore the match (x1.292). Owner ruled bold and bolditalic
+    # untouched in this round -- so the 0.042 rationale below is HISTORY, not a
+    # live derivation. Reopen it as its own round, do not silently "fix" it.
     #
     # BOLDITALIC IS wght 700 NOW, where it used to repeat the SemiBold. The old
     # reason was real but width-specific: SemiCondensed ships no Bold Italic at
@@ -586,6 +631,8 @@ families:
     # gets a genuinely heavier face instead of a repeat.
     #
     # ── WORD SPACE: -0.09 em, derived not judged ────────────────────────────
+    # (Derived against Inknut Light's 0.2840 em space; re-checked for Regular's
+    # 0.2790 and unchanged -- both render 6/7/8/9 px.)
     # Junicode's space is 0.3555 em after the x1.25 scale against Inknut's
     # 0.2840, so an italic phrase inside an Inknut sentence opened up at every
     # word boundary while the letters sat right. Neither `scale:` nor the width
@@ -645,11 +692,11 @@ families:
     sizes: [10, 12, 14, 16]
     metrics: {ascent: 1203, descent: -340, linegap: 0}
     styles:
-      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"}
+      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
       italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
-                   variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+                   variable: {wght: 565, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
       bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
                    variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09,

@@ -86,6 +86,8 @@ _junicode_vf: &vf "https://github.com/psb1558/Junicode-font/releases/download/v2
 _vf_member: &vfm "Junicode/VAR/JunicodeVF-Italic.ttf"
 _inknut_light: &light "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Light.ttf"
 _inknut_bold: &bold "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"
+_inknut_regular: &regular "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"
+_inknut_medium: &medium "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Medium.ttf"
 
 families:
   # ── SemiBold (600) ───────────────────────────────────────────────────────
@@ -1399,4 +1401,281 @@ families:
       regular:    {url: *light}
       bold:       {url: *bold}
       italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  # ── ROUND 15, 2026-08-13: the roman moves up a weight, and the italic is
+  #    re-matched to it and bracketed ────────────────────────────────────────
+  #
+  # Ask: "inknut thin is too thin ... leave bold and bold italic as is, but up
+  # inknut one level higher to regular, then determine the best match for
+  # junicode expanded italic, then bracket it out precisely two stops either
+  # way." Bold (Inknut Bold) and bolditalic (wght 700 + embolden 0.042) are
+  # therefore IDENTICAL in all eight families below -- only the roman and the
+  # italic move.
+  #
+  # ── WHAT IS SAFE TO CARRY OVER ──────────────────────────────────────────
+  # Inknut's x-height does not move with weight: Light and Regular both measure
+  # 0.5320 em, cap 0.7870 vs 0.7860. So `scale: 1.25` and `ENLA: 14`, which
+  # were derived against Light's x-height and cap, hold unchanged for Regular.
+  # Its space advance barely moves either -- 0.2840 -> 0.2790 em -- and renders
+  # to the SAME 6/7/8/9 px word gap at the four sizes, so `word_space_em: -0.09`
+  # from round 13 needs no re-derivation.
+  #
+  # ── LIGHT -> REGULAR IS SUB-PIXEL, AND THAT IS THE ROUND'S RISK ──────────
+  # Measured on the .cpfont rasterisation (FreeType 150 dpi, converter
+  # quantisation, BW ink = level >= 1), stem px of l/n at the four sizes:
+  #
+  #   Inknut Light     3/3  3/4  4/4  4/4     ink/advance  95.4% of Regular
+  #   Inknut Regular   3/3  3/4  4/4  4/4     ink/advance 100.0%
+  #   Inknut Medium    4/3  4/4  5/4  5/5     ink/advance 108.0%
+  #
+  # Light and Regular render the SAME stem at every reading size -- the step is
+  # 0.0078 em, which is 0.16-0.26 px across this ppem range and rounds away,
+  # exactly like the wght 600->700 italic step round 14 measured. Regular is
+  # ~5% more ink (edge pixels, curves), not a heavier stem. MEDIUM is the first
+  # Inknut weight that moves a stem pixel. The three IJ15R families below exist
+  # to put that question in front of the eye rather than assert it.
+  #
+  # ── THE MATCH: wght 590, on colour not on stems ─────────────────────────
+  # Two metrics disagree and the choice between them matters:
+  #
+  #   stem parity   Inknut Regular's stem is 0.1172 em; the italic reaches it
+  #                 at wght ~667 (650 = 0.1133, 700 = 0.1250, all post-x1.25).
+  #   colour parity ink per unit advance -- the page colour an italic phrase
+  #                 contributes inside a roman sentence -- reaches 100.0% at
+  #                 wght ~590.
+  #
+  # Colour wins, for the reason measure_enla.py already argues: the page is
+  # rendered BW with no antialiasing, so what the eye gets is ink coverage, and
+  # stem parity in design units is not preserved by the rasteriser. Junicode
+  # Expanded is inherently darker per advance than Inknut at equal stem.
+  #
+  # Note where that lands: the SHIPPED italic is wght 600. Against Inknut Light
+  # it ran ~7% dark; moving the roman up to Regular lands the existing pairing
+  # within 1% of colour parity on its own. The match is essentially where the
+  # family already sits, which is a finding, not a non-result.
+  #
+  # ── THE STOP IS A PIXEL STOP, NOT AN AXIS STOP ──────────────────────────
+  # A wght-unit stop is invisible here. The entire 400-700 axis is 0.047 em of
+  # stem = about ONE pixel at 10 pt; 25 or 50 units is 0.1-0.3 px. So the five
+  # candidates are spaced by ~3.8% of ink/advance each, which is the smallest
+  # step that changes at least one whole stem pixel. Measured ladder, stem px
+  # l/n at 10/12/14/16 and mean ink/advance against Inknut Regular:
+  #
+  #   ROMAN Regular    3/3  3/4  4/4  4/4    100.0%
+  #   -2  wght 500     2/4  3/4  3/5  4/6     93.2%
+  #   -1  wght 545     2/4  3/5  3/5  4/6     96.9%
+  #   ->  wght 590     2/4  3/5  3/6  4/6    100.7%   the match
+  #   +1  wght 645     3/5  3/5  4/6  4/6    105.2%
+  #   +2  wght 700     3/5  4/5  4/6  5/7    109.5%
+  #
+  # Every adjacent pair differs in exactly one of the eight stem readings, so
+  # each stop is a real rendered difference rather than an axis number.
+  #
+  # +2 lands exactly on the axis ceiling, which is lucky: no synthetic embolden
+  # is needed anywhere in this bracket. Had the match sat at the stem-parity
+  # 667 instead, +1 and +2 would both have had to be synthetic -- and an
+  # embolden at the default y_ratio 0.5 grows the x-height by 2 px (11/14/16/19
+  # -> 13/16/18/21), so it would have changed the italic's SIZE as well as its
+  # weight. `y_ratio: 0.0` was measured as the pure-weight variant if a future
+  # round ever needs to go past 700.
+  #
+  # Not touched, but measured and worth its own round: the italic's x-height
+  # runs 11/14/16/19 px against the roman's 13/15/17/19 -- 2 px short at 10 pt,
+  # 1 px at 12 pt, level by 16 pt. That is ENLA 14's doing and it is the
+  # shipped state, not something this round changed.
+
+  # ---- the italic bracket, roman held at Inknut Regular ----
+
+  - name: IJ15W500
+    description: "Italic -2 stops: wght 500 (93.2% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 500, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ15W545
+    description: "Italic -1 stop: wght 545 (96.9% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 545, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ15W590
+    description: "Italic MATCH: wght 590, colour parity with Inknut Regular"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 590, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ15W645
+    description: "Italic +1 stop: wght 645 (105.2% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 645, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ15W700
+    description: "Italic +2 stops: wght 700, the axis ceiling (109.5% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  # ---- secondary: does Light -> Regular actually read less thin? ----
+  # Italic held at the wght 590 match in all three, so the only variable is the
+  # roman. IJ15RRG is the same build as IJ15W590 under another name, kept
+  # separate so the roman deck reads as its own comparison.
+
+  - name: IJ15RLT
+    description: "Roman ladder: Inknut Light (what ships today)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 590, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ15RRG
+    description: "Roman ladder: Inknut Regular (the ruling)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 590, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ15RMD
+    description: "Roman ladder: Inknut Medium (first weight that moves a stem pixel)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *medium}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 590, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  # ── ROUND 16, 2026-08-13: five steps inside 545-575 ──────────────────────
+  #
+  # Owner, off the round-15 deck: "do it again, but with five steps between 545
+  # and 575. remove inknut light and medium." So the roman ladder is RETIRED --
+  # Inknut Regular is the roman, ruled, and IJ15RLT/IJ15RMD are superseded.
+  # Roman, bold and bolditalic are identical in all five below.
+  #
+  # WHERE THIS SITS. Round 15's bracket ran 500/545/590/645/700 and this zooms
+  # into the light half of it: 545 was -1 stop (96.9% of the roman's ink per
+  # advance), 575 sits just under colour parity (99.4%). The whole new range is
+  # 2.5% of ink, against 3.8% for ONE round-15 stop.
+  #
+  # WHAT THAT COSTS, measured before building so it is not a surprise:
+  #
+  #   wght     stem px l/n at 10/12/14/16    mean ink/advance vs Inknut Regular
+  #   545      2/4  3/5  3/5  4/6             96.9%
+  #   552.5    2/4  3/5  3/5  4/6             97.6%
+  #   560      2/4  3/5  3/5  4/6             97.9%
+  #   567.5    2/4  3/5  3/5  4/6             98.7%
+  #   575      2/4  3/5  3/6  4/6             99.4%
+  #
+  # FOUR OF THE FIVE RENDER THE IDENTICAL STEM TUPLE. Only 575 moves a pixel,
+  # and only at 14 pt. 30 wght units is ~0.0047 em of stem = 0.10-0.16 px across
+  # this ppem range, so this bracket is below the pixel grid by construction --
+  # what differs between frames is edge quantisation, not stroke width. The
+  # frames were diffed pairwise anyway (round 13's lesson) and the counts are
+  # recorded with the deck; a step that diffs to zero would be a false choice,
+  # not a fine one.
+  #
+  # Fractional wght values are deliberate: five steps across 30 units is 7.5
+  # each, and rounding to integers would make the ladder uneven for no gain.
+
+  - name: IJ16W5450
+    description: "Narrow bracket 1/5: wght 545 (96.9% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 545, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ16W5525
+    description: "Narrow bracket 2/5: wght 552.5 (97.6% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 552.5, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ16W5600
+    description: "Narrow bracket 3/5: wght 560 (97.9% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 560, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ16W5675
+    description: "Narrow bracket 4/5: wght 567.5 (98.7% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 567.5, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ16W5750
+    description: "Narrow bracket 5/5: wght 575 (99.4% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 575, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  # Owner asked whether wght 565 could win the round-16 deck — a value between
+  # steps 3 and 4, not one of the five rendered. Built to answer with pixels.
+  - name: IJ16W5650
+    description: "Off-ladder check: wght 565 (98.4% ink)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 565, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
       bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
