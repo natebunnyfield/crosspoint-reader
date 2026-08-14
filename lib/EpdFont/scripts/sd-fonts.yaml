@@ -148,6 +148,13 @@ installed_families:
   - TeXGyreSchola
   - LibreFranklin
   - LibrisADF
+  - InknutJunicode
+# InknutJunicode joined on 2026-08-13 (owner ruling: "add inknutjunicode fully
+# to builds"), after fourteen rounds of bench work settled its borrowed italic —
+# Junicode Expanded SemiBold at ENLA 14, x1.25, word space -0.09 em. It is the
+# first installed family whose roman and italic come from DIFFERENT typefaces,
+# so it is also the first whose italic fit had to be constructed rather than
+# inherited; the recipe below carries the derivation and the accepted tradeoffs.
 # LibrisADF joined on 2026-08-12 (owner ruling; see docs/sd-card-fonts.md),
 # promoted straight out of tools/blind-bench as the best of that bench's
 # fourteen, in the same ruling that cut Merriweather, Accanthis and Spectral
@@ -510,9 +517,9 @@ families:
       bolditalic: {from: bold, synthetic: {slant_deg: 10}}
 
   - name: InknutJunicode
-    description: "Exploratory: Inknut Light/Bold + Junicode's real italics (Latin)"
+    description: "Inknut Antiqua with Junicode's real cut italics (Latin)"
     intervals: latin-ext
-    # NOT in installed_families. Regular/bold = Inknut's shipped Light/Bold
+    # INSTALLED (owner ruling 2026-08-13). Regular/bold = Inknut's shipped Light/Bold
     # (same source files as InknutAntiqua62). Italic/bolditalic are borrowed
     # from Junicode, which ships real cut italics where Inknut's foundry repo
     # has none at any weight.
@@ -571,6 +578,15 @@ families:
     # two symptoms -- and rounds 7-12 let it go again. Caps now sit ~5% over the
     # roman's, accepted: Inknut's counters are small for its size, so bowl
     # parity and height parity cannot both hold, and height won.
+    #
+    # ── BOLDITALIC WEIGHT STEP: lighter than roman pair, accepted ───────────
+    # The italic→bolditalic step is x1.08 on ink; Inknut Light→Bold is x1.40.
+    # Junicode's italic weight axis tops out at wght 700 (stem 0.1000 em),
+    # and matching the roman step would need 0.1314 em -- so the gap cannot
+    # be closed by the axis alone, only by synthetic embolden. The owner
+    # rejected synthetic embolden on 2026-08-13 (round 14). The bolditalic
+    # is deliberately a lighter step than the roman pair; this is a known
+    # accepted tradeoff, not an oversight.
     sizes: [10, 12, 14, 16]
     metrics: {ascent: 1203, descent: -340, linegap: 0}
     styles:

@@ -1328,3 +1328,75 @@ families:
   # -0.09 em is the value that matches the roman's word gap at all four sizes.
   # -0.06 matches at 10 and 12 pt and runs a pixel wide at 14 and 16, which is
   # why it looked right on a 12 pt proof.
+
+  # ── ROUND 14, 2026-08-13: a bold italic that steps like the roman pair ────
+  #
+  # Ask: the italic->bolditalic step should match the ink and stroke-width step
+  # from Inknut Light to Inknut Bold. Measured at 200 ppem, em-relative:
+  #
+  #   Inknut Light  stem 0.1100 em   ink 0.1332 em^2
+  #   Inknut Bold   stem 0.1700 em   ink 0.2044 em^2
+  #                 -> stem x1.545, ink x1.535   (the step to match)
+  #
+  #   Junicode italic, wdth 125 / ENLA 14:
+  #     wght 300  stem 0.0500    wght 600  stem 0.0850  <- the shipped italic
+  #     wght 400  stem 0.0600    wght 700  stem 0.1000  <- the axis ceiling
+  #     wght 500  stem 0.0750
+  #
+  # THE WEIGHT AXIS CANNOT REACH IT. Matching x1.545 from wght 600 needs a stem
+  # of 0.1314 em; wght 700, the heaviest italic Junicode draws at any width,
+  # gives 0.1000 -- a step of x1.176 where the roman steps x1.545. Junicode's
+  # entire italic range is lighter than Inknut's, and the shipped italic
+  # already sits near the top of it.
+  #
+  # So the candidates below are the honest ceiling and three synthetic tops:
+  # wght 700 plus an embolden of the remaining 0.031 em and either side of it.
+  # An embolden is a stem-fattening applied to outlines not drawn for it, which
+  # is adjacent to the 2026-08-13 ruling against distorting letterforms -- hence
+  # a bench and not a recipe change. Note the embolden is NOT proportional by
+  # default: y_ratio 0.5 grows the horizontal stem twice as fast as the
+  # vertical, which is what keeps a faux bold from eating its own x-height.
+
+  - name: InknutJuniBI700
+    description: "Bold-italic candidate: wght 700, the axis ceiling, no synthesis"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+
+  - name: InknutJuniBIE020
+    description: "Bold-italic candidate: wght 700 + embolden 0.020 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.020}}
+
+  - name: InknutJuniBIE031
+    description: "Bold-italic candidate: wght 700 + embolden 0.031 em (hits the measured stem target)"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.031}}
+
+  - name: InknutJuniBIE042
+    description: "Bold-italic candidate: wght 700 + embolden 0.042 em"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *light}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
