@@ -72,3 +72,32 @@ input draws a hint bar (terminal sleep/boot screens excepted).
 `FontDownloadActivity`, theme `drawTabBar`/`tabIndexFromPoint`. Note
 `OtaUpdater` (src/network) **stays**: the simulator's `simulator_ota.cpp`
 consumes it even though no firmware code does.
+
+## TODO — deferred, explicitly wanted (ruling 2026-08-13)
+
+- **Bottom-align the font colophon.** The picker reserves four subtitle lines
+  (`FontSelectionActivity.cpp`, `kColophonLines`) because a mixed-source family
+  like InknutJunicode needs one line per lineage stage. Families with fewer
+  stages currently draw from the TOP of that block, so a one-line colophon
+  leaves three empty lines under it and floats away from its own title. Draw
+  from the bottom instead: a one-liner sits on the last line, a two-line
+  colophon on the bottom two, and a four-line one fills the block exactly as
+  now.
+
+  Where: `LyraTheme::drawList`, the `subtitleLines > 1` branch. It currently
+  starts at `itemY + 30` and steps down by `LyraMetrics::values
+  .listSubtitleLineStep` per line. Bottom-aligning means offsetting the start
+  by `(subtitleLines - actualLines) * listSubtitleLineStep` — which needs the
+  real line count BEFORE the first draw, and today it is only known as the
+  segments are wrapped and emitted. So it wants a counting pre-pass (or
+  building the line vector first, then drawing it), not a one-line tweak.
+
+  Watch two things. The row height is uniform across the list and derives from
+  `getListRowStep(hasSubtitle, subtitleLines)`, so nothing about spacing or
+  paging changes — only where the text sits inside the box it already owns.
+  And the same widget serves the editor-font picker
+  (`EditorFontSelectionActivity.cpp`, its own `kColophonLines = 2`), which
+  prepends an availability marker to line 1 precisely because the tail can be
+  truncated; bottom-aligning moves which line is line 1 on screen, so re-read
+  that comment before changing it.
+
