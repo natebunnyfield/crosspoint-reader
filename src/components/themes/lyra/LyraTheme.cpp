@@ -26,6 +26,15 @@ constexpr int maxListValueWidth = 200;
 constexpr int mainMenuIconSize = 32;
 constexpr int listIconSize = 24;
 constexpr int mainMenuColumns = 2;
+// A list row's first subtitle line, measured from the row's top. The selection
+// band is sized from this and the subtitle is drawn at it; they have to be the
+// same number or the band marks lines that are not where it thinks they are.
+constexpr int kSubtitleTopOffset = 30;
+// Breathing room the selection band leaves above the title and below the last
+// subtitle line. Asymmetric on purpose: the title's own glyphs start a few
+// pixels below its draw origin, so an equal pad reads as bottom-heavy.
+constexpr int kSelectionPadTop = 2;
+constexpr int kSelectionPadBottom = 5;
 int coverWidth = 0;
 
 const uint8_t* iconForName(UIIcon icon, int size) {
@@ -200,18 +209,6 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   int contentWidth =
       rect.width -
       (totalPages > 1 ? (LyraMetrics::values.scrollBarWidth + LyraMetrics::values.scrollBarRightOffset) : 1);
-  if (selectedIndex >= 0) {
-    // Highlight is capped at 1.5 × the base single-line row height so it
-    // stays compact when a row is tall due to multi-line subtitles (e.g. the
-    // font picker's 2-line colophon), then centred vertically in the full row.
-    // The row height, text layout, and hit-target are unchanged.
-    const int highlightH = std::min(rowHeight, LyraMetrics::values.listRowHeight * 3 / 2);
-    const int highlightY = rect.y + selectedIndex % pageItems * rowHeight + (rowHeight - highlightH) / 2;
-    renderer.fillRoundedRect(rect.x + LyraMetrics::values.contentSidePadding, highlightY,
-                             contentWidth - LyraMetrics::values.contentSidePadding * 2, highlightH, cornerRadius,
-                             Color::LightGray);
-  }
-
   int textX = rect.x + LyraMetrics::values.contentSidePadding + hPaddingInSelection;
   int textWidth = contentWidth - LyraMetrics::values.contentSidePadding * 2 - hPaddingInSelection * 2;
   int iconSize;
@@ -219,6 +216,64 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     iconSize = (rowSubtitle != nullptr) ? mainMenuIconSize : listIconSize;
     textX += iconSize + hPaddingInSelection;
     textWidth -= iconSize + hPaddingInSelection;
+  }
+
+  // The subtitle lines a row actually draws, in draw order. The selection
+  // highlight below sizes itself to these and the draw loop renders them, so
+  // the band cannot disagree with the text it sits behind — the two used to be
+  // derived separately, which is how a band ended up marking the wrong lines.
+  const auto subtitleLinesFor = [&](int index) {
+    std::vector<std::string> out;
+    if (rowSubtitle == nullptr || subtitleLines <= 1) return out;
+    const std::string text = rowSubtitle(index);
+    size_t segStart = 0;
+    while (segStart <= text.size() && static_cast<int>(out.size()) < subtitleLines) {
+      const size_t nl = text.find('\n', segStart);
+      const std::string segment = text.substr(segStart, nl == std::string::npos ? std::string::npos : nl - segStart);
+      const auto wrapped =
+          renderer.wrappedText(SMALL_FONT_ID, segment.c_str(), textWidth, subtitleLines - static_cast<int>(out.size()));
+      for (const auto& line : wrapped) {
+        if (static_cast<int>(out.size()) >= subtitleLines) break;
+        out.push_back(line);
+      }
+      if (nl == std::string::npos) break;
+      segStart = nl + 1;
+    }
+    return out;
+  };
+
+  // Draw selection
+  if (selectedIndex >= 0) {
+    // The band hugs the selected row's CONTENT, not its box. A list sizes every
+    // row for its longest entry — four colophon lines in the font picker — so a
+    // band cut to the row leaves a two-line family sitting in 40 px of empty
+    // grey, and a band of fixed height leaves the rest of a tall row outside it.
+    //
+    // Centring a fixed 60 px band is what shipped before, and it broke the
+    // moment kColophonLines went 2 -> 4: the centring offset grew from 9 px to
+    // 27 px and the band started BELOW the family name it exists to mark.
+    //
+    // Row height, text layout, and the hit target are unchanged either way.
+    const int selRow = rect.y + selectedIndex % pageItems * rowHeight;
+    const int selLines = static_cast<int>(subtitleLinesFor(selectedIndex).size());
+    int highlightH;
+    int highlightY;
+    if (selLines > 0) {
+      highlightH = std::min(kSubtitleTopOffset + (selLines - 1) * LyraMetrics::values.listSubtitleLineStep +
+                               renderer.getLineHeight(SMALL_FONT_ID) + kSelectionPadBottom,
+                            rowHeight - kSelectionPadTop);
+      highlightY = selRow + kSelectionPadTop;
+    } else {
+      // Every list that does NOT ask for multiple subtitle lines keeps the
+      // original geometry exactly — a full-height band, centred. Those rows are
+      // sized to their content already, so there is nothing to hug, and moving
+      // them even 2 px would retune every screen in the firmware to fix one.
+      highlightH = std::min(rowHeight, LyraMetrics::values.listRowHeight * 3 / 2);
+      highlightY = selRow + (rowHeight - highlightH) / 2;
+    }
+    renderer.fillRoundedRect(rect.x + LyraMetrics::values.contentSidePadding, highlightY,
+                             contentWidth - LyraMetrics::values.contentSidePadding * 2, highlightH, cornerRadius,
+                             Color::LightGray);
   }
 
   // Draw all items
@@ -277,33 +332,21 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       std::string subtitleText = rowSubtitle(i);
       if (subtitleLines <= 1) {
         auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
-        renderer.drawText(SMALL_FONT_ID, textX, itemY + 30, subtitle.c_str(), true);
+        renderer.drawText(SMALL_FONT_ID, textX, itemY + kSubtitleTopOffset, subtitle.c_str(), true);
         textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, subtitle.c_str()));
       } else {
         // A newline in the subtitle is an EXPLICIT line break, not whitespace:
         // the font picker pairs each lineage stage with its own designer
         // ("Original author · YEAR PLACE" over "Digitizer · YEAR PLACE"), and
         // word-wrapping that as one run puts the break wherever the words run
-        // out — mid-stage, splitting a year from its place. Each segment still
-        // wraps within the remaining budget, so a long stage degrades instead
-        // of overflowing, and the total is capped at subtitleLines.
-        int subtitleY = itemY + 30;
-        int drawn = 0;
-        size_t segStart = 0;
-        while (segStart <= subtitleText.size() && drawn < subtitleLines) {
-          const size_t nl = subtitleText.find('\n', segStart);
-          const std::string segment =
-              subtitleText.substr(segStart, nl == std::string::npos ? std::string::npos : nl - segStart);
-          const auto lines = renderer.wrappedText(SMALL_FONT_ID, segment.c_str(), rowTextWidth, subtitleLines - drawn);
-          for (const auto& line : lines) {
-            if (drawn >= subtitleLines) break;
-            renderer.drawText(SMALL_FONT_ID, textX, subtitleY, line.c_str(), true);
-            textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, line.c_str()));
-            subtitleY += LyraMetrics::values.listSubtitleLineStep;
-            ++drawn;
-          }
-          if (nl == std::string::npos) break;
-          segStart = nl + 1;
+        // out — mid-stage, splitting a year from its place. subtitleLinesFor()
+        // above does the segmenting; the selection band measures the same call,
+        // so the band and these lines cannot drift apart.
+        int subtitleY = itemY + kSubtitleTopOffset;
+        for (const auto& line : subtitleLinesFor(i)) {
+          renderer.drawText(SMALL_FONT_ID, textX, subtitleY, line.c_str(), true);
+          textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, line.c_str()));
+          subtitleY += LyraMetrics::values.listSubtitleLineStep;
         }
       }
     }
