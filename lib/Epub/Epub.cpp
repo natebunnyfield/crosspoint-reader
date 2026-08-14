@@ -659,7 +659,15 @@ bool Epub::generateCoverBmp(bool cropped) const {
     if (!Storage.openFileForWrite("EBP", coverJpgTempPath, coverJpg)) {
       return false;
     }
-    readItemContentsToStream(coverImageHref, coverJpg, 1024);
+    // A failed extraction leaves a truncated or empty temp file behind. Without
+    // this check the converter below runs on it and either fails obscurely or
+    // writes a corrupt BMP that the cache then serves as if it were the cover.
+    if (!readItemContentsToStream(coverImageHref, coverJpg, 1024)) {
+      LOG_ERR("EBP", "Failed to extract cover image: %s", coverImageHref.c_str());
+      coverJpg.close();
+      Storage.remove(coverJpgTempPath.c_str());
+      return false;
+    }
     // Explicitly close() file before reopening for reading
     coverJpg.close();
 
@@ -693,7 +701,14 @@ bool Epub::generateCoverBmp(bool cropped) const {
     if (!Storage.openFileForWrite("EBP", coverPngTempPath, coverPng)) {
       return false;
     }
-    readItemContentsToStream(coverImageHref, coverPng, 1024);
+    // See the JPG branch above: a truncated temp file must not reach the
+    // converter.
+    if (!readItemContentsToStream(coverImageHref, coverPng, 1024)) {
+      LOG_ERR("EBP", "Failed to extract cover image: %s", coverImageHref.c_str());
+      coverPng.close();
+      Storage.remove(coverPngTempPath.c_str());
+      return false;
+    }
     // Explicitly close() file before reopening for reading
     coverPng.close();
 
@@ -748,7 +763,13 @@ bool Epub::generateThumbBmp(int height) const {
     if (!Storage.openFileForWrite("EBP", coverJpgTempPath, coverJpg)) {
       return false;
     }
-    readItemContentsToStream(coverImageHref, coverJpg, 1024);
+    // See generateCoverBmp: a truncated temp file must not reach the converter.
+    if (!readItemContentsToStream(coverImageHref, coverJpg, 1024)) {
+      LOG_ERR("EBP", "Failed to extract cover image for thumbnail: %s", coverImageHref.c_str());
+      coverJpg.close();
+      Storage.remove(coverJpgTempPath.c_str());
+      return false;
+    }
     // Explicitly close() file before reopening for reading
     coverJpg.close();
 
@@ -785,7 +806,13 @@ bool Epub::generateThumbBmp(int height) const {
     if (!Storage.openFileForWrite("EBP", coverPngTempPath, coverPng)) {
       return false;
     }
-    readItemContentsToStream(coverImageHref, coverPng, 1024);
+    // See generateCoverBmp: a truncated temp file must not reach the converter.
+    if (!readItemContentsToStream(coverImageHref, coverPng, 1024)) {
+      LOG_ERR("EBP", "Failed to extract cover image for thumbnail: %s", coverImageHref.c_str());
+      coverPng.close();
+      Storage.remove(coverPngTempPath.c_str());
+      return false;
+    }
     // Explicitly close() file before reopening for reading
     coverPng.close();
 
