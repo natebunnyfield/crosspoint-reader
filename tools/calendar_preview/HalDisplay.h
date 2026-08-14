@@ -11,8 +11,14 @@
 class HalDisplay {
  public:
   static constexpr int RENDER_SCALE = CROSSPOINT_RENDER_SCALE;
-  static constexpr uint16_t DISPLAY_WIDTH = 792;   // X3 landscape panel
-  static constexpr uint16_t DISPLAY_HEIGHT = 528;
+  // The PANEL grows with RENDER_SCALE; the logical page must not. GfxRenderer
+  // divides the panel by RENDER_SCALE to get logical coordinates, so a fixed
+  // 792x528 panel at scale 2 yields a 396x264 logical page — a quarter of the
+  // area, a quarter of the words, and nothing like the page iOS draws. Scaling
+  // the panel keeps the logical page at 792x528 and puts the extra pixels where
+  // they belong: in the framebuffer, which is the whole point of the 2x cut.
+  static constexpr uint16_t DISPLAY_WIDTH = 792 * CROSSPOINT_RENDER_SCALE;   // X3 landscape panel
+  static constexpr uint16_t DISPLAY_HEIGHT = 528 * CROSSPOINT_RENDER_SCALE;
   static constexpr uint16_t DISPLAY_WIDTH_BYTES = DISPLAY_WIDTH / 8;
   static constexpr uint32_t BUFFER_SIZE = DISPLAY_WIDTH_BYTES * DISPLAY_HEIGHT;
   enum RefreshMode { FULL_REFRESH, HALF_REFRESH, FAST_REFRESH };

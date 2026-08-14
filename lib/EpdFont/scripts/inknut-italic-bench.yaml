@@ -1859,3 +1859,154 @@ families:
       bold:       {url: *bold}
       italic:     {zip: *vf, member: *vfm, variable: {wght: 565.0, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
       bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  # ── ROUND 18, 2026-08-14: further reduction, on an ACCURATE preview ──────
+  #
+  # Owner, off a phone screenshot: "junicode italic still seems too large next
+  # to inknut. can we reduce it further? is the html preview accurate?"
+  #
+  # THE PREVIEW WAS NOT ACCURATE, in two ways that both push the same
+  # direction, and the second is the one that matters:
+  #
+  #   1. RAGGED vs JUSTIFIED. drawInlineParagraph was ragged-right; the reader
+  #      justifies (ParsedText.cpp:1151). A justified page at a phone measure
+  #      has word gaps two to three times the natural space, which is a
+  #      different picture entirely. Fixed 2026-08-14; SPECIMEN_RAGGED=1
+  #      restores the old behaviour, which rounds 13-16 were judged under.
+  #   2. BLACK-ON-WHITE vs WHITE-ON-BLACK. The proofs were positive; the owner
+  #      reads inverted. Light type on a dark ground irradiates -- it blooms
+  #      and reads larger and heavier than identical type dark-on-light. So
+  #      every proof so far UNDER-stated the italic's apparent size against
+  #      what he was actually looking at. The deck now renders both polarities.
+  #
+  # Neither is a font bug; both are rig bugs, and rounds 15-17 were judged
+  # through them. Same class as round 13's word-gap bug: a proof that does not
+  # reproduce the reader's own layout is a proof of something else.
+  #
+  # THE FLOOR IS x1.13. Each reduction thins the stems and has to be paid for
+  # in weight to hold the ruled 98% colour; at x1.13 that costs wght 668 and
+  # the axis ends at 700. Below roughly x1.12 the colour can only be held with
+  # a synthetic embolden, which is a different kind of change.
+  #
+  #   scale   wght   2x: x-height / cap / ascender   1x x-height (roman 13/15/17/19)
+  #   1.13    668      -6.2%   -4.5%   -5.4%          10/12/15/17
+  #   1.15    659      -4.4%   -4.0%   -3.7%          10/12/15/17
+  #   1.17    646      -3.7%   -1.6%   -2.2%          10/13/15/17
+  #   1.20    601      -1.0%   +1.2%   +1.1%          10/14/16/18   <- shipped
+  #   1.25    562      +3.8%   +5.3%   +4.6%          11/14/16/19   <- build 70
+  #
+  # Both shipped values are in the deck on purpose: the owner's screenshot came
+  # off TestFlight build 70, which carries x1.25, and it was not established
+  # whether the phone had picked up the x1.2 fonts from iCloud. Having both as
+  # chips lets the screenshot be identified rather than assumed.
+
+
+  - name: IJ18S113
+    description: "scale x1.13, wght 668 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 668, wdth: 125, ENLA: 14}, scale: 1.13, word_space_em: -0.0444}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.13, word_space_em: -0.0444, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S113X2
+    description: "scale x1.13, wght 668 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 668, wdth: 125, ENLA: 14}, scale: 1.13, word_space_em: -0.0444}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.13, word_space_em: -0.0444, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S115
+    description: "scale x1.15, wght 659 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 659, wdth: 125, ENLA: 14}, scale: 1.15, word_space_em: -0.0616}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.15, word_space_em: -0.0616, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S115X2
+    description: "scale x1.15, wght 659 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 659, wdth: 125, ENLA: 14}, scale: 1.15, word_space_em: -0.0616}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.15, word_space_em: -0.0616, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S117
+    description: "scale x1.17, wght 646 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 646, wdth: 125, ENLA: 14}, scale: 1.17, word_space_em: -0.0673}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.17, word_space_em: -0.0673, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S117X2
+    description: "scale x1.17, wght 646 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 646, wdth: 125, ENLA: 14}, scale: 1.17, word_space_em: -0.0673}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.17, word_space_em: -0.0673, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S12
+    description: "scale x1.2, wght 601 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 601, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S12X2
+    description: "scale x1.2, wght 601 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 601, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S125
+    description: "scale x1.25, wght 562 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 562, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ18S125X2
+    description: "scale x1.25, wght 562 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 562, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}

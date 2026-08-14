@@ -56,7 +56,14 @@ HalDisplay display;
 HalGPIO gpio;
 GfxRenderer renderer(display);
 FontDecompressor fontDecompressor;
-FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts());
+// Mirrors src/main.cpp:43-48 — at RENDER_SCALE > 1 the cache manager takes the
+// hi-res SD map as a third argument so it can prewarm the 2x companions.
+FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts()
+#if CROSSPOINT_RENDER_SCALE > 1
+                                                             ,
+                                  renderer.getHiResSdCardFonts()
+#endif
+);
 
 extern SdCardFontSystem sdFontSystem;
 
@@ -94,10 +101,14 @@ const char* kSamples[] = {
     "AVATAR Wavy Yak Toy",
 };
 
-// Read one logical (Portrait) pixel out of the physical landscape framebuffer.
+// Read one PHYSICAL portrait pixel out of the physical landscape framebuffer.
 // GfxRenderer::drawPixel rotates Portrait coords with (rotateCoordinates,
 // GfxRenderer.cpp:187): phyX = y, phyY = panelHeight - 1 - x, writing 1bpp
 // MSB-first where a SET bit is white. This inverts that mapping.
+//
+// At RENDER_SCALE 1 physical and logical coincide, which is why this was named
+// for logical coords; at scale > 1 the caller walks the physical grid so the
+// hi-res glyph pixels survive into the BMP.
 bool logicalPixelIsWhite(const uint8_t* fb, int panelHeight, int panelWidthBytes, int lx, int ly) {
   const int px = ly;
   const int py = (panelHeight - 1) - lx;
@@ -105,8 +116,15 @@ bool logicalPixelIsWhite(const uint8_t* fb, int panelHeight, int panelWidthBytes
 }
 
 bool writeMonoPortraitBmp(const char* path, const GfxRenderer& r) {
-  const int W = r.getScreenWidth();
-  const int H = r.getScreenHeight();
+  // PHYSICAL pixels, not logical. At RENDER_SCALE > 1 the framebuffer carries
+  // scale x the detail — that is the entire reason the 2x companions exist —
+  // and sampling one physical pixel per LOGICAL pixel throws all of it away,
+  // producing a 1x-looking page out of a 2x render. The logical page size is
+  // unchanged by the scale (see HalDisplay.h), so multiplying by RENDER_SCALE
+  // here writes the same page at the resolution it was actually drawn.
+  const int S = GfxRenderer::RENDER_SCALE;
+  const int W = r.getScreenWidth() * S;
+  const int H = r.getScreenHeight() * S;
   const int panelH = r.getDisplayHeight();
   const int panelWB = r.getDisplayWidthBytes();
   const int rowBytes = ((W + 31) / 32) * 4;
@@ -421,29 +439,69 @@ int drawInlineParagraph(int id, const std::vector<StyledWord>& words, int x, int
   };
   // Wrap on CLUSTERS, not words: a cluster is a word plus everything glued to
   // it, so `rounding` + `,` measure and break as one unit.
-  for (size_t i = 0; i < words.size();) {
-    size_t end = i + 1;
-    int clusterW = renderer.getTextWidth(id, words[i].text.c_str(), words[i].style);
-    while (end < words.size() && words[end].glue) {
-      clusterW += renderer.getTextWidth(id, words[end].text.c_str(), words[end].style);
-      ++end;
+  //
+  // JUSTIFIED, because the reader is (ParsedText.cpp:1151 distributes
+  // justifyExtra evenly over a line's gaps) and this specimen exists to be
+  // compared against a device screenshot. Ragged-right specimens misread the
+  // word gaps badly at narrow measures -- a phone screenshot of a justified
+  // page has gaps two or three times the natural space. Set SPECIMEN_RAGGED=1
+  // for the pre-2026-08-14 behaviour; the word-space ladders of rounds 13-16
+  // were judged ragged, so reproduce those with the flag set.
+  //
+  // Break the line first, then draw it, so the leftover is known before any
+  // glyph lands. The last line of a paragraph is never stretched.
+  static const bool ragged = getenv("SPECIMEN_RAGGED") != nullptr;
+
+  struct Piece {
+    size_t begin, end;  // half-open cluster range into `words`
+    int width;          // ink width of the cluster
+    int gapBefore;      // natural gap to the left, 0 for the first on a line
+  };
+  std::vector<Piece> line;
+  size_t i = 0;
+  while (i < words.size()) {
+    line.clear();
+    int natural = 0;
+    while (i < words.size()) {
+      size_t end = i + 1;
+      int clusterW = renderer.getTextWidth(id, words[i].text.c_str(), words[i].style);
+      while (end < words.size() && words[end].glue) {
+        clusterW += renderer.getTextWidth(id, words[end].text.c_str(), words[end].style);
+        ++end;
+      }
+      const int gap = line.empty() ? 0 : gapFor(words[i - 1].style);
+      if (!line.empty() && natural + gap + clusterW > colW) break;
+      line.push_back({i, end, clusterW, gap});
+      natural += gap + clusterW;
+      i = end;
     }
+    if (line.empty()) break;  // a single cluster wider than the column
     if (y + lineH > limit) break;
-    const int spaceW = gapFor(words[i > 0 ? i - 1 : i].style);
-    if (curX > x && curX + spaceW + clusterW > x + colW) {
-      y += lineH;
-      curX = x;
-      if (y + lineH > limit) break;
-    } else if (curX > x) {
-      curX += spaceW;
+
+    // Stretch only a line that both has somewhere to put the slack and is not
+    // the paragraph's last.
+    const size_t gaps = line.size() - 1;
+    const bool lastLine = (i >= words.size());
+    int extra = 0, remainder = 0;
+    if (!ragged && !lastLine && gaps > 0 && colW > natural) {
+      extra = (colW - natural) / static_cast<int>(gaps);
+      remainder = (colW - natural) % static_cast<int>(gaps);
     }
-    for (size_t k = i; k < end; ++k) {
-      renderer.drawText(id, curX, y, words[k].text.c_str(), true, words[k].style);
-      curX += renderer.getTextWidth(id, words[k].text.c_str(), words[k].style);
+
+    curX = x;
+    for (size_t p = 0; p < line.size(); ++p) {
+      if (p > 0) {
+        curX += line[p].gapBefore + extra;
+        if (static_cast<int>(p) <= remainder) curX += 1;  // spread the odd pixels left to right
+      }
+      for (size_t k = line[p].begin; k < line[p].end; ++k) {
+        renderer.drawText(id, curX, y, words[k].text.c_str(), true, words[k].style);
+        curX += renderer.getTextWidth(id, words[k].text.c_str(), words[k].style);
+      }
     }
-    i = end;
+    y += lineH;
   }
-  return y + lineH;
+  return y;
 }
 
 }  // namespace

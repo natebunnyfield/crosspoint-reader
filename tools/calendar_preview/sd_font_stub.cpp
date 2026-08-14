@@ -109,6 +109,32 @@ int registerFromPath(const std::string& path, GfxRenderer& renderer) {
                        font->getEpdFont(3));
   renderer.insertFont(id, family);
   fprintf(stderr, "[stub] loaded %s as id %d (%u styles)\n", path.c_str(), id, font->styleCount());
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Hi-res companion, mirroring SdCardFontManager.cpp:99-134. Without this the
+  // 2x harness renders every glyph 1x-REPLICATED — the page looks plausible and
+  // is at half the resolution the build asked for, which is precisely the
+  // silent failure docs/sd-card-fonts.md describes. A 2x preview that skips
+  // this is a proof of nothing, so the miss is loud here rather than logged.
+  const size_t slash = path.find_last_of('/');
+  const std::string hiResPath =
+      slash == std::string::npos
+          ? std::string()
+          : path.substr(0, slash + 1) + std::to_string(CROSSPOINT_RENDER_SCALE) + "x/" +
+                path.substr(slash + 1);
+  auto* hiRes = hiResPath.empty() ? nullptr : new SdCardFont();
+  if (hiRes != nullptr && hiRes->load(hiResPath.c_str())) {
+    renderer.registerHiResFont(id, hiRes,
+                               EpdFontFamily(hiRes->getEpdFont(0), hiRes->getEpdFont(1),
+                                             hiRes->getEpdFont(2), hiRes->getEpdFont(3)));
+    fprintf(stderr, "[stub] hi-res companion %s -> id %d\n", hiResPath.c_str(), id);
+  } else {
+    delete hiRes;
+    fprintf(stderr,
+            "[stub] WARNING: no hi-res companion at %s — this page renders "
+            "1x-replicated and is NOT a valid 2x proof\n",
+            hiResPath.c_str());
+  }
+#endif
   return id;
 }
 
