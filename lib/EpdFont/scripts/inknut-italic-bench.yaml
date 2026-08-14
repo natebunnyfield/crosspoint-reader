@@ -1679,3 +1679,183 @@ families:
       bold:       {url: *bold}
       italic:     {zip: *vf, member: *vfm, variable: {wght: 565, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
       bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  # ── ROUND 17, 2026-08-13: the italic is ~5% too big, and only 2x shows it ─
+  #
+  # Owner, off TestFlight build 70 on the phone: "the junicode italic appears
+  # slightly too large compared to the inknut." Correct, and every bench before
+  # this one missed it because they all measured 1x, where hinting COMPRESSES
+  # the italic's x-height and hides the overshoot. At 2x the outline
+  # proportions come through. Measured against Inknut Regular, mean over the
+  # four 2x sizes:
+  #
+  #     x-height  +3.8%    -> parity scale 1.204
+  #     cap H     +5.3%    -> parity scale 1.187
+  #     ascender  +4.6%    -> parity scale 1.196
+  #     all three +4.5%    -> parity scale 1.196
+  #
+  # Outline units confirm it is not a rasterisation artifact: at x1.25 Junicode
+  # sits at x 0.5813 / cap 0.8400 / asc 0.9225 per em against Inknut Regular's
+  # 0.5320 / 0.7860 / 0.8730. The recipe's "caps sit ~5% over, accepted" line
+  # was an acceptance made on 1x proofs.
+  #
+  # `scale:` is the knob, because the overshoot is uniform across all three
+  # metrics -- ENLA moves x-height alone (caps are the worst offender) and wdth
+  # moves set width, not height. One value covers italic and bolditalic.
+  #
+  # ── TWO THINGS HELD CONSTANT SO SIZE IS THE ONLY VARIABLE ────────────────
+  #
+  # COLOUR. Shrinking the scale thins the stems: wght 565 goes 98.4% -> 95.3%
+  # of the roman's ink per advance between x1.25 and x1.196, which is nearly a
+  # whole round-16 stop (3.8%). Left alone, the smaller candidates would read
+  # both smaller AND lighter and the eye could not separate them. So each
+  # candidate carries the wght that puts it back on 98.4% -- the colour ruled
+  # in round 16 -- solved per scale:
+  #
+  #     scale   1.172   1.184   1.196   1.208   1.220   1.250
+  #     wght    648.4   623.4   604.7   592.2   585.9   565.0
+  #
+  # WORD SPACE. Junicode's space scales with everything else, so the -0.09 em
+  # correction is too much at a smaller scale. Each candidate carries
+  # -(0.2844*scale - 0.2655), the form that reproduces -0.09 exactly at x1.25.
+  #
+  # ── THE TRADEOFF THE DECK EXISTS TO SHOW ─────────────────────────────────
+  # At 1x 10 pt the italic's x-height is ALREADY 15% short (11 px against 13)
+  # because hinting eats it at low ppem. `scale:` hits both cuts, so fixing the
+  # phone takes that case from -15% to about -19%. The device reads 1x, the
+  # phone and desktop read 2x, and both ship. Hence each candidate is built
+  # TWICE -- <name> at the reading sizes and <name>X2 at doubled sizes, the 2x
+  # companions -- so both ends of the tradeoff are on one page.
+
+
+  - name: IJ17S1172
+    description: "scale x1.172 (cap parity of round 4), wght 648.4 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 648.4, wdth: 125, ENLA: 14}, scale: 1.172, word_space_em: -0.0678}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.172, word_space_em: -0.0678, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S1172X2
+    description: "scale x1.172 (cap parity of round 4), wght 648.4 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 648.4, wdth: 125, ENLA: 14}, scale: 1.172, word_space_em: -0.0678}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.172, word_space_em: -0.0678, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S1184
+    description: "scale x1.184 (between), wght 623.4 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 623.4, wdth: 125, ENLA: 14}, scale: 1.184, word_space_em: -0.0712}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.184, word_space_em: -0.0712, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S1184X2
+    description: "scale x1.184 (between), wght 623.4 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 623.4, wdth: 125, ENLA: 14}, scale: 1.184, word_space_em: -0.0712}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.184, word_space_em: -0.0712, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S1196
+    description: "scale x1.196 (all-three parity), wght 604.7 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 604.7, wdth: 125, ENLA: 14}, scale: 1.196, word_space_em: -0.0746}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.196, word_space_em: -0.0746, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S1196X2
+    description: "scale x1.196 (all-three parity), wght 604.7 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 604.7, wdth: 125, ENLA: 14}, scale: 1.196, word_space_em: -0.0746}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.196, word_space_em: -0.0746, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S1208
+    description: "scale x1.208 (between), wght 592.2 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 592.2, wdth: 125, ENLA: 14}, scale: 1.208, word_space_em: -0.0781}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.208, word_space_em: -0.0781, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S1208X2
+    description: "scale x1.208 (between), wght 592.2 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 592.2, wdth: 125, ENLA: 14}, scale: 1.208, word_space_em: -0.0781}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.208, word_space_em: -0.0781, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S122
+    description: "scale x1.22 (split the difference), wght 585.9 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 585.9, wdth: 125, ENLA: 14}, scale: 1.22, word_space_em: -0.0815}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.22, word_space_em: -0.0815, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S122X2
+    description: "scale x1.22 (split the difference), wght 585.9 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 585.9, wdth: 125, ENLA: 14}, scale: 1.22, word_space_em: -0.0815}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.22, word_space_em: -0.0815, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S125
+    description: "scale x1.25 (today, what you saw), wght 565.0 — reading sizes"
+    intervals: latin-ext
+    sizes: [10, 12, 14, 16]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 565.0, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}
+
+  - name: IJ17S125X2
+    description: "scale x1.25 (today, what you saw), wght 565.0 — 2x companions"
+    intervals: latin-ext
+    sizes: [20, 24, 28, 32]
+    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    styles:
+      regular:    {url: *regular}
+      bold:       {url: *bold}
+      italic:     {zip: *vf, member: *vfm, variable: {wght: 565.0, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+      bolditalic: {zip: *vf, member: *vfm, variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09, synthetic: {embolden_em: 0.042}}

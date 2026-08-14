@@ -569,13 +569,13 @@ families:
     #
     #   width    Expanded (wdth 125). Condensed and SemiCondensed are OUT OF
     #            SCOPE by ruling, not merely unranked.
-    #   weight   565 italic; Bold (700) + embolden bolditalic.
+    #   weight   600 italic; Bold (700) + embolden bolditalic.
     #   ENLA     14
-    #   scale    x1.25
+    #   scale    x1.2   (was x1.25 -- see ROUND 17 below)
     #   tracking 0 -- swept 0 to 0.05 em at 0.005 and rejected; the Expanded
     #            cut already sets at 100% of the roman's lowercase alphabet, so
     #            there is nothing for it to close.
-    #   word sp. -0.09 em  (see below -- this one is not an eye ruling)
+    #   word sp. -0.07 em  (see below -- this one is not an eye ruling)
     #
     # Built from VAR/JunicodeVF-Italic.ttf rather than the named statics for
     # two reasons now: the statics are all ENLA 0, and ENLA is the axis that
@@ -612,9 +612,49 @@ families:
     #
     # Carried over from the Light era, and checked rather than assumed: Inknut's
     # x-height does not move with weight (Light and Regular both 0.5320 em, cap
-    # 0.7870 vs 0.7860), so `scale: 1.25` and `ENLA: 14` still hold; and the
-    # roman's space advance renders to the same 6/7/8/9 px at the four sizes
-    # (0.2840 -> 0.2790 em), so `word_space_em: -0.09` needed no re-derivation.
+    # 0.7870 vs 0.7860), so `ENLA: 14` still holds. (`scale:` and the word space
+    # did NOT survive -- see round 17 immediately below.)
+    #
+    # ── ROUND 17: scale x1.25 -> x1.2, and the italic was 5% too big ────────
+    # Owner off TestFlight build 70, on the phone: "the junicode italic appears
+    # slightly too large compared to the inknut." Correct, and EVERY BENCH
+    # BEFORE THIS ONE MISSED IT, because they all judged 1x -- where the hinter
+    # compresses the italic's x-height and hides the overshoot. iOS and desktop
+    # render the 2x companions, and at 2x the outline proportions come through.
+    # Mean deviation from Inknut Regular over the four 2x sizes, at the old
+    # x1.25:
+    #
+    #     x-height  +3.8%     cap +5.3%     ascender +4.6%
+    #
+    # Outline units agree (Junicode x 0.5813 / cap 0.8400 / asc 0.9225 per em
+    # against Inknut Regular's 0.5320 / 0.7860 / 0.8730), so it is geometry,
+    # not rasterisation. The "caps sit ~5% over, accepted" line further down
+    # was an acceptance made on 1x proofs and is superseded.
+    #
+    # `scale:` is the knob because the overshoot is uniform across all three
+    # metrics: ENLA moves x-height alone (caps were the worst offender) and
+    # wdth moves set width, not height. All-three parity computes to x1.196;
+    # the owner ruled **x1.2** off the rendered deck. At x1.2 the 2x figures
+    # are x -1.0%, cap +1.2%, asc +1.1%.
+    #
+    # THE PRICE, ruled and accepted: at 1x the italic's x-height was already
+    # short at small ppem, and shrinking costs a pixel in two slots --
+    # 10 pt goes 11 -> 10 px against the roman's 13, and 16 pt goes 19 -> 18.
+    # x1.208 was the only bracket value that kept the 10 pt pixel; 16 pt loses
+    # it at any reduction. The device reads 1x and the phone reads 2x, and both
+    # ship, so this is a real trade and not a free win.
+    #
+    # WEIGHT MOVED WITH IT, 565 -> 600. Shrinking the scale thins the stems:
+    # wght 565 falls from 98.4% to 95.3% of the roman's ink per advance between
+    # x1.25 and x1.196, nearly a whole round-16 stop. 600 at x1.2 measures
+    # 98.0%, which restores the round-16 colour ruling rather than quietly
+    # abandoning it. A scale change ALWAYS needs a weight re-solve; they are
+    # not independent knobs.
+    #
+    # WORD SPACE MOVED TOO, -0.09 -> -0.07, and it was measured, not scaled.
+    # The proportional formula predicted -0.076, which renders 5/7/8/8 px
+    # against the roman's 6/7/8/9. -0.070 renders 6/7/8/9 -- parity at every
+    # size, the same criterion round 13 used.
     #
     # KNOWN MISMATCH, left as ruled: bolditalic keeps embolden 0.042, which
     # round 14 chose to land the italic->bolditalic step on the roman pair's.
@@ -696,10 +736,10 @@ families:
       bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
       italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
-                   variable: {wght: 565, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09}
+                   variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07}
       bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
-                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.25, word_space_em: -0.09,
+                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07,
                    synthetic: {embolden_em: 0.042}}
 
   - name: LibreCaslonText
