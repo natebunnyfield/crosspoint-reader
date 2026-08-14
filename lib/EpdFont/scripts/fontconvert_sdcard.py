@@ -194,6 +194,38 @@ STANDARD_LIGATURE_MAP = {
 }
 
 
+def is_presentation_ligature(lig_cp):
+    """True if substituting this output changes only SHAPE, never the text.
+
+    A ligature is a typographic convenience: `fi` -> U+FB01 renders the same
+    two letters with their collision resolved, and a reader searching for "fi"
+    or copying the word still has "fi". But a font may put rules in the SAME
+    `liga` feature whose output is a DISTINCT LETTER — LibrisADF substitutes
+    oe -> oe-ligature and ae -> ae-ligature, TeX Gyre Schola and Junicode do
+    ij -> ij-ligature. Those are correct in French, Latin and Dutch and wrong
+    in English, where they turn "does" into a word spelled with a letter the
+    author never wrote, and "Beijing" and "hijack" likewise. Nothing in this
+    pipeline knows the language of the book, so the safe default is shape-only.
+
+    Two ranges qualify:
+
+      U+FB00-FB06   the Alphabetic Presentation Forms this project targets:
+                    ff fi fl ffi ffl long-s+t st. Unicode itself classes these
+                    as compatibility forms of their components.
+      U+E000-F8FF   the Private Use Area. A foundry that draws ligatures beyond
+                    the standard six has nowhere else to encode them — Edgar
+                    ships NINE this way (fb fh fj fk gy ffb ffh ffj ffk at
+                    U+E000-E008). They are presentation forms in every sense
+                    that matters here; only their encoding is private. A rule
+                    that allowed FB00-FB06 alone would silently delete all nine
+                    while claiming to remove only letter substitutions.
+
+    Deliberately NOT a per-family opt-out list: a new family would inherit the
+    bug by default and the fault only shows up in prose nobody proofs.
+    """
+    return 0xFB00 <= lig_cp <= 0xFB06 or 0xE000 <= lig_cp <= 0xF8FF
+
+
 def extract_ligature_glyph_indices_fonttools(font_path):
     """Map standard ligature codepoints without a cmap entry to their glyph IDs.
 
@@ -557,6 +589,12 @@ def extract_ligatures_fonttools(font_path, codepoints):
         if lig_cp not in codepoints_set or lig_cp > 0xFFFF:
             continue
         if any(cp > 0xFFFF for cp in seq):
+            continue
+        if not is_presentation_ligature(lig_cp):
+            print(f"ligatures: skipping {''.join(chr(c) for c in seq)} -> "
+                  f"U+{lig_cp:04X} ({chr(lig_cp)}): output is a LETTER, not a "
+                  f"presentation form — substituting it would change the text",
+                  file=sys.stderr)
             continue
         if all(cp in codepoints_set for cp in seq):
             filtered[seq] = lig_cp
