@@ -40,11 +40,18 @@ namespace {
 //
 // Releasing early is safe: every WebServer delete path null-checks the pointer
 // first, and every accessor is bounded by the counts we zero here.
+//
+// SIMULATOR: the host shim's WebServer (crosspoint-simulator/src/WebServer.h)
+// is an independent class that shares only the public API — it has no
+// _currentArgs/_postArgs to release, and referring to them does not compile.
+// The shim owns its own request storage, so there is nothing to free here and
+// the subclass degrades to a plain pass-through.
 class CrossPointHttpServer final : public WebServer {
  public:
   explicit CrossPointHttpServer(uint16_t port) : WebServer(port) {}
 
   void releaseRequestArguments() {
+#ifndef SIMULATOR
     if (_currentArgs) {
       delete[] _currentArgs;
       _currentArgs = nullptr;
@@ -56,6 +63,7 @@ class CrossPointHttpServer final : public WebServer {
       _postArgs = nullptr;
     }
     _postArgsLen = 0;
+#endif
   }
 };
 
