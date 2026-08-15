@@ -2,6 +2,7 @@
 // one assertion away from being caught before shipping.
 #include <gtest/gtest.h>
 
+#include <cctype>
 #include <cstring>
 #include <set>
 #include <string>
@@ -151,6 +152,67 @@ TEST(KeyboardPanel, Grid13SpaceIsARealSpaceKey) {
   EXPECT_STREQ(freeink::ui::keyboardOutputFor(grid13::SL_LAYOUT, space->value), " ");
 }
 
+// ---------------------------------------------------------------------------
+// The hold-space-for-caret-mode sentinel (NoteEditorActivity::handlePanelKey).
+//
+// The editor decides "the space bar was held" from the RESULT of a long press:
+// a Character event carrying ' '. That is only safe while two things hold, and
+// both are properties of tables and SDK code this test can reach, so pin them
+// here rather than discovering the regression as a dead gesture on hardware.
+// ---------------------------------------------------------------------------
+
+// 1. A long press on space still resolves to a plain space. keyboardAltOutputFor
+//    returns nullptr for any key whose kind is not Normal, so Space falls back
+//    to keyboardOutputFor. Give the space key an `alt` and the fallback stops
+//    firing -- the gesture would type that alt instead of opening caret mode.
+TEST(KeyboardPanel, LongPressOnSpaceStillResolvesToASpace) {
+  const auto& qwerty = freeink::ui::builtinKeyboardLayout(freeink::ui::KeyboardLayoutId::QwertyEn, false, false, true);
+  EXPECT_EQ(freeink::ui::keyboardAltOutputFor(qwerty, ' '), nullptr);
+  EXPECT_STREQ(freeink::ui::keyboardOutputFor(qwerty, ' '), " ");
+
+  EXPECT_EQ(freeink::ui::keyboardAltOutputFor(grid13::SL_LAYOUT, ' '), nullptr);
+  EXPECT_STREQ(freeink::ui::keyboardOutputFor(grid13::SL_LAYOUT, ' '), " ");
+}
+
+// 2. No OTHER key may resolve to a space on long press, or holding it would
+//    open caret mode instead of typing what it advertises. Covers the case
+//    flip (no letter flips to ' ') and every declared alt in both grids.
+TEST(KeyboardPanel, NoKeyButSpaceLongPressesToASpace) {
+  const freeink::ui::KeyboardLayout* layouts[] = {
+      &grid13::SL_LAYOUT,
+      &freeink::ui::builtinKeyboardLayout(freeink::ui::KeyboardLayoutId::QwertyEn, false, false, true),
+      &freeink::ui::builtinKeyboardLayout(freeink::ui::KeyboardLayoutId::QwertyEn, true, false, true),
+      &freeink::ui::builtinKeyboardLayout(freeink::ui::KeyboardLayoutId::QwertyEn, false, true, true),
+  };
+  for (const auto* l : layouts) {
+    for (int r = 0; r < l->rowCount; ++r) {
+      for (int c = 0; c < l->rows[r].count; ++c) {
+        const auto& key = l->rows[r].keys[c];
+        if (key.kind == freeink::ui::KeyKind::Space) continue;
+        const char* out = freeink::ui::keyboardAltOutputFor(*l, key.value);
+        if (out == nullptr) out = freeink::ui::keyboardOutputFor(*l, key.value);
+        if (out == nullptr) continue;  // Shift, Mode, Del, OK produce no text
+        EXPECT_STRNE(out, " ") << "key '" << (key.label ? key.label : "?")
+                               << "' long-presses to a space, which the "
+                                  "note editor reads as the caret-mode gesture";
+      }
+    }
+  }
+}
+
+// 3. Daisy: the space slot uppercases to itself, so the same sentinel holds on
+//    the wheel, and no other slot may reach a space by the case flip.
+TEST(KeyboardPanel, DaisyLongPressReachesASpaceOnlyFromTheSpaceSlot) {
+  EXPECT_EQ(std::toupper(static_cast<unsigned char>(' ')), ' ');
+  for (int p = 0; p < daisyrings::ABC_CHAR_PETALS; ++p) {
+    for (int s = 0; s < 3; ++s) {
+      const char c = daisyrings::ABC_RING[p][s];
+      if (c == ' ') continue;
+      EXPECT_NE(std::toupper(static_cast<unsigned char>(c)), ' ') << "petal " << p << " slot " << s;
+    }
+  }
+}
+
 // Every 13-Grid row must sum to 13 width units, or the column anchor that makes
 // vertical navigation exact silently stops being exact.
 TEST(KeyboardPanel, Grid13RowsAllSumTo13Units) {
@@ -187,7 +249,7 @@ TEST(KeyboardPanel, Grid13SecondaryCharactersAreExactlyTheShiftPairs) {
   // Each is the shifted partner of its key on a real keyboard, which is the
   // whole reason these five are the ones that may hide.
   const std::set<std::pair<std::string, std::string>> want{{".", ">"}, {",", "<"}, {"'", "\""},
-                                                          {"[", "{"}, {"]", "}"}, {"\\", "|"}};
+                                                           {"[", "{"}, {"]", "}"}, {"\\", "|"}};
   EXPECT_EQ(pairs, want);
 }
 

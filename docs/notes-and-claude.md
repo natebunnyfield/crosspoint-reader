@@ -49,6 +49,7 @@ Buttons in Create Note / Claude:
 | Left / Right | move along the keyboard row; **auto-repeats** while held |
 | Confirm | type the selected key |
 | Confirm (hold) | type its uppercase / alternate |
+| **Confirm (hold) on SPACE** | Create Note only: enter **caret mode** — see below |
 | Up / Down (short) | move between keyboard rows |
 | **Up (hold 1.5 s)** | start Bluetooth and pair a keyboard |
 | **Down (hold 1.5 s)** | disconnect the keyboard, **keeping** the bond |
@@ -61,6 +62,53 @@ made the pairing hold move the selector the wrong way under the NEXT_PREV swap.
 
 Forgetting a bond entirely is deliberately NOT a gesture — it is
 **Settings → Forget Bluetooth Keyboard**, alongside **Pair Bluetooth Keyboard**.
+
+### Caret mode (hold the space bar)
+
+**The problem it fixes.** `TextBuffer::cursorLeft/Right/Up/Down/Home/End` were
+reachable only from `handleKey`, and `handleKey` is fed only by a paired BLE
+keyboard's arrow keys and by a host keyboard's typed text — which carries no
+arrows. So with the on-screen keyboard, the only input most owners have, there
+was **no way to move the caret at all**: repositioning mid-note meant deleting
+back to the spot and retyping.
+
+**The gesture.** Select the space key and hold Confirm. The keyboard stops
+taking input and the four direction buttons drive the text cursor instead —
+Left/Right by a character, Up/Down by a line. Confirm or Back returns to typing;
+Back does **not** leave the editor while the mode is up, the same contract an
+`OptionPopup` has. Auto-repeat works while a direction is held.
+
+While it is up the caret is drawn as a 3px **block** rather than a hairline, the
+status band carries `STR_KB_HINT_MOVE_CURSOR` in place of the byte count, and
+the Confirm hint reads **Done**.
+
+**Why hold-space and not hold-Up**, which is what the full-screen
+`KeyboardEntryActivity` uses for its own `cursorMode`: in this editor hold-Up
+and hold-Down are already the Bluetooth pairing gestures. Hold-space was free —
+`keyboardAltOutputFor` returns `nullptr` for `KeyKind::Space`, so a long press on
+it fell back to `keyboardOutputFor` and typed the same plain space a tap does.
+That also makes a resulting `' '` an exact sentinel for the gesture, which is how
+the editor detects it without KeyboardPanel needing to know anything about it;
+`test/keyboard_panel` pins both halves (space still resolves to a space, and no
+other key resolves to one).
+
+**A paired BLE keyboard does not need this** and never enters the mode: it has
+real arrow keys already wired at `NoteEditorActivity::handleKey`.
+
+**Two known rough edges, neither device-confirmed.**
+
+Up/Down move by HARD lines, because that is what `TextBuffer::cursorUp/Down`
+do — from a soft-wrapped line they jump to the previous or next paragraph, not
+the previous or next visual row. Changing that means teaching `TextBuffer` about
+the renderer's wrap, which it deliberately knows nothing about.
+
+The repaint is debounced exactly like typing (Settings → Typing Redraw Delay),
+so a *held* direction steps the caret several characters between refreshes and
+you cannot see where it is until you let go. Caret repeat is therefore slower
+than the key-grid repeat — 600 ms then 300 ms, against 450/140 — so that roughly
+one step lands per ~570 ms panel refresh. **Whether that is pleasant on real
+e-ink is untested**; it was verified only on the simulator, which repaints in
+milliseconds and cannot tell you.
 
 ## Create Note
 
