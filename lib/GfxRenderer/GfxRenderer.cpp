@@ -848,6 +848,37 @@ void GfxRenderer::drawLine(int x1, int y1, int x2, int y2, const bool state) con
   }
 }
 
+#if CROSSPOINT_RENDER_SCALE > 1
+// One-pixel Bresenham in DEVICE coordinates. The logical drawLine() above cannot
+// be reused for this: every pixel it writes is a RENDER_SCALE-sized block.
+//
+// A member would have to be declared in the header and would widen the public
+// surface for one caller, so it is file-local; drawPixelDevice() does its own
+// rotation and bounds work, exactly as drawPixel() does for the logical form.
+static void drawLineDevice(const GfxRenderer& renderer, int x1, int y1, const int x2, const int y2, const bool state) {
+  int dx = x2 - x1;
+  int dy = y2 - y1;
+  const int sx = (dx > 0) ? 1 : -1;
+  const int sy = (dy > 0) ? 1 : -1;
+  dx = sx * dx;
+  dy = sy * dy;
+  int err = dx - dy;
+  while (true) {
+    renderer.drawPixelDevice(x1, y1, state);
+    if (x1 == x2 && y1 == y2) break;
+    const int e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x1 += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y1 += sy;
+    }
+  }
+}
+#endif
+
 // Thickness grows along the run's MINOR axis, so it is perpendicular to the
 // line rather than always downward.
 //
@@ -871,6 +902,51 @@ void GfxRenderer::drawLine(int x1, int y1, int x2, int y2, const int lineWidth, 
   if (_textOnly) return;
   const int dx = std::abs(x2 - x1);
   const int dy = std::abs(y2 - y1);
+#if CROSSPOINT_RENDER_SCALE > 1
+  // A SLANTED thick line is rasterized at DEVICE resolution on a supersampled
+  // host build, so its staircase steps are one device pixel instead of
+  // RENDER_SCALE of them.
+  //
+  // drawPixel() paints a RENDER_SCALE x RENDER_SCALE block (GfxRenderer.h:377),
+  // which is exactly right for an axis-aligned edge -- a scaled straight line is
+  // still straight -- and exactly wrong for a diagonal, whose steps get scaled
+  // with it. Text does not have this problem: the hi-res glyph path addresses
+  // device pixels one at a time. So on the surfaces that ship supersampled
+  // (crosspoint-simulator/ios/CMakeLists.txt:89,208 pins the iOS app at
+  // RENDER_SCALE=3) every drawn diagonal sat at a third of the resolution of the
+  // characters beside it -- reported against the on-screen keyboard's Return
+  // arrow, whose two barbs are the only slanted strokes on the panel
+  // (freeink-sdk .../components/keyboard/keyboard.h:681-686).
+  //
+  // The SHAPE is deliberately unchanged: same shear-thickening along the minor
+  // axis, same endpoints, same total weight (lineWidth * RENDER_SCALE device
+  // rows == lineWidth logical rows). Only the sampling grid is finer, so this
+  // cannot move a layout or alter the 45-degree thickness convention the comment
+  // above rules on. It compiles out entirely at RENDER_SCALE == 1, which is every
+  // device build -- so it is not a fix anyone can see on an X3 or an X4.
+  //
+  // Axis-aligned runs take the ordinary path below: their block-replicated union
+  // is already identical to a device-resolution rect, and routing them here would
+  // change nothing but the cost.
+  if (dx != 0 && dy != 0) {
+    constexpr int S = RENDER_SCALE;
+    // x is sampled at the centre of the logical column so the run stays centred
+    // in the pixels the logical form would have covered; the thickness offset
+    // starts at the logical row's top edge so the band occupies exactly the same
+    // extent it does at scale 1.
+    const int thick = lineWidth * S;
+    if (dy > dx) {
+      for (int i = 0; i < thick; i++) {
+        drawLineDevice(*this, x1 * S + i, y1 * S + S / 2, x2 * S + i, y2 * S + S / 2, state);
+      }
+    } else {
+      for (int i = 0; i < thick; i++) {
+        drawLineDevice(*this, x1 * S + S / 2, y1 * S + i, x2 * S + S / 2, y2 * S + i, state);
+      }
+    }
+    return;
+  }
+#endif
   if (dy > dx) {
     for (int i = 0; i < lineWidth; i++) {
       drawLine(x1 + i, y1, x2 + i, y2, state);
