@@ -81,47 +81,29 @@ EpdFontFamily librefranklinReader14FontFamily(&lfReader14RegularFont, &lfReader1
 // reading picker — an SD install into /fonts would do both the opposite ways.
 // All four styles are real: MarkdownSpans renders bold, italic and bold-italic.
 //
-// OUTSIDE OMIT_FONTS, for the same reason Libre Franklin 14 pt is: all five
-// editor rows must resolve in EVERY build. They were inside it until 2026-08-09
-// (the two monos) and 2026-08-11 (the three iA faces), and the only build that
+// OUTSIDE OMIT_FONTS, for the same reason Libre Franklin 14 pt is: every
+// editor row must resolve in EVERY build. They were inside it until 2026-08-09
+// (the monos) and 2026-08-11 (the iA faces), and the only build that
 // defines the macro is iOS (crosspoint-simulator/ios/CMakeLists.txt), so on the
 // phone the whole Editor Font setting collapsed — builtinFontIdFor() handed
 // back ids the renderer had no glyphs for, and resolve() fell through to
 // UI_10 chrome. "Built in" has to mean built into the binary that ships.
 //
-// Flash cost: ~41 KB for IBMPlexMono, ~216 KB for the three iA families (ruling
-// 2026-08-11). The _2x companions are dead flash on device (RENDER_SCALE=1,
-// stripped by --gc-sections); they are present only for the simulator / iOS
-// builds that run at RENDER_SCALE=2.
+// Flash cost: ~72 KB for iA Writer Quattro. The _2x companions are dead flash
+// on device (RENDER_SCALE=1, stripped by --gc-sections); they are present only
+// for the simulator / iOS builds that run at RENDER_SCALE=2.
 //
-// Space Mono was here until 2026-08-15 and is gone by owner ruling. Its
-// generated headers are still in builtinFonts/ and its recipe is still in
-// sd-fonts.yaml — only the wiring was removed, so nothing here references it
-// and it costs no flash. See the note above FAMILIES in notes/EditorFonts.h.
-EpdFont ibmplexmono12RegularFont(&ibmplexmono_12_regular);
-EpdFont ibmplexmono12BoldFont(&ibmplexmono_12_bold);
-EpdFont ibmplexmono12ItalicFont(&ibmplexmono_12_italic);
-EpdFont ibmplexmono12BoldItalicFont(&ibmplexmono_12_bolditalic);
-EpdFontFamily ibmplexmono12FontFamily(&ibmplexmono12RegularFont, &ibmplexmono12BoldFont, &ibmplexmono12ItalicFont,
-                                      &ibmplexmono12BoldItalicFont);
+// FOUR families were here and are gone by owner ruling, all on 2026-08-15:
+// Space Mono, then iA Writer Duo, iA Writer Mono and IBM Plex Mono. Their
+// generated headers are still in builtinFonts/ and their recipes are still in
+// sd-fonts.yaml — only the wiring was removed, so nothing here references them
+// and they cost no flash. See the note above FAMILIES in notes/EditorFonts.h.
 EpdFont iawriterquattro12RegularFont(&iawriterquattro_12_regular);
 EpdFont iawriterquattro12BoldFont(&iawriterquattro_12_bold);
 EpdFont iawriterquattro12ItalicFont(&iawriterquattro_12_italic);
 EpdFont iawriterquattro12BoldItalicFont(&iawriterquattro_12_bolditalic);
 EpdFontFamily iawriterquattro12FontFamily(&iawriterquattro12RegularFont, &iawriterquattro12BoldFont,
                                           &iawriterquattro12ItalicFont, &iawriterquattro12BoldItalicFont);
-EpdFont iawriterduo12RegularFont(&iawriterduo_12_regular);
-EpdFont iawriterduo12BoldFont(&iawriterduo_12_bold);
-EpdFont iawriterduo12ItalicFont(&iawriterduo_12_italic);
-EpdFont iawriterduo12BoldItalicFont(&iawriterduo_12_bolditalic);
-EpdFontFamily iawriterduo12FontFamily(&iawriterduo12RegularFont, &iawriterduo12BoldFont, &iawriterduo12ItalicFont,
-                                      &iawriterduo12BoldItalicFont);
-EpdFont iawritermono12RegularFont(&iawritermono_12_regular);
-EpdFont iawritermono12BoldFont(&iawritermono_12_bold);
-EpdFont iawritermono12ItalicFont(&iawritermono_12_italic);
-EpdFont iawritermono12BoldItalicFont(&iawritermono_12_bolditalic);
-EpdFontFamily iawritermono12FontFamily(&iawritermono12RegularFont, &iawritermono12BoldFont, &iawritermono12ItalicFont,
-                                       &iawritermono12BoldItalicFont);
 
 // PragmataPro is COMMERCIAL, so unlike every other family above its glyph
 // tables are NOT in this repo: builtinFonts/pragmatapro_*.h are gitignored and
@@ -185,22 +167,16 @@ EpdFontFamily nittitypewriter12FontFamily(&nittitypewriter12RegularFont, &nittit
 
 // One family's four hi-res faces. `sym` is the 1x symbol prefix, so the family
 // keeps the name the registration code below already uses.
-#define CP_HIRES_FAMILY(sym, r, b, i, bi)                                                                     \
-  EpdFont sym##RegularHiResFont(&CP_HR(r));                                                                   \
-  EpdFont sym##BoldHiResFont(&CP_HR(b));                                                                      \
-  EpdFont sym##ItalicHiResFont(&CP_HR(i));                                                                    \
-  EpdFont sym##BoldItalicHiResFont(&CP_HR(bi));                                                               \
-  EpdFontFamily sym##HiResFontFamily(&sym##RegularHiResFont, &sym##BoldHiResFont, &sym##ItalicHiResFont,       \
+#define CP_HIRES_FAMILY(sym, r, b, i, bi)                                                                \
+  EpdFont sym##RegularHiResFont(&CP_HR(r));                                                              \
+  EpdFont sym##BoldHiResFont(&CP_HR(b));                                                                 \
+  EpdFont sym##ItalicHiResFont(&CP_HR(i));                                                               \
+  EpdFont sym##BoldItalicHiResFont(&CP_HR(bi));                                                          \
+  EpdFontFamily sym##HiResFontFamily(&sym##RegularHiResFont, &sym##BoldHiResFont, &sym##ItalicHiResFont, \
                                      &sym##BoldItalicHiResFont)
 
-CP_HIRES_FAMILY(ibmplexmono12, ibmplexmono_12_regular, ibmplexmono_12_bold, ibmplexmono_12_italic,
-                ibmplexmono_12_bolditalic);
 CP_HIRES_FAMILY(iawriterquattro12, iawriterquattro_12_regular, iawriterquattro_12_bold, iawriterquattro_12_italic,
                 iawriterquattro_12_bolditalic);
-CP_HIRES_FAMILY(iawriterduo12, iawriterduo_12_regular, iawriterduo_12_bold, iawriterduo_12_italic,
-                iawriterduo_12_bolditalic);
-CP_HIRES_FAMILY(iawritermono12, iawritermono_12_regular, iawritermono_12_bold, iawritermono_12_italic,
-                iawritermono_12_bolditalic);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
 // Same __has_include gate as the 1x cuts above, restated so the two blocks
 // cannot drift. Without this the editor would blit pixel-doubled 1x PragmataPro
@@ -457,10 +433,7 @@ void setupDisplayAndFonts(bool seamless = false) {
   // renderer.getFontMap().count(id), so a face defined but never inserted here
   // still reports "Not on card" — the definition and the insert have to leave
   // OMIT_FONTS together or the move buys nothing.
-  renderer.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12FontFamily);
   renderer.insertFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12FontFamily);
-  renderer.insertFont(IAWRITERDUO_12_FONT_ID, iawriterduo12FontFamily);
-  renderer.insertFont(IAWRITERMONO_12_FONT_ID, iawritermono12FontFamily);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
   // Only when the local commercial cuts were built. When they were not, this
   // insert is absent, getFontMap().count() is 0, and the picker marks the row
@@ -471,13 +444,10 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(NITTITYPEWRITER_12_FONT_ID, nittitypewriter12FontFamily);
 #endif
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-  // Hi-res companions for all five editor fonts. drawText() checks
+  // Hi-res companions for every editor font. drawText() checks
   // getHiResFamily() for any font id, so without these the editor activities
   // (NoteEditorActivity, ClaudeChatActivity) render at 1x on a 2x build.
-  renderer.registerHiResBuiltinFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12HiResFontFamily);
   renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12HiResFontFamily);
-  renderer.registerHiResBuiltinFont(IAWRITERDUO_12_FONT_ID, iawriterduo12HiResFontFamily);
-  renderer.registerHiResBuiltinFont(IAWRITERMONO_12_FONT_ID, iawritermono12HiResFontFamily);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
   renderer.registerHiResBuiltinFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12HiResFontFamily);
 #endif

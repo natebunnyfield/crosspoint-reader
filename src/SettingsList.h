@@ -296,10 +296,14 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       v.push_back(std::move(s));
     }
 
-    // EDITOR font group (owner ruling 2026-08-05). Its own list, separate from
-    // the reading families above; see src/notes/EditorFonts.h. Plain ENUM with
-    // valuePtr: the picker index IS the stored value, so it persists via
-    // toJson/fromJson like any other byte — but the list is append-only.
+    // EDITOR font group (owner ruling 2026-08-05; cut to three faces
+    // 2026-08-15). Its own list, separate from the reading families above; see
+    // src/notes/EditorFonts.h. Plain ENUM with valuePtr, so the row keeps
+    // working over the web settings API and the byte keeps being written — but
+    // the byte is NO LONGER what the setting is restored from. fromJson()
+    // reads the family NAME out of "editorFontFamily" and ignores this byte
+    // whenever that key is present, which is what lets the list be edited
+    // without a migration. Do not "simplify" this back to index-only.
     {
       SettingInfo s;
       s.nameId = StrId::STR_EDITOR_FONT;
@@ -448,14 +452,14 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // plain screens, the custom image, the two cover modes, Quick Resume, and
     // the calendars last as a block. The enum values are frozen by persistence
     // -- BLANK is 5 and stays 5 -- so this reorders only what the picker draws.
-    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
-                                  std::move(sleepScreenValues), "sleepScreen", StrId::STR_CAT_SYSTEM)
-                    .withDisplayOrder({CrossPointSettings::BLANK, CrossPointSettings::DARK,
-                                       CrossPointSettings::LIGHT, CrossPointSettings::CUSTOM,
-                                       CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
-                                       CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
-                                       CrossPointSettings::CALENDAR_FOUR, CrossPointSettings::CALENDAR_FIVE,
-                                       CrossPointSettings::CALENDAR_SIX, CrossPointSettings::CALENDAR_WESTSIDE}));
+    v.push_back(
+        SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen, std::move(sleepScreenValues),
+                          "sleepScreen", StrId::STR_CAT_SYSTEM)
+            .withDisplayOrder({CrossPointSettings::BLANK, CrossPointSettings::DARK, CrossPointSettings::LIGHT,
+                               CrossPointSettings::CUSTOM, CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
+                               CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
+                               CrossPointSettings::CALENDAR_FOUR, CrossPointSettings::CALENDAR_FIVE,
+                               CrossPointSettings::CALENDAR_SIX, CrossPointSettings::CALENDAR_WESTSIDE}));
     v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
                                   {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode",
                                   StrId::STR_CAT_DISPLAY));  // withdrawn 2026-08-15 (T-019)
@@ -463,8 +467,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                   {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
                                   "sleepScreenCoverFilter",
                                   StrId::STR_CAT_DISPLAY));  // withdrawn 2026-08-15 (T-019)
-    // Simulator/iOS only, deliberately compiled out on device.
-    //
+                                                             // Simulator/iOS only, deliberately compiled out on device.
+                                                             //
     // On an X4/X3 this row would be a control that cannot do anything: e-ink
     // holds its image with no power, there is no backlight and no host idle
     // timer, and the firmware's own auto-sleep is the Time to Sleep row three

@@ -136,23 +136,13 @@ TEST(SettingDisplayOrder, EditorFontSortsLikeTextSettings) {
   // And the concrete shipped order, so a colophon-data edit that silently
   // reshuffles the picker trips something. Reverse-chronological by earliest
   // year, ties by the drawn label:
-  //   All four Plex-derived faces now tie at 2017 -- IBM Plex Mono itself plus
-  //   the three iA cuts, which are adaptations OF it and so start when it does.
-  //   The tie breaks byte-wise on the DRAWN label: 'IBM' (0x49) precedes 'iA'
-  //   (0x69), then Duo, Mono, Quattro alphabetically. Then PragmataPro 2010 and
-  //   Nitti Typewriter 2007.
-  //
-  //   Three things moved on 2026-08-15, all credit corrections rather than
-  //   cosmetics. iA Writer Mono went 2009 -> 2017: it had been dated to Nitti,
-  //   but its own name table says "2017 IBM Corp. and Information Architects"
-  //   and iA say the face was built on IBM Plex. Quattro went 2018 -> 2017 for
-  //   the same reason -- 2018 is when iA shipped it, 2017 is when the type it
-  //   is made of was drawn, and this table dates the WORK. Nitti Typewriter
-  //   went 2009 -> 2007, the first year in its own copyright string. Space Mono
-  //   left the table entirely.
-  const std::vector<uint8_t> want = {3, 1, 2, 0, 4, 5};
-  EXPECT_EQ(order, want)
-      << "IBM Plex Mono, iA Writer Duo, iA Writer Mono, iA Writer Quattro, PragmataPro, Nitti Typewriter";
+  //   iA Writer Quattro: 2017 (the year IBM Plex Mono was drawn, which Quattro
+  //   is built on — 2018 is when iA shipped it, this table dates the WORK).
+  //   PragmataPro: 2010. Nitti Typewriter: 2007 (first year in its copyright
+  //   string; 2009 was the year of Nitti, not Nitti Typewriter). Three families,
+  //   no ties, straight descending. FAMILIES[0,1,2] = Quattro, Pragma, Nitti.
+  const std::vector<uint8_t> want = {0, 1, 2};
+  EXPECT_EQ(order, want) << "iA Writer Quattro (2017), PragmataPro (2010), Nitti Typewriter (2007)";
 }
 
 TEST(SettingDisplayOrder, EditorFontStoredIndicesDoNotMove) {
@@ -178,7 +168,7 @@ TEST(SettingDisplayOrder, EditorFamiliesAreRecognisedByName) {
   EXPECT_TRUE(editorfonts::isEditorFamily("iawriterquattro"));
   EXPECT_FALSE(editorfonts::isWritingOnlyFamily("iawriterquattro")) << "Quattro is offered for reading too";
   EXPECT_TRUE(editorfonts::isWritingOnlyFamily("iAWriterDuo")) << "Duo stays writing-only";
-  EXPECT_TRUE(editorfonts::isEditorFamily("IAWRITERMONO"));
+  EXPECT_FALSE(editorfonts::isEditorFamily("IAWRITERMONO")) << "Mono was removed from FAMILIES; isEditorFamily returns false for former faces";
 
   // Reading families and junk must NOT be filtered.
   for (const char* reading : {"Coelacanth", "TeXGyreSchola", "LibreFranklin", "Edgar", "", "iAWriter"}) {

@@ -104,11 +104,5 @@ ruby -rdigest -e 'puts [
 # editor asks for ONE size (12) in four styles -- see resolveEditorFont() -- so
 # only the 12 pt cut of each family exists.
 
-echo "#define IBMPLEXMONO_12_FONT_ID ($(
-ruby -rdigest -e 'puts [
-  "./ibmplexmono_12_regular.h",
-  "./ibmplexmono_12_bold.h",
-  "./ibmplexmono_12_bolditalic.h",
-  "./ibmplexmono_12_italic.h",
-].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
-))"
+# IBMPlexMono's block was here until 2026-08-15, when the editor list was cut to
+# three faces. Its headers are still generated and tracked; only the id is gone.

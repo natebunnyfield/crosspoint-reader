@@ -9,17 +9,35 @@
 
 namespace editorfonts {
 
-uint8_t migrateStoredIndex(uint8_t index) {
-  // Space Mono held index 3 until 2026-08-15. See the long note above FAMILIES.
+size_t indexOfFamily(const char* family) {
+  if (family == nullptr) return FAMILY_COUNT;
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    if (strcasecmp(family, FAMILIES[i].family) == 0) return i;
+  }
+  return FAMILY_COUNT;
+}
+
+uint8_t migrateLegacyStoredIndex(uint8_t index) {
+  // Positions in the six-row table that shipped between the two 2026-08-15
+  // rulings: 0 Quattro, 1 Duo, 2 Mono, 3 Plex, 4 PragmataPro, 5 Nitti. The full
+  // reasoning — including why the SIX-row encoding is assumed and what that
+  // costs a device still holding a seven-row byte — is in EditorFonts.h.
   //
-  // Applied ONCE, where the persisted byte is loaded (CrossPointSettings::
-  // normalizeRetiredSettings), and deliberately NOT inside selectedFamily() or
-  // builtinFontIdFor(). Those two take a POSITION IN `FAMILIES`, and the picker
-  // feeds them positions straight out of displayOrder() — migrating in there
-  // would remap a live position that was never stale, so choosing PragmataPro
-  // in the list would hand back IBM Plex Mono. Stored value and table position
-  // are different things that happen to share a type.
-  return index > 3 ? static_cast<uint8_t>(index - 1) : index;
+  // A table rather than arithmetic, deliberately: the previous migration was a
+  // subtraction, and a subtraction is what let it apply twice and go unnoticed.
+  // This is total, and applying it to its own output is not meaningful, so
+  // fromJson gates it on the absence of the name key instead of relying on
+  // idempotence.
+  static constexpr uint8_t kLegacySixRow[] = {
+      0,  // iAWriterQuattro -> iAWriterQuattro
+      0,  // iAWriterDuo     -> iAWriterQuattro (same superfamily)
+      0,  // iAWriterMono    -> iAWriterQuattro (same superfamily)
+      1,  // IBMPlexMono     -> PragmataPro     (nearest surviving mono)
+      1,  // PragmataPro     -> PragmataPro
+      2,  // NittiTypewriter -> NittiTypewriter
+  };
+  if (index >= sizeof(kLegacySixRow) / sizeof(kLegacySixRow[0])) return 0;
+  return kLegacySixRow[index];
 }
 
 const char* selectedFamily(uint8_t index) {
@@ -41,13 +59,24 @@ int fallbackFontId() {
   return 0;  // no built-in family at all; caller keeps its own UI-face fallback
 }
 
-bool isEditorFamily(const char* family) {
-  if (family == nullptr) return false;
-  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    if (strcasecmp(family, FAMILIES[i].family) == 0) return true;
-  }
-  return false;
-}
+bool isEditorFamily(const char* family) { return indexOfFamily(family) < FAMILY_COUNT; }
+
+// Families that WERE editor faces and no longer are. They still have recipes in
+// sd-fonts.yaml and labels in FontDisplayNames, so a card can carry them —
+// and if one does, the reading picker would now offer it, because the filter
+// that used to hide it reads FAMILIES and they are no longer in FAMILIES.
+//
+// Silently growing the reading list by three families is not something the
+// removal ruling asked for (docs/sd-card-fonts.md: "Do not install additional
+// families anywhere without a new ruling"), so the filter keeps its answer and
+// the removal stays a removal rather than a swap. Cheaper than it looks: three
+// string literals in flash, consulted only by the reading picker's filter.
+inline constexpr const char* FORMER_WRITING_FAMILIES[] = {
+    "iAWriterDuo",   // removed 2026-08-15
+    "iAWriterMono",  // removed 2026-08-15
+    "IBMPlexMono",   // removed 2026-08-15
+    "SpaceMono",     // removed 2026-08-15 (earlier ruling the same day)
+};
 
 std::vector<uint8_t> displayOrder() {
   std::vector<uint8_t> order(FAMILY_COUNT);
@@ -92,8 +121,11 @@ std::string rowSubtitle(uint8_t storedIndex, bool available, const char* unavail
 
 bool isWritingOnlyFamily(const char* family) {
   if (family == nullptr) return false;
-  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    if (strcasecmp(family, FAMILIES[i].family) == 0) return !FAMILIES[i].alsoReading;
+  if (const size_t i = indexOfFamily(family); i < FAMILY_COUNT) return !FAMILIES[i].alsoReading;
+  // Not a current editor face. It may still be a retired one — see
+  // FORMER_WRITING_FAMILIES above for why those keep being hidden.
+  for (const char* former : FORMER_WRITING_FAMILIES) {
+    if (strcasecmp(family, former) == 0) return true;
   }
   return false;
 }

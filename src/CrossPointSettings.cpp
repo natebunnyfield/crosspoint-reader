@@ -108,6 +108,13 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   if (ownerName[0] != '\0') {
     doc["ownerName"] = ownerName;
   }
+  // Editor font family by NAME. The SettingsList loop above has already written
+  // the "editorFont" byte, and that stays: the web settings API reads and
+  // writes the row through valuePtr, and an older build reads the byte. But it
+  // is the NAME that fromJson believes, so a face removed or reordered later
+  // cannot silently become a different face — the failure this key exists to
+  // end. A literal from FAMILIES, so no copy: static storage duration.
+  doc["editorFontFamily"] = editorfonts::selectedFamily(editorFont);
 
   // Language -- picked via the in-place option popup in SettingsActivity, not in SettingsList.
   // Stored as ISO code string ("EN", "DE", ...) for stability across enum reorders.
@@ -149,14 +156,15 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // silently revert the owner's choice on the next load.
   hideBatteryPercentage = HIDE_ALWAYS;
 
-  // Space Mono was removed from the editor-font list on 2026-08-15, and it sat
-  // at index 3 of a list whose POSITION is what this byte stores. Every value
-  // above the hole therefore names the wrong family until it is rewritten, so a
-  // device that had PragmataPro selected would come back on Nitti Typewriter.
-  // Rewritten here, once, on load — the same treatment the pins above get, and
-  // the reason this runs before requestResave() below: the corrected value is
-  // what gets written back.
-  editorFont = editorfonts::migrateStoredIndex(editorFont);
+  // editorFont deliberately has NO line here any more, and must not get one.
+  //
+  // It used to: a Space Mono shift applied on every load. That was the bug —
+  // this function cannot see the JSON document, only the already-clamped field,
+  // and it runs unconditionally, so a non-idempotent rewrite here re-applied
+  // itself every boot and walked a saved choice down the list one row per
+  // reboot. The editor font is now resolved in fromJson(), from the family NAME,
+  // where the raw document is in scope and the legacy path can be gated on the
+  // name key being absent. See src/notes/EditorFonts.h.
 
   // Status bar: every element hidden. Thickness is left alone — it only has an
   // effect while the progress bar is drawn, and it is not a visibility control.
@@ -346,6 +354,30 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   const char* sfn = doc["sdFontFamilyName"] | "";
   strncpy(sdFontFamilyName, sfn, sizeof(sdFontFamilyName) - 1);
   sdFontFamilyName[sizeof(sdFontFamilyName) - 1] = '\0';
+  // Editor font family — persisted by NAME since 2026-08-15, so that removing
+  // or reordering a writing face can never re-point a saved value at a
+  // different one. The generic loop above has already loaded the legacy
+  // "editorFont" byte into the field and clamped it against the CURRENT
+  // FAMILY_COUNT; both of those are undone here.
+  const char* efn = doc["editorFontFamily"] | "";
+  if (efn[0] != '\0') {
+    const size_t idx = editorfonts::indexOfFamily(efn);
+    // An unknown name means a family that has since been removed (or a bad web
+    // API write). Fall back to the first row rather than to whatever the clamp
+    // happened to leave behind.
+    editorFont = idx < editorfonts::FAMILY_COUNT ? static_cast<uint8_t>(idx) : 0;
+  } else {
+    // No name key: written by a build that persisted a POSITION. The RAW byte
+    // is read straight from the document because the ENUM clamp above already
+    // replaced every out-of-range value — which is every value worth migrating
+    // — with the default.
+    editorFont = editorfonts::migrateLegacyStoredIndex(doc["editorFont"] | static_cast<uint8_t>(0));
+    // Write the name back at once. That is what makes this a ONE-SHOT: after
+    // the resave the key exists, this branch is unreachable for this device,
+    // and the migration cannot re-apply the way its predecessor did.
+    needsResave = true;
+  }
+
   // Owner name — not in SettingsList, load manually
   const char* own = doc["ownerName"] | "";
   strncpy(ownerName, own, sizeof(ownerName) - 1);

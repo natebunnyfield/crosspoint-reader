@@ -83,14 +83,8 @@ TEST(OmitFonts, TheEditorFacesSurviveAStrippedBuild) {
   // All editor faces must survive OMIT_FONTS: they are the answer every
   // Editor Font row must resolve to in every build, iOS included. Inside the
   // guard they vanish on iOS and every row dies silently.
-  EXPECT_TRUE(survive.count("IBMPLEXMONO_12_FONT_ID"))
-      << "IBM Plex Mono must register even with OMIT_FONTS, same reason";
   EXPECT_TRUE(survive.count("IAWRITERQUATTRO_12_FONT_ID"))
       << "iA Writer Quattro must register even with OMIT_FONTS (ruling 2026-08-11)";
-  EXPECT_TRUE(survive.count("IAWRITERDUO_12_FONT_ID"))
-      << "iA Writer Duo must register even with OMIT_FONTS (ruling 2026-08-11)";
-  EXPECT_TRUE(survive.count("IAWRITERMONO_12_FONT_ID"))
-      << "iA Writer Mono must register even with OMIT_FONTS (ruling 2026-08-11)";
   // PragmataPro and NittiTypewriter are commercial with gitignored headers;
   // their inserts carry a second guard (#ifdef CROSSPOINT_HAS_*) but that is
   // orthogonal to OMIT_FONTS and must not sit inside it.
@@ -115,12 +109,9 @@ TEST(OmitFonts, TheSurvivingSetIsExactlyWhatWeIntend) {
   // list and saying why.
   const std::set<std::string> want = {
       "LIBREFRANKLIN_READER_14_FONT_ID",
-      "IBMPLEXMONO_12_FONT_ID",
       "IAWRITERQUATTRO_12_FONT_ID",
-      "IAWRITERDUO_12_FONT_ID",
-      "IAWRITERMONO_12_FONT_ID",
       // Added 2026-08-14 with the PragmataPro row. Outside the guard for the
-      // same reason as the five above: OMIT_FONTS is the iOS build, and an
+      // same reason as the two above: OMIT_FONTS is the iOS build, and an
       // editor row that resolves to nothing there is the bug that shipped as
       // "Create Note renders one pixel". Its insert carries a SECOND, narrower
       // guard -- #ifdef CROSSPOINT_HAS_PRAGMATAPRO -- because the face is

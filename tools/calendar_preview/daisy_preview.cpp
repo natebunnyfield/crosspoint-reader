@@ -15,8 +15,8 @@
 #include <cstdio>
 #include <cstring>
 
-#include "notes/DaisyRings.h"
 #include "fontIds.h"
+#include "notes/DaisyRings.h"
 
 extern GfxRenderer renderer;
 extern bool simInit();
@@ -102,23 +102,19 @@ bool renderDaisySheet(const char* outPath, const char* title, const Ring* rings,
   return writeMonoPortraitBmpExternal(outPath, renderer);
 }
 
-
-// Specimen for the two built-in editor monospace faces. Proves the generated
+// Specimen for the built-in editor faces. Proves the generated
 // glyph data actually rasterises — a header that compiles and links says
 // nothing at all about whether the bitmaps are right.
 bool renderEditorFontSpecimen(const char* outPath) {
-  // Space Mono was removed from the app on 2026-08-15 and this specimen still
-  // named it, so the harness stopped building the moment the headers went. The
-  // iA Writer Mono cut takes its place -- a shipped editor face, so the
-  // specimen keeps proving two real families rasterise rather than one.
-  static EpdFont iaR(&iawritermono_12_regular), iaB(&iawritermono_12_bold), iaI(&iawritermono_12_italic),
-      iaBI(&iawritermono_12_bolditalic);
-  static EpdFontFamily iaWriterMono(&iaR, &iaB, &iaI, &iaBI);
-  static EpdFont pxR(&ibmplexmono_12_regular), pxB(&ibmplexmono_12_bold), pxI(&ibmplexmono_12_italic),
-      pxBI(&ibmplexmono_12_bolditalic);
-  static EpdFontFamily plexMono(&pxR, &pxB, &pxI, &pxBI);
-  renderer.insertFont(IAWRITERMONO_12_FONT_ID, iaWriterMono);
-  renderer.insertFont(IBMPLEXMONO_12_FONT_ID, plexMono);
+  // This specimen has now lost its face twice to the same kind of ruling --
+  // Space Mono on 2026-08-15, then iA Writer Mono and IBM Plex Mono hours later
+  // when the editor list was cut to three. It draws iA Writer Quattro, the one
+  // surviving editor face whose glyph tables are in this repo, so a clone
+  // without the commercial TTFs still builds the harness.
+  static EpdFont iaR(&iawriterquattro_12_regular), iaB(&iawriterquattro_12_bold), iaI(&iawriterquattro_12_italic),
+      iaBI(&iawriterquattro_12_bolditalic);
+  static EpdFontFamily iaWriterQuattro(&iaR, &iaB, &iaI, &iaBI);
+  renderer.insertFont(IAWRITERQUATTRO_12_FONT_ID, iaWriterQuattro);
 
   renderer.clearScreen();
   int y = 18;
@@ -136,7 +132,7 @@ bool renderEditorFontSpecimen(const char* outPath) {
     const char* name;
     int id;
   };
-  const Face faces[] = {{"iA Writer Mono", IAWRITERMONO_12_FONT_ID}, {"IBM Plex Mono", IBMPLEXMONO_12_FONT_ID}};
+  const Face faces[] = {{"iA Writer Quattro", IAWRITERQUATTRO_12_FONT_ID}};
 
   for (const Face& face : faces) {
     caption(y, face.name);
