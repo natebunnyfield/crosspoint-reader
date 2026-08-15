@@ -22,10 +22,16 @@ every Down press repaints and the side buttons auto-repeat.
 
 **SHIPPED TO BRANCH — UNCONFIRMED on device.** Nothing in this document has
 been seen on a panel. `pio run -e default` and `-e simulator` are both green
-with no new warnings; the host suite is 277 tests with only the pre-existing
-`EditorFontPreviewTest` failure. Panel timing — the gray waveform's real
-duration, which dominates every latency decision below — is reasoned about from
-the LUTs and was never measured.
+with no new warnings, and the host suite is 290/290 after merging current
+`main`. Panel timing — the gray waveform's real duration, which dominates every
+latency decision below — is reasoned about from the LUTs and was never
+measured.
+
+Every flash figure below was taken against `48a3ca8c9`, the commit this branch
+was cut from, with the twelve headers as the *only* difference between builds.
+`main` has since gained dark-mode antialiasing and the PragmataPro editor face,
+so the absolute numbers have moved — this branch's tip measures **4,303,811 B /
+65.7%** — but the deltas are controlled and transfer unchanged.
 
 ## 1. The fonts
 
