@@ -57,43 +57,81 @@ EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
   }
 }
 
+void HalDisplay::toPanelPolarity() { polarity.toPanel(einkDisplay.getFrameBuffer(), einkDisplay.getBufferSize()); }
+
+void HalDisplay::toLogicalPolarity() { polarity.toLogical(einkDisplay.getFrameBuffer(), einkDisplay.getBufferSize()); }
+
+HalDisplay::RefreshMode HalDisplay::resolvePolarityMode(const RefreshMode mode) {
+  // Consumed unconditionally: a HALF or FULL already rewrites every pixel, so
+  // it satisfies the promotion on its own.
+  if (polarity.consumeRefreshPromotion() && mode == RefreshMode::FAST_REFRESH) {
+    return RefreshMode::HALF_REFRESH;
+  }
+  return mode;
+}
+
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
+  mode = resolvePolarityMode(mode);
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
 
+  toPanelPolarity();
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
+  toLogicalPolarity();
 }
 
 void HalDisplay::displayBufferAsync(HalDisplay::RefreshMode mode) {
+  mode = resolvePolarityMode(mode);
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
 
+  // Deliberately NOT restored here. The panel is still reading this frame (X3's
+  // displayFinish re-reads it for the DTM1 sync), and the caller has promised
+  // not to touch the framebuffer until waitRefreshComplete(), which restores it.
+  toPanelPolarity();
   einkDisplay.displayBufferAsyncNoShadow(convertRefreshMode(mode));
 }
 
-void HalDisplay::waitRefreshComplete() { einkDisplay.waitRefreshComplete(); }
+void HalDisplay::waitRefreshComplete() {
+  einkDisplay.waitRefreshComplete();
+  toLogicalPolarity();
+}
 
 bool HalDisplay::supportsAsyncRefresh() const { return einkDisplay.supportsAsyncRefresh(); }
 
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {
+  mode = resolvePolarityMode(mode);
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
 
+  toPanelPolarity();
   einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
+  toLogicalPolarity();
 }
 
-void HalDisplay::setInverted(const bool inverted) { einkDisplay.setInverted(inverted); }
+void HalDisplay::setInverted(const bool inverted) { polarity.setDarkMode(inverted); }
 
-bool HalDisplay::isInverted() const { return einkDisplay.isInverted(); }
+bool HalDisplay::isInverted() const { return polarity.darkMode(); }
 
-void HalDisplay::deepSleep() { einkDisplay.deepSleep(); }
+void HalDisplay::deepSleep() {
+  // deepSleep() drains a pending async refresh first, and that drain re-reads
+  // the framebuffer on X3.
+  toPanelPolarity();
+  einkDisplay.deepSleep();
+  toLogicalPolarity();
+}
 
 uint8_t* HalDisplay::getFrameBuffer() const { return einkDisplay.getFrameBuffer(); }
 
-uint8_t* HalDisplay::lendFrameBufferStorage(uint32_t* sizeOut) { return einkDisplay.lendBuildStorage(sizeOut); }
+uint8_t* HalDisplay::lendFrameBufferStorage(uint32_t* sizeOut) {
+  // The storage is about to be handed to an unrelated consumer; it must not
+  // leave with a half-finished page turn's panel polarity still applied.
+  toLogicalPolarity();
+  return einkDisplay.lendBuildStorage(sizeOut);
+}
 
 void HalDisplay::returnFrameBufferStorage() { einkDisplay.returnBuildStorage(); }
 
@@ -109,11 +147,14 @@ void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) 
   // resync makes displayGrayscaleBase clear first, matching displayBuffer(HALF).
   // The reader's FAST path is deliberately left on the differential path so
   // per-page grayscale stays cheap.
+  fallback = resolvePolarityMode(fallback);
   if (gpio.deviceIsX3() && fallback == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
 
+  toPanelPolarity();
   einkDisplay.displayGrayscaleBase(convertRefreshMode(fallback), turnOffScreen);
+  toLogicalPolarity();
 }
 
 void HalDisplay::preconditionGrayscale() { einkDisplay.preconditionGrayscale(); }
@@ -122,13 +163,34 @@ void HalDisplay::preconditionGrayscale(uint16_t x, uint16_t y, uint16_t w, uint1
   einkDisplay.preconditionGrayscale(x, y, w, h);
 }
 
+// The three plane entry points below take PLANE data, not picture data. A plane
+// bit is "nudge this pixel toward a gray target", which carries no polarity of
+// its own, so dark mode must NOT flip it — the level-to-plane mapping in
+// GlyphAaPlanes.h is where dark mode is accounted for instead.
 void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t* lsbBuffer) { einkDisplay.copyGrayscaleLsbBuffers(lsbBuffer); }
 
 void HalDisplay::copyGrayscaleMsbBuffers(const uint8_t* msbBuffer) { einkDisplay.copyGrayscaleMsbBuffers(msbBuffer); }
 
-void HalDisplay::cleanupGrayscaleBuffers(const uint8_t* bwBuffer) { einkDisplay.cleanupGrayscaleBuffers(bwBuffer); }
+void HalDisplay::cleanupGrayscaleBuffers(const uint8_t* bwBuffer) {
+  // This one IS picture data: it re-seeds the controller's differential
+  // baseline, which must hold what the panel is actually showing. Only the
+  // framebuffer is ever passed (GfxRenderer::cleanupGrayscaleWithFrameBuffer
+  // and restoreBwBuffer); a caller-owned buffer would arrive logical and this
+  // could not flip it in place, so refuse to guess and pass it through.
+  if (bwBuffer == einkDisplay.getFrameBuffer()) {
+    toPanelPolarity();
+    einkDisplay.cleanupGrayscaleBuffers(bwBuffer);
+    toLogicalPolarity();
+    return;
+  }
+  einkDisplay.cleanupGrayscaleBuffers(bwBuffer);
+}
 
-void HalDisplay::displayGrayBuffer(bool turnOffScreen) { einkDisplay.displayGrayBuffer(turnOffScreen); }
+void HalDisplay::displayGrayBuffer(bool turnOffScreen) {
+  toPanelPolarity();
+  einkDisplay.displayGrayBuffer(turnOffScreen);
+  toLogicalPolarity();
+}
 
 void HalDisplay::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows) {
   einkDisplay.writeGrayscalePlaneStrip(lsbPlane ? EInkDisplay::GRAY_PLANE_LSB : EInkDisplay::GRAY_PLANE_MSB, rows,

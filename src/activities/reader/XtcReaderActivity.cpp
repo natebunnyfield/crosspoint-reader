@@ -244,6 +244,14 @@ void XtcReaderActivity::renderPage() {
       }
     }
 
+    // An XTC page is a pre-rendered picture, so it keeps its own polarity in
+    // dark mode exactly as a cover or an EPUB illustration does — counter-invert
+    // the whole frame and the output flip cancels it. Whole frame, not the page
+    // rect: the cleared surround has to travel with the page or it reads as a
+    // black border. No-op in light mode. The grayscale passes below deliberately
+    // do NOT get this: a plane is a mask, not a picture.
+    renderer.preserveImagePolarity(0, 0, renderer.getScreenWidth(), renderer.getScreenHeight());
+
     if (pagesUntilFullRefresh <= 1) {
       // Periodic ghost cleanup: scrub via the normal path, then run the
       // settle flavor of the grayscale base pass (DTM planes are equal after
@@ -296,6 +304,10 @@ void XtcReaderActivity::renderPage() {
       }
     }
 
+    // Same counter-inversion as the base pass: this frame becomes the
+    // controller's differential baseline, so it must match what is on the panel.
+    renderer.preserveImagePolarity(0, 0, renderer.getScreenWidth(), renderer.getScreenHeight());
+
     // Cleanup grayscale buffers with current frame buffer
     renderer.cleanupGrayscaleWithFrameBuffer();
 
@@ -323,6 +335,9 @@ void XtcReaderActivity::renderPage() {
     }
   }
   // White pixels are already cleared by clearScreen()
+
+  // See the 2-bit branch: a page image keeps its own polarity in dark mode.
+  renderer.preserveImagePolarity(0, 0, renderer.getScreenWidth(), renderer.getScreenHeight());
 
   free(pageBuffer);
 
