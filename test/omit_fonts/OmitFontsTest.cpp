@@ -115,6 +115,15 @@ TEST(OmitFonts, TheSurvivingSetIsExactlyWhatWeIntend) {
       "IAWRITERQUATTRO_12_FONT_ID",
       "IAWRITERDUO_12_FONT_ID",
       "IAWRITERMONO_12_FONT_ID",
+      // Added 2026-08-14 with the PragmataPro row. Outside the guard for the
+      // same reason as the five above: OMIT_FONTS is the iOS build, and an
+      // editor row that resolves to nothing there is the bug that shipped as
+      // "Create Note renders one pixel". Its insert carries a SECOND, narrower
+      // guard -- #ifdef CROSSPOINT_HAS_PRAGMATAPRO -- because the face is
+      // commercial and its generated headers are gitignored; that guard is
+      // about whether the glyphs exist in the tree, not about OMIT_FONTS, so it
+      // does not belong in this set's reasoning.
+      "PRAGMATAPRO_12_FONT_ID",
   };
   EXPECT_EQ(fontsSurvivingOmitFonts(kMainCpp), want);
 }

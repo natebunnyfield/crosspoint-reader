@@ -99,6 +99,49 @@ for entry in ${EDITOR_FAMILIES[@]}; do
   done
 done
 
+# --- Editor-group monospace from LOCAL (commercial) sources ------------------
+#
+# PragmataPro is COMMERCIAL (Fabrizio Schiavi). Same rule as Edgar, GTAlpinaCond,
+# Venetian301 and CaledoniaCC on the SD side: the RECIPE is committed, the font
+# files never are. They go in lib/EpdFont/local_fonts/ (gitignored) under the
+# names below.
+#
+# The generated pragmatapro_*.h are ALSO gitignored, which is what makes this
+# different from every other family in this script. A 12/24 pt bitmap table of a
+# commercial face is a redistributable derivative of it, and this repo is
+# public — committing those headers would ship the typeface. So the headers are
+# built locally and stay local, and `#if __has_include` in main.cpp lets a tree
+# without them compile and run with the row degrading through
+# editorfonts::resolve() to a built-in mono. See docs/sd-card-fonts.md.
+#
+# Skips with a clear message when the sources are absent — that means "cannot
+# regenerate here", NOT "missing from the build".
+LOCAL_EDITOR_FAMILIES=(
+  "pragmatapro:PragmataPro"
+)
+
+for entry in ${LOCAL_EDITOR_FAMILIES[@]}; do
+  prefix="${entry%%:*}"
+  stem="${entry#*:}"
+  missing=0
+  for style in ${READER_FONT_STYLES[@]}; do
+    [ -f "../local_fonts/${stem}-${style}.ttf" ] || missing=1
+  done
+  if [ $missing -eq 1 ]; then
+    echo "Skipping ${stem} (no local source in lib/EpdFont/local_fonts/): commercial font, recipe only"
+    continue
+  fi
+  for style in ${READER_FONT_STYLES[@]}; do
+    lc=$(echo $style | tr '[:upper:]' '[:lower:]')
+    # 1x cut, then the 2x hi-res companion (24 pt = 12 * 2), same flags as the
+    # OFL editor families above.
+    python fontconvert.py "${prefix}_12_${lc}" 12 "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_12_${lc}.h"
+    echo "Generated ../builtinFonts/${prefix}_12_${lc}.h"
+    python fontconvert.py "${prefix}_12_${lc}_2x" 24 "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_12_${lc}_2x.h"
+    echo "Generated ../builtinFonts/${prefix}_12_${lc}_2x.h"
+  done
+done
+
 UI_FONT_SIZES=(10 12)
 UI_FONT_STYLES=("Regular" "Bold")
 

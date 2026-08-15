@@ -37,6 +37,16 @@
 #define IAWRITERDUO_12_FONT_ID (-672455302)
 #define IAWRITERMONO_12_FONT_ID (1291847533)
 
+// PragmataPro is the one editor face whose glyph tables are NOT in this repo.
+// It is commercial, so builtinFonts/pragmatapro_*.h are gitignored and built
+// locally from lib/EpdFont/local_fonts/. The ID is declared unconditionally --
+// it is just an opaque handle, and EditorFonts.h's table needs a stable value
+// for the persisted row regardless of whether this build has the glyphs.
+// main.cpp registers the family only when __has_include finds the headers, and
+// editorfonts::resolve() already refuses to hand back an id the renderer has no
+// glyphs for, so a tree without the font degrades to a built-in mono.
+#define PRAGMATAPRO_12_FONT_ID (1544097263)
+
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
 static_assert(LIBREFRANKLIN_READER_12_FONT_ID != 0, "Font ID collision with sentinel");
@@ -51,3 +61,4 @@ static_assert(IBMPLEXMONO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IAWRITERQUATTRO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IAWRITERDUO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IAWRITERMONO_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(PRAGMATAPRO_12_FONT_ID != 0, "Font ID collision with sentinel");

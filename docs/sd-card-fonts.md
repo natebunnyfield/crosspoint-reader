@@ -262,6 +262,57 @@ which erases only the ids it finds in `hiResSdFonts_`. That is what keeps a
 reader-font reload — every font-size change is one — from taking the UI's
 hi-res registrations down with it.
 
+### A built-in whose glyph data is NOT in this repo (PragmataPro, 2026-08-14)
+
+Every other family in `lib/EpdFont/builtinFonts/` ships its generated `.h`
+committed — 96 of them. **PragmataPro is the one exception**, and the reason is
+worth stating plainly: the CLAUDE.md rule for commercial faces is "the recipe is
+committed, never the font files", and for an SD family that is the whole story,
+because the `.cpfont` is built onto a card and never enters git. A *built-in*
+inverts that. Its glyph tables are a committed C array, so following only the
+existing rule — gitignore the TTF, commit the generated header — would put a
+12 pt and 24 pt bitmap rasterisation of a commercial typeface into a public
+repository. That is a redistributable derivative of the face, not a build
+artifact of it.
+
+So both halves stay out of git:
+
+* `lib/EpdFont/local_fonts/PragmataPro-{Regular,Bold,Italic,BoldItalic}.ttf` —
+  gitignored, supplied by whoever holds the licence.
+* `lib/EpdFont/builtinFonts/pragmatapro_*.h` — gitignored too, which is the new
+  part. Rebuild them with `lib/EpdFont/scripts/convert-builtin-fonts.sh`; that
+  script skips the family with a clear message when the TTFs are absent.
+
+`src/main.cpp` gates the row on `#if __has_include(<builtinFonts/pragmatapro_12_regular.h>)`,
+so a clone without the licence compiles and runs unchanged — the row is simply
+not registered, `editorfonts::resolve()` refuses to hand back an id the renderer
+has no glyphs for, and the Editor Font picker degrades it to a built-in mono the
+same way it degrades a card-only family. The headers are deliberately NOT added
+to `builtinFonts/all.h`, which is committed and unconditional.
+
+**Its four cuts are not equally covered, unlike every other editor face.**
+Measured against `fontconvert.py`'s interval list (1665 printable codepoints):
+Regular 950, Bold 234, Italic 234, BoldItalic 234 — for comparison Space Mono is
+539 and IBM Plex Mono 732 across all four styles evenly. All four do cover
+printable ASCII and Latin-1 100%, plus smart quotes, en/em dash, ellipsis and
+bullet; what the three non-roman cuts lack is Latin Extended-A and beyond. So an
+*emphasised* word containing `ż` or `ř` renders `?` where the roman renders the
+letter — the same shape of gap Quattrocento Sans and Libris carry, but
+style-dependent rather than family-wide. `EpdFont::getGlyph` substitutes U+FFFD
+then `'?'`, so the pen still advances and the line does not slide. This is why
+the row is writing-only and must not be given `alsoReading`.
+
+That asymmetry is a property of *these* files (v0.8, 1699/264/264/262 glyphs),
+not of the product: fsd.it describes current PragmataPro as ~18,000 glyphs in
+the Regular and ~17,000 in each of the other three. Re-cutting from a current
+licensed release would even the four styles out and is the right fix if the gap
+ever matters.
+
+Flash cost on device: **+66,086 bytes** (4,176,519 → 4,242,605, 63.7% → 64.7%),
+measured by building `-e default` with the headers present and again with them
+moved aside. The `_2x` companions are not in that number — they sit behind
+`CROSSPOINT_RENDER_SCALE > 1` and reach only simulator/iOS binaries.
+
 The ruling is enforced, not just written down. `installed_families:` at the top
 of `lib/EpdFont/scripts/sd-fonts.yaml` is the single source of truth, and
 `scripts/install-sim-fonts.py` defaults to it. That default used to be "every

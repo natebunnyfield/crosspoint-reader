@@ -33,7 +33,9 @@ struct Entry {
   bool alsoReading;
 };
 
-// All five are OFL. The iA faces are the "S" (narrow) cuts.
+// The first five are OFL. The iA faces are the "S" (narrow) cuts. PragmataPro
+// (row 5) is the exception on every axis and is documented at its own entry
+// below.
 //
 // All five families are now BUILT IN (monos: owner ruling 2026-08-06; iA
 // faces: owner ruling 2026-08-11). Before 2026-08-06 every entry was
@@ -59,6 +61,25 @@ inline constexpr Entry FAMILIES[] = {
     {"iAWriterMono", "iA Writer Mono", IAWRITERMONO_12_FONT_ID, false},
     {"SpaceMono", "Space Mono", SPACEMONO_12_FONT_ID, false},
     {"IBMPlexMono", "IBM Plex Mono", IBMPLEXMONO_12_FONT_ID, false},
+    // COMMERCIAL, and the only row whose glyph tables are not in this repo.
+    // builtinFonts/pragmatapro_*.h are gitignored (see .gitignore) and built
+    // locally from lib/EpdFont/local_fonts/, so a clone without the licensed
+    // TTFs compiles fine and this row simply is not registered — resolve()
+    // degrades it to a built-in mono and the picker marks it unreachable.
+    // That is the SAME mechanism a card-only row uses, reached from the other
+    // direction, which is why no new branch was needed anywhere.
+    //
+    // Coverage is ASYMMETRIC across the styles, unlike every other row here.
+    // The Regular carries 950 of the 1665 codepoints the converter asks for
+    // (more than SpaceMono's 539 or IBM Plex Mono's 732); the Bold, Italic and
+    // BoldItalic carry 234 — full ASCII and full Latin-1 plus the smart quotes,
+    // dashes and ellipsis, but no Latin Extended-A. So an emphasised word
+    // containing e.g. "ż" or "ř" renders '?' where the roman would render the
+    // letter. EpdFont::getGlyph substitutes U+FFFD then '?', so the metrics stay
+    // honest and nothing slides — it degrades, it does not corrupt the line.
+    // Accepted for a Latin-1 writing face; do NOT promote this row to
+    // alsoReading, where the gap would meet arbitrary book text.
+    {"PragmataPro", "PragmataPro", PRAGMATAPRO_12_FONT_ID, false},
 };
 inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);
 

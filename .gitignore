@@ -25,6 +25,13 @@ lib/EpdFont/scripts/scaled_fonts/
 lib/EpdFont/scripts/output/
 # Commercial font files a user supplies locally (e.g. Caledonia CC) - never committed
 lib/EpdFont/local_fonts/
+# Built-in cuts of a COMMERCIAL face. Every other builtinFonts/*.h IS committed;
+# these are the exception. A 12/24 pt bitmap table is a redistributable
+# derivative of the typeface, and this repo is public, so shipping them in git
+# would ship PragmataPro. Built locally from lib/EpdFont/local_fonts/ by
+# lib/EpdFont/scripts/convert-builtin-fonts.sh; main.cpp compiles the row in
+# only when __has_include finds them.
+lib/EpdFont/builtinFonts/pragmatapro_*.h
 # Claude Code: share project skills with the team, keep local agent state
 # (worktrees, scheduled-task locks, settings.local, scout CLEANUP.md) out.
 .claude/*
