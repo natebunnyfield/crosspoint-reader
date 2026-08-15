@@ -457,10 +457,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                        CrossPointSettings::CALENDAR_FOUR, CrossPointSettings::CALENDAR_FIVE,
                                        CrossPointSettings::CALENDAR_SIX, CrossPointSettings::CALENDAR_WESTSIDE}));
     v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
-                                  {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_SYSTEM));
+                                  {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode",
+                                  StrId::STR_CAT_DISPLAY));  // withdrawn 2026-08-15 (T-019)
     v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
                                   {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
-                                  "sleepScreenCoverFilter", StrId::STR_CAT_SYSTEM));
+                                  "sleepScreenCoverFilter",
+                                  StrId::STR_CAT_DISPLAY));  // withdrawn 2026-08-15 (T-019)
     // Simulator/iOS only, deliberately compiled out on device.
     //
     // On an X4/X3 this row would be a control that cannot do anything: e-ink
@@ -504,7 +506,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                    "clockUtcOffsetQ", StrId::STR_CAT_SYSTEM));
     v.push_back(SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat,
                                   {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
-                                  StrId::STR_CAT_SYSTEM));
+                                  StrId::STR_CAT_DISPLAY));  // withdrawn 2026-08-15 (T-019)
     // Persistence flag for NTP debounce. Resetting from the web UI forces a re-sync
     // on next WiFi connect, which is useful when crossing time zones.
     v.push_back(SettingInfo::Toggle(StrId::STR_CLOCK_SYNCED, &CrossPointSettings::clockHasBeenSynced,

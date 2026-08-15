@@ -35,45 +35,6 @@ missing on 2026-08-15. File it the same turn you find it.
 
 ## OPEN
 
-### [T-019] Withdraw three more Settings rows
-**scope: device Settings UI · ruled 2026-08-07 · not started**
-
-*Moved here from `BUGS.md` on 2026-08-15, unchanged. It was filed there as
-`[T-001]` because at the time "there is nowhere else it would be found" — this
-file did not exist yet. That left two different items both called `T-001`.*
-
-Remove from the device Settings screen:
-
-| Row | Field | Key | Defined at |
-|---|---|---|---|
-| Clock Format | `clockFormat` | `clockFormat` | `src/SettingsList.h:463` |
-| Sleep Screen Cover Mode | `sleepScreenCoverMode` | `sleepScreenCoverMode` | `src/SettingsList.h:417` |
-| Sleep Screen Cover Filter | `sleepScreenCoverFilter` | `sleepScreenCoverFilter` | `src/SettingsList.h:419` |
-
-**Do it the withdraw way, not the delete way.** All three are plain
-`SettingInfo::Enum` rows with a `valuePtr`, so deleting the entry from
-`getSettingsList()` would stop the field being written by `toJson()` at all and
-drop it from the web settings API — the trap CLAUDE.md documents and that this
-fork has already been bitten by. The procedure, same as the System font row on
-2026-08-07 (`169540d2`), is three steps and all three are needed:
-
-1. Change `category` from `STR_CAT_SYSTEM` to `STR_CAT_DISPLAY`, a retired
-   category `rebuildSettingsLists()` drops. The row keeps persisting and stays
-   web-settable.
-2. Pin the value in `CrossPointSettings::normalizeRetiredSettings()`, so a save
-   written while the picker existed cannot hold the old choice forever.
-3. Make the field initialiser in `CrossPointSettings.h` match the pin, or fresh
-   installs and upgraded ones disagree — pinning alone is a half-fix.
-
-Decide the pinned value per row before starting; the current initialisers are
-`clockFormat = 0` (24-hour), `sleepScreenCoverMode = FIT`,
-`sleepScreenCoverFilter = NO_FILTER`.
-
-**Verify by save cycle, not by reading the file after boot.** `normalize` fixes
-the in-memory value and nothing has called `saveToFile()` yet, so a
-read-back-after-boot check passes whatever you do. Seed the old value, boot,
-enter Settings and press Back (which saves), then read the file.
-
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
 **scope: verification · opened 2026-08-15**
 
@@ -263,6 +224,37 @@ then either take the patch or write the divergence down in `docs/fork-sync.md`.
 ---
 
 ## Finished
+
+### [T-019] Withdraw three more Settings rows — DONE
+**scope: device Settings UI · ruled 2026-08-07 · done 2026-08-15**
+
+Clock Format, Sleep Screen Cover Mode and Sleep Screen Cover Filter withdrawn
+from the device Settings screen. Pinned to the current field initialisers
+(owner ruling 2026-08-15): `clockFormat = 0` (24-hour), `sleepScreenCoverMode
+= FIT`, `sleepScreenCoverFilter = NO_FILTER`. Fresh installs therefore see no
+change; only someone who had picked 12-hour, CROP or a filter is moved.
+
+Done the withdraw way, not the delete way — all three rows keep their
+`SettingInfo::Enum` entry with its `valuePtr`, so they still persist and stay
+web-settable. `category` moved `STR_CAT_SYSTEM` -> `STR_CAT_DISPLAY`, the
+retired category `rebuildSettingsLists()` drops.
+
+**Step 3 was already satisfied** and needed no edit: the initialisers in
+`CrossPointSettings.h:189,191,206` already carried exactly the pinned values,
+so fresh and upgraded devices agree.
+
+Verified two ways rather than by reading the file after boot, which the item
+warned would pass regardless:
+
+- Seeded `settings.json` with 1 / CROP / a filter, booted the simulator, and
+  the file came back 0 / 0 / 0 with all three keys still present — pinned, and
+  still persisting.
+- Rendered the Settings screen headless: Clock Format no longer sits between
+  Clock UTC Offset and Clock Synced, and neither Cover row appears. The
+  separate `Sleep Screen` row is untouched.
+
+Builds `-e default` and `-e simulator` from a cold cache.
+
 
 ### [T-018] The SDK pin — RULED, rebased and re-pinned
 **scope: submodule · ruled + done 2026-08-15**

@@ -169,6 +169,20 @@ void CrossPointSettings::normalizeRetiredSettings() {
   shortPwrBtn = SHORT_PWRBTN::SLEEP;
   longPressButtonBehavior = FONT_SIZE_STEP;
 
+  // Clock Format and the two Sleep Screen Cover rows were withdrawn from the
+  // device Settings UI on 2026-08-15 (T-019) by moving them to the retired
+  // DISPLAY category, which rebuildSettingsLists() drops. They keep persisting
+  // and stay web-settable, so a save written while the pickers still existed
+  // could otherwise hold a choice forever with no way to change it back.
+  //
+  // Pinned to the values the field initialisers already carry (owner ruling
+  // 2026-08-15), so a fresh install and an upgraded one agree and nothing
+  // visibly changes for a new device. The only people moved are those who had
+  // picked 12-hour, CROP, or a cover filter.
+  clockFormat = 0;  // 24-hour
+  sleepScreenCoverMode = FIT;
+  sleepScreenCoverFilter = NO_FILTER;
+
   // Libre Franklin is the only System font (owner ruling 2026-08-07) and its row
   // is withdrawn from the device UI, so a save written while the picker still
   // existed must not keep the chrome on Ubuntu or a Noto face forever. The field
