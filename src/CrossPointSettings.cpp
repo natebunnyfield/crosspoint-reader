@@ -13,6 +13,7 @@
 #include "ReaderFontSizes.h"
 #include "SettingsList.h"
 #include "fontIds.h"
+#include "notes/EditorFonts.h"
 
 namespace {
 
@@ -147,6 +148,15 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // row under System (SettingsList.h), and pinning a visible control would
   // silently revert the owner's choice on the next load.
   hideBatteryPercentage = HIDE_ALWAYS;
+
+  // Space Mono was removed from the editor-font list on 2026-08-15, and it sat
+  // at index 3 of a list whose POSITION is what this byte stores. Every value
+  // above the hole therefore names the wrong family until it is rewritten, so a
+  // device that had PragmataPro selected would come back on Nitti Typewriter.
+  // Rewritten here, once, on load — the same treatment the pins above get, and
+  // the reason this runs before requestResave() below: the corrected value is
+  // what gets written back.
+  editorFont = editorfonts::migrateStoredIndex(editorFont);
 
   // Status bar: every element hidden. Thickness is left alone — it only has an
   // effect while the progress bar is drawn, and it is not a visibility control.

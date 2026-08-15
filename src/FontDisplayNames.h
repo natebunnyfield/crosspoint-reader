@@ -246,21 +246,50 @@ inline constexpr Entry kEntries[] = {
     // derivation by a different hand is its own start. docs/font-dates.md
     // carries the citations and records this as a decision.
     {"SpaceMono", "Space Mono", "Benjamin Critton, Colophon", "2016 London", 2016},
-    {"IBMPlexMono", "IBM Plex Mono", "Mike Abbink & Bold Monday", "2017 New York & The Hague", 2017},
+    // PEOPLE, never foundries (owner ruling 2026-08-15). "Bold Monday" is a
+    // company; it belongs in the manufacturer field of the font, which is
+    // exactly where the shipped file puts it. IBMPlexMono-Regular.ttf name ID 9
+    // reads "Mike Abbink, Paul van der Laan, Pieter van Rosmalen" and name ID 8
+    // reads "Bold Monday", so the three names below ARE the credit the typeface
+    // states about itself. Places: Bold Monday's own IBM page credits "Mike
+    // Abbink, New York/Austin", and boldmonday.com/support/about/ puts van der
+    // Laan near The Hague and van Rosmalen near Eindhoven.
+    {"IBMPlexMono", "IBM Plex Mono", "Mike Abbink, Paul van der Laan & Pieter van Rosmalen",
+     "2017 New York, Austin, The Hague & Eindhoven", 2017},
     // Dates from iA's own announcement, "A Typographic Christmas" (ia.net,
     // 14 Dec 2018): Mono is "the classic Nitti, designed by Bold Monday";
     // "last year we added iA Writer Duo ... based on IBM Plex"; "this year we
     // add a third font ... called iA Writer Quattro". So the three are NOT one
     // year -- Nitti long predates the others, which is why Mono carries its
     // two-stage lineage the way the reading families do.
-    {"iAWriterQuattro", "iA Writer Quattro", "Oliver Reichenstein & Bold Monday", "2018 Zurich & The Hague", 2018},
-    {"iAWriterDuo", "iA Writer Duo", "Oliver Reichenstein & Bold Monday", "2017 Zurich & The Hague", 2017},
-    // Stage 2 is iA's own adaptation in Zurich, credited the way the sibling
-    // Duo and Quattro entries already credit it. NOTE: iAWriterMono has no row
-    // in docs/font-dates.md, so unlike the other splits this one rests on the
-    // comment above plus those siblings, not on a cited table row.
-    {"iAWriterMono", "iA Writer Mono", "Pieter van Rosmalen, Bold Monday; Oliver Reichenstein",
-     "2009 The Hague; 2018 Zurich", 2009},
+    // All three iA faces carry the SAME four-name designer string in their own
+    // name tables (ID 9): "Mike Abbink, Paul van der Laan, Pieter van Rosmalen,
+    // Oliver Reichenstein", over copyright "2017 IBM Corp. and iA Inc." That is
+    // the Plex team plus iA's, which is what a derivation credits, so each face
+    // splits into the Plex stage and iA's adaptation in Zurich.
+    {"iAWriterQuattro", "iA Writer Quattro",
+     "Mike Abbink, Paul van der Laan & Pieter van Rosmalen; Oliver Reichenstein",
+     "2017 New York, Austin, The Hague & Eindhoven; 2018 Zurich", 2017},
+    {"iAWriterDuo", "iA Writer Duo", "Mike Abbink, Paul van der Laan & Pieter van Rosmalen; Oliver Reichenstein",
+     "2017 New York, Austin, The Hague & Eindhoven; 2017 Zurich", 2017},
+    // This row used to credit Nitti — "Pieter van Rosmalen, Bold Monday;
+    // Oliver Reichenstein", 2009 The Hague — and that was wrong about WHICH
+    // typeface this is. Nitti is what iA Writer LEFT, not what this face is
+    // made of. Two pieces of evidence, both primary:
+    //
+    //   * iAWriterMonoS-Regular.ttf's own name table reads copyright "2017 IBM
+    //     Corp. and Information Architects GmbH" and lists Mike Abbink among
+    //     the designers. Neither is true of a Bold Monday face from 2009.
+    //   * iA's own post: "iA Writer Mono, Duo and Quattro were built upon IBM
+    //     Plex", and the 2017 Duospace post explains why — "IBM Plex, like
+    //     Nitti, was love at first sight ... Since it's open source, we could
+    //     alter it as we wished."
+    //
+    // The Dec-2018 announcement's "the classic Nitti" is iA describing the face
+    // being replaced. Nitti's own credit now lives on the NittiTypewriter row
+    // below, where it is finally attached to the typeface it describes.
+    {"iAWriterMono", "iA Writer Mono", "Mike Abbink, Paul van der Laan & Pieter van Rosmalen; Oliver Reichenstein",
+     "2017 New York, Austin, The Hague & Eindhoven; 2018 Zurich", 2017},
     // The one COMMERCIAL editor face. Released 2010 by Fabrizio Schiavi Design,
     // the studio Schiavi set up in Piacenza (en.wikipedia.org/wiki/Fabrizio_Schiavi,
     // en.wikipedia.org/wiki/PragmataPro). One stage: fsd.it still sells it as a
@@ -270,6 +299,21 @@ inline constexpr Entry kEntries[] = {
     // No row in docs/font-dates.md yet — add one there if that table is
     // regenerated.
     {"PragmataPro", "PragmataPro", "Fabrizio Schiavi", "2010 Piacenza", 2010},
+    // Nitti Typewriter, the face iA Writer used before it moved to IBM Plex
+    // ("the classic Nitti", iA, Dec 2018). 2007 is the first year in the shipped
+    // font's OWN copyright string (name ID 0, "Copyright © 2007–2016 Bold
+    // Monday"), which is primary evidence and outranks inference. It predating
+    // Bold Monday's 2008 founding is not a contradiction: van Rosmalen drew it
+    // before the foundry he co-founded existed, and the foundry's copyright
+    // notice covers the work it later published — the same shape as any face
+    // whose designer incorporated after drawing it. Do not "correct" this to a
+    // post-2008 year without a source that dates the DESIGN.
+    //
+    // No place. Bold Monday publishes offices near The Hague and Eindhoven, but
+    // those are the foundry's today, not where a 2007 face was drawn, and
+    // nothing dates the studio to the design. Bare years, per the rule
+    // docs/font-dates.md applies to Host Grotesk.
+    {"NittiTypewriter", "Nitti Typewriter", "Pieter van Rosmalen", "2007", 2007},
 };
 
 inline const Entry* find(const char* directory) {

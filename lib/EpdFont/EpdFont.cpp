@@ -185,8 +185,8 @@ const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
 
   // Last resorts, in order: U+FFFD, then '?'. B-009.
   //
-  // U+FFFD alone was not enough. Only 52 of the 84 built-in faces carry one, and
-  // the four that do not -- spacemono, ibmplexmono, librefranklin, ubuntu -- are
+  // U+FFFD alone was not enough. Most built-in faces carry one; the ones that do
+  // not -- ibmplexmono and librefranklin among them -- are
   // exactly the editor and UI-chrome faces, i.e. the screens most likely to meet
   // a stray codepoint (a Claude answer, a BLE-typed note). Returning nullptr
   // there lost more than the character: drawText reads

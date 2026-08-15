@@ -4,6 +4,39 @@ set -e
 
 cd "$(dirname "$0")"
 
+# Every generation below is `python fontconvert.py ... > some_font.h`, so ANY
+# byte the interpreter writes to stdout before the converter's own output lands
+# inside the generated C header. On a free-threaded Python build, importing
+# fontTools emits a GIL RuntimeWarning that does exactly that, and the result is
+# a header whose line 1 is prose. The compiler then fails at `<frozen
+# importlib._bootstrap>:491:` with "expected unqualified-id" and a cascade of
+# undeclared-identifier errors naming the font's own arrays — which reads like a
+# broken font recipe rather than a stray warning, and cost a debugging cycle on
+# 2026-08-15 when it corrupted all eight Nitti cuts at once.
+#
+# PYTHON_GIL=1 silences it at the source; PYTHONWARNINGS=ignore covers whatever
+# the next interpreter decides to narrate. Neither changes the rasterisation.
+export PYTHON_GIL=1
+export PYTHONWARNINGS=ignore
+
+# Belt and braces: a generated header must begin with the `/**` banner
+# fontconvert.py writes. Anything else means something leaked into the file, and
+# failing here beats shipping a header that only breaks at compile time — or
+# worse, one that compiles because the junk happened to look like a comment.
+assert_header_clean() {
+  local header="$1"
+  if [ ! -s "$header" ]; then
+    echo "ERROR: $header is empty — fontconvert.py wrote nothing" >&2
+    exit 1
+  fi
+  if ! head -n 1 "$header" | grep -q '^/\*\*'; then
+    echo "ERROR: $header does not start with the /** banner. First line was:" >&2
+    head -n 1 "$header" >&2
+    echo "Something wrote to stdout ahead of the converter (a Python warning?)." >&2
+    exit 1
+  fi
+}
+
 READER_FONT_STYLES=("Regular" "Italic" "Bold" "BoldItalic")
 
 # --- Reader fallback family --------------------------------------------------
@@ -143,6 +176,48 @@ for entry in ${LOCAL_EDITOR_FAMILIES[@]}; do
   done
 done
 
+# --- NittiTypewriter: commercial, Regular-only source, synthetic styles ------
+#
+# NittiTypewriter is COMMERCIAL (Pieter van Rosmalen / Bold Monday). Only the
+# Regular TTF is available; Bold, Italic and BoldItalic are synthesised at
+# build time using fontconvert.py's --synth-* flags (added for this family).
+#
+# Parameters (measured 2026-08-15 at 256ppem):
+#   embolden_em=0.045: stem 21px = 0.082em; target 1.55x → +0.55×0.082=0.045em
+#                      verified stem ratios n=1.571x m=1.632x i=1.600x ✓
+#   y_ratio=0.5: typewriter face is monoweight; no hairlines to protect
+#   slant_deg=11: gentle old-style slant, same as Goudy recipe
+#
+# Counter survival at 12pt 2-bit: e=2px, a=5px, s=3px — all ≥1px ✓
+# ('a' has 5 interior 2-bit white pixels despite appearing closed in 8-bit,
+# because antialias midtones survive the 2-bit threshold as white.)
+#
+# Skips with a clear message when the source is absent — that means
+# "cannot regenerate here", NOT "missing from the build".
+NITTI_SRC="../local_fonts/NittiTypewriter-Regular.ttf"
+if [ ! -f "$NITTI_SRC" ]; then
+  echo "Skipping NittiTypewriter (no local source in lib/EpdFont/local_fonts/): commercial font, recipe only"
+else
+  # 1x cuts
+  python fontconvert.py nittitypewriter_12_regular    12 "$NITTI_SRC" --2bit --compress --pnum > ../builtinFonts/nittitypewriter_12_regular.h
+  echo "Generated ../builtinFonts/nittitypewriter_12_regular.h"
+  python fontconvert.py nittitypewriter_12_bold       12 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 > ../builtinFonts/nittitypewriter_12_bold.h
+  echo "Generated ../builtinFonts/nittitypewriter_12_bold.h"
+  python fontconvert.py nittitypewriter_12_italic     12 "$NITTI_SRC" --2bit --compress --pnum --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_italic.h
+  echo "Generated ../builtinFonts/nittitypewriter_12_italic.h"
+  python fontconvert.py nittitypewriter_12_bolditalic 12 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_bolditalic.h
+  echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic.h"
+  # 2x hi-res companions (24pt = 12*2)
+  python fontconvert.py nittitypewriter_12_regular_2x    24 "$NITTI_SRC" --2bit --compress --pnum > ../builtinFonts/nittitypewriter_12_regular_2x.h
+  echo "Generated ../builtinFonts/nittitypewriter_12_regular_2x.h"
+  python fontconvert.py nittitypewriter_12_bold_2x       24 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 > ../builtinFonts/nittitypewriter_12_bold_2x.h
+  echo "Generated ../builtinFonts/nittitypewriter_12_bold_2x.h"
+  python fontconvert.py nittitypewriter_12_italic_2x     24 "$NITTI_SRC" --2bit --compress --pnum --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_italic_2x.h
+  echo "Generated ../builtinFonts/nittitypewriter_12_italic_2x.h"
+  python fontconvert.py nittitypewriter_12_bolditalic_2x 24 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_bolditalic_2x.h
+  echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic_2x.h"
+fi
+
 UI_FONT_SIZES=(10 12)
 UI_FONT_STYLES=("Regular" "Bold")
 
@@ -239,6 +314,16 @@ for entry in ${UI_FAMILIES[@]}; do
     done
   done
 done
+
+echo ""
+echo "Checking every generated header starts with its banner..."
+for header in ../builtinFonts/*.h; do
+  case "$(basename "$header")" in
+    all.h) continue ;;  # hand-written index, not generated
+  esac
+  assert_header_clean "$header"
+done
+echo "All headers clean."
 
 echo ""
 echo "Running compression verification..."

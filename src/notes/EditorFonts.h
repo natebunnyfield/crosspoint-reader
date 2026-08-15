@@ -33,11 +33,11 @@ struct Entry {
   bool alsoReading;
 };
 
-// The first five are OFL. The iA faces are the "S" (narrow) cuts. PragmataPro
-// (row 5) is the exception on every axis and is documented at its own entry
-// below.
+// The first four are OFL. The iA faces are the "S" (narrow) cuts. PragmataPro
+// and Nitti Typewriter are the commercial exceptions and are documented at
+// their own entries below.
 //
-// All five families are now BUILT IN (monos: owner ruling 2026-08-06; iA
+// All four OFL families are BUILT IN (monos: owner ruling 2026-08-06; iA
 // faces: owner ruling 2026-08-11). Before 2026-08-06 every entry was
 // card-only, and since no card carried any of them this setting did nothing
 // whatsoever: resolveEditorFont() got 0 back from the SD resolver and fell
@@ -48,18 +48,32 @@ struct Entry {
 // iA Writer families (raw.githubusercontent.com/iaolo/iA-Fonts) since those
 // recipes were added — the same mechanism as the Google Fonts pair.
 //
-// Flash cost: ~83 KB for SpaceMono + IBMPlexMono, ~216 KB for the three iA
+// Flash cost: ~41 KB for IBMPlexMono, ~216 KB for the three iA
 // families (all at 12 pt, four styles each, 2-bit compressed). The _2x
 // companions (~818 KB compressed) are dead flash on device where RENDER_SCALE=1
 // and are stripped by --gc-sections; they ship only in the simulator/iOS
 // binaries that run at RENDER_SCALE=2.
 //
 // Rows may only be APPENDED — SETTINGS.editorFont persists this POSITION.
+//
+// ONE row has ever been removed: Space Mono, which sat at index 3 until
+// 2026-08-15 (owner ruling: "remove space mono entirely from app. keep for
+// possible future use in repo though"). Removing a row from the middle is
+// exactly the hazard this comment warns about, so it is handled rather than
+// waved through — editorfonts::migrateStoredIndex() rewrites any value a device
+// already persisted, applied once by CrossPointSettings::normalizeRetiredSettings()
+// as settings.json is loaded. Nothing else in this list may be deleted without
+// extending that function the same way.
+//
+// What "keep in the repo" means here: the recipe stays in sd-fonts.yaml, the
+// picker label stays in FontDisplayNames.h, and the eight generated
+// builtinFonts/spacemono_12_*.h stay tracked. Only the wiring is gone — the
+// row, the id, the font objects in main.cpp, and the all.h includes — so the
+// family costs no flash while remaining one commit away from returning.
 inline constexpr Entry FAMILIES[] = {
     {"iAWriterQuattro", "iA Writer Quattro", IAWRITERQUATTRO_12_FONT_ID, /*alsoReading=*/true},
     {"iAWriterDuo", "iA Writer Duo", IAWRITERDUO_12_FONT_ID, false},
     {"iAWriterMono", "iA Writer Mono", IAWRITERMONO_12_FONT_ID, false},
-    {"SpaceMono", "Space Mono", SPACEMONO_12_FONT_ID, false},
     {"IBMPlexMono", "IBM Plex Mono", IBMPLEXMONO_12_FONT_ID, false},
     // COMMERCIAL, and the only row whose glyph tables are not in this repo.
     // builtinFonts/pragmatapro_*.h are gitignored (see .gitignore) and built
@@ -80,8 +94,36 @@ inline constexpr Entry FAMILIES[] = {
     // Accepted for a Latin-1 writing face; do NOT promote this row to
     // alsoReading, where the gap would meet arbitrary book text.
     {"PragmataPro", "PragmataPro", PRAGMATAPRO_12_FONT_ID, false},
+    // COMMERCIAL, same pattern as PragmataPro. builtinFonts/nitti*.h are
+    // gitignored (see .gitignore) and built locally from
+    // lib/EpdFont/local_fonts/NittiTypewriter-Regular.ttf. UNLIKE PragmataPro,
+    // only Regular exists; Bold/Italic/BoldItalic are synthesised at build time
+    // via fontconvert.py's --synth-embolden-em 0.045 --synth-slant-deg 11.
+    // Coverage across all four styles is symmetric — the synthesiser produces
+    // the same codepoint set from the one Regular source — unlike PragmataPro
+    // whose Bold/Italic cover only ASCII+Latin-1. Writing-only: the synthetic
+    // bold's 'a' counter is narrow (5 px 2-bit white interior, ≥1 ✓) but a
+    // typewriter face at 5 px width is not suited to arbitrary book text.
+    {"NittiTypewriter", "Nitti Typewriter", NITTITYPEWRITER_12_FONT_ID, false},
 };
 inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);
+
+// Rewrite a persisted SETTINGS.editorFont value for the rows that have moved.
+//
+// Space Mono was index 3; IBM Plex Mono, PragmataPro and Nitti Typewriter each
+// shifted down one when it went. So anything above 3 loses one, and a stored 3
+// — a device that had Space Mono selected — lands on what is now index 3, IBM
+// Plex Mono. That is deliberate rather than a reset to row 0: a Space Mono user
+// asked for a grotesque-ish mono, and Plex is the nearest thing left. Values
+// below 3 are untouched.
+//
+// Applied at the SETTINGS boundary, never inside selectedFamily() or
+// builtinFontIdFor(): those take a position in FAMILIES, and the picker hands
+// them positions from displayOrder(). Migrating in there would rewrite a live
+// position that was never stale — picking PragmataPro would select IBM Plex
+// Mono. A stored value and a table position are different things that share a
+// type, which is exactly the sort of confusion that ships quietly.
+uint8_t migrateStoredIndex(uint8_t index);
 
 // Family name for the current SETTINGS.editorFont, or the first entry when the
 // stored index is out of range (a settings.json written before a family was

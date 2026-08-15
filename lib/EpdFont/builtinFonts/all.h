@@ -60,11 +60,3 @@
 #include <builtinFonts/librefranklin_reader_18_bolditalic.h>
 #include <builtinFonts/librefranklin_reader_18_italic.h>
 #include <builtinFonts/librefranklin_reader_18_regular.h>
-#include <builtinFonts/spacemono_12_bold.h>
-#include <builtinFonts/spacemono_12_bold_2x.h>
-#include <builtinFonts/spacemono_12_bolditalic.h>
-#include <builtinFonts/spacemono_12_bolditalic_2x.h>
-#include <builtinFonts/spacemono_12_italic.h>
-#include <builtinFonts/spacemono_12_italic_2x.h>
-#include <builtinFonts/spacemono_12_regular.h>
-#include <builtinFonts/spacemono_12_regular_2x.h>

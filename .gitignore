@@ -32,6 +32,7 @@ lib/EpdFont/local_fonts/
 # lib/EpdFont/scripts/convert-builtin-fonts.sh; main.cpp compiles the row in
 # only when __has_include finds them.
 lib/EpdFont/builtinFonts/pragmatapro_*.h
+lib/EpdFont/builtinFonts/nitti*.h
 # Claude Code: share project skills with the team, keep local agent state
 # (worktrees, scheduled-task locks, settings.local, scout CLEANUP.md) out.
 .claude/*

@@ -295,9 +295,16 @@ inline constexpr ColophonTech COLOPHON_TECH[] = {
     {"SdFat", "SD card filesystem, with UTF-8 long file names"},
     {"Lucide", "Icon set, via the freeink-sdk"},
     {nullptr, "Type"},
-    {"Reading face", "Libre Franklin, by Pablo Impallari. 1902 Jersey City; 2016 Rosario, Argentina"},
-    {"Writing faces", "IBM Plex Mono and Space Mono, 12 pt"},
-    {"Card fonts", "43 buildable families. Installed: Edgar, Coelacanth, TeX Gyre Schola, Libre Franklin"},
+    // People, never foundries (owner ruling 2026-08-15). The shipped font's own
+    // name table (ID 9) reads "Pablo Impallari, Rodrigo Fuenzalida, Nhung Nguyen";
+    // Benton drew the 1902 model. Same two-stage shape FontDisplayNames uses.
+    {"Reading face",
+     "Libre Franklin. Morris Fuller Benton, 1902 Jersey City; Pablo Impallari, Rodrigo Fuenzalida & Nhung "
+     "Nguyen, 2016 Rosario, Argentina"},
+    {"Writing faces", "iA Writer Quattro, Duo and Mono, IBM Plex Mono, PragmataPro, Nitti Typewriter, 12 pt"},
+    {"Card fonts",
+     "48 buildable families. Six installed: Coelacanth, Edgar, Inknut Antiqua + Junicode, Libre Franklin, "
+     "Libris, TeX Gyre Schola"},
     {nullptr, "Simulator"},
     {"Purpose", "Runs this same firmware on a Mac, on Linux and on iPhone"},
     {"SDL3", "release-3.4.12, video only"},
@@ -307,7 +314,8 @@ inline constexpr ColophonTech COLOPHON_TECH[] = {
     {"Speak Screen", "A UITextInput page view over the panel"},
     {"Wi-Fi status", "Network NWPathMonitor and NetworkExtension NEHotspotNetwork"},
     {nullptr, "Written with"},
-    {"Claude, by Anthropic", "Named in the commit trailers as Opus 5, Fable 5, Opus 4.8, Opus 4.7, Sonnet 4.6 and Opus 4.6"},
+    {"Claude, by Anthropic",
+     "Named in the commit trailers as Opus 5, Fable 5, Opus 4.8, Opus 4.7, Sonnet 4.6 and Opus 4.6"},
     {nullptr, "License"},
     {"Firmware", "MIT. Copyright (c) 2025 Dave Allie"},
     {"Simulator", "MIT. Copyright (c) 2026 Julia Nguyen"},
