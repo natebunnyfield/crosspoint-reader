@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <EInkDisplay.h>
+#include <PanelPolarity.h>
 
 // Supersampling factor between the LOGICAL screen coordinate space every caller
 // draws in and the PHYSICAL framebuffer. On real hardware there is exactly one
@@ -58,14 +59,15 @@ class HalDisplay {
                             bool fromProgmem = false) const;
 
   // Output polarity ("dark mode"). The framebuffer stays logical — 1 is still
-  // white — and the SDK flips the bytes on their way to the panel
-  // (FreeInkDisplay.cpp:577-579). Nothing in the drawing layer has to know,
-  // except the image paths, which counter-invert so photographs and covers do
-  // not come out as negatives (GfxRenderer::preserveImagePolarity).
+  // white — and the bytes are flipped on their way to the panel. Nothing in the
+  // drawing layer has to know, except the image paths, which counter-invert so
+  // photographs and covers do not come out as negatives
+  // (GfxRenderer::preserveImagePolarity).
   //
-  // Cost to know about: while inverted the SDK takes the blocking refresh path
-  // and disables every grayscale path outright (FreeInkDisplay.cpp:557-559,
-  // :609-612, :779, :859), so pages render as crisp BW with no antialiasing.
+  // The flip happens HERE (PanelPolarity), not via FreeInkDisplay::setInverted().
+  // The SDK's flag disables every grayscale path, async refresh and window
+  // diffs while it is set; doing the same flip on this side keeps all three.
+  // See PanelPolarity.h for the citations and for the one thing it costs.
   void setInverted(bool inverted);
   bool isInverted() const;
 
@@ -130,7 +132,17 @@ class HalDisplay {
   uint32_t getBufferSize() const;
 
  private:
+  // Ensure the framebuffer carries panel polarity before handing it to the SDK,
+  // and logical polarity again once the SDK is done with it. Both are no-ops in
+  // light mode. See PanelPolarity.h for the invariant.
+  void toPanelPolarity();
+  void toLogicalPolarity();
+  // Promote a FAST refresh to HALF for the one refresh that follows a polarity
+  // change: a differential refresh cannot cross polarities.
+  RefreshMode resolvePolarityMode(RefreshMode mode);
+
   EInkDisplay einkDisplay;
+  PanelPolarity polarity;
 };
 
 extern HalDisplay display;

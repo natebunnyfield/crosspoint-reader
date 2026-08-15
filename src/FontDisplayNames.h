@@ -261,6 +261,15 @@ inline constexpr Entry kEntries[] = {
     // comment above plus those siblings, not on a cited table row.
     {"iAWriterMono", "iA Writer Mono", "Pieter van Rosmalen, Bold Monday; Oliver Reichenstein",
      "2009 The Hague; 2018 Zurich", 2009},
+    // The one COMMERCIAL editor face. Released 2010 by Fabrizio Schiavi Design,
+    // the studio Schiavi set up in Piacenza (en.wikipedia.org/wiki/Fabrizio_Schiavi,
+    // en.wikipedia.org/wiki/PragmataPro). One stage: fsd.it still sells it as a
+    // continuously revised single work (© 2009-2015 on the family page, version
+    // 0.821 at time of writing), and docs/font-dates.md's adjacent-year rule
+    // makes the 2009 copyright start release lag rather than a second stage.
+    // No row in docs/font-dates.md yet — add one there if that table is
+    // regenerated.
+    {"PragmataPro", "PragmataPro", "Fabrizio Schiavi", "2010 Piacenza", 2010},
 };
 
 inline const Entry* find(const char* directory) {

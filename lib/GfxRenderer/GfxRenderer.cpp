@@ -466,30 +466,15 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     }
 
     if (is2Bit) {
-      // Plane membership per glyph gray level, chosen by the configured AA
-      // strength. planeMask bit N set = glyph level N flags the current plane
-      // (glyph levels after the swap below: 1 = dark gray, 2 = light gray; the
-      // BW base pass has already painted every non-white pixel black, so an
-      // unflagged level simply stays black).
-      //   STANDARD: MSB {1,2}, LSB {1}  -> dark stays dark, light stays light
-      //   CRISP:    MSB {2},   LSB {}   -> dark hardens to black, light kept
-      //   DARK:     MSB {2},   LSB {2}  -> dark to black, light to dark
-      uint8_t planeMask = 0;
-      if (renderMode == GfxRenderer::GRAYSCALE_MSB || renderMode == GfxRenderer::GRAYSCALE_LSB) {
-        const bool msb = renderMode == GfxRenderer::GRAYSCALE_MSB;
-        switch (renderer.getGrayscaleAaStrength()) {
-          case GfxRenderer::AA_CRISP:
-            planeMask = msb ? 0b0100 : 0b0000;
-            break;
-          case GfxRenderer::AA_DARK:
-            planeMask = 0b0100;
-            break;
-          case GfxRenderer::AA_STANDARD:
-          default:
-            planeMask = msb ? 0b0110 : 0b0010;
-            break;
-        }
-      }
+      // One table decides which glyph level the BW base pass paints and which
+      // plane each antialiased level flags, for both output polarities. See
+      // GlyphAaPlanes.h — in particular for WHY dark mode leaves the
+      // antialiased levels unpainted instead of painting them.
+      const GlyphAa::Planes aa = renderer.getGlyphAaPlanes();
+      const uint8_t baseInkMask = aa.baseInk;
+      const uint8_t planeMask = (renderMode == GfxRenderer::GRAYSCALE_MSB)   ? aa.msb
+                                : (renderMode == GfxRenderer::GRAYSCALE_LSB) ? aa.lsb
+                                                                             : 0;
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
         const int outerCoord = outerBase + glyphY;
@@ -510,9 +495,14 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
           // 0 -> black, 1 -> dark gray, 2 -> light gray, 3 -> white
           const uint8_t bmpVal = 3 - ((byte >> bit_index) & 0x3);
 
-          if (renderMode == GfxRenderer::BW && bmpVal < 3) {
-            // Black (also paints over the grays in BW mode)
-            plotGlyphPixel<deviceSpace>(renderer, screenX, screenY, pixelState);
+          if (renderMode == GfxRenderer::BW) {
+            // Ink. In light mode that is every non-white level; in dark mode
+            // with an overlay coming, only the levels that are to end up solid,
+            // because a level left unpainted is the one that reaches the panel
+            // black and can therefore be lifted to gray.
+            if ((baseInkMask >> bmpVal) & 1) {
+              plotGlyphPixel<deviceSpace>(renderer, screenX, screenY, pixelState);
+            }
           } else if ((planeMask >> bmpVal) & 1) {
             // Grayscale pass: flag this pixel in the active plane. Dedicated X3
             // gray LUTs now provide proper 4-level gray on both devices. We
@@ -1686,9 +1676,10 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
 
 void GfxRenderer::preserveImagePolarity(const int x, const int y, const int width, const int height) const {
   if (width <= 0 || height <= 0 || !frameBuffer) return;
-  // Only the BW pass owns the framebuffer's polarity. The grayscale planes are
-  // never reached while inverted anyway (FreeInkDisplay.cpp:779, :859) and a
-  // strip target points at a scratch band, not the frame.
+  // Only the BW pass owns the framebuffer's polarity. A grayscale plane is a
+  // mask ("nudge this pixel"), not a picture, so flipping a rectangle of it
+  // would corrupt the overlay rather than preserve anything; a strip target
+  // points at a scratch band, not the frame, for the same reason.
   if (renderMode != BW || _stripActive) return;
   if (!display.isInverted()) return;
 

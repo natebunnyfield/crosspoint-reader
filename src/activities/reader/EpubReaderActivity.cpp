@@ -26,11 +26,11 @@
 #include "ReadAloudCapture.h"
 #include "ReaderFontSizes.h"
 #include "ReaderUtils.h"
+#include "ReadingFontList.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "ReadingFontList.h"
 
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
@@ -1510,8 +1510,7 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
     // at y 15/68/104/137, i.e. yPos + yOffset plus a few px of internal leading
     // above cap height. Subtracting the ascender lifted every rect a full line,
     // so the highlight sat one line above the word being spoken.
-    spans.push_back(
-        {line.xPos + xOffset, line.yPos + yOffset, begin, tokens.size() - begin, sawNonLineSinceLastLine});
+    spans.push_back({line.xPos + xOffset, line.yPos + yOffset, begin, tokens.size() - begin, sawNonLineSinceLastLine});
     sawNonLineSinceLastLine = false;
   }
 
@@ -1569,17 +1568,22 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // retained frame after a silent restart (for example, when returning from
   // KOReader sync), leaving the old UI mixed with the image.
   const bool cleanImageBasePending = manualRefreshPending || pagesUntilFullRefresh <= 1;
-  // Dark mode renders a crisp BW page: the SDK drops every grayscale write while
-  // the output is inverted (FreeInkDisplay.cpp:779, :797, :826-839), so without
-  // this gate the passes below would still run — a 48 KB storeBwBuffer and two
-  // extra full-page renders per page turn, producing pixels nothing ever
-  // displays.
-  const bool grayscaleAvailable = !renderer.isDisplayInverted();
-  const bool needsTextGrayscale = SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF && grayscaleAvailable;
-  const bool needsAnyGrayscale = (needsTextGrayscale || pageHasImages) && grayscaleAvailable;
+  const bool needsTextGrayscale = SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF;
+  const bool needsAnyGrayscale = needsTextGrayscale || pageHasImages;
   // Pick the glyph-gray -> plane mapping for every grayscale pass below (text
   // only; drawBitmap's image mapping is fixed).
   renderer.setGrayscaleAaStrength(ReaderUtils::textAaStrength());
+  // Dark mode antialiasing. The overlay waveform can only lift a BLACK pixel
+  // toward gray (GlyphAaPlanes.h), so an inverted page has to leave its
+  // antialiased glyph levels ON the black background rather than paint them
+  // into the white ink. That changes what the BW base pass draws, which is only
+  // safe while the overlay is genuinely coming — hence the flag is scoped to
+  // this render and cleared on every exit, including the early ones.
+  struct DarkAaScope {
+    GfxRenderer& r;
+    ~DarkAaScope() { r.setDarkModeAntiAliasing(false); }
+  } darkAaScope{renderer};
+  renderer.setDarkModeAntiAliasing(needsTextGrayscale && renderer.isDisplayInverted());
   const bool tiledGrayscale = needsAnyGrayscale && renderer.supportsStripGrayscale();
   // Whole-plane buffering only pays when the BW refresh genuinely runs async
   // underneath it; on blocking panels (X3) it would just spend ~50 KB for the
