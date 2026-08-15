@@ -42,14 +42,12 @@ constexpr int16_t URL_PANEL_VALUE = -3;  // mirrors KeyboardEntryActivity::URL_P
 
 // Shifted faces above the digits they belong to, same rule as the 13-grid: no
 // key carries a secondary character any more (owner ruling 2026-08-10).
-const fui::KeyboardKey URL_NUMSHIFT_ROW[] = {UK("!", "!", '!'), UK("@", "@", '@'), UK("#", "#", '#'),
-                                             UK("$", "$", '$'), UK("%", "%", '%'), UK("^", "^", '^'),
-                                             UK("&", "&", '&'), UK("*", "*", '*'), UK("(", "(", '('),
-                                             UK(")", ")", ')')};
-const fui::KeyboardKey URL_NUM_ROW[] = {UK("1", "1", '1'), UK("2", "2", '2'), UK("3", "3", '3'),
-                                        UK("4", "4", '4'), UK("5", "5", '5'), UK("6", "6", '6'),
-                                        UK("7", "7", '7'), UK("8", "8", '8'), UK("9", "9", '9'),
-                                        UK("0", "0", '0')};
+const fui::KeyboardKey URL_NUMSHIFT_ROW[] = {UK("!", "!", '!'), UK("@", "@", '@'), UK("#", "#", '#'), UK("$", "$", '$'),
+                                             UK("%", "%", '%'), UK("^", "^", '^'), UK("&", "&", '&'), UK("*", "*", '*'),
+                                             UK("(", "(", '('), UK(")", ")", ')')};
+const fui::KeyboardKey URL_NUM_ROW[] = {UK("1", "1", '1'), UK("2", "2", '2'), UK("3", "3", '3'), UK("4", "4", '4'),
+                                        UK("5", "5", '5'), UK("6", "6", '6'), UK("7", "7", '7'), UK("8", "8", '8'),
+                                        UK("9", "9", '9'), UK("0", "0", '0')};
 
 const fui::KeyboardKey URL_ROW1[] = {UK("q", "q", 'q'), UK("w", "w", 'w'), UK("e", "e", 'e'), UK("r", "r", 'r'),
                                      UK("t", "t", 't'), UK("y", "y", 'y'), UK("u", "u", 'u'), UK("i", "i", 'i'),
@@ -114,9 +112,9 @@ const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("ABC", fui::KeyKind::Mode, fui::
 #undef UKS
 
 const fui::KeyboardRow URL_ROWS[] = {{URL_NUMSHIFT_ROW, 10, 0}, {URL_NUM_ROW, 10, 0}, {URL_ROW1, 10, 0},
-                                     {URL_ROW2, 9, 1},        {URL_ROW3, 9, 0},     {URL_BOTTOM, 6, 0}};
-const fui::KeyboardRow URL_SHIFT_ROWS[] = {{URL_NUMSHIFT_ROW, 10, 0}, {URL_NUM_ROW, 10, 0}, {URL_SHIFT_ROW1, 10, 0},
-                                           {URL_SHIFT_ROW2, 9, 1},   {URL_SHIFT_ROW3, 9, 0}, {URL_BOTTOM, 6, 0}};
+                                     {URL_ROW2, 9, 1},          {URL_ROW3, 9, 0},     {URL_BOTTOM, 6, 0}};
+const fui::KeyboardRow URL_SHIFT_ROWS[] = {{URL_NUMSHIFT_ROW, 10, 0}, {URL_NUM_ROW, 10, 0},   {URL_SHIFT_ROW1, 10, 0},
+                                           {URL_SHIFT_ROW2, 9, 1},    {URL_SHIFT_ROW3, 9, 0}, {URL_BOTTOM, 6, 0}};
 const fui::KeyboardRow URL_SNIP_ROWS[] = {
     {URL_SNIP_ROW1, 3, 0}, {URL_SNIP_ROW2, 3, 0}, {URL_SNIP_ROW3, 3, 0}, {URL_SNIP_BOTTOM, 4, 0}};
 
@@ -924,14 +922,25 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     }
   } else if (cursorPos <= displayText.length()) {
     static constexpr int serifW = 3;
+    static constexpr int stemW = 2;
+    static constexpr int serifH = 2;
     const int cX = cursorPixelX;
     const int cY = cursorLineY;
     const int cBottom = cursorLineY + lineHeight - 1;
-    renderer.fillRect(cX, cY, 2, lineHeight, true);
-    renderer.drawLine(cX - serifW, cY, cX - 1, cY, 2, true);
-    renderer.drawLine(cX + 1, cY, cX + serifW, cY, 2, true);
-    renderer.drawLine(cX - serifW, cBottom, cX - 1, cBottom, 2, true);
-    renderer.drawLine(cX + 1, cBottom, cX + serifW, cBottom, 2, true);
+    // An I-beam: a stem with a serif bar across each end. Both bars are single
+    // fillRects spanning the WHOLE width, rather than a left and a right stroke
+    // dodging the stem, because the dodge is what made it lopsided.
+    //
+    // It used to be four drawLine()s: cX-3..cX-1 on the left and cX+1..cX+3 on
+    // the right of a stem occupying columns cX..cX+1. The right pair therefore
+    // started ON the stem and only added two new columns where the left pair
+    // added three -- a bar 3px proud of the stem to the left and 2px to the
+    // right. And drawLine() grows a horizontal run's thickness DOWNWARD, so the
+    // bottom bar, anchored at the stem's last row, hung one row below the stem
+    // while the top bar sat entirely inside it. Lopsided on both axes.
+    renderer.fillRect(cX, cY, stemW, lineHeight, true);
+    renderer.fillRect(cX - serifW, cY, stemW + serifW * 2, serifH, true);
+    renderer.fillRect(cX - serifW, cBottom - serifH + 1, stemW + serifW * 2, serifH, true);
   }
 
   if (isPassword) {
