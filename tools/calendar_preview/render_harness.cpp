@@ -593,7 +593,17 @@ bool renderInlineSpecimen(const char* family, const char* outDir) {
   return true;
 }
 
-bool renderReadingSpecimen(const char* family, const char* outDir) {
+namespace {
+
+// The reading specimen's page, drawn once. Split out of renderReadingSpecimen
+// because the `aa` mode has to draw the IDENTICAL page three times -- once for
+// the BW base and once per grayscale plane -- and a second copy of the layout
+// would drift out of step with this one glyph at a time.
+//
+// `clearValue` is the caller's, because the passes differ there and only there:
+// 0xFF for the BW base (white page), 0x00 for a plane pass (no flags set).
+// `report` gates the stats line so replays stay quiet.
+bool drawReadingPage(const char* family, uint8_t sizeEnum, uint8_t clearValue, bool report) {
   static const char* kBody =
       "The lamp on the far wall flickered once and held, and for a while nobody "
       "in the reading room moved. Outside, rain filled the gutters. Marjorie "
@@ -611,7 +621,7 @@ bool renderReadingSpecimen(const char* family, const char* outDir) {
   static const char* kBoldItalic = "Emphasis inside emphasis: the fourth style, set in a run.";
   static const char* kAlphabet = "abcdefghijklmnopqrstuvwxyz";
 
-  for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
+  {
     // Ordinal slot, NOT nearest-to-12/14/16/18: families reach the same
     // x-height at different point sizes, so slot 3 of a 10/12/14/15 family is
     // its 15pt file, which a nearest-match to 18pt would collapse onto slot 2.
@@ -639,7 +649,7 @@ bool renderReadingSpecimen(const char* family, const char* outDir) {
     const int colW = renderer.getScreenWidth() - margin - (right + 14);
     const int lineH = renderer.getLineHeight(id);
 
-    renderer.clearScreen(0xFF);
+    renderer.clearScreen(clearValue);
     int y = top + 6;
 
     char hdr[128];
@@ -671,14 +681,135 @@ bool renderReadingSpecimen(const char* family, const char* outDir) {
     // Set width is the other half of "readable" on a 528px column: a wider
     // face at the same x-height fits fewer words per line and so more page
     // turns per chapter. Report it rather than leaving it to the eye.
-    const int alphaW = renderer.getTextWidth(id, kAlphabet);
-    printf("%-20s slot %u  line %2dpx  lc-alphabet %3dpx  body lines %2d%s  col %dpx\n", family, sizeEnum, lineH,
-           alphaW, lines, truncated ? " (cut)" : "", colW);
+    if (report) {
+      const int alphaW = renderer.getTextWidth(id, kAlphabet);
+      printf("%-20s slot %u  line %2dpx  lc-alphabet %3dpx  body lines %2d%s  col %dpx\n", family, sizeEnum, lineH,
+             alphaW, lines, truncated ? " (cut)" : "", colW);
+    }
+  }
+  return true;
+}
 
+}  // namespace
+
+bool renderReadingSpecimen(const char* family, const char* outDir) {
+  for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
+    if (!drawReadingPage(family, sizeEnum, 0xFF, /*report=*/true)) return false;
     char path[256];
     snprintf(path, sizeof(path), "%s/reading_%s_%u.bmp", outDir, family, sizeEnum);
     if (!writeMonoPortraitBmp(path, renderer)) return false;
   }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// `aa` mode: the same reading page, but composed through the GRAYSCALE overlay
+// and written as an 8-bit PGM instead of a 1-bit BMP.
+//
+// Why this exists: every other output this harness produces is 1-bit, so the
+// text anti-aliasing the reader actually ships (TextAa::overlayIfEnabled, which
+// runs two extra plane passes over the BW frame) is invisible in it. Judging AA
+// off a mono BMP is judging the wrong image.
+//
+// It reproduces TextAa's whole-frame path (src/TextAntiAliasing.cpp,
+// overlayViaWholeFrame) by hand rather than calling it, because the pass drives
+// HalDisplay entry points this harness only stubs. The three renders and their
+// clear values are the same ones the firmware performs:
+//   BW base       clearScreen(0xFF), RenderMode::BW           -> ink levels
+//   LSB plane     clearScreen(0x00), RenderMode::GRAYSCALE_LSB -> flag bits
+//   MSB plane     clearScreen(0x00), RenderMode::GRAYSCALE_MSB -> flag bits
+// and the composition is GrayscalePreview::previewLevel's, verbatim, so the PGM
+// is the same four levels the simulator and the iOS app put on screen.
+namespace {
+
+// Mirrors crosspoint-simulator/src/GrayscalePreview.h. Duplicated rather than
+// included because that header lives in the other repo; the four constants are
+// the panel's optical grays and are asserted against it in the report.
+constexpr uint8_t kPreviewWhite = 255;
+constexpr uint8_t kPreviewLight = 200;
+constexpr uint8_t kPreviewDark = 96;
+constexpr uint8_t kPreviewBlack = 0;
+
+uint8_t previewLevel(bool baseWhite, bool msbFlagged, bool lsbFlagged) {
+  if (baseWhite) return kPreviewWhite;
+  if (msbFlagged) return lsbFlagged ? kPreviewDark : kPreviewLight;
+  if (lsbFlagged) return kPreviewDark;
+  return kPreviewBlack;
+}
+
+// Binary PGM (P5), portrait, at PHYSICAL framebuffer resolution — same reason
+// writeMonoPortraitBmp uses physical pixels: at RENDER_SCALE > 1 the hi-res
+// glyph detail lives there and sampling per logical pixel throws it away.
+bool writeGrayPortraitPgm(const char* path, const GfxRenderer& r, const uint8_t* base, const uint8_t* lsb,
+                          const uint8_t* msb) {
+  const int S = GfxRenderer::RENDER_SCALE;
+  const int W = r.getScreenWidth() * S;
+  const int H = r.getScreenHeight() * S;
+  const int panelH = r.getDisplayHeight();
+  const int panelWB = r.getDisplayWidthBytes();
+
+  FILE* f = fopen(path, "wb");
+  if (!f) {
+    fprintf(stderr, "cannot open %s\n", path);
+    return false;
+  }
+  fprintf(f, "P5\n%d %d\n255\n", W, H);
+  auto* row = static_cast<uint8_t*>(malloc(W));
+  for (int y = 0; y < H; ++y) {
+    for (int x = 0; x < W; ++x) {
+      const bool baseWhite = logicalPixelIsWhite(base, panelH, panelWB, x, y);
+      // The plane buffers use the same 1bpp layout; a SET bit is a FLAG here
+      // (GfxRenderer.cpp: "0 leave alone, 1 update"), which is exactly what
+      // logicalPixelIsWhite reads out.
+      const bool lsbOn = logicalPixelIsWhite(lsb, panelH, panelWB, x, y);
+      const bool msbOn = logicalPixelIsWhite(msb, panelH, panelWB, x, y);
+      row[x] = previewLevel(baseWhite, msbOn, lsbOn);
+    }
+    fwrite(row, 1, W, f);
+  }
+  free(row);
+  fclose(f);
+  return true;
+}
+
+}  // namespace
+
+bool renderReadingAaSpecimen(const char* family, const char* outDir) {
+  const uint32_t bufSize = static_cast<uint32_t>(renderer.getDisplayWidthBytes()) * renderer.getDisplayHeight();
+  auto* base = static_cast<uint8_t*>(malloc(bufSize));
+  auto* lsb = static_cast<uint8_t*>(malloc(bufSize));
+  auto* msb = static_cast<uint8_t*>(malloc(bufSize));
+  if (!base || !lsb || !msb) {
+    fprintf(stderr, "aa: OOM\n");
+    return false;
+  }
+
+  renderer.setGrayscaleAaStrength(GfxRenderer::AA_STANDARD);
+
+  for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
+    // Pass 0 draws AND writes the BMP + stats (it is renderReadingSpecimen's
+    // own body); passes 1 and 2 only need the same glyphs re-drawn, so the
+    // whole specimen is replayed each time with the render mode changed.
+    for (int pass = 0; pass < 3; ++pass) {
+      renderer.setRenderMode(pass == 0   ? GfxRenderer::BW
+                             : pass == 1 ? GfxRenderer::GRAYSCALE_LSB
+                                         : GfxRenderer::GRAYSCALE_MSB);
+      if (!drawReadingPage(family, sizeEnum, pass == 0 ? 0xFF : 0x00, /*report=*/pass == 0)) {
+        renderer.setRenderMode(GfxRenderer::BW);
+        return false;
+      }
+      memcpy(pass == 0 ? base : pass == 1 ? lsb : msb, renderer.getFrameBuffer(), bufSize);
+    }
+    renderer.setRenderMode(GfxRenderer::BW);
+
+    char path[256];
+    snprintf(path, sizeof(path), "%s/aa_%s_%u.pgm", outDir, family, sizeEnum);
+    if (!writeGrayPortraitPgm(path, renderer, base, lsb, msb)) return false;
+    printf("wrote %s\n", path);
+  }
+  free(base);
+  free(lsb);
+  free(msb);
   return true;
 }
 
@@ -730,6 +861,11 @@ int main(int argc, char** argv) {
   if (strcmp(mode, "reading") == 0) {
     if (argc != 3) return usage(argv[0]);
     return renderReadingSpecimen(argv[2], "./fs_") ? 0 : 1;
+  }
+
+  if (strcmp(mode, "aa") == 0) {
+    if (argc != 3) return usage(argv[0]);
+    return renderReadingAaSpecimen(argv[2], "./fs_") ? 0 : 1;
   }
 
   // "calendar [Y M D]", "calendar-westside [Y M D]", bare "calendar", and the
