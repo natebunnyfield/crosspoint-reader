@@ -137,3 +137,16 @@ git submodule update --init --recursive
 
 `repo-status.sh` flags the submodule when it is uninitialised (`-`) or has
 drifted off the pinned commit (`+`).
+
+### Standing ruling 2026-08-15 — `pagination-right` dropped, not merged
+
+The branch made the note editor's page counter a right-aligned, regular-weight
+cell in the header instead of bold text concatenated onto the file path. It was
+overtaken mid-flight by the owner ruling that **removed the Create Note title
+bar outright, pagination included**, so its one caller no longer exists.
+
+Merging it would have left `BaseTheme::drawHeader`'s new right-cell parameters
+with zero callers — a speculative API, not a feature. The branch is deleted;
+the ruling that superseded it is the one recorded above. If a page counter is
+ever wanted in a header again, write it against the surface that needs it
+rather than restoring this.
