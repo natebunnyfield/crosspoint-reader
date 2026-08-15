@@ -10,6 +10,7 @@
 
 #include "CrossPointSettings.h"
 #include "SdCardFontSystem.h"
+#include "TextAntiAliasing.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "notes/BleHidHost.h"
@@ -30,18 +31,18 @@ constexpr int CHAT_FONT_ID_FALLBACK = UI_10_FONT_ID;
 void ClaudeChatActivity::onEnter() {
   Activity::onEnter();
 
-// The host keyboard channel. Announcing text entry is what raises an iPhone's
-// on-screen keyboard (the harness calls SDL_StartTextInput on this flag), and
-// it is also what suppresses the scancode->button map -- without it every "p"
-// typed here would press POWER and every "s" would sleep the device.
-//
-// KeyboardEntryActivity and DaisyEntryActivity have always done this; the two
-// editors never did, so on the phone Create Note and Claude had no keyboard at
-// all and a paired one fought the button map.
-//
-// Multi: the prompt is a multi-line composer, so a host keyboard's Return is a
-// newline here as it is on the panel (the drain below turns TYPED_COMMIT into
-// handleKey('\n')). Sending is the panel's own OK key, not Return.
+  // The host keyboard channel. Announcing text entry is what raises an iPhone's
+  // on-screen keyboard (the harness calls SDL_StartTextInput on this flag), and
+  // it is also what suppresses the scancode->button map -- without it every "p"
+  // typed here would press POWER and every "s" would sleep the device.
+  //
+  // KeyboardEntryActivity and DaisyEntryActivity have always done this; the two
+  // editors never did, so on the phone Create Note and Claude had no keyboard at
+  // all and a paired one fought the button map.
+  //
+  // Multi: the prompt is a multi-line composer, so a host keyboard's Return is a
+  // newline here as it is on the panel (the drain below turns TYPED_COMMIT into
+  // handleKey('\n')). Sending is the panel's own OK key, not Return.
   mappedInput.setTextEntryActive(true, HalGPIO::TextEntryLines::Multi);
 
   // The on-screen keyboard is the default. BLE only comes up when a keyboard is
@@ -485,7 +486,7 @@ void ClaudeChatActivity::loop() {
 
   for (int c = blekbd::popChar(); c >= 0; c = blekbd::popChar()) {
     if (view == View::Answer) {  // typing returns to the prompt
-      RenderLock lock;  // render() walks these on its own task; see loop() above
+      RenderLock lock;           // render() walks these on its own task; see loop() above
       view = View::Prompt;
       answer.clear();
       answerLines.clear();
@@ -510,6 +511,18 @@ void ClaudeChatActivity::loop() {
   }
 }
 
+// The answer view draws no keyboard, so it gets the whole height down to the
+// status line. Reusing the prompt view's maxLines showed ~8 lines on a screen
+// that fits far more, with the bottom half blank.
+void ClaudeChatActivity::drawAnswerText() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int shown = answerLinesOnScreen();
+  for (size_t n = 0; n < static_cast<size_t>(shown) && answerTop + n < answerLines.size(); ++n) {
+    renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
+                      answerLines[answerTop + n].c_str());
+  }
+}
+
 void ClaudeChatActivity::render(RenderLock&&) {
   renderer.clearScreen();
   const auto pageWidth = renderer.getScreenWidth();
@@ -521,14 +534,7 @@ void ClaudeChatActivity::render(RenderLock&&) {
   const int statusY = renderer.getScreenHeight() - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
 
   if (view == View::Answer) {
-    // The answer view draws no keyboard, so it gets the whole height down to
-    // the status line. Reusing the prompt view's maxLines showed ~8 lines on a
-    // screen that fits far more, with the bottom half blank.
-    const int shown = answerLinesOnScreen();
-    for (size_t n = 0; n < static_cast<size_t>(shown) && answerTop + n < answerLines.size(); ++n) {
-      renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
-                        answerLines[answerTop + n].c_str());
-    }
+    drawAnswerText();
     char note[80];
     snprintf(note, sizeof(note), "saved to /claude-chat.md   line %u/%u", (unsigned)(answerTop + 1),
              (unsigned)answerLines.size());
@@ -536,6 +542,12 @@ void ClaudeChatActivity::render(RenderLock&&) {
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "PgUp", "PgDn");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     renderer.displayBuffer();
+    // The answer is prose you read and page through, so it takes the overlay.
+    // The prompt view below deliberately does not: it repaints on every
+    // keystroke, and it carries the keyboard's inverted selected key and block
+    // cursor, which the one-way overlay cannot lift anyway
+    // (src/TextAntiAliasing.h).
+    TextAa::overlayIfEnabled(renderer, [this] { drawAnswerText(); });
     return;
   }
 

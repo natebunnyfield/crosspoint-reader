@@ -63,6 +63,9 @@ class ClaudeChatActivity final : public Activity {
   void setPhase(const char* phase);
   void layoutAnswer();
   int answerLinesOnScreen() const;
+  // The answer's wrapped lines, and nothing else. Split out so the
+  // anti-aliasing overlay re-renders exactly the text (src/TextAntiAliasing.h).
+  void drawAnswerText() const;
 
  public:
   ClaudeChatActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

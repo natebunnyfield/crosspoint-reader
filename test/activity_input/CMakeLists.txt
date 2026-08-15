@@ -65,6 +65,9 @@ add_executable(ActivityInputTest
   HostHarness.cpp
   # activity + input layer under test
   ${REPO_ROOT}/src/MappedInputManager.cpp
+  # Both font pickers and the Claude answer view push the grayscale text
+  # overlay through TextAa::overlay.
+  ${REPO_ROOT}/src/TextAntiAliasing.cpp
   ${REPO_ROOT}/src/activities/Activity.cpp
   ${REPO_ROOT}/src/activities/settings/FontSelectionActivity.cpp
   ${REPO_ROOT}/src/ReaderFontSizes.cpp

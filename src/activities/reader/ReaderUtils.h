@@ -6,7 +6,10 @@
 #include <Logging.h>
 #include <components/bars/tap-zones.h>
 
+#include <type_traits>
+
 #include "MappedInputManager.h"
+#include "TextAntiAliasing.h"
 #include "activities/ActivityManager.h"
 
 namespace ReaderUtils {
@@ -55,7 +58,6 @@ static_assert(steppedLineSpacing(CrossPointSettings::WIDE, +1) == CrossPointSett
 static_assert(steppedLineSpacing(CrossPointSettings::NORMAL, +1) == CrossPointSettings::WIDE, "Normal + 1 == Wide");
 static_assert(steppedLineSpacing(CrossPointSettings::NORMAL, -1) == CrossPointSettings::TIGHT, "Normal - 1 == Tight");
 
-
 struct PageTurnResult {
   bool prev;
   bool next;
@@ -102,10 +104,8 @@ inline HeldTurnDirection detectHeldTurnDirection(const MappedInputManager& input
   const bool swapFront = input.isNavDirectionSwapped();
   const auto prevButton = swapFront ? MappedInputManager::Button::Right : MappedInputManager::Button::Left;
   const auto nextButton = swapFront ? MappedInputManager::Button::Left : MappedInputManager::Button::Right;
-  const bool prev =
-      input.isPressed(MappedInputManager::Button::PageBack) || input.isPressed(prevButton);
-  const bool next =
-      input.isPressed(MappedInputManager::Button::PageForward) || input.isPressed(nextButton);
+  const bool prev = input.isPressed(MappedInputManager::Button::PageBack) || input.isPressed(prevButton);
+  const bool next = input.isPressed(MappedInputManager::Button::PageForward) || input.isPressed(nextButton);
   return {prev, next};
 }
 
@@ -227,43 +227,22 @@ inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntil
 
 // Map the persisted TEXT_ANTIALIASING value onto the renderer's plane-mapping
 // strength. TEXT_AA_OFF has no grayscale pass, so it maps to the default.
-inline GfxRenderer::GrayscaleAaStrength textAaStrength() {
-  switch (SETTINGS.textAntiAliasing) {
-    case CrossPointSettings::TEXT_AA_CRISP:
-      return GfxRenderer::AA_CRISP;
-    case CrossPointSettings::TEXT_AA_DARK:
-      return GfxRenderer::AA_DARK;
-    default:
-      return GfxRenderer::AA_STANDARD;
-  }
-}
+inline GfxRenderer::GrayscaleAaStrength textAaStrength() { return TextAa::strength(); }
 
-// Grayscale anti-aliasing pass. Renders content twice (LSB + MSB) to build
-// the grayscale buffer. Only the content callback is re-rendered — status bars
-// and other overlays should be drawn before calling this.
-// Kept as a template to avoid std::function overhead; instantiated once per reader type.
+// Grayscale anti-aliasing pass. Renders content twice (LSB + MSB) to build the
+// grayscale buffer. Only the content callback is re-rendered — status bars and
+// other overlays should be drawn before calling this.
+//
+// The pass itself now lives in TextAa (src/TextAntiAliasing.h), shared with the
+// non-reader screens that take the same overlay, and it prefers the tiled path
+// when the controller supports it: 8 KB of band scratch instead of a 48 KB
+// whole-frame save, on both the X4 and the X3. Unlike TextAa::overlayIfEnabled
+// this does NOT check the setting — every existing caller already gates on it.
 template <typename RenderFn>
 void renderAntiAliased(GfxRenderer& renderer, RenderFn&& renderFn) {
-  renderer.setGrayscaleAaStrength(textAaStrength());
-  if (!renderer.storeBwBuffer()) {
-    LOG_ERR("READER", "Failed to store BW buffer for anti-aliasing");
-    return;
-  }
-
-  renderer.clearScreen(0x00);
-  renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
-  renderFn();
-  renderer.copyGrayscaleLsbBuffers();
-
-  renderer.clearScreen(0x00);
-  renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
-  renderFn();
-  renderer.copyGrayscaleMsbBuffers();
-
-  renderer.displayGrayBuffer();
-  renderer.setRenderMode(GfxRenderer::BW);
-
-  renderer.restoreBwBuffer();
+  using Fn = std::remove_reference_t<RenderFn>;
+  TextAa::overlay(
+      renderer, textAaStrength(), [](void* ctx) { (*static_cast<Fn*>(ctx))(); }, static_cast<void*>(&renderFn));
 }
 
 struct BackNavCallback {
