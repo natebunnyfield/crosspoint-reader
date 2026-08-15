@@ -43,16 +43,35 @@ class HalDisplay {
   void refreshDisplay(RefreshMode = FAST_REFRESH, bool = false) {}
   void displayGrayscaleBase(RefreshMode = HALF_REFRESH, bool = false) {}
   void copyGrayscaleBuffers(const uint8_t*, const uint8_t*) {}
-  void copyGrayscaleLsbBuffers(const uint8_t*) {}
-  void copyGrayscaleMsbBuffers(const uint8_t*) {}
-  void cleanupGrayscaleBuffers(const uint8_t*) {}
-  void displayGrayBuffer(bool = false, const unsigned char* = nullptr, bool = false) {}
+  void copyGrayscaleLsbBuffers(const uint8_t*) { lsbPlaneCopies++; }
+  void copyGrayscaleMsbBuffers(const uint8_t*) { msbPlaneCopies++; }
+  void cleanupGrayscaleBuffers(const uint8_t*) { grayCleanups++; }
+  void displayGrayBuffer(bool = false, const unsigned char* = nullptr, bool = false) { grayDisplays++; }
   void drawImage(const uint8_t*, uint16_t, uint16_t, uint16_t, uint16_t, bool = false) {}
   void drawImageTransparent(const uint8_t*, uint16_t, uint16_t, uint16_t, uint16_t, bool = false) {}
-  void writeGrayscalePlaneStrip(bool, const uint8_t*, int, int) {}
-  bool supportsStripGrayscale() const { return false; }
+  void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t*, int, int numRows) {
+    (lsbPlane ? lsbStripRows : msbStripRows) += numRows;
+    stripWrites++;
+  }
+  bool supportsStripGrayscale() const { return stripGrayscale; }
   void preconditionGrayscale(int = 0, int = 0, int = 0, int = 0) {}
   void deepSleep() {}
+
+  // Grayscale instrumentation for the host suite (test/text_antialiasing).
+  // Defaults keep the historical behaviour — no strip support, every grayscale
+  // call a no-op — so no existing harness sees a change.
+  bool stripGrayscale = false;
+  int stripWrites = 0;
+  int lsbStripRows = 0;
+  int msbStripRows = 0;
+  int lsbPlaneCopies = 0;
+  int msbPlaneCopies = 0;
+  int grayDisplays = 0;
+  int grayCleanups = 0;
+  void resetGrayscaleCounters() {
+    stripWrites = lsbStripRows = msbStripRows = 0;
+    lsbPlaneCopies = msbPlaneCopies = grayDisplays = grayCleanups = 0;
+  }
 
  private:
   bool inverted = false;
