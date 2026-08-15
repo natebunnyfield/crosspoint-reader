@@ -201,32 +201,51 @@ def write_page(args, axes, variants, slots, shots):
         data[v["name"]] = {"label": label, "imgs": imgs}
 
     page = f"""<!doctype html><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proof sheet — {html_mod.escape(args.family)}</title>
 <style>
- body{{margin:0;font:13px/1.4 -apple-system,sans-serif;background:#111;color:#ddd}}
- header{{padding:8px 14px;display:flex;gap:18px;align-items:baseline;flex-wrap:wrap}}
- header b{{color:#fff;font-size:15px}}
- #label{{color:#8fd;font-family:ui-monospace,monospace}}
- #stage{{position:relative;background:#fff;margin:0 auto;width:fit-content}}
- #stage img{{display:block;image-rendering:pixelated}}
+ body{{margin:0;font:13px/1.4 -apple-system,sans-serif;background:#111;color:#ddd;
+      padding-bottom:env(safe-area-inset-bottom)}}
+ header{{position:sticky;top:0;background:#111;z-index:2;
+        padding:8px 12px 6px;border-bottom:1px solid #2a2a2a}}
+ header b{{color:#fff;font-size:15px;margin-right:10px}}
+ #label{{color:#8fd;font-family:ui-monospace,monospace;font-size:12px;
+        display:block;margin-top:2px;word-break:break-all}}
+ .chips{{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}}
+ .chip{{background:#2a2a2a;color:#bbb;border:0;border-radius:14px;
+       padding:5px 12px;font:inherit;font-size:12px;touch-action:manipulation}}
+ .chip.on{{background:#8fd;color:#111;font-weight:600}}
+ #stage{{position:relative;background:#fff;margin:0 auto;width:fit-content;
+        max-width:100%;touch-action:pan-y pinch-zoom;
+        -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}}
+ #stage img{{display:block;image-rendering:pixelated;max-width:100vw;height:auto}}
  #stage img.hidden{{display:none}}
- nav{{padding:6px 14px;color:#999}}
- nav kbd{{background:#333;border-radius:3px;padding:1px 5px;margin:0 2px}}
+ nav{{padding:6px 12px;color:#888;font-size:11px}}
+ nav kbd{{background:#333;border-radius:3px;padding:1px 4px;margin:0 1px}}
  .grid #stage{{display:flex;flex-wrap:wrap;gap:8px;background:#111}}
  .grid #stage img{{display:block!important;max-width:46vw;height:auto}}
+ @media (pointer:coarse){{ .kbd-only{{display:none}} }}
 </style>
 <header><b>{html_mod.escape(args.family)}</b>
- <span id="which"></span><span id="label"></span>
- <span id="slotlbl"></span></header>
-<nav><kbd>&larr;</kbd><kbd>&rarr;</kbd>/<kbd>1</kbd>-<kbd>9</kbd> variant &middot;
- <kbd>&uarr;</kbd><kbd>&darr;</kbd> size slot &middot; <kbd>g</kbd> grid &middot;
- blink two: hold a number, tap another</nav>
+ <span id="which"></span> <span id="slotlbl"></span>
+ <span id="label"></span>
+ <div class="chips" id="vchips"></div>
+ <div class="chips" id="schips"></div>
+</header>
+<nav>tap right/left of specimen: next/prev &middot; press-and-hold: blink
+ against previous variant &middot; chips select directly
+ <span class="kbd-only">&middot; <kbd>&larr;</kbd><kbd>&rarr;</kbd>/<kbd>1</kbd>-<kbd>9</kbd>
+ variant &middot; <kbd>&uarr;</kbd><kbd>&darr;</kbd> slot &middot; <kbd>g</kbd> grid</span></nav>
 <div id="stage"></div>
 <script>
 const DATA={json.dumps(data)};
 const NAMES=Object.keys(DATA), SLOTS={json.dumps(slots)};
-let vi=0, si=0, grid=false;
+let vi=0, lastVi=null, si=0, grid=false;
 const stage=document.getElementById('stage');
+const vchips=document.getElementById('vchips'), schips=document.getElementById('schips');
+
+function setVi(n){{ if(n===vi) return; lastVi=vi; vi=n; show(); }}
+
 function build(){{
   stage.innerHTML='';
   for(const n of NAMES){{
@@ -235,26 +254,82 @@ function build(){{
     img.id='img-'+n;
     stage.appendChild(img);
   }}
+  vchips.innerHTML='';
+  NAMES.forEach((n,i)=>{{
+    const b=document.createElement('button');
+    b.className='chip'; b.textContent=(i+1);
+    b.onclick=()=>setVi(i);
+    vchips.appendChild(b);
+  }});
+  const g=document.createElement('button');
+  g.className='chip'; g.textContent='grid';
+  g.onclick=()=>{{grid=!grid; show();}};
+  vchips.appendChild(g);
+  schips.innerHTML='';
+  SLOTS.forEach((s,i)=>{{
+    const b=document.createElement('button');
+    b.className='chip'; b.textContent='slot '+s;
+    b.onclick=()=>{{si=i; build();}};
+    schips.appendChild(b);
+  }});
   show();
 }}
-function show(){{
+function show(showVi){{
+  const cur = showVi===undefined ? vi : showVi;
   NAMES.forEach((n,i)=>{{
-    document.getElementById('img-'+n).classList.toggle('hidden', !grid && i!==vi);
+    document.getElementById('img-'+n).classList.toggle('hidden', !grid && i!==cur);
   }});
-  document.getElementById('which').textContent=(vi+1)+'/'+NAMES.length+' '+NAMES[vi];
-  document.getElementById('label').textContent=DATA[NAMES[vi]].label;
+  document.getElementById('which').textContent=(cur+1)+'/'+NAMES.length+' '+NAMES[cur];
+  document.getElementById('label').textContent=DATA[NAMES[cur]].label;
   document.getElementById('slotlbl').textContent='slot '+SLOTS[si];
   document.body.classList.toggle('grid', grid);
+  [...vchips.children].forEach((c,i)=>c.classList.toggle('on', i===cur));
+  [...schips.children].forEach((c,i)=>c.classList.toggle('on', i===si));
 }}
+
+// Touch: tap right 60% = next, left 40% = prev; press-and-hold >=300ms blinks
+// against the previously viewed variant; vertical movement = scroll, cancels.
+let pDown=null, holdTimer=null, holding=false;
+stage.addEventListener('pointerdown',e=>{{
+  if(grid) return;
+  pDown={{x:e.clientX,y:e.clientY,t:Date.now()}};
+  holding=false;
+  holdTimer=setTimeout(()=>{{
+    if(pDown && lastVi!==null){{ holding=true; show(lastVi); }}
+  }},300);
+}});
+stage.addEventListener('pointermove',e=>{{
+  if(!pDown) return;
+  if(Math.abs(e.clientX-pDown.x)>12 || Math.abs(e.clientY-pDown.y)>12){{
+    clearTimeout(holdTimer);
+    if(holding){{holding=false; show();}}
+    pDown=null;
+  }}
+}});
+function pointerEnd(e){{
+  clearTimeout(holdTimer);
+  if(!pDown){{ if(holding){{holding=false; show();}} return; }}
+  const wasHold=holding; holding=false;
+  const r=stage.getBoundingClientRect();
+  pDown=null;
+  if(wasHold){{ show(); return; }}
+  if(grid) return;
+  if(e.type==='pointercancel') return;
+  const frac=(e.clientX-r.left)/r.width;
+  setVi(frac>=0.4 ? (vi+1)%NAMES.length : (vi+NAMES.length-1)%NAMES.length);
+}}
+stage.addEventListener('pointerup',pointerEnd);
+stage.addEventListener('pointercancel',pointerEnd);
+
 addEventListener('keydown',e=>{{
-  if(e.key==='ArrowRight') vi=(vi+1)%NAMES.length;
-  else if(e.key==='ArrowLeft') vi=(vi+NAMES.length-1)%NAMES.length;
+  if(e.key==='ArrowRight') setVi((vi+1)%NAMES.length);
+  else if(e.key==='ArrowLeft') setVi((vi+NAMES.length-1)%NAMES.length);
   else if(e.key==='ArrowDown'){{si=(si+1)%SLOTS.length; build(); return;}}
   else if(e.key==='ArrowUp'){{si=(si+SLOTS.length-1)%SLOTS.length; build(); return;}}
-  else if(e.key==='g') grid=!grid;
-  else if(/^[1-9]$/.test(e.key) && +e.key<=NAMES.length) vi=+e.key-1;
+  else if(e.key==='g'){{grid=!grid; show();}}
+  else if(/^[1-9]$/.test(e.key) && +e.key<=NAMES.length) setVi(+e.key-1);
   else return;
-  e.preventDefault(); show();
+  e.preventDefault();
 }});
 build();
 </script>"""
