@@ -34,6 +34,35 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-027] Curves and filled polygons are still logical-resolution on a supersampled build
+**severity: low · scope: GfxRenderer · found 2026-08-15**
+
+`drawPixel()` paints a `RENDER_SCALE` x `RENDER_SCALE` block
+(`lib/GfxRenderer/GfxRenderer.cpp:557-565`), which is exactly right for an
+axis-aligned edge and exactly wrong for anything slanted or curved: the
+staircase scales with the shape while text, on the hi-res glyph path, does not.
+The shipped iOS app pins `RENDER_SCALE=3`
+(`crosspoint-simulator/ios/CMakeLists.txt:89,208`), so on a phone every such
+edge sits at a third of the resolution of the characters beside it.
+
+Slanted **thick lines** were fixed on 2026-08-15 (the keyboard's Return arrow;
+`test/hires_shapes` pins it). Still logical-resolution:
+
+| Primitive | Where it shows |
+|---|---|
+| `fillArc` / `fillRoundedRect` (`:1423-1500`) | Every rounded corner — key backgrounds, popups, list pills, and the Return arrow's own elbow, which is now the coarsest thing left in that glyph |
+| `drawArc` / `drawRoundedRect` | Stroked rounded borders |
+| `fillPolygon` | `DrawTarget::triangle`, the cover pattern bands in `BaseTheme.cpp:777-840` |
+| 1-px `drawLine` diagonals | Left deliberately: a device-resolution hairline would be 1/3 the weight, not smoother |
+
+The arc/rounded paths are **not** a copy of the line fix. They dither, and a
+dither cell is defined in LOGICAL pixels on purpose (`ios/README.md:357-361`) —
+so a device-resolution arc has to decide what a dither cell means before it can
+be written. That is a ruling, not a refactor.
+
+Nothing here is visible on an X3 or an X4: `RENDER_SCALE` is 1 on device and the
+whole path preprocesses away.
+
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
