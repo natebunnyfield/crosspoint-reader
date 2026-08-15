@@ -14,6 +14,27 @@ started.
 
 ## OPEN
 
+### [T-009] Side buttons are drawn on the UI — decide whether that is the intent
+**scope: ui · opened 2026-08-15**
+
+Owner observation from the simulator: the side buttons are now visualised on
+screen, seen on the Claude screen. Recorded as asked; **the ruling is not made
+yet**, and it splits two ways that want opposite work:
+
+- **Intended** — then the question is coverage and consistency: which screens
+  show them, whether the labels follow `MappedInputManager` when the front
+  buttons are remapped or `sideButtonLayout` is swapped, and whether the reader
+  screen's existing rotated hints are now duplicated by them.
+- **Not intended on this screen** — then it is a leak from whichever component
+  draws them, and belongs in `BUGS.md` instead of here.
+
+Not investigated: which component draws them, or when it started. Both need
+pinning down before anything is changed — see `docs/ui-conventions.md`, which
+rules on which surface owns which affordance.
+
+**Done looks like:** an owner ruling recorded, and either the coverage made
+consistent across screens or the drawing removed where it does not belong.
+
 ### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
 **scope: verification · opened 2026-08-07**
 
