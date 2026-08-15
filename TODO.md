@@ -35,6 +35,47 @@ missing on 2026-08-15. File it the same turn you find it.
 
 ## OPEN
 
+### [T-020] Sleep screen: mark and owner only, no words
+**scope: ui · asked 2026-08-15**
+
+Owner ask: update the sleep screen icon to the new striped mark, and drop the
+words so it is just the logo and the device owner.
+
+**Half of this is already done.** `237cd034b` (PR #9, 2026-08-09) regenerated
+`src/images/Logo120.h` from the striped "uniform-paper" cut, and
+`SleepActivity::renderDefaultSleepScreen()` already draws that asset
+(`SleepActivity.cpp:253`). There is no second, older icon to swap — `Logo120`
+IS the striped mark. Nothing to do on the icon unless the intent is a
+*different* striped variant, in which case say which.
+
+**What actually remains is two lines** in `renderDefaultSleepScreen()`:
+
+```
+SleepActivity.cpp:254   drawCenteredText(UI_10_FONT_ID, ..., tr(STR_CROSSPOINT), true, BOLD);
+SleepActivity.cpp:255   drawCenteredText(SMALL_FONT_ID, ..., tr(STR_SLEEPING));
+```
+
+The owner name at `:258` stays — that is the "device owner" half of the ask.
+
+**Only this one screen draws words.** The other sleep screens were checked:
+calendar, custom, bitmap, cover, generated cover and last-screen draw no
+wordmark, and `renderBlankSleepScreen()` (`:454`) is already owner-only. So this
+is a single-function change, not a sweep.
+
+**Two things to get right:**
+
+- **Composition.** The mark is centred and the two text lines sat below it at
+  `pageHeight/2 + 70` and `+95`. With them gone the mark stays centred and the
+  owner stays pinned at `pageHeight - 60`, which leaves a large gap. Worth a
+  look at whether the mark should move, and worth a rendered check rather than
+  a guess.
+- **`STR_CROSSPOINT` stays live** — `BootActivity.cpp:17` still draws it, so do
+  not remove the string. `STR_SLEEPING` becomes unused by any call site; leave
+  the translation entry rather than deleting it from every language YAML.
+
+**Done looks like:** default sleep screen rendered headless showing mark +
+owner only, and the boot screen confirmed unchanged.
+
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
 **scope: verification · opened 2026-08-15**
 
