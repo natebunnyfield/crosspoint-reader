@@ -35,47 +35,6 @@ missing on 2026-08-15. File it the same turn you find it.
 
 ## OPEN
 
-### [T-020] Sleep screen: mark and owner only, no words
-**scope: ui · asked 2026-08-15**
-
-Owner ask: update the sleep screen icon to the new striped mark, and drop the
-words so it is just the logo and the device owner.
-
-**Half of this is already done.** `237cd034b` (PR #9, 2026-08-09) regenerated
-`src/images/Logo120.h` from the striped "uniform-paper" cut, and
-`SleepActivity::renderDefaultSleepScreen()` already draws that asset
-(`SleepActivity.cpp:253`). There is no second, older icon to swap — `Logo120`
-IS the striped mark. Nothing to do on the icon unless the intent is a
-*different* striped variant, in which case say which.
-
-**What actually remains is two lines** in `renderDefaultSleepScreen()`:
-
-```
-SleepActivity.cpp:254   drawCenteredText(UI_10_FONT_ID, ..., tr(STR_CROSSPOINT), true, BOLD);
-SleepActivity.cpp:255   drawCenteredText(SMALL_FONT_ID, ..., tr(STR_SLEEPING));
-```
-
-The owner name at `:258` stays — that is the "device owner" half of the ask.
-
-**Only this one screen draws words.** The other sleep screens were checked:
-calendar, custom, bitmap, cover, generated cover and last-screen draw no
-wordmark, and `renderBlankSleepScreen()` (`:454`) is already owner-only. So this
-is a single-function change, not a sweep.
-
-**Two things to get right:**
-
-- **Composition.** The mark is centred and the two text lines sat below it at
-  `pageHeight/2 + 70` and `+95`. With them gone the mark stays centred and the
-  owner stays pinned at `pageHeight - 60`, which leaves a large gap. Worth a
-  look at whether the mark should move, and worth a rendered check rather than
-  a guess.
-- **`STR_CROSSPOINT` stays live** — `BootActivity.cpp:17` still draws it, so do
-  not remove the string. `STR_SLEEPING` becomes unused by any call site; leave
-  the translation entry rather than deleting it from every language YAML.
-
-**Done looks like:** default sleep screen rendered headless showing mark +
-owner only, and the boot screen confirmed unchanged.
-
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
 **scope: verification · opened 2026-08-15**
 
@@ -233,6 +192,34 @@ the cheap version and needs no keychain.
 ---
 
 ## Finished
+
+### [T-020] Boot and sleep: mark only — DONE
+**scope: ui · asked + done 2026-08-15**
+
+Owner ask, in two passes: first "remove words so it is just logo and device
+owner" for the sleep screens, then "remove crosspoint and booting words" for
+boot.
+
+The icon half needed nothing — `237cd034b` (PR #9, 2026-08-09) had already
+regenerated `Logo120` from the striped uniform-paper cut, and both draw sites
+point at it. Proven with rendered screenshots before touching anything.
+
+**Sleep** (`SleepActivity.cpp`, both dark and light — one code path):
+dropped `STR_CROSSPOINT` and `STR_SLEEPING`. Mark and owner name only.
+
+**Boot** (`BootActivity.cpp`): dropped `STR_CROSSPOINT` and `STR_BOOTING`.
+The **version string stays** — it was not named, and it is the only thing on
+that screen saying which build just started.
+
+All three of `STR_CROSSPOINT`, `STR_SLEEPING` and `STR_BOOTING` now have zero
+call sites. **The translation entries stay in the YAMLs on purpose**: `StrId` is
+a generated enum, so removing entries shifts every subsequent value, and that
+churn is not worth reclaiming three short strings.
+
+Verified by rendering all three screens headless through the real renderer —
+boot, sleep-dark (mean brightness 49.3, genuinely inverted) and sleep-light
+(246.1). Builds `-e default` and `-e simulator`.
+
 
 ### [T-007] Short-press power — RULED SLEEP, and a real mismatch fixed
 **scope: fork sync · raised 2026-08-06 · closed 2026-08-15**

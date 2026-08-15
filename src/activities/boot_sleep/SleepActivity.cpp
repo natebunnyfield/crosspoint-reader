@@ -251,8 +251,9 @@ void SleepActivity::renderDefaultSleepScreen() const {
 
   renderer.clearScreen();
   renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
-  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSPOINT), true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_SLEEPING));
+  // Mark and owner only (owner ruling 2026-08-15, T-020). The wordmark and
+  // "Sleeping" were removed: a sleep screen says whose device this is, and the
+  // mark says what it is.
   if (SETTINGS.ownerName[0] != '\0') {
     const std::string owner = renderer.truncatedText(SMALL_FONT_ID, SETTINGS.ownerName, pageWidth - 40);
     renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - 60, owner.c_str());

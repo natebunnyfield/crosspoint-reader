@@ -14,8 +14,10 @@ void BootActivity::onEnter() {
 
   renderer.clearScreen();
   renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
-  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSPOINT), true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_BOOTING));
+  // Mark only. The wordmark and "Booting" were removed 2026-08-15 (owner ruling):
+  // the striped mark carries the identity on its own and a boot screen that
+  // names itself is redundant with it. The version string stays -- it is the
+  // only thing on this screen that says WHICH build just started.
   renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - 30, CROSSPOINT_VERSION);
   renderer.displayBuffer();
 }
