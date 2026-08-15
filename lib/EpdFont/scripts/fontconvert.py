@@ -23,8 +23,15 @@ parser.add_argument("--additional-intervals", dest="additional_intervals", actio
 parser.add_argument("--compress", dest="compress", action="store_true", help="Compress glyph bitmaps using DEFLATE with group-based compression.")
 parser.add_argument("--force-autohint", dest="force_autohint", action="store_true", help="Force FreeType auto-hinter instead of native font hinting. Improves stem width consistency for fonts with weak or no native TrueType hints.")
 parser.add_argument("--pnum", dest="pnum", action="store_true", help="Use proportional numerals (pnum OpenType feature) instead of default tabular figures. Reduces visual gaps between digits in running prose.")
+parser.add_argument("--synth-embolden-em", dest="synth_embolden_em", type=float, default=0.0,
+                    help="Synthetic bold: x-strength as a fraction of the em (0 = no embolden). Use with a single Regular source to synthesise Bold. See docs/synthetic-font-styles.md.")
+parser.add_argument("--synth-y-ratio", dest="synth_y_ratio", type=float, default=0.5,
+                    help="Vertical embolden as a fraction of the horizontal strength (default 0.5; lower for high-contrast faces to protect hairlines).")
+parser.add_argument("--synth-slant-deg", dest="synth_slant_deg", type=float, default=0.0,
+                    help="Oblique shear angle in degrees for synthetic italic (0 = no shear).")
 args = parser.parse_args()
 
+import ctypes
 import freetype
 from fontTools.ttLib import TTFont
 
@@ -34,9 +41,22 @@ font_stack = [freetype.Face(f) for f in args.fontstack]
 is2Bit = args.is2Bit
 size = args.size
 font_name = args.name
-load_flags = freetype.FT_LOAD_RENDER
+# Synthetic style parameters (per docs/synthetic-font-styles.md).
+# ppem = size_pt * dpi / 72; 150 DPI matches the set_char_size call below.
+_ppem = args.size * 150 / 72
+_synth_x = int(round(args.synth_embolden_em * _ppem * 64))
+_synth_y = int(round(args.synth_embolden_em * args.synth_y_ratio * _ppem * 64))
+_synth_shear = int(round(math.tan(math.radians(args.synth_slant_deg)) * 0x10000)) if args.synth_slant_deg else 0
+_use_synth = bool(_synth_x or _synth_y or _synth_shear)
+# Synthesis splits load from render to allow outline modification before rasterising.
+if _use_synth:
+    load_flags = freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP
+else:
+    load_flags = freetype.FT_LOAD_RENDER
 if args.force_autohint:
     load_flags |= freetype.FT_LOAD_FORCE_AUTOHINT
+# Validation pass uses a plain render (no synthesis) to check glyph existence.
+_validate_flags = freetype.FT_LOAD_RENDER | (freetype.FT_LOAD_FORCE_AUTOHINT if args.force_autohint else 0)
 
 # inclusive unicode code point intervals
 # must not overlap and be in ascending order
@@ -245,7 +265,37 @@ if args.pnum:
         if count > 0:
             print(f"pnum: {count} glyph substitutions from {font_path}", file=sys.stderr)
 
-def load_glyph(code_point):
+def _apply_synthetic_and_render(face):
+    """Embolden and/or shear the loaded glyph outline, then render it.
+
+    Must be called immediately after face.load_glyph() with FT_LOAD_NO_BITMAP.
+    Embolden-then-shear: shearing first distorts the stroke stress that the
+    embolden then amplifies. Advance compensation is the caller's responsibility
+    (add _synth_x << 10 to linearHoriAdvance before encoding the glyph advance).
+    See docs/synthetic-font-styles.md for parameter derivation.
+    """
+    slot = face.glyph
+    if slot.format == freetype.FT_GLYPH_FORMAT_OUTLINE:
+        outline_ref = ctypes.byref(slot.outline._FT_Outline)
+        if _synth_x or _synth_y:
+            err = freetype.FT_Outline_EmboldenXY(outline_ref, _synth_x, _synth_y)
+            if err:
+                raise RuntimeError(f"FT_Outline_EmboldenXY failed (error {err})")
+            # Center the growth (KOReader's trick) so bearings stay honest.
+            freetype.FT_Outline_Translate(outline_ref, -(_synth_x // 2), -(_synth_y // 2))
+        if _synth_shear:
+            m = freetype.FT_Matrix()
+            m.xx = 0x10000
+            m.xy = _synth_shear
+            m.yx = 0
+            m.yy = 0x10000
+            freetype.FT_Outline_Transform(outline_ref, ctypes.byref(m))
+        err = freetype.FT_Render_Glyph(slot._FT_GlyphSlot, freetype.FT_RENDER_MODE_NORMAL)
+        if err:
+            raise RuntimeError(f"FT_Render_Glyph failed (error {err})")
+
+
+def load_glyph(code_point, validate=False):
     face_index = 0
     while face_index < len(font_stack):
         face = font_stack[face_index]
@@ -253,7 +303,9 @@ def load_glyph(code_point):
         if glyph_index is None:
             glyph_index = face.get_char_index(code_point)
         if glyph_index > 0:
-            face.load_glyph(glyph_index, load_flags)
+            face.load_glyph(glyph_index, _validate_flags if validate else load_flags)
+            if not validate and _use_synth:
+                _apply_synthetic_and_render(face)
             return face
         face_index += 1
     return None
@@ -270,7 +322,7 @@ for i_start, i_end in unmerged_intervals:
 for i_start, i_end in unvalidated_intervals:
     start = i_start
     for code_point in range(i_start, i_end + 1):
-        face = load_glyph(code_point)
+        face = load_glyph(code_point, validate=True)
         if face is None:
             if start < code_point:
                 intervals.append((start, code_point - 1))
@@ -377,8 +429,11 @@ for i_start, i_end in intervals:
             width = bitmap.width,
             height = bitmap.rows,
             # We use linearHoriAdvance (16.16 fixed-point, unhinted) instead of
-            # advance.x (26.6 fixed-point, grid-fitted to whole pixels by hinter)
-            advance_x = fp4_from_ft16_16(face.glyph.linearHoriAdvance),
+            # advance.x (26.6 fixed-point, grid-fitted to whole pixels by hinter).
+            # Synthetic embolden compensation: add the full x-strength to the
+            # advance so bold text doesn't look cramped. _synth_x is 26.6;
+            # linearHoriAdvance is 16.16, so << 10 converts (2^10 = 1024).
+            advance_x = fp4_from_ft16_16(face.glyph.linearHoriAdvance + (_synth_x << 10)),
             left = face.glyph.bitmap_left,
             top = face.glyph.bitmap_top,
             data_length = len(packed),

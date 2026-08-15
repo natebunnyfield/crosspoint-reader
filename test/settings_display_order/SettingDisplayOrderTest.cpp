@@ -136,15 +136,23 @@ TEST(SettingDisplayOrder, EditorFontSortsLikeTextSettings) {
   // And the concrete shipped order, so a colophon-data edit that silently
   // reshuffles the picker trips something. Reverse-chronological by earliest
   // year, ties by the drawn label:
-  //   Quattro 2018; IBM Plex Mono and Duo both 2017 (tie broken byte-wise, so
-  //   'IBM' precedes 'iA'); Space Mono 2016; iA Writer Mono 2009, because it
-  //   is Nitti -- iA's own announcement calls it "the classic Nitti, designed
-  //   by Bold Monday", long predating the Plex-derived pair.
-  //   PragmataPro 2010 sits between Space Mono and iA Writer Mono (Fabrizio
-  //   Schiavi Design, Piacenza -- appended to FAMILIES 2026-08-14 as stored
-  //   index 5, which the sort places fifth rather than last).
-  const std::vector<uint8_t> want = {0, 4, 1, 3, 5, 2};
-  EXPECT_EQ(order, want) << "iA Writer Quattro, IBM Plex Mono, iA Writer Duo, Space Mono, PragmataPro, iA Writer Mono";
+  //   All four Plex-derived faces now tie at 2017 -- IBM Plex Mono itself plus
+  //   the three iA cuts, which are adaptations OF it and so start when it does.
+  //   The tie breaks byte-wise on the DRAWN label: 'IBM' (0x49) precedes 'iA'
+  //   (0x69), then Duo, Mono, Quattro alphabetically. Then PragmataPro 2010 and
+  //   Nitti Typewriter 2007.
+  //
+  //   Three things moved on 2026-08-15, all credit corrections rather than
+  //   cosmetics. iA Writer Mono went 2009 -> 2017: it had been dated to Nitti,
+  //   but its own name table says "2017 IBM Corp. and Information Architects"
+  //   and iA say the face was built on IBM Plex. Quattro went 2018 -> 2017 for
+  //   the same reason -- 2018 is when iA shipped it, 2017 is when the type it
+  //   is made of was drawn, and this table dates the WORK. Nitti Typewriter
+  //   went 2009 -> 2007, the first year in its own copyright string. Space Mono
+  //   left the table entirely.
+  const std::vector<uint8_t> want = {3, 1, 2, 0, 4, 5};
+  EXPECT_EQ(order, want)
+      << "IBM Plex Mono, iA Writer Duo, iA Writer Mono, iA Writer Quattro, PragmataPro, Nitti Typewriter";
 }
 
 TEST(SettingDisplayOrder, EditorFontStoredIndicesDoNotMove) {

@@ -9,6 +9,19 @@
 
 namespace editorfonts {
 
+uint8_t migrateStoredIndex(uint8_t index) {
+  // Space Mono held index 3 until 2026-08-15. See the long note above FAMILIES.
+  //
+  // Applied ONCE, where the persisted byte is loaded (CrossPointSettings::
+  // normalizeRetiredSettings), and deliberately NOT inside selectedFamily() or
+  // builtinFontIdFor(). Those two take a POSITION IN `FAMILIES`, and the picker
+  // feeds them positions straight out of displayOrder() — migrating in there
+  // would remap a live position that was never stale, so choosing PragmataPro
+  // in the list would hand back IBM Plex Mono. Stored value and table position
+  // are different things that happen to share a type.
+  return index > 3 ? static_cast<uint8_t>(index - 1) : index;
+}
+
 const char* selectedFamily(uint8_t index) {
   if (index >= FAMILY_COUNT) return FAMILIES[0].family;
   return FAMILIES[index].family;

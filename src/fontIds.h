@@ -31,7 +31,6 @@
 // handles (insertFont/drawText keys; SdCardFontManager::computeFontId guards
 // collisions at runtime), so being stale is harmless, but a regen would churn
 // all of them for nothing. All checked non-zero and non-colliding when added.
-#define SPACEMONO_12_FONT_ID (175568128)
 #define IBMPLEXMONO_12_FONT_ID (-1793317468)
 #define IAWRITERQUATTRO_12_FONT_ID (491272101)
 #define IAWRITERDUO_12_FONT_ID (-672455302)
@@ -47,6 +46,14 @@
 // glyphs for, so a tree without the font degrades to a built-in mono.
 #define PRAGMATAPRO_12_FONT_ID (1544097263)
 
+// NittiTypewriter is also COMMERCIAL (Pieter van Rosmalen / Bold Monday).
+// Same treatment as PragmataPro: ID declared unconditionally, glyph tables
+// gitignored (builtinFonts/nitti*.h), main.cpp registers only when
+// __has_include finds them. Unlike PragmataPro, only a Regular TTF is
+// available; Bold/Italic/BoldItalic are synthesised at build time via
+// fontconvert.py's --synth-embolden-em / --synth-slant-deg flags.
+#define NITTITYPEWRITER_12_FONT_ID (738591204)
+
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
 static_assert(LIBREFRANKLIN_READER_12_FONT_ID != 0, "Font ID collision with sentinel");
@@ -56,9 +63,9 @@ static_assert(LIBREFRANKLIN_READER_18_FONT_ID != 0, "Font ID collision with sent
 static_assert(UI_10_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(SMALL_FONT_ID != 0, "Font ID collision with sentinel");
-static_assert(SPACEMONO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IBMPLEXMONO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IAWRITERQUATTRO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IAWRITERDUO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IAWRITERMONO_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(PRAGMATAPRO_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(NITTITYPEWRITER_12_FONT_ID != 0, "Font ID collision with sentinel");

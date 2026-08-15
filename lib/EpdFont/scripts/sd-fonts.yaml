@@ -1147,6 +1147,19 @@ families:
   # deciding what goes on a card. IBM Plex Mono (above) is the fifth member.
   # All OFL; iA's faces are the "S" (narrow) cuts from github.com/iaolo/iA-Fonts.
 
+  - name: NittiTypewriter
+    description: "EDITOR GROUP. COMMERCIAL — recipe only. Nitti Typewriter — typewriter monospace (Latin).
+      Bold/Italic/BoldItalic synthesised from Regular: embolden_em=0.045 (stem 21px=0.082em at 256ppem,
+      target 1.55x ratio → +0.55×0.082=0.045em; verified 1.571x/1.632x/1.600x), y_ratio=0.5 (monoweight,
+      no hairlines), slant_deg=11 (gentle old-style). Counter survival 12pt 2-bit: e=2px a=5px s=3px ≥1px."
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    styles:
+      regular:    {path: "local_fonts/NittiTypewriter-Regular.ttf"}
+      bold:       {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.5}}
+      italic:     {from: regular, synthetic: {slant_deg: 11}}
+      bolditalic: {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.5, slant_deg: 11}}
+
   - name: iAWriterMono
     description: "EDITOR GROUP. iA Writer Mono — true monospace (Latin)"
     intervals: latin-ext

@@ -254,15 +254,31 @@ so every boot discarded the saved byte. If you add a runtime-labeled row, the
 `STR_CAT_READER` and so existed only in the web API — the row was real,
 persisted, and unreachable on an X4 or X3.
 
-**Editor fonts are BUILT IN, and the fallback is monospace.** Space Mono and IBM
-Plex Mono compile into the firmware: one size, 12 pt, four styles each, ~83 KB
-of glyph data. Not installed to `/fonts`, because `SdCardFontRegistry` has no
-exclusion mechanism — an install there would surface these writing faces in the
-READING picker, in the web reading enum, and in `cycleReaderFontFamily()`, where
-a side-button hold mid-book would rewrite `sdFontFamilyName` and invalidate the
-whole book's section cache. Three iA rows remain card-only; they resolve to a
-built-in mono rather than to the UI face, because index 0 is one of them and is
-the shipped default.
+**Editor fonts are BUILT IN, and the fallback is monospace.** All six rows
+compile into the firmware: one size, 12 pt, four styles each. The four OFL
+faces are the three iA Writer cuts and IBM Plex Mono; PragmataPro and Nitti
+Typewriter are commercial, so their glyph tables are gitignored and `main.cpp`
+gates them on `__has_include` — a clone without the licensed sources still
+compiles and simply does not register those rows. None are installed to
+`/fonts`, because `SdCardFontRegistry` has no exclusion mechanism — an install
+there would surface these writing faces in the READING picker, in the web
+reading enum, and in `cycleReaderFontFamily()`, where a side-button hold
+mid-book would rewrite `sdFontFamilyName` and invalidate the whole book's
+section cache.
+
+**Space Mono was removed on 2026-08-15** (owner ruling), and it is the only row
+ever deleted from a list whose POSITION is what `SETTINGS.editorFont` persists.
+It sat at index 3, so every stored value above it named the wrong family until
+rewritten: `editorfonts::migrateStoredIndex()` does that once, from
+`CrossPointSettings::normalizeRetiredSettings()` as settings.json loads. A
+device that had Space Mono selected lands on IBM Plex Mono — the nearest
+surviving mono — rather than resetting to row 0. The migration deliberately does
+NOT live inside `selectedFamily()` or `builtinFontIdFor()`: those take a
+position in `FAMILIES`, the picker feeds them positions straight out of
+`displayOrder()`, and migrating there would remap a live position that was never
+stale, so choosing PragmataPro in the list would select IBM Plex Mono instead.
+Its recipe, picker label and generated headers all stay in the repo; only the
+wiring is gone, which gave back ~85 KB of flash.
 
 **The device reads `/.crosspoint/settings.json`, not `settings.json` at the card
 root.** A file written to the root is silently ignored, which makes a settings

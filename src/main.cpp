@@ -89,16 +89,15 @@ EpdFontFamily librefranklinReader14FontFamily(&lfReader14RegularFont, &lfReader1
 // back ids the renderer had no glyphs for, and resolve() fell through to
 // UI_10 chrome. "Built in" has to mean built into the binary that ships.
 //
-// Flash cost: ~83 KB for SpaceMono + IBMPlexMono (ruling 2026-08-06), ~216 KB
-// for the three iA families (ruling 2026-08-11). The _2x companions are dead
-// flash on device (RENDER_SCALE=1, stripped by --gc-sections); they are present
-// only for the simulator / iOS builds that run at RENDER_SCALE=2.
-EpdFont spacemono12RegularFont(&spacemono_12_regular);
-EpdFont spacemono12BoldFont(&spacemono_12_bold);
-EpdFont spacemono12ItalicFont(&spacemono_12_italic);
-EpdFont spacemono12BoldItalicFont(&spacemono_12_bolditalic);
-EpdFontFamily spacemono12FontFamily(&spacemono12RegularFont, &spacemono12BoldFont, &spacemono12ItalicFont,
-                                    &spacemono12BoldItalicFont);
+// Flash cost: ~41 KB for IBMPlexMono, ~216 KB for the three iA families (ruling
+// 2026-08-11). The _2x companions are dead flash on device (RENDER_SCALE=1,
+// stripped by --gc-sections); they are present only for the simulator / iOS
+// builds that run at RENDER_SCALE=2.
+//
+// Space Mono was here until 2026-08-15 and is gone by owner ruling. Its
+// generated headers are still in builtinFonts/ and its recipe is still in
+// sd-fonts.yaml — only the wiring was removed, so nothing here references it
+// and it costs no flash. See the note above FAMILIES in notes/EditorFonts.h.
 EpdFont ibmplexmono12RegularFont(&ibmplexmono_12_regular);
 EpdFont ibmplexmono12BoldFont(&ibmplexmono_12_bold);
 EpdFont ibmplexmono12ItalicFont(&ibmplexmono_12_italic);
@@ -147,17 +146,30 @@ EpdFontFamily pragmatapro12FontFamily(&pragmatapro12RegularFont, &pragmatapro12B
                                       &pragmatapro12BoldItalicFont);
 #endif
 
+// NittiTypewriter: same commercial/gitignored pattern as PragmataPro. Only the
+// Regular TTF exists; Bold/Italic/BoldItalic are synthesised at build time by
+// convert-builtin-fonts.sh using fontconvert.py's --synth-embolden-em 0.045
+// --synth-slant-deg 11. The macro carries "NITTITYPEWRITER" so the 2x block
+// below can reuse it without repeating the __has_include test.
+#if __has_include(<builtinFonts/nittitypewriter_12_regular.h>)
+#define CROSSPOINT_HAS_NITTITYPEWRITER 1
+#include <builtinFonts/nittitypewriter_12_bold.h>
+#include <builtinFonts/nittitypewriter_12_bolditalic.h>
+#include <builtinFonts/nittitypewriter_12_italic.h>
+#include <builtinFonts/nittitypewriter_12_regular.h>
+EpdFont nittitypewriter12RegularFont(&nittitypewriter_12_regular);
+EpdFont nittitypewriter12BoldFont(&nittitypewriter_12_bold);
+EpdFont nittitypewriter12ItalicFont(&nittitypewriter_12_italic);
+EpdFont nittitypewriter12BoldItalicFont(&nittitypewriter_12_bolditalic);
+EpdFontFamily nittitypewriter12FontFamily(&nittitypewriter12RegularFont, &nittitypewriter12BoldFont,
+                                          &nittitypewriter12ItalicFont, &nittitypewriter12BoldItalicFont);
+#endif
+
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
 // 2x companions for all five editor fonts. Named for the 1x face each stands
 // in for (same convention as the system UI 2x matrix). drawText() checks
 // getHiResFamily() for any font id it is handed, so without a registered
 // companion the editor text renders at 1x resolution on a 2x build.
-EpdFont spacemono12Regular2xFont(&spacemono_12_regular_2x);
-EpdFont spacemono12Bold2xFont(&spacemono_12_bold_2x);
-EpdFont spacemono12Italic2xFont(&spacemono_12_italic_2x);
-EpdFont spacemono12BoldItalic2xFont(&spacemono_12_bolditalic_2x);
-EpdFontFamily spacemono12HiResFontFamily(&spacemono12Regular2xFont, &spacemono12Bold2xFont, &spacemono12Italic2xFont,
-                                         &spacemono12BoldItalic2xFont);
 EpdFont ibmplexmono12Regular2xFont(&ibmplexmono_12_regular_2x);
 EpdFont ibmplexmono12Bold2xFont(&ibmplexmono_12_bold_2x);
 EpdFont ibmplexmono12Italic2xFont(&ibmplexmono_12_italic_2x);
@@ -197,6 +209,19 @@ EpdFont pragmatapro12Italic2xFont(&pragmatapro_12_italic_2x);
 EpdFont pragmatapro12BoldItalic2xFont(&pragmatapro_12_bolditalic_2x);
 EpdFontFamily pragmatapro12HiResFontFamily(&pragmatapro12Regular2xFont, &pragmatapro12Bold2xFont,
                                            &pragmatapro12Italic2xFont, &pragmatapro12BoldItalic2xFont);
+#endif
+#ifdef CROSSPOINT_HAS_NITTITYPEWRITER
+// Same __has_include gate as the 1x cuts above, restated through the macro.
+#include <builtinFonts/nittitypewriter_12_bold_2x.h>
+#include <builtinFonts/nittitypewriter_12_bolditalic_2x.h>
+#include <builtinFonts/nittitypewriter_12_italic_2x.h>
+#include <builtinFonts/nittitypewriter_12_regular_2x.h>
+EpdFont nittitypewriter12Regular2xFont(&nittitypewriter_12_regular_2x);
+EpdFont nittitypewriter12Bold2xFont(&nittitypewriter_12_bold_2x);
+EpdFont nittitypewriter12Italic2xFont(&nittitypewriter_12_italic_2x);
+EpdFont nittitypewriter12BoldItalic2xFont(&nittitypewriter_12_bolditalic_2x);
+EpdFontFamily nittitypewriter12HiResFontFamily(&nittitypewriter12Regular2xFont, &nittitypewriter12Bold2xFont,
+                                               &nittitypewriter12Italic2xFont, &nittitypewriter12BoldItalic2xFont);
 #endif
 #endif
 
@@ -411,7 +436,6 @@ void setupDisplayAndFonts(bool seamless = false) {
   // renderer.getFontMap().count(id), so a face defined but never inserted here
   // still reports "Not on card" — the definition and the insert have to leave
   // OMIT_FONTS together or the move buys nothing.
-  renderer.insertFont(SPACEMONO_12_FONT_ID, spacemono12FontFamily);
   renderer.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12FontFamily);
   renderer.insertFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12FontFamily);
   renderer.insertFont(IAWRITERDUO_12_FONT_ID, iawriterduo12FontFamily);
@@ -422,17 +446,22 @@ void setupDisplayAndFonts(bool seamless = false) {
   // unreachable rather than offering a face that would draw nothing.
   renderer.insertFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12FontFamily);
 #endif
+#ifdef CROSSPOINT_HAS_NITTITYPEWRITER
+  renderer.insertFont(NITTITYPEWRITER_12_FONT_ID, nittitypewriter12FontFamily);
+#endif
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
   // Hi-res companions for all five editor fonts. drawText() checks
   // getHiResFamily() for any font id, so without these the editor activities
   // (NoteEditorActivity, ClaudeChatActivity) render at 1x on a 2x build.
-  renderer.registerHiResBuiltinFont(SPACEMONO_12_FONT_ID, spacemono12HiResFontFamily);
   renderer.registerHiResBuiltinFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12HiResFontFamily);
   renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12HiResFontFamily);
   renderer.registerHiResBuiltinFont(IAWRITERDUO_12_FONT_ID, iawriterduo12HiResFontFamily);
   renderer.registerHiResBuiltinFont(IAWRITERMONO_12_FONT_ID, iawritermono12HiResFontFamily);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
   renderer.registerHiResBuiltinFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12HiResFontFamily);
+#endif
+#ifdef CROSSPOINT_HAS_NITTITYPEWRITER
+  renderer.registerHiResBuiltinFont(NITTITYPEWRITER_12_FONT_ID, nittitypewriter12HiResFontFamily);
 #endif
 #endif
 #ifndef OMIT_FONTS

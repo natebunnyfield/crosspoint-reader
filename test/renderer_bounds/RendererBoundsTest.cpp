@@ -63,7 +63,7 @@ class Gfx {
     renderer_.insertFont(UI_12_FONT_ID, ui12_);
     renderer_.insertFont(SMALL_FONT_ID, small_);
     // The editor/Claude face, and the one that carries no U+FFFD (B-009).
-    renderer_.insertFont(SPACEMONO_12_FONT_ID, spacemono12_);
+    renderer_.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12_);
   }
 
   GfxRenderer renderer_;
@@ -85,8 +85,8 @@ class Gfx {
   EpdFontFamily ui12_{&ui12R_, &ui12B_};
   EpdFont small8_{&librefranklin_8_regular};
   EpdFontFamily small_{&small8_};
-  EpdFont sm12R_{&spacemono_12_regular}, sm12B_{&spacemono_12_bold};
-  EpdFontFamily spacemono12_{&sm12R_, &sm12B_};
+  EpdFont sm12R_{&ibmplexmono_12_regular}, sm12B_{&ibmplexmono_12_bold};
+  EpdFontFamily ibmplexmono12_{&sm12R_, &sm12B_};
 };
 
 // Fixture: a zeroed counter per test. The renderer is portrait-only now —
@@ -383,7 +383,7 @@ TEST_F(RendererBounds, DegeneratePanesDrawNothingAndDoNotCrash) {
 // vanish: the rest of the line slid left into its place, so a width measured
 // with the emoji present no longer matched what was drawn.
 TEST(MissingGlyph, ResolvesToAVisibleFallbackRatherThanNothing) {
-  EpdFont mono{&spacemono_12_regular};
+  EpdFont mono{&ibmplexmono_12_regular};
   // hasCodepoint is the raw coverage question — no substitution — so it still
   // reports the truth about this face after the fallback chain exists.
   ASSERT_FALSE(mono.hasCodepoint(REPLACEMENT_GLYPH))
@@ -399,8 +399,8 @@ TEST(MissingGlyph, ResolvesToAVisibleFallbackRatherThanNothing) {
 // The same property one layer up: a string must not measure NARROWER because a
 // character in it is unrepresentable. That is what silently corrupted wrapping.
 TEST_F(RendererBounds, TextWidthCountsUnrepresentableCharacters) {
-  const int without = r->getTextWidth(SPACEMONO_12_FONT_ID, "ab");
-  const int with = r->getTextWidth(SPACEMONO_12_FONT_ID,
+  const int without = r->getTextWidth(IBMPLEXMONO_12_FONT_ID, "ab");
+  const int with = r->getTextWidth(IBMPLEXMONO_12_FONT_ID,
                                    "a\xF0\x9F\x98\x8A"
                                    "b");  // a + U+1F60A + b
   EXPECT_GT(with, without) << "the unrepresentable character contributed zero width";
