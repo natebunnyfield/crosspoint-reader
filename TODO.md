@@ -251,9 +251,24 @@ yet**, and it splits two ways that want opposite work:
 - **Not intended on this screen** — then it is a leak from whichever component
   draws them, and belongs in `BUGS.md` instead of here.
 
-Not investigated: which component draws them, or when it started. Both need
-pinning down before anything is changed — see `docs/ui-conventions.md`, which
-rules on which surface owns which affordance.
+**Investigated 2026-08-15 — it is deliberate, and narrow.** `GUI.drawSideButtonHints()`
+is a long-standing theme method (`BaseTheme.cpp:165`, overridden in
+`LyraTheme.cpp:479`), but only **two** call sites exist outside the themes
+themselves, both text-entry screens and both guarded the same way:
+
+```
+src/activities/util/ClaudeChatActivity.cpp:590   if (!panel.isDaisy()) GUI.drawSideButtonHints(renderer, ">", "<");
+src/activities/util/NoteEditorActivity.cpp:633   if (!panel.isDaisy()) GUI.drawSideButtonHints(renderer, ">", "<");
+```
+
+Both arrived in `46b0dd60f` (2026-08-06, "fix(keyboard): UX pass round 2 —
+space, Ask, navigation, repeat, gutter"), commented "same convention as the
+full-screen keyboard". So this is **not a leak** and the `BUGS.md` branch of
+this item is closed: it is intended, nine days old, and scoped to typing
+surfaces where the side buttons move the cursor.
+
+What remains is purely a coverage question — whether two screens is the right
+number. See `docs/ui-conventions.md` on which surface owns which affordance.
 
 **Done looks like:** an owner ruling recorded, and either the coverage made
 consistent across screens or the drawing removed where it does not belong.
