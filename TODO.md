@@ -101,28 +101,6 @@ link).
 enough detail to trace. Separate from [T-008], which covers the 2026-08-06
 backlog; this is one named commit.
 
-### [T-018] The SDK pin is 9 commits off upstream, on a branch, going nowhere
-**scope: submodule · opened 2026-08-15**
-
-`freeink-sdk` is pinned to `fix/keyboard-alt-hint-dedupe` at `159f40f` — checked
-against the gitlink at `ade9dac91`, the pin and the branch tip are the same
-commit, so this branch is load-bearing, not a leftover.
-
-It is **9 ahead / 41 behind `upstream/main`**, with no PR open. Nine keyboard-icon
-commits (Space/Return strokes, the alt-hint band reserved per row, a one-cell Ok
-key drawing a return arrow) exist only on this fork. The local `main` in the
-submodule is 137 behind and 0 ahead — purely stale, contributing nothing.
-
-Doing nothing is the expensive option: the gap grows, and every upstream SDK fix
-lands further out of reach.
-
-**Two ways out, owner's call:** open the PR upstream and let the commits land,
-or rebase the nine onto current `upstream/main` and re-pin the submodule. Either
-way `scripts/bump-submodule.sh` is the mechanism ([T-006a]).
-
-**Done looks like:** the pin sits on something that is not diverging, and the
-nine commits are either upstream or deliberately fork-only with that recorded.
-
 ### [T-012] A setting for tables: flat or tabular
 **scope: reader · opened 2026-08-15**
 
@@ -285,6 +263,27 @@ then either take the patch or write the divergence down in `docs/fork-sync.md`.
 ---
 
 ## Finished
+
+### [T-018] The SDK pin — RULED, rebased and re-pinned
+**scope: submodule · ruled + done 2026-08-15**
+
+The pin sat on `fix/keyboard-alt-hint-dedupe` at `159f40f`: 9 ahead, **41
+behind** `upstream/main`, no PR open, gap widening. Owner ruling: rebase and
+re-pin, keeping the nine fork-only rather than sending them upstream.
+
+All nine rebased onto `upstream/main` with **no conflicts**. New tip `8403043`,
+now **0 behind / 9 ahead**. The pre-rebase tip is preserved as tag
+`pre-rebase-2026-08-15` on the SDK fork, because the branch force-moved.
+
+Verified against the rebased SDK before pinning: `-e default` (RAM 16.5%,
+Flash 64.5%) and `-e simulator` build, headless run 0 errors. Flash grew
+~4.8 KB — that is the 41 upstream commits arriving, not our nine. Also checked
+the documented trap: `BleHidHost.cpp.o` exists at 523 KB with 46 nimble refs in
+its `.d`, so the BLE include path survived.
+
+**The nine stay fork-only by decision.** Not a candidate for re-proposal as
+"should these go upstream" — that was asked and answered.
+
 
 ### [T-011] Side buttons drawn on the UI — RULED, removed
 **scope: ui · ruled 2026-08-15**
