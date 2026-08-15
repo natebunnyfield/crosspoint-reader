@@ -62,6 +62,7 @@ add_executable(ActivityInputTest
   ActivityInputTest.cpp
   TypedTextEntryTest.cpp
   ClaudeChatSendTest.cpp
+  ListPagingTest.cpp
   HostHarness.cpp
   # activity + input layer under test
   ${REPO_ROOT}/src/MappedInputManager.cpp

@@ -168,4 +168,57 @@ consumes it even though no firmware code does.
      `requestUpdate()`, so a held button on a short list costs nothing rather
      than burning a redraw per repeat.
 
-  All four questions are now settled. Not started. No branch.
+  All four questions are now settled. **SHIPPED 2026-08-15 on branch
+  `pageupdown`** — sim-verified, device-unconfirmed. What landed:
+
+  * `MappedInputManager::Button::PageNext` / `PagePrevious`, the third logical
+    pair, bound to the side buttons. `NavNext`/`NavPrevious` narrowed to the
+    front pair, exactly as sketched above.
+  * The side pair **honors `SETTINGS.sideButtonLayout`** so a list pages the
+    same way round as the book, but `SIDE_BUTTONS_DISABLED` deliberately falls
+    through to the natural order instead of going inert. That setting exists to
+    stop the side buttons turning BOOK pages; honoring it here would leave every
+    list with no page control at all. Same trap, same fix, as
+    `ReaderUtils.h:112-125` records for the reader's side font controls.
+  * `ButtonNavigator::pageDown/pageUp(int& index, total, perPage)` — the clamped
+    arithmetic, returning false when nothing moved so question 4's redraw
+    suppression is mechanical rather than per-screen discipline. `onPageNext` /
+    `onPagePrevious` wire press + hold-repeat, on their **own** repeat clock:
+    `onRelease()` drops a release whenever a continuous fired, so one shared
+    timer would have let a held side button eat the next front-button step.
+  * **Question 1, resolved as: a page is one screenful, and the selection keeps
+    its position within the page** (`index ± perPage`, not a snap to the page
+    boundary). `(i + p) / p == i / p + 1` for any `i`, so the drawn page — which
+    `BaseTheme::drawList` derives as `selectedIndex / pageItems` — advances by
+    exactly one either way; keeping the offset means the highlight does not jump
+    to the top row and the eye does not have to re-find it. The clamp overrides
+    it at the ends, sliding onto the first/last row.
+  * **Home is the exception, and it is question 1's "next section" reading** —
+    on the two-page home the covers ARE page 0 and the menu IS page 1, so the
+    two readings coincide there and paging lands on the first row of the other
+    page. Dead when the home is not split (no recent books).
+  * The `HomeActivity` clamp special case was **kept**, per the "verify before
+    deleting" note: it governs the FRONT pair, which still wraps everywhere else
+    via `ButtonNavigator::nextIndex`.
+
+  Two consequences worth knowing:
+
+  * **`OptionPopup` side buttons are now dead.** It navigates on
+    `NavNext`/`NavPrevious` and its options always fit the dialog, so question
+    2's ruling applies verbatim: no page, no action. Front Left/Right still move
+    the selection. Flagged rather than special-cased — say so if a popup should
+    keep the side pair as a step.
+  * **`TextViewerActivity` and `ColophonActivity` wire the page pair
+    explicitly.** They are paged text, not row lists, so both pairs turn a page
+    there and that is correct rather than the redundancy this ruling is about.
+    Without the explicit wiring the narrowing of `NavNext` would have silently
+    stopped their side buttons working.
+
+  Exempt, unchanged: `FontSelectionActivity` and `EditorFontSelectionActivity`
+  (side buttons step the font size), `IntervalSelectionActivity` (side buttons
+  are the coarse value step), the keyboards / note editor / Claude chat (side
+  buttons are bespoke picks), and every reader (`PageBack`/`PageForward`).
+
+  Coverage: `test/activity_input/ListPagingTest.cpp` (12 cases — the mapping
+  seam, both clamps, a short list, an exact multiple, and the shared-timer
+  hazard).

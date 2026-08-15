@@ -154,8 +154,12 @@ void EditorFontSelectionActivity::loop() {
   const int pageItems =
       UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, previewHeight + metrics_.verticalSpacing, 1);
 
-  // FRONT buttons only, like the reading picker: ButtonNavigator's Nav* aliases
-  // also resolve to the side buttons, which would make them move the selection.
+  // FRONT buttons only, like the reading picker. Nav* is the front pair now
+  // (2026-08-15) so getNextButtons() would work, but spell it out: this screen
+  // must NOT pick up the side pair's page handlers either, because the side
+  // buttons here step the editor font size. This is one of the two screens the
+  // "side buttons page" ruling deliberately exempts — see the size handler
+  // above and docs/ui-conventions.md.
   static const std::vector<MappedInputManager::Button> kNextButtons = {MappedInputManager::Button::Right};
   static const std::vector<MappedInputManager::Button> kPreviousButtons = {MappedInputManager::Button::Left};
 

@@ -236,6 +236,34 @@ void HomeActivity::loop() {
     requestUpdate();
   });
 
+  // The SIDE pair pages, where the FRONT pair above steps one row. This screen
+  // is the one the owner named ("make side buttons be page up and page down,
+  // when they are identical functionality to front buttons, like on the home
+  // screen"), and it is also the screen where "one screenful" and "the next
+  // section" are the same thing: on the two-page home the covers own page 0
+  // ([0, bookCount)) and the menu owns page 1 ([bookCount, menuCount)), and the
+  // page is DERIVED from selectorIndex by render() below. So paging means
+  // landing on the first row of the other page.
+  //
+  // Clamped, per docs/ui-conventions.md — no wrap from the menu back to the
+  // covers. And dead when the home is NOT split (no recent books, or a theme
+  // that puts everything on one page): there is no page to turn, so a held side
+  // button costs nothing rather than burning a redraw per repeat.
+  const int bookCount = static_cast<int>(recentBooks.size());
+  const bool splitPages = metrics.homeMenuOnSecondPage && bookCount > 0;
+
+  buttonNavigator.onPageNext([this, bookCount, splitPages] {
+    if (!splitPages || selectorIndex >= bookCount) return;
+    selectorIndex = bookCount;
+    requestUpdate();
+  });
+
+  buttonNavigator.onPagePrevious([this, bookCount, splitPages] {
+    if (!splitPages || selectorIndex < bookCount) return;
+    selectorIndex = 0;
+    requestUpdate();
+  });
+
   const auto swipe = mappedInput.wasSwipe();
   if (swipe == MappedInputManager::SwipeDir::Up) {
     selectorIndex = ButtonNavigator::nextIndex(selectorIndex, menuCount);
