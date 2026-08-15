@@ -17,9 +17,10 @@ READER_FONT_STYLES=("Regular" "Italic" "Bold" "BoldItalic")
 # statics so this script needs no network.
 #
 # The `librefranklin_reader_` prefix is deliberate: the system-font matrix
-# below emits plain 1-bit `librefranklin_` UI cuts, and distinct symbols mean
-# regenerating one set can never silently downgrade the other — the trap the
-# old shared Noto 12 pt cut carried.
+# below emits `librefranklin_` UI cuts at DIFFERENT flags (2-bit but
+# uncompressed, no --pnum), and distinct symbols mean regenerating one set can
+# never silently downgrade the other — the trap the old shared Noto 12 pt cut
+# carried.
 LIBREFRANKLIN_READER_SIZES=(12 14 16 18)
 
 for size in ${LIBREFRANKLIN_READER_SIZES[@]}; do
@@ -110,10 +111,45 @@ UI_FONT_STYLES=("Regular" "Bold")
 # --- System-font matrix -----------------------------------------------------
 #
 # The chrome draws at three sizes -- 8, 10 and 12 pt -- in regular and bold.
-# Libre Franklin is the only chrome family (owner ruling 2026-08-07). Plain
-# 1-bit, no --compress: these are the UI faces, and the decompressor cost is
-# not worth paying on every list row. Distinct symbols from the 2-bit
-# `librefranklin_reader_` cuts above -- see the note there.
+# Libre Franklin is the only chrome family (owner ruling 2026-08-07).
+#
+# --2bit, and DELIBERATELY NOT --compress. These were plain 1-bit until
+# 2026-08-14; the comment here said "plain 1-bit, no --compress: these are the
+# UI faces, and the decompressor cost is not worth paying on every list row".
+# Measured, that sentence is half right, and the two halves point opposite ways
+# -- see docs/two-bit-chrome.md for the full table.
+#
+# FLASH, measured on -e default (same tree, only these headers differ):
+#
+#   1-bit, uncompressed (what shipped)   4,178,069 B   63.8%
+#   2-bit, uncompressed  (chosen)        4,300,597 B   65.6%   +122,528 B
+#   2-bit, compressed                    4,152,733 B   63.4%    -25,336 B
+#
+# So compression really is free on flash -- better than free. It is TIME that
+# rules it out. A chrome screen has no PrewarmScope (readers do), so every
+# glyph goes through FontDecompressor's hot-group path, and one group must be
+# inflated again on every switch of font id or style. Measured in the
+# simulator, three variant binaries interleaved round-robin so machine load hit
+# all three equally, median of 33-45 repaints each:
+#
+#   colophon, one page turn      1-bit  3,331 us | 2-bit  3,327 us | 2-bit+z 20,395 us
+#   settings list, one Down      1-bit  3,249 us | 2-bit  3,300 us | 2-bit+z  5,436 us
+#
+# 2-bit uncompressed is TIME-NEUTRAL against the 1-bit cuts it replaces -- the
+# extra bit costs nothing measurable in the plot loop. Compression costs 6x on
+# the colophon, because its bold/regular alternation forces 45 group inflates
+# per repaint, 194,633 uncompressed bytes. It also holds up to 19,612 B of DRAM
+# in the decompressor's grow-only hot-group buffer, which a chrome-only session
+# never used to allocate at all. Uncompressed chrome reads its glyphs straight
+# out of flash: zero DRAM, zero inflate.
+#
+# 1-bit is what made anti-aliased chrome impossible in the first place: a
+# grayscale plane is flagged only from the 2-bit branch of
+# GfxRenderer::renderCharImpl, so a 1-bit chrome glyph contributed nothing to a
+# plane pass.
+#
+# NOTE: --compress REQUIRES --2bit (fontconvert.py:808). There is no compressed
+# 1-bit format, so those two columns above are the only alternatives that exist.
 #
 # Upstream ships Libre Franklin as a variable font; source/LibreFranklin holds
 # the wght 400 and 700 instances cut by build-sd-fonts.py, committed as
@@ -129,7 +165,7 @@ for entry in ${UI_FAMILIES[@]}; do
     for style in ${UI_FONT_STYLES[@]}; do
       font_name="${prefix}_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
       output_path="../builtinFonts/${font_name}.h"
-      python fontconvert.py $font_name $size "../builtinFonts/source/${stem}-${style}.ttf" > $output_path
+      python fontconvert.py $font_name $size "../builtinFonts/source/${stem}-${style}.ttf" --2bit > $output_path
       echo "Generated $output_path"
     done
   done
@@ -141,6 +177,13 @@ done
 # CROSSPOINT_RENDER_SCALE=2 host build. Metrics keep coming from the 1x tables
 # (see registerHiResBuiltinFont), so these carry bitmaps and nothing else, and
 # the name encodes the 1x face each stands in for -- not its own point size.
+#
+# Same --2bit flag as the 1x cut above, and that is a HARD requirement, not
+# symmetry: drawText() picks the companion by font id and blits it through the
+# same renderCharImpl, which reads the bit depth off the EpdFontData it was
+# handed. A 1-bit companion under a 2-bit 1x face would render as noise.
+# None of these reach the device binary -- no device env sets
+# CROSSPOINT_RENDER_SCALE, and nm on firmware.elf shows zero `_2x` symbols.
 for entry in ${UI_FAMILIES[@]}; do
   prefix="${entry%%:*}"
   stem="${entry#*:}"
@@ -148,7 +191,7 @@ for entry in ${UI_FAMILIES[@]}; do
     for style in ${UI_FONT_STYLES[@]}; do
       font_name="${prefix}_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')_2x"
       output_path="../builtinFonts/${font_name}.h"
-      python fontconvert.py $font_name $((size * 2)) "../builtinFonts/source/${stem}-${style}.ttf" > $output_path
+      python fontconvert.py $font_name $((size * 2)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit > $output_path
       echo "Generated $output_path"
     done
   done
