@@ -82,7 +82,9 @@ class KeyboardIconTarget final : public freeink::ui::DrawTarget {
 
  private:
   freeink::ui::GfxRendererTarget inner;
-  const GfxRenderer& renderer;
+  // Only read by the CROSSPOINT_RENDER_SCALE > 1 device-pixel blit below, so at
+  // scale 1 (the device build) it is genuinely unused rather than left over.
+  [[maybe_unused]] const GfxRenderer& renderer;
 
 #if CROSSPOINT_RENDER_SCALE > 1
   // Supersampled host build: the logical grid is coarser than the panel, so the
