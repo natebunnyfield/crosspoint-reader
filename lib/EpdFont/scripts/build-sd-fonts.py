@@ -501,16 +501,40 @@ def _stream_pipe(pipe, prefix: str, dest: list[str]):
 
 
 def build_family(
-    family: dict, output_base: Path, verbose: bool = False, timeout: int = 600
+    family: dict, output_base: Path, verbose: bool = False, timeout: int = 600, scale: int = 1
 ) -> tuple[str, bool, str]:
     """Build a single font family. Returns (name, success, message)."""
     name = family["name"]
-    output_dir = output_base / name
+    # A hi-res tier lands in <Family>/<scale>x/ with the SAME filenames as the
+    # 1x set -- SdCardFontManager::hiResCompanionPath() takes the 1x path and
+    # splices "<scale>x/" in front of the basename, so a 3x file must keep the
+    # 1x name (Coelacanth_13.cpfont, rasterised at 39 pt) rather than being
+    # renamed for its own point size.
+    output_dir = output_base / name if scale == 1 else output_base / name / f"{scale}x"
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    def rename_to_slot_names() -> None:
+        """Give a hi-res cut the 1x filename it must load under.
+
+        fontconvert names each file for the ppem it rasterised, so a 3x cut of a
+        13 pt slot lands as <Family>_39.cpfont. SdCardFontManager builds the
+        companion path by splicing "<scale>x/" in front of the 1x BASENAME, so
+        the file has to keep the 1x name and simply carry finer pixels. Renaming
+        here rather than teaching fontconvert a second naming rule keeps the
+        number in a filename meaning one thing everywhere: the size SLOT, not the
+        rasterisation.
+        """
+        if scale == 1:
+            return
+        for base in family["sizes"]:
+            built = output_dir / f"{name}_{base * scale}.cpfont"
+            if built.exists():
+                built.replace(output_dir / f"{name}_{base}.cpfont")
 
     styles = family.get("styles", {})
     intervals = family["intervals"]
-    sizes = ",".join(str(s) for s in family["sizes"])
+    # The FILENAME keeps the 1x size; only the rasterised ppem is multiplied.
+    sizes = ",".join(str(s * scale) for s in family["sizes"])
     fallback_font = fallback_font_for(intervals)
 
     # Resolve all font file paths (downloads as needed).
@@ -652,6 +676,7 @@ def build_family(
             if proc.returncode != 0:
                 err = "".join(stderr_lines).strip()
                 return name, False, err or f"Exit code {proc.returncode}"
+            rename_to_slot_names()
             return name, True, ""
         else:
             result = subprocess.run(
@@ -659,6 +684,7 @@ def build_family(
             )
             if result.returncode != 0:
                 return name, False, result.stderr.strip() or f"Exit code {result.returncode}"
+            rename_to_slot_names()
             return name, True, ""
     except subprocess.TimeoutExpired as e:
         elapsed = time.monotonic() - start
@@ -681,6 +707,14 @@ def main():
         "--output-dir", default=str(DEFAULT_OUTPUT), help="Output directory for .cpfont files"
     )
     parser.add_argument("--only", help="Comma-separated family names to build (default: all)")
+    parser.add_argument(
+        "--scale", type=int, default=1,
+        help="Hi-res tier to build: multiplies every size and writes into "
+             "<output>/<Family>/<scale>x/ (default 1, the base tier). The "
+             "device reads 1x; host builds read the tier matching "
+             "CROSSPOINT_RENDER_SCALE, and SdCardFontManager derives that "
+             "directory name from the scale itself."
+    )
     parser.add_argument(
         "--jobs", "-j", type=int, default=None,
         help="Max parallel jobs (default: number of families)"
@@ -779,7 +813,7 @@ def main():
     failed = []
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(build_family, family, output_base, verbose, timeout): family["name"]
+            executor.submit(build_family, family, output_base, verbose, timeout, args.scale): family["name"]
             for family in families
         }
         for future in as_completed(futures):
