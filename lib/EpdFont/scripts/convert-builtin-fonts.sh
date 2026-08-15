@@ -39,6 +39,23 @@ assert_header_clean() {
 
 READER_FONT_STYLES=("Regular" "Italic" "Bold" "BoldItalic")
 
+# Hi-res companion tiers to emit, as multipliers of each face's 1x point size.
+#
+# The repo carries EVERY tier, not just the one the current build uses, because
+# host builds pick their scale at compile time and there is no single right
+# answer: the desktop simulator runs 2 (scripts/sim_render_scale.py) and the iOS
+# target runs 3 (crosspoint-simulator/ios/CMakeLists.txt). A build references one
+# tier and --gc-sections drops the rest; the DEVICE references none, since no
+# device env sets CROSSPOINT_RENDER_SCALE at all.
+#
+# Adding a tier here is all that is needed on the generation side -- main.cpp
+# pastes the suffix from CROSSPOINT_RENDER_SCALE rather than naming _2x, so it
+# follows automatically.
+# Overridable so a single tier can be regenerated without rewriting the others:
+#   CROSSPOINT_HIRES_SCALES=3 ./convert-builtin-fonts.sh
+# The 1x cuts are emitted by their own loops and always run.
+HIRES_SCALES=(${CROSSPOINT_HIRES_SCALES:-2 3})
+
 # --- Reader fallback family --------------------------------------------------
 #
 # Libre Franklin is the ONLY built-in reading family (owner ruling 2026-08-07;
@@ -124,12 +141,14 @@ done
 for entry in ${EDITOR_FAMILIES[@]}; do
   prefix="${entry%%:*}"
   stem="${entry#*:}"
-  for style in ${READER_FONT_STYLES[@]}; do
-    lc=$(echo $style | tr '[:upper:]' '[:lower:]')
-    font_name="${prefix}_12_${lc}_2x"
-    output_path="../builtinFonts/${font_name}.h"
-    python fontconvert.py $font_name 24 "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
-    echo "Generated $output_path"
+  for scale in ${HIRES_SCALES[@]}; do
+    for style in ${READER_FONT_STYLES[@]}; do
+      lc=$(echo $style | tr '[:upper:]' '[:lower:]')
+      font_name="${prefix}_12_${lc}_${scale}x"
+      output_path="../builtinFonts/${font_name}.h"
+      python fontconvert.py $font_name $((12 * scale)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
+      echo "Generated $output_path"
+    done
   done
 done
 
@@ -167,12 +186,14 @@ for entry in ${LOCAL_EDITOR_FAMILIES[@]}; do
   fi
   for style in ${READER_FONT_STYLES[@]}; do
     lc=$(echo $style | tr '[:upper:]' '[:lower:]')
-    # 1x cut, then the 2x hi-res companion (24 pt = 12 * 2), same flags as the
+    # 1x cut, then one hi-res companion per HIRES_SCALES tier, same flags as the
     # OFL editor families above.
     python fontconvert.py "${prefix}_12_${lc}" 12 "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_12_${lc}.h"
     echo "Generated ../builtinFonts/${prefix}_12_${lc}.h"
-    python fontconvert.py "${prefix}_12_${lc}_2x" 24 "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_12_${lc}_2x.h"
-    echo "Generated ../builtinFonts/${prefix}_12_${lc}_2x.h"
+    for scale in ${HIRES_SCALES[@]}; do
+      python fontconvert.py "${prefix}_12_${lc}_${scale}x" $((12 * scale)) "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_12_${lc}_${scale}x.h"
+      echo "Generated ../builtinFonts/${prefix}_12_${lc}_${scale}x.h"
+    done
   done
 done
 
@@ -207,15 +228,23 @@ else
   echo "Generated ../builtinFonts/nittitypewriter_12_italic.h"
   python fontconvert.py nittitypewriter_12_bolditalic 12 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_bolditalic.h
   echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic.h"
-  # 2x hi-res companions (24pt = 12*2)
-  python fontconvert.py nittitypewriter_12_regular_2x    24 "$NITTI_SRC" --2bit --compress --pnum > ../builtinFonts/nittitypewriter_12_regular_2x.h
-  echo "Generated ../builtinFonts/nittitypewriter_12_regular_2x.h"
-  python fontconvert.py nittitypewriter_12_bold_2x       24 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 > ../builtinFonts/nittitypewriter_12_bold_2x.h
-  echo "Generated ../builtinFonts/nittitypewriter_12_bold_2x.h"
-  python fontconvert.py nittitypewriter_12_italic_2x     24 "$NITTI_SRC" --2bit --compress --pnum --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_italic_2x.h
-  echo "Generated ../builtinFonts/nittitypewriter_12_italic_2x.h"
-  python fontconvert.py nittitypewriter_12_bolditalic_2x 24 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_bolditalic_2x.h
-  echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic_2x.h"
+  # Hi-res companions, one set per HIRES_SCALES tier.
+  #
+  # The synthesis flags are em-relative (--synth-embolden-em, --synth-slant-deg),
+  # so they are scale-independent by construction and the SAME numbers apply at
+  # every tier -- a 3x cut emboldens by the same fraction of the em as the 1x,
+  # just rasterised finer. Do not "scale" them to match the point size.
+  for scale in ${HIRES_SCALES[@]}; do
+    px=$((12 * scale))
+    python fontconvert.py "nittitypewriter_12_regular_${scale}x"    $px "$NITTI_SRC" --2bit --compress --pnum > "../builtinFonts/nittitypewriter_12_regular_${scale}x.h"
+    echo "Generated ../builtinFonts/nittitypewriter_12_regular_${scale}x.h"
+    python fontconvert.py "nittitypewriter_12_bold_${scale}x"       $px "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 > "../builtinFonts/nittitypewriter_12_bold_${scale}x.h"
+    echo "Generated ../builtinFonts/nittitypewriter_12_bold_${scale}x.h"
+    python fontconvert.py "nittitypewriter_12_italic_${scale}x"     $px "$NITTI_SRC" --2bit --compress --pnum --synth-slant-deg 11 > "../builtinFonts/nittitypewriter_12_italic_${scale}x.h"
+    echo "Generated ../builtinFonts/nittitypewriter_12_italic_${scale}x.h"
+    python fontconvert.py "nittitypewriter_12_bolditalic_${scale}x" $px "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 --synth-slant-deg 11 > "../builtinFonts/nittitypewriter_12_bolditalic_${scale}x.h"
+    echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic_${scale}x.h"
+  done
 fi
 
 UI_FONT_SIZES=(10 12)
@@ -307,10 +336,12 @@ for entry in ${UI_FAMILIES[@]}; do
   stem="${entry#*:}"
   for size in 8 10 12; do
     for style in ${UI_FONT_STYLES[@]}; do
-      font_name="${prefix}_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')_2x"
-      output_path="../builtinFonts/${font_name}.h"
-      python fontconvert.py $font_name $((size * 2)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit > $output_path
-      echo "Generated $output_path"
+      for scale in ${HIRES_SCALES[@]}; do
+        font_name="${prefix}_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')_${scale}x"
+        output_path="../builtinFonts/${font_name}.h"
+        python fontconvert.py $font_name $((size * scale)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit > $output_path
+        echo "Generated $output_path"
+      done
     done
   done
 done

@@ -166,63 +166,81 @@ EpdFontFamily nittitypewriter12FontFamily(&nittitypewriter12RegularFont, &nittit
 #endif
 
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-// 2x companions for all five editor fonts. Named for the 1x face each stands
-// in for (same convention as the system UI 2x matrix). drawText() checks
-// getHiResFamily() for any font id it is handed, so without a registered
-// companion the editor text renders at 1x resolution on a 2x build.
-EpdFont ibmplexmono12Regular2xFont(&ibmplexmono_12_regular_2x);
-EpdFont ibmplexmono12Bold2xFont(&ibmplexmono_12_bold_2x);
-EpdFont ibmplexmono12Italic2xFont(&ibmplexmono_12_italic_2x);
-EpdFont ibmplexmono12BoldItalic2xFont(&ibmplexmono_12_bolditalic_2x);
-EpdFontFamily ibmplexmono12HiResFontFamily(&ibmplexmono12Regular2xFont, &ibmplexmono12Bold2xFont,
-                                           &ibmplexmono12Italic2xFont, &ibmplexmono12BoldItalic2xFont);
-EpdFont iawriterquattro12Regular2xFont(&iawriterquattro_12_regular_2x);
-EpdFont iawriterquattro12Bold2xFont(&iawriterquattro_12_bold_2x);
-EpdFont iawriterquattro12Italic2xFont(&iawriterquattro_12_italic_2x);
-EpdFont iawriterquattro12BoldItalic2xFont(&iawriterquattro_12_bolditalic_2x);
-EpdFontFamily iawriterquattro12HiResFontFamily(&iawriterquattro12Regular2xFont, &iawriterquattro12Bold2xFont,
-                                               &iawriterquattro12Italic2xFont, &iawriterquattro12BoldItalic2xFont);
-EpdFont iawriterduo12Regular2xFont(&iawriterduo_12_regular_2x);
-EpdFont iawriterduo12Bold2xFont(&iawriterduo_12_bold_2x);
-EpdFont iawriterduo12Italic2xFont(&iawriterduo_12_italic_2x);
-EpdFont iawriterduo12BoldItalic2xFont(&iawriterduo_12_bolditalic_2x);
-EpdFontFamily iawriterduo12HiResFontFamily(&iawriterduo12Regular2xFont, &iawriterduo12Bold2xFont,
-                                           &iawriterduo12Italic2xFont, &iawriterduo12BoldItalic2xFont);
-EpdFont iawritermono12Regular2xFont(&iawritermono_12_regular_2x);
-EpdFont iawritermono12Bold2xFont(&iawritermono_12_bold_2x);
-EpdFont iawritermono12Italic2xFont(&iawritermono_12_italic_2x);
-EpdFont iawritermono12BoldItalic2xFont(&iawritermono_12_bolditalic_2x);
-EpdFontFamily iawritermono12HiResFontFamily(&iawritermono12Regular2xFont, &iawritermono12Bold2xFont,
-                                            &iawritermono12Italic2xFont, &iawritermono12BoldItalic2xFont);
+// Hi-res companions for the editor fonts, at whatever tier this build runs.
+//
+// The suffix is PASTED from CROSSPOINT_RENDER_SCALE rather than written out, so
+// _2x and _3x are the same code and a new tier needs no edit here -- only a
+// matching entry in convert-builtin-fonts.sh's HIRES_SCALES and a block in
+// builtinFonts/all.h. Before this, every one of these declarations named _2x
+// literally, which is why the scale was effectively frozen at two.
+//
+// CP_CAT has to be two levels deep: the argument must expand BEFORE the ##, or
+// the paste would produce the literal `base_CROSSPOINT_RENDER_SCALEx`. The
+// pieces are joined left to right so every intermediate is a valid identifier
+// (`base_`, then `base_3`, then `base_3x`); pasting `3` onto `x` first would
+// form `3x`, which is not one.
+#define CP_CAT_(a, b) a##b
+#define CP_CAT(a, b) CP_CAT_(a, b)
+#define CP_HR(base) CP_CAT(CP_CAT(CP_CAT(base, _), CROSSPOINT_RENDER_SCALE), x)
+
+// One family's four hi-res faces. `sym` is the 1x symbol prefix, so the family
+// keeps the name the registration code below already uses.
+#define CP_HIRES_FAMILY(sym, r, b, i, bi)                                                                     \
+  EpdFont sym##RegularHiResFont(&CP_HR(r));                                                                   \
+  EpdFont sym##BoldHiResFont(&CP_HR(b));                                                                      \
+  EpdFont sym##ItalicHiResFont(&CP_HR(i));                                                                    \
+  EpdFont sym##BoldItalicHiResFont(&CP_HR(bi));                                                               \
+  EpdFontFamily sym##HiResFontFamily(&sym##RegularHiResFont, &sym##BoldHiResFont, &sym##ItalicHiResFont,       \
+                                     &sym##BoldItalicHiResFont)
+
+CP_HIRES_FAMILY(ibmplexmono12, ibmplexmono_12_regular, ibmplexmono_12_bold, ibmplexmono_12_italic,
+                ibmplexmono_12_bolditalic);
+CP_HIRES_FAMILY(iawriterquattro12, iawriterquattro_12_regular, iawriterquattro_12_bold, iawriterquattro_12_italic,
+                iawriterquattro_12_bolditalic);
+CP_HIRES_FAMILY(iawriterduo12, iawriterduo_12_regular, iawriterduo_12_bold, iawriterduo_12_italic,
+                iawriterduo_12_bolditalic);
+CP_HIRES_FAMILY(iawritermono12, iawritermono_12_regular, iawritermono_12_bold, iawritermono_12_italic,
+                iawritermono_12_bolditalic);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
-// Same __has_include gate as the 1x cuts above, restated through the macro so
-// the two blocks cannot drift. Without this the editor would blit pixel-doubled
-// 1x PragmataPro next to crisp 2x chrome on a RENDER_SCALE=2 build — the
-// mixed-resolution bug drawTextRotated90CW shipped on 2026-08-04.
+// Same __has_include gate as the 1x cuts above, restated so the two blocks
+// cannot drift. Without this the editor would blit pixel-doubled 1x PragmataPro
+// next to crisp hi-res chrome — the mixed-resolution bug drawTextRotated90CW
+// shipped on 2026-08-04.
+//
+// The includes are spelled out per tier because a #include path cannot be
+// token-pasted: '/' and '.' are not valid paste operands. Only the declarations
+// below go through CP_HIRES_FAMILY.
+#if CROSSPOINT_RENDER_SCALE == 2
 #include <builtinFonts/pragmatapro_12_bold_2x.h>
 #include <builtinFonts/pragmatapro_12_bolditalic_2x.h>
 #include <builtinFonts/pragmatapro_12_italic_2x.h>
 #include <builtinFonts/pragmatapro_12_regular_2x.h>
-EpdFont pragmatapro12Regular2xFont(&pragmatapro_12_regular_2x);
-EpdFont pragmatapro12Bold2xFont(&pragmatapro_12_bold_2x);
-EpdFont pragmatapro12Italic2xFont(&pragmatapro_12_italic_2x);
-EpdFont pragmatapro12BoldItalic2xFont(&pragmatapro_12_bolditalic_2x);
-EpdFontFamily pragmatapro12HiResFontFamily(&pragmatapro12Regular2xFont, &pragmatapro12Bold2xFont,
-                                           &pragmatapro12Italic2xFont, &pragmatapro12BoldItalic2xFont);
+#elif CROSSPOINT_RENDER_SCALE == 3
+#include <builtinFonts/pragmatapro_12_bold_3x.h>
+#include <builtinFonts/pragmatapro_12_bolditalic_3x.h>
+#include <builtinFonts/pragmatapro_12_italic_3x.h>
+#include <builtinFonts/pragmatapro_12_regular_3x.h>
+#endif
+CP_HIRES_FAMILY(pragmatapro12, pragmatapro_12_regular, pragmatapro_12_bold, pragmatapro_12_italic,
+                pragmatapro_12_bolditalic);
 #endif
 #ifdef CROSSPOINT_HAS_NITTITYPEWRITER
-// Same __has_include gate as the 1x cuts above, restated through the macro.
+// Same __has_include gate as the 1x cuts above, restated here.
+#if CROSSPOINT_RENDER_SCALE == 2
 #include <builtinFonts/nittitypewriter_12_bold_2x.h>
 #include <builtinFonts/nittitypewriter_12_bolditalic_2x.h>
 #include <builtinFonts/nittitypewriter_12_italic_2x.h>
 #include <builtinFonts/nittitypewriter_12_regular_2x.h>
-EpdFont nittitypewriter12Regular2xFont(&nittitypewriter_12_regular_2x);
-EpdFont nittitypewriter12Bold2xFont(&nittitypewriter_12_bold_2x);
-EpdFont nittitypewriter12Italic2xFont(&nittitypewriter_12_italic_2x);
-EpdFont nittitypewriter12BoldItalic2xFont(&nittitypewriter_12_bolditalic_2x);
-EpdFontFamily nittitypewriter12HiResFontFamily(&nittitypewriter12Regular2xFont, &nittitypewriter12Bold2xFont,
-                                               &nittitypewriter12Italic2xFont, &nittitypewriter12BoldItalic2xFont);
+#elif CROSSPOINT_RENDER_SCALE == 3
+#include <builtinFonts/nittitypewriter_12_bold_3x.h>
+#include <builtinFonts/nittitypewriter_12_bolditalic_3x.h>
+#include <builtinFonts/nittitypewriter_12_italic_3x.h>
+#include <builtinFonts/nittitypewriter_12_regular_3x.h>
 #endif
+CP_HIRES_FAMILY(nittitypewriter12, nittitypewriter_12_regular, nittitypewriter_12_bold, nittitypewriter_12_italic,
+                nittitypewriter_12_bolditalic);
+#endif
+#undef CP_HIRES_FAMILY
 #endif
 
 #ifndef OMIT_FONTS
@@ -270,10 +288,13 @@ CP_UI_FAMILY(sysLibreFranklin, librefranklin_8_regular, librefranklin_8_bold, li
              librefranklin_10_bold, librefranklin_12_regular, librefranklin_12_bold);
 
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-// The same matrix at double the ppem, for glyph blitting only. Named for the 1x
-// face each stands in for; their own point sizes are 16/20/24.
-CP_UI_FAMILY(sysLibreFranklin2x, librefranklin_8_regular_2x, librefranklin_8_bold_2x, librefranklin_10_regular_2x,
-             librefranklin_10_bold_2x, librefranklin_12_regular_2x, librefranklin_12_bold_2x);
+// The same matrix at RENDER_SCALE times the ppem, for glyph blitting only.
+// Named for the 1x face each stands in for, so at scale 3 `sysLibreFranklinHiRes8`
+// is a 24 pt cut standing in for the 8 pt one. Suffix pasted by CP_HR, same as
+// the editor families above.
+CP_UI_FAMILY(sysLibreFranklinHiRes, CP_HR(librefranklin_8_regular), CP_HR(librefranklin_8_bold),
+             CP_HR(librefranklin_10_regular), CP_HR(librefranklin_10_bold), CP_HR(librefranklin_12_regular),
+             CP_HR(librefranklin_12_bold));
 #endif
 #undef CP_UI_FAMILY
 
@@ -290,9 +311,9 @@ void applySystemFont(GfxRenderer& renderer) {
   renderer.replaceFont(UI_12_FONT_ID, sysLibreFranklin12);
 
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-  renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklin2x8);
-  renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklin2x10);
-  renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklin2x12);
+  renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklinHiRes8);
+  renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklinHiRes10);
+  renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklinHiRes12);
 #endif
 }
 

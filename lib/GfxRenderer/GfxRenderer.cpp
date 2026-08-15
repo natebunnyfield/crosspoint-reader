@@ -1181,8 +1181,14 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
     // the fill looks pixel-for-pixel like scale 1, just replicated -- rather
     // than becoming a finer (and visibly different) pattern.
     constexpr int S = CROSSPOINT_RENDER_SCALE;
-    static_assert((S & (S - 1)) == 0, "RENDER_SCALE must be a power of two (the dither mask indexes with a mask)");
     constexpr int MASK_PERIOD = 2 * S;
+    // Indexed with % rather than & (MASK_PERIOD - 1), which is why there is no
+    // longer a power-of-two static_assert here. MASK_PERIOD is a compile-time
+    // constant, so at 1x and 2x the compiler still emits the same single AND it
+    // did when the mask was written by hand -- and at 3x it emits the
+    // multiply-shift that a period of 6 needs, instead of silently indexing
+    // wrong. Both sites below are non-negative: phyY0 is a clamped panel row and
+    // the loop only counts up from it.
     uint8_t blackMasks[MASK_PERIOD];
     for (int parityIdx = 0; parityIdx < MASK_PERIOD; ++parityIdx) {
       const int samplePy = phyY0 + parityIdx;
@@ -1226,11 +1232,11 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
         }
         if (isBlack) mask |= static_cast<uint8_t>(1u << (7 - b));
       }
-      blackMasks[samplePy & (MASK_PERIOD - 1)] = mask;
+      blackMasks[samplePy % MASK_PERIOD] = mask;
     }
 
     for (int py = phyY0; py <= phyY1; ++py) {
-      const uint8_t blackMask = blackMasks[py & (MASK_PERIOD - 1)];
+      const uint8_t blackMask = blackMasks[py % MASK_PERIOD];
       const uint8_t whiteMask = static_cast<uint8_t>(~blackMask);
 
       // Dither writes BOTH inks (the slow path called drawPixel for every
