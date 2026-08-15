@@ -90,27 +90,6 @@ have bitten before):
 **Done looks like:** the setting exists, both modes render correctly on a real
 table-bearing EPUB, and switching it invalidates the layout cache.
 
-### [T-013] A setting for 1-bit or 2-bit chrome fonts
-**scope: display · opened 2026-08-15**
-
-The 2-bit chrome font work (merged `1a18de260`) traded flash for a UI that can
-be antialiased at all. `folio-etc/folio` went the other way and packed bundled
-theme `.cpfont`s to 1 bit. Both are defensible; make it the owner's choice
-rather than a build-time ruling.
-
-Needs a measured flash delta for each mode before the setting is worth having —
-if the saving is small the setting is not worth its own complexity, and that is
-a legitimate outcome to record here.
-
-Interacts with the `_2x`/`_3x` hi-res companions and `CROSSPOINT_RENDER_SCALE`,
-so read `all.h` and `applySystemFont()` in `main.cpp` first. Note
-`insertFont()` refuses to overwrite — a live change must use `replaceFont()`,
-or the setting will read as changed while every pixel stays on the old face
-until reboot.
-
-**Done looks like:** the setting exists, the flash cost of each mode is
-recorded, and changing it re-binds the chrome faces without a reboot.
-
 ### [T-014] Sibling-fork improvements, as reviewable PRs
 **scope: upstream-adjacent · opened 2026-08-15**
 
@@ -224,6 +203,43 @@ then either take the patch or write the divergence down in `docs/fork-sync.md`.
 ---
 
 ## Finished
+
+### [T-013] A setting for 1-bit or 2-bit chrome fonts — RULED, keep 2-bit
+**scope: display · ruled 2026-08-15 · no code change**
+
+Asked for as a Settings option. **Measuring it changed the question**, twice
+over, so the numbers are recorded here rather than re-derived.
+
+**A runtime setting costs flash, it does not save it.** `--2bit` is a flag on
+`fontconvert.py` at *generation* time (`convert-builtin-fonts.sh:81,124,149`),
+and that script already notes at :132 that the 1x and 2x cuts must share a bit
+depth, because the renderer blits both through one path. A live switch would
+therefore need BOTH depths compiled in — roughly **+120 KB**, the opposite of
+the intended saving. Only a build-time choice actually saves anything.
+
+**What the depth is worth**, measured from `firmware.elf` with
+`riscv32-esp-elf-gcc-nm --print-size`, summing the six chrome bitmap symbols
+that `applySystemFont()` binds (Libre Franklin 8/10/12, regular + bold):
+
+| Symbol | Bytes |
+|---|---|
+| `librefranklin_8_regularBitmaps` | 25,462 |
+| `librefranklin_8_boldBitmaps` | 28,148 |
+| `librefranklin_10_regularBitmaps` | 38,250 |
+| `librefranklin_10_boldBitmaps` | 42,177 |
+| `librefranklin_12_regularBitmaps` | 53,354 |
+| `librefranklin_12_boldBitmaps` | 59,659 |
+| **Total, 2-bit** | **247,050 (241.3 KB)** |
+| 1-bit, projected | ~123,525 (120.6 KB) |
+
+So the whole prize is **~120 KB, 1.9% of the 6.4 MB budget**, against a build
+currently at 64.5% used — paid for by giving up the antialiasing that
+`1a18de260` was merged to get. Owner ruling: **keep 2-bit.**
+
+`folio-etc/folio`'s 1-bit `.cpfont` packing stays in
+[docs/fork-ecosystem.md](docs/fork-ecosystem.md) as the reference if flash ever
+becomes the binding constraint. It is not one today.
+
 
 ### [T-019] Withdraw three more Settings rows — DONE
 **scope: device Settings UI · ruled 2026-08-07 · done 2026-08-15**
