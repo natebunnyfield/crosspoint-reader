@@ -258,8 +258,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   }
 
   // Owner ruling 2026-08-05: the EDITOR font group is separate from the
-  // reading S tier. Index into EDITOR_FONT_FAMILIES; the index IS the persisted
-  // value, so this list is append-only (see "Enum order is frozen" in CLAUDE.md).
+  // reading S tier. This is a live position in editorfonts::FAMILIES, NOT the
+  // persisted form — settings.json stores the family NAME under
+  // "editorFontFamily" (2026-08-15), so removing or reordering a writing face
+  // no longer needs a migration and "Enum order is frozen" does not bind this
+  // one row. The byte is still written for the web API and for older builds.
   uint8_t editorFont = 0;
 
   // Text rendering settings

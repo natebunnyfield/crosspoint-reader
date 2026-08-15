@@ -62,8 +62,10 @@ class Gfx {
     renderer_.insertFont(UI_10_FONT_ID, ui10_);
     renderer_.insertFont(UI_12_FONT_ID, ui12_);
     renderer_.insertFont(SMALL_FONT_ID, small_);
-    // The editor/Claude face, and the one that carries no U+FFFD (B-009).
-    renderer_.insertFont(IBMPLEXMONO_12_FONT_ID, ibmplexmono12_);
+    // The editor face used for B-009: carries no U+FFFD. Was Space Mono, then
+    // IBM Plex Mono (2026-08-15), then iA Writer Quattro when the list was cut
+    // to three (2026-08-15, ibmplexmono id removed).
+    renderer_.insertFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12_);
   }
 
   GfxRenderer renderer_;
@@ -85,8 +87,8 @@ class Gfx {
   EpdFontFamily ui12_{&ui12R_, &ui12B_};
   EpdFont small8_{&librefranklin_8_regular};
   EpdFontFamily small_{&small8_};
-  EpdFont sm12R_{&ibmplexmono_12_regular}, sm12B_{&ibmplexmono_12_bold};
-  EpdFontFamily ibmplexmono12_{&sm12R_, &sm12B_};
+  EpdFont sm12R_{&iawriterquattro_12_regular}, sm12B_{&iawriterquattro_12_bold};
+  EpdFontFamily iawriterquattro12_{&sm12R_, &sm12B_};
 };
 
 // Fixture: a zeroed counter per test. The renderer is portrait-only now —
@@ -374,16 +376,16 @@ TEST_F(RendererBounds, DegeneratePanesDrawNothingAndDoNotCrash) {
 
 // B-009. A codepoint no face can draw must still occupy space.
 //
-// Space Mono carries neither U+1F60A nor U+FFFD, and it is what the Claude
-// answer and the note editor are painted in — SETTINGS.editorFont defaults to
-// the card-only iA Writer row, so resolveEditorFont falls through to the
-// built-in mono. Before the fallback chain, getGlyph returned nullptr,
-// renderCharImpl drew nothing, and drawText advanced the cursor by ZERO
-// (`prevAdvanceFP = glyph ? glyph->advanceX : 0`). The character did not just
-// vanish: the rest of the line slid left into its place, so a width measured
-// with the emoji present no longer matched what was drawn.
+// The test face is iA Writer Quattro (was Space Mono, then IBM Plex Mono on
+// 2026-08-15, then Quattro when the IBM Plex Mono id was removed the same day).
+// The face carries no U+1F60A nor U+FFFD. Before the fallback chain, getGlyph
+// returned nullptr, renderCharImpl drew nothing, and drawText advanced the
+// cursor by ZERO (`prevAdvanceFP = glyph ? glyph->advanceX : 0`). The
+// character did not just vanish: the rest of the line slid left into its
+// place, so a width measured with the emoji present no longer matched what was
+// drawn.
 TEST(MissingGlyph, ResolvesToAVisibleFallbackRatherThanNothing) {
-  EpdFont mono{&ibmplexmono_12_regular};
+  EpdFont mono{&iawriterquattro_12_regular};
   // hasCodepoint is the raw coverage question — no substitution — so it still
   // reports the truth about this face after the fallback chain exists.
   ASSERT_FALSE(mono.hasCodepoint(REPLACEMENT_GLYPH))
@@ -399,8 +401,8 @@ TEST(MissingGlyph, ResolvesToAVisibleFallbackRatherThanNothing) {
 // The same property one layer up: a string must not measure NARROWER because a
 // character in it is unrepresentable. That is what silently corrupted wrapping.
 TEST_F(RendererBounds, TextWidthCountsUnrepresentableCharacters) {
-  const int without = r->getTextWidth(IBMPLEXMONO_12_FONT_ID, "ab");
-  const int with = r->getTextWidth(IBMPLEXMONO_12_FONT_ID,
+  const int without = r->getTextWidth(IAWRITERQUATTRO_12_FONT_ID, "ab");
+  const int with = r->getTextWidth(IAWRITERQUATTRO_12_FONT_ID,
                                    "a\xF0\x9F\x98\x8A"
                                    "b");  // a + U+1F60A + b
   EXPECT_GT(with, without) << "the unrepresentable character contributed zero width";

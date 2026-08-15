@@ -254,31 +254,58 @@ so every boot discarded the saved byte. If you add a runtime-labeled row, the
 `STR_CAT_READER` and so existed only in the web API — the row was real,
 persisted, and unreachable on an X4 or X3.
 
-**Editor fonts are BUILT IN, and the fallback is monospace.** All six rows
-compile into the firmware: one size, 12 pt, four styles each. The four OFL
-faces are the three iA Writer cuts and IBM Plex Mono; PragmataPro and Nitti
-Typewriter are commercial, so their glyph tables are gitignored and `main.cpp`
-gates them on `__has_include` — a clone without the licensed sources still
-compiles and simply does not register those rows. None are installed to
+**Editor fonts are BUILT IN, and the fallback is monospace.** All three rows
+compile into the firmware: one size, 12 pt, four styles each. iA Writer Quattro
+is OFL and always present; PragmataPro and Nitti Typewriter are commercial, so
+their glyph tables are gitignored and `main.cpp` gates them on `__has_include` —
+a clone without the licensed sources still compiles and simply does not register
+those rows, which is why Quattro is also `fallbackFontId()`. None are installed to
 `/fonts`, because `SdCardFontRegistry` has no exclusion mechanism — an install
 there would surface these writing faces in the READING picker, in the web
 reading enum, and in `cycleReaderFontFamily()`, where a side-button hold
 mid-book would rewrite `sdFontFamilyName` and invalidate the whole book's
 section cache.
 
-**Space Mono was removed on 2026-08-15** (owner ruling), and it is the only row
-ever deleted from a list whose POSITION is what `SETTINGS.editorFont` persists.
-It sat at index 3, so every stored value above it named the wrong family until
-rewritten: `editorfonts::migrateStoredIndex()` does that once, from
-`CrossPointSettings::normalizeRetiredSettings()` as settings.json loads. A
-device that had Space Mono selected lands on IBM Plex Mono — the nearest
-surviving mono — rather than resetting to row 0. The migration deliberately does
-NOT live inside `selectedFamily()` or `builtinFontIdFor()`: those take a
-position in `FAMILIES`, the picker feeds them positions straight out of
-`displayOrder()`, and migrating there would remap a live position that was never
-stale, so choosing PragmataPro in the list would select IBM Plex Mono instead.
-Its recipe, picker label and generated headers all stay in the repo; only the
-wiring is gone, which gave back ~85 KB of flash.
+**The list was cut twice on 2026-08-15, and the second cut changed how the
+setting is persisted.** First Space Mono went, absorbed by shifting the stored
+POSITION. Then the list was cut to three — iA Writer Quattro, PragmataPro, Nitti
+Typewriter — dropping iA Writer Duo, iA Writer Mono and IBM Plex Mono.
+
+The position shift was a mistake and is gone. `SETTINGS.editorFont` is a byte
+that never recorded which table it indexed, the shift ran unconditionally on
+every load, and the corrected value was written back by the ordinary `valuePtr`
+loop — so it re-applied on the next boot and walked a saved choice down the list
+one row per reboot (pick PragmataPro, get IBM Plex Mono two reboots later).
+
+**The editor font now persists by family NAME**, under the settings key
+`editorFontFamily`, exactly as `sdFontFamilyName` and `language` already do. The
+`editorFont` byte is still written — the web settings API reads and writes the
+row through `valuePtr`, and an older build reads the byte — but `fromJson()`
+believes the name whenever it is present. So removing or reordering a writing
+face needs no migration at all, and the list is no longer order-frozen.
+
+`editorfonts::migrateLegacyStoredIndex()` is the one-shot rescue of bytes
+written before the name key existed. Three things about it are load-bearing:
+
+* It runs in `fromJson()`, not `normalizeRetiredSettings()`, because only
+  `fromJson()` can see the document and gate on the name key being ABSENT. It
+  sets `needsResave`, so the name is written immediately and the function is
+  unreachable for that device afterwards — that gate, not idempotence, is what
+  stops the re-application.
+* It reads the RAW `doc["editorFont"]`. The generic ENUM loop clamps against the
+  current `FAMILY_COUNT` (3) before anything else runs, so by then every value
+  worth migrating has already been replaced with the default.
+* It decodes the SIX-row table, and lands Duo and Mono on Quattro (one
+  superfamily, differing only in spacing) and IBM Plex Mono on PragmataPro (the
+  nearest surviving engineered mono). A byte from the seven-row table that
+  preceded it can only exist on a device that has not booted since 02:53 that
+  day; for those, values 4/5/6 land on PragmataPro, Nitti and the default — all
+  surviving writing faces.
+
+Every removed family keeps its recipe, its picker label and its generated
+headers; only the wiring goes. `isWritingOnlyFamily()` also keeps answering true
+for them, via `FORMER_WRITING_FAMILIES`, so a card that happens to carry one
+does not quietly grow the READING picker.
 
 **The device reads `/.crosspoint/settings.json`, not `settings.json` at the card
 root.** A file written to the root is silently ignored, which makes a settings

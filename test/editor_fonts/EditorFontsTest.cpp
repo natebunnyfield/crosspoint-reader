@@ -9,7 +9,7 @@
 // The setting rendered, persisted, and changed nothing on screen. Nothing
 // failed loudly; the picker just had no effect.
 //
-// IBM Plex Mono is compiled in, which is what these tests
+// iA Writer Quattro is compiled in unconditionally, which is what these tests
 // pin. They deliberately do NOT test the renderer: whether a glyph is legible
 // is a device/sim question, and asserting it here would be theatre.
 #include <gtest/gtest.h>
@@ -56,49 +56,140 @@ auto noneRegistered = [](int) { return false; };
 auto allRegistered = [](int) { return true; };
 auto noSdCard = [](const char*) { return 0; };
 
-// Space Mono was deleted from index 3 on 2026-08-15, the only row ever removed
-// from a list whose positions are persisted in SETTINGS.editorFont. Pinned by
-// value rather than by "it does not crash": an off-by-one here silently opens
-// someone's editor in a different typeface, and nothing on screen says why.
+// --- the 2026-08-15 cut to three faces, and the byte it left behind ---------
 //
-// Note the composition below -- migrateStoredIndex() THEN selectedFamily().
-// That is the real call shape: the migration belongs to the persisted byte,
-// and selectedFamily() takes a table position. Collapsing the two is the bug
-// the function's own comment warns about.
-TEST(EditorFonts, RemovingSpaceMonoRemapsWhatDevicesAlreadyStored) {
-  // Below the hole: untouched.
-  EXPECT_EQ(migrateStoredIndex(0), 0);
-  EXPECT_EQ(migrateStoredIndex(1), 1);
-  EXPECT_EQ(migrateStoredIndex(2), 2);
+// Pinned by value rather than by "it does not crash": an off-by-one here
+// silently opens someone's editor in a different typeface, and nothing on
+// screen says why.
+//
+// Note the composition below -- migrateLegacyStoredIndex() THEN
+// selectedFamily(). That is the real call shape: the migration belongs to the
+// persisted byte, and selectedFamily() takes a table position. Collapsing the
+// two is the bug the function's own comment warns about.
+TEST(EditorFonts, CuttingToThreeFacesRemapsWhatDevicesAlreadyStored) {
+  // Exact survivors -- the three values that name a face that still exists.
+  // These are the ones a wrong migration would visibly steal.
+  EXPECT_STREQ(selectedFamily(migrateLegacyStoredIndex(0)), "iAWriterQuattro");
+  EXPECT_STREQ(selectedFamily(migrateLegacyStoredIndex(4)), "PragmataPro");
+  EXPECT_STREQ(selectedFamily(migrateLegacyStoredIndex(5)), "NittiTypewriter");
 
-  // The hole itself. A device that had Space Mono selected lands on what is now
-  // index 3 -- IBM Plex Mono, the nearest surviving mono -- rather than being
-  // reset to row 0.
-  EXPECT_EQ(migrateStoredIndex(3), 3);
-  EXPECT_STREQ(selectedFamily(migrateStoredIndex(3)), "IBMPlexMono");
+  // The two iA siblings land on Quattro. Duo, Mono and Quattro are one
+  // superfamily differing only in how they space, so this is the nearest
+  // surviving face by a wide margin -- not a reset to row 0 that happens to
+  // look like one.
+  EXPECT_STREQ(selectedFamily(migrateLegacyStoredIndex(1)), "iAWriterQuattro");
+  EXPECT_STREQ(selectedFamily(migrateLegacyStoredIndex(2)), "iAWriterQuattro");
 
-  // Above the hole: each shifts down one, so the face someone chose is the face
-  // they keep. These three are the whole point of the migration.
-  EXPECT_EQ(migrateStoredIndex(4), 3);
-  EXPECT_STREQ(selectedFamily(migrateStoredIndex(4)), "IBMPlexMono");
-  EXPECT_EQ(migrateStoredIndex(5), 4);
-  EXPECT_STREQ(selectedFamily(migrateStoredIndex(5)), "PragmataPro");
-  EXPECT_EQ(migrateStoredIndex(6), 5);
-  EXPECT_STREQ(selectedFamily(migrateStoredIndex(6)), "NittiTypewriter");
+  // IBM Plex Mono lands on PragmataPro: both are engineered monos, where Nitti
+  // is a typewriter texture and further away.
+  EXPECT_STREQ(selectedFamily(migrateLegacyStoredIndex(3)), "PragmataPro");
+
+  // Out of range for the six-row table it decodes. Includes 6, which was Nitti
+  // under the SEVEN-row table -- see the note in EditorFonts.h about why the
+  // six-row encoding is the one assumed.
+  EXPECT_EQ(migrateLegacyStoredIndex(6), 0);
+  EXPECT_EQ(migrateLegacyStoredIndex(255), 0);
 }
 
-// Index 3 is IBM Plex Mono, a compiled-in row -- when the build really has it.
-// (It was Space Mono until 2026-08-15; that row is gone and everything above
-// it shifted down one, which migrateStoredIndex() absorbs.)
+// Every output is a LIVE position, not just a smaller number. The predecessor
+// of this function returned index-1, which for a stored 6 produced 5 -- a
+// position that did not exist in the table it was migrating onto.
+TEST(EditorFonts, EveryMigratedValueIsInRange) {
+  for (int i = 0; i < 256; ++i) {
+    const uint8_t got = migrateLegacyStoredIndex(static_cast<uint8_t>(i));
+    EXPECT_LT(got, FAMILY_COUNT) << "legacy value " << i << " migrated out of the table";
+  }
+}
+
+// THE BUG THIS EXISTS FOR, AND WHY THIS TEST ASSERTS SOMETHING WEAKER THAN YOU
+// MIGHT EXPECT
+//
+// The predecessor migration was `index > 3 ? index - 1 : index`, applied
+// unconditionally in normalizeRetiredSettings() on EVERY load. Nothing recorded
+// that it had run, and the corrected value was written back to settings.json by
+// the ordinary valuePtr loop -- so the next boot migrated the already-migrated
+// value again. A device on PragmataPro (stored 4) came back on IBM Plex Mono
+// (3) after two reboots, and on Nitti (5) it walked 5 -> 4 -> 3, one row per
+// boot, until it stuck at the first index the subtraction left alone.
+//
+// The obvious fix would be to make the mapping IDEMPOTENT. It cannot be, and
+// that is not a shortcoming of the table -- it is arithmetic. Idempotence needs
+// every output to be a fixed point, so it would need map(1) == 1 and
+// map(2) == 2. But 1 and 2 are iA Writer Duo and Mono in the encoding being
+// read, and they must land on Quattro (0), while 1 and 2 are PragmataPro and
+// Nitti in the encoding being written. The two encodings overlap, and one byte
+// cannot mean both. NO position-based migration between these two tables can be
+// idempotent.
+//
+// So idempotence is not the safety property. The GATE is: fromJson() calls this
+// only when the "editorFontFamily" key is ABSENT, and sets needsResave so the
+// name is written immediately -- after which the function is unreachable for
+// that device. That gate lives in CrossPointSettings.cpp, a translation unit
+// this suite deliberately does not link, so it is proved end-to-end in the
+// simulator instead: qa/editor-font-migration.sh seeds each legacy byte, boots,
+// and re-boots to show the resolved family does not drift.
+//
+// What this test pins is the property the table alone can carry, and the one
+// the old subtraction lacked: a SECOND application cannot leave the table. The
+// old one could -- migrateStoredIndex(6) returned 5, a position that did not
+// exist in the six-row table it was migrating onto.
+TEST(EditorFonts, MigratingAnAlreadyMigratedValueStaysInsideTheTable) {
+  for (int i = 0; i < 256; ++i) {
+    const uint8_t once = migrateLegacyStoredIndex(static_cast<uint8_t>(i));
+    const uint8_t twice = migrateLegacyStoredIndex(once);
+    EXPECT_LT(twice, FAMILY_COUNT) << "legacy value " << i << " left the table on a second application";
+    // Not EXPECT_EQ(once, twice): see above, that is unachievable here. A
+    // second application still names a real writing face, it just names the
+    // wrong one -- which is exactly why fromJson must never allow one.
+  }
+}
+
+// indexOfFamily is what fromJson uses to turn the persisted NAME back into a
+// position. It is the whole reason a future removal needs no migration at all,
+// so it has to be exact and case-insensitive (the name can arrive from a FAT
+// directory listing or the web API).
+TEST(EditorFonts, StoredNameRoundTripsThroughTheTable) {
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    EXPECT_EQ(indexOfFamily(FAMILIES[i].family), i) << FAMILIES[i].family;
+  }
+  EXPECT_EQ(indexOfFamily("pragmatapro"), indexOfFamily("PragmataPro"));
+
+  // A name that is not ours -- a family removed in this very ruling, or a typo
+  // from the web API -- must be reported as unknown rather than guessed at.
+  // fromJson turns FAMILY_COUNT into row 0; it does not get a near miss.
+  EXPECT_EQ(indexOfFamily("IBMPlexMono"), FAMILY_COUNT);
+  EXPECT_EQ(indexOfFamily("iAWriterDuo"), FAMILY_COUNT);
+  EXPECT_EQ(indexOfFamily(""), FAMILY_COUNT);
+  EXPECT_EQ(indexOfFamily(nullptr), FAMILY_COUNT);
+}
+
+// A family that WAS a writing face must stay hidden from the READING picker.
+//
+// The filter reads FAMILIES, and these are no longer in FAMILIES, so removing
+// the rows would have quietly added three families to the reading list on any
+// card that carries them -- growing a user-facing list nobody asked to grow.
+// FORMER_WRITING_FAMILIES keeps the answer the same.
+TEST(EditorFonts, RetiredWritingFacesStayOutOfTheReadingPicker) {
+  for (const char* retired : {"iAWriterDuo", "iAWriterMono", "IBMPlexMono", "SpaceMono"}) {
+    EXPECT_TRUE(isWritingOnlyFamily(retired)) << retired << " would now be offered as a reading face";
+    EXPECT_FALSE(readingfonts::offeredForReading(retired)) << retired;
+    // They are retired, not current: nothing should treat them as editor rows.
+    EXPECT_FALSE(isEditorFamily(retired)) << retired << " is no longer an editor face";
+  }
+}
+
+// Index 0 is iA Writer Quattro, a compiled-in row -- when the build really has
+// it. (Index 3 was IBM Plex Mono until the list was cut to three on 2026-08-15;
+// that row is gone, and so is the arithmetic that used to chase it.)
 TEST(EditorFonts, BuiltinRowResolvesToItsFaceWhenRegistered) {
-  EXPECT_EQ(resolve(3, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(3));
+  EXPECT_EQ(resolve(0, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(0));
 }
 
 // The regression: same row, but this build omitted the face. Returning the id
 // anyway is what drew a blank page.
 TEST(EditorFonts, BuiltinRowDoesNotResolveToAnUnregisteredFace) {
-  const int got = resolve(3, noneRegistered, noSdCard, kUiFallback);
-  EXPECT_NE(got, builtinFontIdFor(3)) << "returned a font id the renderer has no glyphs for";
+  const int got = resolve(0, noneRegistered, noSdCard, kUiFallback);
+  EXPECT_NE(got, builtinFontIdFor(0)) << "returned a font id the renderer has no glyphs for";
   EXPECT_EQ(got, kUiFallback) << "with no editor face in the binary, only the UI face can draw";
 }
 
@@ -122,39 +213,28 @@ TEST(EditorFonts, CardOnlyRowPrefersTheInstalledFamily) {
 // family -- the built-in is checked first on purpose.
 TEST(EditorFonts, BuiltinWinsOverTheCardWhenPresent) {
   auto sdHasIt = [](const char*) { return kSdId; };
-  EXPECT_EQ(resolve(3, allRegistered, sdHasIt, kUiFallback), builtinFontIdFor(3));
+  EXPECT_EQ(resolve(0, allRegistered, sdHasIt, kUiFallback), builtinFontIdFor(0));
 }
 
-// The five OFL faces are built in (monos: ruling 2026-08-06; iA faces: ruling
-// 2026-08-11). Without this the setting is inert for that row. PragmataPro is
-// the sixth and is checked separately below: it is compiled in too, but its
-// glyph tables are gitignored, so it is the one row whose presence legitimately
-// varies by checkout and it cannot be asserted the same way.
+// iA Writer Quattro is the only surviving row whose glyph tables are in this
+// repo, so it is the only one that can be asserted unconditionally -- and it
+// carries the whole out-of-the-box path, being the default and the fallback.
+// PragmataPro and Nitti Typewriter are commercial and gitignored, so their
+// presence legitimately varies by checkout; they are checked separately below
+// through resolve()'s isRegistered machinery instead.
 TEST(EditorFonts, AllFacesAreCompiledIn) {
-  bool sawQuattro = false, sawDuo = false, sawMono = false;
-  bool sawPlex = false;
+  bool sawQuattro = false;
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
     if (std::strcmp(FAMILIES[i].family, "iAWriterQuattro") == 0) {
       sawQuattro = true;
       EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "iA Writer Quattro must be compiled in";
     }
-    if (std::strcmp(FAMILIES[i].family, "iAWriterDuo") == 0) {
-      sawDuo = true;
-      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "iA Writer Duo must be compiled in";
-    }
-    if (std::strcmp(FAMILIES[i].family, "iAWriterMono") == 0) {
-      sawMono = true;
-      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "iA Writer Mono must be compiled in";
-    }
-    if (std::strcmp(FAMILIES[i].family, "IBMPlexMono") == 0) {
-      sawPlex = true;
-      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "IBM Plex Mono must be compiled in";
-    }
+    // Every row claims a built-in id regardless: a card-only editor row would
+    // mean the setting does nothing on a device with no matching card family,
+    // which is the original bug this file exists for.
+    EXPECT_NE(FAMILIES[i].builtinFontId, 0) << FAMILIES[i].family << " must be compiled in";
   }
-  EXPECT_TRUE(sawQuattro);
-  EXPECT_TRUE(sawDuo);
-  EXPECT_TRUE(sawMono);
-  EXPECT_TRUE(sawPlex);
+  EXPECT_TRUE(sawQuattro) << "the default and fallback face is missing from the table";
 }
 
 // builtinFontIdFor is what resolveEditorFont consults first, so it must agree
@@ -195,26 +275,22 @@ TEST(EditorFonts, BuiltinIdsAreDistinct) {
   }
 }
 
-// SETTINGS.editorFont persists this POSITION, so the order is the on-disk
-// encoding. Reordering or deleting a row silently re-points every saved
-// settings.json at a different family; appending is the only safe edit.
-// This test is the tripwire for that, so it hardcodes the shipped order.
+// The shipped list, hardcoded. It is no longer the on-disk encoding -- that is
+// the family NAME now -- so editing this table is allowed in a way it was not
+// before. What is NOT allowed is editing it silently: three faces is an owner
+// ruling (2026-08-15), and the picker, the colophon and the built-in font
+// registrations in main.cpp all have to move with it.
 TEST(EditorFonts, RowOrderIsFrozen) {
-  ASSERT_EQ(FAMILY_COUNT, 6u) << "a row was added or removed: rows may only be APPENDED, and if you "
-                                 "appended one, extend this test rather than changing the earlier entries. "
-                                 "Removing one is a THIRD case and needs migrateStoredIndex() extended too "
-                                 "-- see RemovingSpaceMonoRemapsWhatDevicesAlreadyStored";
+  ASSERT_EQ(FAMILY_COUNT, 3u) << "a row was added or removed. Three writing faces is an owner ruling; "
+                                 "if it has changed, update main.cpp's font registrations, fontIds.h, "
+                                 "all.h and ColophonData.h to match, and note that persistence is by "
+                                 "NAME now so no index migration is needed -- see EditorFonts.h";
   EXPECT_STREQ(FAMILIES[0].family, "iAWriterQuattro");
-  EXPECT_STREQ(FAMILIES[1].family, "iAWriterDuo");
-  EXPECT_STREQ(FAMILIES[2].family, "iAWriterMono");
-  EXPECT_STREQ(FAMILIES[3].family, "IBMPlexMono");
-  // Appended 2026-08-14. Every earlier index above is untouched, which is the
-  // whole contract: SETTINGS.editorFont on a device that already chose IBM Plex
-  // Mono must still mean IBM Plex Mono.
-  EXPECT_STREQ(FAMILIES[4].family, "PragmataPro");
-  // Appended 2026-08-15. COMMERCIAL, Regular-only source; Bold/Italic/BoldItalic
-  // synthesised at build time.
-  EXPECT_STREQ(FAMILIES[5].family, "NittiTypewriter");
+  // COMMERCIAL, glyph tables gitignored.
+  EXPECT_STREQ(FAMILIES[1].family, "PragmataPro");
+  // COMMERCIAL, Regular-only source; Bold/Italic/BoldItalic synthesised at
+  // build time.
+  EXPECT_STREQ(FAMILIES[2].family, "NittiTypewriter");
 }
 
 // PragmataPro is COMMERCIAL, and it is the only row whose glyph tables are not
@@ -228,7 +304,7 @@ TEST(EditorFonts, RowOrderIsFrozen) {
 // already has the machinery (isRegistered), so the test is that PragmataPro
 // routes through it rather than around it.
 TEST(EditorFonts, PragmataProIsABuiltinRowThatDegradesWhenTheFontIsAbsent) {
-  const uint8_t pp = 4;  // was 5 until Space Mono left index 3 on 2026-08-15
+  const uint8_t pp = 1;  // was 4 until the list was cut to three on 2026-08-15
   ASSERT_STREQ(FAMILIES[pp].family, "PragmataPro");
   EXPECT_NE(FAMILIES[pp].builtinFontId, 0) << "PragmataPro is compiled in, not a card family";
 
@@ -241,7 +317,7 @@ TEST(EditorFonts, PragmataProIsABuiltinRowThatDegradesWhenTheFontIsAbsent) {
   EXPECT_NE(degraded, builtinFontIdFor(pp)) << "returned a font id the renderer has no glyphs for";
 
   // And when the OTHER editor faces are present (the real shape of a clone
-  // without PragmataPro: five OFL monos compiled in, one missing), it degrades
+  // without PragmataPro: the OFL faces compiled in, this one missing), degrades
   // to a sibling WRITING face, never to UI chrome.
   const auto allButPragmata = [&](int id) { return id != FAMILIES[pp].builtinFontId; };
   const int sibling = resolve(pp, allButPragmata, noSdCard, kUiFallback);
@@ -259,14 +335,14 @@ TEST(EditorFonts, PragmataProIsWritingOnly) {
   EXPECT_TRUE(isEditorFamily("PragmataPro"));
   EXPECT_TRUE(isEditorFamily("pragmatapro")) << "matched case-insensitively like the other rows";
   EXPECT_TRUE(isWritingOnlyFamily("PragmataPro"));
-  EXPECT_FALSE(FAMILIES[4].alsoReading) << "promoting this row would expose its Latin-1-only bold to book text";
+  EXPECT_FALSE(FAMILIES[1].alsoReading) << "promoting this row would expose its Latin-1-only bold to book text";
 }
 
 // NittiTypewriter: COMMERCIAL, same degradation contract as PragmataPro.
 // The glyph tables are gitignored; a clone without the TTFs must still compile
 // and the row must degrade to a built-in mono — not crash, not return garbage.
 TEST(EditorFonts, NittiTypewriterIsABuiltinRowThatDegradesWhenTheFontIsAbsent) {
-  const uint8_t nt = 5;  // was 6 until Space Mono left index 3 on 2026-08-15
+  const uint8_t nt = 2;  // was 5 until the list was cut to three on 2026-08-15
   ASSERT_STREQ(FAMILIES[nt].family, "NittiTypewriter");
   EXPECT_NE(FAMILIES[nt].builtinFontId, 0) << "NittiTypewriter is compiled in, not a card family";
 
@@ -292,7 +368,7 @@ TEST(EditorFonts, NittiTypewriterIsWritingOnly) {
   EXPECT_TRUE(isEditorFamily("NittiTypewriter"));
   EXPECT_TRUE(isEditorFamily("nittitypewriter")) << "matched case-insensitively like the other rows";
   EXPECT_TRUE(isWritingOnlyFamily("NittiTypewriter"));
-  EXPECT_FALSE(FAMILIES[5].alsoReading) << "typewriter face with narrow bold counter must not reach the reading picker";
+  EXPECT_FALSE(FAMILIES[2].alsoReading) << "typewriter face with narrow bold counter must not reach the reading picker";
 }
 
 // Every row needs a label the picker can draw and a family name the SD

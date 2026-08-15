@@ -97,7 +97,9 @@ done
 # real: MarkdownSpans renders bold, italic and bold-italic. 2-bit + compressed,
 # matching the reader cuts.
 #
-# Flash cost: ~83 KB for SpaceMono + IBMPlexMono, ~216 KB for the three iA
+# Only iAWriterQuattro is still wired into the firmware (2026-08-15 ruling);
+# the rest are kept generatable so a removed family stays one commit away.
+# Historic flash cost: ~83 KB for SpaceMono + IBMPlexMono, ~216 KB for the iA
 # Writer families (owner ruling 2026-08-11). The iA faces are the "S" (narrow)
 # cuts; their URL-fetch recipes live in sd-fonts.yaml "Editor group", and the
 # source TTFs for the builtin cuts are in builtinFonts/source/iAWriterXxx/.

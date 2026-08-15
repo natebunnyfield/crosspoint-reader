@@ -3,8 +3,9 @@
 // faces — they do not join the six-family reading S tier, and a card carrying
 // them is not thereby carrying a seventh reading family.
 //
-// Order is the persisted encoding of SETTINGS.editorFont — APPEND ONLY.
-// Recipes live in lib/EpdFont/scripts/sd-fonts.yaml under "Editor group".
+// The persisted form is the family NAME, not this list's order (2026-08-15,
+// see migrateLegacyStoredIndex below). Recipes live in
+// lib/EpdFont/scripts/sd-fonts.yaml under "Editor group".
 #pragma once
 
 #include <stddef.h>
@@ -33,48 +34,45 @@ struct Entry {
   bool alsoReading;
 };
 
-// The first four are OFL. The iA faces are the "S" (narrow) cuts. PragmataPro
-// and Nitti Typewriter are the commercial exceptions and are documented at
-// their own entries below.
+// THREE faces, by owner ruling 2026-08-15: iA Writer Quattro, PragmataPro,
+// Nitti Typewriter. Quattro is OFL and always compiled in; the other two are
+// commercial and documented at their own entries below.
 //
-// All four OFL families are BUILT IN (monos: owner ruling 2026-08-06; iA
-// faces: owner ruling 2026-08-11). Before 2026-08-06 every entry was
-// card-only, and since no card carried any of them this setting did nothing
-// whatsoever: resolveEditorFont() got 0 back from the SD resolver and fell
-// through to the 10 pt UI face no matter which row you picked.
+// Every row is BUILT IN (monos: owner ruling 2026-08-06; iA faces: owner
+// ruling 2026-08-11). Before 2026-08-06 every entry was card-only, and since
+// no card carried any of them this setting did nothing whatsoever:
+// resolveEditorFont() got 0 back from the SD resolver and fell through to the
+// 10 pt UI face no matter which row you picked.
 //
-// The "not fetchable by URL" claim that appeared here previously was stale.
-// lib/EpdFont/scripts/sd-fonts.yaml has had URL-fetch recipes for all three
-// iA Writer families (raw.githubusercontent.com/iaolo/iA-Fonts) since those
-// recipes were added — the same mechanism as the Google Fonts pair.
+// Flash cost of the survivors: ~72 KB for iA Writer Quattro plus whatever the
+// two commercial cuts weigh where their TTFs are present (all at 12 pt, four
+// styles each, 2-bit compressed). The _2x companions are dead flash on device
+// where RENDER_SCALE=1 and are stripped by --gc-sections; they ship only in
+// the simulator/iOS binaries that run at RENDER_SCALE=2.
 //
-// Flash cost: ~41 KB for IBMPlexMono, ~216 KB for the three iA
-// families (all at 12 pt, four styles each, 2-bit compressed). The _2x
-// companions (~818 KB compressed) are dead flash on device where RENDER_SCALE=1
-// and are stripped by --gc-sections; they ship only in the simulator/iOS
-// binaries that run at RENDER_SCALE=2.
+// FOUR rows have been removed, in two rulings:
+//   2026-08-15  Space Mono, from index 3 of a seven-row table.
+//   2026-08-15  iA Writer Duo, iA Writer Mono and IBM Plex Mono, from indices
+//               1, 2 and 3 of the six-row table the first ruling left behind.
 //
-// Rows may only be APPENDED — SETTINGS.editorFont persists this POSITION.
+// The first removal was absorbed by shifting the stored POSITION, and that was
+// a mistake: the byte on disk carried no record of which table it indexed, so
+// the shift re-applied on every load and walked a saved value down the list one
+// row per boot (pick PragmataPro, get IBM Plex Mono two reboots later). The
+// second removal does not repeat it. SETTINGS.editorFont is now persisted by
+// FAMILY NAME under the settings key "editorFontFamily", exactly as
+// sdFontFamilyName and language already are, so no future removal or reorder
+// can re-point a saved value at a different face and this list is no longer
+// order-frozen. See migrateLegacyStoredIndex() below for the one-shot rescue of
+// the position-encoded bytes that already exist.
 //
-// ONE row has ever been removed: Space Mono, which sat at index 3 until
-// 2026-08-15 (owner ruling: "remove space mono entirely from app. keep for
-// possible future use in repo though"). Removing a row from the middle is
-// exactly the hazard this comment warns about, so it is handled rather than
-// waved through — editorfonts::migrateStoredIndex() rewrites any value a device
-// already persisted, applied once by CrossPointSettings::normalizeRetiredSettings()
-// as settings.json is loaded. Nothing else in this list may be deleted without
-// extending that function the same way.
-//
-// What "keep in the repo" means here: the recipe stays in sd-fonts.yaml, the
-// picker label stays in FontDisplayNames.h, and the eight generated
-// builtinFonts/spacemono_12_*.h stay tracked. Only the wiring is gone — the
-// row, the id, the font objects in main.cpp, and the all.h includes — so the
-// family costs no flash while remaining one commit away from returning.
+// What "keep in the repo" means for a removed family: the recipe stays in
+// sd-fonts.yaml, the picker label stays in FontDisplayNames.h, and the
+// generated builtinFonts/*.h stay tracked. Only the wiring goes — the row, the
+// id, the font objects in main.cpp, and the all.h includes — so the family
+// costs no flash while remaining one commit away from returning.
 inline constexpr Entry FAMILIES[] = {
     {"iAWriterQuattro", "iA Writer Quattro", IAWRITERQUATTRO_12_FONT_ID, /*alsoReading=*/true},
-    {"iAWriterDuo", "iA Writer Duo", IAWRITERDUO_12_FONT_ID, false},
-    {"iAWriterMono", "iA Writer Mono", IAWRITERMONO_12_FONT_ID, false},
-    {"IBMPlexMono", "IBM Plex Mono", IBMPLEXMONO_12_FONT_ID, false},
     // COMMERCIAL, and the only row whose glyph tables are not in this repo.
     // builtinFonts/pragmatapro_*.h are gitignored (see .gitignore) and built
     // locally from lib/EpdFont/local_fonts/, so a clone without the licensed
@@ -108,22 +106,58 @@ inline constexpr Entry FAMILIES[] = {
 };
 inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);
 
-// Rewrite a persisted SETTINGS.editorFont value for the rows that have moved.
+// Table position for a persisted family NAME, or FAMILY_COUNT when the name is
+// not one of ours (a family since removed, or a typo from the web API). The
+// caller decides what "not ours" means; this does not guess.
+size_t indexOfFamily(const char* family);
+
+// ONE-SHOT rescue of a settings.json written before the name key existed.
 //
-// Space Mono was index 3; IBM Plex Mono, PragmataPro and Nitti Typewriter each
-// shifted down one when it went. So anything above 3 loses one, and a stored 3
-// — a device that had Space Mono selected — lands on what is now index 3, IBM
-// Plex Mono. That is deliberate rather than a reset to row 0: a Space Mono user
-// asked for a grotesque-ish mono, and Plex is the nearest thing left. Values
-// below 3 are untouched.
+// The input is a POSITION in the six-row table that shipped between the two
+// 2026-08-15 rulings — 0 Quattro, 1 Duo, 2 Mono, 3 Plex, 4 PragmataPro,
+// 5 Nitti — and the output is a position in FAMILIES above. Three rows map
+// exactly; the three removed families have to land somewhere:
 //
-// Applied at the SETTINGS boundary, never inside selectedFamily() or
-// builtinFontIdFor(): those take a position in FAMILIES, and the picker hands
-// them positions from displayOrder(). Migrating in there would rewrite a live
-// position that was never stale — picking PragmataPro would select IBM Plex
-// Mono. A stored value and a table position are different things that share a
-// type, which is exactly the sort of confusion that ships quietly.
-uint8_t migrateStoredIndex(uint8_t index);
+//   0 iAWriterQuattro -> 0 iAWriterQuattro   exact
+//   1 iAWriterDuo     -> 0 iAWriterQuattro   same superfamily, same designer;
+//   2 iAWriterMono    -> 0 iAWriterQuattro     Duo/Mono/Quattro differ only in
+//                                              how they space, so the nearest
+//                                              surviving face is very near
+//   3 IBMPlexMono     -> 1 PragmataPro       both engineered monos; Nitti is a
+//                                              typewriter texture and further
+//   4 PragmataPro     -> 1 PragmataPro       exact
+//   5 NittiTypewriter -> 2 NittiTypewriter   exact
+//   >=6               -> 0                   out of range for that table
+//
+// Why the SIX-row encoding and not the seven-row one that preceded it: the
+// six-row table is what main's picker writes (EditorFontSelectionActivity
+// stores a live displayOrder() position) and what its toJson persists, so it is
+// the encoding of every byte that a build carrying the first ruling has saved.
+// A seven-row byte only survives on a device that has not booted since
+// 2026-08-15 02:53, and for those the three ambiguous values (4 Plex, 5
+// PragmataPro, 6 Nitti) land on PragmataPro, Nitti and the default — all
+// surviving writing faces, none of them a reading face. That is the cost of
+// disambiguating a byte that never recorded its own encoding, and it is the
+// last time it has to be paid.
+//
+// Applied ONCE, in CrossPointSettings::fromJson, and only when the
+// "editorFontFamily" key is ABSENT. Presence of the name is the discriminator
+// the old bare byte never had, and fromJson sets needsResave so the name is
+// written immediately — after which this function is unreachable for that
+// device forever. That is what stops the re-application that walked stored
+// values down the list one row per boot under the first ruling.
+//
+// It must read the RAW doc["editorFont"] byte, never the field: the generic
+// ENUM loop in fromJson clamps against the CURRENT FAMILY_COUNT (3) before
+// normalizeRetiredSettings ever runs, so by then every value worth migrating
+// has already been thrown away and replaced with the default.
+//
+// Never call this from selectedFamily() or builtinFontIdFor(): those take a
+// position in FAMILIES, and the picker hands them positions from
+// displayOrder(). Migrating in there would rewrite a live position that was
+// never stale. A stored value and a table position are different things that
+// share a type, which is exactly the sort of confusion that ships quietly.
+uint8_t migrateLegacyStoredIndex(uint8_t index);
 
 // Family name for the current SETTINGS.editorFont, or the first entry when the
 // stored index is out of range (a settings.json written before a family was
@@ -136,12 +170,13 @@ int builtinFontIdFor(uint8_t index);
 
 // The last resort, and it is a MONOSPACE face rather than the UI face.
 //
-// Three of the five rows are card-only, index 0 among them, so the shipped
-// default resolved to nothing and the editor came up in 10 pt Libre Franklin --
-// compiling two faces in fixed the two new rows and left the out-of-the-box
-// path exactly as broken as before. Falling back to a built-in mono means every
-// row lands on a writing face, and a card-only row degrades to a sibling in the
-// same group instead of to UI chrome.
+// Historically most rows were card-only, index 0 among them, so the shipped
+// default resolved to nothing and the editor came up in 10 pt Libre Franklin.
+// Falling back to a built-in mono means every row lands on a writing face, and
+// an unreachable row degrades to a sibling in the same group instead of to UI
+// chrome. It still matters with three rows: iA Writer Quattro is the only one
+// whose glyph tables are in this repo, so on a clone without the licensed TTFs
+// the other two are unregistered and land here.
 //
 // Deliberately NOT done by changing the default index: SETTINGS.editorFont is a
 // persisted position, every existing device already has 0 stored, and a device
@@ -190,9 +225,12 @@ bool isWritingOnlyFamily(const char* family);
 
 // The order the PICKER lists these in: display position -> stored index.
 //
-// FAMILIES itself is APPEND ONLY (its index IS SETTINGS.editorFont), so the
-// on-screen order has to be a separate permutation or nothing can ever be
-// reordered again. Nothing here moves a stored value.
+// This was a separate permutation because FAMILIES used to be append-only (its
+// index WAS the persisted value). Persistence is by name now, so the table
+// could in principle be reordered directly — but the permutation stays: it
+// keeps the on-screen order derived from lineage dates rather than from
+// whatever order the rows happen to sit in, which is what makes it agree with
+// Text Settings automatically. Nothing here moves a stored value.
 //
 // Owner ruling 2026-08-09: this list presents and sorts IDENTICALLY to Text
 // Settings. That is the reading picker's comparator, restated —

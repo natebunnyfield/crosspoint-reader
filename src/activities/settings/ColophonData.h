@@ -301,7 +301,7 @@ inline constexpr ColophonTech COLOPHON_TECH[] = {
     {"Reading face",
      "Libre Franklin. Morris Fuller Benton, 1902 Jersey City; Pablo Impallari, Rodrigo Fuenzalida & Nhung "
      "Nguyen, 2016 Rosario, Argentina"},
-    {"Writing faces", "iA Writer Quattro, Duo and Mono, IBM Plex Mono, PragmataPro, Nitti Typewriter, 12 pt"},
+    {"Writing faces", "iA Writer Quattro, PragmataPro, Nitti Typewriter, 12 pt"},
     {"Card fonts",
      "48 buildable families. Six installed: Coelacanth, Edgar, Inknut Antiqua + Junicode, Libre Franklin, "
      "Libris, TeX Gyre Schola"},
