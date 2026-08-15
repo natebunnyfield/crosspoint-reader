@@ -96,6 +96,11 @@ class GfxRenderer {
   mutable int _stripRows = 0;
   mutable bool _stripActive = false;
 
+  // Text-only mode. While set, every NON-GLYPH drawing primitive returns
+  // without touching the buffer; drawText and drawTextRotated90CW are the only
+  // things that still put pixels down. See TextOnlyScope for why.
+  mutable bool _textOnly = false;
+
   // CJK UI font fallback map: primary (built-in, Latin-only) UI font id -> a
   // size-matched SD-card font id that carries CJK glyphs. When a string drawn
   // or measured with a mapped primary font contains a CJK codepoint the primary
@@ -295,6 +300,34 @@ class GfxRenderer {
   // grayscale planes band-by-band without a full second buffer.
   void beginStripTarget(uint8_t* scratch, int stripY0, int stripRows) const;
   void endStripTarget() const;
+
+  // Text-only mode, for the grayscale anti-aliasing pass.
+  //
+  // In a grayscale plane pass every write means "lift this pixel toward
+  // white", so a fill, a rule, an icon or a bitmap re-drawn during the pass
+  // comes out GRAY on the panel even though the base frame drew it solid.
+  // TextAntiAliasingPass.h states that as a rule the caller has to obey; this
+  // enforces it, so a whole existing render body can be handed to the overlay
+  // instead of a hand-maintained text-only copy of it that drifts.
+  //
+  // Suppressed: every non-glyph primitive (lines, rects, rounded rects, arcs,
+  // polygons, dithered fills, images, icons, bitmaps, invertScreen,
+  // writeFramebufferRegion). NOT suppressed: drawText / drawCenteredText /
+  // drawTextRotated90CW, clearScreen (the pass clears each band itself), and
+  // every measurement call -- layout must come out identical to the base pass
+  // or the overlay lands on the wrong pixels.
+  bool isTextOnly() const { return _textOnly; }
+  class TextOnlyScope {
+   public:
+    explicit TextOnlyScope(const GfxRenderer& r) : r_(r), prev_(r._textOnly) { r._textOnly = true; }
+    ~TextOnlyScope() { r_._textOnly = prev_; }
+    TextOnlyScope(const TextOnlyScope&) = delete;
+    TextOnlyScope& operator=(const TextOnlyScope&) = delete;
+
+   private:
+    const GfxRenderer& r_;
+    bool prev_;
+  };
 
   // Band culling for tiled grayscale. Takes a glyph bounding box in logical
   // screen coords and returns false only when a strip is active AND the box's

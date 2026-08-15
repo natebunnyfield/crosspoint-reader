@@ -36,15 +36,28 @@
 // only a 2-BIT font can be antialiased at all. Plane flags come solely from
 // the 2-bit branch of GfxRenderer::renderCharImpl, which reads a glyph's four
 // coverage levels; a 1-bit glyph has no partial coverage, and its single write
-// in a plane pass clears a bit in a plane that starts cleared. Every UI chrome
-// font in this firmware is 1-bit — lib/EpdFont/builtinFonts holds exactly
-// twelve 1-bit faces and they are the Libre Franklin 8/10/12 cuts main.cpp
-// binds to SMALL_FONT_ID / UI_10_FONT_ID / UI_12_FONT_ID. So headers, list
-// rows, button hints, popups, the keyboard, the colophon and the file viewer
-// cannot be antialiased no matter what is plumbed to them; the pass over them
-// buys a second panel refresh and zero pixels. Only the SD .cpfont reading
-// cuts, the librefranklin_reader_* fallbacks and the built-in editor
-// monospaces are 2-bit. test/text_antialiasing pins both directions.
+// in a plane pass clears a bit in a plane that starts cleared.
+//
+// Every font in this firmware is now 2-bit. The UI chrome cuts were the last
+// 1-bit faces and were rebuilt on 2026-08-14 -- 2-bit but deliberately
+// UNCOMPRESSED, at +122,528 B of flash, because compressing them would have
+// been 25 KB cheaper still and 6.1x slower on the colophon (chrome has no
+// PrewarmScope, so every font/style switch re-inflates a group on the render
+// path). docs/two-bit-chrome.md has the tables.
+//
+// So the font-depth blocker that made chrome AA a no-op is gone. What remains
+// is the COST above, and it still rules out most of the chrome: measured, the
+// overlay makes a settings-list repaint 10x and a Home repaint 20x, so only the
+// colophon and the file viewer take it -- the two chrome surfaces you page
+// through rather than move a selection around. test/text_antialiasing pins both
+// directions of the depth rule, so a face that regresses to 1-bit is caught
+// here rather than on a panel.
+//
+// The TEXT-ONLY rule (TextAntiAliasingPass.h) is enforced, not just documented:
+// wrap the callback body in a GfxRenderer::TextOnlyScope and every non-glyph
+// primitive it calls becomes a no-op for the duration, so an existing render
+// body can be handed to the overlay without a hand-maintained text-only copy
+// that drifts out of step with it.
 namespace TextAa {
 
 inline bool enabled() { return SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF; }
@@ -74,6 +87,29 @@ inline void overlayIfEnabled(GfxRenderer& renderer, F&& draw) {
   if (!enabled()) return;
   using Fn = std::remove_reference_t<F>;
   overlay(renderer, strength(), [](void* ctx) { (*static_cast<Fn*>(ctx))(); }, static_cast<void*>(&draw));
+}
+
+// UI chrome draws at 8, 10 and 12 pt, and at those sizes AA_STANDARD is a
+// REGRESSION rather than an improvement, so the chrome overlay pins AA_CRISP
+// instead of following the reader's setting.
+//
+// Standard sends glyph level 1 (high coverage) to dark gray. In reading sizes
+// that level is edge pixels; at 8-12 pt it is a large share of the STEM, so the
+// whole face lifts off black and reads washed out and thinner rather than
+// smoother -- measured on the settings header and the button hints, and visible
+// at any zoom. Crisp leaves level 1 painted black by the base pass and lifts
+// only level 2, the faintest coverage, which is the only part that was ever
+// aliasing. See docs/two-bit-chrome.md for the crops.
+//
+// It is a pin, not a second setting: SETTINGS.textAntiAliasing is itself
+// pinned to TEXT_AA_STANDARD by normalizeRetiredSettings() and has no device
+// control, so following it would mean every chrome surface always taking the
+// one strength that hurts. enabled() is still honoured, so Off is Off.
+template <typename F>
+inline void overlayChromeIfEnabled(GfxRenderer& renderer, F&& draw) {
+  if (!enabled()) return;
+  using Fn = std::remove_reference_t<F>;
+  overlay(renderer, GfxRenderer::AA_CRISP, [](void* ctx) { (*static_cast<Fn*>(ctx))(); }, static_cast<void*>(&draw));
 }
 
 }  // namespace TextAa

@@ -136,6 +136,108 @@ TEST(LibreFranklinBuiltinCuts, BoldIsNotTheRegularCut) {
   EXPECT_NE(librefranklin_12_bold_2x.bitmap, librefranklin_12_regular_2x.bitmap);
 }
 
+// --- 1b. The bit depth ------------------------------------------------------
+//
+// The chrome cuts were the last 1-bit faces in builtinFonts and were rebuilt
+// 2-bit, UNCOMPRESSED, on 2026-08-14 (docs/two-bit-chrome.md). Two separate
+// things can silently undo that, and both look like "the UI got slightly
+// worse" rather than like an error:
+//
+//   * dropping --2bit puts the chrome back to one coverage level, which makes
+//     the anti-aliasing overlay on the colophon and the file viewer a no-op
+//     that still costs a second panel refresh. That exact regression already
+//     shipped once and was found only by an A/B of two byte-identical
+//     screenshots.
+//   * ADDING --compress. It looks like a pure win -- it takes 148 KB back off
+//     the flash the 2-bit rebuild spent, landing 25 KB under the 1-bit cuts --
+//     and it costs 6.1x on the colophon repaint, because a chrome screen has
+//     no PrewarmScope and every font/style switch re-inflates a whole group
+//     through FontDecompressor's hot-group path. It also parks up to 19,612 B
+//     of DRAM in that grow-only buffer. docs/two-bit-chrome.md has the table.
+//
+// The 2x companions have to move in lockstep: drawText hands the companion's
+// EpdFontData to the same renderCharImpl, which reads the depth off the data
+// it was given, so a 1-bit companion under a 2-bit 1x face renders as noise.
+
+TEST(LibreFranklinBuiltinCuts, EveryChromeCutIsTwoBit) {
+  for (const auto& cut : kCuts) {
+    EXPECT_TRUE(cut.oneX->is2Bit) << cut.name << " (1x) is 1-bit: chrome anti-aliasing silently becomes a no-op";
+    EXPECT_TRUE(cut.twoX->is2Bit) << cut.name
+                                  << " (2x) is 1-bit while its 1x face is 2-bit: the companion blits "
+                                     "through the same renderCharImpl and would come out as noise";
+  }
+}
+
+TEST(LibreFranklinBuiltinCuts, NoChromeCutIsCompressed) {
+  for (const auto& cut : kCuts) {
+    for (const EpdFontData* data : {cut.oneX, cut.twoX}) {
+      const bool hiRes = (data == cut.twoX);
+      const std::string label = std::string(cut.name) + (hiRes ? " (2x)" : " (1x)");
+      EXPECT_EQ(data->groups, nullptr) << label
+                                       << " is compressed; chrome has no PrewarmScope, so every font/style "
+                                          "switch re-inflates a group on the render path (6.1x on the "
+                                          "colophon, measured) and parks ~19.6 KB of DRAM in the hot-group "
+                                          "buffer";
+      EXPECT_EQ(data->groupCount, 0u) << label << " carries a group table";
+    }
+  }
+}
+
+// The other half of that ruling, stated as behaviour rather than as a struct
+// field: chrome must render with NO FontDecompressor attached at all. An
+// uncompressed face is read straight out of flash by getGlyphBitmap, so the
+// chrome keeps working on any renderer, and no chrome-only session (one that
+// never opens a book) allocates a decompression buffer.
+TEST(LibreFranklinBuiltinCuts, ChromeDrawsWithNoDecompressorAttached) {
+  GfxRenderer bare(display);
+  bare.begin();
+  ASSERT_EQ(nullptr, bare.getFontCacheManager()) << "fixture wired a cache manager; the point is that it has none";
+
+  EpdFont r{&librefranklin_12_regular};
+  const EpdFontFamily fam{&r};
+  bare.insertFont(UI_12_FONT_ID, fam);
+  bare.clearScreen();
+  bare.drawText(UI_12_FONT_ID, 20, 60, "Settings");
+
+  const uint8_t* fb = bare.getFrameBuffer();
+  bool anyInk = false;
+  for (uint32_t i = 0; i < bare.getBufferSize() && !anyInk; ++i) anyInk = fb[i] != 0xFF;
+  EXPECT_TRUE(anyInk) << "chrome drew nothing without a decompressor -- the faces have been compressed again, and "
+                         "every screen that draws before main.cpp:367 wires one would come up blank";
+}
+
+// The point of the whole exercise: a chrome glyph must now put bits in a
+// grayscale plane, which is what the overlay lifts. This is the positive twin
+// of test/text_antialiasing's OneBitFontContributesNothingToAGrayscalePlane.
+TEST(LibreFranklinBuiltinCuts, AChromeGlyphFlagsAGrayscalePlane) {
+  GfxRenderer renderer(display);
+  renderer.begin();
+
+  EpdFont r{&librefranklin_10_regular};
+  const EpdFontFamily fam{&r};
+  renderer.insertFont(UI_10_FONT_ID, fam);
+
+  // Sanity: the face draws at all, so the plane assertion is not vacuous.
+  renderer.setRenderMode(GfxRenderer::BW);
+  renderer.clearScreen(0xFF);
+  renderer.drawText(UI_10_FONT_ID, 20, 60, "Handgloves", true);
+  const uint8_t* fb = renderer.getFrameBuffer();
+  bool anyInk = false;
+  for (uint32_t i = 0; i < renderer.getBufferSize() && !anyInk; ++i) anyInk = fb[i] != 0xFF;
+  ASSERT_TRUE(anyInk) << "chrome face drew nothing in BW";
+
+  renderer.setGrayscaleAaStrength(GfxRenderer::AA_STANDARD);
+  renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
+  renderer.clearScreen(0x00);
+  renderer.drawText(UI_10_FONT_ID, 20, 60, "Handgloves", true);
+  renderer.setRenderMode(GfxRenderer::BW);
+
+  bool anyFlagged = false;
+  for (uint32_t i = 0; i < renderer.getBufferSize() && !anyFlagged; ++i) anyFlagged = fb[i] != 0x00;
+  EXPECT_TRUE(anyFlagged) << "a chrome glyph flagged no plane pixels -- the overlay on Home, Settings, the colophon "
+                             "and the file viewer would buy a second panel refresh and zero pixels";
+}
+
 // --- 2. The registration ----------------------------------------------------
 
 namespace {

@@ -15,6 +15,11 @@ namespace TextAa {
 // in a plane, and a plane flag means "lift this pixel toward white". A fill, a
 // rule or an icon re-drawn here would therefore come out gray on the panel
 // even though the base frame drew it solid black.
+//
+// GfxRenderer::TextOnlyScope enforces it: constructed inside the callback it
+// turns every non-glyph primitive into a no-op, so a whole existing render
+// body is safe to pass here. Prefer that to writing a second, text-only copy
+// of a screen's draw code -- the copy is what drifts.
 using DrawFn = void (*)(void*);
 
 // Runs the two grayscale plane passes over a frame whose 1-bit base has

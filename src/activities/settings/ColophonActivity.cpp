@@ -10,6 +10,7 @@
 
 #include "ColophonData.h"
 #include "MappedInputManager.h"
+#include "TextAntiAliasing.h"
 #include "activities/RenderLock.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -39,8 +40,8 @@ void ColophonActivity::onEnter() {
   linesPerPage = (contentBottom - contentTop) / lineHeight;
   if (linesPerPage < 1) linesPerPage = 1;
   // Keep clear of the persistent scrollbar on the right edge.
-  maxWidth =
-      renderer.getScreenWidth() - metrics.contentSidePadding * 2 - metrics.scrollBarWidth - metrics.scrollBarRightOffset;
+  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2 - metrics.scrollBarWidth -
+             metrics.scrollBarRightOffset;
   if (maxWidth < 1) maxWidth = 1;
 
   layout();
@@ -147,9 +148,7 @@ void ColophonActivity::layout() {
   }
 }
 
-bool ColophonActivity::atEnd() const {
-  return topLine + linesPerPage >= static_cast<int>(lines.size());
-}
+bool ColophonActivity::atEnd() const { return topLine + linesPerPage >= static_cast<int>(lines.size()); }
 
 void ColophonActivity::pageForward() {
   if (atEnd()) return;  // no wrap-around: the end of the credits is the end
@@ -210,9 +209,10 @@ void ColophonActivity::drawScrollBar() const {
   renderer.fillRect(trackX, thumbY, metrics.scrollBarWidth, thumbH, true);
 }
 
-void ColophonActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
+// Everything the credits page puts on the panel, minus the clear and the
+// refresh. Split out so the grayscale overlay can re-run the identical body
+// (see render()) rather than a text-only copy of it that would drift.
+void ColophonActivity::drawFrame() const {
   const auto pageWidth = renderer.getScreenWidth();
   const auto& metrics = UITheme::getInstance().getMetrics();
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_COLOPHON));
@@ -250,6 +250,20 @@ void ColophonActivity::render(RenderLock&&) {
   const auto labels =
       mappedInput.mapLabels(tr(STR_BACK), "", topLine > 0 ? tr(STR_DIR_UP) : "", atEnd() ? "" : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+}
 
+void ColophonActivity::render(RenderLock&&) {
+  renderer.clearScreen();
+  drawFrame();
   renderer.displayBuffer();
+
+  // The credits are prose you read and page through with Up/Down, one panel
+  // refresh per page, which is the same repaint shape the reader has always
+  // paid the overlay on -- not a list you walk a selection down. The chrome
+  // faces became 2-bit on 2026-08-14, so this pass now moves pixels; against
+  // the 1-bit cuts it was byte-identical to no pass at all.
+  TextAa::overlayChromeIfEnabled(renderer, [this] {
+    const GfxRenderer::TextOnlyScope textOnly(renderer);
+    drawFrame();
+  });
 }

@@ -68,6 +68,9 @@ class ColophonActivity final : public Activity {
   void pageBack();
   bool atEnd() const;
   void drawScrollBar() const;
+  // The page's drawing, without the clear or the refresh, so render() and the
+  // grayscale anti-aliasing pass share one body.
+  void drawFrame() const;
 
   // Formats "address  -  YYYY-MM-DD" for one contributor into `buf`.
   static void formatPersonMeta(uint16_t index, char* buf, size_t bufLen);

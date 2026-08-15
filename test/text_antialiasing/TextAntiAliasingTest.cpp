@@ -36,9 +36,11 @@
 
 HalDisplay display;
 
-// Every 2-bit builtin is compressed, so a glyph only reaches the framebuffer
-// through the decompressor + cache manager. Mirrors src/main.cpp:43-48 and
-// tools/calendar_preview/render_harness.cpp:58-66.
+// Every 2-bit builtin EXCEPT the chrome cuts is compressed, so those glyphs
+// only reach the framebuffer through the decompressor + cache manager. Mirrors
+// src/main.cpp:43-48 and tools/calendar_preview/render_harness.cpp:58-66. (The
+// chrome cuts are 2-bit uncompressed and need none of this -- see
+// docs/two-bit-chrome.md; the fixture still wires it for the reader face below.)
 FontDecompressor fontDecompressor;
 
 namespace {
@@ -223,24 +225,50 @@ TEST_F(TextAntiAliasing, StrengthIsAppliedToTheRendererBeforeThePlanePasses) {
 // a plane pass CLEARS a bit in a plane that starts cleared, so it contributes
 // nothing at all.
 //
-// That is not a detail: every UI chrome font in this firmware is 1-bit.
-// lib/EpdFont/builtinFonts holds exactly twelve 1-bit faces, and they are the
-// twelve Libre Franklin 8/10/12 cuts that main.cpp:224-231 binds to
-// SMALL_FONT_ID, UI_10_FONT_ID and UI_12_FONT_ID. So the headers, list rows,
-// button hints, popups, keyboard, colophon and file viewer CANNOT be
-// antialiased no matter what overlay is plumbed to them — running the pass
-// over them buys a second panel refresh and zero pixels. Only the 2-bit faces
-// (the SD .cpfont reading cuts, the librefranklin_reader_* fallbacks and the
-// built-in editor monospaces) can take it.
+// That USED to rule out every chrome surface. lib/EpdFont/builtinFonts held
+// exactly twelve 1-bit faces — the Libre Franklin 8/10/12 cuts main.cpp binds
+// to SMALL_FONT_ID, UI_10_FONT_ID and UI_12_FONT_ID — so headers, list rows,
+// button hints, popups, the keyboard, the colophon and the file viewer could
+// not be antialiased no matter what overlay was plumbed to them, and Colophon
+// and TextViewer were wired up and reverted after an A/B showed the frames
+// byte-identical.
 //
-// These two cases pin that, so the next person to wire up a screen finds out
-// here rather than on a panel.
+// Those twelve were rebuilt 2-bit on 2026-08-14 (uncompressed: compressing
+// them would have been cheaper on flash and 6.1x slower on the colophon --
+// docs/two-bit-chrome.md), and the colophon and file viewer are wired again.
+// So nothing in builtinFonts is 1-bit today and this case can no longer borrow
+// a real face for its fixture; it builds a synthetic 1-bit glyph instead.
+//
+// The RULE is what is under test, not the font, and it still binds: an SD
+// .cpfont written 1-bit, or a chrome cut regenerated without --2bit, silently
+// turns every one of those overlays back into a second panel refresh for zero
+// pixels. test/system_font's EveryChromeCutIsTwoBit guards the built-ins;
+// this guards the mechanism they rely on.
 // ---------------------------------------------------------------------------
 
 TEST_F(TextAntiAliasing, OneBitFontContributesNothingToAGrayscalePlane) {
-  ASSERT_FALSE(librefranklin_10_regular.is2Bit) << "fixture no longer a 1-bit face";
+  // A synthetic 1-bit face: one glyph, a solid 8x8 block of ink. Built here
+  // rather than borrowed from builtinFonts because no built-in is 1-bit any
+  // more -- see the block above. 1-bit packing is a continuous MSB-first
+  // bitstream where a SET bit is ink, so 0xFF x 8 is a filled square.
+  static const uint8_t kInk[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  // Field order is width, height, advanceX (12.4 fixed-point), left, top,
+  // dataLength, dataOffset -- EpdFontData.h:131-139.
+  static const EpdGlyph kGlyph = {8, 8, 10 << 4, 0, 8, 8, 0};
+  static const EpdUnicodeInterval kInterval = {'A', 'A', 0};
+  static EpdFontData kOneBit = {};
+  kOneBit.bitmap = kInk;
+  kOneBit.glyph = &kGlyph;
+  kOneBit.intervals = &kInterval;
+  kOneBit.intervalCount = 1;
+  kOneBit.advanceY = 12;
+  kOneBit.ascender = 10;
+  kOneBit.descender = -2;
+  kOneBit.is2Bit = false;
 
-  static EpdFont font(&librefranklin_10_regular);
+  ASSERT_FALSE(kOneBit.is2Bit) << "fixture no longer a 1-bit face";
+
+  static EpdFont font(&kOneBit);
   static EpdFontFamily family(&font, &font, &font, &font);
   renderer().insertFont(9101, family);
 
@@ -248,21 +276,49 @@ TEST_F(TextAntiAliasing, OneBitFontContributesNothingToAGrayscalePlane) {
   // about the 1-bit branch and not about a font that failed to load.
   renderer().setRenderMode(GfxRenderer::BW);
   renderer().clearScreen(0xFF);
-  renderer().drawText(9101, 20, 60, "Handgloves", true);
+  renderer().drawText(9101, 20, 60, "AAAA", true);
   bool anyInk = false;
   for (uint32_t i = 0; i < frameBytes() && !anyInk; ++i) anyInk = frame()[i] != 0xFF;
   ASSERT_TRUE(anyInk) << "fixture face drew nothing at all in BW";
 
   renderer().setRenderMode(GfxRenderer::GRAYSCALE_MSB);
   renderer().clearScreen(0x00);
-  renderer().drawText(9101, 20, 60, "Handgloves", true);
+  renderer().drawText(9101, 20, 60, "AAAA", true);
   renderer().setRenderMode(GfxRenderer::BW);
 
   const uint8_t* fb = frame();
   for (uint32_t i = 0; i < frameBytes(); ++i) {
     ASSERT_EQ(0x00, fb[i]) << "a 1-bit face flagged plane byte " << i
-                           << "; the whole 'chrome cannot antialias' ruling rests on it not doing that";
+                           << "; every 'can this screen be antialiased' answer rests on it not doing that";
   }
+}
+
+// The chrome faces specifically, since they are what the four new overlay call
+// sites draw with. A depth regression here is invisible on a panel: the screen
+// still renders, the overlay still runs, and the only symptom is a second
+// refresh that changes nothing.
+TEST_F(TextAntiAliasing, TheChromeFacesAreTwoBitAndFlagAPlane) {
+  ASSERT_TRUE(librefranklin_10_regular.is2Bit)
+      << "the UI chrome cut is 1-bit again -- Colophon, TextViewer, Settings and Home are paying a panel refresh "
+         "for nothing (docs/two-bit-chrome.md)";
+
+  static EpdFont font(&librefranklin_10_regular);
+  static EpdFontFamily family(&font, &font, &font, &font);
+  // No prewarm: the chrome cuts are 2-bit UNCOMPRESSED, so their glyphs come
+  // straight out of flash with no decompressor involved (test/system_font's
+  // NoChromeCutIsCompressed pins that).
+  renderer().insertFont(9103, family);
+
+  renderer().setGrayscaleAaStrength(GfxRenderer::AA_STANDARD);
+  renderer().setRenderMode(GfxRenderer::GRAYSCALE_MSB);
+  renderer().clearScreen(0x00);
+  renderer().drawText(9103, 20, 60, "Handgloves", true);
+  renderer().setRenderMode(GfxRenderer::BW);
+
+  const uint8_t* fb = frame();
+  bool anyFlagged = false;
+  for (uint32_t i = 0; i < frameBytes() && !anyFlagged; ++i) anyFlagged = fb[i] != 0x00;
+  EXPECT_TRUE(anyFlagged) << "the chrome face flagged no plane pixels";
 }
 
 TEST_F(TextAntiAliasing, TwoBitFontDoesFlagAGrayscalePlane) {
@@ -272,8 +328,9 @@ TEST_F(TextAntiAliasing, TwoBitFontDoesFlagAGrayscalePlane) {
   static EpdFontFamily family(&font, &font, &font, &font);
   renderer().insertFont(9102, family);
 
-  // Every 2-bit builtin is compressed: its glyph groups only become drawable
-  // after a prewarm pass, the same one CalendarSleepScreen::render does.
+  // The READER cuts are compressed (unlike the chrome cuts), so their glyph
+  // groups only become drawable after a prewarm pass -- the same one
+  // CalendarSleepScreen::render does.
   ASSERT_NE(nullptr, renderer().getFontCacheManager());
   renderer().getFontCacheManager()->prewarmCache(9102, "Handgloves", 0x01);
 
