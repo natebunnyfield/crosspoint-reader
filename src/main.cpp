@@ -122,7 +122,16 @@ EpdFontFamily iawriterquattro14FontFamily(&iawriterquattro14RegularFont, &iawrit
 // glyphs for, so it degrades to a built-in mono exactly like a card-only row.
 // Deliberately NOT added to builtinFonts/all.h: that header is committed and
 // unconditional, so a missing include there would break the build for everyone.
-#if __has_include(<builtinFonts/pragmatapro_12_regular.h>)
+// Gate on the LARGEST size this block includes, not the smallest. Gating on 12
+// asserted that a tree holding the 12 pt headers holds the 14 pt ones too --
+// true only of a tree regenerated since 14 was added, which the primary
+// checkout was not. It broke `pio run -e simulator` on a missing
+// pragmatapro_14_bold.h while a clone with no licensed TTFs at all built fine,
+// so the machines that HAVE the fonts were the only ones that failed. Gating on
+// the strictest requirement cannot do that: a stale tree simply does not
+// register the row and degrades down the already-handled no-TTF path. Re-run
+// lib/EpdFont/scripts/convert-builtin-fonts.sh to get the face back.
+#if __has_include(<builtinFonts/pragmatapro_14_regular.h>)
 #define CROSSPOINT_HAS_PRAGMATAPRO 1
 #include <builtinFonts/pragmatapro_12_bold.h>
 #include <builtinFonts/pragmatapro_12_bolditalic.h>
@@ -136,9 +145,9 @@ EpdFont pragmatapro12RegularFont(&pragmatapro_12_regular);
 EpdFont pragmatapro12BoldFont(&pragmatapro_12_bold);
 EpdFont pragmatapro12ItalicFont(&pragmatapro_12_italic);
 EpdFont pragmatapro12BoldItalicFont(&pragmatapro_12_bolditalic);
-// One guard covers both cuts: convert-builtin-fonts.sh generates every size in
-// EDITOR_SIZES together, so a tree that has the 12 pt headers has the 14 pt
-// ones too. A second __has_include would only be able to disagree.
+// One guard covers both cuts, tested against the 14 pt header above so a tree
+// carrying only the older 12 pt generation fails the test rather than the
+// compile.
 EpdFont pragmatapro14RegularFont(&pragmatapro_14_regular);
 EpdFont pragmatapro14BoldFont(&pragmatapro_14_bold);
 EpdFont pragmatapro14ItalicFont(&pragmatapro_14_italic);
@@ -154,7 +163,8 @@ EpdFontFamily pragmatapro12FontFamily(&pragmatapro12RegularFont, &pragmatapro12B
 // convert-builtin-fonts.sh using fontconvert.py's --synth-embolden-em 0.045
 // --synth-slant-deg 11. The macro carries "NITTITYPEWRITER" so the 2x block
 // below can reuse it without repeating the __has_include test.
-#if __has_include(<builtinFonts/nittitypewriter_12_regular.h>)
+// Gated on the largest size, for the reason spelled out at PragmataPro above.
+#if __has_include(<builtinFonts/nittitypewriter_14_regular.h>)
 #define CROSSPOINT_HAS_NITTITYPEWRITER 1
 #include <builtinFonts/nittitypewriter_12_bold.h>
 #include <builtinFonts/nittitypewriter_12_bolditalic.h>
