@@ -76,7 +76,8 @@ void NoteEditorActivity::onEnter() {
   const auto& metrics = UITheme::getInstance().getMetrics();
   lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;
-  contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  // Starts at topPadding: there is no header band to skip past any more.
+  contentTop = metrics.topPadding;
   // No side gutter: the side-button hints that it reserved room for were
   // removed (owner ruling 2026-08-15), so the text gets the width back.
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
@@ -84,7 +85,8 @@ void NoteEditorActivity::onEnter() {
   panelHeight = panel.preferredHeight(renderer);
   panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
   // Vertical bands, top to bottom, each owning a disjoint range:
-  //   header | text | status | keyboard panel | button hints
+  //   text | status | keyboard panel | button hints
+  // (no header band since 2026-08-15 -- the title bar was removed)
   // The status line sits BETWEEN the text and the panel and must be reserved
   // here — computing maxLines against panelTop let the last line of text draw
   // underneath it.
@@ -565,11 +567,15 @@ void NoteEditorActivity::render(RenderLock&&) {
   const auto pageWidth = renderer.getScreenWidth();
   const auto& metrics = UITheme::getInstance().getMetrics();
 
-  char header[72];
-  const size_t page = maxLines > 0 ? topLine / maxLines + 1 : 1;
-  const size_t pages = maxLines > 0 ? (lines.size() + maxLines - 1) / maxLines : 1;
-  snprintf(header, sizeof(header), "%s  %u/%u", path.c_str(), (unsigned)page, (unsigned)(pages ? pages : 1));
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, header);
+  // No title bar (owner ruling 2026-08-15). The editor used to draw the file
+  // path and an "n/m" page counter across the top; both are gone and the text
+  // starts at the top of the screen instead. The filename is chosen by the
+  // editor itself (a YYYYMMDDHHmmss.md stamp), so it told the owner nothing
+  // they did not already know, and the page counter belongs to a paginated
+  // reader rather than to a document being typed into.
+  //
+  // contentTop in relayout() reclaims the band, so this is a layout change and
+  // not just a hidden draw call.
 
   if (oomFailed || !buf) {
     // Wrapped and translated for the same reason as Claude's hint: a raw
@@ -614,11 +620,43 @@ void NoteEditorActivity::render(RenderLock&&) {
   // so the note stays visible while typing.
   panel.render(renderer, metrics.contentSidePadding, panelTop, pageWidth - metrics.contentSidePadding * 2, panelHeight);
 
-  char status[96];
-  snprintf(status, sizeof(status), "%u ch%s  kbd:%s", (unsigned)(buf ? buf->size() : 0), bufferFull ? "  FULL" : "",
-           blekbd::stateName());
+  // Status bar: a right-aligned GRID, not a concatenated string.
+  //
+  // Each cell owns a fixed column measured from the right edge, so a cell's
+  // width never moves its neighbours. The character count is the only thing
+  // here that changes width while typing, and the whole point of the grid is
+  // that KBD and FULL do not twitch left and right as digits are added -- so
+  // the count column is sized for the widest value the buffer can ever hold
+  // (BUF_SIZE is 8192, four digits) rather than for the current value.
   const int statusY = panelTop - statusHeight;
-  renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, status);
+  const int rightEdge = pageWidth - metrics.contentSidePadding;
+  const int cellGap = renderer.getTextAdvanceX(SMALL_FONT_ID, "  ", EpdFontFamily::REGULAR);
+
+  // Rightmost cell: the count, just the number. Right-aligned inside its own
+  // column so the digits stay flush to the edge as they grow.
+  char countText[8];
+  snprintf(countText, sizeof(countText), "%u", (unsigned)(buf ? buf->size() : 0));
+  const int countColW = renderer.getTextAdvanceX(SMALL_FONT_ID, "8888", EpdFontFamily::REGULAR);
+  const int countW = renderer.getTextAdvanceX(SMALL_FONT_ID, countText, EpdFontFamily::REGULAR);
+  renderer.drawText(SMALL_FONT_ID, rightEdge - countW, statusY, countText);
+
+  // Next cell left: KBD, shown ONLY while the keyboard stack is up. Off is the
+  // ordinary state and printing "kbd:off" there was noise. Its x is derived
+  // from countColW, never from countW, which is what keeps it still.
+  const int kbdColRight = rightEdge - countColW - cellGap;
+  int nextCellRight = kbdColRight;
+  if (blekbd::state() != blekbd::State::Off) {
+    const int kbdW = renderer.getTextAdvanceX(SMALL_FONT_ID, "KBD", EpdFontFamily::REGULAR);
+    renderer.drawText(SMALL_FONT_ID, kbdColRight - kbdW, statusY, "KBD");
+  }
+  // FULL keeps its own cell to the left of KBD. It is a real warning -- the
+  // buffer stops accepting input -- so it is not folded into the count.
+  if (bufferFull) {
+    const int kbdColW = renderer.getTextAdvanceX(SMALL_FONT_ID, "KBD", EpdFontFamily::REGULAR);
+    nextCellRight = kbdColRight - kbdColW - cellGap;
+    const int fullW = renderer.getTextAdvanceX(SMALL_FONT_ID, "FULL", EpdFontFamily::REGULAR);
+    renderer.drawText(SMALL_FONT_ID, nextCellRight - fullW, statusY, "FULL");
+  }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
