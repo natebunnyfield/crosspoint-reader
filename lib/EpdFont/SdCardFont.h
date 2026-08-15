@@ -89,6 +89,13 @@ class SdCardFont {
   uint8_t styleCount() const { return styleCount_; }
 
   // Returns true if the glyph pointer points into the overflow buffer.
+  // On-demand (overflow) glyph loads since the last cache clear. Each one is a
+  // .cpfont open+seek+read. A healthy prewarmed render leaves this at zero; a
+  // number climbing into the thousands means the drawn working set exceeds
+  // OVERFLOW_CAPACITY and the LRU ring is thrashing. The 1-in-256 summary in
+  // glyphMissHandler reports the same value.
+  uint32_t overflowLoadsSinceClear() const { return overflowLoadsSinceClear_; }
+
   bool isOverflowGlyph(const EpdGlyph* glyph) const;
 
   // Returns the bitmap for an on-demand-loaded (overflow) glyph.

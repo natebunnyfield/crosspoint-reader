@@ -415,9 +415,26 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
       // directly and only in the style it is drawn in: body regular (0x01),
       // closing line italic (0x04). The ellipsis comes from truncation in
       // either of them.
-      fcm->prewarmCache(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE), 0x01);
-      fcm->prewarmCache(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE_ITALIC), 0x04);
-      fcm->prewarmCache(fontId, ELLIPSIS_UTF8, 0x05);
+      //
+      // ONE call per style, with the ellipsis CONCATENATED rather than warmed
+      // separately afterwards. A second prewarm of the same style rebuilds that
+      // style's mini working set from scratch whenever the new request is not
+      // already covered by it (SdCardFont::prewarmStyle) — so a trailing
+      // prewarm(ELLIPSIS, 0x05) replaced style 0's whole prose working set with
+      // the single ellipsis glyph. Every body character then fell through to
+      // the 16-slot on-demand overflow ring, which for a working set that size
+      // is LRU's worst case: 100% misses, one .cpfont open+seek+read PER
+      // CHARACTER, per redraw. Measured in the simulator before this fix,
+      // ~110,000 on-demand loads across two renders; on device those are real
+      // SD reads and the screen simply stops responding. Reported as "freezing
+      // on change font size while long text sample is previewing" — the size
+      // change makes it worse because ensureLoaded() clears the cache first.
+      //
+      // The non-prose branch below has always done it this way.
+      const std::string proseWarm = std::string(I18N.get(StrId::STR_FONT_PREVIEW_PROSE)) + ELLIPSIS_UTF8;
+      const std::string italicWarm = std::string(I18N.get(StrId::STR_FONT_PREVIEW_PROSE_ITALIC)) + ELLIPSIS_UTF8;
+      fcm->prewarmCache(fontId, proseWarm.c_str(), 0x01);
+      fcm->prewarmCache(fontId, italicWarm.c_str(), 0x04);
     } else {
       // Reuses `scratch` — the label was drawn above and is no longer needed.
       snprintf(scratch, sizeof(scratch), "%s %s", I18N.get(StrId::STR_FONT_PREVIEW_TEXT), ELLIPSIS_UTF8);

@@ -22,6 +22,7 @@
 #include <gtest/gtest.h>
 
 #include <GfxRenderer.h>
+#include <SdCardFont.h>
 #include <SdCardFontManager.h>
 #include <SdCardFontRegistry.h>
 
@@ -29,6 +30,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <new>
+#include <string>
 #include <vector>
 
 HalDisplay display;
@@ -258,6 +260,54 @@ TEST_F(FontSwitchChurn, LeakedFamilyIsDetectable) {
   manager_.unloadAll(*renderer_);
   EXPECT_LE(std::llabs(static_cast<long long>(g_liveBytes) - static_cast<long long>(settled)), 512)
       << "unloadAll did not return the heap to its settled level";
+}
+
+// Drawing a prewarmed passage must not fall through to the on-demand ring.
+//
+// The guard for "freezing on change font size while long text sample is
+// previewing" (2026-08-15). FontSelectionActivity's prose preview warmed the
+// passage and the ellipsis in SEPARATE prewarm calls; in the running simulator
+// that produced ~110,000 on-demand overflow loads across two renders, each one
+// a .cpfont open+seek+read. Fast on the host, a freeze on device. Warming
+// everything a style draws in ONE call took the same script to zero.
+//
+// What this test pins is the INVARIANT the fix relies on -- a passage warmed in
+// one call draws without touching the overflow ring -- not the internals of
+// prewarm. The exact reason the split form thrashed in the app is NOT
+// reproduced here: the same split sequence against this harness stays at zero,
+// so something in the live preview path (render scale, the hi-res companion
+// warm, or the AA second pass) is part of it. If you are chasing that, start by
+// making this test fail with the split form.
+TEST_F(FontSwitchChurn, DrawingAPrewarmedPassageNeedsNoOnDemandLoads) {
+  const auto& fams = registry_.getFamilies();
+  ASSERT_TRUE(manager_.loadFamily(fams[0], *renderer_, ptForSlot(fams[0], 1)));
+  const int fontId = manager_.getFontId(fams[0].name);
+  ASSERT_NE(fontId, 0);
+
+  const auto& sdFonts = renderer_->getSdCardFonts();
+  ASSERT_EQ(sdFonts.size(), 1u);
+  SdCardFont* font = sdFonts.begin()->second;
+  ASSERT_NE(font, nullptr);
+
+  static constexpr const char* kBody = "Handgloves on the radiator, quinces in a bowl, a jug of milk going warm";
+  static constexpr const char* kEllipsis = "\xE2\x80\xA6";  // U+2026
+  static constexpr uint8_t kRegularMask = 0x01;
+
+  // One prewarm covering everything this style draws -- body AND the ellipsis
+  // truncation can add. Drawing then touches every glyph bitmap; measuring is
+  // not enough, since getTextWidth answers from the advance table and never
+  // loads one.
+  font->clearCache();
+  const std::string both = std::string(kBody) + kEllipsis;
+  font->prewarm(both.c_str(), kRegularMask);
+  const uint32_t before = font->overflowLoadsSinceClear();
+
+  renderer_->drawText(fontId, 0, 40, kBody, true, EpdFontFamily::REGULAR);
+  renderer_->drawText(fontId, 0, 80, kEllipsis, true, EpdFontFamily::REGULAR);
+
+  EXPECT_EQ(font->overflowLoadsSinceClear(), before)
+      << "a passage warmed in one call must draw entirely from the prewarmed set; every on-demand load here "
+         "is a .cpfont open+seek+read on device";
 }
 
 }  // namespace
