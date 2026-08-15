@@ -29,7 +29,14 @@ Usage
 
 The env var is read at build time only; it does not need to be set when the
 resulting binary is run. Toggling it does not change platformio.ini, so the
-build directories survive and SCons recompiles incrementally.
+build directory survives -- and that used to be a trap rather than a feature.
+The scale changes a STRUCT LAYOUT, not just code paths: FontCacheManager takes
+an extra constructor parameter under RENDER_SCALE > 1. Recompiling incrementally
+across a scale change therefore mixed objects built at different scales, and the
+lucky outcome was the undefined-symbol link error that caught it on 2026-08-15.
+The unlucky one is a binary that links and misbehaves. The marker below makes a
+scale change wipe the build directory, so a build is all one scale or it is not
+a build.
 
 An explicit -DCROSSPOINT_RENDER_SCALE passed through build_flags /
 PLATFORMIO_BUILD_FLAGS still wins and is left alone, so the older incantation
@@ -95,3 +102,43 @@ elif override:
 else:
     env.Append(CPPDEFINES=[(MACRO, DEFAULT_SCALE)])  # noqa: F821
     print(f"[sim_render_scale.py] {MACRO}={DEFAULT_SCALE} (default)")
+
+
+
+# --- Scale changes invalidate the whole build directory ----------------------
+#
+# PlatformIO's project checksum covers platformio.ini and the source tree, not
+# the environment, so nothing here would otherwise force a rebuild when the
+# scale changes. Stamp the value and clear the directory when it moves.
+#
+# Deliberately a full wipe rather than a targeted one: the affected set is
+# "every TU that sees a scale-dependent declaration", which is most of them via
+# GfxRenderer.h and FontCacheManager.h, and getting that list subtly wrong
+# reintroduces exactly the mixed-object bug this prevents.
+_build_dir = env.subst("$BUILD_DIR")  # noqa: F821
+_effective = explicit if explicit else (override or str(DEFAULT_SCALE))
+_marker = os.path.join(_build_dir, ".render_scale")
+
+if os.path.isdir(_build_dir):
+    _previous = None
+    try:
+        with open(_marker) as fh:
+            _previous = fh.read().strip()
+    except OSError:
+        # No marker: a directory from before this check existed. Treat it as
+        # unknown rather than as a match -- it may hold objects from any scale.
+        _previous = None
+    if _previous != str(_effective):
+        import shutil
+
+        print(
+            f"[sim_render_scale.py] scale changed ({_previous or 'unknown'} -> "
+            f"{_effective}); clearing {_build_dir} so no objects survive from "
+            "the previous scale",
+            file=sys.stderr,
+        )
+        shutil.rmtree(_build_dir, ignore_errors=True)
+
+os.makedirs(_build_dir, exist_ok=True)
+with open(_marker, "w") as fh:
+    fh.write(str(_effective))

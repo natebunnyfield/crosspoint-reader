@@ -501,7 +501,8 @@ def _stream_pipe(pipe, prefix: str, dest: list[str]):
 
 
 def build_family(
-    family: dict, output_base: Path, verbose: bool = False, timeout: int = 600, scale: int = 1
+    family: dict, output_base: Path, verbose: bool = False, timeout: int = 600, scale: int = 1,
+    extra_drops: list | None = None
 ) -> tuple[str, bool, str]:
     """Build a single font family. Returns (name, success, message)."""
     name = family["name"]
@@ -584,6 +585,14 @@ def build_family(
         # Family-level cmap drops, before the metrics patch so the two chain
         # (drops -> metrics -> conversion) and before `from:` aliasing so
         # synthetics inherit both.
+        # YAML drops are permanent facts about a family (Freight Sans' broken
+        # fraction glyphs). extra_drops come from --drop-codepoints and belong to
+        # THIS build only, which is what makes them usable for a hi-res tier: a
+        # glyph over 255 px cannot be expressed in EpdGlyph's uint8 width/height,
+        # but that is a property of the SIZE, not of the family, so dropping it
+        # from the 1x cut as well would be wrong. A codepoint missing from the
+        # hi-res tier degrades exactly one character -- hiRes->getGlyph() returns
+        # null and that glyph alone renders 1x-replicated.
         drops = family.get("drop_codepoints")
         if drops:
             for style_name in list(resolved_styles):
@@ -639,6 +648,11 @@ def build_family(
 
     cmd.extend(["--intervals", intervals])
     cmd.extend(["--sizes", sizes])
+    # Build-level drops go to the CONVERTER, not through apply_cmap_drops: a
+    # cmap drop only hides the glyph from the primary face, and the fallback
+    # then supplies it. See the note in fontconvert_sdcard's interval validator.
+    if extra_drops:
+        cmd.extend(["--drop-codepoints", ",".join(hex(c) for c in extra_drops)])
     cmd.extend(["--name", name])
     cmd.extend(["--output-dir", str(output_dir) + "/"])
 
@@ -708,6 +722,14 @@ def main():
     )
     parser.add_argument("--only", help="Comma-separated family names to build (default: all)")
     parser.add_argument(
+        "--drop-codepoints", default="",
+        help="Comma-separated codepoints (0x2E3B or 11835) to omit from THIS "
+             "build only, on top of the family's own drop_codepoints. Needed "
+             "for hi-res tiers: a glyph wider or taller than 255 px cannot be "
+             "expressed by EpdGlyph's uint8 fields, and the offender is "
+             "size-dependent rather than a property of the family."
+    )
+    parser.add_argument(
         "--scale", type=int, default=1,
         help="Hi-res tier to build: multiplies every size and writes into "
              "<output>/<Family>/<scale>x/ (default 1, the base tier). The "
@@ -738,6 +760,8 @@ def main():
 
     with open(config_path) as f:
         config = yaml.safe_load(f)
+
+    extra_drops = [int(c, 0) for c in args.drop_codepoints.split(",") if c.strip()]
 
     families = config.get("families", [])
     if not families:
@@ -813,7 +837,8 @@ def main():
     failed = []
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(build_family, family, output_base, verbose, timeout, args.scale): family["name"]
+            executor.submit(build_family, family, output_base, verbose, timeout, args.scale,
+                            extra_drops): family["name"]
             for family in families
         }
         for future in as_completed(futures):

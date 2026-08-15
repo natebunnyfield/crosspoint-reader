@@ -674,6 +674,7 @@ def spacing_params_for_size(spacing, ppem):
 
 
 def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=False,
+                         drop_codepoints=None,
                          fallback_fontfile=None, synthetic=None, spacing=None):
     """Rasterize all glyphs for one font style. Returns StyleRasterData.
 
@@ -779,6 +780,15 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         for code_point in range(i_start, i_end + 1):
             has_primary = face.get_char_index(code_point) != 0 or code_point in ligature_glyph_indices
             has_fallback = fallback_face and fallback_face.get_char_index(code_point) != 0
+            # An explicit drop is treated as "not covered" so it splits the
+            # interval through the SAME path a genuinely missing glyph takes.
+            # Dropping via the source cmap does not work here: the fallback face
+            # would simply supply the glyph instead, which is exactly what
+            # happened when U+2E3B (three-em dash, 276 px wide at 3x) survived a
+            # cmap drop and still overflowed EpdGlyph's uint8 width.
+            if code_point in (drop_codepoints or ()):
+                has_primary = False
+                has_fallback = False
             if not has_primary and not has_fallback:
                 if start < code_point:
                     validated_intervals.append((start, code_point - 1))
@@ -966,6 +976,20 @@ def pack_style_sections(sd):
 
     glyphs_data = bytearray()
     for glyph, packed in sd.all_glyphs:
+        # EpdGlyph.width and .height are uint8_t, so a glyph over 255 px on
+        # either axis cannot be expressed. struct.pack reports that as a bare
+        # "'B' format requires 0 <= number <= 255" with no clue WHICH glyph or
+        # even which field, which is useless in a 4-style 1800-glyph build --
+        # it cost a 3x build run to work out that the answer was "the largest
+        # size, one outlier codepoint". Say exactly what and how big.
+        if glyph.width > 255 or glyph.height > 255:
+            raise ValueError(
+                f"glyph U+{glyph.code_point:04X} rasterises to "
+                f"{glyph.width}x{glyph.height} px, over the 255 px limit of "
+                f"EpdGlyph's uint8 width/height. Either drop this codepoint for "
+                f"this size (drop_codepoints in sd-fonts.yaml) or build this "
+                f"family at a smaller size / lower hi-res tier."
+            )
         glyphs_data += struct.pack(GLYPH_STRUCT_FORMAT,
                                    glyph.width, glyph.height, glyph.advance_x,
                                    glyph.left, glyph.top,
@@ -1005,7 +1029,8 @@ def style_sections_total_size(sections):
 
 def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
                                force_autohint=False, fallback_style_fonts=None,
-                               synth_specs=None, spacing_specs=None):
+                               synth_specs=None, spacing_specs=None,
+                               drop_codepoints=None):
     """Generate a multi-style v4 .cpfont file.
 
     style_fonts: dict of {style_id: fontfile_path} e.g. {0: "Regular.ttf", 2: "Italic.ttf"}
@@ -1032,6 +1057,7 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
         raster_data[style_id] = rasterize_font_style(
             fontfile, size, intervals, style_id=style_id,
             force_autohint=force_autohint,
+            drop_codepoints=drop_codepoints,
             fallback_fontfile=fallback_fontfile,
             synthetic=synth_specs.get(style_id),
             spacing=spacing_specs.get(style_id))
@@ -1173,6 +1199,14 @@ def main():
     parser.add_argument("--space-bold", dest="space_bold", help=SPACE_HELP)
     parser.add_argument("--space-italic", dest="space_italic", help=SPACE_HELP)
     parser.add_argument("--space-bolditalic", dest="space_bolditalic", help=SPACE_HELP)
+    parser.add_argument(
+        "--drop-codepoints", dest="drop_codepoints", default="",
+        help="Comma-separated codepoints (0x2E3B or 11835) to omit from COVERAGE "
+             "entirely, primary and fallback alike. Needed when a glyph cannot be "
+             "expressed: EpdGlyph's width/height are uint8, so anything over 255 px "
+             "on either axis fails to pack, and which glyph offends depends on the "
+             "rasterised size rather than on the family."
+    )
 
     args = parser.parse_args()
 
@@ -1251,6 +1285,11 @@ def main():
         print(f"Available presets: {', '.join(sorted(INTERVAL_PRESETS.keys()))}", file=sys.stderr)
         sys.exit(1)
 
+    drop_codepoints = {int(c, 0) for c in (args.drop_codepoints or "").split(",") if c.strip()}
+    if drop_codepoints:
+        print(f"  Dropping {len(drop_codepoints)} codepoint(s) from coverage: "
+              + ", ".join(f"U+{c:04X}" for c in sorted(drop_codepoints)), file=sys.stderr)
+
     intervals = resolve_intervals(args.intervals)
 
     # Determine sizes
@@ -1312,7 +1351,8 @@ def main():
             force_autohint=args.force_autohint,
             fallback_style_fonts=fallback_style_fonts,
             synth_specs=synth_specs,
-            spacing_specs=spacing_specs)
+            spacing_specs=spacing_specs,
+            drop_codepoints=drop_codepoints)
     print(f"\nTotal: {len(sizes)} files, {total_size / 1024 / 1024:.2f} MB", file=sys.stderr)
 
 
