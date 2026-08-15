@@ -176,3 +176,44 @@ outward.
   and no rename would not have surfaced.**
 - The compare API caps `.commits[]` at 250, so forks further ahead than that
   had only their most recent 250 subjects read.
+
+## Salvage log — what was actually taken
+
+Updated as PRs land. Records the skips too, with the reason, so a later pass
+does not re-evaluate the same commit from scratch.
+
+### matcha-reader — heap/OOM series (T-014, first pass 2026-08-15)
+
+Probed all ten heap-related commits by cherry-pick. **One applied cleanly**;
+the rest conflict, which is expected at 659 commits of divergence and is not a
+verdict on their quality.
+
+| Commit | Outcome |
+|---|---|
+| `9011c91fd` emergency font release also frees kern/lig tables | **TAKEN.** Applied clean. |
+| `07b35f966` free font cache before settings save | **SKIPPED — needs infrastructure we lack.** Calls `FontCacheManager::releaseAllFontMemory()`, which does not exist here; our manager exposes only `clearCache()`. Porting it means porting matcha's emergency-release machinery first. Its guard (`finishOnBack`) also has no analogue — this fork's `SettingsActivity` has nine `saveToFile()` sites and no reader-entered mode flag. Revisit if that machinery is ever ported. |
+| `f6df3e35c` drop per-call allocation from `HalStorage::hasContent` | Conflicts (2). Worth a hand-port; generic HAL. |
+| `d8b220990` avoid EPUB indexing heap pressure | Conflicts (3). Worth a hand-port. |
+| `2ea69f77a` avoid reader settings OOM | Conflicts (2). Same area as `07b35f966`. |
+| `37265177f` report a power lock that is never released | Conflicts (2). Diagnostic; generic. |
+| `41d36878a` use-after-free crashed XTC on the second page turn | Conflicts (1). XTC exists here — worth reading. |
+| `5bca482f1` throttle mid-build read-back retries to real heap changes | Conflicts (1). Touches the same read-during-build path as our `O_RDWR` fix. |
+| `f07d737d0` bound the history by memory | Conflicts (6). "History" is matcha's; likely N/A. |
+| `16d4dd225` cover thumbnails without HAL power locks | Conflicts (3). Their `LibraryActivity`; likely N/A. |
+
+Not probed, and deliberately: everything vertical-writing, manga, Babylon
+dictionary or word-lookup specific. Those are features this fork does not have.
+
+**On the one taken.** Two halves, and only the first is unambiguously ours:
+
+- `freeStyleKernLigatureData()` now clears the `stubData` / `miniData` ligature
+  mirrors alongside the array. Both alias `ligaturePairs` directly, so freeing
+  the array without clearing them leaves dangling pointers. That is a
+  correctness fix here regardless of call site.
+- `clearPersistentCache()` now frees the kern/lig class tables too. Matcha's
+  measured rationale is about an *emergency* mid-read release, which this fork
+  does not have — our `clearPersistentCache()` is reached from `freeAll()`
+  (`SdCardFont.cpp:200`), i.e. font unload. The anti-fragmentation argument
+  still holds at that point, but the dramatic 61428 -> 102388 `maxAlloc` figure
+  in their commit message is theirs, measured on their build. Do not repeat it
+  as ours.
