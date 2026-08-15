@@ -84,8 +84,9 @@ void ClaudeChatActivity::onEnter() {
   // Reserve the right gutter: the side-button hints are drawn there whenever
   // row navigation is available, and wrapped text would otherwise run under
   // them. Daisy draws no hints, so it keeps the full width.
-  const int sideGutter = panel.isDaisy() ? 0 : metrics.sideButtonHintsWidth;
-  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2 - sideGutter;
+  // No side gutter: the side-button hints that it reserved room for were
+  // removed (owner ruling 2026-08-15), so the text gets the width back.
+  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
 
   // Split screen: prompt/answer above, keyboard below.
   panelHeight = panel.preferredHeight(renderer);
@@ -586,7 +587,5 @@ void ClaudeChatActivity::render(RenderLock&&) {
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-  // Row navigation lives on the side buttons and is otherwise undiscoverable.
-  if (!panel.isDaisy()) GUI.drawSideButtonHints(renderer, ">", "<");  // same convention as the full-screen keyboard
   renderer.displayBuffer();
 }
