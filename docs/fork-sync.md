@@ -58,12 +58,38 @@ So: merge upstream **by hand, per commit**, or not at all.
 
 1. `scripts/repo-status.sh` lists each unmerged upstream commit as `N/A` or
    `REVIEW`. `N/A` touches only removed subsystems — skip it and move on.
+
+   **The count is an upper bound, not the real backlog.** It counts by
+   ancestry, so anything applied without recording the merge still shows as
+   unmerged. Measured 2026-08-15: six of the reported 45 produced an *empty*
+   cherry-pick. Check before working a commit —
+
+   ```bash
+   git cherry origin/main upstream/develop            # patch-id; '-' = present
+   git cherry-pick --no-commit <sha> && git diff --cached --stat   # empty = present
+   ```
+
+   The two disagree (each caught cases the other missed), so run both.
+   **Never probe with `git cherry-pick -X ours`** — it resolves conflicts by
+   discarding upstream's side and exits 0, so conflicting commits report clean.
+   That mistake once turned 9 genuinely-clean commits into a map claiming 28.
 2. `REVIEW` means the commit straddles live and removed code. Read it before
    doing anything: `git show <sha> --stat`.
 3. Take only the live hunks. `git cherry-pick -n <sha>` then unstage the
    removed paths, or apply the specific files with `git checkout <sha> -- <path>`.
 4. Build and, where the change touches layout or caching, bump the cache
    format version — see `docs/file-formats.md`.
+
+### Standing rulings — N/A by decision, not by subsystem
+
+`repo-status.sh` classifies by which files a commit touches, so a commit that
+is live code but unwanted keeps reappearing as `REVIEW` forever. Those are
+recorded here instead.
+
+- `b1d53ba81` "add orangutan translation (#2992)" — **N/A, owner ruling
+  2026-08-15.** This fork ships two languages deliberately; a novelty third is
+  out of scope. Declined on scope, not on risk: the commit is mechanically
+  safe, since `_order: 34` appends and no persisted `language` index shifts.
 
 ### The two currently outstanding (2026-08-03)
 
