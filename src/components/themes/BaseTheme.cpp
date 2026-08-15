@@ -18,8 +18,6 @@
 
 // Internal constants
 namespace {
-constexpr int homeMenuMargin = 20;
-constexpr int homeMarginTop = 30;
 constexpr int subtitleY = 738;
 }  // namespace
 
@@ -117,7 +115,7 @@ void BaseTheme::drawProgressBar(const GfxRenderer& renderer, Rect rect, const si
   // Use 64-bit arithmetic to avoid overflow for large files
   const int percent = static_cast<int>((static_cast<uint64_t>(current) * 100) / total);
 
-  LOG_DBG("UI", "Drawing progress bar: current=%u, total=%u, percent=%d", current, total, percent);
+  LOG_DBG("UI", "Drawing progress bar: current=%zu, total=%zu, percent=%d", current, total, percent);
   // Draw outline
   renderer.drawRect(rect.x, rect.y, rect.width, rect.height);
 
@@ -257,8 +255,8 @@ int BaseTheme::getListPageItems(int contentHeight, bool hasSubtitle, int subtitl
 void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, int selectedIndex,
                          const std::function<std::string(int index)>& rowTitle,
                          const std::function<std::string(int index)>& rowSubtitle,
-                         const std::function<UIIcon(int index)>& rowIcon,
-                         const std::function<std::string(int index)>& rowValue, bool highlightValue,
+                         const std::function<UIIcon(int index)>& /*rowIcon*/,
+                         const std::function<std::string(int index)>& rowValue, bool /*highlightValue*/,
                          const std::function<bool(int index)>& rowDimmed, int subtitleLines) const {
   int rowHeight = getListRowStep(rowSubtitle != nullptr, subtitleLines);
   int pageItems = rowHeight > 0 ? std::max(1, rect.height / rowHeight) : 1;
@@ -961,7 +959,7 @@ void BaseTheme::drawGeneratedCover(const GfxRenderer& renderer, const Rect rect,
 
 void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                const std::function<std::string(int index)>& buttonLabel,
-                               const std::function<UIIcon(int index)>& rowIcon) const {
+                               const std::function<UIIcon(int index)>& /*rowIcon*/) const {
   // Same fit rule as LyraTheme::drawButtonMenu -- see the note there. Rows are
   // compressed to stay inside rect rather than marching off the bottom of it.
   const int naturalPitch = BaseMetrics::values.menuRowHeight + BaseMetrics::values.menuSpacing;

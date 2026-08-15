@@ -535,13 +535,13 @@ void FontDecompressor::resetStats() { stats = Stats{}; }
 
 void FontDecompressor::logStats(const char* label) {
   const uint32_t total = stats.cacheHits + stats.cacheMisses;
-  LOG_DBG("FDC", "[%s] hits=%lu misses=%lu (%.1f%% hit rate)", label, stats.cacheHits, stats.cacheMisses,
+  LOG_DBG("FDC", "[%s] hits=%u misses=%u (%.1f%% hit rate)", label, stats.cacheHits, stats.cacheMisses,
           total > 0 ? 100.0f * stats.cacheHits / total : 0.0f);
-  LOG_DBG("FDC", "[%s] decompress=%lums groups_accessed=%u", label, stats.decompressTimeMs, stats.uniqueGroupsAccessed);
-  LOG_DBG("FDC", "[%s] mem: pageBuf=%lu pageGlyphs=%lu hotGroup=%lu peakTemp=%lu", label, stats.pageBufferBytes,
+  LOG_DBG("FDC", "[%s] decompress=%ums groups_accessed=%u", label, stats.decompressTimeMs, stats.uniqueGroupsAccessed);
+  LOG_DBG("FDC", "[%s] mem: pageBuf=%u pageGlyphs=%u hotGroup=%u peakTemp=%u", label, stats.pageBufferBytes,
           stats.pageGlyphsBytes, stats.hotGroupBytes, stats.peakTempBytes);
   if (stats.getBitmapCalls > 0) {
-    LOG_DBG("FDC", "[%s] getBitmap: %lu calls, %luus total, %luus/call avg", label, stats.getBitmapCalls,
+    LOG_DBG("FDC", "[%s] getBitmap: %u calls, %uus total, %uus/call avg", label, stats.getBitmapCalls,
             stats.getBitmapTimeUs, stats.getBitmapTimeUs / stats.getBitmapCalls);
   }
   resetStats();

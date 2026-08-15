@@ -80,10 +80,6 @@ void ClaudeChatActivity::onEnter() {
   lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;
   contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing;
-  // Reserve the right gutter: the side-button hints are drawn there whenever
-  // row navigation is available, and wrapped text would otherwise run under
-  // them. Daisy draws no hints, so it keeps the full width.
   // No side gutter: the side-button hints that it reserved room for were
   // removed (owner ruling 2026-08-15), so the text gets the width back.
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;

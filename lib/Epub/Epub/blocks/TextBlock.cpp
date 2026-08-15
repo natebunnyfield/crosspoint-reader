@@ -431,7 +431,11 @@ std::unique_ptr<TextBlock> TextBlock::deserialize(HalFile& file) {
       LOG_ERR("TXB", "OOM: arena %u bytes", static_cast<uint32_t>(size));
       return nullptr;
     }
-    if (file.read(block->arena.get(), size) != size) {
+    // read() returns a signed count and -1 on error. Comparing that to a size_t
+    // directly promoted the -1 to a huge unsigned value, which happened to take
+    // this branch for the right reason by accident; make the error case explicit.
+    const int arenaRead = file.read(block->arena.get(), size);
+    if (arenaRead < 0 || static_cast<size_t>(arenaRead) != size) {
       LOG_ERR("TXB", "Deserialization failed: arena read (%u bytes)", static_cast<uint32_t>(size));
       return nullptr;
     }

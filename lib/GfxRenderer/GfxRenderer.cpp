@@ -356,7 +356,7 @@ static inline bool glyphInBand(const GfxRenderer& renderer, const int x0, const 
 // The advance width is also halved in drawText() so layout reserves exactly the right
 // horizontal space for the scaled glyph.
 template <bool deviceSpace = false>
-static void renderCharScaled(const GfxRenderer& renderer, GfxRenderer::RenderMode renderMode,
+static void renderCharScaled(const GfxRenderer& renderer, GfxRenderer::RenderMode /*renderMode*/,
                              const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
                              const bool pixelState, const EpdFontFamily::Style style) {
   const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
@@ -1023,7 +1023,7 @@ void GfxRenderer::fillRect(const int x, const int y, const int width, const int 
 // NOTE: Those are in critical path, and need to be templated to avoid runtime checks for every pixel.
 // Any branching must be done outside the loops to avoid performance degradation.
 template <>
-void GfxRenderer::drawPixelDither<Color::Clear>(const int x, const int y) const {
+void GfxRenderer::drawPixelDither<Color::Clear>(const int /*x*/, const int /*y*/) const {
   // Do nothing
 }
 

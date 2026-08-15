@@ -585,7 +585,6 @@ void FontSelectionActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
   const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
 
   // Titled for what the screen now covers — family and size, applied live —
   // rather than just the family list it started as.

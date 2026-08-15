@@ -25,7 +25,6 @@ constexpr int topHintButtonY = 345;
 constexpr int maxListValueWidth = 200;
 constexpr int mainMenuIconSize = 32;
 constexpr int listIconSize = 24;
-constexpr int mainMenuColumns = 2;
 // A list row's first subtitle line, measured from the row's top. The selection
 // band is sized from this and the subtitle is drawn at it; they have to be the
 // same number or the band marks lines that are not where it thinks they are.
@@ -538,7 +537,7 @@ void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
 
 void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                                     const int selectorIndex, bool& coverRendered, bool& coverBufferStored,
-                                    bool& bufferRestored, std::function<bool()> storeCoverBuffer) const {
+                                    bool& /*bufferRestored*/, std::function<bool()> storeCoverBuffer) const {
   const int tileWidth = rect.width - 2 * LyraMetrics::values.contentSidePadding;
   const int tileHeight = rect.height;
   const int tileY = rect.y;

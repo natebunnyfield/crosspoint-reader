@@ -760,10 +760,10 @@ std::vector<size_t> ParsedText::computeLineBreaks(const GfxRenderer& renderer, c
 
       // Calculate extraStartOffset for the first word on the line (i) (protect left margin)
       int extraStartOffset = 0;
-      if (j == i && !rubyTexts.empty() && i < rubyTexts.size() && !rubyTexts[i].empty() &&
+      if (j == static_cast<size_t>(i) && !rubyTexts.empty() && static_cast<size_t>(i) < rubyTexts.size() && !rubyTexts[i].empty() &&
           (wordStyles[i] & EpdFontFamily::RUBY_CONTINUE) == 0) {
         int groupWordCount = 1;
-        while (i + groupWordCount < totalWordCount &&
+        while (static_cast<size_t>(i + groupWordCount) < totalWordCount &&
                (wordStyles[i + groupWordCount] & EpdFontFamily::RUBY_CONTINUE) != 0) {
           groupWordCount++;
         }
@@ -790,7 +790,7 @@ std::vector<size_t> ParsedText::computeLineBreaks(const GfxRenderer& renderer, c
         }
       }
 
-      currlen += wordWidths[j] + gap + (j == i ? extraStartOffset : 0);
+      currlen += wordWidths[j] + gap + (j == static_cast<size_t>(i) ? extraStartOffset : 0);
 
       if (currlen > effectivePageWidth) {
         break;
