@@ -3,7 +3,7 @@
  * name: iawriterquattro_12_regular
  * size: 12
  * mode: 2-bit  compressed: true
- * Command used: fontconvert.py iawriterquattro_12_regular 12 /Users/natebunnyfield/src/crosspoint-reader/.claude/worktrees/show-keyboard-button-size-3fd996/lib/EpdFont/builtinFonts/source/iAWriterQuattro/iAWriterQuattro-Regular.ttf --2bit --compress --pnum
+ * Command used: fontconvert.py iawriterquattro_12_regular 12 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-Regular.ttf --2bit --compress --pnum
  */
 #pragma once
 #include "EpdFontData.h"

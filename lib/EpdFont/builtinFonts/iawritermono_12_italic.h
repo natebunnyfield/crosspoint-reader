@@ -3,7 +3,7 @@
  * name: iawritermono_12_italic
  * size: 12
  * mode: 2-bit  compressed: true
- * Command used: fontconvert.py iawritermono_12_italic 12 /Users/natebunnyfield/src/crosspoint-reader/.claude/worktrees/show-keyboard-button-size-3fd996/lib/EpdFont/builtinFonts/source/iAWriterMono/iAWriterMono-Italic.ttf --2bit --compress --pnum
+ * Command used: fontconvert.py iawritermono_12_italic 12 ../builtinFonts/source/iAWriterMono/iAWriterMono-Italic.ttf --2bit --compress --pnum
  */
 #pragma once
 #include "EpdFontData.h"
