@@ -25,12 +25,6 @@ constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
 // face stands in, so the screen is never blank because of a missing font.
 }  // namespace
 
-// Thin bind of the shared measurement to this editor's font. The trailing-space
-// correction and why it exists live in notes/MarkdownRender.h.
-int NoteEditorActivity::advanceOf(const char* piece, EpdFontFamily::Style style) const {
-  return mdrender::advanceOf(renderer, editorFontId, piece, style);
-}
-
 void NoteEditorActivity::onEnter() {
   Activity::onEnter();
 
@@ -202,7 +196,11 @@ void NoteEditorActivity::relayout() {
       if (cand >= sizeof(probe)) break;
       memcpy(probe, text + start, cand);
       probe[cand] = '\0';
-      if (renderer.getTextWidth(editorFontId, probe) > maxWidth) break;
+      // measureLine, NOT getTextWidth: the line is DRAWN by mdrender::drawLine,
+      // which consumes the markers, so measuring the raw source charges the
+      // line four characters for every "**bold**" it never puts on screen. The
+      // wrap then broke early and left a gap after each styled word.
+      if (mdrender::measureLine(renderer, editorFontId, lineHeight, probe, cand) > maxWidth) break;
       if (text[j] == ' ') lastBreak = j + 1;
       ++j;
     }
@@ -547,20 +545,17 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
   mdrender::drawLine(renderer, editorFontId, lineHeight, metrics.contentSidePadding, y, text, len);
 
   if (showCursor) {
-    // Caret drawn at the cursor's column, measured in the raw source text so it
-    // tracks what the typist is actually editing.
-    char upto[192];
-    size_t n = cursorCol < sizeof(upto) - 1 ? cursorCol : sizeof(upto) - 1;
-    memcpy(upto, text, n);
-    upto[n] = '\0';
-    // Must go through advanceOf(), not getTextWidth() directly. A TRAILING
-    // space gets almost none of its advance from the raw call -- measured with
-    // LibreFranklin 12, "ab" is 28, "ab " is 29, "ab  " is 34, so an interior
-    // space is 5px and a trailing one counts 1. `upto` ends in a space the
-    // instant the typist presses one, so the caret crawled a pixel instead of a
-    // space-width and read as stuck. advanceOf's sentinel recovers the full
-    // advance.
-    const int cx = metrics.contentSidePadding + advanceOf(upto, EpdFontFamily::REGULAR);
+    // The caret still tracks the SOURCE column -- that is what the typist is
+    // editing -- but it is placed at the x that column is DRAWN at.
+    //
+    // It used to be placed by measuring the raw source prefix, which counts the
+    // markers drawLine has just thrown away: after typing "**bold**" the caret
+    // sat four characters to the right of the "d" it belonged against, and the
+    // gap grew with every styled run earlier in the line. caretX walks the same
+    // spans drawLine does, so the two cannot disagree; a column that lands
+    // inside a marker clamps to the run it opens or closes.
+    const int cx = metrics.contentSidePadding +
+                   mdrender::caretX(renderer, editorFontId, lineHeight, text, len, cursorCol > len ? len : cursorCol);
     renderer.drawLine(cx, y, cx, y + lineHeight - 2, true);
   }
 }
