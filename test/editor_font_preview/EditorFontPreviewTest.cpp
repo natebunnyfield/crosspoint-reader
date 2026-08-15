@@ -255,7 +255,12 @@ TEST(EditorFontPreview, ThePragmataProRowPresentsLikeTheOthers) {
     found = true;
     const std::string sub = editorfonts::rowSubtitle(i, /*available=*/true, kNotOnCard);
     EXPECT_FALSE(sub.empty()) << "PragmataPro must carry a colophon";
-    EXPECT_NE(sub.find("\xC2\xB7"), std::string::npos) << "designer and lineage must be separated: " << sub;
+    // Either separator: a one-stage lineage like this one stacks the designer
+    // over their year and place with a line break, and only a lineage deeper
+    // than four information lines falls back to the middle dot. This case was
+    // written against the pre-2026-08-14 dot-only form.
+    const bool separated = sub.find('\n') != std::string::npos || sub.find("\xC2\xB7") != std::string::npos;
+    EXPECT_TRUE(separated) << "designer and lineage must be separated: " << sub;
     EXPECT_EQ(sub.find(kNotOnCard), std::string::npos) << "a compiled-in face must not be marked: " << sub;
   }
   EXPECT_TRUE(found) << "PragmataPro row is gone from FAMILIES";
