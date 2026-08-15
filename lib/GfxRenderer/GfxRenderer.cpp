@@ -1837,6 +1837,79 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
   if (_textOnly) return;
   if (numPoints < 3) return;
 
+#if CROSSPOINT_RENDER_SCALE > 1
+  // A polygon is rasterized at DEVICE resolution on a supersampled host build.
+  //
+  // drawPixel() paints a RENDER_SCALE x RENDER_SCALE block (GfxRenderer.h:378),
+  // which is right for an axis-aligned edge and wrong for a slanted one: the
+  // staircase gets scaled along with the shape, while the text beside it does
+  // not (the hi-res glyph path addresses device pixels one at a time). The iOS
+  // app ships at RENDER_SCALE=3 (crosspoint-simulator/ios/CMakeLists.txt:89,208),
+  // so every polygon edge sat at a third of the resolution of the characters
+  // around it. The keyboard's Return arrowhead is a filled triangle
+  // (freeink-sdk .../components/keyboard/keyboard.h), and a blocky hypotenuse is
+  // exactly what a chiselled tip looks like -- so this is what makes the point
+  // read as a point on a phone.
+  //
+  // This is the polygon half of B-027. The arc/rounded-rect half is NOT the same
+  // change and is deliberately not attempted here: those paths dither, and a
+  // dither cell is defined in LOGICAL pixels on purpose, so they need a ruling
+  // before they can be written in device space. fillPolygon does not dither --
+  // it writes a solid `state` -- so it has no such question to answer.
+  //
+  // Vertices are sampled at the CENTRE of their logical pixel (v * S + S/2), the
+  // same convention drawLineDevice() uses for its minor axis. That keeps the
+  // shape centred on the pixels the logical form would have covered, so this
+  // cannot shift a glyph by half a pixel in either direction; the area, and
+  // therefore the ink weight, is unchanged to within one device pixel of
+  // boundary. It compiles out entirely at RENDER_SCALE == 1, which is every
+  // device build -- nothing here is visible on an X3 or an X4.
+  {
+    constexpr int S = RENDER_SCALE;
+    const auto sx = [&](const int i) { return xPoints[i] * S + S / 2; };
+    const auto sy = [&](const int i) { return yPoints[i] * S + S / 2; };
+
+    int minY = sy(0), maxY = sy(0);
+    for (int i = 1; i < numPoints; i++) {
+      if (sy(i) < minY) minY = sy(i);
+      if (sy(i) > maxY) maxY = sy(i);
+    }
+    if (minY < 0) minY = 0;
+    if (maxY >= getScreenHeight() * S) maxY = getScreenHeight() * S - 1;
+
+    auto* nodeX = static_cast<int*>(malloc(numPoints * sizeof(int)));
+    if (!nodeX) {
+      LOG_ERR("GFX", "!! Failed to allocate polygon node buffer");
+      return;
+    }
+
+    for (int scanY = minY; scanY <= maxY; scanY++) {
+      int nodes = 0;
+      int j = numPoints - 1;
+      for (int i = 0; i < numPoints; i++) {
+        if ((sy(i) < scanY && sy(j) >= scanY) || (sy(j) < scanY && sy(i) >= scanY)) {
+          const int dy = sy(j) - sy(i);
+          if (dy != 0) nodeX[nodes++] = sx(i) + (scanY - sy(i)) * (sx(j) - sx(i)) / dy;
+        }
+        j = i;
+      }
+      std::sort(nodeX, nodeX + nodes);
+      for (int i = 0; i < nodes - 1; i += 2) {
+        int startX = nodeX[i];
+        int endX = nodeX[i + 1];
+        if (startX < 0) startX = 0;
+        if (endX >= getScreenWidth() * S) endX = getScreenWidth() * S - 1;
+        for (int x = startX; x <= endX; x++) {
+          drawPixelDevice(x, scanY, state);
+        }
+      }
+    }
+
+    free(nodeX);
+    return;
+  }
+#endif
+
   // Find bounding box
   int minY = yPoints[0], maxY = yPoints[0];
   for (int i = 1; i < numPoints; i++) {
