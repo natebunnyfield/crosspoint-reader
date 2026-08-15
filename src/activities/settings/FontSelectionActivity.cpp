@@ -12,28 +12,32 @@
 #include "FontDisplayNames.h"
 #include "MappedInputManager.h"
 #include "ReaderFontSizes.h"
+#include "ReadingFontList.h"
 #include "SdCardFontSystem.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "ReadingFontList.h"
 #include "notes/EditorFonts.h"
 
 namespace {
 constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
 
-// Subtitle lines the colophon row gets. Two, because one ellipsized every
-// entry that carries a two-stage lineage — "Bogusław Jackowski & Janusz M.
-// Nowacki · 1918 Jersey…" cut off exactly the half the credit exists to show.
-// Both the page stride and drawList have to be told, or paging skips rows.
-constexpr int kColophonLines = 4;
+// Colophon lines the PREVIEW PANE reserves. Five is the worst case in the
+// table: two lineage stages at a person and a year-place each, plus the blank
+// line that separates the originator from whoever digitised their work.
+// FontDisplayNames::subtitle() collapses anything deeper to one bulleted line
+// per stage, so nothing exceeds this.
+constexpr int kColophonLines = 5;
 
-// Families visible at once. Three, not "as many as fit": five rows left the
-// specimen pane at 30% of the usable height, which is a four-line sample and
-// nothing else. The list is a comparison set the user steps through, while the
-// specimen is the thing actually being judged — so the rows are capped and the
-// pane takes everything they give back.
-constexpr int kVisibleFontRows = 3;
+// Families visible at once. The list rows are the family name alone now, so a
+// row is one line instead of six, and five families fit in less height than
+// three subtitled ones used to take. The credit moved to the pane, which is
+// where the face is actually being judged — the list is only the set you step
+// through.
+constexpr int kVisibleFontRows = 5;
+
+// Air between the pane's label and the colophon beneath it.
+constexpr int kColophonGap = 6;
 
 // Resolve the current selection to a POSITION IN `fonts_`.
 //
@@ -104,7 +108,9 @@ void FontSelectionActivity::onEnter() {
   // so the last one is never drawn clipped, and clamped to the space that
   // exists in case a theme's row grows past a third of the screen.
   const int listBudget = std::max(0, usableHeight - metrics_.verticalSpacing);
-  const int rowStep = GUI.getListRowStep(true, kColophonLines);
+  // Name-only rows now, so the step is a single line and more families fit in
+  // less height than three subtitled rows used to take.
+  const int rowStep = GUI.getListRowStep(false, 1);
   listHeight = rowStep > 0 ? std::min(rowStep * kVisibleFontRows, (listBudget / rowStep) * rowStep)
                            : usableHeight * (100 - metrics_.previewHeightPercent) / 100;
   previewHeight = usableHeight - metrics_.verticalSpacing - listHeight;
@@ -222,8 +228,8 @@ void FontSelectionActivity::loop() {
   // No cap: the stride is whatever the theme says fits below the preview pane,
   // which is the same question render()'s list rect answers, so the page stride
   // and the drawn page still agree.
-  const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true,
-                                                         previewHeight + metrics_.verticalSpacing, kColophonLines);
+  const int pageItems =
+      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, previewHeight + metrics_.verticalSpacing, 1);
 
   // List navigation is bound to the FRONT buttons only. ButtonNavigator's
   // NavNext/NavPrevious resolve to "side Down OR front Right" and "side Up OR
@@ -379,13 +385,26 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
     snprintf(scratch, sizeof(scratch), "%s \"%s\"", tr(STR_PREVIEW), fontName ? fontName : "");
   }
 
-  const int labelY = top + height - metrics_.previewPadding - labelH;
+  // Name, then credit — the order every crediting convention uses, from a
+  // library catalogue's statement of responsibility to a foundry's specimen.
+  // The label names the face; the colophon under it says who is responsible
+  // for it and when. Both sit at the pane's foot so the specimen keeps the top.
+  const auto colophon = previewColophonLines(width);
+  const int colophonBlockH = previewColophonHeight(width);
+  const int labelY = top + height - metrics_.previewPadding - colophonBlockH - labelH;
   // Guard against a negative origin: a short pane, or a large label font, can
   // drive this above the top edge, and the renderer logs
   // "!! Outside range ... -> (x, -1)" and writes outside the framebuffer.
   if (labelY >= 0) {
     const std::string safeLabel = renderer.truncatedText(labelFontId, scratch, width);
     renderer.drawText(labelFontId, left, labelY, safeLabel.c_str());
+
+    const int colophonStep = renderer.getLineHeight(SMALL_FONT_ID);
+    int colophonY = labelY + labelH + kColophonGap;
+    for (const auto& line : colophon) {
+      if (!line.empty()) renderer.drawText(SMALL_FONT_ID, left, colophonY, line.c_str(), true);
+      colophonY += colophonStep;
+    }
   }
 
   if (fontId == 0) return;
@@ -418,6 +437,45 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
 // flag pixels the BW base pass painted black). Keep the two derivations in
 // lockstep. The prewarm stays in renderPreviewPane: by the time the AA passes
 // re-render, the glyphs are already cached.
+// Segmenting mirrors LyraTheme::drawList's subtitle walk: a '\n' is an EXPLICIT
+// break (one lineage stage per pair of lines), and an EMPTY segment is the
+// deliberate blank line between an originator and their digitiser, which has to
+// be emitted directly because wrappedText() has no words to lay out for it.
+std::vector<std::string> FontSelectionActivity::previewColophonLines(int width) const {
+  std::vector<std::string> out;
+  if (width <= 0) return out;
+  if (previewFontIndex_ < 0 || previewFontIndex_ >= static_cast<int>(fonts_.size())) return out;
+  if (fonts_[previewFontIndex_].isBuiltin) return out;
+
+  const std::string text = FontDisplayNames::subtitle(fonts_[previewFontIndex_].name);
+  if (text.empty()) return out;
+
+  out.reserve(kColophonLines);
+  size_t segStart = 0;
+  while (segStart <= text.size() && static_cast<int>(out.size()) < kColophonLines) {
+    const size_t nl = text.find('\n', segStart);
+    const std::string segment = text.substr(segStart, nl == std::string::npos ? std::string::npos : nl - segStart);
+    if (segment.empty()) {
+      out.push_back(std::string());
+    } else {
+      for (auto& line :
+           renderer.wrappedText(SMALL_FONT_ID, segment.c_str(), width, kColophonLines - static_cast<int>(out.size()))) {
+        if (static_cast<int>(out.size()) >= kColophonLines) break;
+        out.push_back(std::move(line));
+      }
+    }
+    if (nl == std::string::npos) break;
+    segStart = nl + 1;
+  }
+  return out;
+}
+
+int FontSelectionActivity::previewColophonHeight(int width) const {
+  const auto lines = previewColophonLines(width);
+  if (lines.empty()) return 0;
+  return kColophonGap + static_cast<int>(lines.size()) * renderer.getLineHeight(SMALL_FONT_ID);
+}
+
 void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontId) const {
   const int left = metrics_.previewPadding;
   const int width = renderer.getScreenWidth() - (metrics_.previewPadding * 2);
@@ -425,7 +483,10 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
 
   const int labelH = renderer.getTextHeight(UI_10_FONT_ID);
   const int labelGap = 4;
-  const int labelReserved = labelH + labelGap + metrics_.previewPadding;
+  // Same reserve renderPreviewPane draws into — label, then the colophon under
+  // it. Derived from the same call so the AA pass lays the specimen out exactly
+  // where the BW pass did.
+  const int labelReserved = labelH + labelGap + metrics_.previewPadding + previewColophonHeight(width);
 
   if (fontId == 0) return;
 
@@ -566,18 +627,18 @@ void FontSelectionActivity::render(RenderLock&&) {
       [this](int index) {
         return fonts_[index].isBuiltin ? fonts_[index].name : FontDisplayNames::displayName(fonts_[index].name);
       },
-      // Subtitle: "Designer · YEAR PLACE; YEAR PLACE" — the attribution that
-      // used to share the title line, wrapped over kColophonLines lines.
-      // Built-ins and unlisted families return "" and show no second line.
-      [this](int index) -> std::string {
-        return fonts_[index].isBuiltin ? "" : FontDisplayNames::subtitle(fonts_[index].name);
-      },
-      nullptr,
+      // NO subtitle. The credit does not belong in the list: it is about the
+      // face being judged, not about navigating to it, and one row per family
+      // is what lets the list BE a comparison set — five families on screen
+      // instead of three (owner ruling 2026-08-14). The colophon is now a
+      // permanent part of the preview pane, where it sits next to the specimen
+      // it describes.
+      nullptr, nullptr,
       [this](int index) -> std::string {
         if (index == previewFontIndex_) return tr(STR_SELECTED);
         return "";
       },
-      true, nullptr, kColophonLines);
+      true, nullptr, 1);
 
   // Confirm carries two meanings and the label says which one is live: on any
   // row but the applied one it applies that font, on the applied row it swaps

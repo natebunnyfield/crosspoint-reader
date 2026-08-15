@@ -284,14 +284,28 @@ inline std::string displayName(const std::string& directory) {
   return e != nullptr ? std::string(e->name) : directory;
 }
 
-// "Designer · YEAR PLACE; YEAR PLACE" for the picker row subtitle. One middle
-// dot now, not two: the year and place of a stage belong together, so the only
-// division left is designer from lineage. A family not in the table gets an
-// empty subtitle. The theme wraps this over two lines and ellipsizes overflow.
-// One line PER STAGE, newline-separated: "Original author · YEAR PLACE" over
-// "Digitizer · YEAR PLACE", the format docs/font-dates.md specified on
-// 2026-08-12 and fed with data that nothing consumed until now. Stage N of
-// `designer` pairs with stage N of `lineage`, both split on the same ";".
+// Above this many lines of information, the colophon gives up the roomy
+// stacked form and bullets instead. Blank separator lines do not count toward
+// it (owner ruling 2026-08-14).
+constexpr size_t kMaxStackedInfoLines = 4;
+
+// The picker row subtitle: TWO lines per lineage stage, the person on one and
+// their year and place on the next, with a BLANK LINE between stages (owner
+// rulings 2026-08-14 — "Chappel and 1938 need a newline", then "put a newline
+// between originator and digitizer"). A family not in the table gets an empty
+// subtitle.
+//
+// The middle dot that used to join designer to year is GONE. It was doing two
+// different jobs in one glyph — separating a name from a date, and reading as a
+// list bullet — and at picker width the pair regularly ran past the column and
+// ellipsized exactly the half the credit exists to show. A line break separates
+// without spending width.
+//
+// Six lines is the worst case in the table (Inknut Antiqua + Junicode: four
+// stages, two of them with no person). `kColophonLines` in
+// FontSelectionActivity is sized to it; the editor picker's four covers its own
+// mono faces. Stage N of `designer` pairs with stage N of `lineage`, both split
+// on the same ";".
 //
 // This is a PAIRING, not a wrap. The previous version returned one flat run
 // and let the theme word-wrap it, so the break landed wherever the words ran
@@ -345,26 +359,68 @@ inline std::string subtitle(const std::string& directory) {
   if (people.size() != stages.size()) {
     std::string flat(e->designer);
     if (e->lineage != nullptr && e->lineage[0] != '\0') {
-      flat += " \xC2\xB7 ";  // middle dot
+      flat += '\n';
       flat += e->lineage;
     }
     return flat;
   }
 
+  const size_t stageCount = stages.empty() ? people.size() : stages.size();
+
+  // How many lines of INFO the roomy form would need — a person and a
+  // year-place for every stage that has both. Blank separators are not counted;
+  // they are spacing, not information.
+  size_t infoLines = 0;
+  for (size_t i = 0; i < stageCount; ++i) {
+    const bool who = i < people.size() && !people[i].empty();
+    const bool when = i < stages.size() && !stages[i].empty();
+    infoLines += static_cast<size_t>(who) + static_cast<size_t>(when);
+  }
+
+  // Past four lines of info the stacked form stops being readable and starts
+  // being a column of fragments, so it collapses back to one BULLETED line per
+  // stage — the middle dot doing the joining a line break did above (owner
+  // ruling 2026-08-14: newlines when it is possible, bullets when it is not,
+  // and four info lines is where "possible" ends). Only the deepest lineages
+  // take this path: Lexica Ultralegible's three stages and Inknut Antiqua +
+  // Junicode's four.
+  if (infoLines > kMaxStackedInfoLines) {
+    std::string out;
+    for (size_t i = 0; i < stageCount; ++i) {
+      const std::string& who = i < people.size() ? people[i] : std::string();
+      const std::string& when = i < stages.size() ? stages[i] : std::string();
+      if (who.empty() && when.empty()) continue;
+      if (!out.empty()) out += '\n';
+      if (who.empty()) {
+        out += when;
+      } else if (when.empty()) {
+        out += who;
+      } else {
+        out += who;
+        out += " \xC2\xB7 ";  // middle dot
+        out += when;
+      }
+    }
+    return out;
+  }
+
+  // Roomy form: the person, then their year and place, then a BLANK LINE before
+  // the next stage. The blank is what separates an originator from the person
+  // who digitised their work decades later — without it the four lines read as
+  // one undifferentiated block of names and dates.
   std::string out;
-  const size_t lines = stages.empty() ? people.size() : stages.size();
-  for (size_t i = 0; i < lines; ++i) {
+  for (size_t i = 0; i < stageCount; ++i) {
     const std::string& who = i < people.size() ? people[i] : std::string();
     const std::string& when = i < stages.size() ? stages[i] : std::string();
     if (who.empty() && when.empty()) continue;
-    if (!out.empty()) out += '\n';
+    if (!out.empty()) out += "\n\n";  // blank line between stages
     if (who.empty()) {
       out += when;
     } else if (when.empty()) {
       out += who;
     } else {
       out += who;
-      out += " \xC2\xB7 ";  // middle dot
+      out += '\n';
       out += when;
     }
   }

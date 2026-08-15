@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "CrossPointSettings.h"
+#include "FontDisplayNames.h"
 #include "MappedInputManager.h"
 #include "SdCardFontSystem.h"
 #include "activities/reader/ReaderUtils.h"
@@ -24,13 +25,17 @@ namespace {
 // Owner ruling 2026-08-09: this list presents and sorts identically to Text
 // Settings. The subtitle used to be the availability note alone; it is now the
 // colophon with that note prepended (editorfonts::rowSubtitle).
-constexpr int kColophonLines = 2;
+constexpr int kColophonLines = 5;
 
 // Faces visible at once. Five rows is the whole list, so the pane takes
 // whatever they leave rather than the list being capped like the reading
 // picker's. A two-line row is taller, so the clamp below (whole rows only,
 // bounded by the space that exists) is what actually decides it.
 constexpr int kVisibleRows = 5;
+
+// Air between the pane's label and the colophon beneath it, same as the
+// reading picker.
+constexpr int kColophonGap = 6;
 
 // The editor asks the SD resolver for this and nothing else
 // (NoteEditorActivity::onEnter), so the specimen is drawn at it. Previewing at
@@ -57,7 +62,7 @@ void EditorFontSelectionActivity::onEnter() {
   // never drawn clipped. Same ordering as FontSelectionActivity, and the same
   // reason: the row count is the fixed quantity.
   const int listBudget = std::max(0, usableHeight - metrics_.verticalSpacing);
-  const int rowStep = GUI.getListRowStep(true, kColophonLines);
+  const int rowStep = GUI.getListRowStep(false, 1);
   listHeight = rowStep > 0 ? std::min(rowStep * kVisibleRows, (listBudget / rowStep) * rowStep)
                            : usableHeight * (100 - metrics_.previewHeightPercent) / 100;
   previewHeight = usableHeight - metrics_.verticalSpacing - listHeight;
@@ -146,8 +151,8 @@ void EditorFontSelectionActivity::loop() {
   }
 
   const int listSize = static_cast<int>(rows_.size());
-  const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true,
-                                                         previewHeight + metrics_.verticalSpacing, kColophonLines);
+  const int pageItems =
+      UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, previewHeight + metrics_.verticalSpacing, 1);
 
   // FRONT buttons only, like the reading picker: ButtonNavigator's Nav* aliases
   // also resolve to the side buttons, which would make them move the selection.
@@ -235,7 +240,8 @@ void EditorFontSelectionActivity::renderPreviewPane(int top, int height, int fon
   // drawn instead, because the alternative is a specimen quietly showing the
   // fallback under the missing face's name.
   const int labelH = renderer.getTextHeight(UI_10_FONT_ID);
-  const int labelY = top + height - metrics_.previewPadding - labelH;
+  const int colophonBlockH = previewColophonHeight(width);
+  const int labelY = top + height - metrics_.previewPadding - colophonBlockH - labelH;
   char label[96];
   if (faceName == nullptr) return;
   if (available) {
@@ -243,7 +249,53 @@ void EditorFontSelectionActivity::renderPreviewPane(int top, int height, int fon
   } else {
     snprintf(label, sizeof(label), "%s — %s", faceName, I18N.get(StrId::STR_FONT_NOT_ON_CARD));
   }
+  if (labelY < 0) return;
   renderer.drawText(UI_10_FONT_ID, left, labelY, label);
+
+  // Name, then credit — same order the reading picker uses.
+  const int colophonStep = renderer.getLineHeight(SMALL_FONT_ID);
+  int colophonY = labelY + labelH + kColophonGap;
+  for (const auto& line : previewColophonLines(width)) {
+    if (!line.empty()) renderer.drawText(SMALL_FONT_ID, left, colophonY, line.c_str(), true);
+    colophonY += colophonStep;
+  }
+}
+
+// Mirrors FontSelectionActivity's pair: a '\n' is an explicit break between the
+// two halves of a lineage stage, and an EMPTY segment is the deliberate blank
+// line between an originator and their digitiser, which wrappedText() cannot
+// produce because it has no words to lay out.
+std::vector<std::string> EditorFontSelectionActivity::previewColophonLines(int width) const {
+  std::vector<std::string> out;
+  if (width <= 0 || rows_.empty()) return out;
+  const int idx = appliedIndex_ >= 0 && appliedIndex_ < static_cast<int>(rows_.size()) ? appliedIndex_ : 0;
+  const std::string text = FontDisplayNames::subtitle(editorfonts::FAMILIES[rows_[idx]].family);
+  if (text.empty()) return out;
+
+  out.reserve(kColophonLines);
+  size_t segStart = 0;
+  while (segStart <= text.size() && static_cast<int>(out.size()) < kColophonLines) {
+    const size_t nl = text.find('\n', segStart);
+    const std::string segment = text.substr(segStart, nl == std::string::npos ? std::string::npos : nl - segStart);
+    if (segment.empty()) {
+      out.push_back(std::string());
+    } else {
+      for (auto& line :
+           renderer.wrappedText(SMALL_FONT_ID, segment.c_str(), width, kColophonLines - static_cast<int>(out.size()))) {
+        if (static_cast<int>(out.size()) >= kColophonLines) break;
+        out.push_back(std::move(line));
+      }
+    }
+    if (nl == std::string::npos) break;
+    segStart = nl + 1;
+  }
+  return out;
+}
+
+int EditorFontSelectionActivity::previewColophonHeight(int width) const {
+  const auto lines = previewColophonLines(width);
+  if (lines.empty()) return 0;
+  return kColophonGap + static_cast<int>(lines.size()) * renderer.getLineHeight(SMALL_FONT_ID);
 }
 
 void EditorFontSelectionActivity::render(RenderLock&&) {
@@ -272,17 +324,17 @@ void EditorFontSelectionActivity::render(RenderLock&&) {
       renderer, Rect{0, listTop, pageWidth, listHeight}, static_cast<int>(rows_.size()), selectedIndex_,
       // Title: the typeface name alone, exactly as the reading picker draws it.
       [this](int index) -> std::string { return editorfonts::FAMILIES[rows_[index]].label; },
-      // Subtitle: the reading picker's "Designer · YEAR PLACE" colophon, with
-      // the availability note prepended on a row that cannot be reached. A row
-      // that IS reachable says nothing about it -- a "present" badge on four
-      // rows out of five is noise, while the absent one needs to stand out.
-      [this](int index) -> std::string {
-        const uint8_t stored = rows_[index];
-        return editorfonts::rowSubtitle(stored, isAvailable(stored), I18N.get(StrId::STR_FONT_NOT_ON_CARD));
-      },
-      nullptr,
-      [this](int index) -> std::string { return index == appliedIndex_ ? tr(STR_SELECTED) : ""; }, true, nullptr,
-      kColophonLines);
+      // NO subtitle, matching the reading picker (owner ruling 2026-08-14). The
+      // credit is about the face being judged, so it lives in the preview pane
+      // beside the specimen; the list is just the set you step through.
+      //
+      // The availability note went with it. That costs nothing today — every
+      // editor face is compiled into the firmware, so isAvailable() cannot
+      // fail — and the pane's own label still says "not on card" for the
+      // applied face. editorfonts::rowSubtitle() is kept for the day a face is
+      // reachable again from the card.
+      nullptr, nullptr, [this](int index) -> std::string { return index == appliedIndex_ ? tr(STR_SELECTED) : ""; },
+      true, nullptr, 1);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

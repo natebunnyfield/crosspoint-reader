@@ -50,6 +50,14 @@ class FontSelectionActivity final : public Activity {
   // re-render exactly the glyphs the BW pass drew — it is the content callback
   // handed to ReaderUtils::renderAntiAliased() from render().
   void renderPreviewSpecimen(int top, int height, int fontId) const;
+  // The colophon for the face the pane is previewing, wrapped to `width` and
+  // capped at kColophonLines. Empty for built-ins and for families the display
+  // table does not carry. Both pane passes call this and size their bottom
+  // reserve from it, so the BW pass and the grayscale AA pass cannot disagree
+  // about where the specimen ends.
+  std::vector<std::string> previewColophonLines(int width) const;
+  // Height the colophon block occupies below the pane's label, gap included.
+  int previewColophonHeight(int width) const;
 
   struct FontEntry {
     std::string name;

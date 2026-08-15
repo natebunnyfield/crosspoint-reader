@@ -2278,6 +2278,61 @@ int GfxRenderer::getFontAscenderSize(const int fontId) const {
   return fontIt->second.getData(EpdFontFamily::REGULAR)->ascender;
 }
 
+bool GfxRenderer::getTextInkBounds(const int fontId, const char* text, int& inkTop, int& inkBottom,
+                                   const EpdFontFamily::Style style) const {
+  inkTop = 0;
+  inkBottom = 0;
+  if (text == nullptr || *text == '\0') return false;
+
+  const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  const auto fontIt = fontMap.find(resolvedFontId);
+  if (fontIt == fontMap.end()) return false;
+
+  const int ascender = getFontAscenderSize(resolvedFontId);
+  bool any = false;
+  int top = 0;
+  int bottom = 0;
+
+  const auto* cursor = reinterpret_cast<const unsigned char*>(text);
+  while (*cursor) {
+    const uint32_t cp = utf8NextCodepoint(&cursor);
+    if (cp == 0) break;
+    const EpdGlyph* g = fontIt->second.getGlyph(cp, style);
+    // A blank (space) has no bitmap and must not drag the box to the baseline.
+    if (g == nullptr || g->width == 0 || g->height == 0) continue;
+    // drawText places a glyph's upper-left at (baseline - glyph.top), and the
+    // baseline is `ascender` below the y it was handed — so measured from that
+    // same y, this glyph's ink runs from (ascender - top) down by its height.
+    const int glyphTop = ascender - g->top;
+    const int glyphBottom = glyphTop + g->height;
+    if (!any) {
+      top = glyphTop;
+      bottom = glyphBottom;
+      any = true;
+    } else {
+      if (glyphTop < top) top = glyphTop;
+      if (glyphBottom > bottom) bottom = glyphBottom;
+    }
+  }
+
+  if (!any) return false;
+  inkTop = top;
+  inkBottom = bottom;
+  return true;
+}
+
+int GfxRenderer::getFontDescenderSize(const int fontId) const {
+  const auto fontIt = fontMap.find(fontId);
+  if (fontIt == fontMap.end()) {
+    LOG_ERR("GFX", "Font %d not found", fontId);
+    return 0;
+  }
+
+  // Stored negative (distance BELOW the baseline); callers want a depth.
+  const int descender = fontIt->second.getData(EpdFontFamily::REGULAR)->descender;
+  return descender < 0 ? -descender : descender;
+}
+
 int GfxRenderer::getLineHeight(const int fontId) const {
   const auto fontIt = fontMap.find(fontId);
   if (fontIt == fontMap.end()) {

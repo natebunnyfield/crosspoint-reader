@@ -51,6 +51,11 @@ class EditorFontSelectionActivity final : public Activity {
   // anti-aliasing passes can re-render exactly the glyphs the BW pass drew.
   // Same split, and same reason, as FontSelectionActivity.
   void renderPreviewSpecimen(int top, int height, int fontId) const;
+  // Colophon for the face the pane shows, wrapped and capped at kColophonLines;
+  // both pane passes size their bottom reserve from it so the BW pass and the
+  // grayscale AA pass cannot disagree about where the specimen ends.
+  std::vector<std::string> previewColophonLines(int width) const;
+  int previewColophonHeight(int width) const;
 
   ButtonNavigator buttonNavigator_;
   // Display positions -> editorfonts::FAMILIES indices, from

@@ -391,6 +391,22 @@ class GfxRenderer {
   int getKerning(int fontId, uint32_t leftCp, uint32_t rightCp, EpdFontFamily::Style style) const;
   int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style) const;
   int getFontAscenderSize(int fontId) const;
+  // Depth below the baseline, as a POSITIVE number (EpdFontData stores it
+  // negative). Needed to centre text vertically: drawText() takes the top of the
+  // ascender box and the glyphs run on down past the baseline, so centring on
+  // the ascender alone leaves the text sitting half a descender too low.
+  int getFontDescenderSize(int fontId) const;
+  // Ink extent of THIS string, as offsets from the y that would be handed to
+  // drawText(). Font-wide ascender/descender describe what a face COULD reach,
+  // not what a given word does: centring "Selected" on the full box reserves
+  // descender space nothing occupies and the label rides high, while centring on
+  // the ascender alone leaves it low. Walks the string's glyphs and skips blanks.
+  // Returns false (and zeroes both) for empty text or an unknown font.
+  //
+  // Cheap for the built-in UI faces. An SD-backed font may hit the card for a
+  // glyph it has not cached, so do not call this per frame in a hot path.
+  bool getTextInkBounds(int fontId, const char* text, int& inkTop, int& inkBottom,
+                        EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   int getLineHeight(int fontId) const;
   int getLineHeight(int fontId, float compression) const;
   std::string truncatedText(int fontId, const char* text, int maxWidth,

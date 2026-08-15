@@ -230,6 +230,16 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     while (segStart <= text.size() && static_cast<int>(out.size()) < subtitleLines) {
       const size_t nl = text.find('\n', segStart);
       const std::string segment = text.substr(segStart, nl == std::string::npos ? std::string::npos : nl - segStart);
+      // An EMPTY segment is a deliberate blank line — the font colophon puts one
+      // between an originator and the person who digitised their work. It has to
+      // be emitted directly: wrappedText() has no words to lay out and returns
+      // nothing, which would silently close the gap the blank exists to open.
+      if (segment.empty()) {
+        out.push_back(std::string());
+        if (nl == std::string::npos) break;
+        segStart = nl + 1;
+        continue;
+      }
       const auto wrapped =
           renderer.wrappedText(SMALL_FONT_ID, segment.c_str(), textWidth, subtitleLines - static_cast<int>(out.size()));
       for (const auto& line : wrapped) {
@@ -240,6 +250,20 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       segStart = nl + 1;
     }
     return out;
+  };
+
+  // Where a row's subtitle block STARTS, given how many lines it actually has.
+  // The block is sized for the worst case in the list — four lineage stages in
+  // the font picker — so a family with fewer draws BOTTOM-ALIGNED within it: a
+  // one-line colophon lands on the last reserved line, a two-liner on the
+  // bottom two, and a four-liner fills the block exactly as before (owner
+  // ruling 2026-08-13, docs/ui-conventions.md).
+  //
+  // Both the selection band and the draw loop go through this, so the band
+  // cannot mark lines the text does not occupy — the failure the band already
+  // shipped once, when its geometry was derived separately.
+  const auto subtitleTopFor = [&](int lineCount) {
+    return kSubtitleTopOffset + std::max(0, subtitleLines - lineCount) * LyraMetrics::values.listSubtitleLineStep;
   };
 
   // Draw selection
@@ -259,8 +283,13 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     int highlightH;
     int highlightY;
     if (selLines > 0) {
-      highlightH = std::min(kSubtitleTopOffset + (selLines - 1) * LyraMetrics::values.listSubtitleLineStep +
-                               renderer.getLineHeight(SMALL_FONT_ID) + kSelectionPadBottom,
+      // Bottom-aligned subtitles mean the row's content now runs from its title
+      // down to the LAST reserved line whatever the row's own line count, so the
+      // band reaches the bottom of the block rather than stopping under a short
+      // colophon. Expressed through subtitleTopFor() rather than as
+      // `subtitleLines - 1` so it stays tied to where the text actually starts.
+      highlightH = std::min(subtitleTopFor(selLines) + (selLines - 1) * LyraMetrics::values.listSubtitleLineStep +
+                                renderer.getLineHeight(SMALL_FONT_ID) + kSelectionPadBottom,
                             rowHeight - kSelectionPadTop);
       highlightY = selRow + kSelectionPadTop;
     } else {
@@ -342,8 +371,9 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
         // out — mid-stage, splitting a year from its place. subtitleLinesFor()
         // above does the segmenting; the selection band measures the same call,
         // so the band and these lines cannot drift apart.
-        int subtitleY = itemY + kSubtitleTopOffset;
-        for (const auto& line : subtitleLinesFor(i)) {
+        const auto subtitleTextLines = subtitleLinesFor(i);
+        int subtitleY = itemY + subtitleTopFor(static_cast<int>(subtitleTextLines.size()));
+        for (const auto& line : subtitleTextLines) {
           renderer.drawText(SMALL_FONT_ID, textX, subtitleY, line.c_str(), true);
           textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, line.c_str()));
           subtitleY += LyraMetrics::values.listSubtitleLineStep;
@@ -380,7 +410,23 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
       // Centred in the pill (same centre as the row, since the pill is centred in
       // the row), not pinned near its top.
-      const int valueY = itemY + (rowHeight - renderer.getTextHeight(UI_10_FONT_ID)) / 2;
+      //
+      // Centre THIS LABEL'S OWN INK, not the font's theoretical box. drawText()
+      // takes the top of the ascender box and adds the ascender to reach the
+      // baseline (GfxRenderer.cpp:659), so subtracting getTextHeight() — the
+      // ascender alone — parked the label half a descender LOW, and subtracting
+      // ascender+descender parked it high by whatever descender depth the word
+      // does not use ("Selected" has no descenders at all). Measuring the drawn
+      // string lands it on the pill's centre either way. Both errors were
+      // invisible on a tall row and obvious once the rows became a single line.
+      int inkTop = 0;
+      int inkBottom = 0;
+      int valueY;
+      if (renderer.getTextInkBounds(UI_10_FONT_ID, valueText.c_str(), inkTop, inkBottom)) {
+        valueY = itemY + (rowHeight - (inkBottom - inkTop)) / 2 - inkTop;
+      } else {
+        valueY = itemY + (rowHeight - renderer.getFontAscenderSize(UI_10_FONT_ID)) / 2;
+      }
       renderer.drawText(UI_10_FONT_ID, rect.x + contentWidth - LyraMetrics::values.contentSidePadding - valueWidth,
                         valueY, valueText.c_str(), !(i == selectedIndex && highlightValue));
     }
