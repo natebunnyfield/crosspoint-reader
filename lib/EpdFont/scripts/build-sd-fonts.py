@@ -646,6 +646,14 @@ def build_family(
     for style_name, spec in space_flags.items():
         cmd.extend([f"--space-{style_name}", spec])
 
+    # Family-level leading override. Not per-style: a family whose styles
+    # disagreed on line advance would fuse or gap depending on which style a
+    # line happened to start with, and getLineHeight() reads REGULAR anyway.
+    if family.get("line_height"):
+        cmd.extend(["--line-height", str(int(family["line_height"]))])
+    if family.get("line_height_scale"):
+        cmd.extend(["--line-height-scale", str(float(family["line_height_scale"]))])
+
     cmd.extend(["--intervals", intervals])
     cmd.extend(["--sizes", sizes])
     # Build-level drops go to the CONVERTER, not through apply_cmap_drops: a

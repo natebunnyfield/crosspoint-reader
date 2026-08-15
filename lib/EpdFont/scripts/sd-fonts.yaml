@@ -1148,17 +1148,45 @@ families:
   # All OFL; iA's faces are the "S" (narrow) cuts from github.com/iaolo/iA-Fonts.
 
   - name: NittiTypewriter
+    # 33/25: the leading the four iA/IBM editor faces use at 12pt, expressed as
+    # a RATIO so the 14/16/18 cuts scale with it. An absolute value would pin
+    # every size to one leading while the glyphs kept growing.
+    line_height_scale: 1.32
     description: "EDITOR GROUP. COMMERCIAL — recipe only. Nitti Typewriter — typewriter monospace (Latin).
-      Bold/Italic/BoldItalic synthesised from Regular: embolden_em=0.045 (stem 21px=0.082em at 256ppem,
-      target 1.55x ratio → +0.55×0.082=0.045em; verified 1.571x/1.632x/1.600x), y_ratio=0.5 (monoweight,
-      no hairlines), slant_deg=11 (gentle old-style). Counter survival 12pt 2-bit: e=2px a=5px s=3px ≥1px."
+      Three of the four styles are DRAWN cuts, not synthesis. regular = the roman.
+      italic = the genuine Underline cut (a struck-through rule under the letterform, which is what a
+      typewriter actually had in place of an italic); it replaces the old 11-degree shear.
+      bold = the genuine INVERSE (knockout) cut: a solid filled cell with the letterform carved out in
+      white. That is a POLARITY INVERSION, not a stroke thickening — the strokes are not heavier, the
+      ground is. Chosen because outline-emboldening a monospace face grows the advance (measured
+      45.000 -> 48.375 px at 36pt), which breaks the one guarantee a mono face makes; the inverse cut
+      keeps advance 600/1000 em across all four styles, so the grid holds exactly.
+      bolditalic = the joined Underline cut OVERPRINTED (double_strike_em 0.0533), so it behaves like
+      italic-with-weight while bold is its own gesture. Bold and bold-italic therefore do NOT share a
+      mechanism, which is a deliberate ruling (2026-08-15) and visible in a specimen: one inverts
+      polarity, the other thickens by striking.
+      The underline rule is JOINED across the cell (underline_connect). A drawn underline face draws
+      its rule inside each glyph bbox, so it stops short of the advance -- measured pen-x 3..41 on `a`
+      and 5..39 on `n` against an advance of 45 at 75 ppem -- and the line breaks at every character.
+      The join replicates the bar's own fully-inked interior column outward rather than drawing a
+      rectangle, which carries the bar's soft edges and exact ink levels; it reaches 2 px past the
+      advance so cells overlap rather than abut, because abutting depends on exact integer placement.
+      Measured after: 0 white columns across a 317 px run, against 6 breaks / 49 white px before.
+      line_height 33 is an OVERRIDE, not the face's own metric. Nitti sets 25 natively while every
+      other editor face (iA Writer Quattro/Duo/Mono, IBM Plex Mono) sits at 33. Nitti already matches
+      that set exactly on the two things governing reflow -- advance 15.000 and x-height 13 px at
+      12pt -- so pinning the leading makes it a true drop-in instead of a page 24% denser.
+      The inverse cell overhangs its advance by design (bbox ~655 units wide, ~1149 tall, vs advance
+      600), so adjacent knockout cells OVERLAP by ~55 units and merge into one continuous bar — a run
+      of bold is a solid slab with no white seams between characters. Bitmap heights stay well inside
+      EpdGlyph's uint8 limit (18pt 1x ≈ 44 px; 3x tier ≈ 130 px)."
     intervals: latin-ext
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {path: "local_fonts/NittiTypewriter-Regular.ttf"}
-      bold:       {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.5}}
-      italic:     {from: regular, synthetic: {slant_deg: 11}}
-      bolditalic: {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.5, slant_deg: 11}}
+      italic:     {path: "local_fonts/NittiTypewriter-Underline.ttf", synthetic: {underline_connect: 1, underline_overlap_px: 2}}
+      bold:       {path: "local_fonts/NittiTypewriter-Inverse.ttf"}
+      bolditalic: {path: "local_fonts/NittiTypewriter-Underline.ttf", synthetic: {underline_connect: 1, underline_overlap_px: 2, double_strike_em: 0.0533}}
 
   - name: iAWriterMono
     description: "EDITOR GROUP. iA Writer Mono — true monospace (Latin)"

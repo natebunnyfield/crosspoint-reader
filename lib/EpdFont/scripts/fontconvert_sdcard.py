@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import ctypes
 import struct
+import zlib
 import sys
 import os
 import re
@@ -651,6 +652,102 @@ def synth_params_for_size(synthetic, size):
     return x_strength, y_strength, shear_xy
 
 
+def double_strike_px_for_size(synthetic, size):
+    """Horizontal overprint offset, in whole device pixels at this size.
+
+    A typewriter had no bold cut. Emphasis was the same slug struck twice with
+    the carriage barely advanced, so the letterform is not redrawn -- it is
+    printed on top of itself a hair to the right. Emulating THAT rather than
+    emboldening the outline matters for a monospace face: growing an outline
+    also grows the advance (measured +7.5% at embolden_em 0.045), which breaks
+    the one guarantee a mono face makes, that every glyph fills the same cell.
+    An overprint leaves the advance untouched.
+
+    Two spellings, so a value can be pinned either way:
+      double_strike_px  absolute device pixels at the rasterised size
+      double_strike_em  a fraction of the em, which scales across size slots
+                        and across hi-res tiers
+    """
+    if not synthetic:
+        return 0
+    ppem = size * 150.0 / 72.0
+    if "double_strike_em" in synthetic:
+        return int(round(float(synthetic["double_strike_em"]) * ppem))
+    return int(round(float(synthetic.get("double_strike_px", 0))))
+
+
+def underline_connect_params(synthetic):
+    """Settings for joining a drawn underline cut across the monospace grid.
+
+    An underline face draws its rule inside the glyph's own bbox, so the rule
+    stops short of the advance and the line breaks at every character. Measured
+    on Nitti Typewriter Underline at 75 ppem: the rule spans pen-x 3..41 on `a`
+    and 5..39 on `n` against an advance of 45, losing 7 and 11 px per cell.
+
+    Returns (enabled, overlap_px, min_cov). min_cov defaults to
+    0.80, not 0.85. The rule's two antialiased end columns fall under the ink
+    threshold, so a 13-column bar measures 11/13 = 0.846 -- and a default of
+    0.85 sat just above a value this face produces naturally, silently leaving
+    13 glyphs unjoined at 1x including SPACE, H and z. Measured across 645
+    glyphs, dropping to 0.80 rescues exactly those 13 and changes nothing else.
+    """
+    if not synthetic:
+        return False, 0, 0.80
+    if not synthetic.get("underline_connect"):
+        return False, 0, 0.80
+    overlap = int(round(float(synthetic.get("underline_overlap_px", 1))))
+    min_cov = float(synthetic.get("underline_min_cov", 0.80))
+    return True, max(0, overlap), min_cov
+
+
+def strike_jitter_for_glyph(synthetic, code_point):
+    """Per-glyph variation of the second impression: (dx, dy, ink).
+
+    A typewriter's slugs do not all strike alike -- one sits a hair high, the
+    next prints a touch dry -- and it is that unevenness, more than the weight,
+    that makes typed text look typed. Baked per GLYPH at build time, so `a`
+    differs from `e` differs from `H` across the whole face.
+
+    DETERMINISTIC, keyed on the codepoint and an explicit seed rather than a
+    live RNG. Two builds of one recipe must be byte-identical: the build cache
+    is content-addressed, cards are verified by hash, and a cut you liked has to
+    be reproducible. A random() here would quietly break all three.
+
+    Knobs, all optional:
+      double_strike_jitter_px    max |dx| and |dy| deviation, whole pixels
+      double_strike_dy           base vertical offset, whole pixels
+      double_strike_ink_jitter   0..1, how much the strike's coverage may drop
+      double_strike_seed         change to reshuffle the whole face
+    """
+    if not synthetic:
+        return 0, 0, 1.0
+    jitter = int(round(float(synthetic.get("double_strike_jitter_px", 0))))
+    base_dy = int(round(float(synthetic.get("double_strike_dy", 0))))
+    ink_jitter = float(synthetic.get("double_strike_ink_jitter", 0.0))
+    if jitter == 0 and base_dy == 0 and ink_jitter == 0.0:
+        return 0, base_dy, 1.0
+
+    seed = int(synthetic.get("double_strike_seed", 0))
+    # zlib.crc32 rather than hash(): Python salts str/bytes hashing per process
+    # (PYTHONHASHSEED), so hash() would give a different face on every run --
+    # the exact non-reproducibility this function exists to avoid.
+    h = zlib.crc32(f"{seed}:{code_point}".encode())
+    dx = (h % (2 * jitter + 1)) - jitter if jitter else 0
+    dy = ((h >> 8) % (2 * jitter + 1)) - jitter if jitter else 0
+    # Dryness varies between `ink_min` and full, never below.
+    #
+    # Without a floor, ink jitter dims some glyphs enough that they read as
+    # WEAK rather than dry, and a handful of weak letters costs the line its
+    # boldness even though total ink coverage barely moves (measured: 19.50%
+    # with jitter vs 19.16% without -- the eye is reading per-glyph weight, not
+    # coverage). The floor keeps the texture and drops the weak letters.
+    ink_min = float(synthetic.get("double_strike_ink_min", 0.0))
+    ink = 1.0 - ((h >> 16) & 0xFF) / 255.0 * ink_jitter
+    if ink < ink_min:
+        ink = ink_min
+    return dx, base_dy + dy, ink
+
+
 def spacing_params_for_size(spacing, ppem):
     """Per-size advance deltas, in FreeType 16.16, from an em-relative spec.
 
@@ -675,7 +772,8 @@ def spacing_params_for_size(spacing, ppem):
 
 def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=False,
                          drop_codepoints=None,
-                         fallback_fontfile=None, synthetic=None, spacing=None):
+                         fallback_fontfile=None, synthetic=None, spacing=None,
+                         line_height_px=None, line_height_scale=None):
     """Rasterize all glyphs for one font style. Returns StyleRasterData.
 
     `synthetic`, when set, is a dict (see synth_params_for_size) describing a
@@ -711,10 +809,11 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
               f"word space {word_adv / 65536:+.2f} px (advance only)", file=sys.stderr)
 
     synth_x, synth_y, synth_shear = (0, 0, 0)
+    ds_px = double_strike_px_for_size(synthetic, size)
     if synthetic:
         synth_x, synth_y, synth_shear = synth_params_for_size(synthetic, size)
         print(f"  [{style_label}] Synthetic: embolden x={synth_x} y={synth_y} (26.6 px units), "
-              f"shear xy={synth_shear} (16.16)", file=sys.stderr)
+              f"shear xy={synth_shear} (16.16), double-strike {ds_px} px", file=sys.stderr)
         load_flags = freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP
     else:
         load_flags = freetype.FT_LOAD_RENDER
@@ -826,30 +925,153 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             # Cache bitmap.buffer in a local — ctypes struct field access
             # creates a new Python wrapper object each time, so re-evaluating
             # it per pixel is catastrophically slow.
+            # Normalise FreeType's buffer to a flat top-down list of 8-bit
+            # coverage, then optionally overprint it. Doing this here means the
+            # rest of the pipeline reads one plain list and never has to think
+            # about pitch, flips, or the strike.
+            _abs_pitch = abs(bitmap.pitch)
+            _fbuf = bitmap.buffer
+            src8 = []
+            for y in range(bitmap.rows):
+                ro = y * _abs_pitch if bitmap.pitch >= 0 else (bitmap.rows - 1 - y) * _abs_pitch
+                src8.extend(_fbuf[ro:ro + bitmap.width])
+
+            # Join a drawn underline rule across the cell.
+            #
+            # The rule is EXTENDED BY REPLICATING ONE OF ITS OWN COLUMNS, not by
+            # drawing a rectangle. The bar is not a clean box -- it has soft top
+            # and bottom edges and tapered end caps -- and copying a real
+            # interior column carries that exact vertical ink profile outward,
+            # so the join keeps the face's inky character instead of pasting a
+            # hard-edged synthetic bar next to it. The tapered caps are
+            # overwritten, which is precisely what has to happen for the rule to
+            # become continuous.
+            #
+            # It reaches one pixel PAST the advance on each side so neighbouring
+            # cells overlap rather than merely abut: abutting relies on exact
+            # integer placement, and a single rounding step reopens the seam.
+            # Overlap is free here because compositing is max(), so the doubled
+            # region cannot print darker than the rule already is.
+            glyph_left = f.glyph.bitmap_left
+            ul_on, ul_overlap, ul_min_cov = underline_connect_params(synthetic)
+            if ul_on and bitmap.width and bitmap.rows:
+                gtop = f.glyph.bitmap_top
+                bar_rows = []
+                for y in range(bitmap.rows):
+                    if y <= gtop:
+                        continue          # at or above the baseline: not the rule
+                    row = src8[y * bitmap.width:(y + 1) * bitmap.width]
+                    if sum(1 for v in row if v > 32) >= ul_min_cov * bitmap.width:
+                        bar_rows.append(y)
+                if bar_rows:
+                    # Source column: the one carrying the most ink through the
+                    # band, i.e. a fully-inked interior column rather than a
+                    # tapered end.
+                    best_x, best_sum = 0, -1
+                    for x in range(bitmap.width):
+                        t = sum(src8[y * bitmap.width + x] for y in bar_rows)
+                        if t > best_sum:
+                            best_sum, best_x = t, x
+                    col = {y: src8[y * bitmap.width + best_x] for y in bar_rows}
+
+                    adv_px = int(round(f.glyph.linearHoriAdvance / 65536.0))
+                    lo = -ul_overlap                      # pen-space span the
+                    hi = adv_px + ul_overlap              # rule must cover
+                    new_left = min(glyph_left, lo)
+                    new_right = max(glyph_left + bitmap.width, hi)
+                    new_w = new_right - new_left
+                    shift = glyph_left - new_left
+
+                    buf = [0] * (new_w * bitmap.rows)
+                    for y in range(bitmap.rows):
+                        rs = y * bitmap.width
+                        rd = y * new_w + shift
+                        buf[rd:rd + bitmap.width] = src8[rs:rs + bitmap.width]
+                    for y in bar_rows:
+                        v = col[y]
+                        if not v:
+                            continue
+                        rd = y * new_w
+                        for x in range(lo - new_left, hi - new_left):
+                            if v > buf[rd + x]:
+                                buf[rd + x] = v
+                    src8 = buf
+                    bitmap_width = new_w
+                    glyph_left = new_left
+                else:
+                    bitmap_width = bitmap.width
+            else:
+                bitmap_width = bitmap.width
+
+            render_w = bitmap_width
+            render_rows = bitmap.rows
+            pad_top = 0
+            jx, jy, jink = strike_jitter_for_glyph(synthetic, code_point)
+            off_x = max(0, ds_px + jx)
+            off_y = jy
+            if (off_x or off_y) and bitmap_width and bitmap.rows:
+                # Overprint: max-composite the same coverage shifted right.
+                #
+                # Composited at 8-bit coverage, BEFORE the 2-bit quantisation
+                # below, because ink overlaps as ink -- a strike landing half on
+                # an antialiased edge should darken it, not stack two hard
+                # edges. Compositing after quantisation loses exactly that.
+                #
+                # max(), not add(): a second impression of the same ribbon
+                # cannot print darker than the ribbon's own black. Adding would
+                # bloom every overlap to full black and lose the letterform.
+                #
+                # The bitmap grows by the offset; the ADVANCE deliberately does
+                # not, which is the whole point of doing it this way.
+                # The strike may sit above the baseline-relative top or below the
+                # bottom row, so the bitmap grows in whichever direction it
+                # went. `top` moves with pad_top -- it is the distance from the
+                # baseline to the FIRST row, and we just added rows above.
+                pad_top = max(0, -off_y)
+                pad_bot = max(0, off_y)
+                render_w = bitmap_width + off_x
+                render_rows = bitmap.rows + pad_top + pad_bot
+                comp = [0] * (render_w * render_rows)
+                for y in range(bitmap.rows):
+                    rs = y * bitmap_width
+                    rd0 = (y + pad_top) * render_w              # first impression
+                    rd1 = (y + pad_top + off_y) * render_w      # the strike
+                    for x in range(bitmap_width):
+                        v = src8[rs + x]
+                        if not v:
+                            continue
+                        if v > comp[rd0 + x]:
+                            comp[rd0 + x] = v
+                        # Ink jitter dims the SECOND impression only: the first
+                        # is the keystroke itself, the strike is the one that
+                        # catches a drier part of the ribbon.
+                        sv = int(v * jink) if jink < 1.0 else v
+                        if sv > comp[rd1 + x + off_x]:
+                            comp[rd1 + x + off_x] = sv
+                src8 = comp
+
             pixels4g = []
             px = 0
-            buf = bitmap.buffer
-            abs_pitch = abs(bitmap.pitch)
-            for y in range(bitmap.rows):
-                row_offset = y * abs_pitch if bitmap.pitch >= 0 else (bitmap.rows - 1 - y) * abs_pitch
-                for x in range(bitmap.width):
-                    v = buf[row_offset + x]
+            for y in range(render_rows):
+                row_offset = y * render_w
+                for x in range(render_w):
+                    v = src8[row_offset + x]
                     if x % 2 == 0:
                         px = (v >> 4)
                     else:
                         px = px | (v & 0xF0)
                         pixels4g.append(px)
                         px = 0
-                if bitmap.width % 2 > 0:
+                if render_w % 2 > 0:
                     pixels4g.append(px)
                     px = 0
 
             # Downsample to 2-bit bitmap
             pixels2b = []
             px = 0
-            pitch = (bitmap.width // 2) + (bitmap.width % 2)
-            for y in range(bitmap.rows):
-                for x in range(bitmap.width):
+            pitch = (render_w // 2) + (render_w % 2)
+            for y in range(render_rows):
+                for x in range(render_w):
                     px = px << 2
                     bm = pixels4g[y * pitch + (x // 2)]
                     bm = (bm >> ((x % 2) * 4)) & 0xF
@@ -861,16 +1083,16 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                     elif bm >= 4:
                         px += 1
 
-                    if (y * bitmap.width + x) % 4 == 3:
+                    if (y * render_w + x) % 4 == 3:
                         pixels2b.append(px)
                         px = 0
-            if (bitmap.width * bitmap.rows) % 4 != 0:
+            if (render_w * render_rows) % 4 != 0:
                 # Outer parens are for clarity: in Python `*` binds tighter
                 # than `<<`, so the original `px << (4 - … % 4) * 2` already
                 # evaluates as `px << ((4 - … % 4) * 2)`. Match the explicit
                 # bracketing here so the shift width is obvious at a glance,
                 # mirroring the inner-loop style in fontconvert.py.
-                px = px << ((4 - (bitmap.width * bitmap.rows) % 4) * 2)
+                px = px << ((4 - (render_w * render_rows) % 4) * 2)
                 pixels2b.append(px)
 
             packed = bytes(pixels2b)
@@ -889,11 +1111,12 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             advance_16_16 = max(0, f.glyph.linearHoriAdvance + (synth_x << 10) + spacing_adv)
 
             glyph = GlyphProps(
-                width=bitmap.width,
-                height=bitmap.rows,
+                width=render_w,
+                height=render_rows,
                 advance_x=fp4_from_ft16_16(advance_16_16),
-                left=f.glyph.bitmap_left,
-                top=f.glyph.bitmap_top,
+                left=glyph_left,
+                top=f.glyph.bitmap_top + pad_top,
+                # left moves when the rule extends past the original bbox
                 data_length=len(packed),
                 data_offset=total_bitmap_size,
                 code_point=code_point,
@@ -904,7 +1127,25 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # Get font metrics from pipe character (same heuristic as fontconvert.py)
     load_glyph(ord('|'))
 
+    # Leading override.
+    #
+    # advanceY otherwise comes straight from the face's own OS/2 metrics, which
+    # is right until you swap one face for another in a fixed UI. Measured at
+    # 12 pt: the four iA/IBM editor faces all sit at 33 px, PragmataPro at 28,
+    # Nitti Typewriter at 25 -- so Nitti sets 24% denser than the face it
+    # replaces even though its advance and x-height match exactly. This makes
+    # the leading a decision rather than an inherited property.
+    #
+    # It changes ONLY the line advance. Glyphs, advance widths and the x-height
+    # are untouched, so nothing reflows horizontally.
     advanceY = norm_ceil(face.size.height)
+    if line_height_px:
+        # Absolute: correct only for a single-size family. Across a ramp it
+        # pins every size to one leading while the glyphs keep growing, so 18pt
+        # overflows a line sized for 12pt. Use line_height_scale for a ramp.
+        advanceY = int(line_height_px)
+    elif line_height_scale:
+        advanceY = int(round(advanceY * line_height_scale))
     ascender = norm_ceil(face.size.ascender)
     descender = norm_floor(face.size.descender)
 
@@ -1029,7 +1270,7 @@ def style_sections_total_size(sections):
 
 def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
                                force_autohint=False, fallback_style_fonts=None,
-                               synth_specs=None, spacing_specs=None,
+                               synth_specs=None, spacing_specs=None, line_height_px=None, line_height_scale=None,
                                drop_codepoints=None):
     """Generate a multi-style v4 .cpfont file.
 
@@ -1060,7 +1301,9 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
             drop_codepoints=drop_codepoints,
             fallback_fontfile=fallback_fontfile,
             synthetic=synth_specs.get(style_id),
-            spacing=spacing_specs.get(style_id))
+            spacing=spacing_specs.get(style_id),
+            line_height_px=line_height_px,
+            line_height_scale=line_height_scale)
 
     # Pack binary sections for each style
     packed_sections = {}  # style_id -> tuple of section bytearrays
@@ -1195,6 +1438,12 @@ def main():
     SPACE_HELP = ("Advance-only spacing for this style: comma-separated "
                   "key=value pairs (tracking_em, word_space_em), em-relative. "
                   "Outlines are untouched.")
+    parser.add_argument("--line-height-scale", dest="line_height_scale", type=float, default=None,
+                        help="Multiply the face's own line advance. Use this for a size ramp; "
+                             "--line-height pins one absolute value and only suits a single size.")
+    parser.add_argument("--line-height", dest="line_height", type=int, default=None,
+                        help="Override the line advance, in whole pixels, for every style. "
+                             "Glyphs and advance widths are untouched.")
     parser.add_argument("--space-regular", dest="space_regular", help=SPACE_HELP)
     parser.add_argument("--space-bold", dest="space_bold", help=SPACE_HELP)
     parser.add_argument("--space-italic", dest="space_italic", help=SPACE_HELP)
@@ -1262,7 +1511,12 @@ def main():
                 sys.exit(1)
         return spec
 
-    SYNTH_KEYS = {"embolden_em", "y_ratio", "slant_deg"}
+    SYNTH_KEYS = {"embolden_em", "y_ratio", "slant_deg",
+                  "double_strike_px", "double_strike_em",
+                  "double_strike_dy", "double_strike_jitter_px",
+                  "double_strike_ink_jitter", "double_strike_ink_min",
+                  "double_strike_seed", "underline_connect",
+                  "underline_overlap_px", "underline_min_cov"}
     SPACE_KEYS = {"tracking_em", "word_space_em"}
     synth_specs = {}
     spacing_specs = {}
@@ -1352,6 +1606,8 @@ def main():
             fallback_style_fonts=fallback_style_fonts,
             synth_specs=synth_specs,
             spacing_specs=spacing_specs,
+            line_height_px=args.line_height,
+            line_height_scale=args.line_height_scale,
             drop_codepoints=drop_codepoints)
     print(f"\nTotal: {len(sizes)} files, {total_size / 1024 / 1024:.2f} MB", file=sys.stderr)
 
