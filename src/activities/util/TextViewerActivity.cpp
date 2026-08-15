@@ -1,6 +1,7 @@
 #include "TextViewerActivity.h"
 
 #include <Bitmap.h>
+#include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 #include <Memory.h>
@@ -10,6 +11,7 @@
 #include "activities/RenderLock.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "notes/MarkdownRender.h"
 
 namespace {
 // One sliding window over the file; the whole file is never loaded.
@@ -17,6 +19,14 @@ constexpr size_t CHUNK_SIZE = 4096;
 constexpr size_t PAGE_STACK_RESERVE = 64;
 constexpr int VIEWER_FONT_ID = UI_10_FONT_ID;
 constexpr int MIN_THUMB_HEIGHT = 12;
+// A markdown source line is read whole before it is wrapped, so it needs a
+// bound. Longer lines are cut here and the remainder is laid out as the next
+// source line -- which is a wrap in the middle of a sentence, but only for a
+// line already four times the screen's width.
+constexpr size_t MD_MAX_SOURCE_LINE = 512;
+// Visual lines one source line may produce. A page cannot show more than
+// maxLines anyway; this only bounds the stack array.
+constexpr size_t MD_MAX_FRAGMENTS = 32;
 }  // namespace
 
 void TextViewerActivity::onEnter() {
@@ -34,6 +44,11 @@ void TextViewerActivity::onEnter() {
   }
 
   if (!openFailed) {
+    // .md opens STYLED. It is the only kind whose pretty view is a way of
+    // drawing rather than a document to generate, so it does not go through
+    // PrettyView at all (see the header). Confirm still swaps to the source.
+    markdownFile = FsHelpers::hasMarkdownExtension(path);
+    markdownMode = markdownFile;
     prettyKind = PrettyView::detect(path, fileSize);
     // Raw bytes are illegible for images, books and binary caches — open those
     // in pretty view; json/html open raw (they are already text).
@@ -128,6 +143,8 @@ uint32_t TextViewerActivity::layoutPage(const uint32_t start) {
       self->lines.swap(*built);
     }
   } publish{this, &built};
+
+  if (markdownMode) return layoutMarkdownPage(start, built);
 
   const uint32_t srcSize = sourceSize();
 
@@ -230,6 +247,68 @@ uint32_t TextViewerActivity::layoutPage(const uint32_t start) {
   return srcSize;
 }
 
+// Markdown pagination.
+//
+// The plain path above wraps atom by atom, which cannot work here: a wrap
+// decision depends on the whole line's block kind and on which runs are styled,
+// and both come from mdspans::analyze over a complete source line. So this
+// reads one source line at a time and hands it to mdrender::wrapLine, which
+// measures candidates with the SAME call the draw will use -- the wrap and the
+// drawing therefore cannot disagree, which is the whole failure this file's
+// sibling bug was made of.
+//
+// The returned offset is a byte position in the FILE, always at the start of a
+// fragment or of a source line, so paging back and forward replays exactly.
+// Resuming mid-line is safe because wrapLine is greedy left to right: wrapping
+// the tail from a break point yields the same breaks as continuing would.
+uint32_t TextViewerActivity::layoutMarkdownPage(const uint32_t start, std::vector<std::string>& built) {
+  const uint32_t srcSize = sourceSize();
+  uint32_t offset = start;
+
+  std::string source;
+  source.reserve(128);
+
+  while (offset < srcSize && static_cast<int>(built.size()) < maxLines) {
+    // Collect one source line (or MD_MAX_SOURCE_LINE bytes of it).
+    //
+    // Byte i of `source` is file byte lineStart + i, and it has to stay that
+    // way: a fragment's offset is handed back as the next page's start. So
+    // control bytes are SUBSTITUTED, never dropped or expanded -- a tab that
+    // became two spaces, or a CR that vanished, would shift every offset after
+    // it and make paging land in the wrong place.
+    source.clear();
+    const uint32_t lineStart = offset;
+    while (offset < srcSize && source.size() < MD_MAX_SOURCE_LINE) {
+      const int b = byteAt(offset);
+      if (b < 0) break;  // read error: treat as EOF
+      offset++;
+      if (b == '\n') break;
+      source += (b < 0x20 || b == 0x7F) ? ' ' : static_cast<char>(b);
+    }
+    // A CRLF leaves its CR as a trailing space, which measures as one. Only the
+    // end of the line is trimmed, so no offset moves.
+    while (!source.empty() && source.back() == ' ') source.pop_back();
+
+    if (source.empty()) {
+      built.emplace_back();  // blank source line keeps its blank row
+      continue;
+    }
+
+    mdrender::Fragment frags[MD_MAX_FRAGMENTS];
+    const size_t n = mdrender::wrapLine(renderer, VIEWER_FONT_ID, lineHeight, source.c_str(), source.size(), maxWidth,
+                                        frags, MD_MAX_FRAGMENTS);
+    for (size_t i = 0; i < n; ++i) {
+      if (static_cast<int>(built.size()) >= maxLines) {
+        // Page is full mid-line: resume at this fragment's byte in the file.
+        return lineStart + frags[i].start;
+      }
+      built.emplace_back(source, frags[i].start, frags[i].end - frags[i].start);
+    }
+  }
+
+  return offset >= srcSize ? srcSize : offset;
+}
+
 void TextViewerActivity::layoutCurrentPage() { nextPageOffset = layoutPage(pageStarts.back()); }
 
 void TextViewerActivity::resetPagination() {
@@ -239,6 +318,14 @@ void TextViewerActivity::resetPagination() {
 }
 
 void TextViewerActivity::togglePretty() {
+  if (markdownFile) {
+    // Styled <-> source. Nothing to generate and nothing that can fail, so
+    // there is no unavailable state to fall into.
+    markdownMode = !markdownMode;
+    resetPagination();
+    requestUpdate();
+    return;
+  }
   if (prettyKind == PrettyView::Kind::None || prettyUnavailable) return;
   if (!prettyMode && !imageMode() && prettyText.empty() && prettyKind != PrettyView::Kind::ImageBmp &&
       prettyKind != PrettyView::Kind::ImageDecoded) {
@@ -390,6 +477,16 @@ void TextViewerActivity::drawFrame() {
   } else if (lines.empty()) {
     renderer.drawText(VIEWER_FONT_ID, metrics.contentSidePadding, contentTop,
                       openFailed ? tr(STR_PAGE_LOAD_ERROR) : tr(STR_EMPTY_FILE));
+  } else if (markdownMode) {
+    // Styled, through the same renderer the note editor and the Editor Font
+    // specimen draw with. maxX bounds the right edge as a backstop; wrapLine
+    // already fitted every fragment, so it should never cut.
+    const int rightBound = metrics.contentSidePadding + maxWidth;
+    for (size_t i = 0; i < lines.size(); i++) {
+      if (lines[i].empty()) continue;
+      mdrender::drawLine(renderer, VIEWER_FONT_ID, lineHeight, metrics.contentSidePadding,
+                         contentTop + static_cast<int>(i) * lineHeight, lines[i].c_str(), lines[i].size(), rightBound);
+    }
   } else {
     for (size_t i = 0; i < lines.size(); i++) {
       renderer.drawText(VIEWER_FONT_ID, metrics.contentSidePadding, contentTop + static_cast<int>(i) * lineHeight,
@@ -400,8 +497,13 @@ void TextViewerActivity::drawFrame() {
 
   const bool atStart = pageStarts.size() <= 1;
   const bool atEnd = nextPageOffset >= sourceSize();
-  const bool canToggle = prettyKind != PrettyView::Kind::None && !prettyUnavailable;
-  const char* toggleLabel = canToggle ? (prettyMode ? tr(STR_RAW) : tr(STR_PRETTY)) : "";
+  const bool canToggle = markdownFile || (prettyKind != PrettyView::Kind::None && !prettyUnavailable);
+  const char* toggleLabel = "";
+  if (markdownFile) {
+    toggleLabel = markdownMode ? tr(STR_RAW) : tr(STR_PRETTY);
+  } else if (canToggle) {
+    toggleLabel = prettyMode ? tr(STR_RAW) : tr(STR_PRETTY);
+  }
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), toggleLabel, (imageMode() || atStart) ? "" : tr(STR_DIR_UP),
                                             (imageMode() || atEnd) ? "" : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

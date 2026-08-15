@@ -80,7 +80,6 @@ class NoteEditorActivity final : public Activity {
   bool repeatCol(MappedInputManager::Button button, int delta);
   void pollPairingGestures();
   void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
-  int advanceOf(const char* piece, EpdFontFamily::Style style) const;
   bool save();
   // Shared exit for Back and keyboard Done: saves, then routes to FileManager
   // (when launched from there) or goes home.

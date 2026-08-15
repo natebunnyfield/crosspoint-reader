@@ -20,6 +20,20 @@
 // card (all paginated from an in-memory document via the same layout path),
 // bmp/png/jpg render as an image. A persistent right-edge scrollbar shows the
 // page's position and share of the file in both text modes.
+//
+// MARKDOWN IS NOT A PrettyView::Kind, deliberately. PrettyView::generate
+// returns a std::string and every kind above is paginated and drawn by a single
+// drawText per line (drawFrame), with one font id and one style -- there is no
+// channel through which a generated *document* could carry a heading, a bold
+// run or a hanging indent. Styling has to happen at the draw call, so .md gets
+// its own mode here that lays out and draws through src/notes/MarkdownRender.h,
+// the same code the note editor and the Editor Font specimen use. Confirm still
+// flips it, so the raw source is one press away.
+//
+// Two known limits of drawing markdown at the chrome face: UI_10 has no italic
+// cut (main.cpp CP_UI_FAMILY registers regular + bold only), so *italic* and
+// `code` render as regular; and a wrapped continuation fragment is re-analysed
+// on its own, so the second line of a long bullet loses the hanging indent.
 class TextViewerActivity final : public Activity {
   ButtonNavigator buttonNavigator;
 
@@ -38,6 +52,9 @@ class TextViewerActivity final : public Activity {
   bool prettyUnavailable = false;  // generation failed once: stop offering it
   std::string prettyText;          // generated document for non-image kinds
 
+  bool markdownFile = false;  // .md: styled mode is available
+  bool markdownMode = false;  // .md: styled mode is on (default for .md)
+
   // Byte offsets where each visited page starts; back() = current page.
   std::vector<uint32_t> pageStarts;
   uint32_t nextPageOffset = 0;
@@ -54,6 +71,9 @@ class TextViewerActivity final : public Activity {
   uint32_t sourceSize() const;
   int byteAt(uint32_t offset);
   uint32_t layoutPage(uint32_t start);
+  // Markdown pagination: one source line at a time, wrapped through
+  // mdrender::wrapLine so the breaks match what mdrender::drawLine will draw.
+  uint32_t layoutMarkdownPage(uint32_t start, std::vector<std::string>& built);
   void layoutCurrentPage();
   void pageForward();
   void pageBack();

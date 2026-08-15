@@ -8,11 +8,120 @@
 #include "notes/MarkdownSpans.h"
 
 namespace mdrender {
+namespace {
+
+// One piece buffer per call, on the stack. 192 bytes is inside the 256-byte
+// local budget and matches what drawLine has always used.
+constexpr size_t PIECE_CAP = 192;
+
+// Which face a span renders in. Named once so drawLine, measureLine, caretX and
+// wrapLine cannot disagree about it -- the four of them exist precisely to
+// agree, and a copy of this ladder in each was the shape the spacing bug took.
+EpdFontFamily::Style styleFor(const mdspans::Line& md, const mdspans::Span& sp) {
+  if (mdspans::blockIsBold(md.block) || sp.style == mdspans::Style::Bold) return EpdFontFamily::BOLD;
+  if (sp.style == mdspans::Style::Italic) return EpdFontFamily::ITALIC;
+  return EpdFontFamily::REGULAR;
+}
+
+// Copy at most PIECE_CAP-1 bytes of a span into `piece` and terminate it.
+void copyPiece(char* piece, const char* src, size_t len) {
+  if (len > PIECE_CAP - 1) len = PIECE_CAP - 1;
+  memcpy(piece, src, len);
+  piece[len] = '\0';
+}
+
+bool isBreakSpace(char c) { return c == ' ' || c == '\t'; }
+
+}  // namespace
 
 int advanceOf(GfxRenderer& renderer, int fontId, const char* piece, EpdFontFamily::Style style) {
-  char probe[200];
-  snprintf(probe, sizeof(probe), "%s|", piece);
-  return renderer.getTextWidth(fontId, probe, style) - renderer.getTextWidth(fontId, "|", style);
+  return renderer.getTextAdvanceX(fontId, piece, style);
+}
+
+int measureLine(GfxRenderer& renderer, const int fontId, const int indentStep, const char* text, const size_t len) {
+  if (text == nullptr || len == 0) return 0;
+  const mdspans::Line md = mdspans::analyze(text, len);
+
+  int x = md.indent * indentStep;
+  const char* body = text + md.bodyStart;
+  char piece[PIECE_CAP];
+  for (size_t i = 0; i < md.spanCount; ++i) {
+    const mdspans::Span& sp = md.spans[i];
+    copyPiece(piece, body + sp.start, sp.len);
+    x += advanceOf(renderer, fontId, piece, styleFor(md, sp));
+  }
+  return x;
+}
+
+int caretX(GfxRenderer& renderer, const int fontId, const int indentStep, const char* text, const size_t len,
+           const size_t column) {
+  if (text == nullptr || len == 0) return 0;
+  const mdspans::Line md = mdspans::analyze(text, len);
+
+  int x = md.indent * indentStep;
+  // Anywhere in the block prefix ("## ", "- ", "> ") sits against the body: the
+  // prefix either is not drawn at all or lives in the gutter, so there is no
+  // column inside it to point at.
+  if (column <= md.bodyStart) return x;
+
+  const char* body = text + md.bodyStart;
+  const size_t col = column - md.bodyStart;
+  char piece[PIECE_CAP];
+  for (size_t i = 0; i < md.spanCount; ++i) {
+    const mdspans::Span& sp = md.spans[i];
+    const EpdFontFamily::Style style = styleFor(md, sp);
+    if (col <= sp.start) return x;  // inside the marker that opens this span
+    if (col < static_cast<size_t>(sp.start) + sp.len) {
+      copyPiece(piece, body + sp.start, col - sp.start);
+      return x + advanceOf(renderer, fontId, piece, style);
+    }
+    copyPiece(piece, body + sp.start, sp.len);
+    x += advanceOf(renderer, fontId, piece, style);
+  }
+  return x;  // past the last span: a closing marker, or the end of the line
+}
+
+size_t wrapLine(GfxRenderer& renderer, const int fontId, const int indentStep, const char* text, const size_t len,
+                const int maxWidth, Fragment* out, const size_t maxFragments) {
+  if (out == nullptr || maxFragments == 0) return 0;
+  if (text == nullptr || len == 0 || maxWidth <= 0) {
+    out[0] = Fragment{0, 0};
+    return 1;
+  }
+
+  size_t count = 0;
+  size_t start = 0;
+  while (start < len && count < maxFragments) {
+    // Candidate ends, ascending: every space, then the end of the line. The
+    // rendered width grows monotonically with the prefix, so the first
+    // candidate that does not fit bounds the scan -- this stays linear in the
+    // fragment rather than in the line.
+    size_t best = 0;
+    for (size_t j = start + 1; j <= len; ++j) {
+      if (j != len && !isBreakSpace(text[j])) continue;
+      if (measureLine(renderer, fontId, indentStep, text + start, j - start) > maxWidth) break;
+      best = j;
+      if (j == len) break;
+    }
+
+    if (best == 0) {
+      // One word wider than the line. Cut at the widest prefix that fits,
+      // stepping back over UTF-8 continuation bytes so a multi-byte character
+      // is never split into a replacement glyph.
+      size_t j = len;
+      while (j > start + 1) {
+        --j;
+        while (j > start + 1 && (static_cast<unsigned char>(text[j]) & 0xC0) == 0x80) --j;
+        if (measureLine(renderer, fontId, indentStep, text + start, j - start) <= maxWidth) break;
+      }
+      best = j > start ? j : start + 1;
+    }
+
+    out[count++] = Fragment{static_cast<uint16_t>(start), static_cast<uint16_t>(best)};
+    start = best;
+    while (start < len && isBreakSpace(text[start])) ++start;  // drop the space the break was taken at
+  }
+  return count;
 }
 
 int drawLine(GfxRenderer& renderer, int fontId, int indentStep, int originX, int y, const char* text, size_t len,
@@ -39,20 +148,11 @@ int drawLine(GfxRenderer& renderer, int fontId, int indentStep, int originX, int
     renderer.drawText(fontId, originX, y, marker);
   }
 
-  char piece[192];
+  char piece[PIECE_CAP];
   for (size_t i = 0; i < md.spanCount; ++i) {
     const mdspans::Span& sp = md.spans[i];
-    size_t n = sp.len;
-    if (n > sizeof(piece) - 1) n = sizeof(piece) - 1;
-    memcpy(piece, body + sp.start, n);
-    piece[n] = '\0';
-
-    EpdFontFamily::Style style = EpdFontFamily::REGULAR;
-    if (mdspans::blockIsBold(md.block) || sp.style == mdspans::Style::Bold) {
-      style = EpdFontFamily::BOLD;
-    } else if (sp.style == mdspans::Style::Italic) {
-      style = EpdFontFamily::ITALIC;
-    }
+    copyPiece(piece, body + sp.start, sp.len);
+    const EpdFontFamily::Style style = styleFor(md, sp);
     if (maxX > 0) {
       // Cut to what fits. Trailing UTF-8 continuation bytes (0b10xxxxxx) are
       // dropped with their lead byte, so a multi-byte character is never split
