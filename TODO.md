@@ -14,6 +14,55 @@ started.
 
 ## OPEN
 
+### [T-017] Light sleep (#2525) is on main and unconfirmed on device
+**scope: verification · opened 2026-08-15**
+
+`ade9dac91` carries upstream #2525 — light-sleep between input polls when idle,
+a two-stage idle backoff (downclock at 500 ms, sleep at 1 s, replacing the flat
+3 s window), and a CPU downclock during the e-ink BUSY wait. Upstream measured
+it on an X3 with a Nordic PPK2: idle 9.68 mA → 2.78 mA, session average
+~11.6 → ~3.6 mA, which is the ~3.2x active-reading-time figure.
+
+**None of that is confirmed here.** Host evidence only: five environments build
+from a cold cache (`default` RAM 16.5%, Flash 64.4%), ASAN clean, and a headless
+session boots, opens a book, idles past both thresholds and turns pages. Power
+and felt timing cannot be observed off-device at all.
+
+Its stated dependency on freeink-sdk PR#8 is already satisfied —
+`setBusyWaitSliceHook` exists in the pinned SDK (`FreeInkDisplay.h:260`), so no
+submodule bump is owed.
+
+**What to watch on device:** input latency after the device has been idle;
+whether page turns still feel immediate; and that USB serial still works while
+connected, since light sleep is deliberately suppressed on USB (it kills the CDC
+link).
+
+**Done looks like:** confirmed on an X3 or X4, or a reported regression with
+enough detail to trace. Separate from [T-008], which covers the 2026-08-06
+backlog; this is one named commit.
+
+### [T-018] The SDK pin is 9 commits off upstream, on a branch, going nowhere
+**scope: submodule · opened 2026-08-15**
+
+`freeink-sdk` is pinned to `fix/keyboard-alt-hint-dedupe` at `159f40f` — checked
+against the gitlink at `ade9dac91`, the pin and the branch tip are the same
+commit, so this branch is load-bearing, not a leftover.
+
+It is **9 ahead / 41 behind `upstream/main`**, with no PR open. Nine keyboard-icon
+commits (Space/Return strokes, the alt-hint band reserved per row, a one-cell Ok
+key drawing a return arrow) exist only on this fork. The local `main` in the
+submodule is 137 behind and 0 ahead — purely stale, contributing nothing.
+
+Doing nothing is the expensive option: the gap grows, and every upstream SDK fix
+lands further out of reach.
+
+**Two ways out, owner's call:** open the PR upstream and let the commits land,
+or rebase the nine onto current `upstream/main` and re-pin the submodule. Either
+way `scripts/bump-submodule.sh` is the mechanism ([T-006a]).
+
+**Done looks like:** the pin sits on something that is not diverging, and the
+nine commits are either upstream or deliberately fork-only with that recorded.
+
 ### [T-012] A setting for tables: flat or tabular
 **scope: reader · opened 2026-08-15**
 
