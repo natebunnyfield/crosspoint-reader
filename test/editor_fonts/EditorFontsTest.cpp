@@ -182,14 +182,14 @@ TEST(EditorFonts, RetiredWritingFacesStayOutOfTheReadingPicker) {
 // it. (Index 3 was IBM Plex Mono until the list was cut to three on 2026-08-15;
 // that row is gone, and so is the arithmetic that used to chase it.)
 TEST(EditorFonts, BuiltinRowResolvesToItsFaceWhenRegistered) {
-  EXPECT_EQ(resolve(0, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(0));
+  EXPECT_EQ(resolve(0, 12, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(0, 12));
 }
 
 // The regression: same row, but this build omitted the face. Returning the id
 // anyway is what drew a blank page.
 TEST(EditorFonts, BuiltinRowDoesNotResolveToAnUnregisteredFace) {
-  const int got = resolve(0, noneRegistered, noSdCard, kUiFallback);
-  EXPECT_NE(got, builtinFontIdFor(0)) << "returned a font id the renderer has no glyphs for";
+  const int got = resolve(0, 12, noneRegistered, noSdCard, kUiFallback);
+  EXPECT_NE(got, builtinFontIdFor(0, 12)) << "returned a font id the renderer has no glyphs for";
   EXPECT_EQ(got, kUiFallback) << "with no editor face in the binary, only the UI face can draw";
 }
 
@@ -197,7 +197,7 @@ TEST(EditorFonts, BuiltinRowDoesNotResolveToAnUnregisteredFace) {
 // the SD lookup to the mono fallback, which is equally absent under OMIT_FONTS.
 TEST(EditorFonts, NoRowResolvesToAnUnregisteredFace) {
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    const int got = resolve(static_cast<uint8_t>(i), noneRegistered, noSdCard, kUiFallback);
+    const int got = resolve(static_cast<uint8_t>(i), 12, noneRegistered, noSdCard, kUiFallback);
     EXPECT_EQ(got, kUiFallback) << "row " << i << " resolved to an unregistered face";
   }
 }
@@ -206,14 +206,14 @@ TEST(EditorFonts, NoRowResolvesToAnUnregisteredFace) {
 // without the isRegistered check: whatever registered it returned the id.
 TEST(EditorFonts, CardOnlyRowPrefersTheInstalledFamily) {
   auto sdHasIt = [](const char*) { return kSdId; };
-  EXPECT_EQ(resolve(0, noneRegistered, sdHasIt, kUiFallback), kSdId);
+  EXPECT_EQ(resolve(0, 12, noneRegistered, sdHasIt, kUiFallback), kSdId);
 }
 
 // A built-in row that IS present must not be overridden by a same-named card
 // family -- the built-in is checked first on purpose.
 TEST(EditorFonts, BuiltinWinsOverTheCardWhenPresent) {
   auto sdHasIt = [](const char*) { return kSdId; };
-  EXPECT_EQ(resolve(0, allRegistered, sdHasIt, kUiFallback), builtinFontIdFor(0));
+  EXPECT_EQ(resolve(0, 12, allRegistered, sdHasIt, kUiFallback), builtinFontIdFor(0, 12));
 }
 
 // iA Writer Quattro is the only surviving row whose glyph tables are in this
@@ -227,12 +227,12 @@ TEST(EditorFonts, AllFacesAreCompiledIn) {
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
     if (std::strcmp(FAMILIES[i].family, "iAWriterQuattro") == 0) {
       sawQuattro = true;
-      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << "iA Writer Quattro must be compiled in";
+      EXPECT_NE(FAMILIES[i].builtinFontId[0], 0) << "iA Writer Quattro must be compiled in";
     }
     // Every row claims a built-in id regardless: a card-only editor row would
     // mean the setting does nothing on a device with no matching card family,
     // which is the original bug this file exists for.
-    EXPECT_NE(FAMILIES[i].builtinFontId, 0) << FAMILIES[i].family << " must be compiled in";
+    EXPECT_NE(FAMILIES[i].builtinFontId[0], 0) << FAMILIES[i].family << " must be compiled in";
   }
   EXPECT_TRUE(sawQuattro) << "the default and fallback face is missing from the table";
 }
@@ -241,7 +241,7 @@ TEST(EditorFonts, AllFacesAreCompiledIn) {
 // with the table for every in-range index.
 TEST(EditorFonts, BuiltinLookupMatchesTheTable) {
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    EXPECT_EQ(builtinFontIdFor(static_cast<uint8_t>(i)), FAMILIES[i].builtinFontId) << "index " << i;
+    EXPECT_EQ(builtinFontIdFor(static_cast<uint8_t>(i), 12), FAMILIES[i].builtinFontId[0]) << "index " << i;
   }
 }
 
@@ -250,28 +250,35 @@ TEST(EditorFonts, BuiltinLookupMatchesTheTable) {
 TEST(EditorFonts, OutOfRangeIndexFallsBackToTheFirstEntry) {
   const uint8_t past = static_cast<uint8_t>(FAMILY_COUNT);
   EXPECT_STREQ(selectedFamily(past), FAMILIES[0].family);
-  EXPECT_EQ(builtinFontIdFor(past), FAMILIES[0].builtinFontId);
+  EXPECT_EQ(builtinFontIdFor(past, 12), FAMILIES[0].builtinFontId[0]);
   EXPECT_STREQ(selectedFamily(255), FAMILIES[0].family);
-  EXPECT_EQ(builtinFontIdFor(255), FAMILIES[0].builtinFontId);
+  EXPECT_EQ(builtinFontIdFor(255, 12), FAMILIES[0].builtinFontId[0]);
 }
 
 // Font id 0 is the renderer's "not found" sentinel, so a built-in row whose id
 // collided with it would silently behave as card-only.
 TEST(EditorFonts, NoBuiltinIdIsTheNotFoundSentinel) {
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    if (FAMILIES[i].builtinFontId != 0) {
-      EXPECT_NE(FAMILIES[i].builtinFontId, 0) << FAMILIES[i].family;
+    for (size_t s = 0; s < SIZE_COUNT; ++s) {
+      if (FAMILIES[i].builtinFontId[s] != 0) {
+        EXPECT_NE(FAMILIES[i].builtinFontId[s], 0) << FAMILIES[i].family << " size slot " << s;
+      }
     }
   }
 }
 
 // Two rows sharing a font id would make one of them draw the other's face.
+// Checked across ALL rows AND ALL sizes: a collision anywhere in the table
+// means one row silently draws the other's cut at that size.
 TEST(EditorFonts, BuiltinIdsAreDistinct) {
   std::set<int> seen;
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    const int id = FAMILIES[i].builtinFontId;
-    if (id == 0) continue;  // card-only rows legitimately share the 0 marker
-    EXPECT_TRUE(seen.insert(id).second) << "duplicate builtin font id on " << FAMILIES[i].family;
+    for (size_t s = 0; s < SIZE_COUNT; ++s) {
+      const int id = FAMILIES[i].builtinFontId[s];
+      if (id == 0) continue;  // card-only rows legitimately share the 0 marker
+      EXPECT_TRUE(seen.insert(id).second)
+          << "duplicate builtin font id on " << FAMILIES[i].family << " size slot " << s;
+    }
   }
 }
 
@@ -306,22 +313,22 @@ TEST(EditorFonts, RowOrderIsFrozen) {
 TEST(EditorFonts, PragmataProIsABuiltinRowThatDegradesWhenTheFontIsAbsent) {
   const uint8_t pp = 1;  // was 4 until the list was cut to three on 2026-08-15
   ASSERT_STREQ(FAMILIES[pp].family, "PragmataPro");
-  EXPECT_NE(FAMILIES[pp].builtinFontId, 0) << "PragmataPro is compiled in, not a card family";
+  EXPECT_NE(FAMILIES[pp].builtinFontId[0], 0) << "PragmataPro is compiled in, not a card family";
 
   // Present in this build: the row resolves to its own face.
-  EXPECT_EQ(resolve(pp, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(pp));
+  EXPECT_EQ(resolve(pp, 12, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(pp, 12));
 
   // Absent from this build -- the ordinary case for a clone without the
   // commercial TTFs. It must NOT hand back an id with no glyphs behind it.
-  const int degraded = resolve(pp, noneRegistered, noSdCard, kUiFallback);
-  EXPECT_NE(degraded, builtinFontIdFor(pp)) << "returned a font id the renderer has no glyphs for";
+  const int degraded = resolve(pp, 12, noneRegistered, noSdCard, kUiFallback);
+  EXPECT_NE(degraded, builtinFontIdFor(pp, 12)) << "returned a font id the renderer has no glyphs for";
 
   // And when the OTHER editor faces are present (the real shape of a clone
   // without PragmataPro: the OFL faces compiled in, this one missing), degrades
   // to a sibling WRITING face, never to UI chrome.
-  const auto allButPragmata = [&](int id) { return id != FAMILIES[pp].builtinFontId; };
-  const int sibling = resolve(pp, allButPragmata, noSdCard, kUiFallback);
-  EXPECT_EQ(sibling, fallbackFontId()) << "a missing commercial face must fall back to a built-in mono";
+  const auto allButPragmata = [&](int id) { return id != FAMILIES[pp].builtinFontId[0]; };
+  const int sibling = resolve(pp, 12, allButPragmata, noSdCard, kUiFallback);
+  EXPECT_EQ(sibling, fallbackFontId(12)) << "a missing commercial face must fall back to a built-in mono";
   EXPECT_NE(sibling, kUiFallback) << "the editor must never drop to UI chrome while a mono is available";
 }
 
@@ -344,19 +351,19 @@ TEST(EditorFonts, PragmataProIsWritingOnly) {
 TEST(EditorFonts, NittiTypewriterIsABuiltinRowThatDegradesWhenTheFontIsAbsent) {
   const uint8_t nt = 2;  // was 5 until the list was cut to three on 2026-08-15
   ASSERT_STREQ(FAMILIES[nt].family, "NittiTypewriter");
-  EXPECT_NE(FAMILIES[nt].builtinFontId, 0) << "NittiTypewriter is compiled in, not a card family";
+  EXPECT_NE(FAMILIES[nt].builtinFontId[0], 0) << "NittiTypewriter is compiled in, not a card family";
 
   // Present in this build: the row resolves to its own face.
-  EXPECT_EQ(resolve(nt, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(nt));
+  EXPECT_EQ(resolve(nt, 12, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(nt, 12));
 
   // Absent from this build — the ordinary case for a clone without the TTF.
-  const int degraded = resolve(nt, noneRegistered, noSdCard, kUiFallback);
-  EXPECT_NE(degraded, builtinFontIdFor(nt)) << "returned a font id the renderer has no glyphs for";
+  const int degraded = resolve(nt, 12, noneRegistered, noSdCard, kUiFallback);
+  EXPECT_NE(degraded, builtinFontIdFor(nt, 12)) << "returned a font id the renderer has no glyphs for";
 
   // Degrades to a built-in mono, not to UI chrome.
-  const auto allButNitti = [&](int id) { return id != FAMILIES[nt].builtinFontId; };
-  const int sibling = resolve(nt, allButNitti, noSdCard, kUiFallback);
-  EXPECT_EQ(sibling, fallbackFontId()) << "a missing commercial face must fall back to a built-in mono";
+  const auto allButNitti = [&](int id) { return id != FAMILIES[nt].builtinFontId[0]; };
+  const int sibling = resolve(nt, 12, allButNitti, noSdCard, kUiFallback);
+  EXPECT_EQ(sibling, fallbackFontId(12)) << "a missing commercial face must fall back to a built-in mono";
   EXPECT_NE(sibling, kUiFallback) << "the editor must never drop to UI chrome while a mono is available";
 }
 
@@ -388,20 +395,20 @@ TEST(EditorFonts, EveryRowHasANameAndALabel) {
 // its own built-in id and resolves without the fallback.
 TEST(EditorFonts, TheShippedDefaultResolvesToAMonospaceFace) {
   // Index 0 is now compiled in (iAWriterQuattro, owner ruling 2026-08-11).
-  EXPECT_NE(builtinFontIdFor(0), 0) << "index 0 (iAWriterQuattro) must be compiled in";
+  EXPECT_NE(builtinFontIdFor(0, 12), 0) << "index 0 (iAWriterQuattro) must be compiled in";
   // fallbackFontId() must still return a real id for the remaining resolution
   // chain (OMIT_FONTS builds, future card-only additions).
-  EXPECT_NE(fallbackFontId(), 0) << "no built-in family to fall back to: the editor fallback is dead";
+  EXPECT_NE(fallbackFontId(12), 0) << "no built-in family to fall back to: the editor fallback is dead";
 }
 
 // The fallback must name a family that is actually compiled in, not an
 // arbitrary constant.
 TEST(EditorFonts, FallbackIsOneOfTheBuiltinRows) {
-  const int fb = fallbackFontId();
+  const int fb = fallbackFontId(12);
   ASSERT_NE(fb, 0);
   bool found = false;
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    if (FAMILIES[i].builtinFontId == fb) found = true;
+    if (FAMILIES[i].builtinFontId[0] == fb) found = true;
   }
   EXPECT_TRUE(found) << "fallbackFontId() returned an id no row carries";
 }
@@ -409,9 +416,138 @@ TEST(EditorFonts, FallbackIsOneOfTheBuiltinRows) {
 // Every card-only row degrades to a writing face rather than to UI chrome.
 TEST(EditorFonts, EveryRowResolvesToSomeMonospaceFace) {
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    const int resolved =
-        builtinFontIdFor(static_cast<uint8_t>(i)) != 0 ? builtinFontIdFor(static_cast<uint8_t>(i)) : fallbackFontId();
+    const int resolved = builtinFontIdFor(static_cast<uint8_t>(i), 12) != 0
+                             ? builtinFontIdFor(static_cast<uint8_t>(i), 12)
+                             : fallbackFontId(12);
     EXPECT_NE(resolved, 0) << "row " << i << " (" << FAMILIES[i].family << ") resolves to nothing";
+  }
+}
+
+// --- Size axis: the new 12/14 pt setting -------------------------------------
+//
+// THE BUG THESE EXIST FOR
+//
+// Adding a size picker is trivially two-pointed: if builtinFontIdFor(i, 12) and
+// builtinFontIdFor(i, 14) return the same value, the setting renders, persists,
+// and changes nothing — exactly the original editor-font bug, repeated for sizes.
+// Every test below exists to catch a specific version of that failure.
+
+// nearestOfferedSize: exact hits must pass through unchanged. A size that IS
+// offered must not snap to a neighbour.
+TEST(EditorFonts, NearestOfferedSizePassesThroughExactHits) {
+  for (size_t s = 0; s < SIZE_COUNT; ++s) {
+    EXPECT_EQ(nearestOfferedSize(SIZES[s]), SIZES[s])
+        << "SIZES[" << s << "] = " << static_cast<int>(SIZES[s]) << " snapped to something else";
+  }
+}
+
+// Values below the offered range should snap to the smallest offered size, not
+// to zero or to whatever happens to be at the array head.
+TEST(EditorFonts, NearestOfferedSizeSnapsValuesBelowRangeToSmallest) {
+  EXPECT_EQ(nearestOfferedSize(0), SIZES[0]) << "0 pt must snap to the smallest offered size";
+  EXPECT_EQ(nearestOfferedSize(11), SIZES[0]) << "11 pt (one below 12) must snap to 12";
+}
+
+// Values above the offered range should snap to the largest offered size.
+TEST(EditorFonts, NearestOfferedSizeSnapsValuesAboveRangeToLargest) {
+  const uint8_t largest = SIZES[SIZE_COUNT - 1];
+  EXPECT_EQ(nearestOfferedSize(20), largest) << "20 pt (above all offered sizes) must snap to the largest";
+  EXPECT_EQ(nearestOfferedSize(255), largest) << "255 pt must snap to the largest offered size";
+}
+
+// 13 pt is exactly between 12 and 14. The tie-breaking rule is SMALLER:
+// shrinking keeps more of the note on screen. 13 was asked for in the same
+// ruling as 12/14 and DECLINED because no ramp anywhere carries a 13 -- so
+// this test exists to make that decision observable: if 13 were offered, a
+// stored 13 would snap to itself; since it is not, it must snap down, not up.
+TEST(EditorFonts, NearestOfferedSizeTieBreaksToSmaller) {
+  // 13 is equidistant from 12 and 14 (|13-12|=1, |13-14|=1). Ties go smaller.
+  EXPECT_EQ(nearestOfferedSize(13), 12u) << "13 pt ties 12 and 14; must snap to 12 (smaller) not 14 (larger)";
+}
+
+// Every possible stored value (0..255) must resolve to something that IS in
+// SIZES. A value outside SIZES would mean a call to builtinFontIdFor() with
+// that resolved size would look up an out-of-range slot.
+TEST(EditorFonts, NearestOfferedSizeAlwaysReturnsAMemberOfSizes) {
+  for (int v = 0; v < 256; ++v) {
+    const uint8_t snapped = nearestOfferedSize(static_cast<uint8_t>(v));
+    bool found = false;
+    for (size_t s = 0; s < SIZE_COUNT; ++s) {
+      if (SIZES[s] == snapped) {
+        found = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found) << "nearestOfferedSize(" << v << ") = " << static_cast<int>(snapped) << " which is not in SIZES";
+  }
+}
+
+// The 12 pt and 14 pt cuts of every row must carry different ids. If they were
+// the same id, the size setting would silently do nothing -- the original
+// editor-font bug, replayed for sizes. Two cuts sharing an id means one draws
+// the other's glyphs at the wrong metrics, which is a rendering corruption, not
+// a silent no-op.
+TEST(EditorFonts, EachRowHasDifferentIdsForDifferentSizes) {
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    const int id12 = builtinFontIdFor(static_cast<uint8_t>(i), 12);
+    const int id14 = builtinFontIdFor(static_cast<uint8_t>(i), 14);
+    EXPECT_NE(id12, id14) << FAMILIES[i].family
+                          << ": 12pt and 14pt return the same id -- the size setting would do nothing";
+    // Both must also be non-zero: a zero here means the size is card-only for
+    // this row, which the editor does not support (all rows must be built in).
+    EXPECT_NE(id12, 0) << FAMILIES[i].family << " 12pt id is the not-found sentinel";
+    EXPECT_NE(id14, 0) << FAMILIES[i].family << " 14pt id is the not-found sentinel";
+  }
+}
+
+// Every id in the entire table -- all rows, all sizes -- must be distinct.
+// A collision anywhere means one cut silently draws another's glyphs.
+TEST(EditorFonts, AllTableIdsAreDistinctAndNonZero) {
+  std::set<int> seen;
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    for (size_t s = 0; s < SIZE_COUNT; ++s) {
+      const int id = FAMILIES[i].builtinFontId[s];
+      EXPECT_NE(id, 0) << FAMILIES[i].family << " size slot " << s << " is the not-found sentinel";
+      EXPECT_TRUE(seen.insert(id).second)
+          << "duplicate id " << id << " on " << FAMILIES[i].family << " size slot " << s;
+    }
+  }
+}
+
+// The two fallback ids must differ: falling back must change the FACE, not the
+// SIZE. If fallbackFontId(12) == fallbackFontId(14), then a device whose chosen
+// face is absent would always open the editor at 12 pt regardless of the size
+// setting -- a silent size reset with no visible cause.
+//
+// Each fallback id must equal the first compiled-in row's cut at that size,
+// which is how the implementation is specified (EditorFonts.cpp:83-93): the
+// fallback follows the table rather than naming a family twice.
+TEST(EditorFonts, FallbackDiffersBetweenSizesAndMatchesFirstRow) {
+  const int fb12 = fallbackFontId(12);
+  const int fb14 = fallbackFontId(14);
+
+  EXPECT_NE(fb12, fb14) << "fallbackFontId(12) == fallbackFontId(14): falling back would silently reset the size to 12";
+
+  // Each fallback equals the first row's cut at that size. If a new row were
+  // inserted before iAWriterQuattro and its id happened to match, this would
+  // fire, catching the change before it ships.
+  EXPECT_EQ(fb12, FAMILIES[0].builtinFontId[0])
+      << "fallbackFontId(12) must equal the first row's 12pt id -- it is the face of last resort at that size";
+  EXPECT_EQ(fb14, FAMILIES[0].builtinFontId[1])
+      << "fallbackFontId(14) must equal the first row's 14pt id -- falling back must not change the size";
+}
+
+// resolve() with 14 pt must return the 14 pt id, not the 12 pt one. This is
+// the end-to-end path the editor's font resolver walks: if resolve somehow
+// used the wrong slot, the size picker would change the stored byte while the
+// editor kept drawing the wrong cut.
+TEST(EditorFonts, ResolveAt14PtReturnsFourteenPtId) {
+  for (size_t i = 0; i < FAMILY_COUNT; ++i) {
+    const int got = resolve(static_cast<uint8_t>(i), 14, allRegistered, noSdCard, kUiFallback);
+    const int want = builtinFontIdFor(static_cast<uint8_t>(i), 14);
+    EXPECT_EQ(got, want) << FAMILIES[i].family << ": resolve(14) returned the 12pt id, not 14pt";
+    EXPECT_NE(got, builtinFontIdFor(static_cast<uint8_t>(i), 12))
+        << FAMILIES[i].family << ": resolve(14) returned the same id as resolve(12)";
   }
 }
 

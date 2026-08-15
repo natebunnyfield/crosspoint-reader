@@ -187,6 +187,60 @@ inline SettingInfo buildScreenMarginSetting() {
   return s;
 }
 
+// Editor font SIZE, as a drop-down over editorfonts::SIZES.
+//
+// The STORED value stays the size in POINTS, never the picker's index — the
+// same rule buildScreenMarginSetting() above follows, and for a sharper reason
+// here: the editor font FAMILY was rescued from index persistence hours before
+// this row was written (see src/notes/EditorFonts.h), and putting the size on
+// an index would have reintroduced the identical failure one field over. A
+// stored 12 must mean twelve points forever, whatever the list looks like
+// later.
+//
+// valuePtr is deliberately left null. CrossPointWebServer's ENUM case prefers
+// valuePtr over valueSetter when both are set, and would write the raw index
+// into the byte.
+//
+// STR_CAT_SYSTEM so it sits with Editor Font: rebuildSettingsLists() keeps
+// STR_CAT_SYSTEM rows and drops the rest, so any other category would make this
+// row real but unreachable on an X4 or X3 — which is exactly the state Editor
+// Font itself was found in.
+inline SettingInfo buildEditorFontSizeSetting() {
+  // Bare numbers, like the screen-margin ramp: a "pt" suffix would need
+  // translating and the row title already says what it is.
+  std::vector<std::string> labels;
+  labels.reserve(editorfonts::SIZE_COUNT);
+  for (size_t i = 0; i < editorfonts::SIZE_COUNT; i++) {
+    labels.push_back(std::to_string(editorfonts::SIZES[i]));
+  }
+
+  SettingInfo s;
+  s.nameId = StrId::STR_EDITOR_FONT_SIZE;
+  s.type = SettingType::ENUM;
+  s.enumStringValues = std::move(labels);
+  s.key = "editorFontSize";
+  s.category = StrId::STR_CAT_SYSTEM;
+
+  s.valueGetter = []() -> uint8_t {
+    // Nearest, not exact — a byte posted by an API client, or written when the
+    // offered list differed, must not silently reset the row to the first size.
+    // nearestOfferedSize() owns that rule so the picker and the renderer cannot
+    // disagree about which size a stored byte means.
+    const uint8_t snapped = editorfonts::nearestOfferedSize(SETTINGS.editorFontSize);
+    for (size_t i = 0; i < editorfonts::SIZE_COUNT; i++) {
+      if (editorfonts::SIZES[i] == snapped) return static_cast<uint8_t>(i);
+    }
+    return 0;
+  };
+
+  s.valueSetter = [](const uint8_t v) {
+    if (v >= editorfonts::SIZE_COUNT) return;
+    SETTINGS.editorFontSize = editorfonts::SIZES[v];
+  };
+
+  return s;
+}
+
 // Shared settings list used by both the device settings UI and the web settings API.
 // Each entry has a key (for JSON API) and category (for grouping).
 // ACTION-type entries and entries without a key are device-only.
@@ -238,9 +292,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // SettingInfo slots held for the life of the process), which is why it
     // drifted. Corrected to the true count here.
 #ifdef SIMULATOR
-    constexpr size_t FIXED_ENTRY_COUNT = 33;
+    constexpr size_t FIXED_ENTRY_COUNT = 34;
 #else
-    constexpr size_t FIXED_ENTRY_COUNT = 32;
+    constexpr size_t FIXED_ENTRY_COUNT = 33;
 #endif
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
@@ -326,6 +380,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       s.withDisplayOrder(editorfonts::displayOrder());
       v.push_back(std::move(s));
     }
+    // Directly after Editor Font: the two are one decision split in two rows,
+    // and the size is meaningless without knowing which face it applies to.
+    v.push_back(buildEditorFontSizeSetting());
     v.push_back(SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &CrossPointSettings::embeddedStyle, "embeddedStyle",
                                     StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled,

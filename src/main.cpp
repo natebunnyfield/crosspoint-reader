@@ -104,6 +104,14 @@ EpdFont iawriterquattro12ItalicFont(&iawriterquattro_12_italic);
 EpdFont iawriterquattro12BoldItalicFont(&iawriterquattro_12_bolditalic);
 EpdFontFamily iawriterquattro12FontFamily(&iawriterquattro12RegularFont, &iawriterquattro12BoldFont,
                                           &iawriterquattro12ItalicFont, &iawriterquattro12BoldItalicFont);
+// The 14 pt cut of the same family. Two sizes, not two families -- the Editor
+// Font Size setting picks between them (owner ruling 2026-08-15).
+EpdFont iawriterquattro14RegularFont(&iawriterquattro_14_regular);
+EpdFont iawriterquattro14BoldFont(&iawriterquattro_14_bold);
+EpdFont iawriterquattro14ItalicFont(&iawriterquattro_14_italic);
+EpdFont iawriterquattro14BoldItalicFont(&iawriterquattro_14_bolditalic);
+EpdFontFamily iawriterquattro14FontFamily(&iawriterquattro14RegularFont, &iawriterquattro14BoldFont,
+                                          &iawriterquattro14ItalicFont, &iawriterquattro14BoldItalicFont);
 
 // PragmataPro is COMMERCIAL, so unlike every other family above its glyph
 // tables are NOT in this repo: builtinFonts/pragmatapro_*.h are gitignored and
@@ -120,10 +128,23 @@ EpdFontFamily iawriterquattro12FontFamily(&iawriterquattro12RegularFont, &iawrit
 #include <builtinFonts/pragmatapro_12_bolditalic.h>
 #include <builtinFonts/pragmatapro_12_italic.h>
 #include <builtinFonts/pragmatapro_12_regular.h>
+#include <builtinFonts/pragmatapro_14_bold.h>
+#include <builtinFonts/pragmatapro_14_bolditalic.h>
+#include <builtinFonts/pragmatapro_14_italic.h>
+#include <builtinFonts/pragmatapro_14_regular.h>
 EpdFont pragmatapro12RegularFont(&pragmatapro_12_regular);
 EpdFont pragmatapro12BoldFont(&pragmatapro_12_bold);
 EpdFont pragmatapro12ItalicFont(&pragmatapro_12_italic);
 EpdFont pragmatapro12BoldItalicFont(&pragmatapro_12_bolditalic);
+// One guard covers both cuts: convert-builtin-fonts.sh generates every size in
+// EDITOR_SIZES together, so a tree that has the 12 pt headers has the 14 pt
+// ones too. A second __has_include would only be able to disagree.
+EpdFont pragmatapro14RegularFont(&pragmatapro_14_regular);
+EpdFont pragmatapro14BoldFont(&pragmatapro_14_bold);
+EpdFont pragmatapro14ItalicFont(&pragmatapro_14_italic);
+EpdFont pragmatapro14BoldItalicFont(&pragmatapro_14_bolditalic);
+EpdFontFamily pragmatapro14FontFamily(&pragmatapro14RegularFont, &pragmatapro14BoldFont, &pragmatapro14ItalicFont,
+                                      &pragmatapro14BoldItalicFont);
 EpdFontFamily pragmatapro12FontFamily(&pragmatapro12RegularFont, &pragmatapro12BoldFont, &pragmatapro12ItalicFont,
                                       &pragmatapro12BoldItalicFont);
 #endif
@@ -139,10 +160,21 @@ EpdFontFamily pragmatapro12FontFamily(&pragmatapro12RegularFont, &pragmatapro12B
 #include <builtinFonts/nittitypewriter_12_bolditalic.h>
 #include <builtinFonts/nittitypewriter_12_italic.h>
 #include <builtinFonts/nittitypewriter_12_regular.h>
+#include <builtinFonts/nittitypewriter_14_bold.h>
+#include <builtinFonts/nittitypewriter_14_bolditalic.h>
+#include <builtinFonts/nittitypewriter_14_italic.h>
+#include <builtinFonts/nittitypewriter_14_regular.h>
 EpdFont nittitypewriter12RegularFont(&nittitypewriter_12_regular);
 EpdFont nittitypewriter12BoldFont(&nittitypewriter_12_bold);
 EpdFont nittitypewriter12ItalicFont(&nittitypewriter_12_italic);
 EpdFont nittitypewriter12BoldItalicFont(&nittitypewriter_12_bolditalic);
+// One guard, both cuts -- see the PragmataPro note above.
+EpdFont nittitypewriter14RegularFont(&nittitypewriter_14_regular);
+EpdFont nittitypewriter14BoldFont(&nittitypewriter_14_bold);
+EpdFont nittitypewriter14ItalicFont(&nittitypewriter_14_italic);
+EpdFont nittitypewriter14BoldItalicFont(&nittitypewriter_14_bolditalic);
+EpdFontFamily nittitypewriter14FontFamily(&nittitypewriter14RegularFont, &nittitypewriter14BoldFont,
+                                          &nittitypewriter14ItalicFont, &nittitypewriter14BoldItalicFont);
 EpdFontFamily nittitypewriter12FontFamily(&nittitypewriter12RegularFont, &nittitypewriter12BoldFont,
                                           &nittitypewriter12ItalicFont, &nittitypewriter12BoldItalicFont);
 #endif
@@ -177,6 +209,8 @@ EpdFontFamily nittitypewriter12FontFamily(&nittitypewriter12RegularFont, &nittit
 
 CP_HIRES_FAMILY(iawriterquattro12, iawriterquattro_12_regular, iawriterquattro_12_bold, iawriterquattro_12_italic,
                 iawriterquattro_12_bolditalic);
+CP_HIRES_FAMILY(iawriterquattro14, iawriterquattro_14_regular, iawriterquattro_14_bold, iawriterquattro_14_italic,
+                iawriterquattro_14_bolditalic);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
 // Same __has_include gate as the 1x cuts above, restated so the two blocks
 // cannot drift. Without this the editor would blit pixel-doubled 1x PragmataPro
@@ -191,14 +225,24 @@ CP_HIRES_FAMILY(iawriterquattro12, iawriterquattro_12_regular, iawriterquattro_1
 #include <builtinFonts/pragmatapro_12_bolditalic_2x.h>
 #include <builtinFonts/pragmatapro_12_italic_2x.h>
 #include <builtinFonts/pragmatapro_12_regular_2x.h>
+#include <builtinFonts/pragmatapro_14_bold_2x.h>
+#include <builtinFonts/pragmatapro_14_bolditalic_2x.h>
+#include <builtinFonts/pragmatapro_14_italic_2x.h>
+#include <builtinFonts/pragmatapro_14_regular_2x.h>
 #elif CROSSPOINT_RENDER_SCALE == 3
 #include <builtinFonts/pragmatapro_12_bold_3x.h>
 #include <builtinFonts/pragmatapro_12_bolditalic_3x.h>
 #include <builtinFonts/pragmatapro_12_italic_3x.h>
 #include <builtinFonts/pragmatapro_12_regular_3x.h>
+#include <builtinFonts/pragmatapro_14_bold_3x.h>
+#include <builtinFonts/pragmatapro_14_bolditalic_3x.h>
+#include <builtinFonts/pragmatapro_14_italic_3x.h>
+#include <builtinFonts/pragmatapro_14_regular_3x.h>
 #endif
 CP_HIRES_FAMILY(pragmatapro12, pragmatapro_12_regular, pragmatapro_12_bold, pragmatapro_12_italic,
                 pragmatapro_12_bolditalic);
+CP_HIRES_FAMILY(pragmatapro14, pragmatapro_14_regular, pragmatapro_14_bold, pragmatapro_14_italic,
+                pragmatapro_14_bolditalic);
 #endif
 #ifdef CROSSPOINT_HAS_NITTITYPEWRITER
 // Same __has_include gate as the 1x cuts above, restated here.
@@ -207,14 +251,24 @@ CP_HIRES_FAMILY(pragmatapro12, pragmatapro_12_regular, pragmatapro_12_bold, prag
 #include <builtinFonts/nittitypewriter_12_bolditalic_2x.h>
 #include <builtinFonts/nittitypewriter_12_italic_2x.h>
 #include <builtinFonts/nittitypewriter_12_regular_2x.h>
+#include <builtinFonts/nittitypewriter_14_bold_2x.h>
+#include <builtinFonts/nittitypewriter_14_bolditalic_2x.h>
+#include <builtinFonts/nittitypewriter_14_italic_2x.h>
+#include <builtinFonts/nittitypewriter_14_regular_2x.h>
 #elif CROSSPOINT_RENDER_SCALE == 3
 #include <builtinFonts/nittitypewriter_12_bold_3x.h>
 #include <builtinFonts/nittitypewriter_12_bolditalic_3x.h>
 #include <builtinFonts/nittitypewriter_12_italic_3x.h>
 #include <builtinFonts/nittitypewriter_12_regular_3x.h>
+#include <builtinFonts/nittitypewriter_14_bold_3x.h>
+#include <builtinFonts/nittitypewriter_14_bolditalic_3x.h>
+#include <builtinFonts/nittitypewriter_14_italic_3x.h>
+#include <builtinFonts/nittitypewriter_14_regular_3x.h>
 #endif
 CP_HIRES_FAMILY(nittitypewriter12, nittitypewriter_12_regular, nittitypewriter_12_bold, nittitypewriter_12_italic,
                 nittitypewriter_12_bolditalic);
+CP_HIRES_FAMILY(nittitypewriter14, nittitypewriter_14_regular, nittitypewriter_14_bold, nittitypewriter_14_italic,
+                nittitypewriter_14_bolditalic);
 #endif
 #undef CP_HIRES_FAMILY
 #endif
@@ -434,25 +488,31 @@ void setupDisplayAndFonts(bool seamless = false) {
   // still reports "Not on card" — the definition and the insert have to leave
   // OMIT_FONTS together or the move buys nothing.
   renderer.insertFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12FontFamily);
+  renderer.insertFont(IAWRITERQUATTRO_14_FONT_ID, iawriterquattro14FontFamily);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
   // Only when the local commercial cuts were built. When they were not, this
   // insert is absent, getFontMap().count() is 0, and the picker marks the row
   // unreachable rather than offering a face that would draw nothing.
   renderer.insertFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12FontFamily);
+  renderer.insertFont(PRAGMATAPRO_14_FONT_ID, pragmatapro14FontFamily);
 #endif
 #ifdef CROSSPOINT_HAS_NITTITYPEWRITER
   renderer.insertFont(NITTITYPEWRITER_12_FONT_ID, nittitypewriter12FontFamily);
+  renderer.insertFont(NITTITYPEWRITER_14_FONT_ID, nittitypewriter14FontFamily);
 #endif
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
   // Hi-res companions for every editor font. drawText() checks
   // getHiResFamily() for any font id, so without these the editor activities
   // (NoteEditorActivity, ClaudeChatActivity) render at 1x on a 2x build.
   renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12HiResFontFamily);
+  renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_14_FONT_ID, iawriterquattro14HiResFontFamily);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
   renderer.registerHiResBuiltinFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12HiResFontFamily);
+  renderer.registerHiResBuiltinFont(PRAGMATAPRO_14_FONT_ID, pragmatapro14HiResFontFamily);
 #endif
 #ifdef CROSSPOINT_HAS_NITTITYPEWRITER
   renderer.registerHiResBuiltinFont(NITTITYPEWRITER_12_FONT_ID, nittitypewriter12HiResFontFamily);
+  renderer.registerHiResBuiltinFont(NITTITYPEWRITER_14_FONT_ID, nittitypewriter14HiResFontFamily);
 #endif
 #endif
 #ifndef OMIT_FONTS

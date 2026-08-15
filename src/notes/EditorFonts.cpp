@@ -45,16 +45,49 @@ const char* selectedFamily(uint8_t index) {
   return FAMILIES[index].family;
 }
 
-int builtinFontIdFor(uint8_t index) {
-  if (index >= FAMILY_COUNT) return FAMILIES[0].builtinFontId;
-  return FAMILIES[index].builtinFontId;
+uint8_t nearestOfferedSize(uint8_t pointSize) {
+  uint8_t best = SIZES[0];
+  int bestDelta = -1;
+  for (size_t i = 0; i < SIZE_COUNT; ++i) {
+    const int delta = static_cast<int>(SIZES[i]) - static_cast<int>(pointSize);
+    const int absDelta = delta < 0 ? -delta : delta;
+    // Strictly-less keeps the FIRST of any tie, and SIZES is ascending, so a
+    // value exactly between two offered sizes takes the smaller. Deliberate:
+    // shrinking text keeps more of the note on screen than growing it.
+    if (bestDelta < 0 || absDelta < bestDelta) {
+      bestDelta = absDelta;
+      best = SIZES[i];
+    }
+  }
+  return best;
 }
 
-int fallbackFontId() {
+namespace {
+// Position in SIZES for an already-snapped size. Separate from
+// nearestOfferedSize so the snap happens exactly once per lookup.
+size_t slotOfSize(uint8_t pointSize) {
+  const uint8_t snapped = nearestOfferedSize(pointSize);
+  for (size_t i = 0; i < SIZE_COUNT; ++i) {
+    if (SIZES[i] == snapped) return i;
+  }
+  return 0;  // unreachable: nearestOfferedSize only ever returns a member
+}
+}  // namespace
+
+int builtinFontIdFor(uint8_t index, uint8_t pointSize) {
+  const size_t slot = slotOfSize(pointSize);
+  if (index >= FAMILY_COUNT) return FAMILIES[0].builtinFontId[slot];
+  return FAMILIES[index].builtinFontId[slot];
+}
+
+int fallbackFontId(uint8_t pointSize) {
   // First compiled-in entry, in list order, so this follows the table rather
-  // than naming a family twice.
+  // than naming a family twice. Resolved at the SAME size the caller asked for,
+  // so falling back changes the FACE and not the size -- a fallback that also
+  // silently resized would be two surprises instead of one.
+  const size_t slot = slotOfSize(pointSize);
   for (size_t i = 0; i < FAMILY_COUNT; ++i) {
-    if (FAMILIES[i].builtinFontId != 0) return FAMILIES[i].builtinFontId;
+    if (FAMILIES[i].builtinFontId[slot] != 0) return FAMILIES[i].builtinFontId[slot];
   }
   return 0;  // no built-in family at all; caller keeps its own UI-face fallback
 }
@@ -130,11 +163,11 @@ bool isWritingOnlyFamily(const char* family) {
   return false;
 }
 
-int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
+int resolve(uint8_t index, uint8_t pointSize, const std::function<bool(int)>& isRegistered,
             const std::function<int(const char*)>& sdLookup, int uiFallbackId) {
   // Built-in first -- but only if this build actually compiled it in. A font id
   // is just an int; holding one implies nothing about the family being present.
-  if (const int builtin = builtinFontIdFor(index); builtin != 0 && isRegistered && isRegistered(builtin)) {
+  if (const int builtin = builtinFontIdFor(index, pointSize); builtin != 0 && isRegistered && isRegistered(builtin)) {
     return builtin;
   }
 
@@ -144,7 +177,7 @@ int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
 
   // A card-only row whose family is not installed degrades to a built-in
   // MONOSPACE face rather than to UI chrome -- again only if it is really there.
-  if (const int mono = fallbackFontId(); mono != 0 && isRegistered && isRegistered(mono)) return mono;
+  if (const int mono = fallbackFontId(pointSize); mono != 0 && isRegistered && isRegistered(mono)) return mono;
 
   // Reached only by a row whose built-in is not registered in this build
   // (isRegistered returned false) AND the SD card has no matching family. Since

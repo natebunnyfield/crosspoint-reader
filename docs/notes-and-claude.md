@@ -255,16 +255,51 @@ so every boot discarded the saved byte. If you add a runtime-labeled row, the
 persisted, and unreachable on an X4 or X3.
 
 **Editor fonts are BUILT IN, and the fallback is monospace.** All three rows
-compile into the firmware: one size, 12 pt, four styles each. iA Writer Quattro
-is OFL and always present; PragmataPro and Nitti Typewriter are commercial, so
-their glyph tables are gitignored and `main.cpp` gates them on `__has_include` —
-a clone without the licensed sources still compiles and simply does not register
-those rows, which is why Quattro is also `fallbackFontId()`. None are installed to
-`/fonts`, because `SdCardFontRegistry` has no exclusion mechanism — an install
-there would surface these writing faces in the READING picker, in the web
-reading enum, and in `cycleReaderFontFamily()`, where a side-button hold
-mid-book would rewrite `sdFontFamilyName` and invalidate the whole book's
-section cache.
+compile into the firmware at TWO sizes — 12 and 14 pt (owner ruling
+2026-08-15), four styles each. iA Writer Quattro is OFL and always present;
+PragmataPro and Nitti Typewriter are commercial, so their glyph tables are
+gitignored and `main.cpp` gates them on `__has_include` — a clone without the
+licensed sources still compiles and simply does not register those rows, which
+is why Quattro is also `fallbackFontId()`. One `__has_include` covers both
+sizes: `convert-builtin-fonts.sh` generates every size in `EDITOR_SIZES`
+together, so a tree with the 12 pt headers has the 14 pt ones too.
+
+None are installed to `/fonts` — but the reason has changed, and the old one is
+no longer true. It used to be that `SdCardFontRegistry` had no exclusion
+mechanism, so an install would surface these writing faces in the READING
+picker. There IS one now: `readingfonts::offeredForReading()` filters both
+reading pickers (`FontSelectionActivity.cpp:136`,
+`EpubReaderActivity.cpp:820`), and `FORMER_WRITING_FAMILIES` keeps retired
+faces filtered too. So installing them is *possible*; it simply has not been
+ruled on, and `docs/sd-card-fonts.md` requires a ruling before any family joins
+a card. `cycleReaderFontFamily()` and the section-cache invalidation it can
+trigger are still the reason to be careful about it.
+
+**The SIZE is persisted as a real point size, not a picker index.**
+`SETTINGS.editorFontSize` holds 12 or 14. Its `getSettingsList()` row is a
+getter/setter entry with `valuePtr` left **null** — `CrossPointWebServer`'s ENUM
+case prefers `valuePtr` over the setter and would write the raw index into the
+byte — which means the generic `toJson` loop does not carry it, so
+`CrossPointSettings` writes and reads `editorFontSize` by hand, exactly as
+`fontSizeSlot` and `screenMargin` do. Leave either of those explicit lines out
+and the row keeps working perfectly until the next reboot, when it silently
+reverts. That is the trap CLAUDE.md documents, and putting the size on an index
+would have re-created on the size axis the identical bug the FAMILY axis was
+rescued from hours earlier.
+
+A stored size that is not offered is snapped by
+`editorfonts::nearestOfferedSize()` (ties go to the smaller size) rather than
+clamped away, so the picker and the renderer cannot disagree about what a
+stored byte means. The snap is in-memory: a settings.json holding 13 keeps
+saying 13 on disk until something else triggers a save, while the device reads,
+draws and displays 12.
+
+**13 pt was asked for and declined** in the same ruling that added 14. No size
+ramp anywhere carries a 13, and `SdCardFontSystem::loadForDisplay` snaps to the
+nearest size it finds (`findNearestSize`) rather than failing — so a 13 row
+would have rendered 12 while the label said 13. That is the same
+silently-does-nothing shape this file documents twice already, and dropping the
+size removed it rather than managing it.
 
 **The list was cut twice on 2026-08-15, and the second cut changed how the
 setting is persisted.** First Space Mono went, absorbed by shifting the stored

@@ -19,13 +19,35 @@
 
 namespace editorfonts {
 
+// The point sizes the editor offers, in the order the picker lists them.
+//
+// These are REAL POINT SIZES, and SETTINGS.editorFontSize stores one of these
+// values -- not a position in this array. So unlike an ENUM row, this list is
+// not order-frozen and a size can be added or dropped without a migration; a
+// stored size that is no longer offered simply snaps to the nearest one that is
+// (nearestOfferedSize). That is the same lesson the family list learned the
+// hard way on 2026-08-15 -- see the note above FAMILIES.
+//
+// 13 pt was asked for in the same ruling and DECLINED: no ramp anywhere carries
+// a 13, and SdCardFontSystem::loadForDisplay snaps to the nearest size it finds
+// rather than failing, so a 13 row would have rendered 12 while the label said
+// 13. Adding one later means adding the value here, adding a cut to
+// EDITOR_SIZES in convert-builtin-fonts.sh, and adding one id per row below.
+inline constexpr uint8_t SIZES[] = {12, 14};
+inline constexpr size_t SIZE_COUNT = sizeof(SIZES) / sizeof(SIZES[0]);
+
 struct Entry {
   const char* family;  // sd-fonts.yaml family name == on-card directory name
   const char* label;   // picker label
-  // Non-zero when the face is COMPILED IN; the card is then never consulted.
-  // Zero means card-only: the family must be present in /fonts or /.fonts, or
-  // the editor falls back to the UI face.
-  int builtinFontId;
+  // One id per entry in SIZES, positionally. Non-zero when that CUT is compiled
+  // in; the card is then never consulted for it. Zero means card-only: the
+  // family must be present in /fonts or /.fonts at that size, or the editor
+  // falls back.
+  //
+  // An array rather than a second scalar so that adding a third size is a data
+  // change -- one more value per row -- instead of another structural edit to
+  // every consumer, which is what widening this from a scalar cost.
+  int builtinFontId[SIZE_COUNT];
   // Also offered as a READING face in Text Settings (owner ruling
   // 2026-08-09). The ruling at the top of this file -- writing faces are not
   // reading faces -- still holds for the rest; Quattro is the exception the
@@ -72,7 +94,10 @@ struct Entry {
 // id, the font objects in main.cpp, and the all.h includes — so the family
 // costs no flash while remaining one commit away from returning.
 inline constexpr Entry FAMILIES[] = {
-    {"iAWriterQuattro", "iA Writer Quattro", IAWRITERQUATTRO_12_FONT_ID, /*alsoReading=*/true},
+    {"iAWriterQuattro",
+     "iA Writer Quattro",
+     {IAWRITERQUATTRO_12_FONT_ID, IAWRITERQUATTRO_14_FONT_ID},
+     /*alsoReading=*/true},
     // COMMERCIAL, and the only row whose glyph tables are not in this repo.
     // builtinFonts/pragmatapro_*.h are gitignored (see .gitignore) and built
     // locally from lib/EpdFont/local_fonts/, so a clone without the licensed
@@ -91,7 +116,7 @@ inline constexpr Entry FAMILIES[] = {
     // honest and nothing slides — it degrades, it does not corrupt the line.
     // Accepted for a Latin-1 writing face; do NOT promote this row to
     // alsoReading, where the gap would meet arbitrary book text.
-    {"PragmataPro", "PragmataPro", PRAGMATAPRO_12_FONT_ID, false},
+    {"PragmataPro", "PragmataPro", {PRAGMATAPRO_12_FONT_ID, PRAGMATAPRO_14_FONT_ID}, false},
     // COMMERCIAL, same pattern as PragmataPro. builtinFonts/nitti*.h are
     // gitignored (see .gitignore) and built locally from
     // lib/EpdFont/local_fonts/NittiTypewriter-Regular.ttf. UNLIKE PragmataPro,
@@ -102,7 +127,7 @@ inline constexpr Entry FAMILIES[] = {
     // whose Bold/Italic cover only ASCII+Latin-1. Writing-only: the synthetic
     // bold's 'a' counter is narrow (5 px 2-bit white interior, ≥1 ✓) but a
     // typewriter face at 5 px width is not suited to arbitrary book text.
-    {"NittiTypewriter", "Nitti Typewriter", NITTITYPEWRITER_12_FONT_ID, false},
+    {"NittiTypewriter", "Nitti Typewriter", {NITTITYPEWRITER_12_FONT_ID, NITTITYPEWRITER_14_FONT_ID}, false},
 };
 inline constexpr size_t FAMILY_COUNT = sizeof(FAMILIES) / sizeof(FAMILIES[0]);
 
@@ -164,9 +189,16 @@ uint8_t migrateLegacyStoredIndex(uint8_t index);
 // removed from the list).
 const char* selectedFamily(uint8_t index);
 
-// Compiled-in font id for the current SETTINGS.editorFont, or 0 when that row
-// is card-only. Callers try this FIRST, then the SD resolver, then fallback().
-int builtinFontIdFor(uint8_t index);
+// The offered size nearest to `pointSize`, so a stored size that is no longer
+// offered degrades to a neighbour rather than to the default. Ties go to the
+// smaller size. This is what makes SIZES editable without a migration.
+uint8_t nearestOfferedSize(uint8_t pointSize);
+
+// Compiled-in font id for the current SETTINGS.editorFont at `pointSize`, or 0
+// when that cut is not compiled in. `pointSize` is snapped through
+// nearestOfferedSize() first, so any stored value answers something. Callers
+// try this FIRST, then the SD resolver, then fallback().
+int builtinFontIdFor(uint8_t index, uint8_t pointSize);
 
 // The last resort, and it is a MONOSPACE face rather than the UI face.
 //
@@ -184,7 +216,7 @@ int builtinFontIdFor(uint8_t index);
 // Remapping the stored value would also overwrite a deliberate web-API choice.
 // Resolving at read time fixes fresh, upgraded and web-set devices alike and
 // touches no persisted state.
-int fallbackFontId();
+int fallbackFontId(uint8_t pointSize);
 
 // The whole resolution chain, in one place, with the availability check the
 // two activities' copies of it did not have.
@@ -200,10 +232,14 @@ int fallbackFontId();
 // Both lookups are injected rather than reached through globals, so this stays
 // testable without a GfxRenderer or a CrossPointSettings -- the editor-font
 // suite deliberately links neither.
+//   pointSize    : the size wanted; snapped to an offered size, then used for
+//                  BOTH the built-in lookup and the caller's sdLookup, so the
+//                  two cannot disagree about what size is being resolved
 //   isRegistered : does the renderer actually have glyphs for this font id
-//   sdLookup     : resolve a family name to an SD font id at 12 pt, or 0
+//   sdLookup     : resolve a family name to an SD font id at the resolved size,
+//                  or 0
 //   uiFallbackId : the caller's own last resort, used only when nothing resolves
-int resolve(uint8_t index, const std::function<bool(int)>& isRegistered,
+int resolve(uint8_t index, uint8_t pointSize, const std::function<bool(int)>& isRegistered,
             const std::function<int(const char*)>& sdLookup, int uiFallbackId);
 
 // Is `family` (an on-card directory name) one of these writing faces?

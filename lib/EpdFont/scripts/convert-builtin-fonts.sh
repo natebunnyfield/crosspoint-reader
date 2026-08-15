@@ -92,8 +92,14 @@ done
 # cannot appear in the READING picker, which an install into /fonts would cause,
 # since SdCardFontRegistry lists whatever family directories it finds there.
 #
-# ONE size only. resolveEditorFont() asks for 12 pt and nothing else, so the
-# 14/16/18 cuts the reading faces carry would be dead flash. All four styles are
+# TWO sizes, 12 and 14 (owner ruling 2026-08-15, "allow editor font to be
+# resized"). 13 was asked for and declined: it exists in no ramp anywhere and
+# SdCardFontSystem::loadForDisplay snaps to the nearest available size, so a 13
+# row would have rendered 12 while claiming 13. The 16/18 cuts the reading faces
+# carry are still dead flash and are still not built.
+#
+# Only the THREE WIRED families get 14. The retired ones below stay at 12: they
+# are generatable-but-unwired, so a 14 cut would be disk and nothing else. All four styles are
 # real: MarkdownSpans renders bold, italic and bold-italic. 2-bit + compressed,
 # matching the reader cuts.
 #
@@ -108,15 +114,38 @@ done
 # iAWriterQuattroS (with the S suffix for narrow), but we strip it for the
 # source directory and internal symbol names to match sd-fonts.yaml's family
 # name (iAWriterQuattro).
+# The sizes the Editor Font Size setting offers. The setting persists a real
+# POINT SIZE rather than a picker index, so this list is not order-frozen and a
+# size may be added or dropped without a migration.
+EDITOR_SIZES=(12 14)
+
 EDITOR_FAMILIES=(
+  "iawriterquattro:iAWriterQuattro/iAWriterQuattro"
+)
+# Removed from the app on 2026-08-15 but kept generatable, so a family stays one
+# commit away from returning. 12 pt only -- nothing references these.
+EDITOR_FAMILIES_RETIRED=(
   "spacemono:SpaceMono/SpaceMono"
   "ibmplexmono:IBMPlexMono/IBMPlexMono"
-  "iawriterquattro:iAWriterQuattro/iAWriterQuattro"
   "iawriterduo:iAWriterDuo/iAWriterDuo"
   "iawritermono:iAWriterMono/iAWriterMono"
 )
 
 for entry in ${EDITOR_FAMILIES[@]}; do
+  prefix="${entry%%:*}"
+  stem="${entry#*:}"
+  for size in ${EDITOR_SIZES[@]}; do
+    for style in ${READER_FONT_STYLES[@]}; do
+      lc=$(echo $style | tr '[:upper:]' '[:lower:]')
+      font_name="${prefix}_${size}_${lc}"
+      output_path="../builtinFonts/${font_name}.h"
+      python fontconvert.py $font_name $size "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
+      echo "Generated $output_path"
+    done
+  done
+done
+
+for entry in ${EDITOR_FAMILIES_RETIRED[@]}; do
   prefix="${entry%%:*}"
   stem="${entry#*:}"
   for style in ${READER_FONT_STYLES[@]}; do
@@ -143,13 +172,15 @@ done
 for entry in ${EDITOR_FAMILIES[@]}; do
   prefix="${entry%%:*}"
   stem="${entry#*:}"
-  for scale in ${HIRES_SCALES[@]}; do
-    for style in ${READER_FONT_STYLES[@]}; do
-      lc=$(echo $style | tr '[:upper:]' '[:lower:]')
-      font_name="${prefix}_12_${lc}_${scale}x"
-      output_path="../builtinFonts/${font_name}.h"
-      python fontconvert.py $font_name $((12 * scale)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
-      echo "Generated $output_path"
+  for size in ${EDITOR_SIZES[@]}; do
+    for scale in ${HIRES_SCALES[@]}; do
+      for style in ${READER_FONT_STYLES[@]}; do
+        lc=$(echo $style | tr '[:upper:]' '[:lower:]')
+        font_name="${prefix}_${size}_${lc}_${scale}x"
+        output_path="../builtinFonts/${font_name}.h"
+        python fontconvert.py $font_name $((size * scale)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
+        echo "Generated $output_path"
+      done
     done
   done
 done
@@ -186,15 +217,17 @@ for entry in ${LOCAL_EDITOR_FAMILIES[@]}; do
     echo "Skipping ${stem} (no local source in lib/EpdFont/local_fonts/): commercial font, recipe only"
     continue
   fi
-  for style in ${READER_FONT_STYLES[@]}; do
-    lc=$(echo $style | tr '[:upper:]' '[:lower:]')
-    # 1x cut, then one hi-res companion per HIRES_SCALES tier, same flags as the
-    # OFL editor families above.
-    python fontconvert.py "${prefix}_12_${lc}" 12 "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_12_${lc}.h"
-    echo "Generated ../builtinFonts/${prefix}_12_${lc}.h"
-    for scale in ${HIRES_SCALES[@]}; do
-      python fontconvert.py "${prefix}_12_${lc}_${scale}x" $((12 * scale)) "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_12_${lc}_${scale}x.h"
-      echo "Generated ../builtinFonts/${prefix}_12_${lc}_${scale}x.h"
+  for size in ${EDITOR_SIZES[@]}; do
+    for style in ${READER_FONT_STYLES[@]}; do
+      lc=$(echo $style | tr '[:upper:]' '[:lower:]')
+      # 1x cut, then one hi-res companion per HIRES_SCALES tier, same flags as
+      # the OFL editor families above.
+      python fontconvert.py "${prefix}_${size}_${lc}" $size "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_${size}_${lc}.h"
+      echo "Generated ../builtinFonts/${prefix}_${size}_${lc}.h"
+      for scale in ${HIRES_SCALES[@]}; do
+        python fontconvert.py "${prefix}_${size}_${lc}_${scale}x" $((size * scale)) "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_${size}_${lc}_${scale}x.h"
+        echo "Generated ../builtinFonts/${prefix}_${size}_${lc}_${scale}x.h"
+      done
     done
   done
 done
@@ -235,11 +268,16 @@ done
 # to round in the first place; 2 px is already insurance.) Scaling it would just
 # widen every glyph bitmap at 2x/3x for nothing.
 #
-# --line-height 33 on all four styles. Measured from the shipped headers at
-# 12 pt: iA Writer Quattro/Duo/Mono and IBM Plex Mono all sit at line 33,
-# x-height 13, advance 15.000. Nitti natively is 25 / 13 / 15.000 -- it matches
-# that set exactly on advance and x-height, so nothing reflows and the text
-# reads the same size, but it sets 24% denser. 33 makes it a true drop-in.
+# --line-height, per size, matched to the iA Writer Quattro cut at the SAME
+# size so the three editor faces stay interchangeable without reflowing.
+# Measured from the generated Quattro headers (the advanceY field of
+# EpdFontData): 33 at 12 pt, 38 at 14 pt. Nitti natively sets 24% denser than
+# that -- 25 at 12 pt -- while matching on advance and x-height, so overriding
+# the leading is what makes it a true drop-in rather than a different rhythm.
+#
+# Derived per size rather than scaled: 33 * 14/12 is 38.5, and rounding a
+# derived leading is exactly how a family ends up one pixel off the set it is
+# supposed to match. The number comes from the cut it has to sit beside.
 #
 # Skips with a clear message when any source is absent — that means
 # "cannot regenerate here", NOT "missing from the build".
@@ -254,21 +292,27 @@ if [ $NITTI_MISSING -eq 1 ]; then
   echo "Skipping NittiTypewriter (no local source in lib/EpdFont/local_fonts/): commercial font, recipe only"
 else
   NITTI_JOIN="--synth-underline-connect --synth-underline-overlap-px 2"
-  NITTI_LH="--line-height 33"
   # 1x cuts, then one hi-res companion per HIRES_SCALES tier. Same flags at
   # every tier: the strike is em-relative, the join is measured off the tier's
   # own advance, and the line height is the 1x metric the hi-res tables inherit.
-  for scale in 1 ${HIRES_SCALES[@]}; do
-    if [ "$scale" = "1" ]; then suffix=""; else suffix="_${scale}x"; fi
-    px=$((12 * scale))
-    python fontconvert.py "nittitypewriter_12_regular${suffix}"    $px "$NITTI_REGULAR"   --2bit --compress --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_12_regular${suffix}.h"
-    echo "Generated ../builtinFonts/nittitypewriter_12_regular${suffix}.h"
-    python fontconvert.py "nittitypewriter_12_bold${suffix}"       $px "$NITTI_INVERSE"   --2bit --compress --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_12_bold${suffix}.h"
-    echo "Generated ../builtinFonts/nittitypewriter_12_bold${suffix}.h"
-    python fontconvert.py "nittitypewriter_12_italic${suffix}"     $px "$NITTI_UNDERLINE" --2bit --compress --pnum $NITTI_JOIN $NITTI_LH > "../builtinFonts/nittitypewriter_12_italic${suffix}.h"
-    echo "Generated ../builtinFonts/nittitypewriter_12_italic${suffix}.h"
-    python fontconvert.py "nittitypewriter_12_bolditalic${suffix}" $px "$NITTI_UNDERLINE" --2bit --compress --pnum $NITTI_JOIN --synth-double-strike-em 0.0533 $NITTI_LH > "../builtinFonts/nittitypewriter_12_bolditalic${suffix}.h"
-    echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic${suffix}.h"
+  for size in ${EDITOR_SIZES[@]}; do
+    case $size in
+      12) NITTI_LH="--line-height 33" ;;
+      14) NITTI_LH="--line-height 38" ;;
+      *)  echo "No measured Nitti line height for ${size}pt -- generate the iA Writer Quattro cut at that size and read its advanceY" >&2; exit 1 ;;
+    esac
+    for scale in 1 ${HIRES_SCALES[@]}; do
+      if [ "$scale" = "1" ]; then suffix=""; else suffix="_${scale}x"; fi
+      px=$((size * scale))
+      python fontconvert.py "nittitypewriter_${size}_regular${suffix}"    $px "$NITTI_REGULAR"   --2bit --compress --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_regular${suffix}.h"
+      echo "Generated ../builtinFonts/nittitypewriter_${size}_regular${suffix}.h"
+      python fontconvert.py "nittitypewriter_${size}_bold${suffix}"       $px "$NITTI_INVERSE"   --2bit --compress --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_bold${suffix}.h"
+      echo "Generated ../builtinFonts/nittitypewriter_${size}_bold${suffix}.h"
+      python fontconvert.py "nittitypewriter_${size}_italic${suffix}"     $px "$NITTI_UNDERLINE" --2bit --compress --pnum $NITTI_JOIN $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_italic${suffix}.h"
+      echo "Generated ../builtinFonts/nittitypewriter_${size}_italic${suffix}.h"
+      python fontconvert.py "nittitypewriter_${size}_bolditalic${suffix}" $px "$NITTI_UNDERLINE" --2bit --compress --pnum $NITTI_JOIN --synth-double-strike-em 0.0533 $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_bolditalic${suffix}.h"
+      echo "Generated ../builtinFonts/nittitypewriter_${size}_bolditalic${suffix}.h"
+    done
   done
 fi
 

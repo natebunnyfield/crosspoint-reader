@@ -87,6 +87,7 @@ STR_EDITOR_FONT_PREVIEW_TEXT: "## Thursday, half four\nRain again; the **fix** w
 STR_FONT_NOT_ON_CARD: "Not on card"
 STR_FONT_FAMILY: "Reader Font Family"
 STR_EDITOR_FONT: "Editor Font"
+STR_EDITOR_FONT_SIZE: "Editor Font Size"
 STR_CLAUDE_PROMPT_HINT: "Type a question, then press Ask."
 STR_EDITOR_OOM: "Not enough memory to open the editor."
 STR_CREATE_NOTE: "Create Note"

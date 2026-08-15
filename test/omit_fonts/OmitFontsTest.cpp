@@ -110,6 +110,14 @@ TEST(OmitFonts, TheSurvivingSetIsExactlyWhatWeIntend) {
   const std::set<std::string> want = {
       "LIBREFRANKLIN_READER_14_FONT_ID",
       "IAWRITERQUATTRO_12_FONT_ID",
+      // The 14 pt cut of every editor face, added 2026-08-15 with the Editor
+      // Font Size setting. Each sits outside the guard for exactly the reason
+      // its 12 pt sibling does: OMIT_FONTS is the iOS build, and a SIZE that
+      // resolves to nothing there is the same failure as a FACE that does --
+      // the editor would draw the 12 pt cut while the setting said 14, or
+      // nothing at all. Both sizes have to survive or the setting is a lie on
+      // that target.
+      "IAWRITERQUATTRO_14_FONT_ID",
       // Added 2026-08-14 with the PragmataPro row. Outside the guard for the
       // same reason as the two above: OMIT_FONTS is the iOS build, and an
       // editor row that resolves to nothing there is the bug that shipped as
@@ -119,11 +127,13 @@ TEST(OmitFonts, TheSurvivingSetIsExactlyWhatWeIntend) {
       // about whether the glyphs exist in the tree, not about OMIT_FONTS, so it
       // does not belong in this set's reasoning.
       "PRAGMATAPRO_12_FONT_ID",
+      "PRAGMATAPRO_14_FONT_ID",
       // Added 2026-08-15 with NittiTypewriter. Same reasoning as PragmataPro:
       // commercial, gitignored headers, second narrower guard
       // (#ifdef CROSSPOINT_HAS_NITTITYPEWRITER) about glyph presence, not
       // about OMIT_FONTS.
       "NITTITYPEWRITER_12_FONT_ID",
+      "NITTITYPEWRITER_14_FONT_ID",
   };
   EXPECT_EQ(fontsSurvivingOmitFonts(kMainCpp), want);
 }
