@@ -605,6 +605,10 @@ bool renderReadingSpecimen(const char* family, const char* outDir) {
   static const char* kItalic = "Every officer aboard knew the difference between quiet and silence.";
   static const char* kBold = "Chapter Nine: The Ledger of the Wharf";
   static const char* kHard = "Illinois 1lI0O · rn m · cl d · 3/8 5/6 · fjord ffi · ÄÖÜ Café";
+  // BOLD_ITALIC was never exercised here, so a family could ship a broken
+  // fourth style and this specimen would render four clean pages. It is the
+  // style most likely to be wrong, being the one usually synthesised.
+  static const char* kBoldItalic = "Emphasis inside emphasis: the fourth style, set in a run.";
   static const char* kAlphabet = "abcdefghijklmnopqrstuvwxyz";
 
   for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
@@ -658,6 +662,9 @@ bool renderReadingSpecimen(const char* family, const char* outDir) {
 
     y += lineH / 2;
     y = drawWrapped(id, kItalic, EpdFontFamily::ITALIC, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
+    y += lineH / 2;
+    y = drawWrapped(id, kBoldItalic, EpdFontFamily::BOLD_ITALIC, margin, y, colW, lineH, pageBottom, nullptr,
+                    nullptr);
     y += lineH / 2;
     y = drawWrapped(id, kHard, EpdFontFamily::REGULAR, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
 

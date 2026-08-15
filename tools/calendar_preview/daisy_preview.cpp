@@ -107,13 +107,17 @@ bool renderDaisySheet(const char* outPath, const char* title, const Ring* rings,
 // glyph data actually rasterises — a header that compiles and links says
 // nothing at all about whether the bitmaps are right.
 bool renderEditorFontSpecimen(const char* outPath) {
-  static EpdFont smR(&spacemono_12_regular), smB(&spacemono_12_bold), smI(&spacemono_12_italic),
-      smBI(&spacemono_12_bolditalic);
-  static EpdFontFamily spaceMono(&smR, &smB, &smI, &smBI);
+  // Space Mono was removed from the app on 2026-08-15 and this specimen still
+  // named it, so the harness stopped building the moment the headers went. The
+  // iA Writer Mono cut takes its place -- a shipped editor face, so the
+  // specimen keeps proving two real families rasterise rather than one.
+  static EpdFont iaR(&iawritermono_12_regular), iaB(&iawritermono_12_bold), iaI(&iawritermono_12_italic),
+      iaBI(&iawritermono_12_bolditalic);
+  static EpdFontFamily iaWriterMono(&iaR, &iaB, &iaI, &iaBI);
   static EpdFont pxR(&ibmplexmono_12_regular), pxB(&ibmplexmono_12_bold), pxI(&ibmplexmono_12_italic),
       pxBI(&ibmplexmono_12_bolditalic);
   static EpdFontFamily plexMono(&pxR, &pxB, &pxI, &pxBI);
-  renderer.insertFont(SPACEMONO_12_FONT_ID, spaceMono);
+  renderer.insertFont(IAWRITERMONO_12_FONT_ID, iaWriterMono);
   renderer.insertFont(IBMPLEXMONO_12_FONT_ID, plexMono);
 
   renderer.clearScreen();
@@ -132,7 +136,7 @@ bool renderEditorFontSpecimen(const char* outPath) {
     const char* name;
     int id;
   };
-  const Face faces[] = {{"Space Mono", SPACEMONO_12_FONT_ID}, {"IBM Plex Mono", IBMPLEXMONO_12_FONT_ID}};
+  const Face faces[] = {{"iA Writer Mono", IAWRITERMONO_12_FONT_ID}, {"IBM Plex Mono", IBMPLEXMONO_12_FONT_ID}};
 
   for (const Face& face : faces) {
     caption(y, face.name);
