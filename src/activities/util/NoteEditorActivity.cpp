@@ -28,21 +28,21 @@ constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
 void NoteEditorActivity::onEnter() {
   Activity::onEnter();
 
-// The host keyboard channel. Announcing text entry is what raises an iPhone's
-// on-screen keyboard (the harness calls SDL_StartTextInput on this flag), and
-// it is also what suppresses the scancode->button map -- without it every "p"
-// typed here would press POWER and every "s" would sleep the device.
-//
-// KeyboardEntryActivity and DaisyEntryActivity have always done this; the two
-// editors never did, so on the phone Create Note and Claude had no keyboard at
-// all and a paired one fought the button map.
-//
-// Multi, because this is an editor and not a field: a host keyboard's Return
-// is a line break here, exactly as a paired Bluetooth keyboard's Enter already
-// is (notes/HidKeymap.h decodes usage 0x28 to '\n', and the drain below turns
-// TYPED_COMMIT into the same). Announcing Single left the host treating Return
-// as the Confirm button, so it pressed Select on the on-screen panel instead
-// of breaking the line -- ST-006.
+  // The host keyboard channel. Announcing text entry is what raises an iPhone's
+  // on-screen keyboard (the harness calls SDL_StartTextInput on this flag), and
+  // it is also what suppresses the scancode->button map -- without it every "p"
+  // typed here would press POWER and every "s" would sleep the device.
+  //
+  // KeyboardEntryActivity and DaisyEntryActivity have always done this; the two
+  // editors never did, so on the phone Create Note and Claude had no keyboard at
+  // all and a paired one fought the button map.
+  //
+  // Multi, because this is an editor and not a field: a host keyboard's Return
+  // is a line break here, exactly as a paired Bluetooth keyboard's Enter already
+  // is (notes/HidKeymap.h decodes usage 0x28 to '\n', and the drain below turns
+  // TYPED_COMMIT into the same). Announcing Single left the host treating Return
+  // as the Confirm button, so it pressed Select on the on-screen panel instead
+  // of breaking the line -- ST-006.
   mappedInput.setTextEntryActive(true, HalGPIO::TextEntryLines::Multi);
 
   panel.begin();
@@ -361,6 +361,91 @@ bool NoteEditorActivity::repeatCol(const MappedInputManager::Button button, cons
   return false;
 }
 
+void NoteEditorActivity::moveCaret(const CaretDir dir) {
+  if (!buf) return;
+  // render() reads buf->cursor() on its own task.
+  RenderLock lock;
+  switch (dir) {
+    case CaretDir::Left:
+      buf->cursorLeft();
+      break;
+    case CaretDir::Right:
+      buf->cursorRight();
+      break;
+    case CaretDir::Up:
+      buf->cursorUp();
+      break;
+    case CaretDir::Down:
+      buf->cursorDown();
+      break;
+  }
+  caretDirty = true;
+  caretLastMs = millis();
+}
+
+// One caret step on press, then repeats while held. Deliberately SLOWER than
+// repeatCol's 450/140: the repaint is debounced (below) and an e-ink refresh is
+// ~570 ms, so a caret stepping faster than the panel can show it runs blind and
+// overshoots. One step per refresh is the most the display can actually report.
+bool NoteEditorActivity::repeatCaret(const MappedInputManager::Button button, const CaretDir dir) {
+  constexpr uint32_t FIRST_REPEAT_MS = 600;
+  constexpr uint32_t NEXT_REPEAT_MS = 300;
+  if (mappedInput.wasPressed(button)) {
+    moveCaret(dir);
+    caretRepeatAt = millis() + FIRST_REPEAT_MS;
+    return true;
+  }
+  if (mappedInput.isPressed(button) && caretRepeatAt != 0 && millis() >= caretRepeatAt) {
+    moveCaret(dir);
+    caretRepeatAt = millis() + NEXT_REPEAT_MS;
+    return true;
+  }
+  if (mappedInput.wasReleased(button)) {
+    caretRepeatAt = 0;
+    return true;
+  }
+  return false;
+}
+
+// Caret mode owns the tick outright — the keyboard panel takes no input at all
+// while it is up, the same way an OptionPopup gates the top of a loop().
+// pollPairingGestures() is therefore NOT reached, which is the point: holding
+// Up here means "cursor up", not "start Bluetooth".
+void NoteEditorActivity::loopCaretMode() {
+  // Back or Confirm PRESS leaves. Press, not release: the release that ends the
+  // long press on space has not arrived yet and must not read as an exit. Back
+  // returns to typing rather than leaving the editor, as a popup's Back does.
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
+      mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+    caretMode = false;
+    caretDirty = false;
+    caretRepeatAt = 0;
+    {
+      RenderLock lock;
+      ensureCursorVisible();
+    }
+    requestUpdate();
+    return;
+  }
+
+  bool moved = repeatCaret(MappedInputManager::Button::Left, CaretDir::Left);
+  if (!moved) moved = repeatCaret(MappedInputManager::Button::Right, CaretDir::Right);
+  if (!moved) moved = repeatCaret(MappedInputManager::Button::Up, CaretDir::Up);
+  if (!moved) repeatCaret(MappedInputManager::Button::Down, CaretDir::Down);
+
+  // Same debounce as typing, and for the same reason: a repaint per step would
+  // cost a full panel refresh each time. No relayout() — the TEXT did not
+  // change, only where the caret sits in it.
+  if (caretDirty && millis() - caretLastMs >= SETTINGS.getDisplayDebounceMs()) {
+    caretDirty = false;
+    {
+      RenderLock lock;
+      ensureCursorVisible();
+    }
+    requestUpdate();
+  }
+}
+
 void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
   // Everything below mutates buf/lines/topLine, all of which render() walks on
   // its own task.
@@ -369,6 +454,38 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
   // selected key, with long-press giving the alt output (uppercase).
   const notes::KeyboardPanel::Result r =
       panel.isDaisy() ? panel.activateSlot(slot, longPress) : panel.activate(longPress);
+
+  // HOLD THE SPACE BAR -> caret mode. Detected on the RESULT rather than by
+  // asking the panel which key is selected, which keeps this entirely out of
+  // KeyboardPanel and works identically on all three layouts.
+  //
+  // A space is an exact sentinel for "the space key was held", and nothing else
+  // can produce one: keyboardAltOutputFor returns nullptr for any key whose
+  // kind is not Normal (FreeInkUI.cpp:772), so KeyKind::Space falls back to
+  // keyboardOutputFor and yields " " -- a long press on space typed a plain
+  // space, byte for byte what a tap already did, so the gesture slot was free.
+  // No letter's case flip and no declared alt in any layout is " ".
+  // test/keyboard_panel pins both halves of that.
+  if (longPress && r.event == notes::KeyboardPanel::Event::Character && r.ch == ' ') {
+    // Flush any typing still sitting behind the debounce first: render() is
+    // about to paint and `lines` would otherwise be a layout short.
+    relayout();
+    ensureCursorVisible();
+    dirty = false;
+    pendingChars = 0;
+    caretMode = true;
+    caretDirty = false;
+    caretRepeatAt = 0;
+    // Hand the pick loop back a clean slate. Leaving pickSlot armed meant the
+    // Confirm RELEASE that ends this hold got consumed by caret mode instead,
+    // and the next Confirm press after leaving the mode was then eaten by the
+    // stale pickFired.
+    pickSlot = -1;
+    pickFired = false;
+    requestUpdate();
+    return;
+  }
+
   bool textChanged = true;
   switch (r.event) {
     case notes::KeyboardPanel::Event::Character:
@@ -412,6 +529,13 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
 }
 
 void NoteEditorActivity::loop() {
+  // Gated ABOVE the Back handler, like an OptionPopup: while caret mode is up
+  // Back closes the mode and does not leave the editor.
+  if (caretMode) {
+    loopCaretMode();
+    return;
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     exitEditor();
     return;
@@ -484,6 +608,7 @@ void NoteEditorActivity::loop() {
           millis() - pickHeldSince > LONG_PRESS_MS) {
         handlePanelKey(pk.slot, /*longPress=*/true);
         pickFired = true;
+        if (caretMode) return;  // it reset the pick state; nothing below applies
       }
       if (mappedInput.wasReleased(pk.button) && pickSlot == pk.slot) {
         if (!pickFired) handlePanelKey(pk.slot, /*longPress=*/false);
@@ -556,9 +681,20 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
     // gap grew with every styled run earlier in the line. caretX walks the same
     // spans drawLine does, so the two cannot disagree; a column that lands
     // inside a marker clamps to the run it opens or closes.
+    //
+    // This also subsumes the old advanceOf() trailing-space workaround: caretX
+    // measures spans, so a prefix ending in a space no longer loses that
+    // space's advance the way a raw getTextWidth() call did.
     const int cx = metrics.contentSidePadding +
                    mdrender::caretX(renderer, editorFontId, lineHeight, text, len, cursorCol > len ? len : cursorCol);
-    renderer.drawLine(cx, y, cx, y + lineHeight - 2, true);
+    // A BLOCK caret says "the buttons drive me now" without a word of text, and
+    // it lands exactly where the eye already is. The status band carries the
+    // sentence; this carries the state.
+    if (caretMode) {
+      renderer.fillRect(cx, y, 3, lineHeight - 2, true);
+    } else {
+      renderer.drawLine(cx, y, cx, y + lineHeight - 2, true);
+    }
   }
 }
 
@@ -658,7 +794,30 @@ void NoteEditorActivity::render(RenderLock&&) {
     renderer.drawText(SMALL_FONT_ID, nextCellRight - fullW, statusY, "FULL");
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
+  // Caret mode borrows the LEFT of the same band for the only line of prose on
+  // this screen, rather than adding a sixth band. The string is the full-screen
+  // keyboard's own cursor-mode hint, reused verbatim -- same gesture, same
+  // words, already translated.
+  //
+  // It shares the band with the grid rather than replacing it: the two occupy
+  // opposite ends, and the count is still worth reading while the caret is
+  // being driven. A translation long enough to reach the grid's leftmost
+  // occupied cell is dropped rather than overprinted -- the count is the
+  // load-bearing half.
+  if (caretMode) {
+    const char* hint = tr(STR_KB_HINT_MOVE_CURSOR);
+    const int hintW = renderer.getTextAdvanceX(SMALL_FONT_ID, hint, EpdFontFamily::REGULAR);
+    if (metrics.contentSidePadding + hintW < nextCellRight - cellGap) {
+      renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, statusY, hint);
+    }
+  }
+
+  // In caret mode Confirm ends the mode rather than typing, so it is labelled
+  // for what it does. Back returns to typing, which is a parent state, so it
+  // keeps STR_BACK per docs/ui-conventions.md.
+  const auto labels = caretMode
+                          ? mappedInput.mapLabels(tr(STR_BACK), tr(STR_DONE), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT))
+                          : mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

@@ -58,6 +58,19 @@ class NoteEditorActivity final : public Activity {
   bool pickFired = false;
   bool sideHandled = false;
 
+  // Caret mode: hold Confirm on the SPACE key and the four direction buttons
+  // stop driving the key grid and drive the text cursor instead. Without it the
+  // on-screen keyboard has NO way to move the caret at all -- cursorLeft() and
+  // friends were reachable only from a paired BLE keyboard's arrow keys
+  // (handleKey, hidkeymap::KEY_LEFT), so an owner with no keyboard could only
+  // reposition by deleting back to the spot. Same shape as the full-screen
+  // KeyboardEntryActivity's `cursorMode`, which has had this since long before.
+  enum class CaretDir : uint8_t { Left, Right, Up, Down };
+  bool caretMode = false;
+  bool caretDirty = false;  // a step happened; the repaint is still debounced
+  uint32_t caretRepeatAt = 0;
+  uint32_t caretLastMs = 0;
+
   bool dirty = false;
   bool bufferFull = false;
   // The file was too big to load, so the buffer holds nothing that came from
@@ -78,6 +91,10 @@ class NoteEditorActivity final : public Activity {
   // slot is the daisy pick (0=top,1=middle,2=bottom); ignored by the grids.
   void handlePanelKey(int slot = 1, bool longPress = false);
   bool repeatCol(MappedInputManager::Button button, int delta);
+  // Caret mode owns the whole tick while it is active; see CaretDir above.
+  void loopCaretMode();
+  bool repeatCaret(MappedInputManager::Button button, CaretDir dir);
+  void moveCaret(CaretDir dir);
   void pollPairingGestures();
   void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
   bool save();
