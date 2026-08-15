@@ -305,29 +305,37 @@ recipe for every family in `src/FontDisplayNames.h`, so
 `Skipping (no buildable source in sd-fonts.yaml): ...`. If it does, a recipe
 regressed or a local source is missing.
 
-**S tier — the only INSTALLED families (fork ruling, 2026-08-02; sans added
-2026-08-03, resolved to two 2026-08-04): Edgar, Coelacanth, Rosarivo,
-TeXGyreSchola, LibreFranklin, QuattrocentoSans.** Buildable is not installed:
-everything else stays a recipe only. Every surface carries exactly these six —
-device SD cards, `fs_/fonts/`, and the iOS seed bundle
-(`crosspoint-simulator/ios/seedfonts/`), each with its `2x/` hi-res companions.
+**S tier — the only INSTALLED families. The authoritative list is
+`installed_families:` in `lib/EpdFont/scripts/sd-fonts.yaml`; the ruling
+history lives in [docs/sd-card-fonts.md](docs/sd-card-fonts.md).** As of
+2026-08-13 that list is six: Edgar, Coelacanth, InknutJunicode, TeXGyreSchola,
+LibreFranklin, LibrisADF (Rosarivo and QuattrocentoSans were cut to A tier on
+2026-08-07; LibrisADF joined 08-12, InknutJunicode 08-13 — this paragraph
+previously named the retired 08-04 six and went stale for a week, hence the
+pointer-first rewrite). Buildable is not installed: everything else stays a
+recipe only. Every surface carries exactly the installed set — device SD
+cards, `fs_/fonts/`, and the iOS seed bundle
+(`crosspoint-simulator/ios/seedfonts/`), each with its hi-res companions.
 An earlier sweep found one 16 KB cluster of `Rosarivo_16.cpfont` on CARD-X3
 overwritten with foreign data, so compare hashes rather than filenames when
 checking a card.
 
-**Card status, 2026-08-06.** OWEN_BNF (X4) carries all six S-tier families,
-hash-verified 48/48 against `fs_/fonts` — Quattrocento Sans added and a broken
-Rosarivo repaired. That break is the cautionary one: `.fonts/Rosarivo/` held the
-**2x** cuts in the 1x slots with no `2x/` directory at all, so the X4 had been
-rendering Rosarivo from double-resolution glyph tables since December. The
-filenames and the directory listing looked perfect; only hashing found it.
-Freight Sans (never on a card) was cut to C tier on 2026-08-04.
+**Card status.** BUNNYFIELDS reprovisioned + hash-verified with all six on
+2026-08-15. OWEN_BNF (X4) still carries the pre-08-07 set — last hash-verified
+48/48 on 2026-08-06, before three rulings changed the set — and needs
+reprovisioning. The cautionary tale from OWEN_BNF's 2026-08-06 verification:
+`.fonts/Rosarivo/` held the **2x** cuts in the 1x slots with no `2x/` directory
+at all, so the X4 had been rendering Rosarivo from double-resolution glyph
+tables since December. The filenames and the directory listing looked perfect;
+only hashing found it.
 
-**CARD-X3 is NOT verified, and the card looks unhealthy.** It dropped
-off the bus twice during sustained reads on 2026-08-06, mid-verification both
-times, after smaller writes to it had completed and hash-verified. Treat a
-volume that disappears during a read as a hardware question, not a font
-question — re-seat, re-verify by hash, and consider retiring it.
+**The 2026-08-06 "CARD-X3 looks unhealthy" note was wrong, or the fault
+cleared.** The card (BUNNYFIELDS) dropped off the bus twice during sustained
+reads that day, but a 2026-08-15 re-test read the entire volume (471.8 MB,
+~8.5 MB/s) with zero I/O errors and it stayed mounted through a full
+reprovision. Keep the general rule — a volume that disappears during a read is
+a hardware question, not a font question; re-seat and re-verify by hash — but
+do not retire this card on the strength of the old note.
 
 **Freight Sans was cut to C tier on 2026-08-04**, the same ruling that promoted
 Quattrocento Sans to S. Both are humanist sans filling one cell of the taxonomy,

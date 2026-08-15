@@ -3,21 +3,32 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12)
+## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12; InknutJunicode added 2026-08-13)
 
-The installed set on this fork is exactly five families — **Edgar, Coelacanth,
-TeXGyreSchola, LibreFranklin, LibrisADF** — on every surface: both device SD
-cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed set
-(`crosspoint-simulator/ios/seedfonts/`). The other curated families remain
-fully buildable recipes in `sd-fonts.yaml` (picker labels stay in
+The installed set on this fork is exactly six families — **Edgar, Coelacanth,
+InknutJunicode, TeXGyreSchola, LibreFranklin, LibrisADF** — on every surface:
+device SD cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed
+set (`crosspoint-simulator/ios/seedfonts/`). The authoritative list is
+`installed_families:` in `lib/EpdFont/scripts/sd-fonts.yaml` — when this prose
+and that list disagree, the yaml wins. The other curated families remain fully
+buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these five and nothing else.
+surface or reprovisioning a card, install these six and nothing else.
 
-**Physical device SD cards (OWEN_BNF, CARD-X3) are not part of this ruling's
-execution** — no hardware was attached to this session. Reprovision them by
-hand before relying on LibrisADF being present on a physical card.
+**InknutJunicode joined 2026-08-13** (owner ruling: "add inknutjunicode fully
+to builds", `6c5fefe0a`), after fourteen bench rounds settled its borrowed
+italic — Junicode Expanded SemiBold at ENLA 14, x1.25, word space −0.09 em; the
+first installed family whose roman and italic come from different typefaces.
+Details in the `installed_families:` comment block in `sd-fonts.yaml`.
 
-Two of the five are sans, as of a 2026-08-12 owner ruling: **Libre Franklin**,
+**Physical device SD cards are re-verified per provisioning, not per ruling.**
+BUNNYFIELDS was reprovisioned and hash-verified with all six on 2026-08-15;
+OWEN_BNF still carries the pre-08-07 set (last verified 2026-08-06) until
+reprovisioned. Cards provisioned before a ruling carry the older set —
+compare against `fs_/fonts` by hash, and reprovision by hand before relying on
+a newer family being present.
+
+Two of the six are sans, as of a 2026-08-12 owner ruling: **Libre Franklin**,
 the text grotesque, from `lib/EpdFont/scripts/grotesque-candidates.yaml`, and
 **Libris** (`LibrisADF`), a calligraphic humanist sans reclassified out of the
 Serif section it was originally promoted into — see below. Both stay installed
