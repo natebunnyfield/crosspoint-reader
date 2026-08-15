@@ -782,6 +782,7 @@ const char* resolveVisualText(const char* text, std::string& visualBuffer, const
 
 void GfxRenderer::drawLine(int x1, int y1, int x2, int y2, const bool state) const {
   if (fontCacheManager_ && fontCacheManager_->isScanning()) return;
+  if (_textOnly) return;
   if (x1 == x2) {
     if (y2 < y1) {
       std::swap(y1, y2);
@@ -842,6 +843,7 @@ void GfxRenderer::drawLine(int x1, int y1, int x2, int y2, const bool state) con
 // every chevron, tick and X mark in the UI to fix nothing anyone reported.
 // Every horizontal caller is likewise untouched, by the same equality.
 void GfxRenderer::drawLine(int x1, int y1, int x2, int y2, const int lineWidth, const bool state) const {
+  if (_textOnly) return;
   const int dx = std::abs(x2 - x1);
   const int dy = std::abs(y2 - y1);
   if (dy > dx) {
@@ -865,6 +867,7 @@ void GfxRenderer::drawRect(const int x, const int y, const int width, const int 
 // Border is inside the rectangle
 void GfxRenderer::drawRect(const int x, const int y, const int width, const int height, const int lineWidth,
                            const bool state) const {
+  if (_textOnly) return;
   // -1 because width/height are extents, not the last coordinate: the far edge
   // of an (x, width) rect is x + width - 1. The 5-argument overload above has
   // always done this; this one did not, so every border landed one pixel right
@@ -883,6 +886,7 @@ void GfxRenderer::drawRect(const int x, const int y, const int width, const int 
 
 void GfxRenderer::drawArc(const int maxRadius, const int cx, const int cy, const int xDir, const int yDir,
                           const int lineWidth, const bool state) const {
+  if (_textOnly) return;
   const int stroke = std::min(lineWidth, maxRadius);
   const int innerRadius = std::max(maxRadius - stroke, 0);
   const int outerRadius = maxRadius;
@@ -933,6 +937,7 @@ void GfxRenderer::drawRoundedRect(const int x, const int y, const int width, con
 void GfxRenderer::drawRoundedRect(const int x, const int y, const int width, const int height, const int lineWidth,
                                   const int cornerRadius, bool roundTopLeft, bool roundTopRight, bool roundBottomLeft,
                                   bool roundBottomRight, bool state) const {
+  if (_textOnly) return;
   if (lineWidth <= 0 || width <= 0 || height <= 0) {
     return;
   }
@@ -982,6 +987,7 @@ void GfxRenderer::drawRoundedRect(const int x, const int y, const int width, con
 }
 
 void GfxRenderer::fillRect(const int x, const int y, const int width, const int height, const bool state) const {
+  if (_textOnly) return;
   if (state) {
     fillRectImpl<Color::Black>(x, y, width, height);
   } else {
@@ -1017,6 +1023,7 @@ void GfxRenderer::drawPixelDither<Color::DarkGray>(const int x, const int y) con
 }
 
 void GfxRenderer::fillRectDither(const int x, const int y, const int width, const int height, Color color) const {
+  if (_textOnly) return;
   switch (color) {
     case Color::Clear:
       break;
@@ -1308,6 +1315,7 @@ void GfxRenderer::fillRoundedRect(const int x, const int y, const int width, con
 void GfxRenderer::fillRoundedRect(const int x, const int y, const int width, const int height, const int cornerRadius,
                                   bool roundTopLeft, bool roundTopRight, bool roundBottomLeft, bool roundBottomRight,
                                   const Color color) const {
+  if (_textOnly) return;
   if (width <= 0 || height <= 0) {
     return;
   }
@@ -1374,6 +1382,7 @@ void GfxRenderer::fillRoundedRect(const int x, const int y, const int width, con
 }
 
 void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, const int width, const int height) const {
+  if (_textOnly) return;
 #if CROSSPOINT_RENDER_SCALE > 1
   // The SDK blit copies bytes 1:1 into the framebuffer, so it cannot express a
   // supersampled panel — and its bitmaps are stored pre-rotated, so re-plotting
@@ -1452,6 +1461,7 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, co
 }
 
 void GfxRenderer::drawIcon(const uint8_t bitmap[], const int x, const int y, const int size) const {
+  if (_textOnly) return;
   // Plot the icon pixel-by-pixel through drawPixel (which applies the orientation
   // transform) instead of the byte-aligned framebuffer blit. The blit snaps the
   // icon's position to 8px (one byte) along the rotated axis, which prevents it
@@ -1474,6 +1484,7 @@ void GfxRenderer::drawIcon(const uint8_t bitmap[], const int x, const int y, con
 void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, const int maxWidth, const int maxHeight,
                              const float cropX, const float cropY) const {
   if (fontCacheManager_ && fontCacheManager_->isScanning()) return;
+  if (_textOnly) return;
   // For 1-bit bitmaps, use optimized 1-bit rendering path (no crop support for 1-bit)
   if (bitmap.is1Bit() && cropX == 0.0f && cropY == 0.0f) {
     drawBitmap1Bit(bitmap, x, y, maxWidth, maxHeight);
@@ -1589,6 +1600,7 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
 
 void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y, const int maxWidth,
                                  const int maxHeight) const {
+  if (_textOnly) return;
   float scale = 1.0f;
   bool isScaled = false;
   if (maxWidth > 0 && bitmap.getWidth() > maxWidth) {
@@ -1715,6 +1727,7 @@ void GfxRenderer::preserveImagePolarity(const int x, const int y, const int widt
 }
 
 void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state) const {
+  if (_textOnly) return;
   if (numPoints < 3) return;
 
   // Find bounding box
@@ -1831,6 +1844,7 @@ bool GfxRenderer::glyphIntersectsStrip(int x0, int y0, int x1, int y1) const {
 }
 
 void GfxRenderer::invertScreen() const {
+  if (_textOnly) return;
   for (uint32_t i = 0; i < frameBufferSize; i++) {
     frameBuffer[i] = ~frameBuffer[i];
   }
@@ -1877,6 +1891,7 @@ size_t GfxRenderer::readFramebufferRegion(int x, int y, int w, int h, uint8_t* d
 }
 
 void GfxRenderer::writeFramebufferRegion(int x, int y, int w, int h, const uint8_t* src) {
+  if (_textOnly) return;
   if (src == nullptr || w <= 0 || h <= 0) return;
 
   const AlignedMemRect mem = screenRectToAlignedMemRect(orientation, x, y, w, h, panelWidth, panelHeight);

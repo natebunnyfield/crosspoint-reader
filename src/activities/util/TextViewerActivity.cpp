@@ -6,6 +6,7 @@
 #include <Memory.h>
 
 #include "Epub/converters/ImageDecoderFactory.h"
+#include "TextAntiAliasing.h"
 #include "activities/RenderLock.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -368,9 +369,10 @@ void TextViewerActivity::renderImage() {
   }
 }
 
-void TextViewerActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
+// Everything the viewer puts on the panel, minus the clear and the refresh.
+// Split out so the grayscale overlay re-runs the identical body (see render())
+// instead of a text-only copy of it that would drift.
+void TextViewerActivity::drawFrame() {
   const auto pageWidth = renderer.getScreenWidth();
   const auto& metrics = UITheme::getInstance().getMetrics();
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, displayTitle.c_str());
@@ -395,6 +397,20 @@ void TextViewerActivity::render(RenderLock&&) {
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), toggleLabel, (imageMode() || atStart) ? "" : tr(STR_DIR_UP),
                                             (imageMode() || atEnd) ? "" : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+}
 
+void TextViewerActivity::render(RenderLock&&) {
+  renderer.clearScreen();
+  drawFrame();
   renderer.displayBuffer();
+
+  // Text pages only. TextOnlyScope would stop an image reaching the plane, but
+  // it would not stop renderImage() re-opening the file and re-decoding it once
+  // per band -- the expensive half -- and an image page has no glyph coverage
+  // to lift anyway.
+  if (imageMode()) return;
+  TextAa::overlayChromeIfEnabled(renderer, [this] {
+    const GfxRenderer::TextOnlyScope textOnly(renderer);
+    drawFrame();
+  });
 }

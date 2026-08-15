@@ -61,6 +61,9 @@ class TextViewerActivity final : public Activity {
   void resetPagination();
   void renderImage();
   void drawScrollBar() const;
+  // The page's drawing, without the clear or the refresh, so render() and the
+  // grayscale anti-aliasing pass share one body.
+  void drawFrame();
 
  public:
   explicit TextViewerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string path,
