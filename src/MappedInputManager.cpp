@@ -87,13 +87,31 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
           return false;
       }
     case Button::NavNext:
-      // Logical "next item" navigation: side Down + front Right.
-      return isNavDirectionSwapped() ? (mapButton(Button::Up, fn) || mapButton(Button::Left, fn))
-                                     : (mapButton(Button::Down, fn) || mapButton(Button::Right, fn));
+      // Logical "next item" navigation: the FRONT pair only.
+      //
+      // This used to be "side Down OR front Right", which made the two pairs
+      // literally the same action on every list screen in the firmware — the
+      // owner's 2026-08-14 ask ("make side buttons be page up and page down,
+      // when they are identical functionality to front buttons, like on the
+      // home screen"). Narrowing it here rather than per-screen is what keeps
+      // every list consistent; see docs/ui-conventions.md.
+      return isNavDirectionSwapped() ? mapButton(Button::Left, fn) : mapButton(Button::Right, fn);
     case Button::NavPrevious:
-      // Logical "previous item" navigation: side Up + front Left.
-      return isNavDirectionSwapped() ? (mapButton(Button::Down, fn) || mapButton(Button::Right, fn))
-                                     : (mapButton(Button::Up, fn) || mapButton(Button::Left, fn));
+      // Logical "previous item" navigation: the FRONT pair only.
+      return isNavDirectionSwapped() ? mapButton(Button::Right, fn) : mapButton(Button::Left, fn);
+    case Button::PageNext:
+      // Logical "next screenful": the SIDE pair, honoring the user's side-button
+      // swap so paging a list runs the same way round as paging the book.
+      //
+      // SIDE_BUTTONS_DISABLED deliberately falls through to the natural order
+      // rather than going inert, for the reason ReaderUtils.h:112-125 records
+      // about the reader's side font controls: that setting exists to stop the
+      // side buttons turning BOOK pages, and honoring it here would leave every
+      // list with no page control at all — a silent loss for anyone who set it.
+      return (gpio.*fn)(sideLayout == CrossPointSettings::NEXT_PREV ? HalGPIO::BTN_UP : HalGPIO::BTN_DOWN);
+    case Button::PagePrevious:
+      // Logical "previous screenful": the SIDE pair. See PageNext.
+      return (gpio.*fn)(sideLayout == CrossPointSettings::NEXT_PREV ? HalGPIO::BTN_DOWN : HalGPIO::BTN_UP);
     case Button::ScreenLeft:
     case Button::ScreenRight:
     case Button::ScreenUp:

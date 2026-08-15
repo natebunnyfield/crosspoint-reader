@@ -18,6 +18,8 @@ class MappedInputManager {
     PageForward,
     NavNext,
     NavPrevious,
+    PageNext,
+    PagePrevious,
     ScreenLeft,
     ScreenRight,
     ScreenUp,

@@ -101,6 +101,20 @@ void EpubReaderChapterSelectionActivity::loop() {
     selectorIndex = ButtonNavigator::previousPageIndex(selectorIndex, totalItems, pageItems);
     requestUpdate();
   });
+
+  // The SIDE pair pages by a whole screenful; the FRONT pair above steps one
+  // row. They used to be the same action (docs/ui-conventions.md, "Side buttons
+  // should page, not repeat the front buttons"). pageDown/pageUp clamp at the
+  // ends and return false when nothing moved, so a short list costs no redraw.
+  buttonNavigator.onPageNext([this, totalItems, pageItems] {
+    if (!ButtonNavigator::pageDown(selectorIndex, totalItems, pageItems)) return;
+    requestUpdate();
+  });
+
+  buttonNavigator.onPagePrevious([this, totalItems, pageItems] {
+    if (!ButtonNavigator::pageUp(selectorIndex, totalItems, pageItems)) return;
+    requestUpdate();
+  });
 }
 
 void EpubReaderChapterSelectionActivity::render(RenderLock&&) {

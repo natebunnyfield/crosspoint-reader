@@ -721,6 +721,26 @@ void WifiSelectionActivity::loop() {
         requestUpdate();
         return;
       }
+
+      // The SIDE pair pages by a whole screenful; the FRONT pair below steps one
+      // row. They used to be the same action (docs/ui-conventions.md, "Side
+      // buttons should page, not repeat the front buttons"). pageDown/pageUp
+      // clamp at the ends and return false when nothing moved, so a scan that
+      // found only a handful of networks costs no redraw.
+      const int networkCount = static_cast<int>(networks.size());
+      buttonNavigator.onPageNext([this, networkCount, pageItems] {
+        int index = static_cast<int>(selectedNetworkIndex);
+        if (!ButtonNavigator::pageDown(index, networkCount, pageItems)) return;
+        selectedNetworkIndex = static_cast<size_t>(index);
+        requestUpdate();
+      });
+
+      buttonNavigator.onPagePrevious([this, networkCount, pageItems] {
+        int index = static_cast<int>(selectedNetworkIndex);
+        if (!ButtonNavigator::pageUp(index, networkCount, pageItems)) return;
+        selectedNetworkIndex = static_cast<size_t>(index);
+        requestUpdate();
+      });
     }
 
     // Handle navigation

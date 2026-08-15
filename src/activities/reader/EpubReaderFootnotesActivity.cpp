@@ -67,6 +67,20 @@ void EpubReaderFootnotesActivity::loop() {
       requestUpdate();
       return;
     }
+
+    // The SIDE pair pages by a whole screenful; the FRONT pair below steps one
+    // row. They used to be the same action (docs/ui-conventions.md, "Side
+    // buttons should page, not repeat the front buttons"). This is the same
+    // clamped arithmetic the swipes above already used, now shared.
+    buttonNavigator.onPageNext([this, totalItems, pageItems] {
+      if (!ButtonNavigator::pageDown(selectedIndex, totalItems, pageItems)) return;
+      requestUpdate();
+    });
+
+    buttonNavigator.onPagePrevious([this, totalItems, pageItems] {
+      if (!ButtonNavigator::pageUp(selectedIndex, totalItems, pageItems)) return;
+      requestUpdate();
+    });
   }
 
   buttonNavigator.onNext([this] {

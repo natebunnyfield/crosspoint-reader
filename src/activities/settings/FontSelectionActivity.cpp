@@ -231,10 +231,13 @@ void FontSelectionActivity::loop() {
   const int pageItems =
       UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, previewHeight + metrics_.verticalSpacing, 1);
 
-  // List navigation is bound to the FRONT buttons only. ButtonNavigator's
-  // NavNext/NavPrevious resolve to "side Down OR front Right" and "side Up OR
-  // front Left" (MappedInputManager.cpp), so using them here would make the
-  // side buttons both change size and move the selection.
+  // List navigation is bound to the FRONT buttons only. NavNext/NavPrevious are
+  // the front pair now (2026-08-15, MappedInputManager.cpp) so getNextButtons()
+  // would work, but spell it out: this screen must NOT pick up the side pair's
+  // page handlers either, because the side buttons here step the reader font
+  // size. This is one of the two screens the "side buttons page" ruling
+  // deliberately exempts — see the size handler above and
+  // docs/ui-conventions.md.
   // ButtonNavigator::Buttons is a private alias, so spell out the vector type.
   static const std::vector<MappedInputManager::Button> kNextButtons = {MappedInputManager::Button::Right};
   static const std::vector<MappedInputManager::Button> kPreviousButtons = {MappedInputManager::Button::Left};

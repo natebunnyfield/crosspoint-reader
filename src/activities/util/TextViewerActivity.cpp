@@ -293,6 +293,14 @@ void TextViewerActivity::loop() {
   buttonNavigator.onPreviousRelease([this] { pageBack(); });
   buttonNavigator.onNextContinuous([this] { pageForward(); });
   buttonNavigator.onPreviousContinuous([this] { pageBack(); });
+
+  // NOT a row list: the only unit here IS a page, so both pairs do the same
+  // thing and that is correct rather than the redundancy the side-button ruling
+  // is about. Wired explicitly because NavNext/NavPrevious narrowed to the
+  // front pair (MappedInputManager.cpp) — without this the side buttons would
+  // silently stop turning pages on this screen.
+  buttonNavigator.onPageNext([this] { pageForward(); });
+  buttonNavigator.onPagePrevious([this] { pageBack(); });
 }
 
 // Persistent right-edge scrollbar: thumb position = page start / source size,

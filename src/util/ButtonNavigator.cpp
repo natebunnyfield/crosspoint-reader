@@ -1,5 +1,7 @@
 #include "ButtonNavigator.h"
 
+#include <algorithm>
+
 const MappedInputManager* ButtonNavigator::mappedInput = nullptr;
 
 void ButtonNavigator::onNext(const Callback& callback) {
@@ -55,7 +57,8 @@ void ButtonNavigator::onRelease(const Buttons& buttons, const Callback& callback
 
 void ButtonNavigator::onContinuous(const Buttons& buttons, const Callback& callback) {
   const bool isPressed = std::any_of(buttons.begin(), buttons.end(), [this](const MappedInputManager::Button button) {
-    return mappedInput != nullptr && mappedInput->isPressed(button) && shouldNavigateContinuously();
+    return mappedInput != nullptr && mappedInput->isPressed(button) &&
+           shouldNavigateContinuously(lastContinuousNavTime);
   });
 
   if (isPressed) {
@@ -64,11 +67,33 @@ void ButtonNavigator::onContinuous(const Buttons& buttons, const Callback& callb
   }
 }
 
-bool ButtonNavigator::shouldNavigateContinuously() const {
+void ButtonNavigator::onPageNext(const Callback& callback) {
+  onPress(getPageNextButtons(), callback);
+  onPageContinuous(getPageNextButtons(), callback);
+}
+
+void ButtonNavigator::onPagePrevious(const Callback& callback) {
+  onPress(getPagePreviousButtons(), callback);
+  onPageContinuous(getPagePreviousButtons(), callback);
+}
+
+void ButtonNavigator::onPageContinuous(const Buttons& buttons, const Callback& callback) {
+  const bool isPressed = std::any_of(buttons.begin(), buttons.end(), [this](const MappedInputManager::Button button) {
+    return mappedInput != nullptr && mappedInput->isPressed(button) &&
+           shouldNavigateContinuously(lastContinuousPageTime);
+  });
+
+  if (isPressed) {
+    callback();
+    lastContinuousPageTime = millis();
+  }
+}
+
+bool ButtonNavigator::shouldNavigateContinuously(const uint32_t lastTime) const {
   if (!mappedInput) return false;
 
   const bool buttonHeldLongEnough = mappedInput->getHeldTime() > continuousStartMs;
-  const bool navigationIntervalElapsed = (millis() - lastContinuousNavTime) > continuousIntervalMs;
+  const bool navigationIntervalElapsed = (millis() - lastTime) > continuousIntervalMs;
 
   return buttonHeldLongEnough && navigationIntervalElapsed;
 }
@@ -121,4 +146,26 @@ int ButtonNavigator::previousPageIndex(const int currentIndex, const int totalIt
   }
 
   return lastPageIndex * itemsPerPage;
+}
+
+bool ButtonNavigator::pageDown(int& index, const int totalItems, const int itemsPerPage) {
+  // Nothing to page: an empty list, a nonsense page size, or a list that fits
+  // one screen (the side buttons are deliberately dead there, they do not fall
+  // back to stepping a row). Returning false before any caller redraw is what
+  // makes a held side button on a short list cost nothing.
+  if (totalItems <= 0 || itemsPerPage <= 0 || totalItems <= itemsPerPage) return false;
+
+  const int next = std::min(totalItems - 1, index + itemsPerPage);
+  if (next == index) return false;  // already on the last row
+  index = next;
+  return true;
+}
+
+bool ButtonNavigator::pageUp(int& index, const int totalItems, const int itemsPerPage) {
+  if (totalItems <= 0 || itemsPerPage <= 0 || totalItems <= itemsPerPage) return false;
+
+  const int previous = std::max(0, index - itemsPerPage);
+  if (previous == index) return false;  // already on the first row
+  index = previous;
+  return true;
 }
