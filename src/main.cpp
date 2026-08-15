@@ -124,6 +124,29 @@ EpdFont iawritermono12BoldItalicFont(&iawritermono_12_bolditalic);
 EpdFontFamily iawritermono12FontFamily(&iawritermono12RegularFont, &iawritermono12BoldFont, &iawritermono12ItalicFont,
                                        &iawritermono12BoldItalicFont);
 
+// PragmataPro is COMMERCIAL, so unlike every other family above its glyph
+// tables are NOT in this repo: builtinFonts/pragmatapro_*.h are gitignored and
+// regenerated locally by convert-builtin-fonts.sh from lib/EpdFont/local_fonts/.
+// __has_include is what lets both trees compile from one source — a clone
+// without the licensed TTFs simply does not register the row, and
+// editorfonts::resolve() already refuses to return an id the renderer has no
+// glyphs for, so it degrades to a built-in mono exactly like a card-only row.
+// Deliberately NOT added to builtinFonts/all.h: that header is committed and
+// unconditional, so a missing include there would break the build for everyone.
+#if __has_include(<builtinFonts/pragmatapro_12_regular.h>)
+#define CROSSPOINT_HAS_PRAGMATAPRO 1
+#include <builtinFonts/pragmatapro_12_bold.h>
+#include <builtinFonts/pragmatapro_12_bolditalic.h>
+#include <builtinFonts/pragmatapro_12_italic.h>
+#include <builtinFonts/pragmatapro_12_regular.h>
+EpdFont pragmatapro12RegularFont(&pragmatapro_12_regular);
+EpdFont pragmatapro12BoldFont(&pragmatapro_12_bold);
+EpdFont pragmatapro12ItalicFont(&pragmatapro_12_italic);
+EpdFont pragmatapro12BoldItalicFont(&pragmatapro_12_bolditalic);
+EpdFontFamily pragmatapro12FontFamily(&pragmatapro12RegularFont, &pragmatapro12BoldFont, &pragmatapro12ItalicFont,
+                                      &pragmatapro12BoldItalicFont);
+#endif
+
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
 // 2x companions for all five editor fonts. Named for the 1x face each stands
 // in for (same convention as the system UI 2x matrix). drawText() checks
@@ -133,8 +156,8 @@ EpdFont spacemono12Regular2xFont(&spacemono_12_regular_2x);
 EpdFont spacemono12Bold2xFont(&spacemono_12_bold_2x);
 EpdFont spacemono12Italic2xFont(&spacemono_12_italic_2x);
 EpdFont spacemono12BoldItalic2xFont(&spacemono_12_bolditalic_2x);
-EpdFontFamily spacemono12HiResFontFamily(&spacemono12Regular2xFont, &spacemono12Bold2xFont,
-                                         &spacemono12Italic2xFont, &spacemono12BoldItalic2xFont);
+EpdFontFamily spacemono12HiResFontFamily(&spacemono12Regular2xFont, &spacemono12Bold2xFont, &spacemono12Italic2xFont,
+                                         &spacemono12BoldItalic2xFont);
 EpdFont ibmplexmono12Regular2xFont(&ibmplexmono_12_regular_2x);
 EpdFont ibmplexmono12Bold2xFont(&ibmplexmono_12_bold_2x);
 EpdFont ibmplexmono12Italic2xFont(&ibmplexmono_12_italic_2x);
@@ -159,6 +182,22 @@ EpdFont iawritermono12Italic2xFont(&iawritermono_12_italic_2x);
 EpdFont iawritermono12BoldItalic2xFont(&iawritermono_12_bolditalic_2x);
 EpdFontFamily iawritermono12HiResFontFamily(&iawritermono12Regular2xFont, &iawritermono12Bold2xFont,
                                             &iawritermono12Italic2xFont, &iawritermono12BoldItalic2xFont);
+#ifdef CROSSPOINT_HAS_PRAGMATAPRO
+// Same __has_include gate as the 1x cuts above, restated through the macro so
+// the two blocks cannot drift. Without this the editor would blit pixel-doubled
+// 1x PragmataPro next to crisp 2x chrome on a RENDER_SCALE=2 build — the
+// mixed-resolution bug drawTextRotated90CW shipped on 2026-08-04.
+#include <builtinFonts/pragmatapro_12_bold_2x.h>
+#include <builtinFonts/pragmatapro_12_bolditalic_2x.h>
+#include <builtinFonts/pragmatapro_12_italic_2x.h>
+#include <builtinFonts/pragmatapro_12_regular_2x.h>
+EpdFont pragmatapro12Regular2xFont(&pragmatapro_12_regular_2x);
+EpdFont pragmatapro12Bold2xFont(&pragmatapro_12_bold_2x);
+EpdFont pragmatapro12Italic2xFont(&pragmatapro_12_italic_2x);
+EpdFont pragmatapro12BoldItalic2xFont(&pragmatapro_12_bolditalic_2x);
+EpdFontFamily pragmatapro12HiResFontFamily(&pragmatapro12Regular2xFont, &pragmatapro12Bold2xFont,
+                                           &pragmatapro12Italic2xFont, &pragmatapro12BoldItalic2xFont);
+#endif
 #endif
 
 #ifndef OMIT_FONTS
@@ -377,6 +416,12 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12FontFamily);
   renderer.insertFont(IAWRITERDUO_12_FONT_ID, iawriterduo12FontFamily);
   renderer.insertFont(IAWRITERMONO_12_FONT_ID, iawritermono12FontFamily);
+#ifdef CROSSPOINT_HAS_PRAGMATAPRO
+  // Only when the local commercial cuts were built. When they were not, this
+  // insert is absent, getFontMap().count() is 0, and the picker marks the row
+  // unreachable rather than offering a face that would draw nothing.
+  renderer.insertFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12FontFamily);
+#endif
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
   // Hi-res companions for all five editor fonts. drawText() checks
   // getHiResFamily() for any font id, so without these the editor activities
@@ -386,6 +431,9 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12HiResFontFamily);
   renderer.registerHiResBuiltinFont(IAWRITERDUO_12_FONT_ID, iawriterduo12HiResFontFamily);
   renderer.registerHiResBuiltinFont(IAWRITERMONO_12_FONT_ID, iawritermono12HiResFontFamily);
+#ifdef CROSSPOINT_HAS_PRAGMATAPRO
+  renderer.registerHiResBuiltinFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12HiResFontFamily);
+#endif
 #endif
 #ifndef OMIT_FONTS
   renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, librefranklinReader12FontFamily);

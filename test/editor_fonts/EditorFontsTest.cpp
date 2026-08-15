@@ -49,7 +49,7 @@ using namespace editorfonts;
 // isRegistered is what the renderer would answer. Nothing here needs a
 // GfxRenderer, which is why the suite can keep its no-renderer rule.
 
-constexpr int kUiFallback = 4242;   // stands in for UI_10_FONT_ID
+constexpr int kUiFallback = 4242;  // stands in for UI_10_FONT_ID
 constexpr int kSdId = 777;
 
 auto noneRegistered = [](int) { return false; };
@@ -92,8 +92,11 @@ TEST(EditorFonts, BuiltinWinsOverTheCardWhenPresent) {
   EXPECT_EQ(resolve(3, allRegistered, sdHasIt, kUiFallback), builtinFontIdFor(3));
 }
 
-// All five faces are built in (monos: ruling 2026-08-06; iA faces: ruling
-// 2026-08-11). Without this the setting is inert for that row.
+// The five OFL faces are built in (monos: ruling 2026-08-06; iA faces: ruling
+// 2026-08-11). Without this the setting is inert for that row. PragmataPro is
+// the sixth and is checked separately below: it is compiled in too, but its
+// glyph tables are gitignored, so it is the one row whose presence legitimately
+// varies by checkout and it cannot be asserted the same way.
 TEST(EditorFonts, AllFacesAreCompiledIn) {
   bool sawQuattro = false, sawDuo = false, sawMono = false;
   bool sawSpaceMono = false, sawPlex = false;
@@ -169,13 +172,62 @@ TEST(EditorFonts, BuiltinIdsAreDistinct) {
 // settings.json at a different family; appending is the only safe edit.
 // This test is the tripwire for that, so it hardcodes the shipped order.
 TEST(EditorFonts, RowOrderIsFrozen) {
-  ASSERT_EQ(FAMILY_COUNT, 5u) << "a row was added or removed: rows may only be APPENDED, and if you "
+  ASSERT_EQ(FAMILY_COUNT, 6u) << "a row was added or removed: rows may only be APPENDED, and if you "
                                  "appended one, extend this test rather than changing the earlier entries";
   EXPECT_STREQ(FAMILIES[0].family, "iAWriterQuattro");
   EXPECT_STREQ(FAMILIES[1].family, "iAWriterDuo");
   EXPECT_STREQ(FAMILIES[2].family, "iAWriterMono");
   EXPECT_STREQ(FAMILIES[3].family, "SpaceMono");
   EXPECT_STREQ(FAMILIES[4].family, "IBMPlexMono");
+  // Appended 2026-08-14. Every earlier index above is untouched, which is the
+  // whole contract: SETTINGS.editorFont on a device that already chose IBM Plex
+  // Mono must still mean IBM Plex Mono.
+  EXPECT_STREQ(FAMILIES[5].family, "PragmataPro");
+}
+
+// PragmataPro is COMMERCIAL, and it is the only row whose glyph tables are not
+// in this repo (builtinFonts/pragmatapro_*.h are gitignored). So it must carry a
+// built-in id like the others -- the row is a built-in, not a card family, and
+// nothing should ever go looking for /fonts/PragmataPro -- while a clone without
+// the licensed TTFs still has to compile and behave.
+//
+// That second half is what this pins: the row's correctness must not depend on
+// the font being present, because for most checkouts it is absent. resolve()
+// already has the machinery (isRegistered), so the test is that PragmataPro
+// routes through it rather than around it.
+TEST(EditorFonts, PragmataProIsABuiltinRowThatDegradesWhenTheFontIsAbsent) {
+  const uint8_t pp = 5;
+  ASSERT_STREQ(FAMILIES[pp].family, "PragmataPro");
+  EXPECT_NE(FAMILIES[pp].builtinFontId, 0) << "PragmataPro is compiled in, not a card family";
+
+  // Present in this build: the row resolves to its own face.
+  EXPECT_EQ(resolve(pp, allRegistered, noSdCard, kUiFallback), builtinFontIdFor(pp));
+
+  // Absent from this build -- the ordinary case for a clone without the
+  // commercial TTFs. It must NOT hand back an id with no glyphs behind it.
+  const int degraded = resolve(pp, noneRegistered, noSdCard, kUiFallback);
+  EXPECT_NE(degraded, builtinFontIdFor(pp)) << "returned a font id the renderer has no glyphs for";
+
+  // And when the OTHER editor faces are present (the real shape of a clone
+  // without PragmataPro: five OFL monos compiled in, one missing), it degrades
+  // to a sibling WRITING face, never to UI chrome.
+  const auto allButPragmata = [&](int id) { return id != FAMILIES[pp].builtinFontId; };
+  const int sibling = resolve(pp, allButPragmata, noSdCard, kUiFallback);
+  EXPECT_EQ(sibling, fallbackFontId()) << "a missing commercial face must fall back to a built-in mono";
+  EXPECT_NE(sibling, kUiFallback) << "the editor must never drop to UI chrome while a mono is available";
+}
+
+// The reading/writing split still holds for the new row. PragmataPro's Bold,
+// Italic and BoldItalic cover only ASCII + Latin-1 (234 of the converter's 1665
+// codepoints, against 950 in the Regular), so an emphasised word outside
+// Latin-1 renders '?'. That is tolerable for notes the owner types; it is not
+// tolerable against arbitrary book text, which is why this row must stay
+// writing-only.
+TEST(EditorFonts, PragmataProIsWritingOnly) {
+  EXPECT_TRUE(isEditorFamily("PragmataPro"));
+  EXPECT_TRUE(isEditorFamily("pragmatapro")) << "matched case-insensitively like the other rows";
+  EXPECT_TRUE(isWritingOnlyFamily("PragmataPro"));
+  EXPECT_FALSE(FAMILIES[5].alsoReading) << "promoting this row would expose its Latin-1-only bold to book text";
 }
 
 // Every row needs a label the picker can draw and a family name the SD
@@ -264,9 +316,8 @@ TEST(EditorFonts, TheInBookFontCycleAppliesTheWritingOnlyFilter) {
     if (depth <= 0 && code.find('}') != std::string::npos) break;
   }
   ASSERT_TRUE(inCycle) << "cycleReaderFontFamily not found -- this test has stopped guarding anything";
-  EXPECT_TRUE(sawCall)
-      << "cycleReaderFontFamily does not CALL readingfonts::offeredForReading, so holding a side "
-         "button can select a font Text Settings does not list";
+  EXPECT_TRUE(sawCall) << "cycleReaderFontFamily does not CALL readingfonts::offeredForReading, so holding a side "
+                          "button can select a font Text Settings does not list";
 }
 
 // Retired families are withheld from reading. Rosarivo was A-tier'd on
@@ -294,4 +345,6 @@ TEST(ReadingFontList, WritingOnlyFacesAreNotOfferedForReading) {
   EXPECT_FALSE(readingfonts::offeredForReading("IBMPlexMono"));
   EXPECT_TRUE(readingfonts::offeredForReading("iAWriterQuattro"))
       << "Quattro carries alsoReading (owner ruling 2026-08-09)";
+  EXPECT_FALSE(readingfonts::offeredForReading("PragmataPro"))
+      << "a commercial writing face with a Latin-1-only bold must not reach the reading picker";
 }

@@ -149,6 +149,26 @@ TEST(EditorFontPreview, ACompiledInFaceThisBuildOmittedIsNotAvailable) {
   }
 }
 
+// PragmataPro is a BUILT-IN row whose glyph tables are gitignored (commercial).
+// That combination is new, and it is exactly the shape that could regress into
+// "built-in face reported missing": the family name never appears on a card, so
+// anything that reached for the card to answer "is this available" would mark it
+// unreachable on every device.
+//
+// The rule: a built-in row's availability is decided ONLY by whether the
+// renderer has the glyphs. An empty card must not change the answer for it, and
+// a full card must not rescue it -- the two lookups are separate on purpose.
+TEST(EditorFontPreview, ABuiltinRowIgnoresTheCardEntirely) {
+  const auto registered = [](int) { return true; };
+  for (uint8_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
+    if (editorfonts::FAMILIES[i].builtinFontId == 0) continue;
+    const bool emptyCard = isAvailable(i, registered, [](const char*) { return false; });
+    const bool fullCard = isAvailable(i, registered, [](const char*) { return true; });
+    EXPECT_TRUE(emptyCard) << editorfonts::FAMILIES[i].label << " is compiled in and must never be reported missing";
+    EXPECT_EQ(emptyCard, fullCard) << editorfonts::FAMILIES[i].label << ": the card must not affect a built-in row";
+  }
+}
+
 TEST(EditorFontPreview, OutOfRangeRowIsNotAvailable) {
   const auto yes = [](int) { return true; };
   const auto onCard = [](const char*) { return true; };
@@ -204,4 +224,20 @@ TEST(EditorFontPreview, RowSubtitleDegradesRatherThanShowingPunctuationAlone) {
 
   EXPECT_EQ(editorfonts::rowSubtitle(editorfonts::FAMILY_COUNT, false, kNotOnCard), "");
   EXPECT_EQ(editorfonts::rowSubtitle(200, true, kNotOnCard), "");
+}
+
+// The new row carries a real colophon, so it presents like every other row
+// rather than falling to the bottom of the picker as an undated unknown -- the
+// failure mode a face added to FAMILIES without a FontDisplayNames entry has.
+TEST(EditorFontPreview, ThePragmataProRowPresentsLikeTheOthers) {
+  bool found = false;
+  for (uint8_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
+    if (std::strcmp(editorfonts::FAMILIES[i].family, "PragmataPro") != 0) continue;
+    found = true;
+    const std::string sub = editorfonts::rowSubtitle(i, /*available=*/true, kNotOnCard);
+    EXPECT_FALSE(sub.empty()) << "PragmataPro must carry a colophon";
+    EXPECT_NE(sub.find("\xC2\xB7"), std::string::npos) << "designer and lineage must be separated: " << sub;
+    EXPECT_EQ(sub.find(kNotOnCard), std::string::npos) << "a compiled-in face must not be marked: " << sub;
+  }
+  EXPECT_TRUE(found) << "PragmataPro row is gone from FAMILIES";
 }

@@ -77,8 +77,8 @@ TEST(SettingDisplayOrder, DebounceRoundTripsEveryValue) {
 
 TEST(SettingDisplayOrder, SleepScreenPutsNoneFirstAndKeepsCalendarsTogether) {
   // Labels by CrossPointSettings::SLEEP_SCREEN_MODE value.
-  const std::vector<std::string> labels = {"Dark",         "Light",         "Custom",       "Cover",
-                                           "Cover Custom", "None",          "Quick Resume", "Calendar",
+  const std::vector<std::string> labels = {"Dark",          "Light",         "Custom",       "Cover",
+                                           "Cover Custom",  "None",          "Quick Resume", "Calendar",
                                            "Calendar Four", "Calendar Five", "Calendar Six", "Westside"};
   const std::vector<uint8_t> order = {5, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11};
   const auto shown = settingorder::reorder(order, labels);
@@ -128,7 +128,8 @@ TEST(SettingDisplayOrder, EditorFontSortsLikeTextSettings) {
   // DRAWS. It agrees with FontDisplayNames::displayName today; pin that, since
   // a drift would sort the list by something invisible.
   for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
-    EXPECT_EQ(FontDisplayNames::displayName(editorfonts::FAMILIES[i].family), std::string(editorfonts::FAMILIES[i].label))
+    EXPECT_EQ(FontDisplayNames::displayName(editorfonts::FAMILIES[i].family),
+              std::string(editorfonts::FAMILIES[i].label))
         << "picker label and colophon display name must not drift: " << editorfonts::FAMILIES[i].family;
   }
 
@@ -139,8 +140,11 @@ TEST(SettingDisplayOrder, EditorFontSortsLikeTextSettings) {
   //   'IBM' precedes 'iA'); Space Mono 2016; iA Writer Mono 2009, because it
   //   is Nitti -- iA's own announcement calls it "the classic Nitti, designed
   //   by Bold Monday", long predating the Plex-derived pair.
-  const std::vector<uint8_t> want = {0, 4, 1, 3, 2};
-  EXPECT_EQ(order, want) << "iA Writer Quattro, IBM Plex Mono, iA Writer Duo, Space Mono, iA Writer Mono";
+  //   PragmataPro 2010 sits between Space Mono and iA Writer Mono (Fabrizio
+  //   Schiavi Design, Piacenza -- appended to FAMILIES 2026-08-14 as stored
+  //   index 5, which the sort places fifth rather than last).
+  const std::vector<uint8_t> want = {0, 4, 1, 3, 5, 2};
+  EXPECT_EQ(order, want) << "iA Writer Quattro, IBM Plex Mono, iA Writer Duo, Space Mono, PragmataPro, iA Writer Mono";
 }
 
 TEST(SettingDisplayOrder, EditorFontStoredIndicesDoNotMove) {
