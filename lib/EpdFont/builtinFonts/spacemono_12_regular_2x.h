@@ -2125,4 +2125,7 @@ static const EpdFontData spacemono_12_regular_2x = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

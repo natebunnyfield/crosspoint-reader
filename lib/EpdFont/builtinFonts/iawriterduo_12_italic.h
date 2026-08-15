@@ -2000,4 +2000,7 @@ static const EpdFontData iawriterduo_12_italic = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

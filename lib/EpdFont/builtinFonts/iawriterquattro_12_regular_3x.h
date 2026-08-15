@@ -5026,4 +5026,7 @@ static const EpdFontData iawriterquattro_12_regular_3x = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

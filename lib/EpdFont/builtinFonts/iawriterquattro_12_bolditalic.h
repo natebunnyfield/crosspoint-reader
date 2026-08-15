@@ -2099,4 +2099,7 @@ static const EpdFontData iawriterquattro_12_bolditalic = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

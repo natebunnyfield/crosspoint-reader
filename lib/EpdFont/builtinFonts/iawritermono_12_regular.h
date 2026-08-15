@@ -1755,4 +1755,7 @@ static const EpdFontData iawritermono_12_regular = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

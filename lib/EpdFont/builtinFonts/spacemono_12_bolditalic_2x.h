@@ -2793,4 +2793,7 @@ static const EpdFontData spacemono_12_bolditalic_2x = {
     0,
     spacemono_12_bolditalic_2xLigaturePairs,
     2,
+    nullptr,
+    nullptr,
+    nullptr,
 };

@@ -4057,4 +4057,7 @@ static const EpdFontData librefranklin_10_regular = {
     41,
     librefranklin_10_regularLigaturePairs,
     2,
+    nullptr,
+    nullptr,
+    nullptr,
 };

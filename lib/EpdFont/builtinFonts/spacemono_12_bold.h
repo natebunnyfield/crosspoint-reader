@@ -1289,4 +1289,7 @@ static const EpdFontData spacemono_12_bold = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

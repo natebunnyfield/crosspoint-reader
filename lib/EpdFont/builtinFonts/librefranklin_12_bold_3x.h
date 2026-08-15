@@ -32569,4 +32569,7 @@ static const EpdFontData librefranklin_12_bold_3x = {
     40,
     librefranklin_12_bold_3xLigaturePairs,
     2,
+    nullptr,
+    nullptr,
+    nullptr,
 };

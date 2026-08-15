@@ -2107,4 +2107,7 @@ static const EpdFontData ibmplexmono_12_bolditalic = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

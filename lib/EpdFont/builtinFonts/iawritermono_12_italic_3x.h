@@ -5839,4 +5839,7 @@ static const EpdFontData iawritermono_12_italic_3x = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

@@ -197,53 +197,76 @@ for entry in ${LOCAL_EDITOR_FAMILIES[@]}; do
   done
 done
 
-# --- NittiTypewriter: commercial, Regular-only source, synthetic styles ------
+# --- NittiTypewriter: commercial, three real cuts, no outline synthesis ------
 #
-# NittiTypewriter is COMMERCIAL (Pieter van Rosmalen / Bold Monday). Only the
-# Regular TTF is available; Bold, Italic and BoldItalic are synthesised at
-# build time using fontconvert.py's --synth-* flags (added for this family).
+# NittiTypewriter is COMMERCIAL (Pieter van Rosmalen / Bold Monday). Three cuts
+# are available locally and all four styles are now drawn from a REAL one --
+# nothing is emboldened or sheared any more (owner ruling 2026-08-15, replacing
+# the embolden_em 0.045 / slant_deg 11 synthesis this block used to carry):
 #
-# Parameters (measured 2026-08-15 at 256ppem):
-#   embolden_em=0.045: stem 21px = 0.082em; target 1.55x → +0.55×0.082=0.045em
-#                      verified stem ratios n=1.571x m=1.632x i=1.600x ✓
-#   y_ratio=0.5: typewriter face is monoweight; no hairlines to protect
-#   slant_deg=11: gentle old-style slant, same as Goudy recipe
+#   regular     NittiTypewriter-Regular.ttf, untouched
+#   italic      NittiTypewriter-Underline.ttf, rule joined across the cell
+#   bold        NittiTypewriter-Inverse.ttf -- the knockout cut, a solid cell
+#               with the letterform punched out white. A typewriter had no bold
+#               slug; on a monospace grid a knockout reads as emphasis without
+#               the outline growth that would break the cell.
+#   bolditalic  Underline again, joined, PLUS the double strike -- the same slug
+#               hit twice with the carriage barely advanced, which is what
+#               emphasis actually was on a typewriter.
 #
-# Counter survival at 12pt 2-bit: e=2px, a=5px, s=3px — all ≥1px ✓
-# ('a' has 5 interior 2-bit white pixels despite appearing closed in 8-bit,
-# because antialias midtones survive the 2-bit threshold as white.)
+# --synth-underline-connect: the Underline cut draws its rule inside each
+# glyph's own bbox, so the rule stops short of the advance and the line breaks
+# at every character (measured at 75 ppem: pen-x 3..41 on `a`, 5..39 on `n`,
+# against an advance of 45). The flag replicates one of the rule's own interior
+# columns out to -overlap .. advance+overlap. `left` moves; the advance does not.
 #
-# Skips with a clear message when the source is absent — that means
+# --synth-double-strike-em 0.0533: em-relative, so it is scale-independent by
+# construction and the SAME number applies at every hi-res tier. It grows the
+# BITMAP only -- outline emboldening moved the advance from 45.000 to 48.375 at
+# 36 pt and broke the monospace grid, which is exactly why this is an overprint.
+#
+# --synth-underline-overlap-px 2 is ABSOLUTE pixels and is deliberately NOT
+# scaled per tier. The overlap exists to defeat one rounding step when
+# neighbouring cells are placed, and that error is ~1 device pixel at whatever
+# resolution the tier rasterises at -- it does not grow with the tier. (Nitti's
+# advance is an exact 15.000 px at 12 pt, so there is no fractional accumulation
+# to round in the first place; 2 px is already insurance.) Scaling it would just
+# widen every glyph bitmap at 2x/3x for nothing.
+#
+# --line-height 33 on all four styles. Measured from the shipped headers at
+# 12 pt: iA Writer Quattro/Duo/Mono and IBM Plex Mono all sit at line 33,
+# x-height 13, advance 15.000. Nitti natively is 25 / 13 / 15.000 -- it matches
+# that set exactly on advance and x-height, so nothing reflows and the text
+# reads the same size, but it sets 24% denser. 33 makes it a true drop-in.
+#
+# Skips with a clear message when any source is absent — that means
 # "cannot regenerate here", NOT "missing from the build".
-NITTI_SRC="../local_fonts/NittiTypewriter-Regular.ttf"
-if [ ! -f "$NITTI_SRC" ]; then
+NITTI_REGULAR="../local_fonts/NittiTypewriter-Regular.ttf"
+NITTI_UNDERLINE="../local_fonts/NittiTypewriter-Underline.ttf"
+NITTI_INVERSE="../local_fonts/NittiTypewriter-Inverse.ttf"
+NITTI_MISSING=0
+for f in "$NITTI_REGULAR" "$NITTI_UNDERLINE" "$NITTI_INVERSE"; do
+  [ -f "$f" ] || NITTI_MISSING=1
+done
+if [ $NITTI_MISSING -eq 1 ]; then
   echo "Skipping NittiTypewriter (no local source in lib/EpdFont/local_fonts/): commercial font, recipe only"
 else
-  # 1x cuts
-  python fontconvert.py nittitypewriter_12_regular    12 "$NITTI_SRC" --2bit --compress --pnum > ../builtinFonts/nittitypewriter_12_regular.h
-  echo "Generated ../builtinFonts/nittitypewriter_12_regular.h"
-  python fontconvert.py nittitypewriter_12_bold       12 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 > ../builtinFonts/nittitypewriter_12_bold.h
-  echo "Generated ../builtinFonts/nittitypewriter_12_bold.h"
-  python fontconvert.py nittitypewriter_12_italic     12 "$NITTI_SRC" --2bit --compress --pnum --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_italic.h
-  echo "Generated ../builtinFonts/nittitypewriter_12_italic.h"
-  python fontconvert.py nittitypewriter_12_bolditalic 12 "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 --synth-slant-deg 11 > ../builtinFonts/nittitypewriter_12_bolditalic.h
-  echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic.h"
-  # Hi-res companions, one set per HIRES_SCALES tier.
-  #
-  # The synthesis flags are em-relative (--synth-embolden-em, --synth-slant-deg),
-  # so they are scale-independent by construction and the SAME numbers apply at
-  # every tier -- a 3x cut emboldens by the same fraction of the em as the 1x,
-  # just rasterised finer. Do not "scale" them to match the point size.
-  for scale in ${HIRES_SCALES[@]}; do
+  NITTI_JOIN="--synth-underline-connect --synth-underline-overlap-px 2"
+  NITTI_LH="--line-height 33"
+  # 1x cuts, then one hi-res companion per HIRES_SCALES tier. Same flags at
+  # every tier: the strike is em-relative, the join is measured off the tier's
+  # own advance, and the line height is the 1x metric the hi-res tables inherit.
+  for scale in 1 ${HIRES_SCALES[@]}; do
+    if [ "$scale" = "1" ]; then suffix=""; else suffix="_${scale}x"; fi
     px=$((12 * scale))
-    python fontconvert.py "nittitypewriter_12_regular_${scale}x"    $px "$NITTI_SRC" --2bit --compress --pnum > "../builtinFonts/nittitypewriter_12_regular_${scale}x.h"
-    echo "Generated ../builtinFonts/nittitypewriter_12_regular_${scale}x.h"
-    python fontconvert.py "nittitypewriter_12_bold_${scale}x"       $px "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 > "../builtinFonts/nittitypewriter_12_bold_${scale}x.h"
-    echo "Generated ../builtinFonts/nittitypewriter_12_bold_${scale}x.h"
-    python fontconvert.py "nittitypewriter_12_italic_${scale}x"     $px "$NITTI_SRC" --2bit --compress --pnum --synth-slant-deg 11 > "../builtinFonts/nittitypewriter_12_italic_${scale}x.h"
-    echo "Generated ../builtinFonts/nittitypewriter_12_italic_${scale}x.h"
-    python fontconvert.py "nittitypewriter_12_bolditalic_${scale}x" $px "$NITTI_SRC" --2bit --compress --pnum --synth-embolden-em 0.045 --synth-y-ratio 0.5 --synth-slant-deg 11 > "../builtinFonts/nittitypewriter_12_bolditalic_${scale}x.h"
-    echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic_${scale}x.h"
+    python fontconvert.py "nittitypewriter_12_regular${suffix}"    $px "$NITTI_REGULAR"   --2bit --compress --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_12_regular${suffix}.h"
+    echo "Generated ../builtinFonts/nittitypewriter_12_regular${suffix}.h"
+    python fontconvert.py "nittitypewriter_12_bold${suffix}"       $px "$NITTI_INVERSE"   --2bit --compress --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_12_bold${suffix}.h"
+    echo "Generated ../builtinFonts/nittitypewriter_12_bold${suffix}.h"
+    python fontconvert.py "nittitypewriter_12_italic${suffix}"     $px "$NITTI_UNDERLINE" --2bit --compress --pnum $NITTI_JOIN $NITTI_LH > "../builtinFonts/nittitypewriter_12_italic${suffix}.h"
+    echo "Generated ../builtinFonts/nittitypewriter_12_italic${suffix}.h"
+    python fontconvert.py "nittitypewriter_12_bolditalic${suffix}" $px "$NITTI_UNDERLINE" --2bit --compress --pnum $NITTI_JOIN --synth-double-strike-em 0.0533 $NITTI_LH > "../builtinFonts/nittitypewriter_12_bolditalic${suffix}.h"
+    echo "Generated ../builtinFonts/nittitypewriter_12_bolditalic${suffix}.h"
   done
 fi
 

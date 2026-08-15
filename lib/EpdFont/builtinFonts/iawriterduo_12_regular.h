@@ -1971,4 +1971,7 @@ static const EpdFontData iawriterduo_12_regular = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

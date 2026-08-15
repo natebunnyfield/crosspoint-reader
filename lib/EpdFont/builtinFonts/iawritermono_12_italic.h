@@ -1987,4 +1987,7 @@ static const EpdFontData iawritermono_12_italic = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

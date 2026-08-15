@@ -3262,4 +3262,7 @@ static const EpdFontData librefranklin_reader_14_bold = {
     41,
     librefranklin_reader_14_boldLigaturePairs,
     2,
+    nullptr,
+    nullptr,
+    nullptr,
 };

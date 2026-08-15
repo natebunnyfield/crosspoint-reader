@@ -3424,4 +3424,7 @@ static const EpdFontData librefranklin_8_bold = {
     41,
     librefranklin_8_boldLigaturePairs,
     2,
+    nullptr,
+    nullptr,
+    nullptr,
 };

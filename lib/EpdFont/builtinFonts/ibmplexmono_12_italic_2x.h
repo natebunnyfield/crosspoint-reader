@@ -3819,4 +3819,7 @@ static const EpdFontData ibmplexmono_12_italic_2x = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

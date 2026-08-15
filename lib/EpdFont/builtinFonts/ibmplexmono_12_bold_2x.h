@@ -3130,4 +3130,7 @@ static const EpdFontData ibmplexmono_12_bold_2x = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

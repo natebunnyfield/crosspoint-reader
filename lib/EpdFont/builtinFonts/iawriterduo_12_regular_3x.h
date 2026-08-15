@@ -5023,4 +5023,7 @@ static const EpdFontData iawriterduo_12_regular_3x = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

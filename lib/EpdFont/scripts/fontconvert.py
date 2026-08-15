@@ -29,6 +29,41 @@ parser.add_argument("--synth-y-ratio", dest="synth_y_ratio", type=float, default
                     help="Vertical embolden as a fraction of the horizontal strength (default 0.5; lower for high-contrast faces to protect hairlines).")
 parser.add_argument("--synth-slant-deg", dest="synth_slant_deg", type=float, default=0.0,
                     help="Oblique shear angle in degrees for synthetic italic (0 = no shear).")
+# --- Typewriter overprint / underline joining -------------------------------
+# Ported from fontconvert_sdcard.py (double_strike_px_for_size,
+# strike_jitter_for_glyph, underline_connect_params) so the BUILT-IN editor
+# faces can use what the SD reading faces already do. Same semantics, same
+# defaults; only the plumbing differs (flat CLI flags here, a key=value spec
+# dict there).
+parser.add_argument("--synth-double-strike-em", dest="synth_double_strike_em", type=float, default=None,
+                    help="Typewriter overprint: composite the glyph with a copy of itself offset "
+                         "right by this fraction of the em. The bitmap grows; the ADVANCE does not, "
+                         "which is the point on a monospace face. Takes precedence over --synth-double-strike-px.")
+parser.add_argument("--synth-double-strike-px", dest="synth_double_strike_px", type=float, default=None,
+                    help="Overprint offset in absolute device pixels at the rasterised size. "
+                         "Prefer the -em spelling, which scales across sizes and hi-res tiers.")
+parser.add_argument("--synth-double-strike-dy", dest="synth_double_strike_dy", type=float, default=0.0,
+                    help="Base vertical offset of the second impression, whole pixels.")
+parser.add_argument("--synth-double-strike-jitter-px", dest="synth_double_strike_jitter_px", type=float, default=0.0,
+                    help="Max |dx| and |dy| per-glyph deviation of the strike, whole pixels. "
+                         "Deterministic (CRC32 of seed:codepoint), never a live RNG.")
+parser.add_argument("--synth-double-strike-ink-jitter", dest="synth_double_strike_ink_jitter", type=float, default=0.0,
+                    help="0..1 — how much the strike's coverage may drop on a given glyph (dryness).")
+parser.add_argument("--synth-double-strike-ink-min", dest="synth_double_strike_ink_min", type=float, default=0.0,
+                    help="Floor for ink jitter, so dryness never makes a glyph read as WEAK.")
+parser.add_argument("--synth-double-strike-seed", dest="synth_double_strike_seed", type=int, default=0,
+                    help="Change to reshuffle the whole face's jitter. Same seed = byte-identical build.")
+parser.add_argument("--synth-underline-connect", dest="synth_underline_connect", action="store_true",
+                    help="Join a drawn underline cut's rule across the monospace grid by replicating "
+                         "one of the rule's own interior columns out to the advance.")
+parser.add_argument("--synth-underline-overlap-px", dest="synth_underline_overlap_px", type=int, default=1,
+                    help="Pixels the joined rule reaches PAST the advance on each side, so neighbouring "
+                         "cells overlap rather than merely abut.")
+parser.add_argument("--synth-underline-min-cov", dest="synth_underline_min_cov", type=float, default=0.80,
+                    help="Fraction of a row's columns that must carry ink for it to count as part of the rule.")
+parser.add_argument("--line-height", dest="line_height", type=int, default=None,
+                    help="Override advanceY (the line advance) in whole pixels. Glyphs, advance widths "
+                         "and x-height are untouched, so nothing reflows horizontally.")
 args = parser.parse_args()
 
 import ctypes
@@ -48,6 +83,61 @@ _synth_x = int(round(args.synth_embolden_em * _ppem * 64))
 _synth_y = int(round(args.synth_embolden_em * args.synth_y_ratio * _ppem * 64))
 _synth_shear = int(round(math.tan(math.radians(args.synth_slant_deg)) * 0x10000)) if args.synth_slant_deg else 0
 _use_synth = bool(_synth_x or _synth_y or _synth_shear)
+
+# --- Pixel-stage effects (overprint + underline joining) ---------------------
+#
+# These do NOT touch the outline, so they need no load-flag change: they run on
+# the rendered 8-bit coverage, before the 2-bit (or 1-bit) quantisation. That
+# ordering is deliberate — ink overlaps as ink, and a strike landing half on an
+# antialiased edge should darken it rather than stack two hard edges.
+#
+# `double_strike_em` wins over `double_strike_px` when both are given, matching
+# fontconvert_sdcard.py:674.
+if args.synth_double_strike_em is not None:
+    _ds_px = int(round(args.synth_double_strike_em * _ppem))
+elif args.synth_double_strike_px is not None:
+    _ds_px = int(round(args.synth_double_strike_px))
+else:
+    _ds_px = 0
+_ds_jitter = int(round(args.synth_double_strike_jitter_px))
+_ds_base_dy = int(round(args.synth_double_strike_dy))
+_ds_ink_jitter = args.synth_double_strike_ink_jitter
+_ds_ink_min = args.synth_double_strike_ink_min
+_ds_seed = args.synth_double_strike_seed
+_ul_connect = args.synth_underline_connect
+_ul_overlap = max(0, args.synth_underline_overlap_px)
+_ul_min_cov = args.synth_underline_min_cov
+
+# Gate for the whole normalise-then-composite path. When this is False the
+# rasteriser runs the ORIGINAL loop over FreeType's buffer, unchanged, so every
+# font generated before these flags existed still comes out byte-identical.
+_use_pixel_fx = bool(_ds_px or _ds_jitter or _ds_base_dy or _ds_ink_jitter or _ul_connect)
+
+
+def _strike_jitter_for_glyph(code_point):
+    """Per-glyph variation of the second impression: (dx, dy, ink).
+
+    DETERMINISTIC, keyed on the codepoint and an explicit seed rather than a
+    live RNG — two builds of one recipe must be byte-identical, because the
+    build cache is content-addressed and cards are verified by hash.
+    zlib.crc32 rather than hash(): Python salts str hashing per process.
+
+    Ported verbatim from fontconvert_sdcard.py:698-743.
+    """
+    if _ds_jitter == 0 and _ds_base_dy == 0 and _ds_ink_jitter == 0.0:
+        return 0, _ds_base_dy, 1.0
+    h = zlib.crc32(f"{_ds_seed}:{code_point}".encode())
+    dx = (h % (2 * _ds_jitter + 1)) - _ds_jitter if _ds_jitter else 0
+    dy = ((h >> 8) % (2 * _ds_jitter + 1)) - _ds_jitter if _ds_jitter else 0
+    # Dryness varies between ink_min and full, never below: without a floor a
+    # handful of glyphs read as WEAK rather than dry and the line loses its
+    # boldness even though total coverage barely moves.
+    ink = 1.0 - ((h >> 16) & 0xFF) / 255.0 * _ds_ink_jitter
+    if ink < _ds_ink_min:
+        ink = _ds_ink_min
+    return dx, _ds_base_dy + dy, ink
+
+
 # Synthesis splits load from render to allow outline modification before rasterising.
 if _use_synth:
     load_flags = freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP
@@ -340,13 +430,140 @@ for i_start, i_end in intervals:
     for code_point in range(i_start, i_end + 1):
         face = load_glyph(code_point)
         bitmap = face.glyph.bitmap
+        glyph_left = face.glyph.bitmap_left
+        glyph_top = face.glyph.bitmap_top
+
+        # `src8` is whatever the 4-bit stage below reads, and `render_w` /
+        # `render_rows` its dimensions. With no pixel-stage effect active they
+        # are FreeType's own buffer and bbox, so the loop that follows is
+        # literally the code that has always run — that is what keeps every
+        # pre-existing built-in font byte-identical.
+        src8 = bitmap.buffer
+        render_w = bitmap.width
+        render_rows = bitmap.rows
+
+        if _use_pixel_fx and bitmap.width and bitmap.rows:
+            # Normalise to a flat TOP-DOWN 8-bit list first. FreeType's pitch
+            # is the row stride in bytes and can be negative (bottom-up
+            # storage); walking by real pitch means the rest of this block
+            # never has to think about padding or flips.
+            _abs_pitch = abs(bitmap.pitch)
+            _fbuf = bitmap.buffer
+            src8 = []
+            for y in range(bitmap.rows):
+                ro = y * _abs_pitch if bitmap.pitch >= 0 else (bitmap.rows - 1 - y) * _abs_pitch
+                src8.extend(_fbuf[ro:ro + bitmap.width])
+
+            # --- Join a drawn underline rule across the cell -----------------
+            #
+            # An underline cut draws its rule inside the glyph's own bbox, so
+            # the rule stops short of the advance and the line breaks at every
+            # character. The rule is EXTENDED BY REPLICATING ONE OF ITS OWN
+            # COLUMNS, not by drawing a rectangle: the bar has soft top/bottom
+            # edges and tapered end caps, and copying a real interior column
+            # carries that exact vertical ink profile outward, so the join
+            # keeps the face's inky character. The tapered caps are
+            # overwritten, which is precisely what has to happen.
+            #
+            # It reaches `overlap` px PAST the advance on each side so
+            # neighbouring cells overlap rather than merely abut — abutting
+            # relies on exact integer placement and one rounding step reopens
+            # the seam. Overlap is free because compositing is max().
+            if _ul_connect:
+                bar_rows = []
+                for y in range(bitmap.rows):
+                    if y <= glyph_top:
+                        continue          # at or above the baseline: not the rule
+                    row = src8[y * bitmap.width:(y + 1) * bitmap.width]
+                    if sum(1 for v in row if v > 32) >= _ul_min_cov * bitmap.width:
+                        bar_rows.append(y)
+                if bar_rows:
+                    # Source column: the one carrying the most ink through the
+                    # band, i.e. a fully-inked interior column rather than a
+                    # tapered end.
+                    best_x, best_sum = 0, -1
+                    for x in range(bitmap.width):
+                        t = sum(src8[y * bitmap.width + x] for y in bar_rows)
+                        if t > best_sum:
+                            best_sum, best_x = t, x
+                    col = {y: src8[y * bitmap.width + best_x] for y in bar_rows}
+
+                    adv_px = int(round(face.glyph.linearHoriAdvance / 65536.0))
+                    lo = -_ul_overlap                       # pen-space span the
+                    hi = adv_px + _ul_overlap               # rule must cover
+                    new_left = min(glyph_left, lo)
+                    new_right = max(glyph_left + bitmap.width, hi)
+                    new_w = new_right - new_left
+                    shift = glyph_left - new_left
+
+                    buf = [0] * (new_w * bitmap.rows)
+                    for y in range(bitmap.rows):
+                        rs = y * bitmap.width
+                        rd = y * new_w + shift
+                        buf[rd:rd + bitmap.width] = src8[rs:rs + bitmap.width]
+                    for y in bar_rows:
+                        v = col[y]
+                        if not v:
+                            continue
+                        rd = y * new_w
+                        for x in range(lo - new_left, hi - new_left):
+                            if v > buf[rd + x]:
+                                buf[rd + x] = v
+                    src8 = buf
+                    render_w = new_w
+                    # `left` moves with the extension; the advance does not.
+                    glyph_left = new_left
+
+            # --- Typewriter overprint ---------------------------------------
+            #
+            # A typewriter had no bold cut: emphasis was the same slug struck
+            # twice with the carriage barely advanced. Emulating THAT rather
+            # than emboldening the outline matters for a monospace face —
+            # growing an outline also grows the advance and breaks the one
+            # guarantee a mono face makes. An overprint leaves it untouched.
+            #
+            # max(), not add(): a second impression of the same ribbon cannot
+            # print darker than the ribbon's own black.
+            jx, jy, jink = _strike_jitter_for_glyph(code_point)
+            off_x = max(0, _ds_px + jx)
+            off_y = jy
+            if off_x or off_y:
+                # The strike may sit above the first row or below the last, so
+                # the bitmap grows in whichever direction it went. `top` moves
+                # with pad_top — it is the distance from the baseline to the
+                # FIRST row, and rows were just added above it.
+                pad_top = max(0, -off_y)
+                pad_bot = max(0, off_y)
+                comp_w = render_w + off_x
+                comp_rows = bitmap.rows + pad_top + pad_bot
+                comp = [0] * (comp_w * comp_rows)
+                for y in range(bitmap.rows):
+                    rs = y * render_w
+                    rd0 = (y + pad_top) * comp_w               # first impression
+                    rd1 = (y + pad_top + off_y) * comp_w       # the strike
+                    for x in range(render_w):
+                        v = src8[rs + x]
+                        if not v:
+                            continue
+                        if v > comp[rd0 + x]:
+                            comp[rd0 + x] = v
+                        # Ink jitter dims the SECOND impression only: the first
+                        # is the keystroke, the strike is the one that catches a
+                        # drier part of the ribbon.
+                        sv = int(v * jink) if jink < 1.0 else v
+                        if sv > comp[rd1 + x + off_x]:
+                            comp[rd1 + x + off_x] = sv
+                src8 = comp
+                render_w = comp_w
+                render_rows = comp_rows
+                glyph_top = glyph_top + pad_top
 
         # Build out 4-bit grayscale bitmap
         pixels4g = []
         px = 0
-        for i, v in enumerate(bitmap.buffer):
-            y = i / bitmap.width
-            x = i % bitmap.width
+        for i, v in enumerate(src8):
+            y = i / render_w
+            x = i % render_w
             if x % 2 == 0:
                 px = (v >> 4)
             else:
@@ -354,7 +571,7 @@ for i_start, i_end in intervals:
                 pixels4g.append(px);
                 px = 0
             # eol
-            if x == bitmap.width - 1 and bitmap.width % 2 > 0:
+            if x == render_w - 1 and render_w % 2 > 0:
                 pixels4g.append(px)
                 px = 0
 
@@ -363,9 +580,9 @@ for i_start, i_end in intervals:
             # Downsample to 2-bit bitmap
             pixels2b = []
             px = 0
-            pitch = (bitmap.width // 2) + (bitmap.width % 2)
-            for y in range(bitmap.rows):
-                for x in range(bitmap.width):
+            pitch = (render_w // 2) + (render_w % 2)
+            for y in range(render_rows):
+                for x in range(render_w):
                     px = px << 2
                     bm = pixels4g[y * pitch + (x // 2)]
                     bm = (bm >> ((x % 2) * 4)) & 0xF
@@ -377,11 +594,11 @@ for i_start, i_end in intervals:
                     elif bm >= 4:
                         px += 1
 
-                    if (y * bitmap.width + x) % 4 == 3:
+                    if (y * render_w + x) % 4 == 3:
                         pixels2b.append(px)
                         px = 0
-            if (bitmap.width * bitmap.rows) % 4 != 0:
-                px = px << (4 - (bitmap.width * bitmap.rows) % 4) * 2
+            if (render_w * render_rows) % 4 != 0:
+                px = px << (4 - (render_w * render_rows) % 4) * 2
                 pixels2b.append(px)
 
             # for y in range(bitmap.rows):
@@ -397,18 +614,18 @@ for i_start, i_end in intervals:
             # Downsample to 1-bit bitmap - treat any 2+ as black
             pixelsbw = []
             px = 0
-            pitch = (bitmap.width // 2) + (bitmap.width % 2)
-            for y in range(bitmap.rows):
-                for x in range(bitmap.width):
+            pitch = (render_w // 2) + (render_w % 2)
+            for y in range(render_rows):
+                for x in range(render_w):
                     px = px << 1
                     bm = pixels4g[y * pitch + (x // 2)]
                     px += 1 if ((x & 1) == 0 and bm & 0xE > 0) or ((x & 1) == 1 and bm & 0xE0 > 0) else 0
 
-                    if (y * bitmap.width + x) % 8 == 7:
+                    if (y * render_w + x) % 8 == 7:
                         pixelsbw.append(px)
                         px = 0
-            if (bitmap.width * bitmap.rows) % 8 != 0:
-                px = px << (8 - (bitmap.width * bitmap.rows) % 8)
+            if (render_w * render_rows) % 8 != 0:
+                px = px << (8 - (render_w * render_rows) % 8)
                 pixelsbw.append(px)
 
             # for y in range(bitmap.rows):
@@ -426,16 +643,19 @@ for i_start, i_end in intervals:
         # Build output data
         packed = bytes(pixels)
         glyph = GlyphProps(
-            width = bitmap.width,
-            height = bitmap.rows,
+            width = render_w,
+            height = render_rows,
             # We use linearHoriAdvance (16.16 fixed-point, unhinted) instead of
             # advance.x (26.6 fixed-point, grid-fitted to whole pixels by hinter).
             # Synthetic embolden compensation: add the full x-strength to the
             # advance so bold text doesn't look cramped. _synth_x is 26.6;
             # linearHoriAdvance is 16.16, so << 10 converts (2^10 = 1024).
+            # An overprint or a joined rule grows the BITMAP and moves `left`;
+            # neither touches the advance, which is the whole point on a mono
+            # face.
             advance_x = fp4_from_ft16_16(face.glyph.linearHoriAdvance + (_synth_x << 10)),
-            left = face.glyph.bitmap_left,
-            top = face.glyph.bitmap_top,
+            left = glyph_left,
+            top = glyph_top,
             data_length = len(packed),
             data_offset = total_size,
             code_point = code_point,
@@ -445,6 +665,21 @@ for i_start, i_end in intervals:
 
 # pipe seems to be a good heuristic for the "real" descender
 face = load_glyph(ord('|'))
+
+# Leading override.
+#
+# advanceY otherwise comes straight from the face's own metrics, which is right
+# until you swap one face for another in a fixed UI. Measured at 12 pt: the four
+# iA/IBM editor faces all sit at 33 px, PragmataPro at 28, Nitti Typewriter at
+# 25 -- so Nitti sets 24% denser than the face it replaces even though its
+# advance (15.000) and x-height (13) match exactly. This makes the leading a
+# decision rather than an inherited property.
+#
+# It changes ONLY the line advance. Glyphs, advance widths and the x-height are
+# untouched, so nothing reflows horizontally.
+advanceY = norm_ceil(face.size.height)
+if args.line_height:
+    advanceY = int(args.line_height)
 
 glyph_data = []
 glyph_props = []
@@ -1060,7 +1295,7 @@ print(f"    {font_name}Bitmaps,")
 print(f"    {font_name}Glyphs,")
 print(f"    {font_name}Intervals,")
 print(f"    {len(intervals)},")
-print(f"    {norm_ceil(face.size.height)},")
+print(f"    {advanceY},")
 print(f"    {norm_ceil(face.size.ascender)},")
 print(f"    {norm_floor(face.size.descender)},")
 print(f"    {'true' if is2Bit else 'false'},")
@@ -1094,4 +1329,12 @@ if ligature_pairs:
 else:
     print(f"    nullptr,")
     print(f"    0,")
+# The three on-demand-loading fields close the struct. They are meaningless for a
+# built-in font -- every glyph is already in flash and the interval table is
+# complete -- but leaving them off is not free: the host test build compiles with
+# -Wmissing-field-initializers, so every generated header emitted a warning, and a
+# real missing initializer would have been invisible in that noise.
+print(f"    nullptr,")  # glyphMissHandler
+print(f"    nullptr,")  # glyphMissCtx
+print(f"    nullptr,")  # coverageHandler
 print("};")

@@ -14324,4 +14324,7 @@ static const EpdFontData librefranklin_12_regular_2x = {
     41,
     librefranklin_12_regular_2xLigaturePairs,
     2,
+    nullptr,
+    nullptr,
+    nullptr,
 };

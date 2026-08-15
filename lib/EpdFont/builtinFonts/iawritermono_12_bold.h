@@ -1811,4 +1811,7 @@ static const EpdFontData iawritermono_12_bold = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };

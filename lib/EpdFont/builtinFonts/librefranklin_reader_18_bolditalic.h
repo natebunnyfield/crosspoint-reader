@@ -4099,4 +4099,7 @@ static const EpdFontData librefranklin_reader_18_bolditalic = {
     41,
     librefranklin_reader_18_bolditalicLigaturePairs,
     2,
+    nullptr,
+    nullptr,
+    nullptr,
 };

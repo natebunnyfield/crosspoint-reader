@@ -3622,4 +3622,7 @@ static const EpdFontData iawriterduo_12_bold_2x = {
     0,
     nullptr,
     0,
+    nullptr,
+    nullptr,
+    nullptr,
 };
