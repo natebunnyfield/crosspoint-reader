@@ -186,7 +186,7 @@ Named forks, in the owner's order:
 |---|---|
 | `eszter007/matcha-reader` | The heap/OOM series — EPUB indexing pressure, reader-settings OOM, font cache freed before a settings save, per-call allocation out of `HalStorage::hasContent`, history bounded by memory, cover thumbnails without HAL power locks. Richest vein, and only 31 behind upstream. |
 | `uxjulia/CrossInk` | Table rendering + colSpan (feeds T-012); progressive JPEG cover support. Skip themes, carousels, tilt and touch. |
-| `folio-etc/folio` | 1-bit `.cpfont` packing (feeds T-013); font budgets during heavy activities; power-button claiming and button-hint rendering (feeds T-011). |
+| `folio-etc/folio` | 1-bit `.cpfont` packing (feeds T-013); font budgets during heavy activities; power-button claiming and button-hint rendering (T-011 removed ours; folio's approach is still the reference if hints ever return). |
 | `0x1abin/crossmux` | Low-heap crash fixes — EPUB footnote allocation, web settings heap exhaustion. Skip the Apps hub and mini-games. |
 | `zrn-ns/crosspoint-jp` | The `abort()` on page-turning very long CJK paragraphs. Skip vertical writing. |
 | `franssjz/cpr-vcodex` | Progressive EPUB indexing. Skip KOReader profiles, flashcards, dashboards. |
@@ -237,42 +237,6 @@ rule is the same as everywhere else, no claim without a grep.
 was deliberately removed and why (pointing at `SCOPE.md` / `docs/fork-sync.md`),
 and no longer lists anything that is not there.
 
-### [T-011] Side buttons are drawn on the UI — decide whether that is the intent
-**scope: ui · opened 2026-08-15**
-
-Owner observation from the simulator: the side buttons are now visualised on
-screen, seen on the Claude screen. Recorded as asked; **the ruling is not made
-yet**, and it splits two ways that want opposite work:
-
-- **Intended** — then the question is coverage and consistency: which screens
-  show them, whether the labels follow `MappedInputManager` when the front
-  buttons are remapped or `sideButtonLayout` is swapped, and whether the reader
-  screen's existing rotated hints are now duplicated by them.
-- **Not intended on this screen** — then it is a leak from whichever component
-  draws them, and belongs in `BUGS.md` instead of here.
-
-**Investigated 2026-08-15 — it is deliberate, and narrow.** `GUI.drawSideButtonHints()`
-is a long-standing theme method (`BaseTheme.cpp:165`, overridden in
-`LyraTheme.cpp:479`), but only **two** call sites exist outside the themes
-themselves, both text-entry screens and both guarded the same way:
-
-```
-src/activities/util/ClaudeChatActivity.cpp:590   if (!panel.isDaisy()) GUI.drawSideButtonHints(renderer, ">", "<");
-src/activities/util/NoteEditorActivity.cpp:633   if (!panel.isDaisy()) GUI.drawSideButtonHints(renderer, ">", "<");
-```
-
-Both arrived in `46b0dd60f` (2026-08-06, "fix(keyboard): UX pass round 2 —
-space, Ask, navigation, repeat, gutter"), commented "same convention as the
-full-screen keyboard". So this is **not a leak** and the `BUGS.md` branch of
-this item is closed: it is intended, nine days old, and scoped to typing
-surfaces where the side buttons move the cursor.
-
-What remains is purely a coverage question — whether two screens is the right
-number. See `docs/ui-conventions.md` on which surface owns which affordance.
-
-**Done looks like:** an owner ruling recorded, and either the coverage made
-consistent across screens or the drawing removed where it does not belong.
-
 ### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
 **scope: verification · opened 2026-08-07**
 
@@ -321,6 +285,35 @@ then either take the patch or write the divergence down in `docs/fork-sync.md`.
 ---
 
 ## Finished
+
+### [T-011] Side buttons drawn on the UI — RULED, removed
+**scope: ui · ruled 2026-08-15**
+
+Owner observation from the simulator: side buttons visualised on screen, seen
+on the Claude screen.
+
+**Investigated first — it was deliberate, not a leak.** `drawSideButtonHints()`
+is a long-standing theme method (`BaseTheme.cpp:165`, overridden in
+`LyraTheme.cpp:479`), but only two call sites existed outside the themes, both
+text-entry screens and both guarded by `!panel.isDaisy()`. Both arrived in
+`46b0dd60f` (2026-08-06, keyboard UX pass), commented "same convention as the
+full-screen keyboard".
+
+**Ruling: remove them.** Too much chrome. The side buttons still navigate rows;
+they are simply no longer labelled. A partial revert of `46b0dd60f`.
+
+Both call sites deleted, and with them the 30 px `sideGutter` each screen
+reserved *for* those hints — keeping the gutter after removing the labels would
+have been strictly worse than before, paying the cost with none of the benefit.
+The text column gets that width back.
+
+`drawSideButtonHints()` itself is kept in the themes. It is theme API with no
+remaining callers, not dead private code, and the reader's rotated hints still
+exercise the same rotated-text path.
+
+Verified: `-e default` and `-e simulator` build; note editor rendered headless
+showing no hints and the keyboard grid using the full width.
+
 
 ### [T-010] settings.json / state.json writes are not atomic — FIXED
 **scope: data durability · found by the 2026-08-08 P0 audit · fixed 2026-08-08**
