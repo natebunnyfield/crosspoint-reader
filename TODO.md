@@ -189,20 +189,41 @@ fails when that target links. The iOS archive belongs IN the loop, not after it.
 `xcodebuild -target CrossPointX3 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO` is
 the cheap version and needs no keychain.
 
-### [T-007] Upstream issue #2863 reproduces here and is tracked nowhere
-**scope: fork sync · raised 2026-08-06 · confirmed 2026-08-07**
-
-The short-press power behavior upstream reports is present in this fork's code:
-`lib/hal/HalGPIO.cpp:207` carries a `TODO` describing the same thing. Upstream
-issues are not visible from this repo's tracker, so it would otherwise be
-rediscovered rather than remembered.
-
-**Close by:** decide whether the fork wants upstream's fix or its own behavior,
-then either take the patch or write the divergence down in `docs/fork-sync.md`.
-
 ---
 
 ## Finished
+
+### [T-007] Short-press power — RULED SLEEP, and a real mismatch fixed
+**scope: fork sync · raised 2026-08-06 · closed 2026-08-15**
+
+Opened because upstream issue #2863's short-press power behaviour is present in
+this fork's code and upstream issues are invisible from this tracker.
+
+**Investigating it found a live inconsistency, not just an untracked issue.**
+`CrossPointSettings.h:271` initialised `shortPwrBtn = IGNORE` while
+`normalizeRetiredSettings()` (`.cpp:169`) pinned it to `SLEEP` on every load.
+Because the Controls tab is withdrawn from the device UI, nothing on the device
+could reconcile them:
+
+- a factory-fresh unit never runs `fromJson()`, so it kept `IGNORE` — the power
+  button did nothing;
+- any unit that had saved settings once got `SLEEP`.
+
+That is exactly the "pinning is only half" trap CLAUDE.md documents, shipped.
+
+**Owner ruling 2026-08-15: SLEEP on both.** The initialiser now reads `SLEEP`
+and carries a comment saying it must stay in step with the pin. Side effect,
+deliberate: `CrossPointSettings.h:403` shortens the power-hold window from
+400 ms to 10 ms when the value is `SLEEP`, so a fresh unit now also gets the
+short window.
+
+Verified on a genuinely fresh profile — `settings.json` deleted, booted, then
+the documented save cycle (enter Settings, press Back). File comes back with
+`shortPwrBtn = 1`. Reading the value after boot without a save proves nothing
+here, which is why the save cycle is the check.
+
+Cold-cache builds for `-e default` and `-e simulator`.
+
 
 ### [T-013] A setting for 1-bit or 2-bit chrome fonts — RULED, keep 2-bit
 **scope: display · ruled 2026-08-15 · no code change**

@@ -267,8 +267,18 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // TEXT_ANTIALIASING value (0=Off, 1=Standard, 2=Crisp, 3=Dark). Non-zero
   // still reads as "AA enabled" everywhere the old toggle was tested as a bool.
   uint8_t textAntiAliasing = TEXT_AA_STANDARD;
-  // Short power button click behavior
-  uint8_t shortPwrBtn = IGNORE;
+  // Short power button click behavior.
+  //
+  // SLEEP, not IGNORE, and it must stay in step with the pin in
+  // normalizeRetiredSettings(). The Controls tab is withdrawn from the device
+  // UI, so nothing on the device can correct a disagreement: this initialiser
+  // is the ONLY value a factory-fresh unit ever sees (fromJson never runs
+  // without a settings.json), while every device that has saved once gets the
+  // pinned value. It read IGNORE against a pin of SLEEP until 2026-08-15, so a
+  // fresh unit's power button did nothing while an upgraded one slept — the
+  // exact "pinning is only half" trap CLAUDE.md documents. Owner ruling: SLEEP
+  // on both.
+  uint8_t shortPwrBtn = SLEEP;
   // EPUB reading orientation settings
   // 0 = portrait (default), 1 = landscape clockwise, 2 = inverted, 3 = landscape counter-clockwise
   // Button layouts (front layout retained for migration only)
