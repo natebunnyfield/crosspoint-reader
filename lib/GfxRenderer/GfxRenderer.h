@@ -3,6 +3,8 @@
 #include <EpdFontFamily.h>
 #include <HalDisplay.h>
 
+#include "GlyphAaPlanes.h"
+
 namespace BidiUtils {
 // Paragraph base direction for the Unicode BiDi algorithm (UAX#9).
 // AUTO: scan text for first strong directional character (P2/P3 rules)
@@ -41,6 +43,10 @@ class GfxRenderer {
     AA_CRISP,     // glyph dark -> black, glyph light -> panel light
     AA_DARK       // glyph dark -> black, glyph light -> panel dark
   };
+  static_assert(static_cast<uint8_t>(AA_STANDARD) == static_cast<uint8_t>(GlyphAa::Standard) &&
+                    static_cast<uint8_t>(AA_CRISP) == static_cast<uint8_t>(GlyphAa::Crisp) &&
+                    static_cast<uint8_t>(AA_DARK) == static_cast<uint8_t>(GlyphAa::Dark),
+                "GrayscaleAaStrength and GlyphAa::Strength must stay in step");
 
   // Logical screen orientation from the perspective of callers
   enum Orientation {
@@ -56,6 +62,12 @@ class GfxRenderer {
   HalDisplay& display;
   RenderMode renderMode;
   GrayscaleAaStrength grayscaleAaStrength = AA_STANDARD;
+  // Set for the duration of a render that is BOTH inverted and going to run the
+  // grayscale overlay. Flips which glyph levels the BW base pass paints and
+  // which gray target each antialiased level takes; see GlyphAaPlanes.h. Off by
+  // default so every screen that draws text without a grayscale pass — all UI
+  // chrome — keeps painting solid glyphs.
+  bool darkModeAa = false;
   // The panel is physically 800x480; portrait reading IS the 90 degree rotation.
   // Constant rather than a field so every non-Portrait branch folds out at compile time.
   static constexpr Orientation orientation = Portrait;
@@ -276,10 +288,10 @@ class GfxRenderer {
   // fadingFix isn't forcing the blocking path. Callers can skip overlap
   // scaffolding (e.g. whole-plane grayscale buffers) when false.
   bool supportsAsyncRefresh() const;
-  // True when the panel output is being inverted (dark mode). Render paths use
-  // it to skip work the SDK would discard: every grayscale entry point is a
-  // no-op while inverted (FreeInkDisplay.cpp:779-859), so rendering AA planes
-  // would cost a 48 KB buffer and two full page renders for nothing.
+  // True when the panel output is being inverted (dark mode). Grayscale still
+  // runs in that state — the flip lives in HalDisplay, not in the SDK's
+  // setInverted() — so this is NOT a reason to skip the AA passes. Render paths
+  // pair it with setDarkModeAntiAliasing() to pick the right level split.
   bool isDisplayInverted() const;
   // EXPERIMENTAL: Windowed update - display only a rectangular region
   // void displayWindow(int x, int y, int width, int height) const;
@@ -414,6 +426,18 @@ class GfxRenderer {
   // SETTINGS.textAntiAliasing without threading it through every call site.
   void setGrayscaleAaStrength(const GrayscaleAaStrength s) { this->grayscaleAaStrength = s; }
   GrayscaleAaStrength getGrayscaleAaStrength() const { return grayscaleAaStrength; }
+  // Announce that this render is inverted AND will run the grayscale overlay.
+  // Scope it to the render (set on entry, clear on every exit) — leaving it on
+  // would render UI chrome with its antialiased levels unpainted and nothing
+  // coming to fill them in.
+  void setDarkModeAntiAliasing(const bool on) { this->darkModeAa = on; }
+  bool getDarkModeAntiAliasing() const { return darkModeAa; }
+  // The level -> (base pass, MSB plane, LSB plane) split for the current
+  // strength and mode. One place, so the BW pass and the two grayscale passes
+  // cannot disagree about which level belongs where.
+  GlyphAa::Planes getGlyphAaPlanes() const {
+    return GlyphAa::planes(static_cast<GlyphAa::Strength>(grayscaleAaStrength), darkModeAa);
+  }
   // Grayscale preconditioning settle pass (no-op on X4). The rect overload
   // takes the gray region in LOGICAL screen coordinates and rotates it to the
   // panel; the no-arg overload settles the full frame. Call after the BW base
