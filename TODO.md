@@ -14,7 +14,121 @@ started.
 
 ## OPEN
 
-### [T-009] Side buttons are drawn on the UI — decide whether that is the intent
+### [T-012] A setting for tables: flat or tabular
+**scope: reader · opened 2026-08-15**
+
+Today tables are always flattened. `ChapterHtmlSlimParser.cpp:481-519` tracks
+`tableDepth` and handles `thead`/`tr`/`td`/`th`, but there is no `colspan`
+handling and nothing draws a border — verified by grep, no hits. PR #10 added
+header labels to flattened cells, which is the current best behaviour.
+
+Wanted: an owner-facing choice between the flattened reading order and a real
+tabular render. `uxjulia/CrossInk` has both halves already (#89 table rendering,
+#90 colSpan as header/footer rows) — see
+[docs/fork-ecosystem.md](docs/fork-ecosystem.md).
+
+**Traps before writing the setting** (`docs/` + CLAUDE.md rules, all of which
+have bitten before):
+
+- An ENUM row persists its **index**. Two values only, so a bool row is simpler
+  and safer; if it becomes an enum, values APPEND — inserting one re-points every
+  saved `settings.json` at a different choice.
+- Anything that changes layout **must bump the `section.bin` version**
+  (currently 35) or stale caches render the old shape. See
+  `docs/file-formats.md`.
+- A row with no `valuePtr` does not persist; if it becomes a getter/setter row,
+  add explicit lines to BOTH `toJson` and `fromJson`.
+
+**Done looks like:** the setting exists, both modes render correctly on a real
+table-bearing EPUB, and switching it invalidates the layout cache.
+
+### [T-013] A setting for 1-bit or 2-bit chrome fonts
+**scope: display · opened 2026-08-15**
+
+The 2-bit chrome font work (merged `1a18de260`) traded flash for a UI that can
+be antialiased at all. `folio-etc/folio` went the other way and packed bundled
+theme `.cpfont`s to 1 bit. Both are defensible; make it the owner's choice
+rather than a build-time ruling.
+
+Needs a measured flash delta for each mode before the setting is worth having —
+if the saving is small the setting is not worth its own complexity, and that is
+a legitimate outcome to record here.
+
+Interacts with the `_2x`/`_3x` hi-res companions and `CROSSPOINT_RENDER_SCALE`,
+so read `all.h` and `applySystemFont()` in `main.cpp` first. Note
+`insertFont()` refuses to overwrite — a live change must use `replaceFont()`,
+or the setting will read as changed while every pixel stays on the old face
+until reboot.
+
+**Done looks like:** the setting exists, the flash cost of each mode is
+recorded, and changing it re-binds the chrome faces without a reboot.
+
+### [T-014] Sibling-fork improvements, as reviewable PRs
+**scope: upstream-adjacent · opened 2026-08-15**
+
+From [docs/fork-ecosystem.md](docs/fork-ecosystem.md), which surveyed 1,443
+forks. Bring the worthwhile work across as **several small PRs for review** —
+one concern each, not one large drop. Per `docs/fork-sync.md`: per commit, live
+hunks only.
+
+Named forks, in the owner's order:
+
+| Fork | What to mine |
+|---|---|
+| `eszter007/matcha-reader` | The heap/OOM series — EPUB indexing pressure, reader-settings OOM, font cache freed before a settings save, per-call allocation out of `HalStorage::hasContent`, history bounded by memory, cover thumbnails without HAL power locks. Richest vein, and only 31 behind upstream. |
+| `uxjulia/CrossInk` | Table rendering + colSpan (feeds T-012); progressive JPEG cover support. Skip themes, carousels, tilt and touch. |
+| `folio-etc/folio` | 1-bit `.cpfont` packing (feeds T-013); font budgets during heavy activities; power-button claiming and button-hint rendering (feeds T-011). |
+| `0x1abin/crossmux` | Low-heap crash fixes — EPUB footnote allocation, web settings heap exhaustion. Skip the Apps hub and mini-games. |
+| `zrn-ns/crosspoint-jp` | The `abort()` on page-turning very long CJK paragraphs. Skip vertical writing. |
+| `franssjz/cpr-vcodex` | Progressive EPUB indexing. Skip KOReader profiles, flashcards, dashboards. |
+
+**Do not re-propose** the three already checked and present: HTML 4.01 entities
+(all 252 in `htmlEntities.cpp`), `<hr>` (handled at
+`ChapterHtmlSlimParser.cpp:601` and `:992`), the hidden-file toggle
+(`FileBrowserActivity.h:31`).
+
+**Done looks like:** one branch + PR per concern, each building `-e default`
+AND `-e simulator` from a cold cache, each stating what was verified on host
+and what still needs the device.
+
+### [T-015] Pull in the progressive JPEG decode fix, if it is real
+**scope: reader · opened 2026-08-15**
+
+Two independent forks hit the same area: `matcha-reader` has "decode
+progressive JPEGs whose DC scan is non-interleaved", `CrossInk` has "improve
+progressive jpeg cover support". Two forks converging is decent evidence the
+bug is real.
+
+**Conditional on its own merit** — read both diffs against
+`lib/Epub/Epub/converters/JpegToFramebufferConverter.cpp` first and find a book
+whose cover actually reproduces it. If it cannot be reproduced here, record that
+and close the item; a decoder change with no failing case is not worth the risk.
+
+**Done looks like:** either a reproduction plus the fix plus the cover rendering
+correctly, or a written finding that our decoder already handles it.
+
+### [T-016] READMEs no longer describe what these repos are
+**scope: docs · opened 2026-08-15**
+
+Both `crosspoint-reader` and `crosspoint-simulator` have drifted a long way from
+their READMEs. The firmware fork has deleted whole subsystems (KOReader sync,
+Calibre, the status bar, bookmarks, auto page turn, the reader menu, four of
+five themes) and added others (Manage Files, notes, summarization, the keyboard
+redesign, 2-bit chrome). The simulator has grown an iOS target, a read-aloud
+channel, host text entry and pad-contrast presets.
+
+A README that advertises removed features is worse than a thin one: it is the
+first thing a new contributor reads, and every wrong line costs someone a
+session.
+
+**Do both repos.** Check each claim against the tree before keeping it — the
+rule is the same as everywhere else, no claim without a grep.
+
+**Done looks like:** each README describes what its repo does today, names what
+was deliberately removed and why (pointing at `SCOPE.md` / `docs/fork-sync.md`),
+and no longer lists anything that is not there.
+
+### [T-011] Side buttons are drawn on the UI — decide whether that is the intent
 **scope: ui · opened 2026-08-15**
 
 Owner observation from the simulator: the side buttons are now visualised on
