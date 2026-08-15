@@ -120,19 +120,31 @@ TEST(EditorFontPreview, EveryFaceIsAvailableWhenCompiledInOrOnCard) {
   }
 }
 
-TEST(EditorFontPreview, CardOnlyFacesAreMarkedWhenTheCardLacksThem) {
+TEST(EditorFontPreview, EveryEditorFaceIsCompiledInSoNoneCanBeMissing) {
+  // This used to assert the opposite — that SOME face is card-only, so the
+  // "Not on card" mark has something to mark. That stopped being true when
+  // every editor face became built-in (2026-08-11), and the case failed on a
+  // clean tree from then until 2026-08-14 with nobody owning it.
+  //
+  // Inverted deliberately rather than deleted. The invariant it now pins is
+  // load-bearing: because no face can be missing, the marker was dropped from
+  // the picker's list rows when the colophon moved to the preview pane
+  // (2026-08-14). Add a card-only face and this fires — which is the moment to
+  // go and give the mark a home in the rows again, since the pane's label only
+  // speaks for the APPLIED face.
   const auto allRegistered = [](int) { return true; };
   const auto emptyCard = [](const char*) { return false; };
 
-  int marked = 0;
+  int cardOnly = 0;
   for (uint8_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
     const bool builtin = editorfonts::FAMILIES[i].builtinFontId != 0;
     const bool avail = isAvailable(i, allRegistered, emptyCard);
     EXPECT_EQ(avail, builtin) << editorfonts::FAMILIES[i].label
                               << ": a compiled-in face is always available, a card-only face is not";
-    if (!avail) ++marked;
+    if (!avail) ++cardOnly;
   }
-  EXPECT_GT(marked, 0) << "the whole point is that SOME faces can be missing";
+  EXPECT_EQ(cardOnly, 0) << "an editor face now depends on the card — the picker's rows no longer carry the "
+                            "availability mark, so it would go unshown. See EditorFontSelectionActivity's drawList.";
 }
 
 TEST(EditorFontPreview, ACompiledInFaceThisBuildOmittedIsNotAvailable) {
@@ -171,8 +183,15 @@ TEST(EditorFontPreview, AvailableRowShowsTheColophonAndNothingElse) {
     EXPECT_FALSE(sub.empty()) << editorfonts::FAMILIES[i].label << " must carry a colophon like a reading family";
     EXPECT_EQ(sub.find(kNotOnCard), std::string::npos)
         << "a reachable row must not be marked: a badge on four rows out of five is noise";
-    // The reading picker's shape: designer, one middle dot, then the lineage.
-    EXPECT_NE(sub.find("\xC2\xB7"), std::string::npos) << "subtitle must separate designer from lineage: " << sub;
+    // The reading picker's shape: the designer, then a LINE BREAK, then their
+    // year and place. The middle dot that used to join them was removed on
+    // 2026-08-14 — it read as a list bullet and it spent width the picker column
+    // did not have, ellipsizing the half of the credit that matters. A deeper
+    // lineage (more than four lines of information) collapses back to one
+    // bulleted line per stage, so accept either separator and require only that
+    // designer and lineage are divided at all.
+    const bool separated = sub.find('\n') != std::string::npos || sub.find("\xC2\xB7") != std::string::npos;
+    EXPECT_TRUE(separated) << "subtitle must separate designer from lineage: " << sub;
   }
 }
 
