@@ -8,48 +8,27 @@ project guide).
 Format: `**[id] Title** — severity · where · status`, then what breaks, how it
 was found, and what closing it requires.
 
----
+**Defects only, and only `B-` ids.** Anything that is merely owed goes to
+[TODO.md](TODO.md), even when it was found during bug work. A parked todo lived
+here as `[T-001]` until 2026-08-15 because this file predated `TODO.md`; two
+different items ended up sharing that id. `scripts/tracker-check.sh` now fails
+on that.
 
-## TODO — deferred by ruling
+## Where the rest of the work lives
 
-Not defects. Work the owner has asked for and explicitly parked; kept here
-because this is the running register and there is nowhere else it would be
-found. Newest first.
+Four trackers across two repos. `scripts/tracker-check.sh` prints all of them
+with open counts and the next free id.
 
-### [T-001] Withdraw three more Settings rows
-**scope: device Settings UI · ruled 2026-08-07 · not started**
+| Tracker | Ids | Holds |
+|---|---|---|
+| [TODO.md](TODO.md) | `T-` | Firmware work that is owed |
+| **BUGS.md** (this file) | `B-` | Firmware defects |
+| `../crosspoint-simulator/TODO.md` | `ST-` | Simulator work that is owed |
+| `../crosspoint-simulator/BUGS.md` | `S-` | Simulator defects |
 
-Remove from the device Settings screen:
-
-| Row | Field | Key | Defined at |
-|---|---|---|---|
-| Clock Format | `clockFormat` | `clockFormat` | `src/SettingsList.h:463` |
-| Sleep Screen Cover Mode | `sleepScreenCoverMode` | `sleepScreenCoverMode` | `src/SettingsList.h:417` |
-| Sleep Screen Cover Filter | `sleepScreenCoverFilter` | `sleepScreenCoverFilter` | `src/SettingsList.h:419` |
-
-**Do it the withdraw way, not the delete way.** All three are plain
-`SettingInfo::Enum` rows with a `valuePtr`, so deleting the entry from
-`getSettingsList()` would stop the field being written by `toJson()` at all and
-drop it from the web settings API — the trap CLAUDE.md documents and that this
-fork has already been bitten by. The procedure, same as the System font row on
-2026-08-07 (`169540d2`), is three steps and all three are needed:
-
-1. Change `category` from `STR_CAT_SYSTEM` to `STR_CAT_DISPLAY`, a retired
-   category `rebuildSettingsLists()` drops. The row keeps persisting and stays
-   web-settable.
-2. Pin the value in `CrossPointSettings::normalizeRetiredSettings()`, so a save
-   written while the picker existed cannot hold the old choice forever.
-3. Make the field initialiser in `CrossPointSettings.h` match the pin, or fresh
-   installs and upgraded ones disagree — pinning alone is a half-fix.
-
-Decide the pinned value per row before starting; the current initialisers are
-`clockFormat = 0` (24-hour), `sleepScreenCoverMode = FIT`,
-`sleepScreenCoverFilter = NO_FILTER`.
-
-**Verify by save cycle, not by reading the file after boot.** `normalize` fixes
-the in-memory value and nothing has called `saveToFile()` yet, so a
-read-back-after-boot check passes whatever you do. Seed the old value, boot,
-enter Settings and press Back (which saves), then read the file.
+Not tracked as numbered items: the upstream backlog
+([docs/fork-sync.md](docs/fork-sync.md)) and the sibling-fork candidates
+([docs/fork-ecosystem.md](docs/fork-ecosystem.md)).
 
 ---
 

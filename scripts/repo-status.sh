@@ -103,4 +103,12 @@ for repo in $REPOS; do
   echo
 done
 
+# What is still owed, across all four trackers in both repos. Reported here
+# because this is the script people actually run, and work that lives only in a
+# chat transcript is work that gets lost (see tracker-check.sh for the three
+# times that happened). A duplicate id fails; open counts never do.
+if [ -x "$(dirname "$0")/tracker-check.sh" ]; then
+  "$(dirname "$0")/tracker-check.sh" || rc=1
+fi
+
 exit "$rc"

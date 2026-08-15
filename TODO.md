@@ -10,9 +10,69 @@ Format: `### [T-NNN] Title` then what it is, why, and what "done" looks like.
 An item leaves this file when it ships or when it is ruled out — not when it is
 started.
 
+## Where the rest of the work lives
+
+Four trackers across two repos. Run `scripts/tracker-check.sh` for all of them
+with open counts and the next free id — do not hand-pick an id, it has produced
+a duplicate `T-009` and a `T-001` in two files.
+
+| Tracker | Ids | Holds |
+|---|---|---|
+| **TODO.md** (this file) | `T-` | Firmware work that is owed |
+| [BUGS.md](BUGS.md) | `B-` | Firmware defects |
+| `../crosspoint-simulator/TODO.md` | `ST-` | Simulator work that is owed |
+| `../crosspoint-simulator/BUGS.md` | `S-` | Simulator defects |
+
+Each tracker holds only its own prefix. Not tracked as numbered items: the
+upstream backlog ([docs/fork-sync.md](docs/fork-sync.md)) and the sibling-fork
+candidates ([docs/fork-ecosystem.md](docs/fork-ecosystem.md)).
+
+**If it only exists in a chat transcript, it is already lost.** That is how this
+file came to exist, how the simulator's did, and how T-017 and T-018 nearly went
+missing on 2026-08-15. File it the same turn you find it.
+
 ---
 
 ## OPEN
+
+### [T-019] Withdraw three more Settings rows
+**scope: device Settings UI · ruled 2026-08-07 · not started**
+
+*Moved here from `BUGS.md` on 2026-08-15, unchanged. It was filed there as
+`[T-001]` because at the time "there is nowhere else it would be found" — this
+file did not exist yet. That left two different items both called `T-001`.*
+
+Remove from the device Settings screen:
+
+| Row | Field | Key | Defined at |
+|---|---|---|---|
+| Clock Format | `clockFormat` | `clockFormat` | `src/SettingsList.h:463` |
+| Sleep Screen Cover Mode | `sleepScreenCoverMode` | `sleepScreenCoverMode` | `src/SettingsList.h:417` |
+| Sleep Screen Cover Filter | `sleepScreenCoverFilter` | `sleepScreenCoverFilter` | `src/SettingsList.h:419` |
+
+**Do it the withdraw way, not the delete way.** All three are plain
+`SettingInfo::Enum` rows with a `valuePtr`, so deleting the entry from
+`getSettingsList()` would stop the field being written by `toJson()` at all and
+drop it from the web settings API — the trap CLAUDE.md documents and that this
+fork has already been bitten by. The procedure, same as the System font row on
+2026-08-07 (`169540d2`), is three steps and all three are needed:
+
+1. Change `category` from `STR_CAT_SYSTEM` to `STR_CAT_DISPLAY`, a retired
+   category `rebuildSettingsLists()` drops. The row keeps persisting and stays
+   web-settable.
+2. Pin the value in `CrossPointSettings::normalizeRetiredSettings()`, so a save
+   written while the picker existed cannot hold the old choice forever.
+3. Make the field initialiser in `CrossPointSettings.h` match the pin, or fresh
+   installs and upgraded ones disagree — pinning alone is a half-fix.
+
+Decide the pinned value per row before starting; the current initialisers are
+`clockFormat = 0` (24-hour), `sleepScreenCoverMode = FIT`,
+`sleepScreenCoverFilter = NO_FILTER`.
+
+**Verify by save cycle, not by reading the file after boot.** `normalize` fixes
+the in-memory value and nothing has called `saveToFile()` yet, so a
+read-back-after-boot check passes whatever you do. Seed the old value, boot,
+enter Settings and press Back (which saves), then read the file.
 
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
 **scope: verification · opened 2026-08-15**
