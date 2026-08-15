@@ -15,9 +15,9 @@
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
-#include "notes/EditorFonts.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "notes/EditorFonts.h"
 
 namespace {
 constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
@@ -32,7 +32,6 @@ void TxtReaderActivity::onEnter() {
   if (!txt) {
     return;
   }
-
 
   txt->setupCacheDir();
 
@@ -107,9 +106,11 @@ void TxtReaderActivity::initializeReader() {
   // family the READER happens to have resident, which silently made three of
   // the five editor rows do nothing.
   cachedFontId = editorfonts::resolve(
-      SETTINGS.editorFont, [this](int id) { return renderer.getFontMap().count(id) > 0; },
-      [this](const char* family) { return sdFontSystem.loadForDisplay(family, 12, renderer); },
-      editorfonts::fallbackFontId());
+      SETTINGS.editorFont, SETTINGS.editorFontSize, [this](int id) { return renderer.getFontMap().count(id) > 0; },
+      [this](const char* family) {
+        return sdFontSystem.loadForDisplay(family, editorfonts::nearestOfferedSize(SETTINGS.editorFontSize), renderer);
+      },
+      editorfonts::fallbackFontId(SETTINGS.editorFontSize));
   cachedScreenMargin = SETTINGS.screenMargin;
   cachedParagraphAlignment = SETTINGS.paragraphAlignment;
 
@@ -582,4 +583,3 @@ void TxtReaderActivity::savePageIndexCache() const {
 
   LOG_DBG("TRS", "Saved page index cache: %d pages", totalPages);
 }
-

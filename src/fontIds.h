@@ -15,8 +15,8 @@
 #define SMALL_FONT_ID (674098198)
 
 // Editor-group fonts, compiled into the firmware rather than loaded from the
-// card. resolveEditorFont() asks for ONE size, 12 pt, in four styles, so only
-// that cut of each family exists. THREE families as of the 2026-08-15 ruling:
+// card. resolveEditorFont() asks for TWO sizes, 12 and 14 pt (owner ruling
+// 2026-08-15), in four styles each. THREE families as of the 2026-08-15 ruling:
 // iA Writer Quattro (OFL, in this repo) plus the two commercial faces below.
 // Space Mono, IBM Plex Mono, iA Writer Duo and iA Writer Mono were all removed
 // that day; their ids are gone, their generated headers stay tracked. The _2x
@@ -33,6 +33,7 @@
 // collisions at runtime), so being stale is harmless, but a regen would churn
 // all of them for nothing. All checked non-zero and non-colliding when added.
 #define IAWRITERQUATTRO_12_FONT_ID (491272101)
+#define IAWRITERQUATTRO_14_FONT_ID (913617268)
 
 // PragmataPro is the one editor face whose glyph tables are NOT in this repo.
 // It is commercial, so builtinFonts/pragmatapro_*.h are gitignored and built
@@ -43,6 +44,7 @@
 // editorfonts::resolve() already refuses to hand back an id the renderer has no
 // glyphs for, so a tree without the font degrades to a built-in mono.
 #define PRAGMATAPRO_12_FONT_ID (1544097263)
+#define PRAGMATAPRO_14_FONT_ID (1474155098)
 
 // NittiTypewriter is also COMMERCIAL (Pieter van Rosmalen / Bold Monday).
 // Same treatment as PragmataPro: ID declared unconditionally, glyph tables
@@ -51,6 +53,7 @@
 // available; Bold/Italic/BoldItalic are synthesised at build time via
 // fontconvert.py's --synth-embolden-em / --synth-slant-deg flags.
 #define NITTITYPEWRITER_12_FONT_ID (738591204)
+#define NITTITYPEWRITER_14_FONT_ID (1881475312)
 
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
@@ -62,5 +65,8 @@ static_assert(UI_10_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(SMALL_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(IAWRITERQUATTRO_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(IAWRITERQUATTRO_14_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(PRAGMATAPRO_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(PRAGMATAPRO_14_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(NITTITYPEWRITER_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(NITTITYPEWRITER_14_FONT_ID != 0, "Font ID collision with sentinel");

@@ -56,7 +56,7 @@ void ClaudeChatActivity::onEnter() {
   panel.begin(/*okIsDone=*/true);  // OK asks Claude here
 
   editorFontId = editorfonts::resolve(
-      SETTINGS.editorFont, [this](int id) { return renderer.getFontMap().count(id) > 0; },
+      SETTINGS.editorFont, SETTINGS.editorFontSize, [this](int id) { return renderer.getFontMap().count(id) > 0; },
       [this](const char* family) {
         // loadForDisplay(), NOT SETTINGS.sdFontIdResolver. The resolver is
         // resolveFontId(), which returns a font id only when that family is the
@@ -73,7 +73,7 @@ void ClaudeChatActivity::onEnter() {
         // It can evict the reader family; that is safe and already routine --
         // the reader re-asserts through sdFontSystem.ensureLoaded() on entry,
         // which is exactly why FontSelectionActivity::onEnter does the same.
-        return sdFontSystem.loadForDisplay(family, 12, renderer);
+        return sdFontSystem.loadForDisplay(family, editorfonts::nearestOfferedSize(SETTINGS.editorFontSize), renderer);
       },
       CHAT_FONT_ID_FALLBACK);
   const auto& metrics = UITheme::getInstance().getMetrics();

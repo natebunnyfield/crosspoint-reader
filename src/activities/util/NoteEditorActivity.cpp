@@ -53,7 +53,7 @@ void NoteEditorActivity::onEnter() {
   // and panelHeight unset. Same shape as the NimBLE-before-init panic: a
   // failure path that leaves the object half-built and still live.
   editorFontId = editorfonts::resolve(
-      SETTINGS.editorFont, [this](int id) { return renderer.getFontMap().count(id) > 0; },
+      SETTINGS.editorFont, SETTINGS.editorFontSize, [this](int id) { return renderer.getFontMap().count(id) > 0; },
       [this](const char* family) {
         // loadForDisplay(), NOT SETTINGS.sdFontIdResolver. The resolver is
         // resolveFontId(), which returns a font id only when that family is the
@@ -65,12 +65,12 @@ void NoteEditorActivity::onEnter() {
         // editorFont=iAWriterQuattro was BYTE-IDENTICAL to one rendered with
         // editorFont=SpaceMono. Three of the five rows did nothing at all.
         //
-        // loadForDisplay does load it, at the editor's 12 pt, the same way the
+        // loadForDisplay does load it, at the editor's chosen size, the same way the
         // Lyra theme loads its title face and CalendarSleepScreen loads 18 pt.
         // It can evict the reader family; that is safe and already routine --
         // the reader re-asserts through sdFontSystem.ensureLoaded() on entry,
         // which is exactly why FontSelectionActivity::onEnter does the same.
-        return sdFontSystem.loadForDisplay(family, 12, renderer);
+        return sdFontSystem.loadForDisplay(family, editorfonts::nearestOfferedSize(SETTINGS.editorFontSize), renderer);
       },
       EDITOR_FONT_ID_FALLBACK);
   const auto& metrics = UITheme::getInstance().getMetrics();

@@ -265,6 +265,18 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // one row. The byte is still written for the web API and for older builds.
   uint8_t editorFont = 0;
 
+  // Editor font POINT SIZE (owner ruling 2026-08-15, "allow editor font to be
+  // resized"). The stored byte is the real size -- 12 or 14 -- never a picker
+  // position, which is why its SettingsList row is a getter/setter with
+  // valuePtr left null and why toJson/fromJson carry it explicitly. Storing an
+  // index here would have repeated on the size axis the exact bug the family
+  // axis had just been rescued from.
+  //
+  // 13 was asked for in the same ruling and declined: no ramp carries it and
+  // loadForDisplay snaps to nearest, so the row would have claimed 13 and drawn
+  // 12. See src/notes/EditorFonts.h SIZES.
+  uint8_t editorFontSize = 12;
+
   // Text rendering settings
   uint8_t extraParagraphSpacing = 1;
   // TEXT_ANTIALIASING value (0=Off, 1=Standard, 2=Crisp, 3=Dark). Non-zero

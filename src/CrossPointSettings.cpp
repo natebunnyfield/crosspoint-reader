@@ -115,6 +115,12 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // cannot silently become a different face — the failure this key exists to
   // end. A literal from FAMILIES, so no copy: static storage duration.
   doc["editorFontFamily"] = editorfonts::selectedFamily(editorFont);
+  // Editor font SIZE, in points. Written here rather than by the SettingsList
+  // loop because its row has no valuePtr (it is a getter/setter row so the byte
+  // stays a point size instead of a picker index), and that loop persists only
+  // valuePtr rows -- a row with neither is silently dropped from settings.json.
+  // Same reason fontSizeSlot and screenMargin appear by hand above.
+  doc["editorFontSize"] = editorFontSize;
 
   // Language -- picked via the in-place option popup in SettingsActivity, not in SettingsList.
   // Stored as ISO code string ("EN", "DE", ...) for stability across enum reorders.
@@ -377,6 +383,12 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
     // and the migration cannot re-apply the way its predecessor did.
     needsResave = true;
   }
+
+  // Editor font size -- see the toJson note; a getter/setter row is not carried
+  // by the generic loop. Snapped through nearestOfferedSize so a byte written
+  // when a different set of sizes was offered lands on a real one rather than
+  // being clamped away or resolving to a cut that is not compiled in.
+  editorFontSize = editorfonts::nearestOfferedSize(doc["editorFontSize"] | static_cast<uint8_t>(12));
 
   // Owner name — not in SettingsList, load manually
   const char* own = doc["ownerName"] | "";

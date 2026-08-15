@@ -40,7 +40,11 @@ constexpr int kColophonGap = 6;
 // The editor asks the SD resolver for this and nothing else
 // (NoteEditorActivity::onEnter), so the specimen is drawn at it. Previewing at
 // any other size would be showing a rendering the editor never produces.
-constexpr uint8_t kEditorPointSize = 12;
+// The size the PREVIEW draws at, and the size the picker's rows report. Follows
+// the Editor Font Size setting rather than a constant 12, so the specimen shows
+// the face at the size it will actually be typed in -- a preview at a size the
+// editor will not use is a preview of the wrong thing.
+inline uint8_t editorPointSize() { return editorfonts::nearestOfferedSize(SETTINGS.editorFontSize); }
 }  // namespace
 
 EditorFontSelectionActivity::EditorFontSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -97,7 +101,9 @@ bool EditorFontSelectionActivity::isAvailable(uint8_t storedIndex) const {
   if (storedIndex >= editorfonts::FAMILY_COUNT) return false;
   // Compiled in: present by construction, but only if this build really has it
   // -- a font id is just an int and holding one implies nothing.
-  if (const int builtin = editorfonts::builtinFontIdFor(storedIndex); builtin != 0) {
+  // Asked at the CURRENT editor size: a row is available if the cut the editor
+  // would actually load is present, not if some other size of it is.
+  if (const int builtin = editorfonts::builtinFontIdFor(storedIndex, editorPointSize()); builtin != 0) {
     return renderer.getFontMap().count(builtin) > 0;
   }
   // Card-only: a registry lookup, which is in memory. Deliberately NOT
@@ -112,8 +118,8 @@ int EditorFontSelectionActivity::resolveAppliedFontId() {
   // use -- which is the exact failure this screen exists to prevent, and the one
   // the Editor Font setting originally shipped with.
   return editorfonts::resolve(
-      SETTINGS.editorFont, [this](int id) { return renderer.getFontMap().count(id) > 0; },
-      [this](const char* family) { return sdFontSystem.loadForDisplay(family, kEditorPointSize, renderer); },
+      SETTINGS.editorFont, SETTINGS.editorFontSize, [this](int id) { return renderer.getFontMap().count(id) > 0; },
+      [this](const char* family) { return sdFontSystem.loadForDisplay(family, editorPointSize(), renderer); },
       UI_10_FONT_ID);
 }
 
@@ -249,7 +255,7 @@ void EditorFontSelectionActivity::renderPreviewPane(int top, int height, int fon
   char label[96];
   if (faceName == nullptr) return;
   if (available) {
-    snprintf(label, sizeof(label), "%s — %u pt", faceName, static_cast<unsigned>(kEditorPointSize));
+    snprintf(label, sizeof(label), "%s — %u pt", faceName, static_cast<unsigned>(editorPointSize()));
   } else {
     snprintf(label, sizeof(label), "%s — %s", faceName, I18N.get(StrId::STR_FONT_NOT_ON_CARD));
   }

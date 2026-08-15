@@ -71,7 +71,7 @@ bool hasStyle(const mdspans::Line& md, mdspans::Style want) {
 bool isAvailable(uint8_t storedIndex, const std::function<bool(int)>& isRegistered,
                  const std::function<bool(const char*)>& onCard) {
   if (storedIndex >= editorfonts::FAMILY_COUNT) return false;
-  if (const int builtin = editorfonts::builtinFontIdFor(storedIndex); builtin != 0) {
+  if (const int builtin = editorfonts::builtinFontIdFor(storedIndex, 12); builtin != 0) {
     return isRegistered(builtin);
   }
   return onCard(editorfonts::FAMILIES[storedIndex].family);
@@ -137,7 +137,7 @@ TEST(EditorFontPreview, EveryEditorFaceIsCompiledInSoNoneCanBeMissing) {
 
   int cardOnly = 0;
   for (uint8_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
-    const bool builtin = editorfonts::FAMILIES[i].builtinFontId != 0;
+    const bool builtin = editorfonts::FAMILIES[i].builtinFontId[0] != 0;
     const bool avail = isAvailable(i, allRegistered, emptyCard);
     EXPECT_EQ(avail, builtin) << editorfonts::FAMILIES[i].label
                               << ": a compiled-in face is always available, a card-only face is not";
@@ -155,7 +155,7 @@ TEST(EditorFontPreview, ACompiledInFaceThisBuildOmittedIsNotAvailable) {
   const auto noneRegistered = [](int) { return false; };
   const auto fullCard = [](const char*) { return true; };
   for (uint8_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
-    if (editorfonts::FAMILIES[i].builtinFontId == 0) continue;
+    if (editorfonts::FAMILIES[i].builtinFontId[0] == 0) continue;
     EXPECT_FALSE(isAvailable(i, noneRegistered, fullCard))
         << editorfonts::FAMILIES[i].label << " is compiled in by the table but absent from this build";
   }
@@ -173,7 +173,7 @@ TEST(EditorFontPreview, ACompiledInFaceThisBuildOmittedIsNotAvailable) {
 TEST(EditorFontPreview, ABuiltinRowIgnoresTheCardEntirely) {
   const auto registered = [](int) { return true; };
   for (uint8_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
-    if (editorfonts::FAMILIES[i].builtinFontId == 0) continue;
+    if (editorfonts::FAMILIES[i].builtinFontId[0] == 0) continue;
     const bool emptyCard = isAvailable(i, registered, [](const char*) { return false; });
     const bool fullCard = isAvailable(i, registered, [](const char*) { return true; });
     EXPECT_TRUE(emptyCard) << editorfonts::FAMILIES[i].label << " is compiled in and must never be reported missing";
