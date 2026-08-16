@@ -222,3 +222,33 @@ consumes it even though no firmware code does.
   Coverage: `test/activity_input/ListPagingTest.cpp` (12 cases — the mapping
   seam, both clamps, a short list, an exact multiple, and the shared-timer
   hazard).
+
+## Custom iconography — sweep closed (ruling 2026-08-15)
+
+Two glyphs were redrawn after owner reports, and the sweep **stops there**.
+
+Shipped:
+
+* **Return arrowhead** — two fanned thick strokes could not form a point (each
+  `drawLine` ends in a flat cap, and two caps overlap into a lozenge), so it is
+  a filled triangle. Then a follow-up report — "the top half is missing ink on
+  its left side" — turned out to be two faults in `fillPolygon` rather than in
+  the glyph: division truncation that followed the edge-walk order, and a
+  parity rule that dropped the row at each edge's minimum y. Triangles now
+  rasterize by exact integer half-space tests.
+* **Text cursor I-beam** — notched serifs plus a baseline crossbar, at the
+  shipped 2 px serif. The serif notch is the shipped macOS cursor's shape; the
+  crossbar is the classic Macintosh I-beam's baseline mark.
+
+**Declined, and not to be re-proposed as an improvement:** redrawing the
+battery and the charging bolt, and the lower-ranked glyphs behind them. The
+faults are real and were measured — the bolt is eight literal scanlines with
+two flare rows at double the stem weight and the halves offset by 1 px, and the
+battery's terminal nub is two bare `drawPixel` calls at hardcoded offsets that
+only centre at one height — but the owner ruled the sweep closed with the two
+keyboard glyphs done. Header art stays as it is.
+
+Also NOT done, and still dead code if anyone goes looking: `CoverIcon` has zero
+references anywhere, and two `BaseTheme` shapes are unreachable. Deleting them
+was bundled into the declined option; they were not separately ruled on, so
+that remains open rather than settled.
