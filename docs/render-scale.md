@@ -223,3 +223,23 @@ objects — the mixed-object bug that check was written for, in a new hat.
    pixel a clean 2x2 square — with identical line breaks to the other two.
 5. Back to **Fine (3x)**, relaunch, and confirm it is indistinguishable from the
    build before this change.
+
+## Standing ruling 2026-08-15 — all three scales ship, +53 MB accepted
+
+The owner ruled: keep 1x, 2x and 3x, and accept the ~53 MB of bundle needed to
+carry both hi-res font tiers.
+
+The reasoning, so it is not re-litigated. 2x is the only setting that presents
+the panel at **exactly 1.0** on a 1260 px-wide phone — nothing resampled, the
+framebuffer reaching the glass untouched. It is therefore the only mode that
+provably cannot moire, and dropping it would have left a choice between blocky
+(1x, integer-floored to 2.0) and bilinear-filtered (3x). Dropping the ceiling to
+2 instead was rejected for the mirror reason: 3x is the only scale that reaches
+the minified branch, so it is the only one the bilinear fix exists for.
+
+Bundle size is an install-time cost and nothing more here — TestFlight on this
+project is single-user.
+
+**Do not re-propose trimming a tier as a size saving.** It was measured, costed
+and declined. Reopen only if a future panel or device geometry changes which
+scales land on the pixel grid.
