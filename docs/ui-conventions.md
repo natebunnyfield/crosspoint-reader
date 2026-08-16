@@ -248,7 +248,13 @@ battery's terminal nub is two bare `drawPixel` calls at hardcoded offsets that
 only centre at one height — but the owner ruled the sweep closed with the two
 keyboard glyphs done. Header art stays as it is.
 
-Also NOT done, and still dead code if anyone goes looking: `CoverIcon` has zero
-references anywhere, and two `BaseTheme` shapes are unreachable. Deleting them
-was bundled into the declined option; they were not separately ruled on, so
-that remains open rather than settled.
+**`CoverIcon` stays, ruled 2026-08-15.** `src/components/icons/cover.h` is
+included by no file in either repo, its array is referenced nowhere, and it does
+NOT appear in the device binary -- verified with `nm` on `firmware.elf`, so it
+occupies zero flash. Deleting it would buy nothing measurable, and on an
+e-reader a cover icon is a plausible deliberate stub. Do not re-file it as an
+orphan: the zero-reference grep is not news, it is the recorded state.
+
+Still genuinely unverified: the icons agent reported two unreachable `BaseTheme`
+shapes. Nobody has confirmed that independently, and it was never ruled on -- so
+it is an open question, not a pending cleanup.
