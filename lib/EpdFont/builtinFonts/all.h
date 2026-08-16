@@ -33,7 +33,7 @@
 #include <builtinFonts/librefranklin_reader_18_italic.h>
 #include <builtinFonts/librefranklin_reader_18_regular.h>
 
-// Hi-res companions, selected by CROSSPOINT_RENDER_SCALE.
+// Hi-res companions, for every tier at or below CROSSPOINT_RENDER_SCALE.
 //
 // Guarded rather than unconditional so a device build parses NONE of them. It
 // previously included the 2x tier always and relied on --gc-sections to drop
@@ -45,7 +45,16 @@
 // to match. Only the OFL families appear: PragmataPro and Nitti Typewriter are
 // commercial, their headers are gitignored, and main.cpp includes those behind
 // __has_include so a clone without the licensed sources still builds.
-#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE == 2
+//
+// EVERY TIER UP TO THE CEILING, NOT JUST THE CEILING. The macro used to select
+// exactly one (`== 2` / `== 3`) because the render factor was fixed at compile
+// time and only one tier could ever be blitted. It is now latched at startup
+// from the owner's setting (RenderScale.h), so a binary compiled at ceiling 3
+// may render at 2, and a companion set for the tier it is actually rendering at
+// has to be present in the binary. Registering the wrong tier's companions is
+// worse than registering none: the glyph bitmaps would be blitted at a pixel
+// density the framebuffer does not have.
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE >= 2
 #include <builtinFonts/iawriterquattro_12_bold_2x.h>
 #include <builtinFonts/iawriterquattro_14_bold_2x.h>
 #include <builtinFonts/iawriterquattro_12_bolditalic_2x.h>
@@ -60,7 +69,8 @@
 #include <builtinFonts/librefranklin_12_regular_2x.h>
 #include <builtinFonts/librefranklin_8_bold_2x.h>
 #include <builtinFonts/librefranklin_8_regular_2x.h>
-#elif defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE == 3
+#endif
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE >= 3
 #include <builtinFonts/iawriterquattro_12_bold_3x.h>
 #include <builtinFonts/iawriterquattro_14_bold_3x.h>
 #include <builtinFonts/iawriterquattro_12_bolditalic_3x.h>

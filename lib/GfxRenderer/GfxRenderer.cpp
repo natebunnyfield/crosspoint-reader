@@ -287,7 +287,7 @@ static AlignedMemRect screenRectToAlignedMemRect(GfxRenderer::Orientation orient
 
   // rotateCoordinates works in DEVICE space (it is parameterised by the
   // framebuffer dims), so scale the logical rect up first. Folds away at scale 1.
-  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int S = cp::renderScale();
   int x0, y0, x1, y1;
   rotateCoordinates(orientation, sx * S, sy * S, &x0, &y0, panelWidth, panelHeight);
   rotateCoordinates(orientation, (sx + sw) * S - 1, (sy + sh) * S - 1, &x1, &y1, panelWidth, panelHeight);
@@ -556,10 +556,11 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
 // looking exactly as it does at scale 1: the shape is unchanged, only its
 // sampling grid is finer. Glyphs bypass this via the hi-res path in drawText().
 void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
-  const int dx0 = x * RENDER_SCALE;
-  const int dy0 = y * RENDER_SCALE;
-  for (int j = 0; j < RENDER_SCALE; ++j) {
-    for (int i = 0; i < RENDER_SCALE; ++i) {
+  const int S = cp::renderScale();
+  const int dx0 = x * S;
+  const int dy0 = y * S;
+  for (int j = 0; j < S; ++j) {
+    for (int i = 0; i < S; ++i) {
       drawPixelDevice(dx0 + i, dy0 + j, state);
     }
   }
@@ -721,8 +722,8 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
                                                        combiningGlyph->left, combiningGlyph->width);
 #if CROSSPOINT_RENDER_SCALE > 1
       if (hiRes && hiRes->getGlyph(cp, style)) {
-        renderCharImpl<TextRotation::None, true>(*this, renderMode, *hiRes, cp, combiningX * RENDER_SCALE,
-                                                 (yPos - raiseBy) * RENDER_SCALE, black, style);
+        renderCharImpl<TextRotation::None, true>(*this, renderMode, *hiRes, cp, combiningX * renderScale(),
+                                                 (yPos - raiseBy) * renderScale(), black, style);
         continue;
       }
 #endif
@@ -756,8 +757,8 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
 
 #if CROSSPOINT_RENDER_SCALE > 1
     if (hiRes && hiRes->getGlyph(cp, style)) {
-      const int devX = lastBaseX * RENDER_SCALE;
-      const int devY = yPos * RENDER_SCALE;
+      const int devX = lastBaseX * renderScale();
+      const int devY = yPos * renderScale();
       if (isSupSub) {
         // renderCharScaled halves the glyph. A RENDER_SCALE-x face halved on the
         // device grid is exactly the half-size logical glyph, supersampled.
@@ -929,7 +930,7 @@ void GfxRenderer::drawLine(int x1, int y1, int x2, int y2, const int lineWidth, 
   // is already identical to a device-resolution rect, and routing them here would
   // change nothing but the cost.
   if (dx != 0 && dy != 0) {
-    constexpr int S = RENDER_SCALE;
+    const int S = cp::renderScale();
     // x is sampled at the centre of the logical column so the run stays centred
     // in the pixels the logical form would have covered; the thickness offset
     // starts at the logical row's top edge so the band occupies exactly the same
@@ -1163,7 +1164,7 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
   // is rigid (no shear/stretch) so the bbox of the two corners IS the rect.
   // Scale to device pixels first: a logical rect covers S x S framebuffer pixels
   // per logical pixel, so the fill is the same shape at a finer sampling grid.
-  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int S = cp::renderScale();
   int paX, paY, pbX, pbY;
   rotateCoordinates(orientation, lx0 * S, ly0 * S, &paX, &paY, panelWidth, panelHeight);
   rotateCoordinates(orientation, lx1 * S - 1, ly1 * S - 1, &pbX, &pbY, panelWidth, panelHeight);
@@ -1256,16 +1257,21 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
     // coordinate divided by S. That keeps the dither at LOGICAL resolution --
     // the fill looks pixel-for-pixel like scale 1, just replicated -- rather
     // than becoming a finer (and visibly different) pattern.
-    constexpr int S = CROSSPOINT_RENDER_SCALE;
-    constexpr int MASK_PERIOD = 2 * S;
+    const int S = cp::renderScale();
+    const int MASK_PERIOD = 2 * S;
     // Indexed with % rather than & (MASK_PERIOD - 1), which is why there is no
-    // longer a power-of-two static_assert here. MASK_PERIOD is a compile-time
-    // constant, so at 1x and 2x the compiler still emits the same single AND it
-    // did when the mask was written by hand -- and at 3x it emits the
-    // multiply-shift that a period of 6 needs, instead of silently indexing
-    // wrong. Both sites below are non-negative: phyY0 is a clamped panel row and
-    // the loop only counts up from it.
-    uint8_t blackMasks[MASK_PERIOD];
+    // power-of-two static_assert here: the period is 2, 4 or 6 and only two of
+    // those are maskable. At a fixed scale this was constexpr and the compiler
+    // emitted the same single AND the hand-written mask did; with the scale
+    // latched at launch it is a variable, and the modulo is a real one. That is
+    // the cost of the setting, and it is paid per ROW, not per pixel.
+    //
+    // The ARRAY, unlike the period, stays compile-time sized -- at the CEILING,
+    // so it is large enough for any factor this binary can latch. A VLA here
+    // would be the same trade for no benefit. Both index sites below are
+    // non-negative: phyY0 is a clamped panel row and the loop only counts up
+    // from it.
+    uint8_t blackMasks[2 * cp::kRenderScaleMax];
     for (int parityIdx = 0; parityIdx < MASK_PERIOD; ++parityIdx) {
       const int samplePy = phyY0 + parityIdx;
       int lxBase = 0, lyBase = 0;
@@ -1497,7 +1503,7 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, co
   // Instead reproduce the blit EXACTLY: work out the physical rect it would
   // occupy on the un-scaled panel, then write each of its pixels as a
   // RENDER_SCALE x RENDER_SCALE device block. Mapping-agnostic and pixel-exact.
-  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int S = cp::renderScale();
   const int logicalPanelW = panelWidth / S;
   const int logicalPanelH = panelHeight / S;
   int rotatedX = 0;
@@ -1793,7 +1799,7 @@ void GfxRenderer::preserveImagePolarity(const int x, const int y, const int widt
   // Clip in logical space, then rotate the two opposing corners into physical
   // framebuffer space, exactly as fillRectImpl does. Rotation is rigid, so the
   // bounding box of the two rotated corners IS the rectangle.
-  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int S = cp::renderScale();
   const int lx0 = std::max(0, x);
   const int ly0 = std::max(0, y);
   const int lx1 = std::min(getScreenWidth(), x + width);
@@ -1865,7 +1871,7 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
   // boundary. It compiles out entirely at RENDER_SCALE == 1, which is every
   // device build -- nothing here is visible on an X3 or an X4.
   {
-    constexpr int S = RENDER_SCALE;
+    const int S = cp::renderScale();
     const auto sx = [&](const int i) { return xPoints[i] * S + S / 2; };
     const auto sy = [&](const int i) { return yPoints[i] * S + S / 2; };
 
@@ -2001,7 +2007,7 @@ void GfxRenderer::endStripTarget() const {
 #if CROSSPOINT_RENDER_SCALE > 1
 // Logical bbox -> device bbox (inclusive corners), then the device test below.
 bool GfxRenderer::glyphIntersectsStrip(int x0, int y0, int x1, int y1) const {
-  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int S = cp::renderScale();
   return glyphIntersectsStripDevice(x0 * S, y0 * S, x1 * S + S - 1, y1 * S + S - 1);
 }
 
@@ -2180,13 +2186,13 @@ int GfxRenderer::getScreenWidth() const {
     case Portrait:
     case PortraitInverted:
       // 480px wide in portrait logical coordinates
-      return panelHeight / RENDER_SCALE;
+      return panelHeight / cp::renderScale();
     case LandscapeClockwise:
     case LandscapeCounterClockwise:
       // 800px wide in landscape logical coordinates
-      return panelWidth / RENDER_SCALE;
+      return panelWidth / cp::renderScale();
   }
-  return panelHeight / RENDER_SCALE;
+  return panelHeight / cp::renderScale();
 }
 
 int GfxRenderer::getScreenHeight() const {
@@ -2194,13 +2200,13 @@ int GfxRenderer::getScreenHeight() const {
     case Portrait:
     case PortraitInverted:
       // 800px tall in portrait logical coordinates
-      return panelWidth / RENDER_SCALE;
+      return panelWidth / cp::renderScale();
     case LandscapeClockwise:
     case LandscapeCounterClockwise:
       // 480px tall in landscape logical coordinates
-      return panelHeight / RENDER_SCALE;
+      return panelHeight / cp::renderScale();
   }
-  return panelWidth / RENDER_SCALE;
+  return panelWidth / cp::renderScale();
 }
 
 void GfxRenderer::tapToLogical(float nx, float ny, int& outX, int& outY) const {
@@ -2231,8 +2237,8 @@ void GfxRenderer::tapToLogical(float nx, float ny, int& outX, int& outY) const {
       break;
   }
   // The inverse rotate lands in DEVICE pixels; callers want logical ones.
-  outX /= RENDER_SCALE;
-  outY /= RENDER_SCALE;
+  outX /= cp::renderScale();
+  outY /= cp::renderScale();
 }
 
 // Translate a logical rect through rotateCoordinates and take the bounding
@@ -2244,7 +2250,7 @@ static bool logicalRectToPhysicalBounds(GfxRenderer::Orientation orientation, in
   if (lw <= 0 || lh <= 0) return false;
   // Corners in DEVICE pixels: rotateCoordinates is parameterised by the
   // framebuffer dims, which are RENDER_SCALE x the logical panel.
-  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int S = cp::renderScale();
   lx *= S;
   ly *= S;
   lw *= S;
@@ -2602,8 +2608,8 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
                                                                   combiningGlyph->left, combiningGlyph->width);
 #if CROSSPOINT_RENDER_SCALE > 1
       if (hiRes && hiRes->getGlyph(cp, style)) {
-        renderCharImpl<TextRotation::Rotated90CW, true>(*this, renderMode, *hiRes, cp, combiningX * RENDER_SCALE,
-                                                        combiningY * RENDER_SCALE, black, style);
+        renderCharImpl<TextRotation::Rotated90CW, true>(*this, renderMode, *hiRes, cp, combiningX * renderScale(),
+                                                        combiningY * renderScale(), black, style);
         continue;
       }
 #endif
@@ -2629,8 +2635,8 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
 #if CROSSPOINT_RENDER_SCALE > 1
     if (hiRes && hiRes->getGlyph(cp, style)) {
-      renderCharImpl<TextRotation::Rotated90CW, true>(*this, renderMode, *hiRes, cp, x * RENDER_SCALE,
-                                                      lastBaseY * RENDER_SCALE, black, style);
+      renderCharImpl<TextRotation::Rotated90CW, true>(*this, renderMode, *hiRes, cp, x * renderScale(),
+                                                      lastBaseY * renderScale(), black, style);
       prevCp = cp;
       continue;
     }
@@ -2657,7 +2663,7 @@ void GfxRenderer::preconditionGrayscale(int x, int y, int w, int h) const {
   if (w <= 0 || h <= 0) return;
   // Rotate the logical rect's opposite corners to physical panel coords; the
   // physical bbox stays axis-aligned for all four orientations.
-  constexpr int S = CROSSPOINT_RENDER_SCALE;
+  const int S = cp::renderScale();
   int ax, ay, bx, by;
   rotateCoordinates(orientation, x * S, y * S, &ax, &ay, panelWidth, panelHeight);
   rotateCoordinates(orientation, (x + w) * S - 1, (y + h) * S - 1, &bx, &by, panelWidth, panelHeight);

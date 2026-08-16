@@ -1,7 +1,5 @@
 #include "PngToBmpConverter.h"
 
-#include "PngBitDepth.h"
-
 #include <HalDisplay.h>
 #include <HalStorage.h>
 #include <InflateStream.h>
@@ -14,6 +12,7 @@
 #include <cstring>
 
 #include "BitmapHelpers.h"
+#include "PngBitDepth.h"
 
 // ============================================================================
 // IMAGE PROCESSING OPTIONS - Same as JpegToBmpConverter for consistency
@@ -853,12 +852,20 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
 
 bool PngToBmpConverter::pngFileToBmpStream(HalFile& pngFile, Print& bmpOut, bool crop) {
   // Use runtime display dimensions (swapped for portrait cover sizing).
-  // LOGICAL, not framebuffer: at CROSSPOINT_RENDER_SCALE > 1 the framebuffer is
-  // a multiple of the panel, and a cover.bmp is cached on the SD card without a
+  // LOGICAL, not framebuffer: on a supersampled host build the framebuffer is a
+  // multiple of the panel, and a cover.bmp is cached on the SD card without a
   // dimension key -- sizing it from the framebuffer would silently write covers
   // at a different resolution than the device produces.
-  const int targetWidth = display.getDisplayHeight() / HalDisplay::RENDER_SCALE;
-  const int targetHeight = display.getDisplayWidth() / HalDisplay::RENDER_SCALE;
+  //
+  // Read straight off the LOGICAL constants rather than dividing the live
+  // framebuffer by the render scale. Those are the same number, but only the
+  // constants stay the same number when the scale becomes a launch-time choice
+  // (RenderScale.h): the division has to pair the ACTIVE framebuffer with the
+  // ACTIVE scale, and getting that pairing wrong writes a cover at the wrong
+  // size into a cache that has no dimension key to invalidate it. There is
+  // nothing to pair here.
+  const int targetWidth = HalDisplay::LOGICAL_HEIGHT;
+  const int targetHeight = HalDisplay::LOGICAL_WIDTH;
   return pngFileToBmpStreamInternal(pngFile, bmpOut, targetWidth, targetHeight, false, crop);
 }
 

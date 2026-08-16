@@ -4,6 +4,7 @@
 #include <HalDisplay.h>
 
 #include "GlyphAaPlanes.h"
+#include "RenderScale.h"
 
 namespace BidiUtils {
 // Paragraph base direction for the Unicode BiDi algorithm (UAX#9).
@@ -368,10 +369,21 @@ class GfxRenderer {
   int getWriteOriginY() const { return _stripActive ? _stripY0 : 0; }
   int getWriteRows() const { return _stripActive ? _stripRows : panelHeight; }
 
-  // Supersampling: how many framebuffer pixels one logical pixel covers on each
-  // axis. 1 on device (see HalDisplay.h). Everything above the pixel-write layer
-  // -- coordinates, metrics, layout -- is in LOGICAL units regardless.
-  static constexpr int RENDER_SCALE = CROSSPOINT_RENDER_SCALE;
+  // Supersampling CEILING: the largest number of framebuffer pixels one logical
+  // pixel may cover on each axis. 1 on device (see HalDisplay.h). Everything
+  // above the pixel-write layer -- coordinates, metrics, layout -- is in LOGICAL
+  // units regardless.
+  //
+  // THIS IS THE CEILING, NOT THE ACTIVE FACTOR. It gates the `#if` blocks below
+  // and sizes the simulator's framebuffers, so it has to be a constant. The
+  // factor actually being rendered at is renderScale(), which on a host build is
+  // latched from the owner's setting at startup and may be anything from 1 up to
+  // this. Using RENDER_SCALE where renderScale() is meant is how you get glyphs
+  // blitted at a density the framebuffer does not have.
+  static constexpr int RENDER_SCALE = cp::kRenderScaleMax;
+
+  // The factor this process is actually rendering at. See RenderScale.h.
+  static int renderScale() { return cp::renderScale(); }
 
   // Drawing
   void drawPixel(int x, int y, bool state = true) const;

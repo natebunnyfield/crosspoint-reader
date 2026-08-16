@@ -63,19 +63,26 @@ class KeyboardIconTarget final : public freeink::ui::DrawTarget {
               const freeink::ui::Rotation rotation = freeink::ui::Rotation::None) override {
     if (bitmap.data == freeink::ui::lucideDeleteIcon16().data && !rect.empty()) {
 #if CROSSPOINT_RENDER_SCALE > 1
-      drawBackspaceDevicePixels(rect, foreground);
-      return;
-#else
-      // Device path. Hand the SDK the 32px art and let its own sampler run:
-      // the icon rect is 32 logical px, so this is a 1:1 blit and the
-      // nearest-neighbor loop reduces to a copy. Same rect, same Contain
-      // semantics, so layout and hit rects are untouched.
+      // The runtime check matters as much as the compile-time one: a host build
+      // compiled at ceiling 3 can be rendering at 1, and at 1 the device-pixel
+      // blit would downsample the 64px art into a 32px box instead of blitting
+      // the 32px art 1:1. Same picture either way, but not the SAME PIXELS, and
+      // "scale 1 on the host is what the device draws" is the whole point of
+      // offering scale 1.
+      if (cp::renderScale() > 1) {
+        drawBackspaceDevicePixels(rect, foreground);
+        return;
+      }
+#endif
+      // Device path, and the scale-1 host path. Hand the SDK the 32px art and
+      // let its own sampler run: the icon rect is 32 logical px, so this is a
+      // 1:1 blit and the nearest-neighbor loop reduces to a copy. Same rect,
+      // same Contain semantics, so layout and hit rects are untouched.
       inner.bitmap(
           rect,
           freeink::ui::BitmapRef{BACKSPACE_32, BACKSPACE_32_PX, BACKSPACE_32_PX, freeink::ui::BitmapFormat::Mask1},
           mode, foreground, rotation);
       return;
-#endif
     }
     inner.bitmap(rect, bitmap, mode, foreground, rotation);
   }
@@ -90,7 +97,7 @@ class KeyboardIconTarget final : public freeink::ui::DrawTarget {
   // Supersampled host build: the logical grid is coarser than the panel, so the
   // 64px art is blitted per DEVICE pixel, exactly like a hi-res font companion.
   void drawBackspaceDevicePixels(const freeink::ui::Rect rect, const freeink::ui::Paint foreground) const {
-    constexpr int S = GfxRenderer::RENDER_SCALE;
+    const int S = cp::renderScale();
     constexpr int src = BACKSPACE_64_PX;
     constexpr int rowBytes = src / 8;
     const bool black = foreground.color != freeink::ui::Color::White;

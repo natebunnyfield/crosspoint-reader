@@ -1,6 +1,8 @@
 """
-PlatformIO pre-build script: emit the simulator's supersampling factor as
-EXACTLY ONE -DCROSSPOINT_RENDER_SCALE on the compiler command line.
+PlatformIO pre-build script: emit the simulator's supersampling CEILING as
+EXACTLY ONE -DCROSSPOINT_RENDER_SCALE on the compiler command line, plus the
+-DCROSSPOINT_RENDER_SCALE_RUNTIME switch that lets the factor actually rendered
+at be chosen when the binary runs.
 
 Why this is not just a build_flags entry
 ----------------------------------------
@@ -27,8 +29,20 @@ Usage
     CROSSPOINT_RENDER_SCALE=2 pio run -e simulator_x3        # 2x supersampled
     CROSSPOINT_RENDER_SCALE=2 pio run -e simulator_x3 -t run_simulator
 
-The env var is read at build time only; it does not need to be set when the
-resulting binary is run. Toggling it does not change platformio.ini, so the
+CROSSPOINT_RENDER_SCALE is read at BUILD time and fixes the ceiling. Above a
+ceiling of 1 this script also defines CROSSPOINT_RENDER_SCALE_RUNTIME, which
+makes cp::renderScale() (lib/GfxRenderer/RenderScale.h) a variable rather than a
+constant -- so one binary can render at any factor up to its ceiling, chosen at
+launch by the RUN-time env var CROSSPOINT_SIM_RENDER_SCALE (the iOS app reads
+Settings > Page Sharpness instead). Unset, it renders at the ceiling, which is
+byte-for-byte the behaviour from before the switch existed.
+
+    CROSSPOINT_RENDER_SCALE=3 pio run -e simulator      # ceiling 3, renders 3x
+    CROSSPOINT_SIM_RENDER_SCALE=2 .pio/build/simulator/program   # same binary, 2x
+
+At a ceiling of 1 the switch is deliberately NOT defined: there is nothing to
+choose, and leaving cp::renderScale() constexpr keeps the device-exact desktop
+build folding the scale arithmetic away exactly as the device build does. Toggling it does not change platformio.ini, so the
 build directory survives -- and that used to be a trap rather than a feature.
 The scale changes a STRUCT LAYOUT, not just code paths: FontCacheManager takes
 an extra constructor parameter under RENDER_SCALE > 1. Recompiling incrementally
@@ -95,13 +109,43 @@ if explicit:
             file=sys.stderr,
         )
     print(f"[sim_render_scale.py] {explicit} supplied via build flags; leaving it alone")
+    _ceiling = 0  # unknown -- parsed below only to decide the runtime switch
+    if "=" in explicit:
+        try:
+            _ceiling = int(explicit.split("=", 1)[1])
+        except ValueError:
+            _ceiling = 0
 elif override:
     scale = resolve_scale(override)
     env.Append(CPPDEFINES=[(MACRO, scale)])  # noqa: F821
     print(f"[sim_render_scale.py] {MACRO}={scale} (from environment)")
+    _ceiling = scale
 else:
     env.Append(CPPDEFINES=[(MACRO, DEFAULT_SCALE)])  # noqa: F821
     print(f"[sim_render_scale.py] {MACRO}={DEFAULT_SCALE} (default)")
+    _ceiling = DEFAULT_SCALE
+
+# The runtime switch, above a ceiling of 1. See the module docstring.
+#
+# CROSSPOINT_RENDER_SCALE_RUNTIME=0 in the environment forces it off, which
+# builds a binary whose scale is a compile-time constant again -- the shape this
+# repo had before the setting existed. That is not a nostalgia switch: it is how
+# you produce a reference binary to diff a runtime build against, and proving
+# "runtime at N is byte-identical to fixed at N" is the only way to know the
+# ~40 arithmetic sites were converted without one of them silently reading the
+# ceiling.
+_runtime_env = os.environ.get(MACRO + "_RUNTIME", "").strip()
+_runtime_on = False
+if _runtime_env == "0":
+    print(f"[sim_render_scale.py] {MACRO}_RUNTIME disabled by environment; "
+          f"scale is a compile-time constant {_ceiling}")
+elif _ceiling > 1:
+    env.Append(CPPDEFINES=[(MACRO + "_RUNTIME", 1)])  # noqa: F821
+    _runtime_on = True
+    print(
+        f"[sim_render_scale.py] {MACRO}_RUNTIME=1 "
+        f"(CROSSPOINT_SIM_RENDER_SCALE picks 1..{_ceiling} at launch)"
+    )
 
 
 
@@ -115,8 +159,16 @@ else:
 # "every TU that sees a scale-dependent declaration", which is most of them via
 # GfxRenderer.h and FontCacheManager.h, and getting that list subtly wrong
 # reintroduces exactly the mixed-object bug this prevents.
+# The RUNTIME switch is part of the stamp, not just the scale. It changes
+# whether cp::renderScale() is a constexpr function or an extern variable --
+# which is an ODR-relevant difference in every header that calls it, and it
+# changes DirectPixelWriter's layout (a member at runtime, nothing at
+# compile time). Stamping only the scale would let a RUNTIME=0 reference build
+# link against runtime objects, which is the mixed-object bug this check was
+# written for, wearing a different hat.
 _build_dir = env.subst("$BUILD_DIR")  # noqa: F821
 _effective = explicit if explicit else (override or str(DEFAULT_SCALE))
+_effective = f"{_effective}/runtime={1 if _runtime_on else 0}"
 _marker = os.path.join(_build_dir, ".render_scale")
 
 if os.path.isdir(_build_dir):
