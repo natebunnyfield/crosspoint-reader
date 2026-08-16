@@ -39,7 +39,17 @@ struct DirectPixelWriter {
   // images keep exactly the size and shape they have at scale 1 (this change is
   // about text; image resolution is deliberately left alone). S == 1 on device,
   // where every branch below compiles out.
+  //
+  // Spelled twice rather than once through cp::renderScale() because this is
+  // the per-pixel image path: on device the factor is a compile-time 1 and the
+  // S-loops must fold away entirely, and a member read -- even one the compiler
+  // would probably propagate -- is not something to leave to probably here.
+  // On a host build it is a member, latched at startup with everything else.
+#if defined(CROSSPOINT_RENDER_SCALE_RUNTIME) && CROSSPOINT_RENDER_SCALE_RUNTIME
+  const int S = cp::renderScale();
+#else
   static constexpr int S = CROSSPOINT_RENDER_SCALE;
+#endif
 
   void init(GfxRenderer& renderer) {
     fb = renderer.getWriteTarget();

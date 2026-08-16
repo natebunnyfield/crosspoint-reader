@@ -205,32 +205,47 @@ EpdFontFamily nittitypewriter12FontFamily(&nittitypewriter12RegularFont, &nittit
 // form `3x`, which is not one.
 #define CP_CAT_(a, b) a##b
 #define CP_CAT(a, b) CP_CAT_(a, b)
-#define CP_HR(base) CP_CAT(CP_CAT(CP_CAT(base, _), CROSSPOINT_RENDER_SCALE), x)
+// `base` at tier `t`, e.g. CP_HR(librefranklin_8_bold, 3) -> librefranklin_8_bold_3x.
+//
+// The tier is now a PARAMETER rather than CROSSPOINT_RENDER_SCALE itself. The
+// macro is instantiated once per tier from 2 up to the ceiling, because the
+// factor actually rendered at is latched at startup and can be any of them --
+// see RenderScale.h. Symbols get the tier in their name (`...HiRes3Font`) so
+// the two sets coexist.
+#define CP_HR(base, t) CP_CAT(CP_CAT(CP_CAT(base, _), t), x)
 
-// One family's four hi-res faces. `sym` is the 1x symbol prefix, so the family
-// keeps the name the registration code below already uses.
-#define CP_HIRES_FAMILY(sym, r, b, i, bi)                                                                \
-  EpdFont sym##RegularHiResFont(&CP_HR(r));                                                              \
-  EpdFont sym##BoldHiResFont(&CP_HR(b));                                                                 \
-  EpdFont sym##ItalicHiResFont(&CP_HR(i));                                                               \
-  EpdFont sym##BoldItalicHiResFont(&CP_HR(bi));                                                          \
-  EpdFontFamily sym##HiResFontFamily(&sym##RegularHiResFont, &sym##BoldHiResFont, &sym##ItalicHiResFont, \
-                                     &sym##BoldItalicHiResFont)
+// One family's four hi-res faces at one tier. `sym` is the 1x symbol prefix, so
+// the family keeps the name the registration code below already uses, with the
+// tier appended.
+#define CP_HIRES_FAMILY(sym, t, r, b, i, bi)                                                     \
+  EpdFont sym##HiRes##t##RegularFont(&CP_HR(r, t));                                              \
+  EpdFont sym##HiRes##t##BoldFont(&CP_HR(b, t));                                                 \
+  EpdFont sym##HiRes##t##ItalicFont(&CP_HR(i, t));                                               \
+  EpdFont sym##HiRes##t##BoldItalicFont(&CP_HR(bi, t));                                          \
+  EpdFontFamily sym##HiRes##t##FontFamily(&sym##HiRes##t##RegularFont, &sym##HiRes##t##BoldFont, \
+                                          &sym##HiRes##t##ItalicFont, &sym##HiRes##t##BoldItalicFont)
 
-CP_HIRES_FAMILY(iawriterquattro12, iawriterquattro_12_regular, iawriterquattro_12_bold, iawriterquattro_12_italic,
-                iawriterquattro_12_bolditalic);
-CP_HIRES_FAMILY(iawriterquattro14, iawriterquattro_14_regular, iawriterquattro_14_bold, iawriterquattro_14_italic,
-                iawriterquattro_14_bolditalic);
+// Every hi-res family the build carries, at one tier. Instantiated per tier
+// below; the commercial faces stay behind the same __has_include gates as their
+// 1x cuts so a clone without the licensed sources still builds.
+#define CP_HIRES_ALL_FAMILIES(t)                                                             \
+  CP_HIRES_FAMILY(iawriterquattro12, t, iawriterquattro_12_regular, iawriterquattro_12_bold, \
+                  iawriterquattro_12_italic, iawriterquattro_12_bolditalic);                 \
+  CP_HIRES_FAMILY(iawriterquattro14, t, iawriterquattro_14_regular, iawriterquattro_14_bold, \
+                  iawriterquattro_14_italic, iawriterquattro_14_bolditalic)
+
+// ---- Tier 2 ----
+#if CROSSPOINT_RENDER_SCALE >= 2
+CP_HIRES_ALL_FAMILIES(2);
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
 // Same __has_include gate as the 1x cuts above, restated so the two blocks
 // cannot drift. Without this the editor would blit pixel-doubled 1x PragmataPro
-// next to crisp hi-res chrome — the mixed-resolution bug drawTextRotated90CW
+// next to crisp hi-res chrome -- the mixed-resolution bug drawTextRotated90CW
 // shipped on 2026-08-04.
 //
 // The includes are spelled out per tier because a #include path cannot be
 // token-pasted: '/' and '.' are not valid paste operands. Only the declarations
-// below go through CP_HIRES_FAMILY.
-#if CROSSPOINT_RENDER_SCALE == 2
+// go through CP_HIRES_FAMILY.
 #include <builtinFonts/pragmatapro_12_bold_2x.h>
 #include <builtinFonts/pragmatapro_12_bolditalic_2x.h>
 #include <builtinFonts/pragmatapro_12_italic_2x.h>
@@ -239,24 +254,12 @@ CP_HIRES_FAMILY(iawriterquattro14, iawriterquattro_14_regular, iawriterquattro_1
 #include <builtinFonts/pragmatapro_14_bolditalic_2x.h>
 #include <builtinFonts/pragmatapro_14_italic_2x.h>
 #include <builtinFonts/pragmatapro_14_regular_2x.h>
-#elif CROSSPOINT_RENDER_SCALE == 3
-#include <builtinFonts/pragmatapro_12_bold_3x.h>
-#include <builtinFonts/pragmatapro_12_bolditalic_3x.h>
-#include <builtinFonts/pragmatapro_12_italic_3x.h>
-#include <builtinFonts/pragmatapro_12_regular_3x.h>
-#include <builtinFonts/pragmatapro_14_bold_3x.h>
-#include <builtinFonts/pragmatapro_14_bolditalic_3x.h>
-#include <builtinFonts/pragmatapro_14_italic_3x.h>
-#include <builtinFonts/pragmatapro_14_regular_3x.h>
-#endif
-CP_HIRES_FAMILY(pragmatapro12, pragmatapro_12_regular, pragmatapro_12_bold, pragmatapro_12_italic,
+CP_HIRES_FAMILY(pragmatapro12, 2, pragmatapro_12_regular, pragmatapro_12_bold, pragmatapro_12_italic,
                 pragmatapro_12_bolditalic);
-CP_HIRES_FAMILY(pragmatapro14, pragmatapro_14_regular, pragmatapro_14_bold, pragmatapro_14_italic,
+CP_HIRES_FAMILY(pragmatapro14, 2, pragmatapro_14_regular, pragmatapro_14_bold, pragmatapro_14_italic,
                 pragmatapro_14_bolditalic);
 #endif
 #ifdef CROSSPOINT_HAS_NITTITYPEWRITER
-// Same __has_include gate as the 1x cuts above, restated here.
-#if CROSSPOINT_RENDER_SCALE == 2
 #include <builtinFonts/nittitypewriter_12_bold_2x.h>
 #include <builtinFonts/nittitypewriter_12_bolditalic_2x.h>
 #include <builtinFonts/nittitypewriter_12_italic_2x.h>
@@ -265,7 +268,31 @@ CP_HIRES_FAMILY(pragmatapro14, pragmatapro_14_regular, pragmatapro_14_bold, prag
 #include <builtinFonts/nittitypewriter_14_bolditalic_2x.h>
 #include <builtinFonts/nittitypewriter_14_italic_2x.h>
 #include <builtinFonts/nittitypewriter_14_regular_2x.h>
-#elif CROSSPOINT_RENDER_SCALE == 3
+CP_HIRES_FAMILY(nittitypewriter12, 2, nittitypewriter_12_regular, nittitypewriter_12_bold, nittitypewriter_12_italic,
+                nittitypewriter_12_bolditalic);
+CP_HIRES_FAMILY(nittitypewriter14, 2, nittitypewriter_14_regular, nittitypewriter_14_bold, nittitypewriter_14_italic,
+                nittitypewriter_14_bolditalic);
+#endif
+#endif  // ceiling >= 2
+
+// ---- Tier 3 ----
+#if CROSSPOINT_RENDER_SCALE >= 3
+CP_HIRES_ALL_FAMILIES(3);
+#ifdef CROSSPOINT_HAS_PRAGMATAPRO
+#include <builtinFonts/pragmatapro_12_bold_3x.h>
+#include <builtinFonts/pragmatapro_12_bolditalic_3x.h>
+#include <builtinFonts/pragmatapro_12_italic_3x.h>
+#include <builtinFonts/pragmatapro_12_regular_3x.h>
+#include <builtinFonts/pragmatapro_14_bold_3x.h>
+#include <builtinFonts/pragmatapro_14_bolditalic_3x.h>
+#include <builtinFonts/pragmatapro_14_italic_3x.h>
+#include <builtinFonts/pragmatapro_14_regular_3x.h>
+CP_HIRES_FAMILY(pragmatapro12, 3, pragmatapro_12_regular, pragmatapro_12_bold, pragmatapro_12_italic,
+                pragmatapro_12_bolditalic);
+CP_HIRES_FAMILY(pragmatapro14, 3, pragmatapro_14_regular, pragmatapro_14_bold, pragmatapro_14_italic,
+                pragmatapro_14_bolditalic);
+#endif
+#ifdef CROSSPOINT_HAS_NITTITYPEWRITER
 #include <builtinFonts/nittitypewriter_12_bold_3x.h>
 #include <builtinFonts/nittitypewriter_12_bolditalic_3x.h>
 #include <builtinFonts/nittitypewriter_12_italic_3x.h>
@@ -274,12 +301,14 @@ CP_HIRES_FAMILY(pragmatapro14, pragmatapro_14_regular, pragmatapro_14_bold, prag
 #include <builtinFonts/nittitypewriter_14_bolditalic_3x.h>
 #include <builtinFonts/nittitypewriter_14_italic_3x.h>
 #include <builtinFonts/nittitypewriter_14_regular_3x.h>
-#endif
-CP_HIRES_FAMILY(nittitypewriter12, nittitypewriter_12_regular, nittitypewriter_12_bold, nittitypewriter_12_italic,
+CP_HIRES_FAMILY(nittitypewriter12, 3, nittitypewriter_12_regular, nittitypewriter_12_bold, nittitypewriter_12_italic,
                 nittitypewriter_12_bolditalic);
-CP_HIRES_FAMILY(nittitypewriter14, nittitypewriter_14_regular, nittitypewriter_14_bold, nittitypewriter_14_italic,
+CP_HIRES_FAMILY(nittitypewriter14, 3, nittitypewriter_14_regular, nittitypewriter_14_bold, nittitypewriter_14_italic,
                 nittitypewriter_14_bolditalic);
 #endif
+#endif  // ceiling >= 3
+
+#undef CP_HIRES_ALL_FAMILIES
 #undef CP_HIRES_FAMILY
 #endif
 
@@ -327,15 +356,23 @@ EpdFontFamily librefranklinReader18FontFamily(&lfReader18RegularFont, &lfReader1
 CP_UI_FAMILY(sysLibreFranklin, librefranklin_8_regular, librefranklin_8_bold, librefranklin_10_regular,
              librefranklin_10_bold, librefranklin_12_regular, librefranklin_12_bold);
 
-#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-// The same matrix at RENDER_SCALE times the ppem, for glyph blitting only.
-// Named for the 1x face each stands in for, so at scale 3 `sysLibreFranklinHiRes8`
-// is a 24 pt cut standing in for the 8 pt one. Suffix pasted by CP_HR, same as
-// the editor families above.
-CP_UI_FAMILY(sysLibreFranklinHiRes, CP_HR(librefranklin_8_regular), CP_HR(librefranklin_8_bold),
-             CP_HR(librefranklin_10_regular), CP_HR(librefranklin_10_bold), CP_HR(librefranklin_12_regular),
-             CP_HR(librefranklin_12_bold));
+// The same matrix at TIER times the ppem, for glyph blitting only. Named for
+// the 1x face each stands in for, so `sysLibreFranklinHiRes3_8` is a 24 pt cut
+// standing in for the 8 pt one. Suffix pasted by CP_HR, same as the editor
+// families above, and instantiated once per tier for the same reason: the
+// factor is latched at startup and the binary has to carry the companions for
+// whichever tier the owner picked.
+#define CP_UI_HIRES(t)                                                                                         \
+  CP_UI_FAMILY(sysLibreFranklinHiRes##t##_, CP_HR(librefranklin_8_regular, t), CP_HR(librefranklin_8_bold, t), \
+               CP_HR(librefranklin_10_regular, t), CP_HR(librefranklin_10_bold, t),                            \
+               CP_HR(librefranklin_12_regular, t), CP_HR(librefranklin_12_bold, t))
+#if CROSSPOINT_RENDER_SCALE >= 2
+CP_UI_HIRES(2);
 #endif
+#if CROSSPOINT_RENDER_SCALE >= 3
+CP_UI_HIRES(3);
+#endif
+#undef CP_UI_HIRES
 #undef CP_UI_FAMILY
 
 // Bind every UI slot to Libre Franklin. Called once at boot. SETTINGS.systemFont
@@ -351,9 +388,28 @@ void applySystemFont(GfxRenderer& renderer) {
   renderer.replaceFont(UI_12_FONT_ID, sysLibreFranklin12);
 
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-  renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklinHiRes8);
-  renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklinHiRes10);
-  renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklinHiRes12);
+  // Whichever tier this process latched at startup, and NONE at scale 1 --
+  // there the 1x face already is the framebuffer's density, and registering a
+  // companion would blit glyphs three times too big. Falling through the switch
+  // is therefore the correct scale-1 behaviour, not an oversight.
+  switch (cp::renderScale()) {
+#if CROSSPOINT_RENDER_SCALE >= 2
+    case 2:
+      renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklinHiRes2_8);
+      renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklinHiRes2_10);
+      renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklinHiRes2_12);
+      break;
+#endif
+#if CROSSPOINT_RENDER_SCALE >= 3
+    case 3:
+      renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklinHiRes3_8);
+      renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklinHiRes3_10);
+      renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklinHiRes3_12);
+      break;
+#endif
+    default:
+      break;
+  }
 #endif
 }
 
@@ -511,19 +567,46 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(NITTITYPEWRITER_14_FONT_ID, nittitypewriter14FontFamily);
 #endif
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
-  // Hi-res companions for every editor font. drawText() checks
-  // getHiResFamily() for any font id, so without these the editor activities
-  // (NoteEditorActivity, ClaudeChatActivity) render at 1x on a 2x build.
-  renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12HiResFontFamily);
-  renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_14_FONT_ID, iawriterquattro14HiResFontFamily);
+  // Hi-res companions for every editor font, at the tier this process latched.
+  // drawText() checks getHiResFamily() for any font id, so without these the
+  // editor activities (NoteEditorActivity, ClaudeChatActivity) render at 1x on
+  // a supersampled build. At scale 1 none are registered -- see applySystemFont.
+#define CP_REG_HIRES_EDITOR(t)                                                                          \
+  renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_12_FONT_ID, iawriterquattro12HiRes##t##FontFamily); \
+  renderer.registerHiResBuiltinFont(IAWRITERQUATTRO_14_FONT_ID, iawriterquattro14HiRes##t##FontFamily); \
+  CP_REG_HIRES_PRAGMATA(t)                                                                              \
+  CP_REG_HIRES_NITTI(t)
 #ifdef CROSSPOINT_HAS_PRAGMATAPRO
-  renderer.registerHiResBuiltinFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12HiResFontFamily);
-  renderer.registerHiResBuiltinFont(PRAGMATAPRO_14_FONT_ID, pragmatapro14HiResFontFamily);
+#define CP_REG_HIRES_PRAGMATA(t)                                                                \
+  renderer.registerHiResBuiltinFont(PRAGMATAPRO_12_FONT_ID, pragmatapro12HiRes##t##FontFamily); \
+  renderer.registerHiResBuiltinFont(PRAGMATAPRO_14_FONT_ID, pragmatapro14HiRes##t##FontFamily);
+#else
+#define CP_REG_HIRES_PRAGMATA(t)
 #endif
 #ifdef CROSSPOINT_HAS_NITTITYPEWRITER
-  renderer.registerHiResBuiltinFont(NITTITYPEWRITER_12_FONT_ID, nittitypewriter12HiResFontFamily);
-  renderer.registerHiResBuiltinFont(NITTITYPEWRITER_14_FONT_ID, nittitypewriter14HiResFontFamily);
+#define CP_REG_HIRES_NITTI(t)                                                                           \
+  renderer.registerHiResBuiltinFont(NITTITYPEWRITER_12_FONT_ID, nittitypewriter12HiRes##t##FontFamily); \
+  renderer.registerHiResBuiltinFont(NITTITYPEWRITER_14_FONT_ID, nittitypewriter14HiRes##t##FontFamily);
+#else
+#define CP_REG_HIRES_NITTI(t)
 #endif
+  switch (cp::renderScale()) {
+#if CROSSPOINT_RENDER_SCALE >= 2
+    case 2:
+      CP_REG_HIRES_EDITOR(2)
+      break;
+#endif
+#if CROSSPOINT_RENDER_SCALE >= 3
+    case 3:
+      CP_REG_HIRES_EDITOR(3)
+      break;
+#endif
+    default:
+      break;
+  }
+#undef CP_REG_HIRES_EDITOR
+#undef CP_REG_HIRES_PRAGMATA
+#undef CP_REG_HIRES_NITTI
 #endif
 #ifndef OMIT_FONTS
   renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, librefranklinReader12FontFamily);

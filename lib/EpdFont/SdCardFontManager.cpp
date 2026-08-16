@@ -32,7 +32,7 @@ namespace {
 std::string hiResCompanionPath(const std::string& path) {
   const size_t slash = path.find_last_of('/');
   if (slash == std::string::npos) return {};
-  return path.substr(0, slash + 1) + std::to_string(CROSSPOINT_RENDER_SCALE) + "x/" + path.substr(slash + 1);
+  return path.substr(0, slash + 1) + std::to_string(cp::renderScale()) + "x/" + path.substr(slash + 1);
 }
 }  // namespace
 #endif
@@ -96,8 +96,16 @@ int SdCardFontManager::loadFile(const SdCardFontFileInfo& file, const char* fami
   // what shipped before. Note this is registered under the SAME fontId, so the
   // section cache key (which is that id) is unaffected and pagination cannot
   // move because a companion appeared or disappeared.
-  const std::string hiResPath = hiResCompanionPath(file.path);
-  if (hiResPath.empty()) {
+  //
+  // Skipped outright at an active scale of 1, where the 1x face already matches
+  // the framebuffer's density and there is no `1x/` directory to find. Without
+  // this the ceiling-3 binary asks for `<family>/1x/<file>` on every load and
+  // reports each miss through the INF line below -- true, useless, and exactly
+  // the kind of noise that trains people to ignore that line when it matters.
+  const std::string hiResPath = cp::renderScale() > 1 ? hiResCompanionPath(file.path) : std::string();
+  if (cp::renderScale() <= 1) {
+    // Nothing to do: no companion is the correct state at 1x.
+  } else if (hiResPath.empty()) {
     LOG_ERR("SDMGR", "No directory component in %s - cannot form a hi-res path", file.path.c_str());
   } else if (!Storage.exists(hiResPath.c_str())) {
     // SAY SO. A missing companion is a supported fallback rather than a

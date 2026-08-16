@@ -717,8 +717,11 @@ bool JpegToBmpConverter::jpegFileToBmpStream(HalFile& jpegFile, Print& bmpOut, b
   // Use runtime display dimensions (swapped for portrait cover sizing)
   // LOGICAL, not framebuffer: cover.bmp is cached without a dimension key, so
   // it must keep the size the device would write (see PngToBmpConverter).
-  const int targetWidth = display.getDisplayHeight() / HalDisplay::RENDER_SCALE;
-  const int targetHeight = display.getDisplayWidth() / HalDisplay::RENDER_SCALE;
+  // The logical constants, not the live framebuffer divided by the render
+  // scale -- same number, but only these stay so once the scale is a
+  // launch-time choice. See the longer note in PngToBmpConverter.
+  const int targetWidth = HalDisplay::LOGICAL_HEIGHT;
+  const int targetHeight = HalDisplay::LOGICAL_WIDTH;
   return jpegFileToBmpStreamInternal(jpegFile, bmpOut, targetWidth, targetHeight, false, crop);
 }
 
