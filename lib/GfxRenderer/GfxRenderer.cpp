@@ -1833,9 +1833,104 @@ void GfxRenderer::preserveImagePolarity(const int x, const int y, const int widt
   }
 }
 
+namespace {
+
+// Signed area x2 of the triangle ABC. Positive for one winding, negative for
+// the other; zero when the three points are collinear.
+inline int triArea2(const int ax, const int ay, const int bx, const int by, const int cx, const int cy) {
+  return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+}
+
+// Is P inside (or on the boundary of) the triangle ABC, given CCW winding?
+//
+// Three integer edge functions, each closed (>= 0). This is EXACT -- no
+// division, so no truncation -- which is the whole point: the scanline path
+// below computes each boundary x by integer division, and the direction that
+// division truncates depends on which endpoint the edge loop happened to reach
+// first. On a shape mirrored about a horizontal axis the two halves are walked
+// in opposite directions, so the upper half rounded one way and the lower half
+// the other, and the arrowhead came out a column narrower above the apex than
+// below it (owner, 2026-08-15: "the top half is missing ink on its left side").
+//
+// Mirroring negates all three edge functions together, so a symmetric triangle
+// rasterizes to a symmetric bitmap here by construction, not by luck.
+inline bool triContains(const int px, const int py, const int ax, const int ay, const int bx, const int by,
+                        const int cx, const int cy) {
+  return triArea2(ax, ay, bx, by, px, py) >= 0 && triArea2(bx, by, cx, cy, px, py) >= 0 &&
+         triArea2(cx, cy, ax, ay, px, py) >= 0;
+}
+
+}  // namespace
+
 void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state) const {
   if (_textOnly) return;
   if (numPoints < 3) return;
+
+  // A TRIANGLE is rasterized by exact half-space tests rather than by the
+  // scanline sweep below.
+  //
+  // Two reasons, and only one of them is the rounding bug above. The other is
+  // the sweep's parity rule: it counts an edge crossing when one endpoint is
+  // strictly above the scanline and the other is at or below it, which includes
+  // the row at each edge's MAXIMUM y and excludes the row at its minimum. For a
+  // triangle whose apex sits level with the middle of its base that drops the
+  // topmost row outright -- the head was 4 rows above the apex and 5 below.
+  //
+  // Restricted to three points on purpose. A 3-gon is always convex, so a
+  // closed inside-test cannot double-fill or leave a seam. The other callers
+  // pass 5, 6 and 2*ARC_PTS points (BaseTheme.cpp, DaisyEntryActivity.cpp) and
+  // at least one of those is an annulus, where even-odd parity is doing real
+  // work -- so they keep the sweep, unchanged.
+  if (numPoints == 3) {
+    int ax = xPoints[0], ay = yPoints[0];
+    int bx = xPoints[1], by = yPoints[1];
+    int cx = xPoints[2], cy = yPoints[2];
+    // Normalize winding so all three edge functions share a sign.
+    if (triArea2(ax, ay, bx, by, cx, cy) < 0) {
+      std::swap(bx, cx);
+      std::swap(by, cy);
+    }
+
+    int minX = ax < bx ? (ax < cx ? ax : cx) : (bx < cx ? bx : cx);
+    int maxX = ax > bx ? (ax > cx ? ax : cx) : (bx > cx ? bx : cx);
+    int minY = ay < by ? (ay < cy ? ay : cy) : (by < cy ? by : cy);
+    int maxY = ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy);
+
+#if CROSSPOINT_RENDER_SCALE > 1
+    // Device resolution, same convention as the sweep below: a logical vertex
+    // samples at the centre of its logical pixel, so the shape stays where the
+    // logical form put it while its edges gain RENDER_SCALE times the detail.
+    {
+      constexpr int S = RENDER_SCALE;
+      const int dax = ax * S + S / 2, day = ay * S + S / 2;
+      const int dbx = bx * S + S / 2, dby = by * S + S / 2;
+      const int dcx = cx * S + S / 2, dcy = cy * S + S / 2;
+      int x0 = minX * S, x1 = maxX * S + S - 1;
+      int y0 = minY * S, y1 = maxY * S + S - 1;
+      if (x0 < 0) x0 = 0;
+      if (y0 < 0) y0 = 0;
+      if (x1 >= getScreenWidth() * S) x1 = getScreenWidth() * S - 1;
+      if (y1 >= getScreenHeight() * S) y1 = getScreenHeight() * S - 1;
+      for (int y = y0; y <= y1; y++) {
+        for (int x = x0; x <= x1; x++) {
+          if (triContains(x, y, dax, day, dbx, dby, dcx, dcy)) drawPixelDevice(x, y, state);
+        }
+      }
+      return;
+    }
+#else
+    if (minX < 0) minX = 0;
+    if (minY < 0) minY = 0;
+    if (maxX >= getScreenWidth()) maxX = getScreenWidth() - 1;
+    if (maxY >= getScreenHeight()) maxY = getScreenHeight() - 1;
+    for (int y = minY; y <= maxY; y++) {
+      for (int x = minX; x <= maxX; x++) {
+        if (triContains(x, y, ax, ay, bx, by, cx, cy)) drawPixel(x, y, state);
+      }
+    }
+    return;
+#endif
+  }
 
 #if CROSSPOINT_RENDER_SCALE > 1
   // A polygon is rasterized at DEVICE resolution on a supersampled host build.

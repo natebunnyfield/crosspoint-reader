@@ -325,4 +325,56 @@ TEST_F(ReturnArrow, NewHeadIsCentredOnTheShaft) {
       << "apex row " << apexRow << " vs shaft centre " << shaftMid << " -- head is not on the shaft's axis";
 }
 
+// The head's two halves must be MIRROR IMAGES, row for row.
+//
+// Owner report, 2026-08-15: "the top half is missing ink on its left side."
+// Measured before the fix, with the apex on row 28: the left edge stepped
+// 19, 21, 22, 23, 24 going up and 19, 20, 21, 22, 23 going down -- one column
+// tighter above throughout -- and the topmost row was absent entirely, so the
+// head had four rows above the apex and five below.
+//
+// Both faults were in GfxRenderer::fillPolygon, not in the geometry here: the
+// vertices have always been symmetric about yMid. The scanline sweep computed
+// each boundary x by integer division whose truncation direction followed the
+// edge-walk order, which is opposite in the two halves, and its parity rule
+// excluded the row at each edge's minimum y. Triangles now rasterize through
+// exact integer half-space tests, which mirror by construction.
+//
+// This asserts the SHAPE, so it holds whatever the rasterizer does next.
+TEST_F(ReturnArrow, NewHeadIsSymmetricAboutTheApexRow) {
+  drawNewArrow(*r_);
+  const Box b = glyphBox();
+  const int apex = leftmostInkColumn(b);
+  ASSERT_GE(apex, 0);
+
+  // The apex's row, taken as the midpoint of the apex column's own ink so a
+  // multi-row apex (RENDER_SCALE > 1) does not bias the axis upward.
+  int first = -1, last = -1;
+  for (int dy = b.y0; dy <= b.y1; ++dy) {
+    if (!inkAtDevice(apex, dy)) continue;
+    if (first < 0) first = dy;
+    last = dy;
+  }
+  ASSERT_GE(first, 0);
+  const int axis2 = first + last;  // twice the axis row, so it stays integral
+
+  // Compare only rows the HEAD spans. Past the base the riser rises on one side
+  // only, by design, and would read as asymmetry that is not there.
+  const int headHalf = (lh / 2) / 2;
+  const int headLen = (lh / 2) * 2 / 3;
+  const int baseX = apex + (headLen - 1) * S;
+
+  for (int k = 1; k <= headHalf * S; ++k) {
+    const int upRow = (axis2 - 2 * k) / 2;
+    const int downRow = (axis2 + 2 * k) / 2;
+    int leftUp = -1, leftDown = -1;
+    for (int dx = apex; dx <= baseX; ++dx) {
+      if (leftUp < 0 && inkAtDevice(dx, upRow)) leftUp = dx;
+      if (leftDown < 0 && inkAtDevice(dx, downRow)) leftDown = dx;
+    }
+    EXPECT_EQ(leftUp, leftDown) << "row " << upRow << " above the apex starts at column " << leftUp << ", its mirror "
+                                << downRow << " starts at " << leftDown << " -- the head is lopsided";
+  }
+}
+
 }  // namespace
