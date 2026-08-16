@@ -129,6 +129,59 @@ marker is the normal mid-keystroke state.
 **Manage Files → Edit** opens an existing `.md`/`.txt` in the same editor. A
 file larger than the 8 KB buffer is refused on open rather than truncated.
 
+### The bands, and the two that can vanish (2026-08-15/16)
+
+Top to bottom: **text | status | keyboard panel | button hints**. There is no
+header band — the title bar and its page counter were removed by owner ruling
+on 2026-08-15. The filename is a `YYYYMMDDHHmmss.md` stamp the editor chose
+itself, so it told the owner nothing they did not already know, and a page
+counter belongs to a paginated reader rather than to a document being typed
+into.
+
+The **status** band is a right-aligned GRID, not a concatenated string. Each
+cell owns a fixed column measured from the right edge, so a cell's width never
+moves its neighbours. The character count is the only thing here that changes
+width while typing, so its column is sized for the widest value the buffer can
+ever hold — `BUF_SIZE` is 8192, four digits — rather than for the current
+value. `KBD` appears only while the keyboard stack is up; `FULL` keeps its own
+cell, because the buffer refusing input is a real warning and not a footnote to
+the count.
+
+The **keyboard panel** disappears entirely while a host's own software keyboard
+is up (owner ruling 2026-08-16: "automatically hidden, giving space to text").
+Two keyboards for one job, and the phone's covers the bottom of the screen
+anyway, so `applyLayout()` sets `panelHeight` to 0, closes `panelTop` onto the
+button hints, and `maxLines` grows by exactly the rows the panel had. Measured
+headlessly: ink inside the keyboard band drops from 6858 to 60, the 60 being
+the character count that moves down with the status band.
+
+**A hidden panel also takes no input.** `loop()` returns before the panel
+dispatch, because skipping only the draw would leave Confirm typing a key
+nobody can see — worse than a dead button. Back is handled earlier and typed
+text is drained earlier still, so the editor stays usable and exitable with the
+phone's keyboard alone.
+
+On device none of this is reachable: `HalGPIO::isHostKeyboardVisible()` is a
+constant `false` there — the X3 has no host — so the branch folds away and the
+panel is always drawn.
+
+### Editor font, and its size
+
+The face comes from `SETTINGS.editorFont` (`src/notes/EditorFonts.h`), the size
+from `SETTINGS.editorFontSize`, offered at **12 and 14 pt**. Both are
+getter/setter rows with `valuePtr` left null, and both carry explicit lines in
+`toJson`/`fromJson` — an ENUM row persists its INDEX, and a size stored as an
+index would have re-created on the size axis exactly the bug the family axis was
+rescued from.
+
+Three faces: iA Writer Quattro, PragmataPro, Nitti Typewriter. The last two are
+COMMERCIAL — their generated headers are gitignored and built locally, so a
+clone without the licensed TTFs compiles fine and the picker marks those rows
+unreachable. `main.cpp` gates them on the LARGEST size it includes, not the
+smallest; gating on 12 asserted that a tree holding the 12 pt headers holds the
+14 pt ones too, which broke the build on exactly the machines that HAVE the
+fonts.
+
 ## E-ink refresh limits, and what the redraw delay can and cannot do
 
 **Settings → Typing Redraw Delay** (25 / 50 / 100 / 250 / 500 / 1000 ms,
@@ -266,6 +319,16 @@ Run them with `ctest --test-dir build/test`; see the verification tiers in
 row renders but can never be selected. Also add
 `lastHomeMenuItem = HomeMenuItem::X;` to the row's `goTo*` wrapper, or Back
 will not return the selector to it.
+
+**The text cursor and the Return arrow are drawn, not glyphs.** Both live in
+the SDK's keyboard component and both were redrawn on 2026-08-15/16: the arrow
+head is a filled triangle (two thick lines cannot form a point — each ends in a
+flat cap, and two caps overlap into a lozenge), and the I-beam has notched
+serifs plus a baseline crossbar. If either looks lopsided, suspect
+`GfxRenderer::fillPolygon` before the geometry: it had two faults that made
+symmetric input render asymmetric, and triangles now go through exact integer
+half-space tests for that reason. Covered by `test/return_arrow`, built at
+RENDER_SCALE 1 and 3.
 
 **A key's `output` field can be NULL on a key that still types.** The SDK's
 space key is `KeyKind::Space` with `output == nullptr`; `keyboardOutputFor()`

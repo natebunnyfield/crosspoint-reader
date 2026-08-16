@@ -150,3 +150,32 @@ with zero callers — a speculative API, not a feature. The branch is deleted;
 the ruling that superseded it is the one recorded above. If a page counter is
 ever wanted in a header again, write it against the surface that needs it
 rather than restoring this.
+
+### Standing ruling 2026-08-15/16 — iconography sweep, and the palette dial
+
+Two areas gained rulings worth not re-litigating.
+
+**The custom-iconography sweep is CLOSED** after two glyphs: the Return
+arrowhead (a filled triangle, because two thick strokes cannot form a point) and
+the text cursor I-beam (notched serifs plus a baseline crossbar, both taken from
+real cursors rather than invented). Redrawing the battery and the charging bolt
+was measured, costed and **declined** — the faults are real (the bolt is eight
+literal scanlines with two flare rows at double the stem weight and the halves
+offset by 1 px) but the owner ruled the sweep closed. Full note in
+`docs/ui-conventions.md`. `CoverIcon` also stays: verified dead three ways —
+no includer, no reference in either repo, and absent from `firmware.elf` — and
+therefore costing nothing.
+
+**The page palette is now a fourteen-row dial**, host-side only. Nothing here
+reaches device firmware: it is a simulator/iOS presentation choice, and the
+device has no Settings.app to expose it. The presets, their measured contrast,
+the one deliberate exemption (Solarized, whose low contrast is the palette's
+thesis) and the phosphor research behind the CRT rows live in
+`crosspoint-simulator/ios/README.md` and
+`crosspoint-simulator/docs/crt-phosphor-presets.md`.
+
+The trap that keeps recurring there, recorded here because it is a *fork*
+discipline issue and not a palette one: **a preset persists as an integer**, so
+rows append and never insert, and the test's "unknown preset" sentinel has to
+stay ahead of the enum. It has been walked four times (7 → 11 → 13 → 14) and
+each time it caught the collision instead of shipping one.

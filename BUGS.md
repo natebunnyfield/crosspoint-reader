@@ -34,8 +34,8 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
-### [B-027] Curves and filled polygons are still logical-resolution on a supersampled build
-**severity: low · scope: GfxRenderer · found 2026-08-15**
+### [B-027] Curves are still logical-resolution on a supersampled build
+**severity: low · scope: GfxRenderer · found 2026-08-15 · polygons FIXED 2026-08-16, arcs open**
 
 `drawPixel()` paints a `RENDER_SCALE` x `RENDER_SCALE` block
 (`lib/GfxRenderer/GfxRenderer.cpp:557-565`), which is exactly right for an
@@ -52,13 +52,27 @@ Slanted **thick lines** were fixed on 2026-08-15 (the keyboard's Return arrow;
 |---|---|
 | `fillArc` / `fillRoundedRect` (`:1423-1500`) | Every rounded corner — key backgrounds, popups, list pills, and the Return arrow's own elbow, which is now the coarsest thing left in that glyph |
 | `drawArc` / `drawRoundedRect` | Stroked rounded borders |
-| `fillPolygon` | `DrawTarget::triangle`, the cover pattern bands in `BaseTheme.cpp:777-840` |
+| ~~`fillPolygon`~~ | **FIXED 2026-08-15/16** — see below |
 | 1-px `drawLine` diagonals | Left deliberately: a device-resolution hairline would be 1/3 the weight, not smoother |
+
+**The polygon half is closed.** `fillPolygon` rasterizes at device resolution
+on a supersampled build, and triangles additionally go through exact integer
+half-space tests rather than the scanline sweep — the sweep had two faults that
+made symmetric input render asymmetric (division truncation following the
+edge-walk order, and a parity rule that dropped the row at each edge's minimum
+y). Sampling vertices at the centre of their logical pixel keeps the shape where
+the logical form put it, so nothing shifts by half a pixel. `test/return_arrow`
+pins it at RENDER_SCALE 1 and 3.
+
+`fillPolygon` was tractable precisely where the arcs are not: it writes a solid
+state with no dithering, so it has no "what is a dither cell in device space"
+question to answer.
 
 The arc/rounded paths are **not** a copy of the line fix. They dither, and a
 dither cell is defined in LOGICAL pixels on purpose (`ios/README.md:357-361`) —
 so a device-resolution arc has to decide what a dither cell means before it can
-be written. That is a ruling, not a refactor.
+be written. That is a ruling, not a refactor. **That is all that remains of
+B-027.**
 
 Nothing here is visible on an X3 or an X4: `RENDER_SCALE` is 1 on device and the
 whole path preprocesses away.

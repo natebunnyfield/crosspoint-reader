@@ -460,6 +460,40 @@ did, mid-task, while a shipping binary was being built from it.
 
 ## Coding Standards
 
+### Drawing: a filled triangle is exact, an arc is not
+
+`GfxRenderer::fillPolygon` special-cases `numPoints == 3` and rasterizes it with
+three integer half-space tests rather than the scanline sweep. That is not an
+optimization — the sweep had two faults that made SYMMETRIC input render
+asymmetric, and both were invisible until someone looked closely at a glyph:
+
+* each boundary x came from an integer division whose truncation direction
+  followed the edge-walk order, which is opposite in the two halves of a
+  mirrored shape, so one half floored and the other ceiled;
+* its parity rule includes the row at an edge's maximum y and excludes the row
+  at its minimum, so a vertex that is a minimum for both edges meeting there
+  loses its row entirely.
+
+Triangles are convex, so a closed inside-test cannot double-fill or leave a
+seam. The 5-, 6- and `2*ARC_PTS`-point callers keep the sweep — at least one is
+an annulus where even-odd parity is load-bearing. Covered by
+`test/return_arrow`, built at RENDER_SCALE 1 and 3.
+
+### Asking whether a HOST keyboard is up
+
+`HalGPIO::isHostKeyboardVisible()` returns a constant `false` on device. It is
+not a stub awaiting an implementation — it is the X3's real answer, since there
+is no host. It exists so an activity can ask in ONE form that compiles
+everywhere instead of every caller carrying an `#if`, and so the branch folds
+away entirely on device. The simulator answers it for real, and the editors use
+it to drop their own keyboard panel and give the rows to text.
+
+Same shape: `crosspointRequestRender()` in `src/SimulatorRenderRequest.cpp` is a
+one-call seam letting a host ask for a re-render. `ActivityManager.h` holds
+`unique_ptr<Activity>`, so including it needs the complete `Activity` type and
+drags the whole activity header set into an Objective-C++ translation unit for
+one call.
+
 ### Spelling: American, always
 
 Color, not colour. Gray, not grey. Behavior, center, initialize, analyze,
@@ -869,6 +903,18 @@ Two traps in that path, both of which shipped as silent wrong-pixel bugs:
 
 Both are covered by `test/system_font/`, built at `CROSSPOINT_RENDER_SCALE=2` —
 at scale 1 the hi-res path compiles out and those cases assert nothing.
+
+**Commercial faces are gated on the LARGEST size the block includes.** The
+editor's PragmataPro and Nitti Typewriter headers are gitignored and built
+locally from `lib/EpdFont/local_fonts/`, so `main.cpp` guards them with
+`#if __has_include(<builtinFonts/pragmatapro_14_regular.h>)`. Gating on the
+SMALLEST asserts that a tree holding the 12 pt headers holds the 14 pt ones
+too, which is false for any tree generated before 14 pt existed — and the
+failure is inverted from the usual one: a clone with no licensed TTFs builds
+fine, while the machines that HAVE the fonts fail on a missing header. Always
+test the strictest requirement, so a stale tree degrades down the no-TTF path
+`editorfonts::resolve()` already handles. Re-run
+`lib/EpdFont/scripts/convert-builtin-fonts.sh` to restore the face.
 
 **Total**: ~80+ global `EpdFont` and `EpdFontFamily` objects
 

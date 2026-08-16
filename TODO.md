@@ -341,6 +341,24 @@ its `.d`, so the BLE include path survived.
 **The nine stay fork-only by decision.** Not a candidate for re-proposal as
 "should these go upstream" — that was asked and answered.
 
+**2026-08-16 — the pin is now reachable from a permanent branch.** Two more
+commits landed (the Return arrowhead work), taking the tip to `352098e`, and
+for a while that commit existed ONLY on `fix/return-arrow-triangle`. A pin
+reachable from a single feature branch is a live fragility: delete the branch in
+a routine tidy and the commit becomes unreferenced, GitHub eventually collects
+it, and `git submodule update` breaks for any fresh clone — with an error that
+looks nothing like its cause. The SDK fork's `main` was fast-forwarded to
+include it and the feature branch deleted. Verified after the fact:
+
+```
+$ git branch -r --contains 352098e
+    origin/HEAD -> origin/main
+    origin/main
+```
+
+**Check this before deleting any SDK branch:** if `--contains` names only one
+branch and that branch is not `main`, do not delete it — merge it first.
+
 
 ### [T-011] Side buttons drawn on the UI — RULED, removed
 **scope: ui · ruled 2026-08-15**

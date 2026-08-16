@@ -93,10 +93,48 @@ would corrupt the overlay. `HalDisplay::copyGrayscale*Buffers` and
 `cleanupGrayscaleBuffers` — which seeds the differential baseline with actual
 picture data — does flip.
 
+## 3. On a host, the SYSTEM owns the appearance and the setting follows it
+
+Added 2026-08-16. On device `SETTINGS.darkMode` is the only input: the owner
+toggles it, `main.cpp` applies it at boot, `SettingsActivity` applies it on
+change. On a host that has an appearance of its own — the iOS app — the phone
+owns it instead, and the setting is kept in step with the phone.
+
+`applyTheme()` in the simulator's `ios/CrossPointIOSShim.cpp` writes
+`SETTINGS.darkMode` whenever the system appearance flips, guarded on change so a
+repaint does not rewrite the settings file.
+
+**Why the write is not optional.** `main.cpp` runs
+`display.setInverted(SETTINGS.darkMode != 0)` during `setup()`, which happens
+AFTER the harness installs. A stale value therefore does not merely display
+wrong — it is pushed back onto the panel and undoes the appearance the phone
+asked for. That same ordering is why `CROSSPOINT_SIM_DARK` cannot force a
+desktop capture; set `darkMode` in `fs_/.crosspoint/settings.json` instead.
+
+**And the screen has to be re-RENDERED, not just re-presented.**
+`SimulatorOverlay::requestPresent()` only pushes the framebuffer that already
+exists, so anything drawn from the old value stays on screen — most visibly the
+System > Dark Mode row, which kept painting "OFF" over a dark page until the
+owner navigated away and back. The polarity flip inverts those pixels, so the
+stale row was perfectly legible and perfectly wrong. `applyTheme()` now calls
+`crosspointRequestRender()` (`src/SimulatorRenderRequest.cpp`), a one-call seam
+that exists because `ActivityManager.h` holds `unique_ptr<Activity>` and would
+otherwise drag the whole activity header set into an Objective-C++ translation
+unit.
+
 ## Status
 
-**SHIPPED TO BRANCH — UNCONFIRMED on device.** Nothing here has been seen on a
-panel. It cannot be seen in the simulator either without a matching change
-there: `GrayscalePreview::previewLevel` gates the lift on the pixel being black
-in the LOGICAL framebuffer, which is the wrong test once the flip is applied at
-display time.
+**UNCONFIRMED on device** — nothing here has been seen on a real panel.
+
+It IS confirmed in the simulator, which the previous version of this note said
+was impossible. That blocker is gone: inversion no longer needs a 255-level
+flip at all, because the dark palette's ink→paper direction already runs
+light-on-dark (`HalDisplay.cpp:411-413`), so the same interpolation serves both
+polarities.
+
+Verified live on the iOS Simulator, 2026-08-16, on the Settings screen and
+without navigating away: flipping the system appearance moved the Dark Mode row
+from OFF to ON in place, the log carried
+`[harness] SETTINGS.darkMode -> 1 (system appearance)`, and the page flipped to
+the dark half of the chosen palette. Flipping back returned it to OFF, so it
+tracks both directions rather than latching.
