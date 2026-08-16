@@ -938,9 +938,36 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     // right. And drawLine() grows a horizontal run's thickness DOWNWARD, so the
     // bottom bar, anchored at the stem's last row, hung one row below the stem
     // while the top bar sat entirely inside it. Lopsided on both axes.
-    renderer.fillRect(cX, cY, stemW, lineHeight, true);
-    renderer.fillRect(cX - serifW, cY, stemW + serifW * 2, serifH, true);
-    renderer.fillRect(cX - serifW, cBottom - serifH + 1, stemW + serifW * 2, serifH, true);
+    // Each serif is NOTCHED on the centreline, and the stem carries a crossbar
+    // just below its middle (owner ruling 2026-08-15).
+    //
+    // Both features are drawn from the real thing rather than invented. The
+    // cursor macOS ships (HIServices.framework/.../cursors/ibeamhorizontal)
+    // splits its serifs exactly this way -- two arms with the centreline open,
+    // and the stem starting on the row beneath them -- while the classic
+    // Macintosh I-beam was "a capital I with a tiny crossbeam at its middle",
+    // marking the baseline of type. This carries both.
+    //
+    // The stem MUST stop below the notch rows. Drawing it full height and
+    // leaving a gap in the serif is a no-op: the stem bridges its own notch and
+    // the result is byte-identical to a solid bar. Measured, not assumed.
+    //
+    // It also fits in the shipped 2 px serif, which is not obvious -- the trick
+    // is spending those two rows as "arms, then tie bar" instead of keeping a
+    // full bar below the notch, which would have cost a third row.
+    static constexpr int notchH = 1;
+    renderer.fillRect(cX, cY + notchH, stemW, lineHeight - notchH * 2, true);
+    // Top serif: the two arms, then the bar tying them across the stem.
+    renderer.fillRect(cX - serifW, cY, serifW, notchH, true);
+    renderer.fillRect(cX + stemW, cY, serifW, notchH, true);
+    renderer.fillRect(cX - serifW, cY + notchH, stemW + serifW * 2, serifH - notchH, true);
+    // Bottom serif: mirrored, so the glyph is symmetric about its own middle.
+    renderer.fillRect(cX - serifW, cBottom - serifH + 1, stemW + serifW * 2, serifH - notchH, true);
+    renderer.fillRect(cX - serifW, cBottom, serifW, notchH, true);
+    renderer.fillRect(cX + stemW, cBottom, serifW, notchH, true);
+    // Baseline crossbar. One column proud of the stem on each side, so it reads
+    // as a crossbeam rather than as the stem briefly thickening.
+    renderer.fillRect(cX - 1, cY + lineHeight / 2 + 1, stemW + 2, 1, true);
   }
 
   if (isPassword) {

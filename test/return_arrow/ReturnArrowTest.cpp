@@ -227,6 +227,34 @@ void drawOldIBeam(const GfxRenderer& r) {
 
 void drawNewIBeam(const GfxRenderer& r) {
   const int cBottom = curY + kCursorLineH - 1;
+  const int notchH = 1;
+  r.fillRect(curX, curY + notchH, kStemW, kCursorLineH - notchH * 2, true);
+  r.fillRect(curX - kSerifW, curY, kSerifW, notchH, true);
+  r.fillRect(curX + kStemW, curY, kSerifW, notchH, true);
+  r.fillRect(curX - kSerifW, curY + notchH, kStemW + kSerifW * 2, kSerifH - notchH, true);
+  r.fillRect(curX - kSerifW, cBottom - kSerifH + 1, kStemW + kSerifW * 2, kSerifH - notchH, true);
+  r.fillRect(curX - kSerifW, cBottom, kSerifW, notchH, true);
+  r.fillRect(curX + kStemW, cBottom, kSerifW, notchH, true);
+  r.fillRect(curX - 1, curY + kCursorLineH / 2 + 1, kStemW + 2, 1, true);
+}
+
+// A stem drawn FULL HEIGHT bridges its own notch. This reproduces that mistake
+// so the byte-identical result is on the record: it is the reason the stem is
+// inset by notchH rather than the serif being deepened.
+void drawIBeamNotchBridgedByStem(const GfxRenderer& r) {
+  const int cBottom = curY + kCursorLineH - 1;
+  r.fillRect(curX, curY, kStemW, kCursorLineH, true);
+  r.fillRect(curX - kSerifW, curY, kSerifW, 1, true);
+  r.fillRect(curX + kStemW, curY, kSerifW, 1, true);
+  r.fillRect(curX - kSerifW, curY + 1, kStemW + kSerifW * 2, kSerifH - 1, true);
+  r.fillRect(curX - kSerifW, cBottom - kSerifH + 1, kStemW + kSerifW * 2, kSerifH - 1, true);
+  r.fillRect(curX - kSerifW, cBottom, kSerifW, 1, true);
+  r.fillRect(curX + kStemW, cBottom, kSerifW, 1, true);
+}
+
+// The plain bar, kept only as the comparison the test above needs.
+void drawIBeamSolidSerifs(const GfxRenderer& r) {
+  const int cBottom = curY + kCursorLineH - 1;
   r.fillRect(curX, curY, kStemW, kCursorLineH, true);
   r.fillRect(curX - kSerifW, curY, kStemW + kSerifW * 2, kSerifH, true);
   r.fillRect(curX - kSerifW, cBottom - kSerifH + 1, kStemW + kSerifW * 2, kSerifH, true);
@@ -375,6 +403,48 @@ TEST_F(ReturnArrow, NewHeadIsSymmetricAboutTheApexRow) {
     EXPECT_EQ(leftUp, leftDown) << "row " << upRow << " above the apex starts at column " << leftUp << ", its mirror "
                                 << downRow << " starts at " << leftDown << " -- the head is lopsided";
   }
+}
+
+// The notch is REAL ink removed, not a redraw that looks different in prose.
+TEST_F(ReturnArrow, NewIBeamSerifsAreNotchedOnTheCentreline) {
+  drawNewIBeam(*r_);
+  const Box b = cursorBox();
+  dumpPgm("cursor_new", b);
+  // On the serif's outer row the centreline must be BLANK and the arms inked.
+  for (const int dy : {curY * S, (curY + kCursorLineH - 1) * S + S - 1}) {
+    EXPECT_FALSE(inkAtDevice(curX * S, dy)) << "centreline is inked at row " << dy << " -- no notch";
+    EXPECT_TRUE(inkAtDevice((curX - 1) * S, dy)) << "left arm missing at row " << dy;
+    EXPECT_TRUE(inkAtDevice((curX + kStemW) * S, dy)) << "right arm missing at row " << dy;
+  }
+}
+
+// A full-height stem fills the notch. Pinning it byte-for-byte, because the
+// difference between the two constructions is invisible in the source.
+TEST_F(ReturnArrow, AFullHeightStemBridgesItsOwnNotch) {
+  const Box b = cursorBox();
+  r_->clearScreen(0xFF);
+  drawIBeamNotchBridgedByStem(*r_);
+  std::vector<bool> bridged;
+  for (int dy = b.y0; dy <= b.y1; ++dy)
+    for (int dx = b.x0; dx <= b.x1; ++dx) bridged.push_back(inkAtDevice(dx, dy));
+  r_->clearScreen(0xFF);
+  drawIBeamSolidSerifs(*r_);
+  std::vector<bool> solid;
+  for (int dy = b.y0; dy <= b.y1; ++dy)
+    for (int dx = b.x0; dx <= b.x1; ++dx) solid.push_back(inkAtDevice(dx, dy));
+  EXPECT_EQ(bridged, solid) << "expected the bridged notch to be indistinguishable from a solid bar";
+}
+
+// The crossbar sits below centre and is PROUD of the stem, or it is just a
+// thicker stem row and reads as nothing.
+TEST_F(ReturnArrow, NewIBeamCarriesABaselineCrossbar) {
+  drawNewIBeam(*r_);
+  const int beamY = (curY + kCursorLineH / 2 + 1) * S;
+  EXPECT_TRUE(inkAtDevice((curX - 1) * S, beamY)) << "crossbar does not overhang left of the stem";
+  EXPECT_TRUE(inkAtDevice((curX + kStemW) * S, beamY)) << "crossbar does not overhang right of the stem";
+  // The row above it must be stem-only, so the bar is a distinct mark.
+  EXPECT_FALSE(inkAtDevice((curX - 1) * S, beamY - S)) << "row above the crossbar is inked -- not a distinct bar";
+  EXPECT_GT(beamY, (curY + kCursorLineH / 2) * S - 1) << "crossbar is not below centre";
 }
 
 }  // namespace
