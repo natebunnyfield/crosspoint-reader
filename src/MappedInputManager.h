@@ -70,6 +70,10 @@ class MappedInputManager {
     gpio.setTextEntryActive(active, lines);
   }
   bool consumeTypedText(std::string& out) const { return gpio.consumeTypedText(out); }
+  // Is a host's own software keyboard covering the screen? Always false on
+  // device -- see HalGPIO::isHostKeyboardVisible for why it is asked in one
+  // form rather than behind an #if.
+  bool isHostKeyboardVisible() const { return gpio.isHostKeyboardVisible(); }
 
   SwipeDir wasSwipe() const;
   bool wasHomeGesture() const;

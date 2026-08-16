@@ -165,6 +165,21 @@ class HalGPIO {
   void setTextEntryActive(bool /*active*/, TextEntryLines /*lines*/ = TextEntryLines::Single) {}
   bool consumeTypedText(std::string& /*out*/) { return false; }
 
+  // Is a HOST's own software keyboard covering the screen right now?
+  //
+  // Always false here, and not a stub awaiting an implementation: this board
+  // has no host and no software keyboard. It exists so an activity can ask the
+  // question in ONE form that compiles everywhere, rather than every caller
+  // carrying an #if for the simulator -- the simulator's HalGPIO answers it for
+  // real (crosspoint-simulator/src/HalGPIO.h), and on a phone it is what says
+  // the iOS keyboard is up.
+  //
+  // The editors use it to drop their own on-screen keyboard panel and give the
+  // rows to text while a host keyboard is doing that job (owner ruling
+  // 2026-08-16). Because this returns false on device, that branch folds away
+  // and an X3 always draws its panel, exactly as before.
+  bool isHostKeyboardVisible() const { return false; }
+
   static constexpr char TYPED_BACKSPACE = '\b';
   static constexpr char TYPED_COMMIT = '\n';
   static constexpr char TYPED_CANCEL = '\x1b';

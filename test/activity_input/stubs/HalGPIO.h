@@ -90,6 +90,13 @@ class HalGPIO {
     return true;
   }
 
+  // A host keyboard, scriptable, so a test can put the editor in the state a
+  // phone puts it in. The device HAL answers a constant false and the simulator
+  // answers for real; this one lets a host test drive BOTH sides of the edge,
+  // which is the only way to exercise the band relayout without a phone.
+  void simSetHostKeyboardVisible(const bool visible) { hostKeyboardVisible_ = visible; }
+  bool isHostKeyboardVisible() const { return hostKeyboardVisible_; }
+
   static constexpr char TYPED_BACKSPACE = '\b';
   static constexpr char TYPED_COMMIT = '\n';
   static constexpr char TYPED_CANCEL = '\x1b';
@@ -164,6 +171,7 @@ class HalGPIO {
   unsigned long heldTimeMs_ = 0;
   DeviceType deviceType_ = DeviceType::X4;
   bool textEntryActive_ = false;
+  bool hostKeyboardVisible_ = false;
   TextEntryLines textEntryLines_ = TextEntryLines::Single;
   std::string typed_;
 };

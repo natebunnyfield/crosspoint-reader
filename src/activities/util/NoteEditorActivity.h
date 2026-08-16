@@ -47,6 +47,10 @@ class NoteEditorActivity final : public Activity {
   // only started when one is already bonded.
   notes::KeyboardPanel panel;
   int panelHeight = 0;
+  // True while a host's own software keyboard is covering the screen, in which
+  // case the on-screen panel is not drawn and its rows go to text. Always false
+  // on device -- HalGPIO::isHostKeyboardVisible is a constant there.
+  bool panelHidden = false;
   // Top of the keyboard strip. Held rather than recomputed in render() so the
   // text area's bottom and the strip's top cannot drift apart.
   int panelTop = 0;
@@ -83,6 +87,9 @@ class NoteEditorActivity final : public Activity {
   bool savedOk = false;
 
   void relayout();
+  // Recompute the vertical bands. Called on entry and again whenever a host
+  // keyboard rises or falls, since that changes whether the panel band exists.
+  void applyLayout();
   void ensureCursorVisible();
   void pageUp();
   void pageDown();

@@ -25,6 +25,33 @@ constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
 // face stands in, so the screen is never blank because of a missing font.
 }  // namespace
 
+// The vertical bands, top to bottom, each owning a disjoint range:
+//   text | status | keyboard panel | button hints
+// (no header band since 2026-08-15 -- the title bar was removed)
+//
+// Recomputed rather than fixed at entry, because ONE of those bands can vanish
+// while the editor is open: when a host's own software keyboard is covering the
+// screen, drawing our on-screen panel underneath it is two keyboards for one
+// job, and the rows are better spent on text (owner ruling 2026-08-16). On
+// device isHostKeyboardVisible() is a constant false, so panelHeight is always
+// the panel's own height and this is the same arithmetic it always was.
+//
+// The status line sits BETWEEN the text and the panel and must be reserved
+// here -- computing maxLines against panelTop let the last line of text draw
+// underneath it.
+void NoteEditorActivity::applyLayout() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  panelHidden = mappedInput.isHostKeyboardVisible();
+  panelHeight = panelHidden ? 0 : panel.preferredHeight(renderer);
+  // With the panel gone the band closes up entirely rather than leaving a hole:
+  // panelTop lands on the hints, and the text below gains those rows.
+  panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
+  statusHeight = renderer.getLineHeight(SMALL_FONT_ID);
+  const int textBottom = panelTop - statusHeight;
+  maxLines = (textBottom - contentTop) / lineHeight;
+  if (maxLines < 1) maxLines = 1;
+}
+
 void NoteEditorActivity::onEnter() {
   Activity::onEnter();
 
@@ -82,18 +109,7 @@ void NoteEditorActivity::onEnter() {
   // removed (owner ruling 2026-08-15), so the text gets the width back.
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
 
-  panelHeight = panel.preferredHeight(renderer);
-  panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
-  // Vertical bands, top to bottom, each owning a disjoint range:
-  //   text | status | keyboard panel | button hints
-  // (no header band since 2026-08-15 -- the title bar was removed)
-  // The status line sits BETWEEN the text and the panel and must be reserved
-  // here — computing maxLines against panelTop let the last line of text draw
-  // underneath it.
-  statusHeight = renderer.getLineHeight(SMALL_FONT_ID);
-  const int textBottom = panelTop - statusHeight;
-  maxLines = (textBottom - contentTop) / lineHeight;
-  if (maxLines < 1) maxLines = 1;
+  applyLayout();
 
   storage = makeUniqueNoThrow<char[]>(BUF_SIZE);
   if (storage) buf = makeUniqueNoThrow<textbuf::TextBuffer>(storage.get(), BUF_SIZE);
@@ -529,6 +545,22 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
 }
 
 void NoteEditorActivity::loop() {
+  // A host keyboard can rise or fall at any moment -- the owner taps the chip,
+  // or dismisses from the bar -- and the band layout depends on it. Checked
+  // here rather than on an event, because nothing on this board raises one:
+  // isHostKeyboardVisible() is a plain query, and on device it is a constant
+  // false so this whole branch never fires.
+  //
+  // relayout() as well as applyLayout(), because maxWidth is unchanged but the
+  // LINE COUNT is not: the wrap is the same, the window into it is bigger.
+  if (mappedInput.isHostKeyboardVisible() != panelHidden) {
+    RenderLock lock;
+    applyLayout();
+    relayout();
+    ensureCursorVisible();
+    requestUpdate();
+  }
+
   // Gated ABOVE the Back handler, like an OptionPopup: while caret mode is up
   // Back closes the mode and does not leave the editor.
   if (caretMode) {
@@ -578,6 +610,14 @@ void NoteEditorActivity::loop() {
   }
 
   pollPairingGestures();
+
+  // A HIDDEN panel takes no input. Nothing below this point is reachable while
+  // a host keyboard is up, and that is the point: the panel is not drawn then,
+  // and a Confirm that typed a key nobody can see would be worse than a dead
+  // button. Typed text from the host still arrives -- that is drained above,
+  // before this -- as does Back, which is handled earlier still, so the editor
+  // stays fully usable with only the phone's keyboard.
+  if (panelHidden) return;
 
   // Front buttons drive the on-screen keyboard: Left/Right move along a row,
   // Confirm types the selected key. Side buttons move between rows — a long
@@ -754,7 +794,12 @@ void NoteEditorActivity::render(RenderLock&&) {
 
   // Split screen: the keyboard panel occupies the strip above the button hints,
   // so the note stays visible while typing.
-  panel.render(renderer, metrics.contentSidePadding, panelTop, pageWidth - metrics.contentSidePadding * 2, panelHeight);
+  // Skipped entirely while a host keyboard is up -- not drawn zero-height, not
+  // drawn behind it. panelHeight is 0 then and the text above has already been
+  // laid out into the rows this would have taken.
+  if (!panelHidden)
+    panel.render(renderer, metrics.contentSidePadding, panelTop, pageWidth - metrics.contentSidePadding * 2,
+                 panelHeight);
 
   // Status bar: a right-aligned GRID, not a concatenated string.
   //
