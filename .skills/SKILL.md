@@ -460,6 +460,19 @@ did, mid-task, while a shipping binary was being built from it.
 
 ## Coding Standards
 
+### Spelling: American, always
+
+Color, not colour. Gray, not grey. Behavior, center, initialize, analyze,
+artifact, rasterize. This covers prose, comments, commit messages, docs **and
+user-visible strings** — the last is where it actually costs something, and it
+is where it went wrong: the iOS Settings.bundle shipped a "Page Colours" group
+onto the owner's phone before anyone noticed (2026-08-16).
+
+Fix what you touch. Do NOT launch a repo-wide rewrite: vendored third-party
+code stays as it is, and a mass sweep collides with any agent working the same
+tree.
+
+
 ### Naming Conventions
 * Classes: PascalCase (e.g., EpubReaderActivity)
 * Methods/Variables: camelCase (e.g., renderPage())
