@@ -43,11 +43,18 @@ Two consequences, neither of them work items:
 
 - The six branches and their worktrees are `cptidy` candidates — merged branches
   plus prunable worktree records, including two under a session scratchpad.
+  **Owner ruling 2026-08-17: he runs `cptidy`, no session deletes them.** Same
+  end state either way since all six are 0 ahead; the reason is that the
+  simulator repo had another session committing to it at the time, and the
+  standing convention is that tidy and merge are his commands, not a session's.
 - The simulator's `main` was **9 commits ahead of `origin/main`** at the time of
   the sweep (the page-colour palette line, plus `ST-009` filed against it), and
   its `TODO.md` was being written to in the same minute by another session. Not
   pushed from here on purpose: an unpushed branch that someone else is actively
-  committing to is theirs to push.
+  committing to is theirs to push. **Owner ruling 2026-08-17, same reason:**
+  leave `ST-005` alone too — its mockups need approval before code, and two
+  sessions rendering mockups into one tracker is how an entry gets half-written
+  twice. Simulator work waits for that session to finish.
 
 ---
 
@@ -109,7 +116,13 @@ have bitten before):
 table-bearing EPUB, and switching it invalidates the layout cache.
 
 ### [T-014] Sibling-fork improvements, as reviewable PRs
-**scope: upstream-adjacent · opened 2026-08-15**
+**scope: upstream-adjacent · opened 2026-08-15 · STARTED, owner ruling 2026-08-17**
+
+**Owner ruling 2026-08-17: start here, and start with the matcha heap series.**
+Asked as "what do I pick up next" against T-012 (tables) and a tidy/device-prep
+pass; the heap/OOM work won because it is real crash fixes against the 380 KB
+ceiling, it can be verified correct on a host, and matcha is only 31 behind
+upstream so the hunks still apply. T-012 stays open and unstarted.
 
 From [docs/fork-ecosystem.md](docs/fork-ecosystem.md), which surveyed 1,443
 forks. Bring the worthwhile work across as **several small PRs for review** —
@@ -176,6 +189,15 @@ phone" items: `ST-008`, `ST-004` and `ST-006` are testable in build-82, the
 palette work is not in any build yet.
 
 The rest of the entry below is unchanged and still owed.
+
+**Owner ruling 2026-08-17: stage a bin and write one checklist.** Asked what to
+prepare for the device batch. A `gh_release` build from a clean throwaway
+worktree at current `main`, named `<UTC>-crosspoint-<sha>.bin` and staged in
+`~/crosspoint-archive/staged/`, plus a single ordered checklist covering every
+device-blocked item across both trackers — what to flash, what to watch, what
+supersedes what. Cards are NOT reprovisioned as part of this; that waits for a
+mount. The point is that one card mount plus one sitting then closes nine items
+instead of rediscovering them from four tracker entries.
 
 **Not done — needs the hardware in hand:**
 
@@ -749,8 +771,15 @@ Pre-scrub history is preserved at
 `~/crosspoint-archive/crosspoint-reader-prescrub-20260807-1555.bundle` and as
 `refs/prescrub/main` locally.
 
-**Still outstanding, and it is not a code change:** the API key was served over
-the network by every build up to today, and the SSID was public from 2026-08-03.
-A scrub limits future exposure and retracts nothing — anyone who cloned still
-has both. **Rotate the Anthropic key.**
+**The key was served over the network by every build up to 2026-08-07, and the
+SSID was public from 2026-08-03.** A scrub limits future exposure and retracts
+nothing — anyone who cloned still has both.
+
+**CLOSED 2026-08-17, owner: the key has been rotated.** The line above used to
+end "Rotate the Anthropic key" and it stayed owed for ten days inside an entry
+already marked DONE, which is where an action goes to be forgotten. Nothing else
+about this entry changes: the file is still servable by design, the file
+transfer server still has no authentication, and AP mode is still an open
+network. That remains a known, accepted risk on this fork — do not "fix" it
+without asking.
 
