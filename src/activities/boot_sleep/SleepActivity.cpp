@@ -2,6 +2,7 @@
 
 #include <Epub.h>
 #include <Epub/converters/PngToFramebufferConverter.h>
+#include <FontCacheManager.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
@@ -502,6 +503,14 @@ bool drawSleepPopupPreservingFrame(GfxRenderer& renderer) {
   return true;
 }
 
+void releaseSdFontCachesForDecode(const GfxRenderer& renderer) {
+  if (auto* fcm = renderer.getFontCacheManager()) {
+    LOG_DBG("SLP", "Free heap before SD font cache release: %d bytes", ESP.getFreeHeap());
+    fcm->releaseSdFontCaches();
+    LOG_DBG("SLP", "Free heap before sleep image decode: %d bytes", ESP.getFreeHeap());
+  }
+}
+
 }  // namespace
 
 void SleepActivity::onEnter() {
@@ -531,6 +540,7 @@ void SleepActivity::onEnter() {
     // polarity after the display driver returns to normal.
     if (frameWasInverted) renderer.invertScreen();
     drawSleepPopupPreservingFrame(renderer);
+    releaseSdFontCachesForDecode(renderer);
     return renderTransparentCustomSleepScreen();
   }
 
