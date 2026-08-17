@@ -31,6 +31,24 @@ candidates ([docs/fork-ecosystem.md](docs/fork-ecosystem.md)).
 file came to exist, how the simulator's did, and how T-017 and T-018 nearly went
 missing on 2026-08-15. File it the same turn you find it.
 
+**Branches are not a fifth tracker, and a sweep on 2026-08-17 confirmed it.**
+Every feature branch in both repos was checked with `git log --oneline main..<b>`
+and every one returned **empty** — `crt-red-grey-fw` and `bw-outlines` here,
+`crt-all-phosphors`, `crt-sepia-blue`, `crt-red-grey` and `bw-outlines` in the
+simulator. All six are fully merged; nothing is owed from a branch, and no work
+is stranded on one. Recording the negative result so the next person does not
+re-audit six worktrees to learn that they are empty.
+
+Two consequences, neither of them work items:
+
+- The six branches and their worktrees are `cptidy` candidates — merged branches
+  plus prunable worktree records, including two under a session scratchpad.
+- The simulator's `main` was **9 commits ahead of `origin/main`** at the time of
+  the sweep (the page-colour palette line, plus `ST-009` filed against it), and
+  its `TODO.md` was being written to in the same minute by another session. Not
+  pushed from here on purpose: an unpushed branch that someone else is actively
+  committing to is theirs to push.
+
 ---
 
 ## OPEN
@@ -119,6 +137,78 @@ JPEG cover support ([docs/progressive-jpeg.md](docs/progressive-jpeg.md)), HTML 
 AND `-e simulator` from a cold cache, each stating what was verified on host
 and what still needs the device.
 
+### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
+**scope: verification · opened 2026-08-07**
+
+Build, package and TestFlight are DONE. The device half is not, and the two keep
+getting reported together, so this entry exists to keep them apart.
+
+**Done 2026-08-07, from a clean tree at `91b4a8fc`:**
+
+| Artifact | State |
+|---|---|
+| `gh_release` firmware | built, staged at `~/crosspoint-archive/staged/20260808T0201Z-crosspoint-91b4a8fc.bin`, sha256 `96f77816…` |
+| Mac app (`CrossPointX3.app`) | packaged and `verify`-clean (all 3 purpose strings); NOT TestFlighted, per owner ruling |
+| iOS TestFlight | **build-38 uploaded**, 19,545,915 bytes, delivery `d3e7a3ba` |
+
+**Superseded on the TestFlight line, 2026-08-17: build-82 is up** — 50 MB IPA,
+delivery `3f4451a4`, tagged and pushed as `build-82` in the simulator repo. It
+carries firmware `c36dba242` (this file's T-015 fix) and simulator `2e9e4c3`,
+on top of the iPad-landscape change `eaaa048`. All four `testflight.sh` gates
+passed: desktop canary, source set current (132 TUs), `crosspoint_core` carries
+`SIMULATOR_DEVICE_X3` + `CROSSPOINT_RENDER_SCALE=3`, and no purpose string is
+demanded by the binary.
+
+One honest caveat, so nobody tests the wrong thing: **the progressive-JPEG fix
+is NOT exercised by this build.** It lives in a JPEGDEC patch, and the iOS
+target substitutes stb_image for JPEGDEC entirely — that path was already
+correct there. The fix needs the device.
+
+**Where the two repos stand against build-82, re-measured 2026-08-17 15:25:**
+
+| Repo | Against the build |
+|---|---|
+| firmware | build-82 carries `c36dba242`, which is still the newest **code** on `main` — the only commit since is `809702e91`, docs. So the firmware half of build-82 is current. |
+| simulator | `main` has moved **9 commits past the tag**: the page-colour button, the palette rework (Sepia CRT retired, Reading at three paper temperatures replacing Soft and Cool Gray), and `ST-009`. None of it is on TestFlight. |
+
+That split matters when reading the simulator's "SHIPPED, unverified on the
+phone" items: `ST-008`, `ST-004` and `ST-006` are testable in build-82, the
+palette work is not in any build yet.
+
+The rest of the entry below is unchanged and still owed.
+
+**Not done — needs the hardware in hand:**
+
+- **The SD cards.** None were mounted, so `cpcards` never ran. They are still on
+  `bb614f73`, roughly forty commits back. This is the only step blocked on a
+  physical act.
+- **Confirm on device**, since it will be in hand anyway: the seven Lucide icons
+  on Home, the caret advancing a full space in Create Note, the clock preview on
+  the offset screen, and the WebDAV update flow — that last one matters most,
+  because its erase-write-reboot step is the ONLY part that cannot be exercised
+  off-device at all.
+- **One-button firmware update** (`ee6fad7e5`, Home → Update Firmware,
+  2026-08-16). Added after this list was written, and it is the second thing on
+  it that no host build can reach: the Home row is compiled out under
+  `CROSSPOINT_NO_DEVICE_FLASH` (`HomeActivity.cpp:34-39`), so build-82 does not
+  carry the row at all. What to watch is the whole chain — check, install,
+  reboot, and the **rollback**, which is the part that was genuinely missing
+  before that commit (`network/OtaCommit.cpp` confirming a healthy boot). Full
+  write-up in [docs/one-button-firmware-update.md](docs/one-button-firmware-update.md).
+- **Older debt, still unconfirmed:** power-off-while-typing (build-33+), iOS file
+  transfer (build-37), B-018 back-nav, B-017's notes half.
+
+**What this loop taught, worth keeping:** the iOS archive found a link error that
+neither the device nor the desktop build could see — `SdFirmwareUpdateActivity`
+is excluded from the iOS source set, and a new call into it from a shared TU only
+fails when that target links. The iOS archive belongs IN the loop, not after it.
+`xcodebuild -target CrossPointX3 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO` is
+the cheap version and needs no keychain.
+
+---
+
+## Finished
+
 ### [T-016] READMEs no longer describe what these repos are — DONE 2026-08-16
 **scope: docs · opened 2026-08-15 · both repos landed 2026-08-16**
 
@@ -159,59 +249,6 @@ rule is the same as everywhere else, no claim without a grep.
 **Done looks like:** each README describes what its repo does today, names what
 was deliberately removed and why (pointing at `SCOPE.md` / `docs/fork-sync.md`),
 and no longer lists anything that is not there.
-
-### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
-**scope: verification · opened 2026-08-07**
-
-Build, package and TestFlight are DONE. The device half is not, and the two keep
-getting reported together, so this entry exists to keep them apart.
-
-**Done 2026-08-07, from a clean tree at `91b4a8fc`:**
-
-| Artifact | State |
-|---|---|
-| `gh_release` firmware | built, staged at `~/crosspoint-archive/staged/20260808T0201Z-crosspoint-91b4a8fc.bin`, sha256 `96f77816…` |
-| Mac app (`CrossPointX3.app`) | packaged and `verify`-clean (all 3 purpose strings); NOT TestFlighted, per owner ruling |
-| iOS TestFlight | **build-38 uploaded**, 19,545,915 bytes, delivery `d3e7a3ba` |
-
-**Superseded on the TestFlight line, 2026-08-17: build-82 is up** — 50 MB IPA,
-delivery `3f4451a4`, tagged and pushed as `build-82` in the simulator repo. It
-carries firmware `c36dba242` (this file's T-015 fix) and simulator `2e9e4c3`,
-on top of the iPad-landscape change `eaaa048`. All four `testflight.sh` gates
-passed: desktop canary, source set current (132 TUs), `crosspoint_core` carries
-`SIMULATOR_DEVICE_X3` + `CROSSPOINT_RENDER_SCALE=3`, and no purpose string is
-demanded by the binary.
-
-One honest caveat, so nobody tests the wrong thing: **the progressive-JPEG fix
-is NOT exercised by this build.** It lives in a JPEGDEC patch, and the iOS
-target substitutes stb_image for JPEGDEC entirely — that path was already
-correct there. The fix needs the device.
-
-The rest of the entry below is unchanged and still owed.
-
-**Not done — needs the hardware in hand:**
-
-- **The SD cards.** None were mounted, so `cpcards` never ran. They are still on
-  `bb614f73`, roughly forty commits back. This is the only step blocked on a
-  physical act.
-- **Confirm on device**, since it will be in hand anyway: the seven Lucide icons
-  on Home, the caret advancing a full space in Create Note, the clock preview on
-  the offset screen, and the WebDAV update flow — that last one matters most,
-  because its erase-write-reboot step is the ONLY part that cannot be exercised
-  off-device at all.
-- **Older debt, still unconfirmed:** power-off-while-typing (build-33+), iOS file
-  transfer (build-37), B-018 back-nav, B-017's notes half.
-
-**What this loop taught, worth keeping:** the iOS archive found a link error that
-neither the device nor the desktop build could see — `SdFirmwareUpdateActivity`
-is excluded from the iOS source set, and a new call into it from a shared TU only
-fails when that target links. The iOS archive belongs IN the loop, not after it.
-`xcodebuild -target CrossPointX3 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO` is
-the cheap version and needs no keychain.
-
----
-
-## Finished
 
 ### [T-015] Progressive JPEG decode — REPRODUCED and FIXED 2026-08-17
 **scope: reader · opened 2026-08-15 · full write-up in [docs/progressive-jpeg.md](docs/progressive-jpeg.md)**
