@@ -174,6 +174,21 @@ getting reported together, so this entry exists to keep them apart.
 | Mac app (`CrossPointX3.app`) | packaged and `verify`-clean (all 3 purpose strings); NOT TestFlighted, per owner ruling |
 | iOS TestFlight | **build-38 uploaded**, 19,545,915 bytes, delivery `d3e7a3ba` |
 
+**Superseded on the TestFlight line, 2026-08-17: build-82 is up** — 50 MB IPA,
+delivery `3f4451a4`, tagged and pushed as `build-82` in the simulator repo. It
+carries firmware `c36dba242` (this file's T-015 fix) and simulator `2e9e4c3`,
+on top of the iPad-landscape change `eaaa048`. All four `testflight.sh` gates
+passed: desktop canary, source set current (132 TUs), `crosspoint_core` carries
+`SIMULATOR_DEVICE_X3` + `CROSSPOINT_RENDER_SCALE=3`, and no purpose string is
+demanded by the binary.
+
+One honest caveat, so nobody tests the wrong thing: **the progressive-JPEG fix
+is NOT exercised by this build.** It lives in a JPEGDEC patch, and the iOS
+target substitutes stb_image for JPEGDEC entirely — that path was already
+correct there. The fix needs the device.
+
+The rest of the entry below is unchanged and still owed.
+
 **Not done — needs the hardware in hand:**
 
 - **The SD cards.** None were mounted, so `cpcards` never ran. They are still on

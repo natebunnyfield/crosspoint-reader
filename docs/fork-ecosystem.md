@@ -207,7 +207,7 @@ verdict on their quality.
 |---|---|
 | `9011c91fd` emergency font release also frees kern/lig tables | **TAKEN.** Applied clean. |
 | `07b35f966` free font cache before settings save | **SKIPPED — needs infrastructure we lack.** Calls `FontCacheManager::releaseAllFontMemory()`, which does not exist here; our manager exposes only `clearCache()`. Porting it means porting matcha's emergency-release machinery first. Its guard (`finishOnBack`) also has no analogue — this fork's `SettingsActivity` has nine `saveToFile()` sites and no reader-entered mode flag. Revisit if that machinery is ever ported. |
-| `f6df3e35c` drop per-call allocation from `HalStorage::hasContent` | Conflicts (2). Worth a hand-port; generic HAL. |
+| `f6df3e35c` drop per-call allocation from `HalStorage::hasContent` | **N/A — checked 2026-08-17, `hasContent` does not exist here.** `grep -rn hasContent lib/ src/` returns one hit and it is `http.hasContentLength()` in `HttpDownloader.cpp:75`. The commit optimizes a method matcha ADDED (a guard against 0-byte husks left by an interrupted conversion being read back as finished artifacts). So this is not a hand-portable perf fix; taking it means importing the API and converting its call sites — a feature decision, not a cleanup. The first pass read "generic HAL" off the diff without checking that the method was ours. |
 | `d8b220990` avoid EPUB indexing heap pressure | Conflicts (3). Worth a hand-port. |
 | `2ea69f77a` avoid reader settings OOM | Conflicts (2). Same area as `07b35f966`. |
 | `37265177f` report a power lock that is never released | Conflicts (2). Diagnostic; generic. |

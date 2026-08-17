@@ -98,9 +98,15 @@ no longer a useful step — the branch above is unambiguous.
 
 Both named commits — `9c48609f` (bookmarks survive re-pagination) and
 `0f747b82` (content-based EPUB sync positions) — are still unmerged, but the
-"two" in the title has been stale for a while. As of 2026-08-07
-`git rev-list --left-right --count main...upstream/develop` reports **255 ahead
-/ 13 behind**: twelve more upstream commits have landed since this was filed.
+"two" in the title has been stale for a while. Re-measured **2026-08-17**:
+`git rev-list --left-right --count main...upstream/develop` reports **502 ahead
+/ 58 behind**, up from 255 / 13 on 2026-08-07 — 45 more upstream commits in ten
+days, so this count ages faster than any breakdown written against it.
+
+Note before acting on that 58: `scripts/repo-status.sh` OVERSTATES the backlog,
+because a commit already applied by hand still counts as unmerged. On the last
+pass 6 of 45 were already present. And never probe with
+`git cherry-pick -X ours` — it reports conflicts as clean.
 `git merge upstream/develop` produces 18 conflicts, six `modify/delete`,
 because the named commits straddle live Epub engine code and subsystems this
 fork deleted on purpose.
