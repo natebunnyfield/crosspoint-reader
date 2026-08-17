@@ -34,49 +34,6 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
-### [B-027] Curves are still logical-resolution on a supersampled build
-**severity: low · scope: GfxRenderer · found 2026-08-15 · polygons FIXED 2026-08-16, arcs open**
-
-`drawPixel()` paints a `RENDER_SCALE` x `RENDER_SCALE` block
-(`lib/GfxRenderer/GfxRenderer.cpp:557-565`), which is exactly right for an
-axis-aligned edge and exactly wrong for anything slanted or curved: the
-staircase scales with the shape while text, on the hi-res glyph path, does not.
-The shipped iOS app pins `RENDER_SCALE=3`
-(`crosspoint-simulator/ios/CMakeLists.txt:89,208`), so on a phone every such
-edge sits at a third of the resolution of the characters beside it.
-
-Slanted **thick lines** were fixed on 2026-08-15 (the keyboard's Return arrow;
-`test/hires_shapes` pins it). Still logical-resolution:
-
-| Primitive | Where it shows |
-|---|---|
-| `fillArc` / `fillRoundedRect` (`:1423-1500`) | Every rounded corner — key backgrounds, popups, list pills, and the Return arrow's own elbow, which is now the coarsest thing left in that glyph |
-| `drawArc` / `drawRoundedRect` | Stroked rounded borders |
-| ~~`fillPolygon`~~ | **FIXED 2026-08-15/16** — see below |
-| 1-px `drawLine` diagonals | Left deliberately: a device-resolution hairline would be 1/3 the weight, not smoother |
-
-**The polygon half is closed.** `fillPolygon` rasterizes at device resolution
-on a supersampled build, and triangles additionally go through exact integer
-half-space tests rather than the scanline sweep — the sweep had two faults that
-made symmetric input render asymmetric (division truncation following the
-edge-walk order, and a parity rule that dropped the row at each edge's minimum
-y). Sampling vertices at the centre of their logical pixel keeps the shape where
-the logical form put it, so nothing shifts by half a pixel. `test/return_arrow`
-pins it at RENDER_SCALE 1 and 3.
-
-`fillPolygon` was tractable precisely where the arcs are not: it writes a solid
-state with no dithering, so it has no "what is a dither cell in device space"
-question to answer.
-
-The arc/rounded paths are **not** a copy of the line fix. They dither, and a
-dither cell is defined in LOGICAL pixels on purpose (`ios/README.md:357-361`) —
-so a device-resolution arc has to decide what a dither cell means before it can
-be written. That is a ruling, not a refactor. **That is all that remains of
-B-027.**
-
-Nothing here is visible on an X3 or an X4: `RENDER_SCALE` is 1 on device and the
-whole path preprocesses away.
-
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
@@ -162,6 +119,69 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-027] Curves are still logical-resolution on a supersampled build — FIXED
+**severity: low · scope: GfxRenderer · found 2026-08-15 · lines, polygons and arcs all FIXED by 2026-08-16**
+
+**The arc half landed 2026-08-16 (`21371f79`).** It was recorded below as
+needing a ruling — "a device-resolution arc has to decide what a dither cell
+means before it can be written" — and it turned out not to. The BOUNDARY is
+geometry and belongs at device resolution; the DITHER is texture and stays
+logical. `fillArc` walks device rows while the ink decision still asks the
+logical coordinate, so a solid arc gets a smooth edge and a dithered arc gets a
+smooth edge around an unchanged texture. Nothing about the dither moved, so
+there was nothing to rule on.
+
+Geometry is pinned to the logical shape (outer edge at `maxRadius + 0.5`,
+centres at `k*S + S/2`) so no corner shifted, and the path is guarded on
+`renderScale() > 1` so the device build is untouched. `test/hires_shapes` gains
+three cases at scale 3, all verified failing-first against a forced recompile.
+
+Only the 1-px `drawLine` diagonal remains logical, and that is the deliberate
+exclusion below, not an omission.
+
+**Original entry follows.**
+
+`drawPixel()` paints a `RENDER_SCALE` x `RENDER_SCALE` block
+(`lib/GfxRenderer/GfxRenderer.cpp:557-565`), which is exactly right for an
+axis-aligned edge and exactly wrong for anything slanted or curved: the
+staircase scales with the shape while text, on the hi-res glyph path, does not.
+The shipped iOS app pins `RENDER_SCALE=3`
+(`crosspoint-simulator/ios/CMakeLists.txt:89,208`), so on a phone every such
+edge sits at a third of the resolution of the characters beside it.
+
+Slanted **thick lines** were fixed on 2026-08-15 (the keyboard's Return arrow;
+`test/hires_shapes` pins it). Still logical-resolution:
+
+| Primitive | Where it shows |
+|---|---|
+| `fillArc` / `fillRoundedRect` (`:1423-1500`) | Every rounded corner — key backgrounds, popups, list pills, and the Return arrow's own elbow, which is now the coarsest thing left in that glyph |
+| `drawArc` / `drawRoundedRect` | Stroked rounded borders |
+| ~~`fillPolygon`~~ | **FIXED 2026-08-15/16** — see below |
+| 1-px `drawLine` diagonals | Left deliberately: a device-resolution hairline would be 1/3 the weight, not smoother |
+
+**The polygon half is closed.** `fillPolygon` rasterizes at device resolution
+on a supersampled build, and triangles additionally go through exact integer
+half-space tests rather than the scanline sweep — the sweep had two faults that
+made symmetric input render asymmetric (division truncation following the
+edge-walk order, and a parity rule that dropped the row at each edge's minimum
+y). Sampling vertices at the centre of their logical pixel keeps the shape where
+the logical form put it, so nothing shifts by half a pixel. `test/return_arrow`
+pins it at RENDER_SCALE 1 and 3.
+
+`fillPolygon` was tractable precisely where the arcs are not: it writes a solid
+state with no dithering, so it has no "what is a dither cell in device space"
+question to answer.
+
+The arc/rounded paths are **not** a copy of the line fix. They dither, and a
+dither cell is defined in LOGICAL pixels on purpose (`ios/README.md:357-361`) —
+so a device-resolution arc has to decide what a dither cell means before it can
+be written. That is a ruling, not a refactor. **That is all that remains of
+B-027.**
+
+Nothing here is visible on an X3 or an X4: `RENDER_SCALE` is 1 on device and the
+whole path preprocesses away.
+
 
 ### [B-019] `clockFormat` is a visible setting that nothing reads
 **severity: medium · scope: lying control · found 2026-08-06 · filed 2026-08-07** · FIXED 2026-08-07
