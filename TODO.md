@@ -134,8 +134,28 @@ and close the item; a decoder change with no failing case is not worth the risk.
 **Done looks like:** either a reproduction plus the fix plus the cover rendering
 correctly, or a written finding that our decoder already handles it.
 
-### [T-016] READMEs no longer describe what these repos are
-**scope: docs · opened 2026-08-15**
+### [T-016] READMEs no longer describe what these repos are — DONE 2026-08-16
+**scope: docs · opened 2026-08-15 · both repos landed 2026-08-16**
+
+**Done, with the simulator's paired `ST-007`.** This README gained Manage Files,
+Create Note (full-screen editor, timestamped notes at the card root), Claude
+(`/claude-key.txt`, `claude-haiku-4-5`, transcript appended to
+`/claude-chat.md`, BLE torn down for the TLS exchange), the two text-entry
+styles behind `TextEntryFactory`, Bluetooth keyboards, and text antialiasing
+(`SETTINGS.textAntiAliasing`, off by default) — each checked against the tree
+before being written. It also gained a short section pointing at `SCOPE.md` and
+`docs/fork-sync.md` for what was deliberately removed, described as what those
+two files actually are rather than what would have been convenient.
+
+**The "advertises removed features" premise turned out to be already handled.**
+Greping this README for KOReader, Calibre, bookmarks, auto page turn, the status
+bar and OPDS returns **zero hits each** — the removals had already been kept up
+with, and two of them (the four themes, the wireless OTA screen) are named
+inline with their dates. What was actually missing was the other direction: the
+features this fork ADDED and never wrote down. Recording that here so the next
+person does not re-audit the removal half.
+
+**Original entry follows.**
 
 Both `crosspoint-reader` and `crosspoint-simulator` have drifted a long way from
 their READMEs. The firmware fork has deleted whole subsystems (KOReader sync,

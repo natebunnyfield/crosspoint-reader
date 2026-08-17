@@ -18,7 +18,13 @@ CrossPoint is open-source e-reader firmware - community-built, fully hackable, f
 
 - **Custom fonts**: install your favorite fonts on the SD card.
 
-- **Library workflow**: folder browser, hidden-file toggle, long-press delete, recent books, SD-cache management.
+- **Library workflow**: folder browser, hidden-file toggle, long-press delete, recent books, SD-cache management, and a **Manage Files** screen for rename/move/delete across the card.
+
+- **Writing on the device**: **Create Note** is a full-screen text editor; notes are saved to the SD card root under a timestamped, collision-free name. Text entry comes in two styles, picked in Settings — a daisywheel, or a keyboard grid (13-key or QWERTY). A Bluetooth keyboard can be paired from Settings and typed on directly.
+
+- **Claude**: ask a question from the device and keep the answer. Put an Anthropic API key in `/claude-key.txt` on the card; the exchange runs over Wi-Fi against `claude-haiku-4-5`, and every prompt and reply is appended to `/claude-chat.md` — the prompt is written *before* the request, so a failed attempt is still recorded. The BLE keyboard is shut down for the duration because the two radios cannot both hold their heap at once.
+
+- **Antialiased text**: glyphs can render through 2-bit grayscale planes rather than pure black-and-white (Settings > Reader > Text anti-aliasing). Off by default.
 
 - **Wireless workflows**:
   
@@ -33,6 +39,21 @@ CrossPoint is open-source e-reader firmware - community-built, fully hackable, f
 - **Customization**: sleep screen modes, side button swap (Prev/Next), power-button behavior, refresh cadence, reading typeface and size, and more. The interface itself is a single theme (Lyra Six) — the other four were removed on 2026-08-04. Firmware updates are installed via SD card (Settings > Device > SD Firmware Update); the wireless OTA-check screen was removed on 2026-08-08 as unreachable (no menu entry launched it).
 
 - **Localization**: English and Spanish.
+
+### What this fork deliberately does not have
+
+This fork removes as readily as it adds, and a feature missing from the list
+above is often gone on purpose rather than unbuilt — the single theme and the
+wireless OTA screen above are two examples with dates on them.
+
+[SCOPE.md](SCOPE.md) carries **upstream's** scope and contribution policy
+verbatim, so it stays mergeable, with a fork note naming the two things this fork
+ships that the policy excludes: the note editor and Claude chat.
+[docs/fork-sync.md](docs/fork-sync.md) is the divergence log — why this is a
+selectively divergent fork rather than a tracking mirror, how to take an upstream
+change deliberately, and the standing rulings on what was evaluated and declined.
+Read both before proposing a feature back; several have already been built,
+measured and removed.
 
 ### Coming soon:
 
