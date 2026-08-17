@@ -29,9 +29,14 @@ class HomeActivity final : public Activity {
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
 
-  // Menu order, owner ruling 2026-08-06. FOUR things encode this list: these
-  // two maps and the menuItems/menuIcons vectors in HomeActivity.cpp. They must
-  // agree; a mismatch shows up as the wrong screen opening, not as an error.
+  // Menu order, owner ruling 2026-08-06. FIVE things encode this list: these two
+  // maps, the menuItems/menuIcons vectors in HomeActivity.cpp, and
+  // getMenuItemCount()'s literal. They must agree; a mismatch shows up as the
+  // wrong screen opening, not as an error -- and a stale count shows up as a row
+  // that renders but that the selector can never reach.
+  //
+  // (The comment said FOUR until 2026-08-16. The count was always the fifth; it
+  // is written down now because adding a row is exactly when that bites.)
   static int menuItemToIndex(HomeMenuItem item) {
     int i = 0;
     if (item == HomeMenuItem::RECENTS) return i;
@@ -46,6 +51,10 @@ class HomeActivity final : public Activity {
     ++i;
     if (item == HomeMenuItem::CLAUDE) return i;
     ++i;
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+    if (item == HomeMenuItem::UPDATE_FIRMWARE) return i;
+    ++i;
+#endif
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
     return 0;
   }
@@ -58,6 +67,9 @@ class HomeActivity final : public Activity {
     if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
     if (idx == i++) return HomeMenuItem::CREATE_NOTE;
     if (idx == i++) return HomeMenuItem::CLAUDE;
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+    if (idx == i++) return HomeMenuItem::UPDATE_FIRMWARE;
+#endif
     if (idx == i) return HomeMenuItem::SETTINGS_MENU;
     return HomeMenuItem::NONE;
   }
@@ -69,6 +81,9 @@ class HomeActivity final : public Activity {
   void onManageFilesOpen();
   void onCreateNoteOpen();
   void onClaudeOpen();
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+  void onFirmwareUpdateOpen();
+#endif
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image

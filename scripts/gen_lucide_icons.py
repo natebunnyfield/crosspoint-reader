@@ -54,6 +54,10 @@ ICONS = [
     # a stroked approximation of it reads as a generic snowflake and not as the
     # mark. Lucide `bot` is the sanctioned fallback if the mark is ever unwanted.
     ("ClaudeMark", "claude-mark"),
+    # The one-button firmware update on Home. cloud-download rather than
+    # refresh-cw: this pulls a release off GitHub, and a recycle arrow reads as
+    # "reload this screen" next to six rows that all open something.
+    ("Update", "cloud-download"),
 ]
 
 SIZES = (24, 32)

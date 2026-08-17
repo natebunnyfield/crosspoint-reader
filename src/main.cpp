@@ -29,6 +29,7 @@
 #include "activities/boot_sleep/SleepScreenPolicy.h"
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "activities/settings/SdFirmwareUpdateActivity.h"
+#include "network/OtaCommit.h"
 #endif
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -915,6 +916,23 @@ void setup() {
 
   LOG_INF("MEM", "Boot complete: free=%u total=%u maxalloc=%u", (unsigned)ESP.getFreeHeap(),
           (unsigned)ESP.getHeapSize(), (unsigned)ESP.getMaxAllocHeap());
+
+  // LAST, on purpose. If this boot is the trial run of a freshly installed OTA
+  // image, reaching this line is the proof it works: the panel is up, the SD
+  // card mounted (setup() returns early above if it did not), settings and
+  // recent books loaded, and an activity routed. Confirming here cancels the
+  // bootloader's pending rollback and makes the update permanent.
+  //
+  // Every path that fails before this leaves the image PENDING_VERIFY, and the
+  // next boot reverts to the previous firmware on its own. That is the whole
+  // anti-brick guarantee, and it is why this call sits after everything rather
+  // than at the top. See src/network/OtaCommit.h.
+  //
+  // Gated with the include above: a build that cannot flash a partition has no
+  // OTA image to confirm, and on iOS the whole update screen is excluded.
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+  ota_commit::confirmBootIfPending();
+#endif
 }
 
 // delay() counts ticks, and the tick stops while onEinkBusyWaitSlice() light-sleeps

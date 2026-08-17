@@ -73,6 +73,8 @@ const uint8_t* iconForName(UIIcon icon, int size) {
       return small ? CreateNote24LucideIcon : CreateNote32LucideIcon;
     case UIIcon::ClaudeMark:
       return small ? ClaudeMark24LucideIcon : ClaudeMark32LucideIcon;
+    case UIIcon::Update:
+      return small ? Update24LucideIcon : Update32LucideIcon;
     case UIIcon::None:
       break;
   }

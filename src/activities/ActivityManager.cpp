@@ -15,6 +15,9 @@
 #include "network/CrossPointWebServerActivity.h"
 #include "reader/ReaderActivity.h"
 #include "settings/SettingsActivity.h"
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+#include "settings/OnlineFirmwareUpdateActivity.h"
+#endif
 #include "util/ClaudeChatActivity.h"
 #include "util/FullScreenMessageActivity.h"
 #include "util/NoteEditorActivity.h"
@@ -271,6 +274,17 @@ void ActivityManager::goToNoteEditor(std::string path, std::string returnDir) {
 void ActivityManager::goToClaudeChat() {
   lastHomeMenuItem = HomeMenuItem::CLAUDE;
   replaceActivity(std::make_unique<ClaudeChatActivity>(renderer, mappedInput));
+}
+
+void ActivityManager::goToFirmwareUpdate() {
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+  lastHomeMenuItem = HomeMenuItem::UPDATE_FIRMWARE;
+  replaceActivity(std::make_unique<OnlineFirmwareUpdateActivity>(renderer, mappedInput));
+#else
+  // The row is not offered on a build that cannot flash, so nothing should
+  // reach this. Going home is a harmless answer if something does.
+  goHome();
+#endif
 }
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {

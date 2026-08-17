@@ -30,7 +30,13 @@ static constexpr const char* NOTES_DIR = "/";
 int HomeActivity::getMenuItemCount() const {
   // This count is what bounds selectorIndex — leave it stale after adding a
   // menu row and the row renders but the selector can never reach it.
-  int count = 7;  // Browse, Recents, Transfer, Manage Files, Settings, Create Note, Claude
+  // Recents, Browse, Manage Files, Transfer, Create Note, Claude, Settings --
+  // plus Update Firmware on builds that can actually flash one.
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+  int count = 8;
+#else
+  int count = 7;
+#endif
   if (!recentBooks.empty()) {
     count += recentBooks.size();
   }
@@ -199,6 +205,11 @@ void HomeActivity::loop() {
       case HomeMenuItem::CREATE_NOTE:
         onCreateNoteOpen();
         break;
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+      case HomeMenuItem::UPDATE_FIRMWARE:
+        onFirmwareUpdateOpen();
+        break;
+#endif
       case HomeMenuItem::CLAUDE:
         onClaudeOpen();
         break;
@@ -391,6 +402,15 @@ void HomeActivity::render(RenderLock&&) {
                                           tr(STR_FILE_TRANSFER),     tr(STR_CREATE_NOTE),  "Claude",
                                           tr(STR_SETTINGS_TITLE)};
     std::vector<UIIcon> menuIcons = {Recent, Folder, ManageFiles, Transfer, CreateNote, ClaudeMark, Settings};
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+    // One-button firmware update, immediately above Settings. Inserted rather
+    // than written into the literals above so the iOS build -- which cannot
+    // write a flash partition -- drops the row without disturbing the order of
+    // the six that stay. The two index maps in HomeActivity.h and the count in
+    // getMenuItemCount() carry the same guard; all five must agree.
+    menuItems.insert(menuItems.end() - 1, tr(STR_UPDATE_FIRMWARE));
+    menuIcons.insert(menuIcons.end() - 1, Update);
+#endif
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme
@@ -486,3 +506,7 @@ void HomeActivity::onCreateNoteOpen() {
 }
 
 void HomeActivity::onClaudeOpen() { activityManager.goToClaudeChat(); }
+
+#ifndef CROSSPOINT_NO_DEVICE_FLASH
+void HomeActivity::onFirmwareUpdateOpen() { activityManager.goToFirmwareUpdate(); }
+#endif

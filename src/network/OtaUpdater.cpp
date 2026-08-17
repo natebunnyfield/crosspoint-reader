@@ -19,7 +19,15 @@
 #include "FirmwareFlasher.h"
 
 namespace {
-constexpr char latestReleaseUrl[] = "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest";
+// THIS FORK'S OWN RELEASES. It pointed at crosspoint-reader/crosspoint-reader
+// until 2026-08-16, which is UPSTREAM -- so a one-button update on Home would
+// have offered stock upstream firmware and silently erased every change in this
+// fork. Owner: "get the latest firmware available on my github."
+//
+// The asset the parser looks for is unchanged: a release with a firmware.bin
+// attached. Publish one and the device sees it.
+constexpr char latestReleaseUrl[] =
+    "https://api.github.com/repos/natebunnyfield/crosspoint-reader/releases/latest";
 }  // namespace
 
 OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
@@ -109,11 +117,13 @@ bool OtaUpdater::isUpdateNewer() const {
   // One final check, if we're on an RC build (contains "-rc"), we should consider the latest version as newer even if
   // the segments are equal, since RC builds are pre-release versions.
   //
-  // EXCEPT on the -BNY fork: latestReleaseUrl points at the UPSTREAM repo, so
-  // promoting an equal-numbered release over a fork RC would offer stock
-  // upstream firmware as an "update" and silently erase the fork's changes.
-  // Fork builds only update on a strictly greater numeric version.
-  if (strstr(currentVersion, "-rc") != nullptr && strstr(currentVersion, "-BNY") == nullptr) {
+  // The -BNY carve-out that used to live here is GONE, and deliberately: it
+  // existed only because latestReleaseUrl pointed at the UPSTREAM repo, so
+  // promoting an equal-numbered release over a fork RC would have offered stock
+  // upstream firmware and erased the fork. The URL now points at this fork's own
+  // releases (see the top of this file), so an equal-numbered release IS this
+  // fork's, and an RC should take it like any other build.
+  if (strstr(currentVersion, "-rc") != nullptr) {
     return true;
   }
 
