@@ -611,6 +611,46 @@ void NoteEditorActivity::loop() {
 
   pollPairingGestures();
 
+  // KEYBOARD DRAIN AND REPAINT COME BEFORE THE panelHidden GUARD, and must stay
+  // there. They used to sit at the very bottom of loop(), below the early
+  // return -- so with a phone's software keyboard up (the only state in which
+  // panelHidden is ever true) the drain above put every typed character into
+  // buf and nothing ever called relayout() or requestUpdate() again. The text
+  // was saved correctly on exit and the screen never changed once while it was
+  // being typed, which is exactly what was reported: "create note with iOS
+  // keyboard: not updating while typing at all". Verified headlessly --
+  // tests/test_note_editor_repaint.sh, two screenshots either side of a TYPE
+  // that came back byte-identical under CROSSPOINT_SIM_HOST_KEYBOARD=1.
+  //
+  // ClaudeChatActivity, the sibling editor, never had the bug because it has no
+  // early return at all: it gates the panel's INPUT inside an if and hides the
+  // panel in render(). This is the same shape, reached by moving the tail up.
+  bool got = false;
+  for (int c = blekbd::popChar(); c >= 0; c = blekbd::popChar()) {
+    handleKey(c);
+    got = true;
+    ++pendingChars;
+  }
+
+  if (got) {
+    lastKeyMs = millis();
+    dirty = true;
+  }
+
+  if (dirty && (pendingChars >= FLUSH_CHARS || millis() - lastKeyMs >= SETTINGS.getDisplayDebounceMs())) {
+    dirty = false;
+    pendingChars = 0;
+    {
+      // render() runs on the ActivityManager's render task and walks `lines`
+      // and `buf`. relayout() clears and regrows that vector, so without the
+      // lock a repaint can hold a reference into a reallocated buffer.
+      RenderLock lock;
+      relayout();
+      ensureCursorVisible();
+    }
+    requestUpdate();
+  }
+
   // A HIDDEN panel takes no input. Nothing below this point is reachable while
   // a host keyboard is up, and that is the point: the panel is not drawn then,
   // and a Confirm that typed a key nobody can see would be worse than a dead
@@ -673,32 +713,8 @@ void NoteEditorActivity::loop() {
     requestUpdate();
     return;
   }
-
-  bool got = false;
-  for (int c = blekbd::popChar(); c >= 0; c = blekbd::popChar()) {
-    handleKey(c);
-    got = true;
-    ++pendingChars;
-  }
-
-  if (got) {
-    lastKeyMs = millis();
-    dirty = true;
-  }
-
-  if (dirty && (pendingChars >= FLUSH_CHARS || millis() - lastKeyMs >= SETTINGS.getDisplayDebounceMs())) {
-    dirty = false;
-    pendingChars = 0;
-    {
-      // render() runs on the ActivityManager's render task and walks `lines`
-      // and `buf`. relayout() clears and regrows that vector, so without the
-      // lock a repaint can hold a reference into a reallocated buffer.
-      RenderLock lock;
-      relayout();
-      ensureCursorVisible();
-    }
-    requestUpdate();
-  }
+  // The BLE drain and the debounced repaint used to live here; they are above
+  // the panelHidden guard now. See the comment there.
 }
 
 // Draw one display line with markdown styling, then the caret.

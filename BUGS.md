@@ -126,6 +126,48 @@ format version if layout output changes.
 
 ## FIXED
 
+### [B-028] A note does not repaint while a host keyboard types into it — FIXED 2026-08-17
+**severity: high · scope: NoteEditorActivity · reported and FIXED 2026-08-17**
+
+Reported against TestFlight build 85: *"create note with iOS keyboard: not
+updating while typing at all."* Taken literally, and literally is what it was —
+the characters reached the buffer and were saved correctly on exit; the screen
+simply never changed once while they were being typed.
+
+**Death point: `src/activities/util/NoteEditorActivity.cpp:620`,
+`if (panelHidden) return;`.** The host-typed text is drained into `buf` at
+line 587 and sets `dirty`, but the only code that acts on `dirty` — the
+debounced `relayout()` / `ensureCursorVisible()` / `requestUpdate()` block —
+sat at the BOTTOM of `loop()`, below that early return. `panelHidden` is
+`mappedInput.isHostKeyboardVisible()`, which is a constant false on device and
+true exactly when a host software keyboard is up. So on hardware the block was
+always reached, and on an iPhone with the keyboard raised it was never reached,
+from the first keystroke to the last. The guard was added for the panel's
+BUTTON input (a hidden panel must not take a Confirm), and it took the repaint
+with it.
+
+`ClaudeChatActivity` — the sibling editor, same channel, same debounce — never
+had the bug because it has no early return in `loop()` at all: it gates the
+panel's input inside an `if` and hides the panel in `render()`
+(`ClaudeChatActivity.cpp:622`).
+
+**Fix:** the BLE drain and the debounced repaint move ABOVE the `panelHidden`
+guard, which is the shape ClaudeChat already has. Nothing else changed; the
+panel-visible path executes in exactly the order it did.
+
+**Evidence, headless, both directions.** Two frames captured either side of a
+`TYPE` in a fresh note, under `CROSSPOINT_SIM_HOST_KEYBOARD=1` (the flag that
+makes a desktop build answer `isHostKeyboardVisible()` the way a phone does):
+
+| | before fix | after fix |
+|---|---|---|
+| panel visible (`=0`) | frames differ | frames differ, **byte-identical to the pre-fix pair** |
+| host keyboard up (`=1`) | frames **identical** (`a04d4495…` twice) | frames differ; "hello world" and the count `11` on screen |
+
+Pinned by `crosspoint-simulator/tests/test_note_editor_repaint.sh`, verified
+failing-first: with the fix stashed the control arm passes and the
+`host_keyboard` arm fails at the frame comparison.
+
 ### [B-027] Curves are still logical-resolution on a supersampled build — FIXED
 **severity: low · scope: GfxRenderer · found 2026-08-15 · lines, polygons and arcs all FIXED by 2026-08-16**
 
