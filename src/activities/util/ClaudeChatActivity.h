@@ -32,6 +32,11 @@ class ClaudeChatActivity final : public Activity {
   // On-screen keyboard is the default input here too; a BLE keyboard is
   // optional and only started when one is already bonded.
   notes::KeyboardPanel panel;
+  // True while a HOST keyboard is up, in which case this screen's own key panel
+  // is not drawn and its band closes up. Always false on device --
+  // HalGPIO::isHostKeyboardVisible is a constant there -- so the hardware build
+  // keeps the layout it always had. See applyLayout().
+  bool panelHidden = false;
   int panelHeight = 0;
   int panelTop = 0;
   int statusHeight = 0;  // reserved band between text and panel
@@ -58,6 +63,9 @@ class ClaudeChatActivity final : public Activity {
   void handlePanelKey(int slot = 1, bool longPress = false);
   bool repeatCol(MappedInputManager::Button button, int delta);
   void relayoutPrompt();
+  // The vertical bands. Re-runnable, because a host keyboard can rise or fall
+  // at any moment and the panel band depends on it.
+  void applyLayout();
   void pollPairingGestures();
   void send();
   void setPhase(const char* phase);

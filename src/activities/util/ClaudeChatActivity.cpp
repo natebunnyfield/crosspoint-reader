@@ -76,26 +76,7 @@ void ClaudeChatActivity::onEnter() {
         return sdFontSystem.loadForDisplay(family, editorfonts::nearestOfferedSize(SETTINGS.editorFontSize), renderer);
       },
       CHAT_FONT_ID_FALLBACK);
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  lineHeight = renderer.getLineHeight(editorFontId);
-  if (lineHeight < 1) lineHeight = 1;
-  contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  // No side gutter: the side-button hints that it reserved room for were
-  // removed (owner ruling 2026-08-15), so the text gets the width back.
-  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
-
-  // Split screen: prompt/answer above, keyboard below.
-  panelHeight = panel.preferredHeight(renderer);
-  panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
-  // Vertical bands, top to bottom, each owning a disjoint range:
-  //   header | text | status | keyboard panel | button hints
-  // The status line sits BETWEEN the text and the panel and must be reserved
-  // here — computing maxLines against panelTop let the last line of text draw
-  // underneath it.
-  statusHeight = renderer.getLineHeight(SMALL_FONT_ID);
-  const int textBottom = panelTop - statusHeight;
-  maxLines = (textBottom - contentTop) / lineHeight;
-  if (maxLines < 1) maxLines = 1;
+  applyLayout();
 
   // Allocate AFTER geometry, so an OOM cannot leave render() painting with an
   // unset editorFontId (0 is the font-not-found sentinel).
@@ -107,6 +88,46 @@ void ClaudeChatActivity::onEnter() {
   }
 
   requestUpdate();
+}
+
+// The vertical bands, recomputed. Split out of onEnter() so a host keyboard
+// rising or falling can re-run it -- see the poll in loop().
+//
+// WHEN A HOST KEYBOARD IS UP, THIS SCREEN'S OWN KEY PANEL GOES AWAY. That is
+// not new behavior; NoteEditorActivity has done it since the chip shipped, and
+// this screen simply never got it. The result on an iPhone was the bug the
+// owner reported: raise the system keyboard on the Claude prompt and the
+// firmware's grid stayed underneath it, so the rows the keyboard covered were
+// dead pixels advertising keys that could not be reached -- while the status
+// line went on saying "OK asks Claude" about an OK key that was buried.
+//
+// On device isHostKeyboardVisible() is a constant false (lib/hal/HalGPIO.h),
+// so panelHeight is the panel's own height and this is the arithmetic it always
+// was. Nothing about the hardware build changes.
+void ClaudeChatActivity::applyLayout() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  lineHeight = renderer.getLineHeight(editorFontId);
+  if (lineHeight < 1) lineHeight = 1;
+  contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  // No side gutter: the side-button hints that it reserved room for were
+  // removed (owner ruling 2026-08-15), so the text gets the width back.
+  maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
+
+  // Split screen: prompt/answer above, keyboard below -- unless a host keyboard
+  // is already occupying "below", in which case the band closes up entirely
+  // rather than leaving a hole, exactly as the note editor does.
+  panelHidden = mappedInput.isHostKeyboardVisible();
+  panelHeight = panelHidden ? 0 : panel.preferredHeight(renderer);
+  panelTop = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - panelHeight;
+  // Vertical bands, top to bottom, each owning a disjoint range:
+  //   header | text | status | keyboard panel | button hints
+  // The status line sits BETWEEN the text and the panel and must be reserved
+  // here — computing maxLines against panelTop let the last line of text draw
+  // underneath it.
+  statusHeight = renderer.getLineHeight(SMALL_FONT_ID);
+  const int textBottom = panelTop - statusHeight;
+  maxLines = (textBottom - contentTop) / lineHeight;
+  if (maxLines < 1) maxLines = 1;
 }
 
 void ClaudeChatActivity::onExit() {
@@ -354,6 +375,28 @@ void ClaudeChatActivity::handlePanelKey(const int slot, const bool longPress) {
 }
 
 void ClaudeChatActivity::loop() {
+  // A host keyboard can rise or fall at any moment -- the owner taps the chip,
+  // or dismisses from the keyboard's own bar -- and the panel band depends on
+  // it. Polled rather than driven by an event, because nothing on this board
+  // raises one: isHostKeyboardVisible() is a plain query, and on device it is a
+  // constant false so this branch never fires there.
+  //
+  // relayoutPrompt() as well as applyLayout(): the wrap width is unchanged but
+  // the LINE COUNT is not, so the window into the wrapped text grows when the
+  // panel goes away. Same pairing as NoteEditorActivity's.
+  if (mappedInput.isHostKeyboardVisible() != panelHidden) {
+    {
+      RenderLock lock;
+      applyLayout();
+      if (view == View::Answer) {
+        layoutAnswer();
+      } else {
+        relayoutPrompt();
+      }
+    }
+    requestUpdate();
+  }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     if (view == View::Answer) {  // Back from an answer returns to the prompt
       {
@@ -574,7 +617,12 @@ void ClaudeChatActivity::render(RenderLock&&) {
     }
   }
 
-  panel.render(renderer, metrics.contentSidePadding, panelTop, pageWidth - metrics.contentSidePadding * 2, panelHeight);
+  // Not while a host keyboard owns the bottom of the screen: the grid would be
+  // drawn underneath it, unreachable, which is exactly the reported bug.
+  if (!panelHidden) {
+    panel.render(renderer, metrics.contentSidePadding, panelTop, pageWidth - metrics.contentSidePadding * 2,
+                 panelHeight);
+  }
 
   char status[80];
   snprintf(status, sizeof(status), "%u ch   kbd:%s   OK asks Claude", (unsigned)(buf ? buf->size() : 0),
