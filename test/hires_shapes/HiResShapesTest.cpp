@@ -147,4 +147,100 @@ TEST_F(HiResShapes, AxisAlignedThickLineStaysBlockReplicated) {
   EXPECT_FALSE(inkAtDevice(x * S + S, (y + w) * S));
 }
 
+// ---------------------------------------------------------------------------
+// Arcs (B-027's remaining half). Rounded corners are everywhere in the chrome --
+// key backgrounds, popups, list pills -- and they were the coarsest thing left
+// once slanted lines and polygons were fixed.
+//
+// The two properties below are the whole ruling: the BOUNDARY moves to device
+// resolution, the DITHER stays logical. Asserting only the first would let a
+// "fix" ship that also made the texture finer, which the fillRectDither comment
+// explicitly rules out.
+// ---------------------------------------------------------------------------
+
+// Rightmost inked device column on a device row, or -1.
+int rightmostInk(const int dy, const int searchFrom, const int searchTo) {
+  for (int dx = searchTo - 1; dx >= searchFrom; --dx) {
+    if (inkAtDevice(dx, dy)) return dx;
+  }
+  return -1;
+}
+
+constexpr int kArcR = 12, kArcCx = 40, kArcCy = 40;
+
+// THE REGRESSION. Under block replication a quadrant's edge holds still for S
+// device rows and then jumps, so the distinct edge positions number about
+// (rows / S). At device resolution nearly every row differs.
+TEST_F(HiResShapes, FilledArcEdgeAdvancesFasterThanBlockReplication) {
+  r->fillRoundedRect(kArcCx - kArcR, kArcCy - kArcR, kArcR * 2 + 1, kArcR * 2 + 1, kArcR, Color::Black);
+
+  // Sample the upper-right quadrant's outer edge, skipping the flat top where
+  // the boundary is genuinely horizontal and block replication is correct.
+  std::set<int> edges;
+  const int top = (kArcCy - kArcR) * S;
+  for (int dy = top + 2 * S; dy < kArcCy * S; ++dy) {
+    const int e = rightmostInk(dy, kArcCx * S, (kArcCx + kArcR + 2) * S);
+    if (e >= 0) edges.insert(e);
+  }
+  const int rows = kArcCy * S - (top + 2 * S);
+  // Block replication would give at most rows/S + 1 distinct positions.
+  EXPECT_GT(static_cast<int>(edges.size()), rows / S + 1)
+      << "arc edge is still quantised to logical pixels: " << edges.size() << " distinct positions over " << rows
+      << " device rows";
+}
+
+// The other half of the ruling. A dithered arc's TEXTURE must stay on the
+// logical grid: within one logical pixel, all S x S device pixels agree. That
+// is what "the fill looks pixel-for-pixel like scale 1, replicated" means, and
+// it is what a device-resolution dither would break.
+//
+// Note this asserts block-UNIFORMITY, not a particular phase. An earlier draft
+// asserted ink only at even/even logical coords and failed against the
+// UNMODIFIED renderer -- fillRectDither's byte path picks its phase from the
+// row, so a phase offset is still a perfectly valid logical dither. The test
+// was wrong, not the code; uniformity is the property that actually separates a
+// logical cell from a device one.
+//
+// Sampled strictly inside the shape, because a device-resolution BOUNDARY may
+// legitimately cut a logical pixel in half -- that is the point of the fix, and
+// it is the one place blocks are expected to be mixed.
+TEST_F(HiResShapes, DitheredArcKeepsTheLogicalDitherCell) {
+  r->fillRoundedRect(kArcCx - kArcR, kArcCy - kArcR, kArcR * 2 + 1, kArcR * 2 + 1, kArcR, Color::LightGray);
+
+  int blocks = 0;
+  int mixed = 0;
+  // The CENTRAL square only. An inset from the bounding box is not enough: with
+  // a corner radius this large the curve runs right through the corner regions,
+  // and a block there is mixed by design -- that is the fix working. Half the
+  // radius each way from the centre is solid body under any corner.
+  const int half = kArcR / 2;
+  for (int ly = kArcCy - half; ly <= kArcCy + half; ++ly) {
+    for (int lx = kArcCx - half; lx <= kArcCx + half; ++lx) {
+      const bool first = inkAtDevice(lx * S, ly * S);
+      bool uniform = true;
+      for (int sy = 0; sy < S; ++sy) {
+        for (int sx = 0; sx < S; ++sx) {
+          if (inkAtDevice(lx * S + sx, ly * S + sy) != first) uniform = false;
+        }
+      }
+      ++blocks;
+      if (!uniform) ++mixed;
+    }
+  }
+  EXPECT_GT(blocks, 0) << "sampled nothing";
+  EXPECT_EQ(mixed, 0) << mixed << " of " << blocks
+                      << " logical pixels are not uniform across their device block -- the dither became "
+                         "device-resolution, which the fillRectDither ruling forbids";
+}
+
+// A solid arc must still COVER what it covered before, so no corner shifts and
+// no chrome moves. The centre of the rounded rect is unambiguously interior.
+TEST_F(HiResShapes, FilledArcStillCoversTheInterior) {
+  r->fillRoundedRect(kArcCx - kArcR, kArcCy - kArcR, kArcR * 2 + 1, kArcR * 2 + 1, kArcR, Color::Black);
+  EXPECT_TRUE(inkAtDevice(kArcCx * S, kArcCy * S)) << "centre of the rounded rect is not inked";
+  // ...and must not bleed outside its own bounding box.
+  const int outside = (kArcCx + kArcR + 2) * S;
+  EXPECT_FALSE(inkAtDevice(outside, kArcCy * S)) << "arc painted outside the rect's bounding box";
+}
+
 }  // namespace

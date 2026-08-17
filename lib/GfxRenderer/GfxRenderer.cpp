@@ -9,6 +9,7 @@
 #include <Utf8.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 #include "FontCacheManager.h"
@@ -1388,6 +1389,93 @@ void GfxRenderer::fillArc(const int maxRadius, const int cx, const int cy, const
   if constexpr (color == Color::Clear) {
     return;
   }
+
+#if CROSSPOINT_RENDER_SCALE > 1
+  // On a SUPERSAMPLED build, walk DEVICE rows instead of logical ones.
+  //
+  // The loop below scans one logical row at a time and fills it with fillRect,
+  // and drawPixel paints an S x S block -- so the corner's staircase scales with
+  // the shape while the text beside it does not. That is B-027, and at the
+  // shipped iOS scale of 3 every rounded corner sits at a third of the
+  // resolution of its own label.
+  //
+  // WHAT MADE THIS A RULING RATHER THAN A REFACTOR, and why it is neither now.
+  // Unlike fillPolygon, an arc can be DITHERED, and a dither cell is defined in
+  // LOGICAL pixels on purpose (see the fillRectDither comment: the fill must
+  // look pixel-for-pixel like scale 1, replicated, not become a finer and
+  // visibly different texture). The apparent conflict dissolves once the two are
+  // separated: the BOUNDARY is geometry and belongs at device resolution, the
+  // DITHER is texture and stays logical. So the span below is computed per
+  // device row, and the ink decision still asks the logical coordinate
+  // (dx / S, dy / S) -- the same parity drawPixelDither<> uses. A solid arc gets
+  // a smooth edge; a dithered arc gets a smooth edge around an unchanged
+  // texture. Nothing about the dither moves.
+  //
+  // Geometry is pinned to the logical shape so no corner shifts. Logical pixel k
+  // covers device [k*S, (k+1)*S), so its centre is k*S + S/2, and the logical
+  // loop's `x*x + dy*dy <= r*r` includes the pixel whose CENTRE is within
+  // maxRadius -- an outer edge at maxRadius + 0.5. Both are carried over exactly.
+  if (renderScale() > 1) {
+    const double S = renderScale();
+    const double centreX = cx * S + S / 2.0;
+    const double centreY = cy * S + S / 2.0;
+    const double R = (maxRadius + 0.5) * S;
+    const double Rsq = R * R;
+
+    const int devH = getScreenHeight() * renderScale();
+    const int devW = getScreenWidth() * renderScale();
+    const int rowLimit = static_cast<int>(R + S) + 1;
+
+    for (int step = 0; step < rowLimit; ++step) {
+      // Absolute device row, running outward from the centre pixel on the yDir
+      // side -- step 0..S-1 are the centre logical row itself, which the logical
+      // loop also includes whole at dy == 0.
+      const int dy =
+          (yDir >= 0) ? (cy * static_cast<int>(S) + step) : (cy * static_cast<int>(S) + static_cast<int>(S) - 1 - step);
+      if (dy < 0 || dy >= devH) continue;
+
+      const double ddy = (dy + 0.5) - centreY;
+      const double under = Rsq - ddy * ddy;
+      if (under < 0.0) continue;
+      const double half = std::sqrt(under);
+
+      // Half-open in the xDir direction, anchored on the centre pixel exactly as
+      // the logical span runs from cx outward.
+      int x0 = 0;
+      int x1 = 0;
+      if (xDir >= 0) {
+        x0 = cx * static_cast<int>(S);
+        x1 = static_cast<int>(centreX + half - 0.5);
+      } else {
+        x0 = static_cast<int>(centreX - half + 0.5);
+        if (centreX - half + 0.5 > x0) x0 += 1;  // ceil
+        x1 = cx * static_cast<int>(S) + static_cast<int>(S) - 1;
+      }
+      if (x0 < 0) x0 = 0;
+      if (x1 >= devW) x1 = devW - 1;
+
+      for (int dx = x0; dx <= x1; ++dx) {
+        bool ink = false;
+        if constexpr (color == Color::Black) {
+          ink = true;
+        } else if constexpr (color == Color::White) {
+          ink = false;
+        } else {
+          // LOGICAL parity, matching drawPixelDither<>.
+          const int lx = dx / renderScale();
+          const int ly = dy / renderScale();
+          if constexpr (color == Color::LightGray) {
+            ink = (lx % 2 == 0 && ly % 2 == 0);
+          } else {
+            ink = ((lx + ly) % 2 == 0);
+          }
+        }
+        drawPixelDevice(dx, dy, ink);
+      }
+    }
+    return;
+  }
+#endif
 
   const int radiusSq = maxRadius * maxRadius;
 
