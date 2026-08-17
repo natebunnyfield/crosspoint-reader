@@ -103,13 +103,14 @@ Named forks, in the owner's order:
 | Fork | What to mine |
 |---|---|
 | `eszter007/matcha-reader` | The heap/OOM series — EPUB indexing pressure, reader-settings OOM, font cache freed before a settings save, per-call allocation out of `HalStorage::hasContent`, history bounded by memory, cover thumbnails without HAL power locks. Richest vein, and only 31 behind upstream. |
-| `uxjulia/CrossInk` | Table rendering + colSpan (feeds T-012); progressive JPEG cover support. Skip themes, carousels, tilt and touch. |
+| `uxjulia/CrossInk` | Table rendering + colSpan (feeds T-012). Skip themes, carousels, tilt and touch. Its progressive-JPEG work was checked under T-015 and is already present here — do not re-propose. |
 | `folio-etc/folio` | 1-bit `.cpfont` packing (feeds T-013); font budgets during heavy activities; power-button claiming and button-hint rendering (T-011 removed ours; folio's approach is still the reference if hints ever return). |
 | `0x1abin/crossmux` | Low-heap crash fixes — EPUB footnote allocation, web settings heap exhaustion. Skip the Apps hub and mini-games. |
 | `zrn-ns/crosspoint-jp` | The `abort()` on page-turning very long CJK paragraphs. Skip vertical writing. |
 | `franssjz/cpr-vcodex` | Progressive EPUB indexing. Skip KOReader profiles, flashcards, dashboards. |
 
-**Do not re-propose** the three already checked and present: HTML 4.01 entities
+**Do not re-propose** the four already checked and present: CrossInk's progressive
+JPEG cover support ([docs/progressive-jpeg.md](docs/progressive-jpeg.md)), HTML 4.01 entities
 (all 252 in `htmlEntities.cpp`), `<hr>` (handled at
 `ChapterHtmlSlimParser.cpp:601` and `:992`), the hidden-file toggle
 (`FileBrowserActivity.h:31`).
@@ -117,22 +118,6 @@ Named forks, in the owner's order:
 **Done looks like:** one branch + PR per concern, each building `-e default`
 AND `-e simulator` from a cold cache, each stating what was verified on host
 and what still needs the device.
-
-### [T-015] Pull in the progressive JPEG decode fix, if it is real
-**scope: reader · opened 2026-08-15**
-
-Two independent forks hit the same area: `matcha-reader` has "decode
-progressive JPEGs whose DC scan is non-interleaved", `CrossInk` has "improve
-progressive jpeg cover support". Two forks converging is decent evidence the
-bug is real.
-
-**Conditional on its own merit** — read both diffs against
-`lib/Epub/Epub/converters/JpegToFramebufferConverter.cpp` first and find a book
-whose cover actually reproduces it. If it cannot be reproduced here, record that
-and close the item; a decoder change with no failing case is not worth the risk.
-
-**Done looks like:** either a reproduction plus the fix plus the cover rendering
-correctly, or a written finding that our decoder already handles it.
 
 ### [T-016] READMEs no longer describe what these repos are — DONE 2026-08-16
 **scope: docs · opened 2026-08-15 · both repos landed 2026-08-16**
@@ -212,6 +197,41 @@ the cheap version and needs no keychain.
 ---
 
 ## Finished
+
+### [T-015] Progressive JPEG decode — REPRODUCED and FIXED 2026-08-17
+**scope: reader · opened 2026-08-15 · full write-up in [docs/progressive-jpeg.md](docs/progressive-jpeg.md)**
+
+Real, and worse than the item assumed. A progressive JPEG whose DC coefficients
+are split into one scan per component desynchronizes JPEGDEC's MCU loop, which
+reads chroma blocks that the scan does not contain. On a large image that is
+`rc=0 lastError=2`; on a small one **there is no error at all** and the preview
+is silently scrambled — measured at mean |diff| 107.6 (4:4:4) and 113.5 (4:2:0)
+against a Pillow reference while reporting success.
+
+Reproduced on real material: `illustration-108.jpg` in the Standard Ebooks
+Beatrix Potter, the one non-interleaved file among ~1,900 JPEGs in the EPUBs on
+this machine. It is 4:2:0 — which matters, because that is the case matcha's
+patch refuses.
+
+Fixed by `scripts/jpegdec_patches/0003-decode-non-interleaved-dc-scans.patch`:
+re-derive the traversal from the luma component's own block grid, which is what
+T.81 A.2.2 prescribes for a non-interleaved scan and which happens to be
+JPEGDEC's existing 1:1 geometry, so the subsampled case needs no special
+handling. Colour output is refused rather than composed against chroma that was
+never read. Error integers are named at both decode sites now
+(`lib/JpegToBmpConverter/JpegDecodeError.h`, the idea from matcha).
+
+`test/progressive_jpeg/` — 7 tests, 4 of which fail against an unpatched
+decoder. The four unaffected layouts decode byte-identically to before; the two
+broken ones now match the interleaved encoding of the same image byte for byte.
+
+**CrossInk's half was already present** — SOF2 detection, forced 1/8 scale, the
+geometry through the scaler, all three, and via `getJPEGType()` rather than
+re-parsing. Do not re-propose it.
+
+**Still owed:** device confirmation that such a cover renders on Home and as the
+sleep screen. The simulator cannot answer it — it swaps stb_image in for the
+real decoder, and stb_image gets this layout right on its own.
 
 ### [T-020] Boot and sleep: mark only — DONE
 **scope: ui · asked + done 2026-08-15**

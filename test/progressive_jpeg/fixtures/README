@@ -1,0 +1,80 @@
+Fixtures for the non-interleaved progressive-DC-scan bug (T-015).
+
+What each file is
+-----------------
+
+  src.ppm                 The source image for the five synthetic files: a
+                          96x64 RGB gradient with a white disc and a black
+                          rectangle. Committed so the pair below can be
+                          regenerated exactly.
+
+  prog-noninter-444.jpg   THE BUG, 4:4:4. Progressive, DC split into one scan
+                          per component. Before the fix: decoded "successfully"
+                          and was scrambled (mean |diff| 107.6 vs Pillow).
+  prog-noninter-420.jpg   THE BUG, 4:2:0 — the layout MozJPEG emits by default,
+                          and so the common one in the wild. Before: 113.5.
+
+  prog-inter-444.jpg      The twins. Same source image, same subsampling, same
+  prog-inter-420.jpg      quality, one interleaved DC scan instead. The DC
+                          coefficients are therefore the same numbers, so the
+                          1/8 previews must come out byte-identical — which is
+                          what the tests assert, and why no golden file is
+                          needed here.
+
+  baseline-420.jpg        Controls. Neither goes near the patched branch;
+  prog-gray.jpg           they are here so a regression in it shows up as a
+                          failure rather than as silence.
+
+  real-noninter-420.jpg   The real-world specimen: 642x800, 4:2:0, 8 scans, the
+                          first three single-component DC scans. Before the fix
+                          it returned rc=0 / JPEG_DECODE_ERROR — the loud half
+                          of the failure, and the one that reads like memory
+                          pressure. From `epub/images/illustration-108.jpg` in
+                          the Standard Ebooks edition of Beatrix Potter's short
+                          fiction: US public domain (artist d. 1943, published
+                          pre-1929), and Standard Ebooks dedicates its editions
+                          to the public domain.
+
+Why a real file is committed at all
+-----------------------------------
+The synthetic pair covers the code path, but only a large image desynchronizes
+far enough to fail a Huffman lookup. A 96x64 fixture reports success and returns
+noise, which is precisely the half of this bug that hides. Both faces are worth
+pinning.
+
+Regenerating the synthetic five
+-------------------------------
+Needs cjpeg (libjpeg-turbo or mozjpeg; `brew install jpeg-turbo`). The scan
+scripts are the whole point — libjpeg's -scans flag is what puts the DC
+coefficients in one scan per component:
+
+  cat > noninter.txt <<'EOF'
+  0: 0 0 0 0;
+  1: 0 0 0 0;
+  2: 0 0 0 0;
+  0: 1 63 0 0;
+  1: 1 63 0 0;
+  2: 1 63 0 0;
+  EOF
+
+  cat > inter.txt <<'EOF'
+  0,1,2: 0 0 0 0;
+  0: 1 63 0 0;
+  1: 1 63 0 0;
+  2: 1 63 0 0;
+  EOF
+
+  cjpeg -quality 85 -sample 1x1 -scans noninter.txt -outfile prog-noninter-444.jpg src.ppm
+  cjpeg -quality 85 -sample 2x2 -scans noninter.txt -outfile prog-noninter-420.jpg src.ppm
+  cjpeg -quality 85 -sample 1x1 -scans inter.txt    -outfile prog-inter-444.jpg   src.ppm
+  cjpeg -quality 85 -sample 2x2 -scans inter.txt    -outfile prog-inter-420.jpg   src.ppm
+  cjpeg -quality 85 -sample 2x2                     -outfile baseline-420.jpg     src.ppm
+  cjpeg -quality 85 -grayscale -progressive         -outfile prog-gray.jpg        src.ppm
+
+Finding more specimens
+----------------------
+Ordinary tools do not distinguish the layouts: `file`, `identify` and Pillow all
+just say "progressive". The distinguishing marks are SOF2 plus an SOS whose
+component count is 1 with Ss=0 Se=0. Of ~1,900 JPEGs across the EPUBs on the
+owner's machine, 12 were progressive-interleaved and exactly one was
+non-interleaved — this one.

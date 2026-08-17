@@ -1,0 +1,100 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: patch <patch@local>
+Date: Mon, 17 Aug 2026 02:00:00 +0000
+Subject: [PATCH 3/3] Decode progressive JPEGs whose DC scan is non-interleaved
+
+A progressive JPEG may split its DC coefficients into one scan per component
+(SOS with a single component, Ss=0 Se=0) instead of a single interleaved scan.
+MozJPEG and most web optimizers emit that layout, so it is common in ripped
+and scanned material.
+
+The MCU loop in DecodeJPEG reads a Y block -- four of them when subsampled --
+and then the chroma blocks of the same MCU. In a non-interleaved scan those
+chroma bits are not there, so the reads consume bits belonging to the
+following Y blocks and the bitstream desynchronizes. On a large image that
+surfaces as a Huffman failure reported as a bare JPEG_DECODE_ERROR; on a
+small one it does not fail at all and the preview is silently scrambled,
+which is the worse half. Measured against a Pillow reference before this
+patch: mean |diff| 107.6 (4:4:4) and 113.5 (4:2:0) on a 96x64 fixture that
+reported success.
+
+In a non-interleaved scan the data units run in raster order over the
+component's own block grid -- ceil(width/8) x ceil(height/8) for luma,
+whatever the subsampling -- and one data unit counts as one MCU for the
+restart interval (T.81 A.2.2). That is exactly the 0x11 geometry, so this
+re-derives the traversal as 1:1 and skips the chroma reads. It is not an
+approximation: it is the traversal the standard prescribes for this scan,
+which is why the subsampled case needs no separate handling.
+
+Only luma is read here (JPEGPutMCU8BitGray uses the Y MCU alone, and the
+chroma path is MCU_SKIP for grayscale output), so color output is refused
+with JPEG_UNSUPPORTED_FEATURE rather than composed against chroma blocks that
+were never decoded. A single-component first scan that is not the luma DC
+scan is refused the same way.
+
+Verified with a host harness on a six-file corpus: baseline, interleaved
+progressive at 4:4:4 and 4:2:0, grayscale progressive, and both
+non-interleaved variants. The four unaffected files decode byte-identically
+to before the patch; the two broken ones now produce bytes identical to the
+interleaved encoding of the same source image.
+---
+ src/jpeg.inl | 37 ++++++++++++++++++++++++++++++++++---
+ 1 file changed, 34 insertions(+), 3 deletions(-)
+
+diff --git a/src/jpeg.inl b/src/jpeg.inl
+index 1bd38b2..0000000 100644
+--- a/src/jpeg.inl
++++ b/src/jpeg.inl
+@@ -5014,7 +5014,40 @@
+     cDCTable2 = pJPEG->JPCI[2].dc_tbl_no;
+     cACTable2 = pJPEG->JPCI[2].ac_tbl_no;
+     iDCPred0 = iDCPred1 = iDCPred2 = mcuCX = mcuCY = 0;
+-    
++
++    // CrossPoint patch: a progressive JPEG may carry its DC coefficients in one scan PER
++    // COMPONENT (SOS with a single component, Ss=0 Se=0) rather than in one interleaved scan.
++    // MozJPEG and most web optimizers emit that layout, so it is common in ripped and scanned
++    // material -- see crosspoint T-015.
++    //
++    // The MCU loop below reads a Y block (four, when subsampled) and then the chroma blocks of
++    // the same MCU. In a non-interleaved scan those chroma bits are not there, so the reads
++    // consume bits belonging to the FOLLOWING Y blocks and the bitstream desynchronizes. On a
++    // large image that surfaces as a Huffman failure (a bare JPEG_DECODE_ERROR); on a small one
++    // it does not fail at all and the preview is silently scrambled, which is the worse half.
++    //
++    // In a non-interleaved scan the data units are in raster order over the COMPONENT's own
++    // block grid -- ceil(width/8) x ceil(height/8) for luma, whatever the subsampling -- and one
++    // data unit counts as one MCU for the restart interval (T.81 A.2.2). That is exactly the
++    // 0x11 geometry, so re-deriving the traversal as 1:1 is not an approximation; it is the
++    // traversal the standard prescribes for this scan, which is why the subsampled case needs no
++    // separate handling. Only luma is read here, so color output is refused rather than
++    // composed against chroma blocks that were never decoded.
++    const int bSingleCompScan = (pJPEG->ucMode == 0xc2 && pJPEG->ucComponentsInScan == 1 &&
++                                 pJPEG->ucNumComponents > 1);
++    if (bSingleCompScan &&
++        (pJPEG->ucPixelType < EIGHT_BIT_GRAYSCALE || !pJPEG->JPCI[0].component_needed ||
++         pJPEG->iScanStart != 0 || pJPEG->iScanEnd != 0))
++    {
++        // Colour output, or a first scan that is not the luma DC scan: nothing here can produce
++        // the right pixels, so say so instead of rendering noise.
++        pJPEG->iError = JPEG_UNSUPPORTED_FEATURE;
++        return 0;
++    }
++    const int bNonInterleavedDC = bSingleCompScan;
++    if (bNonInterleavedDC)
++        pJPEG->ucSubSample = 0x11; // for this scan the luma block grid IS the MCU grid
++
+     switch (pJPEG->ucSubSample) // set up the parameters for the different subsampling options
+     {
+         case 0x00: // fake value to handle grayscale
+@@ -5227,7 +5260,9 @@
+                     }
+                 } // if 2:2 subsampling
+             } // if subsampling used
+-            if (pJPEG->ucSubSample && pJPEG->ucNumComponents == 3) // if color (not CMYK)
++            // CrossPoint patch: a non-interleaved DC scan carries no chroma bits at all, so these
++            // reads must not happen -- they would eat the next Y block. See bNonInterleavedDC above.
++            if (pJPEG->ucSubSample && pJPEG->ucNumComponents == 3 && !bNonInterleavedDC) // if color (not CMYK)
+             {
+                 // first chroma
+                 pJPEG->ucACTable = cACTable1;

@@ -96,6 +96,22 @@ if(_cp_arduinojson_dirs)
   list(GET _cp_arduinojson_dirs 0 CROSSPOINT_ARDUINOJSON_DIR)
 endif()
 
+# JPEGDEC, same story as ArduinoJson with one addition: a pio build does not
+# merely place it, it PATCHES it in place (scripts/patch_jpegdec.py). Any env's
+# copy will do -- they are the same package and all get the same patches.
+# progressive_jpeg FATAL_ERRORs on both an absent copy and an unpatched one.
+file(GLOB _cp_jpegdec_dirs "${REPO_ROOT}/.pio/libdeps/*/JPEGDEC/src")
+if(NOT _cp_jpegdec_dirs AND CROSSPOINT_PRIMARY_ROOT)
+  file(GLOB _cp_jpegdec_dirs "${CROSSPOINT_PRIMARY_ROOT}/.pio/libdeps/*/JPEGDEC/src")
+  if(_cp_jpegdec_dirs)
+    message(STATUS "JPEGDEC: borrowing the primary checkout's (this worktree has no .pio)")
+  endif()
+endif()
+set(CROSSPOINT_JPEGDEC_DIR "")
+if(_cp_jpegdec_dirs)
+  list(GET _cp_jpegdec_dirs 0 CROSSPOINT_JPEGDEC_DIR)
+endif()
+
 enable_testing()
 include(GoogleTest)
 
@@ -132,3 +148,4 @@ add_subdirectory(table_cell_label)
 add_subdirectory(read_aloud_capture)
 add_subdirectory(credential_integrity)
 add_subdirectory(text_antialiasing)
+add_subdirectory(progressive_jpeg)

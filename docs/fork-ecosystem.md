@@ -81,13 +81,28 @@ the font cache before a settings save; drop the per-call allocation from
 guard; generate cover thumbnails without holding HAL power locks. At 31 behind
 upstream these should apply with little friction.
 
-### CANDIDATE — progressive JPEG decode
+### DONE 2026-08-17 — progressive JPEG decode
 
-"Decode progressive JPEGs whose DC scan is non-interleaved" — a specific
-decoder bug with a specific failure mode. We decode through
-`lib/Epub/Epub/converters/JpegToFramebufferConverter.cpp`. CrossInk
-independently has "improve progressive jpeg cover support", so two forks hit
-this. (matcha + CrossInk)
+Real, reproduced on real material, and fixed — but only half of this entry was
+ever about the same thing. Full account: [progressive-jpeg.md](progressive-jpeg.md).
+
+* **matcha `669d2ac01`** — the same bug and the same reading of the spec. Taken
+  in spirit, not verbatim: matcha's patch fixes 4:4:4 and REFUSES the
+  subsampled case, which is MozJPEG's default and the only variant that turned
+  up here in ~1,900 real images. Ours decodes it, by re-deriving the traversal
+  from the luma component's own block grid
+  (`scripts/jpegdec_patches/0003-...`). Its `JpegDecodeError.h` idea was taken;
+  the text is ours. Worth offering back.
+* **CrossInk `886a2ae68` / `f39a11fee`** — **already present, nothing to take.**
+  SOF2 detection, forced `JPEG_SCALE_EIGHTH`, 1/8 geometry through the scaler:
+  all three exist here, via `getJPEGType()` rather than re-parsing the file
+  (`JpegToFramebufferConverter.cpp:426,455`, `JpegToBmpConverter.cpp:541-549`,
+  which also smooths the upscaled preview — CrossInk does not). Do not
+  re-propose.
+
+Adjacent and NOT taken: CrossInk `c3d04a9dd` raises the max JPEG width 2048 →
+4096. Ours is a RAM guard in `validateImageDimensions` on a 380 KB device; that
+is a separate decision with a cost, not part of a decoder fix.
 
 ### CANDIDATE — 1-bit packing for bundled `.cpfont`s
 
