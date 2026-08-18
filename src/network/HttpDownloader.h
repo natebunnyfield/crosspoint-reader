@@ -21,6 +21,12 @@ class HttpDownloader {
     HTTP_ERROR,
     FILE_ERROR,
     ABORTED,
+    // 404, kept apart from HTTP_ERROR because the two mean opposite things to a
+    // reader. A 404 is a SUCCESSFUL conversation with GitHub whose answer is
+    // "there is nothing here"; HTTP_ERROR is "the conversation did not happen".
+    // Collapsing them printed "Could not reach GitHub" at an owner whose device
+    // had reached GitHub perfectly and been told the fork has no releases.
+    NOT_FOUND,
   };
 
   /**
@@ -37,6 +43,15 @@ class HttpDownloader {
    */
   static bool fetchUrl(const std::string& url, const DataCallback& onData, const std::string& username = "",
                        const std::string& password = "");
+
+  /**
+   * Same, but reports WHY it failed rather than just that it did. Used by the
+   * update check, where "no release published" and "no network" need different
+   * words in front of a person.
+   */
+  static DownloadError fetchUrlWithStatus(const std::string& url, const DataCallback& onData,
+                                          const std::string& username = "",
+                                          const std::string& password = "");
 
   /**
    * Download a file to the SD card with optional credentials.

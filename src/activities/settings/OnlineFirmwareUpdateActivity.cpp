@@ -58,6 +58,11 @@ const char* OnlineFirmwareUpdateActivity::messageForError(OtaUpdater::OtaUpdater
       return tr(STR_UPDATE_CHECK_FAILED);
     case OtaUpdater::JSON_PARSE_ERROR:
       return tr(STR_UPDATE_CHECK_FAILED);
+    // Reached GitHub; GitHub says this repo has published nothing. Saying
+    // "could not reach" here sends someone to debug their Wi-Fi over a release
+    // that was never cut.
+    case OtaUpdater::NO_RELEASE:
+      return tr(STR_UPDATE_NO_RELEASE);
     case OtaUpdater::WRONG_DEVICE_ERROR:
       return tr(STR_FIRMWARE_WRONG_DEVICE);
     case OtaUpdater::OOM_ERROR:

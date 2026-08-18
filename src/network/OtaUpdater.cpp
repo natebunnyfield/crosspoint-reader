@@ -47,11 +47,20 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
     return OOM_ERROR;
   }
   ReleaseJsonParser& releaseParser = *parser;
-  const bool ok = HttpDownloader::fetchUrl(latestReleaseUrl, [&releaseParser](const uint8_t* data, size_t len) {
-    releaseParser.feed(reinterpret_cast<const char*>(data), len);
-    return true;
-  });
-  if (!ok) {
+  const HttpDownloader::DownloadError fetched =
+      HttpDownloader::fetchUrlWithStatus(latestReleaseUrl, [&releaseParser](const uint8_t* data, size_t len) {
+        releaseParser.feed(reinterpret_cast<const char*>(data), len);
+        return true;
+      });
+  // A 404 IS THE COMMON CASE, not an error: GitHub answers it for a repo with
+  // no published releases, which is what this fork had when the owner first
+  // pressed the button. Reporting it as "Could not reach GitHub" blamed the
+  // network for a device that had reached GitHub perfectly.
+  if (fetched == HttpDownloader::NOT_FOUND) {
+    LOG_DBG("OTA", "No releases published at %s", latestReleaseUrl);
+    return NO_RELEASE;
+  }
+  if (fetched != HttpDownloader::OK) {
     LOG_ERR("OTA", "Release check fetch failed");
     return HTTP_ERROR;
   }

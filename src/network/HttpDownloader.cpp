@@ -93,6 +93,12 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
       }
       continue;
     }
+    if (status == 404) {
+      // Reached, answered, and the answer was "nothing here". Distinct from a
+      // failure to reach at all -- see DownloadError::NOT_FOUND.
+      LOG_ERR("HTTP", "wolfSSL 404: %s", url.c_str());
+      return HttpDownloader::NOT_FOUND;
+    }
     if (status != 200) {
       LOG_ERR("HTTP", "wolfSSL unexpected status: %d", status);
       return HttpDownloader::HTTP_ERROR;
@@ -168,6 +174,13 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     status = esp_http_client_get_status_code(client);
   }
 
+  if (status == 404) {
+    // Same distinction as the wolfSSL path: reached and answered "nothing
+    // here", which is not a network failure and must not be reported as one.
+    LOG_ERR("HTTP", "404: %s", url.c_str());
+    esp_http_client_cleanup(client);
+    return HttpDownloader::NOT_FOUND;
+  }
   if (status != 200) {
     LOG_ERR("HTTP", "unexpected status: %d", status);
     esp_http_client_cleanup(client);
@@ -251,10 +264,16 @@ bool HttpDownloader::fetchUrl(const std::string& url, std::string& outContent, c
 
 bool HttpDownloader::fetchUrl(const std::string& url, const DataCallback& onData, const std::string& username,
                               const std::string& password) {
+  return fetchUrlWithStatus(url, onData, username, password) == OK;
+}
+
+HttpDownloader::DownloadError HttpDownloader::fetchUrlWithStatus(const std::string& url, const DataCallback& onData,
+                                                                 const std::string& username,
+                                                                 const std::string& password) {
   LOG_DBG("HTTP", "Fetching: %s", url.c_str());
   Sink sink;
   sink.write = onData;
-  return runGetSecure(url, username, password, sink) == OK;
+  return runGetSecure(url, username, password, sink);
 }
 
 HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& url, const std::string& destPath,

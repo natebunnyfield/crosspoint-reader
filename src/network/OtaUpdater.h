@@ -22,6 +22,9 @@ class OtaUpdater {
     INTERNAL_UPDATE_ERROR,
     OOM_ERROR,
     WRONG_DEVICE_ERROR,
+    // GitHub answered, and the answer was that this repo has published no
+    // releases. Not a network failure and must not be worded as one.
+    NO_RELEASE,
   };
 
   size_t getOtaSize() const { return otaSize; }
