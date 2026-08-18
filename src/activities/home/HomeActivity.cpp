@@ -263,15 +263,40 @@ void HomeActivity::loop() {
   const int bookCount = static_cast<int>(recentBooks.size());
   const bool splitPages = metrics.homeMenuOnSecondPage && bookCount > 0;
 
-  buttonNavigator.onPageNext([this, bookCount, splitPages] {
-    if (!splitPages || selectorIndex >= bookCount) return;
-    selectorIndex = bookCount;
+  // ...AND ON THE LAST PAGE IT SELECTS THE LAST ROW, rather than doing nothing.
+  // Owner 2026-08-18: "page down on the last page in a list (like Home) should
+  // select last item."
+  //
+  // This is what ButtonNavigator::pageDown has always done for the nine lists
+  // that use it -- "CLAMPS at both ends ... the press slides the selection onto
+  // the final/first row so the end of the list is perceptible instead of
+  // teleporting" (its own contract, ruling 2026-08-14). Home could not use that
+  // helper because its pages are SECTIONS of unequal length rather than
+  // screenfuls, so it grew its own two-line version and quietly lost the clamp
+  // along with it. The end of the list was simply unreachable from the side
+  // pair.
+  buttonNavigator.onPageNext([this, bookCount, splitPages, menuCount] {
+    const int lastRow = menuCount - 1;
+    if (menuCount <= 0) return;
+    if (splitPages && selectorIndex < bookCount) {
+      selectorIndex = bookCount;  // covers -> first menu row
+    } else if (selectorIndex < lastRow) {
+      selectorIndex = lastRow;    // already on the last page -> its last row
+    } else {
+      return;                     // already there; no redraw
+    }
     requestUpdate();
   });
 
-  buttonNavigator.onPagePrevious([this, bookCount, splitPages] {
-    if (!splitPages || selectorIndex < bookCount) return;
-    selectorIndex = 0;
+  buttonNavigator.onPagePrevious([this, bookCount, splitPages, menuCount] {
+    if (menuCount <= 0) return;
+    if (splitPages && selectorIndex >= bookCount) {
+      selectorIndex = 0;          // menu -> first cover
+    } else if (selectorIndex > 0) {
+      selectorIndex = 0;          // already on the first page -> its first row
+    } else {
+      return;
+    }
     requestUpdate();
   });
 
