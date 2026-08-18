@@ -18,15 +18,16 @@ and is being re-checked on real e-ink, not discovered.
 
 | | |
 |---|---|
-| File | `~/crosspoint-archive/staged/20260818T2110Z-crosspoint-2c17295f.bin` |
-| Commit | `2c17295fc` |
+| File | `~/crosspoint-archive/staged/20260818T2146Z-crosspoint-b39eea60.bin` |
+| Commit | `b39eea60c` |
 | Version string | `1.5.0-B2` (renamed from `1.5.0-BNY` in `da6736f9f`) |
 | Size | 4,955,360 bytes |
-| sha256 | `73ac29a7ff660df7cd2772c3199dffe9734799a5b0323ac58aaacfafcbe0d23c` |
+| sha256 | `b1baea7b916aae81e36c2747207813370f015fb549e9082199be6986139f0329` |
 | Flash | 75.4% (4,942,381 of 6,553,600) · RAM 16.5% |
 
 **It was built in a worktree, which is the exact trap [B-029](../BUGS.md)
-describes.** The commercial editor faces (`nitti*`, `pragmatapro*`) are
+describes — and as of `b39eea60c` that trap is closed: a release env now REFUSES
+to build without the faces rather than shrinking.** The commercial editor faces (`nitti*`, `pragmatapro*`) are
 gitignored, and a build without them SUCCEEDS SILENTLY, 430,674 bytes smaller.
 The staged bin was checked after linking — `nm firmware.elf | grep -c
 "nittitypewriter\|pragmatapro"` reports 100 — so it carries them. Any future
