@@ -1102,3 +1102,32 @@ none.
 Fixed with `installed_families:` in `sd-fonts.yaml` as the single source of
 truth; `--all-curated` opts back in and warns. See
 [docs/sd-card-fonts.md](docs/sd-card-fonts.md).
+### [B-029] A release built from a fresh clone silently drops the commercial editor faces — FOUND 2026-08-18
+**severity: high · scope: build / release · found 2026-08-18**
+
+Building `gh_release` in a fresh `git worktree` produced a binary **430,674
+bytes smaller** than the same commit built in the working checkout. The
+difference is entirely `nittitypewriter_*` and `pragmatapro_*` glyph tables:
+those headers are **gitignored** (`.gitignore:35`, commercial faces, correctly
+not committed), and `convert-builtin-fonts.sh` guards their absence
+(`NITTI_MISSING`), so the build **succeeds without them and says nothing**.
+
+The result would have been a published firmware that quietly removes two editor
+typefaces from the device. Caught only because the flash figure did not match
+the working tree's — 68.8% against the expected 75.4%.
+
+**Do not publish a release from a clean clone or worktree** unless the untracked
+headers are copied in first:
+
+```
+cp lib/EpdFont/builtinFonts/nitti*.h lib/EpdFont/builtinFonts/pragmatapro*.h <worktree>/lib/EpdFont/builtinFonts/
+```
+
+Verify before publishing: `nm firmware.elf | grep -c "nittitypewriter\|pragmatapro"`
+should report 100, and the flash figure should match a working-tree build.
+
+**Better fix, not yet done:** make the absence loud. `convert-builtin-fonts.sh`
+should fail (or the build should warn at link time) when a face listed in the
+editor family table has no header, rather than emitting a smaller binary
+silently.
+
