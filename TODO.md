@@ -190,6 +190,20 @@ palette work is not in any build yet.
 
 The rest of the entry below is unchanged and still owed.
 
+**DONE 2026-08-18 — the bin is staged and the checklist is written.**
+`~/crosspoint-archive/staged/20260818T2110Z-crosspoint-2c17295f.bin`, built from
+`/private/tmp/rel-wt` at `2c17295fc`, 4,955,360 bytes, sha256 `73ac29a7…`,
+Flash 75.4% / RAM 16.5%, version string `1.5.0-B2`. The ordered checklist is
+[docs/device-verification-checklist.md](docs/device-verification-checklist.md)
+and it, not this entry, is what to work through with the device in hand.
+
+**It was checked against [B-029] after linking**, which is the whole reason that
+figure is recorded: the commercial editor faces are gitignored, a worktree build
+without them succeeds silently and 430,674 bytes smaller, and 68.8% flash would
+have been the only visible sign. `nm firmware.elf | grep -c
+"nittitypewriter\|pragmatapro"` reports 100 on this bin. Cards are NOT
+reprovisioned — that still waits for a mount.
+
 **Owner ruling 2026-08-17: stage a bin and write one checklist.** Asked what to
 prepare for the device batch. A `gh_release` build from a clean throwaway
 worktree at current `main`, named `<UTC>-crosspoint-<sha>.bin` and staged in
