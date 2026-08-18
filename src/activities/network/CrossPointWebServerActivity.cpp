@@ -5,6 +5,7 @@
 #include <FontCacheManager.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <Memory.h>
 #include <WiFi.h>
 
 #include <cstddef>
@@ -224,10 +225,17 @@ void CrossPointWebServerActivity::startAccessPoint() {
   // Start DNS server for captive portal behavior
   // This redirects all DNS queries to our IP, making any domain typed resolve to us
   stopDnsServer();
-  dnsServer = new DNSServer();
-  dnsServer->setErrorReplyCode(DNSReplyCode::NoError);
-  dnsServer->start(DNS_PORT, "*", apIP);
-  LOG_DBG("WEBACT", "DNS server started for captive portal");
+  // nothrow: a bare new aborts on OOM, and the captive portal is a convenience.
+  // Without it the AP still works -- the owner types the IP instead of being
+  // redirected -- so a failure here is logged and skipped, not fatal.
+  dnsServer = new (std::nothrow) DNSServer();
+  if (dnsServer) {
+    dnsServer->setErrorReplyCode(DNSReplyCode::NoError);
+    dnsServer->start(DNS_PORT, "*", apIP);
+    LOG_DBG("WEBACT", "DNS server started for captive portal");
+  } else {
+    LOG_ERR("WEBACT", "OOM: DNS server; captive portal redirect is off");
+  }
 
   LOG_DBG("WEBACT", "Free heap after AP start: %d bytes", ESP.getFreeHeap());
 
@@ -246,8 +254,18 @@ void CrossPointWebServerActivity::startWebServer() {
     LOG_DBG("WEBACT", "Free heap before server alloc: %d bytes", ESP.getFreeHeap());
   }
 
-  // Create the web server instance
-  webServer.reset(new CrossPointWebServer());
+  // Create the web server instance. nothrow, and checked: this is the allocation
+  // the SD font cache was just released FOR, so it is the one most likely to
+  // fail -- and aborting here would take the device down at the exact moment the
+  // owner asked for File Transfer.
+  webServer = makeUniqueNoThrow<CrossPointWebServer>();
+  if (!webServer) {
+    // Same exit the failed-to-start branch below takes -- there is no separate
+    // error state, and inventing one would leave a screen nothing dismisses.
+    LOG_ERR("WEBACT", "OOM: web server instance");
+    onGoHome();
+    return;
+  }
   webServer->begin();
 
   if (webServer->isRunning()) {

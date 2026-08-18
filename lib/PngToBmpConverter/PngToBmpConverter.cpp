@@ -10,6 +10,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <new>
 
 #include "BitmapHelpers.h"
 #include "PngBitDepth.h"
@@ -651,14 +652,31 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   FloydSteinbergDitherer* fsDitherer = nullptr;
   Atkinson1BitDitherer* atkinson1BitDitherer = nullptr;
 
+  // All three are nothrow + checked: with -fno-exceptions a failed bare new
+  // calls abort(), and the mallocs on either side of this block already treat
+  // OOM here as a reported failure. One discipline, not two.
+  bool ditherOk = true;  // stays true when no ditherer is wanted at all
   if (oneBit) {
-    atkinson1BitDitherer = new Atkinson1BitDitherer(outWidth);
+    atkinson1BitDitherer = new (std::nothrow) Atkinson1BitDitherer(outWidth);
+    ditherOk = atkinson1BitDitherer && atkinson1BitDitherer->ok();
   } else if (!USE_8BIT_OUTPUT) {
     if (USE_ATKINSON) {
-      atkinsonDitherer = new AtkinsonDitherer(outWidth);
+      atkinsonDitherer = new (std::nothrow) AtkinsonDitherer(outWidth);
+      ditherOk = atkinsonDitherer && atkinsonDitherer->ok();
     } else if (USE_FLOYD_STEINBERG) {
-      fsDitherer = new FloydSteinbergDitherer(outWidth);
+      fsDitherer = new (std::nothrow) FloydSteinbergDitherer(outWidth);
+      ditherOk = fsDitherer && fsDitherer->ok();
     }
+  }
+  if (!ditherOk) {
+    LOG_ERR("PNG", "OOM: dither error rows for width %d", outWidth);
+    delete atkinsonDitherer;
+    delete fsDitherer;
+    delete atkinson1BitDitherer;
+    free(rowBuffer);
+    free(ctx->currentRow);
+    free(ctx->previousRow);
+    return false;
   }
 
   // Scaling accumulators
@@ -668,8 +686,20 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   uint32_t nextOutY_srcStart = 0;
 
   if (needsScaling) {
-    rowAccum = new uint32_t[outWidth]();
-    rowCount = new uint16_t[outWidth]();
+    rowAccum = new (std::nothrow) uint32_t[outWidth]();
+    rowCount = new (std::nothrow) uint16_t[outWidth]();
+    if (!rowAccum || !rowCount) {
+      LOG_ERR("PNG", "OOM: scaling accumulators for width %d", outWidth);
+      delete[] rowAccum;
+      delete[] rowCount;
+      delete atkinsonDitherer;
+      delete fsDitherer;
+      delete atkinson1BitDitherer;
+      free(rowBuffer);
+      free(ctx->currentRow);
+      free(ctx->previousRow);
+      return false;
+    }
     nextOutY_srcStart = scaleY_fp;
   }
 

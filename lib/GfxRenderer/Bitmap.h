@@ -58,6 +58,9 @@ enum class BmpReaderError : uint8_t {
   BufferTooSmall,
   OomRowBuffer,
   ShortReadRow,
+  // Appended, not inserted: -Werror=switch makes every consumer handle it, and
+  // renumbering an existing value would silently re-label logged errors.
+  OomDitherer,
 };
 
 class Bitmap {

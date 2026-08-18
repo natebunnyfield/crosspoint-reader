@@ -126,6 +126,57 @@ format version if layout output changes.
 
 ## FIXED
 
+### [B-030] Thirteen allocations on the image and Wi-Fi paths abort instead of failing — FIXED 2026-08-18
+**severity: high · scope: memory safety · found + fixed 2026-08-18**
+
+With `-fno-exceptions`, a bare `new` that fails calls `abort()` — it does not
+return `nullptr`. CLAUDE.md says so in two places and says never to write one.
+Thirteen of them were live, and every one sat on a path where OOM is the
+expected failure rather than an impossibility:
+
+| Where | Allocation | At worst |
+|---|---|---|
+| `BitmapHelpers.h` Atkinson x2, Floyd-Steinberg | 8 error-row arrays | 3 x 4,104 B / 2 x 4,100 B |
+| `PngToBmpConverter.cpp:671-672` | scaling accumulators | 8,192 B + 4,096 B |
+| `Bitmap.cpp:171-173`, `PngToBmpConverter.cpp:655-660` | the ditherers themselves | — |
+| `CrossPointWebServer.cpp:159,230,237` | HTTP server, WebDAV handler, WebSocket server | — |
+| `CrossPointWebServerActivity.cpp:227,250` | captive-portal DNS, the server instance | — |
+
+`MAX_IMAGE_WIDTH` is 2048, so the dither path asks for ~12 KB in separate 4 KB
+blocks **while a cover is being decoded**, which is the tightest the heap gets.
+The failure mode was a reboot where a missing cover was the right answer.
+
+**What made it clearly wrong rather than arguable:** `PngToBmpConverter.cpp`
+null-checks its `malloc` for the row buffer and logs `LOG_ERR` — then twenty
+lines later allocated with bare `new` and checked nothing. Same function, same
+path, two disciplines. Likewise the Wi-Fi path: `startWebServer()` already
+releases the SD font caches *for* the server allocation, then allocated in a way
+that could only abort.
+
+This is NOT the unbounded-allocation bug [B-024] fixed. Dimensions are validated
+first (`Bitmap.cpp:122-127` rejects bad and oversized images). This is the
+graceful-failure half.
+
+**Fixed:** every site is `new (std::nothrow)` or `makeUniqueNoThrow`, checked,
+with `LOG_ERR` naming the size. The three ditherer classes gained `ok()` —
+their constructors allocate several rows, so a partial allocation has to be
+detectable; the destructors already handled it, since `delete[] nullptr` is a
+no-op. Degradation is per-site and deliberate: no cover instead of a reboot, a
+new `BmpReaderError::OomDitherer` (appended, never inserted — `-Werror=switch`
+makes every consumer handle it), HTTP-only transfer without WebDAV, HTTP uploads
+without the WebSocket fast path, an AP without the captive-portal redirect, and
+`onGoHome()` rather than a state nothing dismisses if the server itself cannot
+be allocated.
+
+**Proof, and its limit.** `-e default` and `-e simulator` both build; 353/353
+host tests pass; zero bare `new` remain in the five files, by grep. **The OOM
+branch itself is not covered by a test, and I could not make one that is honest
+on a host:** a nothrow array of 2^40 `int16_t` does not return null on macOS, it
+gets the process OOM-killed (measured — exit 137). Forcing a failed allocation
+needs either an allocator seam or the device. So this is a defect removed by
+construction, not a behavior demonstrated.
+
+
 ### [B-028] A note does not repaint while a host keyboard types into it — FIXED 2026-08-17
 **severity: high · scope: NoteEditorActivity · reported and FIXED 2026-08-17**
 

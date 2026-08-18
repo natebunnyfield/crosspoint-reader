@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <new>
 
 struct BmpHeader;
 
@@ -24,10 +25,19 @@ void createBmpHeader(BmpHeader* bmpHeader, int width, int height, BmpRowOrder ro
 class Atkinson1BitDitherer {
  public:
   explicit Atkinson1BitDitherer(int width) : width(width) {
-    errorRow0 = new int16_t[width + 4]();  // Current row
-    errorRow1 = new int16_t[width + 4]();  // Next row
-    errorRow2 = new int16_t[width + 4]();  // Row after next
+    // nothrow, because -fno-exceptions makes a bare new call abort() on OOM --
+    // and this runs on the cover-decode path, where a tight heap is the normal
+    // failure and a missing cover is the right answer, not a reboot. Callers
+    // must check ok(); the destructor handles a partial allocation, since
+    // delete[] nullptr is a no-op.
+    errorRow0 = new (std::nothrow) int16_t[width + 4]();  // Current row
+    errorRow1 = new (std::nothrow) int16_t[width + 4]();  // Next row
+    errorRow2 = new (std::nothrow) int16_t[width + 4]();  // Row after next
   }
+
+  // False when any row failed to allocate. Every caller must test this before
+  // processing a pixel; the buffers are indexed unconditionally in the hot loop.
+  bool ok() const { return errorRow0 && errorRow1 && errorRow2; }
 
   ~Atkinson1BitDitherer() {
     delete[] errorRow0;
@@ -105,10 +115,19 @@ class Atkinson1BitDitherer {
 class AtkinsonDitherer {
  public:
   explicit AtkinsonDitherer(int width) : width(width) {
-    errorRow0 = new int16_t[width + 4]();  // Current row
-    errorRow1 = new int16_t[width + 4]();  // Next row
-    errorRow2 = new int16_t[width + 4]();  // Row after next
+    // nothrow, because -fno-exceptions makes a bare new call abort() on OOM --
+    // and this runs on the cover-decode path, where a tight heap is the normal
+    // failure and a missing cover is the right answer, not a reboot. Callers
+    // must check ok(); the destructor handles a partial allocation, since
+    // delete[] nullptr is a no-op.
+    errorRow0 = new (std::nothrow) int16_t[width + 4]();  // Current row
+    errorRow1 = new (std::nothrow) int16_t[width + 4]();  // Next row
+    errorRow2 = new (std::nothrow) int16_t[width + 4]();  // Row after next
   }
+
+  // False when any row failed to allocate. Every caller must test this before
+  // processing a pixel; the buffers are indexed unconditionally in the hot loop.
+  bool ok() const { return errorRow0 && errorRow1 && errorRow2; }
 
   ~AtkinsonDitherer() {
     delete[] errorRow0;
@@ -206,9 +225,12 @@ class AtkinsonDitherer {
 class FloydSteinbergDitherer {
  public:
   explicit FloydSteinbergDitherer(int width) : width(width), rowCount(0) {
-    errorCurRow = new int16_t[width + 2]();  // +2 for boundary handling
-    errorNextRow = new int16_t[width + 2]();
+    // nothrow for the same reason as the Atkinson ditherers above.
+    errorCurRow = new (std::nothrow) int16_t[width + 2]();  // +2 for boundary handling
+    errorNextRow = new (std::nothrow) int16_t[width + 2]();
   }
+
+  bool ok() const { return errorCurRow && errorNextRow; }
 
   ~FloydSteinbergDitherer() {
     delete[] errorCurRow;

@@ -5,6 +5,7 @@
 #include <HalGPIO.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Memory.h>
 #include <WiFi.h>
 #include <esp_efuse.h>
 #include <esp_efuse_table.h>
@@ -156,7 +157,14 @@ void CrossPointWebServer::begin() {
   LOG_DBG("WEB", "Network mode: %s", apMode ? "AP" : "STA");
 
   LOG_DBG("WEB", "Creating web server on port %d...", port);
-  server.reset(new CrossPointHttpServer(port));
+  // nothrow: bare new aborts on OOM under -fno-exceptions, and this allocation
+  // happens right after the radio came up, which is the tightest the heap gets.
+  // running stays false, so the activity reports a failed start instead.
+  server = makeUniqueNoThrow<CrossPointHttpServer>(port);
+  if (!server) {
+    LOG_ERR("WEB", "OOM: web server on port %d", port);
+    return;
+  }
 
   // Disable WiFi sleep to improve responsiveness and prevent 'unreachable' errors.
   // This is critical for reliable web server operation on ESP32.
@@ -227,18 +235,32 @@ void CrossPointWebServer::begin() {
   // Collect WebDAV headers and register handler
   const char* davHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout"};
   server->collectHeaders(davHeaders, 6);
-  server->addHandler(new WebDAVHandler());  // Note: WebDAVHandler will be deleted by WebServer when server is stopped
-  LOG_DBG("WEB", "WebDAV handler initialized");
+  // Raw new (nothrow) on purpose: WebServer takes ownership and deletes it when
+  // the server stops, so a unique_ptr here would double-free. Without WebDAV the
+  // HTTP file transfer still works, so a failure is logged and skipped.
+  auto* davHandler = new (std::nothrow) WebDAVHandler();
+  if (davHandler) {
+    server->addHandler(davHandler);
+    LOG_DBG("WEB", "WebDAV handler initialized");
+  } else {
+    LOG_ERR("WEB", "OOM: WebDAV handler; HTTP transfer only");
+  }
 
   server->begin();
 
   // Start WebSocket server for fast binary uploads
   LOG_DBG("WEB", "Starting WebSocket server on port %d...", wsPort);
-  wsServer.reset(new WebSocketsServer(wsPort));
-  wsInstance = const_cast<CrossPointWebServer*>(this);
-  wsServer->begin();
-  wsServer->onEvent(wsEventCallback);
-  LOG_DBG("WEB", "WebSocket server started");
+  wsServer = makeUniqueNoThrow<WebSocketsServer>(wsPort);
+  if (wsServer) {
+    wsInstance = const_cast<CrossPointWebServer*>(this);
+    wsServer->begin();
+    wsServer->onEvent(wsEventCallback);
+    LOG_DBG("WEB", "WebSocket server started");
+  } else {
+    // Uploads fall back to the HTTP path, which is slower but complete. Losing
+    // the fast binary channel is worth strictly more than aborting.
+    LOG_ERR("WEB", "OOM: WebSocket server on port %d; uploads use HTTP", wsPort);
+  }
 
   udpActive = udp.begin(LOCAL_UDP_PORT);
   LOG_DBG("WEB", "Discovery UDP %s on port %d", udpActive ? "enabled" : "failed", LOCAL_UDP_PORT);

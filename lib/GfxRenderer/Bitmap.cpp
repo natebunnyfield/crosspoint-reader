@@ -1,7 +1,10 @@
 #include "Bitmap.h"
 
+#include <Logging.h>
+
 #include <cstdlib>
 #include <cstring>
+#include <new>
 
 // ============================================================================
 // IMAGE PROCESSING OPTIONS
@@ -76,6 +79,8 @@ const char* Bitmap::errorToString(BmpReaderError err) {
 
     case BmpReaderError::OomRowBuffer:
       return "OomRowBuffer";
+    case BmpReaderError::OomDitherer:
+      return "OomDitherer (error-diffusion rows)";
     case BmpReaderError::ShortReadRow:
       return "ShortReadRow";
   }
@@ -167,10 +172,26 @@ BmpReaderError Bitmap::parseHeaders() {
   //  - High-color + dithering disabled → simple quantization (no error diffusion)
   const bool highColor = !nativePalette;
   if (highColor && dithering) {
+    // nothrow + a check, because -fno-exceptions turns a failed bare new into
+    // abort(). At MAX_IMAGE_WIDTH the Atkinson rows are three 4KB blocks on a
+    // heap that is already tight by the time a cover is being decoded, and the
+    // right answer to that is a reported error and no cover -- not a reboot.
     if (USE_ATKINSON) {
-      atkinsonDitherer = new AtkinsonDitherer(width);
+      atkinsonDitherer = new (std::nothrow) AtkinsonDitherer(width);
+      if (!atkinsonDitherer || !atkinsonDitherer->ok()) {
+        delete atkinsonDitherer;
+        atkinsonDitherer = nullptr;
+        LOG_ERR("BMP", "OOM: Atkinson error rows for width %d", width);
+        return BmpReaderError::OomDitherer;
+      }
     } else {
-      fsDitherer = new FloydSteinbergDitherer(width);
+      fsDitherer = new (std::nothrow) FloydSteinbergDitherer(width);
+      if (!fsDitherer || !fsDitherer->ok()) {
+        delete fsDitherer;
+        fsDitherer = nullptr;
+        LOG_ERR("BMP", "OOM: Floyd-Steinberg error rows for width %d", width);
+        return BmpReaderError::OomDitherer;
+      }
     }
   }
 
