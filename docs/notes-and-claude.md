@@ -168,8 +168,9 @@ panel is always drawn.
 ### Editor font, and its size
 
 The face comes from `SETTINGS.editorFont` (`src/notes/EditorFonts.h`), the size
-from `SETTINGS.editorFontSize`, offered at **12 and 14 pt**. Both are
-getter/setter rows with `valuePtr` left null, and both carry explicit lines in
+from `SETTINGS.editorFontSize`, offered at **12 and 14 pt**. Both are chosen on
+the same screen — Settings > Editor Font — the face on the front pair, the size
+on the side buttons. Both are getter/setter rows with `valuePtr` left null, and both carry explicit lines in
 `toJson`/`fromJson` — an ENUM row persists its INDEX, and a size stored as an
 index would have re-created on the size axis exactly the bug the family axis was
 rescued from.
@@ -385,6 +386,26 @@ faces filtered too. So installing them is *possible*; it simply has not been
 ruled on, and `docs/sd-card-fonts.md` requires a ruling before any family joins
 a card. `cycleReaderFontFamily()` and the section-cache invalidation it can
 trigger are still the reason to be careful about it.
+
+**The size is adjusted on the Editor Font screen, with the SIDE buttons**
+(owner ruling 2026-08-18). `EditorFontSelectionActivity::changeFontSize` steps
+`editorfonts::SIZES` on `Button::PageForward`/`PageBack` — the same pair, for
+the same reason, as `FontSelectionActivity` uses for the reader size: they
+honour `SETTINGS.sideButtonLayout`, so the control runs the same way round as a
+page turn and is unavailable when the side buttons are set to Disabled. It
+clamps rather than wraps, so with two sizes one button is always dead. The
+specimen redraws at the new size immediately, which needs `appliedFontId_`
+re-resolved under the `RenderLock` — that id is cached per apply and resolved
+AT a point size, so without the re-resolve the pane's label announces 14 pt over
+12 pt glyphs. The front pair is untouched and still selects the typeface.
+
+Its `getSettingsList()` row **still exists** but is withdrawn from the device
+Settings UI: `s.category` moved from `STR_CAT_SYSTEM` to `STR_CAT_READER`, which
+`SettingsActivity::rebuildSettingsLists()` drops. Deleting the row instead would
+have taken `editorFontSize` off the web settings API and out of
+`toJson`/`fromJson` altogether — the same trap `systemFont` and the Controls
+rows are held clear of the same way. Category is not persisted, so no existing
+`settings.json` is affected.
 
 **The SIZE is persisted as a real point size, not a picker index.**
 `SETTINGS.editorFontSize` holds 12 or 14. Its `getSettingsList()` row is a

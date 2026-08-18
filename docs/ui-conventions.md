@@ -219,6 +219,20 @@ consumes it even though no firmware code does.
   are the coarse value step), the keyboards / note editor / Claude chat (side
   buttons are bespoke picks), and every reader (`PageBack`/`PageForward`).
 
+  **The `EditorFontSelectionActivity` half of that exemption was ASPIRATIONAL
+  when written, and is only true from 2026-08-18.** `f278be2fc` copied the
+  sentence over from `FontSelectionActivity` and left the screen's own comment
+  pointing at a "size handler above" that did not exist — `SETTINGS.editorFontSize`
+  had not shipped yet, and when it did (`62905d8e2`) it arrived as a row in the
+  System settings list instead. The exemption was still correct in its effect
+  the whole time (the screen wires `Button::Right`/`Left` explicitly, so it
+  never picked up the page handlers), just wrong about the reason. Owner ruling
+  2026-08-18 moved the size onto the screen and the sentence became accurate:
+  `EditorFontSelectionActivity::changeFontSize` now steps
+  `editorfonts::SIZES` on `PageForward`/`PageBack`, clamped at both ends, and
+  the System row is withdrawn by category. The lesson worth keeping is that a
+  comment describing a handler is not evidence the handler exists — grep for it.
+
   Coverage: `test/activity_input/ListPagingTest.cpp` (12 cases — the mapping
   seam, both clamps, a short list, an exact multiple, and the shared-timer
   hazard).

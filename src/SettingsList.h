@@ -201,10 +201,22 @@ inline SettingInfo buildScreenMarginSetting() {
 // valuePtr over valueSetter when both are set, and would write the raw index
 // into the byte.
 //
-// STR_CAT_SYSTEM so it sits with Editor Font: rebuildSettingsLists() keeps
-// STR_CAT_SYSTEM rows and drops the rest, so any other category would make this
-// row real but unreachable on an X4 or X3 — which is exactly the state Editor
-// Font itself was found in.
+// WITHDRAWN from the device Settings UI on 2026-08-18 (owner ruling): the size
+// is adjusted on the Editor Font screen itself, with the side buttons, next to
+// the specimen it changes — see EditorFontSelectionActivity::changeFontSize.
+// Two places to set one value is one too many, so this row MOVED rather than
+// being duplicated.
+//
+// The entry is NOT deleted, and that distinction is the whole trap: this list
+// is also what CrossPointSettings' fromJson/toJson iterate and what the web
+// settings API serves, so removing the row would drop "editorFontSize" from the
+// HTTP API. Instead the CATEGORY moves off STR_CAT_SYSTEM —
+// rebuildSettingsLists() keeps STR_CAT_SYSTEM rows and drops the rest — which
+// is the same mechanism the Controls rows and systemFont already use. Category
+// is not persisted, so no saved settings.json is affected.
+//
+// STR_CAT_READER of the three withdrawn categories: it is a text setting, and
+// that is where the web UI's grouping should file it.
 inline SettingInfo buildEditorFontSizeSetting() {
   // Bare numbers, like the screen-margin ramp: a "pt" suffix would need
   // translating and the row title already says what it is.
@@ -219,7 +231,7 @@ inline SettingInfo buildEditorFontSizeSetting() {
   s.type = SettingType::ENUM;
   s.enumStringValues = std::move(labels);
   s.key = "editorFontSize";
-  s.category = StrId::STR_CAT_SYSTEM;
+  s.category = StrId::STR_CAT_READER;
 
   s.valueGetter = []() -> uint8_t {
     // Nearest, not exact — a byte posted by an API client, or written when the

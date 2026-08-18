@@ -139,6 +139,55 @@ void EditorFontSelectionActivity::applySelectedFont() {
   requestUpdate();
 }
 
+void EditorFontSelectionActivity::changeFontSize(const int delta) {
+  // Steps a POSITION in editorfonts::SIZES, but what gets stored is the real
+  // point size (12 or 14), never the position -- EditorFonts.h is explicit that
+  // SIZES is not order-frozen precisely because nothing persists an index into
+  // it. Snap first, so a settings.json holding a size that is no longer offered
+  // (a 13 from an API client, or a value written when the list differed) steps
+  // to a neighbour instead of jumping to the first size.
+  const uint8_t current = editorfonts::nearestOfferedSize(SETTINGS.editorFontSize);
+  int position = 0;
+  for (size_t i = 0; i < editorfonts::SIZE_COUNT; i++) {
+    if (editorfonts::SIZES[i] == current) {
+      position = static_cast<int>(i);
+      break;
+    }
+  }
+
+  // Clamp, not wrap, exactly as FontSelectionActivity::changeFontSize does:
+  // wrapping from the largest size back to the smallest reads as a glitch, and
+  // the ends of the range should be perceptible. With two sizes that means one
+  // button is always dead, which is the honest thing for it to be.
+  const int next = std::clamp(position + delta, 0, static_cast<int>(editorfonts::SIZE_COUNT) - 1);
+  if (next == position) return;
+
+  {
+    // RenderLock is REQUIRED, not defensive -- same hazard FontSelectionActivity
+    // documents at length. resolveAppliedFontId() can call
+    // SdCardFontSystem::loadForDisplay, which evicts the resident family the
+    // render task is holding a reference into. It also serialises the
+    // SETTINGS.editorFontSize write, which render() reads every frame through
+    // editorPointSize().
+    RenderLock lock(*this);
+    SETTINGS.editorFontSize = editorfonts::SIZES[next];
+    // appliedFontId_ is CACHED per apply and was resolved AT the old size, so
+    // the specimen keeps drawing the old cut until this line runs. The pane's
+    // label and isAvailable() read editorPointSize() live and would have
+    // followed on their own -- which is exactly how this could have shipped
+    // announcing "14 pt" over 12 pt glyphs.
+    appliedFontId_ = resolveAppliedFontId();
+  }
+
+  // Persisted here for the same reason applySelectedFont() persists: Settings'
+  // result handler saves on the way out, but a power-off before that would
+  // otherwise lose the choice. SETTINGS.editorFontSize has NO valuePtr, so the
+  // generic toJson loop does not carry it -- CrossPointSettings.cpp:123 and
+  // :391 write and read it by hand, and this save is what reaches those lines.
+  SETTINGS.saveToFile();
+  requestUpdate();
+}
+
 void EditorFontSelectionActivity::loop() {
   // Back on PRESS, matching every other settings sub-screen. Choices apply as
   // they are made, so there is nothing to roll back.
@@ -156,6 +205,25 @@ void EditorFontSelectionActivity::loop() {
     return;
   }
 
+  // Side buttons step the EDITOR font size, so a face can be judged at the size
+  // it will actually be written at. Same control, same pair and same reason as
+  // the reading picker (FontSelectionActivity.cpp:212-221); the size setting
+  // lives here rather than in the System settings list, by owner ruling
+  // 2026-08-18.
+  //
+  // PageBack/PageForward rather than Up/Down so the owner's side-button swap
+  // preference is honored, consistent with page turns in the reader. As there,
+  // that means the size control is unavailable when side buttons are set to
+  // Disabled — the same tradeoff page turning already makes.
+  if (mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+    changeFontSize(+1);
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
+    changeFontSize(-1);
+    return;
+  }
+
   const int listSize = static_cast<int>(rows_.size());
   const int pageItems =
       UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, previewHeight + metrics_.verticalSpacing, 1);
@@ -163,9 +231,11 @@ void EditorFontSelectionActivity::loop() {
   // FRONT buttons only, like the reading picker. Nav* is the front pair now
   // (2026-08-15) so getNextButtons() would work, but spell it out: this screen
   // must NOT pick up the side pair's page handlers either, because the side
-  // buttons here step the editor font size. This is one of the two screens the
-  // "side buttons page" ruling deliberately exempts — see the size handler
-  // above and docs/ui-conventions.md.
+  // buttons here step the editor font size — the handler directly above. This
+  // is one of the two screens the "side buttons page" ruling deliberately
+  // exempts; see docs/ui-conventions.md. That exemption was written in
+  // f278be2fc (2026-08-15) describing a handler that did not exist yet, and
+  // was still describing one on 2026-08-18 when this screen finally grew it.
   static const std::vector<MappedInputManager::Button> kNextButtons = {MappedInputManager::Button::Right};
   static const std::vector<MappedInputManager::Button> kPreviousButtons = {MappedInputManager::Button::Left};
 

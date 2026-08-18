@@ -16,9 +16,13 @@
 //
 // Two things make it different from FontSelectionActivity:
 //
-//   - The editor has ONE size. editorfonts::resolve asks for 12 pt and nothing
-//     else, so there is no size axis and the specimen is drawn at 12 pt rather
-//     than at whatever the reader is set to.
+//   - The size axis is the EDITOR's own, not the reader's. The specimen draws
+//     at SETTINGS.editorFontSize -- 12 or 14 pt, editorfonts::SIZES -- rather
+//     than at whatever the reader is set to, and the SIDE buttons step it
+//     here: this screen is where that setting lives (owner ruling 2026-08-18;
+//     it was a row in the System settings list until then). An earlier version
+//     of this comment read "the editor has ONE size ... there is no size
+//     axis", which stopped being true the moment the 12/14 pt setting shipped.
 //   - The specimen is MARKDOWN, drawn through mdrender::drawLine -- the same
 //     function NoteEditorActivity draws with. The editor styles headings, bold,
 //     italic, bullets, quotes and numbered lists, so a reading specimen would
@@ -36,6 +40,13 @@ class EditorFontSelectionActivity final : public Activity {
   // Applies the highlighted face immediately and stays on screen, same contract
   // as the reading picker: no commit step, Back just leaves.
   void applySelectedFont();
+
+  // Steps SETTINGS.editorFontSize one position along editorfonts::SIZES,
+  // clamped at both ends. Re-resolves appliedFontId_, because that id is
+  // resolved AT a point size and is cached per apply -- without it the label
+  // would say 14 pt over 12 pt glyphs. Loads a card family when needed, so it
+  // takes a RenderLock internally; do NOT call it from render().
+  void changeFontSize(int delta);
 
   // Font id the pane should draw in, resolved the SAME way NoteEditorActivity
   // resolves it -- so the specimen cannot show a face the editor would not use.
