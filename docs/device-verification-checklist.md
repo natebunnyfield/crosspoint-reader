@@ -124,6 +124,26 @@ desktop panel.
 | Back navigation | [B-018] |
 | The notes half of [B-017] | still unconfirmed |
 
+## 5a. One number to capture while you are there
+
+Closes the last open item from the matcha audit
+([matcha-heap-audit.md](matcha-heap-audit.md)), and costs one serial capture.
+
+`writeDocToFile` logs contiguous heap either side of every settings/state save.
+Those lines are `LOG_DBG`, so they need a **`default` build** — `gh_release` is
+`LOG_LEVEL=1` and does not carry them. Flash `-e default`, run
+`python3 scripts/debugging_monitor.py`, open a book so the SD fonts are
+resident, then change any setting and read:
+
+```
+[PERSIST] save /.crosspoint/settings.json: before serialize maxAlloc=? free=?
+[PERSIST] save /.crosspoint/settings.json: json=843B maxAlloc=? free=?
+```
+
+The JSON is 843 B, measured on the host. The question is only what `maxAlloc`
+is at that moment. Comfortably above a few KB closes the item as unnecessary;
+anything near it makes matcha's free-the-font-cache-before-saving fix real work.
+
 ## 6. The cards — only if one is mounted
 
 Not part of the staged-bin step, by the same ruling. When a card is in hand:

@@ -105,12 +105,41 @@ This fork calls `SETTINGS.saveToFile()` from five places in `SettingsActivity`
 `clearSdCardFonts` anywhere in that file. So the shape matcha guards against is
 *possible* here.
 
-**Marked inferred, deliberately.** Nobody has measured the contiguous heap at
+**Marked inferred, deliberately.** Nobody had measured the contiguous heap at
 those save points on this fork, and no bug report describes a failed settings
 save. Porting it on the strength of matcha's reasoning would be adding a free +
-reload to a path that may have plenty of room. The next step, if this is picked
-up, is a measurement — log `ESP.getMaxAllocHeap()` immediately before
-`saveToFile()` with SD fonts resident — not a patch.
+reload to a path that may have plenty of room.
+
+### The measurement, 2026-08-18
+
+`PersistableStoreBase::writeDocToFile` now logs heap and serialized size either
+side of `serializeJson` (two `LOG_DBG` lines, compiled out at `LOG_LEVEL 0`, so
+they are present in `default` and `simulator` builds and absent from
+`gh_release`). Headless simulator run, fresh profile, into Settings and back:
+
+| File | Serialized JSON |
+|---|---|
+| `/.crosspoint/settings.json` | **843 B** |
+| `/.crosspoint/recent.json` | 429 B |
+| `/.crosspoint/state.json` | 219 B |
+
+**The size half is decisive; the heap half is not available off-device.** The
+simulator reports a flat `maxAlloc=1048576 free=1048576` at every save — its
+heap is a constant, not a model of fragmentation — so those two numbers say
+nothing and are not quoted as if they did.
+
+What the size does say: `writeDocToFile` serializes into ONE Arduino `String`,
+so the contiguous demand is that string plus the `JsonDocument` pools —
+**about a kilobyte**, not the tens of kilobytes a resident font table would
+threaten. matcha's fix guards a save that needs a large contiguous block. Ours
+does not appear to be one.
+
+**Still not closed, and deliberately so.** The number that would close it is
+`maxAlloc` at a real save on real hardware with SD fonts resident, which the
+instrumentation now prints — it needs a `default` build (`gh_release` is
+`LOG_LEVEL=1`, so the `LOG_DBG` lines are gone) and a serial capture. That is
+now a line on the device checklist. If `maxAlloc` there is comfortably above a
+few KB, this item closes as unnecessary rather than as done.
 
 ## What this means for T-014
 

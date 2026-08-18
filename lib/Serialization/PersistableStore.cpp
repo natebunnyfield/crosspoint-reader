@@ -23,8 +23,19 @@ static String tempPathFor(const char* path) { return String(path) + ".tmp"; }
 
 bool PersistableStoreBase::writeDocToFile(const char* path, const JsonDocument& doc) {
   Storage.mkdir("/.crosspoint");
+
+  // Heap headroom around the one allocation that can fail here. The JSON is
+  // serialized into a single Arduino String, so a save needs a CONTIGUOUS block
+  // of roughly its length on top of whatever the JsonDocument's pools already
+  // took -- which is why matcha-reader frees its font tables before saving
+  // (docs/matcha-heap-audit.md). Whether this fork needs that is a measurement,
+  // and this is the measurement. Both lines compile out at LOG_LEVEL 0.
+  LOG_DBG("PERSIST", "save %s: before serialize maxAlloc=%u free=%u", path, ESP.getMaxAllocHeap(),
+          ESP.getFreeHeap());
   String json;
   serializeJson(doc, json);
+  LOG_DBG("PERSIST", "save %s: json=%uB maxAlloc=%u free=%u", path, (unsigned)json.length(),
+          ESP.getMaxAllocHeap(), ESP.getFreeHeap());
 
   const String tmp = tempPathFor(path);
   if (!Storage.writeFile(tmp.c_str(), json)) {

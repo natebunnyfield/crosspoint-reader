@@ -1126,8 +1126,27 @@ cp lib/EpdFont/builtinFonts/nitti*.h lib/EpdFont/builtinFonts/pragmatapro*.h <wo
 Verify before publishing: `nm firmware.elf | grep -c "nittitypewriter\|pragmatapro"`
 should report 100, and the flash figure should match a working-tree build.
 
-**Better fix, not yet done:** make the absence loud. `convert-builtin-fonts.sh`
-should fail (or the build should warn at link time) when a face listed in the
-editor family table has no header, rather than emitting a smaller binary
-silently.
+**FIXED 2026-08-18 — the build refuses instead of shrinking.**
+`scripts/check_editor_faces.py` runs as a `pre:` script and checks the sixteen
+1x headers the two commercial families need. A **release** environment
+(`gh_release`, `gh_release_rc`) FAILS; every other environment prints the same
+report and carries on, because a clone with no licensed TTFs building fine is
+the behavior `__has_include` exists to provide and has to keep working.
+`CROSSPOINT_ALLOW_MISSING_EDITOR_FACES=1` downgrades the failure for a
+deliberate no-faces release, and says so in the output.
+
+It calls out the PARTIAL case separately, which is the one that actually bit
+before: `main.cpp` gates on the largest size, so a tree regenerated before 14 pt
+existed drops or breaks a face whose siblings are sitting right there.
+
+Registered in **both** `[base]` and `[env:simulator]` `extra_scripts` —
+`[env:simulator]` does not `extends = base`, so a single entry would have missed
+the env where the stale-tree break was first seen.
+
+Verified two ways rather than by reading it: eight logic cases (present, empty
+and partial trees against release, dev and override) all pass, and then for
+real — moving `pragmatapro_14_regular.h` aside made `pio run -e gh_release`
+**FAIL in 5 seconds, before compiling anything**, and the header was restored
+afterwards. With the faces present, `gh_release` and `simulator` both build
+unchanged.
 
