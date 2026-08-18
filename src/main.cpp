@@ -76,6 +76,27 @@ EpdFont lfReader14BoldItalicFont(&librefranklin_reader_14_bolditalic);
 EpdFontFamily librefranklinReader14FontFamily(&lfReader14RegularFont, &lfReader14BoldFont, &lfReader14ItalicFont,
                                               &lfReader14BoldItalicFont);
 
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
+// 14 pt's hi-res cuts live HERE, outside OMIT_FONTS, for exactly the reason the
+// 1x ones do: it is the default reading size and every configuration has it.
+#define CP_READER_HIRES14(t)                                                          \
+  EpdFont lfReader14HiRes##t##R(&librefranklin_reader_14_regular_##t##x);              \
+  EpdFont lfReader14HiRes##t##B(&librefranklin_reader_14_bold_##t##x);                 \
+  EpdFont lfReader14HiRes##t##I(&librefranklin_reader_14_italic_##t##x);               \
+  EpdFont lfReader14HiRes##t##BI(&librefranklin_reader_14_bolditalic_##t##x);          \
+  EpdFontFamily librefranklinReader14HiRes##t##FontFamily(                             \
+      &lfReader14HiRes##t##R, &lfReader14HiRes##t##B, &lfReader14HiRes##t##I,           \
+      &lfReader14HiRes##t##BI)
+#if CROSSPOINT_RENDER_SCALE >= 2
+CP_READER_HIRES14(2);
+#endif
+#if CROSSPOINT_RENDER_SCALE >= 3
+CP_READER_HIRES14(3);
+#endif
+#undef CP_READER_HIRES14
+#endif
+
+
 // Editor-group monospace (owner ruling 2026-08-06). Built in rather than read
 // from the card: the editor asks for one size in four styles, ~83 KB for both
 // families, and a built-in face works on a blank card AND cannot appear in the
@@ -320,6 +341,30 @@ EpdFont lfReader12ItalicFont(&librefranklin_reader_12_italic);
 EpdFont lfReader12BoldItalicFont(&librefranklin_reader_12_bolditalic);
 EpdFontFamily librefranklinReader12FontFamily(&lfReader12RegularFont, &lfReader12BoldFont, &lfReader12ItalicFont,
                                               &lfReader12BoldItalicFont);
+
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
+// Hi-res reading cuts. Named for the 1x face each stands in for; carried for
+// every tier the build can latch, exactly as the UI and editor families are.
+#define CP_READER_HIRES(sz, t)                                                            \
+  EpdFont lfReader##sz##HiRes##t##R(&librefranklin_reader_##sz##_regular_##t##x);          \
+  EpdFont lfReader##sz##HiRes##t##B(&librefranklin_reader_##sz##_bold_##t##x);             \
+  EpdFont lfReader##sz##HiRes##t##I(&librefranklin_reader_##sz##_italic_##t##x);           \
+  EpdFont lfReader##sz##HiRes##t##BI(&librefranklin_reader_##sz##_bolditalic_##t##x);      \
+  EpdFontFamily librefranklinReader##sz##HiRes##t##FontFamily(                             \
+      &lfReader##sz##HiRes##t##R, &lfReader##sz##HiRes##t##B, &lfReader##sz##HiRes##t##I,   \
+      &lfReader##sz##HiRes##t##BI)
+// 12/16/18 only: 14 pt is declared OUTSIDE this block, beside its own 1x twin,
+// because OMIT_FONTS strips the other three and 14 is the default reading size
+// every build must have. Getting this wrong is a link error naming a family
+// that exists in one configuration and not the other.
+#if CROSSPOINT_RENDER_SCALE >= 2
+CP_READER_HIRES(12, 2); CP_READER_HIRES(16, 2); CP_READER_HIRES(18, 2);
+#endif
+#if CROSSPOINT_RENDER_SCALE >= 3
+CP_READER_HIRES(12, 3); CP_READER_HIRES(16, 3); CP_READER_HIRES(18, 3);
+#endif
+#endif
+
 EpdFont lfReader16RegularFont(&librefranklin_reader_16_regular);
 EpdFont lfReader16BoldFont(&librefranklin_reader_16_bold);
 EpdFont lfReader16ItalicFont(&librefranklin_reader_16_italic);
@@ -640,6 +685,43 @@ void setupDisplayAndFonts(bool seamless = false) {
 #undef CP_REG_HIRES_EDITOR
 #undef CP_REG_HIRES_PRAGMATA
 #undef CP_REG_HIRES_NITTI
+#endif
+#if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
+  // THE BUILT-IN READING FACE HAD NO COMPANIONS AT ALL until 2026-08-18, so a
+  // book read in it was blitted at 1x on a supersampled build while every other
+  // family here had its tiers. Nothing reported it: drawText falls back to the
+  // 1x table silently when getHiResFamily() finds nothing.
+#ifdef OMIT_FONTS
+// Only 14 pt exists in this configuration; the other three sizes were stripped.
+#define CP_REG_HIRES_READER(t)                                                       \
+  renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_14_FONT_ID,                 \
+                                    librefranklinReader14HiRes##t##FontFamily)
+#else
+#define CP_REG_HIRES_READER(t)                                                       \
+  renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_12_FONT_ID,                 \
+                                    librefranklinReader12HiRes##t##FontFamily);      \
+  renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_14_FONT_ID,                 \
+                                    librefranklinReader14HiRes##t##FontFamily);      \
+  renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_16_FONT_ID,                 \
+                                    librefranklinReader16HiRes##t##FontFamily);      \
+  renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_18_FONT_ID,                 \
+                                    librefranklinReader18HiRes##t##FontFamily)
+#endif
+  switch (cp::renderScale()) {
+#if CROSSPOINT_RENDER_SCALE >= 2
+    case 2: CP_REG_HIRES_READER(2); break;
+#endif
+#if CROSSPOINT_RENDER_SCALE >= 3
+    case 3: CP_REG_HIRES_READER(3); break;
+#endif
+    default: break;
+  }
+#undef CP_REG_HIRES_READER
+  // Positive evidence, because the failure mode is SILENT: drawText falls back
+  // to the 1x table when no companion is registered and says nothing, which is
+  // how this face went without any for as long as it did.
+  LOG_INF("FONT", "Built-in reader hi-res companions registered at %dx",
+          (int)cp::renderScale());
 #endif
 #ifndef OMIT_FONTS
   renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, librefranklinReader12FontFamily);

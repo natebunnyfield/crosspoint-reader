@@ -83,6 +83,29 @@ for size in ${LIBREFRANKLIN_READER_SIZES[@]}; do
   done
 done
 
+# --- Hi-res companions for the built-in READING face ------------------------
+#
+# librefranklin_reader had NONE until 2026-08-18, which meant the one reading
+# face that ships in the firmware -- what you read a book in before choosing an
+# SD font -- was blitted at 1x on a supersampled host. Every other family here
+# already had its tiers; this one was simply missed, and nothing said so because
+# drawText falls back silently.
+#
+# Device builds are unaffected either way: no device env sets
+# CROSSPOINT_RENDER_SCALE, so these headers are never compiled into firmware.
+for size in ${LIBREFRANKLIN_READER_SIZES[@]}; do
+  for style in ${READER_FONT_STYLES[@]}; do
+    for scale in ${HIRES_SCALES[@]}; do
+      font_name="librefranklin_reader_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')_${scale}x"
+      font_path="../builtinFonts/source/LibreFranklin/LibreFranklin-${style}.ttf"
+      output_path="../builtinFonts/${font_name}.h"
+      python fontconvert.py $font_name $((size * scale)) $font_path --2bit --compress --pnum > $output_path
+      assert_header_clean "$output_path"
+      echo "Generated $output_path"
+    done
+  done
+done
+
 # --- Editor-group monospace ------------------------------------------------
 #
 # Owner ruling 2026-08-06: Space Mono and IBM Plex Mono are compiled INTO the
