@@ -1230,21 +1230,36 @@ def pack_style_sections(sd):
         offset += i_end - i_start + 1
 
     glyphs_data = bytearray()
+    # EpdGlyph.width and .height are uint8_t, so a glyph over 255 px on
+    # either axis cannot be expressed. struct.pack reports that as a bare
+    # "'B' format requires 0 <= number <= 255" with no clue WHICH glyph or
+    # even which field, which is useless in a 4-style 1800-glyph build --
+    # it cost a 3x build run to work out that the answer was "the largest
+    # size, one outlier codepoint". Say exactly what and how big -- and say it
+    # about EVERY offender, not just the first: each rebuild of a hi-res tier
+    # costs minutes, so a one-at-a-time report turns a 3-codepoint problem into
+    # three full build cycles.
+    oversized = []
     for glyph, packed in sd.all_glyphs:
-        # EpdGlyph.width and .height are uint8_t, so a glyph over 255 px on
-        # either axis cannot be expressed. struct.pack reports that as a bare
-        # "'B' format requires 0 <= number <= 255" with no clue WHICH glyph or
-        # even which field, which is useless in a 4-style 1800-glyph build --
-        # it cost a 3x build run to work out that the answer was "the largest
-        # size, one outlier codepoint". Say exactly what and how big.
         if glyph.width > 255 or glyph.height > 255:
-            raise ValueError(
-                f"glyph U+{glyph.code_point:04X} rasterises to "
-                f"{glyph.width}x{glyph.height} px, over the 255 px limit of "
-                f"EpdGlyph's uint8 width/height. Either drop this codepoint for "
-                f"this size (drop_codepoints in sd-fonts.yaml) or build this "
-                f"family at a smaller size / lower hi-res tier."
-            )
+            oversized.append((glyph.code_point, glyph.width, glyph.height))
+    if oversized:
+        seen = {}
+        for cp, w, h in oversized:
+            prev = seen.get(cp)
+            if prev is None or (w, h) > prev:
+                seen[cp] = (w, h)
+        detail = ", ".join(
+            f"U+{cp:04X} ({seen[cp][0]}x{seen[cp][1]} px)" for cp in sorted(seen)
+        )
+        raise ValueError(
+            f"{len(seen)} glyph(s) rasterise over the 255 px limit of EpdGlyph's "
+            f"uint8 width/height: {detail}. Either drop these codepoints for "
+            f"this size (drop_codepoints in sd-fonts.yaml, or --drop-codepoints "
+            f"for a single build) or build this family at a smaller size / "
+            f"lower hi-res tier."
+        )
+    for glyph, packed in sd.all_glyphs:
         glyphs_data += struct.pack(GLYPH_STRUCT_FORMAT,
                                    glyph.width, glyph.height, glyph.advance_x,
                                    glyph.left, glyph.top,
