@@ -34,6 +34,41 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-031] Thirteen more bare `new`, all on the EPUB reading path
+**severity: high · scope: memory safety · found 2026-08-18 · owner ruling: sweep all 13**
+
+What [B-030] left behind. Same defect — a bare `new` under `-fno-exceptions`
+calls `abort()` on OOM — on a path that matters more than covers do:
+
+| File | Sites |
+|---|---|
+| `parsers/ChapterHtmlSlimParser.cpp:233,319,1743,1753,1779` | `new Page()` per page while paginating, `new ParsedText` per block |
+| `Epub.cpp:427,429` | metadata cache, CSS parser |
+| `Epub/Page.cpp:79,172` | `PageImage`, `Page` |
+| `converters/ImageDecoderFactory.cpp:28,33` | JPEG and PNG decoders |
+| `Xtc.cpp:28` | Xtc parser |
+| `EpubReaderActivity.cpp:997` | `new Section` |
+
+The five in the parser are the ones with teeth: a `Page` is allocated **per page
+while a chapter paginates**, so on a long chapter with a fragmented heap the
+abort lands in the middle of reading a book, not in the middle of a thumbnail.
+
+**Owner ruling 2026-08-17-18 walk: sweep all thirteen**, same treatment as
+B-030 — `makeUniqueNoThrow`, null check, `LOG_ERR`, and a real degradation per
+site rather than one blanket bail.
+
+**The design question this opens, and it is the reason the parser half is not
+mechanical:** several callers return pages and sections by value or by
+`unique_ptr` with no failure case, so a failed allocation has to mean something.
+Deciding what a half-paginated chapter does — stop the chapter early at the last
+good page, or refuse the book — is part of the work, not a detail to be picked
+silently while editing.
+
+**Done looks like:** zero bare `new` outside vendored code, `-e default` and
+`-e simulator` green, host tests green, and the pagination failure behavior
+written down here rather than only in the diff.
+
+
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
