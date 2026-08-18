@@ -69,6 +69,12 @@
 #include <builtinFonts/librefranklin_12_regular_2x.h>
 #include <builtinFonts/librefranklin_8_bold_2x.h>
 #include <builtinFonts/librefranklin_8_regular_2x.h>
+#include <builtinFonts/notosans_8_regular_2x.h>
+#include <builtinFonts/notosans_8_bold_2x.h>
+#include <builtinFonts/notosans_10_regular_2x.h>
+#include <builtinFonts/notosans_10_bold_2x.h>
+#include <builtinFonts/notosans_12_regular_2x.h>
+#include <builtinFonts/notosans_12_bold_2x.h>
 #endif
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE >= 3
 #include <builtinFonts/iawriterquattro_12_bold_3x.h>
@@ -85,6 +91,12 @@
 #include <builtinFonts/librefranklin_12_regular_3x.h>
 #include <builtinFonts/librefranklin_8_bold_3x.h>
 #include <builtinFonts/librefranklin_8_regular_3x.h>
+#include <builtinFonts/notosans_8_regular_3x.h>
+#include <builtinFonts/notosans_8_bold_3x.h>
+#include <builtinFonts/notosans_10_regular_3x.h>
+#include <builtinFonts/notosans_10_bold_3x.h>
+#include <builtinFonts/notosans_12_regular_3x.h>
+#include <builtinFonts/notosans_12_bold_3x.h>
 #endif
 
 // Noto Sans: the COVERAGE face behind the chrome (owner 2026-08-17).

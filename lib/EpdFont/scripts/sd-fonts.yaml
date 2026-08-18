@@ -1196,7 +1196,9 @@ families:
 
   - name: iAWriterMono
     description: "EDITOR GROUP. iA Writer Mono — true monospace (Latin)"
-    intervals: latin-ext
+    # Arrows 2026-08-17: an editor face meets them in a note as readily as a
+    # reading face meets them in a book.
+    intervals: latin-ext,(0x2190-0x21FF)
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Mono/Static/iAWriterMonoS-Regular.ttf"}
@@ -1206,7 +1208,9 @@ families:
 
   - name: iAWriterDuo
     description: "EDITOR GROUP. iA Writer Duo — duospace, wider i/l/j (Latin)"
-    intervals: latin-ext
+    # Arrows 2026-08-17: an editor face meets them in a note as readily as a
+    # reading face meets them in a book.
+    intervals: latin-ext,(0x2190-0x21FF)
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Duo/Static/iAWriterDuoS-Regular.ttf"}
@@ -1216,7 +1220,9 @@ families:
 
   - name: iAWriterQuattro
     description: "EDITOR GROUP. iA Writer Quattro — quattrospace, most proportional (Latin)"
-    intervals: latin-ext
+    # Arrows 2026-08-17: an editor face meets them in a note as readily as a
+    # reading face meets them in a book.
+    intervals: latin-ext,(0x2190-0x21FF)
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Quattro/Static/iAWriterQuattroS-Regular.ttf"}

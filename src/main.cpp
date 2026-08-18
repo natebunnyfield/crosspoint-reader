@@ -376,7 +376,10 @@ CP_UI_FAMILY(sysNotoSans, notosans_8_regular, notosans_8_bold, notosans_10_regul
 #define CP_UI_HIRES(t)                                                                                         \
   CP_UI_FAMILY(sysLibreFranklinHiRes##t##_, CP_HR(librefranklin_8_regular, t), CP_HR(librefranklin_8_bold, t), \
                CP_HR(librefranklin_10_regular, t), CP_HR(librefranklin_10_bold, t),                            \
-               CP_HR(librefranklin_12_regular, t), CP_HR(librefranklin_12_bold, t))
+               CP_HR(librefranklin_12_regular, t), CP_HR(librefranklin_12_bold, t));                           \
+  CP_UI_FAMILY(sysNotoSansHiRes##t##_, CP_HR(notosans_8_regular, t), CP_HR(notosans_8_bold, t),                \
+               CP_HR(notosans_10_regular, t), CP_HR(notosans_10_bold, t),                                      \
+               CP_HR(notosans_12_regular, t), CP_HR(notosans_12_bold, t))
 #if CROSSPOINT_RENDER_SCALE >= 2
 CP_UI_HIRES(2);
 #endif
@@ -420,6 +423,11 @@ void applySystemFont(GfxRenderer& renderer) {
       renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklinHiRes2_8);
       renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklinHiRes2_10);
       renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklinHiRes2_12);
+      // The coverage face needs companions too, or a fallback glyph blits at
+      // 1x inside a 2x page -- one third the size of the text around it.
+      renderer.registerHiResBuiltinFont(NOTOSANS_UI_8_FONT_ID, sysNotoSansHiRes2_8);
+      renderer.registerHiResBuiltinFont(NOTOSANS_UI_10_FONT_ID, sysNotoSansHiRes2_10);
+      renderer.registerHiResBuiltinFont(NOTOSANS_UI_12_FONT_ID, sysNotoSansHiRes2_12);
       break;
 #endif
 #if CROSSPOINT_RENDER_SCALE >= 3
@@ -427,6 +435,9 @@ void applySystemFont(GfxRenderer& renderer) {
       renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklinHiRes3_8);
       renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklinHiRes3_10);
       renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklinHiRes3_12);
+      renderer.registerHiResBuiltinFont(NOTOSANS_UI_8_FONT_ID, sysNotoSansHiRes3_8);
+      renderer.registerHiResBuiltinFont(NOTOSANS_UI_10_FONT_ID, sysNotoSansHiRes3_10);
+      renderer.registerHiResBuiltinFont(NOTOSANS_UI_12_FONT_ID, sysNotoSansHiRes3_12);
       break;
 #endif
     default:
