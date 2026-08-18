@@ -3,7 +3,7 @@ PlatformIO pre-build script: compute CROSSPOINT_VERSION for the environments
 whose version cannot be a literal in the ini.
 
   default          1.1.0-dev-<branch>-<sha>   (git state)
-  gh_release_rc    1.5.0-BNY-rc+<hash>        (CROSSPOINT_RC_HASH)
+  gh_release_rc    1.5.0-B2-rc+<hash>        (CROSSPOINT_RC_HASH)
 
 The RC env is here rather than in the ini because of B-004. It used to read
   -DCROSSPOINT_VERSION=\"${crosspoint.version}-rc+${sysenv.CROSSPOINT_RC_HASH}\"
