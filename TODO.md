@@ -118,6 +118,21 @@ table-bearing EPUB, and switching it invalidates the layout cache.
 ### [T-014] Sibling-fork improvements, as reviewable PRs
 **scope: upstream-adjacent · opened 2026-08-15 · STARTED, owner ruling 2026-08-17**
 
+**The matcha half is AUDITED and mostly closed, 2026-08-18 — full write-up in
+[docs/matcha-heap-audit.md](docs/matcha-heap-audit.md).** Five of the six named
+items are done with: `hasContent` does not exist here, the indexing patch is
+vertical-writing code we do not have, the history fix needs a reading-stats
+subsystem we do not have, the cover-thumbnail lock is not on our path, and the
+reader-settings OOM fix is a shape `rebuildSettingsLists()` already has. Only
+"font cache freed before settings save" survives, and it needs a heap
+MEASUREMENT at the five `saveToFile()` sites before it needs a patch.
+
+**Correcting this entry's own framing while here:** "only 31 behind upstream"
+measures matcha against UPSTREAM, not against us. Against us it is 517 ahead /
+673 behind, and it contains whole subsystems this fork never had. Give every
+remaining fork on the list a "does this code even exist here" pass before
+reading its commits as candidates.
+
 **Owner ruling 2026-08-17: start here, and start with the matcha heap series.**
 Asked as "what do I pick up next" against T-012 (tables) and a tidy/device-prep
 pass; the heap/OOM work won because it is real crash fixes against the 380 KB
