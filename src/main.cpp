@@ -357,6 +357,16 @@ EpdFontFamily librefranklinReader18FontFamily(&lfReader18RegularFont, &lfReader1
 CP_UI_FAMILY(sysLibreFranklin, librefranklin_8_regular, librefranklin_8_bold, librefranklin_10_regular,
              librefranklin_10_bold, librefranklin_12_regular, librefranklin_12_bold);
 
+// NOTO SANS, the coverage face behind the chrome (owner 2026-08-17, "put noto
+// sans in as builtin"). NOT a second chrome family -- Libre Franklin is still
+// the only face the UI draws with -- this is what drawText falls back to for a
+// codepoint Libre Franklin has no glyph for. 2,965 codepoints against its 918.
+//
+// It carries NO ARROWS: measured, 0 of the 128 in U+2190-21FF. Whatever else
+// this buys, it does not buy arrows in the chrome.
+CP_UI_FAMILY(sysNotoSans, notosans_8_regular, notosans_8_bold, notosans_10_regular,
+             notosans_10_bold, notosans_12_regular, notosans_12_bold);
+
 // The same matrix at TIER times the ppem, for glyph blitting only. Named for
 // the 1x face each stands in for, so `sysLibreFranklinHiRes3_8` is a 24 pt cut
 // standing in for the 8 pt one. Suffix pasted by CP_HR, same as the editor
@@ -387,6 +397,17 @@ void applySystemFont(GfxRenderer& renderer) {
   renderer.replaceFont(SMALL_FONT_ID, sysLibreFranklin8);
   renderer.replaceFont(UI_10_FONT_ID, sysLibreFranklin10);
   renderer.replaceFont(UI_12_FONT_ID, sysLibreFranklin12);
+
+  // The coverage face, then the mapping that makes it one. setFallbackFont is
+  // the same hook the SD-card CJK path uses (SdCardFontSystem.cpp), so this
+  // rides machinery that already exists rather than adding a second notion of
+  // "what to draw when the glyph is missing".
+  renderer.replaceFont(NOTOSANS_UI_8_FONT_ID, sysNotoSans8);
+  renderer.replaceFont(NOTOSANS_UI_10_FONT_ID, sysNotoSans10);
+  renderer.replaceFont(NOTOSANS_UI_12_FONT_ID, sysNotoSans12);
+  renderer.setFallbackFont(SMALL_FONT_ID, NOTOSANS_UI_8_FONT_ID);
+  renderer.setFallbackFont(UI_10_FONT_ID, NOTOSANS_UI_10_FONT_ID);
+  renderer.setFallbackFont(UI_12_FONT_ID, NOTOSANS_UI_12_FONT_ID);
 
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE > 1
   // Whichever tier this process latched at startup, and NONE at scale 1 --

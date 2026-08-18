@@ -96,6 +96,53 @@ BROAD_FALLBACK_URL = (
 )
 BROAD_FALLBACK_FONT = DOWNLOAD_DIR / "_fallback" / "NotoSans-Regular.ttf"
 
+# THE SYMBOL FACE, appended to every non-Latin fallback chain.
+#
+# NotoSans-Regular does not contain the Arrows block (U+2190-21FF) -- Noto keeps
+# arrows in NotoSansSymbols, a face this project did not have. `reading` asks
+# for U+2150-22FF, so before this the only family that shipped arrows was the
+# one whose OWN face has them, and every other family silently lost them.
+# Reported 2026-08-17: "only edgar seems to have unicode arrows", corrected by
+# the owner to "it is texgyre not edgar" -- and the built fonts agree with the
+# correction, not the first report.
+#
+# TEX GYRE SCHOLA, not NotoSansSymbols, by owner ruling the same day: "can the
+# missing characters in libre franklin be sourced from texgyre instead? drop
+# noto." It is already a shipped family here, so this adds no new dependency,
+# and it carries U+2190-2193 natively.
+#
+# It goes LAST in the chain, so it only ever fills what neither the family nor
+# the primary fallback has. That ordering is what keeps a serif face from
+# restyling glyphs a sans family already provides -- it supplies the arrows
+# nobody else has and nothing more.
+#
+# NOTE ON "drop noto", which was NOT taken and is a question back to the owner:
+# TeX Gyre Schola carries 1,053 codepoints against Noto Sans's 2,965, and has no
+# Greek or Cyrillic. Measured per family, replacing Noto with it outright takes
+# Coelacanth from 79 uncovered codepoints to 1,123 and Edgar from 1,301 to
+# 2,692. So Noto stays as the PRIMARY fallback and TeX Gyre is appended after
+# it; dropping Noto entirely is a separate, much larger decision.
+SYMBOL_FALLBACK_URL = (
+    "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf"
+)
+SYMBOL_FALLBACK_FONT = DOWNLOAD_DIR / "_fallback" / "texgyreschola-regular.otf"
+
+# THE LAST RESORT, and the only face that can answer for the Arrows block.
+#
+# Measured coverage of U+2190-21FF: TeX Gyre Schola 4/128, Noto Sans 0/128,
+# NotoSansSymbols 10/128, NotoSansMath 112/128 -- and of the nine arrows a
+# reader actually meets (left/right/up/down, both bidirectionals, hook, return,
+# and the three double-struck), Math has 9/9 and Schola has 2.
+#
+# So "drop noto" cannot be taken literally AND keep the arrows: no face already
+# in this project carries them. This one sits LAST, behind both TeX Gyre and
+# Noto Sans, so it only ever draws a glyph neither of them has.
+MATH_FALLBACK_URL = (
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/"
+    "main/fonts/NotoSansMath/hinted/ttf/NotoSansMath-Regular.ttf"
+)
+MATH_FALLBACK_FONT = DOWNLOAD_DIR / "_fallback" / "NotoSansMath-Regular.ttf"
+
 # The blocks Libre Franklin is qualified to serve: Latin proper, its phonetic
 # and combining companions, the Latin Extended Additional/Vietnamese block,
 # General Punctuation and the f-ligatures -- exactly the reach 77a5901b measured
@@ -113,7 +160,7 @@ LATIN_FALLBACK_RANGES = [
 
 
 def fallback_font_for(intervals: str) -> Path:
-    """Pick the fallback face for one family, from its `intervals:` string.
+    """The PRIMARY fallback face for one family, from its `intervals:` string.
 
     Libre Franklin when every requested codepoint is Latin (committed, offline,
     and what 77a5901b measured); Noto Sans otherwise.
@@ -124,6 +171,32 @@ def fallback_font_for(intervals: str) -> Path:
         if not any(lo <= start and end <= hi for lo, hi in LATIN_FALLBACK_RANGES):
             return BROAD_FALLBACK_FONT
     return LATIN_FALLBACK_FONT
+
+
+def fallback_chain_for(intervals: str) -> list[Path]:
+    """Every fallback face for one family, in the order they are tried.
+
+    TEX GYRE SCHOLA FIRST, by owner ruling 2026-08-17 ("make texgyre with
+    primary", after "can the missing characters in libre franklin be sourced
+    from texgyre instead? drop noto"). It is a shipped family here rather than a
+    downloaded stranger, and it carries the arrows that started this.
+
+    NOTO STAYS BEHIND IT, and that is the half the owner did not ask for and
+    should know about: TeX Gyre Schola has 1,053 codepoints to Noto Sans's
+    2,965, and no Greek or Cyrillic at all. Measured, replacing Noto outright
+    rather than ordering ahead of it takes Coelacanth from 79 uncovered
+    codepoints to 1,123 and Edgar from 1,301 to 2,692. Ordering TeX Gyre first
+    gives every glyph it HAS to it -- which is the instruction -- while leaving
+    Noto to answer for the Greek and Cyrillic it does not have. Deleting Noto is
+    one line from here if that is wanted.
+
+    A Latin-only family keeps its single committed face: nothing it can ask for
+    reaches the blocks this is about.
+    """
+    primary = fallback_font_for(intervals)
+    if primary == LATIN_FALLBACK_FONT:
+        return [primary]
+    return [SYMBOL_FALLBACK_FONT, primary, MATH_FALLBACK_FONT]
 
 
 _orig_getaddrinfo = socket.getaddrinfo
@@ -536,7 +609,7 @@ def build_family(
     intervals = family["intervals"]
     # The FILENAME keeps the 1x size; only the rasterised ppem is multiplied.
     sizes = ",".join(str(s * scale) for s in family["sizes"])
-    fallback_font = fallback_font_for(intervals)
+    fallback_font = os.pathsep.join(str(p) for p in fallback_chain_for(intervals))
 
     # Resolve all font file paths (downloads as needed).
     # Two passes: styles with real sources first, then `from:` styles, which
@@ -801,7 +874,8 @@ def main():
     # of glyphs per style and raises no other error anywhere.
     chosen_fallbacks: dict[Path, list[str]] = {}
     for f in families:
-        chosen_fallbacks.setdefault(fallback_font_for(f["intervals"]), []).append(f["name"])
+        for fb in fallback_chain_for(f["intervals"]):
+            chosen_fallbacks.setdefault(fb, []).append(f["name"])
     needed_fallbacks = set(chosen_fallbacks)
     for path, names in chosen_fallbacks.items():
         print(f"Fallback glyphs from {path.name}: {', '.join(sorted(names))}")
@@ -812,6 +886,23 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
+    if MATH_FALLBACK_FONT in needed_fallbacks:
+        try:
+            download_font(MATH_FALLBACK_URL, MATH_FALLBACK_FONT)
+        except Exception as exc:
+            print(f"ERROR: could not fetch the math fallback: {exc}", file=sys.stderr)
+            sys.exit(1)
+    if SYMBOL_FALLBACK_FONT in needed_fallbacks:
+        try:
+            download_font(SYMBOL_FALLBACK_URL, SYMBOL_FALLBACK_FONT)
+        except Exception as exc:
+            print(
+                f"ERROR: could not fetch the symbol fallback: {exc}\n"
+                f"Expected at {SYMBOL_FALLBACK_FONT}, from {SYMBOL_FALLBACK_URL}.\n"
+                "Without it every non-Latin family ships without arrows.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
     if BROAD_FALLBACK_FONT in needed_fallbacks:
         try:
             download_font(BROAD_FALLBACK_URL, BROAD_FALLBACK_FONT)

@@ -500,7 +500,9 @@ families:
 
   - name: Coelacanth
     description: "Centaur revival, Venetian oldstyle (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    # Arrows added 2026-08-17: the block was never REQUESTED here, so no
+    # fallback could supply it -- "only <x> seems to have unicode arrows".
+    intervals: latin-ext,greek,cyrillic,(0x2190-0x21FF)
     # Uniform slots: xh 12/14/16/18 (exact), advY 36/42/50/55, +2..+4 over
     # target: floor-bound. Coelacanth's extenders are the longest in the set —
     # plain-ink span + 0.13 em exceeds the uniform leading at every slot, so it
@@ -556,7 +558,9 @@ families:
 
   - name: InknutJunicode
     description: "Inknut Antiqua with Junicode's real cut italics (Latin)"
-    intervals: latin-ext
+    # Arrows added 2026-08-17: the block was never REQUESTED here, so no
+    # fallback could supply it -- "only <x> seems to have unicode arrows".
+    intervals: latin-ext,(0x2190-0x21FF)
     # INSTALLED (owner ruling 2026-08-13). Regular = Inknut Regular, bold =
     # Inknut Bold. Italic/bolditalic are borrowed from Junicode, which ships
     # real cut italics where Inknut's foundry repo has none at any weight.
@@ -910,7 +914,9 @@ families:
     # it — but because the two fill different classification cells (grotesque
     # vs humanist) and a head-to-head only runs within one cell. No bench is
     # pending or expected; both stay installed permanently, same footing.
-    intervals: latin-ext
+    # Arrows added 2026-08-17: the block was never REQUESTED here, so no
+    # fallback could supply it -- "only <x> seems to have unicode arrows".
+    intervals: latin-ext,(0x2190-0x21FF)
     # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — both rows exact on all
     # four, read back from the BUILT .cpfont files and again through
     # render_harness, not computed. The hinted x-height is exactly 1 px per

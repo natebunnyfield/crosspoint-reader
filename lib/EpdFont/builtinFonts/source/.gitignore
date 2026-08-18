@@ -4,7 +4,19 @@
 !.gitignore
 !NotoSerif/
 !NotoSerif/**
+# Noto Sans, the chrome's COVERAGE face (owner 2026-08-17). Committed for the
+# same reason Libre Franklin is: convert-builtin-fonts.sh has to reproduce the
+# UI headers without a network fetch, and a header that cannot be regenerated is
+# a binary blob nobody can audit.
+!NotoSans/
+!NotoSans/**
 !NotoSansArabic/
+# Noto Sans, the chrome's COVERAGE face (owner 2026-08-17). Committed for the
+# same reason Libre Franklin is: convert-builtin-fonts.sh has to reproduce the
+# UI headers without a network fetch, and a header that cannot be regenerated is
+# a binary blob nobody can audit.
+!NotoSans/
+!NotoSans/**
 !NotoSansArabic/**
 !NotoSansHebrew/
 !NotoSansHebrew/**

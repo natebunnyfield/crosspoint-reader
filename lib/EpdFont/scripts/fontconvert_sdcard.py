@@ -795,10 +795,23 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # Invalid_Size_Handle on some fonts.
     face.set_char_size(size << 6, size << 6, 150, 150)
     ligature_glyph_indices = extract_ligature_glyph_indices_fonttools(fontfile)
-    fallback_face = None
-    if fallback_fontfile:
-        fallback_face = freetype.Face(fallback_fontfile)
-        fallback_face.set_char_size(size << 6, size << 6, 150, 150)
+    # A CHAIN, not one face. `fallback_fontfile` may name several faces
+    # separated by os.pathsep, tried in order.
+    #
+    # Why: NotoSans-Regular -- the broad fallback -- does NOT contain the Arrows
+    # block (U+2190-21FF). Noto puts arrows in NotoSansSymbols. So every family
+    # that asked for `reading` (which covers U+2150-22FF) and did not happen to
+    # have arrows in its OWN face shipped without them, and the only family that
+    # showed arrows was TeXGyreSchola, whose face has them natively. Reported
+    # 2026-08-17: "only edgar seems to have unicode arrows" / "it is texgyre not
+    # edgar". One fallback cannot cover the union of blocks `reading` asks for.
+    fallback_faces = []
+    for part in (fallback_fontfile or "").split(os.pathsep):
+        if not part:
+            continue
+        face_i = freetype.Face(part)
+        face_i.set_char_size(size << 6, size << 6, 150, 150)
+        fallback_faces.append(face_i)
 
     # Synthetic styles must split load from render so the outline can be
     # modified in between; real styles keep the single-call FT_LOAD_RENDER
@@ -859,13 +872,13 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             if synthetic:
                 apply_synthetic_and_render(face)
             return face
-        if fallback_face:
-            fallback_glyph_index = fallback_face.get_char_index(code_point)
+        for fb in fallback_faces:
+            fallback_glyph_index = fb.get_char_index(code_point)
             if fallback_glyph_index > 0:
-                fallback_face.load_glyph(fallback_glyph_index, load_flags)
+                fb.load_glyph(fallback_glyph_index, load_flags)
                 if synthetic:
-                    apply_synthetic_and_render(fallback_face)
-                return fallback_face
+                    apply_synthetic_and_render(fb)
+                return fb
         return None
 
     # Validate intervals: remove codepoints not present in the font.
@@ -878,7 +891,8 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         start = i_start
         for code_point in range(i_start, i_end + 1):
             has_primary = face.get_char_index(code_point) != 0 or code_point in ligature_glyph_indices
-            has_fallback = fallback_face and fallback_face.get_char_index(code_point) != 0
+            has_fallback = any(fb.get_char_index(code_point) != 0
+                               for fb in fallback_faces)
             # An explicit drop is treated as "not covered" so it splits the
             # interval through the SAME path a genuinely missing glyph takes.
             # Dropping via the source cmap does not work here: the fallback face

@@ -370,8 +370,21 @@ UI_FONT_STYLES=("Regular" "Bold")
 # Upstream ships Libre Franklin as a variable font; source/LibreFranklin holds
 # the wght 400 and 700 instances cut by build-sd-fonts.py, committed as
 # statics so this script needs no network.
+#
+# NOTO SANS joins the matrix 2026-08-17 by owner instruction ("put noto sans in
+# as builtin"). It is NOT a second chrome family -- Libre Franklin remains the
+# only face the UI draws with (owner ruling 2026-08-07) -- it is the COVERAGE
+# face behind it: 2,965 codepoints against Libre Franklin's 918, which is where
+# Greek, Cyrillic and the rest of Latin Extended come from when a title or a
+# filename has them.
+#
+# MEASURED AND STATED: Noto Sans carries 0 of the 128 codepoints in the Arrows
+# block, so this does NOT put arrows in the chrome. Arrows exist only in
+# NotoSansMath among the faces here. Adding this for arrows would be adding it
+# for something it cannot do.
 UI_FAMILIES=(
   "librefranklin:LibreFranklin/LibreFranklin"
+  "notosans:NotoSans/NotoSans"
 )
 
 for entry in ${UI_FAMILIES[@]}; do

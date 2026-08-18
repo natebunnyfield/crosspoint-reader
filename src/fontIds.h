@@ -14,6 +14,21 @@
 #define UI_12_FONT_ID (1635686837)
 #define SMALL_FONT_ID (674098198)
 
+// Noto Sans, the COVERAGE face behind the chrome (owner instruction 2026-08-17,
+// "put noto sans in as builtin"). Not a chrome family -- Libre Franklin is
+// still the only face the UI draws with -- these ids exist so the renderer can
+// be told to fall back to them for a codepoint Libre Franklin lacks: 2,965
+// codepoints against its 918, which is where Greek, Cyrillic and the rest of
+// Latin Extended come from in a title or a filename.
+//
+// Hand-picked like the ids above and for the same reason: build-font-ids.sh
+// still hashes ubuntu_*/notosans_* headers that were deleted with those
+// families, so it cannot be run to generate these. Chosen well away from the
+// existing values and checked against every id in this file.
+#define NOTOSANS_UI_8_FONT_ID (511000801)
+#define NOTOSANS_UI_10_FONT_ID (511001001)
+#define NOTOSANS_UI_12_FONT_ID (511001201)
+
 // Editor-group fonts, compiled into the firmware rather than loaded from the
 // card. resolveEditorFont() asks for TWO sizes, 12 and 14 pt (owner ruling
 // 2026-08-15), in four styles each. THREE families as of the 2026-08-15 ruling:

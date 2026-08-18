@@ -86,3 +86,11 @@
 #include <builtinFonts/librefranklin_8_bold_3x.h>
 #include <builtinFonts/librefranklin_8_regular_3x.h>
 #endif
+
+// Noto Sans: the COVERAGE face behind the chrome (owner 2026-08-17).
+#include <builtinFonts/notosans_8_regular.h>
+#include <builtinFonts/notosans_8_bold.h>
+#include <builtinFonts/notosans_10_regular.h>
+#include <builtinFonts/notosans_10_bold.h>
+#include <builtinFonts/notosans_12_regular.h>
+#include <builtinFonts/notosans_12_bold.h>
