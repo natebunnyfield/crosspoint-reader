@@ -41,6 +41,15 @@ uname -s
 find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i
 ```
 
+**Do NOT run that across the whole tree — format only the files your change
+touches.** Run as written on 2026-08-18 it reformatted **16 files nobody had
+edited**: the tree is not clang-format-clean and has not been for a long time.
+A blanket sweep is therefore a large whitespace diff that buries the real change,
+and it collides with every other session holding uncommitted work in another
+worktree. Owner ruling 2026-08-18: leave the tree as it is and format per-file.
+CI is not failing on those 16, so nothing is broken — the command is simply
+wider than it looks.
+
 ---
 
 ## Platform and Hardware Constraints
