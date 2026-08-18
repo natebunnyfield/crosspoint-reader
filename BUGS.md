@@ -211,6 +211,14 @@ gets the process OOM-killed (measured — exit 137). Forcing a failed allocation
 needs either an allocator seam or the device. So this is a defect removed by
 construction, not a behavior demonstrated.
 
+**Owner ruling 2026-08-18: that is accepted, and no test seam is being built.**
+A fault-injecting allocator would be new test-only machinery in the memory
+layer — the layer where a mistake is worst — to exercise branches that log and
+return false, and it would only ever fail the simulator's allocator, not the
+device's. The claim this entry makes is therefore deliberately the weaker one:
+the code can no longer abort where it used to, verifiable by reading and by
+grep. Do not re-raise this as missing coverage; it is a decision.
+
 
 ### [B-028] A note does not repaint while a host keyboard types into it — FIXED 2026-08-17
 **severity: high · scope: NoteEditorActivity · reported and FIXED 2026-08-17**
