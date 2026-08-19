@@ -17,6 +17,35 @@ Run `scripts/repo-status.sh` to see where everything stands. It only reports;
 it never merges.
 
 
+## Where the backlog count lives now
+
+**B-002 was closed on 2026-08-19** and its content moved here, which is where it
+should always have been: an unmerged upstream backlog is a standing cost of a
+deliberately divergent fork, not a defect, and a bug entry that can never close
+only makes the open count lie.
+
+Measured 2026-08-19: **540 ahead / 66 behind** `upstream/develop`. It grows at
+roughly a commit a day, so any number written down is wrong within the week —
+re-measure with:
+
+```
+git fetch upstream && git rev-list --left-right --count main...upstream/develop
+```
+
+Both commits B-002 named are resolved. `9c48609f` (bookmarks survive
+re-pagination) needs `lib/KOReaderSync/`, deleted here with bookmarks;
+`0f747b82` (content-based sync positions) is superseded by this fork's own
+`section.bin` v35 word-anchor LUT, which gives the same guarantee by recording
+source byte positions rather than counting visible characters.
+
+Two cautions, both learned the hard way:
+
+* `scripts/repo-status.sh` **overstates** the backlog — a commit already applied
+  by hand still counts as unmerged (6 of 45 on the last pass).
+* Never probe applicability with `git cherry-pick -X ours`. It reports conflicts
+  as clean.
+
+
 ## Intentional divergences from upstream's scope
 
 These are deliberate. They are listed here so a future sync does not "fix" them

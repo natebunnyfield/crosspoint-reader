@@ -64,8 +64,37 @@ so a same-code reflash is accepted):
 CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
 ```
 
-### [B-002] Upstream commits unmerged, and unmergeable as-is
-**severity: low · scope: fork sync · by design, tracked not fixed**
+---
+
+## FIXED
+
+### [B-002] Upstream commits unmerged — CLOSED 2026-08-19, both resolved
+**severity: low · scope: fork sync · closed 2026-08-19**
+
+**Both named commits are resolved, so the entry has nothing left to track.**
+
+* `9c48609f` (bookmarks survive re-pagination) is **N/A**: it edits
+  `lib/KOReaderSync/ProgressMapper`, and `lib/KOReaderSync/` does not exist here
+  — the subsystem was deleted on purpose, along with bookmarks themselves.
+* `0f747b82` (content-based EPUB sync positions) is **superseded**: this fork
+  solved the same problem independently in `section.bin` v35, with a per-page
+  word-anchor LUT that repositions to the exact word after a reflow. Upstream
+  counts visible characters via a new `VisibleTextUtils`; this fork records
+  source byte positions. Different mechanisms, same guarantee — porting theirs
+  would replace a working scheme with another working scheme.
+
+**The backlog itself is not a bug and never was.** Re-measured 2026-08-19:
+**540 ahead / 66 behind**. That number is a standing cost of a deliberately
+divergent fork, it belongs in [docs/fork-sync.md](docs/fork-sync.md), and it will
+keep growing at roughly a commit a day whatever this tracker says. Keeping a
+never-closing bug for it only made the open count lie.
+
+Two cautions worth carrying over, since this entry was where they were written
+down: `scripts/repo-status.sh` OVERSTATES the backlog, because a commit already
+applied by hand still counts as unmerged (6 of 45 on the last pass); and never
+probe with `git cherry-pick -X ours`, which reports conflicts as clean.
+
+**Original entry follows.**
 
 Both named commits — `9c48609f` (bookmarks survive re-pagination) and
 `0f747b82` (content-based EPUB sync positions) — are still unmerged, but the
@@ -93,9 +122,6 @@ Not a defect so much as a standing cost. See [docs/fork-sync.md](docs/fork-sync.
 `ChapterHtmlSlimParser`, `EpubReaderUtils.h` changes — and bumping the cache
 format version if layout output changes.
 
----
-
-## FIXED
 
 ### [B-032] A failed `reserve()` aborts exactly like a bare `new` — FIXED 2026-08-19
 **severity: medium · scope: memory safety · found + fixed 2026-08-19**
