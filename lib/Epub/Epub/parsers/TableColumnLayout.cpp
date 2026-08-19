@@ -57,7 +57,7 @@ Plan planColumns(const std::vector<Row>& rows, const int viewportWidth, const in
       const std::string text = cellText(rows[r][c]);
       if (text.empty()) continue;
       const int w = measureText(ctx, text.c_str(), r == 0);  // header row is bold, and bold is wider
-      natural[c] = std::max(natural[c], w);
+      natural[c] = std::max(natural[c], w + kColumnSlack);
     }
   }
 

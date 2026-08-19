@@ -42,8 +42,8 @@ TEST(TableColumns, PlansNaturalWidthsWhenEverythingFits) {
   const Plan p = planColumns(rows, 800, kSpace, fakeMeasure, nullptr);
   ASSERT_TRUE(p.usable);
   EXPECT_EQ(p.columnCount, 2u);
-  EXPECT_EQ(p.w[0], 6 * 10);   // "Beagle" beats bold "Ship" (4*12=48)
-  EXPECT_EQ(p.w[1], 4 * 12);   // bold header "Year" is the widest thing in it
+  EXPECT_EQ(p.w[0], 6 * 10 + kColumnSlack);  // "Beagle" beats bold "Ship" (4*12=48)
+  EXPECT_EQ(p.w[1], 4 * 12 + kColumnSlack);  // bold header "Year" is the widest thing in it
   EXPECT_EQ(p.x[0], 0);
   EXPECT_EQ(p.x[1], p.w[0] + p.gutter);
 }
@@ -65,8 +65,8 @@ TEST(TableColumns, SqueezesTheWidestColumnAndLeavesTheShortOnesAlone) {
                            {"Challenger", "1872", "1251"}});
   const Plan p = planColumns(rows, 472, kSpace, fakeMeasure, nullptr);
   ASSERT_TRUE(p.usable);
-  EXPECT_EQ(p.w[1], 8 * 12) << "the year column kept its natural width";
-  EXPECT_EQ(p.w[2], 4 * 12) << "the figures column kept its natural width";
+  EXPECT_EQ(p.w[1], 8 * 12 + kColumnSlack) << "the year column kept its natural width";
+  EXPECT_EQ(p.w[2], 4 * 12 + kColumnSlack) << "the figures column kept its natural width";
   EXPECT_LT(p.w[0], 33 * 10) << "the prose column is the one that gave ground";
 }
 

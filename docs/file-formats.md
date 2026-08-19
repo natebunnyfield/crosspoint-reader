@@ -96,6 +96,13 @@ Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
 current reader settings, the section is discarded and rebuilt.
 
+Version 36 is binary-identical to version 35 — no field changed. It was bumped
+because table LAYOUT changed: a table that plans as columns is now emitted as
+columns with a rule under the header row, instead of one paragraph per cell in
+reading order (T-012, ruled 2026-08-18). A cached section from before that
+would render the old shape forever, since nothing else in the header describes
+how tables were laid out.
+
 Version 35 appends a word-anchor LUT after the list-item LUT — one uint32 per
 page, no count prefix (the page count bounds it), located by a fifth offset
 slot appended to the header (so every earlier offset's distance from the

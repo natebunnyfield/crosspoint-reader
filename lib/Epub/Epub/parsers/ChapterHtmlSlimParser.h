@@ -16,6 +16,7 @@
 #include "Epub/css/CssParser.h"
 #include "Epub/css/CssStyle.h"
 #include "TableCellLabel.h"
+#include "TableColumnLayout.h"
 
 class Page;
 class GfxRenderer;
@@ -110,7 +111,37 @@ class ChapterHtmlSlimParser {
   std::string tableLabelCapture;  // accumulates a cell's text for the two above
   bool tableCapturingLabel = false;
   bool tableEmittedDataCell = false;  // guards a <thead>-only table losing its head
-  bool listItemBulletOnly = false;    // true when currentTextBlock has only the <li> bullet
+
+  // --- T-012: tables as columns ------------------------------------------
+  // Columns cannot be laid out until every cell has been measured, and this is
+  // a single-pass SAX parse, so a candidate table is BUFFERED and emitted at
+  // </table>. Buffering is abandoned the moment the table turns out to be
+  // something this cannot lay out -- an image, a link, a nested table, a list,
+  // or simply too much text -- and the flattened streaming path takes over
+  // mid-table exactly as it always did. That is why the old path is still here
+  // untouched: it is the fallback, not dead code.
+  bool tableBuffering = false;
+  bool tableBufferAbandoned = false;  // this table already fell back to streaming
+  std::vector<tablecolumns::Row> tableBuf;
+  size_t tableBufBytes = 0;
+  bool tableCellOpen = false;  // a <td>/<th> is receiving text right now
+  // Whether row 0 of the buffer is a HEADER or just the first row of data.
+  // Without this, a table with no <thead> loses its first row: the flattened
+  // fallback would treat it as labels and emit rows 1..n, and the columns path
+  // would set it bold under a rule it never earned.
+  bool tableBufHasHeader = false;
+
+  void abandonTableBuffer();  // replay what was buffered, then stream the rest
+  void appendTableText(const char* text, int len);
+  void emitBufferedTableFlattened();
+  void emitBufferedTableAsColumns(const tablecolumns::Plan& plan);
+  void emitStyledText(const std::string& text, bool bold, bool italic);
+  // Height a row needs, in pixels, at the planned column widths. Used BEFORE
+  // anything is emitted: a row taller than a page means columns are abandoned
+  // for the whole table, because a row split across a page boundary breaks each
+  // column independently and reads as garbage.
+  int measureRowHeight(const tablecolumns::Row& row, const tablecolumns::Plan& plan, bool headerRow) const;
+  bool listItemBulletOnly = false;  // true when currentTextBlock has only the <li> bullet
 
   // Anchor-to-page mapping: tracks which page each HTML id attribute lands on
   int completedPageCount = 0;

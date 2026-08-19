@@ -38,8 +38,15 @@ inline constexpr size_t kMaxBufferedBytes = 3072;
 // flattened form is genuinely better than four-character-wide columns.
 inline constexpr int kMinColumnWidth = 48;
 
+// Measured width is what the text needs EXACTLY, and the line breaker works in
+// whole words against the width it is given -- so a column sized to its widest
+// cell can still wrap that cell, which is what shipped in the first run of this
+// code ("Col 3" broke after "Col"). Two pixels of slack per column costs
+// nothing and removes the whole class.
+inline constexpr int kColumnSlack = 2;
+
 struct Plan {
-  bool usable = false;      // false -> caller must flatten
+  bool usable = false;  // false -> caller must flatten
   size_t columnCount = 0;
   int x[kMaxColumns] = {};  // left edge of each column, in viewport pixels
   int w[kMaxColumns] = {};  // width available to the cell's text

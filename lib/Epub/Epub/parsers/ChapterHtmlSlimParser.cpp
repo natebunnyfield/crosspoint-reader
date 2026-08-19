@@ -331,6 +331,219 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
   listItemBulletOnly = false;
 }
 
+// --- T-012: tables as columns ---------------------------------------------
+// Text arrives in expat-sized fragments, so a run is extended rather than
+// appended when the style has not changed -- otherwise a cell holds dozens of
+// single-word runs and every one of them re-enters the style machinery.
+void ChapterHtmlSlimParser::appendTableText(const char* text, const int len) {
+  if (len <= 0 || tableBuf.empty() || tableBuf.back().empty()) return;
+  tableBufBytes += static_cast<size_t>(len);
+  if (tableBufBytes > tablecolumns::kMaxBufferedBytes) {
+    abandonTableBuffer();
+    // The text that tipped it over still has to be emitted, and the streaming
+    // path is live again by now, so hand it back to the normal route.
+    characterData(this, text, len);
+    return;
+  }
+  tablecolumns::Cell& cell = tableBuf.back().back();
+  const bool bold = effectiveBold;
+  const bool italic = effectiveItalic;
+  if (!cell.empty() && cell.back().bold == bold && cell.back().italic == italic) {
+    cell.back().text.append(text, static_cast<size_t>(len));
+    return;
+  }
+  cell.push_back(tablecolumns::Run{std::string(text, static_cast<size_t>(len)), bold, italic});
+}
+
+// Emit one styled fragment into the block being built, through the same route
+// the streaming path uses -- so hyphenation, kerning, bidi and word breaking are
+// identical to any other paragraph.
+void ChapterHtmlSlimParser::emitStyledText(const std::string& text, const bool bold, const bool italic) {
+  if (text.empty()) return;
+  StyleStackEntry style;
+  style.depth = depth;
+  style.hasBold = true;
+  style.bold = bold;
+  style.hasItalic = true;
+  style.italic = italic;
+  inlineStyleStack.push_back(style);
+  updateEffectiveInlineStyle();
+  characterData(this, text.c_str(), static_cast<int>(text.size()));
+  if (partWordBufferIndex > 0) {
+    flushPartWordBuffer();
+  }
+  inlineStyleStack.pop_back();
+  updateEffectiveInlineStyle();
+}
+
+// Give up on columns for this table and put the streaming path back in charge.
+// Everything buffered so far is emitted flattened first, so the table reads in
+// order even though it changed shape halfway through.
+void ChapterHtmlSlimParser::abandonTableBuffer() {
+  if (!tableBuffering) return;
+  tableBuffering = false;
+  tableBufferAbandoned = true;
+  tableCellOpen = false;
+  emitBufferedTableFlattened();
+  tableBuf.clear();
+  tableBufBytes = 0;
+}
+
+// The pre-2026-08-19 shape, rebuilt from the buffer: one paragraph per cell,
+// each prefixed with the column name (and the row name in bold, for the first
+// cell of a row). Kept because it is the only thing that works for a table the
+// columns path refuses.
+void ChapterHtmlSlimParser::emitBufferedTableFlattened() {
+  if (tableBuf.empty()) return;
+
+  std::vector<std::string> colLabels;
+  size_t colCount = 0;
+  if (tableBufHasHeader) {
+    const tablecolumns::Row& head = tableBuf.front();
+    colLabels.reserve(head.size());
+    for (const tablecolumns::Cell& c : head) {
+      colLabels.push_back(TableCellLabel::normalize(tablecolumns::cellText(c)));
+    }
+    colCount = head.size();
+  }
+
+  // A <thead> with nothing under it: the head cells are the whole table, and
+  // dropping them would render the table as nothing at all. Joined with middle
+  // dots, which is what the streaming path has always done for this case.
+  if (tableBufHasHeader && tableBuf.size() == 1) {
+    auto headOnlyStyle = BlockStyle();
+    headOnlyStyle.textAlignDefined = true;
+    headOnlyStyle.alignment = (paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
+                                  ? CssTextAlign::Justify
+                                  : static_cast<CssTextAlign>(paragraphAlignment);
+    startNewTextBlock(headOnlyStyle);
+    std::string joined;
+    for (const std::string& label : colLabels) {
+      if (label.empty()) continue;
+      if (!joined.empty()) joined += " \xc2\xb7 ";  // U+00B7 MIDDLE DOT
+      joined += label;
+    }
+    if (!joined.empty()) {
+      emitStyledText(joined, false, false);
+      makePages();
+      tableEmittedDataCell = true;
+    }
+    return;
+  }
+
+  // With no header row, EVERY row is data -- starting at 1 would silently eat
+  // the first row of a table that simply did not use <thead>.
+  for (size_t r = tableBufHasHeader ? 1 : 0; r < tableBuf.size(); r++) {
+    const tablecolumns::Row& row = tableBuf[r];
+    const std::string rowLabel =
+        row.empty() ? std::string() : TableCellLabel::normalize(tablecolumns::cellText(row[0]));
+    for (size_t c = 0; c < row.size(); c++) {
+      auto cellStyle = BlockStyle();
+      cellStyle.textAlignDefined = true;
+      cellStyle.alignment = (paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
+                                ? CssTextAlign::Justify
+                                : static_cast<CssTextAlign>(paragraphAlignment);
+      startNewTextBlock(cellStyle);
+      nextWordContinues = false;
+
+      const bool isRowLabelCell = (c == 0);
+      const std::string label = TableCellLabel::forCell(colLabels, rowLabel, c + 1, colCount);
+      if (!label.empty()) {
+        emitStyledText(label, isRowLabelCell, !isRowLabelCell);
+        nextWordContinues = false;
+      }
+      for (const tablecolumns::Run& run : row[c]) {
+        emitStyledText(run.text, run.bold || isRowLabelCell, run.italic);
+      }
+      nextWordContinues = false;
+      makePages();
+      tableEmittedDataCell = true;
+    }
+  }
+}
+
+int ChapterHtmlSlimParser::measureRowHeight(const tablecolumns::Row& row, const tablecolumns::Plan& plan,
+                                            const bool headerRow) const {
+  const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
+  int lines = 1;
+  for (size_t c = 0; c < row.size() && c < plan.columnCount; c++) {
+    const std::string text = tablecolumns::cellText(row[c]);
+    if (text.empty()) continue;
+    const auto wrapped = renderer.wrappedText(fontId, text.c_str(), plan.w[c], 32,
+                                              headerRow ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+    lines = std::max<int>(lines, static_cast<int>(wrapped.size()));
+  }
+  return lines * lineHeight;
+}
+
+void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan& plan) {
+  const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
+  const int rowGap = std::max(2, lineHeight / 4);
+  constexpr int kRuleThickness = 2;
+
+  for (size_t r = 0; r < tableBuf.size(); r++) {
+    const tablecolumns::Row& row = tableBuf[r];
+    const bool headerRow = (r == 0) && tableBufHasHeader;
+    const int rowHeight = measureRowHeight(row, plan, headerRow);
+    const int needed = rowHeight + rowGap + (headerRow ? kRuleThickness + rowGap : 0);
+
+    if (!currentPage) {
+      currentPage = makeUniqueNoThrow<Page>();
+      if (!currentPage) {
+        noteAllocationFailure("Page for a table row");
+        return;
+      }
+      currentPageNextY = 0;
+    }
+    // Rows move as a unit. Breaking inside one would page-break each column
+    // independently, which puts half a row on each page with no way to tell.
+    if (!currentPage->elements.empty() && currentPageNextY + needed > viewportHeight) {
+      completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
+      completedPageCount++;
+      currentPage = makeUniqueNoThrow<Page>();
+      if (!currentPage) {
+        noteAllocationFailure("Page after a table row break");
+        return;
+      }
+      currentPageNextY = 0;
+    }
+
+    const int16_t rowTop = currentPageNextY;
+    int16_t rowBottom = rowTop;
+    for (size_t c = 0; c < row.size() && c < plan.columnCount; c++) {
+      currentPageNextY = rowTop;
+      auto cellStyle = BlockStyle();
+      cellStyle.marginLeft = static_cast<int16_t>(plan.x[c]);
+      cellStyle.marginRight = static_cast<int16_t>(viewportWidth - (plan.x[c] + plan.w[c]));
+      cellStyle.textAlignDefined = true;
+      cellStyle.alignment = plan.rightAlign[c] ? CssTextAlign::Right : CssTextAlign::Left;
+      startNewTextBlock(cellStyle);
+      nextWordContinues = false;
+      for (const tablecolumns::Run& run : row[c]) {
+        emitStyledText(run.text, run.bold || headerRow, run.italic);
+      }
+      nextWordContinues = false;
+      makePages();
+      if (currentPageNextY > rowBottom) rowBottom = currentPageNextY;
+    }
+    currentPageNextY = static_cast<int16_t>(rowBottom + rowGap);
+    tableEmittedDataCell = true;
+
+    // The one rule the ruling asks for: under the header, spanning the columns.
+    if (headerRow && currentPage) {
+      const int16_t ruleWidth = static_cast<int16_t>(plan.x[plan.columnCount - 1] + plan.w[plan.columnCount - 1]);
+      auto rule = std::shared_ptr<PageHorizontalRule>(
+          new (std::nothrow) PageHorizontalRule(static_cast<uint16_t>(ruleWidth), kRuleThickness, 0, currentPageNextY));
+      if (!rule) {
+        noteAllocationFailure("the table's header rule");
+        return;
+      }
+      currentPage->elements.push_back(rule);
+      currentPageNextY = static_cast<int16_t>(currentPageNextY + kRuleThickness + rowGap);
+    }
+  }
+}
+
 void ChapterHtmlSlimParser::emitHorizontalRule(const BlockStyle& blockStyle) {
   if (partWordBufferIndex > 0) {
     flushPartWordBuffer();
@@ -508,17 +721,56 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     self->tableLabelCapture.clear();
     self->tableCapturingLabel = false;
     self->tableEmittedDataCell = false;
+    // Start buffering this table as a columns candidate. Anything the columns
+    // path cannot lay out abandons it, and the streaming code below takes over
+    // from that point -- so every branch after this stays reachable.
+    self->tableBuffering = true;
+    self->tableBufferAbandoned = false;
+    self->tableCellOpen = false;
+    self->tableBufHasHeader = false;
+    self->tableBuf.clear();
+    self->tableBufBytes = 0;
     self->depth += 1;
     return;
+  }
+
+  // Anything inside a cell that is not plain inline emphasis -- an image, a
+  // link with a footnote, a list, a nested table -- is content the buffered
+  // path would silently drop, because buffering keeps text and styles and
+  // nothing else. Hand the table back to the streaming code, which handles all
+  // of it exactly as it did before.
+  if (self->tableBuffering && self->tableCellOpen) {
+    static constexpr const char* kInlineOk[] = {"b", "strong", "i", "em", "span"};
+    bool ok = false;
+    for (const char* tag : kInlineOk) {
+      if (strcmp(name, tag) == 0) {
+        ok = true;
+        break;
+      }
+    }
+    if (!ok) {
+      self->abandonTableBuffer();
+    }
   }
 
   // Deliberately does not return: <thead> had no handler before and fell
   // through to the generic path, and it should keep doing so.
   if (self->tableDepth == 1 && strcmp(name, "thead") == 0) {
     self->tableInHead = true;
+    if (self->tableBuffering) {
+      self->tableBufHasHeader = true;
+    }
   }
 
   if (self->tableDepth == 1 && strcmp(name, "tr") == 0) {
+    if (self->tableBuffering) {
+      if (self->tableBuf.size() >= tablecolumns::kMaxRows) {
+        self->abandonTableBuffer();
+      } else {
+        self->tableBuf.emplace_back();
+        self->tableCellOpen = false;
+      }
+    }
     self->tableRowIndex += 1;
     self->tableColIndex = 0;
     self->tableRowLabel.clear();
@@ -527,6 +779,23 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   }
 
   if (self->tableDepth == 1 && (strcmp(name, "td") == 0 || strcmp(name, "th") == 0)) {
+    if (self->tableBuffering) {
+      // A cell outside any row, or one column too many, is a shape this cannot
+      // plan; hand the table back to the streaming path rather than guess.
+      if (self->tableBuf.empty() || self->tableBuf.back().size() >= tablecolumns::kMaxColumns) {
+        self->abandonTableBuffer();
+      } else {
+        // A <th> in the first row makes it a header even without a <thead>,
+        // which is how most hand-written EPUB tables are marked up.
+        if (self->tableBuf.size() == 1 && strcmp(name, "th") == 0) {
+          self->tableBufHasHeader = true;
+        }
+        self->tableBuf.back().emplace_back();
+        self->tableCellOpen = true;
+        self->depth += 1;
+        return;
+      }
+    }
     if (self->partWordBufferIndex > 0) {
       self->flushPartWordBuffer();
     }
@@ -1217,6 +1486,15 @@ void XMLCALL ChapterHtmlSlimParser::characterData(void* userData, const XML_Char
     return;
   }
 
+  // A buffered table swallows its text until </table>, when the whole thing can
+  // be measured at once. Nothing is emitted here, and nothing is lost: either
+  // the columns are laid out from the buffer, or abandonTableBuffer() replays
+  // it through the flattened path.
+  if (self->tableBuffering && self->tableCellOpen) {
+    self->appendTableText(s, len);
+    return;
+  }
+
   // Table labels. A <thead> cell is captured INSTEAD of being emitted; the
   // first cell of a body row is captured AS WELL, since it is both the row's
   // name and content the reader still wants to see. The cap is on the buffer,
@@ -1513,6 +1791,10 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   }
 
   if (self->tableDepth == 1 && (strcmp(name, "td") == 0 || strcmp(name, "th") == 0)) {
+    if (self->tableBuffering) {
+      self->tableCellOpen = false;
+      return;
+    }
     if (self->tableCapturingLabel) {
       std::string label = TableCellLabel::normalize(self->tableLabelCapture);
       if (self->tableInHead) {
@@ -1537,6 +1819,46 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   }
 
   if (self->tableDepth == 1 && strcmp(name, "table") == 0) {
+    // The buffered table is decided here, where every cell has been seen. If the
+    // plan is usable it is emitted as columns; if not -- ragged, too wide, too
+    // narrow, too many columns -- it falls through to exactly the flattened
+    // output this parser produced before columns existed.
+    if (self->tableBuffering) {
+      self->tableBuffering = false;
+      self->tableCellOpen = false;
+      const int spaceWidth = self->renderer.getSpaceWidth(self->fontId);
+      struct MeasureCtx {
+        ChapterHtmlSlimParser* self;
+      } ctx{self};
+      const auto measure = [](void* c, const char* text, const bool bold) {
+        auto* m = static_cast<MeasureCtx*>(c);
+        return m->self->renderer.getTextWidth(m->self->fontId, text,
+                                              bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+      };
+      tablecolumns::Plan plan =
+          tablecolumns::planColumns(self->tableBuf, self->viewportWidth, spaceWidth, measure, &ctx);
+
+      // A row taller than the page cannot move as a unit, and a row that does
+      // not move as a unit breaks each column onto a different page. Checked
+      // before anything is emitted, so the fallback is still available.
+      if (plan.usable) {
+        for (size_t r = 0; r < self->tableBuf.size(); r++) {
+          if (self->measureRowHeight(self->tableBuf[r], plan, r == 0) > self->viewportHeight) {
+            plan.usable = false;
+            break;
+          }
+        }
+      }
+
+      if (plan.usable) {
+        self->emitBufferedTableAsColumns(plan);
+      } else {
+        self->emitBufferedTableFlattened();
+      }
+      self->tableBuf.clear();
+      self->tableBufBytes = 0;
+    }
+
     // A table whose only row was its <thead> would otherwise render as nothing,
     // because head cells are captured rather than emitted.
     if (!self->tableEmittedDataCell && !self->tableColLabels.empty()) {
