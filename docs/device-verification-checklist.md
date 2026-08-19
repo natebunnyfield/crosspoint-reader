@@ -18,17 +18,18 @@ and is being re-checked on real e-ink, not discovered.
 
 | | |
 |---|---|
-| File | `~/crosspoint-archive/staged/20260819T1538Z-crosspoint-a039e83c.bin` |
-| Commit | `a039e83cc` |
+| File | `~/crosspoint-archive/staged/20260819T2050Z-crosspoint-84846a41.bin` |
+| Commit | `84846a41b` |
 | Version string | `1.5.0-B2` (renamed from `1.5.0-BNY` in `da6736f9f`) |
-| Size | 4,962,096 bytes |
-| sha256 | `af91f3ec4a500c2b2470a68b…` |
-| Flash | 75.5% (4,949,109 of 6,553,600) · RAM 16.5% |
+| Size | 4,967,904 bytes |
+| sha256 | `a36c36dc15c83c672d02549f…` |
+| Flash | 75.6% (4,954,925 of 6,553,600) · RAM 16.5% |
 
-Restaged 2026-08-19; the previous bin was 12 commits behind and is deleted. What
-this one adds over it: EPUB tables rendered as columns ([T-012]), and the two
-memory sweeps ([B-030], [B-031]) that turned an OOM abort into a reported
-failure on the cover and reading paths.
+Restaged 2026-08-19 (third time today; each superseded bin was deleted). What it
+carries over the morning's build: tables as columns with a header rule
+([T-012]), the rotated wide-table page and its key-block fallback ([T-021]), the
+CSS-parse heap floor ([T-014]'s one import), and the reservation guards
+([B-032]).
 
 **It was built in a worktree, which is the exact trap [B-029](../BUGS.md)
 describes — and as of `b39eea60c` that trap is closed: a release env now REFUSES
