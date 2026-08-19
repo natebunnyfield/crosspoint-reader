@@ -14,7 +14,7 @@ a desk**.
 | Device | Items | Artifact to install |
 |---|---|---|
 | **X3 or X4 e-reader** | [T-008], [T-017], [B-006] (+ [T-012], [T-021], [T-015] confirmations) | `~/crosspoint-archive/staged/20260819T2050Z-crosspoint-84846a41.bin` |
-| **iPhone** | `ST-004`, `ST-009`, `ST-010`, `S-016` | a TestFlight build newer than 101 — see below |
+| **iPhone** | `ST-004`, `ST-009`, `ST-010`, `S-016` | **build-103**, already uploaded |
 | **iPad** | `ST-005` | the same build; one screenshot closes it |
 
 ### 1. The e-reader
@@ -31,11 +31,11 @@ while connected).
 
 ### 2. The iPhone
 
-**TestFlight is at build-101, which pins firmware `f80b140b6`** — before tables,
-before the rotated page, before the memory sweeps. So a new build is needed
-before the phone items mean anything about today's code, and cutting it is the
-simulator repo's job (`testflight.sh`, build number from the highest `build-*`
-tag plus one).
+**Cut 2026-08-19: build-103 is up** (delivery `2dd50ce8`), and it is the first
+build in nineteen whose firmware is current — 98 through 101 were all pinned at
+`f80b140b6`, so tables, the rotated page and the OOM sweeps had never reached the
+phone. Nothing more is needed before the phone items can be checked; the app just
+has to appear in TestFlight (Apple takes 5-10 minutes to process).
 
 What to look at once it is on the phone:
 
