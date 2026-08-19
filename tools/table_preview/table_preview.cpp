@@ -231,6 +231,9 @@ static const WideRow kWideRows[] = {
 static constexpr int kWideRowCount = sizeof(kWideRows) / sizeof(kWideRows[0]);
 
 static constexpr int FONT = LIBREFRANKLIN_READER_14_FONT_ID;
+// The floor of the reader's 12/14/16/18 ramp. Used two ways: as the whole page's
+// size in C/D/E, and as the LABEL size in H.
+static constexpr int SMALL = LIBREFRANKLIN_READER_12_FONT_ID;
 static constexpr int MARGIN = 28;
 static constexpr int CAPTION_GAP = 10;
 static constexpr int PAD = 8;  // inside the outer box, so ink never touches a rule
@@ -447,6 +450,94 @@ static void renderFlatNamedOnce(const bool namesOnOwnLine) {
   }
 }
 
+// --- H: F, with the names in a LEFT-ALIGNED column ------------------------
+//
+// The values stay hard left, in the same column as every other row. The names
+// form their own left-aligned column, parked at the leftmost x that clears every
+// value in the group -- so the labels line up with each other instead of being
+// ragged, and none of them collides with the value it labels. A right-flush set
+// looked like five separate decisions; one shared left edge reads as a column.
+static void renderFlatBoldName() {
+  renderer.clearScreen(0xFF);
+  int y = MARGIN;
+  y = header(y, "H  Named once, bold, one size down", "labels smaller and top-aligned with the values they name");
+  const int left = MARGIN;
+  const int w = pageWidth() - MARGIN * 2;
+  const int lineH = lineH14();
+  const int gap = renderer.getSpaceWidth(FONT) * 2;
+
+  // The label column sits just past the WIDEST value, so no value can reach it.
+  // The names are set a size DOWN from the values -- they are labels on the
+  // data, not part of it, and at reading size they competed with the words they
+  // were labelling. TOP-aligned with the value, not baseline-aligned: the label
+  // marks where the entry starts, which matters more than the two sizes sharing
+  // a baseline when a value wraps to a second line.
+  int widestValue = 0;
+  int widestLabel = 0;
+  for (int c = 0; c < 5; c++) {
+    widestValue = std::max(widestValue, renderer.getTextWidth(FONT, kWideRows[0].c[c]));
+    widestLabel = std::max(widestLabel, renderer.getTextWidth(SMALL, kWideHead[c], EpdFontFamily::BOLD));
+  }
+  int labelX = left + widestValue + gap;
+  // If that runs the labels off the page, pull the column back to the last x
+  // that fits and let the longest value wrap under instead of colliding.
+  if (labelX + widestLabel > left + w) {
+    labelX = left + w - widestLabel;
+  }
+
+  for (int r = 0; r < kWideRowCount; r++) {
+    for (int c = 0; c < 5; c++) {
+      if (r != 0) {
+        y = drawWrapped(left, y, w, kWideRows[r].c[c]);
+        continue;
+      }
+      const std::string whole = kWideRows[r].c[c];
+      // The value WRAPS inside the room left of the label column -- it never
+      // truncates. Asking for one line would ellipsize the longest value, which
+      // loses text to a layout decision, and losing text is the one thing none
+      // of these options is allowed to do.
+      const int room = labelX - left - gap;
+      const auto lines = renderer.wrappedText(FONT, whole.c_str(), room, 6);
+      renderer.drawText(SMALL, labelX, y, kWideHead[c], true, EpdFontFamily::BOLD);
+      for (const auto& line : lines) {
+        renderer.drawText(FONT, left, y, line.c_str());
+        y += lineH;
+      }
+      if (lines.empty()) y += lineH;
+    }
+    y += CAPTION_GAP;
+  }
+}
+
+// --- I: G, with the names collected ABOVE the first row --------------------
+//
+// G names each cell on its own bold line, interleaved with the first row's
+// values, so the names are scattered through it. I lifts them out: all five
+// names first, as a block, then the rows underneath. The block reads as a key,
+// and the first row stops being a special case -- every row below is identical
+// in shape, which is the thing G could not manage.
+static void renderFlatKeyBlock() {
+  renderer.clearScreen(0xFF);
+  int y = MARGIN;
+  y = header(y, "I  Names collected above", "all five names as a block, then every row identical beneath");
+  const int left = MARGIN;
+  const int w = pageWidth() - MARGIN * 2;
+  const int lineH = lineH14();
+
+  for (int c = 0; c < 5; c++) {
+    renderer.drawText(FONT, left, y, kWideHead[c], true, EpdFontFamily::BOLD);
+    y += lineH;
+  }
+  y += CAPTION_GAP;
+
+  for (int r = 0; r < kWideRowCount; r++) {
+    for (int c = 0; c < 5; c++) {
+      y = drawWrapped(left, y, w, kWideRows[r].c[c]);
+    }
+    y += CAPTION_GAP;
+  }
+}
+
 // --- C / D / E: the wide table at the smallest reading size ----------------
 //
 // drawTextRotated90CW anchors a run at its BOTTOM and climbs: text drawn at
@@ -457,8 +548,6 @@ static void renderFlatNamedOnce(const bool namesOnOwnLine) {
 //     portrait x = landscape y                 -- landscape rows march across
 //     portrait y = screenHeight - landscape x  -- landscape columns march up
 //
-static constexpr int SMALL = LIBREFRANKLIN_READER_12_FONT_ID;
-
 static int smallLineH() { return renderer.getLineHeight(SMALL); }
 
 // across = distance from the landscape LEFT edge (reading direction)
@@ -654,6 +743,12 @@ int main() {
 
   renderFlatNamedOnce(true);
   writeMonoPortraitBmp("fs_/wide_named_bold.bmp", renderer);
+
+  renderFlatBoldName();
+  writeMonoPortraitBmp("fs_/wide_named_inline_bold.bmp", renderer);
+
+  renderFlatKeyBlock();
+  writeMonoPortraitBmp("fs_/wide_key_block.bmp", renderer);
 
   printf("wrote 7 BMPs to fs_/\n");
   return 0;
