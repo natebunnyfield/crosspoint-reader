@@ -18,12 +18,17 @@ and is being re-checked on real e-ink, not discovered.
 
 | | |
 |---|---|
-| File | `~/crosspoint-archive/staged/20260818T2146Z-crosspoint-b39eea60.bin` |
-| Commit | `b39eea60c` |
+| File | `~/crosspoint-archive/staged/20260819T1538Z-crosspoint-a039e83c.bin` |
+| Commit | `a039e83cc` |
 | Version string | `1.5.0-B2` (renamed from `1.5.0-BNY` in `da6736f9f`) |
-| Size | 4,955,360 bytes |
-| sha256 | `b1baea7b916aae81e36c2747207813370f015fb549e9082199be6986139f0329` |
-| Flash | 75.4% (4,942,381 of 6,553,600) · RAM 16.5% |
+| Size | 4,962,096 bytes |
+| sha256 | `af91f3ec4a500c2b2470a68b…` |
+| Flash | 75.5% (4,949,109 of 6,553,600) · RAM 16.5% |
+
+Restaged 2026-08-19; the previous bin was 12 commits behind and is deleted. What
+this one adds over it: EPUB tables rendered as columns ([T-012]), and the two
+memory sweeps ([B-030], [B-031]) that turned an OOM abort into a reported
+failure on the cover and reading paths.
 
 **It was built in a worktree, which is the exact trap [B-029](../BUGS.md)
 describes — and as of `b39eea60c` that trap is closed: a release env now REFUSES
