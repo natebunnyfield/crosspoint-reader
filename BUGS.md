@@ -64,35 +64,6 @@ so a same-code reflash is accepted):
 CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
 ```
 
-### [B-003] Exploded `.epub` directories present as folders, never as books
-**severity: low · scope: content · found 2026-08-03 · mechanism corrected 2026-08-07**
-
-The X3 card carried 10 entries named `*.epub` that are DIRECTORIES
-(`META-INF/`, `mimetype`, `OEBPS/`) rather than zip containers.
-
-They never reach the zip layer at all. `FileBrowserActivity::loadFiles` marks a
-directory by appending `/` (`src/activities/home/FileBrowserActivity.cpp:46-47`),
-and `activateSelected` branches on `entry.back() == '/'` (`:139`) to **navigate
-into** it (`:194-197`) instead of calling `onSelectBook` (`:200`). So an exploded
-`foo.epub/` is a browsable folder holding `META-INF/` and `OEBPS/`, with
-`mimetype` hidden for having no matching extension in the filter. There is no
-error and no failure mode to observe — the book simply cannot be opened.
-
-An earlier version of this entry said they "almost certainly do not open"
-because miniz is the only container library and `lib/Epub/Epub/Section.cpp`
-unzips at runtime. Both halves were wrong: the zip layer is
-`lib/ZipFile/ZipFile.cpp`, reached from `lib/Epub/Epub.cpp:218`, and
-`Section.cpp` contains no zip call at all — only two comments mentioning
-"unzipped". The conclusion held; the reasoning behind it did not.
-
-They are preserved at `~/crosspoint-books/_exploded/`. Also note
-`ls *.epub | wc -l` on such a card reports a wildly inflated count because it
-recurses into the directories (reported 510 for a real 76).
-
-**Close by:** re-zipping them as proper EPUBs (mimetype stored first,
-uncompressed) or discarding them. Opening one to "confirm the failure mode" is
-no longer a useful step — the branch above is unambiguous.
-
 ### [B-002] Upstream commits unmerged, and unmergeable as-is
 **severity: low · scope: fork sync · by design, tracked not fixed**
 
@@ -125,6 +96,56 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-003] Exploded `.epub` directories present as folders, never as books — FIXED 2026-08-19
+**severity: low · scope: content · found 2026-08-03 · re-zipped 2026-08-19**
+
+**Fixed by re-zipping all ten**, which was the close-by step this entry named.
+They are at `~/src/crosspoint-books/_rezipped/` — note the path, because this
+entry said `~/crosspoint-books/_exploded/` and that directory does not exist;
+the preserved copies were under `~/src/`. Anyone re-checking this should look
+there.
+
+Each was rebuilt with `mimetype` stored first and uncompressed, as OCF requires,
+and with macOS `._*` and `.DS_Store` droppings excluded — the AppleDouble files
+that would otherwise ride along are the same class of problem the font cards
+have had. Verified two ways: every archive re-opened and checked
+programmatically (first entry is a STORED `mimetype`, `META-INF/container.xml`
+present, no resource-fork files, 10 of 10 clean), and then *Apartment Gardening*
+opened in the simulator and rendered its cover and title page.
+
+**Still owed, and it is a copy rather than a fix:** the card still holds the ten
+exploded directories. Replacing them with these files is a card operation, on
+the device checklist with the rest.
+
+**Original entry follows.**
+
+The X3 card carried 10 entries named `*.epub` that are DIRECTORIES
+(`META-INF/`, `mimetype`, `OEBPS/`) rather than zip containers.
+
+They never reach the zip layer at all. `FileBrowserActivity::loadFiles` marks a
+directory by appending `/` (`src/activities/home/FileBrowserActivity.cpp:46-47`),
+and `activateSelected` branches on `entry.back() == '/'` (`:139`) to **navigate
+into** it (`:194-197`) instead of calling `onSelectBook` (`:200`). So an exploded
+`foo.epub/` is a browsable folder holding `META-INF/` and `OEBPS/`, with
+`mimetype` hidden for having no matching extension in the filter. There is no
+error and no failure mode to observe — the book simply cannot be opened.
+
+An earlier version of this entry said they "almost certainly do not open"
+because miniz is the only container library and `lib/Epub/Epub/Section.cpp`
+unzips at runtime. Both halves were wrong: the zip layer is
+`lib/ZipFile/ZipFile.cpp`, reached from `lib/Epub/Epub.cpp:218`, and
+`Section.cpp` contains no zip call at all — only two comments mentioning
+"unzipped". The conclusion held; the reasoning behind it did not.
+
+They are preserved at `~/crosspoint-books/_exploded/`. Also note
+`ls *.epub | wc -l` on such a card reports a wildly inflated count because it
+recurses into the directories (reported 510 for a real 76).
+
+**Close by:** re-zipping them as proper EPUBs (mimetype stored first,
+uncompressed) or discarding them. Opening one to "confirm the failure mode" is
+no longer a useful step — the branch above is unambiguous.
+
 
 ### [B-031] Thirteen more bare `new`, all on the EPUB reading path — FIXED 2026-08-18
 **severity: high · scope: memory safety · found + fixed 2026-08-18**

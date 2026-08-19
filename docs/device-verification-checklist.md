@@ -188,6 +188,13 @@ Not part of the staged-bin step, by the same ruling. When a card is in hand:
 - If you copied fonts from macOS: `find /Volumes/<CARD>/.fonts -name '._*'
   -delete && sync`.
 
+## 6a. Swap the exploded books, while the card is mounted
+
+**Closes [B-003].** The card holds ten `*.epub` DIRECTORIES, which the file
+browser walks into as folders and can never open. Proper archives of all ten are
+at `~/src/crosspoint-books/_rezipped/` (re-zipped and verified 2026-08-19).
+Delete the directories, copy the files, and the entry closes.
+
 ## Not on this list
 
 **[B-003]**, the ten exploded `.epub` directories, is a content decision — re-zip
