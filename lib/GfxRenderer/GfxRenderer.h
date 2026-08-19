@@ -485,9 +485,15 @@ class GfxRenderer {
   std::vector<std::string> wrappedText(int fontId, const char* text, int maxWidth, int maxLines,
                                        EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
 
-  // Helper for drawing rotated text (90 degrees clockwise, for side buttons)
+  // Helper for drawing rotated text (90 degrees clockwise, for side buttons).
+  // NB the name is the transform, and the page must be turned CLOCKWISE to read
+  // what this draws.
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,
                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  // Its 180-degree mirror: the run descends the page and reads when the page is
+  // turned COUNTER-clockwise, which is how a clockwise-rotated page is drawn.
+  void drawTextRotated90CCW(int fontId, int x, int y, const char* text, bool black = true,
+                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   int getTextHeight(int fontId) const;
 
   // Grayscale functions

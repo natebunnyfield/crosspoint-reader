@@ -747,6 +747,15 @@ int main() {
   renderFlatBoldName();
   writeMonoPortraitBmp("fs_/wide_named_inline_bold.bmp", renderer);
 
+  // Probe: the new CCW primitive against its CW twin, same anchor.
+  renderer.clearScreen(0xFF);
+  renderer.drawText(FONT, 20, 20, "upright");
+  renderer.drawTextRotated90CW(FONT, 80, 400, "CW call");
+  renderer.drawTextRotated90CCW(FONT, 300, 400, "CCW call");
+  renderer.drawLine(80, 400, 120, 400, 1, true);
+  renderer.drawLine(300, 400, 340, 400, 1, true);
+  writeMonoPortraitBmp("fs_/rot2probe.bmp", renderer);
+
   renderFlatKeyBlock();
   writeMonoPortraitBmp("fs_/wide_key_block.bmp", renderer);
 

@@ -319,7 +319,12 @@ static AlignedMemRect screenRectToAlignedMemRect(GfxRenderer::Orientation orient
   return out;
 }
 
-enum class TextRotation { None, Rotated90CW };
+// Rotated90CW draws COUNTER-clockwise content: the run climbs toward -y and the
+// page must be turned clockwise to read it. Rotated90CCW is its 180-degree
+// mirror -- the run descends toward +y and the page is turned counter-clockwise
+// -- which is what a CLOCKWISE-rotated page (a wide table, T-021) is made of.
+// The names describe the glyph transform; the reader's turn is the opposite one.
+enum class TextRotation { None, Rotated90CW, Rotated90CCW };
 
 // Glyph plotting target. `deviceSpace` is only ever true when a hi-res
 // companion face is in play (RENDER_SCALE > 1): the glyph bitmap is already
@@ -456,6 +461,12 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     if (!glyphInBand<deviceSpace>(renderer, ob, ib - (width - 1), ob + height - 1, ib)) {
       return;
     }
+  } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+    const int ob = cursorX - (fontData->ascender - top) - (height - 1);
+    const int ib = cursorY + left;
+    if (!glyphInBand<deviceSpace>(renderer, ob, ib, ob + height - 1, ib + (width - 1))) {
+      return;
+    }
   } else {
     const int gx0 = cursorX + left;
     const int gy0 = cursorY - top;
@@ -473,6 +484,11 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     if constexpr (rotation == TextRotation::Rotated90CW) {
       outerBase = cursorX + fontData->ascender - top;  // screenX = outerBase + glyphY
       innerBase = cursorY - left;                      // screenY = innerBase - glyphX
+    } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+      // The 180-degree mirror of the CW case: both glyph axes reverse, so the
+      // band grows the other way and the run descends instead of climbing.
+      outerBase = cursorX - (fontData->ascender - top);  // screenX = outerBase - glyphY
+      innerBase = cursorY + left;                        // screenY = innerBase + glyphX
     } else {
       outerBase = cursorY - top;   // screenY = outerBase + glyphY
       innerBase = cursorX + left;  // screenX = innerBase + glyphX
@@ -490,12 +506,15 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
                                                                              : 0;
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
-        const int outerCoord = outerBase + glyphY;
+        const int outerCoord = (rotation == TextRotation::Rotated90CCW) ? (outerBase - glyphY) : (outerBase + glyphY);
         for (int glyphX = 0; glyphX < width; glyphX++, pixelPosition++) {
           int screenX, screenY;
           if constexpr (rotation == TextRotation::Rotated90CW) {
             screenX = outerCoord;
             screenY = innerBase - glyphX;
+          } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+            screenX = outerCoord;
+            screenY = innerBase + glyphX;
           } else {
             screenX = innerBase + glyphX;
             screenY = outerCoord;
@@ -528,12 +547,15 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     } else {
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
-        const int outerCoord = outerBase + glyphY;
+        const int outerCoord = (rotation == TextRotation::Rotated90CCW) ? (outerBase - glyphY) : (outerBase + glyphY);
         for (int glyphX = 0; glyphX < width; glyphX++, pixelPosition++) {
           int screenX, screenY;
           if constexpr (rotation == TextRotation::Rotated90CW) {
             screenX = outerCoord;
             screenY = innerBase - glyphX;
+          } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+            screenX = outerCoord;
+            screenY = innerBase + glyphX;
           } else {
             screenX = innerBase + glyphX;
             screenY = outerCoord;
@@ -2825,6 +2847,113 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     }
 #endif
     renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, x, lastBaseY, black, style);
+    prevCp = cp;
+  }
+}
+
+// The 180-degree mirror of drawTextRotated90CW: the run DESCENDS the page and
+// the glyphs are turned the other way, so the page reads when it is turned
+// counter-clockwise -- i.e. this is what a clockwise-rotated PAGE is drawn with.
+// Added for T-021 (wide tables become a rotated full page); the harness had been
+// faking it by turning the whole framebuffer 180 degrees, which a page renderer
+// cannot do.
+void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int y, const char* text, const bool black,
+                                       const EpdFontFamily::Style style) const {
+  // Cannot draw a NULL / empty string
+  if (text == nullptr || *text == '\0') {
+    return;
+  }
+
+  // Route CJK-bearing strings to the fallback font (see resolveTextFontId).
+  const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  // Redirected to the SD fallback: batch-load the string's glyphs so the draw
+  // loop below doesn't fault them in one SD read at a time (#2725).
+  if (resolvedFontId != fontId) {
+    ensureSdGlyphsResident(resolvedFontId, text, style, false);
+  }
+  const auto fontIt = fontMap.find(resolvedFontId);
+  if (fontIt == fontMap.end()) {
+    LOG_ERR("GFX", "Font %d not found", resolvedFontId);
+    return;
+  }
+
+  const auto& font = fontIt->second;
+
+#if CROSSPOINT_RENDER_SCALE > 1
+  // Hi-res glyph blit, same contract as drawText(): `font` stays the ONLY
+  // source of metrics, so the cursor walk below is untouched and every glyph
+  // lands on exactly the logical pixel it would at scale 1. The companion face
+  // only supplies a denser bitmap, drawn on the device grid at
+  // (logical * RENDER_SCALE). No companion registered => the 1x glyph
+  // replicated, i.e. today's output. Without this the rotated side-button
+  // hints were the one piece of chrome text left pixel-doubled at 2x.
+  const EpdFontFamily* hiRes = getHiResFamily(resolvedFontId);
+#endif
+
+  int lastBaseY = y;
+  int lastBaseLeft = 0;
+  int lastBaseWidth = 0;
+  int lastBaseTop = 0;
+  int32_t prevAdvanceFP = 0;  // 12.4 fixed-point: prev glyph's advance + next kern for snap
+
+  uint32_t cp;
+  uint32_t prevCp = 0;
+  while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
+    // RTL vowel marks (Hebrew niqqud, Arabic harakat) ride the combining-mark
+    // path: zero-advance overlays on the preceding base glyph (applyBidiVisual
+    // emits base-then-marks per UAX#9 L3). anchorFor pins position-sensitive
+    // niqqud (dagesh, shin/sin dots, holam) to their spot on the base; other
+    // marks stay centered, raised above the base or (kasra) at their
+    // font-native position. Fonts without their glyphs — the built-ins — miss
+    // the getGlyph lookup and skip them, as before.
+    if (utf8IsCombiningMark(cp) || BidiUtils::isTransparentMark(cp)) {
+      const EpdGlyph* combiningGlyph = font.getGlyph(cp, style);
+      if (!combiningGlyph) continue;
+      const auto anchor = combiningMark::anchorFor(cp);
+      const int raiseBy =
+          combiningMark::raiseAboveBase(anchor, combiningGlyph->top, combiningGlyph->height, lastBaseTop);
+      const int combiningX = x + raiseBy;
+      // Marks reuse the CW anchor maths: the mark's offset from its base is the
+      // same magnitude, and the base's own coordinates already carry the
+      // direction, so no separate mirror is needed here.
+      const int combiningY = combiningMark::anchorOverRotated90CW(anchor, lastBaseY, lastBaseLeft, lastBaseWidth,
+                                                                  combiningGlyph->left, combiningGlyph->width);
+#if CROSSPOINT_RENDER_SCALE > 1
+      if (hiRes && hiRes->getGlyph(cp, style)) {
+        renderCharImpl<TextRotation::Rotated90CCW, true>(*this, renderMode, *hiRes, cp, combiningX * renderScale(),
+                                                         combiningY * renderScale(), black, style);
+        continue;
+      }
+#endif
+      renderCharImpl<TextRotation::Rotated90CCW>(*this, renderMode, font, cp, combiningX, combiningY, black, style);
+      continue;
+    }
+
+    cp = font.applyLigatures(cp, text, style);
+
+    // Differential rounding, as in the CW twin -- ADDING here, because this
+    // rotation runs the other way down the page.
+    if (prevCp != 0) {
+      const auto kernFP = font.getKerning(prevCp, cp, style);  // 4.4 fixed-point kern
+      lastBaseY += fp4::toPixel(prevAdvanceFP + kernFP);       // +: this run DESCENDS the page
+    }
+
+    const EpdGlyph* glyph = font.getGlyph(cp, style);
+
+    lastBaseLeft = glyph ? glyph->left : 0;
+    lastBaseWidth = glyph ? glyph->width : 0;
+    lastBaseTop = glyph ? glyph->top : 0;
+    prevAdvanceFP = glyph ? glyph->advanceX : 0;  // 12.4 fixed-point
+
+#if CROSSPOINT_RENDER_SCALE > 1
+    if (hiRes && hiRes->getGlyph(cp, style)) {
+      renderCharImpl<TextRotation::Rotated90CCW, true>(*this, renderMode, *hiRes, cp, x * renderScale(),
+                                                       lastBaseY * renderScale(), black, style);
+      prevCp = cp;
+      continue;
+    }
+#endif
+    renderCharImpl<TextRotation::Rotated90CCW>(*this, renderMode, font, cp, x, lastBaseY, black, style);
     prevCp = cp;
   }
 }
