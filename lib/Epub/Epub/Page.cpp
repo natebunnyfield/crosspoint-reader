@@ -81,6 +81,84 @@ std::unique_ptr<PageImage> PageImage::deserialize(HalFile& file) {
   return std::unique_ptr<PageImage>(new (std::nothrow) PageImage(std::move(ib), xPos, yPos));
 }
 
+void PageRotatedText::render(GfxRenderer& renderer, const int pageFontId, const int xOffset, const int yOffset) {
+  if (text.empty()) return;
+  const int useFont = fontId != 0 ? fontId : pageFontId;
+  // CCW is the transform that makes a CLOCKWISE-turned page -- see the note on
+  // GfxRenderer::drawTextRotated90CCW. The parser has already wrapped this line
+  // and chosen its landing spot, so there is nothing to measure here.
+  renderer.drawTextRotated90CCW(useFont, xPos + xOffset, yPos + yOffset, text.c_str(), true,
+                                bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+}
+
+bool PageRotatedText::serialize(HalFile& file) {
+  serialization::writePod(file, xPos);
+  serialization::writePod(file, yPos);
+  const uint8_t boldByte = bold ? 1 : 0;
+  serialization::writePod(file, boldByte);
+  serialization::writePod(file, fontId);
+  serialization::writeString(file, text);
+  return true;
+}
+
+std::unique_ptr<PageRotatedText> PageRotatedText::deserialize(HalFile& file) {
+  int16_t xPos = 0;
+  int16_t yPos = 0;
+  uint8_t boldByte = 0;
+  int32_t fontId = 0;
+  std::string text;
+  serialization::readPod(file, xPos);
+  serialization::readPod(file, yPos);
+  serialization::readPod(file, boldByte);
+  serialization::readPod(file, fontId);
+  serialization::readString(file, text);
+  if (text.empty()) {
+    LOG_ERR("PGE", "Deserialization failed: empty rotated text");
+    return nullptr;
+  }
+  auto* line = new (std::nothrow) PageRotatedText(std::move(text), boldByte != 0, fontId, xPos, yPos);
+  if (!line) {
+    LOG_ERR("PGE", "Deserialization failed: could not allocate PageRotatedText");
+    return nullptr;
+  }
+  return std::unique_ptr<PageRotatedText>(line);
+}
+
+void PageVerticalRule::render(GfxRenderer& renderer, const int fontId, const int xOffset, const int yOffset) {
+  (void)fontId;
+  if (length == 0 || thickness == 0) return;
+  renderer.drawLine(xPos + xOffset, yPos + yOffset, xPos + xOffset, yPos + yOffset + length - 1, thickness, true);
+}
+
+bool PageVerticalRule::serialize(HalFile& file) {
+  serialization::writePod(file, xPos);
+  serialization::writePod(file, yPos);
+  serialization::writePod(file, length);
+  serialization::writePod(file, thickness);
+  return true;
+}
+
+std::unique_ptr<PageVerticalRule> PageVerticalRule::deserialize(HalFile& file) {
+  int16_t xPos = 0;
+  int16_t yPos = 0;
+  uint16_t length = 0;
+  uint8_t thickness = 0;
+  serialization::readPod(file, xPos);
+  serialization::readPod(file, yPos);
+  serialization::readPod(file, length);
+  serialization::readPod(file, thickness);
+  if (length == 0 || thickness == 0) {
+    LOG_ERR("PGE", "Deserialization failed: invalid vertical rule (len=%u thick=%u)", length, thickness);
+    return nullptr;
+  }
+  auto* rule = new (std::nothrow) PageVerticalRule(length, thickness, xPos, yPos);
+  if (!rule) {
+    LOG_ERR("PGE", "Deserialization failed: could not allocate PageVerticalRule");
+    return nullptr;
+  }
+  return std::unique_ptr<PageVerticalRule>(rule);
+}
+
 void PageHorizontalRule::render(GfxRenderer& renderer, const int fontId, const int xOffset, const int yOffset) {
   (void)fontId;
   if (width == 0 || thickness == 0) {
@@ -206,6 +284,18 @@ std::unique_ptr<Page> Page::deserialize(HalFile& file) {
         return nullptr;
       }
       page->elements.push_back(std::move(pi));
+    } else if (tag == TAG_PageVerticalRule) {
+      auto rule = PageVerticalRule::deserialize(file);
+      if (!rule) {
+        return nullptr;
+      }
+      page->elements.push_back(std::move(rule));
+    } else if (tag == TAG_PageRotatedText) {
+      auto rot = PageRotatedText::deserialize(file);
+      if (!rot) {
+        return nullptr;
+      }
+      page->elements.push_back(std::move(rot));
     } else if (tag == TAG_PageHorizontalRule) {
       auto rule = PageHorizontalRule::deserialize(file);
       if (!rule) {

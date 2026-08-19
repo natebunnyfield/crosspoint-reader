@@ -462,6 +462,187 @@ void ChapterHtmlSlimParser::emitBufferedTableFlattened() {
   }
 }
 
+// --- T-021: the rotated page, and the key block it falls back to -----------
+//
+// Owner ruling 2026-08-19, against nine renders: a table that cannot be columns
+// upright becomes a CLOCKWISE-turned page of its own -- the columns get the
+// viewport's long axis instead of its short one -- and when even that will not
+// hold the table, the column names stack as a bold block with each row beneath
+// it as plain values.
+//
+// Landscape coordinates here mean: `across` runs along the reading direction and
+// `down` marches through the rows. They map onto the page as
+//   page x = down, page y = across
+// because drawTextRotated90CCW takes the band's x and the run's start y, and the
+// run descends the page. The parser owns all of this; PageRotatedText carries a
+// finished line and its landing spot, nothing more.
+bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
+  if (tableBuf.size() < 2) return false;
+
+  // 2px margins: a table that has already cost the reader a device turn should
+  // not also hand back a quarter of the axis it turned for (owner, 2026-08-19).
+  constexpr int kRotMargin = 2;
+  const int axis = viewportHeight - kRotMargin * 2;  // the long edge, reading direction
+  const int cross = viewportWidth - kRotMargin * 2;  // the short edge, row direction
+  // A size down from the body. Measured, not assumed: at the reading size a
+  // five-column table's own word-floors summed to 899px against 668 available,
+  // so "rotate it" without "and set it smaller" refuses tables that the renders
+  // showed fitting comfortably.
+  const int tableFont = smallFontId != 0 ? smallFontId : fontId;
+  const int lineHeight = renderer.getLineHeight(tableFont, lineCompression);
+  if (axis <= 0 || cross <= 0 || lineHeight <= 0) return false;
+
+  struct MeasureCtx {
+    ChapterHtmlSlimParser* self;
+  } ctx{this};
+  const auto measure = [](void* c, const char* text, const bool bold) {
+    auto* m = static_cast<MeasureCtx*>(c);
+    return m->self->renderer.getTextWidth(m->self->tableFontForRotation(), text,
+                                          bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+  };
+  const tablecolumns::Plan plan =
+      tablecolumns::planColumns(tableBuf, axis, renderer.getSpaceWidth(tableFont), measure, &ctx);
+  if (!plan.usable) return false;
+
+  // Lay the whole thing out FIRST, into a scratch list. Nothing is emitted until
+  // it is known to fit: a rotated table that ran off the page mid-way would have
+  // to be un-drawn, and there is no un-drawing a page.
+  struct Placed {
+    std::string text;
+    bool bold;
+    int across;
+    int down;
+  };
+  std::vector<Placed> placed;
+  placed.reserve(tableBuf.size() * plan.columnCount);
+  int ruleDown = -1;  // where the header rule goes, in row-axis pixels
+
+  const int rowGap = std::max(2, lineHeight / 4);
+  int down = kRotMargin;
+  for (size_t r = 0; r < tableBuf.size(); r++) {
+    const bool headerRow = (r == 0) && tableBufHasHeader;
+    int rowBottom = down;
+    for (size_t c = 0; c < tableBuf[r].size() && c < plan.columnCount; c++) {
+      const std::string cell = tablecolumns::cellText(tableBuf[r][c]);
+      if (cell.empty()) continue;
+      int lineDown = down;
+      for (const auto& line : renderer.wrappedText(tableFont, cell.c_str(), plan.w[c], 8,
+                                                   headerRow ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR)) {
+        placed.push_back(Placed{line, headerRow, kRotMargin + plan.x[c], lineDown});
+        lineDown += lineHeight;
+      }
+      rowBottom = std::max(rowBottom, lineDown);
+    }
+    down = rowBottom + rowGap;
+    if (headerRow) {
+      ruleDown = down;
+      down += 2 + rowGap;  // the rule's thickness, and air under it
+    }
+    // One page only. A rotated table spanning pages would ask the reader to turn
+    // the device back and forth mid-table; the key block is the better answer,
+    // and this is the check that chooses it.
+    if (down > cross) return false;
+  }
+
+  // It fits. Give it a page of its own -- a rotated table sharing a page with
+  // upright prose would be unreadable in both orientations at once.
+  if (currentPage && !currentPage->elements.empty()) {
+    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
+    completedPageCount++;
+    currentPage.reset();
+  }
+  if (!currentPage) {
+    currentPage = makeUniqueNoThrow<Page>();
+    if (!currentPage) {
+      noteAllocationFailure("Page for a rotated table");
+      return true;  // emitted nothing, but the parse is over either way
+    }
+    currentPageNextY = 0;
+  }
+
+  for (const Placed& item : placed) {
+    // Two mappings, both learned from the render rather than from the maths:
+    //
+    //  * the ROW axis is inverted. Page x grows the way the reader's view moves
+    //    UP once the device is turned, so a row `down` pixels from the top of
+    //    the table sits at viewportWidth - down. Without this the header prints
+    //    at the foot of the page and the rows read bottom-to-top.
+    //  * x is the band's RIGHT edge for this call (the CW twin takes a left
+    //    edge), so no line-height is added here; the subtraction already lands
+    //    the band where it belongs.
+    const int pageX = viewportWidth - kRotMargin - item.down;
+    auto element = std::shared_ptr<PageRotatedText>(
+        new (std::nothrow) PageRotatedText(item.text, item.bold, static_cast<int32_t>(tableFont),
+                                           static_cast<int16_t>(pageX), static_cast<int16_t>(item.across)));
+    if (!element) {
+      noteAllocationFailure("a rotated table line");
+      return true;
+    }
+    currentPage->elements.push_back(std::move(element));
+  }
+  // The one rule the ruling asks for, under the header. In the reader's turned
+  // view it runs along the reading direction, which on the upright page is a
+  // VERTICAL line -- drawn as a rule of zero-ish width would be invisible, so it
+  // is a line element rather than a PageHorizontalRule.
+  if (ruleDown >= 0) {
+    const int16_t ruleX = static_cast<int16_t>(viewportWidth - kRotMargin - ruleDown);
+    const int16_t ruleLen =
+        static_cast<int16_t>(plan.x[plan.columnCount - 1] + plan.w[plan.columnCount - 1] + kRotMargin);
+    auto rule = std::shared_ptr<PageVerticalRule>(new (std::nothrow) PageVerticalRule(
+        static_cast<uint16_t>(std::max<int16_t>(1, ruleLen)), 2, ruleX, static_cast<int16_t>(kRotMargin)));
+    if (rule) {
+      currentPage->elements.push_back(std::move(rule));
+    }
+  }
+
+  currentPageNextY = static_cast<int16_t>(viewportHeight);  // the page is spoken for
+  tableEmittedDataCell = true;
+  completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
+  completedPageCount++;
+  currentPage.reset();
+  currentPageNextY = 0;
+  return true;
+}
+
+// The ruled fallback: the names once, as a block, then every row identical.
+void ChapterHtmlSlimParser::emitBufferedTableKeyBlock() {
+  if (tableBuf.empty()) return;
+
+  auto blockStyle = [this] {
+    auto style = BlockStyle();
+    style.textAlignDefined = true;
+    style.alignment = (paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
+                          ? CssTextAlign::Left
+                          : static_cast<CssTextAlign>(paragraphAlignment);
+    return style;
+  };
+
+  if (tableBufHasHeader) {
+    for (const tablecolumns::Cell& cell : tableBuf.front()) {
+      const std::string name = tablecolumns::cellText(cell);
+      if (name.empty()) continue;
+      startNewTextBlock(blockStyle());
+      nextWordContinues = false;
+      emitStyledText(name, true, false);
+      nextWordContinues = false;
+      makePages();
+    }
+  }
+
+  for (size_t r = tableBufHasHeader ? 1 : 0; r < tableBuf.size(); r++) {
+    for (const tablecolumns::Cell& cell : tableBuf[r]) {
+      startNewTextBlock(blockStyle());
+      nextWordContinues = false;
+      for (const tablecolumns::Run& run : cell) {
+        emitStyledText(run.text, run.bold, run.italic);
+      }
+      nextWordContinues = false;
+      makePages();
+      tableEmittedDataCell = true;
+    }
+  }
+}
+
 int ChapterHtmlSlimParser::measureRowHeight(const tablecolumns::Row& row, const tablecolumns::Plan& plan,
                                             const bool headerRow) const {
   const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
@@ -1852,8 +2033,10 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
 
       if (plan.usable) {
         self->emitBufferedTableAsColumns(plan);
-      } else {
-        self->emitBufferedTableFlattened();
+      } else if (!self->emitBufferedTableRotated()) {
+        // Ruled fallback order (T-021): columns upright, else a clockwise page,
+        // else the key block. The old repeat-the-name-per-cell form is retired.
+        self->emitBufferedTableKeyBlock();
       }
       self->tableBuf.clear();
       self->tableBufBytes = 0;

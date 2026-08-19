@@ -425,6 +425,7 @@ ReaderRenderSpec CrossPointSettings::readerRenderSpec(const uint16_t viewportWid
                                                       const uint16_t viewportHeight) const {
   ReaderRenderSpec spec;
   spec.fontId = getReaderFontId();
+  spec.smallFontId = getSmallestReaderFontId();
   spec.lineCompression = getReaderLineCompression();
   spec.extraParagraphSpacing = extraParagraphSpacing != 0;
   spec.paragraphAlignment = paragraphAlignment;
@@ -482,6 +483,19 @@ void CrossPointSettings::clearSdFontFamily() {
   // resolved point size has to move onto the built-in ramp.
   fontPointSize = pointSizeForSlot(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), fontSizeSlot);
   saveToFile();
+}
+
+int CrossPointSettings::getSmallestReaderFontId() const {
+  // SD families: ask the resolver for the smallest point size the family has,
+  // walking up only until something resolves. Built-ins: 12 is the floor of
+  // BUILTIN_READER_POINT_SIZES and always registered.
+  if (sdFontFamilyName[0] != '\0' && sdFontIdResolver) {
+    for (const uint8_t pt : BUILTIN_READER_POINT_SIZES) {
+      const int id = sdFontIdResolver(sdFontResolverCtx, sdFontFamilyName, pt);
+      if (id != 0) return id;
+    }
+  }
+  return LIBREFRANKLIN_READER_12_FONT_ID;
 }
 
 int CrossPointSettings::getReaderFontId() const {

@@ -76,11 +76,14 @@ TEST(TableColumns, RefusesWhenSqueezingWouldGoBelowTheFloor) {
   // 100px viewport: one 12px gutter leaves 88 for two columns whose floor is
   // 48 each. 96 > 88, so there is no arrangement that clears the floor.
   const Plan p = planColumns(rows, 100, kSpace, fakeMeasure, nullptr);
-  EXPECT_FALSE(p.usable) << "too narrow for columns; the caller must flatten";
+  EXPECT_FALSE(p.usable) << "too narrow for columns; the caller rotates instead";
 
-  // And the boundary the other way: 108 available is exactly two floors plus
-  // the gutter, so it squeezes rather than refusing.
-  EXPECT_TRUE(planColumns(rows, 120, kSpace, fakeMeasure, nullptr).usable);
+  // 120 was ACCEPTED before the widest-word floor existed, because 48+48+12
+  // fits. It is refused now, and it should be: "heading" alone is 72px in this
+  // metric, so a 48px column would not wrap it, it would overflow into the
+  // neighbouring column. That shipped once and printed five columns on top of
+  // each other.
+  EXPECT_FALSE(planColumns(rows, 120, kSpace, fakeMeasure, nullptr).usable);
 }
 
 TEST(TableColumns, RefusesARaggedTable) {
@@ -124,4 +127,33 @@ TEST(TableColumns, RunsAreJoinedInOrder) {
   // Qualified: inside a TEST body, `Run` would resolve to testing::Test::Run.
   const Cell c{tablecolumns::Run{"HMS ", false, false}, tablecolumns::Run{"Beagle", false, true}};
   EXPECT_EQ(cellText(c), "HMS Beagle");
+}
+
+TEST(TableColumns, NoColumnIsEverNarrowerThanItsLongestWord) {
+  // The overlap bug, stated as an invariant. A word cannot be split by the line
+  // breaker, so a column narrower than its longest word does not wrap -- it
+  // draws past its own edge and over the next column's text.
+  const auto rows = table({{"Expedition", "Commander", "Departed", "Returned", "Crew"},
+                           {"Beagle, second survey", "Robert FitzRoy", "December 1831", "October 1836", "74"},
+                           {"Challenger", "George Nares", "December 1872", "May 1876", "243"}});
+
+  for (int viewport = 200; viewport <= 900; viewport += 20) {
+    const Plan p = planColumns(rows, viewport, kSpace, fakeMeasure, nullptr);
+    if (!p.usable) continue;
+    for (size_t c = 0; c < p.columnCount; c++) {
+      int longestWord = 0;
+      for (const auto& row : rows) {
+        const std::string text = cellText(row[c]);
+        size_t start = 0;
+        while (start <= text.size()) {
+          const size_t space = text.find(' ', start);
+          const std::string word = text.substr(start, space == std::string::npos ? std::string::npos : space - start);
+          if (!word.empty()) longestWord = std::max(longestWord, fakeMeasure(nullptr, word.c_str(), false));
+          if (space == std::string::npos) break;
+          start = space + 1;
+        }
+      }
+      EXPECT_GE(p.w[c], longestWord) << "column " << c << " at viewport " << viewport << " would overflow";
+    }
+  }
 }

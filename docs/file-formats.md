@@ -96,6 +96,14 @@ Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
 current reader settings, the section is discarded and rebuilt.
 
+Version 37 adds a fourth page-element tag, `TAG_PageRotatedText = 4`: one
+already-wrapped line of a table shown on a clockwise-turned page (T-021), stored
+as x, y, a bold byte and the string. Tags are appended, never renumbered, so a
+v36 cache read by v37 code would still parse — the version is bumped anyway
+because the LAYOUT decision changed: a wide table that used to flatten now
+becomes a rotated page, or the key-block form, and a cached section would
+otherwise keep the old shape forever.
+
 Version 36 is binary-identical to version 35 — no field changed. It was bumped
 because table LAYOUT changed: a table that plans as columns is now emitted as
 columns with a rule under the header row, instead of one paragraph per cell in

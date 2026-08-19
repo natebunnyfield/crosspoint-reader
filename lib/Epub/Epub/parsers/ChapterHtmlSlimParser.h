@@ -59,6 +59,9 @@ class ChapterHtmlSlimParser {
   std::unique_ptr<Page> currentPage = nullptr;
   int16_t currentPageNextY = 0;
   int fontId;
+  // The smallest cut of the same family, for the rotated table page (T-021).
+  // Zero means "no smaller face" and the reading size is used.
+  int smallFontId = 0;
   float lineCompression;
   bool extraParagraphSpacing;
   uint8_t paragraphAlignment;
@@ -135,6 +138,15 @@ class ChapterHtmlSlimParser {
   void appendTableText(const char* text, int len);
   void emitBufferedTableFlattened();
   void emitBufferedTableAsColumns(const tablecolumns::Plan& plan);
+  // T-021. A table too wide for the upright page becomes a page of its own,
+  // turned clockwise, so the columns get the long axis. Returns false when it
+  // does not fit even rotated -- the caller then emits the key-block form,
+  // which is the ruled fallback. Nothing is emitted on a false return.
+  bool emitBufferedTableRotated();
+  // The face a rotated table is measured and drawn in: a size down when the
+  // family has one, the reading face otherwise.
+  int tableFontForRotation() const { return smallFontId != 0 ? smallFontId : fontId; }
+  void emitBufferedTableKeyBlock();
   void emitStyledText(const std::string& text, bool bold, bool italic);
   // Height a row needs, in pixels, at the planned column widths. Used BEFORE
   // anything is emitted: a row taller than a page means columns are abandoned
@@ -199,9 +211,9 @@ class ChapterHtmlSlimParser {
  public:
   explicit ChapterHtmlSlimParser(
       std::shared_ptr<Epub> epub, const std::string& filepath, GfxRenderer& renderer, const int fontId,
-      const float lineCompression, const bool extraParagraphSpacing, const uint8_t paragraphAlignment,
-      const uint16_t viewportWidth, const uint16_t viewportHeight, const bool hyphenationEnabled,
-      const bool focusReadingEnabled,
+      const int smallFontId, const float lineCompression, const bool extraParagraphSpacing,
+      const uint8_t paragraphAlignment, const uint16_t viewportWidth, const uint16_t viewportHeight,
+      const bool hyphenationEnabled, const bool focusReadingEnabled,
       const std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t, uint32_t)>& completePageFn,
       const bool embeddedStyle, const std::string& contentBase, const std::string& imageBasePath,
       const uint8_t imageRendering = 0, std::vector<std::string> tocAnchors = {},
@@ -211,6 +223,7 @@ class ChapterHtmlSlimParser {
         filepath(filepath),
         renderer(renderer),
         fontId(fontId),
+        smallFontId(smallFontId),
         lineCompression(lineCompression),
         extraParagraphSpacing(extraParagraphSpacing),
         paragraphAlignment(paragraphAlignment),

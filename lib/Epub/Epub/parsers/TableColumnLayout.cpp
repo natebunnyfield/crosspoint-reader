@@ -52,12 +52,29 @@ Plan planColumns(const std::vector<Row>& rows, const int viewportWidth, const in
   }
 
   int natural[kMaxColumns] = {};
+  // The widest single WORD a column contains. This is the real floor: the line
+  // breaker cannot split a word, so a column narrower than its longest word does
+  // not wrap -- it OVERFLOWS, and the overflow lands on top of the next column.
+  // That shipped once, and the render is unmistakable: five columns of a wide
+  // table printed over each other. A generic minimum width cannot catch it,
+  // because the offending word is different in every table.
+  int widestWord[kMaxColumns] = {};
   for (size_t c = 0; c < columnCount; c++) {
     for (size_t r = 0; r < rows.size(); r++) {
       const std::string text = cellText(rows[r][c]);
       if (text.empty()) continue;
-      const int w = measureText(ctx, text.c_str(), r == 0);  // header row is bold, and bold is wider
-      natural[c] = std::max(natural[c], w + kColumnSlack);
+      const bool bold = (r == 0);  // the header row is bold, and bold is wider
+      natural[c] = std::max(natural[c], measureText(ctx, text.c_str(), bold) + kColumnSlack);
+      size_t start = 0;
+      while (start <= text.size()) {
+        const size_t space = text.find(' ', start);
+        const std::string word = text.substr(start, space == std::string::npos ? std::string::npos : space - start);
+        if (!word.empty()) {
+          widestWord[c] = std::max(widestWord[c], measureText(ctx, word.c_str(), bold) + kColumnSlack);
+        }
+        if (space == std::string::npos) break;
+        start = space + 1;
+      }
     }
   }
 
@@ -77,13 +94,24 @@ Plan planColumns(const std::vector<Row>& rows, const int viewportWidth, const in
     for (size_t c = 0; c < columnCount; c++) width[c] = natural[c];
     int over = total - avail;
     while (over > 0) {
-      size_t widest = 0;
-      for (size_t c = 1; c < columnCount; c++) {
-        if (width[c] > width[widest]) widest = c;
+      // The widest column WITH ROOM LEFT, not simply the widest. Giving up the
+      // moment the widest column reaches its floor refuses tables that fit
+      // comfortably once a different column gives ground -- which is how a
+      // five-column table that fits the rotated page was still being sent to
+      // the fallback.
+      size_t widest = columnCount;
+      int widestWidth = 0;
+      for (size_t c = 0; c < columnCount; c++) {
+        const int floor = std::max(kMinColumnWidth, widestWord[c]);
+        if (width[c] <= floor) continue;
+        if (widest == columnCount || width[c] > widestWidth) {
+          widest = c;
+          widestWidth = width[c];
+        }
       }
-      const int room = width[widest] - kMinColumnWidth;
-      if (room <= 0) return plan;  // nothing left to give: flatten instead
-      const int take = std::min(room, over);
+      if (widest == columnCount) return plan;  // every column is at its floor
+      const int floor = std::max(kMinColumnWidth, widestWord[widest]);
+      const int take = std::min(width[widest] - floor, over);
       width[widest] -= take;
       over -= take;
     }
@@ -91,6 +119,7 @@ Plan planColumns(const std::vector<Row>& rows, const int viewportWidth, const in
 
   for (size_t c = 0; c < columnCount; c++) {
     if (width[c] < kMinColumnWidth) return plan;
+    if (width[c] < widestWord[c]) return plan;  // would overflow into its neighbour
   }
 
   plan.usable = true;

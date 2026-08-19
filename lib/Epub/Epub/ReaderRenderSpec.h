@@ -12,6 +12,11 @@
 // backstop (a 0x0 viewport lays out nothing), not an invitation to omit it.
 struct ReaderRenderSpec {
   int fontId = 0;
+  // The SMALLEST size the current reading family offers. Used only by the
+  // rotated table page (T-021): a wide table is set a size down, because at the
+  // reading size it does not fit even turned -- measured, not assumed, on a
+  // five-column table whose column floors summed to 899px against 668 available.
+  int smallFontId = 0;
   float lineCompression = 1.0f;
   bool extraParagraphSpacing = false;
   uint8_t paragraphAlignment = 0;

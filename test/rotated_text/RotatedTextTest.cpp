@@ -162,3 +162,15 @@ TEST_F(RotatedText, NeitherRotationWritesOutsideTheScreen) {
   drawAndMeasure(&GfxRenderer::drawTextRotated90CCW, 100, 400);
   EXPECT_EQ(GfxRenderer::outOfRangeCount(), 0u);
 }
+
+TEST_F(RotatedText, TheAnchorsAreMirroredToo) {
+  // Not just the glyphs: CW hangs its band to the RIGHT of x and CCW to the
+  // LEFT, because the whole mapping is rotated 180 degrees. A caller that
+  // assumes both take a left edge draws the CCW band off the page — which is
+  // how the first rotated table page rendered 11,197 out-of-range pixels.
+  const int bandX = 200;
+  const Box cw = drawAndMeasure(&GfxRenderer::drawTextRotated90CW, bandX, 400);
+  const Box ccw = drawAndMeasure(&GfxRenderer::drawTextRotated90CCW, bandX, 300);
+  EXPECT_GE(cw.x0, bandX - 2) << "CW ink should sit at or right of its anchor";
+  EXPECT_LE(ccw.x1, bandX + 2) << "CCW ink should sit at or left of its anchor";
+}

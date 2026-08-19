@@ -428,6 +428,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     return (shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP) ? 10 : 400;
   }
   int getReaderFontId() const;
+  // The smallest cut of the SAME family the reader is using. Falls back to the
+  // reading font itself when the family has nothing smaller.
+  int getSmallestReaderFontId() const;
 
   // Drop the SD font selection and fall back to the built-in family. The reader
   // point size comes back into BUILTIN_READER_POINT_SIZES with it, since that is
