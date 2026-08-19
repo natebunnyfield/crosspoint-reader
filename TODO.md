@@ -87,56 +87,6 @@ link).
 enough detail to trace. Separate from [T-008], which covers the 2026-08-06
 backlog; this is one named commit.
 
-### [T-014] Sibling-fork improvements, as reviewable PRs
-**scope: upstream-adjacent · opened 2026-08-15 · STARTED, owner ruling 2026-08-17**
-
-**The matcha half is AUDITED and mostly closed, 2026-08-18 — full write-up in
-[docs/matcha-heap-audit.md](docs/matcha-heap-audit.md).** Five of the six named
-items are done with: `hasContent` does not exist here, the indexing patch is
-vertical-writing code we do not have, the history fix needs a reading-stats
-subsystem we do not have, the cover-thumbnail lock is not on our path, and the
-reader-settings OOM fix is a shape `rebuildSettingsLists()` already has. Only
-"font cache freed before settings save" survives, and it needs a heap
-MEASUREMENT at the five `saveToFile()` sites before it needs a patch.
-
-**Correcting this entry's own framing while here:** "only 31 behind upstream"
-measures matcha against UPSTREAM, not against us. Against us it is 517 ahead /
-673 behind, and it contains whole subsystems this fork never had. Give every
-remaining fork on the list a "does this code even exist here" pass before
-reading its commits as candidates.
-
-**Owner ruling 2026-08-17: start here, and start with the matcha heap series.**
-Asked as "what do I pick up next" against T-012 (tables) and a tidy/device-prep
-pass; the heap/OOM work won because it is real crash fixes against the 380 KB
-ceiling, it can be verified correct on a host, and matcha is only 31 behind
-upstream so the hunks still apply. T-012 stays open and unstarted.
-
-From [docs/fork-ecosystem.md](docs/fork-ecosystem.md), which surveyed 1,443
-forks. Bring the worthwhile work across as **several small PRs for review** —
-one concern each, not one large drop. Per `docs/fork-sync.md`: per commit, live
-hunks only.
-
-Named forks, in the owner's order:
-
-| Fork | What to mine |
-|---|---|
-| `eszter007/matcha-reader` | The heap/OOM series — EPUB indexing pressure, reader-settings OOM, font cache freed before a settings save, per-call allocation out of `HalStorage::hasContent`, history bounded by memory, cover thumbnails without HAL power locks. Richest vein, and only 31 behind upstream. |
-| `uxjulia/CrossInk` | Table rendering + colSpan (feeds T-012). Skip themes, carousels, tilt and touch. Its progressive-JPEG work was checked under T-015 and is already present here — do not re-propose. |
-| `folio-etc/folio` | 1-bit `.cpfont` packing (feeds T-013); font budgets during heavy activities; power-button claiming and button-hint rendering (T-011 removed ours; folio's approach is still the reference if hints ever return). |
-| `0x1abin/crossmux` | Low-heap crash fixes — EPUB footnote allocation, web settings heap exhaustion. Skip the Apps hub and mini-games. |
-| `zrn-ns/crosspoint-jp` | The `abort()` on page-turning very long CJK paragraphs. Skip vertical writing. |
-| `franssjz/cpr-vcodex` | Progressive EPUB indexing. Skip KOReader profiles, flashcards, dashboards. |
-
-**Do not re-propose** the four already checked and present: CrossInk's progressive
-JPEG cover support ([docs/progressive-jpeg.md](docs/progressive-jpeg.md)), HTML 4.01 entities
-(all 252 in `htmlEntities.cpp`), `<hr>` (handled at
-`ChapterHtmlSlimParser.cpp:601` and `:992`), the hidden-file toggle
-(`FileBrowserActivity.h:31`).
-
-**Done looks like:** one branch + PR per concern, each building `-e default`
-AND `-e simulator` from a cold cache, each stating what was verified on host
-and what still needs the device.
-
 ### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
 **scope: verification · opened 2026-08-07**
 
@@ -236,6 +186,84 @@ the cheap version and needs no keychain.
 ---
 
 ## Finished
+
+### [T-014] Sibling-fork improvements — AUDITED, one ported, 2026-08-19
+**scope: upstream-adjacent · opened 2026-08-15 · closed 2026-08-19**
+
+**All six forks are audited.** matcha in
+[docs/matcha-heap-audit.md](docs/matcha-heap-audit.md) (five of six items N/A,
+one closed by measurement), the other five in
+[docs/fork-audits.md](docs/fork-audits.md).
+
+**What actually came across: one commit.** crosspoint-jp's CSS-parse heap floor.
+`CssParser` here capped the rule COUNT and refused to START parsing below 64 KB,
+but nothing checked the heap between those points — and under `-fno-exceptions`
+the map insert aborts rather than fails. Both registration paths now carry a
+32 KB floor.
+
+**Everything else was already here, ruled out, or written against code this fork
+does not have:** vertical writing (crosspoint-jp's CJK abort), a diverged line
+breaker (crossmux), OPDS and Calibre (crossmux again), a progressive indexer this
+fork already implements another way (cpr-vcodex), 1-bit font packing ruled out by
+[T-013] (folio), and table work superseded by [T-012] and [T-021] (CrossInk).
+
+**The audit's own finding, filed as [B-032]:** the B-030/B-031 sweeps covered
+explicit `new` and not container growth, and a failed `reserve()` aborts exactly
+the same way.
+
+**Closed rather than left open for "more PRs".** The premise — that these forks
+hold a queue of work worth importing — was tested against all six and did not
+hold. Re-open it when a specific commit is named, not as a standing task.
+
+**Original entry follows.**
+
+**The matcha half is AUDITED and mostly closed, 2026-08-18 — full write-up in
+[docs/matcha-heap-audit.md](docs/matcha-heap-audit.md).** Five of the six named
+items are done with: `hasContent` does not exist here, the indexing patch is
+vertical-writing code we do not have, the history fix needs a reading-stats
+subsystem we do not have, the cover-thumbnail lock is not on our path, and the
+reader-settings OOM fix is a shape `rebuildSettingsLists()` already has. Only
+"font cache freed before settings save" survives, and it needs a heap
+MEASUREMENT at the five `saveToFile()` sites before it needs a patch.
+
+**Correcting this entry's own framing while here:** "only 31 behind upstream"
+measures matcha against UPSTREAM, not against us. Against us it is 517 ahead /
+673 behind, and it contains whole subsystems this fork never had. Give every
+remaining fork on the list a "does this code even exist here" pass before
+reading its commits as candidates.
+
+**Owner ruling 2026-08-17: start here, and start with the matcha heap series.**
+Asked as "what do I pick up next" against T-012 (tables) and a tidy/device-prep
+pass; the heap/OOM work won because it is real crash fixes against the 380 KB
+ceiling, it can be verified correct on a host, and matcha is only 31 behind
+upstream so the hunks still apply. T-012 stays open and unstarted.
+
+From [docs/fork-ecosystem.md](docs/fork-ecosystem.md), which surveyed 1,443
+forks. Bring the worthwhile work across as **several small PRs for review** —
+one concern each, not one large drop. Per `docs/fork-sync.md`: per commit, live
+hunks only.
+
+Named forks, in the owner's order:
+
+| Fork | What to mine |
+|---|---|
+| `eszter007/matcha-reader` | The heap/OOM series — EPUB indexing pressure, reader-settings OOM, font cache freed before a settings save, per-call allocation out of `HalStorage::hasContent`, history bounded by memory, cover thumbnails without HAL power locks. Richest vein, and only 31 behind upstream. |
+| `uxjulia/CrossInk` | Table rendering + colSpan (feeds T-012). Skip themes, carousels, tilt and touch. Its progressive-JPEG work was checked under T-015 and is already present here — do not re-propose. |
+| `folio-etc/folio` | 1-bit `.cpfont` packing (feeds T-013); font budgets during heavy activities; power-button claiming and button-hint rendering (T-011 removed ours; folio's approach is still the reference if hints ever return). |
+| `0x1abin/crossmux` | Low-heap crash fixes — EPUB footnote allocation, web settings heap exhaustion. Skip the Apps hub and mini-games. |
+| `zrn-ns/crosspoint-jp` | The `abort()` on page-turning very long CJK paragraphs. Skip vertical writing. |
+| `franssjz/cpr-vcodex` | Progressive EPUB indexing. Skip KOReader profiles, flashcards, dashboards. |
+
+**Do not re-propose** the four already checked and present: CrossInk's progressive
+JPEG cover support ([docs/progressive-jpeg.md](docs/progressive-jpeg.md)), HTML 4.01 entities
+(all 252 in `htmlEntities.cpp`), `<hr>` (handled at
+`ChapterHtmlSlimParser.cpp:601` and `:992`), the hidden-file toggle
+(`FileBrowserActivity.h:31`).
+
+**Done looks like:** one branch + PR per concern, each building `-e default`
+AND `-e simulator` from a cold cache, each stating what was verified on host
+and what still needs the device.
+
 
 ### [T-021] Wide tables: rotate the page, fall back to a key block — SHIPPED 2026-08-19
 **scope: reader · ruled + shipped 2026-08-19 · `6e357bead` + `d7ea20c86`**

@@ -34,6 +34,39 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-032] A failed `reserve()` aborts exactly like a bare `new`
+**severity: medium · scope: memory safety · found 2026-08-19 by the fork audit**
+
+[B-030] and [B-031] swept every explicit `new` out of the fallible paths. They
+did not touch CONTAINER growth, which has the same failure: `-fno-exceptions`
+makes `std::vector::reserve()` and `push_back()` abort on OOM rather than fail,
+so the sweep closed one door and left another open beside it.
+
+Found while auditing `0x1abin/crossmux`, whose layout-OOM fix exists precisely
+because this bites (see [fork-audits.md](docs/fork-audits.md)). Their patch does
+not apply — their line breaker diverged — but the premise does.
+
+Where it matters most, because the size comes from the content rather than from
+a constant:
+
+| Site | Sized from |
+|---|---|
+| `ParsedText.cpp:153` `codepoints.reserve(text.size())` | the paragraph's byte length |
+| `ParsedText.cpp:170` `allowedOffsets.reserve(...)` | codepoint count |
+| `ParsedText.cpp:329-331` the parallel word arrays | token count, doubling |
+
+A long paragraph in a tight heap is the shape that fires it, which is exactly
+what crosspoint-jp's CJK bug was.
+
+**Not a blind sweep.** Most `reserve()` calls in this codebase take a constant or
+a small bound and are fine; converting them all would be churn. The fix is a heap
+check before the content-sized ones, degrading the way the CSS parser now does.
+
+**Done looks like:** the content-sized reservations check the heap first and
+degrade rather than abort, and the entry records which sites were judged safe and
+why.
+
+
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 

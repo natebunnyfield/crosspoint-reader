@@ -1,6 +1,3 @@
-#include <type_traits>
-#include <cstdlib>
-#include <cerrno>
 #include "CssParser.h"
 
 #include <Arduino.h>
@@ -10,9 +7,12 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cerrno>
 #include <charconv>
+#include <cstdlib>
 #include <cstring>
 #include <string_view>
+#include <type_traits>
 
 namespace {
 
@@ -56,6 +56,15 @@ struct ParseScratch {
 // Maximum number of CSS rules to store in the selector map
 // Prevents unbounded memory growth from pathological CSS files
 constexpr size_t MAX_RULES = 1500;
+
+// A rule COUNT cap bounds how many rules exist; it says nothing about whether
+// the heap can hold the next one. Under -fno-exceptions the map's allocation
+// aborts the device rather than failing, so registration also needs a heap
+// FLOOR -- the two guards answer different questions and a book can trip the
+// second while nowhere near the first. Ported from zrn-ns/crosspoint-jp's
+// issue #103 fix (f59d0fa0f), which is the same class as this fork's B-030 and
+// B-031: turn an abort into degraded output. Partial styling beats a reboot.
+constexpr size_t MIN_FREE_HEAP_FOR_CSS_RULES = 32 * 1024;
 
 // Minimum free heap required to apply CSS during rendering
 // If below this threshold, we skip CSS to avoid display artifacts.
@@ -484,6 +493,13 @@ void CssParser::processRuleBlockWithStyle(std::string_view selectorGroup, const 
     return;
   }
 
+  // ...and whether there is heap left to hold another one.
+  if (ESP.getFreeHeap() < MIN_FREE_HEAP_FOR_CSS_RULES) {
+    LOG_ERR("CSS", "Low heap during CSS parse (%u bytes), stopping with %zu rules", ESP.getFreeHeap(),
+            rulesBySelector_.size());
+    return;
+  }
+
   // Walk comma-separated selectors in place — no vector allocation. Selectors
   // with unsupported syntax (combinators, attributes, pseudo, etc.) are skipped
   // silently; the only heap allocation per kept selector is the std::string
@@ -873,6 +889,15 @@ bool CssParser::loadFromCache() {
 
   // Read each rule
   for (uint16_t i = 0; i < ruleCount; ++i) {
+    // The cache was written by a device that had the heap for these rules; the
+    // one reading it may not. Stop early and keep what loaded rather than
+    // aborting on the insert -- a partially styled chapter still renders.
+    if (ESP.getFreeHeap() < MIN_FREE_HEAP_FOR_CSS_RULES) {
+      LOG_ERR("CSS", "Low heap loading CSS cache (%u bytes), stopping with %zu of %u rules", ESP.getFreeHeap(),
+              rulesBySelector_.size(), ruleCount);
+      return true;  // what loaded is usable; a false here would delete the cache
+    }
+
     // Read selector string
     uint16_t selectorLen = 0;
     if (!hasRemainingBytes(sizeof(selectorLen))) {
