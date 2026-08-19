@@ -4,6 +4,7 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Memory.h>
 #include <Utf8.h>
 #include <XmlParserUtils.h>
 #include <expat.h>
@@ -230,7 +231,11 @@ void ChapterHtmlSlimParser::flushPendingAnchor() {
     if (currentPage && !currentPage->elements.empty()) {
       completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
       completedPageCount++;
-      currentPage.reset(new Page());
+      currentPage = makeUniqueNoThrow<Page>();
+      if (!currentPage) {
+        noteAllocationFailure("Page at a TOC boundary");
+        return;
+      }
       currentPageNextY = 0;
     }
   }
@@ -316,7 +321,12 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
   // source bytes into the chapter-global anchor base BEFORE the new block
   // starts counting from zero.
   if (currentTextBlock) chapterSourceBytes_ += currentTextBlock->sourceByteCount();
-  currentTextBlock.reset(new ParsedText(extraParagraphSpacing, hyphenationEnabled, focusReadingEnabled, blockStyle));
+  currentTextBlock =
+      makeUniqueNoThrow<ParsedText>(extraParagraphSpacing, hyphenationEnabled, focusReadingEnabled, blockStyle);
+  if (!currentTextBlock) {
+    noteAllocationFailure("ParsedText for a new block");
+    return;
+  }
   wordsExtractedInBlock = 0;
   listItemBulletOnly = false;
 }
@@ -1675,8 +1685,16 @@ ChapterHtmlSlimParser::ParseStatus ChapterHtmlSlimParser::parseStep() {
   const int done = parseFile_.available() == 0;
 
   if (XML_ParseBuffer(xmlParser_, static_cast<int>(len), done) == XML_STATUS_ERROR) {
+    // An OOM stopped the parser deliberately; say so rather than reporting
+    // expat's "parsing aborted", which reads like a malformed document.
+    if (allocFailed_) {
+      return ParseStatus::Error;
+    }
     LOG_ERR("EHP", "Parse error at line %lu:\n%s", XML_GetCurrentLineNumber(xmlParser_),
             XML_ErrorString(XML_GetErrorCode(xmlParser_)));
+    return ParseStatus::Error;
+  }
+  if (allocFailed_) {
     return ParseStatus::Error;
   }
 
@@ -1695,6 +1713,13 @@ void ChapterHtmlSlimParser::abortParse() {
 }
 
 bool ChapterHtmlSlimParser::finishParse() {
+  // Never flush a trailing page from a layout that ran out of memory partway:
+  // the caller caches what it is handed, and a short chapter cached to disk is
+  // silent text loss that survives every later read.
+  if (allocFailed_) {
+    abortParse();
+    return false;
+  }
   if (xmlParser_) {
     LOG_DBG("EHP", "Time to parse and build pages: %lu ms", millis() - parseStartTime_);
     destroyXmlParser(xmlParser_);
@@ -1716,6 +1741,19 @@ bool ChapterHtmlSlimParser::finishParse() {
   }
 
   return true;
+}
+
+void ChapterHtmlSlimParser::noteAllocationFailure(const char* what) {
+  if (allocFailed_) return;
+  allocFailed_ = true;
+  LOG_ERR("EHP", "OOM: %s; abandoning this chapter's layout", what);
+  // Stop expat NOW. Every dereference of currentPage / currentTextBlock in this
+  // file assumes they are non-null, and the only thing that can null them is the
+  // allocation that just failed -- so the fix is to stop callbacks arriving
+  // rather than to null-check 46 sites. XML_FALSE = not resumable.
+  if (xmlParser_) {
+    XML_StopParser(xmlParser_, XML_FALSE);
+  }
 }
 
 bool ChapterHtmlSlimParser::parseAndBuildPages() {
@@ -1740,7 +1778,11 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
       renderer.getLineHeight(fontId, lineCompression) + line->getRubyShift(renderer.getFontAscenderSize(fontId));
 
   if (!currentPage) {
-    currentPage.reset(new Page());
+    currentPage = makeUniqueNoThrow<Page>();
+    if (!currentPage) {
+      noteAllocationFailure("first Page of a chapter");
+      return;
+    }
     currentPageNextY = 0;
   }
 
@@ -1750,7 +1792,11 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
     completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex,
                    chapterSourceBytes_ + (currentTextBlock ? currentTextBlock->lastExtractedLineSourceStart() : 0));
     completedPageCount++;
-    currentPage.reset(new Page());
+    currentPage = makeUniqueNoThrow<Page>();
+    if (!currentPage) {
+      noteAllocationFailure("Page at a line break");
+      return;
+    }
     currentPageNextY = 0;
   }
 
@@ -1776,7 +1822,11 @@ void ChapterHtmlSlimParser::makePages() {
   }
 
   if (!currentPage) {
-    currentPage.reset(new Page());
+    currentPage = makeUniqueNoThrow<Page>();
+    if (!currentPage) {
+      noteAllocationFailure("Page for a laid-out block");
+      return;
+    }
     currentPageNextY = 0;
   }
 

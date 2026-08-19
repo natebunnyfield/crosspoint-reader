@@ -76,7 +76,9 @@ std::unique_ptr<PageImage> PageImage::deserialize(HalFile& file) {
   serialization::readPod(file, yPos);
 
   auto ib = ImageBlock::deserialize(file);
-  return std::unique_ptr<PageImage>(new PageImage(std::move(ib), xPos, yPos));
+  // nothrow: this runs while deserializing a cached section, so OOM is a real
+  // outcome. Every caller of deserialize() already handles nullptr.
+  return std::unique_ptr<PageImage>(new (std::nothrow) PageImage(std::move(ib), xPos, yPos));
 }
 
 void PageHorizontalRule::render(GfxRenderer& renderer, const int fontId, const int xOffset, const int yOffset) {
@@ -169,7 +171,11 @@ bool Page::serialize(HalFile& file) const {
 }
 
 std::unique_ptr<Page> Page::deserialize(HalFile& file) {
-  auto page = std::unique_ptr<Page>(new Page());
+  auto page = std::unique_ptr<Page>(new (std::nothrow) Page());
+  if (!page) {
+    LOG_ERR("PGE", "OOM: Page while deserializing a cached section");
+    return nullptr;
+  }
 
   uint16_t count;
   serialization::readPod(file, count);

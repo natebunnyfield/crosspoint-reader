@@ -4,6 +4,7 @@
 #include <HalStorage.h>
 #include <JpegToBmpConverter.h>
 #include <Logging.h>
+#include <Memory.h>
 #include <PngToBmpConverter.h>
 #include <Utf8.h>
 #include <ZipFile.h>
@@ -424,9 +425,17 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
   LOG_DBG("EBP", "Loading ePub: %s", filepath.c_str());
 
   // Initialize spine/TOC cache
-  bookMetadataCache.reset(new BookMetadataCache(cachePath));
+  bookMetadataCache = makeUniqueNoThrow<BookMetadataCache>(cachePath);
+  if (!bookMetadataCache) {
+    LOG_ERR("EBP", "OOM: book metadata cache");
+    return false;
+  }
   // Always create CssParser - needed for inline style parsing even without CSS files
-  cssParser.reset(new CssParser(cachePath));
+  cssParser = makeUniqueNoThrow<CssParser>(cachePath);
+  if (!cssParser) {
+    LOG_ERR("EBP", "OOM: CSS parser");
+    return false;
+  }
 
   // Try to load existing cache first
   if (bookMetadataCache->load()) {

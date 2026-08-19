@@ -994,7 +994,14 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   if (!section) {
     const auto filepath = epub->getSpineItem(currentSpineIndex).href;
     LOG_DBG("ERS", "Loading file: %s, index: %d", filepath.c_str(), currentSpineIndex);
-    section = std::unique_ptr<Section>(new Section(epub, currentSpineIndex, renderer));
+    section = makeUniqueNoThrow<Section>(epub, currentSpineIndex, renderer);
+    if (!section) {
+      // render() already returns early in two other places; do the same rather
+      // than carry a null section into the build below. The next render retries,
+      // by which time whatever was holding the heap may have let go.
+      LOG_ERR("ERS", "OOM: Section for spine index %d", currentSpineIndex);
+      return;
+    }
     // Fresh section, fresh chance: a failed lazy extension start in a previous
     // section must not suppress watermark-triggered rebuilds for this one.
     partialRebuildStartFailed = false;

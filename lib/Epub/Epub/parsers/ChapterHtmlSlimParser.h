@@ -48,6 +48,13 @@ class ChapterHtmlSlimParser {
   int rubyStartWordIndex = -1;
   bool collectingRubyText = false;
   std::string rubyTextBuffer;
+  // Sticky: set by noteAllocationFailure(), never cleared within a parse.
+  bool allocFailed_ = false;
+  // Records the OOM, stops expat, and leaves the parse to fail at the next
+  // parseStep(). The caller must return immediately after calling it: the
+  // current callback keeps running to its end even after XML_StopParser.
+  void noteAllocationFailure(const char* what);
+
   std::unique_ptr<Page> currentPage = nullptr;
   int16_t currentPageNextY = 0;
   int fontId;
@@ -201,6 +208,13 @@ class ChapterHtmlSlimParser {
   // the caller can stop once enough pages are built and resume on a later tick.
   enum class ParseStatus { More, Done, Error };
   bool beginParse();
+
+  // True once any page/text-block allocation failed. Expat callbacks cannot
+  // return an error, so a failure sets this AND calls XML_StopParser -- which
+  // stops further callbacks arriving, so the 46 unguarded `currentPage->` /
+  // `currentTextBlock->` dereferences below stay unreachable rather than
+  // needing 46 null checks. parseStep() turns it into ParseStatus::Error.
+  bool allocationFailed() const { return allocFailed_; }
   ParseStatus parseStep();
   bool finishParse();  // flush the trailing page and tear down; returns true
   void abortParse();   // tear down without flushing (error / abandon)
