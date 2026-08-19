@@ -150,6 +150,18 @@ std::vector<size_t> cjkCharacterBreakByteOffsets(const std::string& text) {
   };
 
   std::vector<CodepointBoundary> codepoints;
+  // B-032. This reservation is sized from the CONTENT -- one entry per byte of
+  // the paragraph -- and a failed reserve() aborts under -fno-exceptions exactly
+  // as a bare `new` does. A single enormous paragraph is a real EPUB (it is what
+  // crosspoint-jp's CJK crash was), so ask whether the block exists before
+  // demanding it. Returning empty costs this paragraph its CJK break
+  // opportunities; it does not cost the reader the book.
+  const size_t neededBytes = text.size() * sizeof(CodepointBoundary);
+  if (neededBytes > ESP.getMaxAllocHeap()) {
+    LOG_ERR("PTX", "Paragraph too large for CJK break scan (%u bytes needed, %u largest block)",
+            static_cast<unsigned>(neededBytes), static_cast<unsigned>(ESP.getMaxAllocHeap()));
+    return {};
+  }
   codepoints.reserve(text.size());
   bool hasCjkBreakable = false;
 
@@ -167,6 +179,14 @@ std::vector<size_t> cjkCharacterBreakByteOffsets(const std::string& text) {
   if (!hasCjkBreakable || codepoints.size() < 2) return {};
 
   std::vector<size_t> allowedOffsets;
+  // Same guard, second allocation: by here `codepoints` is already resident, so
+  // the heap is tighter than it was a moment ago and this is the more likely of
+  // the two to fail.
+  const size_t offsetBytes = (codepoints.size() - 1) * sizeof(size_t);
+  if (offsetBytes > ESP.getMaxAllocHeap()) {
+    LOG_ERR("PTX", "No room for CJK break offsets (%u bytes needed)", static_cast<unsigned>(offsetBytes));
+    return {};
+  }
   allowedOffsets.reserve(codepoints.size() - 1);
   for (size_t i = 0; i + 1 < codepoints.size(); ++i) {
     const uint32_t current = codepoints[i].cp;
@@ -324,6 +344,17 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
     size_t newCapacity = wordStyles.capacity() < 16 ? 16 : wordStyles.capacity();
     while (newCapacity < requiredSize) {
       newCapacity *= 2;
+    }
+
+    // Four parallel arrays, so the doubling costs four blocks at once. Skipping
+    // the reservation is SAFE: the pushes below still work, they just grow the
+    // vectors the slow way -- and growth one element at a time asks for smaller
+    // blocks than this bulk reserve does, which is exactly what a tight heap can
+    // still satisfy.
+    const size_t bulkBytes = newCapacity * (sizeof(EpdFontFamily::Style) + sizeof(uint8_t) * 3);
+    if (bulkBytes > ESP.getMaxAllocHeap() / 2) {
+      LOG_DBG("PTX", "Skipping bulk token reserve (%u bytes) on a tight heap", static_cast<unsigned>(bulkBytes));
+      return;
     }
 
     wordStyles.reserve(newCapacity);
@@ -760,8 +791,8 @@ std::vector<size_t> ParsedText::computeLineBreaks(const GfxRenderer& renderer, c
 
       // Calculate extraStartOffset for the first word on the line (i) (protect left margin)
       int extraStartOffset = 0;
-      if (j == static_cast<size_t>(i) && !rubyTexts.empty() && static_cast<size_t>(i) < rubyTexts.size() && !rubyTexts[i].empty() &&
-          (wordStyles[i] & EpdFontFamily::RUBY_CONTINUE) == 0) {
+      if (j == static_cast<size_t>(i) && !rubyTexts.empty() && static_cast<size_t>(i) < rubyTexts.size() &&
+          !rubyTexts[i].empty() && (wordStyles[i] & EpdFontFamily::RUBY_CONTINUE) == 0) {
         int groupWordCount = 1;
         while (static_cast<size_t>(i + groupWordCount) < totalWordCount &&
                (wordStyles[i + groupWordCount] & EpdFontFamily::RUBY_CONTINUE) != 0) {

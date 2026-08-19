@@ -34,39 +34,6 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
-### [B-032] A failed `reserve()` aborts exactly like a bare `new`
-**severity: medium · scope: memory safety · found 2026-08-19 by the fork audit**
-
-[B-030] and [B-031] swept every explicit `new` out of the fallible paths. They
-did not touch CONTAINER growth, which has the same failure: `-fno-exceptions`
-makes `std::vector::reserve()` and `push_back()` abort on OOM rather than fail,
-so the sweep closed one door and left another open beside it.
-
-Found while auditing `0x1abin/crossmux`, whose layout-OOM fix exists precisely
-because this bites (see [fork-audits.md](docs/fork-audits.md)). Their patch does
-not apply — their line breaker diverged — but the premise does.
-
-Where it matters most, because the size comes from the content rather than from
-a constant:
-
-| Site | Sized from |
-|---|---|
-| `ParsedText.cpp:153` `codepoints.reserve(text.size())` | the paragraph's byte length |
-| `ParsedText.cpp:170` `allowedOffsets.reserve(...)` | codepoint count |
-| `ParsedText.cpp:329-331` the parallel word arrays | token count, doubling |
-
-A long paragraph in a tight heap is the shape that fires it, which is exactly
-what crosspoint-jp's CJK bug was.
-
-**Not a blind sweep.** Most `reserve()` calls in this codebase take a constant or
-a small bound and are fine; converting them all would be churn. The fix is a heap
-check before the content-sized ones, degrading the way the CSS parser now does.
-
-**Done looks like:** the content-sized reservations check the heap first and
-degrade rather than abort, and the entry records which sites were judged safe and
-why.
-
-
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
@@ -129,6 +96,63 @@ format version if layout output changes.
 ---
 
 ## FIXED
+
+### [B-032] A failed `reserve()` aborts exactly like a bare `new` — FIXED 2026-08-19
+**severity: medium · scope: memory safety · found + fixed 2026-08-19**
+
+**Fixed at the three content-sized sites, and deliberately nowhere else.**
+
+| Site | Guard | Degradation |
+|---|---|---|
+| `codepoints.reserve(text.size())` | needed bytes vs `getMaxAllocHeap()` | the paragraph loses its CJK break opportunities |
+| `allowedOffsets.reserve(...)` | same, and likelier to fire — `codepoints` is resident by then, so the heap is tighter | as above |
+| the four parallel token arrays | bulk bytes vs half the largest block | the reservation is SKIPPED, not the pushes |
+
+The third is the interesting one: skipping a bulk reserve is safe precisely
+because the pushes still work afterwards. Growing an element at a time asks for
+smaller blocks than the bulk reservation does, which is what a tight heap can
+still satisfy — so the degradation is slower layout, not lost text.
+
+**Not a blind sweep, by design.** Every other `reserve()` in this file and its
+neighbours takes a constant or a small bound; converting them would be churn
+that hides the three that matter.
+
+**Verified:** `-e default` and `-e simulator` build, 370 host tests pass, and a
+real book still paginates and renders unchanged. The guards themselves do not
+fire on a host — the simulator's heap is a constant, so it cannot be walked down
+past a threshold — which is the same limit recorded in [B-030].
+
+**Original entry follows.**
+
+[B-030] and [B-031] swept every explicit `new` out of the fallible paths. They
+did not touch CONTAINER growth, which has the same failure: `-fno-exceptions`
+makes `std::vector::reserve()` and `push_back()` abort on OOM rather than fail,
+so the sweep closed one door and left another open beside it.
+
+Found while auditing `0x1abin/crossmux`, whose layout-OOM fix exists precisely
+because this bites (see [fork-audits.md](docs/fork-audits.md)). Their patch does
+not apply — their line breaker diverged — but the premise does.
+
+Where it matters most, because the size comes from the content rather than from
+a constant:
+
+| Site | Sized from |
+|---|---|
+| `ParsedText.cpp:153` `codepoints.reserve(text.size())` | the paragraph's byte length |
+| `ParsedText.cpp:170` `allowedOffsets.reserve(...)` | codepoint count |
+| `ParsedText.cpp:329-331` the parallel word arrays | token count, doubling |
+
+A long paragraph in a tight heap is the shape that fires it, which is exactly
+what crosspoint-jp's CJK bug was.
+
+**Not a blind sweep.** Most `reserve()` calls in this codebase take a constant or
+a small bound and are fine; converting them all would be churn. The fix is a heap
+check before the content-sized ones, degrading the way the CSS parser now does.
+
+**Done looks like:** the content-sized reservations check the heap first and
+degrade rather than abort, and the entry records which sites were judged safe and
+why.
+
 
 ### [B-003] Exploded `.epub` directories present as folders, never as books — FIXED 2026-08-19
 **severity: low · scope: content · found 2026-08-03 · re-zipped 2026-08-19**
