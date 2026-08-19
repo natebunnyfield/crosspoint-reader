@@ -90,10 +90,34 @@ backlog; this is one named commit.
 ### [T-012] A setting for tables: flat or tabular
 **scope: reader · opened 2026-08-15 · NEXT after B-031, owner ruling 2026-08-18**
 
+**Owner ruling 2026-08-18, after seeing four real renders: COLUMNS + HEADER
+RULE.** Real columns, the numeric column flush right, and a single 2 px rule
+under the header row. Nothing else drawn — no outer box, no row rules, no
+column rules.
+
+The four candidates were rendered through the real `GfxRenderer` onto the real
+528x792 page in the reading face (`tools/table_preview/`), not described in
+prose: flattened (today), columns with no rules, columns with a header rule, and
+a full grid. What the ruling rejects is worth keeping: the full grid is the only
+option where a wrapped cell cannot be misread as a new row, and it was still
+turned down, because on 1-bit ink every rule is the same black as the type and
+the grid is the heaviest thing on the page.
+
+**A second question follows and is NOT answered:** what a table too wide for the
+page does. The mockups all fit. Flattening the overflow case is the obvious
+fallback, but it has not been ruled on.
+
+**Also ruled: no setting.** The entry was written as a flat-vs-tabular choice;
+the owner's clarification was that the ask is tables in EPUB content rendering
+properly. One good render, no row in Settings, no persisted value, no
+cache-invalidation branch for a toggle. Flattening stays only as the fallback
+for tables that cannot fit.
+
 **Owner ruling 2026-08-18: [B-031] first in one pass, then this, same session.**
 Both want `ChapterHtmlSlimParser`, so landing a table renderer on top of
 allocations that are being rewritten is the worse order — whichever goes second
-takes the conflicts, and the memory sweep is the one already framed.
+takes the conflicts, and the memory sweep is the one already framed. B-031
+landed in `e0a1715b8`.
 
 Today tables are always flattened. `ChapterHtmlSlimParser.cpp:481-519` tracks
 `tableDepth` and handles `thead`/`tr`/`td`/`th`, but there is no `colspan`
