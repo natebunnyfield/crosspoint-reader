@@ -88,7 +88,12 @@ enough detail to trace. Separate from [T-008], which covers the 2026-08-06
 backlog; this is one named commit.
 
 ### [T-012] A setting for tables: flat or tabular
-**scope: reader · opened 2026-08-15**
+**scope: reader · opened 2026-08-15 · NEXT after B-031, owner ruling 2026-08-18**
+
+**Owner ruling 2026-08-18: [B-031] first in one pass, then this, same session.**
+Both want `ChapterHtmlSlimParser`, so landing a table renderer on top of
+allocations that are being rewritten is the worse order — whichever goes second
+takes the conflicts, and the memory sweep is the one already framed.
 
 Today tables are always flattened. `ChapterHtmlSlimParser.cpp:481-519` tracks
 `tableDepth` and handles `thead`/`tr`/`td`/`th`, but there is no `colspan`
