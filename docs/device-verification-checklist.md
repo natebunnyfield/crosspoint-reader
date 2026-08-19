@@ -134,6 +134,23 @@ desktop panel.
 | Back navigation | [B-018] |
 | The notes half of [B-017] | still unconfirmed |
 
+## 4a. A wide table, turned
+
+**Closes the device half of [T-021].** A table too wide for the upright page now
+becomes a page of its own, turned clockwise, set a size down with 2 px margins —
+and everything about that is a physical question a host render cannot answer:
+whether turning the device to read one table is worth it at all, whether the
+smaller face is legible on e-ink, and whether 2 px of margin looks deliberate or
+looks like a printing fault.
+
+Put `test/epubs/test_wide_table.epub` on the card. The chapter has one
+five-column table. Expect: header row first, all five columns, nothing cut, a
+rule under the header, and the page otherwise empty.
+
+If the table is instead a bold list of column names followed by plain rows, the
+fallback fired — that is correct behaviour for a table that cannot fit even
+turned, but on THIS book it would mean the rotated path is not being reached.
+
 ## 5a. One number to capture while you are there
 
 Closes the last open item from the matcha audit

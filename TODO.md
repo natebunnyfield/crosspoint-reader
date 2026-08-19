@@ -60,46 +60,6 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
-### [T-021] Wide tables: rotate the page (E), fall back to a key block (I)
-**scope: reader · ruled 2026-08-19 against nine real renders**
-
-**Owner ruling: E when it does not truncate, I when it would.** A table that
-cannot be columns upright becomes a **rotated full page** — turned 90 degrees
-CLOCKWISE, at the smallest reading size, 2 px margins, no chrome — provided
-every cell fits without truncation. When it would truncate, it falls back to
-**I**: the five column names stacked as a bold block, then each row beneath it
-as plain values, every row identical in shape.
-
-What this replaces: today a table the planner refuses is flattened with its
-column name repeated in front of every cell ([T-012], shipped `6c0151f09`).
-That form is retired by this ruling — I is the flattened form now.
-
-Rejected, with reasons, so they are not re-proposed: squeezing columns to a
-floor (truncates whole words), the smallest size upright alone (still truncates
-four of five columns on a 528 px page), and **any counter-clockwise rotation**
-(see the standing ruling in [docs/ui-conventions.md](docs/ui-conventions.md) —
-he is right-handed).
-
-**The blocker, found while scoping: there is no clockwise draw call.**
-`GfxRenderer::drawTextRotated90CW` draws COUNTER-clockwise content; its name is
-the reader's turn, not the transform. `tools/table_preview` faked E by turning
-the finished framebuffer 180 degrees, which a page renderer cannot do per page.
-So E needs `drawTextRotated90CCW` first: `TextRotation` (GfxRenderer.cpp:322)
-gains a variant, `renderCharImpl` gains four mirrored branches at :453, :473,
-:496 and :534, the advance walks the other way, and the hi-res branch comes free
-because it sits inside the same template.
-
-**Then the page-level half**, which is the larger one: a rotated table has to
-become a whole page the reader can turn to, which touches `Page` serialization,
-the `section.bin` format (36 -> 37), and the word-anchor path that assumes every
-page is upright.
-
-**Done looks like:** a wide table renders rotated and complete on device; one
-that cannot fit even rotated renders as I; the section cache is bumped; and the
-truncation decision is made before anything is emitted, the way the column
-planner already does it.
-
-
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
 **scope: verification · opened 2026-08-15**
 
@@ -276,6 +236,74 @@ the cheap version and needs no keychain.
 ---
 
 ## Finished
+
+### [T-021] Wide tables: rotate the page, fall back to a key block — SHIPPED 2026-08-19
+**scope: reader · ruled + shipped 2026-08-19 · `6e357bead` + `d7ea20c86`**
+
+**Done.** Columns upright where they fit; otherwise a clockwise-turned page of
+its own at the smallest size of the reading family; otherwise the names once as
+a bold block with each row beneath. Verified in the simulator on a generated
+five-column EPUB (`test/epubs/test_wide_table.epub`).
+
+**Four bugs, every one found by looking at a render rather than by a green
+build**, which is the part worth carrying forward:
+
+1. Columns OVERLAPPED — the floor allowed a column narrower than its longest
+   word, and a word cannot be split, so cells overflowed onto each other. The
+   floor is each column's widest word now, with a sweep test asserting it.
+2. The squeeze gave up as soon as the WIDEST column hit its floor, even with
+   room in the others, sending fitting tables to the fallback.
+3. The rotated page was set at reading size and so did not fit: word-floors
+   summed to 899 px against 668 available. It is a size down now, which needed
+   `smallFontId` threaded through `ReaderRenderSpec`.
+4. `drawTextRotated90CCW` anchors a band by its RIGHT edge where the CW twin
+   takes the left, and the row axis runs the other way — the first version drew
+   11,197 out-of-range pixels and printed the header at the foot of the page.
+
+**Still owed:** device confirmation. Rotation, a page the reader physically
+turns, and 2 px margins on real e-ink are all things a host render cannot
+settle. Added to [docs/device-verification-checklist.md](docs/device-verification-checklist.md).
+
+**Original entry follows.**
+
+**scope: reader · ruled 2026-08-19 against nine real renders**
+
+**Owner ruling: E when it does not truncate, I when it would.** A table that
+cannot be columns upright becomes a **rotated full page** — turned 90 degrees
+CLOCKWISE, at the smallest reading size, 2 px margins, no chrome — provided
+every cell fits without truncation. When it would truncate, it falls back to
+**I**: the five column names stacked as a bold block, then each row beneath it
+as plain values, every row identical in shape.
+
+What this replaces: today a table the planner refuses is flattened with its
+column name repeated in front of every cell ([T-012], shipped `6c0151f09`).
+That form is retired by this ruling — I is the flattened form now.
+
+Rejected, with reasons, so they are not re-proposed: squeezing columns to a
+floor (truncates whole words), the smallest size upright alone (still truncates
+four of five columns on a 528 px page), and **any counter-clockwise rotation**
+(see the standing ruling in [docs/ui-conventions.md](docs/ui-conventions.md) —
+he is right-handed).
+
+**The blocker, found while scoping: there is no clockwise draw call.**
+`GfxRenderer::drawTextRotated90CW` draws COUNTER-clockwise content; its name is
+the reader's turn, not the transform. `tools/table_preview` faked E by turning
+the finished framebuffer 180 degrees, which a page renderer cannot do per page.
+So E needs `drawTextRotated90CCW` first: `TextRotation` (GfxRenderer.cpp:322)
+gains a variant, `renderCharImpl` gains four mirrored branches at :453, :473,
+:496 and :534, the advance walks the other way, and the hi-res branch comes free
+because it sits inside the same template.
+
+**Then the page-level half**, which is the larger one: a rotated table has to
+become a whole page the reader can turn to, which touches `Page` serialization,
+the `section.bin` format (36 -> 37), and the word-anchor path that assumes every
+page is upright.
+
+**Done looks like:** a wide table renders rotated and complete on device; one
+that cannot fit even rotated renders as I; the section cache is bumped; and the
+truncation decision is made before anything is emitted, the way the column
+planner already does it.
+
 
 ### [T-012] Tables in EPUB content — SHIPPED 2026-08-19 as columns + a header rule
 **scope: reader · opened 2026-08-15 · ruled 2026-08-18 · shipped `6c0151f09`**
