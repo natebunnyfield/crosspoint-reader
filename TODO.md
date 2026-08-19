@@ -87,63 +87,6 @@ link).
 enough detail to trace. Separate from [T-008], which covers the 2026-08-06
 backlog; this is one named commit.
 
-### [T-012] A setting for tables: flat or tabular
-**scope: reader · opened 2026-08-15 · NEXT after B-031, owner ruling 2026-08-18**
-
-**Owner ruling 2026-08-18, after seeing four real renders: COLUMNS + HEADER
-RULE.** Real columns, the numeric column flush right, and a single 2 px rule
-under the header row. Nothing else drawn — no outer box, no row rules, no
-column rules.
-
-The four candidates were rendered through the real `GfxRenderer` onto the real
-528x792 page in the reading face (`tools/table_preview/`), not described in
-prose: flattened (today), columns with no rules, columns with a header rule, and
-a full grid. What the ruling rejects is worth keeping: the full grid is the only
-option where a wrapped cell cannot be misread as a new row, and it was still
-turned down, because on 1-bit ink every rule is the same black as the type and
-the grid is the heaviest thing on the page.
-
-**A second question follows and is NOT answered:** what a table too wide for the
-page does. The mockups all fit. Flattening the overflow case is the obvious
-fallback, but it has not been ruled on.
-
-**Also ruled: no setting.** The entry was written as a flat-vs-tabular choice;
-the owner's clarification was that the ask is tables in EPUB content rendering
-properly. One good render, no row in Settings, no persisted value, no
-cache-invalidation branch for a toggle. Flattening stays only as the fallback
-for tables that cannot fit.
-
-**Owner ruling 2026-08-18: [B-031] first in one pass, then this, same session.**
-Both want `ChapterHtmlSlimParser`, so landing a table renderer on top of
-allocations that are being rewritten is the worse order — whichever goes second
-takes the conflicts, and the memory sweep is the one already framed. B-031
-landed in `e0a1715b8`.
-
-Today tables are always flattened. `ChapterHtmlSlimParser.cpp:481-519` tracks
-`tableDepth` and handles `thead`/`tr`/`td`/`th`, but there is no `colspan`
-handling and nothing draws a border — verified by grep, no hits. PR #10 added
-header labels to flattened cells, which is the current best behaviour.
-
-Wanted: an owner-facing choice between the flattened reading order and a real
-tabular render. `uxjulia/CrossInk` has both halves already (#89 table rendering,
-#90 colSpan as header/footer rows) — see
-[docs/fork-ecosystem.md](docs/fork-ecosystem.md).
-
-**Traps before writing the setting** (`docs/` + CLAUDE.md rules, all of which
-have bitten before):
-
-- An ENUM row persists its **index**. Two values only, so a bool row is simpler
-  and safer; if it becomes an enum, values APPEND — inserting one re-points every
-  saved `settings.json` at a different choice.
-- Anything that changes layout **must bump the `section.bin` version**
-  (currently 35) or stale caches render the old shape. See
-  `docs/file-formats.md`.
-- A row with no `valuePtr` does not persist; if it becomes a getter/setter row,
-  add explicit lines to BOTH `toJson` and `fromJson`.
-
-**Done looks like:** the setting exists, both modes render correctly on a real
-table-bearing EPUB, and switching it invalidates the layout cache.
-
 ### [T-014] Sibling-fork improvements, as reviewable PRs
 **scope: upstream-adjacent · opened 2026-08-15 · STARTED, owner ruling 2026-08-17**
 
@@ -271,10 +214,12 @@ instead of rediscovering them from four tracker entries.
   because its erase-write-reboot step is the ONLY part that cannot be exercised
   off-device at all.
 - **One-button firmware update** (`ee6fad7e5`, Home → Update Firmware,
-  2026-08-16). Added after this list was written, and it is the second thing on
-  it that no host build can reach: the Home row is compiled out under
-  `CROSSPOINT_NO_DEVICE_FLASH` (`HomeActivity.cpp:34-39`), so build-82 does not
-  carry the row at all. What to watch is the whole chain — check, install,
+  2026-08-16). Added after this list was written. `CROSSPOINT_NO_DEVICE_FLASH`
+  (`HomeActivity.cpp:34-39`) compiles the Home row out for **iOS only** — that
+  is where `CrossPointIOSExclusions.cmake` defines it — so build-82 does not
+  carry the row, while the desktop simulator does draw it. (Corrected
+  2026-08-19: this entry previously claimed no host build could reach it.)
+  What still cannot be exercised anywhere but the device is the install itself. What to watch is the whole chain — check, install,
   reboot, and the **rollback**, which is the part that was genuinely missing
   before that commit (`network/OtaCommit.cpp` confirming a healthy boot). Full
   write-up in [docs/one-button-firmware-update.md](docs/one-button-firmware-update.md).
@@ -291,6 +236,96 @@ the cheap version and needs no keychain.
 ---
 
 ## Finished
+
+### [T-012] Tables in EPUB content — SHIPPED 2026-08-19 as columns + a header rule
+**scope: reader · opened 2026-08-15 · ruled 2026-08-18 · shipped `6c0151f09`**
+
+**Done.** A table that plans as columns is emitted as columns: bold header row,
+numeric columns flush right, one 2 px rule under the header, nothing else drawn.
+Verified in the simulator on `test/epubs/test_tables.epub` — the small tables
+render as columns, and the big-table chapter falls back to the flattened form.
+
+The planner is `lib/Epub/Epub/parsers/TableColumnLayout.{h,cpp}`, pure and
+covered by 10 tests. The parser buffers a candidate table (text plus bold/italic
+runs) and emits at `</table>`, because columns cannot be measured mid-stream.
+
+**The old flattened path is still there and is still reachable**, which is the
+part worth knowing before touching this: buffering is abandoned mid-table the
+moment a cell holds anything richer than inline emphasis — an image, a footnote
+link, a list, a nested table — and past 3 KB / 64 rows / 5 columns. Those all
+work through the streaming path and would have been silently dropped by a
+text-and-styles buffer.
+
+**Rows move as a unit.** A row is measured before it is emitted and the page is
+completed first if it does not fit; a row taller than a page abandons columns
+for the whole table before anything is emitted.
+
+**Two bugs found by looking at the output, not by the build:** a column sized to
+fit its widest cell exactly still wrapped it (the line breaker works in whole
+words — `kColumnSlack` is 2 px), and a table with no `<thead>` lost its first
+row while a `<thead>`-only table rendered as nothing.
+
+`section.bin` 35 -> 36: identical bytes, bumped because table LAYOUT changed and
+a cached section would otherwise render the old shape forever.
+
+**Still open, and deliberately not answered:** what a table too wide for the page
+should do. Today it flattens, which is a fallback nobody ruled on — every
+mockup fit. Worth a decision if a real book turns up a wide table.
+
+**Owner ruling 2026-08-18, after seeing four real renders: COLUMNS + HEADER
+RULE.** Real columns, the numeric column flush right, and a single 2 px rule
+under the header row. Nothing else drawn — no outer box, no row rules, no
+column rules.
+
+The four candidates were rendered through the real `GfxRenderer` onto the real
+528x792 page in the reading face (`tools/table_preview/`), not described in
+prose: flattened (today), columns with no rules, columns with a header rule, and
+a full grid. What the ruling rejects is worth keeping: the full grid is the only
+option where a wrapped cell cannot be misread as a new row, and it was still
+turned down, because on 1-bit ink every rule is the same black as the type and
+the grid is the heaviest thing on the page.
+
+**A second question follows and is NOT answered:** what a table too wide for the
+page does. The mockups all fit. Flattening the overflow case is the obvious
+fallback, but it has not been ruled on.
+
+**Also ruled: no setting.** The entry was written as a flat-vs-tabular choice;
+the owner's clarification was that the ask is tables in EPUB content rendering
+properly. One good render, no row in Settings, no persisted value, no
+cache-invalidation branch for a toggle. Flattening stays only as the fallback
+for tables that cannot fit.
+
+**Owner ruling 2026-08-18: [B-031] first in one pass, then this, same session.**
+Both want `ChapterHtmlSlimParser`, so landing a table renderer on top of
+allocations that are being rewritten is the worse order — whichever goes second
+takes the conflicts, and the memory sweep is the one already framed. B-031
+landed in `e0a1715b8`.
+
+Today tables are always flattened. `ChapterHtmlSlimParser.cpp:481-519` tracks
+`tableDepth` and handles `thead`/`tr`/`td`/`th`, but there is no `colspan`
+handling and nothing draws a border — verified by grep, no hits. PR #10 added
+header labels to flattened cells, which is the current best behaviour.
+
+Wanted: an owner-facing choice between the flattened reading order and a real
+tabular render. `uxjulia/CrossInk` has both halves already (#89 table rendering,
+#90 colSpan as header/footer rows) — see
+[docs/fork-ecosystem.md](docs/fork-ecosystem.md).
+
+**Traps before writing the setting** (`docs/` + CLAUDE.md rules, all of which
+have bitten before):
+
+- An ENUM row persists its **index**. Two values only, so a bool row is simpler
+  and safer; if it becomes an enum, values APPEND — inserting one re-points every
+  saved `settings.json` at a different choice.
+- Anything that changes layout **must bump the `section.bin` version**
+  (currently 35) or stale caches render the old shape. See
+  `docs/file-formats.md`.
+- A row with no `valuePtr` does not persist; if it becomes a getter/setter row,
+  add explicit lines to BOTH `toJson` and `fromJson`.
+
+**Done looks like:** the setting exists, both modes render correctly on a real
+table-bearing EPUB, and switching it invalidates the layout cache.
+
 
 ### [T-016] READMEs no longer describe what these repos are — DONE 2026-08-16
 **scope: docs · opened 2026-08-15 · both repos landed 2026-08-16**

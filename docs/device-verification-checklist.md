@@ -44,10 +44,14 @@ staged bin needs the same check; a green build is not the evidence.
 
 **Closes: the newest half of [T-008].** `ee6fad7e5`, Home → **Update Firmware**.
 
-This is the item with the least host evidence of anything on the list. The Home
-row is compiled out under `CROSSPOINT_NO_DEVICE_FLASH`
-(`src/activities/home/HomeActivity.cpp:34-39`), so no simulator build and no
-TestFlight build has ever drawn it, let alone run it.
+This is the item with the least host evidence of anything on the list.
+`CROSSPOINT_NO_DEVICE_FLASH` (`HomeActivity.cpp:34-39`) compiles the Home row
+out — but **only for iOS**, which is where
+`cmake/CrossPointIOSExclusions.cmake` defines it. Corrected 2026-08-19 after
+seeing the row in a desktop simulator screenshot: an earlier version of this
+file said no simulator build had ever drawn it, which was wrong. The desktop
+simulator draws and can enter the screen; **no TestFlight build carries the
+row**, and nothing off-device can perform the erase-write-reboot.
 
 Watch, in order:
 
