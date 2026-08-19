@@ -20,6 +20,7 @@
 #include <builtinFonts/all.h>
 #include <sys/stat.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -48,6 +49,11 @@ extern SdCardFontSystem sdFontSystem;  // sd_font_stub.cpp
 EpdFont lfr14R(&librefranklin_reader_14_regular), lfr14B(&librefranklin_reader_14_bold),
     lfr14I(&librefranklin_reader_14_italic), lfr14BI(&librefranklin_reader_14_bolditalic);
 EpdFontFamily lfReader14Family(&lfr14R, &lfr14B, &lfr14I, &lfr14BI);
+// The SMALLEST size the reader offers -- the floor of the 12/14/16/18 ramp, so
+// "as small as a book is ever set" rather than an arbitrary shrink.
+EpdFont lfr12R(&librefranklin_reader_12_regular), lfr12B(&librefranklin_reader_12_bold),
+    lfr12I(&librefranklin_reader_12_italic), lfr12BI(&librefranklin_reader_12_bolditalic);
+EpdFontFamily lfReader12Family(&lfr12R, &lfr12B, &lfr12I, &lfr12BI);
 EpdFont smallFont(&librefranklin_8_regular);
 EpdFontFamily smallFamily(&smallFont);
 EpdFont ui12Regular(&librefranklin_12_regular), ui12Bold(&librefranklin_12_bold);
@@ -70,6 +76,19 @@ bool logicalPixelIsWhite(const uint8_t* fb, int panelHeight, int panelWidthBytes
   const int py = (panelHeight - 1) - lx;
   return (fb[py * panelWidthBytes + (px >> 3)] >> (7 - (px & 7))) & 0x1;
 }
+
+// Same writer, but emitting the page turned 180 degrees.
+//
+// The renderer offers exactly ONE rotated draw, drawTextRotated90CW, and what it
+// puts on the page is COUNTER-clockwise content -- text climbing bottom to top,
+// meant to be read by turning the device clockwise. Its name describes the
+// device turn, not the glyph transform, which is the trap that produced a
+// counter-clockwise mockup when a clockwise one was asked for. There is no call
+// for a clockwise page, so this composes with the call that exists and turns the
+// finished framebuffer 180 degrees: CCW + 180 = CW. The page flips as a unit, so
+// row order stays right -- the first row moves from the left edge to the right,
+// which is where the top lands once the device is turned counter-clockwise.
+bool writeMonoPortraitBmp180(const char* path, const GfxRenderer& r);
 
 bool writeMonoPortraitBmp(const char* path, const GfxRenderer& r) {
   // PHYSICAL pixels, not logical. At RENDER_SCALE > 1 the framebuffer carries
@@ -128,6 +147,59 @@ bool writeMonoPortraitBmp(const char* path, const GfxRenderer& r) {
   return true;
 }
 
+bool writeMonoPortraitBmp180(const char* path, const GfxRenderer& r) {
+  const int S = GfxRenderer::RENDER_SCALE;
+  const int W = r.getScreenWidth() * S;
+  const int H = r.getScreenHeight() * S;
+  const int panelH = r.getDisplayHeight();
+  const int panelWB = r.getDisplayWidthBytes();
+  const int rowBytes = ((W + 31) / 32) * 4;
+  const uint32_t pixelBytes = static_cast<uint32_t>(rowBytes) * H;
+  constexpr int HEADER = 14 + 40 + 8;
+  const uint32_t fileSize = HEADER + pixelBytes;
+
+  uint8_t hdr[HEADER] = {0};
+  hdr[0] = 'B';
+  hdr[1] = 'M';
+  hdr[2] = fileSize & 0xFF;
+  hdr[3] = (fileSize >> 8) & 0xFF;
+  hdr[4] = (fileSize >> 16) & 0xFF;
+  hdr[5] = (fileSize >> 24) & 0xFF;
+  hdr[10] = HEADER & 0xFF;
+  hdr[11] = (HEADER >> 8) & 0xFF;
+  hdr[14] = 40;
+  hdr[18] = W & 0xFF;
+  hdr[19] = (W >> 8) & 0xFF;
+  hdr[22] = H & 0xFF;
+  hdr[23] = (H >> 8) & 0xFF;
+  hdr[26] = 1;
+  hdr[28] = 1;
+  hdr[46] = 2;
+  hdr[58] = hdr[59] = hdr[60] = 0xFF;
+
+  FILE* f = fopen(path, "wb");
+  if (!f) {
+    fprintf(stderr, "cannot open %s\n", path);
+    return false;
+  }
+  fwrite(hdr, 1, HEADER, f);
+
+  const uint8_t* fb = r.getFrameBuffer();
+  auto* row = static_cast<uint8_t*>(calloc(1, rowBytes));
+  // 180 degrees: mirror both axes. BMP rows are written bottom-up already, so
+  // reversing the y loop direction is the vertical half of the flip.
+  for (int y = 0; y < H; ++y) {
+    memset(row, 0, rowBytes);
+    for (int x = 0; x < W; ++x) {
+      if (logicalPixelIsWhite(fb, panelH, panelWB, (W - 1) - x, y)) row[x >> 3] |= (0x80 >> (x & 7));
+    }
+    fwrite(row, 1, rowBytes, f);
+  }
+  free(row);
+  fclose(f);
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // The specimen. A real shape, not a toy: a three-column table with a header
 // row, one long cell that must wrap, and a numeric column that is only useful
@@ -144,12 +216,27 @@ static const Row kRows[] = {
 };
 static constexpr int kRowCount = sizeof(kRows) / sizeof(kRows[0]);
 
+// The WIDE specimen, for the fallback question: five columns of real text that
+// cannot fit a 528px page at reading size however the width is divided. Same
+// shape as a results table in a nonfiction book.
+static const char* kWideHead[5] = {"Expedition", "Commander", "Departed", "Returned", "Crew"};
+struct WideRow {
+  const char* c[5];
+};
+static const WideRow kWideRows[] = {
+    {{"Beagle, second survey", "Robert FitzRoy", "December 1831", "October 1836", "74"}},
+    {{"Erebus and Terror", "James Clark Ross", "September 1839", "September 1843", "129"}},
+    {{"Challenger", "George Nares", "December 1872", "May 1876", "243"}},
+};
+static constexpr int kWideRowCount = sizeof(kWideRows) / sizeof(kWideRows[0]);
+
 static constexpr int FONT = LIBREFRANKLIN_READER_14_FONT_ID;
 static constexpr int MARGIN = 28;
 static constexpr int CAPTION_GAP = 10;
 static constexpr int PAD = 8;  // inside the outer box, so ink never touches a rule
 
 static int pageWidth() { return renderer.getScreenWidth(); }
+static int lineH14() { return renderer.getLineHeight(FONT); }
 static int lineH() { return renderer.getLineHeight(FONT); }
 
 // Draw `text` wrapped inside [x, x+w), return the y after the last line.
@@ -270,6 +357,254 @@ static void renderColumns(const char* title, const char* note, bool headRule, bo
   (void)rowTops;
 }
 
+// --- 5. The wide table, flattened: what ships today ------------------------
+static void renderWideFlat() {
+  renderer.clearScreen(0xFF);
+  int y = MARGIN;
+  y = header(y, "A  Flattened (what ships today)", "five columns, too wide to fit: every cell becomes a line");
+  const int w = pageWidth() - MARGIN * 2;
+  for (int r = 0; r < kWideRowCount; r++) {
+    for (int c = 0; c < 5; c++) {
+      char buf[160];
+      snprintf(buf, sizeof(buf), "%s: %s", kWideHead[c], kWideRows[r].c[c]);
+      y = drawWrapped(MARGIN, y, w, buf);
+    }
+    y += CAPTION_GAP;
+  }
+}
+
+// --- 6. The wide table, squeezed to the floor ------------------------------
+static void renderWideSqueezed() {
+  renderer.clearScreen(0xFF);
+  int y = MARGIN;
+  y = header(y, "B  Columns, squeezed to the floor", "same table forced into columns; cells wrap hard");
+  const int gutter = renderer.getSpaceWidth(FONT) * 2;
+  const int avail = pageWidth() - MARGIN * 2 - PAD * 2 - gutter * 4;
+  const int colW = avail / 5;  // equal shares: nothing else fits at this width
+  int x[5];
+  for (int c = 0; c < 5; c++) x[c] = MARGIN + PAD + c * (colW + gutter);
+
+  const int pad = 6;
+  const int tableTop = y;
+  int rowTop = y + pad;
+  for (int c = 0; c < 5; c++) {
+    const int after = drawWrapped(x[c], rowTop, colW, kWideHead[c], EpdFontFamily::BOLD);
+    y = (after > y) ? after : y;
+  }
+  y += pad;
+  renderer.drawLine(MARGIN + PAD, y, x[4] + colW, y, 2, true);
+  for (int r = 0; r < kWideRowCount; r++) {
+    rowTop = y + pad;
+    int bottom = rowTop;
+    for (int c = 0; c < 5; c++) {
+      const int after = drawWrapped(x[c], rowTop, colW, kWideRows[r].c[c]);
+      bottom = (after > bottom) ? after : bottom;
+    }
+    y = bottom + pad;
+  }
+  (void)tableTop;
+}
+
+// Probe: where does drawTextRotated90CW actually put its ink? BaseTheme passes
+// y as the BOTTOM of the run, so the text should climb from there.
+static void renderRotProbe() {
+  renderer.clearScreen(0xFF);
+  renderer.drawText(FONT, 20, 20, "unrotated at 20,20");
+  renderer.drawTextRotated90CW(FONT, 100, 400, "ROTATED at 100,400");
+  renderer.drawLine(100, 400, 140, 400, 1, true);
+}
+
+// --- F / G: flattened, but the column names are said ONCE -----------------
+//
+// The flattened form repeats "Expedition:" in front of every cell of every row,
+// which is most of its bulk and all of its drone. F names the columns on the
+// first row only; G lifts those names onto their own bold line, so the first
+// row reads as a key and the rows under it as data.
+static void renderFlatNamedOnce(const bool namesOnOwnLine) {
+  renderer.clearScreen(0xFF);
+  int y = MARGIN;
+  y = header(y, namesOnOwnLine ? "G  Named once, on their own line" : "F  Named once",
+             namesOnOwnLine ? "the column names lead in bold; the rows below are values only"
+                            : "the first row carries the names; the rows below are values only");
+  const int w = pageWidth() - MARGIN * 2;
+  const int lineH = lineH14();
+
+  for (int r = 0; r < kWideRowCount; r++) {
+    for (int c = 0; c < 5; c++) {
+      if (r == 0 && namesOnOwnLine) {
+        renderer.drawText(FONT, MARGIN, y, kWideHead[c], true, EpdFontFamily::BOLD);
+        y += lineH;
+        y = drawWrapped(MARGIN, y, w, kWideRows[r].c[c]);
+      } else if (r == 0) {
+        char buf[160];
+        snprintf(buf, sizeof(buf), "%s: %s", kWideHead[c], kWideRows[r].c[c]);
+        y = drawWrapped(MARGIN, y, w, buf);
+      } else {
+        y = drawWrapped(MARGIN, y, w, kWideRows[r].c[c]);
+      }
+    }
+    y += CAPTION_GAP;
+  }
+}
+
+// --- C / D / E: the wide table at the smallest reading size ----------------
+//
+// drawTextRotated90CW anchors a run at its BOTTOM and climbs: text drawn at
+// (x, y) occupies one line-height of width at x and runs upward from y. Turn
+// the page 90 degrees CLOCKWISE and it reads left to right (verified with a
+// probe render before any of this was written). So landscape maps as:
+//
+//     portrait x = landscape y                 -- landscape rows march across
+//     portrait y = screenHeight - landscape x  -- landscape columns march up
+//
+static constexpr int SMALL = LIBREFRANKLIN_READER_12_FONT_ID;
+
+static int smallLineH() { return renderer.getLineHeight(SMALL); }
+
+// across = distance from the landscape LEFT edge (reading direction)
+// down   = distance from the landscape TOP edge (row direction)
+//
+// Reading runs toward decreasing portrait y, and rows march toward increasing
+// portrait x, so: portrait x = down, portrait y = screenHeight - across.
+static void drawLandscape(int across, int down, const char* text,
+                          EpdFontFamily::Style style = EpdFontFamily::REGULAR) {
+  renderer.drawTextRotated90CW(SMALL, down, renderer.getScreenHeight() - across, text, true, style);
+}
+
+// Wrapped landscape text. Extra lines stack DOWN the page, which is portrait x.
+// Returns the down-coordinate after the last line.
+static int drawLandscapeWrapped(int across, int down, int w, const char* text,
+                                EpdFontFamily::Style style = EpdFontFamily::REGULAR) {
+  for (const auto& line : renderer.wrappedText(SMALL, text, w, 8, style)) {
+    drawLandscape(across, down, line.c_str(), style);
+    down += smallLineH();
+  }
+  return down;
+}
+
+struct WideCols {
+  int x[5];
+  int w[5];
+  int right;
+};
+
+// Natural widths capped to the axis, widest column giving ground first -- the
+// same rule the shipped planner uses, so these renders are not flattering.
+static WideCols planWide(int axisWidth, int fontId) {
+  int natural[5];
+  for (int c = 0; c < 5; c++) {
+    natural[c] = renderer.getTextWidth(fontId, kWideHead[c], EpdFontFamily::BOLD);
+    for (int r = 0; r < kWideRowCount; r++) {
+      const int w = renderer.getTextWidth(fontId, kWideRows[r].c[c]);
+      if (w > natural[c]) natural[c] = w;
+    }
+    natural[c] += 2;
+  }
+  const int gutter = renderer.getSpaceWidth(fontId) * 2;
+  const int avail = axisWidth - gutter * 4;
+  int total = 0;
+  for (int c = 0; c < 5; c++) total += natural[c];
+  while (total > avail) {
+    int widest = 0;
+    for (int c = 1; c < 5; c++) {
+      if (natural[c] > natural[widest]) widest = c;
+    }
+    if (natural[widest] <= 40) break;
+    natural[widest] -= 4;
+    total -= 4;
+  }
+  WideCols cols{};
+  int x = 0;
+  for (int c = 0; c < 5; c++) {
+    cols.x[c] = x;
+    cols.w[c] = natural[c];
+    x += natural[c] + gutter;
+  }
+  cols.right = x - gutter;
+  return cols;
+}
+
+// C: portrait, smallest reading size, nothing else changed.
+static void renderWideSmall() {
+  renderer.clearScreen(0xFF);
+  int y = MARGIN;
+  y = header(y, "C  Smallest reading size", "the same columns set at 12, the smallest a book is read at");
+  const WideCols cols = planWide(pageWidth() - MARGIN * 2 - PAD * 2, SMALL);
+  const int lineH = smallLineH();
+  const int pad = 5;
+  const int left = MARGIN + PAD;
+
+  int rowTop = y + pad;
+  int bottom = rowTop;
+  for (int c = 0; c < 5; c++) {
+    int ly = rowTop;
+    for (const auto& line : renderer.wrappedText(SMALL, kWideHead[c], cols.w[c], 6, EpdFontFamily::BOLD)) {
+      renderer.drawText(SMALL, left + cols.x[c], ly, line.c_str(), true, EpdFontFamily::BOLD);
+      ly += lineH;
+    }
+    bottom = std::max(bottom, ly);
+  }
+  y = bottom + pad;
+  renderer.drawLine(left, y, left + cols.right, y, 2, true);
+
+  for (int r = 0; r < kWideRowCount; r++) {
+    rowTop = y + pad;
+    bottom = rowTop;
+    for (int c = 0; c < 5; c++) {
+      int ly = rowTop;
+      for (const auto& line : renderer.wrappedText(SMALL, kWideRows[r].c[c], cols.w[c], 6)) {
+        renderer.drawText(SMALL, left + cols.x[c], ly, line.c_str());
+        ly += lineH;
+      }
+      bottom = std::max(bottom, ly);
+    }
+    y = bottom + pad;
+  }
+}
+
+// D: smallest size AND rotated, so the table gets the 792px axis.
+// E: the same with no chrome, the table given the whole page.
+static void renderWideRotated(const bool fullPage) {
+  renderer.clearScreen(0xFF);
+  const int axis = renderer.getScreenHeight();  // 792 -- the long edge
+  // Full page means FULL page: 2px, not the reading margin. A table that has
+  // already cost the reader a device turn should not also give back a quarter
+  // of the axis it turned for. Owner ruling 2026-08-19.
+  const int margin = fullPage ? 2 : MARGIN;
+  const int lineH = smallLineH();
+  const int pad = 5;
+  int down = margin;  // how far down the landscape page the next row sits
+
+  if (!fullPage) {
+    drawLandscape(margin, down, "D  Smallest size, rotated", EpdFontFamily::BOLD);
+    down += lineH;
+    drawLandscape(margin, down, "turn the page clockwise, and the table gets the long axis");
+    down += lineH * 2;
+  }
+
+  const WideCols cols = planWide(axis - margin * 2, SMALL);
+  const int left = margin;  // landscape x origin
+
+  int bottom = down;
+  for (int c = 0; c < 5; c++) {
+    bottom = std::max(bottom, drawLandscapeWrapped(left + cols.x[c], down, cols.w[c], kWideHead[c], EpdFontFamily::BOLD));
+  }
+  down = bottom + pad;
+  // The header rule runs along the landscape reading direction, which on the
+  // portrait page is a VERTICAL line at x = down.
+  renderer.drawLine(down, renderer.getScreenHeight() - (left + cols.right), down,
+                    renderer.getScreenHeight() - left, 2, true);
+  down += pad + 2;
+
+  for (int r = 0; r < kWideRowCount; r++) {
+    bottom = down;
+    for (int c = 0; c < 5; c++) {
+      bottom = std::max(bottom, drawLandscapeWrapped(left + cols.x[c], down, cols.w[c], kWideRows[r].c[c]));
+    }
+    down = bottom + pad;
+  }
+}
+
 int main() {
   renderer.begin();
   if (!fontDecompressor.init()) {
@@ -279,6 +614,7 @@ int main() {
   fontCacheManager.setFontDecompressor(&fontDecompressor);
   renderer.setFontCacheManager(&fontCacheManager);
   renderer.insertFont(LIBREFRANKLIN_READER_14_FONT_ID, lfReader14Family);
+  renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, lfReader12Family);
   renderer.insertFont(SMALL_FONT_ID, smallFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12Family);
 
@@ -295,6 +631,30 @@ int main() {
   renderColumns("4  Full grid", "box, row rules and column rules", false, true);
   writeMonoPortraitBmp("fs_/table_grid.bmp", renderer);
 
-  printf("wrote 4 BMPs to fs_/\n");
+  renderWideFlat();
+  writeMonoPortraitBmp("fs_/wide_flat.bmp", renderer);
+
+  renderWideSqueezed();
+  writeMonoPortraitBmp("fs_/wide_squeezed.bmp", renderer);
+
+  renderWideSmall();
+  writeMonoPortraitBmp("fs_/wide_small.bmp", renderer);
+
+  // CLOCKWISE ONLY. The owner is right-handed and ruled on 2026-08-19 that a
+  // counter-clockwise turn is not to be offered again, so the CCW renders are
+  // gone rather than kept as an alternative nobody will pick.
+  renderWideRotated(false);
+  writeMonoPortraitBmp180("fs_/wide_rotated_cw.bmp", renderer);
+
+  renderWideRotated(true);
+  writeMonoPortraitBmp180("fs_/wide_rotated_full_cw.bmp", renderer);
+
+  renderFlatNamedOnce(false);
+  writeMonoPortraitBmp("fs_/wide_named_once.bmp", renderer);
+
+  renderFlatNamedOnce(true);
+  writeMonoPortraitBmp("fs_/wide_named_bold.bmp", renderer);
+
+  printf("wrote 7 BMPs to fs_/\n");
   return 0;
 }

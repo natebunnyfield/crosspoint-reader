@@ -4,6 +4,22 @@ Established 2026-08-08 by the navigation/widget/settings consistency audit.
 These are rules, not observations: new screens follow them, and drift from
 them is a bug. File:line references are to the state at adoption.
 
+## Rotation is clockwise. Always.
+
+**Owner ruling 2026-08-19: never offer a counter-clockwise rotation again.** He
+is right-handed, so a page the reader turns clockwise puts the device's side
+rockers where his hand already is; the mirrored option is not a trade-off worth
+rendering, discussing or re-proposing.
+
+The trap that produced one anyway, recorded because the name invites it:
+`GfxRenderer::drawTextRotated90CW` draws **counter-clockwise content**. Its name
+describes the turn the READER makes, not the transform applied to the glyphs —
+text drawn with it climbs bottom-to-top and reads once the device is turned
+clockwise. There is no clockwise-content call. `tools/table_preview` composes
+one by drawing with that call and turning the finished framebuffer 180 degrees
+(CCW + 180 = CW), which flips the page as a unit so row order survives.
+
+
 ## Choice surfaces — what shape of UI a decision gets
 
 | Decision shape | Surface | Example |
