@@ -106,6 +106,98 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 
 ## FIXED
 
+### [B-035] Only one reading font drew Unicode arrows — FIXED 2026-08-20
+**severity: medium · scope: SD-card fonts (`.cpfont`), font build tooling · fixed 2026-08-20, verified by render**
+
+Reported: "only the TeXGyreSchola reading font renders Unicode arrows. Other
+installed families show nothing (or a fallback box) where an arrow should be."
+
+**It was true, and it was in the FILES, not in the firmware.** Measured by
+parsing the shipped `.cpfont` interval tables directly, before changing
+anything — coverage of U+2190-21FF, regular style, the 16 pt cut of each
+installed family:
+
+| Family | arrows before | after |
+|---|---|---|
+| TeXGyreSchola | 4 / 128 | 112 / 128 |
+| Edgar | 0 | 112 |
+| Coelacanth | 0 | 112 |
+| LibreFranklin | 0 | 112 |
+| LibrisADF | 0 | 112 |
+| InknutJunicode | 0 | 112 |
+
+Schola's four are U+2190-2193, which its own face happens to carry. Every other
+family had none, which is exactly the report.
+
+**Mechanism.** All six families REQUEST 112 of the 128 arrow codepoints
+(`reading` reaches U+2150-22FF; the three `latin-ext` families had the block
+added explicitly on 2026-08-17). A codepoint the family's own cmap misses is
+filled from its fallback chain, so the chain's coverage IS the shipped
+coverage — and the old chain could not answer: NotoSans-Regular carries **0 of
+128** arrows (verified here against `builtinFonts/notosans_12_regular.h`, not
+taken on trust), TeX Gyre Schola 4. The build therefore asked for arrows, found
+them nowhere, and pruned them silently. `7c764cd9f` fixed the CONFIG on
+2026-08-17 by appending NotoSansMath (112/128) to the chain
+(`build-sd-fonts.py:144`, `fallback_chain_for`).
+
+**Why it was still broken three days later: nothing rebuilt the files.** A
+`.cpfont` fix reaches a surface only when that surface is regenerated, and the
+tree in `fs_/` still held cuts dated 12 and 15 August — before the fix. The
+config was right and every shipped byte was stale.
+
+**And a second, narrower version of the same fault.** Rebuilding 1x exposed it:
+`scripts/install-sim-fonts.py` rebuilt only the base tier, pruned the `2x`
+companions by FILENAME, and never mentioned `3x` at all — its own comment said
+"this script cannot regenerate those" (twice). So the first rebuild fixed
+arrows on the device and left every hi-res host build on the old glyphless
+cut. That is the worse half of the bug: the owner inspects this project through
+the simulator, so the tier he actually looks at was the one that stayed broken.
+`build-sd-fonts.py` has had a `--scale` flag the whole time; the installer just
+never called it.
+
+**Why not a renderer fallback, which is the reflex fix.** It cannot work here,
+and the measurement is the reason rather than a preference. `resolveTextFontId`
+(`lib/GfxRenderer/GfxRenderer.cpp:188-216`) is registered for the three chrome
+font ids only (`src/main.cpp:456-458`) — the reading font has no fallback at
+all — and it is gated on `utf8IsCjkCodepoint` at `:211`, so a missing arrow
+would not redirect even if it were. More decisively, **there is no face in the
+binary that could answer**: the coverage face is Noto Sans at 0/128, and a scan
+of every `builtinFonts/*.h` found arrows only in the editor monospaces, at most
+22/128 and only at 12/14 pt. A glyph nothing in flash can draw has to be in the
+`.cpfont`. Fixing the class in the renderer would mean embedding an
+arrow-capable face at all four reading sizes — a large flash cost for a block a
+one-line build change already covers.
+
+**What changed.** `scripts/install-sim-fonts.py` only. It now builds and
+installs 1x, 2x and 3x in one run, so a font-config fix cannot again reach one
+tier and silently miss the others. `--clean` is passed on the first tier only
+(it `rmtree`s the whole output dir, `build-sd-fonts.py:865`). U+2E3B THREE-EM
+DASH is dropped **at 3x only**, where it rasterises 276x8 px and overflows
+`EpdGlyph`'s uint8 width — a tier-local omission, not a removal: it is still
+built into 1x and 2x, which reproduces the 3x set already on the cards
+(verified: present in Edgar 1x and 2x, absent from Edgar 3x).
+
+**Verified**, and not by a green build:
+
+* all **72** shipped files (6 families x 4 sizes x 3 tiers) carry 112/128 arrows
+  in all four styles, parsed from the on-disk binary;
+* rendered through the REAL firmware renderer off-device — all eight reader
+  arrows draw in all six families;
+* `test/sd_font_arrows/` added, and validated failing-first: rebuilt
+  LibreFranklin with the arrow codepoints dropped and confirmed the test fails
+  on it, passes on the shipped set;
+* `pio run -e default` and `-e simulator` green; full suite 371/371.
+
+**Not confirmed on device.** No hardware in this session. The device reads the
+1x tier, which is verified in the files and in a host render, but nobody has
+seen an arrow on a panel.
+
+**Card reprovisioning is still owed.** This fixes `fs_/` (the simulator's card)
+and the tooling. The physical cards carry the pre-fix cuts until they are
+rewritten: BUNNYFIELDS and OWEN_BNF both need `python3
+scripts/install-sim-fonts.py` output copied over, hash-verified per
+`docs/sd-card-fonts.md`.
+
 ### [B-002] Upstream commits unmerged — CLOSED 2026-08-19, both resolved
 **severity: low · scope: fork sync · closed 2026-08-19**
 

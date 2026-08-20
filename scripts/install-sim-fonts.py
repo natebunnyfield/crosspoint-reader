@@ -24,6 +24,12 @@ ios/CrossPointFsPrep.cpp): a family directory under fs_/fonts/ is made to
 contain exactly the freshly built size set — stale sizes from an older ramp
 are removed.
 
+All THREE render-scale tiers are built and installed: 1x (what the device
+reads) plus the 2x and 3x hi-res companions a host build reads. Until
+2026-08-20 this script rebuilt 1x only and merely pruned the hi-res sets by
+filename, so a font-config fix landed on the device tier and left every scaled
+host build on the old glyphs — see B-035.
+
 A full run additionally removes whole family directories a tier ruling has
 CUT from installed_families: (see prune_cut_families below for exactly which
 names are eligible). Until 2026-08-12 it only ever pruned sizes WITHIN a
@@ -42,6 +48,31 @@ REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / "lib/EpdFont/scripts"
 DISPLAY_NAMES = REPO / "src/FontDisplayNames.h"
 EDITOR_FONTS = REPO / "src/notes/EditorFonts.h"
+
+# The hi-res tiers every surface carries, alongside the 1x base tier.
+#
+# 1x is what the DEVICE reads; 2x and 3x are what a host build reads at the
+# matching CROSSPOINT_RENDER_SCALE (docs/render-scale.md), and the standing
+# ruling of 2026-08-15 is that all three ship. The owner inspects this project
+# through the simulator, so a tier left stale is a fix that looks applied and
+# is not -- see the hi-res install block in main() for the case that proved it.
+HIRES_TIERS = (2, 3)
+
+# Codepoints omitted from ONE hi-res tier because they cannot be expressed there.
+#
+# EpdGlyph stores glyph width/height in uint8, so anything rasterising over
+# 255 px is unrepresentable and the build aborts rather than truncating. At 3x,
+# U+2E3B THREE-EM DASH comes out 276x8 px on the families whose `reading`
+# intervals reach it (Edgar, LibreFranklin, TeXGyreSchola), which is what
+# build-sd-fonts.py's --drop-codepoints help means by "the offender is
+# size-dependent rather than a property of the family".
+#
+# This is a TIER-LOCAL omission, not a removal from the font: U+2E3B is still
+# built into 1x and 2x, where it fits, and only a 3x host build falls back for
+# it. That also reproduces the 3x set already on the cards, which was built
+# out-of-band the same way -- verified 2026-08-20 by reading the shipped files:
+# U+2E3B is present in Edgar 1x and 2x and absent from Edgar 3x.
+TIER_OVERSIZED_DROPS = {3: ("0x2E3B",)}
 
 
 def displayname_families() -> list[str]:
@@ -166,16 +197,29 @@ def main() -> int:
 
     out_dir = SCRIPTS / "output"
     print(f"Building {len(families)} families: {', '.join(families)}")
-    # --clean: a stale output/ from an earlier run with a different size ramp
-    # would otherwise be globbed below and installed alongside the fresh
-    # sizes (this shipped a 5-size Junicode once).
-    result = subprocess.run(
-        [sys.executable, str(SCRIPTS / "build-sd-fonts.py"),
-         "--only", ",".join(families), "--output-dir", str(out_dir), "--clean"],
-        cwd=SCRIPTS,
-    )
-    if result.returncode != 0:
-        return result.returncode
+    # Build the base tier and every hi-res tier in one run, so all three reach
+    # the card together. build-sd-fonts.py --scale N writes into
+    # <output>/<Family>/<N>x/ and renames each cut back to its 1x basename
+    # (build-sd-fonts.py:587,600), which is exactly the layout installed below.
+    #
+    # --clean goes on the FIRST tier only. It rmtree's the whole output dir
+    # (build-sd-fonts.py:865), so repeating it would delete the tier just
+    # built; its job is dropping a stale ramp from an earlier run, and one
+    # clean at the start does that. (A stale output/ globbed alongside fresh
+    # sizes once shipped a 5-size Junicode.)
+    for tier in (1, *HIRES_TIERS):
+        cmd = [sys.executable, str(SCRIPTS / "build-sd-fonts.py"),
+               "--only", ",".join(families), "--output-dir", str(out_dir)]
+        if tier == 1:
+            cmd.append("--clean")
+        else:
+            cmd.extend(["--scale", str(tier)])
+        drops = TIER_OVERSIZED_DROPS.get(tier)
+        if drops:
+            cmd.extend(["--drop-codepoints", ",".join(drops)])
+        result = subprocess.run(cmd, cwd=SCRIPTS)
+        if result.returncode != 0:
+            return result.returncode
 
     fonts_root = Path(args.fs_dir) / "fonts"
     fonts_root.mkdir(parents=True, exist_ok=True)
@@ -196,20 +240,37 @@ def main() -> int:
             if old.name not in keep:
                 old.unlink()
                 print(f"  pruned stale {old.relative_to(fonts_root.parent)}")
-        # Hi-res companions (dest/2x/<same 1x filename>, see
-        # SdCardFontManager::hiResCompanionPath) are built out-of-band at
-        # doubled point sizes; this script cannot regenerate them, but a ramp
-        # change makes the old set unreachable (lookup is by 1x filename) and
-        # leaves it lying as dead weight. Prune the orphans and say so.
-        hires = dest / "2x"
-        if hires.is_dir():
+        # Hi-res companions (dest/<N>x/<same 1x filename>, see
+        # SdCardFontManager::hiResCompanionPath, which splices "<N>x/" in front
+        # of the 1x basename). These are now built in the same run as 1x above.
+        #
+        # WHY THAT MATTERS, since this script used to only prune them: a fix
+        # made in sd-fonts.yaml reaches a tier only when that tier is rebuilt.
+        # The 2026-08-17 arrow fix was correct in the config and was installed
+        # into 1x by this script, while every 2x and 3x file kept the old
+        # glyphless cut -- so arrows came back on the device and stayed missing
+        # on every scaled host build, which is where they were being looked at.
+        # Rebuilding one tier and pruning the others by filename cannot detect
+        # that: the names match, only the pixels are stale.
+        for tier in HIRES_TIERS:
+            hires_src = out_dir / family / f"{tier}x"
+            hires = dest / f"{tier}x"
+            built_hires = sorted(hires_src.glob("*.cpfont")) if hires_src.is_dir() else []
+            if built_hires:
+                hires.mkdir(exist_ok=True)
+                for f in built_hires:
+                    shutil.copy2(f, hires / f.name)
+                print(f"  installed {family} {tier}x: {len(built_hires)} sizes")
+            if not hires.is_dir():
+                continue
+            # A ramp change makes an old cut unreachable (lookup is by 1x
+            # filename) and leaves it lying as dead weight.
             for old in hires.glob("*.cpfont"):
                 if old.name not in keep:
                     old.unlink()
                     print(f"  pruned orphaned hi-res {old.relative_to(fonts_root.parent)}")
             if not any(hires.glob("*.cpfont")):
-                print(f"  NOTE: {family} hi-res set now empty — rebuild at 2x sizes "
-                      f"and install under {hires.relative_to(fonts_root.parent)}")
+                print(f"  NOTE: {family} {tier}x set now empty — no hi-res cut was built")
         print(f"  installed {family}: {len(built)} sizes -> {dest}")
 
         # The firmware scans /.fonts BEFORE /fonts and dedups by family name
@@ -217,10 +278,11 @@ def main() -> int:
         # the hidden root would silently shadow everything just installed.
         hidden = Path(args.fs_dir) / ".fonts" / family
         if hidden.is_dir():
-            # Carry a hi-res set over before deleting: the hidden copy may hold
-            # the only 2x build (this script cannot regenerate those), and the
-            # visible-root family it now shadows should inherit it. Only sizes
-            # matching the fresh ramp survive; the rest are orphans anyway.
+            # Carry a hi-res set over before deleting, for the case where the
+            # build produced no 2x cut of its own (the guard below): the hidden
+            # copy may then hold the only one, and the visible-root family it
+            # shadows should inherit it. Only sizes matching the fresh ramp
+            # survive; the rest are orphans anyway.
             hidden_hires = hidden / "2x"
             if hidden_hires.is_dir() and not (dest / "2x").is_dir():
                 salvaged = [f for f in hidden_hires.glob("*.cpfont") if f.name in keep]
