@@ -21,6 +21,13 @@ and is being re-checked on real e-ink, not discovered.
 | File | `~/crosspoint-archive/staged/20260819T2050Z-crosspoint-84846a41.bin` |
 | Commit | `84846a41b` |
 | Version string | `1.5.0-B2` (renamed from `1.5.0-BNY` in `da6736f9f`) |
+
+> **This checklist targets the bin staged on 2026-08-18**, which is why it still
+> expects `1.5.0-B2`. Builds from 2026-08-19 report **`1.5.2-BD`** — the numeric
+> triple moved because the ini had fallen behind the published releases, and the
+> suffix moved by owner instruction. Neither affects OTA: `isNewer()` parses only
+> `%d.%d.%d`. Check against the version the bin in front of you was built with,
+> not against this row.
 | Size | 4,967,904 bytes |
 | sha256 | `a36c36dc15c83c672d02549f…` |
 | Flash | 75.6% (4,954,925 of 6,553,600) · RAM 16.5% |
