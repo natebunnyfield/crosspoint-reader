@@ -319,6 +319,8 @@ class ChapterHtmlSlimParser {
   uint32_t pageStartAnchor() const {
     return chapterSourceBytes_ + (currentTextBlock ? currentTextBlock->sourceByteCount() : 0);
   }
+  // Set at </html>: expat errors on trailing bytes after it are ignored.
+  bool htmlEnded_ = false;
 
   // Footnote link tracking
   bool insideFootnoteLink = false;

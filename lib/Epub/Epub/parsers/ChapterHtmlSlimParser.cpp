@@ -3028,11 +3028,15 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
       self->listStack_.pop_back();
     }
   }
+  if (strcmp(name, "html") == 0) {
+    self->htmlEnded_ = true;
+  }
 }
 
 ChapterHtmlSlimParser::~ChapterHtmlSlimParser() { abortParse(); }
 
 bool ChapterHtmlSlimParser::beginParse() {
+  htmlEnded_ = false;
   // Initialize block style stack with a root entry representing "no ancestor block elements".
   // The user's paragraph alignment is set as the default so child elements without explicit
   // text-align inherit it correctly through getCombinedBlockStyle.
@@ -3133,6 +3137,12 @@ ChapterHtmlSlimParser::ParseStatus ChapterHtmlSlimParser::parseStep() {
     // expat's "parsing aborted", which reads like a malformed document.
     if (allocFailed_) {
       return ParseStatus::Error;
+    }
+    // Some books carry bytes after </html> (a stray footer, a second
+    // document); expat rejects them, but the chapter itself is complete.
+    if (htmlEnded_) {
+      LOG_DBG("EHP", "Ignoring trailing data after </html>: %s", XML_ErrorString(XML_GetErrorCode(xmlParser_)));
+      return ParseStatus::Done;
     }
     LOG_ERR("EHP", "Parse error at line %lu:\n%s", XML_GetCurrentLineNumber(xmlParser_),
             XML_ErrorString(XML_GetErrorCode(xmlParser_)));
