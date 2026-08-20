@@ -4,6 +4,11 @@
 .vscode
 open-x4-sdk
 fs_
+# The DESKTOP simulator's own host settings file, which it writes BESIDE the
+# simulated card -- so running .pio/build/simulator*/program from this root
+# drops one here. It is host state (window, appearance, pad dials), not firmware
+# state, and nothing in this repo should carry it.
+/settings.json
 lib/EpdFont/fontsrc
 lib/I18n/I18nKeys.h
 lib/I18n/I18nStrings.h

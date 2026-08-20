@@ -34,6 +34,44 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-033] The release binary carries a stale provenance stamp
+**severity: low · scope: build / release · handed over 2026-08-19, mechanism unconfirmed**
+
+Reported by the session that cut the 1.5.2-BD release: the binary contains
+`1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
+DISPLAYED version is correct** (1.5.2-BD on the boot screen); this is provenance
+metadata, so the likeliest visible symptom is the web UI reporting an old build.
+
+What that session established, and it is the useful half:
+
+* it survives `pio run -t clean`, so it is not a stale object;
+* plain `grep` cannot find the string in the tree, which points at a
+  **committed compressed asset** — most probably the gzipped web UI that
+  `scripts/build_html.py` embeds.
+
+Deliberately filed without a mechanism rather than guessed at. **Close by**
+finding which committed artifact carries it (start by decompressing the
+generated HTML headers and grepping those), then regenerating it — or, if it is
+baked into a committed `.gz`, making the generator stamp it at build time so it
+cannot go stale again.
+
+### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3
+**severity: low · scope: release · found 2026-08-19**
+
+Tags `1.5.3`, `1.5.4`, `1.5.5` and `1.5.6` exist locally with no releases on this
+fork — they are upstream's, arriving through the `upstream` remote. The fork is
+at **1.5.2** and numbers upward, so its next minor lands on a tag that already
+means something else.
+
+Nothing is broken yet, and that is exactly why it is worth deciding now rather
+than during a release: `git tag 1.5.3` will simply fail, in the middle of a
+publish, on a machine where the fetch happened to have run.
+
+**Close by** choosing a namespace and writing it down — a prefix the fork owns
+(`bd/1.5.3`), or skipping to a range upstream will not reach. Either is fine;
+discovering the clash mid-release is not.
+
+
 ### [B-006] X4 running firmware carries an empty version stamp
 **severity: low · scope: device provisioning · found 2026-08-02**
 
