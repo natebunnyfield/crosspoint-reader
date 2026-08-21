@@ -82,7 +82,31 @@ roughly 2x their current bytes at worst.
 - `synth_prototype.py` is a standalone experiment; nothing in the build uses
   it. Style synthesis (embolden/shear) exists but never fills coverage.
 
-## Fix options (triage pending)
+## Resolution (2026-08-20, same day)
+
+Owner triage: conversion-side fill, `reading` baseline for all six, full scope.
+
+* `sd-fonts.yaml`: InknutJunicode and LibrisADF -> `reading`; Coelacanth ->
+  `reading,greek,cyrillic` (plain reading would have silently dropped the
+  polytonic Greek and Cyrillic-ext blocks it already shipped).
+* Rebuilt and installed, all six families, all three tiers. Verified by
+  parsing the installed interval tables: U+2212, ≠, ≤, ∞, α, Δ, arrows present
+  in EVERY family at EVERY tier. Floor rose 1,094 -> 2,443 codepoints
+  (Coelacanth 2,827). iOS seedfonts mirrored and verified.
+* Two new uint8-overflow offenders surfaced by the wider set, both handled as
+  per-family tier-local drops in `install-sim-fonts.py` (`FAMILY_TIER_DROPS`)
+  rather than global ones, which would have stripped glyphs Edgar/TeXGyre/
+  LibreFranklin ship today: InknutJunicode U+2E3B at 2x + U+2E3A at 3x,
+  Coelacanth U+261C/261E (pointing hands, 265x126 px) at 3x.
+* Silent pruning is silent no more: `fontconvert_sdcard.py` now prints
+  `PRUNED N requested codepoint(s) no face in the chain can supply` with
+  compacted ranges, per style. This rebuild pruned zero.
+* B-036 fixed the same pass (see BUGS.md): kern severed in both directions
+  across a hole, `test/missing_glyph_kern/` holds it.
+
+Physical cards still carry the pre-fix cuts until rewritten.
+
+## Fix options (as triaged)
 
 1. **Conversion-side fill** — extend `intervals:` for the sparse families and
    let the existing fallback chain fill what their faces lack. No firmware

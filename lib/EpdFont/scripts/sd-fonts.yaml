@@ -500,9 +500,14 @@ families:
 
   - name: Coelacanth
     description: "Centaur revival, Venetian oldstyle (Latin, Greek, Cyrillic)"
-    # Arrows added 2026-08-17: the block was never REQUESTED here, so no
-    # fallback could supply it -- "only <x> seems to have unicode arrows".
-    intervals: latin-ext,greek,cyrillic,(0x2190-0x21FF)
+    # Raised to the `reading` baseline 2026-08-20 (owner ruling, triage of
+    # docs/font-unicode-coverage.md): U+2212 MINUS in a Claude reply drew
+    # tofu, and the split was exactly requested-intervals -- the families on
+    # `reading` had the math layer, the ones on latin-ext did not. `greek` and
+    # `cyrillic` stay listed because reading carries only their base blocks;
+    # dropping them would silently lose polytonic Greek and Cyrillic-ext,
+    # which this family HAS. The old arrow range folds into reading.
+    intervals: reading,greek,cyrillic
     # Uniform slots: xh 12/14/16/18 (exact), advY 36/42/50/55, +2..+4 over
     # target: floor-bound. Coelacanth's extenders are the longest in the set —
     # plain-ink span + 0.13 em exceeds the uniform leading at every slot, so it
@@ -558,9 +563,12 @@ families:
 
   - name: InknutJunicode
     description: "Inknut Antiqua with Junicode's real cut italics (Latin)"
-    # Arrows added 2026-08-17: the block was never REQUESTED here, so no
-    # fallback could supply it -- "only <x> seems to have unicode arrows".
-    intervals: latin-ext,(0x2190-0x21FF)
+    # Raised to the `reading` baseline 2026-08-20 (owner ruling, triage of
+    # docs/font-unicode-coverage.md) -- reading is a superset of the old
+    # latin-ext + arrows, and adds the math/symbol layer (U+2212 included)
+    # that drew tofu in Claude chat. The fallback chain fills what the face
+    # lacks.
+    intervals: reading
     # INSTALLED (owner ruling 2026-08-13). Regular = Inknut Regular, bold =
     # Inknut Bold. Italic/bolditalic are borrowed from Junicode, which ships
     # real cut italics where Inknut's foundry repo has none at any weight.
@@ -914,9 +922,12 @@ families:
     # it — but because the two fill different classification cells (grotesque
     # vs humanist) and a head-to-head only runs within one cell. No bench is
     # pending or expected; both stay installed permanently, same footing.
-    # Arrows added 2026-08-17: the block was never REQUESTED here, so no
-    # fallback could supply it -- "only <x> seems to have unicode arrows".
-    intervals: latin-ext,(0x2190-0x21FF)
+    # Raised to the `reading` baseline 2026-08-20 (owner ruling, triage of
+    # docs/font-unicode-coverage.md) -- reading is a superset of the old
+    # latin-ext + arrows, and adds the math/symbol layer (U+2212 included)
+    # that drew tofu in Claude chat. The fallback chain fills what the face
+    # lacks.
+    intervals: reading
     # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — both rows exact on all
     # four, read back from the BUILT .cpfont files and again through
     # render_harness, not computed. The hinted x-height is exactly 1 px per

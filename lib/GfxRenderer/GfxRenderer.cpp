@@ -756,15 +756,20 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
 
     cp = font.applyLigatures(cp, textCursor, style);
 
+    // B-036: the glyph is fetched BEFORE the kern so a missing one severs the
+    // pair in BOTH directions -- no kern INTO the hole here, and no kern OUT
+    // of it via the prevCp reset below. getTextBounds (EpdFont.cpp) already
+    // measures this way; if the draw side kerned where the measure side did
+    // not, a line measured as exactly fitting could draw wider and clip.
+    const EpdGlyph* glyph = font.getGlyph(cp, style);
+
     // Differential rounding: snap (previous advance + current kern) as one unit so
     // identical character pairs always produce the same pixel step regardless of
     // where they fall on the line.
     if (prevCp != 0) {
-      const auto kernFP = font.getKerning(prevCp, cp, style);  // 4.4 fixed-point kern
-      lastBaseX += fp4::toPixel(prevAdvanceFP + kernFP);       // snap 12.4 fixed-point to nearest pixel
+      const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // 4.4 FP
+      lastBaseX += fp4::toPixel(prevAdvanceFP + kernFP);  // snap 12.4 FP to nearest pixel
     }
-
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
 
     lastBaseLeft = glyph ? glyph->left : 0;
     lastBaseWidth = glyph ? glyph->width : 0;
@@ -789,7 +794,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
       } else {
         renderCharImpl<TextRotation::None, true>(*this, renderMode, *hiRes, cp, devX, devY, black, style);
       }
-      prevCp = cp;
+      prevCp = glyph ? cp : 0;  // B-036
       continue;
     }
 #endif
@@ -799,7 +804,13 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     } else {
       renderCharImpl<TextRotation::None>(*this, renderMode, font, cp, lastBaseX, yPos, black, style);
     }
-    prevCp = cp;
+    // B-036: a missing glyph must not become a kern partner. getTextBounds
+    // resets prevCp when getGlyph fails (EpdFont.cpp:38), so if the draw side
+    // kept the codepoint, a line measured as exactly fitting could draw a
+    // kern pair wider and clip at the margin. Same expression on every
+    // draw/measure loop, hiRes branches included -- the kern always comes
+    // from the BASE font, so the base glyph's presence decides on both sides.
+    prevCp = glyph ? cp : 0;
   }
 }
 
@@ -2647,19 +2658,19 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
     }
     cp = font.applyLigatures(cp, text, style);
 
+    const EpdGlyph* glyph = font.getGlyph(cp, style);
+
     // Differential rounding: snap (previous advance + current kern) together,
     // matching drawText so measurement and rendering agree exactly.
     if (prevCp != 0) {
-      const auto kernFP = font.getKerning(prevCp, cp, style);  // 4.4 fixed-point kern
-      widthPx += fp4::toPixel(prevAdvanceFP + kernFP);         // snap 12.4 fixed-point to nearest pixel
+      const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // B-036
+      widthPx += fp4::toPixel(prevAdvanceFP + kernFP);  // snap 12.4 FP to nearest pixel
     }
-
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
     prevAdvanceFP = glyph ? glyph->advanceX : 0;
     if ((style & (EpdFontFamily::SUP | EpdFontFamily::SUB)) != 0) {
       prevAdvanceFP = (prevAdvanceFP + 1) / 2;
     }
-    prevCp = cp;
+    prevCp = glyph ? cp : 0;  // B-036: see drawText -- no kern across a hole
   }
   widthPx += fp4::toPixel(prevAdvanceFP);  // final glyph's advance
   return widthPx;
@@ -2826,12 +2837,12 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
     // Differential rounding: snap (previous advance + current kern) as one unit,
     // subtracting for the rotated coordinate direction.
-    if (prevCp != 0) {
-      const auto kernFP = font.getKerning(prevCp, cp, style);  // 4.4 fixed-point kern
-      lastBaseY -= fp4::toPixel(prevAdvanceFP + kernFP);       // snap 12.4 fixed-point to nearest pixel
-    }
-
     const EpdGlyph* glyph = font.getGlyph(cp, style);
+
+    if (prevCp != 0) {
+      const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // B-036
+      lastBaseY -= fp4::toPixel(prevAdvanceFP + kernFP);  // snap 12.4 FP to nearest pixel
+    }
 
     lastBaseLeft = glyph ? glyph->left : 0;
     lastBaseWidth = glyph ? glyph->width : 0;
@@ -2842,12 +2853,12 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     if (hiRes && hiRes->getGlyph(cp, style)) {
       renderCharImpl<TextRotation::Rotated90CW, true>(*this, renderMode, *hiRes, cp, x * renderScale(),
                                                       lastBaseY * renderScale(), black, style);
-      prevCp = cp;
+      prevCp = glyph ? cp : 0;  // B-036
       continue;
     }
 #endif
     renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, x, lastBaseY, black, style);
-    prevCp = cp;
+    prevCp = glyph ? cp : 0;  // B-036
   }
 }
 
@@ -2931,14 +2942,15 @@ void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int 
 
     cp = font.applyLigatures(cp, text, style);
 
+    const EpdGlyph* glyph = font.getGlyph(cp, style);
+
     // Differential rounding, as in the CW twin -- ADDING here, because this
     // rotation runs the other way down the page.
     if (prevCp != 0) {
-      const auto kernFP = font.getKerning(prevCp, cp, style);  // 4.4 fixed-point kern
-      lastBaseY += fp4::toPixel(prevAdvanceFP + kernFP);       // +: this run DESCENDS the page
+      const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // B-036
+      lastBaseY += fp4::toPixel(prevAdvanceFP + kernFP);  // +: this run DESCENDS the page
     }
 
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
 
     lastBaseLeft = glyph ? glyph->left : 0;
     lastBaseWidth = glyph ? glyph->width : 0;
@@ -2949,12 +2961,12 @@ void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int 
     if (hiRes && hiRes->getGlyph(cp, style)) {
       renderCharImpl<TextRotation::Rotated90CCW, true>(*this, renderMode, *hiRes, cp, x * renderScale(),
                                                        lastBaseY * renderScale(), black, style);
-      prevCp = cp;
+      prevCp = glyph ? cp : 0;  // B-036
       continue;
     }
 #endif
     renderCharImpl<TextRotation::Rotated90CCW>(*this, renderMode, font, cp, x, lastBaseY, black, style);
-    prevCp = cp;
+    prevCp = glyph ? cp : 0;  // B-036
   }
 }
 

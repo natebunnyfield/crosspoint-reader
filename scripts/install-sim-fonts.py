@@ -74,6 +74,22 @@ HIRES_TIERS = (2, 3)
 # U+2E3B is present in Edgar 1x and 2x and absent from Edgar 3x.
 TIER_OVERSIZED_DROPS = {3: ("0x2E3B",)}
 
+# And the PER-FAMILY layer of the same problem. InknutJunicode's em is wide
+# enough (its styles carry a scale override) that U+2E3B overflows already at
+# 2x (289x5 px) and U+2E3A TWO-EM DASH joins it at 3x (286x8 px) -- both hit
+# for the first time when the family moved to the `reading` intervals
+# (2026-08-20), whose U+2E00-2E7F block latin-ext never reached. These CANNOT
+# go into TIER_OVERSIZED_DROPS: Edgar, TeXGyreSchola and LibreFranklin all
+# ship U+2E3B at 2x and U+2E3A at 3x today (verified against the installed
+# files), and a global drop would silently remove them. Families listed here
+# are built by their own build-sd-fonts invocation with the union of drops.
+FAMILY_TIER_DROPS = {
+    "InknutJunicode": {2: ("0x2E3B",), 3: ("0x2E3A",)},
+    # The pointing hands, supplied by the fallback chain, rasterise 265x126 px
+    # against Coelacanth's metrics at 3x. Still in its 1x and 2x.
+    "Coelacanth": {3: ("0x261C", "0x261E")},
+}
+
 
 def displayname_families() -> list[str]:
     """Directory names from the FontDisplayNames entry table, in order."""
@@ -207,19 +223,31 @@ def main() -> int:
     # built; its job is dropping a stale ramp from an earlier run, and one
     # clean at the start does that. (A stale output/ globbed alongside fresh
     # sizes once shipped a 5-size Junicode.)
+    first_invocation = True
     for tier in (1, *HIRES_TIERS):
-        cmd = [sys.executable, str(SCRIPTS / "build-sd-fonts.py"),
-               "--only", ",".join(families), "--output-dir", str(out_dir)]
-        if tier == 1:
-            cmd.append("--clean")
-        else:
-            cmd.extend(["--scale", str(tier)])
-        drops = TIER_OVERSIZED_DROPS.get(tier)
-        if drops:
-            cmd.extend(["--drop-codepoints", ",".join(drops)])
-        result = subprocess.run(cmd, cwd=SCRIPTS)
-        if result.returncode != 0:
-            return result.returncode
+        # Families needing their own extra drops at this tier build in their
+        # own invocation -- --drop-codepoints is global to a run, so batching
+        # them with the rest would strip those codepoints from families that
+        # carry them fine (see FAMILY_TIER_DROPS).
+        groups: dict[tuple[str, ...], list[str]] = {}
+        for fam in families:
+            extra = tuple(FAMILY_TIER_DROPS.get(fam, {}).get(tier, ()))
+            groups.setdefault(extra, []).append(fam)
+        for extra, group in sorted(groups.items()):
+            cmd = [sys.executable, str(SCRIPTS / "build-sd-fonts.py"),
+                   "--only", ",".join(group), "--output-dir", str(out_dir)]
+            if first_invocation:
+                # --clean rmtree's the whole output dir; once, up front.
+                cmd.append("--clean")
+                first_invocation = False
+            if tier != 1:
+                cmd.extend(["--scale", str(tier)])
+            drops = tuple(TIER_OVERSIZED_DROPS.get(tier, ())) + extra
+            if drops:
+                cmd.extend(["--drop-codepoints", ",".join(drops)])
+            result = subprocess.run(cmd, cwd=SCRIPTS)
+            if result.returncode != 0:
+                return result.returncode
 
     fonts_root = Path(args.fs_dir) / "fonts"
     fonts_root.mkdir(parents=True, exist_ok=True)

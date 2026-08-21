@@ -887,12 +887,21 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # DPI and doubles total rasterization time for no benefit.
     print(f"  [{style_label}] Validating intervals against font...", file=sys.stderr)
     validated_intervals = []
+    # The audit trail for silent pruning. Every REQUESTED codepoint that no
+    # face in the chain can supply lands here and is PRINTED below -- this
+    # audit exists because U+2212 MINUS shipped missing from three families
+    # and the first anyone knew was tofu in a Claude reply on the device
+    # (docs/font-unicode-coverage.md, 2026-08-20). Explicit --drop-codepoints
+    # are not listed: those are chosen, not lost.
+    pruned_codepoints = []
     for i_start, i_end in intervals:
         start = i_start
         for code_point in range(i_start, i_end + 1):
             has_primary = face.get_char_index(code_point) != 0 or code_point in ligature_glyph_indices
             has_fallback = any(fb.get_char_index(code_point) != 0
                                for fb in fallback_faces)
+            if not has_primary and not has_fallback and code_point not in (drop_codepoints or ()):
+                pruned_codepoints.append(code_point)
             # An explicit drop is treated as "not covered" so it splits the
             # interval through the SAME path a genuinely missing glyph takes.
             # Dropping via the source cmap does not work here: the fallback face
@@ -908,6 +917,20 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 start = code_point + 1
         if start <= i_end:
             validated_intervals.append((start, i_end))
+
+    if pruned_codepoints:
+        # Compact ranges, so a lost block reads as one line, not 256.
+        ranges = []
+        for cp in pruned_codepoints:
+            if ranges and cp == ranges[-1][1] + 1:
+                ranges[-1][1] = cp
+            else:
+                ranges.append([cp, cp])
+        pretty = ", ".join(f"U+{a:04X}" if a == b else f"U+{a:04X}-{b:04X}"
+                           for a, b in ranges)
+        print(f"  [{style_label}] PRUNED {len(pruned_codepoints)} requested "
+              f"codepoint(s) no face in the chain can supply: {pretty}",
+              file=sys.stderr)
 
     intervals = validated_intervals
     total_glyphs = sum(end - start + 1 for start, end in intervals)
