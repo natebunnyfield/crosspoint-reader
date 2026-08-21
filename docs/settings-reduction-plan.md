@@ -10,6 +10,36 @@ percents, grainCoverage, blotchDepth, palettePreset, four custom hex fields)
 are being worked by another agent right now and are deliberately NOT triaged
 here.
 
+**STATUS: EXECUTED 2026-08-21** — owner ruling, verbatim: *"yes to all of
+these"*, landed as 8ff603517 and released the same night in 1.5.4-BD. The
+places the executed change differs from the table below:
+
+* **lineSpacing stayed a live field** (row deleted, value persisted manually).
+  The plan called it web-only; the compiler found a designed on-device chord —
+  Confirm held + side button steps it (EpubReaderActivity ~:526). Deleting a
+  live gesture on a mischaracterization would be silent capability removal, so
+  the chord and field stay; only the settings surface is gone.
+* **sleepScreen options trimmed** (second ruling, same day, off live renders:
+  *"keep calendar and westside calendar"*): CALENDAR_FOUR/FIVE/SIX withdrawn —
+  FIVE was a literal duplicate of CALENDAR, both drawing the 5-week Spanish/CR
+  screen. Enum values stay frozen as the persisted encoding; stale saves remap
+  to CALENDAR on load, and the render switch folds the three onto the classic
+  screen. The trim surfaced a mechanism gap caught by SCREENSHOT, not tests:
+  `settingorder::resolve` demanded a full permutation, so the shortened order
+  silently degraded to identity and the picker showed all twelve. Withdrawal
+  is now explicit (`withDisplaySubset`); the permutation gate stays the
+  default so an accidentally short table still cannot hide a choice.
+* **iOS renderScale NOT hardcoded yet** — gated on a phone-side 2x-vs-3x
+  eyeball by the plan's own wording.
+* **iOS Settings.bundle rows NOT edited yet** — deferred behind the
+  color-pages agent so Root.plist is edited once.
+* Executed removals also deleted their dead plumbing: the sleep-timeout
+  picker, the quickResume auto-enable machine (sleepscreen::reconcile +
+  initialState + 7 of 10 policy tests), the frontButton remap
+  parsing/validator (the "RemapFrontButtons sub-activity" it credited never
+  existed), the web page's quickResume/shortPwrBtn JS coupling, and the
+  per-board hasTouch() list filters.
+
 Likelihood calibration comes from standing rulings: four of five themes
 deleted; mottleCells removed as a setting the day it was asked; Display /
 Controls / Reader tabs withdrawn; "dedicated e-reader, not a Swiss Army knife";
