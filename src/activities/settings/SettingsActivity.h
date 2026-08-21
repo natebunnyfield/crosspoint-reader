@@ -215,15 +215,11 @@ class SettingsActivity final : public Activity {
   // web settings API.
   std::vector<SettingInfo> deviceSettings;
 
-  bool preserveQuickResumeTimeoutOn = false;
-  bool quickResumeTimeoutAutoEnabled = false;
 
   OptionPopup optionPopup;
 
   void toggleCurrentSetting();
-  void openSleepTimeoutPicker();
   void rebuildSettingsLists();
-  void syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged);
 
  public:
   explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

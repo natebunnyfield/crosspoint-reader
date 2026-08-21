@@ -85,29 +85,11 @@ TEST_F(ListPaging, FrontButtonsStillStepAndDoNotPage) {
   EXPECT_FALSE(host::input().wasPressed(Button::PagePrevious));
 }
 
-TEST_F(ListPaging, PagingFollowsTheUsersSideButtonSwap) {
-  // Same setting the reader's page turns use, so paging a list runs the same
-  // way round as paging the book.
-  SETTINGS.sideButtonLayout = CrossPointSettings::NEXT_PREV;
-
-  press(HalGPIO::BTN_UP);
-  EXPECT_TRUE(host::input().wasPressed(Button::PageNext)) << "under NEXT_PREV the TOP side button pages forward";
-  EXPECT_FALSE(host::input().wasPressed(Button::PagePrevious));
-}
-
-TEST_F(ListPaging, PagingStillWorksWhenSideButtonsAreDisabled) {
-  // SIDE_BUTTONS_DISABLED exists to stop the side buttons turning BOOK pages.
-  // Honoring it here would leave every list with no page control at all — the
-  // same trap ReaderUtils.h records for the reader's side font controls, where
-  // routing through the paging aliases made the feature dead on exactly the
-  // devices whose owner had opted out.
-  SETTINGS.sideButtonLayout = CrossPointSettings::SIDE_BUTTONS_DISABLED;
-
-  press(HalGPIO::BTN_DOWN);
-  EXPECT_TRUE(host::input().wasPressed(Button::PageNext));
-  EXPECT_FALSE(host::input().wasPressed(Button::PageBack))
-      << "book paging stays inert, which is what the setting means";
-}
+// PagingFollowsTheUsersSideButtonSwap and PagingStillWorksWhenSideButtonsAre-
+// Disabled were deleted 2026-08-21 with the sideButtonLayout setting itself:
+// the mapping is hardcoded PREV_NEXT (docs/settings-reduction-plan.md), so
+// there is no swap to follow and no disabled state to survive. The default
+// mapping's coverage stays in the tests above.
 
 // ---------------------------------------------------------------------------
 // 2. The paging arithmetic

@@ -181,14 +181,21 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // is the one exception and is always normal polarity: it carries its own
   // light/dark choice in `sleepScreen` below, and it stays on the panel while
   // the device is powered off, where no runtime flag is left to interpret it.
+  // SETTINGS REDUCTION, owner ruling 2026-08-21 ("yes to all"): every field
+  // below declared `static constexpr` is a former setting hardcoded at its
+  // ruled value -- see docs/settings-reduction-plan.md for the per-field
+  // rationale and odds table. Readers compile unchanged; anything that tries
+  // to WRITE one fails to compile, which is the point. The JSON keys of
+  // removed rows are simply ignored by fromJson (ArduinoJson lookups miss),
+  // so old settings.json files still load.
   uint8_t darkMode = 0;
 
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings
-  uint8_t sleepScreenCoverMode = FIT;
+  static constexpr uint8_t sleepScreenCoverMode = FIT;
   // Sleep screen cover filter
-  uint8_t sleepScreenCoverFilter = NO_FILTER;
+  static constexpr uint8_t sleepScreenCoverFilter = NO_FILTER;
   // Status bar settings. Every element defaults to hidden, matching the pin in
   // normalizeRetiredSettings() — the Customise Status Bar screen is no longer
   // reachable, and a fresh install never runs fromJson() (PersistableStore's
@@ -203,7 +210,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // list entries seasonally; existing devices keep whatever byte they stored.
   uint8_t clockUtcOffsetQ = 28;
   // Clock display format: 0 = 24-hour, 1 = 12-hour
-  uint8_t clockFormat = 0;
+  static constexpr uint8_t clockFormat = 0;  // 24-hour, hardcoded 2026-08-21
   // Set once an NTP sync succeeds. Used to skip re-syncing on every WiFi connect.
   // Resetting to 0 (e.g. via the web UI) forces a re-sync on next WiFi connect.
   uint8_t clockHasBeenSynced = 0;
@@ -234,7 +241,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // ~500 ms regardless -- they just queue refreshes back to back, which costs
   // panel energy and accelerates ghosting for no throughput gain.
   static constexpr uint8_t DEFAULT_DISPLAY_DEBOUNCE = 3;  // 250 ms
-  uint8_t displayDebounce = DEFAULT_DISPLAY_DEBOUNCE;
+  static constexpr uint8_t displayDebounce = DEFAULT_DISPLAY_DEBOUNCE;
 
   // Milliseconds of quiet after the last keystroke before the panel redraws.
   // Low values refresh more often; on e-ink the refresh itself is ~570 ms, so
@@ -278,10 +285,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t editorFontSize = 12;
 
   // Text rendering settings
-  uint8_t extraParagraphSpacing = 1;
+  static constexpr uint8_t extraParagraphSpacing = 1;
   // TEXT_ANTIALIASING value (0=Off, 1=Standard, 2=Crisp, 3=Dark). Non-zero
   // still reads as "AA enabled" everywhere the old toggle was tested as a bool.
-  uint8_t textAntiAliasing = TEXT_AA_STANDARD;
+  static constexpr uint8_t textAntiAliasing = TEXT_AA_STANDARD;
   // Short power button click behavior.
   //
   // SLEEP, not IGNORE, and it must stay in step with the pin in
@@ -293,18 +300,18 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // fresh unit's power button did nothing while an upgraded one slept — the
   // exact "pinning is only half" trap CLAUDE.md documents. Owner ruling: SLEEP
   // on both.
-  uint8_t shortPwrBtn = SLEEP;
+  static constexpr uint8_t shortPwrBtn = SLEEP;
   // EPUB reading orientation settings
   // 0 = portrait (default), 1 = landscape clockwise, 2 = inverted, 3 = landscape counter-clockwise
   // Button layouts (front layout retained for migration only)
-  uint8_t frontButtonLayout = BACK_CONFIRM_LEFT_RIGHT;
-  uint8_t sideButtonLayout = PREV_NEXT;
+  static constexpr uint8_t frontButtonLayout = BACK_CONFIRM_LEFT_RIGHT;
+  static constexpr uint8_t sideButtonLayout = PREV_NEXT;
   // Front button remap (logical -> hardware)
   // Used by MappedInputManager to translate logical buttons into physical front buttons.
-  uint8_t frontButtonBack = FRONT_HW_BACK;
-  uint8_t frontButtonConfirm = FRONT_HW_CONFIRM;
-  uint8_t frontButtonLeft = FRONT_HW_LEFT;
-  uint8_t frontButtonRight = FRONT_HW_RIGHT;
+  static constexpr uint8_t frontButtonBack = FRONT_HW_BACK;
+  static constexpr uint8_t frontButtonConfirm = FRONT_HW_CONFIRM;
+  static constexpr uint8_t frontButtonLeft = FRONT_HW_LEFT;
+  static constexpr uint8_t frontButtonRight = FRONT_HW_RIGHT;
   // Reader font settings
   uint8_t fontFamily = BUILTIN_LIBRE_FRANKLIN;
   // Reader font size, as a slot into the active family's ascending size ramp.
@@ -319,17 +326,22 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Set when a pre-slot settings file was read: the slot cannot be derived until
   // the font registry exists, so SdCardFontSystem::begin() does it once and saves.
   bool fontSlotNeedsMigration = false;
+  // NOT constexpr, alone in this block: the 2026-08-21 reduction assumed every
+  // reading-taste field was web-only, and this one is not -- the reader has a
+  // designed CHORD (Confirm held + side button, EpubReaderActivity ~:526) that
+  // steps it on-device, the same gesture family as the font-size ramp. The
+  // settings ROW is gone; the field persists via the manual key in toJson().
   uint8_t lineSpacing = NORMAL;
-  uint8_t paragraphAlignment = JUSTIFIED;
+  static constexpr uint8_t paragraphAlignment = JUSTIFIED;
   // Auto-sleep timeout setting (default 10 minutes). Legacy sleepTimeout enum values are migration-only.
-  uint8_t sleepTimeoutMinutes = 10;
+  static constexpr uint8_t sleepTimeoutMinutes = 10;
   // E-ink refresh frequency (default 15 pages)
-  uint8_t refreshFrequency = REFRESH_15;
+  static constexpr uint8_t refreshFrequency = REFRESH_15;
   // Pinned to 1 by normalizeRetiredSettings() now that the Reader tab is
   // withdrawn; the default matches so fresh installs agree. It shipped 0, and a
   // device that has one lands on 1 the next time settings.json is read — which
   // re-renders cached sections, since hyphenation is part of ReaderRenderSpec.
-  uint8_t hyphenationEnabled = 1;
+  static constexpr uint8_t hyphenationEnabled = 1;
 
   // Reader screen margin settings
   // Extra margin in pixels, added on top of the panel's bezel margins
@@ -346,13 +358,13 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t screenMargin = SCREEN_MARGIN_DEFAULT;
   // Hide battery percentage. Pinned to HIDE_ALWAYS by normalizeRetiredSettings();
   // the default matches so fresh installs agree.
-  uint8_t hideBatteryPercentage = HIDE_ALWAYS;
+  static constexpr uint8_t hideBatteryPercentage = HIDE_ALWAYS;
   // Long-press page turn button behavior. Defaults to stepping the reader font size
   // (long-press page-back = smaller, page-forward = larger). Note this default also
   // decides the page-turn EDGE: ReaderUtils::detectPageTurn() turns on button PRESS only
   // while this is OFF, and on RELEASE otherwise, so that a hold can be told apart from a
   // tap. Every fresh install therefore turns pages on release.
-  uint8_t longPressButtonBehavior = FONT_SIZE_STEP;
+  static constexpr uint8_t longPressButtonBehavior = FONT_SIZE_STEP;
   // Typeface the UI chrome is drawn in -- headers, list rows, button hints,
   // popups, the battery readout. Swaps all three UI sizes (8/10/12 pt) at once;
   // the reader's body face is a separate setting and is not affected.
@@ -362,7 +374,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // systemFont key -- there is no value to preserve there, and the alternative
   // is a default nobody chose. A settings.json that already names a font keeps
   // it; Ubuntu stays available and unchanged at index 0.
-  uint8_t systemFont = SYSTEM_FONT_LIBREFRANKLIN;
+  static constexpr uint8_t systemFont = SYSTEM_FONT_LIBREFRANKLIN;
   // Text-entry keyboard for every entry field (searches, WiFi passwords, owner
   // name, renames). 13-grid is the default: the 2026-08-04 design ruling picked
   // it as THE keyboard; QWERTY stays selectable for the unconvinced, and the
@@ -370,11 +382,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // gets the ruling's default, same reasoning as systemFont above.
   uint8_t keyboardLayout = KEYBOARD_GRID13;
   // Sunlight fading compensation
-  uint8_t fadingFix = 0;
+  static constexpr uint8_t fadingFix = 0;
   // Power button return from footnotes (1 = enabled, 0 = disabled)
-  uint8_t pwrBtnFootnoteBack = 1;
+  static constexpr uint8_t pwrBtnFootnoteBack = 1;
   // Use book's embedded CSS styles for EPUB rendering (1 = enabled, 0 = disabled)
-  uint8_t embeddedStyle = 1;
+  static constexpr uint8_t embeddedStyle = 1;
   // Focus Reading - emphasizes the first part of words with bold
   uint8_t focusReadingEnabled = 0;
   // SD card font family name (empty = use built-in fontFamily)
@@ -387,11 +399,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Move epub to /Read/ folder on SD card when finished (0 = disabled, 1 = enabled)
   uint8_t moveFinishedToReadFolder = 0;
   // Short press Back goes to file browser instead of home (0 = disabled, 1 = enabled)
-  uint8_t backShortToFileBrowser = 0;
+  static constexpr uint8_t backShortToFileBrowser = 0;
   // Image rendering mode in EPUB reader
-  uint8_t imageRendering = IMAGES_DISPLAY;
+  static constexpr uint8_t imageRendering = IMAGES_DISPLAY;
   // Touch screen reader zones/gestures on boards with a touch controller.
-  uint8_t touchReaderControls = TOUCH_READER_ON;
+  static constexpr uint8_t touchReaderControls = TOUCH_READER_ON;
   // Language setting (Language enum index, default 0 = EN)
   uint8_t language = 0;
   // Quick Resume: keep current content visible with moon icon instead of showing a static sleep screen.
@@ -403,7 +415,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Screen setting look broken out of the box: pick Calendar, watch the row
   // update, never see it. Turning it on is still one row away, and picking the
   // Quick Resume sleep screen turns it on for you.
-  uint8_t quickResumeSleepScreen = QUICK_RESUME_NEVER;
+  static constexpr uint8_t quickResumeSleepScreen = QUICK_RESUME_NEVER;
   // Keep the HOST screen awake while CrossPoint is in the foreground
   // (0 = let the host dim/lock normally, 1 = suppress it).
   //
@@ -412,7 +424,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // persistence are #ifdef SIMULATOR (see SettingsList.h). On an X4/X3 there is
   // no backlight and no idle timer to suppress — the e-ink panel holds its image
   // with no power — so the value is simply never read on device.
-  uint8_t keepScreenAwake = 0;
+  static constexpr uint8_t keepScreenAwake = 0;
 
   static constexpr uint8_t MIN_SLEEP_TIMEOUT_MINUTES = 1;
   static constexpr uint8_t SLEEP_TIMEOUT_NEVER_MINUTES = 31;
@@ -458,8 +470,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   void toJson(JsonDocument& doc) const;
   bool fromJson(JsonVariantConst doc);
 
-  static void validateFrontButtonMapping(CrossPointSettings& settings);
-  static uint8_t sleepTimeoutEnumToMinutes(uint8_t legacyValue);
 
  private:
   // Pins values whose UI has been withdrawn back into a valid, reachable

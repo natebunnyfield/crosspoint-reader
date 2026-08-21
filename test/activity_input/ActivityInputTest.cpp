@@ -323,46 +323,11 @@ TEST_F(ActivityInput, ReplaceCurrentActivityPreservesStack) {
 // the device was broken.
 // ===========================================================================
 
-TEST_F(ActivityInput, LogicalBackFollowsTheUserRemap) {
-  // Default mapping.
-  host::buttons().simSetDown(HalGPIO::BTN_BACK, true);
-  host::buttons().update();
-  EXPECT_TRUE(host::input().wasPressed(MappedInputManager::Button::Back));
-  EXPECT_FALSE(host::input().wasPressed(MappedInputManager::Button::Confirm));
-
-  host::reset();
-
-  // Remapped: Back now lives on the physical Right button, and logical Back
-  // must follow it (MappedInputManager.cpp:20-22).
-  SETTINGS.frontButtonBack = CrossPointSettings::FRONT_HW_RIGHT;
-  SETTINGS.frontButtonRight = CrossPointSettings::FRONT_HW_BACK;
-
-  host::buttons().simSetDown(HalGPIO::BTN_RIGHT, true);
-  host::buttons().update();
-  EXPECT_TRUE(host::input().wasPressed(MappedInputManager::Button::Back));
-
-  host::buttons().simSetDown(HalGPIO::BTN_RIGHT, false);
-  host::buttons().update();
-  EXPECT_TRUE(host::input().wasReleased(MappedInputManager::Button::Back));
-  EXPECT_FALSE(host::input().isPressed(MappedInputManager::Button::Back));
-}
-
-TEST_F(ActivityInput, FontSelectionLeavesViaTheRemappedBackButton) {
-  SETTINGS.frontButtonBack = CrossPointSettings::FRONT_HW_RIGHT;
-  SETTINGS.frontButtonRight = CrossPointSettings::FRONT_HW_BACK;
-
-  host::setRootActivity(makeFontSelection());
-  ASSERT_EQ(host::currentActivityName(), "FontSelect");
-  host::resetCounters();
-
-  // Press-exit: exits on the press of the remapped Back button.
-  host::pressFrame(HalGPIO::BTN_RIGHT);
-  EXPECT_EQ(host::counters().pops, 1);
-  // Release is swallowed by swallowUntilIdle; no second pop.
-  const int popsAfterPress = host::counters().pops;
-  host::releaseFrame(HalGPIO::BTN_RIGHT);
-  EXPECT_EQ(host::counters().pops, popsAfterPress);
-}
+// LogicalBackFollowsTheUserRemap and FontSelectionLeavesViaTheRemappedBack-
+// Button were deleted 2026-08-21 with the frontButton* remap bytes: the
+// mapping is hardcoded to the identity (docs/settings-reduction-plan.md --
+// the "RemapFrontButtons sub-activity" the serializer credited never
+// existed), so there is no remap for logical Back to follow.
 
 // ===========================================================================
 // One physical edge, one action. Holding Back must not exit on its own: only

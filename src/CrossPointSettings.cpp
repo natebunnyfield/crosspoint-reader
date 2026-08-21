@@ -29,37 +29,7 @@ void copyToField(char* dest, const char* src, const size_t maxLen) {
 
 }  // namespace
 
-void CrossPointSettings::validateFrontButtonMapping(CrossPointSettings& settings) {
-  const uint8_t mapping[] = {settings.frontButtonBack, settings.frontButtonConfirm, settings.frontButtonLeft,
-                             settings.frontButtonRight};
-  for (size_t i = 0; i < 4; i++) {
-    for (size_t j = i + 1; j < 4; j++) {
-      if (mapping[i] == mapping[j]) {
-        settings.frontButtonBack = FRONT_HW_BACK;
-        settings.frontButtonConfirm = FRONT_HW_CONFIRM;
-        settings.frontButtonLeft = FRONT_HW_LEFT;
-        settings.frontButtonRight = FRONT_HW_RIGHT;
-        return;
-      }
-    }
-  }
-}
 
-uint8_t CrossPointSettings::sleepTimeoutEnumToMinutes(const uint8_t legacyValue) {
-  switch (legacyValue) {
-    case SLEEP_1_MIN:
-      return 1;
-    case SLEEP_5_MIN:
-      return 5;
-    case SLEEP_15_MIN:
-      return 15;
-    case SLEEP_30_MIN:
-      return 30;
-    case SLEEP_10_MIN:
-    default:
-      return 10;
-  }
-}
 
 void CrossPointSettings::toJson(JsonDocument& doc) const {
   const CrossPointSettings& s = *this;
@@ -83,11 +53,10 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
     }
   }
 
-  // Front button remap — managed by RemapFrontButtons sub-activity, not in SettingsList.
-  doc["frontButtonBack"] = frontButtonBack;
-  doc["frontButtonConfirm"] = frontButtonConfirm;
-  doc["frontButtonLeft"] = frontButtonLeft;
-  doc["frontButtonRight"] = frontButtonRight;
+  // frontButton* keys: gone 2026-08-21. The comment here used to credit a
+  // "RemapFrontButtons sub-activity" that does not exist anywhere in the tree
+  // -- the four bytes were write-only persistence. Hardcoded to the identity
+  // mapping in CrossPointSettings.h; old keys in settings.json are ignored.
   // Font family and size — both use dynamic getter/setters in SettingsList (the
   // option lists depend on the SD font registry), so the generic loop skips them.
   doc["fontFamily"] = fontFamily;
@@ -97,6 +66,9 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // skips it. Without this line the margin silently resets to its default on
   // every boot -- the row still worked, which is what made it invisible.
   doc["screenMargin"] = screenMargin;
+  // lineSpacing: its settings row was deleted 2026-08-21 but the reader's
+  // Confirm+side chord still steps it, so it persists by hand like screenMargin.
+  doc["lineSpacing"] = lineSpacing;
   // The resolved point size is written too, and is what pre-slot firmware reads
   // back from "fontSize" if this card is moved to an older build.
   doc["fontSize"] = fontPointSize;
@@ -128,114 +100,18 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
 }
 
 void CrossPointSettings::normalizeRetiredSettings() {
-  // The reader is portrait-only and no longer exposes any way to rotate. A
-  // save written before the controls were withdrawn can still hold a landscape
-  // or inverted value, which would otherwise be permanent, so it is pinned
-  // back on every load. The field itself stays: ReaderUtils, UITheme and the
-  // sleep screens all still read it.
+  // Nearly this whole function retired itself on 2026-08-21: the settings it
+  // pinned every load (hideBatteryPercentage, shortPwrBtn, longPress,
+  // clockFormat, the two cover rows, systemFont, the reading-taste block) are
+  // now `static constexpr` in CrossPointSettings.h -- hardcoded at exactly the
+  // values the pins held, per the owner's "yes to all" on
+  // docs/settings-reduction-plan.md. A pin was a promise the value could not
+  // drift; the type system now keeps it.
   //
-  // Runs at the end of fromJson(), i.e. under PersistableStore's storeMutex —
-  // no extra locking here.
-  //
-  // longPressButtonBehavior deliberately has NO line here. Index 2 was the
-  // retired ORIENTATION_CHANGE and is now FONT_SIZE_STEP, a live choice with a
-  // label of its own, so pinning it would silently wipe the setting — including
-  // the factory default — on every load. Out-of-range values are still clamped
-  // by the generic enum loop in fromJson().
-  //
-
-  // The Display tab, Manage Fonts and Customise Status Bar were withdrawn from
-  // the device Settings UI. The settings below have no on-device control left,
-  // so they are pinned to the values the UI used to be set to rather than left
-  // wherever an older save happened to leave them. The fields stay live: the
-  // status bar renderer and the sleep path still read them, and they remain in
-  // getSettingsList() so both persistence and the web settings API keep
-  // working. A change made over the web therefore lasts until the next load,
-  // which is the same contract `orientation` has.
-  //
-  // `uiTheme` used to be pinned here. It no longer exists: on 2026-08-04 the
-  // four other themes were deleted and UITheme::setTheme() builds Lyra Six
-  // unconditionally, so there is nothing left to pin or to persist.
-  // quickResumeSleepScreen deliberately has NO line here any more. It was pinned
-  // when its only control lived on the withdrawn Display tab; it now has a real
-  // row under System (SettingsList.h), and pinning a visible control would
-  // silently revert the owner's choice on the next load.
-  hideBatteryPercentage = HIDE_ALWAYS;
-
-  // editorFont deliberately has NO line here any more, and must not get one.
-  //
-  // It used to: a Space Mono shift applied on every load. That was the bug —
-  // this function cannot see the JSON document, only the already-clamped field,
-  // and it runs unconditionally, so a non-idempotent rewrite here re-applied
-  // itself every boot and walked a saved choice down the list one row per
-  // reboot. The editor font is now resolved in fromJson(), from the family NAME,
-  // where the raw document is in scope and the legacy path can be gated on the
-  // name key being absent. See src/notes/EditorFonts.h.
-
-  // Status bar: every element hidden. Thickness is left alone — it only has an
-  // effect while the progress bar is drawn, and it is not a visibility control.
-
-  // The Controls tab was withdrawn from the device Settings UI, so these two have
-  // no on-device control left and are pinned to the behavior the owner wants
-  // rather than left wherever an older save happened to leave them. They stay
-  // live and web-settable: the reader reads shortPwrBtn every frame and
-  // longPressButtonBehavior gates the font-size gesture.
-  shortPwrBtn = SHORT_PWRBTN::SLEEP;
-  longPressButtonBehavior = FONT_SIZE_STEP;
-
-  // Clock Format and the two Sleep Screen Cover rows were withdrawn from the
-  // device Settings UI on 2026-08-15 (T-019) by moving them to the retired
-  // DISPLAY category, which rebuildSettingsLists() drops. They keep persisting
-  // and stay web-settable, so a save written while the pickers still existed
-  // could otherwise hold a choice forever with no way to change it back.
-  //
-  // Pinned to the values the field initialisers already carry (owner ruling
-  // 2026-08-15), so a fresh install and an upgraded one agree and nothing
-  // visibly changes for a new device. The only people moved are those who had
-  // picked 12-hour, CROP, or a cover filter.
-  clockFormat = 0;  // 24-hour
-  sleepScreenCoverMode = FIT;
-  sleepScreenCoverFilter = NO_FILTER;
-
-  // Libre Franklin is the only System font (owner ruling 2026-08-07) and its row
-  // is withdrawn from the device UI, so a save written while the picker still
-  // existed must not keep the chrome on Ubuntu or a Noto face forever. The field
-  // initialiser in CrossPointSettings.h is already SYSTEM_FONT_LIBREFRANKLIN, so
-  // a fresh install and an upgraded one now agree — pinning without that would
-  // leave them disagreeing, which is the half-fix CLAUDE.md warns about.
-  systemFont = SYSTEM_FONT_LIBREFRANKLIN;
-
-  // The Reader tab was withdrawn from the device Settings UI (2026-08-04). Two
-  // of its rows survived and moved to System — the Text Settings action (font
-  // family and size) and Screen Margin — so neither appears here: pinning a
-  // control the owner can still see would silently revert their choice on the
-  // next load — which is exactly why quickResumeSleepScreen above lost its pin.
-  //
-  // Everything else the tab held has no on-device control left and is pinned to
-  // the values the owner asked for. The fields stay live and web-settable, and
-  // stay in getSettingsList() so persistence keeps working; a change made over
-  // the web lasts until the next load, the same contract the pins above have.
-  //
-  // Two of these do not map onto "on":
-  //  * lineSpacing is Tight/Normal/Wide, so NORMAL — the shipped default, and
-  //    the value getReaderLineCompression() answers 1.0 for, i.e. the font's own
-  //    leading rather than a squeeze or a stretch.
-  //  * textAntiAliasing's values 0/1 ARE the legacy Off/On toggle (see
-  //    TEXT_ANTIALIASING), so "on" is exactly TEXT_AA_STANDARD. CRISP and DARK
-  //    were appended later and no "on" ever meant them.
-  //
-  // Each pin matches its field's initializer in CrossPointSettings.h, because a
-  // fresh install never runs fromJson() (PersistableStore::loadFromFile()
-  // returns early with no file) and would otherwise disagree with a loaded one.
-  lineSpacing = NORMAL;
-  paragraphAlignment = JUSTIFIED;
-  embeddedStyle = 1;
-  // OFF, unlike its neighbors: the owner named it as the exception.
+  // What remains is the one live field the owner named as the exception:
+  // focusReadingEnabled stays a real (hidden, web-settable) row, pinned OFF so
+  // a save written while its picker existed cannot hold it on forever.
   focusReadingEnabled = 0;
-  hyphenationEnabled = 1;
-  extraParagraphSpacing = 1;
-  textAntiAliasing = TEXT_AA_STANDARD;
-  imageRendering = IMAGES_DISPLAY;
 }
 
 bool CrossPointSettings::fromJson(JsonVariantConst doc) {
@@ -311,20 +187,9 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
     }
   }
 
-  if (doc["sleepTimeoutMinutes"].isNull() && !doc["sleepTimeout"].isNull()) {
-    const uint8_t legacyValue =
-        clamp(doc["sleepTimeout"] | (uint8_t)SLEEP_10_MIN, SLEEP_TIMEOUT_COUNT, (uint8_t)SLEEP_10_MIN);
-    sleepTimeoutMinutes = sleepTimeoutEnumToMinutes(legacyValue);
-    needsResave = true;
-  }
+  // sleepTimeoutMinutes is hardcoded (10) since 2026-08-21; the legacy
+  // "sleepTimeout" enum migration went with it.
   // Front button remap — managed by RemapFrontButtons sub-activity, not in SettingsList.
-  frontButtonBack = clamp(doc["frontButtonBack"] | (uint8_t)FRONT_HW_BACK, FRONT_BUTTON_HARDWARE_COUNT, FRONT_HW_BACK);
-  frontButtonConfirm =
-      clamp(doc["frontButtonConfirm"] | (uint8_t)FRONT_HW_CONFIRM, FRONT_BUTTON_HARDWARE_COUNT, FRONT_HW_CONFIRM);
-  frontButtonLeft = clamp(doc["frontButtonLeft"] | (uint8_t)FRONT_HW_LEFT, FRONT_BUTTON_HARDWARE_COUNT, FRONT_HW_LEFT);
-  frontButtonRight =
-      clamp(doc["frontButtonRight"] | (uint8_t)FRONT_HW_RIGHT, FRONT_BUTTON_HARDWARE_COUNT, FRONT_HW_RIGHT);
-  validateFrontButtonMapping(s);
 
   // Reader font size — an actual point size since 1.5. Files written by 1.4 and
   // earlier hold the old SMALL/MEDIUM/LARGE/EXTRA_LARGE slot in 0..3; no font is
@@ -356,6 +221,10 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   // when it renders. Only an out-of-range byte falls back to the default.
   const uint8_t storedMargin = doc["screenMargin"] | SCREEN_MARGIN_DEFAULT;
   screenMargin = storedMargin <= SCREEN_MARGIN_MAX ? storedMargin : SCREEN_MARGIN_DEFAULT;
+  // lineSpacing: manual for the same reason as its toJson line -- row deleted,
+  // chord lives. Clamped to the enum, defaulting NORMAL.
+  const uint8_t storedLs = doc["lineSpacing"] | (uint8_t)NORMAL;
+  lineSpacing = storedLs < LINE_COMPRESSION_COUNT ? storedLs : (uint8_t)NORMAL;
   // SD card font family name — not in SettingsList, load manually
   const char* sfn = doc["sdFontFamilyName"] | "";
   strncpy(sdFontFamilyName, sfn, sizeof(sdFontFamilyName) - 1);

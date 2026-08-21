@@ -86,16 +86,6 @@ void SettingsActivity::onEnter() {
 
   // Reset selection to the first row
   selectedSettingIndex = 0;
-  {
-    const sleepscreen::QuickResumeState start = sleepscreen::initialState(SETTINGS.quickResumeSleepScreen);
-    quickResumeTimeoutAutoEnabled = start.autoEnabled;
-    preserveQuickResumeTimeoutOn = start.preserveOn;
-  }
-  // sleepScreenChanged is FALSE: opening this screen is not the owner picking a
-  // sleep screen. The pass still runs, because the Quick Resume MODE implies the
-  // timeout row and that has to hold however the screen was reached.
-  syncQuickResumeTimeoutForSleepScreen(/*sleepScreenChanged=*/false, /*quickResumeTimeoutChanged=*/false);
-
   rebuildSettingsLists();
 
   // Trigger first update
@@ -204,20 +194,13 @@ void SettingsActivity::toggleCurrentSetting() {
   }
 
   const auto& setting = deviceSettings[selectedSettingIndex];
-  const bool sleepScreenChanged = setting.valuePtr == &CrossPointSettings::sleepScreen;
-  const bool quickResumeTimeoutChanged = setting.valuePtr == &CrossPointSettings::quickResumeSleepScreen;
-  // The system font has to be pushed into the renderer before anything repaints,
-  // otherwise the popup closes onto a screen still drawn in the old face.
-  const bool systemFontChanged = setting.valuePtr == &CrossPointSettings::systemFont;
+  // quickResumeSleepScreen is hardcoded OFF since 2026-08-21, so the sleep
+  // screen row no longer has a timeout row to reconcile with -- the whole
+  // sleepscreen::reconcile seam left with it.
   // Panel polarity has to reach the driver before this screen repaints, or the
   // settings list redraws in the outgoing polarity and the row reads "on" over
   // a still-white page until something else forces a refresh.
   const bool darkModeChanged = setting.valuePtr == &CrossPointSettings::darkMode;
-
-  if (setting.nameId == StrId::STR_TIME_TO_SLEEP) {
-    openSleepTimeoutPicker();
-    return;
-  }
 
   if (setting.nameId == StrId::STR_EDITOR_FONT) {
     // Confirm opens the picker with its specimen pane rather than a five-name
@@ -266,14 +249,12 @@ void SettingsActivity::toggleCurrentSetting() {
       // reference would dangle, because onSelect calls rebuildSettingsLists()
       // and that replaces the vector this reference points into.
       const std::vector<uint8_t> order = setting.resolvedDisplayOrder();
-      auto onSelect = [this, valuePtr, order, sleepScreenChanged, quickResumeTimeoutChanged,
-                       systemFontChanged](int idx) {
+      auto onSelect = [this, valuePtr, order](int idx) {
         if (idx < 0 || idx >= static_cast<int>(order.size())) return;
         SETTINGS.*valuePtr = order[static_cast<size_t>(idx)];
-        // Before rebuildSettingsLists(), which measures rows with the UI
-        // font and would otherwise size them against the outgoing face.
-        if (systemFontChanged) applySystemFont(renderer);
-        syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
+        // systemFont's row is gone (hardcoded Libre Franklin, 2026-08-21), so
+        // no popup can change the chrome face and the applySystemFont
+        // re-bind that used to sit here left with it.
         SETTINGS.saveToFile();
         rebuildSettingsLists();
       };
@@ -307,10 +288,9 @@ void SettingsActivity::toggleCurrentSetting() {
       // Same display-order mapping as the valuePtr path above, and captured by
       // value for the same reason.
       const std::vector<uint8_t> order = setting.resolvedDisplayOrder();
-      auto onSelect = [this, valueSetter, order, sleepScreenChanged, quickResumeTimeoutChanged](int idx) {
+      auto onSelect = [this, valueSetter, order](int idx) {
         if (idx < 0 || idx >= static_cast<int>(order.size())) return;
         valueSetter(order[static_cast<size_t>(idx)]);
-        syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
         SETTINGS.saveToFile();
         rebuildSettingsLists();
       };
@@ -431,39 +411,12 @@ void SettingsActivity::toggleCurrentSetting() {
     return;
   }
 
-  syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
   SETTINGS.saveToFile();
   // rebuildSettingsLists() clamps selectedSettingIndex to the new count itself.
   rebuildSettingsLists();
 }
 
-void SettingsActivity::syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged) {
-  // The decision itself lives in sleepscreen::reconcile so it can be tested
-  // without this activity (test/sleep_screen). This is the seam that applies it.
-  const sleepscreen::QuickResumeState next = sleepscreen::reconcile(
-      SETTINGS.sleepScreen,
-      {SETTINGS.quickResumeSleepScreen, quickResumeTimeoutAutoEnabled, preserveQuickResumeTimeoutOn},
-      sleepScreenChanged, quickResumeTimeoutChanged);
 
-  SETTINGS.quickResumeSleepScreen = next.quickResumeOnTimeout;
-  quickResumeTimeoutAutoEnabled = next.autoEnabled;
-  preserveQuickResumeTimeoutOn = next.preserveOn;
-}
-
-void SettingsActivity::openSleepTimeoutPicker() {
-  startActivityForResult(
-      std::make_unique<IntervalSelectionActivity>(
-          renderer, mappedInput, "SleepTimeoutInterval", StrId::STR_TIME_TO_SLEEP, SETTINGS.sleepTimeoutMinutes,
-          CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1, 5,
-          StrId::STR_SLEEP_TIMER_VALUE_FORMAT, false, true, StrId::STR_SLEEP_NEVER),
-      [this](const ActivityResult& result) {
-        if (!result.isCancelled) {
-          SETTINGS.sleepTimeoutMinutes = static_cast<uint8_t>(std::get<IntervalResult>(result.data).value);
-          SETTINGS.saveToFile();
-        }
-        requestUpdate();
-      });
-}
 
 void SettingsActivity::render(RenderLock&&) {
   if (optionPopup.processRender(renderer, mappedInput)) return;
@@ -521,15 +474,6 @@ void SettingsActivity::render(RenderLock&&) {
             // The stored byte is a biased quarter-hour count; show the offset it
             // means. Same helper the picker uses.
             valueText = formatUtcOffset(SETTINGS.*(setting.valuePtr));
-          } else if (setting.nameId == StrId::STR_TIME_TO_SLEEP) {
-            char valueBuffer[32];
-            if (SETTINGS.sleepTimeoutMinutes >= CrossPointSettings::SLEEP_TIMEOUT_NEVER_MINUTES) {
-              valueText = tr(STR_SLEEP_NEVER);
-            } else {
-              snprintf(valueBuffer, sizeof(valueBuffer), tr(STR_SLEEP_TIMER_VALUE_FORMAT),
-                       static_cast<unsigned int>(SETTINGS.*(setting.valuePtr)));
-              valueText = valueBuffer;
-            }
           } else {
             valueText = std::to_string(SETTINGS.*(setting.valuePtr));
           }
@@ -543,7 +487,7 @@ void SettingsActivity::render(RenderLock&&) {
   // in this hint — there is no second tab to switch to.
   auto opensSubScreen = [](const SettingInfo& setting) {
     if (setting.type == SettingType::ACTION) return true;
-    if (setting.nameId == StrId::STR_TIME_TO_SLEEP || setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) return true;
+    if (setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) return true;
     if (setting.type == SettingType::ENUM && setting.enumCount() > 1) return true;
     return false;
   };

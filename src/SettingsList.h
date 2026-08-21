@@ -303,25 +303,16 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // existed. Over-reserving is invisible (no realloc, just ~18 unused
     // SettingInfo slots held for the life of the process), which is why it
     // drifted. Corrected to the true count here.
-#ifdef SIMULATOR
-    constexpr size_t FIXED_ENTRY_COUNT = 34;
-#else
-    constexpr size_t FIXED_ENTRY_COUNT = 33;
-#endif
+    // 12 rows after the 2026-08-21 settings reduction ("yes to all",
+    // docs/settings-reduction-plan.md): 23 rows deleted, their fields now
+    // static constexpr in CrossPointSettings.h. The SIMULATOR split went with
+    // keepScreenAwake's row.
+    constexpr size_t FIXED_ENTRY_COUNT = 10;
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
     // --- Display ---
-    v.push_back(SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
-                                  {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
-                                  StrId::STR_CAT_DISPLAY));
-    v.push_back(SettingInfo::Enum(
-        StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshFrequency,
-        {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15, StrId::STR_PAGES_30},
-        "refreshFrequency", StrId::STR_CAT_DISPLAY));
-    v.push_back(SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
-                                    StrId::STR_CAT_DISPLAY));
-
+            
     // --- Reader ---
     // Built-in font-family entry. Replaced per-call with a registry-aware
     // version when SD fonts are installed. Libre Franklin is the only built-in
@@ -333,34 +324,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // this entry is always replaced by buildFontSizeSetting() below. It only
     // fixes the setting's position in the Reader category.
     v.push_back(SettingInfo::Enum(StrId::STR_FONT_SIZE, nullptr, {}, "fontSize", StrId::STR_CAT_READER));
-    v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing,
-                                  {StrId::STR_TIGHT, StrId::STR_NORMAL, StrId::STR_WIDE}, "lineSpacing",
-                                  StrId::STR_CAT_READER));
-    v.push_back(SettingInfo::Enum(
-        StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
-        {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT, StrId::STR_BOOK_S_STYLE},
-        "paragraphAlignment", StrId::STR_CAT_READER));
-    // How long typing settles before the screen redraws. Labels are built from
-    // the same table the getter reads, so the list and the values cannot drift.
-    {
-      SettingInfo s;
-      s.nameId = StrId::STR_DISPLAY_DEBOUNCE;
-      s.type = SettingType::ENUM;
-      s.key = "displayDebounce";
-      s.category = StrId::STR_CAT_SYSTEM;
-      s.valuePtr = &CrossPointSettings::displayDebounce;
-      s.enumStringValues.reserve(CrossPointSettings::DISPLAY_DEBOUNCE_COUNT);
-      for (uint8_t i = 0; i < CrossPointSettings::DISPLAY_DEBOUNCE_COUNT; i++) {
-        s.enumStringValues.emplace_back(std::to_string(CrossPointSettings::DISPLAY_DEBOUNCE_MS[i]) + " ms");
-      }
-      // Ascending, so "0 ms" reads first instead of after "1000 ms". The table
-      // itself cannot be re-sorted -- the stored setting is the INDEX into it,
-      // so 0 was appended rather than prepended to keep saved settings.json
-      // files pointing at the delay they picked. Sorting the DISPLAY costs
-      // nothing and moves no stored value.
-      s.withDisplayOrder({6, 0, 1, 2, 3, 4, 5});
-      v.push_back(std::move(s));
-    }
 
     // EDITOR font group (owner ruling 2026-08-05; cut to three faces
     // 2026-08-15). Its own list, separate from the reading families above; see
@@ -395,54 +358,23 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // Directly after Editor Font: the two are one decision split in two rows,
     // and the size is meaningless without knowing which face it applies to.
     v.push_back(buildEditorFontSizeSetting());
-    v.push_back(SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &CrossPointSettings::embeddedStyle, "embeddedStyle",
-                                    StrId::STR_CAT_READER));
     v.push_back(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled,
                                     "focusReadingEnabled", StrId::STR_CAT_READER));
-    v.push_back(SettingInfo::Toggle(StrId::STR_HYPHENATION, &CrossPointSettings::hyphenationEnabled,
-                                    "hyphenationEnabled", StrId::STR_CAT_READER));
-    // The reader is portrait-only; there is no orientation setting.
-    v.push_back(SettingInfo::Toggle(StrId::STR_EXTRA_SPACING, &CrossPointSettings::extraParagraphSpacing,
-                                    "extraParagraphSpacing", StrId::STR_CAT_READER));
-    // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
+        // The reader is portrait-only; there is no orientation setting.
+        // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
     // legacy Off/On toggle (persisted files round-trip), 2+ appended.
-    v.push_back(SettingInfo::Enum(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing,
-                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_AA_CRISP, StrId::STR_AA_DARK},
-                                  "textAntiAliasing", StrId::STR_CAT_READER));
-    v.push_back(
-        SettingInfo::Enum(StrId::STR_IMAGES, &CrossPointSettings::imageRendering,
-                          {StrId::STR_IMAGES_DISPLAY, StrId::STR_IMAGES_PLACEHOLDER, StrId::STR_IMAGES_SUPPRESS},
-                          "imageRendering", StrId::STR_CAT_READER));
-
+        
     // --- Controls ---
     // Category is STR_CAT_CONTROLS (not STR_CAT_SYSTEM), so rebuildSettingsLists()
     // drops these rows from the device UI — Controls is a withdrawn tab. They
     // stay in getSettingsList() for persistence (fromJson/toJson) and the web
     // settings API. Category is not persisted, so this change has no impact on
     // saved settings.json files.
-    v.push_back(SettingInfo::Enum(StrId::STR_SIDE_BTN_LAYOUT, &CrossPointSettings::sideButtonLayout,
-                                  {StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV, StrId::STR_DISABLED}, "sideButtonLayout",
-                                  StrId::STR_CAT_CONTROLS));
-    v.push_back(SettingInfo::Enum(StrId::STR_TOUCH_READER_CONTROLS, &CrossPointSettings::touchReaderControls,
-                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "touchReaderControls",
-                                  StrId::STR_CAT_CONTROLS));
-    // Third label = stored value 2 = FONT_SIZE_STEP. The order of this array IS
+            // Third label = stored value 2 = FONT_SIZE_STEP. The order of this array IS
     // the persisted encoding, so append only — see LONG_PRESS_BUTTON_BEHAVIOR in
     // CrossPointSettings.h for why the retired ORIENTATION_CHANGE slot was reused
     // rather than a fourth value added.
-    v.push_back(SettingInfo::Enum(StrId::STR_LONG_PRESS_BEHAVIOR, &CrossPointSettings::longPressButtonBehavior,
-                                  {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
-                                   StrId::STR_LONG_PRESS_BEHAVIOR_FONT_SIZE},
-                                  "longPressButtonBehavior", StrId::STR_CAT_CONTROLS));
-    v.push_back(SettingInfo::Enum(
-        StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
-        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH, StrId::STR_FOOTNOTES},
-        "shortPwrBtn", StrId::STR_CAT_CONTROLS));
-    v.push_back(SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &CrossPointSettings::pwrBtnFootnoteBack,
-                                    "pwrBtnFootnoteBack", StrId::STR_CAT_CONTROLS));
-    v.push_back(SettingInfo::Toggle(StrId::STR_BACK_SHORT_TO_FILE_BROWSER, &CrossPointSettings::backShortToFileBrowser,
-                                    "backShortToFileBrowser", StrId::STR_CAT_CONTROLS));
-
+                
     // --- System ---
     // The System block is contributed to the device list in the order below.
     // Typing Redraw Delay and Editor Font (both STR_CAT_SYSTEM) already appear
@@ -482,21 +414,13 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // Noto font DATA is gone — applySystemFont() binds Libre Franklin
     // regardless of the stored byte — so the labels are a decode surface, not
     // an offer.
-    v.push_back(
-        SettingInfo::Enum(StrId::STR_SYSTEM_FONT, &CrossPointSettings::systemFont,
-                          {StrId::STR_UBUNTU, StrId::STR_NOTO_SANS, StrId::STR_NOTO_SERIF, StrId::STR_LIBRE_FRANKLIN},
-                          "systemFont", StrId::STR_CAT_DISPLAY));
-    // Which text-entry keyboard every entry field opens (searches, WiFi
+        // Which text-entry keyboard every entry field opens (searches, WiFi
     // passwords, owner name, renames). Order must match
     // CrossPointSettings::KEYBOARD_LAYOUT -- the index IS the persisted value.
     v.push_back(SettingInfo::Enum(StrId::STR_KEYBOARD, &CrossPointSettings::keyboardLayout,
                                   {StrId::STR_KEYBOARD_DAISY, StrId::STR_KEYBOARD_GRID13, StrId::STR_KEYBOARD_QWERTY},
                                   "keyboard", StrId::STR_CAT_SYSTEM));
-    v.push_back(SettingInfo::Value(
-        StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
-        {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
-        "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM));
-    // Filed under System, next to Time to Sleep, because that is the row it
+        // Filed under System, next to Time to Sleep, because that is the row it
     // qualifies: it decides what an inactivity-timeout sleep DRAWS, and while it
     // is ON the Sleep Screen setting is bypassed entirely on that path
     // (SleepActivity::onEnter checks it before the sleepScreen switch). It was
@@ -504,10 +428,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // control over the dominant sleep path lived on the web UI. It is also no
     // longer pinned in normalizeRetiredSettings() — a visible row that a reload
     // silently reverts is worse than no row.
-    v.push_back(SettingInfo::Enum(StrId::STR_QUICK_RESUME_TIMEOUT, &CrossPointSettings::quickResumeSleepScreen,
-                                  {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "quickResumeSleepScreen",
-                                  StrId::STR_CAT_SYSTEM));
-    // The sleep image itself, moved out of the withdrawn Display tab for the same
+        // The sleep image itself, moved out of the withdrawn Display tab for the same
     // reason as the row above: with no device control, the only way to reach
     // Custom was BmpViewerActivity's "set as sleep screen" side effect or the web
     // UI, and an owner whose stored mode was anything else had no way back.
@@ -529,40 +450,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
                                CrossPointSettings::CALENDAR_FOUR, CrossPointSettings::CALENDAR_FIVE,
                                CrossPointSettings::CALENDAR_SIX, CrossPointSettings::CALENDAR_WESTSIDE}));
-    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
-                                  {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode",
-                                  StrId::STR_CAT_DISPLAY));  // withdrawn 2026-08-15 (T-019)
-    v.push_back(SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
-                                  {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
-                                  "sleepScreenCoverFilter",
-                                  StrId::STR_CAT_DISPLAY));  // withdrawn 2026-08-15 (T-019)
-                                                             // Simulator/iOS only, deliberately compiled out on device.
-                                                             //
-    // On an X4/X3 this row would be a control that cannot do anything: e-ink
-    // holds its image with no power, there is no backlight and no host idle
-    // timer, and the firmware's own auto-sleep is the Time to Sleep row three
-    // lines up. Shown on device, "Keep Screen Awake" reads as "disable
-    // auto-sleep" and silently does nothing — a lying control, which is worse
-    // than an absent one.
-    //
-    // This is a gate on a NEW row, not the withdrawal of an existing one: no
-    // device owner can see or select this today, so nothing users rely on is
-    // being hidden. Capability-gating rows in this list is the established
-    // pattern — STR_TOUCH_READER_CONTROLS is filtered by BoardConfig::hasTouch()
-    // just below. That one is a runtime check because one C3 binary serves both
-    // X4 and X3; SIMULATOR is a genuine compile-time split between separate
-    // binaries, so the preprocessor is the right tool and the device build pays
-    // nothing for it.
-    //
-    // Consequence to know about: toJson/fromJson iterate this list, so
-    // "keepScreenAwake" is absent from settings.json on device builds. A
-    // settings.json written by the iOS app and then loaded and resaved by device
-    // firmware drops the key. Acceptable — the device cannot act on it.
-#ifdef SIMULATOR
-    v.push_back(SettingInfo::Toggle(StrId::STR_KEEP_SCREEN_AWAKE, &CrossPointSettings::keepScreenAwake,
-                                    "keepScreenAwake", StrId::STR_CAT_SYSTEM));
-#endif
-
+        
     // Clock entries. Kept after the status bar was removed because the calendar
     // sleep screen shifts the RTC's UTC date by clockUtcOffsetQ
     // (SleepActivity.cpp) and WifiSelectionActivity drives the NTP re-sync.
@@ -577,30 +465,13 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // so the row reads "UTC+5:45" rather than "141".
     v.push_back(SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &CrossPointSettings::clockUtcOffsetQ, {0, 104, 1},
                                    "clockUtcOffsetQ", StrId::STR_CAT_SYSTEM));
-    v.push_back(SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat,
-                                  {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
-                                  StrId::STR_CAT_DISPLAY));  // withdrawn 2026-08-15 (T-019)
-    // Persistence flag for NTP debounce. Resetting from the web UI forces a re-sync
-    // on next WiFi connect, which is useful when crossing time zones.
-    v.push_back(SettingInfo::Toggle(StrId::STR_CLOCK_SYNCED, &CrossPointSettings::clockHasBeenSynced,
-                                    "clockHasBeenSynced", StrId::STR_CAT_SYSTEM));
     return v;
   }();
 
   std::vector<SettingInfo> v = baseList;
-  if (!BoardConfig::hasTouch()) {
-    v.erase(std::remove_if(v.begin(), v.end(),
-                           [](const SettingInfo& s) { return s.nameId == StrId::STR_TOUCH_READER_CONTROLS; }),
-            v.end());
-  }
-  if (BoardConfig::hasTouch()) {
-    v.erase(std::remove_if(v.begin(), v.end(),
-                           [](const SettingInfo& s) {
-                             return s.nameId == StrId::STR_FRONT_BTN_FOLLOW_ORIENTATION ||
-                                    s.nameId == StrId::STR_SUNLIGHT_FADING_FIX;
-                           }),
-            v.end());
-  }
+  // The per-board hasTouch() filters are gone with the rows they filtered:
+  // touchReaderControls and fadingFix are hardcoded now (2026-08-21), so the
+  // list is identical on every board.
   if (registry && registry->getFamilyCount() > 0) {
     auto it = std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_FONT_FAMILY; });
     if (it != v.end()) {

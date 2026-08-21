@@ -28,68 +28,11 @@ inline bool shouldQuickResume(const uint8_t sleepScreen, const uint8_t quickResu
           quickResumeOnTimeout == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
 }
 
-// The Settings screen's bookkeeping for the overlap above.
-//
-// autoEnabled: this row was switched on by the code, because the owner picked
-//   the Quick Resume sleep screen -- not because they asked for it directly.
-// preserveOn: the owner turned this row on themselves, in this settings
-//   session. Their word beats any inference.
-struct QuickResumeState {
-  uint8_t quickResumeOnTimeout;
-  bool autoEnabled = false;
-  bool preserveOn = false;
-
-  bool operator==(const QuickResumeState&) const = default;
-};
-
-// The state the Settings screen starts a session with, given what is stored.
-//
-// preserveOn starts FALSE however the row is currently set. It means "the owner
-// asked for this, in this session", and a stored value cannot tell you that:
-// the row shipped on, so on any device that never touched it the stored value
-// is a default nobody chose. Seeding preserveOn from it -- which is what this
-// used to do -- let that default outrank the sleep screen the owner did choose,
-// and was why standing the override down never reached a real device.
-inline QuickResumeState initialState(const uint8_t quickResumeOnTimeout) {
-  return {quickResumeOnTimeout, /*autoEnabled=*/false, /*preserveOn=*/false};
-}
-
-// Recompute the state after one of the two rows changed.
-inline QuickResumeState reconcile(const uint8_t sleepScreen, QuickResumeState s, const bool sleepScreenChanged,
-                                  const bool quickResumeChanged) {
-  constexpr uint8_t kOn = CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT;
-  constexpr uint8_t kOff = CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_NEVER;
-
-  if (quickResumeChanged) {
-    s.preserveOn = s.quickResumeOnTimeout == kOn;
-    s.autoEnabled = false;
-  }
-
-  // Picking the Quick Resume sleep screen implies the timeout row: without it
-  // the mode would only apply to manual sleeps.
-  if (sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME) {
-    if (s.quickResumeOnTimeout != kOn) {
-      s.quickResumeOnTimeout = kOn;
-      s.autoEnabled = !s.preserveOn;
-    } else if (sleepScreenChanged && !s.preserveOn) {
-      s.autoEnabled = true;
-    }
-    return s;
-  }
-
-  // Picking any other sleep screen is a request to SEE it, so stand the override
-  // down -- unless the owner turned it on themselves, whose word beats this.
-  //
-  // This used to require s.autoEnabled, i.e. it only undid an override the code
-  // had switched on itself. That left out the case that mattered most: the row
-  // shipped ON, so on the overwhelming majority of devices it was neither
-  // auto-enabled nor owner-enabled, and nothing here ever stood it down. The
-  // owner picked a sleep screen and it silently never drew.
-  if (sleepScreenChanged && !s.preserveOn) {
-    s.quickResumeOnTimeout = kOff;
-    s.autoEnabled = false;
-  }
-  return s;
-}
+// QuickResumeState, initialState() and reconcile() were deleted 2026-08-21
+// with the quickResumeSleepScreen setting they reconciled: the timeout path is
+// hardcoded OFF (docs/settings-reduction-plan.md), so there is no auto-enable
+// dance left to model. shouldQuickResume above stays -- the QUICK_RESUME sleep
+// SCREEN mode is still a live picker option and main.cpp / SleepActivity still
+// route through it.
 
 }  // namespace sleepscreen

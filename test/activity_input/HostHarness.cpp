@@ -461,11 +461,7 @@ void reset() {
 
   // Restore the settings fields these tests write, so ordering between tests
   // cannot matter.
-  SETTINGS.frontButtonBack = CrossPointSettings::FRONT_HW_BACK;
-  SETTINGS.frontButtonConfirm = CrossPointSettings::FRONT_HW_CONFIRM;
-  SETTINGS.frontButtonLeft = CrossPointSettings::FRONT_HW_LEFT;
-  SETTINGS.frontButtonRight = CrossPointSettings::FRONT_HW_RIGHT;
-  SETTINGS.sideButtonLayout = CrossPointSettings::PREV_NEXT;
+  // frontButton*/sideButtonLayout: constexpr since 2026-08-21, nothing to restore.
   SETTINGS.fontSizeSlot = CrossPointSettings::DEFAULT_FONT_SIZE_SLOT;
   SETTINGS.fontFamily = CrossPointSettings::BUILTIN_LIBRE_FRANKLIN;
   SETTINGS.sdFontFamilyName[0] = '\0';

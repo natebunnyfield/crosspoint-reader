@@ -84,6 +84,10 @@ const char* modeName(const uint8_t m) {
 // --- The bug, stated as the owner sees it -----------------------------------
 
 // Out of the box, on the path a reader actually takes to sleep.
+// Eight reconcile()/initialState() tests were deleted 2026-08-21 with the
+// quickResumeSleepScreen setting and its auto-enable state machine
+// (docs/settings-reduction-plan.md). shouldQuickResume -- the half that still
+// runs, deciding what a sleep DRAWS -- keeps its coverage below.
 TEST(SleepScreenPolicy, FactoryDefaultsDrawTheChosenScreenOnATimeoutSleep) {
   const uint8_t asShipped = SETTINGS.quickResumeSleepScreen;
 
@@ -97,19 +101,6 @@ TEST(SleepScreenPolicy, FactoryDefaultsDrawTheChosenScreenOnATimeoutSleep) {
 // A device that already carries the shipped default in its settings.json is not
 // helped by changing that default, so picking a screen has to stand the override
 // down as well.
-TEST(SleepScreenPolicy, PickingAScreenStandsDownTheTimeoutOverride) {
-  for (const uint8_t mode : kChosenModes) {
-    const sleepscreen::QuickResumeState before{kQrOn, /*autoEnabled=*/false, /*preserveOn=*/false};
-
-    const auto after = sleepscreen::reconcile(mode, before, /*sleepScreenChanged=*/true,
-                                              /*quickResumeChanged=*/false);
-
-    EXPECT_EQ(after.quickResumeOnTimeout, kQrOff)
-        << "picked " << modeName(mode) << " and the timeout override stayed on, so the choice still never draws";
-    EXPECT_FALSE(sleepscreen::shouldQuickResume(mode, after.quickResumeOnTimeout, /*fromTimeout=*/true))
-        << modeName(mode) << " still overridden after being picked";
-  }
-}
 
 // Opening Settings must not be mistaken for the owner asking for the override.
 //
@@ -120,74 +111,18 @@ TEST(SleepScreenPolicy, PickingAScreenStandsDownTheTimeoutOverride) {
 // explicit preference, and it then outranked the sleep screen the owner did
 // choose. Entering the screen is also not itself a pick, so the consistency
 // pass onEnter runs must change nothing on its own.
-TEST(SleepScreenPolicy, OpeningSettingsIsNotAnOwnerOptIn) {
-  auto s = sleepscreen::initialState(kQrOn);
-  EXPECT_FALSE(s.preserveOn) << "the stored value was read as an explicit opt-in";
-
-  s = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::DARK, s, /*sleepScreenChanged=*/false,
-                             /*quickResumeChanged=*/false);
-  EXPECT_EQ(s.quickResumeOnTimeout, kQrOn) << "merely opening Settings changed a stored setting";
-
-  s = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR, s, /*sleepScreenChanged=*/true,
-                             /*quickResumeChanged=*/false);
-  EXPECT_EQ(s.quickResumeOnTimeout, kQrOff) << "picking a screen still did not stand the override down";
-}
 
 // ...but a toggle inside the session does count, and survives a later pick.
-TEST(SleepScreenPolicy, AnOptInWithinTheSessionOutranksALaterPick) {
-  auto s = sleepscreen::initialState(kQrOff);
-  s.quickResumeOnTimeout = kQrOn;  // owner toggles the row on
-  s = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::DARK, s, /*sleepScreenChanged=*/false,
-                             /*quickResumeChanged=*/true);
-  ASSERT_TRUE(s.preserveOn);
-
-  s = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR, s, /*sleepScreenChanged=*/true,
-                             /*quickResumeChanged=*/false);
-  EXPECT_EQ(s.quickResumeOnTimeout, kQrOn) << "an opt-in made this session was overwritten";
-}
 
 // --- What must keep working -------------------------------------------------
 
 // The override is a real feature; an owner who asks for it keeps it, even if
 // they then change which screen a manual sleep draws.
-TEST(SleepScreenPolicy, AnOwnerWhoTurnedTheOverrideOnKeepsIt) {
-  const sleepscreen::QuickResumeState theyTurnedItOn{kQrOn, /*autoEnabled=*/false, /*preserveOn=*/true};
-
-  const auto after = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR, theyTurnedItOn,
-                                            /*sleepScreenChanged=*/true, /*quickResumeChanged=*/false);
-
-  EXPECT_EQ(after.quickResumeOnTimeout, kQrOn) << "an explicit opt-in was overwritten by a sleep-screen change";
-}
 
 // Toggling the row itself records the owner's word, in both directions.
-TEST(SleepScreenPolicy, TogglingTheRowRecordsIntent) {
-  const auto turnedOn = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR,
-                                               {kQrOn, /*autoEnabled=*/true, /*preserveOn=*/false},
-                                               /*sleepScreenChanged=*/false, /*quickResumeChanged=*/true);
-  EXPECT_TRUE(turnedOn.preserveOn);
-  EXPECT_FALSE(turnedOn.autoEnabled);
-  EXPECT_EQ(turnedOn.quickResumeOnTimeout, kQrOn) << "toggling the row on must not be undone by the reconcile";
-
-  const auto turnedOff = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR,
-                                                {kQrOff, /*autoEnabled=*/false, /*preserveOn=*/true},
-                                                /*sleepScreenChanged=*/false, /*quickResumeChanged=*/true);
-  EXPECT_FALSE(turnedOff.preserveOn);
-  EXPECT_EQ(turnedOff.quickResumeOnTimeout, kQrOff);
-}
 
 // Picking the Quick Resume MODE implies the timeout row -- otherwise the mode
 // would only apply to manual sleeps, which is not what it means.
-TEST(SleepScreenPolicy, ChoosingQuickResumeModeEnablesTheTimeoutRow) {
-  const auto after = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME,
-                                            {kQrOff, /*autoEnabled=*/false, /*preserveOn=*/false},
-                                            /*sleepScreenChanged=*/true, /*quickResumeChanged=*/false);
-
-  EXPECT_EQ(after.quickResumeOnTimeout, kQrOn);
-  EXPECT_TRUE(after.autoEnabled) << "enabling it on the owner's behalf must be remembered as such, so moving off "
-                                    "Quick Resume can put it back";
-  EXPECT_TRUE(sleepscreen::shouldQuickResume(CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME,
-                                             after.quickResumeOnTimeout, /*fromTimeout=*/false));
-}
 
 // The Quick Resume mode applies to every sleep, not only timeouts.
 TEST(SleepScreenPolicy, QuickResumeModeAppliesToManualSleepToo) {
@@ -208,14 +143,3 @@ TEST(SleepScreenPolicy, TheOverrideIsScopedToTimeoutSleeps) {
 
 // Moving off Quick Resume, having only ever had the row auto-enabled, puts it
 // back. This is the behaviour that already worked and must survive the fix.
-TEST(SleepScreenPolicy, LeavingQuickResumeModeUndoesTheAutoEnable) {
-  const auto enabled = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME,
-                                              {kQrOff, false, false}, /*sleepScreenChanged=*/true,
-                                              /*quickResumeChanged=*/false);
-  ASSERT_EQ(enabled.quickResumeOnTimeout, kQrOn);
-
-  const auto after = sleepscreen::reconcile(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR, enabled,
-                                            /*sleepScreenChanged=*/true, /*quickResumeChanged=*/false);
-  EXPECT_EQ(after.quickResumeOnTimeout, kQrOff);
-  EXPECT_FALSE(after.autoEnabled);
-}
