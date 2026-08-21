@@ -615,6 +615,12 @@ bool drawReadingPage(const char* family, uint8_t sizeEnum, uint8_t clearValue, b
   static const char* kItalic = "Every officer aboard knew the difference between quiet and silence.";
   static const char* kBold = "Chapter Nine: The Ledger of the Wharf";
   static const char* kHard = "Illinois 1lI0O · rn m · cl d · 3/8 5/6 · fjord ffi · ÄÖÜ Café";
+  // The math layer, added 2026-08-20 after U+2212 MINUS shipped missing from
+  // three families and surfaced as tofu on the device
+  // (docs/font-unicode-coverage.md). Every codepoint here is one the coverage
+  // audit found absent somewhere: a family that loses one again renders its
+  // replacement box on this page, where it is impossible to miss.
+  static const char* kMath = "Net +7 − 2 = 5 · ≠ ≤ ≥ ∞ · α β Δ π · ← → 30 × 41 ÷ 7";
   // BOLD_ITALIC was never exercised here, so a family could ship a broken
   // fourth style and this specimen would render four clean pages. It is the
   // style most likely to be wrong, being the one usually synthesised.
@@ -640,7 +646,7 @@ bool drawReadingPage(const char* family, uint8_t sizeEnum, uint8_t clearValue, b
     // per-page and each prewarm replaces the last, so wrapping against a
     // stale one would measure an unkerned font (see renderFontSpecimen).
     char page[1536];
-    snprintf(page, sizeof(page), "%s %s %s %s %s", kBody, kItalic, kBold, kHard, kAlphabet);
+    snprintf(page, sizeof(page), "%s %s %s %s %s %s", kBody, kItalic, kBold, kHard, kMath, kAlphabet);
     it->second->prewarm(page, 0x0F, /*metadataOnly=*/false);
 
     int top, right, bottom, left;
@@ -658,6 +664,14 @@ bool drawReadingPage(const char* family, uint8_t sizeEnum, uint8_t clearValue, b
     y += renderer.getLineHeight(UI_12_FONT_ID) + 10;
 
     const int pageBottom = renderer.getScreenHeight() - bottom - 6;
+    // The diagnostic lines draw FIRST, before any prose. They spent one build
+    // drawn last, below a tail whose height varies per family, and the page
+    // simply ran out before reaching them at every slot -- a specimen whose
+    // probe lines can silently fall off the page is a specimen that always
+    // passes. Prose is the filler here; the probes are the point.
+    y = drawWrapped(id, kHard, EpdFontFamily::REGULAR, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
+    y = drawWrapped(id, kMath, EpdFontFamily::REGULAR, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
+    y += lineH / 2;
     y = drawWrapped(id, kBold, EpdFontFamily::BOLD, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
     y += lineH / 2;
 
@@ -675,8 +689,6 @@ bool drawReadingPage(const char* family, uint8_t sizeEnum, uint8_t clearValue, b
     y += lineH / 2;
     y = drawWrapped(id, kBoldItalic, EpdFontFamily::BOLD_ITALIC, margin, y, colW, lineH, pageBottom, nullptr,
                     nullptr);
-    y += lineH / 2;
-    y = drawWrapped(id, kHard, EpdFontFamily::REGULAR, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
 
     // Set width is the other half of "readable" on a 528px column: a wider
     // face at the same x-height fits fewer words per line and so more page
