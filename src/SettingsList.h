@@ -445,11 +445,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(
         SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen, std::move(sleepScreenValues),
                           "sleepScreen", StrId::STR_CAT_SYSTEM)
-            .withDisplayOrder({CrossPointSettings::BLANK, CrossPointSettings::DARK, CrossPointSettings::LIGHT,
-                               CrossPointSettings::CUSTOM, CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
-                               CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
-                               CrossPointSettings::CALENDAR_FOUR, CrossPointSettings::CALENDAR_FIVE,
-                               CrossPointSettings::CALENDAR_SIX, CrossPointSettings::CALENDAR_WESTSIDE}));
+            // CALENDAR_FOUR/FIVE/SIX withdrawn from the picker (owner ruling
+            // 2026-08-21: "keep calendar and westside calendar"). FIVE was a
+            // literal duplicate of CALENDAR -- both draw the 5-week Spanish/CR
+            // layout (SleepActivity.cpp). The enum values stay, because they
+            // are the persisted encoding; stale saves are remapped to CALENDAR
+            // in normalizeRetiredSettings(), and their labels remain a decode
+            // surface exactly like systemFont's did.
+            .withDisplaySubset({CrossPointSettings::BLANK, CrossPointSettings::DARK, CrossPointSettings::LIGHT,
+                                CrossPointSettings::CUSTOM, CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
+                                CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
+                                CrossPointSettings::CALENDAR_WESTSIDE}));
         
     // Clock entries. Kept after the status bar was removed because the calendar
     // sleep screen shifts the RTC's UTC date by clockUtcOffsetQ

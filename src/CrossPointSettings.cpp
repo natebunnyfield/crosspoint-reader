@@ -112,6 +112,15 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // focusReadingEnabled stays a real (hidden, web-settable) row, pinned OFF so
   // a save written while its picker existed cannot hold it on forever.
   focusReadingEnabled = 0;
+
+  // The three withdrawn calendar rows (owner ruling 2026-08-21: "keep calendar
+  // and westside calendar"). Their enum values are frozen by persistence, so a
+  // stale save is remapped to the classic calendar rather than left holding a
+  // row the picker no longer offers. FIVE drew the identical screen already;
+  // FOUR and SIX collapse to the nearest survivor.
+  if (sleepScreen == CALENDAR_FOUR || sleepScreen == CALENDAR_FIVE || sleepScreen == CALENDAR_SIX) {
+    sleepScreen = CALENDAR;
+  }
 }
 
 bool CrossPointSettings::fromJson(JsonVariantConst doc) {

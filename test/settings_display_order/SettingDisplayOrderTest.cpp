@@ -205,3 +205,41 @@ TEST(SettingDisplayOrder, PermutationCheck) {
   EXPECT_FALSE(settingorder::isPermutation({0, 1, 1}, 3)) << "duplicate";
   EXPECT_FALSE(settingorder::isPermutation({0, 1, 3}, 3)) << "out of range";
 }
+
+// ============================================================================
+// Subset orders (2026-08-21): a row may deliberately WITHDRAW choices.
+// The permutation gate stays the default so an accidentally short table still
+// degrades to identity; only subset=true honors a shorter list.
+// ============================================================================
+
+TEST(SettingDisplayOrder, SubsetIsHonoredOnlyWhenAskedFor) {
+  const std::vector<uint8_t> nine = {5, 0, 1, 2, 3, 4, 6, 7, 11};
+  // Default (permutation) mode: 9 of 12 is a stale table -> identity.
+  EXPECT_EQ(settingorder::resolve(nine, 12).size(), 12u);
+  // Subset mode: honored as-is.
+  const auto r = settingorder::resolve(nine, 12, /*subset=*/true);
+  EXPECT_EQ(r, nine);
+}
+
+TEST(SettingDisplayOrder, SubsetStillRejectsDuplicatesAndRange) {
+  EXPECT_EQ(settingorder::resolve({1, 1}, 12, true).size(), 12u);   // dup -> identity
+  EXPECT_EQ(settingorder::resolve({12}, 12, true).size(), 12u);     // range -> identity
+  EXPECT_EQ(settingorder::resolve({}, 12, true).size(), 12u);       // empty -> identity
+}
+
+TEST(SettingDisplayOrder, WithdrawnValueStillDecodesToPositionZero) {
+  // A save holding CALENDAR_FIVE (9) with the trimmed sleep-screen subset:
+  // not listed, so the picker highlights position 0 rather than crashing or
+  // hiding the popup. The stored byte itself is remapped on load elsewhere.
+  const std::vector<uint8_t> nine = {5, 0, 1, 2, 3, 4, 6, 7, 11};
+  EXPECT_EQ(settingorder::positionOf(nine, 12, 9, true), 0u);
+  EXPECT_EQ(settingorder::positionOf(nine, 12, 11, true), 8u);  // WESTSIDE at tail
+}
+
+TEST(SettingDisplayOrder, ReorderWithSubsetReturnsOnlyTheListed) {
+  const std::vector<int> vals = {10, 11, 12, 13};
+  const auto out = settingorder::reorder({3, 0}, vals, true);
+  ASSERT_EQ(out.size(), 2u);
+  EXPECT_EQ(out[0], 13);
+  EXPECT_EQ(out[1], 10);
+}

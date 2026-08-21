@@ -63,26 +63,42 @@ struct SettingInfo {
   // presented in does, so the reader-facing order can be fixed at any time
   // without a migration and without re-pointing anyone's saved settings.
   std::vector<uint8_t> displayOrder;
+  // True only for rows that deliberately WITHDRAW choices: the order may then
+  // list a subset of the enum, and the picker shows only what it lists.
+  // Stored values outside the subset still decode (the row renderer indexes
+  // the raw vectors), they just cannot be re-picked.
+  bool displayOrderIsSubset = false;
 
   // See SettingDisplayOrder.h for what these do and why a bad table degrades to
   // identity instead of hiding a choice.
-  std::vector<uint8_t> resolvedDisplayOrder() const { return settingorder::resolve(displayOrder, enumCount()); }
+  std::vector<uint8_t> resolvedDisplayOrder() const {
+    return settingorder::resolve(displayOrder, enumCount(), displayOrderIsSubset);
+  }
 
   size_t positionOfStored(uint8_t stored) const {
-    return settingorder::positionOf(displayOrder, enumCount(), stored);
+    return settingorder::positionOf(displayOrder, enumCount(), stored, displayOrderIsSubset);
   }
 
   // Labels in display order. The row renderer does NOT use these -- it indexes
   // the raw vectors by the stored value, which is unaffected by presentation
   // order -- so these exist only for the picker.
-  std::vector<StrId> orderedEnumValues() const { return settingorder::reorder(displayOrder, enumValues); }
+  std::vector<StrId> orderedEnumValues() const {
+    return settingorder::reorder(displayOrder, enumValues, displayOrderIsSubset);
+  }
 
   std::vector<std::string> orderedEnumStringValues() const {
-    return settingorder::reorder(displayOrder, enumStringValues);
+    return settingorder::reorder(displayOrder, enumStringValues, displayOrderIsSubset);
   }
 
   SettingInfo& withDisplayOrder(std::vector<uint8_t> order) {
     displayOrder = std::move(order);
+    return *this;
+  }
+
+  // Deliberate withdrawal: show ONLY the listed values, in this order.
+  SettingInfo& withDisplaySubset(std::vector<uint8_t> order) {
+    displayOrder = std::move(order);
+    displayOrderIsSubset = true;
     return *this;
   }
 

@@ -65,14 +65,15 @@ void SleepActivity::onEnter() {
         return renderCustomSleepScreen();
       }
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR):
+    // The week-count variants were withdrawn 2026-08-21 ("keep calendar and
+    // westside calendar"); normalizeRetiredSettings remaps stale saves, and
+    // these cases fold onto the classic screen so a value that slips through
+    // anyway still draws something sensible rather than the default logo.
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR):
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE):
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX):
       // The classic style keeps its original five-week look.
       return renderCalendarSleepScreen(5);
-    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR):
-      return renderCalendarSleepScreen(4);
-    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE):
-      return renderCalendarSleepScreen(5);
-    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX):
-      return renderCalendarSleepScreen(6);
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE):
       return renderCalendarSleepScreen(5, calendar::Style::WestsideEN);
     default:

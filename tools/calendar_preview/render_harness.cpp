@@ -211,8 +211,17 @@ bool simInit() {
 }
 
 bool renderCalendar(int year, int month, int day, const char* outPath) {
+  // Weeks from CROSSPOINT_CAL_WEEKS (4/5/6), defaulting to the classic 5 --
+  // added for the 2026-08-21 sleep-screen triage so all three row counts can
+  // be rendered side by side without a device.
+  int weeks = 5;
+  if (const char* w = std::getenv("CROSSPOINT_CAL_WEEKS")) {
+    const int parsed = atoi(w);
+    if (parsed >= 4 && parsed <= 6) weeks = parsed;
+  }
   calendar::CalendarSleepScreen::render(
-      renderer, calendar::YMD{static_cast<uint16_t>(year), static_cast<uint8_t>(month), static_cast<uint8_t>(day)});
+      renderer, calendar::YMD{static_cast<uint16_t>(year), static_cast<uint8_t>(month), static_cast<uint8_t>(day)},
+      static_cast<uint8_t>(weeks));
   if (!writeMonoPortraitBmp(outPath, renderer)) return false;
   printf("wrote %s\n", outPath);
   return true;
