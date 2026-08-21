@@ -29,8 +29,11 @@ places the executed change differs from the table below:
   silently degraded to identity and the picker showed all twelve. Withdrawal
   is now explicit (`withDisplaySubset`); the permutation gate stays the
   default so an accidentally short table still cannot hide a choice.
-* **iOS renderScale NOT hardcoded yet** — gated on a phone-side 2x-vs-3x
-  eyeball by the plan's own wording.
+* **iOS renderScale RESOLVED by ruling, not hardcode** (2026-08-21: "keep 2x
+  and 3x"): the Sharpness row survives with two options; Panel (1x) left the
+  picker, stored 1s floor to 2 in the getter, and desktop QA keeps 1x via
+  CROSSPOINT_SIM_RENDER_SCALE. Landed as crosspoint-simulator e93605d. No
+  phone eyeball needed — the choice stays with the owner.
 * **iOS Settings.bundle rows NOT edited yet** — deferred behind the
   color-pages agent so Root.plist is edited once.
 * Executed removals also deleted their dead plumbing: the sleep-timeout
