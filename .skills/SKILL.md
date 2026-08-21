@@ -188,6 +188,26 @@ created worktree would not have it and would silently fall back to a private
 cache — the exact bug. Sharing also lifts hit rates, since worktrees of one repo
 compile identical translation units.
 
+**Adding or deleting a translation unit breaks the next iOS build in the
+OTHER repo.** The simulator's iOS target compiles this firmware from a
+generated source list (`crosspoint-simulator/cmake/CrossPointSources.cmake`),
+and its configure gate refuses when the list goes stale — correctly, and
+silently if nobody is watching the Terminal tab it dies in. It cost a
+TestFlight cut on 2026-08-21 when the settings reduction deleted plumbing TUs.
+After any TU add/delete/rename, regenerate from this repo:
+`pio run -e simulator -t compiledb && python3 ../crosspoint-simulator/tools/gen_cmake_sources.py --firmware-dir . --compile-db compile_commands.json`
+— the gate's own error prints the same commands.
+
+**Adding or deleting a translation unit breaks the next iOS build in the
+OTHER repo.** The simulator's iOS target compiles this firmware from a
+generated source list (`crosspoint-simulator/cmake/CrossPointSources.cmake`),
+and its configure gate refuses when the list goes stale -- correctly, and
+silently if nobody is watching the Terminal tab it dies in. It cost a
+TestFlight cut on 2026-08-21 when the settings reduction deleted plumbing TUs.
+After any TU add/delete/rename, regenerate from this repo:
+`pio run -e simulator -t compiledb && python3 ../crosspoint-simulator/tools/gen_cmake_sources.py --firmware-dir . --compile-db compile_commands.json`
+-- the gate's own error prints the same commands.
+
 Two things about how it is wired, both of which cost a debugging cycle to find:
 
 * It is registered as **both `pre:` and `post:`**. During `pre:`, `PROGNAME` is
