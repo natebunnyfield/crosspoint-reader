@@ -191,22 +191,16 @@ compile identical translation units.
 **Adding or deleting a translation unit breaks the next iOS build in the
 OTHER repo.** The simulator's iOS target compiles this firmware from a
 generated source list (`crosspoint-simulator/cmake/CrossPointSources.cmake`),
-and its configure gate refuses when the list goes stale — correctly, and
-silently if nobody is watching the Terminal tab it dies in. It cost a
-TestFlight cut on 2026-08-21 when the settings reduction deleted plumbing TUs.
-After any TU add/delete/rename, regenerate from this repo:
-`pio run -e simulator -t compiledb && python3 ../crosspoint-simulator/tools/gen_cmake_sources.py --firmware-dir . --compile-db compile_commands.json`
-— the gate's own error prints the same commands.
-
-**Adding or deleting a translation unit breaks the next iOS build in the
-OTHER repo.** The simulator's iOS target compiles this firmware from a
-generated source list (`crosspoint-simulator/cmake/CrossPointSources.cmake`),
 and its configure gate refuses when the list goes stale -- correctly, and
-silently if nobody is watching the Terminal tab it dies in. It cost a
-TestFlight cut on 2026-08-21 when the settings reduction deleted plumbing TUs.
-After any TU add/delete/rename, regenerate from this repo:
+silently if nobody is watching the Terminal tab it dies in. After any TU
+add/delete/rename, regenerate from this repo:
 `pio run -e simulator -t compiledb && python3 ../crosspoint-simulator/tools/gen_cmake_sources.py --firmware-dir . --compile-db compile_commands.json`
--- the gate's own error prints the same commands.
+-- the gate's own error prints the same commands. (The 2026-08-21 incident
+first blamed on this was actually two link errors in the simulator's iOS
+mixer -- an extern "C" definition inside an anonymous namespace, and an
+extern "C" declaration of a C++ firmware symbol -- reachable only by the iOS
+target, which is the one target syntax-only checks never link. The gate is
+still real; that day just wasn't its day.)
 
 Two things about how it is wired, both of which cost a debugging cycle to find:
 
