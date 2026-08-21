@@ -3,6 +3,8 @@
 
 #include <functional>
 #include <string>
+#include <utility>
+#include <vector>
 
 /**
  * HTTP client utility for fetching content and downloading files. Built on
@@ -52,6 +54,17 @@ class HttpDownloader {
   static DownloadError fetchUrlWithStatus(const std::string& url, const DataCallback& onData,
                                           const std::string& username = "",
                                           const std::string& password = "");
+
+  // Extra request headers, sent verbatim. Exists for the GitHub asset API,
+  // where a private repo needs "Authorization: Bearer <token>" plus
+  // "Accept: application/octet-stream" — Basic auth cannot express either.
+  using HeaderList = std::vector<std::pair<std::string, std::string>>;
+
+  /**
+   * fetchUrlWithStatus with custom request headers. Same streaming contract.
+   */
+  static DownloadError fetchUrlWithHeaders(const std::string& url, const HeaderList& headers,
+                                           const DataCallback& onData);
 
   /**
    * Download a file to the SD card with optional credentials.

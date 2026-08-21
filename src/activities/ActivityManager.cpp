@@ -14,6 +14,7 @@
 #include "home/RecentBooksActivity.h"
 #include "network/CrossPointWebServerActivity.h"
 #include "reader/ReaderActivity.h"
+#include "settings/LibraryUpdateActivity.h"
 #include "settings/SettingsActivity.h"
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "settings/OnlineFirmwareUpdateActivity.h"
@@ -285,6 +286,11 @@ void ActivityManager::goToFirmwareUpdate() {
   // reach this. Going home is a harmless answer if something does.
   goHome();
 #endif
+}
+
+void ActivityManager::goToLibraryUpdate() {
+  lastHomeMenuItem = HomeMenuItem::UPDATE_LIBRARY;
+  replaceActivity(std::make_unique<LibraryUpdateActivity>(renderer, mappedInput));
 }
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {

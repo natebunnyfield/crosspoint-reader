@@ -30,12 +30,13 @@ static constexpr const char* NOTES_DIR = "/";
 int HomeActivity::getMenuItemCount() const {
   // This count is what bounds selectorIndex — leave it stale after adding a
   // menu row and the row renders but the selector can never reach it.
-  // Recents, Browse, Manage Files, Transfer, Create Note, Claude, Settings --
-  // plus Update Firmware on builds that can actually flash one.
+  // Recents, Browse, Manage Files, Transfer, Create Note, Claude, Update
+  // Library, Settings -- plus Update Firmware on builds that can actually
+  // flash one.
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
-  int count = 8;
+  int count = 9;
 #else
-  int count = 7;
+  int count = 8;
 #endif
   if (!recentBooks.empty()) {
     count += recentBooks.size();
@@ -210,6 +211,9 @@ void HomeActivity::loop() {
         onFirmwareUpdateOpen();
         break;
 #endif
+      case HomeMenuItem::UPDATE_LIBRARY:
+        onLibraryUpdateOpen();
+        break;
       case HomeMenuItem::CLAUDE:
         onClaudeOpen();
         break;
@@ -436,6 +440,11 @@ void HomeActivity::render(RenderLock&&) {
     menuItems.insert(menuItems.end() - 1, tr(STR_UPDATE_FIRMWARE));
     menuIcons.insert(menuIcons.end() - 1, Update);
 #endif
+    // Update Library, immediately above Settings (owner's ask 2026-08-21) and
+    // below Update Firmware where that row exists. Unconditional: every build
+    // can write /books/, including the ones that cannot flash firmware.
+    menuItems.insert(menuItems.end() - 1, tr(STR_UPDATE_LIBRARY));
+    menuIcons.insert(menuIcons.end() - 1, Library);
 
     if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
       // Insert Continue Reading at the top if enabled in theme
@@ -535,3 +544,5 @@ void HomeActivity::onClaudeOpen() { activityManager.goToClaudeChat(); }
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
 void HomeActivity::onFirmwareUpdateOpen() { activityManager.goToFirmwareUpdate(); }
 #endif
+
+void HomeActivity::onLibraryUpdateOpen() { activityManager.goToLibraryUpdate(); }

@@ -55,6 +55,8 @@ class HomeActivity final : public Activity {
     if (item == HomeMenuItem::UPDATE_FIRMWARE) return i;
     ++i;
 #endif
+    if (item == HomeMenuItem::UPDATE_LIBRARY) return i;
+    ++i;
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
     return 0;
   }
@@ -70,6 +72,7 @@ class HomeActivity final : public Activity {
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
     if (idx == i++) return HomeMenuItem::UPDATE_FIRMWARE;
 #endif
+    if (idx == i++) return HomeMenuItem::UPDATE_LIBRARY;
     if (idx == i) return HomeMenuItem::SETTINGS_MENU;
     return HomeMenuItem::NONE;
   }
@@ -84,6 +87,7 @@ class HomeActivity final : public Activity {
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
   void onFirmwareUpdateOpen();
 #endif
+  void onLibraryUpdateOpen();
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image

@@ -39,6 +39,9 @@ struct Sink {
   bool* cancelFlag = nullptr;
   size_t total = 0;
   size_t downloaded = 0;
+  // Extra request headers (Authorization/Accept for the GitHub asset API).
+  // Values may carry a secret token; nothing below logs a header value.
+  const HttpDownloader::HeaderList* extraHeaders = nullptr;
 };
 
 bool isRedirect(int status) {
@@ -62,6 +65,11 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
     // append a second User-Agent header, which strict servers reject (aiohttp
     // answers 400 "Duplicate 'User-Agent' header found").
     http.setUserAgent("CrossPoint-ESP32-" CROSSPOINT_VERSION);
+    if (sink.extraHeaders) {
+      for (const auto& header : *sink.extraHeaders) {
+        http.addHeader(header.first, header.second);
+      }
+    }
     if (!username.empty() && !password.empty()) {
       const std::string credentials = username + ":" + password;
       const String encoded = base64::encode(credentials.c_str());
@@ -144,6 +152,11 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
   }
 
   esp_http_client_set_header(client, "User-Agent", "CrossPoint-ESP32-" CROSSPOINT_VERSION);
+  if (sink.extraHeaders) {
+    for (const auto& header : *sink.extraHeaders) {
+      esp_http_client_set_header(client, header.first.c_str(), header.second.c_str());
+    }
+  }
   if (!username.empty() && !password.empty()) {
     // Preemptive Basic auth, like the prior addHeader; don't wait for a 401.
     const std::string credentials = username + ":" + password;
@@ -274,6 +287,15 @@ HttpDownloader::DownloadError HttpDownloader::fetchUrlWithStatus(const std::stri
   Sink sink;
   sink.write = onData;
   return runGetSecure(url, username, password, sink);
+}
+
+HttpDownloader::DownloadError HttpDownloader::fetchUrlWithHeaders(const std::string& url, const HeaderList& headers,
+                                                                  const DataCallback& onData) {
+  LOG_DBG("HTTP", "Fetching (custom headers): %s", url.c_str());
+  Sink sink;
+  sink.write = onData;
+  sink.extraHeaders = &headers;
+  return runGetSecure(url, "", "", sink);
 }
 
 HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& url, const std::string& destPath,

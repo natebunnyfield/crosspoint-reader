@@ -80,6 +80,10 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   if (ownerName[0] != '\0') {
     doc["ownerName"] = ownerName;
   }
+  // GitHub token for Update Library — same manual free-text pattern.
+  if (githubToken[0] != '\0') {
+    doc["githubToken"] = githubToken;
+  }
   // Editor font family by NAME. The SettingsList loop above has already written
   // the "editorFont" byte, and that stays: the web settings API reads and
   // writes the row through valuePtr, and an older build reads the byte. But it
@@ -272,6 +276,11 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   const char* own = doc["ownerName"] | "";
   strncpy(ownerName, own, sizeof(ownerName) - 1);
   ownerName[sizeof(ownerName) - 1] = '\0';
+  // GitHub token for Update Library — free text like ownerName, load manually.
+  // Never logged anywhere.
+  const char* ghTok = doc["githubToken"] | "";
+  strncpy(githubToken, ghTok, sizeof(githubToken) - 1);
+  githubToken[sizeof(githubToken) - 1] = '\0';
   if (storedFontFamily == LEGACY_OPENDYSLEXIC && sdFontFamilyName[0] == '\0') {
     fontFamily = BUILTIN_LIBRE_FRANKLIN;
     strncpy(sdFontFamilyName, "OpenDyslexic", sizeof(sdFontFamilyName) - 1);

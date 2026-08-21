@@ -25,7 +25,8 @@ enum class HomeMenuItem {
   SETTINGS_MENU,
   CREATE_NOTE,
   CLAUDE,
-  UPDATE_FIRMWARE
+  UPDATE_FIRMWARE,
+  UPDATE_LIBRARY
 };
 
 /**
@@ -111,6 +112,7 @@ class ActivityManager {
   void goToNoteEditor(std::string path, std::string returnDir = {});
   void goToClaudeChat();
   void goToFirmwareUpdate();
+  void goToLibraryUpdate();
   void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE);
 
   // This will move current activity to stack instead of deleting it
