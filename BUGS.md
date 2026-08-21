@@ -34,6 +34,24 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-036] A line with a missing glyph measures narrower than it draws
+**severity: low · scope: text layout · found 2026-08-20 by runtime audit, not yet reproduced on screen**
+
+Measurement and rendering disagree about kerning after a missing glyph.
+`getTextBounds` resets `prevCp = 0` when a codepoint has no glyph
+(`lib/EpdFont/EpdFont.cpp:38`), so the pair spanning the gap takes no kern —
+but `drawText` and `getTextAdvanceX` keep `prevCp = cp` unconditionally
+(`lib/GfxRenderer/GfxRenderer.cpp:802`, `:2662`) and DO look the kern pair up.
+A wrapped line measured as exactly fitting can therefore draw a kerned pixel
+or two wider and clip at the margin — only on text containing a glyph the
+active font lacks, which is also exactly the text the coverage gaps in
+[docs/font-unicode-coverage.md](docs/font-unicode-coverage.md) produce.
+
+**Close by** making the three sites agree (resetting `prevCp` in all of them is
+the conservative direction: no kern across a hole) plus a unit test that
+measures and draws a string containing an uncovered codepoint and asserts the
+widths match.
+
 ### [B-033] The release binary carries a stale provenance stamp
 **severity: low · scope: build / release · handed over 2026-08-19, mechanism unconfirmed**
 
