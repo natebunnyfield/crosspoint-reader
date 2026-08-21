@@ -1508,6 +1508,14 @@ cp lib/EpdFont/builtinFonts/nitti*.h lib/EpdFont/builtinFonts/pragmatapro*.h <wo
 ```
 
 Verify before publishing: `nm firmware.elf | grep -c "nittitypewriter\|pragmatapro"`
+
+**UPDATE 2026-08-21: the silent half is fixed — the guard hard-fails now.** A
+fresh worktree build of `gh_release` refuses with the B-029 banner rather than
+succeeding smaller, which is how the 1.5.3-BD release build caught it in
+practice. The copy step above is still required (and still unscripted); after
+copying, the 1.5.3-BD binary verified at 100 face symbols and full size. Every
+shipping worktree needs the copy — the simulator's TestFlight and Mac-app
+builds hit the same guard when pointed at a fresh worktree.
 should report 100, and the flash figure should match a working-tree build.
 
 **FIXED 2026-08-18 — the build refuses instead of shrinking.**
