@@ -48,11 +48,12 @@ struct Entry {
   // change -- one more value per row -- instead of another structural edit to
   // every consumer, which is what widening this from a scalar cost.
   int builtinFontId[SIZE_COUNT];
-  // Also offered as a READING face in Text Settings (owner ruling
-  // 2026-08-09). The ruling at the top of this file -- writing faces are not
-  // reading faces -- still holds for the rest; Quattro is the exception the
-  // owner asked for, and a flag on the row is how an exception stays visible
-  // instead of becoming a special case buried in the filter.
+  // Also offered as a READING face in Text Settings. The ruling at the top of
+  // this file -- writing faces are not reading faces -- now holds with NO
+  // exceptions: Quattro was the one the owner asked for on 2026-08-09 and the
+  // one the owner removed on 2026-08-21 ("remove ia quattro from reading
+  // fonts"). The flag stays so the next exception is a data change, and so
+  // this reversal stays visible instead of becoming a deleted row.
   bool alsoReading;
 };
 
@@ -97,7 +98,7 @@ inline constexpr Entry FAMILIES[] = {
     {"iAWriterQuattro",
      "iA Writer Quattro",
      {IAWRITERQUATTRO_12_FONT_ID, IAWRITERQUATTRO_14_FONT_ID},
-     /*alsoReading=*/true},
+     /*alsoReading=*/false},
     // COMMERCIAL, and the only row whose glyph tables are not in this repo.
     // builtinFonts/pragmatapro_*.h are gitignored (see .gitignore) and built
     // locally from lib/EpdFont/local_fonts/, so a clone without the licensed
