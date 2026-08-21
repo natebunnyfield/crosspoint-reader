@@ -115,3 +115,32 @@ Physical cards still carry the pre-fix cuts until rewritten.
    Fixes every card forever; costs code in the hot glyph path and mixes faces.
 3. **Transliteration** — map codepoints we choose not to carry (U+2212 → '-')
    before layout. Cheap; wrong for anything that isn't punctuation.
+
+## The claude-tools epub diff (2026-08-20, later the same day)
+
+Owner ask: which glyphs the epubs generated from `~/src/claude-tools` use that
+the installed families lack. Method: unzip all 18 canonical epubs (worktree
+duplicates excluded), strip tags/entities from every xhtml/ncx/opf, take the
+distinct codepoint set (135), diff against every family's installed interval
+table.
+
+**Result: one glyph — U+2717 ✗ BALLOT X** (`tico-spanish-sealed.epub`, used
+beside the ✓ that was already covered). Missing from all six families: it sits
+in the Dingbats block `reading` requests, but NO face in the fallback chain
+carried any of that block — NotoSansMath is math-only, NotoSans proper has
+none, and plain NotoSansSymbols (846 glyphs) has none either, probed directly.
+**NotoSansSymbols2** (2,660 glyphs) is the one that carries 2700-27BF; it is
+now the chain's last link (`DINGBAT_FALLBACK_FONT`). Verified after rebuild:
+U+2717 present in all six families at all three tiers, and the epub diff
+reports **zero missing codepoints**. Per-style pruning fell 733 → ~450-500
+(the residue is genuinely unfillable: C1 controls, U+2160-2182 Roman numerals,
+rare Greek).
+
+Found on the way: **the pruning audit printed into a void.** `build-sd-fonts.py`
+runs the converter with `capture_output=True` and, on success, discarded its
+stderr — so the PRUNED lines added earlier today were invisible in exactly the
+runs that mattered. Success paths now surface them.
+
+Negative results: NotoSansSymbols (the first) is useless for this — despite the
+name it carries none of the probed dingbats/symbols. Box-drawing and misc
+symbols supplied by Symbols2 raised no 255px overflows at any tier.

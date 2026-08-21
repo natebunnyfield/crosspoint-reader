@@ -143,6 +143,20 @@ MATH_FALLBACK_URL = (
 )
 MATH_FALLBACK_FONT = DOWNLOAD_DIR / "_fallback" / "NotoSansMath-Regular.ttf"
 
+# THE DINGBAT TAIL. Found 2026-08-20 by diffing the claude-tools epubs against
+# installed coverage: U+2717 BALLOT X (tico-spanish-sealed.epub uses it beside
+# the U+2713 check Edgar carries) was requested by every `reading` family and
+# pruned from every one, because none of the three faces above has ANY of the
+# Dingbats block -- NotoSansMath is math, NotoSans proper has none, and plain
+# NotoSansSymbols (the first one, 846 glyphs) surprisingly has none either;
+# probed directly, only Symbols2 (2,660 glyphs) carries 2700-27BF. Sits LAST so
+# it only ever answers for what every other face lacks.
+DINGBAT_FALLBACK_URL = (
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/"
+    "main/fonts/NotoSansSymbols2/hinted/ttf/NotoSansSymbols2-Regular.ttf"
+)
+DINGBAT_FALLBACK_FONT = DOWNLOAD_DIR / "_fallback" / "NotoSansSymbols2-Regular.ttf"
+
 # The blocks Libre Franklin is qualified to serve: Latin proper, its phonetic
 # and combining companions, the Latin Extended Additional/Vietnamese block,
 # General Punctuation and the f-ligatures -- exactly the reach 77a5901b measured
@@ -196,7 +210,7 @@ def fallback_chain_for(intervals: str) -> list[Path]:
     primary = fallback_font_for(intervals)
     if primary == LATIN_FALLBACK_FONT:
         return [primary]
-    return [SYMBOL_FALLBACK_FONT, primary, MATH_FALLBACK_FONT]
+    return [SYMBOL_FALLBACK_FONT, primary, MATH_FALLBACK_FONT, DINGBAT_FALLBACK_FONT]
 
 
 _orig_getaddrinfo = socket.getaddrinfo
@@ -779,6 +793,15 @@ def build_family(
             )
             if result.returncode != 0:
                 return name, False, result.stderr.strip() or f"Exit code {result.returncode}"
+            # The pruning audit (fontconvert_sdcard.py "PRUNED ...") arrives on
+            # the child's stderr, which this non-verbose path captures and, on
+            # success, used to DISCARD -- so the audit printed into a void and
+            # U+2717 vanished from a build without a line of output. Success is
+            # exactly when those lines matter: on failure the whole stderr is
+            # surfaced anyway.
+            for line in result.stderr.splitlines():
+                if "PRUNED" in line:
+                    print(f"  {name}: {line.strip()}", file=sys.stderr)
             rename_to_slot_names()
             return name, True, ""
     except subprocess.TimeoutExpired as e:
@@ -891,6 +914,12 @@ def main():
             download_font(MATH_FALLBACK_URL, MATH_FALLBACK_FONT)
         except Exception as exc:
             print(f"ERROR: could not fetch the math fallback: {exc}", file=sys.stderr)
+            sys.exit(1)
+    if DINGBAT_FALLBACK_FONT in needed_fallbacks:
+        try:
+            download_font(DINGBAT_FALLBACK_URL, DINGBAT_FALLBACK_FONT)
+        except Exception as exc:
+            print(f"ERROR: could not fetch the dingbat fallback: {exc}", file=sys.stderr)
             sys.exit(1)
     if SYMBOL_FALLBACK_FONT in needed_fallbacks:
         try:

@@ -620,7 +620,7 @@ bool drawReadingPage(const char* family, uint8_t sizeEnum, uint8_t clearValue, b
   // (docs/font-unicode-coverage.md). Every codepoint here is one the coverage
   // audit found absent somewhere: a family that loses one again renders its
   // replacement box on this page, where it is impossible to miss.
-  static const char* kMath = "Net +7 − 2 = 5 · ≠ ≤ ≥ ∞ · α β Δ π · ← → 30 × 41 ÷ 7";
+  static const char* kMath = "Net +7 − 2 = 5 · ≠ ≤ ≥ ∞ · α β Δ π · ← → 30 × 41 ÷ 7 · ✓ ✗";
   // BOLD_ITALIC was never exercised here, so a family could ship a broken
   // fourth style and this specimen would render four clean pages. It is the
   // style most likely to be wrong, being the one usually synthesised.
