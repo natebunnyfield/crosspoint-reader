@@ -989,6 +989,20 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   buildViewportWidth = viewportWidth;
   buildViewportHeight = viewportHeight;
 
+  // Publish the reader's FINAL text-block insets — top AFTER the cap-ink trim
+  // renderContents applies at paint time — in FRAMEBUFFER pixels (logical px
+  // times the active render scale). Inline no-op on device (lib/hal/HalGPIO.h,
+  // same seam as the read-aloud channel); the simulator stores them so a host
+  // laying paper around the panel (the iOS zen sheet) can place the page from
+  // the real ink insets instead of calibrated constants. 2026-08-22 layout
+  // exactness pass; research in crosspoint-simulator/docs/zen-page-margins.md.
+  {
+    const int s = cp::renderScale();
+    const int paintTop = orientedMarginTop - renderer.getCapInkTrim(SETTINGS.getReaderFontId());
+    gpio.publishReaderTextInsets(paintTop * s, orientedMarginRight * s, orientedMarginBottom * s,
+                                 orientedMarginLeft * s);
+  }
+
   const ReaderRenderSpec renderSpec = SETTINGS.readerRenderSpec(viewportWidth, viewportHeight);
 
   if (!section) {
@@ -1546,10 +1560,20 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   const auto t0 = millis();
   const int fontId = SETTINGS.getReaderFontId();
 
+  // Cap-ink trim, applied at PAINT time only: shift the whole page body up by
+  // the line box's air above cap height, so the first line's cap ink lands
+  // exactly at orientedMarginTop (viewable margin + screenMargin) with zero
+  // ascent air. Pagination and the section caches never see this — the parser
+  // still stacks full line boxes from y=0. 2026-08-22 layout exactness pass;
+  // measured 9 px at 18 pt / 6 px at 12 pt in
+  // crosspoint-simulator/docs/zen-page-margins.md §2b.
+  const int paintMarginTop = orientedMarginTop - renderer.getCapInkTrim(fontId);
+
   // Read-aloud capture, before any pixel work: the page's element list is
   // already final here, and this function is the commitment that this page is
-  // the one being displayed.
-  captureReadAloudPage(*page, renderer, fontId, orientedMarginLeft, orientedMarginTop);
+  // the one being displayed. Uses the SAME trimmed top as the paint passes
+  // below, so highlight rects stay glued to the shifted glyphs.
+  captureReadAloudPage(*page, renderer, fontId, orientedMarginLeft, paintMarginTop);
 
   // The image pixel-cache RAM slot lives for exactly one page render (it feeds
   // the BW double-refresh and every grayscale band pass); release it on every
@@ -1561,7 +1585,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // Font prewarm: scan pass accumulates text, then prewarm, then real render
   auto* fcm = renderer.getFontCacheManager();
   auto scope = fcm->createPrewarmScope();
-  page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);  // scan pass
+  page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);  // scan pass
   scope.endScanAndPrewarm();
   const auto tPrewarm = millis();
 
@@ -1600,19 +1624,19 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   const bool overlapRefresh = tiledGrayscale && renderer.supportsAsyncRefresh() && !pageHasImages;
   auto renderGrayscalePass = [&]() {
     if (needsTextGrayscale) {
-      page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);
+      page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);
     } else {
-      page->renderImages(renderer, fontId, orientedMarginLeft, orientedMarginTop);
+      page->renderImages(renderer, fontId, orientedMarginLeft, paintMarginTop);
     }
   };
 
   if (pageHasImagesNeedingDecode) {
-    page->renderWithImagePlaceholders(renderer, fontId, orientedMarginLeft, orientedMarginTop);
+    page->renderWithImagePlaceholders(renderer, fontId, orientedMarginLeft, paintMarginTop);
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     renderer.clearScreen();
   }
 
-  page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);
+  page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);
   const auto tBwRender = millis();
 
   if (pageHasImages) {
@@ -1628,12 +1652,12 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       if (cleanImageBasePending) {
         renderer.displayBuffer(HalDisplay::HALF_REFRESH);
       }
-      renderer.fillRect(imgX + orientedMarginLeft, imgY + orientedMarginTop, imgW, imgH, false);
+      renderer.fillRect(imgX + orientedMarginLeft, imgY + paintMarginTop, imgW, imgH, false);
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 
       // Re-render page content to restore images into the blanked area
       // Status bar is not re-rendered here to avoid reading stale dynamic values (e.g. battery %)
-      page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);
+      page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     } else {
       renderer.displayBuffer(HalDisplay::HALF_REFRESH);

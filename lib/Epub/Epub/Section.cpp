@@ -37,7 +37,13 @@ namespace {
 //      poem chapters — no <p> at all — meant every reflow rewound to page 0).
 //      Same version also makes h1-h3 headings open a fresh page (parser), so a
 //      heading at the top of a page keeps that position across reflows.
-constexpr uint8_t SECTION_FILE_VERSION = 37;
+// v38: layout exactness pass (2026-08-22). Two pagination changes with no
+//      ReaderRenderSpec field moving, so the version must carry them: the last
+//      line of a page now fits by its INK extent (ascender + descender + ruby)
+//      instead of the full leaded line box, and a block's marginTop/paddingTop
+//      collapse away at the top of a page. Stale v37 caches would misalign
+//      against the new layout rather than fail, hence the bump.
+constexpr uint8_t SECTION_FILE_VERSION = 38;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

@@ -475,6 +475,22 @@ class GfxRenderer {
   // glyph it has not cached, so do not call this per frame in a hot path.
   bool getTextInkBounds(int fontId, const char* text, int& inkTop, int& inkBottom,
                         EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+
+  // The line box's air above cap height for one font, in logical px: the
+  // inkTop of 'H' (EpdFontData carries no capHeight metric, so the cap glyph
+  // is measured). drawText places the baseline `ascender` below the y it is
+  // handed, and the tallest ordinary Latin ink starts (ascender − capHeight)
+  // below that y — 9 px at 18 pt, 6 at 12 pt for the built-in reader family
+  // (measured 2026-08-22, crosspoint-simulator/docs/zen-page-margins.md §2b).
+  // The readers subtract it at paint time so the first line's cap ink lands
+  // exactly on the design top, and the paginators subtract it from the last
+  // line's ink-extent fit (ChapterHtmlSlimParser::addLineToPage). Cached per
+  // fontId — ids are computeFontId hashes of family+size, so an id never means
+  // a different face later. Returns 0 for a missing font or one with no 'H',
+  // and does NOT cache that failure, so a late-loading SD font is measured on
+  // the first call where it is resident.
+  int getCapInkTrim(int fontId) const;
+
   int getLineHeight(int fontId) const;
   int getLineHeight(int fontId, float compression) const;
   std::string truncatedText(int fontId, const char* text, int maxWidth,

@@ -58,6 +58,10 @@ class ChapterHtmlSlimParser {
 
   std::unique_ptr<Page> currentPage = nullptr;
   int16_t currentPageNextY = 0;
+  // The y a freshly created page starts at: the chapter sinkage on the
+  // SECTION'S FIRST page (completedPageCount == 0), 0 on every later page.
+  // See the definition for the owner ruling and the sizing.
+  int16_t newPageStartY() const;
   int fontId;
   // The smallest cut of the same family, for the rotated table page (T-021).
   // Zero means "no smaller face" and the reading size is used.

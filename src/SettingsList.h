@@ -120,77 +120,19 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
   return s;
 }
 
-// Screen margin as a drop-down over the SCREEN_MARGIN_MIN..MAX ramp rather than
-// a stepper that walks one notch per press.
-//
-// The STORED value stays the margin in PIXELS, never the picker's index. That
-// is the whole reason this is a getter/setter entry instead of a plain
-// SettingInfo::Enum over the member pointer: the reader adds
-// SETTINGS.screenMargin straight onto its oriented margins
-// (EpubReaderActivity::applyMargins) and the value is part of what invalidates
-// the section cache, so storing an index would reinterpret every settings.json
-// ever written — a saved 20 px margin would come back as 20, be read as index
-// 20, and run off the end of a ten-entry ramp.
-//
-// valuePtr is deliberately left null. CrossPointWebServer's ENUM case prefers
-// valuePtr over valueSetter when both are set, and would write the raw index
-// into the byte.
-//
-// Filed under System since 2026-08-04. It is a reading setting by nature, but
-// the Reader tab was withdrawn from the device UI and this row is one of the
-// two the owner kept, so its category moves with it rather than the device
-// growing a second, divergent notion of where a row lives. Same move the sleep
-// group made out of the withdrawn Display tab, for the same reason.
-inline SettingInfo buildScreenMarginSetting() {
-  std::vector<uint8_t> steps;
-  steps.reserve(CrossPointSettings::SCREEN_MARGIN_MAX / CrossPointSettings::SCREEN_MARGIN_STEP + 1);
-  for (int v = CrossPointSettings::SCREEN_MARGIN_MIN; v <= CrossPointSettings::SCREEN_MARGIN_MAX;
-       v += CrossPointSettings::SCREEN_MARGIN_STEP) {
-    steps.push_back(static_cast<uint8_t>(v));
-  }
-
-  // Bare numbers: a unit suffix would have to be translated, and the row already
-  // says what it is.
-  std::vector<std::string> labels;
-  labels.reserve(steps.size());
-  for (const uint8_t v : steps) labels.push_back(std::to_string(v));
-
-  SettingInfo s;
-  s.nameId = StrId::STR_SCREEN_MARGIN;
-  s.type = SettingType::ENUM;
-  s.enumStringValues = std::move(labels);
-  s.key = "screenMargin";
-  s.category = StrId::STR_CAT_SYSTEM;
-
-  s.valueGetter = [steps]() -> uint8_t {
-    const int cur = SETTINGS.screenMargin;
-    // Nearest rather than exact. A byte saved under the old 5..40 stepper, or
-    // posted by an API client, need not sit on the ramp; falling back to index
-    // 0 would quietly move the reader's margin the next time this row rendered.
-    uint8_t best = 0;
-    int bestDist = 256;
-    for (size_t i = 0; i < steps.size(); i++) {
-      const int d = steps[i] > cur ? steps[i] - cur : cur - steps[i];
-      if (d < bestDist) {
-        bestDist = d;
-        best = static_cast<uint8_t>(i);
-      }
-    }
-    return best;
-  };
-
-  s.valueSetter = [steps](const uint8_t v) {
-    if (v >= steps.size()) return;
-    SETTINGS.screenMargin = steps[v];
-  };
-
-  return s;
-}
+// Screen Margin's picker row was REMOVED 2026-08-22 (owner layout-exactness
+// order; research in crosspoint-simulator/docs/zen-page-margins.md). The
+// `screenMargin` FIELD stays: it persists (toJson/fromJson by hand in
+// CrossPointSettings.cpp) and the reader still adds it to its oriented
+// margins, so the value is card-controlled — the device's card keeps whatever
+// it holds while the iOS harness pins its own card to 5 at boot. With no row
+// here the web settings API drops it too (the loop walks getAllSettings and
+// POST skips unknown keys).
 
 // Editor font SIZE, as a drop-down over editorfonts::SIZES.
 //
 // The STORED value stays the size in POINTS, never the picker's index — the
-// same rule buildScreenMarginSetting() above follows, and for a sharper reason
+// same rule the retired Screen Margin picker followed, and for a sharper reason
 // here: the editor font FAMILY was rescued from index persistence hours before
 // this row was written (see src/notes/EditorFonts.h), and putting the size on
 // an index would have reintroduced the identical failure one field over. A
@@ -378,10 +320,10 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // --- System ---
     // The System block is contributed to the device list in the order below.
     // Typing Redraw Delay and Editor Font (both STR_CAT_SYSTEM) already appear
-    // above in the Reader section so they sort to their natural position; Screen
-    // Margin follows them. Text Settings — the device-only action — is inserted
-    // above the whole shared list by SettingsActivity::rebuildSettingsLists().
-    v.push_back(buildScreenMarginSetting());
+    // above in the Reader section so they sort to their natural position. Text
+    // Settings — the device-only action — is inserted above the whole shared
+    // list by SettingsActivity::rebuildSettingsLists(). Screen Margin's row was
+    // removed 2026-08-22; see the note above buildEditorFontSizeSetting().
     // Whole-screen polarity. A TOGGLE rather than a Light/Dark ENUM because the
     // decision is boolean and docs/ui-conventions.md files boolean preferences
     // as toggle rows; a two-option enum would open a popup to show one

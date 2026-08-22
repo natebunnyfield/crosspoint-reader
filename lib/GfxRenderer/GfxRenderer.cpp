@@ -2729,6 +2729,25 @@ bool GfxRenderer::getTextInkBounds(const int fontId, const char* text, int& inkT
   return true;
 }
 
+int GfxRenderer::getCapInkTrim(const int fontId) const {
+  // One-entry cache: the reader paints with one body font at a time and a font
+  // change just recomputes. Font ids are computeFontId hashes of family+size,
+  // so a hit can never be a different face. Render-task only, like the rest of
+  // the text path, so two plain statics need no lock.
+  static int cachedFontId = 0;  // 0 is never a registered font id
+  static int cachedTrim = 0;
+  if (fontId != cachedFontId) {
+    int inkTop = 0, inkBottom = 0;
+    // A font with no 'H' (or not yet resident) trims nothing rather than
+    // guessing — and the failure is NOT cached, so a late-loading SD font gets
+    // measured on the first call where it is actually present.
+    if (!getTextInkBounds(fontId, "H", inkTop, inkBottom)) return 0;
+    cachedTrim = inkTop;
+    cachedFontId = fontId;
+  }
+  return cachedTrim;
+}
+
 int GfxRenderer::getFontDescenderSize(const int fontId) const {
   const auto fontIt = fontMap.find(fontId);
   if (fontIt == fontMap.end()) {

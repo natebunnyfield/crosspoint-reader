@@ -463,3 +463,66 @@ TEST_F(RendererBounds, SentinelMeasurementRecoversTheFullSpaceAdvance) {
   const int trailing = sentinelWidth(*r, fontId, "ab ") - sentinelWidth(*r, fontId, "ab");
   EXPECT_EQ(trailing, interior) << "the caret must advance by a full space when one is typed";
 }
+
+// ── First baseline exactness (2026-08-22 layout exactness pass) ─────────────
+//
+// The readers shift their whole page body up by GfxRenderer::getCapInkTrim
+// — getTextInkBounds(font, "H").inkTop — at paint time, so the first line's cap
+// ink lands EXACTLY at the design top instead of (ascender − capHeight) px
+// below it. This pins the contract that shift depends on: drawing at
+// (designTop − inkTop) puts the topmost ink pixel of 'H' at designTop, to the
+// pixel, at every registered reader size.
+//
+// Read back through the real framebuffer: portrait maps logical (x, y) to
+// physical (y, panelHeight − 1 − x), MSB-first bytes, and INK IS A CLEARED
+// BIT (drawPixel: state==true clears). Any of those three flipping silently
+// is exactly the kind of thing this file exists to observe.
+
+namespace {
+constexpr int kFbRowBytes = 792 / 8;  // physical panel width / 8
+constexpr size_t kFbBytes = static_cast<size_t>(kFbRowBytes) * 528;
+
+bool logicalPixelIsInk(const uint8_t* fb, int x, int y) {
+  const int phyX = y;
+  const int phyY = 528 - 1 - x;
+  const uint8_t byte = fb[static_cast<size_t>(phyY) * kFbRowBytes + phyX / 8];
+  return (byte & (1u << (7 - phyX % 8))) == 0;
+}
+
+// Topmost logical row containing any ink, or -1 on an empty framebuffer.
+int firstInkRow(GfxRenderer& r) {
+  static uint8_t fb[kFbBytes];
+  if (r.readFramebufferRegion(0, 0, 528, 792, fb, sizeof(fb)) != kFbBytes) return -2;
+  for (int y = 0; y < 792; y++)
+    for (int x = 0; x < 528; x++)
+      if (logicalPixelIsInk(fb, x, y)) return y;
+  return -1;
+}
+}  // namespace
+
+TEST_F(RendererBounds, CapInkTrimPutsFirstInkExactlyAtDesignTop) {
+  const int readerFonts[] = {LIBREFRANKLIN_READER_12_FONT_ID, LIBREFRANKLIN_READER_14_FONT_ID,
+                             LIBREFRANKLIN_READER_18_FONT_ID};
+  for (const int fontId : readerFonts) {
+    int inkTop = 0, inkBottom = 0;
+    ASSERT_TRUE(r->getTextInkBounds(fontId, "H", inkTop, inkBottom)) << "font " << fontId << " not loaded";
+    EXPECT_GT(inkTop, 0) << "no ascent air above cap height — the trim would be a no-op";
+    EXPECT_EQ(r->getCapInkTrim(fontId), inkTop) << "getCapInkTrim must be exactly the 'H' inkTop";
+
+    const int designTop = 100;
+
+    // Untrimmed control: a line drawn AT the design top leaves its ink inkTop
+    // pixels lower. This is the air the readers used to show.
+    r->clearScreen();
+    r->drawText(fontId, 50, designTop, "H");
+    EXPECT_EQ(firstInkRow(*r), designTop + inkTop) << "font " << fontId;
+
+    // Trimmed: drawing at (designTop − inkTop) puts the cap ink exactly at
+    // the design top. This is the shift EpubReaderActivity::renderContents and
+    // TxtReaderActivity::renderPage apply.
+    r->clearScreen();
+    r->drawText(fontId, 50, designTop - inkTop, "H");
+    EXPECT_EQ(firstInkRow(*r), designTop) << "font " << fontId;
+    EXPECT_TRUE(noEscapes());
+  }
+}

@@ -557,7 +557,7 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
       noteAllocationFailure("Page for a rotated table");
       return true;  // emitted nothing, but the parse is over either way
     }
-    currentPageNextY = 0;
+    currentPageNextY = newPageStartY();
   }
 
   for (const Placed& item : placed) {
@@ -674,7 +674,7 @@ void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan&
         noteAllocationFailure("Page for a table row");
         return;
       }
-      currentPageNextY = 0;
+      currentPageNextY = newPageStartY();
     }
     // Rows move as a unit. Breaking inside one would page-break each column
     // independently, which puts half a row on each page with no way to tell.
@@ -1285,11 +1285,16 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                     LOG_ERR("EHP", "Failed to create initial page");
                     return;
                   }
-                  self->currentPageNextY = 0;
+                  self->currentPageNextY = self->newPageStartY();
                 }
 
-                // Apply top margin from container block
-                self->currentPageNextY += imageMarginTop;
+                // Apply top margin from container block — except at PAGE TOP,
+                // where space-before collapses like every other block's (the
+                // 2026-08-22 page-top collapse; the chapter sinkage above is
+                // the one designed exception and must not be added to).
+                if (!self->currentPage->elements.empty()) {
+                  self->currentPageNextY += imageMarginTop;
+                }
 
                 // Create ImageBlock and add to page
                 // nothrow: make_shared uses bare new, which aborts on OOM under
@@ -2278,9 +2283,29 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
   return finishParse();
 }
 
+// Chapter sinkage: the fraction of the viewport height a chapter opening drops
+// before its first line. Owner ruling 2026-08-22, verbatim: "include chapter
+// drop as the only exception to collapse space above rule." Every OTHER
+// page-top space collapses (see makePages); the first page of a spine section
+// instead gets this DESIGNED drop — deliberate, uniform across chapters,
+// chosen by the layout rather than inherited from the file's CSS, which is
+// classical chapter sinkage. 1/5 of the viewport, SNAPPED DOWN to a whole
+// number of line-heights so the line grid below it holds; that sits between
+// the old accidental ~1.5-line CSS leak and the classical 1/3-page drop,
+// sized for this small panel.
+constexpr int kChapterSinkageFraction = 5;  // sinkage = viewportHeight / 5
+
+int16_t ChapterHtmlSlimParser::newPageStartY() const {
+  if (completedPageCount > 0) return 0;
+  const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
+  if (lineHeight <= 0) return 0;
+  const int lines = (viewportHeight / kChapterSinkageFraction) / lineHeight;
+  return static_cast<int16_t>(lines * lineHeight);
+}
+
 void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
-  const int lineHeight =
-      renderer.getLineHeight(fontId, lineCompression) + line->getRubyShift(renderer.getFontAscenderSize(fontId));
+  const int rubyShift = line->getRubyShift(renderer.getFontAscenderSize(fontId));
+  const int lineHeight = renderer.getLineHeight(fontId, lineCompression) + rubyShift;
 
   if (!currentPage) {
     currentPage = makeUniqueNoThrow<Page>();
@@ -2288,10 +2313,29 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
       noteAllocationFailure("first Page of a chapter");
       return;
     }
-    currentPageNextY = 0;
+    currentPageNextY = newPageStartY();
   }
 
-  if (currentPageNextY + lineHeight > viewportHeight) {
+  // The LAST line on a page only needs its INK to fit: ascender + descender
+  // (plus any ruby riding above the ascender) MINUS the cap-ink trim the
+  // renderers subtract at paint time — the whole painted page sits capInkTrim
+  // px higher than the layout's y, so that air is real bottom room. For the
+  // built-in reader family the bare ascender+descender EXCEEDS the leaded
+  // advanceY (47 vs 45 at 18 pt — the metrics carry negative external
+  // leading), which is why the trim term is not optional: without it this test
+  // would paginate EARLIER than the old full-line-box rule. With it the ink
+  // extent is 38 px at 18 pt against a 45 px slot, which is what lets a page
+  // whose last slot the old rule rejected keep that line (2026-08-22 layout
+  // exactness pass; crosspoint-simulator/docs/zen-page-margins.md). Clamped to
+  // the leaded height so no metric combination can ever paginate earlier than
+  // before. The advance below (currentPageNextY += lineHeight) still uses the
+  // full leaded height, so line pitch is untouched. Pagination change —
+  // covered by the SECTION_FILE_VERSION bump to v38 (Section.cpp).
+  int inkExtent = renderer.getFontAscenderSize(fontId) + renderer.getFontDescenderSize(fontId) + rubyShift -
+                  renderer.getCapInkTrim(fontId);
+  if (inkExtent < 1) inkExtent = 1;
+  const int fitExtent = inkExtent < lineHeight ? inkExtent : lineHeight;
+  if (currentPageNextY + fitExtent > viewportHeight) {
     // The page ends here; the incoming line opens the next one, so the next
     // page's start anchor is that line's source position within the chapter.
     completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex,
@@ -2332,18 +2376,31 @@ void ChapterHtmlSlimParser::makePages() {
       noteAllocationFailure("Page for a laid-out block");
       return;
     }
-    currentPageNextY = 0;
+    currentPageNextY = newPageStartY();
   }
 
   const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
 
-  // Apply top spacing before the paragraph (stored in pixels)
+  // Apply top spacing before the paragraph (stored in pixels) — but NOT at the
+  // top of a page. Classic page-top margin collapse: space-before exists to
+  // separate a block from the content above it, and at the top of a page there
+  // is nothing above. Honoring it there put a heading's full marginTop (46 px
+  // at 12 pt, 68 px at 18 pt, ~1.8 em — measured, crosspoint-simulator/
+  // docs/zen-page-margins.md §3 item 4) of dead space above every
+  // chapter-opening heading. "At the top" is judged by the page being EMPTY,
+  // not by y == 0, because the section's first page starts at the chapter
+  // sinkage (newPageStartY above) — the one designed exception, which REPLACES
+  // the file's space-before rather than adding to it (owner ruling
+  // 2026-08-22). 2026-08-22 layout exactness pass; pagination change, covered
+  // by the SECTION_FILE_VERSION bump to v38 (Section.cpp).
   const BlockStyle& blockStyle = currentTextBlock->getBlockStyle();
-  if (blockStyle.marginTop > 0) {
-    currentPageNextY += blockStyle.marginTop;
-  }
-  if (blockStyle.paddingTop > 0) {
-    currentPageNextY += blockStyle.paddingTop;
+  if (!currentPage->elements.empty()) {
+    if (blockStyle.marginTop > 0) {
+      currentPageNextY += blockStyle.marginTop;
+    }
+    if (blockStyle.paddingTop > 0) {
+      currentPageNextY += blockStyle.paddingTop;
+    }
   }
 
   // Calculate effective width accounting for horizontal margins/padding

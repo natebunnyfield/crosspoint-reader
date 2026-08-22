@@ -23,7 +23,11 @@ namespace {
 constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
 // Cache file magic and version
 constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
-constexpr uint8_t CACHE_VERSION = 3;          // Increment when cache format changes
+// Increment when cache format OR pagination changes. v4: the last line of a
+// page fits by its ink extent (ascender + descender) instead of the full
+// leaded line box (2026-08-22 layout exactness pass), so v3 page offsets no
+// longer match what renderPage shows.
+constexpr uint8_t CACHE_VERSION = 4;
 }  // namespace
 
 void TxtReaderActivity::onEnter() {
@@ -126,8 +130,23 @@ void TxtReaderActivity::initializeReader() {
   const int viewportHeight = renderer.getScreenHeight() - cachedOrientedMarginTop - cachedOrientedMarginBottom;
   const int lineHeight = renderer.getLineHeight(cachedFontId);
 
-  linesPerPage = viewportHeight / lineHeight;
-  if (linesPerPage < 1) linesPerPage = 1;
+  // Same last-line rule as the EPUB parser (ChapterHtmlSlimParser::addLineToPage,
+  // 2026-08-22 layout exactness pass): the final line only needs its INK to fit
+  // — ascender + descender minus the paint-time cap-ink trim (see the parser's
+  // comment for why the trim term is load-bearing: the bare ascender+descender
+  // exceeds the leaded advanceY for the built-in family), clamped to the leaded
+  // line box — so N lines need (N-1) * lineHeight + inkExtent, not
+  // N * lineHeight. Pagination change; CACHE_VERSION v4 above rebuilds stale
+  // page indexes.
+  int inkAscDesc = renderer.getFontAscenderSize(cachedFontId) + renderer.getFontDescenderSize(cachedFontId) -
+                   renderer.getCapInkTrim(cachedFontId);
+  if (inkAscDesc < 1) inkAscDesc = 1;
+  const int lastLineExtent = inkAscDesc < lineHeight ? inkAscDesc : lineHeight;
+  if (lineHeight > 0 && viewportHeight >= lastLineExtent) {
+    linesPerPage = 1 + (viewportHeight - lastLineExtent) / lineHeight;
+  } else {
+    linesPerPage = 1;
+  }
 
   LOG_DBG("TRS", "Viewport: %dx%d, lines per page: %d", viewportWidth, viewportHeight, linesPerPage);
 
@@ -368,7 +387,12 @@ void TxtReaderActivity::renderPage() {
 
   // Render text lines with alignment
   auto renderLines = [&]() {
-    int y = cachedOrientedMarginTop;
+    // Cap-ink trim, paint time only — same treatment as
+    // EpubReaderActivity::renderContents (2026-08-22 layout exactness pass):
+    // the first line's cap ink lands exactly at the design top instead of
+    // (ascender − capHeight) px below it. Pagination (linesPerPage, the page
+    // index cache) never sees this.
+    int y = cachedOrientedMarginTop - renderer.getCapInkTrim(cachedFontId);
     for (const auto& line : currentPageLines) {
       if (!line.empty()) {
         int x = cachedOrientedMarginLeft;

@@ -199,6 +199,18 @@ class HalGPIO {
   void publishReadAloudPage(const char* /*utf8*/, size_t /*utf8Len*/, const ReadAloudWordRect* /*rects*/,
                             size_t /*rectCount*/) {}
 
+  // The reader's FINAL text-block insets — top after the paint-time cap-ink
+  // trim, then right, bottom, left — in FRAMEBUFFER pixels (logical px times
+  // the active render scale). A no-op here for the same reason the read-aloud
+  // channel above is: nothing on this board sits outside the panel, so nothing
+  // here could consume where the ink starts. A host drawing furniture around
+  // the panel (the iOS zen paper sheet) needs the real insets to place the
+  // page, instead of the calibrated constants that drifted the moment the
+  // margin or font dial moved (crosspoint-simulator/docs/zen-page-margins.md
+  // §4). EpubReaderActivity publishes on every render; the simulator's HalGPIO
+  // stores the four values for its harness to read.
+  void publishReaderTextInsets(int /*topPx*/, int /*rightPx*/, int /*bottomPx*/, int /*leftPx*/) {}
+
   // Verify power button was held long enough after wakeup.
   // Returns true if verification succeeded, false if device should return to sleep.
   // Should only be called when wakeup reason is PowerButton.
