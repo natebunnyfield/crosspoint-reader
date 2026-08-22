@@ -60,6 +60,27 @@ class ChapterHtmlSlimParser {
   std::unique_ptr<Page> currentPage = nullptr;
   int16_t currentPageNextY = 0;
 
+  // --- Inter-block gap cap (owner ruling 2026-08-22) ---------------------
+  // Owner, verbatim: "keep half-line gap, but collapse any gap that is more
+  // than a half-line gap." The vertical gap between two blocks in flow is
+  // CAPPED at lineHeight/2 — whatever CSS margins, padding and the extra
+  // paragraph spacing compute, a larger gap collapses to exactly half a
+  // line; a smaller one stays as computed. prevBlockBottomApplied_ is what
+  // the previous block's bottom pass already spent of that budget, so the
+  // next block's top pass only adds the remainder. Consumed and cleared by
+  // every makePages() call; any non-text element placed between two blocks
+  // (image, rule, table) breaks adjacency and clears it via
+  // resetInterBlockCollapse(). sceneBreakLiftPx_ carries the <br> section
+  // separator's designed blank line, which rides ON TOP of the capped gap —
+  // it is generated space marking a scene break, not a CSS gap, and capping
+  // it would make section breaks indistinguishable from paragraph gaps.
+  int16_t prevBlockBottomApplied_ = 0;
+  int16_t sceneBreakLiftPx_ = 0;
+  void resetInterBlockCollapse() {
+    prevBlockBottomApplied_ = 0;
+    sceneBreakLiftPx_ = 0;
+  }
+
   // --- Widow/orphan control (keep-2/2, 2026-08-22) -----------------------
   // Lines are HELD BACK (up to three) between extraction and page placement so
   // the paginator knows, when it places a paragraph's first line, that at

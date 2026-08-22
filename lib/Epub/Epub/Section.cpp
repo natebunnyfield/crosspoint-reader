@@ -52,7 +52,14 @@ namespace {
 //      which moves line breaks for SD reading fonts. Hanging punctuation is
 //      justification-slack-only and break-neutral, but its painted x lives in
 //      the cached TextBlocks, so it needs the bump too.
-constexpr uint8_t SECTION_FILE_VERSION = 39;
+// v40: inter-block gap cap (owner ruling 2026-08-22, the Wingspan title
+//      page: "keep half-line gap, but collapse any gap that is more than a
+//      half-line gap"). No header change; pure pagination: the vertical gap
+//      between two blocks in flow is capped at lineHeight/2 instead of
+//      summing marginBottom + half-line + marginTop (the <br> scene-break
+//      line rides on top of the cap). Stale v39 caches would keep the
+//      triple-dipped gaps, hence the bump.
+constexpr uint8_t SECTION_FILE_VERSION = 40;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

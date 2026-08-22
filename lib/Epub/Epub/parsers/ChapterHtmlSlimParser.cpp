@@ -291,8 +291,13 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
         // The empty block was created by a <br> section separator. Inject a full line of
         // blank space before the following paragraph so the scene/section break is visible.
         // This only fires when the <br> block stayed empty (i.e. no inline text was added).
-        const int16_t lineHeight = static_cast<int16_t>(renderer.getLineHeight(fontId, lineCompression));
-        incoming.marginTop = static_cast<int16_t>(incoming.marginTop + lineHeight);
+        // Carried as sceneBreakLiftPx_ rather than in the block's style: the
+        // style's vertical spacing is subject to the half-line inter-block gap
+        // cap (owner ruling 2026-08-22, makePages), and a capped scene break
+        // would be indistinguishable from an ordinary paragraph gap. The lift
+        // rides on top of the capped gap, preserving the old half-line + one
+        // full line rhythm exactly.
+        sceneBreakLiftPx_ = static_cast<int16_t>(renderer.getLineHeight(fontId, lineCompression));
       }
 
       currentTextBlock->setBlockStyle(style.getCombinedBlockStyle(incoming, BlockStyle::CombineAxis::Vertical));
@@ -596,6 +601,7 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
   }
 
   currentPageNextY = static_cast<int16_t>(viewportHeight);  // the page is spoken for
+  resetInterBlockCollapse();  // a full-page table breaks paragraph adjacency (2026-08-22)
   tableEmittedDataCell = true;
   completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
   completedPageCount++;
@@ -658,6 +664,8 @@ int ChapterHtmlSlimParser::measureRowHeight(const tablecolumns::Row& row, const 
 }
 
 void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan& plan) {
+  // Table rows between two paragraphs break their margin adjacency (2026-08-22).
+  resetInterBlockCollapse();
   const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
   const int rowGap = std::max(2, lineHeight / 4);
   constexpr int kRuleThickness = 2;
@@ -731,6 +739,8 @@ void ChapterHtmlSlimParser::emitHorizontalRule(const BlockStyle& blockStyle) {
   if (partWordBufferIndex > 0) {
     flushPartWordBuffer();
   }
+  // A rule between two paragraphs breaks their margin adjacency (2026-08-22).
+  resetInterBlockCollapse();
 
   if (currentTextBlock) {
     const BlockStyle parentBlockStyle = currentTextBlock->getBlockStyle();
@@ -1319,6 +1329,10 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                 }
                 self->currentPage->elements.push_back(pageImage);
                 self->currentPageNextY += displayHeight + imageMarginBottom;
+                // An image between two paragraphs breaks their margin
+                // adjacency (2026-08-22): the next block's marginTop must not
+                // collapse against the pre-image paragraph's bottom spacing.
+                self->resetInterBlockCollapse();
                 // Line Grid: the image's whole advance rounds up so the text
                 // after it returns to the baseline grid.
                 self->snapToLineGrid();
@@ -2533,13 +2547,34 @@ void ChapterHtmlSlimParser::makePages() {
   // 2026-08-22). 2026-08-22 layout exactness pass; pagination change, covered
   // by the SECTION_FILE_VERSION bump to v38 (Section.cpp).
   const BlockStyle& blockStyle = currentTextBlock->getBlockStyle();
+  // Inter-block gap cap (owner ruling 2026-08-22, verbatim: "keep half-line
+  // gap, but collapse any gap that is more than a half-line gap"; report: the
+  // Wingspan title page showed ~3-line-height gaps between its styled blocks
+  // because marginBottom + half-line + marginTop all SUMMED). The whole gap
+  // between two blocks in flow — previous block's bottom spacing plus this
+  // block's top spacing — is capped at lineHeight/2. The previous block's
+  // bottom pass already spent prevBottomApplied of that budget, so this top
+  // pass adds at most the remainder. Gaps that compute smaller than half a
+  // line stay as computed. The page-top rules are untouched: space-before
+  // still collapses on an empty page, and the chapter sinkage stays the one
+  // designed exception (owner, same report: "chapter heading 'Wingspan' is
+  // placed okay though").
+  const int16_t prevBottomApplied = prevBlockBottomApplied_;
+  const int16_t sceneBreakLift = sceneBreakLiftPx_;
+  resetInterBlockCollapse();
   if (!currentPage->elements.empty()) {
-    if (blockStyle.marginTop > 0) {
-      currentPageNextY += blockStyle.marginTop;
-    }
+    int topSpacing = blockStyle.marginTop > 0 ? blockStyle.marginTop : 0;
     if (blockStyle.paddingTop > 0) {
-      currentPageNextY += blockStyle.paddingTop;
+      topSpacing += blockStyle.paddingTop;
     }
+    const int gapCap = lineHeight / 2;
+    const int budget = gapCap > prevBottomApplied ? gapCap - prevBottomApplied : 0;
+    if (topSpacing > budget) {
+      topSpacing = budget;
+    }
+    // A <br> section separator's designed blank line rides ON TOP of the
+    // capped gap — see startNewTextBlock.
+    currentPageNextY = static_cast<int16_t>(currentPageNextY + topSpacing + sceneBreakLift);
     // Line Grid: block top spacing rounds up to the next line-height multiple
     // so the paragraph's first baseline stays on the grid.
     snapToLineGrid();
@@ -2569,17 +2604,29 @@ void ChapterHtmlSlimParser::makePages() {
     pendingFootnotes.clear();
   }
 
-  // Apply bottom spacing after the paragraph (stored in pixels)
-  if (blockStyle.marginBottom > 0) {
-    currentPageNextY += blockStyle.marginBottom;
-  }
-  if (blockStyle.paddingBottom > 0) {
-    currentPageNextY += blockStyle.paddingBottom;
-  }
-
-  // Extra paragraph spacing if enabled (default behavior)
-  if (extraParagraphSpacing) {
-    currentPageNextY += lineHeight / 2;
+  // Apply bottom spacing after the paragraph (stored in pixels), capped at
+  // half a line (owner ruling 2026-08-22, see the top pass above): CSS
+  // marginBottom, paddingBottom and the extra paragraph spacing compute a
+  // gap, and anything over lineHeight/2 collapses to exactly lineHeight/2.
+  // A plain paragraph (no CSS spacing) computes exactly the half-line, so
+  // the default rhythm is byte-identical to what always shipped; the styled
+  // blocks that used to stack margin + half-line + margin are what the cap
+  // exists for. What was applied here is remembered so the next block's top
+  // pass only adds the remainder of the same half-line budget.
+  {
+    int bottomSpacing = blockStyle.marginBottom > 0 ? blockStyle.marginBottom : 0;
+    if (blockStyle.paddingBottom > 0) {
+      bottomSpacing += blockStyle.paddingBottom;
+    }
+    if (extraParagraphSpacing) {
+      bottomSpacing += lineHeight / 2;
+    }
+    const int gapCap = lineHeight / 2;
+    if (bottomSpacing > gapCap) {
+      bottomSpacing = gapCap;
+    }
+    currentPageNextY = static_cast<int16_t>(currentPageNextY + bottomSpacing);
+    prevBlockBottomApplied_ = static_cast<int16_t>(bottomSpacing);
   }
   // Line Grid: paragraph bottom spacing rounds up to the next line-height
   // multiple so the following paragraph's baselines stay on the grid.
