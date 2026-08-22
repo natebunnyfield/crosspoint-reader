@@ -248,6 +248,9 @@ void ActivityManager::loop() {
       s.counters.transitions++;
 
       if (s.stack.empty()) {
+        // Mirror ActivityManager.cpp: swallow before goHome(), because the
+        // real replaceActivity's immediate-launch branch never swallows.
+        mappedInput.swallowUntilIdle();
         lock.unlock();  // goHome acquires its own
         goHome();
         continue;

@@ -336,9 +336,15 @@ void MappedInputManager::swallowUntilIdle() {
 
 bool MappedInputManager::wasPressed(const Button button) const {
   if (swallowActive_) {
-    // Suppress the edge. Clear the flag only once all buttons are idle so
-    // the release frame following an exit-on-press is also suppressed.
-    if (!isAnyPhysicalButtonHeld()) swallowActive_ = false;
+    // Suppress the edge. Clear the flag only once all buttons are idle AND no
+    // edge is latched this frame. The idle (level) check alone is not enough:
+    // the release edge arrives on a frame whose levels are already low, so the
+    // frame's FIRST query cleared the flag and a LATER query in the SAME frame
+    // read the still-latched release. Home does exactly that — ButtonNavigator's
+    // wasPressed() probes run before the wasReleased(Back) that opens the most
+    // recent book — which is how one Back press in Settings popped to Home and
+    // then opened the book (owner report, iOS build 120 lineage).
+    if (!isAnyPhysicalButtonHeld() && !gpio.wasAnyPressed() && !gpio.wasAnyReleased()) swallowActive_ = false;
     return false;
   }
   if (button == Button::Back && wasBackGesture()) return true;
@@ -347,7 +353,8 @@ bool MappedInputManager::wasPressed(const Button button) const {
 
 bool MappedInputManager::wasReleased(const Button button) const {
   if (swallowActive_) {
-    if (!isAnyPhysicalButtonHeld()) swallowActive_ = false;
+    // Same clear condition as wasPressed() above, for the same reason.
+    if (!isAnyPhysicalButtonHeld() && !gpio.wasAnyPressed() && !gpio.wasAnyReleased()) swallowActive_ = false;
     return false;
   }
   if (button == Button::Back && wasBackGesture()) return true;

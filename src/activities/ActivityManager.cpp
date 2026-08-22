@@ -101,6 +101,12 @@ void ActivityManager::loop() {
 
       if (stackActivities.empty()) {
         LOG_DBG("ACT", "No more activities on stack, going home");
+        // Swallow edges here too: goHome() lands in replaceActivity's
+        // immediate-launch branch (currentActivity is already null), which
+        // never reaches the swallow the deferred paths run — so without this
+        // the release of the press that popped the last activity leaked into
+        // Home, whose Back handler opens the most recent book.
+        mappedInput.swallowUntilIdle();
         lock.unlock();  // goHome may acquire its own lock
         goHome();
         continue;  // Will launch goHome immediately

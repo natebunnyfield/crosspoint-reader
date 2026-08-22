@@ -90,6 +90,36 @@ class ReaderParentDouble final : public Activity {
   }
 };
 
+// HomeActivity's loop() shape, reduced to the two queries that matter, in
+// Home's order: ButtonNavigator's wasPressed() probes run FIRST, then the
+// wasReleased(Back) that opens the most recent book (HomeActivity.cpp:319-326).
+// The order is the hazard: on the release frame the button LEVELS are already
+// idle, so the frame's FIRST swallow-gated query decides whether the swallow
+// clears — and if it clears there, a LATER query in the SAME frame reads the
+// still-latched release edge. The single-query ReaderParentDouble above cannot
+// see this, which is how the suite stayed green while build 120's Home opened
+// the book on the release of the press that closed Settings.
+struct HomeObservations {
+  int backReleasesSeen = 0;
+};
+HomeObservations g_homeObs;
+
+class HomeLikeParentDouble final : public Activity {
+ public:
+  HomeLikeParentDouble(GfxRenderer& renderer, MappedInputManager& mappedInput)
+      : Activity("TestHomeLikeParent", renderer, mappedInput) {}
+
+  void loop() override {
+    // ButtonNavigator::update()'s edge probes come first on Home.
+    (void)mappedInput.wasPressed(MappedInputManager::Button::Right);
+    (void)mappedInput.wasPressed(MappedInputManager::Button::Left);
+    // Then Home's "Back opens the most recent book" check.
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+      g_homeObs.backReleasesSeen++;
+    }
+  }
+};
+
 // Idle placeholder useful when a test needs a named activity with no behaviour.
 class NamedDouble final : public Activity {
  public:
@@ -351,6 +381,38 @@ TEST_F(ActivityInput, HoldingBackExitsOnceAndReleaseIsSwallowed) {
   // Release: swallowed by swallowUntilIdle — successor does not see it.
   host::releaseFrame(HalGPIO::BTN_BACK);
   EXPECT_EQ(host::counters().pops, 1) << "release leaked to the successor and triggered a second pop";
+}
+
+// ===========================================================================
+// The swallowed release must STAY swallowed for every query in its frame, not
+// just the first. Owner report (iOS build 120 lineage): "after navigating
+// through settings, I hit the back button and it loads up the book instead of
+// going back to settings." Mechanism: the child exits on the Back PRESS; the
+// swallow arms; the RELEASE lands frames later in Home, whose loop probes
+// wasPressed (ButtonNavigator) before its wasReleased(Back) book-open — the
+// probe ran on an idle-level frame, cleared the swallow, and the Back check
+// then consumed the release edge of the very press that closed Settings.
+// ===========================================================================
+
+TEST_F(ActivityInput, TheSwallowedReleaseStaysSwallowedForLaterQueriesInTheSameFrame) {
+  g_homeObs = HomeObservations{};
+  auto parentOwned = std::make_unique<HomeLikeParentDouble>(host::renderer(), host::input());
+  auto* parent = parentOwned.get();
+  host::setRootActivity(std::move(parentOwned));
+  parent->startActivityForResult(makeFontSelection(), [](const ActivityResult&) {});
+  host::frame();
+  ASSERT_EQ(host::currentActivityName(), "FontSelect") << "child was never pushed";
+  host::resetCounters();
+
+  // One deliberate tap: the child exits on the press edge; the release edge
+  // lands one frame later, in the Home-shaped parent's loop.
+  host::tap(HalGPIO::BTN_BACK);
+  host::frames(2);
+
+  EXPECT_EQ(g_homeObs.backReleasesSeen, 0)
+      << "the Back release of the press that closed the child leaked past the swallow to a later "
+         "query in the release frame — this is 'back from Settings opens the book'";
+  EXPECT_EQ(host::currentActivityName(), "TestHomeLikeParent");
 }
 
 // ===========================================================================
