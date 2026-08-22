@@ -24,6 +24,9 @@ an edge produced for one consumer read by a second after a boundary.
 
 ## Remaining findings (post-fix), ranked
 
+Findings 1-4 FIXED 2026-08-22 (commit pending) — see "Fixes" below. 5-9 remain
+documented only.
+
 | # | Mechanism | Producer | Stale consumer | Failure | Conf |
 |---|---|---|---|---|---|
 | 1 | Hold crosses boundary: `isPressed`+`getHeldTime` bypass swallow; hold timer never resets on transition | NoteEditorActivity.cpp:571 exit on wasPressed(Back) | FileManagerActivity.cpp:608 `isPressed(Back) && getHeldTime()>=GO_HOME_MS` | Hold Back ~1 s to leave a note → Manage Files jumps to SD root, not the note's folder | verified |
@@ -35,6 +38,45 @@ an edge produced for one consumer read by a second after a boundary.
 | 7 | Mid-frame update() inside File Transfer inner loop destroys edges for other consumers | CrossPointWebServerActivity.cpp:399 | main.cpp:1103 inactivity timer + all non-Back buttons | Presses vanish during transfer; inactivity not reset | verified, low |
 | 8 | `getPressedFrontButton()` bypasses swallow; its consumer was deleted | MappedInputManager.cpp:419-435 | none | latent | verified |
 | 9 | ButtonNavigator::lastContinuousNavTime never reset at entry | ButtonNavigator.cpp:50-55 | same activity after pop | first Left/Right after return could be swallowed mid-auto-repeat | suspected, no path found |
+
+## Fixes (2026-08-22, commit pending)
+
+All four verified headlessly on the desktop simulator, before (bug) and after
+(fixed), same script both times; card state built and restored per run.
+
+- **1 — FIXED at the mechanism**: `swallowUntilIdle()` now gates the LEVEL
+  reads too — `isPressed()` returns false and `getHeldTime()` returns 0 while
+  the swallow is active (`src/MappedInputManager.cpp`, same clear condition as
+  the edge reads). Chosen over per-consumer pairing flags because the swallow
+  already arms exactly at the boundary while a button is held, so every hold
+  branch in every activity is covered at once. Evidence: editor → hold Back
+  1.5 s; before, Manage Files landed at `/` (root listing, path line `/`);
+  after, it lands in the note's folder (`/!qa`, title and path line show it).
+  `[ACT]` path identical both runs: FileManager → NoteEditor → FileManager.
+- **2 — FIXED generically in the framework**: `OptionPopup` now consumes the
+  whole closing press — `closeOnPress()` records the button and `handleInput()`
+  keeps returning true after close until level low AND no edge latched
+  (`src/components/OptionPopup.h`). RecentBooks and FileBrowser now gate on
+  `handleInput()` instead of `isActive()` so the drain is reachable;
+  FileManager keeps its own release locks. Evidence: Recents → long-press
+  Confirm → Back dismiss; before, `[ACT]` shows RecentBooks → Home 85 ms after
+  the tap; after, no transition, screenshot still in Recents.
+- **3 — FIXED with the level-read form** (B-026's twin):
+  `FileBrowserActivity.cpp` clears `lockLongPressBack` on `!isPressed(Back)`
+  instead of the swallow-suppressed `wasReleased(Back)`. Evidence: reader →
+  long-press Back → Browse → long-press Back again; before, still `/zzqa` and
+  the following short Back only went up one level; after, the second
+  long-press jumps to SD root and the next short Back goes Home (`[ACT]`
+  FileBrowser → Home).
+- **4 — FIXED**: the swallow moved INTO `replaceActivity()`'s immediate-launch
+  branch (`ActivityManager.cpp`), the pop-to-empty call removed as redundant,
+  and `test/activity_input/HostHarness.cpp` mirrors both, so the
+  test/production divergence noted under "Prior art" is closed. Covered by the
+  activity_input suite (links the real `MappedInputManager`).
+
+ctest: 367/369, the two failures pre-existing and unrelated (EditorFontsTest,
+SettingDisplayOrderTest — font-list assertions). Desktop canary SUCCESS;
+simulator repo `tests/run_all.sh` 31/31.
 
 Closed by dfeb1232e, worth regression pins: action-menu Confirm press → TextViewer togglePretty (FileManagerActivity.cpp:634-641 → TextViewerActivity.cpp:364); every wasPressed-pop → HomeActivity.cpp:323/369 (crash screen / SD error / "Library updated" dismissals opening the last book or relaunching the updater).
 

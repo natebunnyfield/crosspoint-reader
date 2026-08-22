@@ -101,12 +101,10 @@ void ActivityManager::loop() {
 
       if (stackActivities.empty()) {
         LOG_DBG("ACT", "No more activities on stack, going home");
-        // Swallow edges here too: goHome() lands in replaceActivity's
-        // immediate-launch branch (currentActivity is already null), which
-        // never reaches the swallow the deferred paths run — so without this
-        // the release of the press that popped the last activity leaked into
-        // Home, whose Back handler opens the most recent book.
-        mappedInput.swallowUntilIdle();
+        // No swallow here: goHome() lands in replaceActivity's immediate-launch
+        // branch (currentActivity is already null), which swallows before
+        // onEnter() — see the comment there (input-edge audit 2026-08-21,
+        // finding 4).
         lock.unlock();  // goHome may acquire its own lock
         goHome();
         continue;  // Will launch goHome immediately
@@ -201,6 +199,12 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
   } else {
     // No current activity, safe to launch immediately
     currentActivity = std::move(newActivity);
+    // Swallow stale edges/holds HERE, not only at the deferred call sites:
+    // every goTo* from null-current takes this branch (boot routing with a
+    // button held, the recovery picker entered mid-UP-hold, pop-to-empty →
+    // goHome), and patching individual callers let the class re-open
+    // (input-edge audit 2026-08-21, finding 4).
+    mappedInput.swallowUntilIdle();
     currentActivity->onEnter();
   }
 }

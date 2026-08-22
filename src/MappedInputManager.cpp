@@ -361,13 +361,33 @@ bool MappedInputManager::wasReleased(const Button button) const {
   return mapButton(button, &HalGPIO::wasReleased);
 }
 
-bool MappedInputManager::isPressed(const Button button) const { return mapButton(button, &HalGPIO::isPressed); }
+bool MappedInputManager::isPressed(const Button button) const {
+  if (swallowActive_) {
+    // Level reads are gated too, not just edges: a hold that crosses an
+    // activity boundary belongs to the DEPARTED activity, and the hold timer
+    // never resets on transition. When isPressed()/getHeldTime() bypassed the
+    // swallow, holding Back out of the note editor satisfied Manage Files'
+    // isPressed(Back) && getHeldTime() >= GO_HOME_MS branch on its first
+    // frames and jumped to the SD root instead of the note's folder
+    // (input-edge audit 2026-08-21, finding 1). Same clear condition as
+    // wasPressed() above.
+    if (!isAnyPhysicalButtonHeld() && !gpio.wasAnyPressed() && !gpio.wasAnyReleased()) swallowActive_ = false;
+    return false;
+  }
+  return mapButton(button, &HalGPIO::isPressed);
+}
 
 bool MappedInputManager::wasAnyPressed() const { return gpio.wasAnyPressed(); }
 
 bool MappedInputManager::wasAnyReleased() const { return gpio.wasAnyReleased(); }
 
 unsigned long MappedInputManager::getHeldTime() const {
+  if (swallowActive_) {
+    // Same gate and clear condition as isPressed() above: a held time carried
+    // across an activity swap measures the previous activity's press.
+    if (!isAnyPhysicalButtonHeld() && !gpio.wasAnyPressed() && !gpio.wasAnyReleased()) swallowActive_ = false;
+    return 0;
+  }
   if (!gpio.wasAnyPressed() && !gpio.wasAnyReleased() && touchHeldOverrideValid &&
       millis() - touchHeldOverrideAt <= TOUCH_HELD_OVERRIDE_WINDOW_MS) {
     return touchHeldOverrideMs;

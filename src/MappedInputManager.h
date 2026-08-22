@@ -95,9 +95,11 @@ class MappedInputManager {
   [[nodiscard]] bool isNavDirectionSwapped() const;
 
   // After an activity swap (pop, push, or replace) the incoming activity must
-  // not see stale press/release edges from the button(s) the outgoing activity
-  // consumed. Call this once at the transition; wasPressed()/wasReleased() will
-  // return false until all physical buttons are idle for one complete frame.
+  // not see stale press/release edges — or the stale LEVEL and HOLD TIME — from
+  // the button(s) the outgoing activity consumed. Call this once at the
+  // transition; wasPressed()/wasReleased()/isPressed() return false and
+  // getHeldTime() returns 0 until all physical buttons are idle for one
+  // complete frame.
   void swallowUntilIdle();
 
   // Pair for test tear-down: clears the flag so a between-test reset does not
@@ -127,8 +129,9 @@ class MappedInputManager {
   mutable unsigned long touchHeldOverrideMs = 0;
   mutable unsigned long touchHeldOverrideAt = 0;
 
-  // When true, wasPressed()/wasReleased() return false and are cleared only once
-  // all physical buttons are observed idle. Set by swallowUntilIdle().
+  // When true, wasPressed()/wasReleased()/isPressed() return false and
+  // getHeldTime() returns 0, cleared only once all physical buttons are
+  // observed idle. Set by swallowUntilIdle().
   mutable bool swallowActive_ = false;
   bool isAnyPhysicalButtonHeld() const;
 };

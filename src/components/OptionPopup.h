@@ -24,6 +24,7 @@ class OptionPopup {
     onSelectCallback = std::move(onSelect);
     infoLines.clear();
     layoutValid = false;
+    drainingClosePress = false;
     active = true;
   }
 
@@ -38,6 +39,7 @@ class OptionPopup {
     onSelectCallback = std::move(onSelect);
     infoLines.clear();
     layoutValid = false;
+    drainingClosePress = false;
     active = true;
   }
 
@@ -56,11 +58,30 @@ class OptionPopup {
     onSelectCallback = std::move(onSelect);
     infoLines.clear();
     layoutValid = false;
+    drainingClosePress = false;
     active = true;
   }
 
   bool handleInput(MappedInputManager& input, const std::function<void()>& requestUpdate) {
-    if (!active) return false;
+    if (!active) {
+      // A button press closed the popup, but its release is still in flight —
+      // and popup dismissal is not an activity swap, so the central
+      // swallowUntilIdle() never applies. Keep owning input until the closing
+      // press has fully ended: level low AND no edge latched this frame. The
+      // level alone is not enough, because the release edge lands on a frame
+      // whose level is already low, and the host's release handler would read
+      // it — dismissing "Remove from recents?" with Back fired
+      // RecentBooksActivity's wasReleased(Back) and went Home (input-edge
+      // audit 2026-08-21, finding 2).
+      if (drainingClosePress) {
+        if (!input.isPressed(closeButton) && !input.wasAnyPressed() && !input.wasAnyReleased()) {
+          drainingClosePress = false;
+          return false;
+        }
+        return true;
+      }
+      return false;
+    }
 
     const int count = static_cast<int>(ownedStrings.size());
     int tx = 0;
@@ -105,12 +126,12 @@ class OptionPopup {
       requestUpdate();
       return true;
     } else if (input.wasPressed(MappedInputManager::Button::Confirm)) {
-      active = false;
+      closeOnPress(MappedInputManager::Button::Confirm);
       if (onSelectCallback) onSelectCallback(selectedIndex);
       requestUpdate();
       return true;
     } else if (input.wasPressed(MappedInputManager::Button::Back)) {
-      active = false;
+      closeOnPress(MappedInputManager::Button::Back);
       requestUpdate();
       return true;
     }
@@ -201,7 +222,19 @@ class OptionPopup {
     return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
   }
 
+  // Close caused by a BUTTON press (Confirm select / Back dismiss): the popup
+  // must consume the whole press, so remember which button so handleInput()
+  // can drain its release. Touch closes need no drain — a tap leaves no
+  // button release behind.
+  void closeOnPress(MappedInputManager::Button button) {
+    active = false;
+    drainingClosePress = true;
+    closeButton = button;
+  }
+
   bool active = false;
+  bool drainingClosePress = false;
+  MappedInputManager::Button closeButton = MappedInputManager::Button::Back;
   std::string title;
   std::vector<std::string> ownedStrings;
   std::vector<std::string> infoLines;

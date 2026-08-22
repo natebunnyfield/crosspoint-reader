@@ -41,10 +41,12 @@ void RecentBooksActivity::onExit() {
 }
 
 void RecentBooksActivity::loop() {
-  if (removePopup.isActive()) {
-    removePopup.handleInput(mappedInput, [this] { requestUpdate(); });
-    return;
-  }
+  // handleInput() as the gate, not isActive(): it keeps returning true while
+  // draining the release of the press that closed the popup, so dismissing
+  // "Remove from recents?" with Back cannot fall through to the
+  // wasReleased(Back) → Home handler below (input-edge audit 2026-08-21,
+  // finding 2).
+  if (removePopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
 
   const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, true);
   const auto& metrics = UITheme::getInstance().getMetrics();

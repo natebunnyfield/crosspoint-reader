@@ -248,9 +248,8 @@ void ActivityManager::loop() {
       s.counters.transitions++;
 
       if (s.stack.empty()) {
-        // Mirror ActivityManager.cpp: swallow before goHome(), because the
-        // real replaceActivity's immediate-launch branch never swallows.
-        mappedInput.swallowUntilIdle();
+        // Mirror ActivityManager.cpp: no swallow here — replaceActivity's
+        // immediate-launch branch swallows before onEnter() (finding 4).
         lock.unlock();  // goHome acquires its own
         goHome();
         continue;
@@ -321,6 +320,9 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
     s.current = std::move(newActivity);
     s.currentName = s.current->name;
     s.counters.transitions++;
+    // Mirror ActivityManager.cpp: the immediate-launch branch swallows stale
+    // edges/holds before onEnter() (input-edge audit 2026-08-21, finding 4).
+    mappedInput.swallowUntilIdle();
     s.current->onEnter();
   }
 }

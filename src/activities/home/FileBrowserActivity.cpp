@@ -105,10 +105,11 @@ void FileBrowserActivity::onExit() {
 }
 
 void FileBrowserActivity::loop() {
-  if (deletePopup.isActive()) {
-    deletePopup.handleInput(mappedInput, [this] { requestUpdate(); });
-    return;
-  }
+  // handleInput() as the gate, not isActive(): it keeps returning true while
+  // draining the release of the press that closed the popup, so a button
+  // dismiss cannot leak its release into the handlers below (input-edge audit
+  // 2026-08-21, finding 2 pattern).
+  if (deletePopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
 
   // Long press BACK (1s+) goes to root folder (Books mode only).
   // In firmware-pick mode we keep navigation simple: short Back = up dir / cancel.
@@ -121,7 +122,13 @@ void FileBrowserActivity::loop() {
     return;
   }
 
-  if (lockLongPressBack && mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+  // Use a level read (!isPressed) instead of wasReleased to clear the lock:
+  // arriving here via the reader's long-press-Back exit, the central
+  // swallowUntilIdle() suppresses the release edge, so an edge-read lock never
+  // cleared — long-press-to-root stayed dead for the session and the next Back
+  // tap was eaten (input-edge audit 2026-08-21, finding 3; the missed twin of
+  // the B-026 fix in FileManagerActivity).
+  if (lockLongPressBack && !mappedInput.isPressed(MappedInputManager::Button::Back)) {
     lockLongPressBack = false;
     return;
   }
