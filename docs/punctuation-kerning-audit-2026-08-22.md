@@ -273,3 +273,13 @@ Identical `(leftClass, rightClass)` in LibreFranklin (3,4), Noto (4,5), Coelacan
 | No kern across a missing glyph | B-036: `GfxRenderer.cpp:759-762`, `:807-812`, `:2666`, `:2673`; `EpdFont.cpp:38-46`. |
 
 **Files an implementer will want open:** `lib/EpdFont/EpdFontData.h:139-216`, `lib/EpdFont/EpdFont.cpp:104-118`, `lib/GfxRenderer/GfxRenderer.cpp:770, 2571-2597, 2612-2677`, `lib/Epub/Epub/ParsedText.cpp:200-208, 824-826, 1144-1186, 1330-1332, 1369`, `lib/EpdFont/SdCardFont.cpp:1122-1145, 1247-1272`, `lib/EpdFont/scripts/fontconvert_sdcard.py:1246-1412`.
+---
+
+# Standing rulings (owner, 2026-08-22, asked one at a time)
+
+1. **Alignment default: RAGGED RIGHT.** The new Justified/Ragged reader
+   setting ships with ragged right as the default (justified one tap away).
+2. **Editor faces: fix iA Writer Quattro's period and comma only.** '.' and
+   ',' get the narrow (i-width) advance via font regeneration; PragmataPro and
+   Nitti Typewriter stay at full advance — correct for true monospace. No
+   synthesized kern tables for editor faces (option declined).
