@@ -283,3 +283,18 @@ Identical `(leftClass, rightClass)` in LibreFranklin (3,4), Noto (4,5), Coelacan
    ',' get the narrow (i-width) advance via font regeneration; PragmataPro and
    Nitti Typewriter stay at full advance — correct for true monospace. No
    synthesized kern tables for editor faces (option declined).
+3. **Inter-block gap: capped at half a line.** "keep half-line gap, but
+   collapse any gap that is more than a half-line gap" — any computed gap
+   (CSS margins, padding, extra spacing) above lineHeight/2 collapses to
+   exactly lineHeight/2; smaller gaps stay as computed. Page-top rules and
+   the chapter sinkage (placement approved from the render) unchanged.
+4. **Chapter-select progress bar**: ~2x taller, outlined, read-portion
+   filled solid left of current position, no gray background, a tick line
+   previewing the highlighted chapter's location; total height within one
+   text line.
+5. **Verse/blockquote/list + typographic details: audit and fix worst.**
+   One agent renders real samples (poetry, blockquotes, nested lists, plus
+   dashes/quotes/ellipsis/non-breaking-space line-break behavior),
+   documents findings in an md, fixes the indefensible.
+6. **Chapter-opener styling: NEITHER** drop cap nor small caps — the
+   sinkage stands alone. Closed.
