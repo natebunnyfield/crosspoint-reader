@@ -288,6 +288,20 @@ int trailingHangWidth(const GfxRenderer& renderer, const int fontId, const std::
   return fullHang ? advance : advance / 2;
 }
 
+// A line must never BEGIN with a dash (block-rendering audit 2026-08-22,
+// docs/block-rendering-audit-2026-08-22.md): a spaced em dash — tokenized as
+// its own word — was an ordinary break opportunity, so "quiet — almost" could
+// wrap to a line starting "— almost". Typographically the dash hangs with the
+// word BEFORE it; both breakers treat a dash-initial token like a continuation
+// word and move the preceding word down with it. En dash (U+2013), em dash
+// (U+2014) and horizontal bar (U+2015) only: the ASCII hyphen stays breakable
+// (it ends hyphenated prefixes and plain-text bullets legitimately).
+bool startsWithLineForbiddenDash(const std::string& word) {
+  const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str());
+  const uint32_t cp = utf8NextCodepoint(&ptr);
+  return cp == 0x2013 || cp == 0x2014 || cp == 0x2015;
+}
+
 // Checks if a UTF-8 codepoint should be counted as part of a word for Focus Reading
 bool isWordCharacter(uint32_t cp) {
   // ASCII range (Catches 95%+ of characters immediately)
@@ -882,6 +896,12 @@ std::vector<size_t> ParsedText::computeLineBreaks(const GfxRenderer& renderer, c
         continue;
       }
 
+      // Cannot break before a dash token — the dash hangs with the word before it
+      // (see startsWithLineForbiddenDash).
+      if (j + 1 < totalWordCount && startsWithLineForbiddenDash(words[j + 1])) {
+        continue;
+      }
+
       // Calculate extraEndOffset if we break after word j (protect right margin)
       int extraEndOffset = 0;
       if (!rubyTexts.empty() && j < rubyTexts.size()) {
@@ -1052,7 +1072,12 @@ std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& r
 
     // Don't break before a continuation word (e.g., orphaned "?" after "question").
     // Backtrack to the start of the continuation group so the whole group moves to the next line.
-    while (currentIndex > lineStart + 1 && currentIndex < wordWidths.size() && continuesVec[currentIndex]) {
+    // A dash-initial token (spaced em/en dash) is treated the same way: the dash must not
+    // start a line, so the word before it backs off and the pair travels down together
+    // (see startsWithLineForbiddenDash).
+    while (currentIndex > lineStart + 1 && currentIndex < wordWidths.size() &&
+           (continuesVec[currentIndex] ||
+            (currentIndex < words.size() && startsWithLineForbiddenDash(words[currentIndex])))) {
       --currentIndex;
     }
 

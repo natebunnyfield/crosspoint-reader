@@ -59,7 +59,15 @@ namespace {
 //      summing marginBottom + half-line + marginTop (the <br> scene-break
 //      line rides on top of the cap). Stale v39 caches would keep the
 //      triple-dipped gaps, hence the bump.
-constexpr uint8_t SECTION_FILE_VERSION = 40;
+// v41: block-rendering audit fixes (2026-08-22,
+//      docs/block-rendering-audit-2026-08-22.md). Two pagination changes, no
+//      header change: a line can no longer begin with a spaced em/en dash or
+//      horizontal bar (the breakers move the preceding word down with it,
+//      ParsedText), and a block's ACCUMULATED horizontal insets are capped at
+//      2/5 of the viewport (nested blockquote margins used to push text off
+//      the right edge of the panel, ChapterHtmlSlimParser). Stale v40 caches
+//      would keep dash-initial lines and clipped nested quotes, hence the bump.
+constexpr uint8_t SECTION_FILE_VERSION = 41;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

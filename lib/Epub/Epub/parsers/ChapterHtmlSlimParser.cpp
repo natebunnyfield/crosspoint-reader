@@ -54,6 +54,30 @@ constexpr const char* SKIP_TAGS[] = {"head", "rp"};
 
 bool isWhitespace(const char c) { return c == ' ' || c == '\r' || c == '\n' || c == '\t'; }
 
+// Over-indent guard (block-rendering audit 2026-08-22,
+// docs/block-rendering-audit-2026-08-22.md). BlockStyle::fromCssStyle caps each
+// SIDE of each ELEMENT at 2em, but nothing capped the ACCUMULATED total: three
+// nested blockquotes at margin+padding 2em each stack ~12em per side, which
+// exceeds the viewport — makePages' effectiveWidth guard then falls back to
+// FULL width while placeLineOnPage still shifts every line by the full
+// leftInset, so the text is laid out wide and painted off the right edge of
+// the panel. Cap the accumulated total at 2/5 of the viewport (both sides
+// scaled proportionally) so a block always keeps at least 3/5 of the measure
+// (~16 of the ~27 chars per line at 18 pt on X3). Applied only where the CSS
+// block-style stack accumulates — table cell placement builds its column
+// x-offsets as margins and must not be rescaled.
+BlockStyle clampAccumulatedHorizontalInsets(BlockStyle style, const uint16_t viewportWidth) {
+  const int maxInset = (static_cast<int>(viewportWidth) * 2) / 5;
+  const int total = style.totalHorizontalInset();
+  if (total <= maxInset) return style;
+  const float scale = static_cast<float>(maxInset) / static_cast<float>(total);
+  style.marginLeft = static_cast<int16_t>(style.marginLeft * scale);
+  style.marginRight = static_cast<int16_t>(style.marginRight * scale);
+  style.paddingLeft = static_cast<int16_t>(style.paddingLeft * scale);
+  style.paddingRight = static_cast<int16_t>(style.paddingRight * scale);
+  return style;
+}
+
 std::string trimAndNormalize(const std::string& str) {
   if (str.empty()) return "";
   size_t start = 0;
@@ -1501,8 +1525,9 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     if (self->embeddedStyle && cssStyle.hasTextAlign()) {
       headerBlockStyle.alignment = cssStyle.textAlign;
     }
-    const auto accumulated =
-        self->blockStyleStack.back().getCombinedBlockStyle(headerBlockStyle, BlockStyle::CombineAxis::Horizontal);
+    const auto accumulated = clampAccumulatedHorizontalInsets(
+        self->blockStyleStack.back().getCombinedBlockStyle(headerBlockStyle, BlockStyle::CombineAxis::Horizontal),
+        self->viewportWidth);
     self->blockStyleStack.push_back(accumulated);
     self->startNewTextBlock(accumulated.withoutBottom());
     // h1-h3 always open a fresh page, the same way a TOC chapter boundary does
@@ -1554,8 +1579,10 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       self->startNewTextBlock(brStyle);
     } else {
       self->currentCssStyle = cssStyle;
-      const auto accumulated = self->blockStyleStack.back().getCombinedBlockStyle(userAlignmentBlockStyle,
-                                                                                  BlockStyle::CombineAxis::Horizontal);
+      const auto accumulated = clampAccumulatedHorizontalInsets(
+          self->blockStyleStack.back().getCombinedBlockStyle(userAlignmentBlockStyle,
+                                                             BlockStyle::CombineAxis::Horizontal),
+          self->viewportWidth);
       self->blockStyleStack.push_back(accumulated);
       self->startNewTextBlock(accumulated.withoutBottom());
       self->updateEffectiveInlineStyle();

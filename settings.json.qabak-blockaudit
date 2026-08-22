@@ -1,0 +1,146 @@
+{
+  // CrossPoint simulator - desktop settings. Edited while running and applied
+  // within a second; no relaunch. Same keys as the iOS Settings app.
+  //
+  // Every value each key accepts is listed above it. A line you break costs
+  // that line only, and a key you delete falls back to its default.
+
+  // ---------------------------------------------------------------- PAGE ---
+  // The page's two tones. Every preset below; the integer is what is
+  // stored, and it never changes meaning even when the list is
+  // reordered. Rows marked * are the shortlist at the head of the
+  // iOS picker. A CRT preset also switches the page to emissive and
+  // gives it that phosphor's glow.
+  // *   7 = CRT Amber (P3 phosphor, 322 ms trail)
+  // *  37 = CRT Radar Orange (P19 (KF,MgF2):Mn, 1095 ms trail)
+  // *  40 = CRT TV Green (P22G (Zn,Cd)S:Cu,Al, 63 ms trail)
+  // *  12 = CRT Gray (P4 phosphor, 514 ms trail)
+  // *  25 = CRT Cascade (P7 blue-white to yellow-green, 2828 ms trail)
+  // *  15 = CRT Blue (P11 phosphor, 126 ms trail)
+  //     2 = Neutral High Contrast (black on white)
+  //     1 = Neutral Default (e-ink)
+  //    16 = Neutral Reading (long-form on OLED)
+  //    17 = Neutral Reading Warm (warmer paper)
+  //    18 = Neutral Reading Cool (cooler paper)
+  //     3 = Paper Sepia (warm)
+  //     9 = Paper Gruvbox Light (warm pale)
+  //    10 = Paper Latte (neutral pale)
+  //     8 = Paper Nord (cool pale)
+  //     5 = Paper Solarized (low contrast by design)
+  //     6 = CRT Green (P1 phosphor, 400 ms trail)
+  //    26 = CRT Blue-Green Long (P2 ZnS:Cu(Ag), 1095 ms trail)
+  //    27 = CRT Blue Fastest (P5 CaWO4:W, 20 ms trail)
+  //    28 = CRT White TV (P6 ZnS:Ag+ZnS:CdS:Ag, 63 ms trail)
+  //    29 = CRT Dark Trace (P10 KCl, 1095 ms trail)
+  //    30 = CRT Orange Persistent (P12 Zn(Mg)F2:Mn, 693 ms trail)
+  //    31 = CRT Red-Orange (P13 MgSi2O6:Mn, 283 ms trail)
+  //    32 = CRT Cascade Orange (P14 ZnS:Ag on ZnS:CdS:Cu, 1095 ms trail)
+  //    33 = CRT Blue-Green Fastest (P15 ZnO:Zn, 20 ms trail)
+  //    34 = CRT Violet (P16 CaMgSi2O6:Ce, 20 ms trail)
+  //    35 = CRT Cascade Yellow (P17 ZnO,ZnCdS:Cu, 1095 ms trail)
+  //    36 = CRT White Soft (P18 CaMgSi2O6:Ti, BeSi2O6:Mn, 89 ms trail)
+  //    47 = CRT Radar Orange Longest (P33 MgF2:Mn, 2828 ms trail)
+  //    38 = CRT Yellow-Green Long (P20 (Zn,Cd)S:Ag or (Zn,Cd)S:Cu, 400 ms trail)
+  //    39 = CRT Radar Red (P21 MgF2:Mn2+, 1095 ms trail)
+  //    11 = CRT Red (P22R phosphor, 283 ms trail)
+  //    24 = CRT Blue TV (P22B color-tube gun, 283 ms trail)
+  //    41 = CRT White Warm (P23 ZnS:Ag+(Zn,Cd)S:Ag, 63 ms trail)
+  //    42 = CRT VFD Green (P24 ZnO:Zn, 20 ms trail)
+  //    43 = CRT Orange Lead (P25 CaSi2O6:Pb:Mn, 283 ms trail)
+  //    44 = CRT Radar Orange Long (P26 (KF,MgF2):Mn, 1095 ms trail)
+  //    45 = CRT Red-Orange Deep (P27 ZnPO4:Mn, 283 ms trail)
+  //    46 = CRT Yellow (P28 (Zn,Cd)S:Cu,Cl, 283 ms trail)
+  //    20 = CRT Green Fast (P31 oscilloscope, 89 ms trail)
+  //    48 = CRT Green Longest (P34 not published, 2828 ms trail)
+  //    49 = CRT Blue-White (P35 ZnS,ZnSe:Ag, 89 ms trail)
+  //    50 = CRT Radar Amber (P38 (Zn,Mg)F2:Mn, 1095 ms trail)
+  //    19 = CRT Green Long (P39, long persistence, 1095 ms trail)
+  //    51 = CRT White Long (P40 ZnS:Ag+(Zn,Cd)S:Cu, 1095 ms trail)
+  //    52 = CRT Terbium Green (P43 Gd2O2S:Tb, 283 ms trail)
+  //    21 = CRT White (P45 viewfinder, 283 ms trail)
+  //    53 = CRT Green Fastest (P46 Y3Al5O12:Ce, 17 ms trail)
+  //    22 = CRT Blue Fast (P47, very short, 20 ms trail)
+  //    54 = CRT Projector Green (P53 Y3Al5O12:Tb, 63 ms trail)
+  //    55 = CRT Blue Projector (P55 ZnS:Ag,Al, 63 ms trail)
+  //    23 = CRT Red Projector (P56 projection tube, 283 ms trail)
+  "panelPalettePreset": 21,
+
+  // 1 = dark page, 0 = light. Each palette defines both, so this picks which
+  // half of the chosen preset is drawn.
+  "darkMode": 1,
+
+  // ---------------------------------------------------------------- FADE ---
+  // Seconds the page takes to fade after the last input, the way a phosphor
+  // goes on dimming after the beam has moved on.
+  //   0 = off   15   30   60 = 1 min   120 = 2 min   300 = 5 min
+  "pageFadeSeconds": 300,
+
+  // How much of the legible floor is KEPT when it has finished fading.
+  //   100 = readable, stops while you can still read it
+  //    75 = dim, past readable but plainly still there
+  //    50 = ghost, the shape of the page rather than the words
+  //    25 = faint, only just visible
+  //     0 = fully transparent, the page disappears
+  "pageFadeDepthPercent": 75,
+
+  // ---------------------------------------------------------------- BEAM ---
+  // Milliseconds for the beam to sweep a new page in from the top. A CRT does
+  // not swap pictures, it draws them.
+  //   0 = off, arrives at once      17 = 60 Hz, a real field sweep
+  //   33 = 30 Hz, just visible      67 = slow enough to watch
+  //   150 = deliberate              300 = a wipe, not a tube
+  "beamPaintMs": 67,
+
+  // Whether the 1-bit pass may reach the screen ahead of the antialiased
+  // compose that follows it. An antialiased page is painted twice; normally
+  // only the composed frame lands.
+  //   0 = off, the page arrives composed
+  //   1 = on, the 1-bit pass lands first, like the panel itself
+  "presentFlash": 0,
+
+  // --------------------------------------------------------------- GRAIN ---
+  // The screen is a settled layer of phosphor crystals with uneven coverage.
+  // Strength as a percentage of what a real one has.
+  //   0 = off   30 = 0.3x, barely there   100 = 1x, realistic   300 = 3x
+  // The amplitude is scaled per palette on top of this: a page with less
+  // contrast to spare gets less coating.
+  "phosphorGrainPercent": 100,
+
+  // How the grain is spread across the screen.
+  //   0 = Even, coated uniformly
+  //   1 = Vignette, grainier at the rim with dimmed corners
+  //   2 = Mottled, blotchy the way a coating settles
+  //   3 = both
+  "phosphorGrainCoverage": 3,
+
+  // How hard the blotches swing the grain, in hundredths. Their SIZE is not
+  // settable -- see kMottleCellsDefault.
+  //   0 = off, no blotching at all       3 = 0.03, a suggestion
+  //   10 = 0.10, visible                90 = 0.90, plainly a coated surface
+  "phosphorGrainMottleDepth": 90,
+
+  // --------------------------------------------------------- PHOSPHOR MIX ---
+  // The same mixer the iOS page-color modal drives, through the same math. A
+  // mix OWNS the page and its glow while active; panelPalettePreset is ignored.
+  //   -1 = off (use panelPalettePreset above)
+  //    0 = blend    weighted mixture of up to 4 pure phosphors
+  //    1 = parts    ink, paper and fade from three donors
+  //    2 = cascade  a flash layer that paints, a persistence layer that lingers
+  // Premixed phosphors (P4 P6 P7 P14 P17 P18 P23 P40) are not ingredients --
+  // pick them as presets instead. Every phosphor's integer is in the palette
+  // list at the top of this file.
+  "phosphorMixMode": -1,
+
+  // Blend: "preset:weight" pairs, comma-separated, weights 1-9.
+  // e.g. "6:3,15:1" is P1 green 3 parts to P11 blue 1 part.
+  "phosphorMixBlend": "",
+
+  // Parts: which preset donates each role.
+  "phosphorMixInkFrom": -1,
+  "phosphorMixPaperFrom": -1,
+  "phosphorMixTrailFrom": -1,
+
+  // Cascade: the flash paints the page, the persistence lingers in its color.
+  "phosphorMixFlash": -1,
+  "phosphorMixPersist": -1
+}
