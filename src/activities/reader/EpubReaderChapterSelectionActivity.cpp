@@ -7,6 +7,13 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+namespace {
+// How far the chapter-preview tick extends past the progress bar's outline,
+// above and below. Shared by loop() and render() so the touch-target math and
+// the drawn layout cannot drift apart.
+constexpr int kTickOverhang = 2;
+}  // namespace
+
 int EpubReaderChapterSelectionActivity::getTotalItems() const { return epub->getTocItemsCount(); }
 
 void EpubReaderChapterSelectionActivity::onEnter() {
@@ -54,10 +61,11 @@ void EpubReaderChapterSelectionActivity::loop() {
 
   auto metrics = UITheme::getInstance().getMetrics();
   Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  // Keep in step with render(): the thin book-progress bar sits between the
-  // header and the list, so the list starts one bar band lower.
+  // Keep in step with render(): the book-progress bar band (bar plus the tick
+  // overhang above and below) sits between the header and the list, so the
+  // list starts one band lower.
   const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing +
-                         metrics.popupProgressBarHeight + metrics.verticalSpacing;
+                         metrics.popupProgressBarHeight * 2 + kTickOverhang * 2 + metrics.verticalSpacing;
   const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
   switch (handleListTouch(selectorIndex, totalItems, contentTop, contentHeight, false)) {
     case ListTouchResult::Activated:
@@ -129,21 +137,47 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
                  tr(STR_SELECT_CHAPTER));
 
-  // Thin book-position bar (2026-08-22): the reader's byte-weighted progress
-  // through the whole book, at the page the chapter screen was opened from.
-  // Same outline-plus-fill idiom as BaseTheme::drawProgressBar, at the popup
-  // bar's 4 px height and without the percent label — the list needs the room.
-  const int barTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  // Book-position bar (2026-08-22 redesign): twice the popup bar's height,
+  // a 1 px ink outline with an EMPTY (paper) interior — no gray fill. The
+  // already-read portion, left of the reader's current position, fills solid
+  // ink. A vertical tick previews where the HIGHLIGHTED chapter begins, so
+  // moving the selection shows the jump target's location before committing.
+  // The tick notches through the outline (kTickOverhang above and below the
+  // bar) and its interior run flips to paper where it crosses the solid fill,
+  // so it reads in both zones on a 1bpp panel. "Ink"/"paper" are the
+  // renderer's states — dark mode inverts them for free, no special-casing.
+  const int barHeight = metrics.popupProgressBarHeight * 2;
+  const int barTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing + kTickOverhang;
+  const int barLeft = screen.x + metrics.contentSidePadding;
   const int barWidth = screen.width - metrics.contentSidePadding * 2;
-  const int barHeight = metrics.popupProgressBarHeight;
-  renderer.drawRect(screen.x + metrics.contentSidePadding, barTop, barWidth, barHeight);
+  renderer.drawRect(barLeft, barTop, barWidth, barHeight);
   const float clamped = bookProgress < 0.0f ? 0.0f : (bookProgress > 1.0f ? 1.0f : bookProgress);
   const int fillWidth = static_cast<int>((barWidth - 2) * clamped);
   if (fillWidth > 0) {
-    renderer.fillRect(screen.x + metrics.contentSidePadding + 1, barTop + 1, fillWidth, barHeight - 2);
+    renderer.fillRect(barLeft + 1, barTop + 1, fillWidth, barHeight - 2);
   }
 
-  const int contentTop = barTop + barHeight + metrics.verticalSpacing;
+  // The highlighted chapter's start, as the same byte-weighted fraction the
+  // fill uses: Epub::calculateProgress(spineIndex, 0.0f). Spine granularity —
+  // an anchored TOC entry shares its spine's start fraction, the best figure
+  // available here without paginating every chapter.
+  const auto selectedItem = epub->getTocItem(selectorIndex);
+  if (selectedItem.spineIndex != -1) {
+    float chapterFrac = epub->calculateProgress(selectedItem.spineIndex, 0.0f);
+    chapterFrac = chapterFrac < 0.0f ? 0.0f : (chapterFrac > 1.0f ? 1.0f : chapterFrac);
+    const int kTickWidth = 2;
+    const int tickX = barLeft + 1 + static_cast<int>((barWidth - 2 - kTickWidth) * chapterFrac + 0.5f);
+    renderer.fillRect(tickX, barTop - kTickOverhang, kTickWidth, barHeight + kTickOverhang * 2);
+    // Where the tick crosses the solid fill, carve its interior run to paper
+    // so it stays visible against the ink.
+    const int fillRight = barLeft + 1 + fillWidth;
+    const int carveWidth = (tickX + kTickWidth < fillRight ? tickX + kTickWidth : fillRight) - tickX;
+    if (fillWidth > 0 && carveWidth > 0) {
+      renderer.fillRect(tickX, barTop + 1, carveWidth, barHeight - 2, false);
+    }
+  }
+
+  const int contentTop = barTop + barHeight + kTickOverhang + metrics.verticalSpacing;
   const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
 
   const int totalItems = getTotalItems();
