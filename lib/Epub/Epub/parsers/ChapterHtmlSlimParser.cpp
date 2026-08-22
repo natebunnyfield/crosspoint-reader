@@ -44,7 +44,17 @@ constexpr size_t TEXT_BLOCK_SOFT_FLUSH_WORDS_WITH_CSS = 320;
 constexpr size_t MAX_ANCHORS_PER_CHAPTER = 1024;
 
 constexpr const char* HEADER_TAGS[] = {"h1", "h2", "h3", "h4", "h5", "h6"};
-constexpr const char* BLOCK_TAGS[] = {"p", "li", "div", "br", "blockquote"};
+constexpr const char* BLOCK_TAGS[] = {"p", "li", "div", "br", "blockquote", "ul", "ol"};
+
+// Default indent per list nesting level, applied to a <ul>/<ol> that carries no
+// publisher left margin/padding of its own (there is no UA stylesheet). 1.5 em
+// is sized against this panel's short measure (~27 chars/line at 18 pt): it
+// swallows a three-digit "999. " marker gutter with room to spare, while three
+// full levels still leave ~18 chars of measure — above the ~15-16-char floor
+// the 2/5-viewport accumulated-inset clamp guarantees (block-rendering audit
+// 2026-08-22, F2). Deeper nests hit that same clamp and compress
+// proportionally instead of crushing the text.
+constexpr float LIST_INDENT_STEP_EM = 1.5f;
 constexpr const char* BOLD_TAGS[] = {"b", "strong"};
 constexpr const char* ITALIC_TAGS[] = {"i", "em"};
 constexpr const char* UNDERLINE_TAGS[] = {"u", "ins"};
@@ -290,6 +300,16 @@ void ChapterHtmlSlimParser::flushPartWordBuffer() {
     fontStyle = static_cast<EpdFontFamily::Style>(fontStyle | EpdFontFamily::SUB);
   }
 
+  // A list item's first text word attaches to the marker word regardless of
+  // source whitespace after <li> (which resets nextWordContinues in
+  // characterData). The glued group keeps the marker→text gap fixed under
+  // Justified (a continuation advance is never a stretchable gap) and keeps
+  // the breaker from orphaning a marker at the end of a line.
+  if (listMarkerGluePending_) {
+    nextWordContinues = true;
+    listMarkerGluePending_ = false;
+  }
+
   // flush the buffer
   partWordBuffer[partWordBufferIndex] = '\0';
   currentTextBlock->addWord(partWordBuffer, fontStyle, false, nextWordContinues);
@@ -358,6 +378,10 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
   }
   wordsExtractedInBlock = 0;
   listItemBulletOnly = false;
+  // A genuinely new block means any pending marker glue is stale. The early
+  // returns above (empty-block merge, bullet-only reuse) deliberately keep it,
+  // so <li><p>text still glues its first word to the marker.
+  listMarkerGluePending_ = false;
 }
 
 // --- T-012: tables as columns ---------------------------------------------
@@ -1579,17 +1603,91 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       self->startNewTextBlock(brStyle);
     } else {
       self->currentCssStyle = cssStyle;
-      const auto accumulated = clampAccumulatedHorizontalInsets(
-          self->blockStyleStack.back().getCombinedBlockStyle(userAlignmentBlockStyle,
-                                                             BlockStyle::CombineAxis::Horizontal),
+      BlockStyle elementStyle = userAlignmentBlockStyle;
+      const bool isListContainer = strcmp(name, "ul") == 0 || strcmp(name, "ol") == 0;
+      const bool isListItem = strcmp(name, "li") == 0;
+      std::string listMarker;
+      if (isListContainer) {
+        // One indent step per nesting level, but only when the publisher gave
+        // this list no left inset of its own — explicit CSS (including an
+        // explicit 0) is list fidelity and wins.
+        if (!cssStyle.hasMarginLeft() && !cssStyle.hasPaddingLeft()) {
+          elementStyle.marginLeft = static_cast<int16_t>(emSize * LIST_INDENT_STEP_EM);
+        }
+        ListContext ctx;
+        ctx.ordered = (name[0] == 'o');
+        if (ctx.ordered) {
+          // HTML "start" attribute: first item's number. Lowercase per XHTML.
+          const char* startAttr = getAttribute(atts, "start");
+          if (startAttr != nullptr) {
+            char* endp = nullptr;
+            const long v = strtol(startAttr, &endp, 10);
+            if (endp != startAttr && *endp == '\0' && v >= -99999 && v <= 99999) {
+              ctx.nextValue = static_cast<int>(v);
+            }
+          }
+        }
+        self->listStack_.push_back(ctx);
+      } else if (isListItem) {
+        // The marker is an ordinary word carrying its own trailing space, so
+        // its full advance is what the layout engine measures — and the item's
+        // first text word is GLUED to it (listMarkerGluePending_), so under
+        // Justified the marker→text gap is a continuation advance, never a
+        // stretchable inter-word gap. Hanging indent: the block's first line
+        // starts at -gutter (negative text-indent), placing the marker in the
+        // gutter and the text at the block's content edge, where every wrapped
+        // line returns. Plain decimal only — the CSS parser has no
+        // list-style-type, so roman/alpha counters are not available.
+        const bool ordered = !self->listStack_.empty() && self->listStack_.back().ordered;
+        if (ordered) {
+          ListContext& ctx = self->listStack_.back();
+          // HTML "value" attribute on <li> resets the counter.
+          const char* valueAttr = getAttribute(atts, "value");
+          if (valueAttr != nullptr) {
+            char* endp = nullptr;
+            const long v = strtol(valueAttr, &endp, 10);
+            if (endp != valueAttr && *endp == '\0' && v >= -99999 && v <= 99999) {
+              ctx.nextValue = static_cast<int>(v);
+            }
+          }
+          char markerBuf[16];
+          snprintf(markerBuf, sizeof(markerBuf), "%d. ", ctx.nextValue);
+          ctx.nextValue++;
+          listMarker = markerBuf;
+        } else {
+          listMarker = "\xe2\x80\xa2 ";  // U+2022 bullet, same gutter scheme
+        }
+        const int gutter = self->renderer.getTextAdvanceX(self->fontId, listMarker.c_str(), EpdFontFamily::REGULAR);
+        elementStyle.textIndent = static_cast<int16_t>(-gutter);
+        elementStyle.textIndentDefined = true;
+      }
+      auto accumulated = clampAccumulatedHorizontalInsets(
+          self->blockStyleStack.back().getCombinedBlockStyle(elementStyle, BlockStyle::CombineAxis::Horizontal),
           self->viewportWidth);
+      if (isListContainer) {
+        // A list container never carries a first-line indent: an ancestor
+        // paragraph's text-indent (or an outer item's hanging indent, for a
+        // list nested inside <li>) must not leak onto this list's items —
+        // each <li> sets its own.
+        accumulated.textIndent = 0;
+        accumulated.textIndentDefined = false;
+      }
+      if (isListItem && accumulated.textIndent < 0 && accumulated.leftInset() < -accumulated.textIndent) {
+        // The marker gutter is part of the item's left inset: if the
+        // accumulated inset is narrower than the gutter (publisher zeroed the
+        // list's margins, or a bare <li> outside any list), widen it so the
+        // hanging marker cannot paint left of the page margin.
+        accumulated.marginLeft =
+            static_cast<int16_t>(accumulated.marginLeft + (-accumulated.textIndent - accumulated.leftInset()));
+      }
       self->blockStyleStack.push_back(accumulated);
       self->startNewTextBlock(accumulated.withoutBottom());
       self->updateEffectiveInlineStyle();
 
-      if (strcmp(name, "li") == 0) {
-        self->currentTextBlock->addWord("\xe2\x80\xa2", EpdFontFamily::REGULAR);
+      if (isListItem) {
+        self->currentTextBlock->addWord(listMarker, EpdFontFamily::REGULAR);
         self->listItemBulletOnly = true;
+        self->listMarkerGluePending_ = true;
       }
     }
   } else if (matches(name, UNDERLINE_TAGS, std::size(UNDERLINE_TAGS))) {
@@ -2174,6 +2272,12 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
     if (strcmp(name, "li") == 0) {
       self->listItemBulletOnly = false;
     }
+
+    // </ul>/</ol> closes its list context (nested <ol> numbering restarts per
+    // level because each pushes its own counter).
+    if ((strcmp(name, "ul") == 0 || strcmp(name, "ol") == 0) && !self->listStack_.empty()) {
+      self->listStack_.pop_back();
+    }
   }
 }
 
@@ -2190,6 +2294,8 @@ bool ChapterHtmlSlimParser::beginParse() {
   blockStyleStack.clear();
   blockStyleStack.reserve(8);
   blockStyleStack.push_back(rootBlockStyle);
+  listStack_.clear();
+  listMarkerGluePending_ = false;
 
   auto paragraphAlignmentBlockStyle = BlockStyle();
   paragraphAlignmentBlockStyle.textAlignDefined = true;

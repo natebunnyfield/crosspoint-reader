@@ -210,7 +210,24 @@ class ChapterHtmlSlimParser {
   // for the whole table, because a row split across a page boundary breaks each
   // column independently and reads as garbage.
   int measureRowHeight(const tablecolumns::Row& row, const tablecolumns::Plan& plan, bool headerRow) const;
-  bool listItemBulletOnly = false;  // true when currentTextBlock has only the <li> bullet
+  bool listItemBulletOnly = false;  // true when currentTextBlock has only the <li> marker
+
+  // --- List rendering (numbers + hanging indent, 2026-08-22) --------------
+  // One entry per open <ul>/<ol>; depth is the stack size. An ordered list's
+  // counter lives here so nested <ol> numbering restarts per level and the
+  // "start"/"value" attributes can seed/reset it. The marker itself is an
+  // ordinary word ("1. " / "• ") on the item's first line; the hanging indent
+  // is the item's negative text-indent sized to that marker's advance, so
+  // wrapped lines return to the item's text edge, not the marker's.
+  struct ListContext {
+    bool ordered = false;
+    int nextValue = 1;  // number the next <li> takes (ordered lists only)
+  };
+  std::vector<ListContext> listStack_;
+  // Set right after the marker word is added; consumed by the next
+  // flushPartWordBuffer so the item's first text word attaches to the marker
+  // even though source whitespace after <li> resets nextWordContinues.
+  bool listMarkerGluePending_ = false;
 
   // Anchor-to-page mapping: tracks which page each HTML id attribute lands on
   int completedPageCount = 0;

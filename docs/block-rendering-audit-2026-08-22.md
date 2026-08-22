@@ -100,8 +100,10 @@ established pattern; the partial-version sentinel derives automatically.
 
 1. **Nested-inset clipping** — FIXED (F2 above).
 2. **Line-initial dash** — FIXED (F1 above).
-3. **Lists are structurally flat** — documented, NOT fixed (not in the
-   ordered indefensible set; it is a feature gap, not a collision).
+3. **Lists are structurally flat** — **FIXED 2026-08-22** (owner-approved:
+   "Numbers + hanging indent"; see the addendum at the end of this file for
+   the implementation and measurements). The original finding, kept for the
+   record:
    Measured: all three `ul` nesting levels and both `ol` levels render at
    x=14, identical to a plain paragraph (`lists-flat.png`). Three causes,
    all in the parser:
@@ -209,3 +211,92 @@ established pattern; the partial-version sentinel derives automatically.
 Nothing here was committed (per the order); the diff is
 `ParsedText.cpp`, `ChapterHtmlSlimParser.cpp`, `Section.cpp`, this file and
 `docs/images/block-audit-2026-08-22/`.
+
+---
+
+## Addendum 2026-08-22 — finding 3 FIXED: numbers + hanging indent
+
+Owner-approved follow-up to finding 3 ("Numbers + hanging indent"). Same
+method as the audit proper: scratch-generated EPUB (nested `ul`/`ol` 3-5
+deep, long wrapped items, `ol start="5"` with `li value="10"`, publisher-CSS
+lists, and a measurement chapter whose every line begins with the same glyph
+so ink-edge x is bearing-identical), rendered headlessly on the X3 build at
+fontSize 18 / fontFamily 0 under BOTH alignment settings, plus a Line Grid ON
+spot check. All claims below marked "measured" were read off those renders;
+screenshots in `docs/images/block-audit-2026-08-22/lists-*-after.png`
+(`lists-flat.png` is the before).
+
+### What changed (all in the parser; pagination → SECTION_FILE_VERSION 41 → 42)
+
+- **`ul`/`ol` joined `BLOCK_TAGS`**
+  ([ChapterHtmlSlimParser.cpp:47](../lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp)),
+  so publisher CSS on list containers now accumulates through the existing —
+  clamped — block-style machinery, exactly the blockquote pattern. A list
+  container with NO publisher left inset gets a default 1.5 em step per level
+  (`LIST_INDENT_STEP_EM`, :57): 1.5 em ≈ 56 px at 18 pt swallows a
+  three-digit "999. " gutter, and three levels still leave ~18 chars of the
+  ~27-char measure. A list-context stack (`ListContext { ordered, nextValue }`,
+  ChapterHtmlSlimParser.h:222) carries depth + counter; pushed at `<ul>`/`<ol>`
+  (:1617), popped at the close tag, so nested `ol` numbering restarts per level.
+- **`ol` items get real decimal numbers** — `start` on `ol` and `value` on
+  `li` honored when present (lowercase, as XHTML mandates; parsed with
+  `strtol`, non-numeric ignored). Plain decimal only: the CSS parser has no
+  `list-style-type`, so roman/alpha are not available.
+- **Hanging indent** — the marker ("1. " / "• ") is an ordinary word carrying
+  its own trailing space; the item block gets `textIndent = -advance(marker)`
+  (:1663-1665), so the first line starts in the gutter and every wrapped line
+  returns to the item's text edge. The item's first text word is GLUED to the
+  marker (`listMarkerGluePending_`, consumed in `flushPartWordBuffer` :308,
+  surviving the source-whitespace reset after `<li>`): under Justified the
+  marker→text gap is a continuation advance, never a stretchable inter-word
+  gap — and the breaker can no longer orphan a marker at a line's end (the
+  audit's "bullet orphaned on its own line" observation). The gutter math
+  relies on kern(x,' ') = kern(' ',x) = 0, which
+  `SdKernMeasure.SpaceAdvanceStaysUnkernedForShippedFonts` pins for every
+  shipped font. If the accumulated inset is narrower than the gutter
+  (publisher `margin-left: 0`, or a bare `<li>`), the item's `marginLeft` is
+  widened so the marker cannot paint off-panel (:1676-1683).
+- A list container strips inherited `text-indent` (:1670-1674), so an
+  ancestor paragraph's first-line indent — or an outer item's hanging indent,
+  for a list nested in `<li>` — never leaks onto items.
+
+### Measured (X3, 792x528, 18 pt, em ≈ 37 px, line height 45 px)
+
+- **Hanging alignment is EXACT, both alignments.** Measurement chapter
+  (every line "HHHH…"): ul L1 first-line text x=71, wrapped lines 71/71/71;
+  ul L2 126, wrapped 126×3; ol "1." text 71, wrapped 71 — identical columns
+  under Ragged and Justified (`lists-measure-justified-after.png`). Under
+  Justified the inter-word gaps stretch while the marker gap does not.
+- **Numbers correct at every level**: outer 1/2/3 with inner 1/2/3 and
+  third-depth 1/2, outer numbering CONTINUING after the nest closes
+  (`lists-ol-nested-after.png`); `start="5"` → 5, 6; `value="10"` → 10, then
+  11 (`lists-ol-start-value-after.png`).
+- **Per-level step**: text edge 71 → 126 → 181 (55-56 px ≈ 1.5 em per level).
+- **The cap engages at depth 4 (18 pt)**: 4 × 56 px exceeds the 2/5-viewport
+  clamp (203 px of 508), so depth 4 lands at text x=214 (= margin 10 + 203 +
+  bearing) and depth 5 renders at the SAME x — clamped, not crushed, ~16
+  chars of measure kept (`lists-depth-cap-after.png`). Max depth with full
+  distinct steps at 18 pt is 3.
+- **Publisher CSS honored**: `ul { margin-left:1.5em; padding-left:1.5em }`
+  measured at text x=124-126 (= 10 + 3 em); `ol { margin-left:0 }` keeps its
+  "1." at the page margin via the gutter bump, text x≈48.
+- **Marker widths are per-item**: a two-digit "10." whose 60 px advance
+  exceeds a level-1 list's 56 px inset bumps that item's text edge 4 px
+  deeper than its one-digit siblings (71 → 75). Wrapped-line alignment stays
+  exact per item; a common right-aligned marker column would need lookahead a
+  single-pass SAX parse does not have. Accepted.
+- **Interplay, verified not rebuilt**: half-line gap between items (67 px
+  line pitch = 45 + 22, the existing cap — items are blocks, nothing
+  list-specific added); widow/orphan keeps the 2/2 rule on a wrapped item
+  split across pages (4 lines / 2 lines measured); Line Grid ON snaps item
+  lines to the 45 px grid.
+
+### Verification
+
+- `ctest --test-dir build/test`: **367/369**, the 2 failures the known
+  pre-existing pair (`EditorFontsTest`, `SettingDisplayOrderTest`);
+  `ReadAloudCaptureTest` and `SdKernMeasure*` PASS.
+- Desktop canaries `pio run -e simulator` and `simulator_x3`: green.
+- Simulator repo `tests/run_all.sh`: **34 passed, 0 skipped**.
+- Card state backed up (`.qabak-lists`) and restored; scratch epub and its
+  section cache removed from `fs_`.

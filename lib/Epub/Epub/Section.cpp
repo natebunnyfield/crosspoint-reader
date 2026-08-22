@@ -67,7 +67,13 @@ namespace {
 //      2/5 of the viewport (nested blockquote margins used to push text off
 //      the right edge of the panel, ChapterHtmlSlimParser). Stale v40 caches
 //      would keep dash-initial lines and clipped nested quotes, hence the bump.
-constexpr uint8_t SECTION_FILE_VERSION = 41;
+// v42: proper list rendering (2026-08-22, block audit finding 3): <ul>/<ol>
+//      join the block-style stack (their CSS now applies, default 1.5 em
+//      indent per level when they carry none), <ol> items get real decimal
+//      numbers (start/value honored), and every item hangs its marker in a
+//      gutter via negative text-indent so wrapped lines align under the text.
+//      Stale v41 caches would keep flat, bullet-only lists, hence the bump.
+constexpr uint8_t SECTION_FILE_VERSION = 42;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
