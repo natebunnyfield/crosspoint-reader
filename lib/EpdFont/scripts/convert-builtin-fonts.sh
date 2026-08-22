@@ -145,6 +145,20 @@ EDITOR_SIZES=(12 14)
 EDITOR_FAMILIES=(
   "iawriterquattro:iAWriterQuattro/iAWriterQuattro"
 )
+
+# Quattro is DUOSPACE ('i' 7.50 px, 'm' 22.50 px at 12 pt) yet the source TTF
+# gives '.' and ',' the full wide 15.00 px advance -- 5 px of ink centered in
+# 5+5 px of side bearing, the most over-advanced punctuation in the build.
+# Owner ruling 2026-08-22 (docs/punctuation-kerning-audit-2026-08-22.md,
+# Standing rulings): '.' and ',' get the narrow i-width advance, ink
+# re-centered, via regeneration. ONLY Quattro: PragmataPro and Nitti are true
+# monospace, where the full advance is correct, and they stay untouched.
+narrow_punct_flags_for() {
+  case "$1" in
+    iawriterquattro) echo '--narrow-punct .,' ;;
+    *) echo '' ;;
+  esac
+}
 # Removed from the app on 2026-08-15 but kept generatable, so a family stays one
 # commit away from returning. 12 pt only -- nothing references these.
 EDITOR_FAMILIES_RETIRED=(
@@ -162,7 +176,7 @@ for entry in ${EDITOR_FAMILIES[@]}; do
       lc=$(echo $style | tr '[:upper:]' '[:lower:]')
       font_name="${prefix}_${size}_${lc}"
       output_path="../builtinFonts/${font_name}.h"
-      python fontconvert.py $font_name $size "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
+      python fontconvert.py $font_name $size "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum $(narrow_punct_flags_for $prefix) > $output_path
       echo "Generated $output_path"
     done
   done
@@ -201,7 +215,7 @@ for entry in ${EDITOR_FAMILIES[@]}; do
         lc=$(echo $style | tr '[:upper:]' '[:lower:]')
         font_name="${prefix}_${size}_${lc}_${scale}x"
         output_path="../builtinFonts/${font_name}.h"
-        python fontconvert.py $font_name $((size * scale)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
+        python fontconvert.py $font_name $((size * scale)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum $(narrow_punct_flags_for $prefix) > $output_path
         echo "Generated $output_path"
       done
     done

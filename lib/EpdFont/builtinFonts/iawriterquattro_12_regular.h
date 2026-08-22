@@ -3,7 +3,7 @@
  * name: iawriterquattro_12_regular
  * size: 12
  * mode: 2-bit  compressed: true
- * Command used: fontconvert.py iawriterquattro_12_regular 12 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-Regular.ttf --2bit --compress --pnum
+ * Command used: fontconvert.py iawriterquattro_12_regular 12 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-Regular.ttf --2bit --compress --pnum --narrow-punct .,
  */
 #pragma once
 #include "EpdFontData.h"
@@ -1070,9 +1070,9 @@ static const EpdGlyph iawriterquattro_12_regularGlyphs[] = {
     { 8, 22, 240, 2, 19, 44, 378 }, // )
     { 13, 13, 240, 1, 14, 43, 422 }, // *
     { 13, 12, 240, 1, 14, 39, 465 }, // +
-    { 5, 7, 240, 5, 4, 9, 504 }, // ,
+    { 5, 7, 120, 1, 4, 9, 504 }, // ,
     { 9, 2, 240, 3, 8, 5, 513 }, // -
-    { 5, 3, 240, 5, 3, 4, 518 }, // .
+    { 5, 3, 120, 1, 3, 4, 518 }, // .
     { 11, 22, 240, 2, 19, 61, 522 }, // /
     { 13, 17, 240, 1, 17, 56, 583 }, // 0
     { 13, 17, 240, 1, 17, 56, 639 }, // 1

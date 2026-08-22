@@ -3,7 +3,7 @@
  * name: iawriterquattro_14_bolditalic_2x
  * size: 28
  * mode: 2-bit  compressed: true
- * Command used: fontconvert.py iawriterquattro_14_bolditalic_2x 28 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-BoldItalic.ttf --2bit --compress --pnum
+ * Command used: fontconvert.py iawriterquattro_14_bolditalic_2x 28 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-BoldItalic.ttf --2bit --compress --pnum --narrow-punct .,
  */
 #pragma once
 #include "EpdFontData.h"
@@ -3925,9 +3925,9 @@ static const EpdGlyph iawriterquattro_14_bolditalic_2xGlyphs[] = {
     { 26, 53, 560, 1, 45, 345, 2438 }, // )
     { 32, 30, 560, 2, 32, 240, 2783 }, // *
     { 30, 29, 560, 3, 33, 218, 3023 }, // +
-    { 19, 19, 560, 5, 10, 91, 3241 }, // ,
+    { 19, 19, 280, -1, 10, 91, 3241 }, // ,
     { 20, 8, 560, 8, 22, 40, 3332 }, // -
-    { 13, 10, 560, 9, 10, 33, 3372 }, // .
+    { 13, 10, 280, 2, 10, 33, 3372 }, // .
     { 35, 53, 560, 0, 45, 464, 3405 }, // /
     { 33, 43, 560, 2, 42, 355, 3869 }, // 0
     { 31, 41, 560, 2, 41, 318, 4224 }, // 1

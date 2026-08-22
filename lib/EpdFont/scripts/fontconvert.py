@@ -23,6 +23,14 @@ parser.add_argument("--additional-intervals", dest="additional_intervals", actio
 parser.add_argument("--compress", dest="compress", action="store_true", help="Compress glyph bitmaps using DEFLATE with group-based compression.")
 parser.add_argument("--force-autohint", dest="force_autohint", action="store_true", help="Force FreeType auto-hinter instead of native font hinting. Improves stem width consistency for fonts with weak or no native TrueType hints.")
 parser.add_argument("--pnum", dest="pnum", action="store_true", help="Use proportional numerals (pnum OpenType feature) instead of default tabular figures. Reduces visual gaps between digits in running prose.")
+parser.add_argument("--narrow-punct", dest="narrow_punct", default=None,
+                    help="Characters (e.g. \".,\") whose advance is overridden to the advance of 'i', "
+                         "with the ink re-centered in the new box (LSB = (newAdvance - inkWidth)/2, rounded). "
+                         "For duospace faces that give punctuation the full wide advance: iA Writer Quattro "
+                         "is duospace ('i' 7.50 px, 'm' 22.50 px at 12 pt) yet gives '.' and ',' the wide "
+                         "15.00 px advance -- 5 px of ink centered in 5+5 px of side bearing (owner ruling "
+                         "2026-08-22, docs/punctuation-kerning-audit-2026-08-22.md). Only ever narrows: a "
+                         "glyph already at or under the 'i' advance is left untouched.")
 parser.add_argument("--synth-embolden-em", dest="synth_embolden_em", type=float, default=0.0,
                     help="Synthetic bold: x-strength as a fraction of the em (0 = no embolden). Use with a single Regular source to synthesise Bold. See docs/synthetic-font-styles.md.")
 parser.add_argument("--synth-y-ratio", dest="synth_y_ratio", type=float, default=0.5,
@@ -680,6 +688,33 @@ face = load_glyph(ord('|'))
 advanceY = norm_ceil(face.size.height)
 if args.line_height:
     advanceY = int(args.line_height)
+
+# --- Narrow-punctuation advance override (--narrow-punct) --------------------
+#
+# A metrics-only post-process: each listed codepoint gets the ADVANCE of 'i'
+# (copied as the same 12.4 fixed-point value, so no re-rounding) and its ink
+# re-centered in the new box: LSB = (newAdvance - inkWidth) / 2, rounded.
+# Bitmaps, every other glyph, and advanceY are untouched. Applied only when it
+# narrows -- a glyph already at or under the 'i' advance passes through -- and
+# the flag is recorded in the header banner via `Command used:` like every
+# other option.
+if args.narrow_punct:
+    _narrow_ref = next((p for p, _ in all_glyphs if p.code_point == ord('i')), None)
+    if _narrow_ref is None:
+        print("ERROR: --narrow-punct needs 'i' in the exported set", file=sys.stderr)
+        sys.exit(1)
+    _narrow_targets = set(ord(c) for c in args.narrow_punct)
+    for _gi, (_props, _packed) in enumerate(all_glyphs):
+        if _props.code_point not in _narrow_targets:
+            continue
+        if _props.advance_x <= _narrow_ref.advance_x:
+            print(f"narrow-punct: U+{_props.code_point:04X} already narrow "
+                  f"({_props.advance_x}/16 <= {_narrow_ref.advance_x}/16), untouched", file=sys.stderr)
+            continue
+        _new_left = round((_narrow_ref.advance_x / 16.0 - _props.width) / 2.0)
+        print(f"narrow-punct: U+{_props.code_point:04X} advance {_props.advance_x}/16 -> "
+              f"{_narrow_ref.advance_x}/16, left {_props.left} -> {_new_left}", file=sys.stderr)
+        all_glyphs[_gi] = (_props._replace(advance_x=_narrow_ref.advance_x, left=_new_left), _packed)
 
 glyph_data = []
 glyph_props = []

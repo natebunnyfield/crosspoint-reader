@@ -3,7 +3,7 @@
  * name: iawriterquattro_12_italic_3x
  * size: 36
  * mode: 2-bit  compressed: true
- * Command used: fontconvert.py iawriterquattro_12_italic_3x 36 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-Italic.ttf --2bit --compress --pnum
+ * Command used: fontconvert.py iawriterquattro_12_italic_3x 36 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-Italic.ttf --2bit --compress --pnum --narrow-punct .,
  */
 #pragma once
 #include "EpdFontData.h"
@@ -5120,9 +5120,9 @@ static const EpdGlyph iawriterquattro_12_italic_3xGlyphs[] = {
     { 28, 68, 720, 3, 58, 476, 3658 }, // )
     { 39, 38, 720, 4, 42, 371, 4134 }, // *
     { 37, 37, 720, 5, 42, 343, 4505 }, // +
-    { 18, 21, 720, 10, 10, 95, 4848 }, // ,
+    { 18, 21, 360, 2, 10, 95, 4848 }, // ,
     { 24, 6, 720, 11, 26, 36, 4943 }, // -
-    { 12, 10, 720, 14, 10, 30, 4979 }, // .
+    { 12, 10, 360, 5, 10, 30, 4979 }, // .
     { 44, 68, 720, 1, 58, 748, 5009 }, // /
     { 39, 55, 720, 4, 54, 537, 5757 }, // 0
     { 37, 53, 720, 3, 53, 491, 6294 }, // 1

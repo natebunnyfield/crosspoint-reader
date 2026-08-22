@@ -3,7 +3,7 @@
  * name: iawriterquattro_12_bolditalic_2x
  * size: 24
  * mode: 2-bit  compressed: true
- * Command used: fontconvert.py iawriterquattro_12_bolditalic_2x 24 /Users/natebunnyfield/src/crosspoint-reader/.claude/worktrees/show-keyboard-button-size-3fd996/lib/EpdFont/builtinFonts/source/iAWriterQuattro/iAWriterQuattro-BoldItalic.ttf --2bit --compress --pnum
+ * Command used: fontconvert.py iawriterquattro_12_bolditalic_2x 24 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-BoldItalic.ttf --2bit --compress --pnum --narrow-punct .,
  */
 #pragma once
 #include "EpdFontData.h"
@@ -3292,9 +3292,9 @@ static const EpdGlyph iawriterquattro_12_bolditalic_2xGlyphs[] = {
     { 22, 46, 480, 1, 39, 253, 1846 }, // )
     { 27, 26, 480, 2, 28, 176, 2099 }, // *
     { 25, 26, 480, 3, 29, 163, 2275 }, // +
-    { 15, 17, 480, 5, 9, 64, 2438 }, // ,
+    { 15, 17, 240, 0, 9, 64, 2438 }, // ,
     { 18, 7, 480, 6, 19, 32, 2502 }, // -
-    { 11, 9, 480, 8, 9, 25, 2534 }, // .
+    { 11, 9, 240, 2, 9, 25, 2534 }, // .
     { 30, 46, 480, 0, 39, 345, 2559 }, // /
     { 29, 38, 480, 1, 37, 276, 2904 }, // 0
     { 26, 36, 480, 2, 36, 234, 3180 }, // 1

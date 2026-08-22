@@ -3,7 +3,7 @@
  * name: iawriterquattro_14_bolditalic_3x
  * size: 42
  * mode: 2-bit  compressed: true
- * Command used: fontconvert.py iawriterquattro_14_bolditalic_3x 42 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-BoldItalic.ttf --2bit --compress --pnum
+ * Command used: fontconvert.py iawriterquattro_14_bolditalic_3x 42 ../builtinFonts/source/iAWriterQuattro/iAWriterQuattro-BoldItalic.ttf --2bit --compress --pnum --narrow-punct .,
  */
 #pragma once
 #include "EpdFontData.h"
@@ -6614,9 +6614,9 @@ static const EpdGlyph iawriterquattro_14_bolditalic_3xGlyphs[] = {
     { 38, 78, 840, 2, 66, 741, 5377 }, // )
     { 48, 45, 840, 3, 48, 540, 6118 }, // *
     { 44, 42, 840, 5, 48, 462, 6658 }, // +
-    { 27, 28, 840, 8, 15, 189, 7120 }, // ,
+    { 27, 28, 420, 0, 15, 189, 7120 }, // ,
     { 30, 12, 840, 12, 32, 90, 7309 }, // -
-    { 19, 16, 840, 14, 16, 76, 7399 }, // .
+    { 19, 16, 420, 4, 16, 76, 7399 }, // .
     { 53, 78, 840, 0, 66, 1034, 7475 }, // /
     { 49, 63, 840, 3, 62, 772, 8509 }, // 0
     { 45, 61, 840, 4, 61, 687, 9281 }, // 1
