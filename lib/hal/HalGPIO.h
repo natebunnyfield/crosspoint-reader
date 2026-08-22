@@ -199,6 +199,18 @@ class HalGPIO {
   void publishReadAloudPage(const char* /*utf8*/, size_t /*utf8Len*/, const ReadAloudWordRect* /*rects*/,
                             size_t /*rectCount*/) {}
 
+  // --- Font-family step channel ---------------------------------------------
+  //
+  // A no-op here for the same host-capability reason the keyboard channel
+  // above is: this board cannot be shaken meaningfully (no accelerometer), and
+  // a phone running the simulator can. A host shake in zen mode injects one
+  // step; the EPUB reader polls this in its input handling and cycles to the
+  // next reading font family (cycleReaderFontFamily(+1)). Constant false, so
+  // the poll folds away on device. The simulator implements it for real; the
+  // contract lives in its src/FontFamilyStepChannel.h (consume-once, bursts
+  // collapse to one step).
+  bool consumeFontFamilyStep() { return false; }
+
   // The reader's FINAL text-block insets — top after the paint-time cap-ink
   // trim, then right, bottom, left — in FRAMEBUFFER pixels (logical px times
   // the active render scale). A no-op here for the same reason the read-aloud

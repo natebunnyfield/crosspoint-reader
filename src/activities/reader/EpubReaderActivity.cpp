@@ -397,6 +397,21 @@ void EpubReaderActivity::loop() {
     pendingReadFolderMove = false;
   }
 
+  // Host shake -> next reading font family (owner 2026-08-22: "change reader
+  // font on shake in zen mode"). A host-capability channel like the keyboard
+  // one: on device consumeFontFamilyStep() is an inline constant-false no-op
+  // (lib/hal/HalGPIO.h) and this branch folds away; the simulator implements
+  // it for real (iOS shake while zen is on, SHAKE in a desktop input script).
+  // Polled here and nowhere else — the reader is the one place a family step
+  // means something — and routed through the SAME cycle the held side button
+  // uses, so persistence, position preservation and repagination are that
+  // path's, not a second copy.
+  if (gpio.consumeFontFamilyStep()) {
+    LOG_DBG("ERS", "Host font-family step (shake)");
+    cycleReaderFontFamily(+1);
+    return;
+  }
+
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
 
   // ---- CONFIRM AS A MODIFIER KEY (Confirm held + side button tap = line spacing) ----
