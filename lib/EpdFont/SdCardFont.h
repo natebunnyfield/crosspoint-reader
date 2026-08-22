@@ -62,6 +62,15 @@ class SdCardFont {
   // Returns true if advance table is populated for at least one style.
   bool hasAdvanceTable() const;
 
+  // Layout-time kern lookup (2026-08-22, punctuation-kerning audit P0).
+  // Returns the 4.4 fixed-point kern for a codepoint pair, read from full
+  // kern-matrix ROWS loaded beside the advance table (loadMeasureKernRows) —
+  // the same on-disk cells drawText's per-page mini matrix is built from, so
+  // measure and draw agree. `styleIdx` is a resolved style INDEX. Returns 0
+  // for any pair whose row is not resident, which is the pre-2026-08-22
+  // measurement behavior.
+  int8_t getMeasureKern(uint32_t leftCp, uint32_t rightCp, uint8_t styleIdx) const;
+
   // Free mini data for all styles and restore stub EpdFontData.
   // Preserves the persistent advance cache so repeated layout passes can reuse
   // previously fetched metrics.
@@ -181,6 +190,20 @@ class SdCardFont {
     EpdKernClassEntry* kernRightClasses = nullptr;
     EpdLigaturePair* ligaturePairs = nullptr;
     bool kernLigLoaded = false;
+
+    // Measure-time kern rows (2026-08-22, punctuation-kerning audit P0): full
+    // kern-matrix ROWS (kernRightClassCount bytes each) for the LEFT classes
+    // the advance-table codepoints reach, loaded by loadMeasureKernRows on the
+    // same pass that builds the advance table and with the same lifetime
+    // (clearPersistentCache frees them). Original class IDs, no renumbering:
+    // lookups go through the resident kernLeftClasses/kernRightClasses tables,
+    // so a row loaded once serves every later paragraph. Bounded: worst case
+    // is kernLeftClassCount rows (Edgar, the richest shipped face: 36 × 48 =
+    // 1.7 KB per style) and MEASURE_KERN_ARENA_LIMIT caps pathological fonts.
+    uint8_t* measureKernRowClasses = nullptr;  // sorted original left-class ids
+    int8_t* measureKernRows = nullptr;         // rowCount × kernRightClassCount
+    uint16_t measureKernRowCount = 0;
+    uint16_t measureKernRowCapacity = 0;
 
     // Stub EpdFontData returned when not prewarmed
     EpdFontData stubData{};
@@ -321,6 +344,12 @@ class SdCardFont {
   void freeStyleAll(PerStyle& s);
   void freeStyleKernLigatureData(PerStyle& s);
   void freeStyleMiniKern(PerStyle& s);
+  // Measure-kern rows: hard cap on the per-style row arena. The shipped SD
+  // faces top out under 2 KB; a pathological font beyond this simply measures
+  // its overflow pairs unkerned (the pre-2026-08-22 behavior).
+  static constexpr uint32_t MEASURE_KERN_ARENA_LIMIT = 16 * 1024;
+  void freeStyleMeasureKern(PerStyle& s);
+  void loadMeasureKernRows(PerStyle& s, const uint32_t* codepoints, uint32_t cpCount);
   bool loadStyleKernLigatureData(PerStyle& s);
   bool buildMiniKernMatrix(PerStyle& s, const uint32_t* codepoints, uint32_t cpCount);
   void applyKernLigaturePointers(PerStyle& s, EpdFontData& data) const;

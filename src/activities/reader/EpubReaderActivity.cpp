@@ -884,8 +884,18 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
 void EpubReaderActivity::openChapterSelection() {
   const int spineIdx = currentSpineIndex;
   const std::string path = epub->getPath();
+  // Position through the whole book (0..1) for the chapter screen's progress
+  // bar: the byte-weighted progress the reader already tracks, at the page the
+  // reader is on right now.
+  float bookProgress = 0.0f;
+  if (section && section->pageCount > 0) {
+    const float frac = static_cast<float>(section->currentPage) / static_cast<float>(section->pageCount);
+    bookProgress = epub->calculateProgress(spineIdx, frac);
+  } else {
+    bookProgress = epub->calculateProgress(spineIdx, 0.0f);
+  }
   startActivityForResult(
-      std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, spineIdx),
+      std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, spineIdx, bookProgress),
       [this](const ActivityResult& result) {
         if (!result.isCancelled) {
           const auto& chapterResult = std::get<ChapterResult>(result.data);

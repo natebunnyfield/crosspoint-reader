@@ -317,15 +317,16 @@ std::string prettySectionBin(const std::string& data) {
   // Header layout (docs/file-formats.md): u8 version, s32 fontId, f32
   // lineCompression, u8 extraParagraphSpacing, u8 paragraphAlignment,
   // u16 viewportW, u16 viewportH, u8 hyphenation, u8 embeddedStyle,
-  // u8 imageRendering, u8 focusReading, u16 pageCount.
-  if (data.size() < 21) return "";
+  // u8 imageRendering, u8 focusReading, u8 lineGrid (v39+), u16 pageCount.
+  if (data.size() < 22) return "";
   const auto* p = reinterpret_cast<const uint8_t*>(data.data());
   char buf[48];
   std::string out;
   out.reserve(128);
   snprintf(buf, sizeof(buf), "section.bin v%u\n", p[0]);
   out += buf;
-  snprintf(buf, sizeof(buf), "pages: %u\n", rdU16(p + 19));
+  // v39 grew the header by the lineGrid byte, shifting pageCount from 19 to 20.
+  snprintf(buf, sizeof(buf), "pages: %u\n", rdU16(p + (p[0] >= 39 ? 20 : 19)));
   out += buf;
   snprintf(buf, sizeof(buf), "viewport: %ux%u\n", rdU16(p + 11), rdU16(p + 13));
   out += buf;

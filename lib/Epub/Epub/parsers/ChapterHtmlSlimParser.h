@@ -4,6 +4,7 @@
 #include <expat.h>
 
 #include <climits>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <string>
@@ -58,6 +59,36 @@ class ChapterHtmlSlimParser {
 
   std::unique_ptr<Page> currentPage = nullptr;
   int16_t currentPageNextY = 0;
+
+  // --- Widow/orphan control (keep-2/2, 2026-08-22) -----------------------
+  // Lines are HELD BACK (up to three) between extraction and page placement so
+  // the paginator knows, when it places a paragraph's first line, that at
+  // least two more follow, and knows at the paragraph's end which line is the
+  // last. addLineToPage() buffers; placeLineOnPage() is the old placement
+  // body; flushPendingLines() runs at the end of makePages() — the paragraph
+  // boundary — and applies both rules. Paragraphs of 1–2 lines are exempt.
+  // Each pending line carries its own source anchor, captured at extraction
+  // time, because lastExtractedLineSourceStart() has moved on by placement
+  // time.
+  struct PendingLine {
+    std::shared_ptr<TextBlock> line;
+    uint32_t anchor;  // chapter-global source anchor of this line's first word
+  };
+  std::deque<PendingLine> pendingLines_;
+  int paraLinesPlaced_ = 0;  // lines of the current paragraph already placed
+  void placeLineOnPage(std::shared_ptr<TextBlock> line, uint32_t anchor);
+  void flushPendingLines();
+  // Completes the current page (if it holds anything) so the next placement
+  // starts a fresh one. `anchor` is the source position the new page starts at.
+  void breakPageBefore(uint32_t anchor);
+  // The leaded height this line advances the cursor by / the ink extent it
+  // needs to FIT as the last line of a page (see placeLineOnPage).
+  int lineAdvanceOf(const TextBlock& line) const;
+  int lineFitExtentOf(const TextBlock& line) const;
+
+  // Line Grid (2026-08-22, spec.lineGridEnabled): rounds currentPageNextY UP
+  // to the next whole line-height multiple. No-op when the option is off.
+  void snapToLineGrid();
   // The y a freshly created page starts at: the chapter sinkage on the
   // SECTION'S FIRST page (completedPageCount == 0), 0 on every later page.
   // See the definition for the owner ruling and the sizing.
@@ -73,6 +104,7 @@ class ChapterHtmlSlimParser {
   uint16_t viewportHeight;
   bool hyphenationEnabled;
   bool focusReadingEnabled;
+  bool lineGridEnabled;
   const CssParser* cssParser;
   bool embeddedStyle;
   uint8_t imageRendering;
@@ -217,7 +249,7 @@ class ChapterHtmlSlimParser {
       std::shared_ptr<Epub> epub, const std::string& filepath, GfxRenderer& renderer, const int fontId,
       const int smallFontId, const float lineCompression, const bool extraParagraphSpacing,
       const uint8_t paragraphAlignment, const uint16_t viewportWidth, const uint16_t viewportHeight,
-      const bool hyphenationEnabled, const bool focusReadingEnabled,
+      const bool hyphenationEnabled, const bool focusReadingEnabled, const bool lineGridEnabled,
       const std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t, uint32_t)>& completePageFn,
       const bool embeddedStyle, const std::string& contentBase, const std::string& imageBasePath,
       const uint8_t imageRendering = 0, std::vector<std::string> tocAnchors = {},
@@ -235,6 +267,7 @@ class ChapterHtmlSlimParser {
         viewportHeight(viewportHeight),
         hyphenationEnabled(hyphenationEnabled),
         focusReadingEnabled(focusReadingEnabled),
+        lineGridEnabled(lineGridEnabled),
         completePageFn(completePageFn),
         popupFn(popupFn),
         cssParser(cssParser),

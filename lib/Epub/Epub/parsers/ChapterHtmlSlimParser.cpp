@@ -708,6 +708,7 @@ void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan&
       if (currentPageNextY > rowBottom) rowBottom = currentPageNextY;
     }
     currentPageNextY = static_cast<int16_t>(rowBottom + rowGap);
+    snapToLineGrid();  // Line Grid: row gap rounds up so table baselines stay on it
     tableEmittedDataCell = true;
 
     // The one rule the ruling asks for: under the header, spanning the columns.
@@ -721,6 +722,7 @@ void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan&
       }
       currentPage->elements.push_back(rule);
       currentPageNextY = static_cast<int16_t>(currentPageNextY + kRuleThickness + rowGap);
+      snapToLineGrid();  // Line Grid: closing rule spacing rounds up too
     }
   }
 }
@@ -780,6 +782,8 @@ void ChapterHtmlSlimParser::emitHorizontalRule(const BlockStyle& blockStyle) {
   }
   currentPage->elements.push_back(pageRule);
   currentPageNextY = static_cast<int16_t>(currentPageNextY + ruleThickness + bottomSpacing);
+  // Line Grid: hr/br spacing rounds up to the next line-height multiple.
+  snapToLineGrid();
 
   if (!pendingAnchorId.empty()) {
     anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
@@ -1315,6 +1319,9 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                 }
                 self->currentPage->elements.push_back(pageImage);
                 self->currentPageNextY += displayHeight + imageMarginBottom;
+                // Line Grid: the image's whole advance rounds up so the text
+                // after it returns to the baseline grid.
+                self->snapToLineGrid();
 
                 // The image consumed the empty block's accumulated vertical spacing.
                 // Reset the block so the Vertical merge in startNewTextBlock doesn't
@@ -2303,9 +2310,156 @@ int16_t ChapterHtmlSlimParser::newPageStartY() const {
   return static_cast<int16_t>(lines * lineHeight);
 }
 
-void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
-  const int rubyShift = line->getRubyShift(renderer.getFontAscenderSize(fontId));
+// The leaded height a line advances the cursor by.
+int ChapterHtmlSlimParser::lineAdvanceOf(const TextBlock& line) const {
+  return renderer.getLineHeight(fontId, lineCompression) + line.getRubyShift(renderer.getFontAscenderSize(fontId));
+}
+
+// The LAST line on a page only needs its INK to fit: ascender + descender
+// (plus any ruby riding above the ascender) MINUS the cap-ink trim the
+// renderers subtract at paint time — the whole painted page sits capInkTrim
+// px higher than the layout's y, so that air is real bottom room. For the
+// built-in reader family the bare ascender+descender EXCEEDS the leaded
+// advanceY (47 vs 45 at 18 pt — the metrics carry negative external
+// leading), which is why the trim term is not optional: without it this test
+// would paginate EARLIER than the old full-line-box rule. With it the ink
+// extent is 38 px at 18 pt against a 45 px slot, which is what lets a page
+// whose last slot the old rule rejected keep that line (2026-08-22 layout
+// exactness pass; crosspoint-simulator/docs/zen-page-margins.md). Clamped to
+// the leaded height so no metric combination can ever paginate earlier than
+// before. The advance (currentPageNextY += lineHeight) still uses the
+// full leaded height, so line pitch is untouched. Pagination change —
+// covered by the SECTION_FILE_VERSION bump to v38 (Section.cpp).
+int ChapterHtmlSlimParser::lineFitExtentOf(const TextBlock& line) const {
+  const int rubyShift = line.getRubyShift(renderer.getFontAscenderSize(fontId));
+  int inkExtent = renderer.getFontAscenderSize(fontId) + renderer.getFontDescenderSize(fontId) + rubyShift -
+                  renderer.getCapInkTrim(fontId);
+  if (inkExtent < 1) inkExtent = 1;
   const int lineHeight = renderer.getLineHeight(fontId, lineCompression) + rubyShift;
+  return inkExtent < lineHeight ? inkExtent : lineHeight;
+}
+
+void ChapterHtmlSlimParser::snapToLineGrid() {
+  if (!lineGridEnabled) return;
+  const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
+  if (lineHeight <= 0 || currentPageNextY <= 0) return;
+  const int rem = currentPageNextY % lineHeight;
+  if (rem != 0) currentPageNextY = static_cast<int16_t>(currentPageNextY + lineHeight - rem);
+}
+
+void ChapterHtmlSlimParser::breakPageBefore(const uint32_t anchor) {
+  if (!currentPage || currentPage->elements.empty()) return;
+  completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, anchor);
+  completedPageCount++;
+  currentPage = makeUniqueNoThrow<Page>();
+  if (!currentPage) {
+    noteAllocationFailure("Page at a line break");
+    return;
+  }
+  currentPageNextY = 0;
+}
+
+// Widow/orphan control (keep-2/2, 2026-08-22): lines are buffered here and
+// placed by placeLineOnPage()/flushPendingLines(). Holding THREE lines back is
+// what resolves the 3-line-paragraph conflict case exactly: when the fourth
+// line arrives the first may be placed knowing at least two follow it (orphan
+// side), and a paragraph whose lines are all still pending at flush time is
+// short enough to decide with full knowledge. Pagination change — covered by
+// the SECTION_FILE_VERSION bump to v39 (Section.cpp).
+void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
+  // This line's source anchor, captured NOW: by placement time
+  // lastExtractedLineSourceStart() has moved on to a later line.
+  const uint32_t anchor =
+      chapterSourceBytes_ + (currentTextBlock ? currentTextBlock->lastExtractedLineSourceStart() : 0);
+  pendingLines_.push_back({std::move(line), anchor});
+  if (pendingLines_.size() <= 3) return;
+
+  PendingLine l = std::move(pendingLines_.front());
+  pendingLines_.pop_front();
+  if (paraLinesPlaced_ == 0 && currentPage && !currentPage->elements.empty()) {
+    // Orphan control: the paragraph's FIRST line, with (holdback) at least
+    // three more lines following. It may only land on this page if the second
+    // line fits under it; otherwise break early so 2+ travel together. Only on
+    // a non-empty page — on an empty one there is nothing above to orphan it.
+    const TextBlock& second = *pendingLines_.front().line;
+    if (currentPageNextY + lineAdvanceOf(*l.line) + lineFitExtentOf(second) > viewportHeight) {
+      breakPageBefore(l.anchor);
+    }
+  }
+  placeLineOnPage(std::move(l.line), l.anchor);
+  paraLinesPlaced_++;
+}
+
+// Places the paragraph's still-buffered tail. Runs at the paragraph boundary
+// (end of makePages), where the LAST line is finally known.
+void ChapterHtmlSlimParser::flushPendingLines() {
+  if (pendingLines_.empty()) {
+    paraLinesPlaced_ = 0;
+    return;
+  }
+  const size_t totalLines = static_cast<size_t>(paraLinesPlaced_) + pendingLines_.size();
+
+  if (totalLines <= 2) {
+    // 1–2 line paragraphs are exempt from both rules.
+    while (!pendingLines_.empty()) {
+      PendingLine l = std::move(pendingLines_.front());
+      pendingLines_.pop_front();
+      placeLineOnPage(std::move(l.line), l.anchor);
+    }
+    paraLinesPlaced_ = 0;
+    return;
+  }
+
+  if (paraLinesPlaced_ == 0) {
+    // The whole (3-line) paragraph is pending: keep-2/2 on three lines means
+    // either all three land on this page or all three open the next one — a
+    // 2/1 split widows the last line and a 1/2 split orphans the first.
+    int y = currentPageNextY;
+    bool allFit = currentPage && !currentPage->elements.empty();
+    if (allFit) {
+      for (size_t i = 0; i < pendingLines_.size(); i++) {
+        const TextBlock& ln = *pendingLines_[i].line;
+        const bool isLastPending = i + 1 == pendingLines_.size();
+        if (y + (isLastPending ? lineFitExtentOf(ln) : lineAdvanceOf(ln)) > viewportHeight) {
+          allFit = false;
+          break;
+        }
+        y += lineAdvanceOf(ln);
+      }
+      if (!allFit) breakPageBefore(pendingLines_.front().anchor);
+    }
+  } else {
+    // Paragraph of 4+ lines: everything before the final two places normally
+    // (each still has two or more lines after it).
+    while (pendingLines_.size() > 2) {
+      PendingLine l = std::move(pendingLines_.front());
+      pendingLines_.pop_front();
+      placeLineOnPage(std::move(l.line), l.anchor);
+      paraLinesPlaced_++;
+    }
+    // Widow control: if the LAST line would not fit on this page after the
+    // second-to-last, break before the second-to-last so both travel. Only
+    // when the second-to-last itself still fits here — otherwise the natural
+    // page break already moves them together.
+    const TextBlock& secondToLast = *pendingLines_[0].line;
+    const TextBlock& last = *pendingLines_[1].line;
+    if (currentPage && !currentPage->elements.empty() &&
+        currentPageNextY + lineFitExtentOf(secondToLast) <= viewportHeight &&
+        currentPageNextY + lineAdvanceOf(secondToLast) + lineFitExtentOf(last) > viewportHeight) {
+      breakPageBefore(pendingLines_.front().anchor);
+    }
+  }
+
+  while (!pendingLines_.empty()) {
+    PendingLine l = std::move(pendingLines_.front());
+    pendingLines_.pop_front();
+    placeLineOnPage(std::move(l.line), l.anchor);
+  }
+  paraLinesPlaced_ = 0;
+}
+
+void ChapterHtmlSlimParser::placeLineOnPage(std::shared_ptr<TextBlock> line, const uint32_t anchor) {
+  const int lineHeight = lineAdvanceOf(*line);
 
   if (!currentPage) {
     currentPage = makeUniqueNoThrow<Page>();
@@ -2316,30 +2470,12 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
     currentPageNextY = newPageStartY();
   }
 
-  // The LAST line on a page only needs its INK to fit: ascender + descender
-  // (plus any ruby riding above the ascender) MINUS the cap-ink trim the
-  // renderers subtract at paint time — the whole painted page sits capInkTrim
-  // px higher than the layout's y, so that air is real bottom room. For the
-  // built-in reader family the bare ascender+descender EXCEEDS the leaded
-  // advanceY (47 vs 45 at 18 pt — the metrics carry negative external
-  // leading), which is why the trim term is not optional: without it this test
-  // would paginate EARLIER than the old full-line-box rule. With it the ink
-  // extent is 38 px at 18 pt against a 45 px slot, which is what lets a page
-  // whose last slot the old rule rejected keep that line (2026-08-22 layout
-  // exactness pass; crosspoint-simulator/docs/zen-page-margins.md). Clamped to
-  // the leaded height so no metric combination can ever paginate earlier than
-  // before. The advance below (currentPageNextY += lineHeight) still uses the
-  // full leaded height, so line pitch is untouched. Pagination change —
-  // covered by the SECTION_FILE_VERSION bump to v38 (Section.cpp).
-  int inkExtent = renderer.getFontAscenderSize(fontId) + renderer.getFontDescenderSize(fontId) + rubyShift -
-                  renderer.getCapInkTrim(fontId);
-  if (inkExtent < 1) inkExtent = 1;
-  const int fitExtent = inkExtent < lineHeight ? inkExtent : lineHeight;
-  if (currentPageNextY + fitExtent > viewportHeight) {
+  // See lineFitExtentOf for why the last line of a page fits by INK, not by
+  // its leaded box.
+  if (currentPageNextY + lineFitExtentOf(*line) > viewportHeight) {
     // The page ends here; the incoming line opens the next one, so the next
     // page's start anchor is that line's source position within the chapter.
-    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex,
-                   chapterSourceBytes_ + (currentTextBlock ? currentTextBlock->lastExtractedLineSourceStart() : 0));
+    completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, anchor);
     completedPageCount++;
     currentPage = makeUniqueNoThrow<Page>();
     if (!currentPage) {
@@ -2362,6 +2498,9 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
   const int16_t xOffset = line->getBlockStyle().leftInset();
   currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, currentPageNextY));
   currentPageNextY += lineHeight;
+  // Line Grid: a ruby line advances by more than one line-height; round up so
+  // the next baseline returns to the grid. No-op for plain lines already on it.
+  snapToLineGrid();
 }
 
 void ChapterHtmlSlimParser::makePages() {
@@ -2401,6 +2540,9 @@ void ChapterHtmlSlimParser::makePages() {
     if (blockStyle.paddingTop > 0) {
       currentPageNextY += blockStyle.paddingTop;
     }
+    // Line Grid: block top spacing rounds up to the next line-height multiple
+    // so the paragraph's first baseline stays on the grid.
+    snapToLineGrid();
   }
 
   // Calculate effective width accounting for horizontal margins/padding
@@ -2411,6 +2553,11 @@ void ChapterHtmlSlimParser::makePages() {
   currentTextBlock->layoutAndExtractLines(
       renderer, fontId, effectiveWidth,
       [this](const std::shared_ptr<TextBlock>& textBlock) { addLineToPage(textBlock); });
+
+  // Paragraph boundary: place the held-back tail with widow/orphan control.
+  // Must run before the footnote fallback and bottom spacing below, and before
+  // any non-line element (image, rule, table) is emitted onto the page.
+  flushPendingLines();
 
   // Fallback: transfer any remaining pending footnotes to current page.
   // Normally addLineToPage handles this via word-index tracking, but this catches
@@ -2434,4 +2581,7 @@ void ChapterHtmlSlimParser::makePages() {
   if (extraParagraphSpacing) {
     currentPageNextY += lineHeight / 2;
   }
+  // Line Grid: paragraph bottom spacing rounds up to the next line-height
+  // multiple so the following paragraph's baselines stay on the grid.
+  snapToLineGrid();
 }

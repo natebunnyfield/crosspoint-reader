@@ -238,6 +238,56 @@ uint16_t measureWordWidth(const GfxRenderer& renderer, const int fontId, const s
   return renderer.getTextAdvanceX(fontId, sanitized.c_str(), style);
 }
 
+// Optical margin alignment (hanging punctuation), right edge only.
+//
+// Returns the width by which a line's trailing glyph may hang past the measure
+// into the right margin: the FULL advance for '.' and ',' (near-invisible ink;
+// the classical full hang) and HALF the advance for the rest of the terminal
+// set — quotes, hyphens (including the one hyphenation appends), semicolon,
+// colon, '!' and '?' — whose taller ink reads wrong fully outside the measure.
+//
+// Measured from the glyph's OWN advance in the word's own style — italic '.'
+// carries roughly twice the roman right side bearing
+// (docs/punctuation-kerning-audit-2026-08-22.md §4 P3), so a roman-derived
+// hang would under-hang italics. Any kern INTO the punctuation (T. −4.56 in
+// LibreFranklin 16) is already inside the word's measured width and is NOT
+// re-added here, so nothing is double-counted.
+int trailingHangWidth(const GfxRenderer& renderer, const int fontId, const std::string& word,
+                      const EpdFontFamily::Style style) {
+  if (word.empty()) return 0;
+  // Find the start of the last UTF-8 sequence.
+  size_t i = word.size() - 1;
+  while (i > 0 && (static_cast<uint8_t>(word[i]) & 0xC0) == 0x80) {
+    --i;
+  }
+  const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str() + i);
+  const uint32_t cp = utf8NextCodepoint(&ptr);
+  bool fullHang = false;
+  switch (cp) {
+    case '.':
+    case ',':
+      fullHang = true;
+      break;
+    case ';':
+    case ':':
+    case '!':
+    case '?':
+    case '-':
+    case '\'':
+    case '"':
+    case 0x2010:  // hyphen
+    case 0x2018:  // ‘
+    case 0x2019:  // ’
+    case 0x201C:  // “
+    case 0x201D:  // ”
+      break;
+    default:
+      return 0;  // not a hangable glyph
+  }
+  const int advance = renderer.getTextAdvanceX(fontId, word.c_str() + i, style);
+  return fullHang ? advance : advance / 2;
+}
+
 // Checks if a UTF-8 codepoint should be counted as part of a word for Focus Reading
 bool isWordCharacter(uint32_t cp) {
   // ASCII range (Catches 95%+ of characters immediately)
@@ -976,7 +1026,15 @@ std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& r
       const int availableWidth = effectivePageWidth - lineWidth - spacing;
       const bool allowFallbackBreaks = isFirstWord;  // Only for first word on line
 
-      if (availableWidth > 0 &&
+      // Ragged right (any non-justified alignment): hyphenation is only a
+      // RESCUE against a conspicuously short line. Once the line has reached
+      // ~70% of the measure the ragged edge is accepted and the word moves
+      // down whole; under 70% (and always for an oversized first word, where
+      // lineWidth is 0) the split logic runs exactly as for justified text.
+      const bool raggedSkipsHyphen = blockStyle.alignment != CssTextAlign::Justify && !isFirstWord &&
+                                     lineWidth * 10 >= effectivePageWidth * 7;
+
+      if (!raggedSkipsHyphen && availableWidth > 0 &&
           hyphenateWordAtIndex(currentIndex, availableWidth, renderer, fontId, wordWidths, allowFallbackBreaks)) {
         // Prefix now fits; append it to this line and move to next line
         lineWidth += spacing + wordWidths[currentIndex];
@@ -1179,8 +1237,23 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
           ? CssTextAlign::Right
           : blockStyle.alignment;
 
+  // Optical margin alignment: on a justified line whose last glyph is terminal
+  // punctuation, that glyph hangs (fully or half — see trailingHangWidth) into
+  // the right margin so the WORD edge, not the punctuation's air, lands on the
+  // measure. Implemented purely as extra justification slack: line BREAKS were
+  // already decided against the full width including the punctuation
+  // (computeLineBreaks/computeHyphenatedLineBreaks are untouched), so
+  // pagination is byte-identical — only the space distribution and the paint x
+  // of the trailing word change. RTL/bidi lines are left out: after visual
+  // reordering the trailing LOGICAL token is not the trailing VISUAL one.
+  const int hangWidth =
+      (effectiveAlignment == CssTextAlign::Justify && !isLastLine && !blockStyle.isRtl && !hasRtlWord &&
+       !lineWords.empty())
+          ? trailingHangWidth(renderer, fontId, lineWords.back(), lineWordStyles.back())
+          : 0;
+
   // For justified text, compute per-gap extra to distribute remaining space evenly
-  const int spareSpace = effectivePageWidth - lineWordWidthSum - totalNaturalGaps;
+  const int spareSpace = effectivePageWidth - lineWordWidthSum - totalNaturalGaps + hangWidth;
   const int justifyExtra = (effectiveAlignment == CssTextAlign::Justify && !isLastLine)
                                ? computeJustifyExtra(spareSpace, actualGapCount)
                                : 0;

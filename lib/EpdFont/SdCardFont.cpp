@@ -182,6 +182,15 @@ void SdCardFont::freeStyleMiniKern(PerStyle& s) {
   s.miniKernMatrixCapacity = 0;
 }
 
+void SdCardFont::freeStyleMeasureKern(PerStyle& s) {
+  delete[] s.measureKernRowClasses;
+  s.measureKernRowClasses = nullptr;
+  delete[] s.measureKernRows;
+  s.measureKernRows = nullptr;
+  s.measureKernRowCount = 0;
+  s.measureKernRowCapacity = 0;
+}
+
 void SdCardFont::freeStyleAll(PerStyle& s) {
   freeStyleMiniData(s);
   delete[] s.fullIntervals;
@@ -190,6 +199,7 @@ void SdCardFont::freeStyleAll(PerStyle& s) {
   s.bmpIntervals = nullptr;
   s.intervalsAreBmp16 = false;
   freeStyleKernLigatureData(s);
+  freeStyleMeasureKern(s);
   s.present = false;
 }
 
@@ -516,6 +526,128 @@ bool SdCardFont::buildMiniKernMatrix(PerStyle& s, const uint32_t* codepoints, ui
           s.header.kernLeftClassCount, s.header.kernRightClassCount,
           static_cast<uint32_t>(s.header.kernLeftClassCount) * s.header.kernRightClassCount);
   return true;
+}
+
+// --- Measure-time kern rows (2026-08-22, punctuation-kerning audit P0) -----
+//
+// Layout used to measure SD fonts with NO kerning while drawText kerned, so a
+// word ending "r." in LibreFranklin 16 measured 2.75 px wider than it drew and
+// justified gaps absorbed the error; GfxRenderer::getKerning meanwhile read a
+// mini matrix that was null or stale from a previously RENDERED page. These
+// rows are the deterministic source for layout: full kern-matrix rows for the
+// left classes the advance-table codepoints reach, loaded on the same pass
+// that builds the advance table, kept with the same lifetime, looked up
+// through the resident full class tables. Original class IDs — no renumbering
+// — so rows accumulate across paragraphs exactly like the advance table does.
+
+void SdCardFont::loadMeasureKernRows(PerStyle& s, const uint32_t* codepoints, const uint32_t cpCount) {
+  if (s.header.kernLeftEntryCount == 0 || s.header.kernRightClassCount == 0) return;
+  if (!loadStyleKernLigatureData(s) || !s.kernLeftClasses) return;
+
+  // Which left classes do these codepoints reach that we do not yet have rows
+  // for? 256-bit bitmap: class IDs are uint8_t. 32 bytes of stack.
+  uint8_t needed[32] = {};
+  uint32_t neededCount = 0;
+  for (uint32_t i = 0; i < cpCount; i++) {
+    const uint8_t lc = miniLookupKernClass(s.kernLeftClasses, s.header.kernLeftEntryCount, codepoints[i]);
+    if (lc == 0) continue;
+    if (needed[lc >> 3] & (1u << (lc & 7))) continue;
+    bool have = false;
+    for (uint16_t r = 0; r < s.measureKernRowCount; r++) {
+      if (s.measureKernRowClasses[r] == lc) {
+        have = true;
+        break;
+      }
+    }
+    if (have) continue;
+    needed[lc >> 3] |= static_cast<uint8_t>(1u << (lc & 7));
+    neededCount++;
+  }
+  if (neededCount == 0) return;
+
+  const uint32_t rowBytes = s.header.kernRightClassCount;
+  const uint32_t newCount = s.measureKernRowCount + neededCount;
+  if (newCount * rowBytes > MEASURE_KERN_ARENA_LIMIT) {
+    // Pathological font: pairs beyond the cap measure unkerned (old behavior).
+    LOG_ERR("SDCF", "Measure-kern arena cap hit (%u rows x %u B); extra pairs measure unkerned",
+            static_cast<unsigned>(newCount), static_cast<unsigned>(rowBytes));
+    return;
+  }
+
+  // Grow both arrays (row count is small — shipped faces top out at 48).
+  uint8_t* newClasses = new (std::nothrow) uint8_t[newCount];
+  int8_t* newRows = new (std::nothrow) int8_t[newCount * rowBytes];
+  if (!newClasses || !newRows) {
+    delete[] newClasses;
+    delete[] newRows;
+    LOG_ERR("SDCF", "Failed to allocate measure-kern rows (%u bytes)",
+            static_cast<unsigned>(newCount * (rowBytes + 1)));
+    return;
+  }
+
+  HalFile file;
+  if (!Storage.openFileForRead("SDCF", filePath_, file)) {
+    delete[] newClasses;
+    delete[] newRows;
+    return;
+  }
+
+  // Merge: walk class IDs ascending, copying resident rows and reading new
+  // ones, so the class array stays sorted for the binary search in
+  // getMeasureKern.
+  uint16_t out = 0;
+  uint16_t oldIdx = 0;
+  for (uint32_t lc = 1; lc < 256 && out < newCount; lc++) {
+    const bool isNeeded = (needed[lc >> 3] & (1u << (lc & 7))) != 0;
+    const bool isResident = oldIdx < s.measureKernRowCount && s.measureKernRowClasses[oldIdx] == lc;
+    if (!isNeeded && !isResident) continue;
+    newClasses[out] = static_cast<uint8_t>(lc);
+    if (isResident) {
+      memcpy(newRows + static_cast<uint32_t>(out) * rowBytes, s.measureKernRows + static_cast<uint32_t>(oldIdx) * rowBytes,
+             rowBytes);
+      oldIdx++;
+    } else {
+      const uint32_t rowFileOff = s.kernMatrixFileOffset + (lc - 1u) * rowBytes;
+      if (!file.seekSet(rowFileOff) ||
+          file.read(reinterpret_cast<uint8_t*>(newRows + static_cast<uint32_t>(out) * rowBytes), rowBytes) !=
+              static_cast<int>(rowBytes)) {
+        LOG_ERR("SDCF", "Failed to read measure-kern row %u", static_cast<unsigned>(lc));
+        delete[] newClasses;
+        delete[] newRows;
+        return;  // keep the old rows; unloaded pairs measure unkerned
+      }
+    }
+    out++;
+  }
+
+  delete[] s.measureKernRowClasses;
+  delete[] s.measureKernRows;
+  s.measureKernRowClasses = newClasses;
+  s.measureKernRows = newRows;
+  s.measureKernRowCount = out;
+  s.measureKernRowCapacity = out;
+}
+
+int8_t SdCardFont::getMeasureKern(const uint32_t leftCp, const uint32_t rightCp, uint8_t styleIdx) const {
+  styleIdx &= (MAX_STYLES - 1);
+  const PerStyle& s = styles_[styleIdx];
+  if (!s.present || s.measureKernRowCount == 0 || !s.kernLeftClasses || !s.kernRightClasses) return 0;
+  const uint8_t lc = miniLookupKernClass(s.kernLeftClasses, s.header.kernLeftEntryCount, leftCp);
+  if (lc == 0) return 0;
+  const uint8_t rc = miniLookupKernClass(s.kernRightClasses, s.header.kernRightEntryCount, rightCp);
+  if (rc == 0) return 0;
+  // Binary search the sorted row-class array.
+  uint16_t lo = 0, hi = s.measureKernRowCount;
+  while (lo < hi) {
+    const uint16_t mid = lo + (hi - lo) / 2;
+    if (s.measureKernRowClasses[mid] < lc) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  if (lo >= s.measureKernRowCount || s.measureKernRowClasses[lo] != lc) return 0;
+  return s.measureKernRows[static_cast<uint32_t>(lo) * s.header.kernRightClassCount + (rc - 1u)];
 }
 
 // --- Glyph miss callback ---
@@ -1118,7 +1250,9 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // per style, small — the big matrix is NOT loaded here) and then build the
   // per-page mini kern matrix restricted to class pairs reachable from this
   // page's codepoints. Skip during metadata-only prewarm — layout only needs
-  // advanceX and the mini kern would be thrown away before rendering.
+  // advanceX and the mini kern would be thrown away before rendering. (Layout
+  // measurement gets its kerning from the measure-kern rows built alongside
+  // the advance table — see loadMeasureKernRows — not from this mini matrix.)
   bool kernLigOk = false;
   if (!metadataOnly) {
     if (loadStyleKernLigatureData(s)) {
@@ -1188,6 +1322,9 @@ void SdCardFont::clearPersistentCache() {
   // is safe at any point outside an in-flight measurement.
   for (uint8_t i = 0; i < MAX_STYLES; i++) {
     freeStyleKernLigatureData(styles_[i]);
+    // The measure-kern rows share the advance table's lifetime: both exist to
+    // serve layout measurement and both reload beside it on the next ensure.
+    freeStyleMeasureKern(styles_[i]);
   }
 }
 
@@ -1414,6 +1551,14 @@ int SdCardFont::buildAdvanceTableRange(Iter begin, Iter end, bool includeSpace, 
   }
   std::sort(codepoints, codepoints + cpCount);
   int totalMissed = fetchAdvancesForCodepoints(codepoints, cpCount, styleMask);
+  // Measure-time kern rows ride the same pass (2026-08-22, audit P0): the
+  // measurement fast paths in GfxRenderer read them via getMeasureKern, so
+  // layout kerns with exactly the cells drawText will. Cumulative like the
+  // advance table — a covered paragraph costs zero SD reads here.
+  for (uint8_t si = 0; si < MAX_STYLES; si++) {
+    if (!(styleMask & (1u << si)) || !styles_[si].present) continue;
+    loadMeasureKernRows(styles_[si], codepoints, cpCount);
+  }
   delete[] codepoints;
   stats_.prewarmTotalMs = millis() - startMs;
   return totalMissed;

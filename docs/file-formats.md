@@ -326,6 +326,7 @@ struct SectionBin {
     bool embeddedStyle;
     u8 imageRendering;
     bool focusReadingEnabled;
+    bool lineGridEnabled;  // v39+
 
     u16 pageCount;
     u32 pageLutOffset;

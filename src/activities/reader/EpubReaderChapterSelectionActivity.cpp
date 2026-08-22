@@ -54,7 +54,10 @@ void EpubReaderChapterSelectionActivity::loop() {
 
   auto metrics = UITheme::getInstance().getMetrics();
   Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  // Keep in step with render(): the thin book-progress bar sits between the
+  // header and the list, so the list starts one bar band lower.
+  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing +
+                         metrics.popupProgressBarHeight + metrics.verticalSpacing;
   const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
   switch (handleListTouch(selectorIndex, totalItems, contentTop, contentHeight, false)) {
     case ListTouchResult::Activated:
@@ -126,7 +129,21 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
                  tr(STR_SELECT_CHAPTER));
 
-  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  // Thin book-position bar (2026-08-22): the reader's byte-weighted progress
+  // through the whole book, at the page the chapter screen was opened from.
+  // Same outline-plus-fill idiom as BaseTheme::drawProgressBar, at the popup
+  // bar's 4 px height and without the percent label — the list needs the room.
+  const int barTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const int barWidth = screen.width - metrics.contentSidePadding * 2;
+  const int barHeight = metrics.popupProgressBarHeight;
+  renderer.drawRect(screen.x + metrics.contentSidePadding, barTop, barWidth, barHeight);
+  const float clamped = bookProgress < 0.0f ? 0.0f : (bookProgress > 1.0f ? 1.0f : bookProgress);
+  const int fillWidth = static_cast<int>((barWidth - 2) * clamped);
+  if (fillWidth > 0) {
+    renderer.fillRect(screen.x + metrics.contentSidePadding + 1, barTop + 1, fillWidth, barHeight - 2);
+  }
+
+  const int contentTop = barTop + barHeight + metrics.verticalSpacing;
   const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
 
   const int totalItems = getTotalItems();

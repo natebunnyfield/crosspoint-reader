@@ -249,7 +249,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // docs/settings-reduction-plan.md): 23 rows deleted, their fields now
     // static constexpr in CrossPointSettings.h. The SIMULATOR split went with
     // keepScreenAwake's row.
-    constexpr size_t FIXED_ENTRY_COUNT = 10;
+    constexpr size_t FIXED_ENTRY_COUNT = 11;
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
@@ -302,6 +302,22 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(buildEditorFontSizeSetting());
     v.push_back(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled,
                                     "focusReadingEnabled", StrId::STR_CAT_READER));
+    // Text alignment (2026-08-22): Justified (value 0 — the pre-reduction
+    // behavior, full hyphenation) vs Ragged right (value 1 = LEFT_ALIGN —
+    // natural spaces; hyphenation only rescues lines under ~70% of the
+    // measure). The index IS the persisted value and matches
+    // PARAGRAPH_ALIGNMENT/CssTextAlign, so a pre-reduction settings.json
+    // holding 2..4 clamps to the field default. Owner ruling 2026-08-22: the
+    // default is Ragged right. STR_CAT_SYSTEM so the row is visible on device
+    // (rebuildSettingsLists keeps only System rows).
+    v.push_back(SettingInfo::Enum(StrId::STR_TEXT_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
+                                  {StrId::STR_ALIGN_JUSTIFIED, StrId::STR_ALIGN_RAGGED_RIGHT}, "paragraphAlignment",
+                                  StrId::STR_CAT_SYSTEM));
+    // Line Grid (2026-08-22, default off): every vertical advance rounds UP to
+    // a whole line-height so all baselines share one grid. Part of
+    // ReaderRenderSpec — flipping it repaginates on the next section load.
+    v.push_back(SettingInfo::Toggle(StrId::STR_LINE_GRID, &CrossPointSettings::lineGridEnabled, "lineGrid",
+                                    StrId::STR_CAT_SYSTEM));
         // The reader is portrait-only; there is no orientation setting.
         // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
     // legacy Off/On toggle (persisted files round-trip), 2+ appended.

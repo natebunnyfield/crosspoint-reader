@@ -332,7 +332,19 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // steps it on-device, the same gesture family as the font-size ramp. The
   // settings ROW is gone; the field persists via the manual key in toJson().
   uint8_t lineSpacing = NORMAL;
-  static constexpr uint8_t paragraphAlignment = JUSTIFIED;
+  // Text alignment. Live again since 2026-08-22 (it was hardcoded JUSTIFIED in
+  // the 2026-08-21 reduction): the owner ordered a two-option row — Justified
+  // (value 0, full hyphenation) vs Ragged right (value 1 = LEFT_ALIGN, natural
+  // spaces, hyphenation only rescues lines under ~70% of the measure; see
+  // ParsedText::computeHyphenatedLineBreaks). Owner ruling 2026-08-22: the
+  // DEFAULT is Ragged right. Values 2+ from pre-reduction saves clamp back to
+  // this default through the ENUM row's two-label list.
+  uint8_t paragraphAlignment = LEFT_ALIGN;
+  // Line Grid (owner order 2026-08-22, default off): when ON every vertical
+  // advance the paginator makes rounds UP to a whole line-height, so every
+  // baseline on every page sits on the same grid. Participates in
+  // ReaderRenderSpec — flipping it repaginates.
+  uint8_t lineGridEnabled = 0;
   // Auto-sleep timeout setting (default 10 minutes). Legacy sleepTimeout enum values are migration-only.
   static constexpr uint8_t sleepTimeoutMinutes = 10;
   // E-ink refresh frequency (default 15 pages)

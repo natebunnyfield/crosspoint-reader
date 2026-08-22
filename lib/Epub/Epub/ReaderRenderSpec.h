@@ -26,4 +26,7 @@ struct ReaderRenderSpec {
   bool embeddedStyle = true;
   uint8_t imageRendering = 0;
   bool focusReadingEnabled = false;
+  // Line Grid (2026-08-22): every vertical advance the paginator makes rounds
+  // UP to a whole line-height. In the spec so a toggle repaginates.
+  bool lineGridEnabled = false;
 };

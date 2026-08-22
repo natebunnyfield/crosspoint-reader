@@ -2567,13 +2567,18 @@ int GfxRenderer::getSpaceWidth(const int fontId, const EpdFontFamily::Style styl
 
 int GfxRenderer::getSpaceAdvance(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
                                  const EpdFontFamily::Style style) const {
-  // Advance table fast-path for SD card fonts during layout.
-  // Kern data is not loaded during layout (consistent with previous metadataOnly behavior),
-  // so we return just the space advance without kerning.
+  // Advance table fast-path for SD card fonts during layout. The flanking
+  // kerns are applied here since 2026-08-22 via the measure-kern rows
+  // (docs/punctuation-kerning-audit-2026-08-22.md §4 P0). For every shipped
+  // font kern('.',' ') and kern(' ',X) are 0 — space is not a kern partner —
+  // so this is parity with the built-in path, not a visible change.
   auto sdIt = sdCardFonts_.find(fontId);
   if (sdIt != sdCardFonts_.end() && sdIt->second->hasAdvanceTable()) {
     const uint8_t resolvedStyle = resolveSdCardStyle(*sdIt->second, style);
-    return fp4::toPixel(sdIt->second->getAdvance(' ', resolvedStyle));
+    const int32_t spaceFP = sdIt->second->getAdvance(' ', resolvedStyle);
+    const int32_t kernFP = static_cast<int32_t>(sdIt->second->getMeasureKern(leftCp, ' ', resolvedStyle)) +
+                           static_cast<int32_t>(sdIt->second->getMeasureKern(' ', rightCp, resolvedStyle));
+    return fp4::toPixel(spaceFP + kernFP);
   }
 
   const auto fontIt = fontMap.find(fontId);
@@ -2590,6 +2595,16 @@ int GfxRenderer::getSpaceAdvance(const int fontId, const uint32_t leftCp, const 
 
 int GfxRenderer::getKerning(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
                             const EpdFontFamily::Style style) const {
+  // SD fast path (2026-08-22, audit P0 corollary): during layout the per-page
+  // mini kern matrix behind EpdFont::getKerning is either absent or STALE from
+  // a previously rendered page, so ParsedText's attached-token calls got
+  // non-deterministic values. The measure-kern rows are deterministic and
+  // carry the same cells.
+  auto sdIt = sdCardFonts_.find(fontId);
+  if (sdIt != sdCardFonts_.end() && sdIt->second->hasAdvanceTable()) {
+    const uint8_t styleIdx = resolveSdCardStyle(*sdIt->second, style);
+    return fp4::toPixel(sdIt->second->getMeasureKern(leftCp, rightCp, styleIdx));
+  }
   const auto fontIt = fontMap.find(fontId);
   if (fontIt == fontMap.end()) return 0;
   const int kernFP = fontIt->second.getKerning(leftCp, rightCp, style);  // 4.4 fixed-point
@@ -2609,11 +2624,23 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
   text = resolveVisualText(text, visual, BidiUtils::BidiBaseDir::AUTO);
 
   // Advance table fast-path for SD card fonts during layout.
-  // No kerning/ligature lookup — consistent with previous metadataOnly behavior
-  // where kern/lig data was not loaded.
+  //
+  // Kerning is applied here since 2026-08-22. It used to be skipped
+  // ("consistent with previous metadataOnly behavior"), which was the
+  // punctuation-kerning audit's P0: drawText kerns (:770) so a word ending
+  // "r." measured wider than it drew and justified gaps absorbed the error.
+  // The kern comes from SdCardFont::getMeasureKern — full-matrix rows loaded
+  // beside the advance table, deterministic during layout and byte-identical
+  // to the cells drawText's per-page mini matrix reads. The
+  // differential-rounding walk mirrors the generic path and drawText exactly:
+  // snap (previous advance + current kern) as one unit, sever the pair across
+  // a hole (B-036), and skip combining/transparent marks the way drawText's
+  // cursor does (zero advance). Ligature collapse is still NOT applied on this
+  // path — no ligature ever touches punctuation (audit §3d) and the pairs are
+  // not resident during layout; that pre-existing fi/fl measure/draw delta is
+  // out of this fix's scope.
   auto sdIt = sdCardFonts_.find(resolvedFontId);
   if (sdIt != sdCardFonts_.end() && sdIt->second->hasAdvanceTable()) {
-    int32_t widthFP = 0;
     const bool isSupSub = (style & (EpdFontFamily::SUP | EpdFontFamily::SUB)) != 0;
     const uint8_t styleIdx = resolveSdCardStyle(*sdIt->second, style);
     const auto fontIt = fontMap.find(resolvedFontId);
@@ -2622,19 +2649,29 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
       return 0;
     }
     const auto& font = fontIt->second;
+    int widthPx = 0;
+    uint32_t prevCp = 0;
+    int32_t prevAdvanceFP = 0;  // 12.4 fixed-point
     while (uint32_t cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text))) {
-      // RTL vowel marks (niqqud/harakat) are zero-advance overlays in drawText — no width.
-      if (BidiUtils::isTransparentMark(cp)) {
+      // RTL vowel marks and combining marks are zero-advance overlays in
+      // drawText — no width, and they do not sever a kern pair.
+      if (BidiUtils::isTransparentMark(cp) || utf8IsCombiningMark(cp)) {
         continue;
       }
       int32_t advFP = sdIt->second->getAdvance(cp, styleIdx);
-      if (advFP == 0 && !utf8IsCombiningMark(cp)) {
+      if (advFP == 0) {
         const EpdGlyph* glyph = font.getGlyph(cp, style);
         advFP = glyph ? glyph->advanceX : 0;
       }
-      widthFP += isSupSub ? (advFP + 1) / 2 : advFP;
+      if (prevCp != 0) {
+        const int8_t kernFP = advFP != 0 ? sdIt->second->getMeasureKern(prevCp, cp, styleIdx) : 0;  // B-036
+        widthPx += fp4::toPixel(prevAdvanceFP + kernFP);
+      }
+      prevAdvanceFP = isSupSub ? (advFP + 1) / 2 : advFP;
+      prevCp = advFP != 0 ? cp : 0;  // B-036: no kern across a hole
     }
-    return fp4::toPixel(widthFP);
+    widthPx += fp4::toPixel(prevAdvanceFP);
+    return widthPx;
   }
 
   const auto fontIt = fontMap.find(resolvedFontId);
