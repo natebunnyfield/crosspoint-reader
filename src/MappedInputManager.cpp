@@ -40,37 +40,46 @@ MappedInputManager::Button MappedInputManager::mapScreenDirection(const Button b
 }
 
 bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint8_t) const) const {
+  return mapButton(button, [this, fn](const uint8_t i) { return (gpio.*fn)(i); });
+}
+
+bool MappedInputManager::mapButtonInMask(const Button button, const uint8_t mask) const {
+  if (mask == 0) return false;
+  return mapButton(button, [mask](const uint8_t i) { return ((mask >> i) & 1u) != 0; });
+}
+
+bool MappedInputManager::mapButton(const Button button, const std::function<bool(uint8_t)>& fn) const {
   const auto sideLayout = SETTINGS.sideButtonLayout;
 
   switch (button) {
     case Button::Back:
       // Logical Back maps to user-configured front button.
-      return (gpio.*fn)(SETTINGS.frontButtonBack);
+      return fn(SETTINGS.frontButtonBack);
     case Button::Confirm:
       // Logical Confirm maps to user-configured front button.
-      return (gpio.*fn)(SETTINGS.frontButtonConfirm);
+      return fn(SETTINGS.frontButtonConfirm);
     case Button::Left:
       // Logical Left maps to user-configured front button.
-      return (gpio.*fn)(SETTINGS.frontButtonLeft);
+      return fn(SETTINGS.frontButtonLeft);
     case Button::Right:
       // Logical Right maps to user-configured front button.
-      return (gpio.*fn)(SETTINGS.frontButtonRight);
+      return fn(SETTINGS.frontButtonRight);
     case Button::Up:
       // Side buttons remain fixed for Up/Down.
-      return (gpio.*fn)(HalGPIO::BTN_UP);
+      return fn(HalGPIO::BTN_UP);
     case Button::Down:
       // Side buttons remain fixed for Up/Down.
-      return (gpio.*fn)(HalGPIO::BTN_DOWN);
+      return fn(HalGPIO::BTN_DOWN);
     case Button::Power:
       // Power button bypasses remapping.
-      return (gpio.*fn)(HalGPIO::BTN_POWER);
+      return fn(HalGPIO::BTN_POWER);
     case Button::PageBack:
       // Reader page navigation uses side buttons and can be swapped via settings.
       switch (sideLayout) {
         case CrossPointSettings::PREV_NEXT:
-          return (gpio.*fn)(HalGPIO::BTN_UP);
+          return fn(HalGPIO::BTN_UP);
         case CrossPointSettings::NEXT_PREV:
-          return (gpio.*fn)(HalGPIO::BTN_DOWN);
+          return fn(HalGPIO::BTN_DOWN);
         case CrossPointSettings::SIDE_BUTTONS_DISABLED:
         default:
           return false;
@@ -79,9 +88,9 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
       // Reader page navigation uses side buttons and can be swapped via settings.
       switch (sideLayout) {
         case CrossPointSettings::PREV_NEXT:
-          return (gpio.*fn)(HalGPIO::BTN_DOWN);
+          return fn(HalGPIO::BTN_DOWN);
         case CrossPointSettings::NEXT_PREV:
-          return (gpio.*fn)(HalGPIO::BTN_UP);
+          return fn(HalGPIO::BTN_UP);
         case CrossPointSettings::SIDE_BUTTONS_DISABLED:
         default:
           return false;
@@ -108,10 +117,10 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
       // about the reader's side font controls: that setting exists to stop the
       // side buttons turning BOOK pages, and honoring it here would leave every
       // list with no page control at all — a silent loss for anyone who set it.
-      return (gpio.*fn)(sideLayout == CrossPointSettings::NEXT_PREV ? HalGPIO::BTN_UP : HalGPIO::BTN_DOWN);
+      return fn(sideLayout == CrossPointSettings::NEXT_PREV ? HalGPIO::BTN_UP : HalGPIO::BTN_DOWN);
     case Button::PagePrevious:
       // Logical "previous screenful": the SIDE pair. See PageNext.
-      return (gpio.*fn)(sideLayout == CrossPointSettings::NEXT_PREV ? HalGPIO::BTN_DOWN : HalGPIO::BTN_UP);
+      return fn(sideLayout == CrossPointSettings::NEXT_PREV ? HalGPIO::BTN_DOWN : HalGPIO::BTN_UP);
     case Button::ScreenLeft:
     case Button::ScreenRight:
     case Button::ScreenUp:
@@ -317,35 +326,69 @@ bool MappedInputManager::wasHomeGesture() const {
 }
 
 bool MappedInputManager::isAnyPhysicalButtonHeld() const {
-  // Check all seven physical button indices.  The swallow must stay active
-  // while any button is held down, even if no edge is pending, because the
-  // activity that just became current might contain long-press checks on
-  // isPressed() that would misfireotherwise.
+  // Check all seven physical button indices.
   for (uint8_t i = 0; i <= HalGPIO::BTN_POWER; ++i) {
     if (gpio.isPressed(i)) return true;
   }
   return false;
 }
 
+void MappedInputManager::update() const {
+  gpio.update();
+  if (!swallowActive_) return;
+  // A new frame began, so the arming frame is over and this frame's swallow
+  // state can be settled ONCE, here, rather than lazily in whichever gated
+  // read runs first. (Lazy clearing is what dfeb1232e had to patch: the
+  // frame's first query decided for the whole frame, and a later query in the
+  // same frame could still read a latched edge.)
+  swallowArmingFrame_ = false;
+  uint8_t releases = 0;
+  uint8_t held = 0;
+  for (uint8_t i = 0; i <= HalGPIO::BTN_POWER; ++i) {
+    const uint8_t bit = static_cast<uint8_t>(1u << i);
+    if (gpio.wasReleased(i)) releases |= bit;
+    if (gpio.isPressed(i)) held |= bit;
+  }
+  // The stale release: this frame's release edge on a button that was held at
+  // swap time belongs to the press the DEPARTED activity consumed.
+  staleReleaseMask_ = swallowMask_ & releases;
+  // A button no longer held has finished its stale story and cannot produce
+  // another stale edge: re-pressing it makes a PRESS edge, which is fresh
+  // input by definition after the arming frame.
+  swallowMask_ &= held;
+  if (swallowMask_ == 0 && staleReleaseMask_ == 0) swallowActive_ = false;
+}
+
 void MappedInputManager::swallowUntilIdle() {
-  // Only arm if a button is actually held. If nothing is held at swap time there
-  // are no stale edges to protect against, and arming would swallow the NEXT
-  // legitimate press (which may arrive immediately in tests or UI combos).
-  if (isAnyPhysicalButtonHeld()) swallowActive_ = true;
+  // Only arm for buttons actually held at the swap. If nothing is held there
+  // are no stale edges or holds to protect against, and arming would swallow
+  // the NEXT legitimate press (which may arrive immediately in tests or UI
+  // combos).
+  uint8_t held = 0;
+  for (uint8_t i = 0; i <= HalGPIO::BTN_POWER; ++i) {
+    if (gpio.isPressed(i)) held |= static_cast<uint8_t>(1u << i);
+  }
+  if (held == 0) return;
+  swallowMask_ |= held;
+  swallowActive_ = true;
+  // Everything in the ARMING frame is stale: the press edge that triggered the
+  // swap can still be latched (transitions are processed in the frame that
+  // produced them), so same-frame consumers — result handlers, onEnter, an
+  // immediate-launch replaceActivity — must see nothing at all. update()
+  // clears this at the next frame boundary.
+  swallowArmingFrame_ = true;
 }
 
 bool MappedInputManager::wasPressed(const Button button) const {
   if (swallowActive_) {
-    // Suppress the edge. Clear the flag only once all buttons are idle AND no
-    // edge is latched this frame. The idle (level) check alone is not enough:
-    // the release edge arrives on a frame whose levels are already low, so the
-    // frame's FIRST query cleared the flag and a LATER query in the SAME frame
-    // read the still-latched release. Home does exactly that — ButtonNavigator's
-    // wasPressed() probes run before the wasReleased(Back) that opens the most
-    // recent book — which is how one Back press in Settings popped to Home and
-    // then opened the book (owner report, iOS build 120 lineage).
-    if (!isAnyPhysicalButtonHeld() && !gpio.wasAnyPressed() && !gpio.wasAnyReleased()) swallowActive_ = false;
-    return false;
+    if (swallowArmingFrame_) return false;
+    // After the arming frame a press edge is fresh input UNLESS it is on a
+    // button still held since the swap — only an edge detector starting from
+    // zero state produces that (a button held across boot, finding 4's
+    // recovery picker). A fresh press on any other button is DELIVERED: the
+    // swallow exists to eat the stale release of the press that caused the
+    // swap, not the user's next press (input-edge audit 2026-08-21, finding 6).
+    if (mapButtonInMask(button, swallowMask_)) return false;
   }
   if (button == Button::Back && wasBackGesture()) return true;
   return mapButton(button, &HalGPIO::wasPressed);
@@ -353,9 +396,13 @@ bool MappedInputManager::wasPressed(const Button button) const {
 
 bool MappedInputManager::wasReleased(const Button button) const {
   if (swallowActive_) {
-    // Same clear condition as wasPressed() above, for the same reason.
-    if (!isAnyPhysicalButtonHeld() && !gpio.wasAnyPressed() && !gpio.wasAnyReleased()) swallowActive_ = false;
-    return false;
+    if (swallowArmingFrame_) return false;
+    // The stale release itself, eaten for EVERY query in its frame — the
+    // owner's "Back from Settings opens the book" was a later query in the
+    // release frame reading the latched edge (iOS build 120 lineage,
+    // dfeb1232e). A still-held swap button has no release edge to leak, and a
+    // release on any other button is the end of a fresh press: delivered.
+    if (mapButtonInMask(button, staleReleaseMask_)) return false;
   }
   if (button == Button::Back && wasBackGesture()) return true;
   return mapButton(button, &HalGPIO::wasReleased);
@@ -363,16 +410,16 @@ bool MappedInputManager::wasReleased(const Button button) const {
 
 bool MappedInputManager::isPressed(const Button button) const {
   if (swallowActive_) {
+    if (swallowArmingFrame_) return false;
     // Level reads are gated too, not just edges: a hold that crosses an
     // activity boundary belongs to the DEPARTED activity, and the hold timer
     // never resets on transition. When isPressed()/getHeldTime() bypassed the
     // swallow, holding Back out of the note editor satisfied Manage Files'
     // isPressed(Back) && getHeldTime() >= GO_HOME_MS branch on its first
     // frames and jumped to the SD root instead of the note's folder
-    // (input-edge audit 2026-08-21, finding 1). Same clear condition as
-    // wasPressed() above.
-    if (!isAnyPhysicalButtonHeld() && !gpio.wasAnyPressed() && !gpio.wasAnyReleased()) swallowActive_ = false;
-    return false;
+    // (input-edge audit 2026-08-21, finding 1). Only the swap-held buttons
+    // are gated: a fresh press's level reads normally.
+    if (mapButtonInMask(button, swallowMask_)) return false;
   }
   return mapButton(button, &HalGPIO::isPressed);
 }
@@ -383,9 +430,9 @@ bool MappedInputManager::wasAnyReleased() const { return gpio.wasAnyReleased(); 
 
 unsigned long MappedInputManager::getHeldTime() const {
   if (swallowActive_) {
-    // Same gate and clear condition as isPressed() above: a held time carried
-    // across an activity swap measures the previous activity's press.
-    if (!isAnyPhysicalButtonHeld() && !gpio.wasAnyPressed() && !gpio.wasAnyReleased()) swallowActive_ = false;
+    // The HAL's held time is global, not per-button, so while any swap-held
+    // button is still settling the value measures the previous activity's
+    // press (finding 1). 0 until the swallow resolves.
     return 0;
   }
   if (!gpio.wasAnyPressed() && !gpio.wasAnyReleased() && touchHeldOverrideValid &&

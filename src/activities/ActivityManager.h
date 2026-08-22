@@ -54,6 +54,13 @@ class ActivityManager {
 
   void exitActivity(const RenderLock& lock);
 
+  // Drains pendingAction/pendingActivity until none remain (pop, push, replace,
+  // and anything a result handler or onEnter() chains onto them). Split out of
+  // loop() so goToSleep() can settle its pending SleepActivity WITHOUT re-running
+  // the outgoing activity's input handling — see the comment there (input-edge
+  // audit 2026-08-21, finding 5).
+  void processPendingTransitions();
+
   // Pending activity to be launched on next loop iteration
   std::unique_ptr<Activity> pendingActivity;
   enum class PendingAction { None, Push, Pop, Replace, ReplaceCurrentOnly };

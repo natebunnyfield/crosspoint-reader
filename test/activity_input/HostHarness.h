@@ -27,10 +27,11 @@ HalGPIO& buttons();
 
 // ---- frame driving ----
 
-// One iteration of src/main.cpp's loop(): gpio.update() (main.cpp:505) followed
-// by activityManager.loop() (main.cpp:599). Button edges are computed inside
-// update(), so an edge set up before frame() is visible to exactly this frame's
-// loop() and no other — which is the whole point.
+// One iteration of src/main.cpp's loop(): mappedInputManager.update() (which
+// is gpio.update() plus the swallow's per-frame settling) followed by
+// activityManager.loop(). Button edges are computed inside update(), so an
+// edge set up before frame() is visible to exactly this frame's loop() and no
+// other — which is the whole point.
 void frame();
 void frames(int count);
 

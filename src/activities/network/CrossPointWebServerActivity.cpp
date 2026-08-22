@@ -383,31 +383,38 @@ void CrossPointWebServerActivity::loop() {
       resetTaskWatchdogIfSubscribed();
 
       // Process HTTP requests in tight loop for maximum throughput
-      // More iterations = more data processed per main loop cycle
+      // More iterations = more data processed per main loop cycle.
+      //
+      // No input polling in here. The old shape called mappedInput.update()
+      // every 64 iterations "for responsiveness", but update() recomputes and
+      // CLEARS the frame's press/release edges — a mid-frame call destroyed
+      // them for every consumer outside this loop (main.cpp's activity check,
+      // the FORCE_REFRESH power-release read; input-edge audit 2026-08-21,
+      // finding 7). This loop only ever needed Back, and Back is read by the
+      // per-frame check below; the batch is time-bounded instead, so under a
+      // busy transfer the main loop gets control back within ~MAX_BATCH_MS and
+      // the Back check runs no later than the old every-64-busy-iterations
+      // cadence, while an idle pass still runs its full MAX_ITERATIONS.
       constexpr int MAX_ITERATIONS = 500;
+      constexpr unsigned long MAX_BATCH_MS = 100;
+      const unsigned long batchStart = millis();
       for (int i = 0; i < MAX_ITERATIONS && webServer->isRunning(); i++) {
         webServer->handleClient();
         // Reset watchdog every 32 iterations
         if ((i & 0x1F) == 0x1F) {
           resetTaskWatchdogIfSubscribed();
         }
-        // Yield and check for exit button every 64 iterations
+        // Yield every 64 iterations; hand the batch back to the main loop once
+        // it has run long enough that input may be waiting on it.
         if ((i & 0x3F) == 0x3F) {
           yield();
-          // Force trigger an update of which buttons are being pressed so be have accurate state
-          // for back button checking
-          mappedInput.update();
-          // Check for exit button inside loop for responsiveness
-          if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-            onGoHome();
-            return;
-          }
+          if (millis() - batchStart >= MAX_BATCH_MS) break;
         }
       }
       lastHandleClientTime = millis();
     }
 
-    // Handle exit on Back button (also check outside loop)
+    // Handle exit on Back button (per-frame edge from the main loop's update)
     if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
       onGoHome();
       return;

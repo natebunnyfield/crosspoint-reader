@@ -232,6 +232,15 @@ void ActivityManager::loop() {
     s.current->loop();
   }
 
+  processPendingTransitions();
+}
+
+// Mirrors ActivityManager.cpp's split: goToSleep() drains ONLY the pending
+// transition, without re-running the outgoing activity's input handling
+// (input-edge audit 2026-08-21, finding 5).
+void ActivityManager::processPendingTransitions() {
+  auto& s = am();
+
   while (s.pendingAction != HostPending::None) {
     if (s.pendingAction == HostPending::Pop) {
       RenderLock lock;
@@ -351,6 +360,16 @@ void ActivityManager::goToReader(std::string, bool) {
   replaceActivity(std::make_unique<HostPlaceholderActivity>("TestReader", renderer, mappedInput));
 }
 
+// Mirrors ActivityManager.cpp: the pending SleepActivity is settled by
+// processPendingTransitions(), NOT by loop() — the outgoing activity must not
+// get another input pass whose push/replace would discard the sleep entry
+// (finding 5). SleepActivity itself is not linkable here; the placeholder
+// records that the user landed on the sleep screen.
+void ActivityManager::goToSleep(bool) {
+  replaceActivity(std::make_unique<HostPlaceholderActivity>("TestSleep", renderer, mappedInput));
+  processPendingTransitions();
+}
+
 void ActivityManager::requestUpdate(bool) { am().counters.updates++; }
 
 // The real one asserts on three conditions (ActivityManager.cpp:319-326). Only
@@ -408,8 +427,10 @@ MappedInputManager& input() { return mappedInputSingleton(); }
 HalGPIO& buttons() { return gpio; }
 
 void frame() {
-  gpio.update();           // src/main.cpp:505
-  activityManager.loop();  // src/main.cpp:599
+  // Through MappedInputManager, exactly as src/main.cpp's loop top now does:
+  // update() is gpio.update() plus the swallow's per-frame settling.
+  mappedInputSingleton().update();
+  activityManager.loop();
 }
 
 void frames(int count) {

@@ -416,6 +416,137 @@ TEST_F(ActivityInput, TheSwallowedReleaseStaysSwallowedForLaterQueriesInTheSameF
 }
 
 // ===========================================================================
+// The swallow is directional (input-edge audit 2026-08-21, finding 6). The
+// invariant, verified against the manager's model: a PRESS edge observed after
+// the arming frame is always FRESH input — a held button cannot emit a second
+// press edge without first releasing, and the press that caused the swap
+// delivered its edge before the swap. The old whole-frame latch could not tell
+// direction, so a genuine second press that landed in the same idle-poll
+// window as the stale release was eaten with it.
+// ===========================================================================
+
+struct FreshPressObservations {
+  int backPressesSeen = 0;
+  int backReleasesSeen = 0;
+  int confirmPressesSeen = 0;
+  int confirmReleasesSeen = 0;
+};
+FreshPressObservations g_freshObs;
+
+// Records every Back/Confirm edge it sees, presses probed before releases —
+// Home's query order, the one the stale release must survive.
+class FreshPressParentDouble final : public Activity {
+ public:
+  FreshPressParentDouble(GfxRenderer& renderer, MappedInputManager& mappedInput)
+      : Activity("TestFreshPressParent", renderer, mappedInput) {}
+
+  void loop() override {
+    if (mappedInput.wasPressed(MappedInputManager::Button::Back)) g_freshObs.backPressesSeen++;
+    if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) g_freshObs.confirmPressesSeen++;
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back)) g_freshObs.backReleasesSeen++;
+    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) g_freshObs.confirmReleasesSeen++;
+  }
+};
+
+TEST_F(ActivityInput, AFreshPressInTheStaleReleaseFrameIsDelivered) {
+  g_freshObs = FreshPressObservations{};
+  auto parentOwned = std::make_unique<FreshPressParentDouble>(host::renderer(), host::input());
+  auto* parent = parentOwned.get();
+  host::setRootActivity(std::move(parentOwned));
+  parent->startActivityForResult(makeFontSelection(), [](const ActivityResult&) {});
+  host::frame();
+  ASSERT_EQ(host::currentActivityName(), "FontSelect") << "child was never pushed";
+
+  // Back press: the child exits on the press edge; the swallow arms with Back held.
+  host::pressFrame(HalGPIO::BTN_BACK);
+  ASSERT_EQ(host::currentActivityName(), "TestFreshPressParent");
+
+  // The audit's window: the stale Back release and a GENUINE Confirm press
+  // land in the SAME ~50 ms idle-poll frame.
+  host::buttons().simSetDown(HalGPIO::BTN_BACK, false);
+  host::buttons().simSetDown(HalGPIO::BTN_CONFIRM, true);
+  host::frame();
+
+  EXPECT_EQ(g_freshObs.backReleasesSeen, 0) << "the stale Back release leaked past the swallow";
+  EXPECT_EQ(g_freshObs.confirmPressesSeen, 1)
+      << "a genuine press landing in the stale release's frame was eaten by the swallow";
+
+  // And the fresh press's own release is fresh too.
+  host::releaseFrame(HalGPIO::BTN_CONFIRM);
+  EXPECT_EQ(g_freshObs.confirmReleasesSeen, 1) << "the fresh press's release was eaten";
+}
+
+TEST_F(ActivityInput, AGenuineSecondPressOfTheSwapButtonIsDelivered) {
+  g_freshObs = FreshPressObservations{};
+  auto parentOwned = std::make_unique<FreshPressParentDouble>(host::renderer(), host::input());
+  auto* parent = parentOwned.get();
+  host::setRootActivity(std::move(parentOwned));
+  parent->startActivityForResult(makeFontSelection(), [](const ActivityResult&) {});
+  host::frame();
+  ASSERT_EQ(host::currentActivityName(), "FontSelect") << "child was never pushed";
+
+  host::pressFrame(HalGPIO::BTN_BACK);    // child exits on the press; swallow arms
+  host::releaseFrame(HalGPIO::BTN_BACK);  // the stale release, eaten
+
+  // The user presses Back AGAIN one frame later — inside what used to be the
+  // wait-for-an-edge-free-frame window that ate it.
+  host::pressFrame(HalGPIO::BTN_BACK);
+  EXPECT_EQ(g_freshObs.backPressesSeen, 1) << "the genuine second Back press was eaten by the swallow";
+  EXPECT_EQ(g_freshObs.backReleasesSeen, 0);
+  host::releaseFrame(HalGPIO::BTN_BACK);
+  EXPECT_EQ(g_freshObs.backReleasesSeen, 1) << "the second press's release was eaten";
+}
+
+// ===========================================================================
+// Sleep entry must win (input-edge audit 2026-08-21, finding 5). goToSleep()
+// used to drain its pending SleepActivity by calling loop(), which FIRST
+// re-ran the outgoing activity with the frame's edges; a push/replace
+// requested there hit the "pendingActivity while pushActivity is not
+// expected" path and DISCARDED the sleep entry — the device slept without the
+// sleep screen, with a half-entered activity saved as state. goToSleep() now
+// drains only processPendingTransitions(); the outgoing activity gets its
+// onExit(), never another input pass. (The device-side window — a press edge
+// in the very frame the power-hold threshold crosses — is too timing-tight to
+// script, so the guard is pinned here, on the harness's exact mirror of the
+// manager's loop shape.)
+// ===========================================================================
+
+class MenuPushingDouble final : public Activity {
+ public:
+  MenuPushingDouble(GfxRenderer& renderer, MappedInputManager& mappedInput)
+      : Activity("TestMenuPusher", renderer, mappedInput) {}
+
+  void loop() override {
+    if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+      startActivityForResult(std::make_unique<NamedDouble>("TestMenu", renderer, mappedInput),
+                             [](const ActivityResult&) {});
+    }
+  }
+};
+
+TEST_F(ActivityInput, SleepEntryWinsOverAPushRequestedByTheOutgoingActivity) {
+  host::setRootActivity(std::make_unique<MenuPushingDouble>(host::renderer(), host::input()));
+  host::resetCounters();
+
+  // The frame's input poll has run (a Confirm press is latched) but the
+  // activity's loop() has NOT — exactly where main.cpp's enterDeepSleep()
+  // sits, since both sleep checks precede activityManager.loop().
+  host::buttons().simSetDown(HalGPIO::BTN_CONFIRM, true);
+  host::input().update();
+
+  activityManager.goToSleep(false);
+
+  EXPECT_EQ(host::currentActivityName(), "TestSleep")
+      << "the outgoing activity's push displaced the pending SleepActivity";
+  EXPECT_EQ(host::counters().pushes, 0) << "the outgoing activity got an input pass during sleep entry";
+
+  // Nothing deferred resurfaces to displace the sleep screen afterwards.
+  host::frame();
+  EXPECT_EQ(host::currentActivityName(), "TestSleep");
+  EXPECT_EQ(host::counters().pushes, 0);
+}
+
+// ===========================================================================
 // The render lock around the two calls that free fonts under the render task.
 // changeFontSize() and applySelectedFont() both call
 // SdCardFontSystem::ensureLoaded(), which unloads the resident SdCardFont;

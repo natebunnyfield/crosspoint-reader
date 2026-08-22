@@ -1065,7 +1065,10 @@ void loop() {
   static unsigned long lastMemPrint = 0;
 
   gpio.setSharedConfirmPowerShortPressEmitsPower(SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP);
-  gpio.update();
+  // Through MappedInputManager, not gpio directly: beyond gpio.update() this
+  // settles the post-swap swallow's per-frame state at the frame boundary
+  // (input-edge audit 2026-08-21, finding 6).
+  mappedInputManager.update();
 
   renderer.setFadingFix(SETTINGS.fadingFix);
 

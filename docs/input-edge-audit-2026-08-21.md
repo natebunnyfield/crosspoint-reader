@@ -24,8 +24,9 @@ an edge produced for one consumer read by a second after a boundary.
 
 ## Remaining findings (post-fix), ranked
 
-Findings 1-4 FIXED 2026-08-22 (commit pending) — see "Fixes" below. 5-9 remain
-documented only.
+Findings 1-4 FIXED 2026-08-22 (landed as 3e415eaf5) and 5-7 FIXED 2026-08-22
+(second pass, commit pending) — see "Fixes" below. 8 (latent: consumer deleted)
+and 9 (suspected, no path found) stay documented only.
 
 | # | Mechanism | Producer | Stale consumer | Failure | Conf |
 |---|---|---|---|---|---|
@@ -77,6 +78,63 @@ All four verified headlessly on the desktop simulator, before (bug) and after
 ctest: 367/369, the two failures pre-existing and unrelated (EditorFontsTest,
 SettingDisplayOrderTest — font-list assertions). Desktop canary SUCCESS;
 simulator repo `tests/run_all.sh` 31/31.
+
+## Fixes (2026-08-22, second pass: findings 5-7, commit pending)
+
+- **5 — FIXED at the mechanism**: `goToSleep()` no longer calls `loop()`. The
+  transition-draining half of `loop()` is extracted to
+  `processPendingTransitions()` (`src/activities/ActivityManager.cpp`), and
+  goToSleep calls that instead: the pending SleepActivity still settles
+  synchronously (its onEnter paints via `displayBuffer()`, which is the only
+  thing the old `loop()` call was for), but the OUTGOING activity never gets
+  another input pass, so nothing can reach the `pendingActivity while
+  pushActivity is not expected` discard. Chosen over a suppress-requests guard
+  flag because it removes the hazard's precondition (the re-entrant input pass)
+  rather than intercepting its consequence, and it needs no new state.
+  Evidence: the device window (a press edge in the exact frame the power-hold
+  threshold crosses) is too timing-tight to script headlessly, so the guard is
+  pinned host-side: `test/activity_input/HostHarness.cpp` mirrors the
+  loop/processPendingTransitions split and goToSleep, and
+  `SleepEntryWinsOverAPushRequestedByTheOutgoingActivity` fails against the old
+  shape (verified by temporarily restoring `loop()` in the mirror) and passes
+  against the new.
+- **6 — FIXED, the swallow is now directional and per-button**
+  (`src/MappedInputManager.cpp`). Invariant verified against the model at the
+  top of this file: a PRESS edge observed after the arming frame is always
+  fresh — a held button cannot emit a second press edge without first
+  releasing, and the swap-causing press delivered its edge before the swap. So
+  `swallowUntilIdle()` records WHICH buttons were held (`swallowMask_`), the
+  arming frame still reads fully idle (the triggering press edge can be
+  latched there for same-frame consumers), and from the next frame on only the
+  swap-held buttons are gated (level, hold, from-zero boot press edge) plus
+  their release edge — the stale release — for its whole frame
+  (`staleReleaseMask_`). Everything else is delivered. Per-frame settling
+  moved into `MappedInputManager::update()`, now called from the main loop
+  (`src/main.cpp` loop top) and the harness `frame()`, so no lazy in-read
+  clearing remains. Pinned: `AFreshPressInTheStaleReleaseFrameIsDelivered`
+  (stale release + genuine press in the SAME frame: press delivered, release
+  eaten) and `AGenuineSecondPressOfTheSwapButtonIsDelivered`; both fail
+  against the old whole-frame latch (verified by temporary revert), and every
+  pre-existing swallow pin (dfeb1232e's included) stays green.
+- **7 — FIXED, no mid-frame input update**: the File Transfer inner loop's
+  `mappedInput.update()` + Back check
+  (`src/activities/network/CrossPointWebServerActivity.cpp`) are gone; the
+  batch is time-bounded instead (`MAX_BATCH_MS` 100 ms alongside the existing
+  500-iteration cap), so the per-frame Back check below the loop is reached at
+  least as often as the old every-64-busy-iterations poll, and the frame's
+  edges are never destroyed for main.cpp's consumers. What update() clears:
+  `InputManager::update()` zeroes `pressedEvents`/`releasedEvents` and the
+  touch one-shots at its top (freeink-sdk InputManager.cpp:413-421), so an
+  edge latched by a mid-frame call was gone before the next frame's readers
+  ran. Evidence: desktop sim smoke — Home → File Transfer → Join Network →
+  fake WiFi → `Web server started successfully`; `curl 127.0.0.1:8080/`
+  returned HTTP 200 (1366 bytes) through the time-bounded batch, and a Back
+  press then exited to Home (`[ACT] Exiting activity: CrossPointWebServer` →
+  `Entering activity: Home`).
+
+ctest after the second pass: 370/372 (three new activity_input cases), same two
+pre-existing failures. Desktop canary (`pio run -e simulator`) SUCCESS;
+simulator repo `tests/run_all.sh` 34/34.
 
 Closed by dfeb1232e, worth regression pins: action-menu Confirm press → TextViewer togglePretty (FileManagerActivity.cpp:634-641 → TextViewerActivity.cpp:364); every wasPressed-pop → HomeActivity.cpp:323/369 (crash screen / SD error / "Library updated" dismissals opening the last book or relaunching the updater).
 

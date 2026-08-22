@@ -82,6 +82,18 @@ void ActivityManager::loop() {
     currentActivity->loop();
   }
 
+  processPendingTransitions();
+
+  if (requestedUpdate.exchange(false)) {
+    // Using direct notification to signal the render task to update
+    // Increment counter so multiple rapid calls won't be lost
+    if (renderTaskHandle) {
+      xTaskNotify(renderTaskHandle, 1, eIncrement);
+    }
+  }
+}
+
+void ActivityManager::processPendingTransitions() {
   while (pendingAction != PendingAction::None) {
     if (pendingAction == PendingAction::Pop) {
       RenderLock lock;
@@ -171,14 +183,6 @@ void ActivityManager::loop() {
       continue;
     }
   }
-
-  if (requestedUpdate.exchange(false)) {
-    // Using direct notification to signal the render task to update
-    // Increment counter so multiple rapid calls won't be lost
-    if (renderTaskHandle) {
-      xTaskNotify(renderTaskHandle, 1, eIncrement);
-    }
-  }
 }
 
 void ActivityManager::exitActivity(const RenderLock& lock) {
@@ -247,7 +251,17 @@ void ActivityManager::goToReader(std::string path, const bool allowFastInitialRe
 
 void ActivityManager::goToSleep(bool fromTimeout) {
   replaceActivity(std::make_unique<SleepActivity>(renderer, mappedInput, fromTimeout));
-  loop();  // Important: sleep screen must be rendered immediately, the caller will go to sleep right after this returns
+  // The caller goes to sleep right after this returns, so the pending replace
+  // must settle NOW: SleepActivity::onEnter() paints the sleep screen
+  // synchronously (every render* path ends in displayBuffer()). Drain ONLY the
+  // transition — this used to call loop(), which first re-ran the OUTGOING
+  // activity with the frame's edges; if that activity requested a push/replace,
+  // pushActivity()'s "pendingActivity while pushActivity is not expected" path
+  // discarded the pending SleepActivity, and the device slept without the sleep
+  // screen with a half-entered activity saved as state (input-edge audit
+  // 2026-08-21, finding 5). Sleep entry must win: the outgoing activity gets
+  // its onExit(), never another input pass.
+  processPendingTransitions();
 }
 
 void ActivityManager::goToBoot() { replaceActivity(std::make_unique<BootActivity>(renderer, mappedInput)); }
