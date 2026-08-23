@@ -319,7 +319,8 @@ struct SectionBin {
     s32 fontId;
     float lineCompression;
     bool extraParagraphSpacing;
-    u8 paragraphAlignment;
+    u8 paragraphAlignment;  // constant since v44 -- the setting is gone and the
+                            // measure decides per block (docs/auto-justification.md)
     u16 viewportWidth;
     u16 viewportHeight;
     bool hyphenationEnabled;

@@ -12,6 +12,7 @@
 #include <limits>
 #include <vector>
 
+#include "AutoJustify.h"
 #include "hyphenation/Hyphenator.h"
 
 constexpr int MAX_COST = std::numeric_limits<int>::max();
@@ -59,6 +60,27 @@ uint32_t lastCodepoint(const std::string& word) {
 }
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
+
+// Alphabet length: the width of a-z set in this face at this size, which is
+// what the automatic-justification estimate divides the measure by (see
+// AutoJustify.h). Measured through the same getTextAdvanceX the line breaker
+// measures words with, so the estimate and the layout cannot disagree -- that
+// call carries kerning on the SD advance-table path since 2026-08-22
+// (docs/punctuation-kerning-audit-2026-08-22.md, P0), and the alphabet's own
+// pairs are kerned exactly as a word's would be.
+//
+// Not cached. It is 26 advance lookups against a paragraph's hundreds of
+// words, and a memo keyed on fontId would go stale the moment a font unload
+// hands the same id to a different face (test/font_switch_churn).
+int measureLowercaseAlphabet(const GfxRenderer& renderer, const int fontId) {
+  // The persistent advance table is built from the paragraph's own words, so
+  // a letter this paragraph happens not to use (q, z) may not be resident.
+  // Regular style only -- the alphabet length is a metric of the roman.
+  if (renderer.isSdCardFont(fontId)) {
+    renderer.ensureSdCardFontReady(fontId, autojustify::ALPHABET, /*styleMask=*/0x01);
+  }
+  return renderer.getTextAdvanceX(fontId, autojustify::ALPHABET, EpdFontFamily::REGULAR);
+}
 
 bool isNoBreakBeforeCjkPunctuation(const uint32_t cp) {
   switch (cp) {
@@ -687,10 +709,6 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
     }
   }
 
-  isNaturalAlign =
-      blockStyle.alignment == CssTextAlign::Justify ||
-      (blockStyle.isRtl ? blockStyle.alignment == CssTextAlign::Right : blockStyle.alignment == CssTextAlign::Left);
-
   // Ensure SD card font glyph metrics are loaded before measuring word widths.
   // For flash-based fonts isSdCardFont() returns false and this block is skipped
   // entirely — no heap allocation. For SD card fonts this reads glyph metadata
@@ -707,6 +725,45 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
     if (styleMask == 0) styleMask = 0x01;  // defensive: regular only
     renderer.ensureSdCardFontReady(fontId, words, hyphenationEnabled, styleMask);
   }
+
+  // Automatic justification (owner ruling 2026-08-23, replacing the Text
+  // Alignment setting): a block that asks to be justified keeps it only when
+  // its OWN measure is wide enough to justify well. viewportWidth here is this
+  // block's measure -- the page viewport already reduced by the block's
+  // margins and padding at the call site -- so a blockquote or a table cell
+  // decides for itself and can come out ragged on a page whose body text is
+  // justified. The first line's text-indent is deliberately not subtracted:
+  // the body measure is what the paragraph is set to, not its opening line.
+  //
+  // Idempotent by construction. The demotion only ever reads Justify and only
+  // ever writes Left/Right, and the paginator calls this method repeatedly on
+  // one block as it fills successive pages, always with the same measure and
+  // font -- so the second call sees Left, matches nothing, and no block can
+  // oscillate between pages. See AutoJustify.h for the threshold and its
+  // source, and docs/auto-justification.md for the measurement method.
+  if (blockStyle.alignment == CssTextAlign::Justify) {
+    const int alphabetPx = measureLowercaseAlphabet(renderer, fontId);
+    if (!autojustify::shouldJustify(viewportWidth, alphabetPx)) {
+      blockStyle.alignment = blockStyle.isRtl ? CssTextAlign::Right : CssTextAlign::Left;
+    }
+    // One line per distinct (measure, face) rather than one per block: a page
+    // holds dozens of blocks at the same measure and the repeat says nothing.
+    // The comparison keeps the statics live at LOG_LEVEL 1, where LOG_DBG is
+    // empty and a write-only static would warn.
+    static int lastLoggedMeasure = -1;
+    static int lastLoggedAlphabet = -1;
+    if (viewportWidth != lastLoggedMeasure || alphabetPx != lastLoggedAlphabet) {
+      lastLoggedMeasure = viewportWidth;
+      lastLoggedAlphabet = alphabetPx;
+      LOG_DBG("PTX", "auto-justify: measure %u px, alphabet %d px, ~%d chars/line -> %s", viewportWidth, alphabetPx,
+              autojustify::charsPerLine(viewportWidth, alphabetPx),
+              blockStyle.alignment == CssTextAlign::Justify ? "justified" : "ragged");
+    }
+  }
+
+  isNaturalAlign =
+      blockStyle.alignment == CssTextAlign::Justify ||
+      (blockStyle.isRtl ? blockStyle.alignment == CssTextAlign::Right : blockStyle.alignment == CssTextAlign::Left);
 
   const int pageWidth = viewportWidth;
   auto wordWidths = calculateWordWidths(renderer, fontId);

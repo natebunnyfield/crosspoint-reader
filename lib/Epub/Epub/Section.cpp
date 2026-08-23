@@ -80,7 +80,16 @@ namespace {
 //      the same reason the trailing hang is, but the painted x lives in the
 //      cached TextBlocks — the v39 note above — so stale v42 caches would keep
 //      flush-left quotes, hence the bump.
-constexpr uint8_t SECTION_FILE_VERSION = 43;
+// v44: automatic justification (2026-08-23, owner ruling). The Text Alignment
+//      setting is withdrawn and the measure decides per block, so pagination
+//      moves twice over: the base intent goes back to JUSTIFIED (v43 caches
+//      were built ragged, whose hyphenation rule differs — see
+//      computeHyphenatedLineBreaks's raggedSkipsHyphen), and a narrow block
+//      now demotes itself. Line BREAKS change, not just painted x, so a stale
+//      v43 cache would keep the old ragged breaks for the life of the book.
+//      The spec's paragraphAlignment byte can no longer catch this: it is a
+//      compile-time constant now, identical in both eras' files.
+constexpr uint8_t SECTION_FILE_VERSION = 44;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

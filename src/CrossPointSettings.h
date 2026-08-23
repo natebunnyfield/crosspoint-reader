@@ -332,14 +332,24 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // steps it on-device, the same gesture family as the font-size ramp. The
   // settings ROW is gone; the field persists via the manual key in toJson().
   uint8_t lineSpacing = NORMAL;
-  // Text alignment. Live again since 2026-08-22 (it was hardcoded JUSTIFIED in
-  // the 2026-08-21 reduction): the owner ordered a two-option row — Justified
-  // (value 0, full hyphenation) vs Ragged right (value 1 = LEFT_ALIGN, natural
-  // spaces, hyphenation only rescues lines under ~70% of the measure; see
-  // ParsedText::computeHyphenatedLineBreaks). Owner ruling 2026-08-22: the
-  // DEFAULT is Ragged right. Values 2+ from pre-reduction saves clamp back to
-  // this default through the ENUM row's two-label list.
-  uint8_t paragraphAlignment = LEFT_ALIGN;
+  // Text alignment. The Justified / Ragged right ROW is withdrawn again on
+  // 2026-08-23 — owner ruling: "remove ragged right or justified ios app
+  // settings, instead make it automatic by letting the character length decide
+  // what is optimal." The base intent is JUSTIFIED, exactly as the 2026-08-21
+  // reduction hardcoded it, and the ragged decision has moved to where the
+  // measure is actually known: ParsedText::layoutAndExtractLines demotes a
+  // justified block to its natural ragged edge when that block's own measure
+  // carries fewer than autojustify::THRESHOLD_CHARS characters per line
+  // (lib/Epub/Epub/AutoJustify.h, docs/auto-justification.md).
+  //
+  // `static constexpr` is this repo's retirement pattern (see the 2026-08-21
+  // block above): fromJson iterates getSettingsList(), so a key that no longer
+  // has a row is never read back and a stored 0..4 from either era is ignored
+  // rather than re-pointed at something it did not mean. toJson stops writing
+  // it. The stored integers themselves are untouched — CssTextAlign still maps
+  // 1:1 onto PARAGRAPH_ALIGNMENT — so a future row could be reinstated on the
+  // same values.
+  static constexpr uint8_t paragraphAlignment = JUSTIFIED;
   // Line Grid (owner order 2026-08-22, default off): when ON every vertical
   // advance the paginator makes rounds UP to a whole line-height, so every
   // baseline on every page sits on the same grid. Participates in

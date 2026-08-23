@@ -302,17 +302,18 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(buildEditorFontSizeSetting());
     v.push_back(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled,
                                     "focusReadingEnabled", StrId::STR_CAT_READER));
-    // Text alignment (2026-08-22): Justified (value 0 — the pre-reduction
-    // behavior, full hyphenation) vs Ragged right (value 1 = LEFT_ALIGN —
-    // natural spaces; hyphenation only rescues lines under ~70% of the
-    // measure). The index IS the persisted value and matches
-    // PARAGRAPH_ALIGNMENT/CssTextAlign, so a pre-reduction settings.json
-    // holding 2..4 clamps to the field default. Owner ruling 2026-08-22: the
-    // default is Ragged right. STR_CAT_SYSTEM so the row is visible on device
-    // (rebuildSettingsLists keeps only System rows).
-    v.push_back(SettingInfo::Enum(StrId::STR_TEXT_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
-                                  {StrId::STR_ALIGN_JUSTIFIED, StrId::STR_ALIGN_RAGGED_RIGHT}, "paragraphAlignment",
-                                  StrId::STR_CAT_SYSTEM));
+    // NO Text Alignment row. It shipped 2026-08-22 (Justified / Ragged right)
+    // and is withdrawn 2026-08-23 — owner ruling: "remove ragged right or
+    // justified ios app settings, instead make it automatic by letting the
+    // character length decide what is optimal." The decision is now made per
+    // BLOCK, where the measure is known, by ParsedText::layoutAndExtractLines
+    // against autojustify::THRESHOLD_CHARS. CrossPointSettings::
+    // paragraphAlignment is `static constexpr` JUSTIFIED, so the row cannot be
+    // reinstated by accident: &CrossPointSettings::paragraphAlignment no longer
+    // forms. STR_TEXT_ALIGNMENT / STR_ALIGN_JUSTIFIED / STR_ALIGN_RAGGED_RIGHT
+    // stay in the string table — an unused string costs a few bytes of flash,
+    // while deleting them renumbers StrId for every translation.
+    //
     // Line Grid (2026-08-22, default off): every vertical advance rounds UP to
     // a whole line-height so all baselines share one grid. Part of
     // ReaderRenderSpec — flipping it repaginates on the next section load.
