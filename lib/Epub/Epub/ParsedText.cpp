@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "AutoJustify.h"
+#include "BookNotes.h"
 #include "hyphenation/Hyphenator.h"
 
 constexpr int MAX_COST = std::numeric_limits<int>::max();
@@ -768,6 +769,12 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
     const int alphabetPx = measureLowercaseAlphabet(renderer, fontId);
     if (!autojustify::shouldJustify(viewportWidth, alphabetPx)) {
       blockStyle.alignment = blockStyle.isRtl ? CssTextAlign::Right : CssTextAlign::Left;
+      // The reader sees a ragged edge in a book that asked to be justified and
+      // has no way to find out why. Record the narrowest measure responsible --
+      // the note quotes that character count, which is the whole argument.
+      booknotes::current().raiseWithCharsPerLine(
+          booknotes::Note::JustificationDemoted,
+          static_cast<uint16_t>(autojustify::charsPerLine(viewportWidth, alphabetPx)));
     }
     // One line per distinct (measure, face) rather than one per block: a page
     // holds dozens of blocks at the same measure and the repeat says nothing.

@@ -247,6 +247,14 @@ compiled out of `gh_release` (`LOG_LEVEL=1`) and free when off.
    serialization format change requiring `SECTION_FILE_VERSION` 44 → 45, and
    13% is the wrong risk/benefit to take on the same day as a 17x change and
    two other cache bumps.
+
+   **DONE, later the same day** (owner ruling: "take it"). A presence byte per
+   block plus a sparse index-prefixed list -- cheaper than the presence byte
+   alone, because even a ruby line annotates only its group leaders.
+   `SECTION_FILE_VERSION` 45, measured at 12.6% on `giant.epub` and 12.7% on
+   `measure.epub`, with the ruby rendering proved pixel-identical across the
+   change. Write-up:
+   [book-notes-and-sparse-ruby-2026-08-23.md](book-notes-and-sparse-ruby-2026-08-23.md).
 3. **Page turn on a cached section: 3 opens of the same `.bin` + ~11 seeks.**
    `loadPageAt` (`Section.cpp:858`) opens, re-reads `lutOffset` from the header,
    seeks three times; `saveProgress` (`EpubReaderActivity.cpp:1465`) then calls

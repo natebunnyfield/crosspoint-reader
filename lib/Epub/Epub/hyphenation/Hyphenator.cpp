@@ -6,6 +6,7 @@
 #include <cassert>
 #include <vector>
 
+#include "Epub/BookNotes.h"
 #include "HyphenationCommon.h"
 #include "LanguageHyphenator.h"
 #include "LanguageRegistry.h"
@@ -272,4 +273,14 @@ std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string& w
   return breaks;
 }
 
-void Hyphenator::setPreferredLanguage(const std::string& lang) { cachedHyphenator_ = hyphenatorForLanguage(lang); }
+void Hyphenator::setPreferredLanguage(const std::string& lang) {
+  cachedHyphenator_ = hyphenatorForLanguage(lang);
+  if (cachedHyphenator_ == nullptr) {
+    // Only English and Spanish tries ship. Every other book -- including one
+    // with no dc:language at all -- is set without hyphenation, which on a
+    // narrow measure is exactly the condition auto-justification then reacts
+    // to. The two notes are frequently the same story and the reader deserves
+    // both halves of it.
+    booknotes::current().raise(booknotes::Note::NoHyphenationForLanguage);
+  }
+}

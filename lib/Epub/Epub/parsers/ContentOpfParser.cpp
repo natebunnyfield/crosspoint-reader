@@ -1,5 +1,7 @@
 #include "ContentOpfParser.h"
 
+#include "Epub/BookNotes.h"
+
 #include <FsHelpers.h>
 #include <Logging.h>
 #include <Serialization.h>
@@ -302,6 +304,12 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
 
           if (found && self->cache) {
             self->cache->createSpineEntry(href);
+          } else if (!found) {
+            // The itemref names a manifest id that is not in the manifest. The
+            // chapter simply is not in the book any more, and until now the
+            // only trace was that the reading order was one shorter than the
+            // publisher built.
+            booknotes::current().raise(booknotes::Note::SpineEntriesMissing);
           }
         }
       }

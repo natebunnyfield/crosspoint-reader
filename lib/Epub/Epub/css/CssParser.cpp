@@ -1,5 +1,7 @@
 #include "CssParser.h"
 
+#include "Epub/BookNotes.h"
+
 #include <Arduino.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -460,6 +462,15 @@ void CssParser::parseDeclarationIntoStyle(std::string_view decl, CssStyle& style
       style.verticalAlign = CssVerticalAlign::Sub;
       style.defined.verticalAlign = 1;
     }
+  } else if (iequalsAscii(name, "writing-mode")) {
+    // Parsed for the note ONLY -- there is no vertical layout in this firmware
+    // and no CssStyle field to hold one. A vertical-rl book still renders
+    // horizontally left-to-right, which for a tategaki novel is not a
+    // degradation but a different book, so the reader has to be told.
+    const std::string_view mode = stripTrailingImportant(value);
+    if (mode.size() >= 8 && iequalsAscii(mode.substr(0, 8), "vertical")) {
+      booknotes::current().raise(booknotes::Note::VerticalWritingIgnored);
+    }
   }
 }
 
@@ -490,6 +501,7 @@ void CssParser::processRuleBlockWithStyle(std::string_view selectorGroup, const 
   // Check if we've reached the rule limit before processing
   if (rulesBySelector_.size() >= MAX_RULES) {
     LOG_DBG("CSS", "Reached max rules limit (%zu), stopping CSS parsing", MAX_RULES);
+    booknotes::current().raise(booknotes::Note::StylesheetSkipped);
     return;
   }
 
@@ -497,6 +509,7 @@ void CssParser::processRuleBlockWithStyle(std::string_view selectorGroup, const 
   if (ESP.getFreeHeap() < MIN_FREE_HEAP_FOR_CSS_RULES) {
     LOG_ERR("CSS", "Low heap during CSS parse (%u bytes), stopping with %zu rules", ESP.getFreeHeap(),
             rulesBySelector_.size());
+    booknotes::current().raise(booknotes::Note::StylesheetSkipped);
     return;
   }
 
@@ -528,11 +541,19 @@ void CssParser::processRuleBlockWithStyle(std::string_view selectorGroup, const 
         //   ' '  descendant combinator
         // Single-pass scan via find_first_of instead of eight sequential find() calls.
         constexpr std::string_view kUnsupportedSelectorChars = "+>[:#~* ";
-        if (sel.find_first_of(kUnsupportedSelectorChars) != std::string_view::npos) return;
+        if (sel.find_first_of(kUnsupportedSelectorChars) != std::string_view::npos) {
+          // Nearly every real stylesheet has at least one of these, so this is
+          // the note that most often explains "the book does not look like the
+          // publisher's proof". Counted, because one dropped descendant
+          // selector and four hundred of them are different books.
+          booknotes::current().countDroppedCssRules(1);
+          return;
+        }
 
         // Skip if this would exceed the rule limit
         if (rulesBySelector_.size() >= MAX_RULES) {
           LOG_DBG("CSS", "Reached max rules limit, stopping selector processing");
+          booknotes::current().raise(booknotes::Note::StylesheetSkipped);
           limitReached = true;
           return;
         }
@@ -600,6 +621,10 @@ bool CssParser::loadFromStream(HalFile& source) {
         return;
       }
       if (c == '@' && selector.empty()) {
+        // The whole at-rule body is skipped, so a sheet wrapped in @media all
+        // -- which publishers do -- contributes nothing at all. @font-face is
+        // the other common one, and it is why the embedded-font note exists.
+        booknotes::current().raise(booknotes::Note::StylesheetPartlyUnderstood);
         inAtRule = true;
         atDepth = 0;
         return;
@@ -609,6 +634,7 @@ bool CssParser::loadFromStream(HalFile& source) {
         currentStyle = CssStyle{};
         declBuffer.clear();
         if (selector.size() > MAX_SELECTOR_LENGTH * 4) {
+          booknotes::current().raise(booknotes::Note::StylesheetSkipped);
           skippingRule = true;
         }
         return;

@@ -15,6 +15,7 @@
 
 #include "../../../../src/fontIds.h"
 #include "Epub.h"
+#include "Epub/BookNotes.h"
 #include "Epub/Page.h"
 #include "Epub/converters/ImageDecoderFactory.h"
 #include "Epub/converters/ImageDimsProbe.h"
@@ -943,13 +944,25 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     return;
   }
 
+  // <pre> is not implemented: the whitespace collapser downstream treats its
+  // content like any other prose, so the line breaks, the indentation and the
+  // runs of spaces that ARE the content of a code listing or a piece of ASCII
+  // art are gone by the time it reaches a block. Nothing here can fix that
+  // cheaply; the reader can at least be told the shape he is looking at is not
+  // the shape the book shipped.
+  if (strcmp(name, "pre") == 0) {
+    booknotes::current().raise(booknotes::Note::PreformattedCollapsed);
+  }
+
   // Special handling for tables/cells: flatten into per-cell paragraphs with a prefixed header.
   if (strcmp(name, "table") == 0) {
-    // skip nested tables
+    // skip nested tables -- their text is discarded, not reflowed
     if (self->tableDepth > 0) {
+      booknotes::current().raise(booknotes::Note::TablesFlattened);
       self->tableDepth += 1;
       return;
     }
+    booknotes::current().raise(booknotes::Note::TablesFlattened);
 
     if (self->partWordBufferIndex > 0) {
       self->flushPartWordBuffer();
@@ -1421,7 +1434,10 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         return;
       }
 
-      // No alt text, skip
+      // No alt text, skip. The picture is gone with nothing in its place, so
+      // the reader sees a gap he cannot account for -- the one image outcome
+      // worth a note. (Alt text above is a substitution, not a loss.)
+      booknotes::current().countDroppedImage();
       self->skipUntilDepth = self->depth;
       self->depth += 1;
       return;
@@ -1604,6 +1620,17 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     } else {
       self->currentCssStyle = cssStyle;
       BlockStyle elementStyle = userAlignmentBlockStyle;
+      // This is the only place a NON-heading block's alignment is decided, and
+      // BlockStyle::fromCssStyle discards the book's value outright when the
+      // setting is not "Book's Style" -- which since 2026-08-23 it never is
+      // (CrossPointSettings::paragraphAlignment is a constexpr JUSTIFIED, so
+      // the honoring branch is dead code). Headings take a different path above
+      // and DO keep their CSS, so the note is raised here rather than beside
+      // fromCssStyle, where it would fire for elements that were never
+      // overridden.
+      if (cssStyle.hasTextAlign() && cssStyle.textAlign != elementStyle.alignment) {
+        booknotes::current().raise(booknotes::Note::AlignmentOverridden);
+      }
       const bool isListContainer = strcmp(name, "ul") == 0 || strcmp(name, "ol") == 0;
       const bool isListItem = strcmp(name, "li") == 0;
       std::string listMarker;

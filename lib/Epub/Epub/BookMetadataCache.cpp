@@ -1,5 +1,7 @@
 #include "BookMetadataCache.h"
 
+#include "Epub/BookNotes.h"
+
 #include <BufferedFile.h>
 #include <Logging.h>
 #include <Serialization.h>
@@ -429,6 +431,7 @@ void BookMetadataCache::createTocEntry(const std::string& title, const std::stri
 
     if (spineIndex == -1) {
       LOG_DBG("BMC", "createTocEntry: Could not find spine item for TOC href %s", href.c_str());
+      booknotes::current().raise(booknotes::Note::TocEntriesUnresolved);
     }
   } else {
     spineFile.seek(0);
@@ -441,6 +444,7 @@ void BookMetadataCache::createTocEntry(const std::string& title, const std::stri
     }
     if (spineIndex == -1) {
       LOG_DBG("BMC", "createTocEntry: Could not find spine item for TOC href %s", href.c_str());
+      booknotes::current().raise(booknotes::Note::TocEntriesUnresolved);
     }
   }
 

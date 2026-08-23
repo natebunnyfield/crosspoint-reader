@@ -5,6 +5,7 @@
 #include <Memory.h>
 #include <Serialization.h>
 
+#include "BookNotes.h"
 #include "Epub/css/CssParser.h"
 #include "Page.h"
 #include "hyphenation/Hyphenator.h"
@@ -89,7 +90,18 @@ namespace {
 //      v43 cache would keep the old ragged breaks for the life of the book.
 //      The spec's paragraphAlignment byte can no longer catch this: it is a
 //      compile-time constant now, identical in both eras' files.
-constexpr uint8_t SECTION_FILE_VERSION = 44;
+// v45: sparse ruby (2026-08-23, owner ruling; the deferred item 2 of
+//      docs/performance-indexing-2026-08-23.md). TextBlock stopped writing a
+//      writeString per WORD for its furigana -- 4 bytes of empty-string length
+//      for every word of every non-CJK book, 13% of a section file -- and
+//      writes one presence byte per block plus an index-prefixed entry for each
+//      word that actually carries an annotation (lib/Epub/Epub/blocks/
+//      RubySerialization.h). A STRUCTURAL change: a v44 file's ruby bytes decode
+//      as a presence byte and garbage, so the header check is the only thing
+//      standing between a stale cache and a mis-parsed page. Pagination is
+//      unchanged; the bump is the format, per the note below that a layout OR a
+//      structural change bumps this.
+constexpr uint8_t SECTION_FILE_VERSION = 45;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
@@ -750,6 +762,9 @@ bool Section::finalizeBuild() {
           static_cast<uint32_t>(build_->pageWriter ? build_->pageWriter->writeCalls() : 0));
 
   const bool committed = commitBuildFile(SECTION_FILE_VERSION, 0, 0);
+  // A finished chapter is the point at which everything the layout engine
+  // noticed about this book is known. Cheap: a no-op unless a note was raised.
+  booknotes::current().flush();
   if (build_->cssParser) build_->cssParser->clear();
   build_.reset();
   if (!committed) {

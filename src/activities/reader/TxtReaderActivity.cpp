@@ -24,11 +24,36 @@ namespace {
 constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
 // Cache file magic and version
 constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
-// Increment when cache format OR pagination changes. v4: the last line of a
-// page fits by its ink extent (ascender + descender) instead of the full
-// leaded line box (2026-08-22 layout exactness pass), so v3 page offsets no
-// longer match what renderPage shows.
-constexpr uint8_t CACHE_VERSION = 4;
+//
+// THE LADDER, in the style Section.cpp keeps one. This file had a single line
+// and no history, and that asymmetry is what let two invalidations be missed
+// (audit 2026-08-23): the header records fontId, but src/fontIds.h freezes
+// built-in ids BY DESIGN and SD ids are content-hashed, so **a change to what a
+// font MEASURES moves nothing this header compares**. The index is built by
+// wrapping through getTextAdvanceX, so a metrics change silently invalidates
+// every page offset while the header still matches.
+//
+// The symptom is not subtle when it lands: rendering re-wraps from the stored
+// offset, fits more text than the index assumed, and text REPEATS at the top of
+// every page turn while the page count overshoots into EOF.
+//
+//   v3 -> v4  2026-08-22  the last line of a page fits by its ink extent
+//                         (ascender + descender) rather than the full leaded
+//                         line box, so v3 offsets no longer match renderPage.
+//   v4 -> v5  2026-08-23  iA Writer Quattro's period and comma advances were
+//                         HALVED on 2026-08-22 (--narrow-punct, commit
+//                         35c931b97) and this version did not move. Quattro is
+//                         the editor face, which is the face this index
+//                         measures with. A released build never carried the
+//                         mismatch -- v4 landed 65 minutes earlier and the
+//                         alignment field in the header happened to differ
+//                         across the same window -- but the escape was luck,
+//                         not design, so the bump is taken now.
+//
+// RULE: bump this when the format changes, when pagination changes, OR when
+// anything a measured advance depends on changes. The last clause is the one
+// that was missing.
+constexpr uint8_t CACHE_VERSION = 5;
 }  // namespace
 
 void TxtReaderActivity::onEnter() {

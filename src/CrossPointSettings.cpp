@@ -377,6 +377,18 @@ int CrossPointSettings::getSmallestReaderFontId() const {
   // SD families: ask the resolver for the smallest point size the family has,
   // walking up only until something resolves. Built-ins: 12 is the floor of
   // BUILTIN_READER_POINT_SIZES and always registered.
+  //
+  // MEASURED 2026-08-23: for an SD family this loop returns on its FIRST
+  // iteration whatever size it asks for, because resolveFontId ignores
+  // pointSize -- the manager holds exactly one reader-size cut, by design and
+  // for RAM. So this returns the SAME id as getReaderFontId(), and the
+  // wide-table step-down it exists for does nothing for any SD family, which
+  // is every shipped configuration.
+  //
+  // Left as it is rather than quietly deleted: the built-in path below is real,
+  // and making the SD path work means holding a second cut in RAM on a device
+  // with 320 KB of it. That is a size-versus-feature call for the owner, not a
+  // cleanup. Recorded in docs/ so it is a decision rather than a mystery.
   if (sdFontFamilyName[0] != '\0' && sdFontIdResolver) {
     for (const uint8_t pt : BUILTIN_READER_POINT_SIZES) {
       const int id = sdFontIdResolver(sdFontResolverCtx, sdFontFamilyName, pt);

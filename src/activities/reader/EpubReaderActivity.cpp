@@ -1,5 +1,6 @@
 #include "EpubReaderActivity.h"
 
+#include <Epub/BookNotes.h>
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
 #include <FontCacheManager.h>
@@ -1043,6 +1044,11 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   }
 
   const ReaderRenderSpec renderSpec = SETTINGS.readerRenderSpec(viewportWidth, viewportHeight);
+  // A font, size, spacing or orientation change invalidates every layout-scope
+  // book note, for the same reason it invalidates the section cache. Costs one
+  // compare when nothing moved, which is every render but the first after a
+  // settings change.
+  booknotes::current().setLayoutFingerprint(renderSpec.layoutFingerprint());
 
   if (!section) {
     const auto filepath = epub->getSpineItem(currentSpineIndex).href;

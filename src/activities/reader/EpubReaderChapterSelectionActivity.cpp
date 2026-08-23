@@ -1,8 +1,12 @@
 #include "EpubReaderChapterSelectionActivity.h"
 
+#include <Epub/BookNotes.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 
+#include <cstdio>
+
+#include "BookNotesActivity.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -14,7 +18,7 @@ namespace {
 constexpr int kTickOverhang = 2;
 }  // namespace
 
-int EpubReaderChapterSelectionActivity::getTotalItems() const { return epub->getTocItemsCount(); }
+int EpubReaderChapterSelectionActivity::getTotalItems() const { return epub->getTocItemsCount() + noteRowCount; }
 
 void EpubReaderChapterSelectionActivity::onEnter() {
   Activity::onEnter();
@@ -23,10 +27,16 @@ void EpubReaderChapterSelectionActivity::onEnter() {
     return;
   }
 
+  // Latch the notes row before the selection is computed against it. Reading
+  // the accumulated set is a mask test -- nothing is parsed or measured here,
+  // which is the whole point of collecting these at parse time.
+  noteRowCount = booknotes::current().any() ? 1 : 0;
+
   selectorIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
   if (selectorIndex == -1) {
     selectorIndex = 0;
   }
+  selectorIndex += noteRowCount;
 
   // Trigger first update
   requestUpdate();
@@ -47,7 +57,15 @@ void EpubReaderChapterSelectionActivity::loop() {
   }
 
   auto selectChapter = [this] {
-    const auto tocItem = epub->getTocItem(selectorIndex);
+    if (noteRowCount != 0 && selectorIndex == 0) {
+      // The notes row. Push the verbose screen rather than leaving this one:
+      // Back from there comes straight back to the chapter list, with the
+      // highlight where it was.
+      startActivityForResult(std::make_unique<BookNotesActivity>(renderer, mappedInput),
+                             [](const ActivityResult&) {});
+      return;
+    }
+    const auto tocItem = epub->getTocItem(selectorIndex - noteRowCount);
     if (tocItem.spineIndex == -1) {
       ActivityResult result;
       result.isCancelled = true;
@@ -161,7 +179,10 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
   // fill uses: Epub::calculateProgress(spineIndex, 0.0f). Spine granularity —
   // an anchored TOC entry shares its spine's start fraction, the best figure
   // available here without paginating every chapter.
-  const auto selectedItem = epub->getTocItem(selectorIndex);
+  // The notes row previews nothing -- it is not a place in the book -- so the
+  // tick stays where the reader is.
+  const auto selectedItem = (noteRowCount != 0 && selectorIndex == 0) ? BookMetadataCache::TocEntry{}
+                                                                     : epub->getTocItem(selectorIndex - noteRowCount);
   if (selectedItem.spineIndex != -1) {
     float chapterFrac = epub->calculateProgress(selectedItem.spineIndex, 0.0f);
     chapterFrac = chapterFrac < 0.0f ? 0.0f : (chapterFrac > 1.0f ? 1.0f : chapterFrac);
@@ -183,7 +204,13 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
   const int totalItems = getTotalItems();
   GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, totalItems, selectorIndex,
                [this](int index) {
-                 auto item = epub->getTocItem(index);
+                 if (noteRowCount != 0 && index == 0) {
+                   char row[64];
+                   snprintf(row, sizeof(row), "%s (%u)", tr(STR_BOOK_NOTES),
+                            static_cast<unsigned>(booknotes::current().count()));
+                   return std::string(row);
+                 }
+                 auto item = epub->getTocItem(index - noteRowCount);
                  std::string indent((item.level - 1) * 2, ' ');
                  return indent + item.title;
                });

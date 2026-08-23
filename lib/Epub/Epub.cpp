@@ -9,6 +9,7 @@
 #include <Utf8.h>
 #include <ZipFile.h>
 
+#include "Epub/BookNotes.h"
 #include "Epub/parsers/ContainerParser.h"
 #include "Epub/parsers/ContentOpfParser.h"
 #include "Epub/parsers/TocNavParser.h"
@@ -220,6 +221,37 @@ bool Epub::parseTocNavFile() const {
   return true;
 }
 
+void Epub::scanZipForBookNotes() const {
+  // Two facts about a book live in its zip directory and nowhere else, and both
+  // are silent today. One pass, folded into the indexing that already opens the
+  // central directory -- worth about a millisecond, and the result is persisted
+  // so a warm open pays nothing.
+  bool sawEncryption = false;
+  bool sawFont = false;
+  ZipFile(filepath).enumerateFilePaths([&](std::string_view path) {
+    if (!sawEncryption && path == "META-INF/encryption.xml") {
+      sawEncryption = true;
+    }
+    if (!sawFont &&
+        (FsHelpers::checkFileExtension(path, ".ttf") || FsHelpers::checkFileExtension(path, ".otf") ||
+         FsHelpers::checkFileExtension(path, ".woff") || FsHelpers::checkFileExtension(path, ".woff2"))) {
+      sawFont = true;
+    }
+  });
+  if (sawEncryption) {
+    // encryption.xml means either DRM or font obfuscation, and this firmware
+    // reads neither: it opens the book as if the bytes were plaintext, so the
+    // failure arrives later, as a chapter that will not parse.
+    booknotes::current().raise(booknotes::Note::Drm);
+  }
+  if (sawFont) {
+    // There is no @font-face path at all -- the CSS engine skips every at-rule
+    // body and no font file in a book has ever been loaded. The publisher chose
+    // a face; the reader is getting the device's.
+    booknotes::current().raise(booknotes::Note::EmbeddedFontsIgnored);
+  }
+}
+
 void Epub::discoverCssFilesFromZip() {
   const std::string& opfDir = contentBasePath;
   ZipFile zf(filepath);
@@ -424,6 +456,10 @@ void Epub::parseCssFiles() const {
 bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
   LOG_DBG("EBP", "Loading ePub: %s", filepath.c_str());
 
+  // Before anything can raise one. openBook() clears first, so the previous
+  // book's notes can never be shown against this one.
+  booknotes::current().openBook(cachePath);
+
   // Initialize spine/TOC cache
   bookMetadataCache = makeUniqueNoThrow<BookMetadataCache>(cachePath);
   if (!bookMetadataCache) {
@@ -472,6 +508,9 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
     // resident pins tens of KB for the whole reading session (more on warm resume into
     // an already-cached chapter, where createSectionFile never runs to clear it).
     cssParser->clear();
+    // Persist whatever a CSS re-parse raised on this path. A no-op when nothing
+    // changed, which is the ordinary warm open.
+    booknotes::current().flush();
     LOG_DBG("EBP", "Loaded ePub: %s", filepath.c_str());
     return true;
   }
@@ -505,6 +544,7 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
     return false;
   }
   discoverCssFilesFromZip();
+  scanZipForBookNotes();
   if (!bookMetadataCache->endContentOpfPass()) {
     LOG_ERR("EBP", "Could not end writing content.opf pass");
     return false;
@@ -534,7 +574,9 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
 
   if (!tocParsed) {
     LOG_ERR("EBP", "Warning: Could not parse any TOC format");
-    // Continue anyway - book will work without TOC
+    // Continue anyway - book will work without TOC. The reader meets this as an
+    // empty Select Chapter screen, which is exactly where the note goes.
+    booknotes::current().raise(booknotes::Note::NoTableOfContents);
   }
 
   if (!bookMetadataCache->endTocPass()) {
@@ -580,6 +622,7 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
     return false;
   }
 
+  booknotes::current().flush();
   LOG_DBG("EBP", "Loaded ePub: %s", filepath.c_str());
   return true;
 }

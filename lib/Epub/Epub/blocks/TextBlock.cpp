@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "../../../../src/fontIds.h"
+#include "RubySerialization.h"
 
 size_t TextBlock::arenaSize(const uint16_t wordCount, const bool hasFocus, const uint16_t textBytes) {
   // Layout documented in TextBlock.h: 16-bit arrays first, then 8-bit arrays, then text.
@@ -119,12 +120,9 @@ TextBlock::TextBlock(const std::vector<std::string>& words, const std::vector<in
   }
 }
 
-bool TextBlock::hasRuby() const {
-  for (const auto& rt : rubyTexts) {
-    if (!rt.empty()) return true;
-  }
-  return false;
-}
+// Shared with the serializer's presence flag so the two can't disagree about
+// what "this block has ruby" means.
+bool TextBlock::hasRuby() const { return rubyserial::hasAnnotations(rubyTexts); }
 
 void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int x, const int y) const {
   if (!isValid) {
@@ -369,10 +367,10 @@ bool TextBlock::serialize(serialization::BufferedFileWriter& out) const {
     out.write(arena.get(), size);
   }
 
-  // Ruby text data
-  for (size_t i = 0; i < numWords; i++) {
-    serialization::writeString(out, (i < rubyTexts.size()) ? rubyTexts[i] : std::string());
-  }
+  // Ruby text data: one presence byte for a block with no furigana, then only
+  // the words that carry one. See RubySerialization.h for why this stopped
+  // being a string per word.
+  rubyserial::write(out, rubyTexts, numWords);
 
   // Style (alignment + margins/padding/indent)
   serialization::writePod(out, blockStyle.alignment);
@@ -455,24 +453,14 @@ std::unique_ptr<TextBlock> TextBlock::deserialize(HalFile& file) {
     }
   }
 
-  // Ruby text data. Ruby is a CJK feature, so for nearly every book every entry here
-  // is the empty string. Materializing the vector regardless costs wordCount * 24 bytes
-  // (sizeof(std::string)) plus a heap block per line, held for as long as the page is
-  // resident -- several KB of DRAM on a full page, none of it ever read. An empty
-  // rubyTexts is already the "no ruby" representation: hasRuby() reports false and every
-  // other reader is guarded by `i < rubyTexts.size()`, so allocate lazily and only once a
-  // non-empty annotation actually shows up.
-  //
-  // `scratch` is reused across words: readString() resizes it to the incoming length and
-  // overwrites every byte, so a moved-from value carries nothing into the next iteration.
-  std::string scratch;
-  for (uint16_t i = 0; i < wc; i++) {
-    serialization::readString(file, scratch);
-    if (scratch.empty()) continue;
-    if (block->rubyTexts.empty()) {
-      block->rubyTexts.resize(wc);
-    }
-    block->rubyTexts[i] = std::move(scratch);
+  // Ruby text data. Still allocated lazily -- rubyserial::read leaves the vector empty
+  // for a block with no annotation, because materializing wordCount std::strings costs
+  // 24 bytes each plus a heap block per line, held for as long as the page is resident,
+  // and an empty rubyTexts is already the "no ruby" representation (hasRuby() reports
+  // false and every other reader is guarded by `i < rubyTexts.size()`).
+  if (!rubyserial::read(file, wc, block->rubyTexts)) {
+    LOG_ERR("TXB", "Deserialization failed: corrupt ruby record");
+    return nullptr;
   }
 
   // Style (alignment + margins/padding/indent)
