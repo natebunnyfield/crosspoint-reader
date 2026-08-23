@@ -38,6 +38,7 @@ class BufferedFileWriter {
       flushBuffer();
     }
     if (len >= cap) {  // also the cap == 0 passthrough
+      calls++;
       okFlag &= file.write(p, len) == len;
       return;
     }
@@ -50,6 +51,12 @@ class BufferedFileWriter {
   // Logical write position (bytes written since the file was opened).
   size_t position() const { return pos; }
 
+  // Underlying HalFile::write calls issued so far. This is the number that
+  // decides the cost on real hardware -- each one is a mutex plus an SdFat
+  // transaction against a single shared 512-byte sector cache -- while the byte
+  // count is not. Reported by the section build; free when nobody asks.
+  size_t writeCalls() const { return calls; }
+
   // Flush buffered bytes; returns false if any write so far has failed short.
   bool flush() {
     flushBuffer();
@@ -59,6 +66,7 @@ class BufferedFileWriter {
  private:
   void flushBuffer() {
     if (fill == 0) return;
+    calls++;
     okFlag &= file.write(buf.get(), fill) == fill;
     fill = 0;
   }
@@ -68,6 +76,7 @@ class BufferedFileWriter {
   const size_t cap;
   size_t fill = 0;
   size_t pos;
+  size_t calls = 0;
   bool okFlag = true;
 };
 

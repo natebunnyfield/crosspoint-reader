@@ -148,7 +148,12 @@ void SdCardFont::resetStyleMiniData(PerStyle& s) {
   // of page N+1 serve the actual page turn with zero SD reads.
 }
 
+// Defined below, next to the mini-kern builder that is its other caller.
+static uint8_t miniLookupKernClass(const EpdKernClassEntry* entries, uint16_t count, uint32_t cp);
+
 void SdCardFont::freeStyleKernLigatureData(PerStyle& s) {
+  delete[] s.kernClassAscii;
+  s.kernClassAscii = nullptr;
   delete[] s.kernLeftClasses;
   s.kernLeftClasses = nullptr;
   delete[] s.kernRightClasses;
@@ -297,6 +302,16 @@ bool SdCardFont::loadStyleKernLigatureData(PerStyle& s) {
       LOG_ERR("SDCF", "Failed to read kern classes");
       freeStyleKernLigatureData(s);
       return false;
+    }
+
+    // ASCII shortcut for getMeasureKern (see SdCardFont.h). Failing to allocate
+    // it is not an error: the lookups fall back to the binary search.
+    s.kernClassAscii = new (std::nothrow) uint8_t[256];
+    if (s.kernClassAscii) {
+      for (uint32_t cp = 0; cp < 128; cp++) {
+        s.kernClassAscii[cp] = miniLookupKernClass(s.kernLeftClasses, s.header.kernLeftEntryCount, cp);
+        s.kernClassAscii[128 + cp] = miniLookupKernClass(s.kernRightClasses, s.header.kernRightEntryCount, cp);
+      }
     }
   }
 
@@ -632,9 +647,13 @@ int8_t SdCardFont::getMeasureKern(const uint32_t leftCp, const uint32_t rightCp,
   styleIdx &= (MAX_STYLES - 1);
   const PerStyle& s = styles_[styleIdx];
   if (!s.present || s.measureKernRowCount == 0 || !s.kernLeftClasses || !s.kernRightClasses) return 0;
-  const uint8_t lc = miniLookupKernClass(s.kernLeftClasses, s.header.kernLeftEntryCount, leftCp);
+  const uint8_t lc = (s.kernClassAscii && leftCp < 128)
+                         ? s.kernClassAscii[leftCp]
+                         : miniLookupKernClass(s.kernLeftClasses, s.header.kernLeftEntryCount, leftCp);
   if (lc == 0) return 0;
-  const uint8_t rc = miniLookupKernClass(s.kernRightClasses, s.header.kernRightEntryCount, rightCp);
+  const uint8_t rc = (s.kernClassAscii && rightCp < 128)
+                         ? s.kernClassAscii[128 + rightCp]
+                         : miniLookupKernClass(s.kernRightClasses, s.header.kernRightEntryCount, rightCp);
   if (rc == 0) return 0;
   // Binary search the sorted row-class array.
   uint16_t lo = 0, hi = s.measureKernRowCount;

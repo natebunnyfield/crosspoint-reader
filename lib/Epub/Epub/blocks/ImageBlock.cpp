@@ -428,11 +428,11 @@ void ImageBlock::render(GfxRenderer& renderer, const int x, const int y) {
   LOG_DBG("IMG", "Decode successful");
 }
 
-bool ImageBlock::serialize(HalFile& file) {
-  serialization::writeString(file, imagePath);
-  serialization::writeString(file, srcPath);
-  serialization::writePod(file, width);
-  serialization::writePod(file, height);
+bool ImageBlock::serialize(serialization::BufferedFileWriter& out) {
+  serialization::writeString(out, imagePath);
+  serialization::writeString(out, srcPath);
+  serialization::writePod(out, width);
+  serialization::writePod(out, height);
   return true;
 }
 

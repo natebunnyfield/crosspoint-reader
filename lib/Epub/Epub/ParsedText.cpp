@@ -37,6 +37,25 @@ bool mayContainRtlBytes(const char* str) {
   return false;
 }
 
+// Byte-level pre-check for the CJK break scan below. The lowest breakable
+// codepoint is U+1100 (Hangul Jamo), whose UTF-8 lead byte is 0xE1; every
+// 2-byte sequence and every continuation byte is below that, so a word with no
+// byte >= 0xE1 provably contains nothing utf8IsCjkBreakable() answers true for.
+// It is a NECESSARY condition, not a sufficient one -- Ethiopic still gets the
+// full scan and still comes back empty.
+//
+// This runs on every word of every book. The scan it skips allocates a vector
+// sized to the word, decodes the word, and asks ESP.getMaxAllocHeap() first --
+// and that last one is a free-list walk under the heap lock on the device while
+// being a constant in the simulator, so the saving is invisible to a host
+// profile and real on hardware.
+bool mayContainCjkBreakableBytes(const char* str) {
+  for (const auto* p = reinterpret_cast<const unsigned char*>(str); *p; ++p) {
+    if (*p >= 0xE1) return true;
+  }
+  return false;
+}
+
 // Returns the first rendered codepoint of a word (skipping leading soft hyphens).
 uint32_t firstCodepoint(const std::string& word) {
   const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str());
@@ -149,6 +168,8 @@ bool isNoBreakAfterCjkPunctuation(const uint32_t cp) {
 }
 
 bool containsCjkBreakableCodepoint(const std::string& text) {
+  if (!mayContainCjkBreakableBytes(text.c_str())) return false;
+
   const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
   while (*ptr) {
     const uint32_t cp = utf8NextCodepoint(&ptr);
@@ -167,6 +188,8 @@ bool hasCjkBreakOpportunityBetween(const uint32_t leftCp, const uint32_t rightCp
 }
 
 std::vector<size_t> cjkCharacterBreakByteOffsets(const std::string& text) {
+  if (!mayContainCjkBreakableBytes(text.c_str())) return {};
+
   struct CodepointBoundary {
     uint32_t cp;
     size_t endOffset;

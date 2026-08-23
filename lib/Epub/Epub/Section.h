@@ -1,4 +1,6 @@
 #pragma once
+#include <BufferedFile.h>
+
 #include <functional>
 #include <memory>
 #include <optional>
@@ -39,6 +41,13 @@ class Section {
   // and the in-RAM page-offset table.
   struct BuildContext {
     std::unique_ptr<ChapterHtmlSlimParser> parser;
+    // Every page is written through this, never straight to `file`. A page is
+    // ~600 pods and arena chunks; unbuffered that was ~600 HalFile calls per
+    // page, which measured as 85% of the whole pagination build on the host.
+    // Anything that touches `file` directly while a build is live (a seek to
+    // re-read a built page, the commit) must flush() first -- the wrapper
+    // tracks the write cursor itself and a foreign seek would desynchronize it.
+    std::unique_ptr<serialization::BufferedFileWriter> pageWriter;
     std::vector<PageLutEntry> lut;
     std::string parsePath;
     std::string contentBase;

@@ -191,6 +191,18 @@ class SdCardFont {
     EpdLigaturePair* ligaturePairs = nullptr;
     bool kernLigLoaded = false;
 
+    // Direct-mapped left/right class for U+0000-U+007F: 128 left bytes then 128
+    // right bytes, filled from the two tables above the moment they load.
+    // getMeasureKern runs a binary search of each table for EVERY adjacent
+    // character pair the layout measures -- ~2.5M pairs on a novel, and 28% of
+    // the pagination build's CPU once the page writes were buffered. ASCII is
+    // what an English book is made of, so the shortcut covers nearly all of it;
+    // anything above U+007F still takes the search. Heap-allocated (256 B per
+    // style, freed with the class tables) rather than inline, so a font that
+    // carries no kern data costs a pointer. nullptr = fall through to the
+    // search, which is also the allocation-failure path.
+    uint8_t* kernClassAscii = nullptr;
+
     // Measure-time kern rows (2026-08-22, punctuation-kerning audit P0): full
     // kern-matrix ROWS (kernRightClassCount bytes each) for the LEFT classes
     // the advance-table codepoints reach, loaded by loadMeasureKernRows on the

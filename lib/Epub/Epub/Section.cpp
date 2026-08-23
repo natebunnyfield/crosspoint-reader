@@ -107,6 +107,9 @@ constexpr uint8_t SECTION_FILE_INCOMPLETE_VERSION = 0;
 // only fails (noisily, via the block-decode error path) when a page is loaded.
 // Derived so the pairing can't be forgotten: 0xFE for v28, 0xFD for v29, ...
 constexpr uint8_t SECTION_FILE_PARTIAL_VERSION = 0xFE - (SECTION_FILE_VERSION - 28);
+// Write buffer for the page stream (see BuildContext::pageWriter).
+constexpr size_t PAGE_WRITE_BUFFER_SIZE = 1024;
+
 constexpr uint32_t HEADER_SIZE = sizeof(uint8_t) + sizeof(int) + sizeof(float) + sizeof(bool) + sizeof(uint8_t) +
                                  sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(bool) + sizeof(bool) +
                                  sizeof(uint8_t) + sizeof(bool) + sizeof(bool) + sizeof(uint32_t) + sizeof(uint32_t) +
@@ -127,13 +130,16 @@ Section::Section(const std::shared_ptr<Epub>& epub, const int spineIndex, GfxRen
 Section::~Section() { suspendBuild(); }
 
 uint32_t Section::onPageComplete(std::unique_ptr<Page> page) {
-  if (!file) {
+  if (!file || !build_ || !build_->pageWriter) {
     LOG_ERR("SCT", "File not open for writing page %d", builtPageCount_);
     return 0;
   }
 
-  const uint32_t position = file.position();
-  if (!page->serialize(file)) {
+  // Logical position, not file.position(): bytes still sitting in the writer's
+  // buffer have not reached the file yet, so the LUT would point at the page
+  // before this one.
+  const uint32_t position = build_->pageWriter->position();
+  if (!page->serialize(*build_->pageWriter)) {
     LOG_ERR("SCT", "Failed to serialize page %d", builtPageCount_);
     return 0;
   }
@@ -409,6 +415,19 @@ bool Section::startBuild(const ReaderRenderSpec& spec, const std::function<void(
   }
   // htmlCached == "htmlPath is the live cache" (reused, or just promoted). finalizeBuild/abandonBuild
   // then leave the cached HTML alone; only an un-promoted temp (rename failed) is theirs to clean up.
+  // Constructed here, after the header write, so its logical cursor starts at
+  // HEADER_SIZE. 1 KB rather than BookMetadataCache's 4 KB: this one is held for
+  // the whole build (which can run for minutes on a giant spine) instead of a
+  // single streaming pass, and a page is a few KB, so 1 KB already collapses the
+  // per-page call count from ~600 to a handful.
+  ctx->pageWriter = makeUniqueNoThrow<serialization::BufferedFileWriter>(file, PAGE_WRITE_BUFFER_SIZE);
+  if (!ctx->pageWriter) {
+    LOG_ERR("SCT", "OOM: page writer");
+    file.close();
+    Storage.remove(binTmpPath().c_str());
+    if (!reusedHtml) Storage.remove(tmpHtmlPath.c_str());
+    return false;
+  }
   ctx->reusedHtml = htmlCached;
   ctx->htmlPath = htmlPath;
   ctx->tmpHtmlPath = tmpHtmlPath;
@@ -607,50 +626,80 @@ bool Section::commitBuildFile(const uint8_t version, const uint32_t bytesConsume
     return false;
   };
 
-  const uint32_t lutOffset = file.position();
-  for (const auto& entry : build_->lut) {
-    if (entry.fileOffset == 0) {
-      LOG_ERR("SCT", "Failed to write LUT due to invalid page positions");
-      return failCommit();
+  // The page stream is buffered (BuildContext::pageWriter); its tail must reach
+  // the file before the tables that follow it are positioned.
+  if (build_->pageWriter && !build_->pageWriter->flush()) {
+    LOG_ERR("SCT", "Short write flushing the page stream");
+    return failCommit();
+  }
+
+  // Four parallel tables, one entry per page each: unbuffered that is 4 pods per
+  // page (23,000 HalFile calls on a 5,800-page spine) for ~50 KB of data.
+  uint32_t lutOffset;
+  uint32_t anchorMapOffset;
+  uint32_t paragraphLutOffset;
+  uint32_t liLutFileOffset;
+  uint32_t wordLutFileOffset;
+  // Set instead of returning from inside the writer's scope: failCommit() closes
+  // the file, and the writer's destructor would then flush into a closed handle.
+  bool tablesOk = true;
+  {
+    serialization::BufferedFileWriter tables(file, PAGE_WRITE_BUFFER_SIZE);
+    lutOffset = tables.position();
+    for (const auto& entry : build_->lut) {
+      if (entry.fileOffset == 0) {
+        LOG_ERR("SCT", "Failed to write LUT due to invalid page positions");
+        tablesOk = false;
+        break;
+      }
+      serialization::writePod(tables, entry.fileOffset);
     }
-    serialization::writePod(file, entry.fileOffset);
-  }
 
-  // Write anchor-to-page map for fragment navigation (e.g. footnote targets). For a
-  // partial, skip anchors that landed on the incomplete trailing page the suspend drops.
-  const uint32_t anchorMapOffset = file.position();
-  const auto& anchors = build_->parser->getAnchors();
-  uint16_t anchorCount = 0;
-  for (const auto& [anchor, page] : anchors) {
-    if (!asPartial || page < builtPageCount_) anchorCount++;
-  }
-  serialization::writePod(file, anchorCount);
-  for (const auto& [anchor, page] : anchors) {
-    if (asPartial && page >= builtPageCount_) continue;
-    serialization::writeString(file, anchor);
-    serialization::writePod(file, page);
-  }
+    // Write anchor-to-page map for fragment navigation (e.g. footnote targets). For a
+    // partial, skip anchors that landed on the incomplete trailing page the suspend drops.
+    anchorMapOffset = tables.position();
+    const auto& anchors = build_->parser->getAnchors();
+    uint16_t anchorCount = 0;
+    for (const auto& [anchor, page] : anchors) {
+      if (!asPartial || page < builtPageCount_) anchorCount++;
+    }
+    serialization::writePod(tables, anchorCount);
+    for (const auto& [anchor, page] : anchors) {
+      if (asPartial && page >= builtPageCount_) continue;
+      serialization::writeString(tables, anchor);
+      serialization::writePod(tables, page);
+    }
 
-  const uint32_t paragraphLutOffset = file.position();
-  serialization::writePod(file, static_cast<uint16_t>(build_->lut.size()));
-  for (const auto& entry : build_->lut) {
-    serialization::writePod(file, entry.paragraphIndex);
-  }
+    paragraphLutOffset = tables.position();
+    serialization::writePod(tables, static_cast<uint16_t>(build_->lut.size()));
+    for (const auto& entry : build_->lut) {
+      serialization::writePod(tables, entry.paragraphIndex);
+    }
 
-  const uint32_t liLutFileOffset = static_cast<uint32_t>(file.position());
-  for (const auto& entry : build_->lut) {
-    serialization::writePod(file, entry.listItemIndex);
-  }
+    liLutFileOffset = static_cast<uint32_t>(tables.position());
+    for (const auto& entry : build_->lut) {
+      serialization::writePod(tables, entry.listItemIndex);
+    }
 
-  const uint32_t wordLutFileOffset = static_cast<uint32_t>(file.position());
-  for (const auto& entry : build_->lut) {
-    serialization::writePod(file, entry.wordAnchor);
-  }
+    wordLutFileOffset = static_cast<uint32_t>(tables.position());
+    for (const auto& entry : build_->lut) {
+      serialization::writePod(tables, entry.wordAnchor);
+    }
 
-  if (asPartial) {
-    // Watermark trailer, located on load as wordLutOffset + pageCount * sizeof(uint32_t).
-    serialization::writePod(file, bytesConsumed);
-    serialization::writePod(file, totalBytes);
+    if (asPartial) {
+      // Watermark trailer, located on load as wordLutOffset + pageCount * sizeof(uint32_t).
+      serialization::writePod(tables, bytesConsumed);
+      serialization::writePod(tables, totalBytes);
+    }
+
+    // Must land before the header patch below seeks backwards.
+    if (!tables.flush()) {
+      LOG_ERR("SCT", "Short write flushing the section tables");
+      tablesOk = false;
+    }
+  }
+  if (!tablesOk) {
+    return failCommit();
   }
 
   // Patch header with the built page count and section offsets...
@@ -693,6 +742,12 @@ bool Section::finalizeBuild() {
       Storage.remove(build_->tmpHtmlPath.c_str());
     }
   }
+
+  // Storage-call count, not byte count: the cost of this path on the device is
+  // one SdFat transaction per call against a single shared sector cache, so this
+  // is the figure that says whether the page stream is streaming or thrashing.
+  LOG_DBG("SCT", "Build wrote %u pages in %u storage writes", builtPageCount_,
+          static_cast<uint32_t>(build_->pageWriter ? build_->pageWriter->writeCalls() : 0));
 
   const bool committed = commitBuildFile(SECTION_FILE_VERSION, 0, 0);
   if (build_->cssParser) build_->cssParser->clear();
@@ -784,8 +839,12 @@ std::unique_ptr<Page> Section::loadPageDuringBuild(const int page) {
   if (pos == 0) {
     return nullptr;
   }
-  // The .bin is open O_RDWR for the build. Read the already-written page, then restore
-  // the write cursor so the next onPageComplete keeps appending where it left off.
+  // The .bin is open O_RDWR for the build. Flush first -- the page may still be
+  // in the writer's buffer, and the seek below would otherwise leave the writer
+  // appending at the read position.
+  if (build_->pageWriter) build_->pageWriter->flush();
+  // Read the already-written page, then restore the write cursor so the next
+  // onPageComplete keeps appending where it left off.
   const uint32_t writePos = file.position();
   file.seek(pos);
   auto p = Page::deserialize(file);

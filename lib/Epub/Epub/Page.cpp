@@ -24,12 +24,12 @@ void PageLine::render(GfxRenderer& renderer, const int fontId, const int xOffset
   block->render(renderer, fontId, xPos + xOffset, yPos + yOffset);
 }
 
-bool PageLine::serialize(HalFile& file) {
-  serialization::writePod(file, xPos);
-  serialization::writePod(file, yPos);
+bool PageLine::serialize(serialization::BufferedFileWriter& out) {
+  serialization::writePod(out, xPos);
+  serialization::writePod(out, yPos);
 
   // serialize TextBlock pointed to by PageLine
-  return block->serialize(file);
+  return block->serialize(out);
 }
 
 std::unique_ptr<PageLine> PageLine::deserialize(HalFile& file) {
@@ -61,12 +61,12 @@ void PageImage::renderPlaceholder(GfxRenderer& renderer, const int xOffset, cons
   imageBlock->renderPlaceholder(renderer, xPos + xOffset, yPos + yOffset);
 }
 
-bool PageImage::serialize(HalFile& file) {
-  serialization::writePod(file, xPos);
-  serialization::writePod(file, yPos);
+bool PageImage::serialize(serialization::BufferedFileWriter& out) {
+  serialization::writePod(out, xPos);
+  serialization::writePod(out, yPos);
 
   // serialize ImageBlock
-  return imageBlock->serialize(file);
+  return imageBlock->serialize(out);
 }
 
 std::unique_ptr<PageImage> PageImage::deserialize(HalFile& file) {
@@ -91,13 +91,13 @@ void PageRotatedText::render(GfxRenderer& renderer, const int pageFontId, const 
                                 bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 }
 
-bool PageRotatedText::serialize(HalFile& file) {
-  serialization::writePod(file, xPos);
-  serialization::writePod(file, yPos);
+bool PageRotatedText::serialize(serialization::BufferedFileWriter& out) {
+  serialization::writePod(out, xPos);
+  serialization::writePod(out, yPos);
   const uint8_t boldByte = bold ? 1 : 0;
-  serialization::writePod(file, boldByte);
-  serialization::writePod(file, fontId);
-  serialization::writeString(file, text);
+  serialization::writePod(out, boldByte);
+  serialization::writePod(out, fontId);
+  serialization::writeString(out, text);
   return true;
 }
 
@@ -130,11 +130,11 @@ void PageVerticalRule::render(GfxRenderer& renderer, const int fontId, const int
   renderer.drawLine(xPos + xOffset, yPos + yOffset, xPos + xOffset, yPos + yOffset + length - 1, thickness, true);
 }
 
-bool PageVerticalRule::serialize(HalFile& file) {
-  serialization::writePod(file, xPos);
-  serialization::writePod(file, yPos);
-  serialization::writePod(file, length);
-  serialization::writePod(file, thickness);
+bool PageVerticalRule::serialize(serialization::BufferedFileWriter& out) {
+  serialization::writePod(out, xPos);
+  serialization::writePod(out, yPos);
+  serialization::writePod(out, length);
+  serialization::writePod(out, thickness);
   return true;
 }
 
@@ -168,11 +168,11 @@ void PageHorizontalRule::render(GfxRenderer& renderer, const int fontId, const i
   renderer.drawLine(xPos + xOffset, yPos + yOffset, xPos + xOffset + width - 1, yPos + yOffset, thickness, true);
 }
 
-bool PageHorizontalRule::serialize(HalFile& file) {
-  serialization::writePod(file, xPos);
-  serialization::writePod(file, yPos);
-  serialization::writePod(file, width);
-  serialization::writePod(file, thickness);
+bool PageHorizontalRule::serialize(serialization::BufferedFileWriter& out) {
+  serialization::writePod(out, xPos);
+  serialization::writePod(out, yPos);
+  serialization::writePod(out, width);
+  serialization::writePod(out, thickness);
   return true;
 }
 
@@ -220,31 +220,30 @@ void Page::renderWithImagePlaceholders(GfxRenderer& renderer, const int fontId, 
   }
 }
 
-bool Page::serialize(HalFile& file) const {
+bool Page::serialize(serialization::BufferedFileWriter& out) const {
   const uint16_t count = elements.size();
-  serialization::writePod(file, count);
+  serialization::writePod(out, count);
 
   for (const auto& el : elements) {
     // Use getTag() method to determine type
-    serialization::writePod(file, static_cast<uint8_t>(el->getTag()));
+    serialization::writePod(out, static_cast<uint8_t>(el->getTag()));
 
-    if (!el->serialize(file)) {
+    if (!el->serialize(out)) {
       return false;
     }
   }
 
   // Serialize footnotes (clamp to MAX_FOOTNOTES_PER_PAGE to match addFootnote/deserialize limits)
   const uint16_t fnCount = std::min<uint16_t>(footnotes.size(), MAX_FOOTNOTES_PER_PAGE);
-  serialization::writePod(file, fnCount);
+  serialization::writePod(out, fnCount);
   for (uint16_t i = 0; i < fnCount; i++) {
     const auto& fn = footnotes[i];
-    if (file.write(fn.number, sizeof(fn.number)) != sizeof(fn.number) ||
-        file.write(fn.href, sizeof(fn.href)) != sizeof(fn.href)) {
-      LOG_ERR("PGE", "Failed to write footnote");
-      return false;
-    }
+    out.write(fn.number, sizeof(fn.number));
+    out.write(fn.href, sizeof(fn.href));
   }
 
+  // The writer reports a short write through flush(), which the caller checks
+  // once per build rather than per field -- that is the point of buffering.
   return true;
 }
 

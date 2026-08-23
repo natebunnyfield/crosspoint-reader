@@ -1,4 +1,5 @@
 #pragma once
+#include <BufferedFile.h>
 #include <EpdFontFamily.h>
 #include <HalStorage.h>
 
@@ -93,6 +94,6 @@ class TextBlock final : public Block {
 
   void render(const GfxRenderer& renderer, int fontId, int x, int y) const;
   BlockType getType() override { return TEXT_BLOCK; }
-  bool serialize(HalFile& file) const;
+  bool serialize(serialization::BufferedFileWriter& out) const;
   static std::unique_ptr<TextBlock> deserialize(HalFile& file);
 };

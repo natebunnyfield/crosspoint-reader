@@ -352,7 +352,7 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
   flushDecorations();
 }
 
-bool TextBlock::serialize(HalFile& file) const {
+bool TextBlock::serialize(serialization::BufferedFileWriter& out) const {
   if (!isValid) {
     LOG_ERR("TXB", "Serialization failed: invalid block");
     return false;
@@ -361,37 +361,34 @@ bool TextBlock::serialize(HalFile& file) const {
   // Word data: scalars, then the arena verbatim -- its in-memory layout is
   // exactly the on-disk layout (see TextBlock.h), so one write covers all
   // per-word arrays and the text blob.
-  serialization::writePod(file, numWords);
-  serialization::writePod(file, static_cast<uint8_t>(focusPresent ? 1 : 0));
-  serialization::writePod(file, textBytes);
+  serialization::writePod(out, numWords);
+  serialization::writePod(out, static_cast<uint8_t>(focusPresent ? 1 : 0));
+  serialization::writePod(out, textBytes);
   if (numWords > 0) {
     const size_t size = arenaSize(numWords, focusPresent, textBytes);
-    if (file.write(arena.get(), size) != size) {
-      LOG_ERR("TXB", "Serialization failed: arena write (%u bytes)", static_cast<uint32_t>(size));
-      return false;
-    }
+    out.write(arena.get(), size);
   }
 
   // Ruby text data
   for (size_t i = 0; i < numWords; i++) {
-    serialization::writeString(file, (i < rubyTexts.size()) ? rubyTexts[i] : std::string());
+    serialization::writeString(out, (i < rubyTexts.size()) ? rubyTexts[i] : std::string());
   }
 
   // Style (alignment + margins/padding/indent)
-  serialization::writePod(file, blockStyle.alignment);
-  serialization::writePod(file, blockStyle.textAlignDefined);
-  serialization::writePod(file, blockStyle.marginTop);
-  serialization::writePod(file, blockStyle.marginBottom);
-  serialization::writePod(file, blockStyle.marginLeft);
-  serialization::writePod(file, blockStyle.marginRight);
-  serialization::writePod(file, blockStyle.paddingTop);
-  serialization::writePod(file, blockStyle.paddingBottom);
-  serialization::writePod(file, blockStyle.paddingLeft);
-  serialization::writePod(file, blockStyle.paddingRight);
-  serialization::writePod(file, blockStyle.textIndent);
-  serialization::writePod(file, blockStyle.textIndentDefined);
-  serialization::writePod(file, blockStyle.isRtl);
-  serialization::writePod(file, blockStyle.directionDefined);
+  serialization::writePod(out, blockStyle.alignment);
+  serialization::writePod(out, blockStyle.textAlignDefined);
+  serialization::writePod(out, blockStyle.marginTop);
+  serialization::writePod(out, blockStyle.marginBottom);
+  serialization::writePod(out, blockStyle.marginLeft);
+  serialization::writePod(out, blockStyle.marginRight);
+  serialization::writePod(out, blockStyle.paddingTop);
+  serialization::writePod(out, blockStyle.paddingBottom);
+  serialization::writePod(out, blockStyle.paddingLeft);
+  serialization::writePod(out, blockStyle.paddingRight);
+  serialization::writePod(out, blockStyle.textIndent);
+  serialization::writePod(out, blockStyle.textIndentDefined);
+  serialization::writePod(out, blockStyle.isRtl);
+  serialization::writePod(out, blockStyle.directionDefined);
 
   return true;
 }
