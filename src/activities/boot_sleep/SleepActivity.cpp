@@ -65,23 +65,27 @@ void SleepActivity::onEnter() {
         return renderCustomSleepScreen();
       }
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR):
-    // The week-count variants were withdrawn 2026-08-21 ("keep calendar and
-    // westside calendar"); normalizeRetiredSettings remaps stale saves, and
-    // these cases fold onto the classic screen so a value that slips through
-    // anyway still draws something sensible rather than the default logo.
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR):
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE):
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX):
-      // The classic style keeps its original five-week look.
-      return renderCalendarSleepScreen(5);
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE):
-      return renderCalendarSleepScreen(5, calendar::Style::WestsideEN);
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_DARK):
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK): {
+      // Style and polarity both decode from the persisted value; the map (and
+      // the fold of the withdrawn week-count variants onto the classic screen)
+      // lives in sleepscreen::calendarPlanFor so a wrong entry fails a test
+      // rather than a sleeping panel. The classic style keeps its original
+      // five-week look.
+      const sleepscreen::CalendarPlan plan = sleepscreen::calendarPlanFor(SETTINGS.sleepScreen);
+      return renderCalendarSleepScreen(5, plan.style, plan.dark);
+    }
     default:
       return renderDefaultSleepScreen();
   }
 }
 
-void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks, const calendar::Style style) const {
+void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks, const calendar::Style style,
+                                              const bool dark) const {
   // The calendar needs a trustworthy wall clock. X3 has a DS3231; X4 does not,
   // and its internal RTC drifts badly across deep sleep (see SCOPE.md), so
   // fall back to the stock sleep image rather than showing a wrong date.
@@ -108,6 +112,26 @@ void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks, const calenda
   // entry, not the current date; there is no timer wake to refresh it (and on
   // battery the MCU is fully powered off, so there could not be).
   calendar::CalendarSleepScreen::render(renderer, today, weeks, style);
+
+  // The dark rendition is a whole-frame invert of the finished page, made the
+  // same way the stock dark sleep screen is (renderDefaultSleepScreen below).
+  // Three things make that the WHOLE of it rather than a restyle:
+  //
+  //   * The calendar is drawn out of polarity-symmetric parts only -- a solid
+  //     black square with the digit knocked out for today, a 1-in-4 dither for
+  //     a marked day, plain ink for everything else (CalendarSleepScreen.cpp
+  //     drawDayCell). Flipping the frame moves every state the same distance
+  //     from its own ground, so the ordering paper < marked < today that the
+  //     screen exists to show survives exactly. A restyle would have to
+  //     re-derive that ordering by hand and could only get it wrong.
+  //   * This page is BW only. No grayscale plane is written anywhere on the
+  //     calendar path, so there is no second buffer to leave in the other
+  //     polarity -- plane bits carry no polarity of their own and must never be
+  //     flipped (HalDisplay.cpp:170-176).
+  //   * It is the framebuffer, not HalDisplay::setInverted(). Panel polarity is
+  //     a runtime flag, and this frame stays on the panel with the device
+  //     powered off, which is exactly why onEnter clears it above.
+  if (dark) renderer.invertScreen();
 
   // Same single-pass HALF waveform the other sleep screens use (see the note
   // above renderDefaultSleepScreen).

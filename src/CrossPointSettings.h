@@ -32,6 +32,15 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     CALENDAR_SIX = 10,
     // Westside Community Schools (D66, Omaha) + US federal holidays, English.
     CALENDAR_WESTSIDE = 11,
+    // Dark renditions of the two surviving calendars. Two more picker VALUES
+    // rather than a flag on the two above, for the same reason DARK and LIGHT
+    // are two values instead of one screen plus a toggle: a drawn sleep screen
+    // carries its own polarity, because the frame stays on the panel with the
+    // device powered off and so must not depend on a runtime flag to look right
+    // (SleepActivity::onEnter). SETTINGS.darkMode is deliberately NOT consulted
+    // on this path -- it is cleared before any sleep screen draws.
+    CALENDAR_DARK = 12,
+    CALENDAR_WESTSIDE_DARK = 13,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };

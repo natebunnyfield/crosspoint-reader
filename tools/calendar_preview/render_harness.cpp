@@ -210,6 +210,15 @@ bool simInit() {
   return true;
 }
 
+// CROSSPOINT_CAL_DARK=1 renders the dark rendition, which is the finished page
+// inverted -- the same one line SleepActivity::renderCalendarSleepScreen applies
+// for the CALENDAR_DARK / CALENDAR_WESTSIDE_DARK modes, so what this writes is
+// the shipped frame and not a preview of one.
+bool calendarDarkRequested() {
+  const char* v = std::getenv("CROSSPOINT_CAL_DARK");
+  return v && v[0] == '1';
+}
+
 bool renderCalendar(int year, int month, int day, const char* outPath) {
   // Weeks from CROSSPOINT_CAL_WEEKS (4/5/6), defaulting to the classic 5 --
   // added for the 2026-08-21 sleep-screen triage so all three row counts can
@@ -222,6 +231,7 @@ bool renderCalendar(int year, int month, int day, const char* outPath) {
   calendar::CalendarSleepScreen::render(
       renderer, calendar::YMD{static_cast<uint16_t>(year), static_cast<uint8_t>(month), static_cast<uint8_t>(day)},
       static_cast<uint8_t>(weeks));
+  if (calendarDarkRequested()) renderer.invertScreen();
   if (!writeMonoPortraitBmp(outPath, renderer)) return false;
   printf("wrote %s\n", outPath);
   return true;
@@ -231,6 +241,7 @@ bool renderCalendarWestside(int year, int month, int day, const char* outPath) {
   calendar::CalendarSleepScreen::render(
       renderer, calendar::YMD{static_cast<uint16_t>(year), static_cast<uint8_t>(month), static_cast<uint8_t>(day)}, 5,
       calendar::Style::WestsideEN);
+  if (calendarDarkRequested()) renderer.invertScreen();
   if (!writeMonoPortraitBmp(outPath, renderer)) return false;
   printf("wrote %s\n", outPath);
   return true;
@@ -844,6 +855,7 @@ int usage(const char* argv0) {
           "~/src/crosspoint-simulator, run via `pio run -e simulator -t run_simulator`)\n\n"
           "  %s calendar [YYYY MM DD]                render Spanish/CR sleep screen -> fs_/sleep.bmp\n"
           "  %s calendar-westside [YYYY MM DD]        render Westside/EN sleep screen -> fs_/sleep.bmp\n"
+          "     (both calendar modes: CROSSPOINT_CAL_DARK=1 for the dark rendition)\n"
           "  %s fonts FAMILY_A FAMILY_B               A-B two SD font families -> fs_/kern_specimen_*.bmp\n"
           "  %s reading FAMILY                        a wrapped body-text page -> fs_/reading_FAMILY_*.bmp\n"
           "  %s inline FAMILY                         italic set INLINE with roman -> fs_/inline_FAMILY_*.bmp\n"

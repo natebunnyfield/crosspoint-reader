@@ -222,6 +222,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     sleepScreenValues[CrossPointSettings::CALENDAR_FIVE] = StrId::STR_CALENDAR_FIVE;
     sleepScreenValues[CrossPointSettings::CALENDAR_SIX] = StrId::STR_CALENDAR_SIX;
     sleepScreenValues[CrossPointSettings::CALENDAR_WESTSIDE] = StrId::STR_SLEEP_WESTSIDE;
+    sleepScreenValues[CrossPointSettings::CALENDAR_DARK] = StrId::STR_SLEEP_CALENDAR_DARK;
+    sleepScreenValues[CrossPointSettings::CALENDAR_WESTSIDE_DARK] = StrId::STR_SLEEP_WESTSIDE_DARK;
 
     // Built one entry at a time instead of from a single braced initializer_list:
     // the whole list was materialised as one stack temporary (~50 x
@@ -411,10 +413,13 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             // are the persisted encoding; stale saves are remapped to CALENDAR
             // in normalizeRetiredSettings(), and their labels remain a decode
             // surface exactly like systemFont's did.
+            // Each calendar sits next to its own dark rendition, and the four
+            // stay one contiguous block at the end.
             .withDisplaySubset({CrossPointSettings::BLANK, CrossPointSettings::DARK, CrossPointSettings::LIGHT,
                                 CrossPointSettings::CUSTOM, CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
                                 CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
-                                CrossPointSettings::CALENDAR_WESTSIDE}));
+                                CrossPointSettings::CALENDAR_DARK, CrossPointSettings::CALENDAR_WESTSIDE,
+                                CrossPointSettings::CALENDAR_WESTSIDE_DARK}));
         
     // Clock entries. Kept after the status bar was removed because the calendar
     // sleep screen shifts the RTC's UTC date by clockUtcOffsetQ

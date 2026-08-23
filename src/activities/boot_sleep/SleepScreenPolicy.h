@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "CalendarSleepScreen.h"
 #include "CrossPointSettings.h"
 
 // Which screen a sleep draws, and how the two settings that decide it are kept
@@ -34,5 +35,45 @@ inline bool shouldQuickResume(const uint8_t sleepScreen, const uint8_t quickResu
 // dance left to model. shouldQuickResume above stays -- the QUICK_RESUME sleep
 // SCREEN mode is still a live picker option and main.cpp / SleepActivity still
 // route through it.
+
+// Which calendar a sleep-screen mode draws, and in which polarity.
+//
+// Every field here is decoded from ONE persisted integer, which is the shape
+// that fails silently: a value pointed at the wrong style or the wrong polarity
+// still compiles, still draws a calendar, and is wrong only to the owner who
+// knows which one they picked. Kept out of the switch in SleepActivity::onEnter
+// for the same reason shouldQuickResume is -- the activity drags in the clock,
+// the SD font system and the renderer, and the part worth testing is the map.
+struct CalendarPlan {
+  bool isCalendar = false;
+  calendar::Style style = calendar::Style::SpanishCR;
+  // Dark is a whole-frame invert of the finished page, applied by the caller.
+  // See SleepActivity::renderCalendarSleepScreen for why that is the whole of
+  // it rather than a restyle.
+  bool dark = false;
+};
+
+inline CalendarPlan calendarPlanFor(const uint8_t sleepScreen) {
+  using M = CrossPointSettings::SLEEP_SCREEN_MODE;
+  switch (sleepScreen) {
+    case M::CALENDAR:
+    // The week-count variants were withdrawn 2026-08-21 ("keep calendar and
+    // westside calendar"); normalizeRetiredSettings() remaps stale saves, and
+    // these fold onto the classic screen so a value that slips through anyway
+    // still draws something sensible rather than the default logo.
+    case M::CALENDAR_FOUR:
+    case M::CALENDAR_FIVE:
+    case M::CALENDAR_SIX:
+      return {true, calendar::Style::SpanishCR, false};
+    case M::CALENDAR_DARK:
+      return {true, calendar::Style::SpanishCR, true};
+    case M::CALENDAR_WESTSIDE:
+      return {true, calendar::Style::WestsideEN, false};
+    case M::CALENDAR_WESTSIDE_DARK:
+      return {true, calendar::Style::WestsideEN, true};
+    default:
+      return {};
+  }
+}
 
 }  // namespace sleepscreen

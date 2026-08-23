@@ -22,7 +22,10 @@ class SleepActivity final : public Activity {
   void renderBlankSleepScreen() const;
   // CALENDAR: draw the holiday calendar straight into the framebuffer
   // and refresh. Nothing is written to the SD card. See CalendarSleepScreen.h.
-  void renderCalendarSleepScreen(uint8_t weeks, calendar::Style style = calendar::Style::SpanishCR) const;
+  // `dark` inverts the finished frame; the definition says why that is the
+  // whole of the dark rendition rather than a restyle.
+  void renderCalendarSleepScreen(uint8_t weeks, calendar::Style style = calendar::Style::SpanishCR,
+                                 bool dark = false) const;
 
   bool fromTimeout = false;
 };

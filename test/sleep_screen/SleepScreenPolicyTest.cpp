@@ -26,6 +26,8 @@
 
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "CrossPointSettings.h"
 #include "activities/boot_sleep/SleepScreenPolicy.h"
 
@@ -48,6 +50,8 @@ constexpr uint8_t kChosenModes[] = {
     CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE,
     CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX,
     CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE,
+    CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_DARK,
+    CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK,
 };
 
 const char* modeName(const uint8_t m) {
@@ -74,6 +78,10 @@ const char* modeName(const uint8_t m) {
       return "Calendar Six";
     case CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE:
       return "Calendar Westside";
+    case CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_DARK:
+      return "Calendar (dark)";
+    case CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK:
+      return "Calendar Westside (dark)";
     default:
       return "?";
   }
@@ -143,3 +151,110 @@ TEST(SleepScreenPolicy, TheOverrideIsScopedToTimeoutSleeps) {
 
 // Moving off Quick Resume, having only ever had the row auto-enabled, puts it
 // back. This is the behaviour that already worked and must survive the fix.
+
+// --- Which calendar, in which polarity --------------------------------------
+
+// calendarPlanFor decodes ONE persisted integer into three answers, and every
+// way it can be wrong is silent: the panel still shows a calendar, just not the
+// one that was picked, and nobody is awake to see it happen. These pin the map
+// rather than the rendering.
+
+// The four rows the picker offers each reach a different screen. Stated as a
+// distinctness property, because the failure that matters is two rows landing
+// on the same (style, polarity) pair -- which is exactly what CALENDAR_FIVE
+// turned out to be against CALENDAR, and why it was withdrawn.
+TEST(SleepScreenPolicy, EveryOfferedCalendarRowDrawsADifferentScreen) {
+  constexpr uint8_t kOffered[] = {
+      CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR,
+      CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_DARK,
+      CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE,
+      CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK,
+  };
+  for (const uint8_t a : kOffered) {
+    const auto pa = sleepscreen::calendarPlanFor(a);
+    EXPECT_TRUE(pa.isCalendar) << modeName(a) << " is an offered calendar row and must draw one";
+    for (const uint8_t b : kOffered) {
+      if (a == b) continue;
+      const auto pb = sleepscreen::calendarPlanFor(b);
+      EXPECT_FALSE(pa.style == pb.style && pa.dark == pb.dark)
+          << modeName(a) << " and " << modeName(b) << " draw the identical screen, so one of the two rows is a lie";
+    }
+  }
+}
+
+// The stored value each row means. Written out one by one rather than derived,
+// because a persisted integer re-pointed at the other style or the other
+// polarity is precisely what this must catch, and a formula would move with it.
+TEST(SleepScreenPolicy, StoredValuesKeepTheirMeaning) {
+  const auto cr = sleepscreen::calendarPlanFor(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR);
+  EXPECT_EQ(cr.style, calendar::Style::SpanishCR);
+  EXPECT_FALSE(cr.dark);
+
+  const auto crDark = sleepscreen::calendarPlanFor(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_DARK);
+  EXPECT_EQ(crDark.style, calendar::Style::SpanishCR) << "the dark row must draw the SAME calendar, inverted";
+  EXPECT_TRUE(crDark.dark);
+
+  const auto ws = sleepscreen::calendarPlanFor(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE);
+  EXPECT_EQ(ws.style, calendar::Style::WestsideEN);
+  EXPECT_FALSE(ws.dark);
+
+  const auto wsDark = sleepscreen::calendarPlanFor(CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK);
+  EXPECT_EQ(wsDark.style, calendar::Style::WestsideEN) << "the dark row must draw the SAME calendar, inverted";
+  EXPECT_TRUE(wsDark.dark);
+}
+
+// A dark row is its light row plus the invert, and nothing else. If a future
+// change makes dark mean a different data source or a different locale, this is
+// the assertion that should have to be deleted deliberately.
+TEST(SleepScreenPolicy, DarkChangesOnlyThePolarity) {
+  const std::pair<uint8_t, uint8_t> kPairs[] = {
+      {CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR, CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_DARK},
+      {CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE,
+       CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK},
+  };
+  for (const auto& [light, dark] : kPairs) {
+    const auto l = sleepscreen::calendarPlanFor(light);
+    const auto d = sleepscreen::calendarPlanFor(dark);
+    EXPECT_EQ(l.style, d.style) << modeName(dark) << " must be " << modeName(light) << " with the frame flipped";
+    EXPECT_FALSE(l.dark);
+    EXPECT_TRUE(d.dark);
+  }
+}
+
+// The withdrawn week-count rows still decode. Their enum values are frozen by
+// persistence and normalizeRetiredSettings() remaps them on load, but a save
+// that slips past it must still land on a calendar rather than the stock logo.
+// All three fold onto the LIGHT classic screen: they were withdrawn before a
+// dark rendition existed, so inventing one for them would change what an old
+// save draws.
+TEST(SleepScreenPolicy, WithdrawnWeekCountRowsFoldOntoTheLightClassicScreen) {
+  for (const uint8_t mode : {CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR,
+                             CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE,
+                             CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX}) {
+    const auto p = sleepscreen::calendarPlanFor(mode);
+    EXPECT_TRUE(p.isCalendar) << modeName(mode) << " must still draw a calendar";
+    EXPECT_EQ(p.style, calendar::Style::SpanishCR);
+    EXPECT_FALSE(p.dark) << modeName(mode) << " predates the dark rendition and must not acquire one";
+  }
+}
+
+// Nothing that is not a calendar may decode as one. Swept over the whole uint8
+// range, not just the named modes, because the value arrives from a JSON file
+// that anyone can edit and an out-of-range one must fall through to the default
+// screen rather than into the calendar branch.
+TEST(SleepScreenPolicy, NoOtherStoredValueDecodesAsACalendar) {
+  for (int v = 0; v <= 0xFF; ++v) {
+    const auto p = sleepscreen::calendarPlanFor(static_cast<uint8_t>(v));
+    const bool isCalendarValue = v == CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR ||
+                                 v == CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR ||
+                                 v == CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE ||
+                                 v == CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX ||
+                                 v == CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE ||
+                                 v == CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_DARK ||
+                                 v == CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK;
+    EXPECT_EQ(p.isCalendar, isCalendarValue) << "stored sleepScreen value " << v << " decoded wrongly";
+    if (!isCalendarValue) {
+      EXPECT_FALSE(p.dark) << "a non-calendar value must not carry a polarity";
+    }
+  }
+}

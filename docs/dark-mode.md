@@ -122,6 +122,47 @@ that exists because `ActivityManager.h` holds `unique_ptr<Activity>` and would
 otherwise drag the whole activity header set into an Objective-C++ translation
 unit.
 
+## 3. The calendar sleep screens are dark by INVERT, not by restyle
+
+Owner ask 2026-08-23: "a dark mode for costa rica calendar and school
+calendar". Both are one renderer -- `CalendarSleepScreen::render()` with
+`Style::SpanishCR` or `Style::WestsideEN`; the Westside table is a data header,
+not a second screen -- so both got the same treatment.
+
+**Nothing on this path consults `SETTINGS.darkMode`, deliberately.**
+`SleepActivity::onEnter` clears panel polarity before any drawn sleep screen,
+because the frame stays on the panel with the device powered off and so must not
+depend on a runtime flag to look right. A drawn sleep screen carries its own
+polarity in `SETTINGS.sleepScreen`, which is why `DARK` and `LIGHT` are two
+values of that picker rather than one screen plus a toggle. Dark is therefore
+two more appended values -- `CALENDAR_DARK = 12`,
+`CALENDAR_WESTSIDE_DARK = 13` -- and no new settings row.
+
+**The whole of the dark rendition is `renderer.invertScreen()`**, the same one
+line that makes the stock dark sleep screen (`renderDefaultSleepScreen`). Not
+`HalDisplay::setInverted()`, which is a runtime flag; and not a restyle, because
+the calendar is already built out of polarity-symmetric parts. Measured on the
+2026-11-09 window, sampling each square's fill band clear of the digit ink
+(fraction of LIT pixels):
+
+| cell state | light | dark | distance from its own ground |
+|---|---|---|---|
+| unmarked day (ground) | 1.000 | 0.000 | — |
+| holiday / no-school (`LightGray`, 1-in-4 dither) | 0.750 | 0.250 | 0.250 both ways |
+| today (`Black` fill, digit knocked out) | 0.000 | 1.000 | 1.000 both ways |
+
+Three distinct levels in each polarity, the ordering preserved, and the closest
+pair 0.250 apart in both. The flip is bit-exact (`dark == 255 - light`), and it
+is complete because the calendar path is BW only -- no grayscale plane is
+written, so there is no second buffer that would have to NOT be flipped
+(`HalDisplay.cpp:170-176`).
+
+**What this does not fix:** a holiday and a no-school day already draw the
+identical square, in light as well as dark -- both are `isHoliday` and both get
+`Color::LightGray`. The legend below the grid is what tells them apart. A third
+tone is available (`Color::DarkGray`, a 50% checkerboard) if that distinction is
+ever wanted, but it would change the light calendar too and was not asked for.
+
 ## Status
 
 **UNCONFIRMED on device** — nothing here has been seen on a real panel.
