@@ -9,6 +9,7 @@
 
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
 
@@ -155,6 +156,10 @@ void XtcReaderActivity::render(RenderLock&&) {
 }
 
 void XtcReaderActivity::renderPage() {
+  // WHICH PAGE THIS IS -- the EPUB reader's channel, no-op on device. An XTC is
+  // pre-paginated book-wide, so spineIndex is 0 like the TXT reader's.
+  gpio.publishReaderPageIdentity(readerBookKey(xtc->getPath()), 0, static_cast<int32_t>(currentPage));
+
   const uint16_t pageWidth = xtc->getPageWidth();
   const uint16_t pageHeight = xtc->getPageHeight();
   const uint8_t bitDepth = xtc->getBitDepth();

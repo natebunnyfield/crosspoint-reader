@@ -1600,6 +1600,18 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // below, so highlight rects stay glued to the shifted glyphs.
   captureReadAloudPage(*page, renderer, fontId, orientedMarginLeft, paintMarginTop);
 
+  // WHICH PAGE THIS IS, published beside the read-aloud capture and for the
+  // same reason: this function IS the commitment that this page is the one
+  // being displayed, and it is reached exactly once per displayed page. A no-op
+  // on device; the simulator seeds its paper from it, so a page you turn back
+  // to is the same sheet (crosspoint-simulator/docs/paper-defects.md).
+  //
+  // (spineIndex, pageInSpine) is the ordinal -- there is no book-cumulative
+  // page number here, only the current Section's pagination, and pageCount is a
+  // watermark rather than a count.
+  gpio.publishReaderPageIdentity(readerBookKey(epub->getPath()), currentSpineIndex,
+                                 section ? section->currentPage : 0);
+
   // The image pixel-cache RAM slot lives for exactly one page render (it feeds
   // the BW double-refresh and every grayscale band pass); release it on every
   // exit so nothing stays resident across page turns.

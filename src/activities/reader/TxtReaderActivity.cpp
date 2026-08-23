@@ -3,6 +3,7 @@
 #include <BidiUtils.h>
 #include <FontCacheManager.h>
 #include <GfxRenderer.h>
+#include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Serialization.h>
@@ -382,6 +383,11 @@ void TxtReaderActivity::render(RenderLock&&) {
 }
 
 void TxtReaderActivity::renderPage() {
+  // WHICH PAGE THIS IS. Same channel and same reason as the EPUB reader's, and
+  // a no-op on device: a host emulating paper seeds the sheet from it. A TXT
+  // has one book-wide page ordinal rather than a spine, so spineIndex is 0.
+  gpio.publishReaderPageIdentity(readerBookKey(txt->getPath()), 0, currentPage);
+
   const int lineHeight = renderer.getLineHeight(cachedFontId);
   const int contentWidth = viewportWidth;
 

@@ -5,6 +5,29 @@
 
 #include <string>
 
+// A STABLE 64-bit key for a book, from its path.
+//
+// FNV-1a, spelled out here rather than borrowed, because determinism across
+// builds is the whole point: std::hash<std::string> is implementation-defined
+// and libc++ and libstdc++ disagree, so a desktop simulator build and an iOS
+// build of the same book would key differently. Twelve lines is cheaper than
+// that class of bug. Used for HalGPIO::publishReaderPageIdentity below.
+//
+// MIRRORED in the simulator's own src/HalGPIO.h, which shadows this header on a
+// simulator build. The two must agree byte for byte, and the shared guard macro
+// keeps a translation unit that sees both from redefining it.
+#ifndef CROSSPOINT_READER_BOOK_KEY
+#define CROSSPOINT_READER_BOOK_KEY
+inline uint64_t readerBookKey(const std::string& path) {
+  uint64_t h = 1469598103934665603ull;  // FNV offset basis
+  for (const char c : path) {
+    h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+    h *= 1099511628211ull;  // FNV prime
+  }
+  return h;
+}
+#endif
+
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
 #define EPD_SCLK 8   // SPI Clock
 #define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
@@ -222,6 +245,26 @@ class HalGPIO {
   // §4). EpubReaderActivity publishes on every render; the simulator's HalGPIO
   // stores the four values for its harness to read.
   void publishReaderTextInsets(int /*topPx*/, int /*rightPx*/, int /*bottomPx*/, int /*leftPx*/) {}
+
+  // WHICH PAGE OF WHICH BOOK IS ON SCREEN, published once per DISPLAYED page.
+  // A no-op here for the same host-capability reason as the two channels above:
+  // this panel's paper is a constant, so nothing on this board could consume a
+  // page identity. A host EMULATING paper needs it, because paper is not a
+  // constant -- the simulator seeds its letterpress sheet and its paper defects
+  // from a hash of exactly these three numbers, so a given page is the same
+  // sheet forever, including across a relaunch
+  // (crosspoint-simulator/docs/paper-defects.md).
+  //
+  // bookKey must be STABLE ACROSS BUILDS AND PLATFORMS -- use readerBookKey()
+  // below, never std::hash, whose result is implementation-defined and differs
+  // between libc++ and libstdc++ (Epub's cache key uses it, and that is fine
+  // because a cache is local; a sheet identity is not).
+  //
+  // (spineIndex, pageInSpine) IS the ordinal. The EPUB reader paginates one
+  // Section at a time and has no book-cumulative page number; the pair is exact
+  // where pageCount is only a watermark. Readers with a book-wide page number
+  // (TXT, XTC) publish spineIndex 0.
+  void publishReaderPageIdentity(uint64_t /*bookKey*/, int32_t /*spineIndex*/, int32_t /*pageInSpine*/) {}
 
   // Verify power button was held long enough after wakeup.
   // Returns true if verification succeeded, false if device should return to sleep.
