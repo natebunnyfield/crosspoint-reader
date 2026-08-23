@@ -113,8 +113,10 @@ using it — the same silent fallback to replicated 1x glyphs, arriving one
 launch after the setting was changed, which is the hardest possible version of
 that bug to attribute.
 
-**Cost: about +53 MB of app bundle** (measured on the six installed families:
-the 1x set is 16 MB, 2x is 53 MB, 3x is 114 MB; the app already carried 1x+3x).
+**Cost: about +53 MB of app bundle** (measured on the six families installed
+at the time: the 1x set is 16 MB, 2x is 53 MB, 3x is 114 MB; the app already
+carried 1x+3x. TeX Gyre Heros made it seven on 2026-08-23 and the figure has
+not been re-measured since).
 
 ## The filter each scale ends up with
 

@@ -144,3 +144,33 @@ runs that mattered. Success paths now surface them.
 Negative results: NotoSansSymbols (the first) is useless for this — despite the
 name it carries none of the probed dingbats/symbols. Box-drawing and misc
 symbols supplied by Symbols2 raised no 255px overflows at any tier.
+
+## Addendum: the seventh family (TeX Gyre Heros, 2026-08-23)
+
+Everything above says "six families" and is left as written — it is the record
+of what was audited on 2026-08-17/20, and rewriting the count would falsify the
+runs. TeX Gyre Heros joined `installed_families` on 2026-08-23 (owner ruling,
+docs/sd-card-fonts.md) and was built against the same `reading` baseline and
+the same four-face fallback chain, so the conclusions above extend to it. That
+was measured, not assumed — reading the installed interval tables the same way
+the 2026-08-20 verification did:
+
+| Family | 1x | 2x | 3x |
+|---|---|---|---|
+| TeXGyreHeros | 2,676 | 2,676 | 2,675 |
+| TeXGyreSchola | 2,676 | 2,676 | 2,675 |
+| LibrisADF | 2,676 | 2,676 | 2,675 |
+| Edgar | 2,861 | 2,861 | 2,860 |
+
+Identical to the two families it sits beside, and the 3x figure is one lower
+for all of them for the documented reason: U+2E3B THREE-EM DASH rasterises over
+EpdGlyph's 255 px limit at that tier and is dropped there only. The eight
+probes the 08-20 pass used — U+2212, ≠, ≤, ∞, α, Δ, → and U+2717 ✗ — are all
+present in TeXGyreHeros at all three tiers.
+
+The face's OWN cmap is narrow (Latin-1 223/224, Latin Extended-A 124/128,
+Greek 54/144, Cyrillic 0/256, 1,087 codepoints), so most of that 2,676 comes
+from the fallback chain. That is not a defect specific to this family: TeX Gyre
+Schola's own cmap is the same 1,087 codepoints, because GUST could not
+relicense the base-35 Cyrillic (`qhv-hist.txt`) and shipped no Cyrillic in any
+TeX Gyre face.

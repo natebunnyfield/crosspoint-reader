@@ -103,9 +103,9 @@
 # The S-tier ruling (docs/sd-card-fonts.md, 2026-08-02; Lexica Ultralegible
 # added 2026-08-03, three text grotesques the same day, two of those three cut
 # 2026-08-04, Lexica Ultralegible itself cut 2026-08-04, Quattrocento Sans
-# promoted 2026-08-04): these six, and only these six, are INSTALLED on every
-# surface — both device SD cards, the simulator's fs_/fonts/, and the iOS
-# bundled seed set. Everything else below stays a buildable recipe that ships
+# promoted 2026-08-04, TeX Gyre Heros added 2026-08-23): these seven, and only
+# these seven, are INSTALLED on every surface — both device SD cards, the
+# simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
 # Quattrocento Sans came in on 2026-08-04 in the same ruling that cut Freight
@@ -149,6 +149,16 @@ installed_families:
   - LibreFranklin
   - LibrisADF
   - InknutJunicode
+  - TeXGyreHeros
+# TeXGyreHeros joined on 2026-08-23 (owner ruling: "add TeX Gyre Heros fully to
+# app as s tier candidate"). It is the second GUST e-foundry face in the tier
+# and the third installed sans: a Helvetica lineage reached through URW Nimbus
+# Sans, which is a neo-grotesque and therefore its own classification cell —
+# neither Libre Franklin's 19th-century grotesque nor Libris' calligraphic
+# humanist, so it displaces neither and no head-to-head is owed. Its recipe in
+# the Sans-serif section carries the slot derivation and the one thing worth
+# knowing before touching it: force_autohint is load-bearing, because the
+# native ramp cannot render a 16 px x-height at any point size.
 # InknutJunicode joined on 2026-08-13 (owner ruling: "add inknutjunicode fully
 # to builds"), after fourteen rounds of bench work settled its borrowed italic —
 # Junicode Expanded SemiBold at ENLA 14, x1.25, word space -0.09 em. It is the
@@ -979,6 +989,68 @@ families:
       bold:       {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Bold.otf"}
       italic:     {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Italic.otf"}
       bolditalic: {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-BoldItalic.otf"}
+
+  - name: TeXGyreHeros
+    description: "GUST's Helvetica revival, via URW Nimbus Sans (Latin)"
+    intervals: reading
+    # Same foundry, same license and same URL pattern as TeX Gyre Schola in the
+    # Serif section — GUST Font License, four real cuts on CTAN — so like Schola
+    # and Libris this one needs no local files and rebuilds on any machine.
+    #
+    # cmap coverage (regular, read from the shipped OTF): Latin-1 223/224,
+    # Latin Extended-A 124/128, Latin Extended-B 51/208, Greek 54/144
+    # (symbol-adjacent only), Cyrillic 0/256, 1087 codepoints total. `reading`
+    # still asks for Greek, Cyrillic and the math/symbol blocks; the fallback
+    # chain fills them, exactly as it does for Antpolt, whose GUST-built cmap
+    # has the same shape. The description says Latin for that reason and does
+    # not claim the two scripts the face does not have. The absent Cyrillic is
+    # upstream policy, not an oversight worth chasing: qhv-hist.txt records
+    # that the base-35 Cyrillic was Valek Filippov's GPL addition, that GUST
+    # could not obtain his permission to relicense it, and "thus there are no
+    # Cyrillic glyphs in any of the TeX Gyre fonts". Measured, that is exactly
+    # true — TeX Gyre Schola's own cmap is 54/144 Greek and 0/256 Cyrillic,
+    # byte-for-byte the same 1087 codepoints as this face, so the Cyrillic in
+    # ITS description above has always come from the fallback too. Left as it
+    # stands; correcting another family's description is not this recipe's job.
+    #
+    # force_autohint is LOAD-BEARING, the same way it is for Archivo above,
+    # though for the milder of the two reasons. Under the font's native hinting
+    # the x-height ramp SKIPS 16 px: 14 pt renders 15 and 15 pt renders 17, so
+    # slot 2 could only be built a pixel small or a pixel large and no metrics
+    # override moves it (the span sets leading, not glyph size). The auto-hinter
+    # puts 14 pt exactly on 16 px and lands all four slots. Unlike Archivo it
+    # rescues no counters, because none were shut: enclosed-pixel counts for
+    # s/e/a at all four sizes are equal or better under the auto-hinter
+    # (s = 0 enclosed either way — that aperture is open at every slot — and the
+    # 12 pt 'e' eye goes 17 -> 23 px). It is here for the ramp alone.
+    force_autohint: true
+    # Uniform slots: xh 12/14/16/18 exact on all four; advY 35/39/45/51. Slots
+    # 1-3 are the shipped Edgar/TeXGyreSchola cluster exactly and slot 0 is one
+    # px over it — the same landing Archivo gets from the same four point sizes,
+    # and for the same reason: at 11 pt one pixel of leading costs ~44 units of
+    # span, so every span that lands 34 at slot 0 drags the rest down with it
+    # (the 34 band measures 37/43/49 through 38/44/50).
+    sizes: [11, 12, 14, 16]
+    # Span 1542, read back from the BUILT files and NOT computed: the header's
+    # ceil() formula puts the 35/39/45/51 band at 1520-1527, and it is wrong by
+    # 20 units, because FreeType rounds face.size.height to whole pixels before
+    # norm_ceil sees it. Sweeping spans and measuring what the converter
+    # actually writes puts the band at 1540-1545; 1542 is its center, so a
+    # FreeType version bump has two units of slack below and three above.
+    # Same trap, same remedy, as the LibrisADF note above.
+    #
+    # The split: ascent 1026 is the accented-capital ink top (961) plus the
+    # 65/1000 pad exactly, so ÁÉÍÓÚ clear the declared ascender; descent -516
+    # takes the remainder, against a plain-text ink bottom of -219 across all
+    # four styles. Well clear of the leading floor, which is only 1096 here
+    # (ink 747/-219 plus 0.13 em) — this face's line span is set by the small
+    # point sizes its large x-height forces, not by its ink.
+    metrics: {ascent: 1026, descent: -516, linegap: 0}
+    styles:
+      regular:    {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf"}
+      bold:       {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bold.otf"}
+      italic:     {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-italic.otf"}
+      bolditalic: {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf"}
 
   - name: HostGrotesk
     description: "Host Grotesk, Element Type's contemporary grotesque (Latin)"

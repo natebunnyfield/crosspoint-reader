@@ -3,17 +3,18 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12; InknutJunicode added 2026-08-13)
+## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12; InknutJunicode added 2026-08-13; TeXGyreHeros added 2026-08-23)
 
-The installed set on this fork is exactly six families — **Edgar, Coelacanth,
-InknutJunicode, TeXGyreSchola, LibreFranklin, LibrisADF** — on every surface:
+The installed set on this fork is exactly seven families — **Edgar, Coelacanth,
+InknutJunicode, TeXGyreSchola, LibreFranklin, LibrisADF, TeXGyreHeros** — on
+every surface:
 device SD cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed
 set (`crosspoint-simulator/ios/seedfonts/`). The authoritative list is
 `installed_families:` in `lib/EpdFont/scripts/sd-fonts.yaml` — when this prose
 and that list disagree, the yaml wins. The other curated families remain fully
 buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these six and nothing else.
+surface or reprovisioning a card, install these seven and nothing else.
 
 **InknutJunicode joined 2026-08-13** (owner ruling: "add inknutjunicode fully
 to builds", `6c5fefe0a`), after fourteen bench rounds settled its borrowed
@@ -22,16 +23,20 @@ first installed family whose roman and italic come from different typefaces.
 Details in the `installed_families:` comment block in `sd-fonts.yaml`.
 
 **Physical device SD cards are re-verified per provisioning, not per ruling.**
-BUNNYFIELDS was reprovisioned and hash-verified with all six on 2026-08-15;
+BUNNYFIELDS was reprovisioned and hash-verified with the then-six on
+2026-08-15 and has NOT been reprovisioned since TeX Gyre Heros joined;
 OWEN_BNF still carries the pre-08-07 set (last verified 2026-08-06) until
 reprovisioned. Cards provisioned before a ruling carry the older set —
 compare against `fs_/fonts` by hash, and reprovision by hand before relying on
 a newer family being present.
 
-Two of the six are sans, as of a 2026-08-12 owner ruling: **Libre Franklin**,
-the text grotesque, from `lib/EpdFont/scripts/grotesque-candidates.yaml`, and
-**Libris** (`LibrisADF`), a calligraphic humanist sans reclassified out of the
-Serif section it was originally promoted into — see below. Both stay installed
+**Three of the seven are sans**, and each holds a different cell: **Libre
+Franklin**, the 19th-century text grotesque, from
+`lib/EpdFont/scripts/grotesque-candidates.yaml`; **Libris** (`LibrisADF`), a
+calligraphic humanist sans reclassified out of the Serif section it was
+originally promoted into (2026-08-12 owner ruling, see below); and **TeX Gyre
+Heros** (2026-08-23 owner ruling, see below), a neo-grotesque — GUST's
+Helvetica through URW's Nimbus Sans. The first two stay installed
 permanently, not provisionally: **there is no head-to-head between them,
 because a head-to-head only runs WITHIN one classification cell** — the
 grotesque bench compared grotesques, the humanist/accessibility bench compared
@@ -132,6 +137,68 @@ Archivo, Host Grotesk and Lexica Ultralegible got. Its commercial sources stay
 in gitignored `lib/EpdFont/local_fonts/`, never committed or distributed.
 Putting it back into `installed_families:` — or back onto a surface — is a
 regression, not a restoration; it needs a fresh ruling.
+
+### TeXGyreHeros is S tier (owner ruling, 2026-08-23)
+
+"add TeX Gyre Heros fully to app as s tier candidate. include meta info."
+Installed on all three surfaces the same day, as a third sans in a third
+classification cell.
+
+**Why it qualifies.** It is a *neo-grotesque* — Helvetica's structure, reached
+through URW's Nimbus Sans — which is neither Libre Franklin's 19th-century
+grotesque nor Libris' calligraphic humanist sans. The cell rule that has
+governed every sans decision on this fork since 2026-08-04 applies unchanged:
+a head-to-head only runs WITHIN one cell, so Heros displaces nothing and owes
+no bench. The Archivo / Host Grotesk / Lexica Ultralegible cuts were about
+three candidates crowding ONE cell; this is the opposite case.
+
+It also clears the two bars the tier has actually enforced in practice:
+
+- **Rebuildable anywhere.** Four CTAN URLs under the GUST Font License, four
+  real cuts (v2.004), nothing in gitignored `local_fonts/` — the same standing
+  TeX Gyre Schola and Libris have, and the reason Freight Sans lost the
+  humanist cell to Quattrocento Sans in the first place.
+- **The uniform slots, measured off the built files.** x-height 12/14/16/18 px
+  exact on all four slots; `advanceY` 35/39/45/51 against the tier's shipped
+  Edgar/TeXGyreSchola cluster of 34/39/45/51 — three slots exact, slot 0 one
+  pixel over. That is the same landing Archivo gets from the same four point
+  sizes, and no span reaches 34 at 11 pt without dragging slots 1-3 down with
+  it.
+
+**`force_autohint: true`, and it is load-bearing.** Under the font's native
+hinting the x-height ramp *skips 16 px* — 14 pt renders 15, 15 pt renders 17 —
+so slot 2 could only be built a pixel small or a pixel large, and no metrics
+override can fix that (a span sets leading, not glyph size). The auto-hinter
+puts 14 pt exactly on 16 px. Unlike Archivo, which needed the auto-hinter to
+reopen apertures that had sealed shut, this one costs nothing: measured
+enclosed-pixel counts for `s`/`e`/`a` at all four sizes are equal or better
+under the auto-hinter. It is here for the ramp alone. Archivo's is no longer
+the set's only `force_autohint`.
+
+**Metrics span 1542 (ascent 1026, descent −516), read back from built
+`.cpfont` files rather than computed.** The `sd-fonts.yaml` header's `ceil()`
+formula puts the 35/39/45/51 band at 1520-1527 and is wrong by 20 units,
+because FreeType rounds `face.size.height` to whole pixels before `norm_ceil`
+sees it. Sweeping spans and measuring what the converter writes puts the band
+at 1540-1545. Same trap LibrisADF's recipe records.
+
+**Coverage: Latin, and the description says so.** Measured on the shipped OTF:
+Latin-1 223/224, Latin Extended-A 124/128, Latin Extended-B 51/208, Greek
+54/144 (symbol-adjacent only), Cyrillic 0/256 — 1087 codepoints. The absent
+Cyrillic is upstream policy: `qhv-hist.txt` records that the base-35 Cyrillic
+was Valek Filippov's GPL addition, that GUST could not obtain permission to
+relicense it, and "thus there are no Cyrillic glyphs in any of the TeX Gyre
+fonts". That is measurably true of TeX Gyre Schola as well — identical 1087
+codepoints — so the Greek and Cyrillic in *its* description have always come
+from the fallback chain too. Left as-is; correcting Schola's description is a
+separate change.
+
+Lineage, citations and the picker entry: `docs/font-dates.md` and
+`src/FontDisplayNames.h`. The one thing worth repeating here is that the
+digitization year is **2009, not the 2006 in the font's copyright string** —
+`qhv-hist.txt` calls v2.003 of 16.09.2009 "the first official release of the
+TeX Gyre Heros fonts", which it had to be, since URW only released the base-35
+originals under the LPPL on 2009-06-22.
 
 ### Almendra is C tier (owner ruling, 2026-08-11)
 
@@ -335,7 +402,7 @@ excludes, which is exactly the drift the list now prevents. Use
 The iOS app needs no equivalent list. `CrossPointFsPrep.cpp::seedOneFontDirectory`
 seeds whatever `crosspoint-simulator/ios/seedfonts/` contains and prunes files
 the bundle no longer carries, so that directory is its own source of truth —
-keep it holding exactly these six.
+keep it holding exactly these seven.
 
 ## A tier (fork ruling, 2026-08-07)
 
@@ -475,9 +542,9 @@ The current list of pre-built fonts is maintained in the
 
 ## What the catalog covers
 
-[type-coverage.html](type-coverage.html) sorts all 37 curated families by what
+[type-coverage.html](type-coverage.html) sorts all 38 curated families by what
 the letterforms actually are rather than by the four headings `sd-fonts.yaml`
-files them under, which are a filing system and not a classification. The 37
+files them under, which are a filing system and not a classification. The 38
 land in 13 of 22 structural classes; the nine empty ones are listed with a
 judgment on each, because a gap only matters if the class survives a 1-bit
 panel at 12-18 pt — a Didone is defined by a hairline, and a hairline here is
@@ -489,6 +556,9 @@ of the sans taken from the headings is off by one. And **the S tier is better
 spread than the catalog**: its five occupy five different classes, while 19 of
 the catalog's 25 serifs sit in two. Cutting Archivo and Host Grotesk widened
 that spread rather than narrowing it, since all three grotesques filled one cell.
+(That "five" is the tier as it stood on 2026-08-07; it is seven families now,
+and the two additions since — Inknut Antiqua + Junicode, TeX Gyre Heros —
+widened the spread again rather than doubling a class.)
 Cutting Lexica Ultralegible is the one cut that did cost a class — humanist sans,
 and the low-vision/hyperlegible cell with it.
 

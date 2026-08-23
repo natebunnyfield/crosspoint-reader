@@ -607,7 +607,7 @@ TEST(ReadingFontList, RetiredFamiliesAreNotOfferedForReading) {
   EXPECT_FALSE(readingfonts::offeredForReading("Rosarivo"));
 
   // Still shipped, and must stay offered.
-  for (const char* keep : {"Edgar", "Coelacanth", "TeXGyreSchola", "LibreFranklin"}) {
+  for (const char* keep : {"Edgar", "Coelacanth", "TeXGyreSchola", "LibreFranklin", "TeXGyreHeros"}) {
     EXPECT_TRUE(readingfonts::offeredForReading(keep)) << keep << " is in installed_families and must be offered";
   }
   // A face nobody has heard of is offered, not hidden -- the fallback

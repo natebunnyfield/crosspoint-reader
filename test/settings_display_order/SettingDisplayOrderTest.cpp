@@ -171,7 +171,7 @@ TEST(SettingDisplayOrder, EditorFamiliesAreRecognisedByName) {
   EXPECT_FALSE(editorfonts::isEditorFamily("IAWRITERMONO")) << "Mono was removed from FAMILIES; isEditorFamily returns false for former faces";
 
   // Reading families and junk must NOT be filtered.
-  for (const char* reading : {"Coelacanth", "TeXGyreSchola", "LibreFranklin", "Edgar", "", "iAWriter"}) {
+  for (const char* reading : {"Coelacanth", "TeXGyreSchola", "LibreFranklin", "TeXGyreHeros", "Edgar", "", "iAWriter"}) {
     EXPECT_FALSE(editorfonts::isEditorFamily(reading)) << reading << " is not an editor face";
   }
   EXPECT_FALSE(editorfonts::isEditorFamily(nullptr));

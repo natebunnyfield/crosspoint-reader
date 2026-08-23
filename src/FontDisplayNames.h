@@ -204,6 +204,44 @@ inline constexpr Entry kEntries[] = {
      "2012, 2020 Buenos Aires", 2012},
     {"LibreFranklin", "Libre Franklin", "Morris Fuller Benton; Pablo Impallari, Rodrigo Fuenzalida & Nhung Nguyen",
      "1902 Jersey City; 2016 Rosario, Argentina", 1902},
+    // The neo-grotesque, installed 2026-08-23. Same GUST e-foundry duo, same
+    // license and same CTAN shelf as TeX Gyre Schola above, pointed at the
+    // other end of the base-35 set.
+    //
+    // WHAT IS BEING NAMED, stage 1: Helvetica, not Nimbus Sans. Schola's row
+    // already settled this shape — it is model-dated at Benton's 1918 metal
+    // Century Schoolbook and carries "via URW Century Schoolbook L" only in
+    // docs/font-dates.md's digital-place column, because URW's base-35 cut is
+    // the digitization route, not a design stage by a third hand. Heros takes
+    // the same route through URW's Nimbus Sans and so takes the same two
+    // stages.
+    //
+    // Both stage-1 names are the FONT'S OWN claim, not an outside attribution:
+    // CTAN's README-TeX-Gyre-Heros.txt says the face "can be used as a
+    // replacement for a popular font Helvetica, also known as Swiss (prepared
+    // by Max Miedinger with Eduard Hoffmann, 1957, at the Haas Type Foundry)".
+    // Hoffmann joins Miedinger for the same reason Newsreader pairs Gentile
+    // with Levée and Lexica pairs Scott with Dobie — the source credits both,
+    // and the second name is the foundry director who set the brief.
+    // Münchenstein, near Basel, is where the Haas'sche Schriftgiesserei sat.
+    //
+    // 2009, ONE year, and it is deliberately not the font's copyright string.
+    // The shipped OTF name table reads "Copyright 2006, 2009", CTAN's README
+    // license block reads "Copyright 2007--2009", and the family's own history
+    // file (qhv-hist.txt) resolves the disagreement: v0.991/0.995 (Feb-Mar
+    // 2007) are labeled prereleases, and v2.003 of 16.09.2009 is "the first
+    // official release of the TeX Gyre Heros fonts" — it could not have come
+    // earlier, because URW only released the base-35 originals under the LPPL
+    // on 2009-06-22. v2.004 (30.10.2009) is the shipped version, same year, so
+    // there is no second year to comma in. 2006 appears in no history entry
+    // and is a collection-wide copyright year, so it stays out under the
+    // table's "no unreliable dates" rule. Antpolt above takes its years from
+    // its name table instead; that is not a contradiction — its name-table
+    // years agree with its own release history and these do not.
+    {"TeXGyreHeros", "TeX Gyre Heros",
+     "Max Miedinger & Eduard Hoffmann; Bogus\xC5\x82"
+     "aw Jackowski & Janusz M. Nowacki",
+     "1957 M\xC3\xBCnchenstein, Switzerland; 2009 Gda\xC5\x84sk", 1957},
     // Cut back to a recipe on 2026-08-04 and deleted from every surface; the
     // label stays because a card provisioned before that ruling still carries
     // the family. Born digital, one stage. 2004 is the design year from the

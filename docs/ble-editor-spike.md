@@ -354,10 +354,10 @@ Two separate facts:
   scale 1; the 2x companions exist for `CROSSPOINT_RENDER_SCALE=2` **host
   builds** (desktop/iOS simulator). So: device gets the 1x cuts, and the 2x
   companions make it crisp in the iOS app.
-- **S-tier note:** the installed-families ruling (six families) governs
-  *reading* faces. An editor monospace is a new surface — needs an explicit
-  ruling either extending S tier or declaring the editor font out of its scope.
-  Do not silently install a seventh family.
+- **S-tier note:** the installed-families ruling (seven families since
+  2026-08-23) governs *reading* faces. An editor monospace is a new surface —
+  needs an explicit ruling either extending S tier or declaring the editor font
+  out of its scope. Do not silently install one more family.
 
 ### Can the iOS app support internal and external keyboards now?
 
