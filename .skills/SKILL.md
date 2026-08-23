@@ -1120,6 +1120,15 @@ rm -rf /path/to/sd/.crosspoint/epub_<hash>/sections/
 1. **ALWAYS increment version** BEFORE changing binary structure
 2. Version mismatch → Cache auto-invalidated and regenerated
 3. Document format changes in `docs/file-formats.md`
+4. **A layout change bumps it too, not only a structure change.** The cached
+   `TextBlocks` carry each line's painted x and its break points, so anything
+   that moves either invalidates them even though the struct is untouched. Both
+   2026-08-23 changes hit this and both were caught by reproducing the stale
+   render rather than by reasoning: left-edge hanging punctuation (43) is
+   break-neutral but changes painted x, and automatic justification (44)
+   reaches line breaking at one point, where a ragged block skips a hyphen
+   attempt near the measure. If a change alters what a page LOOKS like, ask
+   whether a cache built before it would still be right.
 
 **Example** (incrementing section format version):
 ```cpp
