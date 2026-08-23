@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 // The Update Library compare logic, PURE on purpose: no Storage, no network,
 // no Arduino. Every decision here is host-testable (the simulator repo compiles
