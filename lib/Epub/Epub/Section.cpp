@@ -73,7 +73,14 @@ namespace {
 //      numbers (start/value honored), and every item hangs its marker in a
 //      gutter via negative text-indent so wrapped lines align under the text.
 //      Stale v41 caches would keep flat, bullet-only lists, hence the bump.
-constexpr uint8_t SECTION_FILE_VERSION = 42;
+// v43: hanging punctuation gains its LEFT edge (2026-08-22, surface roadmap
+//      T3). A line that BEGINS with an opening quote, bracket or dash is
+//      painted shifted left by a fraction of that glyph's advance, and on a
+//      justified line the shift is handed back to the gaps. Break-neutral for
+//      the same reason the trailing hang is, but the painted x lives in the
+//      cached TextBlocks — the v39 note above — so stale v42 caches would keep
+//      flush-left quotes, hence the bump.
+constexpr uint8_t SECTION_FILE_VERSION = 43;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

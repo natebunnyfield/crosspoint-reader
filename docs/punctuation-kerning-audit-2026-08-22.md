@@ -298,3 +298,42 @@ Identical `(leftClass, rightClass)` in LibreFranklin (3,4), Noto (4,5), Coelacan
    documents findings in an md, fixes the indefensible.
 6. **Chapter-opener styling: NEITHER** drop cap nor small caps — the
    sinkage stands alone. Closed.
+
+## Follow-up: the LEFT edge, landed 2026-08-22 (surface roadmap T3)
+
+The trailing hang shipped first and was half the feature — §(c) above names
+`:1183` as "the single hook point", which is true for the right edge only. The
+leading hang is now in, at `ParsedText.cpp` (the `HANG_FRACTIONS` table, one
+row per glyph with a trailing column and a leading column, and `leadingHang`
+in `extractLine`).
+
+What was verified rather than assumed:
+
+- **The trailing hang really is measure-independent.** It enters exactly one
+  expression, `spareSpace`, which feeds nothing but `computeJustifyExtra`;
+  `computeLineBreaks` and `computeHyphenatedLineBreaks` never see it. The
+  leading hang follows the same route, plus a negative paint x on the line's
+  first word.
+- **Line breaks are unchanged, measured.** Six headless X3 renders of a
+  dialogue fixture (left-aligned and justified, screen margin 10 and 0) put
+  every line band at an identical y and identical height before and after.
+- **Only lines that begin with hanging punctuation move.** At 18 px /
+  LibrisADF: `“` −5 px, `‘` −3 px, `(` −2 px, `—` −10 px, every other line
+  0 px.
+- **Justified lines stay flush right.** The shift is added to `spareSpace`, so
+  the gaps give back what the left edge took; right-edge x within ±3 px of
+  the unchanged value, which is `computeJustifyExtra`'s integer division.
+- **The hang is capped by the page's own left margin.** At Screen Margin 0 an
+  X3 leaves 4 px to the left of the measure; an uncapped half-em dash wanted
+  14 and would have been clipped by the panel edge, not wrapped into the
+  margin. `leftHangBudget` in `extractLine` is that cap, recovered from
+  `getScreenWidth() - pageWidth` because ParsedText is handed a width and
+  never a margin.
+- **Stale caches would have kept flush-left quotes**, so `SECTION_FILE_VERSION`
+  went to 43 for the reason v39 gives: a hang is break-neutral but its painted
+  x lives in the cached TextBlocks.
+
+Not implemented, and deliberately: the capital `T`/`W`/`A`/`V` optical
+correction the roadmap mentions alongside this. That is side-bearing
+compensation on letterforms, not punctuation — a different and far more
+subjective feature, and it is not what "hanging punctuation" asked for.

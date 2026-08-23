@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <vector>
@@ -238,13 +239,30 @@ uint16_t measureWordWidth(const GfxRenderer& renderer, const int fontId, const s
   return renderer.getTextAdvanceX(fontId, sanitized.c_str(), style);
 }
 
-// Optical margin alignment (hanging punctuation), right edge only.
+// Optical margin alignment (hanging punctuation), both edges.
 //
-// Returns the width by which a line's trailing glyph may hang past the measure
-// into the right margin: the FULL advance for '.' and ',' (near-invisible ink;
-// the classical full hang) and HALF the advance for the rest of the terminal
-// set — quotes, hyphens (including the one hyphenation appends), semicolon,
-// colon, '!' and '?' — whose taller ink reads wrong fully outside the measure.
+// One table, two columns: the fraction of a glyph's OWN advance that may hang
+// past the measure when the glyph ENDS a line and when it BEGINS one, counted
+// in quarters (4 = the full advance, 2 = half, 1 = a quarter, 0 = no hang).
+// Two columns rather than two tables: a glyph that hangs on both edges must be
+// worth the same air on both, or the page's two margins disagree.
+//
+// Trailing: the FULL advance for '.' and ',' (near-invisible ink; the classical
+// full hang) and HALF for the rest of the terminal set — quotes, hyphens
+// (including the one hyphenation appends), semicolon, colon, '!' and '?' —
+// whose taller ink reads wrong fully outside the measure.
+//
+// Leading: the shared glyphs keep their trailing fraction. ';' ':' '!' '?'
+// never legitimately begin a line, so they hang 0 there rather than dragging
+// real ink into the margin for what is a parse artifact. Opening parens,
+// brackets and braces are leading-only and hang a QUARTER: their ink runs the
+// full body height with almost no side bearing, so a larger hang reads as a
+// misaligned line rather than an optical correction. The en/em dashes and the
+// horizontal bar hang a quarter for a different reason: half an em is wider
+// than the page's whole left margin at the tightest Screen Margin, and a hang
+// that big is capped away rather than drawn (see extractLine). The leading-only quote
+// forms («, ‹, ‚, „) and the em/en dashes carry a trailing 0, so no line that
+// hung before this table existed hangs differently now.
 //
 // Measured from the glyph's OWN advance in the word's own style — italic '.'
 // carries roughly twice the roman right side bearing
@@ -252,40 +270,71 @@ uint16_t measureWordWidth(const GfxRenderer& renderer, const int fontId, const s
 // hang would under-hang italics. Any kern INTO the punctuation (T. −4.56 in
 // LibreFranklin 16) is already inside the word's measured width and is NOT
 // re-added here, so nothing is double-counted.
+struct HangFraction {
+  uint32_t cp;
+  uint8_t trailingQuarters;
+  uint8_t leadingQuarters;
+};
+
+constexpr HangFraction HANG_FRACTIONS[] = {
+    {'.', 4, 4},     {',', 4, 4},     {';', 2, 0},     {':', 2, 0},     {'!', 2, 0},
+    {'?', 2, 0},     {'-', 2, 2},     {'\'', 2, 2},    {'"', 2, 2},     {0x2010, 2, 2},  // hyphen
+    {0x2018, 2, 2},                                                                      // ‘
+    {0x2019, 2, 2},                                                                      // ’
+    {0x201C, 2, 2},                                                                      // “
+    {0x201D, 2, 2},                                                                      // ”
+    {0x201A, 0, 2},                                                                      // ‚
+    {0x201E, 0, 2},                                                                      // „
+    {0x00AB, 0, 2},                                                                      // «
+    {0x2039, 0, 2},                                                                      // ‹
+    {0x2013, 0, 1},                                                                      // –
+    {0x2014, 0, 1},                                                                      // —
+    {0x2015, 0, 1},                                                                      // ―
+    {'(', 0, 1},     {'[', 0, 1},     {'{', 0, 1},
+};
+
+uint8_t hangQuarters(const uint32_t cp, const bool leading) {
+  for (const auto& entry : HANG_FRACTIONS) {
+    if (entry.cp == cp) return leading ? entry.leadingQuarters : entry.trailingQuarters;
+  }
+  return 0;
+}
+
+// `glyph` is a NUL-terminated single UTF-8 sequence, so the advance measured is
+// the punctuation's alone and never the word it sits in.
+int hangWidthOfGlyph(const GfxRenderer& renderer, const int fontId, const char* glyph,
+                     const EpdFontFamily::Style style, const bool leading) {
+  const auto* ptr = reinterpret_cast<const unsigned char*>(glyph);
+  const uint32_t cp = utf8NextCodepoint(&ptr);
+  const uint8_t quarters = hangQuarters(cp, leading);
+  if (quarters == 0) return 0;
+  return renderer.getTextAdvanceX(fontId, glyph, style) * quarters / 4;
+}
+
 int trailingHangWidth(const GfxRenderer& renderer, const int fontId, const std::string& word,
                       const EpdFontFamily::Style style) {
   if (word.empty()) return 0;
-  // Find the start of the last UTF-8 sequence.
+  // Find the start of the last UTF-8 sequence; it runs to the word's own NUL.
   size_t i = word.size() - 1;
   while (i > 0 && (static_cast<uint8_t>(word[i]) & 0xC0) == 0x80) {
     --i;
   }
-  const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str() + i);
-  const uint32_t cp = utf8NextCodepoint(&ptr);
-  bool fullHang = false;
-  switch (cp) {
-    case '.':
-    case ',':
-      fullHang = true;
-      break;
-    case ';':
-    case ':':
-    case '!':
-    case '?':
-    case '-':
-    case '\'':
-    case '"':
-    case 0x2010:  // hyphen
-    case 0x2018:  // ‘
-    case 0x2019:  // ’
-    case 0x201C:  // “
-    case 0x201D:  // ”
-      break;
-    default:
-      return 0;  // not a hangable glyph
+  return hangWidthOfGlyph(renderer, fontId, word.c_str() + i, style, false);
+}
+
+int leadingHangWidth(const GfxRenderer& renderer, const int fontId, const std::string& word,
+                     const EpdFontFamily::Style style) {
+  if (word.empty()) return 0;
+  // Copy out the first UTF-8 sequence: unlike the trailing case there is no NUL
+  // after it, and measuring from word.c_str() would measure the whole word.
+  size_t len = 1;
+  while (len < word.size() && (static_cast<uint8_t>(word[len]) & 0xC0) == 0x80) {
+    ++len;
   }
-  const int advance = renderer.getTextAdvanceX(fontId, word.c_str() + i, style);
-  return fullHang ? advance : advance / 2;
+  if (len > 4) return 0;
+  char glyph[5] = {0};
+  std::memcpy(glyph, word.c_str(), len);
+  return hangWidthOfGlyph(renderer, fontId, glyph, style, true);
 }
 
 // A line must never BEGIN with a dash (block-rendering audit 2026-08-22,
@@ -1277,8 +1326,34 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
           ? trailingHangWidth(renderer, fontId, lineWords.back(), lineWordStyles.back())
           : 0;
 
-  // For justified text, compute per-gap extra to distribute remaining space evenly
-  const int spareSpace = effectivePageWidth - lineWordWidthSum - totalNaturalGaps + hangWidth;
+  // Optical margin alignment, left edge: a line that BEGINS with an opening
+  // quote, an opening bracket or a dash is shifted LEFT by that glyph's hang
+  // (see leadingHangWidth), so the word edge rather than the punctuation's air
+  // lands on the measure -- and this is the edge the eye reads down. Paint-time
+  // only, for the same reason the trailing hang is: line BREAKS were decided
+  // against the unshifted measure, and a left shift moves ink AWAY from the
+  // right margin, so pagination is byte-identical. Right/Center lines are
+  // skipped -- their left edge is ragged, so there is nothing to align to.
+  // RTL/bidi lines are left out for the trailing hang's reason: after visual
+  // reordering the leading LOGICAL token is not the leading VISUAL one.
+  // The reader insets both sides of the page equally, so the space to the left
+  // of the measure is half of what the screen has spare -- screenMargin 0 leaves
+  // 4 px on an X3 and a half-em dash would hang 14. Hanging past it does not
+  // wrap into the margin, it walks off the panel and the glyph is clipped, so
+  // the budget caps the hang rather than the other way round. Recovered here
+  // instead of plumbed in because ParsedText is handed a width, not a margin;
+  // every layout it is used for is centered in the same way.
+  const int leftHangBudget = std::max(0, (renderer.getScreenWidth() - pageWidth) / 2);
+  const int leadingHang =
+      (effectiveAlignment != CssTextAlign::Right && effectiveAlignment != CssTextAlign::Center && !blockStyle.isRtl &&
+       !hasRtlWord && !lineWords.empty())
+          ? std::min(leftHangBudget, leadingHangWidth(renderer, fontId, lineWords.front(), lineWordStyles.front()))
+          : 0;
+
+  // For justified text, compute per-gap extra to distribute remaining space evenly.
+  // The left shift is handed back to the gaps here so the justified right edge stays
+  // flush: it is applied once at the paint x and paid for once here, never twice.
+  const int spareSpace = effectivePageWidth - lineWordWidthSum - totalNaturalGaps + hangWidth + leadingHang;
   const int justifyExtra = (effectiveAlignment == CssTextAlign::Justify && !isLastLine)
                                ? computeJustifyExtra(spareSpace, actualGapCount)
                                : 0;
@@ -1463,8 +1538,10 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
         }
       }
     } else {
-      // LTR: position words from left to right
-      int xpos = firstLineIndent;
+      // LTR: position words from left to right. The leading hang (0 unless this
+      // line opens with hanging punctuation) is the only negative x the paint
+      // path produces, and it lands inside the reader's own screen margin.
+      int xpos = firstLineIndent - leadingHang;
       if (effectiveAlignment == CssTextAlign::Right) {
         xpos = effectivePageWidth - lineWordWidthSum - totalNaturalGaps;
       } else if (effectiveAlignment == CssTextAlign::Center) {
