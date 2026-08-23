@@ -433,7 +433,8 @@ template <TextRotation rotation = TextRotation::None, bool deviceSpace = false>
 static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode renderMode,
                            const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
                            const bool pixelState, const EpdFontFamily::Style style) {
-  const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
+  EpdFontFamily::GlyphSource glyphSource = EpdFontFamily::GlyphSource::Direct;
+  const EpdGlyph* glyph = fontFamily.getGlyph(cp, style, &glyphSource);
   if (!glyph) {
     // DBG, not ERR: the firmware does not control what codepoints reach it. An
     // EPUB, a BLE-typed note, or a model answer can all carry an emoji no
@@ -444,6 +445,17 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     LOG_DBG("GFX", "No glyph for codepoint %d", cp);
     return;
   }
+
+  // A face with no U+FFFD substitutes '?' (B-009), and a '?' standing in for a
+  // missing character is INDISTINGUISHABLE from one the author typed -- which
+  // is worse than the empty space sweep item #38 reported, because it reads as
+  // content. Draw the '?' glyph's own cell as a hollow box instead. Reusing the
+  // substitute's metrics is the whole trick: every measure walk in this file
+  // already measured that glyph, so the box cannot disagree with the layout the
+  // way an invented advance would (B-036 is the same lesson from the other
+  // side). A face that DOES carry U+FFFD already draws an unmistakable mark and
+  // is left alone.
+  const bool drawNotdefBox = glyphSource == EpdFontFamily::GlyphSource::Fallback;
 
   const EpdFontData* fontData = fontFamily.getData(style);
   const bool is2Bit = fontData->is2Bit;
@@ -475,25 +487,64 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     }
   }
 
+  // For Normal:  outer loop advances screenY, inner loop advances screenX
+  // For Rotated: outer loop advances screenX, inner loop advances screenY (in reverse)
+  int outerBase, innerBase;
+  if constexpr (rotation == TextRotation::Rotated90CW) {
+    outerBase = cursorX + fontData->ascender - top;  // screenX = outerBase + glyphY
+    innerBase = cursorY - left;                      // screenY = innerBase - glyphX
+  } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+    // The 180-degree mirror of the CW case: both glyph axes reverse, so the
+    // band grows the other way and the run descends instead of climbing.
+    outerBase = cursorX - (fontData->ascender - top);  // screenX = outerBase - glyphY
+    innerBase = cursorY + left;                        // screenY = innerBase + glyphX
+  } else {
+    outerBase = cursorY - top;   // screenY = outerBase + glyphY
+    innerBase = cursorX + left;  // screenX = innerBase + glyphX
+  }
+
+  // The glyph-cell mapping, in the box's terms. It is the same arithmetic the
+  // bitmap loops below do inline -- kept separate rather than shared because
+  // those loops walk every pixel in scan order with the bitmap index riding
+  // along, and the box touches only the rim. What matters is that both land in
+  // the same cell, so the box occupies exactly the pixels the substitute's
+  // bitmap would have.
+  const auto plotCell = [&](const int glyphX, const int glyphY) {
+    int screenX, screenY;
+    if constexpr (rotation == TextRotation::Rotated90CW) {
+      screenX = outerBase + glyphY;
+      screenY = innerBase - glyphX;
+    } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+      screenX = outerBase - glyphY;
+      screenY = innerBase + glyphX;
+    } else {
+      screenX = innerBase + glyphX;
+      screenY = outerBase + glyphY;
+    }
+    plotGlyphPixel<deviceSpace>(renderer, screenX, screenY, pixelState);
+  };
+
+  if (drawNotdefBox) {
+    // Ink on the rim only. The BW pass paints it and the grayscale passes leave
+    // it alone: the box is a hairline rule, not a shape with antialiased edges,
+    // and flagging it into a gray plane would leave the rim half-painted when a
+    // page renders BW-only.
+    if (renderMode == GfxRenderer::BW && width > 0 && height > 0) {
+      for (int glyphX = 0; glyphX < width; glyphX++) {
+        plotCell(glyphX, 0);
+        plotCell(glyphX, height - 1);
+      }
+      for (int glyphY = 1; glyphY < height - 1; glyphY++) {
+        plotCell(0, glyphY);
+        plotCell(width - 1, glyphY);
+      }
+    }
+    return;
+  }
+
   const uint8_t* bitmap = renderer.getGlyphBitmap(fontData, glyph);
 
   if (bitmap != nullptr) {
-    // For Normal:  outer loop advances screenY, inner loop advances screenX
-    // For Rotated: outer loop advances screenX, inner loop advances screenY (in reverse)
-    int outerBase, innerBase;
-    if constexpr (rotation == TextRotation::Rotated90CW) {
-      outerBase = cursorX + fontData->ascender - top;  // screenX = outerBase + glyphY
-      innerBase = cursorY - left;                      // screenY = innerBase - glyphX
-    } else if constexpr (rotation == TextRotation::Rotated90CCW) {
-      // The 180-degree mirror of the CW case: both glyph axes reverse, so the
-      // band grows the other way and the run descends instead of climbing.
-      outerBase = cursorX - (fontData->ascender - top);  // screenX = outerBase - glyphY
-      innerBase = cursorY + left;                        // screenY = innerBase + glyphX
-    } else {
-      outerBase = cursorY - top;   // screenY = outerBase + glyphY
-      innerBase = cursorX + left;  // screenX = innerBase + glyphX
-    }
-
     if (is2Bit) {
       // One table decides which glyph level the BW base pass paints and which
       // plane each antialiased level flags, for both output polarities. See

@@ -101,7 +101,16 @@ namespace {
 //      standing between a stale cache and a mis-parsed page. Pagination is
 //      unchanged; the bump is the format, per the note below that a layout OR a
 //      structural change bumps this.
-constexpr uint8_t SECTION_FILE_VERSION = 45;
+// v46: missing-glyph accounting (2026-08-23, sweep item #38). Neither the
+//      bytes nor the pagination move: the .notdef box is drawn in the
+//      substitute glyph's own cell, so every advance is the one v45 measured.
+//      What changes is what a chapter parse DISCOVERS -- the count of
+//      codepoints the reading face has no shape for is a layout-scope book
+//      note, and a chapter served from a v45 cache is never parsed again, so
+//      the note would be silently absent on every book already on the card.
+//      A note that is missing looks exactly like a book with nothing to report,
+//      which is the failure the whole feature exists to prevent.
+constexpr uint8_t SECTION_FILE_VERSION = 46;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

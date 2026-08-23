@@ -29,6 +29,21 @@ constexpr char manifestAssetName[] = "manifest.json";
 constexpr char booksDir[] = "/books/";
 constexpr size_t SHA_CHUNK = 1024;
 
+// The ledger of "what this book looked like when its digest was last checked".
+// Beside the reader's other state, not under /books/, because it is this
+// firmware's bookkeeping and a card plugged into a computer should show books.
+constexpr char syncRecordsPath[] = "/.crosspoint/library_sync.json";
+// Bump when the shape of a record changes. A file at any other version is
+// IGNORED WHOLE, which costs one hashing pass and can never mis-skip: the
+// alternative -- reading fields whose meaning may have moved -- decides
+// downloads from numbers it does not understand.
+constexpr int SYNC_RECORDS_VERSION = 1;
+// The highest manifest.json this build knows how to act on. The published
+// manifest carries no "version" key today, which is why the default is 1: an
+// unversioned file is version 1 by definition, and the check only bites once
+// the publisher starts stamping them.
+constexpr int MAX_MANIFEST_VERSION = 1;
+
 std::string bearerHeaderValue() {
   // Built in one place so no call site ever holds the raw token where a log
   // line could pick it up. NEVER log the returned value.
@@ -283,6 +298,16 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
     LOG_ERR("LIB", "Manifest JSON did not parse");
     return JSON_PARSE_ERROR;
   }
+  // The manifest had no versioning at all until this check existed. Refusing an
+  // unknown version is the point of adding one: a future manifest that redefines
+  // "bytes" or "sha256" would otherwise be acted on silently, and the damage is
+  // downloads over books that were fine.
+  const int manifestVersion = doc["version"] | 1;
+  if (manifestVersion > MAX_MANIFEST_VERSION) {
+    LOG_ERR("LIB", "Manifest is version %d; this firmware understands %d", manifestVersion, MAX_MANIFEST_VERSION);
+    return MANIFEST_TOO_NEW;
+  }
+
   JsonArrayConst manifestBooks = doc["books"].as<JsonArrayConst>();
   if (manifestBooks.isNull()) {
     LOG_ERR("LIB", "Manifest has no books array");
@@ -318,6 +343,138 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
   return OK;
 }
 
+void LibraryUpdater::loadSyncRecords() {
+  if (recordsLoaded) return;
+  recordsLoaded = true;  // set FIRST: a missing or unreadable file means "no records", and
+                         // retrying the read per book would cost a card open each time.
+
+  HalFile file;
+  if (!Storage.openFileForRead("LIB", syncRecordsPath, file)) {
+    LOG_DBG("LIB", "No sync ledger yet; every book will be hashed once");
+    return;
+  }
+  // A corrupt directory entry can report any size at all, and this allocates
+  // exactly what it is told. 64 KB is ~500 records against a library of a few
+  // dozen; a file past it is not a ledger and reading none is the safe answer,
+  // because "no records" only ever costs a hashing pass.
+  constexpr size_t MAX_LEDGER_BYTES = 64 * 1024;
+  const size_t ledgerBytes = file.size();
+  if (ledgerBytes > MAX_LEDGER_BYTES) {
+    LOG_ERR("LIB", "Sync ledger is %u bytes; ignoring it", static_cast<unsigned>(ledgerBytes));
+    file.close();
+    return;
+  }
+  std::string body;
+  body.resize(ledgerBytes);
+  if (!body.empty()) file.read(&body[0], body.size());
+  file.close();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) {
+    LOG_ERR("LIB", "Sync ledger did not parse; hashing everything once");
+    return;
+  }
+  const int version = doc["version"] | 0;
+  if (version != SYNC_RECORDS_VERSION) {
+    LOG_INF("LIB", "Sync ledger is version %d, not %d; hashing everything once", version, SYNC_RECORDS_VERSION);
+    return;
+  }
+  for (JsonObjectConst entry : doc["books"].as<JsonArrayConst>()) {
+    StoredRecord record;
+    record.file = entry["f"] | "";
+    record.sha = entry["s"] | "";
+    record.bytes = entry["b"] | 0;
+    record.fatDate = static_cast<uint16_t>(entry["d"] | 0);
+    record.fatTime = static_cast<uint16_t>(entry["t"] | 0);
+    // A record with no name or a truncated digest cannot answer anything; drop
+    // it rather than let it match a book by accident.
+    if (record.file.empty() || record.sha.size() != 64) continue;
+    records.push_back(std::move(record));
+  }
+  LOG_DBG("LIB", "Sync ledger: %u records", static_cast<unsigned>(records.size()));
+}
+
+const LibraryUpdater::StoredRecord* LibraryUpdater::findRecord(const std::string& file) const {
+  for (const auto& record : records) {
+    if (record.file == file) return &record;
+  }
+  return nullptr;
+}
+
+void LibraryUpdater::putRecord(const std::string& file, const librarysync::CardStamp& stamp, const std::string& sha) {
+  // No mtime means nothing worth recording: hashVerdict refuses to skip without
+  // one, so a record carrying a zero would be read once and rejected forever.
+  if (!stamp.haveMtime) return;
+  for (auto& record : records) {
+    if (record.file != file) continue;
+    record.bytes = stamp.bytes;
+    record.fatDate = stamp.fatDate;
+    record.fatTime = stamp.fatTime;
+    record.sha = sha;
+    recordsDirty = true;
+    return;
+  }
+  StoredRecord record;
+  record.file = file;
+  record.bytes = stamp.bytes;
+  record.fatDate = stamp.fatDate;
+  record.fatTime = stamp.fatTime;
+  record.sha = sha;
+  records.push_back(std::move(record));
+  recordsDirty = true;
+}
+
+void LibraryUpdater::flushSyncRecords() {
+  if (!recordsDirty) return;
+
+  JsonDocument doc;
+  doc["version"] = SYNC_RECORDS_VERSION;
+  JsonArray array = doc["books"].to<JsonArray>();
+  for (const auto& record : records) {
+    JsonObject entry = array.add<JsonObject>();
+    entry["f"] = record.file;
+    entry["b"] = record.bytes;
+    entry["d"] = record.fatDate;
+    entry["t"] = record.fatTime;
+    entry["s"] = record.sha;
+  }
+  std::string body;
+  serializeJson(doc, body);
+
+  HalFile file;
+  if (!Storage.openFileForWrite("LIB", syncRecordsPath, file)) {
+    // Leave recordsDirty set. A second sync in the same session must try again
+    // rather than believe a write that never happened -- clearing the flag up
+    // front made the retry a silent no-op.
+    LOG_ERR("LIB", "Cannot write the sync ledger; the next run will hash again");
+    return;
+  }
+  const size_t written = file.write(body.data(), body.size());
+  file.close();
+  if (written != body.size()) {
+    LOG_ERR("LIB", "Sync ledger write was short (%u of %u bytes); the next run will hash again",
+            static_cast<unsigned>(written), static_cast<unsigned>(body.size()));
+    return;  // same reasoning: still dirty, and a short JSON file fails its own version check
+  }
+  recordsDirty = false;
+  LOG_DBG("LIB", "Sync ledger written: %u records, %u bytes", static_cast<unsigned>(records.size()),
+          static_cast<unsigned>(body.size()));
+}
+
+// What the card says about a book right now. Size and modification time come
+// from the same open, so they describe one moment.
+namespace {
+librarysync::CardStamp stampOf(const std::string& path) {
+  librarysync::CardStamp stamp;
+  HalFile file;
+  if (!Storage.openFileForRead("LIB", path, file)) return stamp;
+  stamp.bytes = file.size();
+  stamp.haveMtime = file.getModifyDateTime(&stamp.fatDate, &stamp.fatTime);
+  file.close();
+  return stamp;
+}
+}  // namespace
+
 bool LibraryUpdater::computeCardSha256(const std::string& path, char outHex[65]) {
   HalFile file;
   if (!Storage.openFileForRead("LIB", path, file)) return false;
@@ -351,17 +508,30 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
   if (index >= books.size()) return BookResult::FAILED;
   const Book& book = books[index];
 
+  loadSyncRecords();
+
   const std::string destPath = booksDir + book.file;
   const bool existed = Storage.exists(destPath.c_str());
-  size_t cardBytes = 0;
-  if (existed) {
-    HalFile f;
-    if (Storage.openFileForRead("LIB", destPath, f)) cardBytes = f.size();
-  }
+  const librarysync::CardStamp stamp = existed ? stampOf(destPath) : librarysync::CardStamp{};
 
-  if (librarysync::sizeVerdict(existed, cardBytes, book.bytes) == librarysync::SizeVerdict::CHECK_SHA) {
+  if (librarysync::sizeVerdict(existed, stamp.bytes, book.bytes) == librarysync::SizeVerdict::CHECK_SHA) {
+    const StoredRecord* stored = findRecord(book.file);
+    librarysync::SyncRecord record;
+    if (stored != nullptr) {
+      record.present = true;
+      record.bytes = stored->bytes;
+      record.fatDate = stored->fatDate;
+      record.fatTime = stored->fatTime;
+      record.sha = stored->sha.c_str();
+    }
+    if (librarysync::hashVerdict(stamp, record, book.sha256.c_str()) == librarysync::HashVerdict::SKIP_HASH) {
+      LOG_DBG("LIB", "Unchanged (size and mtime match the ledger, not read): %s", book.file.c_str());
+      return BookResult::UNCHANGED;
+    }
     char cardSha[65];
     if (computeCardSha256(destPath, cardSha) && librarysync::shaMatches(cardSha, book.sha256.c_str())) {
+      // Record what was just proved, so the next run can pass this book over.
+      putRecord(book.file, stamp, book.sha256);
       LOG_DBG("LIB", "Unchanged: %s", book.file.c_str());
       return BookResult::UNCHANGED;
     }
@@ -448,6 +618,11 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
       LOG_DBG("LIB", "Cleared stale cache for %s", book.file.c_str());
     }
   }
+
+  // The digest is known for certain here -- it was computed over the bytes as
+  // they streamed in -- so the ledger records the file as it now sits, and the
+  // next run reads no part of it.
+  putRecord(book.file, stampOf(destPath), book.sha256);
 
   LOG_INF("LIB", "%s: %s", existed ? "Updated" : "Added", book.file.c_str());
   return existed ? BookResult::UPDATED : BookResult::ADDED;

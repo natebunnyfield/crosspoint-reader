@@ -26,11 +26,14 @@ struct NoteText {
   StrId headline;
   StrId body;
   // Which Details figure fills the body's single %u, if any.
-  enum class Fill : uint8_t { None, CharsPerLine, Images, CssRules } fill;
+  // Encoding fills a %s; every other filled body takes a %u.
+  enum class Fill : uint8_t { None, CharsPerLine, Images, CssRules, MissingGlyphs, Encoding } fill;
 };
 
 constexpr NoteText kNotes[] = {
     {booknotes::Note::Drm, StrId::STR_BOOK_NOTE_DRM_H, StrId::STR_BOOK_NOTE_DRM_B, NoteText::Fill::None},
+    {booknotes::Note::TextEncodingUnsupported, StrId::STR_BOOK_NOTE_ENCODING_H, StrId::STR_BOOK_NOTE_ENCODING_B,
+     NoteText::Fill::Encoding},
     {booknotes::Note::NoTableOfContents, StrId::STR_BOOK_NOTE_NO_TOC_H, StrId::STR_BOOK_NOTE_NO_TOC_B,
      NoteText::Fill::None},
     {booknotes::Note::SpineEntriesMissing, StrId::STR_BOOK_NOTE_SPINE_MISSING_H, StrId::STR_BOOK_NOTE_SPINE_MISSING_B,
@@ -43,6 +46,8 @@ constexpr NoteText kNotes[] = {
      NoteText::Fill::None},
     {booknotes::Note::JustificationDemoted, StrId::STR_BOOK_NOTE_RAGGED_H, StrId::STR_BOOK_NOTE_RAGGED_B,
      NoteText::Fill::CharsPerLine},
+    {booknotes::Note::MissingGlyphs, StrId::STR_BOOK_NOTE_MISSING_GLYPHS_H, StrId::STR_BOOK_NOTE_MISSING_GLYPHS_B,
+     NoteText::Fill::MissingGlyphs},
     {booknotes::Note::NoHyphenationForLanguage, StrId::STR_BOOK_NOTE_NO_HYPHENATION_H,
      StrId::STR_BOOK_NOTE_NO_HYPHENATION_B, NoteText::Fill::None},
     {booknotes::Note::EmbeddedFontsIgnored, StrId::STR_BOOK_NOTE_FONTS_H, StrId::STR_BOOK_NOTE_FONTS_B,
@@ -116,6 +121,17 @@ void BookNotesActivity::buildLines() {
         break;
       case NoteText::Fill::CssRules:
         snprintf(filled, sizeof(filled), body, static_cast<unsigned>(detail.cssRulesDropped));
+        body = filled;
+        break;
+      case NoteText::Fill::MissingGlyphs:
+        snprintf(filled, sizeof(filled), body, static_cast<unsigned>(detail.missingCodepoints));
+        body = filled;
+        break;
+      case NoteText::Fill::Encoding:
+        // The name came off the card via notes.bin, so it is not trusted to be
+        // terminated by whoever wrote it; openBook terminates it on load and
+        // this reads no further than that.
+        snprintf(filled, sizeof(filled), body, detail.unsupportedEncoding);
         body = filled;
         break;
       case NoteText::Fill::None:

@@ -9,6 +9,8 @@
 #include <cstring>
 #include <memory>
 
+#include "MissingGlyphLedger.h"
+
 #include "EpdFontFamily.h"
 
 static_assert(sizeof(EpdGlyph) == 16, "EpdGlyph must be 16 bytes to match .cpfont file layout");
@@ -1464,6 +1466,13 @@ int SdCardFont::fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCoun
       if (advanceTableLookup(si, cp, nullptr)) continue;  // already cached
       int32_t idx = findGlobalGlyphIndex(s, cp);
       if (idx < 0) {
+        // The SECOND choke point for "this face cannot draw that", and the one
+        // that matters on a shipped card. An SD reading font substitutes the
+        // replacement glyph's ADVANCE here, so getTextAdvanceX finds a cached
+        // advance and never reaches EpdFont::getGlyph -- where the other note()
+        // lives. Without this line the ledger stays at zero for every book read
+        // in an SD font, which is every book read as the device ships.
+        missingglyphs::current().note(cp);
         if (replacementIdx < 0) {
           missedThisStyle++;
           continue;

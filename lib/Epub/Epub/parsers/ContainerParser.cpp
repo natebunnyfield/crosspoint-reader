@@ -3,12 +3,18 @@
 #include <Logging.h>
 #include <XmlParserUtils.h>
 
+#include "XmlEncodingSupport.h"
+
 bool ContainerParser::setup() {
   parser = XML_ParserCreate(nullptr);
   if (!parser) {
     LOG_ERR("CTR", "Couldn't allocate memory for parser");
     return false;
   }
+
+  // An EPUB may write this file in a legacy code page even when the rest of the
+  // book is UTF-8, so the handler goes on EVERY parser, not just the chapters'.
+  installXmlEncodingSupport(parser);
 
   XML_SetUserData(parser, this);
   XML_SetElementHandler(parser, startElement, endElement);

@@ -17,6 +17,8 @@
 #include "Epub.h"
 #include "Epub/BookNotes.h"
 #include "Epub/Page.h"
+#include "XmlEncodingSupport.h"
+#include <MissingGlyphLedger.h>
 #include "Epub/converters/ImageDecoderFactory.h"
 #include "Epub/converters/ImageDimsProbe.h"
 #include "Epub/converters/ImageToFramebufferDecoder.h"
@@ -2336,6 +2338,11 @@ bool ChapterHtmlSlimParser::beginParse() {
     return false;
   }
 
+  // The legacy code pages. Without this a chapter declaring windows-1252 --
+  // the most common non-UTF-8 encoding in EPUB -- fails with "unknown
+  // encoding" and the reader has no way past it (sweep item #52).
+  installXmlEncodingSupport(xmlParser_);
+
   // Handle HTML entities (like &nbsp;) that aren't in XML spec or DTD
   // Using DefaultHandlerExpand preserves normal entity expansion from DOCTYPE
   XML_SetDefaultHandlerExpand(xmlParser_, defaultHandlerExpand);
@@ -2354,6 +2361,12 @@ bool ChapterHtmlSlimParser::beginParse() {
   XML_SetUserData(xmlParser_, this);
   XML_SetElementHandler(xmlParser_, startElement, endElement);
   XML_SetCharacterDataHandler(xmlParser_, characterData);
+
+  // Count the codepoints this reading face has no shape for, for the duration
+  // of the chapter parse and no longer. ARMED here rather than globally because
+  // every UI screen draws through the same renderer, and a filename or a
+  // model's answer carrying an emoji is not a fact about the book.
+  missingglyphs::current().arm();
 
   parseStartTime_ = millis();
   return true;
@@ -2392,7 +2405,22 @@ ChapterHtmlSlimParser::ParseStatus ChapterHtmlSlimParser::parseStep() {
   return done ? ParseStatus::Done : ParseStatus::More;
 }
 
+// Close the ledger and hand the figure to the note. Called from both endings
+// of a parse: a chapter abandoned halfway still met real characters this font
+// cannot draw, and dropping the count would make the note appear and disappear
+// with the memory pressure of the moment.
+void ChapterHtmlSlimParser::reportMissingGlyphs() {
+  auto& ledger = missingglyphs::current();
+  ledger.disarm();
+  if (ledger.distinct() > 0) {
+    booknotes::current().setMissingCodepoints(ledger.distinct());
+    LOG_DBG("EHP", "Reading font has no shape for %u distinct codepoints so far%s", ledger.distinct(),
+            ledger.isSaturated() ? " (ledger full; the true number is higher)" : "");
+  }
+}
+
 void ChapterHtmlSlimParser::abortParse() {
+  reportMissingGlyphs();
   if (xmlParser_) {
     destroyXmlParser(xmlParser_);
     xmlParser_ = nullptr;
@@ -2431,6 +2459,9 @@ bool ChapterHtmlSlimParser::finishParse() {
     currentTextBlock.reset();
   }
 
+  // LAST, not first: makePages() above lays out the trailing page, and its
+  // measure walk is as much a part of this chapter as the parse was.
+  reportMissingGlyphs();
   return true;
 }
 

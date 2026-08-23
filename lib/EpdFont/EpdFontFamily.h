@@ -26,7 +26,10 @@ class EpdFontFamily {
   ~EpdFontFamily() = default;
   void getTextDimensions(const char* string, int* w, int* h, Style style = REGULAR) const;
   const EpdFontData* getData(Style style = REGULAR) const;
-  const EpdGlyph* getGlyph(uint32_t cp, Style style = REGULAR) const;
+  using GlyphSource = EpdFont::GlyphSource;
+  /// See EpdFont::getGlyph -- `source` reports whether this is the codepoint's
+  /// own glyph or a substitute for one the face has no shape for.
+  const EpdGlyph* getGlyph(uint32_t cp, Style style = REGULAR, GlyphSource* source = nullptr) const;
   /// Returns true if the resolved style's font can render `cp` directly
   /// (interval coverage only — see EpdFont::hasCodepoint).
   bool hasCodepoint(uint32_t cp, Style style = REGULAR) const;

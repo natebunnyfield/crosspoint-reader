@@ -1,5 +1,7 @@
 #pragma once
 
+#include <MissingGlyphLedger.h>
+
 #include <cstdint>
 #include <string>
 
@@ -62,11 +64,34 @@ enum class Note : uint8_t {
   ImagesDropped,          // an image could not be shown at all
   TablesFlattened,        // a table was reflowed into paragraphs, or a nested one dropped
   PreformattedCollapsed,  // <pre> / white-space:pre lost its line breaks and spacing
+  // -- Appended 2026-08-23. Scope is declared by isLayoutScope below, NOT by
+  //    position: a book-scope note appended after the layout ones used to
+  //    become layout-scope silently, which is a note that quietly deletes
+  //    itself the first time the reader changes font.
+  TextEncodingUnsupported,  // BOOK: a file declared a character encoding with no table here
+  MissingGlyphs,            // LAYOUT: the reading font has no shape for some of this book's characters
   _COUNT
 };
 
-// The scope boundary. Everything below AlignmentOverridden is book scope.
-constexpr Note FIRST_LAYOUT_NOTE = Note::AlignmentOverridden;
+// Which notes go stale when the measure changes. An EXPLICIT list, not an
+// ordering test: the enum is append-only because its values are persisted, and
+// an ordering test forces a book-scope note appended today to be inserted into
+// the middle -- re-pointing every layout bit in every notes.bin already on a
+// card. Every new note has to name its scope here, which is the one thing a
+// compiler will not remind anyone about.
+constexpr bool isLayoutScope(const Note n) {
+  switch (n) {
+    case Note::AlignmentOverridden:
+    case Note::JustificationDemoted:
+    case Note::ImagesDropped:
+    case Note::TablesFlattened:
+    case Note::PreformattedCollapsed:
+    case Note::MissingGlyphs:
+      return true;
+    default:
+      return false;
+  }
+}
 
 struct Details {
   // The measure that triggered the demotion, in characters per line. The
@@ -74,6 +99,15 @@ struct Details {
   uint16_t narrowestCharsPerLine = 0;
   uint16_t imagesDropped = 0;
   uint16_t cssRulesDropped = 0;
+  // DISTINCT codepoints the reading font could not draw, not occurrences. An
+  // occurrence count would change every time a page was repainted; "eleven
+  // characters are missing" is both stable and the fact a reader can act on.
+  uint16_t missingCodepoints = 0;
+  // The encoding a file declared that this firmware has no table for. A NAME,
+  // because there is no enumeration of the encodings that do NOT exist here and
+  // saying which one is the whole point of the note. Truncated rather than
+  // dropped: every real declaration is far shorter than this.
+  char unsupportedEncoding[24] = {0};
 };
 
 // One book is open at a time and the raise sites are spread across the parser,
@@ -117,6 +151,30 @@ class Notes {
     }
     raise(Note::ImagesDropped);
   }
+  // The FIRST unsupported encoding wins. A book is written in one encoding in
+  // practice, and a later chapter that declares a second is the less
+  // informative of the two -- the reader has already stopped at the first.
+  void raiseUnsupportedEncoding(const char* name) {
+    if (name != nullptr && name[0] != '\0' && detail.unsupportedEncoding[0] == '\0') {
+      size_t i = 0;
+      for (; name[i] != '\0' && i + 1 < sizeof(detail.unsupportedEncoding); ++i) {
+        detail.unsupportedEncoding[i] = name[i];
+      }
+      detail.unsupportedEncoding[i] = '\0';
+      dirty = true;
+    }
+    raise(Note::TextEncodingUnsupported);
+  }
+  // Distinct codepoints, counted by the caller: the ledger that knows which
+  // ones have already been seen lives with the font, not here.
+  void setMissingCodepoints(const uint16_t howMany) {
+    if (howMany == 0) return;
+    if (howMany != detail.missingCodepoints) {
+      detail.missingCodepoints = howMany;
+      dirty = true;
+    }
+    raise(Note::MissingGlyphs);
+  }
   void countDroppedCssRules(const uint16_t howMany) {
     if (howMany == 0) return;
     const uint32_t sum = static_cast<uint32_t>(detail.cssRulesDropped) + howMany;
@@ -141,6 +199,12 @@ class Notes {
     layoutMask = 0;
     detail.narrowestCharsPerLine = 0;
     detail.imagesDropped = 0;
+    // A different reading font has a different set of holes in it, so the old
+    // count is not merely stale, it is about a face that is no longer on screen.
+    // The ledger's lifetime is owned HERE, next to the figure it feeds, so
+    // there is only one place that can forget to clear it.
+    detail.missingCodepoints = 0;
+    missingglyphs::current().reset();
     dirty = true;
   }
   // Write notes.bin if anything changed since the last write. Cheap no-op
@@ -158,7 +222,6 @@ class Notes {
   // NOT named `bit`: Arduino.h defines that as a macro, and this header is
   // included from translation units compiled behind it.
   static uint32_t noteBit(const Note n) { return 1u << static_cast<uint8_t>(n); }
-  static bool isLayoutScope(const Note n) { return static_cast<uint8_t>(n) >= static_cast<uint8_t>(FIRST_LAYOUT_NOTE); }
   static uint8_t popcount32(uint32_t v) {
     uint8_t n = 0;
     while (v) {
@@ -172,6 +235,7 @@ class Notes {
     layoutMask = 0;
     detail = Details{};
     dirty = false;
+    missingglyphs::current().reset();
   }
 
   uint32_t bookMask = 0;

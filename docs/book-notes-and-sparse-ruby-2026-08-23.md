@@ -11,6 +11,15 @@ in a way nobody was told about.
 `SECTION_FILE_VERSION` 44 → **45** ([Section.cpp:93-104](../lib/Epub/Epub/Section.cpp)).
 `BOOK_CACHE_VERSION` is untouched at 10 — the notes are a separate 19-byte file.
 
+> **Superseded in part, later the same day.** Items #52 and #38 from the survey
+> below were taken; see
+> [encodings-glyphs-and-library-sync-2026-08-23.md](encodings-glyphs-and-library-sync-2026-08-23.md).
+> That work took `SECTION_FILE_VERSION` to **46** and `notes.bin` to version
+> **2** (19 bytes → 45), and added two notes, `TextEncodingUnsupported` and
+> `MissingGlyphs`, so the fourteen below are now **sixteen**. It also found that
+> **#38 as written here is wrong** — a missing codepoint has not drawn nothing
+> since B-009 — and the correction is in that document.
+
 ---
 
 ## 1. Sparse ruby
@@ -239,12 +248,13 @@ argument of this section:
 3. **Already known.** A parse the firmware performs anyway discovers it — no new
    pass, no new file read.
 
-Fourteen pass all three and are surfaced. The other 88 are listed below with the
-test they fail, because "checked X, decided against, here is why" is the half a
+Fourteen passed all three and were surfaced on the day this was written; two
+more (#52 and #38) were taken later the same day and bring it to **sixteen**.
+The other 86 are listed below with the test they fail, because "checked X, decided against, here is why" is the half a
 summary drops and the half that stops the same candidate being re-proposed
 forever.
 
-### Surfaced (14)
+### Surfaced (16, two of them added later the same day)
 
 | Note | Raised at | Scope | Frequency |
 |---|---|---|---|
@@ -262,13 +272,15 @@ forever.
 | `ImagesDropped` — no picture and no alt text, counted | [ChapterHtmlSlimParser.cpp](../lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp), the no-alt skip | layout | common (SVG covers) |
 | `TablesFlattened` — reflowed into paragraphs, or a nested one dropped | [ChapterHtmlSlimParser.cpp](../lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp), `<table>` branch | layout | some books |
 | `PreformattedCollapsed` — `<pre>` loses its spacing and line breaks | [ChapterHtmlSlimParser.cpp](../lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp), tag check | layout | some books |
+| `TextEncodingUnsupported` — a file declares an encoding with no table here, carrying its NAME (added 2026-08-23) | [XmlEncodingSupport.cpp](../lib/Epub/Epub/parsers/XmlEncodingSupport.cpp) | book | rare, and total when it happens |
+| `MissingGlyphs` — distinct codepoints the reading face has no shape for (added 2026-08-23) | [MissingGlyphLedger.h](../lib/EpdFont/MissingGlyphLedger.h), raised from `ChapterHtmlSlimParser` | layout | any book outside the reading font's script |
 
 Note the two that are effectively universal (`StylesheetPartlyUnderstood`,
 `JustificationDemoted`) are kept anyway: the first because the COUNT is
 book-specific even when the fact is not, the second because the owner asked for
 it by name and its character figure is the answer to "why does this look loose".
 
-### Not surfaced (88), by the test each fails
+### Not surfaced (86), by the test each fails
 
 #### Fails test 1 — the app's typography, identical for every book
 
@@ -335,12 +347,12 @@ fire on a large fraction of books. Specifically —
 | 23 | Unknown length units (`cm`, `mm`, `in`, `ex`, `ch`, `vw`, `vh`) silently fall through to PIXELS — `margin: 1cm` becomes 1 px | `CssParser.cpp:343` | **the strongest remaining candidate.** It is a genuine wrong answer, not a simplification, and the fix (a note, and probably a real conversion) is small. Left out only because it belongs with fixing the units, not with reporting them |
 | 26/27/28/29/30/31 | CSS caps, oversized selectors, low heap, file > 128 KB | `CssParser.cpp:58,513,610,497`; `Epub.cpp:368,377` | **partly surfaced** as `StylesheetSkipped`; the 128 KB and heap refusals in `Epub.cpp` are not yet wired |
 | 32 | `resolveStyle` returns an empty style for every element while free heap < 48 KB | `CssParser.cpp:708` | per-element and transient; a note raised from it would depend on what else was running |
-| 38 | A codepoint the reading face lacks draws NOTHING — no `.notdef`, and the Noto fallback map is registered for UI fonts only | `GfxRenderer.cpp:437`; `main.cpp:457` | **the most user-visible thing on this list.** Detected in `GfxRenderer`, which is shared with every UI screen, so raising a BOOK note from it needs a seam that does not exist. Filed as the next one to do |
+| 38 | ~~A codepoint the reading face lacks draws NOTHING~~ | `EpdFont.cpp` last-resort branch; `SdCardFont.cpp` advance table | **TAKEN 2026-08-23, and the description above is wrong.** `EpdFont::getGlyph` has substituted U+FFFD, then `'?'`, since B-009: an SD reading face draws the diamond and the built-in Libre Franklin draws a bare question mark, which is worse than empty space because it reads as content. Now a `.notdef` box where the substitute was `'?'`, plus a layout-scope note counting distinct uncoverable codepoints. The seam was one level below `GfxRenderer`, in `lib/EpdFont`, in the two places that decide a face cannot draw a codepoint |
 | 43 | Progressive JPEG decoded DC-only: 1/8 resolution, upscaled | `JpegToFramebufferConverter.cpp:429` | inside the image decoder, which runs at RENDER time, not parse time |
 | 44 | PNG bit-depth combos that overflow the row buffer abort the decode | `PngToFramebufferConverter.cpp:388` | same |
 | 46 | After 16 image failures in a session, further failures are not retried | `ImageBlock.cpp:67` | session state, not book state |
 | 47 | An image positioned outside the panel is skipped | `ImageBlock.cpp:336` | render time |
-| 52 | **No `XML_SetUnknownEncodingHandler` anywhere** — XHTML in windows-1252 / Shift_JIS / GB2312 / EUC-JP cannot be parsed at all | `ChapterHtmlSlimParser.cpp:2306` and four other parsers | chapters DO get `STR_INDEX_FAILED`; OPF/TOC failures are log-only. Deserves a note; the honest fix is the handler |
+| 52 | ~~No `XML_SetUnknownEncodingHandler` anywhere~~ | `XmlEncodingSupport.cpp`, installed at all five `XML_ParserCreate` sites | **TAKEN 2026-08-23.** 29 single-byte code pages (7,424 B of generated table); the multi-byte CJK encodings are refused on purpose, because this firmware carries no CJK reading face and decoding GBK into replacement marks buys nothing. A refusal now raises a book note NAMING the encoding. Reproduced first: the reader was not missing a chapter, it was stuck — page-forward retried the failing chapter forever |
 | 54 | Unknown HTML entities emitted literally as `&foo;` into the prose | `ChapterHtmlSlimParser.cpp:2010` | per-entity, cheap to count — candidate |
 | 55 | CDATA, PIs and DOCTYPE internal subset text dropped | `ChapterHtmlSlimParser.cpp:2015` | correct behavior |
 | 62 | TOC href→spine lookup accepts the first 64-bit hash + length match **without comparing the href** | `BookMetadataCache.cpp:425` | a latent correctness bug, not a notice. Filed separately |
@@ -372,13 +384,19 @@ fire on a large fraction of books. Specifically —
 
 ### The four next candidates, in order
 
-1. **#38, missing glyphs draw nothing.** The largest reader-visible gap on the
-   list, and the only one that can make a page unreadable without any other
-   symptom.
-2. **#52, no unknown-encoding handler.** A whole class of books cannot be opened
-   and the OPF/TOC half of it is log-only.
-3. **#23, unknown CSS units become pixels.** A wrong answer, not a simplification.
+1. ~~**#38, missing glyphs draw nothing.**~~ **Done 2026-08-23**, and the
+   premise was wrong: they drew a question mark. See
+   [encodings-glyphs-and-library-sync-2026-08-23.md](encodings-glyphs-and-library-sync-2026-08-23.md).
+2. ~~**#52, no unknown-encoding handler.**~~ **Done 2026-08-23**, single-byte
+   code pages only, multi-byte refused with a note. Same document.
+3. **#23, unknown CSS units become pixels.** A wrong answer, not a
+   simplification. Now the top of the list.
 4. **#102, watermarked page counts.** It makes a number on screen wrong.
+
+A fifth, promoted by the encoding work: a file whose bytes are windows-1252 and
+which **declares no encoding at all** still fails, because expat assumes UTF-8
+and the first high byte is invalid. That is sniffing rather than decoding, and
+it is a separate repair.
 
 ---
 

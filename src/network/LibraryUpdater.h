@@ -1,8 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include "LibrarySyncPlan.h"  // librarysync::CardStamp, for the record store below
 
 /**
  * Update Library: sync /books/ on the card against the epub set published as
@@ -21,6 +24,16 @@
  *   identical (size AND sha256)             -> skip
  * Books on the card that the manifest does not mention are NEVER touched —
  * removal is not this feature. Compare logic: LibrarySyncPlan.h (pure).
+ *
+ * THE DIGEST IS NOT RECOMPUTED WHEN NOTHING MOVED (owner ruling 2026-08-23).
+ * Hashing every book on every run meant reading the whole library end to end to
+ * learn, almost always, that it was unchanged. A ledger beside the card records
+ * the size and modification time a book had when its digest was last verified,
+ * and a book whose size AND mtime still match that record — against a manifest
+ * still asking for the same digest — is passed over unread. Every way of not
+ * knowing (no record, no mtime from the HAL, a manifest that now wants
+ * something else) hashes, so the first run after this shipped hashes
+ * everything and writes the ledger it will use next time.
  */
 class LibraryUpdater {
  public:
@@ -33,6 +46,7 @@ class LibraryUpdater {
     NO_RELEASE,   // GitHub answered 404: no library-latest release published
     NO_MANIFEST,  // release exists but carries no manifest.json asset
     JSON_PARSE_ERROR,
+    MANIFEST_TOO_NEW,  // manifest.json declares a version this firmware does not act on
     OOM_ERROR,
   };
 
@@ -63,10 +77,34 @@ class LibraryUpdater {
   size_t getProcessedSize() const { return processedSize; }
   size_t getTotalSize() const { return totalSize; }
 
+  // Write the ledger if a syncBook() changed it. Call once when the run ends.
+  // Deliberately NOT written per book: the first run touches every entry, and a
+  // rewrite each time would be O(books^2) card writes to save a hash the run is
+  // already paying for. A run that dies before this costs the next run one more
+  // hashing pass, which is exactly the old behaviour.
+  void flushSyncRecords();
+
  private:
+  // What a book looked like when its digest was last verified. Persisted to
+  // /.crosspoint/library_sync.json; see LibrarySyncPlan.h for the verdict this
+  // feeds and why every uncertainty hashes.
+  struct StoredRecord {
+    std::string file;
+    std::string sha;
+    size_t bytes = 0;
+    uint16_t fatDate = 0;
+    uint16_t fatTime = 0;
+  };
+
   std::vector<Book> books;
+  std::vector<StoredRecord> records;
+  bool recordsLoaded = false;
+  bool recordsDirty = false;
   size_t processedSize = 0;
   size_t totalSize = 0;
 
   bool computeCardSha256(const std::string& path, char outHex[65]);
+  void loadSyncRecords();
+  const StoredRecord* findRecord(const std::string& file) const;
+  void putRecord(const std::string& file, const librarysync::CardStamp& stamp, const std::string& sha);
 };

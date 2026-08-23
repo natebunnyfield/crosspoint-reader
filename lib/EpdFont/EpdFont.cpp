@@ -2,6 +2,8 @@
 
 #include <Utf8.h>
 
+#include "MissingGlyphLedger.h"
+
 #include <algorithm>
 
 void EpdFont::getTextBounds(const char* string, const int startX, const int startY, int* minX, int* minY, int* maxX,
@@ -155,7 +157,8 @@ uint32_t EpdFont::applyLigatures(uint32_t cp, const char*& text) const {
   return cp;
 }
 
-const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
+const EpdGlyph* EpdFont::getGlyph(const uint32_t cp, GlyphSource* source) const {
+  if (source) *source = GlyphSource::Direct;
   const int count = data->intervalCount;
   if (count == 0 && !data->glyphMissHandler) return nullptr;
 
@@ -200,8 +203,19 @@ const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
   // for: U+FFFD -> '?' -> U+FFFD is a cycle, and a face missing both overflows
   // the stack rather than returning nullptr.
   if (cp != REPLACEMENT_GLYPH && cp != FALLBACK_GLYPH) {
-    if (const EpdGlyph* replacement = getGlyph(REPLACEMENT_GLYPH)) return replacement;
-    return getGlyph(FALLBACK_GLYPH);
+    // THE choke point for "this face cannot draw that". Every measure walk and
+    // every draw walk reaches the glyph through here, so counting it here is
+    // the one place that cannot disagree with what lands on the page.
+    missingglyphs::current().note(cp);
+    if (const EpdGlyph* replacement = getGlyph(REPLACEMENT_GLYPH)) {
+      if (source) *source = GlyphSource::Replacement;
+      return replacement;
+    }
+    if (const EpdGlyph* fallback = getGlyph(FALLBACK_GLYPH)) {
+      if (source) *source = GlyphSource::Fallback;
+      return fallback;
+    }
+    return nullptr;
   }
   return nullptr;
 }

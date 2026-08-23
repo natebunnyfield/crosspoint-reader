@@ -10,7 +10,18 @@ class EpdFont {
   ~EpdFont() = default;
   void getTextDimensions(const char* string, int* w, int* h) const;
 
-  const EpdGlyph* getGlyph(uint32_t cp) const;
+  /// Where the returned glyph came from. Direct means the face has a shape for
+  /// the codepoint that was asked for; the other two mean it does not and
+  /// getGlyph substituted, which is exactly the thing that used to be invisible
+  /// (sweep item #38 -- a '?' substituted into prose reads as a question mark
+  /// the author typed).
+  enum class GlyphSource : uint8_t { Direct, Replacement, Fallback };
+
+  /// `source`, when given, says whether this is the codepoint's own glyph or a
+  /// substitute. The default keeps every existing caller unchanged: a caller
+  /// that only needs metrics does not care which it got, and the metrics are
+  /// the same either way by construction.
+  const EpdGlyph* getGlyph(uint32_t cp, GlyphSource* source = nullptr) const;
 
   /// Returns true if this font covers `cp`: either via its in-RAM interval
   /// table or, for SD card fonts, via the coverageHandler that consults the

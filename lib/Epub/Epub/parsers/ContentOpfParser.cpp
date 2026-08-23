@@ -7,6 +7,8 @@
 #include <Serialization.h>
 #include <XmlParserUtils.h>
 
+#include "XmlEncodingSupport.h"
+
 #include <cctype>
 
 #include "Epub/BookMetadataCache.h"
@@ -40,6 +42,10 @@ bool ContentOpfParser::setup() {
     LOG_DBG("COF", "Couldn't allocate memory for parser");
     return false;
   }
+
+  // An EPUB may write this file in a legacy code page even when the rest of the
+  // book is UTF-8, so the handler goes on EVERY parser, not just the chapters'.
+  installXmlEncodingSupport(parser);
 
   XML_SetUserData(parser, this);
   XML_SetElementHandler(parser, startElement, endElement);

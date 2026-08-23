@@ -62,7 +62,11 @@ void LibraryUpdateActivity::runSync() {
     // NO_RELEASE gets its own words for the same reason the OTA screen's does:
     // GitHub was reached and answered; blaming the network sends the owner to
     // debug Wi-Fi over a release that was never published.
-    errorMessage = err == LibraryUpdater::NO_RELEASE ? tr(STR_LIBRARY_NO_RELEASE) : tr(STR_UPDATE_CHECK_FAILED);
+    // Three distinct causes, three distinct sentences. "Check failed" sends the
+    // owner to debug Wi-Fi over a manifest GitHub served perfectly.
+    errorMessage = err == LibraryUpdater::NO_RELEASE      ? tr(STR_LIBRARY_NO_RELEASE)
+                   : err == LibraryUpdater::MANIFEST_TOO_NEW ? tr(STR_LIBRARY_MANIFEST_TOO_NEW)
+                                                             : tr(STR_UPDATE_CHECK_FAILED);
     RenderLock lock(*this);
     state = State::FAILED;
     requestUpdate();
@@ -103,6 +107,9 @@ void LibraryUpdateActivity::runSync() {
         break;
     }
   }
+
+  // One write at the end of the run, not one per book: see flushSyncRecords.
+  updater.flushSyncRecords();
 
   LOG_INF("LIB", "library sync done: %u updated, %u unchanged, %u errors", updated, unchanged, errors);
   RenderLock lock(*this);

@@ -28,6 +28,13 @@ add_library(crosspoint_test_common INTERFACE)
 target_include_directories(crosspoint_test_common INTERFACE
   ${REPO_ROOT}
   ${REPO_ROOT}/lib
+  # PlatformIO puts every lib/<name> directory on the include path, so firmware
+  # sources include their siblings' headers FLAT (<EpdFontFamily.h>). Only the
+  # one library that headers outside it include this way is listed: BookNotes.h
+  # owns the missing-glyph ledger's lifetime and includes <MissingGlyphLedger.h>,
+  # which otherwise breaks every suite that touches book notes at one remove --
+  # hyphenation_eval was the first, and it has nothing to do with fonts.
+  ${REPO_ROOT}/lib/EpdFont
 )
 target_compile_options(crosspoint_test_common INTERFACE
   -Wall
@@ -157,3 +164,6 @@ add_subdirectory(text_antialiasing)
 add_subdirectory(progressive_jpeg)
 add_subdirectory(ruby_serialization)
 add_subdirectory(book_notes)
+add_subdirectory(xml_encodings)
+add_subdirectory(missing_glyphs)
+add_subdirectory(library_sync)

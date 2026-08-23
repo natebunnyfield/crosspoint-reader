@@ -6,8 +6,15 @@
 
 namespace booknotes {
 namespace {
-// version(1) + bookMask(4) + layoutMask(4) + fingerprint(4) + three uint16 = 19.
-constexpr uint8_t NOTES_FILE_VERSION = 1;
+// version(1) + bookMask(4) + layoutMask(4) + fingerprint(4) + four uint16(8)
+// + the encoding name(24) = 45.
+//
+// VERSION 2 (2026-08-23): added the missing-codepoint count and the declared
+// encoding name. An old file is DISCARDED rather than partly read -- the two
+// new notes are also new bits in the masks, and a v1 file has neither. A
+// discarded file costs one re-parse of a book already on the card, which is the
+// path openBook already takes for a book it has never seen.
+constexpr uint8_t NOTES_FILE_VERSION = 2;
 constexpr const char* NOTES_FILE = "/notes.bin";
 }  // namespace
 
@@ -35,7 +42,21 @@ void Notes::openBook(const std::string& cacheDir) {
   serialization::readPod(file, detail.narrowestCharsPerLine);
   serialization::readPod(file, detail.imagesDropped);
   serialization::readPod(file, detail.cssRulesDropped);
+  serialization::readPod(file, detail.missingCodepoints);
+  // A truncated file is a corrupt file: take nothing from it rather than a
+  // half-read name. clear() has already zeroed the field, so the bytes that did
+  // not arrive are zeros rather than stack, but a name cut in half would be
+  // shown to the reader as though it were the encoding the book declared.
+  const int nameBytes = file.read(detail.unsupportedEncoding, sizeof(detail.unsupportedEncoding));
   file.close();
+  if (nameBytes != static_cast<int>(sizeof(detail.unsupportedEncoding))) {
+    LOG_ERR("BKN", "Truncated notes.bin; discarding it");
+    clear();
+    return;
+  }
+  // Terminate regardless of what was written: this is handed to snprintf as a
+  // %s, and the file came off a card.
+  detail.unsupportedEncoding[sizeof(detail.unsupportedEncoding) - 1] = '\0';
 
   // Masks written by a newer firmware may carry bits this build has no note
   // for; drop them rather than count them into a total the screen cannot show.
@@ -60,6 +81,8 @@ void Notes::flush() {
   serialization::writePod(file, detail.narrowestCharsPerLine);
   serialization::writePod(file, detail.imagesDropped);
   serialization::writePod(file, detail.cssRulesDropped);
+  serialization::writePod(file, detail.missingCodepoints);
+  file.write(detail.unsupportedEncoding, sizeof(detail.unsupportedEncoding));
   file.close();
   dirty = false;
   LOG_DBG("BKN", "Wrote book notes: book 0x%08x, layout 0x%08x (chars/line %u, images %u, css rules %u)", bookMask,
