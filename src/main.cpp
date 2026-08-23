@@ -418,13 +418,17 @@ CP_UI_FAMILY(sysNotoSans, notosans_8_regular, notosans_8_bold, notosans_10_regul
 // families above, and instantiated once per tier for the same reason: the
 // factor is latched at startup and the binary has to carry the companions for
 // whichever tier the owner picked.
+//
+// LIBRE FRANKLIN ONLY, since 2026-08-22. The coverage face has no hi-res
+// companions -- 4,325,323 bytes of binary for the codepoints Libre Franklin's
+// own cut lacks (Greek, sub/superscripts, currency, fractions; it already
+// carries Cyrillic and most of Latin Extended). Those now blit from the 1x
+// table, per glyph, which is coarse rather than absent. Simulator repo,
+// docs/ios-app-size.md A4.
 #define CP_UI_HIRES(t)                                                                                         \
   CP_UI_FAMILY(sysLibreFranklinHiRes##t##_, CP_HR(librefranklin_8_regular, t), CP_HR(librefranklin_8_bold, t), \
                CP_HR(librefranklin_10_regular, t), CP_HR(librefranklin_10_bold, t),                            \
-               CP_HR(librefranklin_12_regular, t), CP_HR(librefranklin_12_bold, t));                           \
-  CP_UI_FAMILY(sysNotoSansHiRes##t##_, CP_HR(notosans_8_regular, t), CP_HR(notosans_8_bold, t),                \
-               CP_HR(notosans_10_regular, t), CP_HR(notosans_10_bold, t),                                      \
-               CP_HR(notosans_12_regular, t), CP_HR(notosans_12_bold, t))
+               CP_HR(librefranklin_12_regular, t), CP_HR(librefranklin_12_bold, t))
 #if CROSSPOINT_RENDER_SCALE >= 2
 CP_UI_HIRES(2);
 #endif
@@ -468,11 +472,12 @@ void applySystemFont(GfxRenderer& renderer) {
       renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklinHiRes2_8);
       renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklinHiRes2_10);
       renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklinHiRes2_12);
-      // The coverage face needs companions too, or a fallback glyph blits at
-      // 1x inside a 2x page -- one third the size of the text around it.
-      renderer.registerHiResBuiltinFont(NOTOSANS_UI_8_FONT_ID, sysNotoSansHiRes2_8);
-      renderer.registerHiResBuiltinFont(NOTOSANS_UI_10_FONT_ID, sysNotoSansHiRes2_10);
-      renderer.registerHiResBuiltinFont(NOTOSANS_UI_12_FONT_ID, sysNotoSansHiRes2_12);
+      // The coverage face gets NONE, deliberately (2026-08-22): drawText's
+      // hi-res branch is per glyph and simply falls through to the 1x table
+      // when there is no companion, so a Greek or fraction glyph coarsens
+      // where it used to be supersampled. It does not vanish and it does not
+      // change size -- renderCharImpl reads the density off the EpdFontData it
+      // is handed, and the 1x branch is handed the 1x face.
       break;
 #endif
 #if CROSSPOINT_RENDER_SCALE >= 3
@@ -480,9 +485,6 @@ void applySystemFont(GfxRenderer& renderer) {
       renderer.registerHiResBuiltinFont(SMALL_FONT_ID, sysLibreFranklinHiRes3_8);
       renderer.registerHiResBuiltinFont(UI_10_FONT_ID, sysLibreFranklinHiRes3_10);
       renderer.registerHiResBuiltinFont(UI_12_FONT_ID, sysLibreFranklinHiRes3_12);
-      renderer.registerHiResBuiltinFont(NOTOSANS_UI_8_FONT_ID, sysNotoSansHiRes3_8);
-      renderer.registerHiResBuiltinFont(NOTOSANS_UI_10_FONT_ID, sysNotoSansHiRes3_10);
-      renderer.registerHiResBuiltinFont(NOTOSANS_UI_12_FONT_ID, sysNotoSansHiRes3_12);
       break;
 #endif
     default:

@@ -54,6 +54,15 @@
 // has to be present in the binary. Registering the wrong tier's companions is
 // worse than registering none: the glyph bitmaps would be blitted at a pixel
 // density the framebuffer does not have.
+//
+// NOTO SANS IS NOT HERE, since 2026-08-22. The coverage face keeps its 1x tier
+// (below) and gets no hi-res companions: they were 4,325,323 bytes of the iOS
+// binary for the handful of codepoints Libre Franklin's own cut lacks --
+// Greek, sub/superscripts, currency, fractions; Cyrillic (U+0400-04FF) and
+// most of Latin Extended are already in Libre Franklin. The fallback is PER
+// GLYPH, so without a companion those characters render 1x-replicated, not
+// missing. See the simulator repo's docs/ios-app-size.md A4, and
+// HIRES_UI_FAMILIES in convert-builtin-fonts.sh.
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE >= 2
 #include <builtinFonts/iawriterquattro_12_bold_2x.h>
 #include <builtinFonts/iawriterquattro_14_bold_2x.h>
@@ -85,12 +94,6 @@
 #include <builtinFonts/librefranklin_reader_18_bold_2x.h>
 #include <builtinFonts/librefranklin_reader_18_italic_2x.h>
 #include <builtinFonts/librefranklin_reader_18_bolditalic_2x.h>
-#include <builtinFonts/notosans_8_regular_2x.h>
-#include <builtinFonts/notosans_8_bold_2x.h>
-#include <builtinFonts/notosans_10_regular_2x.h>
-#include <builtinFonts/notosans_10_bold_2x.h>
-#include <builtinFonts/notosans_12_regular_2x.h>
-#include <builtinFonts/notosans_12_bold_2x.h>
 #endif
 #if defined(CROSSPOINT_RENDER_SCALE) && CROSSPOINT_RENDER_SCALE >= 3
 #include <builtinFonts/iawriterquattro_12_bold_3x.h>
@@ -123,12 +126,6 @@
 #include <builtinFonts/librefranklin_reader_18_bold_3x.h>
 #include <builtinFonts/librefranklin_reader_18_italic_3x.h>
 #include <builtinFonts/librefranklin_reader_18_bolditalic_3x.h>
-#include <builtinFonts/notosans_8_regular_3x.h>
-#include <builtinFonts/notosans_8_bold_3x.h>
-#include <builtinFonts/notosans_10_regular_3x.h>
-#include <builtinFonts/notosans_10_bold_3x.h>
-#include <builtinFonts/notosans_12_regular_3x.h>
-#include <builtinFonts/notosans_12_bold_3x.h>
 #endif
 
 // Noto Sans: the COVERAGE face behind the chrome (owner 2026-08-17).

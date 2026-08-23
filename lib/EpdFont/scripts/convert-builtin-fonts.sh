@@ -450,7 +450,21 @@ done
 # handed. A 1-bit companion under a 2-bit 1x face would render as noise.
 # None of these reach the device binary -- no device env sets
 # CROSSPOINT_RENDER_SCALE, and nm on firmware.elf shows zero `_2x` symbols.
-for entry in ${UI_FAMILIES[@]}; do
+#
+# LIBRE FRANKLIN ONLY, since 2026-08-22 (docs/ios-app-size.md A4 in the
+# simulator repo). Noto Sans is the COVERAGE face, not a chrome face: it is
+# only ever reached per glyph, for codepoints Libre Franklin's own cut lacks --
+# and that cut already carries U+0400-04FF Cyrillic and most of Latin Extended,
+# so what is left to Noto is Greek, sub/superscripts, currency and fractions.
+# Its 2x + 3x companions were 4,325,323 bytes -- 21 % of the iOS binary -- for
+# characters that are rare in a title and, without a companion, coarsen rather
+# than vanish. Its 1x tier stays: that is what actually draws them, and hi-res
+# companions carry bitmaps only.
+HIRES_UI_FAMILIES=(
+  "librefranklin:LibreFranklin/LibreFranklin"
+)
+
+for entry in ${HIRES_UI_FAMILIES[@]}; do
   prefix="${entry%%:*}"
   stem="${entry#*:}"
   for size in 8 10 12; do
