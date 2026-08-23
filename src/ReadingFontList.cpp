@@ -1,7 +1,6 @@
 #include "ReadingFontList.h"
 
-#include <cstring>
-
+#include "FontDisplayNames.h"
 #include "notes/EditorFonts.h"
 
 namespace readingfonts {
@@ -36,6 +35,18 @@ bool offeredForReading(const char* family) {
   if (editorfonts::isWritingOnlyFamily(family)) return false;
   if (isRetired(family)) return false;
   return true;
+}
+
+bool sortsBefore(const char* a, const char* b) {
+  const uint16_t ya = FontDisplayNames::earliestYear(a);
+  const uint16_t yb = FontDisplayNames::earliestYear(b);
+  // Newest lineage first; undated families report 0 and therefore sort LAST,
+  // which is the intent -- an unlisted or user-installed face has no date to
+  // place it by.
+  if (ya != yb) return ya > yb;
+  // Ties by display name, so the order is stable run to run rather than
+  // depending on the order the card happened to be scanned in.
+  return FontDisplayNames::displayName(a) < FontDisplayNames::displayName(b);
 }
 
 }  // namespace readingfonts

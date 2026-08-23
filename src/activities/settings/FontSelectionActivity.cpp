@@ -141,11 +141,12 @@ void FontSelectionActivity::onEnter() {
     // last; ties fall back to the display name so the order is stable run to
     // run. settingIndex travels with each row, so reordering never changes
     // which registry family a row selects.
+    // The rule itself lives in readingfonts:: because the in-book cycle has to
+    // walk this same order, and a comparator spelled out in two places drifts
+    // -- which is exactly what happened here (the sets matched, the orders did
+    // not).
     std::sort(fonts_.begin(), fonts_.end(), [](const FontEntry& a, const FontEntry& b) {
-      const uint16_t ya = FontDisplayNames::earliestYear(a.name.c_str());
-      const uint16_t yb = FontDisplayNames::earliestYear(b.name.c_str());
-      if (ya != yb) return ya > yb;
-      return FontDisplayNames::displayName(a.name) < FontDisplayNames::displayName(b.name);
+      return readingfonts::sortsBefore(a.name.c_str(), b.name.c_str());
     });
   }
 

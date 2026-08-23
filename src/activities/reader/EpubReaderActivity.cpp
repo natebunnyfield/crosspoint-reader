@@ -813,8 +813,8 @@ void EpubReaderActivity::stepReaderLineSpacing(const int delta) {
 }
 
 void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
-  // Mirror FontSelectionActivity's list EXACTLY, or holding a side button would walk a
-  // different set of fonts than the picker shows. That list is: the installed SD families
+  // Mirror FontSelectionActivity's list EXACTLY -- both the SET and the ORDER, which are
+  // two separate promises this code has broken separately. That list is: the installed SD families
   // if there are any, and ONLY otherwise the two built-in Noto faces
   // (FontSelectionActivity.cpp, onEnter).
   //
@@ -835,6 +835,20 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
     if (!readingfonts::offeredForReading(families[i].name.c_str())) continue;
     readable.push_back(i);
   }
+  // ...AND IN THE PICKER'S ORDER, which is the half that was still wrong after
+  // the 2026-08-11 fix matched the SETS. This walked raw registry order --
+  // whatever order the card was scanned in -- while Text Settings shows newest
+  // lineage first, so a step landed on a face several rows from the one the
+  // picker sits next to. Owner 2026-08-23: "make sure font change order always
+  // follows Text Settings order." The comparator is readingfonts::sortsBefore
+  // rather than a copy of the picker's lambda, because two copies is how the
+  // orders diverged in the first place.
+  //
+  // Sorts the INDICES, so SETTINGS.sdFontFamilyName still resolves against
+  // registry position and nothing is re-pointed by the reordering.
+  std::sort(readable.begin(), readable.end(), [&families](const int a, const int b) {
+    return readingfonts::sortsBefore(families[a].name.c_str(), families[b].name.c_str());
+  });
   const int sdCount = static_cast<int>(readable.size());
 
   // Cycles at both ends, as asked: the modulo is written to work for delta = -1 too, since

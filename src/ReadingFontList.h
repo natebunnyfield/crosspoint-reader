@@ -31,4 +31,16 @@ bool isRetired(const char* family);
 // project has never heard of.
 bool offeredForReading(const char* family);
 
+// ...and the ORDER, which is the other half of "the same list" and was the half
+// still wrong after 2026-08-11 fixed the set. Text Settings sorts reverse
+// chronologically by lineage year, ties by display name; the in-book cycle
+// walked raw registry order, so a shake or a held side button stepped through
+// the same families in a different sequence than the picker shows them. Owner
+// 2026-08-23: "make sure font change order always follows Text Settings order."
+//
+// True when `a` sorts BEFORE `b`, i.e. usable directly as a std::sort
+// comparator on family directory names. Both consumers call this rather than
+// spelling the rule out, for the reason the file exists.
+bool sortsBefore(const char* a, const char* b);
+
 }  // namespace readingfonts
