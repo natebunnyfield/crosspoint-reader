@@ -992,6 +992,15 @@ families:
 
   - name: TeXGyreHeros
     description: "GUST's Helvetica revival, via URW Nimbus Sans (Latin)"
+    # HI-RES TIERS NEED --drop-codepoints 0x2E3B. At the 3x tier the 16 pt slot
+    # rasterises as 48 pt, and Heros' THREE-EM DASH comes out 276 px wide --
+    # over the 255 px ceiling of EpdGlyph's uint8 width, so the whole size
+    # fails to build. Measured 2026-08-23 while seeding the iOS bundle, which
+    # is the only surface that reads a hi-res tier; the device reads 1x and is
+    # unaffected. It is a per-build flag rather than a family drop_codepoints
+    # because the glyph is perfectly fine at 1x and 2x, and dropping it there
+    # would cost the dash for no reason:
+    #   build-sd-fonts.py --only TeXGyreHeros --scale 3 --drop-codepoints 0x2E3B
     intervals: reading
     # Same foundry, same license and same URL pattern as TeX Gyre Schola in the
     # Serif section — GUST Font License, four real cuts on CTAN — so like Schola
