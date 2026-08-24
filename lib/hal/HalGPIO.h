@@ -266,6 +266,20 @@ class HalGPIO {
   // (TXT, XTC) publish spineIndex 0.
   void publishReaderPageIdentity(uint64_t /*bookKey*/, int32_t /*spineIndex*/, int32_t /*pageInSpine*/) {}
 
+  // WHICH SYSTEM SCREEN IS ON GLASS -- Home, Settings, a picker, a file list.
+  // Same host-capability split as publishReaderPageIdentity above, and inert
+  // here for the same reason: the device has no generated paper to seed.
+  //
+  // Published from Activity::onEnter() for every activity that is NOT a reader,
+  // so the simulator's sheet is per-screen rather than per-launch, and the
+  // screen you came from is the leaf that shows through the one you are on. A
+  // reader is skipped there and keeps publishing its page identity from its
+  // render instead; see crosspoint-simulator/src/SheetIdentity.h.
+  //
+  // screenKey is the FNV-1a of the activity's name, which must be stable across
+  // builds and platforms for the same reason bookKey above must be.
+  void publishScreenIdentity(uint32_t /*screenKey*/) {}
+
   // Verify power button was held long enough after wakeup.
   // Returns true if verification succeeded, false if device should return to sleep.
   // Should only be called when wakeup reason is PowerButton.
