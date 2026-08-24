@@ -103,8 +103,8 @@
 # The S-tier ruling (docs/sd-card-fonts.md, 2026-08-02; Lexica Ultralegible
 # added 2026-08-03, three text grotesques the same day, two of those three cut
 # 2026-08-04, Lexica Ultralegible itself cut 2026-08-04, Quattrocento Sans
-# promoted 2026-08-04, TeX Gyre Heros added 2026-08-23): these seven, and only
-# these seven, are INSTALLED on every surface — both device SD cards, the
+# promoted 2026-08-04, TeX Gyre Heros added 2026-08-23, Almendra added
+# 2026-08-24): these eight, and only these eight, are INSTALLED on every surface — both device SD cards, the
 # simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
@@ -150,6 +150,21 @@ installed_families:
   - LibrisADF
   - InknutJunicode
   - TeXGyreHeros
+  - Almendra
+# Almendra joined on 2026-08-24 (owner ruling: "keep almendra but add in
+# accurate dates and authors"), out of the five-family trial the simulator
+# repo's docs/trial-fonts.md describes; the other four were declined the same
+# day. It is the eighth installed family and the
+# first bookish oldstyle drawn from calligraphy rather than from metal type, so
+# it displaces nothing in the tier and no head-to-head is owed.
+#
+# Its measured slots are the reason it survived the trial: x-height 12/14/16/18,
+# EXACT at all four, which only Edgar, TeX Gyre Schola, Libris and TeX Gyre
+# Heros also manage. advanceY reads back 32/39/45/55 against the tier's
+# 34/39/45/51 -- slots 1 and 2 exact, slot 0 two tight and slot 3 four loose --
+# and NO span fixes that, because `metrics:` and `line_height_scale` are both
+# family-wide multipliers and moving slot 3 down by 4 px would drag the two
+# exact slots off with it. The recipe's own comment carries the derivation.
 # TeXGyreHeros joined on 2026-08-23 (owner ruling: "add TeX Gyre Heros fully to
 # app as s tier candidate"). It is the second GUST e-foundry face in the tier
 # and the third installed sans: a Helvetica lineage reached through URW Nimbus
@@ -222,7 +237,11 @@ families:
     # 34/39/45/51). This row has not been re-measured either way.
     # C tier (owner ruling 2026-08-12): cut from tools/blind-bench/
     # blind-candidates.yaml's 14-family keepers list when LibrisADF went to
-    # S tier.
+    # S tier. Bundled again for the 2026-08-23 iOS trial and cut again on
+    # 2026-08-24 ("lose arvo and the other candidate fonts") — out of the
+    # seed tree and out of CROSSPOINT_IOS_TRIAL_FAMILIES, recipe and picker
+    # label kept. Two rulings against it now; do not bundle a third time
+    # without one for it.
     sizes: [10, 12, 13, 15]
     metrics: {ascent: 1102, descent: -522, linegap: 0}
     styles:
@@ -288,8 +307,17 @@ families:
   # 34/39/45/51. So Arvo runs ONE PIXEL LARGE at every slot and 3-5 px TIGHT at
   # every slot at once — a page that is both bigger and more closely set than
   # anything installed, which is most of what a slab serif's density reads as.
-  # That is the trial's finding, not a defect: fit a metrics: span only if it
-  # is promoted, and expect the span to have real work to do.
+  # That was the trial's finding, not a defect.
+  #
+  # C tier (owner ruling 2026-08-24, "lose arvo and the other candidate
+  # fonts"): the trial ended without a promotion. Its .cpfont tree came out of
+  # the iOS seed set and its name out of CROSSPOINT_IOS_TRIAL_FAMILIES; this
+  # recipe and its picker label in src/FontDisplayNames.h stay, exactly as for
+  # every other cut, so the face is not deleted from the project. It was never
+  # in installed_families, so there is nothing to delete from a device card.
+  # Putting it into installed_families is a promotion, not a restoration, and
+  # needs a fresh ruling. No span was ever fitted, so it would still be
+  # untuned.
   - name: Arvo
     description: "Geometric slab serif for screen reading (Latin)"
     intervals: latin-ext
@@ -515,14 +543,49 @@ families:
       italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondLightItalic.ttf"}
       bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip", member: "Junicode/TTF/Junicode-SemiCondMediumItalic.ttf"}
 
+  # S tier since 2026-08-24 — see installed_families at the top of this file.
+  #
+  # FLAGGED at promotion, NOT changed — awaiting an owner ruling, because the
+  # fix costs bundle megabytes and he asked for a promotion, not for those.
+  # This is the ONLY installed family still on `latin-ext`; the other seven are
+  # all on `reading`. That is not cosmetic: fallback_chain_for() in
+  # build-sd-fonts.py gives a Latin-only family its single committed face and
+  # NO symbol/math/dingbat tail, so Almendra's .cpfont files carry no
+  # U+2190-2193 arrows and no U+2212 MINUS. It fails
+  # test/sd_font_arrows/SdFontArrowsTest (EveryInstalledFamilyDrawsRealArrowGlyphs)
+  # for exactly that reason, and it is now the only INSTALLED family that does.
+  # Coelacanth was raised to `reading` on 2026-08-20 over the same bug, when
+  # U+2212 in a Claude reply drew tofu.
+  #
+  # Measured 2026-08-24, 1x raw bytes, same four sizes, same sources:
+  #
+  #   latin-ext         (today)     965,412   no arrows, no math
+  #   latin-ext,symbols           2,910,561   arrows + math + dingbats, 3.0x
+  #   reading                     4,111,496   the tier baseline, 4.3x
+  #
+  # At 4.3x the 1x+2x tree goes ~4.1 MB -> ~17.7 MB raw, which would put it
+  # mid-pack against Edgar's 22.4 and Libris' 9.5 rather than at the bottom.
+  # The rebuild itself is cheap: about 6 s per tier, sources and fallbacks all
+  # cached. It is the WEIGHT that needs the ruling, not the work.
   - name: Almendra
     description: "Bookish oldstyle drawn from medieval calligraphy (Latin)"
     intervals: latin-ext
-    # Uniform slots: xh 12/14/16/18 (exact), advY 33/39/46/55. The hinted build
-    # measures ~0.55 em x-height (the old "0.485, standard ramp" estimate read
-    # two slots big), and its xh curve is nonlinear: 18 px needs 17 pt while
-    # 16 px needs only 14 pt, so slot 3 runs +4 px loose — one span cannot fit
-    # the 14->17 pt jump. xh takes priority.
+    # READ BACK from the built .cpfonts on 2026-08-24, correcting a computed
+    # column that was off by a pixel at two slots (it said 33/39/46/55): xh
+    # 12/14/16/18 — EXACT at all four — and advY 32/39/45/55, against the
+    # tier's 34/39/45/51.
+    #
+    # The hinted build measures ~0.55 em x-height (the old "0.485, standard
+    # ramp" estimate read two slots big), and its xh curve is nonlinear: 18 px
+    # needs 17 pt while 16 px needs only 14 pt, so slot 3 runs +4 px loose —
+    # one span cannot fit the 14->17 pt jump. xh takes priority.
+    #
+    # Re-checked at promotion, because a trial's fit is allowed to be rough and
+    # an installed family's is not: no `metrics:` span and no
+    # `line_height_scale` fixes slot 3, since both are FAMILY-WIDE multipliers.
+    # Pulling 55 down to 51 is a 0.927 factor, which would take the two exact
+    # slots to 36 and 42 and slot 0 to 30. Four px loose at the largest size,
+    # with three slots right, is the better page. Leave it.
     sizes: [10, 12, 14, 17]
     metrics: {ascent: 1114, descent: -429, linegap: 0}
     # raw.githubusercontent ofl/almendra paths error out; these are the static
@@ -1232,6 +1295,20 @@ families:
       italic:     {url: "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-It.ttf"}
       bolditalic: {url: "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-BoldIt.ttf"}
 
+  # TRIAL, 2026-08-23 (owner: "add ibm plex sans text too"). Note there is no
+  # "IBM Plex Sans Text" cut — IBM/plex ships plex-sans, plex-serif,
+  # plex-mono, the scripts and plex-sans-condensed, and this is plex-sans, the
+  # reading face as against the IBM Plex Mono already here as a writing-only
+  # editor face.
+  #
+  # C tier (owner ruling 2026-08-24, "lose arvo and the other candidate
+  # fonts"): the trial ended without a promotion, and this was the most
+  # expensive of the five — 4,421,311 installed bytes at 1x+2x, because the
+  # recipe asks for Greek and Cyrillic as well. Out of the seed tree and out of
+  # CROSSPOINT_IOS_TRIAL_FAMILIES; recipe and picker label kept, as for every
+  # other cut. Untuned: no metrics: span was ever fitted, and read back it is
+  # xh 13/15/17/20 and advY 33/38/43/49 against the tier's 12/14/16/18 and
+  # 34/39/45/51.
   - name: IBMPlexSans
     description: "IBM corporate sans-serif (Latin, Greek, Cyrillic)"
     intervals: latin-ext,greek,cyrillic
@@ -1266,6 +1343,15 @@ families:
   # and its x-height STEP is uneven (14->15->18->20), so the four sizes do not
   # read as evenly spaced the way the tier's do. A span would have to move both
   # the size and the leading if this one is promoted.
+  #
+  # C tier (owner ruling 2026-08-24, "lose arvo and the other candidate
+  # fonts"): the trial ended without a promotion, and this was the face
+  # furthest off the tier's rhythm. Out of the seed tree and out of
+  # CROSSPOINT_IOS_TRIAL_FAMILIES; this recipe stays, which is the point of
+  # keeping it — the Book-weight sourcing and the SemiBold pairing above were
+  # measured work and rebuilding them from scratch would cost more than the
+  # comment does. It has no picker label, never having had a
+  # src/FontDisplayNames.h row.
   - name: FiraSansBook
     description: "Fira Sans in its Book weight, humanist sans (Latin)"
     intervals: latin-ext

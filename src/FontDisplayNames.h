@@ -54,6 +54,28 @@ struct Entry {
   const char* designer;   // credited designer
   const char* lineage;    // "YEAR PLACE; YEAR PLACE" stages — from docs/font-dates.md
   uint16_t earliestYear;  // first year in `lineage`, for reverse-chron picker sort
+  // Stages after which a BLANK LINE separates one typeface's attribution from
+  // the next's. 0 — the value every row that omits it gets — means no break,
+  // which is every family whose stages are all one typeface's story.
+  //
+  // It exists for the compound families, today only Inknut Antiqua + Junicode,
+  // whose four stages are two typefaces with a model and a digitisation each.
+  // Run together they read as one four-step lineage of one face, which is
+  // exactly wrong: nothing in "1469 Venice / 2014 Amsterdam / 1703 Oxford /
+  // 1998, 2023 Charlottesville" says the third line starts a second typeface
+  // (owner 2026-08-24, "put a line to space out between inknut+junicode
+  // metainfo").
+  //
+  // A stage COUNT rather than a flag on the stage, so the field means the same
+  // thing whatever the stages are. A hypothetical three-typeface row would
+  // need a second break and therefore a different mechanism; that is a
+  // deliberate refusal to build for a case that does not exist.
+  //
+  // DEFAULTED rather than left to aggregate zero-init: every one of the ~30
+  // rows below omits it, and without the initializer each one draws
+  // -Wmissing-field-initializers. Thirty warnings that mean nothing is how a
+  // warning that means something gets missed.
+  uint8_t groupBreakAfter = 0;
 };
 
 // Revivals credit whichever name the face itself doesn't already carry — the
@@ -61,10 +83,33 @@ struct Entry {
 // entry credits Dwiggins; Goudy Bookletter says Goudy, so its entry credits
 // Barry Schwartz, its digital designer.
 inline constexpr Entry kEntries[] = {
-    // Stage 1 empty on purpose: the ~1350 chancery hand is an anonymous scribal
-    // tradition, no scribe found (docs/font-dates.md). Sanfelippo is the 2011
-    // Buenos Aires digitiser, so she takes stage 2.
-    {"Almendra", "Almendra", "; Ana Sanfelippo", "1350 London; 2011 Buenos Aires", 1350},
+    // ONE STAGE, and the row it replaces had two. Almendra is an ORIGINAL
+    // design, not a revival, so Sanfelippo is the author rather than a
+    // digitiser and there is no empty first slot for a model.
+    //
+    // The old "1350 London" stage was the table's own inference and never a
+    // source's claim -- docs/font-dates.md carried it under a standing â  that
+    // called it uncited and a candidate for removal. It was removed on
+    // 2026-08-24, when the face was promoted to installed_families and its
+    // date started deciding where it sorts. Three primary sources, none of
+    // which dates a model:
+    //
+    //   * the shipped TTFs' own name ID 0 -- "Copyright (c) 2011-2012, Ana
+    //     Sanfelippo (anasanfe@gmail.com), with Reserved Font Name 'Almendra'"
+    //     -- two adjacent years, so 2011 under the adjacent-year rule;
+    //   * google/fonts ofl/almendra METADATA.pb, date_added 2011-12-19;
+    //   * the face's own DESCRIPTION.en_us.html, which names "the chancery and
+    //     gothic hands" -- classes of hands worked by many anonymous scribes
+    //     over centuries, not one dated model, and no country.
+    //
+    // Buenos Aires is where it was drawn: it was Sanfelippo's graduation
+    // typeface at the CDT UBA typography postgraduate program.
+    //
+    // The date moves it from LAST in the picker to first. That is not a
+    // side effect to undo -- an original 2011 face genuinely is the newest
+    // lineage in the set, and inventing a medieval one to seat it elsewhere is
+    // the thing this table's "no unreliable dates" rule exists to prevent.
+    {"Almendra", "Almendra", "Ana Sanfelippo", "2011 Buenos Aires", 2011},
     // Three revisions in one stage: Carter & Cone recut Dwiggins' Caledonia in
     // Cambridge across 1988, 1994 and 2026, so those years share a place and
     // take commas; the 1938 Linotype original is a separate stage. Dwiggins drew
@@ -103,8 +148,11 @@ inline constexpr Entry kEntries[] = {
     // S\xC3\xB8rensen's claim) and Junicode's model is Oxford University Press,
     // an institution. Junicode's revision year is restored here: with a line
     // per stage there is no longer a two-line budget forcing it out.
+    // The trailing 2 is `groupBreakAfter`: a blank line after stage 2, which is
+    // where Inknut's story ends and Junicode's begins. The ONLY row in the
+    // table that sets it.
     {"InknutJunicode", "Inknut Antiqua + Junicode", "; Claus Eggers S\xC3\xB8rensen; ; Peter S. Baker",
-     "1469 Venice; 2014 Amsterdam; 1703 Oxford; 1998, 2023 Charlottesville, Virginia", 1469},
+     "1469 Venice; 2014 Amsterdam; 1703 Oxford; 1998, 2023 Charlottesville, Virginia", 1469, 2},
     {"LibreCaslonText", "Libre Caslon Text", "William Caslon; Pablo Impallari & Rodrigo Fuenzalida",
      "1722 London; 2012 Rosario, Argentina", 1722},
     {"Lora", "Lora", "Olga Karpushina", "2011, 2019 Moscow", 2011},
@@ -392,11 +440,16 @@ constexpr size_t kMaxStackedInfoLines = 4;
 // ellipsized exactly the half the credit exists to show. A line break separates
 // without spending width.
 //
-// Six lines is the worst case in the table (Inknut Antiqua + Junicode: four
-// stages, two of them with no person). `kColophonLines` in
-// FontSelectionActivity is sized to it; the editor picker's four covers its own
-// mono faces. Stage N of `designer` pairs with stage N of `lineage`, both split
-// on the same ";".
+// FIVE lines is the worst case, and two different rows reach it. A two-stage
+// family in the roomy form spends person / year-place / blank / person /
+// year-place (Edgar, Coelacanth). Inknut Antiqua + Junicode takes the bulleted
+// form instead -- four stages, six lines of info, so one bulleted line each --
+// and its `groupBreakAfter` blank brings that back to five as well. Both
+// pickers' `kColophonLines` is 5 and neither has slack; a sixth line would be
+// silently dropped, so a new row that needs one has to raise both.
+//
+// Stage N of `designer` pairs with stage N of `lineage`, both split on the
+// same ";".
 //
 // This is a PAIRING, not a wrap. The previous version returned one flat run
 // and let the theme word-wrap it, so the break landed wherever the words ran
@@ -481,7 +534,20 @@ inline std::string subtitle(const std::string& directory) {
       const std::string& who = i < people.size() ? people[i] : std::string();
       const std::string& when = i < stages.size() ? stages[i] : std::string();
       if (who.empty() && when.empty()) continue;
-      if (!out.empty()) out += '\n';
+      if (!out.empty()) {
+        // The group break, if this row has one and we have just passed it: a
+        // blank line where one typeface's attribution ends and the next's
+        // begins. Only this bulleted form needs it -- the roomy form below
+        // already puts a blank between EVERY stage, so a second one there
+        // would be a double gap rather than a separation.
+        //
+        // Emitted as "\n\n" so the consumer sees an EMPTY SEGMENT between two
+        // newlines. Both pickers walk this string splitting on '\n' and push
+        // an empty segment through as a blank line, because wrappedText() has
+        // no words to lay one out from (FontSelectionActivity.cpp and
+        // EditorFontSelectionActivity.cpp, previewColophonLines).
+        out += (e->groupBreakAfter != 0 && i == e->groupBreakAfter) ? "\n\n" : "\n";
+      }
       if (who.empty()) {
         out += when;
       } else if (when.empty()) {

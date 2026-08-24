@@ -23,10 +23,13 @@ namespace {
 constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
 
 // Colophon lines the PREVIEW PANE reserves. Five is the worst case in the
-// table: two lineage stages at a person and a year-place each, plus the blank
-// line that separates the originator from whoever digitised their work.
-// FontDisplayNames::subtitle() collapses anything deeper to one bulleted line
-// per stage, so nothing exceeds this.
+// table, reached two different ways: two lineage stages at a person and a
+// year-place each, plus the blank line that separates the originator from
+// whoever digitised their work; or Inknut Antiqua + Junicode, which is deep
+// enough that FontDisplayNames::subtitle() collapses it to one bulleted line
+// per stage -- four of them -- plus the blank that separates the two
+// TYPEFACES (FontDisplayNames::Entry::groupBreakAfter). Nothing exceeds this,
+// and nothing has slack: a sixth line is dropped without a word.
 constexpr int kColophonLines = 5;
 
 // Families visible at once. The list rows are the family name alone now, so a

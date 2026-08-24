@@ -43,7 +43,8 @@ Every family carries an explicit tier. The column used to be blank for all but
 two rows, which made "demote everything below S" ambiguous — blank was doing
 double duty as both "unranked" and "the curated baseline". It no longer is.
 
-- **S** — the reading faces: Coelacanth, Edgar and TeX Gyre Schola for serif
+- **S** — the reading faces: Coelacanth, Edgar, TeX Gyre Schola and Almendra
+  (bookish calligraphic oldstyle, added 2026-08-24) for serif
   work; Libre Franklin (grotesque), Libris (humanist, added 2026-08-12) and
   TeX Gyre Heros (neo-grotesque, added 2026-08-23) for sans — three sans,
   permanently, because they fill different classification cells and a
@@ -53,8 +54,10 @@ double duty as both "unranked" and "the curated baseline". It no longer is.
   the reader's list (src/ReadingFontList.cpp) because cards provisioned before
   that ruling still carry it. New work, previews and screenshots use Edgar or
   Coelacanth unless a sans is called for. Together with Inknut Antiqua + Junicode
-  (2026-08-13) these are exactly the seven in `installed_families` as of
-  2026-08-23 — that is a consequence of the rulings, not a rule: the two lists
+  (2026-08-13) and Almendra (2026-08-24, promoted out of the iOS trial and
+  reversing its own 2026-08-11 C-tier cut) these are exactly the eight in
+  `installed_families` as of
+  2026-08-24 — that is a consequence of the rulings, not a rule: the two lists
   are still maintained separately, and A and C families are deliberately
   curated-but-not-shipped.
 - **A** — previously S. Still curated, buildable and supported, but **not
@@ -111,7 +114,7 @@ reader sees.
 | A | Rosarivo | Rosarivo | ; Pablo Ugerman | 1470 Venice; 2011 Buenos Aires | Venice, Italy (model: Nicolas Jenson's roman, 1470) | Buenos Aires, Argentina (Ugerman, UBA postgrad program) | [Font Squirrel](https://www.fontsquirrel.com/fonts/rosarivo). **⚠ Jenson NOT promoted — the model attribution itself is uncited, flagged for the owner rather than changed.** Searched 2026-08-12: no source ties this face to Jenson. Its own Google Fonts blurb names no model at all — "a typeface designed for use in letterpress printing … calligraphic and humanistic forms … originates from work presented to the post-graduate course in Typeface Design at the University of Buenos Aires in 2011" ([DESCRIPTION.en_us.html](https://raw.githubusercontent.com/google/fonts/main/ofl/rosarivo/DESCRIPTION.en_us.html)) — and neither Font Squirrel nor [Fonts In Use](https://fontsinuse.com/typefaces/44592/rosarivo) adds one. The name points somewhere else entirely: it honours **Raúl Mario Rosarivo** (1903–66), the Argentine typographer known for analysing the *Gutenberg* Bible's proportions ([Wikipedia](https://en.wikipedia.org/wiki/Ra%C3%BAl_Rosarivo)) — Mainz, not Venice. So the 1470 Venice stage looks like an inference, and promoting Jenson would harden a guess into a credit. **Owner ruling 2026-08-12: ship as written, flagged, revisit later**. **Per-stage split 2026-08-13: stage 1 empty, Ugerman on stage 2.** Ugerman is unambiguously the 2011 Buenos Aires designer (the face came out of the UBA postgrad course that year), and the empty first slot is the direct consequence of the 2026-08-12 ruling not to promote Jenson — the device now renders the 1470 stage as a bare year and place rather than attaching a name to it |
 | B | InknutAntiqua62 | Inknut Antiqua | ; Claus Eggers Sørensen | 1469 Venice; 2014 Amsterdam | Venice, Italy (model: Johannes de Spira's roman, 1469) | Amsterdam, Netherlands (Sørensen, Danish, based in Amsterdam) | [GitHub](https://github.com/clauseggers/Inknut-Antiqua); [FontsArena](https://fontsarena.com/inknut-antiqua-by-claus-eggers-sorensen/). **⚠ De Spira NOT promoted — the model attribution itself is uncited, flagged for the owner rather than changed.** Searched 2026-08-12: Sørensen names a *period*, never a printer. His own README and the Google Fonts blurb both say the face is drawn "to evoke Venetian incunabula and humanist manuscripts, but with the quirks and idiosyncrasies of the kinds of typefaces you find in this artisanal tradition" ([DESCRIPTION.en_us.html](https://raw.githubusercontent.com/google/fonts/main/ofl/inknutantiqua/DESCRIPTION.en_us.html)) — no de Spira, no Jenson, no year. FontsArena and [Fonts In Use](https://fontsinuse.com/typefaces/38696/inknut-antiqua) add nothing. "Johannes de Spira's roman, 1469" is a reasonable reading of "Venetian incunabula" — de Spira printed the first book in Venice in 1469 — but it is the table's inference, not the designer's claim, so no name goes in the Designer column. **Owner ruling 2026-08-12: ship as written, flagged, revisit later**. **Per-stage split 2026-08-13: stage 1 empty, Sørensen on stage 2 (2014 Amsterdam)** — the same placement the InknutJunicode row has already used for this typeface's half of its four stages since that row was written |
 | B | InknutJunicode | Inknut Antiqua + Junicode | Claus Eggers Sørensen; Peter S. Baker | 1469 Venice; 2014 Amsterdam; 1703 Oxford; 1998 Charlottesville | Venice, Italy (Inknut's model: Johannes de Spira's roman, 1469) and Oxford, England (Junicode's model: the OUP "Pica Roman" purchased 1692, printed in Hickes' Thesaurus 1703–05) | Amsterdam, Netherlands (Sørensen) and Charlottesville, Virginia, USA (Baker) | TWO TYPEFACES IN ONE FAMILY, so both columns carry both, roman first: Inknut Antiqua supplies regular and bold, Junicode supplies the real cut italics that Inknut's foundry repo has at no weight. Rows above for [InknutAntiqua62](#) and [Junicode](#) are the source of every fact here — this row only orders and compresses them. COMPRESSED DELIBERATELY: Junicode's stage reads "1998, 2023 Charlottesville, Virginia" in its own row, and the full concatenation measures 947 px at 8 pt against a 472 px line, so it needs three lines where the picker gives two (FontSelectionActivity.cpp:29, kColophonLines = 2) and the Junicode half would be the part truncated away. Dropping the 2023 revision rather than the 1998 initial release follows the lineage convention, which treats "," as separating a release from its later revisions within one stage. Do not "restore" the full string without raising kColophonLines |
-| B | Almendra | Almendra | ; Ana Sanfelippo | 1350 London; 2011 Buenos Aires | London, England (model: English chancery hand, ~1350) | Buenos Aires, Argentina (Sanfelippo, CDT UBA postgrad program) | [Font Squirrel](https://www.fontsquirrel.com/fonts/almendra); [METADATA.pb](https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/METADATA.pb). **No named scribe found for the ~1350 chancery-hand model — anonymous tradition, researched 2026-08-12.** Sanfelippo's own description names a class of hands and nothing narrower: "Almendra is a typeface design based on calligraphy. Its style is related to the chancery and gothic hands" ([DESCRIPTION.en_us.html](https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/DESCRIPTION.en_us.html)). No source names a scribe, a manuscript, a house, or a date — chancery and gothic hands are scribal traditions worked by many anonymous hands across centuries, not one person's design, so there is genuinely no original author to credit and the device's second subtitle line should stay empty. **⚠ Related, flagged not changed**: the "~1350" and "London" in the model parenthetical are likewise uncited — no source connects this face to a specific century or country — so under the "No unreliable dates" and "Places" rules the 1350 London stage is a candidate for removal, an owner call. **Per-stage split 2026-08-13: stage 1 empty, Sanfelippo on stage 2 (2011 Buenos Aires).** Note the wording above — "the device's second subtitle line should stay empty" — means the ORIGINAL-AUTHOR slot, which is the FIRST line under the per-stage format: Sanfelippo is the 2011 digitiser, so she cannot be the empty one, and the "Designer column" section below lists Almendra among the four rows whose empty slot is the anonymous/institutional MODEL. The sentence was written when the subtitle was one flat run and "second line" meant the wrapped remainder |
+| S | Almendra | Almendra | Ana Sanfelippo | 2011 Buenos Aires | — (born digital — an ORIGINAL design, no dated model; see Basis) | Buenos Aires, Argentina (Sanfelippo; drawn as her graduation typeface at CDT UBA, the typography postgraduate program at the Universidad de Buenos Aires) | **REWRITTEN 2026-08-24, at promotion to S tier**, because the row's date started deciding where the face sorts in the picker. Three primary sources, and none of them dates a model. (1) The shipped TTFs' own name ID 0: `Copyright (c) 2011-2012, Ana Sanfelippo (anasanfe@gmail.com), with Reserved Font Name 'Almendra'` — read from the four static cuts in `lib/EpdFont/scripts/downloaded_fonts/Almendra/` on 2026-08-24; two adjacent years, so 2011 under the adjacent-year rule. (2) [METADATA.pb](https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/METADATA.pb), `date_added: 2011-12-19`, designer `Ana Sanfelippo`, repository `https://github.com/googlefonts/almendra`. (3) [DESCRIPTION.en_us.html](https://raw.githubusercontent.com/google/fonts/main/ofl/almendra/DESCRIPTION.en_us.html): “Almendra is a typeface design based on calligraphy. Its style is related to the chancery and gothic hands” — classes of hands worked by many anonymous scribes across centuries, not one dated model, and naming no country. Luc Devroye's [type-designer index](http://luc.devroye.org/fonts-61152.html) agrees on all of it and adds the school: Buenos Aires, 2011, “part calligraphic part Lombardic text family”, her graduation typeface at FADU-UBA, Tipos Latinos 2012 award. **The former first stage, `1350 London`, is GONE** — it was this table's own inference and never a source's claim, and this row already carried a standing ⚠ saying so and calling it a candidate for removal. See Excluded dates below. The Designer column therefore holds ONE name with no leading semicolon: Sanfelippo is the author, not a digitiser, so there is no empty model slot to leave for her to follow. |
 
 ## Designer column: two names, semicolon-separated
 
@@ -142,8 +145,8 @@ is a gap in this table, not a settled fact.
 
 **A stage can have no person, and that is a real answer.** Several rows carry an
 institution, a company or an anonymous tradition where a name would go —
-Junicode (Oxford University Press), Venetian 301 (Bitstream), Almendra
-(anonymous scribal hands), Lexica Ultralegible (an unrecorded punchcutter),
+Junicode (Oxford University Press), Venetian 301 (Bitstream),
+Lexica Ultralegible (an unrecorded punchcutter),
 Inknut Antiqua and Rosarivo (model attributions the table declines to harden
 into a credit), Caledonia CC (three revising hands under one name the face
 already carries), Newsreader (no original author added). The renderer handles an
@@ -216,7 +219,9 @@ pair stage N of `designer` with stage N of `lineage`; the 2026-08-13 pass gave a
 per-stage string to the nine rows that still had one name against two or more
 stages — Almendra, Caledonia CC, GT Alpina, Inknut Antiqua, Newsreader, Rosarivo,
 Junicode, Lexica Ultralegible, Venetian 301 — and picked up Newsreader's
-outstanding `& Jean-Baptiste Levée` at the same time.
+outstanding `& Jean-Baptiste Levée` at the same time. Almendra has since left
+that group: its 2026-08-24 rewrite dropped the invented first stage, so it is
+one name against one stage and needs no split at all.
 
 **Two rows are still deliberately unpaired**, and both need a credit this table
 does not carry rather than a re-split of one it does:
@@ -255,7 +260,19 @@ sourced working notes and do NOT reach the device.
   year for both Coelacanth and Venetian 301.
 - **Newsreader 2021** (Production Type official launch) — collapsed as release
   lag behind the 2020 Google Fonts release.
-- **Rosarivo 2012 / Almendra 2011-12** Google Fonts dates — release lag.
+- **Rosarivo 2012** Google Fonts date — release lag.
+- **Almendra's `1350 London` first stage** (removed 2026-08-24) — an INVENTED
+  lineage, not a late date. No source connects this face to a century, a
+  country, a manuscript, a house or a scribe; "chancery and gothic hands" is
+  the designer's own phrase and names traditions rather than a model. The row
+  had carried a ⚠ flagging it as uncited since 2026-08-12, and it was struck
+  when the face was promoted to `installed_families:` and its earliest year
+  started ordering the picker. Removing it moves Almendra from LAST in the
+  reading list to FIRST, which is the correct consequence of an original 2011
+  design and not a side effect to compensate for.
+- **Almendra 2012** — the second year of the font's own `2011-2012` copyright,
+  and Google Fonts' `date_added: 2011-12-19` falls inside it; adjacent-year
+  rule, so 2011 stands alone.
 - **Lexica Ultralegible's 2023 repo creation and 2025 pushes** — the repo
   predates the release and is still maintained; v1.0.0 (2024-10-06) is the
   first dated release. Its OFL string carries `2020 Braille Institute of

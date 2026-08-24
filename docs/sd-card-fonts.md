@@ -3,18 +3,18 @@
 CrossPoint supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
-## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12; InknutJunicode added 2026-08-13; TeXGyreHeros added 2026-08-23)
+## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12; InknutJunicode added 2026-08-13; TeXGyreHeros added 2026-08-23; Almendra added 2026-08-24)
 
-The installed set on this fork is exactly seven families — **Edgar, Coelacanth,
-InknutJunicode, TeXGyreSchola, LibreFranklin, LibrisADF, TeXGyreHeros** — on
-every surface:
+The installed set on this fork is exactly eight families — **Edgar, Coelacanth,
+InknutJunicode, TeXGyreSchola, LibreFranklin, LibrisADF, TeXGyreHeros,
+Almendra** — on every surface:
 device SD cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed
 set (`crosspoint-simulator/ios/seedfonts/`). The authoritative list is
 `installed_families:` in `lib/EpdFont/scripts/sd-fonts.yaml` — when this prose
 and that list disagree, the yaml wins. The other curated families remain fully
 buildable recipes in `sd-fonts.yaml` (picker labels stay in
 `src/FontDisplayNames.h`), but they are not installed anywhere. When adding a
-surface or reprovisioning a card, install these seven and nothing else.
+surface or reprovisioning a card, install these eight and nothing else.
 
 **InknutJunicode joined 2026-08-13** (owner ruling: "add inknutjunicode fully
 to builds", `6c5fefe0a`), after fourteen bench rounds settled its borrowed
@@ -30,7 +30,7 @@ reprovisioned. Cards provisioned before a ruling carry the older set —
 compare against `fs_/fonts` by hash, and reprovision by hand before relying on
 a newer family being present.
 
-**Three of the seven are sans**, and each holds a different cell: **Libre
+**Three of the eight are sans**, and each holds a different cell: **Libre
 Franklin**, the 19th-century text grotesque, from
 `lib/EpdFont/scripts/grotesque-candidates.yaml`; **Libris** (`LibrisADF`), a
 calligraphic humanist sans reclassified out of the Serif section it was
@@ -200,7 +200,72 @@ digitization year is **2009, not the 2006 in the font's copyright string** —
 TeX Gyre Heros fonts", which it had to be, since URW only released the base-35
 originals under the LPPL on 2009-06-22.
 
+### Almendra is S tier (owner ruling, 2026-08-24) — reversing the 2026-08-11 cut below
+
+> keep almendra but add in accurate dates and authors
+
+The eighth installed family, and the only one promoted out of a bundle-only
+TRIAL rather than off a bench. The trial is the simulator repo's
+`docs/trial-fonts.md`: five faces put on a TestFlight build on 2026-08-23
+"without committing it to s tier", bundled through
+`CROSSPOINT_IOS_TRIAL_FAMILIES` so that no surface but the phone carried them.
+Arvo, Merriweather, IBM Plex Sans and Fira Sans Book were declined the same day
+("lose arvo and the other candidate fonts"); Almendra was kept, so the trial
+list is empty again and the gate is back to what it was.
+
+**This reverses the C-tier ruling of 2026-08-11 below**, which is recorded
+rather than quietly overwritten — that section says in as many words that
+putting Almendra into `installed_families:` "is a regression, not a
+restoration; it needs a fresh ruling". This is that ruling. Both sections stay:
+the earlier one is why the face had a recipe to bundle at all.
+
+**Its measured slots, read back from the built `.cpfont` files on 2026-08-24**
+(not computed from the span — that column has been wrong before, see the
+Merriweather caveat below): x-height **12/14/16/18, exact at all four**, which
+only Edgar, TeX Gyre Schola, Libris and TeX Gyre Heros also manage; advanceY
+**32/39/45/55** against the tier's 34/39/45/51, so slots 1 and 2 are exact,
+slot 0 is 2 px tight and slot 3 is 4 px loose.
+
+No `metrics:` span fixes that last one, and it was re-checked at promotion
+because a trial's fit is allowed to be rough and an installed family's is not.
+`metrics:` and `line_height_scale` are both FAMILY-WIDE multipliers: pulling 55
+down to 51 is a 0.927 factor, which takes the two exact slots to 36 and 42 and
+slot 0 to 30. The cause is the face's nonlinear x-height curve — 18 px needs
+17 pt while 16 px needs only 14 pt — and no single span spans that jump. Three
+slots right and one 4 px loose at the largest size is the better page.
+
+Note the 2026-08-11 section below quotes advY 32/39/45/54 from the blind
+bench's COMPUTED column. The built files measure 55, not 54; the direction of
+that section's finding stands, its last digit does not.
+
+**One thing is flagged and deliberately NOT changed**, because it costs bundle
+megabytes and the ruling asked for a promotion rather than for those.
+Almendra is the only one of the eight still on `intervals: latin-ext`; the
+other seven are all on `reading`. `fallback_chain_for()` in
+`build-sd-fonts.py` gives a Latin-only family its single committed fallback
+face and no symbol/math/dingbat tail, so Almendra's `.cpfont` files carry no
+U+2190–2193 arrows and no U+2212 MINUS — and it is now the only INSTALLED
+family failing `test/sd_font_arrows` (`EveryInstalledFamilyDrawsRealArrowGlyphs`).
+Coelacanth was raised to `reading` on 2026-08-20 over exactly this, when
+U+2212 in a Claude reply drew tofu. Measured 2026-08-24, 1x raw bytes, same
+four sizes and sources:
+
+| `intervals:` | 1x raw | what it buys |
+|---|---|---|
+| `latin-ext` (today) | 965,412 | — |
+| `latin-ext,symbols` | 2,910,561 | arrows, math operators, dingbats — 3.0x |
+| `reading` (the tier baseline) | 4,111,496 | the whole tier layer — 4.3x |
+
+At 4.3x the 1x+2x tree goes ~4.1 MB –> ~17.7 MB raw, which is mid-pack against
+Edgar's 22.4 and Libris' 9.5 rather than bottom. The rebuild is ~6 s per tier
+with sources and fallbacks cached; it is the WEIGHT that needs a ruling, not
+the work.
+
 ### Almendra is C tier (owner ruling, 2026-08-11)
+
+**SUPERSEDED 2026-08-24 — see the S-tier section above.** Left in place because
+the reasoning is still the record of why the face was benched, and because the
+paragraph below is the one the new ruling had to overturn by name.
 
 Called out of `tools/blind-bench/` — a real-device-render blind read, same rig
 as the sans and grotesque benches (`render_harness reading`, uniform 12/14/16/18
@@ -402,7 +467,7 @@ excludes, which is exactly the drift the list now prevents. Use
 The iOS app needs no equivalent list. `CrossPointFsPrep.cpp::seedOneFontDirectory`
 seeds whatever `crosspoint-simulator/ios/seedfonts/` contains and prunes files
 the bundle no longer carries, so that directory is its own source of truth —
-keep it holding exactly these seven.
+keep it holding exactly these eight.
 
 ## A tier (fork ruling, 2026-08-07)
 
@@ -556,9 +621,11 @@ of the sans taken from the headings is off by one. And **the S tier is better
 spread than the catalog**: its five occupy five different classes, while 19 of
 the catalog's 25 serifs sit in two. Cutting Archivo and Host Grotesk widened
 that spread rather than narrowing it, since all three grotesques filled one cell.
-(That "five" is the tier as it stood on 2026-08-07; it is seven families now,
-and the two additions since — Inknut Antiqua + Junicode, TeX Gyre Heros —
-widened the spread again rather than doubling a class.)
+(That "five" is the tier as it stood on 2026-08-07; it is eight families now,
+and the three additions since — Inknut Antiqua + Junicode, TeX Gyre Heros,
+Almendra — widened the spread again rather than doubling a class: Almendra is
+a bookish oldstyle drawn from calligraphy rather than cut in metal, which is
+its own cell.)
 Cutting Lexica Ultralegible is the one cut that did cost a class — humanist sans,
 and the low-vision/hyperlegible cell with it.
 
