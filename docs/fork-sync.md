@@ -120,6 +120,15 @@ recorded here instead.
   out of scope. Declined on scope, not on risk: the commit is mechanically
   safe, since `_order: 34` appends and no persisted `language` index shifts.
 
+- **TeX Gyre Heros' tight `at` — accept, owner ruling 2026-08-24.** He reported
+  it ("treatment has `t`s that are very close"), it was measured, and the fit
+  is the face's own: 35/1000 em at that junction against Libre Franklin's 107,
+  plus a `t` whose 16 px bitmap eats its own right sidebearing. Nothing in this
+  pipeline is implicated — the ASCII kern shortcut is exact across 79,524
+  pairs. Offered loosening pairs and dropping the family; he chose neither.
+  Heros ships unmodified and this does not reopen.
+  Full measurements: `docs/heros-letterfit-2026-08-24.md`.
+
 ### The two currently outstanding (2026-08-03)
 
 Both are `REVIEW`, both are genuinely mixed, and neither is a drive-by:

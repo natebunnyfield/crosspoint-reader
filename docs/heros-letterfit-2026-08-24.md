@@ -152,10 +152,17 @@ genuinely sparse. On Heros:
 It only ever tightens. It structurally cannot address an over-tight junction, so
 it is the wrong instrument here even before its gate fails.
 
-## 4. Options, if the owner wants this changed
+## 4. Options, and the ruling
 
-Not built — this is an appearance choice about a shipped face, and reversing a
-shipped typographic decision costs more than asking does.
+**STANDING RULING, owner 2026-08-24: option 1. Leave it — it is the face.**
+Asked with all three options and the measured cost of each, he chose to accept
+the fit as drawn. Heros stays in the tier, unmodified, with no hand-authored
+kern pairs. This is a decision, not a preference to re-check: do not re-propose
+loosening `at`, and do not treat a future report of the same tightness as a new
+bug — it is this one, already ruled on.
+
+The options as they were put, kept because the reasoning is what makes the
+ruling reversible if he ever changes his mind.
 
 1. **Accept it.** Heros is Helvetica; a tight `at` is the face's character, and
    at 16 px x-height the pixel grid exaggerates it. Costs nothing.
