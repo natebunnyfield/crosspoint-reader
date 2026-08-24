@@ -275,6 +275,32 @@ families:
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/bitter/Bitter-Italic%5Bwght%5D.ttf", variable: {wght: 500}}
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/bitter/Bitter-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
 
+  # TRIAL, 2026-08-23 (owner: "without committing it to s tier, quickly and
+  # minimally add arvo and merriweather and Almendra to a testflight build for
+  # my to check out"). The other three trial faces already had recipes here —
+  # this is the only one that did not. Deliberately UNTUNED: no metrics: span,
+  # so the slots land where the face's own hhea puts them rather than on the
+  # tier's shared 12/14/16/18 x-height rhythm.
+  #
+  # READ BACK from the built .cpfonts (not computed from the span — that column
+  # has been wrong before, see the caveat on Merriweather above): xh
+  # 13/15/17/19 and advY 31/36/41/46, against the tier's 12/14/16/18 and
+  # 34/39/45/51. So Arvo runs ONE PIXEL LARGE at every slot and 3-5 px TIGHT at
+  # every slot at once — a page that is both bigger and more closely set than
+  # anything installed, which is most of what a slab serif's density reads as.
+  # That is the trial's finding, not a defect: fit a metrics: span only if it
+  # is promoted, and expect the span to have real work to do.
+  - name: Arvo
+    description: "Geometric slab serif for screen reading (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    # All four styles are real; Arvo ships no variable axis.
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/arvo/Arvo-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/arvo/Arvo-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/arvo/Arvo-Italic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/arvo/Arvo-BoldItalic.ttf"}
+
   - name: Domitian
     description: "A humanist serif for literary reading (Latin, Greek, Cyrillic)"
     intervals: latin-ext,greek,cyrillic
@@ -1215,6 +1241,40 @@ families:
       bold:       {url: "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Bold.ttf"}
       italic:     {url: "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Italic.ttf"}
       bolditalic: {url: "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-BoldItalic.ttf"}
+
+  # TRIAL, 2026-08-23 (owner: "add fira sans book too"). BOOK, not Regular:
+  # Fira ships both, and Book is the lighter of the two (usWeightClass 350
+  # against Regular's 400; `l` stem 175/1000 em against 183). Google Fonts'
+  # static set omits Book entirely, so this sources from Mozilla's own tree —
+  # the same OFL release, and the only place the cut is separately available.
+  #
+  # The bold is SEMIBOLD, chosen rather than defaulted. Fira's name table
+  # groups Regular+Bold as its RIBBI four (no nameID 16/17 on either) and files
+  # Book and SemiBold as extra members, so the family itself designates no bold
+  # for Book. Measured `l` stem ratios: Fira's own Regular->Bold contrast is
+  # 183->242 = 1.32x; against the lighter Book, SemiBold gives 175->228 = 1.30x
+  # and Bold gives 175->242 = 1.38x. SemiBold reproduces the contrast Fira drew;
+  # Bold would show a heavier jump than the family intends, which would
+  # misrepresent the face on a page of mixed emphasis.
+  #
+  # Untuned, like the other four trial faces: no metrics: span. Latin only
+  # rather than Fira's full Greek+Cyrillic, to keep a trial family's weight down.
+  #
+  # Read back from the built .cpfonts: xh 14/15/18/20 and advY 30/35/40/45,
+  # against the tier's 12/14/16/18 and 34/39/45/51. The furthest off the rhythm
+  # of the five — 1-2 px large at every slot and 4-6 px tight at every slot —
+  # and its x-height STEP is uneven (14->15->18->20), so the four sizes do not
+  # read as evenly spaced the way the tier's do. A span would have to move both
+  # the size and the leading if this one is promoted.
+  - name: FiraSansBook
+    description: "Fira Sans in its Book weight, humanist sans (Latin)"
+    intervals: latin-ext
+    sizes: [12, 14, 16, 18]
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/mozilla/Fira/master/otf/FiraSans-Book.otf"}
+      bold:       {url: "https://raw.githubusercontent.com/mozilla/Fira/master/otf/FiraSans-SemiBold.otf"}
+      italic:     {url: "https://raw.githubusercontent.com/mozilla/Fira/master/otf/FiraSans-BookItalic.otf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/mozilla/Fira/master/otf/FiraSans-SemiBoldItalic.otf"}
 
   - name: Alegreya
     description: "Calligraphic serif/display (Latin, Greek, Cyrillic)"
