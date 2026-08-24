@@ -141,4 +141,82 @@ TEST_F(SdKernMeasure, SpaceAdvanceStaysUnkernedForShippedFonts) {
   EXPECT_EQ(plain, flanked);
 }
 
+// The ASCII kern-class shortcut (ca4cf1056, "getMeasureKern ran two binary
+// searches per character pair", 19% of a paginate) memoises
+// miniLookupKernClass into SdCardFont's 256-byte kernClassAscii table for
+// codepoints below 128. It shipped with no test, and its failure mode is
+// silent: a wrong class ID returns a kern from the WRONG matrix row, so a
+// handful of pairs measure a fraction of a pixel off and the page still
+// renders, still paginates, and still passes every existing assertion.
+//
+// This is the exhaustive comparison that would have caught it. getMeasureKern
+// (shortcut + measure-kern rows) and EpdFont::getKerning (the per-page mini
+// class tables + mini matrix) are INDEPENDENT lookups over the same file data,
+// so agreeing on every prewarmed ASCII pair pins the shortcut against a path
+// that never consults it. Every installed family is swept rather than one,
+// because the shortcut is per-STYLE state built at kern-table load and a font
+// whose class tables are shaped differently is exactly where a memoisation bug
+// would hide.
+TEST(SdKernShortcut, AsciiShortcutAgreesWithTheUnmemoisedLookupInEveryFamily) {
+  GfxRenderer renderer(display);
+  renderer.begin();
+
+  SdCardFontRegistry registry;
+  if (!registry.discover() || registry.getFamilyCount() == 0) {
+    GTEST_SKIP() << "needs SD fonts under fs_; run from the repo root or set CROSSPOINT_TEST_SD";
+  }
+
+  std::string ascii;
+  for (int c = 0x21; c < 0x7F; ++c) ascii += static_cast<char>(c);
+
+  int familiesChecked = 0;
+  for (const auto& family : registry.getFamilies()) {
+    SdCardFontManager manager;
+    if (!manager.loadFamily(family, renderer, 16)) continue;
+    const int fontId = manager.getFontId(family.name.c_str());
+    if (fontId == 0) {
+      manager.unloadAll(renderer);
+      continue;
+    }
+    SdCardFont* sdFont = renderer.getSdCardFonts().at(fontId);
+    ASSERT_NE(sdFont, nullptr);
+
+    // Layout preparation builds the measure-kern rows; the render prewarm
+    // builds the mini matrix the other side reads. Both must cover all of
+    // ASCII or the comparison is vacuous on the uncovered pairs.
+    std::deque<std::string> words{ascii};
+    renderer.ensureSdCardFontReady(fontId, words, /*includeHyphen=*/true, /*styleMask=*/0x01);
+    sdFont->prewarm(ascii.c_str(), 0x01, /*metadataOnly=*/false);
+    EpdFont* epd = sdFont->getEpdFont(0);
+    ASSERT_NE(epd, nullptr);
+
+    int mismatches = 0;
+    int nonZero = 0;
+    for (const unsigned char left : ascii) {
+      for (const unsigned char right : ascii) {
+        const int viaShortcut = sdFont->getMeasureKern(left, right, 0);
+        const int viaMiniMatrix = epd->getKerning(left, right);
+        if (viaShortcut != 0) nonZero++;
+        if (viaShortcut != viaMiniMatrix && mismatches++ < 5) {
+          ADD_FAILURE() << family.name << ": kern(" << left << "," << right << ") measure=" << viaShortcut
+                        << " mini=" << viaMiniMatrix;
+        }
+      }
+    }
+    EXPECT_EQ(mismatches, 0) << family.name << ": ASCII kern-class shortcut disagrees with the mini matrix";
+
+    // A font whose kern data never loaded would agree trivially (0 == 0 for
+    // every pair) and prove nothing. Only NittiTypewriter genuinely carries no
+    // ASCII kerning, so it is the single allowed all-zero family.
+    if (family.name != "NittiTypewriter") {
+      EXPECT_GT(nonZero, 0) << family.name << ": no ASCII kern pairs resident — the comparison above was vacuous";
+    }
+
+    familiesChecked++;
+    manager.unloadAll(renderer);
+  }
+
+  EXPECT_GT(familiesChecked, 0) << "no family loaded; the sweep asserted nothing";
+}
+
 }  // namespace
