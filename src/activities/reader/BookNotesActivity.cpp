@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdio>
 
+#include "CrossPointSettings.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -114,7 +115,15 @@ void BookNotesActivity::buildLines() {
     const char* body = I18n::getInstance().get(entry.body);
     switch (entry.fill) {
       case NoteText::Fill::CharsPerLine:
-        snprintf(filled, sizeof(filled), body, static_cast<unsigned>(detail.narrowestCharsPerLine));
+        // Three arguments, and the last two are the SAME live threshold: the
+        // note names the limit twice (what it is, and what to get back above),
+        // and naming a constant there would make it a lie at four of the five
+        // settings the Justified Text row offers. Read live rather than stored
+        // alongside the count -- moving the threshold repaginates the book, so
+        // the note is re-raised against the value it is about to print.
+        snprintf(filled, sizeof(filled), body, static_cast<unsigned>(detail.narrowestCharsPerLine),
+                 static_cast<unsigned>(autojustify::clampThreshold(SETTINGS.justifyThresholdChars)),
+                 static_cast<unsigned>(autojustify::clampThreshold(SETTINGS.justifyThresholdChars)));
         body = filled;
         break;
       case NoteText::Fill::Images:

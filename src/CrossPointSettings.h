@@ -1,5 +1,6 @@
 #pragma once
 #include <ArduinoJson.h>
+#include <Epub/AutoJustify.h>
 #include <Epub/ReaderRenderSpec.h>
 #include <PersistableStore.h>
 
@@ -364,6 +365,26 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // baseline on every page sits on the same grid. Participates in
   // ReaderRenderSpec — flipping it repaginates.
   uint8_t lineGridEnabled = 0;
+  // Automatic justification THRESHOLD, in characters per line. The decision
+  // stays automatic -- the measure still decides, per block, in
+  // ParsedText::layoutAndExtractLines -- and this is the count it decides
+  // against. Owner ruling 2026-08-24: "make justified or ragged right character
+  // count an ios app setting."
+  //
+  // It landed here rather than in the iOS Settings.app bundle because it moves
+  // line BREAKS, so it has to be a ReaderRenderSpec field for the section cache
+  // to notice it, and ReaderRenderSpec is built from this struct. A host-side
+  // value would have left every already-paginated book serving stale breaks
+  // with a header that compared equal. Being a firmware setting also means the
+  // X3/X4 get it, not only the phone, and it is served by the web settings API.
+  //
+  // Stored as the character COUNT, not a picker index -- the same shape as
+  // screenMargin, so the ladder can gain a rung without migrating a save. Rows
+  // offered by autojustify::THRESHOLD_CHOICES; anything else read off the card
+  // falls back to autojustify::THRESHOLD_CHARS via autojustify::clampThreshold.
+  // Its row has a getter/setter and no valuePtr, so it persists BY HAND in
+  // toJson/fromJson -- see the note on screenMargin there.
+  uint8_t justifyThresholdChars = autojustify::THRESHOLD_CHARS;
   // Auto-sleep timeout setting (default 10 minutes). Legacy sleepTimeout enum values are migration-only.
   static constexpr uint8_t sleepTimeoutMinutes = 10;
   // E-ink refresh frequency (default 15 pages)

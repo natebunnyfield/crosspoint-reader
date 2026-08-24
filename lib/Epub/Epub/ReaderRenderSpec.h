@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include "AutoJustify.h"
+
 // The resolved text-rendering configuration a reader hands to the layout
 // engine. Section-cache validation keys on ELEVEN of the twelve fields: a
 // section file built with a different spec is discarded and rebuilt.
@@ -43,6 +45,16 @@ struct ReaderRenderSpec {
   // Line Grid (2026-08-22): every vertical advance the paginator makes rounds
   // UP to a whole line-height. In the spec so a toggle repaginates.
   bool lineGridEnabled = false;
+  // Automatic justification threshold, in characters per line (owner ruling
+  // 2026-08-24). A block asking to be justified keeps it only when its own
+  // measure carries at least this many characters. In the spec -- and in the
+  // section file, and in the comparison on load -- because moving it moves line
+  // BREAKS, not just painted x: a narrower block stops being justified, and the
+  // ragged branch also stops hyphenating lines already past 70% of the measure
+  // (ParsedText.cpp's raggedSkipsHyphen). Without it here a threshold change
+  // would be accepted against every stale cache on the card and do nothing at
+  // all until the book was cleared. Defaults to autojustify::THRESHOLD_CHARS.
+  uint8_t justifyThresholdChars = autojustify::THRESHOLD_CHARS;
 
   // A cheap identity for "the measure this book was laid out to", used by
   // booknotes::Notes to decide whether a stored layout-scope note still
@@ -67,6 +79,13 @@ struct ReaderRenderSpec {
         static_cast<uint32_t>(embeddedStyle) << 2 | static_cast<uint32_t>(focusReadingEnabled) << 3 |
         static_cast<uint32_t>(lineGridEnabled) << 4 | static_cast<uint32_t>(paragraphAlignment) << 5 |
         static_cast<uint32_t>(imageRendering) << 13);
+    // Mixed on its own rather than packed into the word above: that word is
+    // already carrying imageRendering at bit 13 and a byte would collide with
+    // it. A note's layout scope has to notice this move for the same reason the
+    // section cache does -- the breaks change, so a stored note about "the
+    // narrowest paragraph on this page" is describing a page that no longer
+    // exists.
+    mix(static_cast<uint32_t>(justifyThresholdChars));
     return h;
   }
 };

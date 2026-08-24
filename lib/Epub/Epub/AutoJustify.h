@@ -112,8 +112,59 @@
 namespace autojustify {
 
 // Bringhurst 2.1.2, p. 27: "A reasonable working minimum for justified text in
-// English is the 40-character line."
+// English is the 40-character line." This is the DEFAULT, and the value every
+// call below falls back to; the owner can move it (2026-08-24 ruling, "make
+// justified or ragged right character count an ios app setting" -> the
+// firmware's own Settings screen, since it changes line BREAKS and therefore
+// has to live in ReaderRenderSpec, which is built from CrossPointSettings).
 constexpr int THRESHOLD_CHARS = 40;
+
+// THE OFFERED LADDER, and why these five rungs rather than round numbers.
+//
+// Both endpoints are fixed by measurement, not taste: each is the last rung
+// that still leaves the OTHER regime reachable on this device. That is the part
+// a future reader cannot reconstruct from the numbers alone, so it is recorded
+// here rather than in the settings row.
+//
+// The instrument is the 13 face/size pairs swept through the simulator on
+// 2026-08-23 (the calibration table in docs/auto-justification.md), at the X3's
+// 512 px portrait measure:
+//
+//   * The WIDEST setting in the sweep is LibrisADF 12 pt, estimated 53
+//     characters per line (rendered 50.0). So a threshold of 55 would justify
+//     NOTHING on this card -- a dead row that reads as "off" while claiming to
+//     be a measure. 50 is the highest rung that still leaves a justified
+//     regime, and it means "only the widest pages".
+//   * The NARROWEST is TeXGyre Schola 18 pt, estimated 28 (rendered 25.7).
+//     A threshold of 28 would justify EVERYTHING -- equally dead, from the
+//     other end. 32 is the lowest rung that still leaves a ragged regime:
+//     at 32, Libre Franklin 18 pt (est 32) justifies while Coelacanth 18
+//     (30) and Schola 18 (28) stay ragged.
+//
+// Between them: 36 sits at the lower approach to Bringhurst's own grey band
+// ("less than 38 or 40"), which is also where Gregory & Poulton (1970) measured
+// justification becoming significantly worse than ragged -- seven words per
+// line, ~38-39 characters. 45 is Butterick's comfortable floor (Practical
+// Typography gives 45-90). And 40 is Bringhurst's stated minimum, the default.
+//
+// Ascending, and the ORDER IS the picker's order. The stored value is the
+// character COUNT, never an index into this array -- see the getter/setter row
+// in src/SettingsList.h -- so a rung may be inserted here without migrating a
+// single settings.json.
+constexpr int THRESHOLD_CHOICES[] = {32, 36, 40, 45, 50};
+constexpr int THRESHOLD_CHOICE_COUNT = static_cast<int>(sizeof(THRESHOLD_CHOICES) / sizeof(THRESHOLD_CHOICES[0]));
+
+// A stored byte -> a usable threshold. Anything outside the offered ladder --
+// a hand-edited settings.json, a byte posted by the web settings API, a file
+// written when the ladder differed -- falls back to THRESHOLD_CHARS rather than
+// being snapped to a neighbour. Snapping would silently restyle a book to a
+// value nobody chose; the default is at least the documented one.
+inline int clampThreshold(const int stored) {
+  for (int i = 0; i < THRESHOLD_CHOICE_COUNT; i++) {
+    if (THRESHOLD_CHOICES[i] == stored) return stored;
+  }
+  return THRESHOLD_CHARS;
+}
 
 // Bringhurst's copyfitting table (pp. 28-29) over the alphabet lengths a text
 // roman actually occupies, x10 so the arithmetic stays integer -- this runs
@@ -137,22 +188,23 @@ inline int charsPerLine(const int measurePx, const int alphabetPx) {
 // back empty) returns TRUE: justification is the alignment that was asked for,
 // and the fallback must be "leave the request alone", not "silently restyle the
 // book because a metric was missing".
-inline bool shouldJustify(const int measurePx, const int alphabetPx) {
+inline bool shouldJustify(const int measurePx, const int alphabetPx,
+                          const int thresholdChars = THRESHOLD_CHARS) {
   if (alphabetPx <= 0) return true;
-  return charsPerLine(measurePx, alphabetPx) >= THRESHOLD_CHARS;
+  return charsPerLine(measurePx, alphabetPx) >= thresholdChars;
 }
 
 // The narrowest measure, in pixels, that still justifies for a given alphabet
 // length. Exposed for the tests and for the worked examples in the doc; layout
 // does not call it.
-inline int narrowestJustifiedMeasurePx(const int alphabetPx) {
+inline int narrowestJustifiedMeasurePx(const int alphabetPx, const int thresholdChars = THRESHOLD_CHARS) {
   if (alphabetPx <= 0) return 0;
   // charsPerLine ROUNDS to nearest, so the edge is half a character below the
   // threshold, not at it: floor((m*281 + 5a) / 10a) >= 40  <=>  m*281 >= 395a.
   // Writing 400a here (the naive inverse) puts the reported flip one to two
   // pixels above the predicate's own, which is exactly the kind of
   // off-by-a-rounding a worked example in a doc would carry forever.
-  const int num = (THRESHOLD_CHARS * 10 - 5) * alphabetPx;
+  const int num = (thresholdChars * 10 - 5) * alphabetPx;
   return (num + CHARS_PER_ALPHABET_X10 - 1) / CHARS_PER_ALPHABET_X10;
 }
 

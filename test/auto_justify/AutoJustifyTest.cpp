@@ -230,3 +230,246 @@ TEST(AutoJustify, TheArithmeticDoesNotOverflowAtAnyPlausibleMeasure) {
   EXPECT_EQ(autojustify::charsPerLine(1, 300), 0);
   EXPECT_FALSE(autojustify::shouldJustify(1, 300));
 }
+
+// ---------------------------------------------------------------------------
+// THE THRESHOLD IS A SETTING (owner ruling 2026-08-24, "make justified or
+// ragged right character count an ios app setting" -> the firmware's own
+// Settings screen, as Justified Text).
+//
+// The DECISION is unchanged: the measure still decides, per block. What moves
+// is the count it decides against. Everything below exists because each failure
+// mode is silent -- a threshold that does not reach layout looks exactly like a
+// book whose measure happens to sit on the same side of both values, and a
+// ladder rung that duplicates its neighbour looks exactly like a settings row
+// that works.
+// ---------------------------------------------------------------------------
+
+TEST(AutoJustifyThreshold, TheDefaultIsStillBringhurstsFortyCharacterLine) {
+  // The row moved; the book's number did not. A call that names no threshold
+  // must land exactly where every call landed before the setting existed --
+  // this is what keeps the test harnesses, and any future caller that does not
+  // care, on the documented value rather than on whatever the ladder's first
+  // rung happens to be.
+  EXPECT_EQ(autojustify::THRESHOLD_CHARS, 40);
+  EXPECT_EQ(autojustify::clampThreshold(autojustify::THRESHOLD_CHARS), 40);
+  for (int alphabet = 200; alphabet <= 600; alphabet += 7) {
+    for (int measure = 200; measure <= 900; measure += 11) {
+      EXPECT_EQ(autojustify::shouldJustify(measure, alphabet),
+                autojustify::shouldJustify(measure, alphabet, autojustify::THRESHOLD_CHARS))
+          << "measure " << measure << " alphabet " << alphabet;
+    }
+    EXPECT_EQ(autojustify::narrowestJustifiedMeasurePx(alphabet),
+              autojustify::narrowestJustifiedMeasurePx(alphabet, autojustify::THRESHOLD_CHARS));
+  }
+}
+
+TEST(AutoJustifyThreshold, TheLadderIsAscendingAndEveryRungIsDistinct) {
+  // A duplicated or out-of-order rung is a settings row that lies: the picker
+  // shows five choices and two of them do the same thing, which no compiler and
+  // no render can see.
+  ASSERT_EQ(autojustify::THRESHOLD_CHOICE_COUNT, 5);
+  for (int i = 1; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+    EXPECT_LT(autojustify::THRESHOLD_CHOICES[i - 1], autojustify::THRESHOLD_CHOICES[i])
+        << "rung " << i << " does not ascend";
+  }
+  // The shipped ladder, pinned. Not a restatement of the array: these are the
+  // numbers the settings labels print, and a rung that moves without its label
+  // moving ships a row reading "Balanced (40)" that sets something else.
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[0], 32);
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[1], 36);
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[2], 40);
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[3], 45);
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[4], 50);
+  // Bringhurst's number is on the ladder, and it is the default.
+  bool defaultIsOffered = false;
+  for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+    if (autojustify::THRESHOLD_CHOICES[i] == autojustify::THRESHOLD_CHARS) defaultIsOffered = true;
+  }
+  EXPECT_TRUE(defaultIsOffered) << "the default must be selectable, or the row cannot return to it";
+}
+
+TEST(AutoJustifyThreshold, BothEndpointsLeaveTheOtherRegimeReachable) {
+  // THE reason the rungs are not round numbers, and the one thing a future
+  // reader cannot reconstruct from the array. Each endpoint is the last rung
+  // that still leaves the OTHER regime reachable on this device; one step
+  // further and the row becomes decoration -- a setting that reads as a measure
+  // and behaves as an on/off switch.
+  //
+  // Instrument: the widest and narrowest settings in the 2026-08-23 calibration
+  // sweep, at the X3's 512 px portrait measure.
+  constexpr int kMeasurePx = 512;
+  constexpr int kWidestAlphabetPx = 270;   // LibrisADF 12 pt -> est 53 ch/line
+  constexpr int kNarrowestAlphabetPx = 510;  // TeXGyre Schola 18 pt -> est 28
+
+  const int widest = autojustify::charsPerLine(kMeasurePx, kWidestAlphabetPx);
+  const int narrowest = autojustify::charsPerLine(kMeasurePx, kNarrowestAlphabetPx);
+  ASSERT_EQ(widest, 53);
+  ASSERT_EQ(narrowest, 28);
+
+  const int top = autojustify::THRESHOLD_CHOICES[autojustify::THRESHOLD_CHOICE_COUNT - 1];
+  const int bottom = autojustify::THRESHOLD_CHOICES[0];
+
+  // TOP RUNG: the widest setting on the card still justifies, so a justified
+  // regime remains reachable. 55 would justify nothing at all.
+  EXPECT_LE(top, widest) << "top rung justifies nothing on this device -- a dead row";
+  EXPECT_TRUE(autojustify::shouldJustify(kMeasurePx, kWidestAlphabetPx, top));
+
+  // BOTTOM RUNG: the narrowest setting on the card still rags, so a ragged
+  // regime remains reachable. 28 would justify everything.
+  EXPECT_GT(bottom, narrowest) << "bottom rung justifies everything -- equally dead, from the other end";
+  EXPECT_FALSE(autojustify::shouldJustify(kMeasurePx, kNarrowestAlphabetPx, bottom));
+
+  // And the bottom rung is genuinely a THRESHOLD there, not a floor: Libre
+  // Franklin 18 pt (alphabet 456 px, est 32) justifies at 32 while Coelacanth
+  // 18 pt (483 px, est 30) does not. Both are in the same sweep.
+  EXPECT_TRUE(autojustify::shouldJustify(kMeasurePx, 456, bottom));
+  EXPECT_FALSE(autojustify::shouldJustify(kMeasurePx, 483, bottom));
+}
+
+TEST(AutoJustifyThreshold, EveryRungActuallyMovesTheVerdictForSomeRealSetting) {
+  // A rung that never changes any decision on any face this device ships is a
+  // row the owner can select and see nothing happen. Swept against the 13
+  // face/size pairs of the calibration table, at their measured measure.
+  struct Pair {
+    int measurePx;
+    int alphabetPx;
+  };
+  constexpr Pair kSweep[] = {
+      {512, 270}, {512, 318}, {512, 364}, {512, 412}, {512, 346}, {512, 456}, {512, 397},
+      {512, 510}, {512, 365}, {512, 483}, {512, 412}, {512, 388}, {512, 323},
+  };
+  for (int i = 1; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+    const int lower = autojustify::THRESHOLD_CHOICES[i - 1];
+    const int higher = autojustify::THRESHOLD_CHOICES[i];
+    bool someFaceChanges = false;
+    for (const auto& p : kSweep) {
+      if (autojustify::shouldJustify(p.measurePx, p.alphabetPx, lower) !=
+          autojustify::shouldJustify(p.measurePx, p.alphabetPx, higher)) {
+        someFaceChanges = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(someFaceChanges) << "no shipped face crosses between rungs " << lower << " and " << higher;
+  }
+}
+
+TEST(AutoJustifyThreshold, RaisingItOnlyEverRemovesJustification) {
+  // Monotone in the threshold, which is what makes the row legible: dragging it
+  // up can only ever turn justified blocks ragged, never the reverse. An
+  // inversion here would be invisible per-page and maddening in use.
+  for (int alphabet = 200; alphabet <= 600; alphabet += 3) {
+    for (int measure = 200; measure <= 900; measure += 17) {
+      bool wasJustified = true;
+      for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+        const bool now = autojustify::shouldJustify(measure, alphabet, autojustify::THRESHOLD_CHOICES[i]);
+        if (!wasJustified) {
+          EXPECT_FALSE(now) << "justification came BACK as the threshold rose: measure " << measure << " alphabet "
+                            << alphabet << " rung " << autojustify::THRESHOLD_CHOICES[i];
+        }
+        wasJustified = now;
+      }
+    }
+  }
+}
+
+TEST(AutoJustifyThreshold, AByteOffTheLadderFallsBackToTheDefaultRatherThanSnapping) {
+  // A hand-edited settings.json, a byte posted by the web settings API, or a
+  // file written when the ladder differed. Snapping to the nearest rung would
+  // silently restyle a book to a value nobody chose; the documented default is
+  // at least defensible and is what the row will then display.
+  EXPECT_EQ(autojustify::clampThreshold(0), autojustify::THRESHOLD_CHARS);
+  EXPECT_EQ(autojustify::clampThreshold(1), autojustify::THRESHOLD_CHARS);
+  EXPECT_EQ(autojustify::clampThreshold(33), autojustify::THRESHOLD_CHARS);
+  EXPECT_EQ(autojustify::clampThreshold(44), autojustify::THRESHOLD_CHARS);
+  EXPECT_EQ(autojustify::clampThreshold(255), autojustify::THRESHOLD_CHARS);
+  EXPECT_EQ(autojustify::clampThreshold(-7), autojustify::THRESHOLD_CHARS);
+  // ...and every offered rung survives the round trip unchanged, which is the
+  // half that would break if clampThreshold were ever written as a range check.
+  for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+    EXPECT_EQ(autojustify::clampThreshold(autojustify::THRESHOLD_CHOICES[i]), autojustify::THRESHOLD_CHOICES[i]);
+  }
+}
+
+TEST(AutoJustifyThreshold, TheReportedFlipMeasureTracksTheThresholdExactly) {
+  // narrowestJustifiedMeasurePx is what the doc's worked examples quote. It
+  // rounds the same way the predicate does, and that agreement has to hold at
+  // every rung -- an off-by-a-rounding here would put a wrong number in the
+  // documentation forever, which is exactly what the naive inverse did.
+  for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+    const int threshold = autojustify::THRESHOLD_CHOICES[i];
+    for (int alphabet = 200; alphabet <= 600; alphabet += 1) {
+      const int flip = autojustify::narrowestJustifiedMeasurePx(alphabet, threshold);
+      ASSERT_GT(flip, 0);
+      EXPECT_TRUE(autojustify::shouldJustify(flip, alphabet, threshold))
+          << "the reported flip measure does not justify: alphabet " << alphabet << " threshold " << threshold;
+      EXPECT_FALSE(autojustify::shouldJustify(flip - 1, alphabet, threshold))
+          << "one pixel narrower still justifies: alphabet " << alphabet << " threshold " << threshold;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// THE THRESHOLD REACHES THE THINGS THAT DECIDE WHETHER A PAGE IS REBUILT.
+//
+// This is the half that made the setting a firmware setting rather than an iOS
+// Settings.app row. Moving the threshold moves line BREAKS -- a demoted block
+// also stops hyphenating lines already past 70% of the measure -- so a stored
+// page laid out at one threshold is wrong at another. Two mechanisms notice:
+// the section file's own header comparison (Section.cpp, which reads the byte
+// back and rejects a mismatch) and the layout fingerprint a book note is scoped
+// by. If the field ever stops reaching either, the setting still writes its
+// value, the row still moves, and NOTHING on the page changes -- which is
+// precisely the failure the route decision was made to avoid.
+// ---------------------------------------------------------------------------
+
+#include "ReaderRenderSpec.h"
+
+TEST(AutoJustifyThreshold, TheSpecDefaultsToTheDocumentedThreshold) {
+  const ReaderRenderSpec spec;
+  EXPECT_EQ(spec.justifyThresholdChars, autojustify::THRESHOLD_CHARS);
+}
+
+TEST(AutoJustifyThreshold, EveryRungGivesADistinctLayoutFingerprint) {
+  // Not merely "different from the default" -- ALL FIVE must be mutually
+  // distinct, or two settings share a cache and one of them serves the other's
+  // pagination. A collision is invisible: the page renders, it is just the
+  // wrong page.
+  ReaderRenderSpec spec;
+  spec.fontId = 7;
+  spec.viewportWidth = 512;
+  spec.viewportHeight = 700;
+  spec.hyphenationEnabled = true;
+
+  uint32_t seen[autojustify::THRESHOLD_CHOICE_COUNT];
+  for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+    spec.justifyThresholdChars = static_cast<uint8_t>(autojustify::THRESHOLD_CHOICES[i]);
+    seen[i] = spec.layoutFingerprint();
+  }
+  for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+    for (int j = i + 1; j < autojustify::THRESHOLD_CHOICE_COUNT; j++) {
+      EXPECT_NE(seen[i], seen[j]) << "rungs " << autojustify::THRESHOLD_CHOICES[i] << " and "
+                                  << autojustify::THRESHOLD_CHOICES[j] << " share a layout fingerprint";
+    }
+  }
+}
+
+TEST(AutoJustifyThreshold, TheThresholdDoesNotCollideWithTheOtherPackedFlags) {
+  // The fingerprint packs several small fields into one mixed word, and this
+  // byte is mixed SEPARATELY for that reason. The trap it avoids: a threshold
+  // change that cancels against an imageRendering or paragraphAlignment change
+  // and leaves the hash where it started. Sweep the neighbours it could collide
+  // with and require the threshold to move the hash in every combination.
+  for (uint8_t align = 0; align <= 4; align++) {
+    for (uint8_t imageRendering = 0; imageRendering <= 3; imageRendering++) {
+      ReaderRenderSpec a;
+      a.paragraphAlignment = align;
+      a.imageRendering = imageRendering;
+      a.justifyThresholdChars = 40;
+      ReaderRenderSpec b = a;
+      b.justifyThresholdChars = 45;
+      EXPECT_NE(a.layoutFingerprint(), b.layoutFingerprint())
+          << "threshold cancelled against align " << static_cast<int>(align) << " imageRendering "
+          << static_cast<int>(imageRendering);
+    }
+  }
+}

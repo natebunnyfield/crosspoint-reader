@@ -112,6 +112,12 @@ list row, the JSON key, and any pin; consumers read the constant.
 | `keepScreenAwake` (sim) | 0 | see iOS section | MED | Overlaps allowSleep* toggles — three controls for one behavior across two surfaces. |
 | `ownerName`, `language` | "" / EN | **KEEP** | — | Identity + i18n actions, not dials. |
 
+### Later additions to section B (this table is a 2026-08-21 snapshot)
+
+| setting | added | default | why it was added rather than hardcoded |
+|---|---|---|---|
+| `justifyThreshold` — **Justified Text** | 2026-08-24 | 40 | Owner ruling: *"make justified or ragged right character count an ios app setting."* The automatic-justification threshold (`autojustify::THRESHOLD_CHARS`), offered as 32/36/40/45/50. `STR_CAT_SYSTEM`, `DynamicEnum`, stored as the character COUNT. It is here rather than in the iOS Settings.bundle because it moves line breaks and so must reach `ReaderRenderSpec` for the section cache to invalidate — see `docs/auto-justification.md`. |
+
 ## C. iOS Settings.bundle (excluding Page Colors — other agent)
 
 | setting | default | proposal | odds | why |

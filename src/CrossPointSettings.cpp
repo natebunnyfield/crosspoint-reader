@@ -66,6 +66,10 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // skips it. Without this line the margin silently resets to its default on
   // every boot -- the row still worked, which is what made it invisible.
   doc["screenMargin"] = screenMargin;
+  // Same again: the justification threshold is a drop-down over a character
+  // ramp, so its row carries a getter/setter and no valuePtr and the loop
+  // above skips it. Stored as the character COUNT, never the picker index.
+  doc["justifyThreshold"] = justifyThresholdChars;
   // lineSpacing: its settings row was deleted 2026-08-21 but the reader's
   // Confirm+side chord still steps it, so it persists by hand like screenMargin.
   doc["lineSpacing"] = lineSpacing;
@@ -234,6 +238,14 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   // when it renders. Only an out-of-range byte falls back to the default.
   const uint8_t storedMargin = doc["screenMargin"] | SCREEN_MARGIN_DEFAULT;
   screenMargin = storedMargin <= SCREEN_MARGIN_MAX ? storedMargin : SCREEN_MARGIN_DEFAULT;
+  // Justification threshold — same shape as the margin above, and read back as
+  // a character COUNT. Unlike the margin it is NOT range-clamped but matched
+  // against the offered ladder: the rungs are not a contiguous ramp, and a byte
+  // between two of them (a hand edit, an API client, a file written when the
+  // ladder differed) means a value nobody chose. clampThreshold sends those to
+  // the documented default rather than snapping to a neighbour.
+  justifyThresholdChars =
+      static_cast<uint8_t>(autojustify::clampThreshold(doc["justifyThreshold"] | autojustify::THRESHOLD_CHARS));
   // lineSpacing: manual for the same reason as its toJson line -- row deleted,
   // chord lives. Clamped to the enum, defaulting NORMAL.
   const uint8_t storedLs = doc["lineSpacing"] | (uint8_t)NORMAL;
@@ -323,6 +335,11 @@ ReaderRenderSpec CrossPointSettings::readerRenderSpec(const uint16_t viewportWid
   spec.imageRendering = imageRendering;
   spec.focusReadingEnabled = focusReadingEnabled != 0;
   spec.lineGridEnabled = lineGridEnabled != 0;
+  // Clamped on the way OUT as well as on the way in: the web settings API
+  // writes the byte directly, so the store can hold a value the ladder never
+  // offered. The spec is what the cache compares and what layout obeys, so it
+  // is the last place worth being sure.
+  spec.justifyThresholdChars = static_cast<uint8_t>(autojustify::clampThreshold(justifyThresholdChars));
   return spec;
 }
 

@@ -715,7 +715,7 @@ int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer
 // Consumes data to minimize memory usage
 void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fontId, const uint16_t viewportWidth,
                                        const std::function<void(std::shared_ptr<TextBlock>)>& processLine,
-                                       const bool includeLastLine) {
+                                       const bool includeLastLine, const int justifyThresholdChars) {
   if (words.empty()) {
     return;
   }
@@ -764,10 +764,11 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
   // one block as it fills successive pages, always with the same measure and
   // font -- so the second call sees Left, matches nothing, and no block can
   // oscillate between pages. See AutoJustify.h for the threshold and its
-  // source, and docs/auto-justification.md for the measurement method.
+  // source, the ladder the Justified Text settings row offers, and
+// docs/auto-justification.md for the measurement method.
   if (blockStyle.alignment == CssTextAlign::Justify) {
     const int alphabetPx = measureLowercaseAlphabet(renderer, fontId);
-    if (!autojustify::shouldJustify(viewportWidth, alphabetPx)) {
+    if (!autojustify::shouldJustify(viewportWidth, alphabetPx, justifyThresholdChars)) {
       blockStyle.alignment = blockStyle.isRtl ? CssTextAlign::Right : CssTextAlign::Left;
       // The reader sees a ragged edge in a book that asked to be justified and
       // has no way to find out why. Record the narrowest measure responsible --
@@ -780,13 +781,20 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
     // holds dozens of blocks at the same measure and the repeat says nothing.
     // The comparison keeps the statics live at LOG_LEVEL 1, where LOG_DBG is
     // empty and a write-only static would warn.
+    // The THRESHOLD joins the key, not just the measure and the face: it is a
+    // settings row now, and a run that changed it would otherwise print one
+    // line for the old value and stay silent about the new one -- which is
+    // exactly the reading a headless A/B of this feature depends on.
     static int lastLoggedMeasure = -1;
     static int lastLoggedAlphabet = -1;
-    if (viewportWidth != lastLoggedMeasure || alphabetPx != lastLoggedAlphabet) {
+    static int lastLoggedThreshold = -1;
+    if (viewportWidth != lastLoggedMeasure || alphabetPx != lastLoggedAlphabet ||
+        justifyThresholdChars != lastLoggedThreshold) {
       lastLoggedMeasure = viewportWidth;
       lastLoggedAlphabet = alphabetPx;
-      LOG_DBG("PTX", "auto-justify: measure %u px, alphabet %d px, ~%d chars/line -> %s", viewportWidth, alphabetPx,
-              autojustify::charsPerLine(viewportWidth, alphabetPx),
+      lastLoggedThreshold = justifyThresholdChars;
+      LOG_DBG("PTX", "auto-justify: measure %u px, alphabet %d px, ~%d chars/line, threshold %d -> %s", viewportWidth,
+              alphabetPx, autojustify::charsPerLine(viewportWidth, alphabetPx), justifyThresholdChars,
               blockStyle.alignment == CssTextAlign::Justify ? "justified" : "ragged");
     }
   }

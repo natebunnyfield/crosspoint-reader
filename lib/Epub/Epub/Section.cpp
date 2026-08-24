@@ -130,7 +130,20 @@ namespace {
 //      now consumes its own lines above the table, so every page after one
 //      moves. The same commit gives a <li> whose whole content is a table its
 //      marker on a line of its own, which moves those pages too.
-constexpr uint8_t SECTION_FILE_VERSION = 48;
+// v49: the automatic-justification threshold becomes a setting (owner ruling
+//      2026-08-24, "make justified or ragged right character count an ios app
+//      setting" -> the firmware's own Settings screen, as Justified Text).
+//      Header grows one byte -- spec.justifyThresholdChars, after
+//      lineGridEnabled -- and that byte is what makes the change visible at
+//      all: the DECISION is unchanged (the measure still decides, per block)
+//      but the count it decides against now moves, and moving it moves line
+//      BREAKS, since a demoted block also stops hyphenating lines already past
+//      70% of the measure. Every field a v48 file compares would have matched
+//      across a threshold change, so without the new byte a card full of
+//      paginated books would have kept its old breaks for their whole life and
+//      the setting would have looked inert. The bump itself is for the v48
+//      files already written, which carry no such byte.
+constexpr uint8_t SECTION_FILE_VERSION = 49;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
@@ -153,8 +166,8 @@ constexpr size_t PAGE_WRITE_BUFFER_SIZE = 1024;
 
 constexpr uint32_t HEADER_SIZE = sizeof(uint8_t) + sizeof(int) + sizeof(float) + sizeof(bool) + sizeof(uint8_t) +
                                  sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(bool) + sizeof(bool) +
-                                 sizeof(uint8_t) + sizeof(bool) + sizeof(bool) + sizeof(uint32_t) + sizeof(uint32_t) +
-                                 sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t);
+                                 sizeof(uint8_t) + sizeof(bool) + sizeof(bool) + sizeof(uint8_t) + sizeof(uint32_t) +
+                                 sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t);
 }  // namespace
 
 // Out-of-line so the unique_ptr<ChapterHtmlSlimParser> in BuildContext can be
@@ -205,8 +218,9 @@ void Section::writeSectionFileHeader(const ReaderRenderSpec& spec) {
                                    sizeof(spec.viewportWidth) + sizeof(spec.viewportHeight) + sizeof(pageCount) +
                                    sizeof(spec.hyphenationEnabled) + sizeof(spec.embeddedStyle) +
                                    sizeof(spec.imageRendering) + sizeof(spec.focusReadingEnabled) +
-                                   sizeof(spec.lineGridEnabled) + sizeof(uint32_t) + sizeof(uint32_t) +
-                                   sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t),
+                                   sizeof(spec.lineGridEnabled) + sizeof(spec.justifyThresholdChars) +
+                                   sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) +
+                                   sizeof(uint32_t),
                 "Header size mismatch");
   // Written as the incomplete sentinel; finalizeBuild() patches it to
   // SECTION_FILE_VERSION as the last step, committing the file.
@@ -222,6 +236,7 @@ void Section::writeSectionFileHeader(const ReaderRenderSpec& spec) {
   serialization::writePod(file, spec.imageRendering);
   serialization::writePod(file, spec.focusReadingEnabled);
   serialization::writePod(file, spec.lineGridEnabled);
+  serialization::writePod(file, spec.justifyThresholdChars);
   serialization::writePod(file, pageCount);  // Placeholder for page count (will be initially 0, patched later)
   serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for LUT offset (patched later)
   serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for anchor map offset (patched later)
@@ -259,6 +274,7 @@ bool Section::loadSectionFile(const ReaderRenderSpec& spec) {
     uint8_t fileImageRendering;
     bool fileFocusReadingEnabled;
     bool fileLineGridEnabled;
+    uint8_t fileJustifyThresholdChars;
     serialization::readPod(file, fileFontId);
     serialization::readPod(file, fileLineCompression);
     serialization::readPod(file, fileExtraParagraphSpacing);
@@ -270,13 +286,15 @@ bool Section::loadSectionFile(const ReaderRenderSpec& spec) {
     serialization::readPod(file, fileImageRendering);
     serialization::readPod(file, fileFocusReadingEnabled);
     serialization::readPod(file, fileLineGridEnabled);
+    serialization::readPod(file, fileJustifyThresholdChars);
 
     if (spec.fontId != fileFontId || spec.lineCompression != fileLineCompression ||
         spec.extraParagraphSpacing != fileExtraParagraphSpacing || spec.paragraphAlignment != fileParagraphAlignment ||
         spec.viewportWidth != fileViewportWidth || spec.viewportHeight != fileViewportHeight ||
         spec.hyphenationEnabled != fileHyphenationEnabled || spec.embeddedStyle != fileEmbeddedStyle ||
         spec.imageRendering != fileImageRendering || spec.focusReadingEnabled != fileFocusReadingEnabled ||
-        spec.lineGridEnabled != fileLineGridEnabled) {
+        spec.lineGridEnabled != fileLineGridEnabled ||
+        spec.justifyThresholdChars != fileJustifyThresholdChars) {
       file.close();
       LOG_ERR("SCT", "Deserialization failed: Parameters do not match");
       clearCache();
@@ -507,7 +525,7 @@ bool Section::startBuild(const ReaderRenderSpec& spec, const std::function<void(
   ctx->parser = makeUniqueNoThrow<ChapterHtmlSlimParser>(
       epub, ctxPtr->parsePath, renderer, spec.fontId, spec.smallFontId, spec.lineCompression, spec.extraParagraphSpacing,
       spec.paragraphAlignment, spec.viewportWidth, spec.viewportHeight, spec.hyphenationEnabled,
-      spec.focusReadingEnabled, spec.lineGridEnabled,
+      spec.focusReadingEnabled, spec.lineGridEnabled, spec.justifyThresholdChars,
       [this, ctxPtr](std::unique_ptr<Page> page, const uint16_t paragraphIndex, const uint16_t listItemIndex,
                      const uint32_t wordAnchor) {
         ctxPtr->lut.push_back({this->onPageComplete(std::move(page)), paragraphIndex, listItemIndex, wordAnchor});

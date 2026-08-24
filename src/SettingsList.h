@@ -321,6 +321,72 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // ReaderRenderSpec — flipping it repaginates on the next section load.
     v.push_back(SettingInfo::Toggle(StrId::STR_LINE_GRID, &CrossPointSettings::lineGridEnabled, "lineGrid",
                                     StrId::STR_CAT_SYSTEM));
+    // Justified Text (owner ruling 2026-08-24: "make justified or ragged right
+    // character count an ios app setting"). The DECISION stays automatic -- the
+    // measure still decides, per block -- and this row sets the character count
+    // it decides against. It is the threshold that is settable, not the
+    // alignment; there is still no Justified/Ragged row and there will not be.
+    //
+    // Why it is here rather than in the iOS Settings.app bundle: the threshold
+    // moves line BREAKS, so it has to reach ReaderRenderSpec for the section
+    // cache to notice it, and that struct is built from CrossPointSettings. A
+    // value living in NSUserDefaults would have been compared against nothing,
+    // so every already-paginated book would have kept its old breaks with a
+    // header that matched. Being here also means the X3 and X4 get the control,
+    // not only a phone, and the web settings API serves it for free.
+    //
+    // STR_CAT_SYSTEM for the reason Line Grid above and Dark Mode below carry
+    // it: Reader is a withdrawn category that rebuildSettingsLists() drops, so
+    // a STR_CAT_READER row would persist and serve the API while being
+    // invisible on the device -- which is the whole point of adding it.
+    //
+    // DynamicEnum, not Enum, so the stored byte is the character COUNT and not
+    // this list's index. Same shape as screenMargin, and for the same payoff: a
+    // rung can be inserted in autojustify::THRESHOLD_CHOICES without migrating
+    // a single settings.json. The cost is that the generic toJson/fromJson loop
+    // skips getter/setter rows, so this key is persisted BY HAND in
+    // CrossPointSettings.cpp -- forgetting that half is what silently reset
+    // screenMargin on every boot.
+    {
+      std::vector<StrId> justifyLabels;
+      justifyLabels.reserve(autojustify::THRESHOLD_CHOICE_COUNT);
+      for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+        switch (autojustify::THRESHOLD_CHOICES[i]) {
+          case 32:
+            justifyLabels.push_back(StrId::STR_JUSTIFY_ALMOST_ALWAYS);
+            break;
+          case 36:
+            justifyLabels.push_back(StrId::STR_JUSTIFY_MORE_OFTEN);
+            break;
+          case 40:
+            justifyLabels.push_back(StrId::STR_JUSTIFY_BALANCED);
+            break;
+          case 45:
+            justifyLabels.push_back(StrId::STR_JUSTIFY_LESS_OFTEN);
+            break;
+          default:
+            justifyLabels.push_back(StrId::STR_JUSTIFY_WIDE_ONLY);
+            break;
+        }
+      }
+      v.push_back(SettingInfo::DynamicEnum(
+          StrId::STR_JUSTIFY_THRESHOLD, std::move(justifyLabels),
+          []() -> uint8_t {
+            // Nearest is NOT wanted here, unlike the editor font size: a byte
+            // off the ladder means a value nobody chose, and clampThreshold
+            // sends it to the documented default instead of a neighbour.
+            const int live = autojustify::clampThreshold(SETTINGS.justifyThresholdChars);
+            for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
+              if (autojustify::THRESHOLD_CHOICES[i] == live) return static_cast<uint8_t>(i);
+            }
+            return 0;
+          },
+          [](const uint8_t index) {
+            if (index >= static_cast<uint8_t>(autojustify::THRESHOLD_CHOICE_COUNT)) return;
+            SETTINGS.justifyThresholdChars = static_cast<uint8_t>(autojustify::THRESHOLD_CHOICES[index]);
+          },
+          "justifyThreshold", StrId::STR_CAT_SYSTEM));
+    }
         // The reader is portrait-only; there is no orientation setting.
         // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
     // legacy Off/On toggle (persisted files round-trip), 2+ appended.

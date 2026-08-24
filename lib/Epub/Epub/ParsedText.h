@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "AutoJustify.h"
 #include "blocks/BlockStyle.h"
 #include "blocks/TextBlock.h"
 
@@ -97,7 +98,12 @@ class ParsedText {
   // Block-relative anchor of the line most recently emitted via processLine.
   // Valid inside and after a layoutAndExtractLines() call.
   uint32_t lastExtractedLineSourceStart() const { return lastLineSourceStart_; }
+  // `justifyThresholdChars` is the automatic-justification threshold in
+  // characters per line (ReaderRenderSpec's field, owner ruling 2026-08-24).
+  // Defaulted so the test harnesses and any caller that does not care keep
+  // Bringhurst's 40 without threading it.
   void layoutAndExtractLines(const GfxRenderer& renderer, int fontId, uint16_t viewportWidth,
                              const std::function<void(std::shared_ptr<TextBlock>)>& processLine,
-                             bool includeLastLine = true);
+                             bool includeLastLine = true,
+                             int justifyThresholdChars = autojustify::THRESHOLD_CHARS);
 };

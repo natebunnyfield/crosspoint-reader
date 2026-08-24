@@ -10,8 +10,20 @@ that asks to be justified keeps it only when **that block's own measure** holds
 at least 40 characters per line. Below that it is set ragged — flush left for
 LTR, flush right for RTL.
 
-Nothing about this reaches the device's Settings UI, because there is no longer
-anything to set.
+**Follow-up ruling, 2026-08-24, verbatim:** "make justified or ragged right
+character count an ios app setting."
+
+This does **not** reverse the above. The decision stays automatic and stays per
+block — there is still no Justified/Ragged row and there will not be one. What
+became settable is the **threshold**: the character count the measure is
+compared against. It ships as **Justified Text** on the firmware's own Settings
+screen, offering 32 / 36 / 40 / 45 / 50 with Bringhurst's 40 as the default.
+
+Why it landed there rather than in the iOS Settings.app bundle is
+[its own section below](#why-this-is-a-firmware-setting-and-not-an-ios-settingsapp-row)
+— short version: it moves line breaks, so it has to be a `ReaderRenderSpec`
+field for the section cache to notice it, and that struct is built from
+`CrossPointSettings`.
 
 ---
 
@@ -23,7 +35,10 @@ anything to set.
 | The decision | `lib/Epub/Epub/ParsedText.cpp`, `layoutAndExtractLines` | The only place the block's measure, its font and its requested alignment are all in scope at once |
 | The alphabet measurement | `lib/Epub/Epub/ParsedText.cpp`, `measureLowercaseAlphabet` | Goes through `GfxRenderer::getTextAdvanceX`, the same call the line breaker measures words with |
 | The retired setting | `src/CrossPointSettings.h` (`static constexpr paragraphAlignment = JUSTIFIED`), `src/SettingsList.h` (row deleted) | This repo's retirement pattern |
-| The test | `test/auto_justify/AutoJustifyTest.cpp` | 12 tests |
+| The threshold's stored value | `CrossPointSettings::justifyThresholdChars` | The character COUNT, not a picker index. Persisted by hand in `toJson`/`fromJson` — its row has a getter/setter and no `valuePtr`, which the generic loop skips |
+| The threshold's row | `src/SettingsList.h`, `SettingInfo::DynamicEnum`, `STR_CAT_SYSTEM` | Reader is a withdrawn category; System is what `rebuildSettingsLists()` keeps |
+| The threshold's route into layout | `ReaderRenderSpec::justifyThresholdChars` → `ChapterHtmlSlimParser` ctor → `layoutAndExtractLines` | Mirrors `lineGridEnabled` exactly |
+| The test | `test/auto_justify/AutoJustifyTest.cpp` | 22 tests (12 for the arithmetic, 10 for the threshold and its route to the cache) |
 
 ---
 
@@ -269,8 +284,8 @@ reasons.
    page 4 even in principle.
 
 What *can* cross the threshold is a deliberate settings change — font size, font
-family, screen margin — and each of those already repaginates the whole book
-(they are all in `ReaderRenderSpec`). A user stepping LibrisADF from 14 pt
+family, screen margin, and since 2026-08-24 the threshold itself — and each of
+those already repaginates the whole book (they are all in `ReaderRenderSpec`). A user stepping LibrisADF from 14 pt
 (45 ch/line, justified) to 16 pt (40, justified) to 18 pt (35, ragged) sees the
 alignment change once, at one step, along with everything else about the page.
 That is a reflow, not a flip-flop.
@@ -327,6 +342,131 @@ both still run. Verified in pixels on the justified regime: the line ending
 letter-terminated lines on the same page — the period still hangs 5–6 px past
 the measure.
 
+## The threshold is a setting (2026-08-24)
+
+### The ladder, and why the rungs are not round numbers
+
+| stored | row label | what it does |
+|---|---|---|
+| 32 | Almost always (32) | even narrow columns keep a flush edge |
+| 36 | More often (36) | |
+| **40** | **Balanced (40)** | Bringhurst's stated minimum — **default** |
+| 45 | Less often (45) | |
+| 50 | Only wide pages (50) | only a genuinely comfortable measure justifies |
+
+Both **endpoints are fixed by measurement, not taste**: each is the last rung
+that still leaves the *other* regime reachable on this device. One step further
+in either direction and the row stops being a measure and becomes an on/off
+switch that lies about what it is. The instrument is the 13 face/size pairs in
+the calibration sweep above, at the X3's 512 px portrait measure:
+
+* **Top rung 50.** The widest setting on the card is LibrisADF 12 pt, estimated
+  53 characters per line. A threshold of 55 would justify **nothing** — a dead
+  row. 50 is the highest rung that still leaves a justified regime.
+* **Bottom rung 32.** The narrowest is TeXGyre Schola 18 pt, estimated 28. A
+  threshold of 28 would justify **everything** — equally dead, from the other
+  end. 32 is the lowest rung that still leaves a ragged regime: at 32, Libre
+  Franklin 18 pt (est 32) justifies while Coelacanth 18 pt (30) and Schola 18 pt
+  (28) do not.
+
+Between them, 36 sits at the lower approach to Bringhurst's own grey band
+("less than 38 or 40"), which is also where Gregory & Poulton measured
+justification becoming significantly worse than ragged — seven words per line,
+≈38–39 characters. 45 is Butterick's comfortable floor (45–90). 40 is
+Bringhurst's number and the default.
+
+`AutoJustifyThreshold.BothEndpointsLeaveTheOtherRegimeReachable` and
+`.EveryRungActuallyMovesTheVerdictForSomeRealSetting` pin both claims against
+that sweep, so a rung that stops doing anything fails the build rather than
+shipping as decoration.
+
+### Why this is a firmware setting and not an iOS Settings.app row
+
+Traced end to end before anything was built, because the request said "ios app
+setting" and the honest answer was a different surface within the same app.
+
+**Every row in the iOS `Settings.bundle` is host-side.** Exactly one reaches
+firmware behavior at all — `readAloudEnabled` → `CrossPointPrefs_readAloudEnabled()`
+→ `HalGPIO::setReadAloudCaptureWanted()` → the firmware's `readAloudCaptureWanted()`,
+which is `return false;` inline on device. That channel toggles a **capture**
+side-channel: it changes what the firmware publishes, not how it lays out a
+page, and nothing it touches is cached. No Settings.app row has ever reached a
+firmware layout decision, and three things made this the wrong one to be first.
+
+1. **The cache would not have noticed.** Moving the threshold moves line
+   BREAKS, and section files are validated against `ReaderRenderSpec`, which is
+   built from `CrossPointSettings`. A value living in `NSUserDefaults` never
+   enters that comparison, so every already-paginated book on the card would
+   have kept its old breaks with a header that compared equal — the setting
+   would have looked inert on exactly the books the owner reads.
+2. **It would have given one store two writers.** Injecting the host value into
+   `CrossPointSettings` at boot is the shape of the panel-palette P1 fixed the
+   previous day (`crosspoint-simulator/src/PanelSource.h`: "one READER over a
+   store with two WRITERS is not one source").
+3. **The device would have been pinned at 40 forever.** `readAloudCaptureWanted()`
+   returns false on device because an X3 physically cannot speak. A typography
+   threshold is not a host capability — the hardware can and should have it.
+
+The precedent for where it went is one day older than the request: **Line Grid**
+(2026-08-22) is a typography toggle that repaginates, and it shipped as
+`STR_CAT_SYSTEM` in `getSettingsList()`. That category *is* the device UI —
+`SettingsActivity::rebuildSettingsLists()` keeps System rows and drops Reader,
+Display and Controls. Landing here means the phone gets the control (it renders
+the firmware's own Settings screen), the X3 and X4 get it too, the web settings
+API serves it, and it persists in `/.crosspoint/settings.json`.
+
+### Measured proof that the row reaches the page
+
+X3, portrait, FiraSansBook 14 pt, screen margin 5 → a 512 px measure holding an
+estimated 38 characters per line. That sits **between** two rungs, so the same
+page justifies at 36 and rags at 40 with nothing else changed. Captured
+headless, `CROSSPOINT_SIM_GRAIN_SEED` pinned (its phase jitter is re-rolled per
+launch and is larger than some real effects), restoring the same
+`fs_/.crosspoint/` before each fresh arm.
+
+```
+auto-justify: measure 512 px, alphabet 383 px, ~38 chars/line, threshold 36 -> justified
+auto-justify: measure 512 px, alphabet 383 px, ~38 chars/line, threshold 40 -> ragged
+```
+
+Right-edge ink x of the six body lines of that one page, measured from the
+rendered framebuffer:
+
+| threshold | verdict | right-edge x | spread | σ |
+|---|---|---|---|---|
+| 36 | justified | 516, 513, 514, 514, 517, 518 | **5 px** | 1.80 px |
+| 40 | ragged | 492, 441, 454, 449, 499, 488 | **58 px** | 23.04 px |
+
+Left edges are identical in both arms (8–11 px), and the paragraph's final short
+line is identical in both — a last line is never justified. The 470 px
+blockquote on the same page rags at *both* thresholds (34 ch/line), so the
+per-block decision still works exactly as it did.
+
+### Cache invalidation, proven rather than assumed
+
+The whole reason this went to the firmware screen. Three runs against the same
+card:
+
+| run | card state | threshold | result |
+|---|---|---|---|
+| 1 | pristine | 40 | builds `sections/0.bin` at 40 |
+| 2 | **cache from run 1 intact** | 40 (unchanged) | **0** `Parameters do not match` — the cache is reused |
+| 3 | **cache from run 1 intact** | 40 → 36 | `[ERR] [SCT] Deserialization failed: Parameters do not match` → rebuilt → page renders justified |
+
+Run 2 is the control that matters: without it, "the cache was discarded" is
+indistinguishable from "this build always discards the cache." And the page
+produced by run 3 — rebuilt from a stale threshold-40 cache — is **bit-identical**
+to a fresh threshold-36 render, which is the strongest form the claim can take.
+
+## Section cache: v44 → v49 (this change: v48 → v49)
+
+`SECTION_FILE_VERSION` moves to **49** and the header grows one byte,
+`spec.justifyThresholdChars`, written after `lineGridEnabled`. The byte is the
+part that matters; the version bump only covers the v48 files already on cards,
+which carry no such byte. Every other field a v48 file compares would have
+matched across a threshold change, so without the new byte a card full of
+paginated books would have kept its old breaks for their whole life.
+
 ## Section cache: v43 → v44
 
 `lib/Epub/Epub/Section.cpp`. Required, and the usual guard cannot cover it:
@@ -361,11 +501,27 @@ all of them deliberate:
   left-aligned (true justification would require word spacing adjustments)",
   which is what `LEFT_ALIGN` did there before.
 
+## The book note stops naming a constant
+
+`STR_BOOK_NOTE_RAGGED_B` spelled the threshold out in prose — *"Below forty…
+back above forty characters"* — which became untrue at four of the five rungs
+the moment the row shipped. It now carries the live number instead, three `%u`
+filled by `BookNotesActivity` from `autojustify::clampThreshold(SETTINGS.justifyThresholdChars)`.
+
+Read **live**, not stored beside `narrowestCharsPerLine` in `notes.bin`: moving
+the threshold repaginates the book, so the note is re-raised against the value
+it is about to print, and a stored copy would only ever be a second thing to
+keep in sync. Only `english.yaml` carries the string; other locales fall back to
+it, so the reword is one string rather than a translation sweep.
+
 ## Driving it headlessly
 
 `LOG_DBG("PTX", "auto-justify: …")` prints measure, alphabet, estimated
-characters per line and the verdict, once per distinct `(measure, face)` rather
-than once per block. It is compiled out at `LOG_LEVEL 1` (every release env), so
+characters per line, the live threshold and the verdict, once per distinct
+`(measure, face, threshold)` rather than once per block. The threshold is part
+of that key deliberately: a run that changed it would otherwise print one line
+for the old value and stay silent about the new one, which is exactly the
+reading a headless A/B of this feature depends on. It is compiled out at `LOG_LEVEL 1` (every release env), so
 it exists only in dev and simulator builds.
 
 ```bash
