@@ -105,11 +105,23 @@ inline constexpr Entry kEntries[] = {
     // Buenos Aires is where it was drawn: it was Sanfelippo's graduation
     // typeface at the CDT UBA typography postgraduate program.
     //
-    // The date moves it from LAST in the picker to first. That is not a
-    // side effect to undo -- an original 2011 face genuinely is the newest
-    // lineage in the set, and inventing a medieval one to seat it elsewhere is
-    // the thing this table's "no unreliable dates" rule exists to prevent.
-    {"Almendra", "Almendra", "Ana Sanfelippo", "2011 Buenos Aires", 2011},
+    // OWNER RULING 2026-08-24: "use 1350 London for origin of Alemendra."
+    // Restored after a research pass had removed it, so the reasoning on both
+    // sides is recorded here rather than lost.
+    //
+    // What the sources say: the shipped TTFs' name table reads 2011-2012 Ana
+    // Sanfelippo, Google Fonts' metadata gives 2011-12-19, and the upstream
+    // description cites chancery and gothic HANDS -- classes of anonymous
+    // scribal writing rather than a dated face. No source names a 1350 model or
+    // London, and docs/font-dates.md had flagged that stage as uncited since
+    // 2026-08-12. So this stage is an OWNER RULING, not a citation, and
+    // font-dates.md says so; do not quote it as evidence for anything else.
+    //
+    // What it does: 1350 is the sort key, so the face sits at the old end of
+    // the picker beside Inknut rather than leading it. A 2011 key put it first,
+    // which is where an original 2011 face belongs -- and that placement is
+    // what the ruling changes.
+    {"Almendra", "Almendra", "; Ana Sanfelippo", "1350 London; 2011 Buenos Aires", 1350},
     // Three revisions in one stage: Carter & Cone recut Dwiggins' Caledonia in
     // Cambridge across 1988, 1994 and 2026, so those years share a place and
     // take commas; the 1938 Linotype original is a separate stage. Dwiggins drew
