@@ -33,7 +33,10 @@
 class CssParser {
  public:
   // Bump when CSS cache format or rules change; section caches are invalidated when this changes
-  static constexpr uint8_t CSS_CACHE_VERSION = 8;
+  // v9 (2026-08-23): absolute units convert at parse time and an unconvertible
+  // unit drops its declaration, so a cached v8 rule set holds pixel values that
+  // were never what the book asked for.
+  static constexpr uint8_t CSS_CACHE_VERSION = 9;
 
   explicit CssParser(std::string cachePath) : cachePath(std::move(cachePath)) {}
   ~CssParser() = default;
@@ -152,7 +155,23 @@ class CssParser {
   static CssFontStyle interpretFontStyle(std::string_view val);
   static CssFontWeight interpretFontWeight(std::string_view val);
   static CssTextDecoration interpretDecoration(std::string_view val);
-  static CssLength interpretLength(std::string_view val);
+
+  // How a length value came out. The three outcomes are deliberately distinct:
+  // a keyword like `auto` is not a length and has always resolved to zero here,
+  // while a NUMBER carrying a unit this reader cannot convert is a value the
+  // publisher meant and we cannot honor -- treating that as zero, or as pixels,
+  // is the silent wrong answer this split exists to end. See CssUnits.h.
+  enum class LengthParse : uint8_t { Ok, NotALength, UnsupportedUnit };
+
+  // On UnsupportedUnit `out` is untouched and `unitOut` names the unit, for the
+  // book note. Does NOT raise the note itself: the shorthand path has to see
+  // every component before it decides, and a note raised per component would
+  // name whichever side came first rather than the one that mattered.
+  static LengthParse parseLength(std::string_view val, CssLength& out, std::string_view& unitOut);
+
   /** Returns true only when a numeric length was parsed (e.g. 2em, 50%). False for auto/inherit/initial. */
   static bool tryInterpretLength(std::string_view val, CssLength& out);
+  /** True when the declaration should be applied; false only for a unit with no honest conversion. */
+  static bool acceptLength(std::string_view val, CssLength& out);
+  static bool acceptEdgeShorthand(std::string_view val, CssLength (&out)[4]);
 };

@@ -115,9 +115,11 @@ bool BookMetadataCache::beginTocPass() {
     spineHrefIndex.resize(spineCount);
     spineFile.seek(0);
     for (int i = 0; i < spineCount; i++) {
+      const uint32_t offset = static_cast<uint32_t>(spineFile.position());
       auto entry = readSpineEntry(spineFile);
       SpineHrefIndexEntry idx;
       idx.hrefHash = fnvHash64(entry.href);
+      idx.hrefOffset = offset;
       idx.hrefLen = static_cast<uint16_t>(entry.href.size());
       idx.spineIndex = static_cast<int16_t>(i);
       spineHrefIndex[i] = idx;
@@ -418,15 +420,34 @@ void BookMetadataCache::createTocEntry(const std::string& title, const std::stri
     uint64_t targetHash = fnvHash64(href);
     uint16_t targetLen = static_cast<uint16_t>(href.size());
 
-    auto it =
-        std::lower_bound(spineHrefIndex.begin(), spineHrefIndex.end(), SpineHrefIndexEntry{targetHash, targetLen, 0},
-                         [](const SpineHrefIndexEntry& a, const SpineHrefIndexEntry& b) {
-                           return a.hrefHash < b.hrefHash || (a.hrefHash == b.hrefHash && a.hrefLen < b.hrefLen);
-                         });
+    // Field-by-field, NOT a braced list. The braced form silently re-bound when
+    // `hrefOffset` was inserted into the struct -- the length went into the
+    // offset and the probe's length became 0, which reads as a hash group of
+    // one and is invisible on every book that has no collision, i.e. all of
+    // them but the case this lookup was hardened for.
+    SpineHrefIndexEntry probe;
+    probe.hrefHash = targetHash;
+    probe.hrefOffset = 0;  // not part of the ordering
+    probe.hrefLen = targetLen;
+    probe.spineIndex = 0;  // not part of the ordering
 
-    while (it != spineHrefIndex.end() && it->hrefHash == targetHash && it->hrefLen == targetLen) {
-      spineIndex = it->spineIndex;
-      break;
+    auto it = std::lower_bound(spineHrefIndex.begin(), spineHrefIndex.end(), probe,
+                               [](const SpineHrefIndexEntry& a, const SpineHrefIndexEntry& b) {
+                                 return a.hrefHash < b.hrefHash || (a.hrefHash == b.hrefHash && a.hrefLen < b.hrefLen);
+                               });
+
+    // Every candidate the filter admits, until one's stored href actually IS
+    // the target. Taking the first match without reading it back is how a
+    // collision opened the wrong chapter.
+    for (; it != spineHrefIndex.end() && it->hrefHash == targetHash && it->hrefLen == targetLen; ++it) {
+      spineFile.seek(it->hrefOffset);
+      std::string candidate;
+      serialization::readString(spineFile, candidate);
+      if (candidate == href) {
+        spineIndex = it->spineIndex;
+        break;
+      }
+      LOG_DBG("BMC", "createTocEntry: hash collision on %s, rejected", href.c_str());
     }
 
     if (spineIndex == -1) {

@@ -63,7 +63,27 @@ constexpr const char* ITALIC_TAGS[] = {"i", "em"};
 constexpr const char* UNDERLINE_TAGS[] = {"u", "ins"};
 constexpr const char* LINETHROUGH_TAGS[] = {"del", "s", "strike"};
 constexpr const char* IMAGE_TAGS[] = {"img", "image"};
-constexpr const char* SKIP_TAGS[] = {"head", "rp"};
+// Subtrees whose character data is NOT prose. It was `{"head", "rp"}` alone
+// until 2026-08-23 (sweep item #69), so a <script> or a <style> anywhere in the
+// body emitted its source into the page as text.
+//
+// What is deliberately NOT here, and why -- because the obvious additions are
+// the ones that would cost a reader something:
+//   svg    an SVG-wrapped cover is <svg><image xlink:href="..."/></svg>, and
+//          `image` is in IMAGE_TAGS. Skipping the subtree would drop the cover
+//          of a large share of books. Its <title>/<desc> are handled below
+//          instead, which is where the actual leak was.
+//   math   <mi>/<mn>/<mo> ARE the equation. Leaking "x2+1" is poor; dropping
+//          the equation entirely is worse. Only <annotation>, which repeats the
+//          same expression in TeX or content MathML, is skipped -- that one is
+//          pure duplication.
+//   object,
+//   video,
+//   audio  their child content is the FALLBACK, shown precisely when the object
+//          cannot be rendered, which here is always.
+constexpr const char* SKIP_TAGS[] = {"head",  "rp",     "script",     "style",         "noscript",
+                                     "title", "desc",   "annotation", "annotation-xml", "template",
+                                     "iframe"};
 
 bool isWhitespace(const char c) { return c == ' ' || c == '\r' || c == '\n' || c == '\t'; }
 

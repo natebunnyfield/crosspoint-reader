@@ -110,7 +110,16 @@ namespace {
 //      the note would be silently absent on every book already on the card.
 //      A note that is missing looks exactly like a book with nothing to report,
 //      which is the failure the whole feature exists to prevent.
-constexpr uint8_t SECTION_FILE_VERSION = 46;
+// v47: CSS lengths in real units (2026-08-23, sweep item #23). A LAYOUT change,
+//      which bumps this exactly as a structural one does. `cm`, `mm`, `Q`,
+//      `in` and `pc` were read as PIXELS -- `margin: 1cm` was one pixel -- and
+//      now convert at 150 dpi; `pt` moved with them, from a fixed x1.33 (the
+//      96 dpi answer) to the 2.083 px this renderer's own type is rasterized
+//      at. `!important` also stopped being glued to the unit, so
+//      `margin: 1em !important` now sets four sides instead of two. Every
+//      section built before this measured different insets, and a book served
+//      from a v46 cache would keep them for its whole life.
+constexpr uint8_t SECTION_FILE_VERSION = 47;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

@@ -19,6 +19,19 @@ in a way nobody was told about.
 > `MissingGlyphs`, so the fourteen below are now **sixteen**. It also found that
 > **#38 as written here is wrong** — a missing codepoint has not drawn nothing
 > since B-009 — and the correction is in that document.
+>
+> **Superseded again, later the same day.** Items **#23**, **#24**, **#62** and
+> **#69** were taken; see
+> [css-length-units-2026-08-23.md](css-length-units-2026-08-23.md). That work
+> took `SECTION_FILE_VERSION` to **47**, `CSS_CACHE_VERSION` to **9** and
+> `notes.bin` to version **3** (45 bytes → 53), and added one note,
+> `CssUnitsUnsupported`, so the count is now **seventeen**. It also found that
+> **#69 as written here is wrong for `svg`** — skipping that subtree would drop
+> the cover of a large share of books, because an SVG-wrapped cover is
+> `<svg><image/></svg>` and `image` is in `IMAGE_TAGS`. The correction is in
+> that document, along with an int16 overflow that absolute units made
+> reachable, and a pre-existing `text-align: center !important` that forced
+> LEFT.
 
 ---
 
@@ -249,12 +262,13 @@ argument of this section:
    pass, no new file read.
 
 Fourteen passed all three and were surfaced on the day this was written; two
-more (#52 and #38) were taken later the same day and bring it to **sixteen**.
-The other 86 are listed below with the test they fail, because "checked X, decided against, here is why" is the half a
+more (#52 and #38) were taken later the same day, and #23 later still, bringing
+it to **seventeen**.
+The other 85 are listed below with the test they fail, because "checked X, decided against, here is why" is the half a
 summary drops and the half that stops the same candidate being re-proposed
 forever.
 
-### Surfaced (16, two of them added later the same day)
+### Surfaced (17, three of them added later the same day)
 
 | Note | Raised at | Scope | Frequency |
 |---|---|---|---|
@@ -274,13 +288,14 @@ forever.
 | `PreformattedCollapsed` — `<pre>` loses its spacing and line breaks | [ChapterHtmlSlimParser.cpp](../lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp), tag check | layout | some books |
 | `TextEncodingUnsupported` — a file declares an encoding with no table here, carrying its NAME (added 2026-08-23) | [XmlEncodingSupport.cpp](../lib/Epub/Epub/parsers/XmlEncodingSupport.cpp) | book | rare, and total when it happens |
 | `MissingGlyphs` — distinct codepoints the reading face has no shape for (added 2026-08-23) | [MissingGlyphLedger.h](../lib/EpdFont/MissingGlyphLedger.h), raised from `ChapterHtmlSlimParser` | layout | any book outside the reading font's script |
+| `CssUnitsUnsupported` — a length used a unit with no honest conversion, carrying its NAME (added 2026-08-23) | [CssParser.cpp](../lib/Epub/Epub/css/CssParser.cpp), `acceptLength` / `acceptEdgeShorthand` | book | some books |
 
 Note the two that are effectively universal (`StylesheetPartlyUnderstood`,
 `JustificationDemoted`) are kept anyway: the first because the COUNT is
 book-specific even when the fact is not, the second because the owner asked for
 it by name and its character figure is the answer to "why does this look loose".
 
-### Not surfaced (86), by the test each fails
+### Not surfaced (85), by the test each fails
 
 #### Fails test 1 — the app's typography, identical for every book
 
@@ -330,7 +345,7 @@ fire on a large fraction of books. Specifically —
 | 14 | `<li>` marginLeft widened to fit the marker gutter | `ChapterHtmlSlimParser.cpp:1674` | invisible correction |
 | 17 | An unresolvable percentage `text-indent` falls back to the 3-space default | `BlockStyle.h:136` | identical to the no-indent default, so nothing distinguishes it on the page |
 | 20 | Multi-class selectors never match | `CssParser.cpp:727` | already inside the `StylesheetPartlyUnderstood` count |
-| 24 | `pt`→`px` is a fixed x1.33 regardless of DPI | `CssStyle.h:35` | a unit policy, not a per-book event |
+| 24 | ~~`pt`→`px` is a fixed x1.33 regardless of DPI~~ | `CssStyle.h:35` | **TAKEN 2026-08-23 with #23, and it was not a policy -- it was the 96 dpi answer reached without the question being asked.** x2.0833 now, and `CssUnit::Points` is gone: every absolute unit converts at parse time |
 | 25 | Any `display:` but `none` normalizes to Block | `CssParser.cpp:442` | inside the same count in spirit; reporting it separately would fire on nearly every book with no actionable content |
 | 34 | Byte-identical duplicate stylesheets deduped | `Epub.cpp:326` | provably lossless |
 | 37 | CSS `font-family` ignored | `CssParser.cpp:370` | reported by `EmbeddedFontsIgnored` where it matters |
@@ -344,7 +359,7 @@ fire on a large fraction of books. Specifically —
 
 | # | Decision | file:line | what it would cost |
 |---|---|---|---|
-| 23 | Unknown length units (`cm`, `mm`, `in`, `ex`, `ch`, `vw`, `vh`) silently fall through to PIXELS — `margin: 1cm` becomes 1 px | `CssParser.cpp:343` | **the strongest remaining candidate.** It is a genuine wrong answer, not a simplification, and the fix (a note, and probably a real conversion) is small. Left out only because it belongs with fixing the units, not with reporting them |
+| 23 | ~~Unknown length units silently fall through to PIXELS~~ | `CssParser.cpp`, `CssUnits.h` | **TAKEN 2026-08-23.** `cm`/`mm`/`Q`/`in`/`pt`/`pc` convert at 150 dpi -- the resolution this firmware's own type is rasterized at, not the panel's 257 ppi and not the web's 96, so a point of margin equals a point of type. A unit with no honest conversion (`ex`, `ch`, `vw`, `vh`, or a typo) DROPS its declaration and raises `CssUnitsUnsupported`, carrying the unit's name. `!important` also stopped being glued to the unit |
 | 26/27/28/29/30/31 | CSS caps, oversized selectors, low heap, file > 128 KB | `CssParser.cpp:58,513,610,497`; `Epub.cpp:368,377` | **partly surfaced** as `StylesheetSkipped`; the 128 KB and heap refusals in `Epub.cpp` are not yet wired |
 | 32 | `resolveStyle` returns an empty style for every element while free heap < 48 KB | `CssParser.cpp:708` | per-element and transient; a note raised from it would depend on what else was running |
 | 38 | ~~A codepoint the reading face lacks draws NOTHING~~ | `EpdFont.cpp` last-resort branch; `SdCardFont.cpp` advance table | **TAKEN 2026-08-23, and the description above is wrong.** `EpdFont::getGlyph` has substituted U+FFFD, then `'?'`, since B-009: an SD reading face draws the diamond and the built-in Libre Franklin draws a bare question mark, which is worse than empty space because it reads as content. Now a `.notdef` box where the substitute was `'?'`, plus a layout-scope note counting distinct uncoverable codepoints. The seam was one level below `GfxRenderer`, in `lib/EpdFont`, in the two places that decide a face cannot draw a codepoint |
@@ -355,7 +370,7 @@ fire on a large fraction of books. Specifically —
 | 52 | ~~No `XML_SetUnknownEncodingHandler` anywhere~~ | `XmlEncodingSupport.cpp`, installed at all five `XML_ParserCreate` sites | **TAKEN 2026-08-23.** 29 single-byte code pages (7,424 B of generated table); the multi-byte CJK encodings are refused on purpose, because this firmware carries no CJK reading face and decoding GBK into replacement marks buys nothing. A refusal now raises a book note NAMING the encoding. Reproduced first: the reader was not missing a chapter, it was stuck — page-forward retried the failing chapter forever |
 | 54 | Unknown HTML entities emitted literally as `&foo;` into the prose | `ChapterHtmlSlimParser.cpp:2010` | per-entity, cheap to count — candidate |
 | 55 | CDATA, PIs and DOCTYPE internal subset text dropped | `ChapterHtmlSlimParser.cpp:2015` | correct behavior |
-| 62 | TOC href→spine lookup accepts the first 64-bit hash + length match **without comparing the href** | `BookMetadataCache.cpp:425` | a latent correctness bug, not a notice. Filed separately |
+| 62 | ~~TOC href→spine lookup accepts the first 64-bit hash + length match without comparing the href~~ | `BookMetadataCache.cpp:425` | **TAKEN 2026-08-23.** The hash is a filter now: the index carries each entry's byte offset in the temp spine file, and every candidate the filter admits has its stored href read back and compared. Costs no RAM -- the extra `uint32_t` fits the padding the old struct already had |
 | 78 | After 1024 anchors per chapter no further IDs are recorded; those links land at page 0 | `ChapterHtmlSlimParser.cpp:44` | candidate; needs a counter |
 | 79 | Consecutive non-block elements with IDs can overwrite a pending anchor | `ChapterHtmlSlimParser.cpp:892` | documented residual case |
 | 82/83/84 | A laid-out LINE with > 10,000 words, > 65,535 text bytes, or a failed arena allocation is DROPPED | `TextBlock.cpp:57,76,87` | 82 and 83 effectively never fire (they guard a line, not a paragraph). 84 is real under memory pressure and is a candidate |
@@ -379,7 +394,7 @@ fire on a large fraction of books. Specifically —
 | 64 | A spine item whose file is missing from the zip gets size 0 and stays in the spine | `BookMetadataCache.cpp:322` | candidate — it is a blank chapter |
 | 66 | A cover in an unsupported format yields no cover and no thumbnail | `Epub.cpp:746` | Home screen, not the book |
 | 68 | Href→spine resolution falls back to bare filename matching | `Epub.cpp:1044` | latent bug, same family as 62 |
-| 69 | **`SKIP_TAGS` is only `{"head","rp"}`** — `<svg>`, `<math>`, `<video>`, `<iframe>`, `<object>`, `<form>` are NOT skipped, so their text nodes leak into the prose | `ChapterHtmlSlimParser.cpp:63` | a bug, and a note about it would be a note about a bug. Filed |
+| 69 | ~~`SKIP_TAGS` is only `{"head","rp"}`~~ | `ChapterHtmlSlimParser.cpp:66` | **TAKEN 2026-08-23, and the list above is WRONG for `svg`.** Added: `script`, `style`, `noscript`, `title`, `desc`, `annotation`, `annotation-xml`, `template`, `iframe` -- a `<script>` in the body printed its own source as a paragraph, proved by render. NOT added, each for a reason: `svg` (an SVG-wrapped cover is `<svg><image/></svg>` and `image` is in `IMAGE_TAGS`, so skipping it drops the cover -- its `<title>`/`<desc>` were the actual leak), `math` (`<mi>`/`<mo>` ARE the equation; only `<annotation>`, which duplicates it in TeX, is skipped), `object`/`video`/`audio` (their children are the FALLBACK, shown precisely when the object cannot render, which here is always), `form` (labels read as prose) |
 | 70/72 | Nested table text discarded (**surfaced**); column layout abandoned for a cell with an image/link/list (**surfaced** as the same note) | `ChapterHtmlSlimParser.cpp:947,394` | done |
 
 ### The four next candidates, in order
@@ -389,14 +404,39 @@ fire on a large fraction of books. Specifically —
    [encodings-glyphs-and-library-sync-2026-08-23.md](encodings-glyphs-and-library-sync-2026-08-23.md).
 2. ~~**#52, no unknown-encoding handler.**~~ **Done 2026-08-23**, single-byte
    code pages only, multi-byte refused with a note. Same document.
-3. **#23, unknown CSS units become pixels.** A wrong answer, not a
-   simplification. Now the top of the list.
+3. ~~**#23, unknown CSS units become pixels.**~~ **Done 2026-08-23**, with #24,
+   #62 and #69 alongside it. See
+   [css-length-units-2026-08-23.md](css-length-units-2026-08-23.md).
 4. **#102, watermarked page counts.** It makes a number on screen wrong.
 
 A fifth, promoted by the encoding work: a file whose bytes are windows-1252 and
 which **declares no encoding at all** still fails, because expat assumes UTF-8
 and the first high byte is invalid. That is sniffing rather than decoding, and
 it is a separate repair.
+
+### Re-ranked, after the CSS-unit work
+
+1. **#102, watermarked page counts.** A giant spine is paginated only to a
+   watermark and the page count shown IS the watermark, so the progress figure
+   on screen is wrong. Still the only remaining item that puts a false NUMBER in
+   front of a reader.
+2. **The windows-1252 sniff** (the fifth above). A whole book that will not
+   open, and the encoding work already built everything but the sniff.
+3. **Viewport units, `vw`/`vh`/`vmin`/`vmax`.** Promoted BY the CSS-unit work
+   rather than closed by it: they are now dropped-and-noted rather than silently
+   read as pixels, which is honest, but they are convertible in principle. The
+   case that pays for it is `img { height: 100vh }` on a cover page. It needs a
+   viewport HEIGHT threaded through `CssLength::toPixels`,
+   `BlockStyle::fromCssStyle` and four `ChapterHtmlSlimParser` call sites.
+4. **#54, unknown HTML entities emitted literally as `&foo;`.** Per-entity,
+   cheap to count, and the symptom is visible garbage in the prose.
+5. **#64, a spine item whose file is missing from the zip** gets size 0 and
+   stays in the spine — a blank chapter with nothing said.
+6. **#57, `linear="no"` ignored**, so back-matter appears inline. It changes the
+   reading order visibly, which is exactly test 2.
+7. **#68, href→spine resolution falls back to bare filename matching.** Same
+   family as #62, which is now fixed; this one is still open and is the
+   remaining way the wrong chapter can be opened silently.
 
 ---
 

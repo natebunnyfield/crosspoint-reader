@@ -27,7 +27,7 @@ struct NoteText {
   StrId body;
   // Which Details figure fills the body's single %u, if any.
   // Encoding fills a %s; every other filled body takes a %u.
-  enum class Fill : uint8_t { None, CharsPerLine, Images, CssRules, MissingGlyphs, Encoding } fill;
+  enum class Fill : uint8_t { None, CharsPerLine, Images, CssRules, MissingGlyphs, Encoding, CssUnit } fill;
 };
 
 constexpr NoteText kNotes[] = {
@@ -56,6 +56,8 @@ constexpr NoteText kNotes[] = {
      StrId::STR_BOOK_NOTE_CSS_PARTIAL_B, NoteText::Fill::CssRules},
     {booknotes::Note::StylesheetSkipped, StrId::STR_BOOK_NOTE_CSS_SKIPPED_H, StrId::STR_BOOK_NOTE_CSS_SKIPPED_B,
      NoteText::Fill::None},
+    {booknotes::Note::CssUnitsUnsupported, StrId::STR_BOOK_NOTE_CSS_UNITS_H, StrId::STR_BOOK_NOTE_CSS_UNITS_B,
+     NoteText::Fill::CssUnit},
     {booknotes::Note::ImagesDropped, StrId::STR_BOOK_NOTE_IMAGES_H, StrId::STR_BOOK_NOTE_IMAGES_B,
      NoteText::Fill::Images},
     {booknotes::Note::TablesFlattened, StrId::STR_BOOK_NOTE_TABLES_H, StrId::STR_BOOK_NOTE_TABLES_B,
@@ -125,6 +127,12 @@ void BookNotesActivity::buildLines() {
         break;
       case NoteText::Fill::MissingGlyphs:
         snprintf(filled, sizeof(filled), body, static_cast<unsigned>(detail.missingCodepoints));
+        body = filled;
+        break;
+      case NoteText::Fill::CssUnit:
+        // Same provenance as the encoding name, and the same care: it came off
+        // the card through notes.bin, and openBook is what terminated it.
+        snprintf(filled, sizeof(filled), body, detail.unsupportedCssUnit);
         body = filled;
         break;
       case NoteText::Fill::Encoding:

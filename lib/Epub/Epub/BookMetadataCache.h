@@ -68,10 +68,21 @@ class BookMetadataCache {
   // per spine item; <1KB for typical books).
   std::vector<uint32_t> cumulativeSizes;
 
-  // Index for fast href→spineIndex lookup (used only for large EPUBs)
+  // Index for fast href→spineIndex lookup (used only for large EPUBs).
+  //
+  // The hash is a FILTER, never the answer. A hash-plus-length match used to be
+  // ACCEPTED outright, so a 64-bit collision between two same-length hrefs
+  // opened the wrong chapter with nothing said (sweep item #62,
+  // docs/book-notes-and-sparse-ruby-2026-08-23.md). `hrefOffset` is where the
+  // matching spine entry's own href sits in the temp spine file, so the string
+  // can be read back and compared before the index is trusted. It costs no RAM:
+  // 8 + 4 + 2 + 2 packs into the same 16 bytes the previous three fields did
+  // once padding is counted, and the verifying read is one seek per TOC entry
+  // against the linear scan of up to `spineCount` entries this index replaced.
   struct SpineHrefIndexEntry {
-    uint64_t hrefHash;  // FNV-1a 64-bit hash
-    uint16_t hrefLen;   // length for collision reduction
+    uint64_t hrefHash;   // FNV-1a 64-bit hash
+    uint32_t hrefOffset;  // byte offset of this entry in the temp spine file
+    uint16_t hrefLen;    // length for collision reduction
     int16_t spineIndex;
   };
   std::deque<SpineHrefIndexEntry> spineHrefIndex;

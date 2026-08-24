@@ -4,7 +4,12 @@
 
 // Matches order of PARAGRAPH_ALIGNMENT in CrossPointSettings
 enum class CssTextAlign : uint8_t { Justify = 0, Left = 1, Center = 2, Right = 3, None = 4 };
-enum class CssUnit : uint8_t { Pixels = 0, Em = 1, Rem = 2, Points = 3, Percent = 4 };
+// Points is GONE (2026-08-23). Every absolute unit -- cm mm Q in pt pc -- is
+// converted to pixels at parse time through cssunits::kPixelsPerInch, so
+// nothing survives parsing that still needs a physical conversion. A unit this
+// reader cannot convert never reaches a CssLength at all: the declaration is
+// dropped and a book note is raised. See CssUnits.h.
+enum class CssUnit : uint8_t { Pixels = 0, Em = 1, Rem = 2, Percent = 3 };
 enum class CssTextDirection : uint8_t { Ltr = 0, Rtl = 1 };
 
 // Represents a CSS length value with its unit, allowing deferred resolution to pixels
@@ -31,8 +36,6 @@ struct CssLength {
       case CssUnit::Em:
       case CssUnit::Rem:
         return value * emSize;
-      case CssUnit::Points:
-        return value * 1.33f;  // Approximate pt to px conversion
       case CssUnit::Percent:
         return value * containerWidth / 100.0f;
       default:
@@ -40,9 +43,19 @@ struct CssLength {
     }
   }
 
-  // Resolve to int16_t pixels (for BlockStyle fields)
+  // Resolve to int16_t pixels (for BlockStyle fields).
+  //
+  // The clamp is not a layout policy, it is the boundary of the type the caller
+  // stores in: a cast from a float outside int16 range is undefined behavior,
+  // and it became REACHABLE FROM A REAL STYLESHEET when absolute units started
+  // converting -- `margin-top: 500in` is 75,000 px and `220in` already passes
+  // 32,767, where before every unknown unit collapsed to single digits. NaN
+  // takes the same road, because strtof accepts the spelling.
   [[nodiscard]] int16_t toPixelsInt16(const float emSize, const float containerWidth = 0) const {
-    return static_cast<int16_t>(toPixels(emSize, containerWidth));
+    const float px = toPixels(emSize, containerWidth);
+    if (!(px > -32768.0f)) return px < 0.0f ? INT16_MIN : static_cast<int16_t>(0);  // NaN lands here, as 0
+    if (px > 32767.0f) return INT16_MAX;
+    return static_cast<int16_t>(px);
   }
 };
 

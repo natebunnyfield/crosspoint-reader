@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 // What this book is having done to it, in the reader's words.
 //
@@ -70,6 +71,7 @@ enum class Note : uint8_t {
   //    itself the first time the reader changes font.
   TextEncodingUnsupported,  // BOOK: a file declared a character encoding with no table here
   MissingGlyphs,            // LAYOUT: the reading font has no shape for some of this book's characters
+  CssUnitsUnsupported,      // BOOK: a length used a unit this reader cannot convert, so the rule was dropped
   _COUNT
 };
 
@@ -108,6 +110,11 @@ struct Details {
   // saying which one is the whole point of the note. Truncated rather than
   // dropped: every real declaration is far shorter than this.
   char unsupportedEncoding[24] = {0};
+  // The first CSS length unit that could not be converted, likewise by NAME:
+  // "vh" and "ex" are different problems with the same symptom, and a reader
+  // comparing the page against the publisher's file can only act on the name.
+  // Eight bytes is four times the longest CSS unit.
+  char unsupportedCssUnit[8] = {0};
 };
 
 // One book is open at a time and the raise sites are spread across the parser,
@@ -164,6 +171,21 @@ class Notes {
       dirty = true;
     }
     raise(Note::TextEncodingUnsupported);
+  }
+  // The FIRST unconvertible unit wins, for the same reason the first encoding
+  // does: a stylesheet that reaches for `vh` usually reaches for it throughout,
+  // and the reader has one thing to look for either way. `unit` is a view into
+  // the declaration being parsed, so it is copied rather than kept.
+  void raiseUnsupportedCssUnit(const std::string_view unit) {
+    if (!unit.empty() && detail.unsupportedCssUnit[0] == '\0') {
+      size_t i = 0;
+      for (; i < unit.size() && i + 1 < sizeof(detail.unsupportedCssUnit); ++i) {
+        detail.unsupportedCssUnit[i] = unit[i];
+      }
+      detail.unsupportedCssUnit[i] = '\0';
+      dirty = true;
+    }
+    raise(Note::CssUnitsUnsupported);
   }
   // Distinct codepoints, counted by the caller: the ledger that knows which
   // ones have already been seen lives with the font, not here.
