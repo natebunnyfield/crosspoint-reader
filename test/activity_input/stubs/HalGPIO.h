@@ -71,6 +71,13 @@ class HalGPIO {
   bool isUsbConnected() const { return false; }
   bool wasUsbStateChanged() const { return false; }
 
+  // The per-screen sheet identity (lib/hal/HalGPIO.h:281). A no-op on device and
+  // in this suite; recorded rather than discarded because the value is what makes
+  // a screen the same leaf across a relaunch, so a test that ever cares wants the
+  // key and not merely the fact that a call happened.
+  void publishScreenIdentity(uint32_t screenKey) { lastScreenKey_ = screenKey; }
+  uint32_t simLastScreenKey() const { return lastScreenKey_; }
+
   // Host keyboard text entry. Real behaviour here rather than a hard false:
   // this is the one HAL surface a host CAN implement, so the suite scripts it
   // the same way it scripts buttons — simType() is the typist, and the flag
@@ -169,6 +176,7 @@ class HalGPIO {
   bool pressEdge_[BTN_COUNT] = {};
   bool releaseEdge_[BTN_COUNT] = {};
   unsigned long heldTimeMs_ = 0;
+  uint32_t lastScreenKey_ = 0;
   DeviceType deviceType_ = DeviceType::X4;
   bool textEntryActive_ = false;
   bool hostKeyboardVisible_ = false;

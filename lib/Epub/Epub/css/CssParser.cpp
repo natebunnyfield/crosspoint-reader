@@ -180,26 +180,56 @@ size_t collectEdgeValueTokens(std::string_view s, std::string_view (&out)[4]) {
 }
 
 std::string_view stripTrailingImportant(std::string_view value) {
-  constexpr std::string_view IMPORTANT = "!important";
+  // The bang and the keyword are two separate tokens in the CSS grammar, so
+  // whitespace between them is legal and `! important` means exactly what
+  // `!important` means. This used to match the fused spelling as one literal,
+  // and the spaced one then survived into the value. Measured on 2026-08-24,
+  // both silently and on a page that still rendered: a length reached the unit
+  // scan as "cm ! important", which is not a unit TOKEN at all, so parseLength
+  // answered NotALength and acceptLength turned that into a defined ZERO --
+  // `margin-top: 1cm ! important` came out 0 px against the 59 the book asked
+  // for, and not even the unsupported-unit note fired. A keyword fell through
+  // to its unmatched default, which for alignment is Left rather than neutral,
+  // so a centered heading was FORCED left. Both are the failure modes the fused
+  // spelling's own comments (parseLength, interpretAlignment) already describe;
+  // the spelling was the only difference.
+  //
+  // Comments are the other thing the grammar allows between the two tokens
+  // (`! /*sic*/ important`). Not handled, because this parser strips comments
+  // NOWHERE -- a `/*...*/` anywhere in a declaration already survives into the
+  // value -- so handling them here alone would be a lone exception rather than
+  // a fix.
+  constexpr std::string_view KEYWORD = "important";
 
-  while (!value.empty() && isCssWhitespace(value.back())) {
-    value.remove_suffix(1);
-  }
+  const auto trimTrailingWhitespace = [](std::string_view& v) {
+    while (!v.empty() && isCssWhitespace(v.back())) {
+      v.remove_suffix(1);
+    }
+  };
 
-  if (value.size() < IMPORTANT.size()) {
+  trimTrailingWhitespace(value);
+
+  if (value.size() < KEYWORD.size() + 1) {  // + 1 for the bang itself
     return value;
   }
 
-  const size_t suffixPos = value.size() - IMPORTANT.size();
-  if (!iequalsAscii(value.substr(suffixPos), IMPORTANT)) {
+  const size_t keywordPos = value.size() - KEYWORD.size();
+  if (!iequalsAscii(value.substr(keywordPos), KEYWORD)) {
     return value;
   }
 
-  value.remove_suffix(IMPORTANT.size());
-  while (!value.empty() && isCssWhitespace(value.back())) {
-    value.remove_suffix(1);
+  // Everything before the keyword, with any separating whitespace taken off.
+  // The bang has to be what is left touching it -- so "notimportant" and
+  // "1em important" are values, not annotations.
+  std::string_view head = value.substr(0, keywordPos);
+  trimTrailingWhitespace(head);
+  if (head.empty() || head.back() != '!') {
+    return value;
   }
-  return value;
+
+  head.remove_suffix(1);
+  trimTrailingWhitespace(head);
+  return head;
 }
 
 }  // anonymous namespace

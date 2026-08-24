@@ -36,7 +36,15 @@ class CssParser {
   // v9 (2026-08-23): absolute units convert at parse time and an unconvertible
   // unit drops its declaration, so a cached v8 rule set holds pixel values that
   // were never what the book asked for.
-  static constexpr uint8_t CSS_CACHE_VERSION = 9;
+  // v10 (2026-08-24): `! important` -- the spaced spelling the grammar allows,
+  // since the bang and the keyword are separate tokens -- is recognized. Only
+  // the fused spelling was, so the annotation stayed in the value: a length
+  // then failed its unit scan and came out a defined ZERO -- not dropped, which
+  // is worse, since a dropped declaration leaves the inherited value -- and a
+  // keyword fell through to the unmatched default. This cache stores the interpreted
+  // CssStyle and not the declaration text, so a v9 rule set holds those wrong
+  // values and no later parse revisits them.
+  static constexpr uint8_t CSS_CACHE_VERSION = 10;
 
   explicit CssParser(std::string cachePath) : cachePath(std::move(cachePath)) {}
   ~CssParser() = default;

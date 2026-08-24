@@ -143,7 +143,19 @@ namespace {
 //      paginated books would have kept its old breaks for their whole life and
 //      the setting would have looked inert. The bump itself is for the v48
 //      files already written, which carry no such byte.
-constexpr uint8_t SECTION_FILE_VERSION = 49;
+// v50: `! important` is recognized (2026-08-24). A LAYOUT change, and the same
+//      one v47 already made for the fused spelling -- the bang and the keyword
+//      are two tokens in the CSS grammar, so the space between them is legal
+//      and only the fused spelling was matched. The annotation therefore stayed
+//      in the value: `margin: 1em ! important` failed the unit scan and dropped
+//      the declaration outright, and `text-align: center ! important` fell
+//      through interpretAlignment's unmatched default, which is Left rather
+//      than neutral. Both change insets and line breaks on a book that uses the
+//      spelling, and a section served from a v49 cache is never parsed again.
+//      CSS_CACHE_VERSION moves with it: nothing links the two mechanically
+//      (grep -- the section header does not carry it), so the pairing is by
+//      hand, exactly as it was for v47.
+constexpr uint8_t SECTION_FILE_VERSION = 50;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

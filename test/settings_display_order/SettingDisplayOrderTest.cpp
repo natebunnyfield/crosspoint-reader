@@ -157,16 +157,18 @@ TEST(SettingDisplayOrder, EditorFamiliesAreRecognisedByName) {
   for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
     EXPECT_TRUE(editorfonts::isEditorFamily(editorfonts::FAMILIES[i].family))
         << editorfonts::FAMILIES[i].family << " must be recognised as an editor face";
-    // What the READING picker actually asks. Quattro is offered for both
-    // (owner ruling 2026-08-09); the rest stay writing-only, so a card
-    // carrying them does not grow phantom reading families.
+    // What the READING picker actually asks. Every row is writing-only since
+    // 2026-08-21, when the owner withdrew Quattro's 2026-08-09 alsoReading
+    // exception -- so a card carrying any of them does not grow phantom reading
+    // families.
     const bool writingOnly = editorfonts::isWritingOnlyFamily(editorfonts::FAMILIES[i].family);
     EXPECT_EQ(writingOnly, !editorfonts::FAMILIES[i].alsoReading)
         << editorfonts::FAMILIES[i].family << ": reading-picker visibility must follow alsoReading";
   }
   // Case-insensitive: the name comes from a directory on a FAT card.
   EXPECT_TRUE(editorfonts::isEditorFamily("iawriterquattro"));
-  EXPECT_FALSE(editorfonts::isWritingOnlyFamily("iawriterquattro")) << "Quattro is offered for reading too";
+  EXPECT_TRUE(editorfonts::isWritingOnlyFamily("iawriterquattro"))
+      << "Quattro left the reading list on 2026-08-21 (owner: 'remove ia quattro from reading fonts')";
   EXPECT_TRUE(editorfonts::isWritingOnlyFamily("iAWriterDuo")) << "Duo stays writing-only";
   EXPECT_FALSE(editorfonts::isEditorFamily("IAWRITERMONO")) << "Mono was removed from FAMILIES; isEditorFamily returns false for former faces";
 

@@ -355,6 +355,13 @@ void Epub::parseCssFiles() const {
     return;
   }
 
+  // Past the cache hit, so this really is a parse pass: hand the CSS-derived
+  // book notes back to zero before it re-derives them. openBook() has already
+  // loaded the LAST pass's dropped-rule count off the card, and the counter
+  // accumulates, so leaving it in place made a second parse of the same
+  // stylesheet report twice the rules -- see BookNotes::beginCssParse().
+  booknotes::current().beginCssParse();
+
   // Some converters emit one byte-identical stylesheet per chapter (100+ .css
   // entries), and each parse costs a zip locate plus an SD extract round-trip.
   // Map every CSS path to its central-directory (CRC32, compressed size) in a

@@ -491,3 +491,40 @@ the fraction of pixels away from the modal background by more than 16 levels.
 The negative case was produced by dropping the reading size to 12 pt, which
 takes the measure above 40 characters and retires the only note that book had —
 the same remedy the note's own text recommends.
+
+---
+
+## Addendum 2026-08-24 — the counters that accumulate onto a loaded total
+
+Two counters in `BookNotes.h` share one shape: they add into a field that
+`openBook()` has already loaded off the card, with nothing distinguishing "this
+parse" from "some earlier parse". Only one of them is fixed.
+
+**`cssRulesDropped` — fixed.** Reproduced on `wingspan-the-whole-bird.epub`:
+7 → 14 on a CSS cache rebuild, persisted, and compounding. Note the trigger is
+a **cache rebuild, not a reboot** — three warm reboots hold at 7, because the
+cache serves and no re-parse happens. That is why it was reported as a reboot
+bug and why looking for it on a plain restart finds nothing. `beginCssParse()`
+clears the tally and the two notes that same pass raises, called from
+`Epub::parseCssFiles()` **below** the `hasCache()` early return. Every already
+drifted card heals on first open after the `CSS_CACHE_VERSION` 9 → 10 bump.
+
+**`imagesDropped` — NOT fixed, deliberately, and this is the useful half.**
+Identical accumulate-onto-loaded shape at `BookNotes.h:154`, and a CSS rebuild
+deletes `sections/`, so chapters re-parse and re-count it too. It was not fixed
+for two reasons, both worth recording so the next reader does not repeat the
+work:
+
+1. **It could not be reproduced.** No fixture on the card drops a single image —
+   measured 0 across `ai-engineering-from-zero`, `giant`, `glyphs` and
+   `wingspan`. A fix with no reproduction is a fix on theory.
+2. **The correct fix is genuinely different, not the same one applied twice.**
+   This count legitimately spans many parses *and* many runs — it means "all
+   chapters paginated so far", and chapters paginate lazily over a book's whole
+   reading life. A per-parse reset like `beginCssParse()` would **undercount**
+   it, replacing a doubling bug with a silent-loss bug. It needs per-chapter
+   accounting: record which chapters have contributed, and recount rather than
+   accumulate.
+
+So the shapes match and the fixes do not. Anyone tempted to "apply the same fix
+to the sibling" should read reason 2 first.

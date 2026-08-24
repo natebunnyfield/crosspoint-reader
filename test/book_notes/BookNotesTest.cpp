@@ -124,6 +124,76 @@ TEST(BookNotes, DroppedCssRulesAccumulateAndSaturate) {
   EXPECT_EQ(n.details().cssRulesDropped, UINT16_MAX);  // wraps to a small number otherwise
 }
 
+// A second CSS parse of the SAME stylesheet must report the same figure, not
+// twice it. Reproduced on 2026-08-24 against the real firmware in the
+// simulator: wingspan-the-whole-bird.epub read 7 dropped rules on its first
+// parse and 14 on the next CSS cache rebuild, with the count persisted to
+// notes.bin, so the drift was permanent and compounding. openBook() loads the
+// previous pass's total and countDroppedCssRules ACCUMULATES, so the second
+// pass was counting on top of the first. The trigger is a CSS cache rebuild --
+// which a CSS_CACHE_VERSION bump performs for every book on every card at once.
+TEST(BookNotes, ASecondCssParseReplacesTheDroppedRuleCountRatherThanAddingToIt) {
+  auto& n = fresh();
+
+  // Pass one, as a cold open would run it.
+  n.countDroppedCssRules(5);
+  n.countDroppedCssRules(2);
+  EXPECT_EQ(n.details().cssRulesDropped, 7);
+  EXPECT_TRUE(n.has(booknotes::Note::StylesheetPartlyUnderstood));
+
+  // Pass two, on the same stylesheet -- the state here is what openBook() would
+  // have loaded off the card.
+  n.beginCssParse();
+  EXPECT_EQ(n.details().cssRulesDropped, 0) << "the figure the last pass produced has to go before this one derives it";
+  EXPECT_FALSE(n.has(booknotes::Note::StylesheetPartlyUnderstood))
+      << "and so does the note it raised, or the screen claims a parse that has been superseded";
+
+  n.countDroppedCssRules(5);
+  n.countDroppedCssRules(2);
+  EXPECT_EQ(n.details().cssRulesDropped, 7) << "measured 14 before the fix";
+  EXPECT_TRUE(n.has(booknotes::Note::StylesheetPartlyUnderstood));
+}
+
+TEST(BookNotes, BeginningACssParseLeavesEveryNonCssFigureAlone) {
+  // The reset is scoped to what a CSS pass re-derives. A pass that also cleared
+  // the book's other notes would silently drop them: nothing re-raises a DRM
+  // flag or an image count during a stylesheet parse, and both are persisted,
+  // so they would be gone from the card as well as from the screen.
+  auto& n = fresh();
+  n.raise(booknotes::Note::Drm);
+  n.raise(booknotes::Note::NoTableOfContents);
+  n.raise(booknotes::Note::AlignmentOverridden);
+  for (int i = 0; i < 3; i++) n.countDroppedImage();
+  n.raiseUnsupportedCssUnit("vh");
+  n.countDroppedCssRules(4);
+
+  n.beginCssParse();
+
+  EXPECT_TRUE(n.has(booknotes::Note::Drm));
+  EXPECT_TRUE(n.has(booknotes::Note::NoTableOfContents));
+  EXPECT_TRUE(n.has(booknotes::Note::AlignmentOverridden));
+  EXPECT_EQ(n.details().imagesDropped, 3);
+  // The unconvertible UNIT is raised from the same parse, but it is a first-one-
+  // wins NAME rather than a tally, so re-deriving it is a no-op and clearing it
+  // would only make the reader lose the name on a rebuild.
+  EXPECT_TRUE(n.has(booknotes::Note::CssUnitsUnsupported));
+  EXPECT_STREQ(n.details().unsupportedCssUnit, "vh");
+  // Only the two CSS-pass notes and the tally moved.
+  EXPECT_EQ(n.details().cssRulesDropped, 0);
+  EXPECT_FALSE(n.has(booknotes::Note::StylesheetPartlyUnderstood));
+}
+
+TEST(BookNotes, BeginningACssParseClearsAStylesheetThatWasSkippedEntirely) {
+  // StylesheetSkipped is raised by the heap guard and the rule cap, both inside
+  // the same pass, so it goes with the rest. A device that skipped a stylesheet
+  // once and had the heap for it on the next parse would otherwise keep telling
+  // the reader his book is unstyled.
+  auto& n = fresh();
+  n.raise(booknotes::Note::StylesheetSkipped);
+  n.beginCssParse();
+  EXPECT_FALSE(n.has(booknotes::Note::StylesheetSkipped));
+}
+
 TEST(BookNotes, ExactlyTheLayoutScopedNotesAreDroppedByAFingerprintChange) {
   // isLayoutScope is an explicit list as of 2026-08-23, not a >= against the
   // first layout note -- the ordering version made a BOOK-scope note appended

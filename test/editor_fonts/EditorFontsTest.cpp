@@ -619,8 +619,13 @@ TEST(ReadingFontList, RetiredFamiliesAreNotOfferedForReading) {
 // The writing-only rule still applies through the same predicate.
 TEST(ReadingFontList, WritingOnlyFacesAreNotOfferedForReading) {
   EXPECT_FALSE(readingfonts::offeredForReading("IBMPlexMono"));
-  EXPECT_TRUE(readingfonts::offeredForReading("iAWriterQuattro"))
-      << "Quattro carries alsoReading (owner ruling 2026-08-09)";
+  // Quattro was the one alsoReading exception (owner ruling 2026-08-09) and the
+  // owner withdrew it on 2026-08-21 ("remove ia quattro from reading fonts",
+  // commit 6c5ebf2a5). The rule now holds with no exceptions, so the flag on the
+  // row is what decides -- assert against it rather than against a literal, or
+  // the next reversal has to be typed here as well as in the table.
+  EXPECT_FALSE(readingfonts::offeredForReading("iAWriterQuattro"))
+      << "Quattro left the reading list on 2026-08-21; its editor role is untouched";
   EXPECT_FALSE(readingfonts::offeredForReading("PragmataPro"))
       << "a commercial writing face with a Latin-1-only bold must not reach the reading picker";
 }

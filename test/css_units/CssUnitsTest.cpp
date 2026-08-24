@@ -333,6 +333,79 @@ TEST(CssImportant, TheKEYWORDPathsStripItToo) {
   EXPECT_EQ(s.verticalAlign, CssVerticalAlign::Super);
 }
 
+TEST(CssImportant, TheSpacedSpellingIsTheSameAnnotation) {
+  // The bang and the keyword are separate tokens in the CSS grammar, so
+  // `! important` is legal and means what `!important` means. Only the fused
+  // spelling was matched, and the difference was not cosmetic: the annotation
+  // stayed in the value and each path failed in its own way, both of them
+  // silently and both on a page that still rendered.
+  freshNotes();
+
+  // A LENGTH: the leftover reached the unit scan as "cm ! important", which is
+  // not a unit TOKEN at all (it has spaces in it), so parseLength answered
+  // NotALength -- and acceptLength turns NotALength into a defined ZERO, the
+  // long-standing `margin: auto` behavior. Measured before the fix: 0 px where
+  // the book asked for 59. Not even the unsupported-unit note fired, because
+  // that path needs a token that LOOKS like a unit.
+  const CssStyle length = parse("margin-top: 1cm ! important");
+  ASSERT_TRUE(length.defined.marginTop);
+  EXPECT_NEAR(length.marginTop.toPixels(kEmSize), 59.055f, 0.01f) << "measured 0 before the fix";
+  EXPECT_FALSE(booknotes::current().has(booknotes::Note::CssUnitsUnsupported));
+
+  // A SHORTHAND: the leftover tokenized as two more values, so a one-value
+  // shorthand read as three and the right and left sides came out zero
+  // (measured 0 against the 45 px em before the fix).
+  const CssStyle shorthand = parse("margin: 1em ! important");
+  ASSERT_TRUE(shorthand.defined.marginRight);
+  EXPECT_FLOAT_EQ(shorthand.marginRight.toPixels(kEmSize), kEmSize);
+  EXPECT_FLOAT_EQ(shorthand.marginLeft.toPixels(kEmSize), kEmSize);
+
+  // A KEYWORD: interpretAlignment's unmatched default is Left, not neutral, and
+  // the caller sets `defined.textAlign` regardless -- so a centered heading was
+  // FORCED LEFT rather than merely left unstyled (measured: Left before the
+  // fix). font-weight and font-style went the same way, to Normal.
+  CssStyle keyword = parse("text-align: center ! important");
+  ASSERT_TRUE(keyword.defined.textAlign);
+  EXPECT_EQ(keyword.textAlign, CssTextAlign::Center);
+
+  keyword = parse("font-weight: bold !\timportant");
+  EXPECT_EQ(keyword.fontWeight, CssFontWeight::Bold) << "any CSS whitespace separates them, not only a space";
+
+  keyword = parse("font-style: italic !   IMPORTANT   ");
+  EXPECT_EQ(keyword.fontStyle, CssFontStyle::Italic) << "case-insensitive and run-length-insensitive, as the fused spelling is";
+}
+
+TEST(CssImportant, AValueIsNotAnAnnotationJustBecauseItEndsInTheKeyword) {
+  // The bang is what makes it an annotation, and allowing space in front of the
+  // keyword is exactly what could lose that -- a suffix match on `important`
+  // alone would swallow the keyword out of any value that happens to end in it.
+  // So the parser requires a bang touching the keyword, and these are the cases
+  // that separate a correct implementation from that one.
+  //
+  // The assertion has to be the VALUE and not `defined`: acceptLength defines
+  // the property either way, at zero, so a wrongly-stripped value shows up as a
+  // number and never as an absence.
+  freshNotes();
+
+  // No bang: the unit reads "em important", which is not a unit token, so the
+  // length is not one and the property resolves to zero. A suffix-only match
+  // would strip the word and hand back a perfectly good 1em -- inventing a
+  // margin the book never asked for.
+  const CssStyle noBang = parse("margin-top: 1em important");
+  EXPECT_FLOAT_EQ(noBang.marginTop.toPixels(kEmSize), 0.0f)
+      << "no bang, so `important` is part of the value and there is no unit to read";
+
+  // Glued to the preceding word, so nothing touches the keyword but a letter.
+  const CssStyle glued = parse("margin-top: 1emnotimportant");
+  EXPECT_FLOAT_EQ(glued.marginTop.toPixels(kEmSize), 0.0f);
+
+  // And the annotation with its bang still works on the same property, so the
+  // two assertions above are about the bang and not about the property.
+  const CssStyle annotated = parse("margin-top: 1em ! important");
+  ASSERT_TRUE(annotated.defined.marginTop);
+  EXPECT_FLOAT_EQ(annotated.marginTop.toPixels(kEmSize), kEmSize);
+}
+
 // --- The int16 boundary -----------------------------------------------------
 
 TEST(CssLengths, AHugeAbsoluteLengthCannotOverflowTheStoredPixel) {

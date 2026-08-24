@@ -204,6 +204,37 @@ class Notes {
     dirty = true;
     raise(Note::StylesheetPartlyUnderstood);
   }
+  // A CSS parse pass is starting, and it is about to re-derive every figure the
+  // last one produced. Clear them first.
+  //
+  // The count accumulates across a whole pass -- one call per dropped selector,
+  // across every stylesheet in the book -- and openBook() loads the previous
+  // pass's total off the card. So without this the second pass counted the same
+  // stylesheet ON TOP of the first: measured 7 -> 14 -> 21 on
+  // wingspan-the-whole-bird.epub, one doubling per CSS cache rebuild, and the
+  // figure is persisted so the drift is permanent. What makes it reachable in
+  // the field is that a CSS_CACHE_VERSION bump rebuilds every book's cache on
+  // every card at once.
+  //
+  // The two stylesheet NOTES go with the count, and for the same reason: both
+  // are raised only by this pass (StylesheetPartlyUnderstood by the counter
+  // above, StylesheetSkipped by the heap and rule-cap guards), so a bit left
+  // standing here would be a claim about a parse that has been superseded.
+  //
+  // Call it where the parse really happens, never at the top of a function that
+  // can return early on a cache hit -- clearing figures that are then not
+  // recounted is the same bug pointed the other way.
+  void beginCssParse() {
+    if (detail.cssRulesDropped != 0) {
+      detail.cssRulesDropped = 0;
+      dirty = true;
+    }
+    const uint32_t cssNotes = noteBit(Note::StylesheetPartlyUnderstood) | noteBit(Note::StylesheetSkipped);
+    if ((bookMask & cssNotes) != 0) {
+      bookMask &= ~cssNotes;
+      dirty = true;
+    }
+  }
 
   // Point at a book's cache directory and load notes.bin if present. Clears
   // everything first, so opening a second book cannot inherit the first book's
