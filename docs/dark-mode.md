@@ -179,3 +179,13 @@ from OFF to ON in place, the log carried
 `[harness] SETTINGS.darkMode -> 1 (system appearance)`, and the page flipped to
 the dark half of the chosen palette. Flipping back returned it to OFF, so it
 tracks both directions rather than latching.
+
+### Standing ruling 2026-08-23: holidays and no-school days share a tone
+
+They render as the same square, and only the legend separates them. That
+predates the dark work — both set `isHoliday` and both take `Color::LightGray`.
+
+Asked and answered: **leave them the same.** Both mean "no school tomorrow",
+which is the thing a sleep screen is for, and the legend already names which is
+which. `Color::DarkGray` remains available if this is ever revisited, but it is
+not an open item and should not be re-proposed.
