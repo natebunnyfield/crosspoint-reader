@@ -210,6 +210,14 @@ class ChapterHtmlSlimParser {
   // for the whole table, because a row split across a page boundary breaks each
   // column independently and reads as garbage.
   int measureRowHeight(const tablecolumns::Row& row, const tablecolumns::Plan& plan, bool headerRow) const;
+  // True while the streaming path is still holding text it has not laid out --
+  // a part-built word, or a block with words in it. See
+  // retirePendingBlockBeforeTable(), and tablecolumns::columnStartY for why a
+  // table emitter has to care.
+  bool pendingTextIsUnlaid() const;
+  // Retire whatever the streaming path is holding, in ordinary flow, BEFORE a
+  // table emitter takes the page cursor as its own origin.
+  void retirePendingBlockBeforeTable();
   bool listItemBulletOnly = false;  // true when currentTextBlock has only the <li> marker
 
   // --- List rendering (numbers + hanging indent, 2026-08-22) --------------

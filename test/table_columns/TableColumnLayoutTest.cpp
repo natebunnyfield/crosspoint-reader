@@ -157,3 +157,55 @@ TEST(TableColumns, NoColumnIsEverNarrowerThanItsLongestWord) {
     }
   }
 }
+
+// --- columnStartY: the vertical half of the same invariant -------------------
+//
+// planColumns above makes horizontal overlap impossible. These make VERTICAL
+// overlap impossible, which is what shipped: reported 2026-08-23 against a
+// Catalan phrasebook whose table <caption>, "English" and "Say it" printed on
+// one line with "Catalan" pushed to the next. Every failure mode here is text
+// drawn on top of text, which no other test in this tree can see.
+
+TEST(TableColumnStartY, ColumnsShareTheRowTopWhenBothPreconditionsHold) {
+  // The ordinary case, and the whole point of the function: column 2 starts
+  // where column 0 did, not where column 0 ENDED.
+  EXPECT_EQ(columnStartY(120, 168, true, true), 120);
+  EXPECT_EQ(columnStartY(120, 120, true, true), 120);
+}
+
+TEST(TableColumnStartY, UnclearedRowTopNeverRewinds) {
+  // A <caption> is unlaid at the row top: laying it out costs lines the row top
+  // was measured without, so rewinding to it prints the columns over it. Carry
+  // on below instead.
+  EXPECT_EQ(columnStartY(120, 168, false, true), 168);
+}
+
+TEST(TableColumnStartY, ARowThatChangedPageNeverRewinds) {
+  // Once a cell has overflowed and completed a page, rowTop names a y on a page
+  // that is finished. On the NEW page it is just a number, and usually a large
+  // one -- rewinding to it would print this column over the spill.
+  EXPECT_EQ(columnStartY(400, 20, true, false), 20);
+  EXPECT_EQ(columnStartY(400, 20, false, false), 20);
+}
+
+TEST(TableColumnStartY, TheAnswerIsNeverAboveTheCursorUnlessTheRowTopIsClear) {
+  // The property, swept rather than sampled: the only way this function may
+  // return a y ABOVE where the page cursor already stands -- the only way it can
+  // put ink over ink -- is with both preconditions satisfied, which is the one
+  // case where nothing has been drawn between rowTop and the cursor.
+  for (int rowTop = 0; rowTop <= 400; rowTop += 40) {
+    for (int cursor = 0; cursor <= 400; cursor += 40) {
+      for (const bool clear : {false, true}) {
+        for (const bool samePage : {false, true}) {
+          const int y = columnStartY(rowTop, cursor, clear, samePage);
+          if (y < cursor) {
+            EXPECT_TRUE(clear && samePage)
+                << "rewound to " << y << " from " << cursor << " with clear=" << clear
+                << " samePage=" << samePage;
+            EXPECT_EQ(y, rowTop);
+          }
+        }
+      }
+    }
+  }
+}

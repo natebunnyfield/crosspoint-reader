@@ -119,7 +119,18 @@ namespace {
 //      `margin: 1em !important` now sets four sides instead of two. Every
 //      section built before this measured different insets, and a book served
 //      from a v46 cache would keep them for its whole life.
-constexpr uint8_t SECTION_FILE_VERSION = 47;
+// v48: text left unlaid in front of a table no longer prints under the table's
+//      own header row (2026-08-23, B-037). A <caption> is the reported case but
+//      NOT the only one -- any text in an unclosed block immediately before
+//      <table> took the same route, because <table>'s handler flushes only the
+//      part-word buffer. Such text was still unlaid when </table> was reached,
+//      so the columns emitter took its row top before that text had been
+//      placed, the first cell's block flush then laid it out AT that row top,
+//      and every later column rewound on top of it. A LAYOUT change: the text
+//      now consumes its own lines above the table, so every page after one
+//      moves. The same commit gives a <li> whose whole content is a table its
+//      marker on a line of its own, which moves those pages too.
+constexpr uint8_t SECTION_FILE_VERSION = 48;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

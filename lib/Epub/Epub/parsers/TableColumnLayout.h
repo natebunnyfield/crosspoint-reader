@@ -72,4 +72,39 @@ bool columnIsNumeric(const std::vector<Row>& rows, size_t col);
 Plan planColumns(const std::vector<Row>& rows, int viewportWidth, int spaceWidth,
                  int (*measureText)(void* ctx, const char* text, bool bold), void* ctx);
 
+// Where one column of a table row starts, vertically.
+//
+// Columns share their row's top edge -- that is what makes them columns -- and
+// the parser gets that by REWINDING its page cursor to `rowTop` before each
+// cell. That rewind is the only way this layout can print text over text, so
+// the rule lives here as a pure function with its preconditions named, rather
+// than as an unwritten assumption at the rewind site. planColumns above makes
+// horizontal overlap impossible (the widestWord floor); this makes VERTICAL
+// overlap impossible, which is the half that was missing.
+//
+// The rewind is sound exactly when BOTH hold:
+//
+//   rowTopIsClear       Nothing outside the row loop is still owed a place at
+//                       rowTop. A <caption> -- or any text inside <table> but
+//                       outside a cell -- sits UNLAID in the streaming path's
+//                       pending block and has consumed no vertical space; the
+//                       first cell's block flush lays it out AT rowTop, and
+//                       every later column then rewinds on top of it. That is
+//                       the bug reported 2026-08-23: a three-column phrasebook
+//                       whose caption, "English" and "Say it" printed on one
+//                       line with "Catalan" pushed to the next.
+//   samePageAsRowStart  The row is still on the page it began on. A cell that
+//                       overflows and completes a page leaves rowTop naming a y
+//                       on a page that is already finished, and rewinding to it
+//                       prints this column over whatever spilled onto the new
+//                       one.
+//
+// When either fails the answer is `cursorY` -- carry on below whatever is
+// already there. A column out of line reads badly; a column printed on top of
+// another cannot be read at all.
+inline int columnStartY(const int rowTop, const int cursorY, const bool rowTopIsClear,
+                        const bool samePageAsRowStart) {
+  return (rowTopIsClear && samePageAsRowStart) ? rowTop : cursorY;
+}
+
 }  // namespace tablecolumns

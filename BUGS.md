@@ -133,6 +133,62 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 
 ## FIXED
 
+### [B-037] A table's `<caption>` printed under its own header row — FIXED 2026-08-23
+**severity: high · scope: reader, EPUB table layout (T-012 columns path) · fixed 2026-08-23, verified by render**
+
+Reported with a screenshot of a three-column Catalan phrasebook: the caption
+text, `English` and `Say it` all drawn on ONE line, glyphs on top of each other,
+and `Catalan` fallen to the line below. Body rows underneath were correct.
+
+`<caption>` is handled nowhere (`grep -rn caption lib/Epub/` returns nothing),
+so its text takes the ordinary streaming route — `characterData` diverts into
+the table buffer only while a CELL is open
+(`ChapterHtmlSlimParser.cpp:1928`) — and is still UNLAID at `</table>`, having
+consumed no vertical space. `emitBufferedTableAsColumns` then took
+`rowTop = currentPageNextY` while the caption was still owed exactly that y;
+column 0's `startNewTextBlock` flushed the caption AT rowTop (via `makePages()`,
+`:387`), so `Catalan` landed a line lower, and every later column's
+`currentPageNextY = rowTop` printed straight over the caption. One defect, both
+symptoms. `emitBufferedTableRotated` had the same seam pointed the other way:
+the caption surfaced on the page AFTER the table it names.
+
+**Not the SD step-down.** `smallFontId` — the cut `getSmallestReaderFontId()`
+cannot actually obtain for an SD family — is read only by the ROTATED emitter
+(`ChapterHtmlSlimParser.cpp:605`). The upright columns path measures and draws
+with `fontId` at every step (`:2270`, `:763`, `:782`), so no measure/draw seam
+exists there. That lead was checked and refuted; the step-down remains a
+documented no-op and an open RAM-versus-feature question, untouched.
+
+Fixed by retiring the pending block before either geometry emitter takes the
+page cursor (`retirePendingBlockBeforeTable()`), and by moving the per-column
+rewind into a pure function that names its preconditions and can only ever
+return a y above the cursor when nothing has been drawn between the two
+(`tablecolumns::columnStartY`, four tests). The same change closes an unreported
+second way the rewind could overlap: a cell that overflows and completes a page
+left `rowTop` naming a y on a FINISHED page, and the old code rewound to it.
+`SECTION_FILE_VERSION` 47 -> 48. Flash +148 bytes.
+
+Adversarial review caught the fix reintroducing the reported symptom in a case
+the repro did not cover — the retired block's style was carried onto the empty
+successor block, where the first cell REUSES rather than flushes it, so a
+container margin or a `<br>` flag pushed column 0 below its siblings. Confirmed
+by render (`<div>a<br/>b<table>` put `Term` one line under `Gloss`), then fixed
+with a neutral successor style. The same pass turned up a SEPARATE pre-existing
+case with the identical shape: a `<li>` whose whole content is a table had its
+marker merged into the first cell, where it wrapped inside a column planned for
+the cell's own text. Verified present on the pre-fix tree, fixed here.
+
+**Coverage gap, stated:** no host test links `ChapterHtmlSlimParser`, so the
+emitter half of this fix is covered by render only.
+
+Reproduced and re-rendered before and after in the desktop simulator at 12 pt
+(at 14 pt the phrasebook's tables fail `planColumns` and take the key-block
+fallback, which never had the bug). A fixture that shows it at the DEFAULT
+size is now in the repo: `test/epubs/test_table_caption.epub`, two captioned
+tables — one that plans as columns at 14 pt, one that rotates. Full writeup,
+including the render-scale hypothesis that was measured and refuted:
+[docs/table-caption-overlap-2026-08-23.md](docs/table-caption-overlap-2026-08-23.md).
+
 ### [B-035] Only one reading font drew Unicode arrows — FIXED 2026-08-20
 **severity: medium · scope: SD-card fonts (`.cpfont`), font build tooling · fixed 2026-08-20, verified by render**
 

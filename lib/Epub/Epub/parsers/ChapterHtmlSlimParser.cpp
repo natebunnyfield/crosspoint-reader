@@ -465,6 +465,63 @@ void ChapterHtmlSlimParser::abandonTableBuffer() {
   tableBufBytes = 0;
 }
 
+// --- The precondition every table emitter shares ---------------------------
+//
+// Text can arrive inside <table> but outside any cell: a <caption> is the
+// common one, and stray text between rows is the other. `characterData` only
+// diverts into the buffer while a cell is OPEN, so that text takes the ordinary
+// streaming route and is sitting UNLAID in currentTextBlock when </table> is
+// reached -- it has consumed no vertical space at all.
+//
+// That matters because the columns emitter takes currentPageNextY as the top of
+// its first row and then rewinds to it for every column. The first cell's
+// startNewTextBlock() flushes the pending block, so the caption gets laid out
+// AT that row top, from inside the row loop -- and columns 2..n then rewind
+// straight on top of it. Reported 2026-08-23 against a Catalan phrasebook:
+// caption, "English" and "Say it" all on one line, "Catalan" pushed below.
+// The rotated emitter has the same seam pointed the other way: it completes the
+// current page and the caption would surface AFTER the table it names.
+//
+// So: retire it here, in ordinary flow above the table, and every emitter below
+// starts from a page cursor that owes nothing.
+bool ChapterHtmlSlimParser::pendingTextIsUnlaid() const {
+  return partWordBufferIndex > 0 || (currentTextBlock && !currentTextBlock->isEmpty());
+}
+
+void ChapterHtmlSlimParser::retirePendingBlockBeforeTable() {
+  if (partWordBufferIndex > 0) {
+    flushPartWordBuffer();
+  }
+  if (!currentTextBlock || currentTextBlock->isEmpty()) return;
+  // A <li> whose content is a table leaves the block holding just the list
+  // marker. startNewTextBlock would take its bullet-only branch and MERGE that
+  // marker into the table's first cell instead of laying it out -- and the
+  // marker then wraps inside a column planned for the cell's own text, so the
+  // bullet takes line 1, the cell takes line 2, and every other column sits on
+  // line 1. Same broken shape as the caption bug, from a different cause, and
+  // it predates this change: measured on the pre-fix tree, `<ul><li><table>`
+  // rendered a bare bullet beside `Gloss` and `Say it` with `Term` beneath.
+  // Clearing the flag gives the marker its own line above the table, which is
+  // what a list item holding nothing but a table should look like anyway.
+  listItemBulletOnly = false;
+  // Non-empty, so this takes startNewTextBlock's makePages() path: the block is
+  // laid out where it stands and a fresh one replaces it.
+  //
+  // The successor block is given a NEUTRAL style, not the retired block's own.
+  // The argument does not touch the caption -- makePages() reads the style off
+  // the block it is retiring -- it only dresses the EMPTY block left behind,
+  // and the next thing to open that block is the table's first cell. An empty
+  // block is REUSED rather than flushed (startNewTextBlock's first branch), so
+  // whatever it carries is merged into that cell's style: a container's
+  // marginTop/paddingTop would push column 0 down, and a <br>-flagged block
+  // would arm a full line of sceneBreakLift for it. Either one puts column 0
+  // below columns 1..n -- which is the reported bug, reintroduced from inside
+  // its own fix. Measured, not reasoned: `<div>a<br/>b<table>` rendered `Term`
+  // exactly one line under `Gloss` and `Say it` before this line said
+  // BlockStyle().
+  startNewTextBlock(BlockStyle());
+}
+
 // The pre-2026-08-19 shape, rebuilt from the buffer: one paragraph per cell,
 // each prefixed with the column name (and the row name in bold, for the first
 // cell of a row). Kept because it is the only thing that works for a table the
@@ -620,8 +677,15 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
     if (down > cross) return false;
   }
 
-  // It fits. Give it a page of its own -- a rotated table sharing a page with
-  // upright prose would be unreadable in both orientations at once.
+  // It fits, and every `return false` above is behind us -- so this is the
+  // first point at which emitting is allowed, and the last at which the
+  // "nothing is emitted on a false return" contract still holds. A pending
+  // <caption> is retired here so it lands above the table rather than on the
+  // page after it.
+  retirePendingBlockBeforeTable();
+
+  // Give it a page of its own -- a rotated table sharing a page with upright
+  // prose would be unreadable in both orientations at once.
   if (currentPage && !currentPage->elements.empty()) {
     completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
     completedPageCount++;
@@ -735,6 +799,10 @@ int ChapterHtmlSlimParser::measureRowHeight(const tablecolumns::Row& row, const 
 }
 
 void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan& plan) {
+  // Establishes tablecolumns::columnStartY's `rowTopIsClear` precondition for
+  // the first row: nothing unlaid may be owed a place at the row top the
+  // columns are about to rewind to.
+  retirePendingBlockBeforeTable();
   // Table rows between two paragraphs break their margin adjacency (2026-08-22).
   resetInterBlockCollapse();
   const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
@@ -769,9 +837,15 @@ void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan&
     }
 
     const int16_t rowTop = currentPageNextY;
+    // Both preconditions of the per-column rewind, captured once per row while
+    // they are still facts rather than assumptions. See tablecolumns::
+    // columnStartY -- it owns the rule, this owns the evidence.
+    const bool rowTopIsClear = !pendingTextIsUnlaid();
+    const int rowStartPage = completedPageCount;
     int16_t rowBottom = rowTop;
     for (size_t c = 0; c < row.size() && c < plan.columnCount; c++) {
-      currentPageNextY = rowTop;
+      currentPageNextY = static_cast<int16_t>(tablecolumns::columnStartY(
+          rowTop, currentPageNextY, rowTopIsClear, completedPageCount == rowStartPage));
       auto cellStyle = BlockStyle();
       cellStyle.marginLeft = static_cast<int16_t>(plan.x[c]);
       cellStyle.marginRight = static_cast<int16_t>(viewportWidth - (plan.x[c] + plan.w[c]));
@@ -784,7 +858,13 @@ void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan&
       }
       nextWordContinues = false;
       makePages();
-      if (currentPageNextY > rowBottom) rowBottom = currentPageNextY;
+      // The row's bottom is the deepest column -- but only among columns still
+      // on the page the row started on. Once a cell has spilled onto a new
+      // page, a y measured on the old one is not comparable, and taking the max
+      // would start the next row below the bottom of the wrong page.
+      if (completedPageCount != rowStartPage || currentPageNextY > rowBottom) {
+        rowBottom = currentPageNextY;
+      }
     }
     currentPageNextY = static_cast<int16_t>(rowBottom + rowGap);
     snapToLineGrid();  // Line Grid: row gap rounds up so table baselines stay on it
