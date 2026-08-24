@@ -13,7 +13,21 @@
 #include "FsHelpers.h"
 
 namespace {
-constexpr uint8_t BOOK_CACHE_VERSION = 10;  // v10: ignore ambiguous guide text references
+// v11, 2026-08-23: NOT a format change. Epub::load() returns early on a warm
+// cache, ABOVE the only call to scanZipForBookNotes(), so every book already
+// indexed on a card silently skipped the notes added that day -- DRM, ignored
+// embedded fonts, no table of contents, unresolved TOC entries. Worse, a book
+// whose TOC is non-UTF-8 was parsed by the older firmware, FAILED, and
+// committed its cache anyway: the same day taught five parsers to decode it,
+// and the warm path never re-parses, so 'non-UTF-8 books open now' was true
+// only of books not yet indexed. An existing library kept an empty Select
+// Chapter forever.
+//
+// The rule this restates, from Section.cpp's own ladder: bump when the format
+// changes, when pagination changes, OR when anything the cached pass DECIDED
+// changes. A cache is not only a layout; it is a record of conclusions, and a
+// conclusion reached by code that has since been fixed is stale.
+constexpr uint8_t BOOK_CACHE_VERSION = 11;
 constexpr char bookBinFile[] = "/book.bin";
 constexpr char tmpSpineBinFile[] = "/spine.bin.tmp";
 constexpr char tmpTocBinFile[] = "/toc.bin.tmp";
