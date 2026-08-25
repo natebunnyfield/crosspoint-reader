@@ -4,12 +4,16 @@ Written 2026-08-25, while unfreezing `hyphenationEnabled` into the **Line
 Breaks** row on Typography Settings (owner ruling the same day: *"unfreeze
 hyphenation and get the better line breaker"*).
 
-Everything here was read or measured at `81c5a8a05`. Where a claim is inferred
-rather than measured, it says so.
+Everything in §0–§7 was read or measured at `81c5a8a05`. **§8 is a second dated
+pass, 2026-08-26, measured at `8f6e0294f`**, added after the owner asked how
+"winning" was being defined in §3 — it re-runs the comparison as a 2×2 with
+worst-line, river and hyphen-run metrics. Where a claim is inferred rather than
+measured, it says so.
 
 **Read this before touching `ParsedText::computeLineBreaks` or
-`computeHyphenatedLineBreaks`.** Two of the three sections below overturn
-something that was written down as settled.
+`computeHyphenatedLineBreaks`.** Two of the sections below overturn something
+that was written down as settled, and §8 qualifies a third — §3's verdict
+stands, but not for the reason §3 gives.
 
 ---
 
@@ -25,11 +29,13 @@ the 2026-08-21 reduction until today. It is now a live field with a row:
 | `1` **Hyphenated** | `computeHyphenatedLineBreaks` — first-fit greedy that splits words. **The default, and what every shipped build has drawn.** |
 | `0` **Whole Words** | `computeLineBreaks` — the total-fit dynamic program. Dead code in every shipped configuration until today. |
 | Model | `lib/Epub/Epub/LineBreakMode.h` (pure, host-tested by `test/line_break_mode`) |
-| Quality + cost | `test/line_break_quality` — four live tests, plus `DISABLED_Sweep`, the instrument that produced §3 |
+| Quality + cost | `test/line_break_quality` — eleven live tests, plus `DISABLED_Sweep`, the instrument that produced §3 and §8 |
+| Corpus | not checked in (book text); rebuild it with `tools/linebreak_corpus.py` — §8a |
 
 The row is **not** called Hyphenation because that name describes a side-effect
 and hides the switch. It is not called anything promising evenness either; §3
-says why.
+says why, and §8 says why that verdict survived a re-measurement that was built
+to overturn it.
 
 ### One class of card moves on its own
 
@@ -161,6 +167,13 @@ The corpus for §3 is **394 paragraphs / 23,075 words**, every paragraph of 30+
 words from `ai-engineering-from-zero.epub` and `wingspan-the-whole-bird.epub` on
 the test card.
 
+**It was not checked in, and that cost a reconstruction** — §8a. The extraction
+rule now lives in [tools/linebreak_corpus.py](../tools/linebreak_corpus.py)
+instead of in this paragraph, so the next measurement rebuilds the same corpus
+rather than guessing at one. The rebuilt copy is 394 paragraphs / 22,881 words
+and reproduces this section's table to within 1.7% on the means; §8a records
+the one column that does not.
+
 **The simulator is the authority for pictures**, and for pagination wall time.
 
 **Two traps, both of which cost a wrong reading first:**
@@ -219,6 +232,13 @@ report **line end position**. `hyphen` is lines ending in an inserted hyphen.
 | LF 18 pt @ 640 | justified | Whole Words | 3783 | 24.06 | 17.52 | 367.94 | 58 |
 | LF 18 pt @ 640 | ragged | Hyphenated | 3760 | 579.66 | 44.90 | 490.66 | 155 |
 | LF 18 pt @ 640 | ragged | Whole Words | 3789 | 575.32 | **42.10** | 486.32 | 58 |
+
+> **Qualified by §8 (2026-08-26).** This table is not algorithm against
+> algorithm — the stored byte couples the two, so it compares greedy WITH
+> hyphens against total fit WITHOUT them — and mean/sd cannot see what total fit
+> optimizes. §8 re-measures it on a 2×2 with worst-line, river and hyphen-run
+> metrics. **The verdict below survives**, and by a wider margin than it claims;
+> what changes is the reason, and the strength of the case for the missing cell.
 
 ### THE SURVEY'S PREDICTION IS WRONG, and this is the finding
 
@@ -348,7 +368,8 @@ effect delta 13.6% and 19.2% of pixels changed by more than 4 levels.
 ## 6. Verified
 
 * Host suite **528 → 540**, all passing. `test/line_break_mode` (8) and
-  `test/line_break_quality` (4 + 1 disabled instrument).
+  `test/line_break_quality` (4 + 1 disabled instrument). §8 later took it to
+  **547** with seven more in the same suite.
 * Both `line_break_mode` byte assertions validated failing-first, by re-pointing
   the fallback and by swapping the two stored values.
 * `pio run -e simulator_x3` green; `pio run -e default` (ESP32-C3) green.
@@ -394,3 +415,567 @@ are mine, not its.
   the measure, which is most of why the greedy rag is uneven at 18 pt. Moving it
   is a change to the DEFAULT rendering and nobody asked for one.
 * **A per-book override.** §0: there is nothing to override.
+
+---
+
+## 8. Re-measured 2026-08-26: the 2×2, the worst line, rivers, hyphen runs
+
+Written the day after §3, because §3's verdict was reported to the owner as
+"the greedy breaker beats the total-fit DP" and he asked how *winning* was being
+defined. Three things were wrong with the answer, and this section is the
+re-measurement.
+
+1. **It was not algorithm against algorithm.** The stored byte couples the two,
+   so what §3 compared was greedy **with** hyphens against total fit
+   **without** them — and hyphenation is exactly what lets the greedy breaker
+   pack tight. It flatters the number being measured.
+2. **Mean and standard deviation are the wrong summary for what total fit is
+   FOR.** Knuth-Plass cubes its badness so that one terrible line outweighs many
+   slightly loose ones. Averaging hides precisely that.
+3. **Rivers were not measured at all** — the classic justified-text defect a
+   reader actually notices.
+
+Everything below is measured at **`8f6e0294f`** — the commit that shipped the
+row, one past the `81c5a8a05` §3 quotes — plus the harness changes described in
+§8i, on the same corpus and the same six configurations as §3. `8f6e0294f` is
+the only commit between the two that touches `ParsedText.cpp` or the
+hyphenation tree, and it is the one that introduced the dispatch being measured,
+so the layout engine under test here is the layout engine §3 described.
+
+### 8a. The corpus, and one honest discrepancy
+
+394 paragraphs, **22,881 words** — every `<p>` of 30 or more words from
+`ai-engineering-from-zero.epub` and `wingspan-the-whole-bird.epub` on the test
+card. §3 quotes 23,075 words for the same 394 paragraphs, a 0.8% difference in
+the word count with the paragraph count identical; the corpus itself was never
+checked in, so this one is a **reconstruction** and the extraction rule is now
+[tools/linebreak_corpus.py](../tools/linebreak_corpus.py) rather than a sentence
+in a doc.
+
+Measured against all 24 rows of §3's table: **line counts within 0.85%, means
+within 1.7%, standard deviations within 11.1%** — and every deviation above 5% is
+in a greedy-with-hyphens row and in the same direction (this corpus slightly
+higher). That is what says the two corpora are the same text with a small
+difference in what got extracted, rather than two different texts.
+
+One column does not reproduce at all: §3 reports 24–83 hyphenated lines in the
+Whole Words arm and this corpus produces 0–13, so §3's copy held a handful of
+tokens wide enough to trip the oversized-word pre-pass that this extraction does
+not. It changes no conclusion in either section — the effect being compared is
+400–1000 lines — but it is the one figure below that should not be read against
+§3's, and it is the likeliest explanation for the sd spread above.
+
+### 8b. The 2×2: three cells are reachable, and the fourth is not an algorithm
+
+Hyphenation turns out to be an independent axis after all, and not a new one:
+`Hyphenator::cachedHyphenator_` is filled only by `setPreferredLanguage`, and
+only English and Spanish tries ship (`LanguageRegistry.cpp`). Point it at any
+other tag and pattern hyphenation is gone.
+
+**That cell is not synthetic.** It is what a French, German or untagged EPUB
+renders as on a shipped device *today*, with the default stored byte — the same
+code path minus a trie, and `setPreferredLanguage` raises
+`BookNotes::NoHyphenationForLanguage` on exactly that transition.
+
+| | hyphenation ON | hyphenation OFF |
+|---|---|---|
+| **greedy** (`computeHyphenatedLineBreaks`) | **the shipped default** | reachable — an untagged or non-en/es book |
+| **total fit** (`computeLineBreaks`) | not an algorithm, see below | **the shipped alternative** |
+
+**The fourth cell was settled by measurement, not by argument.** Handing the DP
+an English trie is a legal input, so "total fit with hyphenation" *looks*
+reachable. It is not: the DP can only ever see the hyphens its own
+oversized-word pre-pass already committed, so the trie moves *where* such a word
+splits and never *whether* the optimizer takes a hyphen. If that reasoning is
+right the two runs must land on the same page — and they do:
+
+| config | cell | lines | mean | sd | p95 | hyphenated |
+|---|---|---:|---:|---:|---:|---:|
+| LF 12 pt @ 512 | total fit | 3074 | 13.070 | 7.108 | 26.000 | 0 |
+| LF 12 pt @ 512 | total fit + trie | 3074 | 13.070 | 7.108 | 26.000 | 0 |
+| LF 18 pt @ 400 | total fit | 6413 | 43.714 | 34.573 | 124.000 | 13 |
+| LF 18 pt @ 400 | total fit + trie | 6413 | 43.687 | 34.526 | 124.000 | 13 |
+
+(`lines` here counts lines that have at least one measurable GAP, which is the
+sample the mean and p95 are taken over — 3074 at 12 pt / 512 px. §8f's table
+carries two other counts for the same configuration and neither is this one:
+3075 lines the breaker had a choice about (the one line with no measurable gap
+is the difference), and 3469 lines on the page once each paragraph's last line
+is added back. Three denominators, three questions; an earlier draft of this
+note conflated two of them.)
+
+Identical to three decimals in five of six configurations; the sixth differs by
+0.06% of the mean, which is one over-wide word splitting at a pattern point
+instead of a fallback point. Same lines, same hyphens, same p95, everywhere.
+`LineBreakQuality.TheDpCannotUseHyphenPointsSoThereIsNoFourthCell` pins it, and
+carries a precondition proving the axis is live — two identical rows are also
+what a dead hyphenation axis produces, and a dead axis is this suite's oldest
+failure mode.
+
+So classical Knuth-Plass remains **the missing cell and the real prize**, exactly
+as §1 and §3 say. §8d is now a direct measurement of how much it would be worth.
+
+**One residue to disclose.** "Hyphenation off" is not "no hyphens". Three things
+survive with no trie, and all three are in `Hyphenator::breakOffsets` above the
+`if (hyphenator)` guard: an explicit `-` or soft hyphen already inside a word
+(`buildExplicitBreakInfos`, which returns before the trie is consulted at all),
+an apostrophe contraction boundary (`appendApostropheContractionBreaks`, applied
+regardless), and the every-N-character fallback on a word too wide to fit a line
+alone. In the greedy-minus-hyphens cell that residue is **1.7–2.4% of lines**
+(65 of 3063 at 12 pt / 512 px), against 0–0.2% for the DP, whose only mid-word
+breaks come from its own oversized-word pre-pass. So the comparison is not
+perfectly clean, and it is unclean in the direction that **flatters the greedy
+cell** — which still loses §8d. The conclusion there is conservative.
+
+### 8c. De-confounded: hyphenation moves the page far more than the algorithm
+
+Justified, all six configurations, mean inter-word gap in px:
+
+| config | greedy +hy | greedy −hy | total fit | hyphenation moves | algorithm moves |
+|---|---:|---:|---:|---:|---:|
+| LF 12 pt @ 400 | 12.83 | 16.10 | 16.64 | **3.27** | 0.54 |
+| LF 12 pt @ 512 | 10.59 | 12.76 | 13.07 | **2.17** | 0.31 |
+| LF 12 pt @ 640 | 8.94 | 10.65 | 11.03 | **1.71** | 0.38 |
+| LF 18 pt @ 400 | 31.33 | 43.37 | 43.71 | **12.04** | 0.34 |
+| LF 18 pt @ 512 | 23.21 | 31.00 | 31.30 | **7.79** | 0.30 |
+| LF 18 pt @ 640 | 18.82 | 23.53 | 24.40 | **4.71** | 0.87 |
+
+**The hyphenation axis moves the mean 4.5–35× as far as the algorithm axis does.**
+§3's headline was therefore a report about hyphenation wearing an algorithm's
+name: nearly the whole of "greedy sets tighter and more evenly" is the trie, not
+the breaker. `LineBreakQuality.HyphenationMovesThePageMoreThanTheAlgorithmDoes`
+asserts the ratio so that a future coupling change cannot quietly re-confound it.
+
+### 8d. Worst-line badness — the metric §3 could not see
+
+Same per-line gap as §3's `mean` column, read as order statistics instead of an
+average, and quoted as a **multiple of the font's own word space** so 12 pt and
+18 pt can share a table (12 pt: 5.0 px, 18 pt: 8.0 px). `paraWorst` is the mean
+across paragraphs of that paragraph's loosest line — the "how bad is the worst
+line on this page" figure, and the most robust of the four.
+
+One thing worth pinning before reading the table: on a justified line every gap
+is the same width **to the pixel** — measured over the whole specimen at both
+sizes and in all three cells, the within-line spread is exactly 0.000 px. So
+"the line's mean gap" and "the line's gap" are the same number, and these are
+order statistics over LINES rather than a summary of a summary.
+
+| config | cell | mean | p95 | p99 | max | paraWorst |
+|---|---|---:|---:|---:|---:|---:|
+| LF 12 pt @ 400 | greedy +hy | **2.57** | **5.20** | **8.20** | 67.00 | **5.28** |
+| | greedy −hy | 3.22 | 7.60 | 12.80 | **43.00** | 7.19 |
+| | total fit | 3.33 | 7.20 | 12.00 | 46.80 | 6.82 |
+| LF 12 pt @ 512 | greedy +hy | **2.12** | **4.00** | **5.80** | **16.20** | **3.58** |
+| | greedy −hy | 2.55 | 5.60 | 8.60 | 29.00 | 4.69 |
+| | total fit | 2.61 | 5.20 | 8.00 | **16.20** | 4.35 |
+| LF 12 pt @ 640 | greedy +hy | **1.79** | **3.20** | **4.20** | **9.80** | **2.62** |
+| | greedy −hy | 2.13 | 4.20 | 6.20 | 19.40 | 3.41 |
+| | total fit | 2.21 | 4.20 | 6.20 | 13.20 | 3.27 |
+| LF 18 pt @ 400 | greedy +hy | **3.92** | **9.88** | **17.50** | 37.00 | **10.86** |
+| | greedy −hy | 5.42 | 17.38 | 24.50 | 34.25 | 16.13 |
+| | total fit | 5.46 | 15.50 | 20.62 | **29.50** | 13.80 |
+| LF 18 pt @ 512 | greedy +hy | **2.90** | **6.38** | **10.62** | 51.88 | **6.74** |
+| | greedy −hy | 3.87 | 9.62 | 18.75 | 39.38 | 10.10 |
+| | total fit | 3.91 | 8.75 | 16.88 | **38.62** | 8.91 |
+| LF 18 pt @ 640 | greedy +hy | **2.35** | **4.50** | **7.50** | **18.62** | **4.47** |
+| | greedy −hy | 2.94 | 6.88 | 11.88 | 30.88 | 6.20 |
+| | total fit | 3.05 | 6.38 | 10.25 | 49.00 | 5.85 |
+
+#### At equal hyphenation the DP does exactly what it is for
+
+Reading only the two whole-word cells — the pure algorithm comparison §3 never
+made:
+
+| metric | total fit better | tied | worse |
+|---|---:|---:|---:|
+| mean | 0 | 0 | **6** |
+| sd | 5 | 0 | 1 |
+| **p95** | **5** | 1 | **0** |
+| **p99** | **5** | 1 | **0** |
+| max | 4 | 0 | 2 |
+| **paraWorst** | **6** | 0 | **0** |
+
+**Total fit gives up 0.7–3.8% on the average line and buys back 4.1–14.4% on
+the loosest line of a paragraph, and it never loses that trade in any of the six
+configurations.** (Percentages here are relative to `greedy −hy`, the arm it is
+being compared against. The next table's are relative to the shipped default,
+which is a different baseline — the doc states which each time from here on,
+because an earlier draft did not and the same effect reads 21–32% or 17.7–24.4%
+depending on the choice.) That is the Knuth-Plass bargain, stated in the units it is
+made in, and it is invisible to a mean and a standard deviation. §3's "the
+optimizer loses" was true of the setting and false of the algorithm.
+
+#### But against the shipped default it is not close
+
+| metric | default (greedy +hy) better | tied | worse |
+|---|---:|---:|---:|
+| mean | **6** | 0 | 0 |
+| **p95** | **6** | 0 | 0 |
+| **p99** | **6** | 0 | 0 |
+| max | 2 | 1 | 3 |
+| **paraWorst** | **6** | 0 | 0 |
+
+The default is 21–32% better on `paraWorst` and 30–57% better at p95, both
+relative to the default itself as baseline. **The
+worst-line metric, the one introduced specifically because it might overturn
+§3, does not overturn it** — it strengthens it, because the DP's own advantage
+is worth less than the hyphens it is denied.
+
+### 8e. Rivers
+
+**The definition, and the one that failed.** A river is a maximal chain of gaps
+on consecutive lines of the **same paragraph** spanning **three or more** lines,
+where each consecutive pair is *linked*. Three lines because two aligned gaps
+happen constantly by chance; within a paragraph because a chain crossing a
+paragraph break is not one stripe; tolerances in **space widths** so one number
+means the same thing at 12 pt and 18 pt. Chains are counted at their **endpoint**,
+so a forking stripe counts as two.
+
+*Linkage 1 — centres.* Linked when the two gaps' horizontal centres lie within
+`tol`. This is the obvious definition and **it does not work here**. Under it the
+justified rate does not clear the ragged null — at 12 pt / 512 px it is
+3.18–4.29 rivers per 1000 gaps justified against 3.18–3.40 ragged, and at 18 pt
+the ragged rate is *higher*. A fixed window quoted in natural word spaces is a
+far looser *relative* window on a ragged page, whose gaps are one space, than on
+a justified page, whose gaps run 2–5×.
+
+*Linkage 2 — overlap.* Linked when the two gaps' horizontal **spans** overlap by
+at least `minOverlap`. This is the perceptual model — a river is visible when a
+column of white runs through consecutive lines — and it has the property the
+centre rule lacks: a wider gap can overlap more, so a loosely set line is
+genuinely more river-prone, which is why justified text has rivers and ragged
+text does not. **This is the one the numbers below use.**
+
+**But be precise about what the null then proves, because it is less than it
+looks.** Adversarial review derived the identity and the sweep confirms it to
+the last digit: on a ragged page every gap is exactly one space `w`, so two
+gaps overlap by ≥ `t·w` **iff** their centres differ by ≤ `(1−t)·w`. On the null
+the two linkages are the *same metric with `t` reversed* — §3a's ragged column
+reads 6.79 / 3.96 / 1.64 at t = 0.25 / 0.50 / 0.75 and §3b's reads
+1.64 / 3.96 / 6.79, and at t = 0.50 they are the identical number. So "overlap
+clears the null and centres do not" is **not** a property of the two rules on
+the null; the entire difference is on the justified side, where requiring half a
+space of overlap corresponds to a centre window of `w − 0.5` ≈ 1.6–5.0 spaces.
+
+The overlap rule is still the right one — a river *is* a column of white, and
+its width-sensitivity is the mechanism, not a bug — but the ratios below are
+partly a consequence of the units, not independent validation of the linkage.
+Read them as "the metric fires on justified text and not on the null", which is
+a sanity check, and not as "the metric discovered something the mean gap did
+not". It did not, and the last part of this section is the measurement that
+says so.
+
+#### It fires on justified text and not on the null, by 6.7–21×
+
+Rivers per 1000 **gaps** (not per 1000 lines: a tighter breaker puts more words,
+and so more gaps, on each line, which mechanically gives a river more chances to
+start). Overlap ≥ 0.50 space widths.
+
+| config | cell | justified | ragged null | ratio |
+|---|---|---:|---:|---:|
+| LF 12 pt @ 400 | greedy +hy | 41.17 | 3.96 | 10.4× |
+| | greedy −hy | 56.15 | 3.93 | 14.3× |
+| | total fit | 56.61 | 3.83 | 14.8× |
+| LF 12 pt @ 512 | greedy +hy | **28.64** | 3.18 | 9.0× |
+| | greedy −hy | 38.94 | 3.40 | 11.5× |
+| | total fit | 39.02 | 3.24 | 12.0× |
+| LF 12 pt @ 640 | greedy +hy | **17.39** | 2.59 | 6.7× |
+| | greedy −hy | 25.23 | 2.59 | 9.7× |
+| | total fit | 26.43 | 2.81 | 9.4× |
+| LF 18 pt @ 400 | greedy +hy | **85.77** | 4.90 | 17.5× |
+| | greedy −hy | 103.01 | 4.93 | 20.9× |
+| | total fit | 102.46 | 5.04 | 20.3× |
+| LF 18 pt @ 512 | greedy +hy | **57.34** | 6.23 | 9.2× |
+| | greedy −hy | 77.28 | 6.13 | 12.6× |
+| | total fit | 76.53 | 5.21 | 14.7× |
+| LF 18 pt @ 640 | greedy +hy | **40.82** | 4.43 | 9.2× |
+| | greedy −hy | 56.05 | 4.50 | 12.5× |
+| | total fit | 55.24 | 5.29 | 10.4× |
+
+#### The tolerance sweep: the ranking is stable
+
+Justified rate per 1000 gaps at five overlap thresholds, in space widths:
+
+| config | cell | 0.25 | 0.50 | 0.75 | 1.00 | 1.50 |
+|---|---|---:|---:|---:|---:|---:|
+| LF 12 pt @ 400 | greedy +hy | **48.02** | **41.17** | **34.21** | **28.34** | **9.21** |
+| | greedy −hy | 63.64 | 56.15 | 49.63 | 43.45 | 19.51 |
+| | total fit | 63.98 | 56.61 | 49.76 | 42.84 | 23.42 |
+| LF 12 pt @ 512 | greedy +hy | **35.03** | **28.64** | **22.85** | **17.49** | **4.13** |
+| | greedy −hy | 45.94 | 38.94 | 32.77 | 26.66 | 8.79 |
+| | total fit | 46.49 | 39.02 | 32.38 | 27.17 | 12.24 |
+| LF 12 pt @ 640 | greedy +hy | **23.29** | **17.39** | **12.34** | **9.09** | **1.06** |
+| | greedy −hy | 31.05 | 25.23 | 19.78 | 15.36 | 3.88 |
+| | total fit | 32.16 | 26.43 | 20.76 | 16.59 | 5.24 |
+| LF 18 pt @ 400 | greedy +hy | **94.95** | **85.77** | **77.50** | **69.22** | **43.19** |
+| | greedy −hy | 110.87 | 103.01 | 97.39 | 89.72 | 64.54 |
+| | total fit | 110.21 | 102.46 | 94.90 | 86.18 | 66.61 |
+| LF 18 pt @ 512 | greedy +hy | **66.07** | **57.34** | **46.43** | **38.10** | **17.39** |
+| | greedy −hy | 85.22 | 77.28 | 68.40 | 59.93 | 36.58 |
+| | total fit | 85.06 | 76.53 | 67.41 | 58.76 | 39.86 |
+| LF 18 pt @ 640 | greedy +hy | **51.40** | **40.82** | **32.78** | **24.48** | **9.17** |
+| | greedy −hy | 65.13 | 56.05 | 47.92 | 39.12 | 19.95 |
+| | total fit | 64.42 | 55.24 | 46.74 | 38.12 | 21.79 |
+
+**The shipped default has the fewest rivers in all 6 configurations at all 5
+tolerances — 30 of 30 cells, no exceptions.** The mechanism is the same one that
+makes it tighter: hyphenation narrows the gaps, narrower gaps overlap less. So
+the one new metric that could have gone against the default goes *for* it.
+
+Longest river at 0.50 runs **5–10 lines at 12 pt and 9–18 at 18 pt** — 13–18 at
+18 pt / 400 px alone, where gaps average 5.4 space widths and almost every gap
+overlaps something on the next line. That column is saturating and is reported
+for scale only. (An earlier draft said 5–7 and 9–18, understating the 12 pt
+worst case by three lines and attributing the 18 pt range to one measure.)
+
+#### But it does not separate the two ALGORITHMS, and it adds no new axis
+
+`greedy −hy` and `total fit` are within **0.2–4.8%** of each other at every
+tolerance up to 0.50, and within 8.1% up to 1.00 — the algorithm axis is
+essentially invisible to the metric. And across the 18 justified rows at
+tolerance 0.50, river rate is a near-perfect linear function of the mean gap:
+**r = 0.976, r² = 0.95** with both quantities in space widths (r = 0.967 in raw
+pixels), and no consistent residual by cell — per-config residuals track font
+size, not breaker. Rivers there are the mean gap restated.
+
+One exception, stated because it is the only place the two whole-word cells
+part: at the **1.50** threshold total fit is higher in 6/6, by 3.2–9.2% at 18 pt
+and by 20–39% at 12 pt, where the rate has fallen to 4–23 per 1000 gaps. That is the
+metric at its thinnest and it moves nothing — greedy +hy is still the lowest of
+the three at 1.50 in all six configurations.
+
+So: the metric is real, it clears its null, its ranking is stable, and it
+**confirms §3 rather than adding to it**. Treat it as corroboration, not as an
+independent argument.
+
+### 8f. Hyphen quality, not hyphen count
+
+§3's headline was 489 hyphenated lines against 33. Whether those 489 are *well
+behaved* was unmeasured. The typographic limit is two hyphenated lines in a row;
+three is a **ladder**. Runs are bounded by the paragraph.
+
+**Two denominators, and the difference matters.** A paragraph-final line has no
+break after it, so it can never end in a hyphen — it is a structural zero. Divide
+by the *breakable* lines and you answer "of the lines the breaker had a choice
+about, how many did it split", which is the question about the ALGORITHM; divide
+by *all* lines and you answer "how much of what I see is hyphens", which is the
+question about the PAGE. Over this corpus that is 394 lines of difference and the
+two figures are 8–17% apart in relative terms. **The page figure is the one
+quoted below.** The first version of this measurement reported the breakable
+figure under the all-lines wording; adversarial review caught it.
+
+Justified:
+
+| config | cell | all lines | breakable | hyphenated | density (all) | (breakable) | runs of 2 | ladders (3+) | longest |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| LF 12 pt @ 400 | greedy +hy | 4367 | 3973 | 610 | **13.97%** | 15.35% | 67 | **10** | 4 |
+|  | greedy −hy | 4437 | 4043 | 98 | 2.21% | 2.42% | 3 | 0 | 2 |
+|  | total fit | 4461 | 4067 | 1 | 0.02% | 0.02% | 0 | 0 | 1 |
+| LF 12 pt @ 512 | greedy +hy | 3403 | 3009 | 448 | **13.16%** | 14.89% | 47 | **6** | 4 |
+|  | greedy −hy | 3457 | 3063 | 65 | 1.88% | 2.12% | 0 | 1 | 4 |
+|  | total fit | 3469 | 3075 | 0 | 0.00% | 0.00% | 0 | 0 | 0 |
+| LF 12 pt @ 640 | greedy +hy | 2722 | 2328 | 353 | **12.97%** | 15.16% | 38 | **8** | 3 |
+|  | greedy −hy | 2762 | 2368 | 57 | 2.06% | 2.41% | 1 | 0 | 2 |
+|  | total fit | 2774 | 2380 | 0 | 0.00% | 0.00% | 0 | 0 | 0 |
+| LF 18 pt @ 400 | greedy +hy | 6666 | 6272 | 966 | **14.49%** | 15.40% | 86 | **19** | 4 |
+|  | greedy −hy | 6884 | 6490 | 143 | 2.08% | 2.20% | 6 | 0 | 2 |
+|  | total fit | 6926 | 6532 | 13 | 0.19% | 0.20% | 1 | 0 | 2 |
+| LF 18 pt @ 512 | greedy +hy | 5118 | 4724 | 739 | **14.44%** | 15.64% | 87 | **7** | 3 |
+|  | greedy −hy | 5239 | 4845 | 81 | 1.55% | 1.67% | 1 | 0 | 2 |
+|  | total fit | 5257 | 4863 | 6 | 0.11% | 0.12% | 0 | 0 | 1 |
+| LF 18 pt @ 640 | greedy +hy | 4066 | 3672 | 617 | **15.17%** | 16.80% | 83 | **13** | 5 |
+|  | greedy −hy | 4133 | 3739 | 86 | 2.08% | 2.30% | 0 | 1 | 3 |
+|  | total fit | 4160 | 3766 | 1 | 0.02% | 0.03% | 0 | 0 | 1 |
+
+Two findings, pointing opposite ways.
+
+**The density is high.** **13.0–15.2%** of lines on the page end in a hyphen,
+steady across every measure and size. That is a lot of hyphens by any
+hand-setting standard, and it is a real description of what the shipped default
+draws. (Of the lines that *could* be hyphenated it is 14.9–16.8%, which is the
+figure to quote when comparing breakers rather than pages.)
+
+**The runs are mostly well behaved.** A ladder appears once every **312–731
+lines**, and the longest run anywhere in 23,000 words is **five**. So the 448
+hyphens at the X3's own measure are not stacking up: 47 pairs, 6 ladders, none
+longer than four.
+
+(Lines, not pages, deliberately. This harness lays out paragraphs and has no
+page height, so a per-page figure would be a conversion I cannot make honestly —
+the device's own lines-per-page is the missing factor and it is not measured
+here.)
+
+This is the one metric that finds *against* the shipped default, and what it
+finds is small.
+
+### 8g. Does the shipped default still stand? Yes — and by more than §3 said
+
+Plainly, since that is what was asked. **Hyphenated (greedy + hyphens) is still
+the right default**, and the new metrics strengthen the case rather than
+weakening it:
+
+* On **worst-line badness** — the metric introduced specifically because it
+  might overturn §3 — the default wins 6/6 on p95, p99 and paragraph-worst, by
+  21–57% (relative to the default as baseline; 17.7–36% the other way round).
+* On **rivers** — the metric that had never been measured, and the classic
+  argument *for* a total-fit breaker — the default wins 30/30 cells.
+* The **only** thing it loses is a coin flip on the single loosest line in
+  23,000 words (2 better, 1 tied, 3 worse), which is one line either way.
+* The one genuine cost it carries is **hyphen density at 13.0–15.2% of lines**
+  with a ladder every 312–731. Real, small, and exactly the taste trade the
+  row's two labels already describe.
+
+**What did change is the argument for the missing cell.** §3 inferred that
+total fit with hyphen points would beat both, from the fact that the DP's
+deficit is the candidates it is denied. §8d measures that inference directly:
+held at equal hyphenation, the DP buys 4–14% on the worst line of a paragraph
+and never loses the trade. That advantage is real but small; the other 23–39% —
+the whole of the default's lead on the mean — is the hyphen candidates the DP
+cannot see. Give it those candidates and it should carry both. It remains
+`build` tier and it remains the interesting item, and it is now the only
+plausible way to improve on what ships.
+
+### 8h. Metrics measured and dropped
+
+Recorded so the next pass does not pay for them again.
+
+* **Rivers by gap centre** — dropped, does not clear its own null (§8e).
+  Justified 3.18–4.29 per 1000 gaps against a ragged null of 3.18–3.40 at
+  12 pt / 512 px, and *below* the null at 18 pt. Kept in the harness as
+  `riversByCentre` with the reason attached, and
+  `LineBreakQuality.TheRiverMetricClearsItsRaggedNull` fails if anyone swaps the
+  linkage back — validated by doing so. Note §8e's caveat: on the null the two
+  linkages are the same metric with the tolerance reversed, so this is a
+  statement about the justified side, not about the rules in the abstract.
+* **Loose-line counts (lines above 2× / 3× the natural word space)** — dropped
+  as redundant. At these measures the *typical* line already exceeds 2× (the
+  mean runs 1.79–5.46 space widths), so the threshold names no defect: 39–57% of
+  lines are "loose" at 12 pt / 512 px. The counts rank the three cells
+  identically to the mean in all six configurations, which is what makes them
+  a restatement of it rather than a tail metric.
+* **Single worst line (`max`)** — reported but **not load-bearing**. Across six
+  configurations the default is better in 2, tied in 1, worse in 3, and the
+  swings are enormous (+163% in one cell, −30% in another). It is one line out
+  of 23,000 words and it behaves like noise; `paraWorst` and p99 are the
+  statistics that carry the same idea with a sample size behind them.
+* **Rivers and gap percentiles on ragged text** — not applicable. Every gap on a
+  ragged line is exactly one word space, so the gap distribution is degenerate
+  (p95 = p99 = max = one space in every cell) and the river rate *is* the null.
+  The ragged rows in the harness's table 1 print these for completeness and mean
+  nothing.
+* **Rivers as an algorithm discriminator** — dropped. `greedy −hy` and
+  `total fit` land within 0.2–4.8% at tolerances up to 0.50 and within 8.1% up
+  to 1.00, and river rate is r² = 0.95 explained by the mean gap. It discriminates
+  *hyphenation*, which the mean gap already did.
+
+### 8i. Verified
+
+* Host suite **540 → 547**, all passing, plus the one disabled instrument.
+  The seven new tests are
+  `TheDpCannotUseHyphenPointsSoThereIsNoFourthCell`,
+  `HyphenationMovesThePageMoreThanTheAlgorithmDoes`,
+  `AtEqualHyphenationTotalFitProtectsTheWorstLine`,
+  `TheRiverMetricClearsItsRaggedNull`,
+  `HyphenRunsAreCountedAndTheDefaultsDensityIsHigh`,
+  `HyphenRunCountingMatchesHandWorkedAnswers` and
+  `RiverChainCountingMatchesHandWorkedAnswers`.
+* Four of them validated **failing-first by mutation**, not by assertion:
+  swapping `riversByOverlap` for `riversByCentre` fails the null test on all
+  three cells (justified 2.17 against a null of 13.42); stubbing
+  `hyphenationOnFor` to `false` fails both the fourth-cell precondition and the
+  de-confounding ratio; deleting the `run = 0;` reset in `hyphenRunsOf` fails
+  the hand-worked run fixture (it reports longest 4 and 3 ladders where the
+  truth is 1 and 0); and dropping the "was this chain extended" check in
+  `riversWith` fails the hand-worked river fixture (a 5-line chain counts as 3
+  rivers instead of 1).
+* **The last two of those exist because the first version did not catch them.**
+  The original pair of run assertions — `longest <= hyphenatedLines` and "no
+  ladder without three hyphens" — are tautologies for any implementation that
+  only increments on a hyphenated line, and adversarial review showed both stay
+  green under exactly the mutation their comment claimed to catch. A counter can
+  only be checked against an answer computed a different way, so the fixtures
+  are hand-built corpora with the answers worked out on paper.
+* The four §3 tests are **unchanged in behavior, and this was checked rather
+  than asserted.** `layoutParagraph` now returns whole `LineRecord`s grouped by
+  paragraph instead of two flat scalar vectors — which is what rivers and hyphen
+  runs need — but the gap rule, the one-word-line rule and the last-line
+  exclusion produce the same samples in the same order, the four test bodies are
+  textually identical, and all four print the same figures they printed before.
+  One thing did have to be corrected: `measure()` first routed the Whole Words
+  arm through the *no-trie* cell, which would have moved it onto a different
+  oversized-word pre-pass (2/2 minimum instead of English's 3/3). It routes
+  through the with-trie cell now, which is what those tests always ran. Caught
+  by adversarial review, not by the suite.
+* **Sections 0–3b of the sweep are byte-identical before and after the
+  denominator fix**, which is how the fix is known to have moved only the hyphen
+  table: the geometry columns were diffed against the pre-fix run and every one
+  matches.
+* `pio run -e simulator_x3` green, and `pio run -e default` (ESP32-C3) green.
+  No firmware source was touched — everything in this section is `test/` plus
+  `tools/linebreak_corpus.py` — so there is no flash delta to report.
+* **Every table in §8 was machine-checked against the raw sweep output**, not
+  proofread: **408 values** across §8c, §8d, §8e's two tables and §8f (the last
+  two re-verified after the denominator fix), re-parsed
+  out of the Markdown and compared cell by cell to the instrument's stdout, with
+  the derived columns (the two "moves" columns, the ratio column) recomputed
+  rather than trusted. Zero mismatches. Transcription is the cheapest way to
+  publish a wrong number, and the five tables here hold more figures than §3's
+  one did.
+* **The sweep is deterministic.** Two back-to-back runs produce byte-identical
+  tables, and so does a run after the clang-format and hardening edits — which
+  is what lets the numbers above be quoted rather than described. Nothing in
+  these metrics draws on a seed; contrast the surface passes in the simulator,
+  where `CROSSPOINT_SIM_GRAIN_SEED` has to be pinned for an A/B to mean
+  anything.
+* The sweep stays **disabled by default** and now prints five sections (the
+  fourth cell, the 2×2, worst-line in space widths, rivers with both linkages
+  against the null, hyphen runs):
+
+```bash
+python3 tools/linebreak_corpus.py \
+    fs_/books/ai-engineering-from-zero.epub \
+    fs_/books/wingspan-the-whole-bird.epub /tmp/corpus.txt
+CROSSPOINT_LINEBREAK_CORPUS=/tmp/corpus.txt \
+  build/test/line_break_quality/LineBreakQualityTest \
+  --gtest_also_run_disabled_tests --gtest_filter='*Sweep*'
+```
+
+#### The adversarial pass on §8
+
+Run read-only against the diff, as the standing rule requires, and it paid for
+itself twice over. It found **the one wrong number in the section** — the hyphen
+density, whose denominator silently excluded the 394 paragraph-final lines that
+can never be hyphenated, making "15–17%" out of a true 13.0–15.2% — and it found
+that the two assertions guarding the run counter were tautologies, by mutating
+the counter and showing both stayed green. It also caught the reversed-tolerance
+identity behind the river null (§8e), the `measure()` arm that had drifted onto
+the no-trie pre-pass, the 5–10 rather than 5–7 longest-river range, the 2/2
+against 3/3 fallback asymmetry that "hyphenation off" quietly introduces, and
+six range-endpoint slips (6.7 not 7, 8.1 not 8, 11.1 not 11, 9.2 not 9).
+
+It reported CLEAN, with citations, on the parts easiest to get wrong: the DP
+genuinely cannot see a hyphen candidate it did not already commit
+(`hyphenateWordAtIndex` has exactly two call sites, one of them the pre-pass);
+the river chain bookkeeping, which it lifted into a standalone harness and
+exercised with 21 hand-built cases — no off-by-one, no double counting, chains
+correctly broken by a gapless line and by a paragraph boundary, `prevLine` never
+dereferenced when empty; the refactor, where all four pre-existing test bodies
+diff byte-identical and no sample is added, dropped or reordered; and the other
+new assertions, none of which is tautological. It re-derived the win/loss counts
+and most of the ranges independently and confirmed them.
+
+It did not build or run the suite, so §8i's pass counts and the mutation results
+are mine.
+
+### 8j. Deliberately not done
+
+* **Nothing was changed about what the device draws.** The default is unchanged,
+  the row is unchanged, no threshold moved. This section is a measurement.
+* **No rendered proof.** §5's figures are of §3's comparison and still stand;
+  the 2×2's third cell has no picture, because the effect being reported is a
+  distribution over 23,000 words rather than something one page shows. Saying so
+  is better than cropping a paragraph that happens to agree.
+* **`raggedSkipsHyphen` still not touched**, for the same reason as §7 — it is a
+  change to the default rendering and nobody asked for one. It is worth noting
+  that §8f now measures its effect: the ragged hyphen density is 0.5–2.7% at
+  12 pt against 15% justified, which is that 70% gate doing its work.
