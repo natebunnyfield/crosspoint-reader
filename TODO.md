@@ -60,6 +60,38 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-022] Claude results: the FRONT pair should page too
+
+Owner, 2026-08-24: *"in claude results, front rocker switch should activate
+PgUp / PgDn (currently side buttons work but front ones don't)."*
+
+Taken at face value and consistent with the code. In `ClaudeChatActivity`, the
+paging is bound to `Button::Up` / `Button::Down`, which in this firmware's
+vocabulary is the SIDE pair — the physical rocker (`:424`, `:429`, `:482`,
+`:487`). The FRONT cluster's `Left` / `Right` are spent on `repeatCol`
+(`:480-481`), which is column navigation, so in the results view the front pair
+does nothing for scrolling.
+
+**What "done" looks like:** in the results view — and only there — the front
+`Left`/`Right` page the same way the side rocker does, sharing one code path so
+the two cannot drift. Everywhere else in that activity the front pair keeps its
+current job.
+
+**The thing to get right:** `repeatCol` owns `Left`/`Right` for the composer and
+the daisy picker, so this is a per-VIEW binding, not a global remap. Establish
+which views are live when results are on screen (`panel.isDaisy()` already gates
+two of the four sites) and bind only there. A global change would break column
+navigation in the composer, which is the kind of regression that only shows up
+when someone tries to type.
+
+**Also check the X4.** `HalGPIO::hasEdgeSideButtons()` is FALSE for X4, so on
+that board the side rocker is not on the edge at all — which is the profile
+where a working front binding matters most. Whatever lands should be verified
+against an X4 profile as well as X3.
+
+Not started.
+
+
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
 **scope: verification · opened 2026-08-15**
 
