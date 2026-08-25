@@ -49,9 +49,26 @@ glyph looks.
 
 ## 5. Does not exist — real feature work
 
-Letter spacing (tracking) · word spacing · orphan and widow control · drop caps ·
-small caps and any OpenType feature beyond `liga`/`rlig` · hanging punctuation ·
-hyphenation zone and minimum word length.
+**CORRECTED 2026-08-25.** This list originally included orphan/widow control and
+hanging punctuation. **Both are implemented and always on**, shipped 2026-08-22 —
+widow/orphan as keep-2/2 (`ChapterHtmlSlimParser.cpp:2668-2765`) and hanging
+punctuation on both edges with a quarters table (`ParsedText.cpp:288-384`). They
+belong in category 4, not here: the engine does them, nothing exposes a control.
+Found by the deeper survey in `typography-possible-2026-08-25.md`.
+
+Also corrected: **tracking and word spacing DO exist**, baked per family at build
+time and individually tuned — which is a further argument against a runtime dial
+on top of the cost that already declined it.
+
+Genuinely absent: drop caps · small caps and any OpenType feature beyond
+`liga`/`rlig` · hyphenation zone and minimum word length · larger headings or
+smaller footnotes.
+
+**And one hard ceiling worth knowing before proposing any of those.**
+`SdCardFontSystem::resolveFontId` ignores its `pointSize` argument
+(`src/SdCardFontSystem.cpp:243-248`) — one reader cut in RAM, by design. That
+single fact kills drop caps, larger headings, smaller footnotes and any
+per-block size honoring, regardless of what the CSS asks for.
 
 **Letter spacing was asked for on 2026-08-24 and declined the same day** — owner:
 *"Skip it."* It is not a move: there is no `letterSpacing` field and no tracking
