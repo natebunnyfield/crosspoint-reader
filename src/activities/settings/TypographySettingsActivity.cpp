@@ -59,9 +59,10 @@ void TypographySettingsActivity::rebuildRows() {
 
   // THE SCREEN'S ORDER, and why it is this one. Vertical rhythm first (how far
   // apart the lines sit, then whether they share a grid), then the horizontal
-  // decision (justification), then the glyph-level detail (ligatures) and its
-  // per-pair rows. Coarse to fine, so the rows a reader is most likely to want
-  // are not below fourteen ligature toggles.
+  // decisions in the order the engine makes them -- where the line BREAKS, then
+  // whether the slack is spread -- then the glyph-level detail (ligatures) and
+  // its per-pair rows. Coarse to fine, so the rows a reader is most likely to
+  // want are not below fourteen ligature toggles.
   //
   // SELECTED from getSettingsList(), not redefined here: each row keeps its one
   // definition, so this screen cannot drift from what persists or from what the
@@ -70,6 +71,11 @@ void TypographySettingsActivity::rebuildRows() {
   static constexpr StrId kSettingRows[] = {
       StrId::STR_LINE_SPACING,
       StrId::STR_LINE_GRID,
+      // Which line breaker runs. Above Justified Text because the break is
+      // chosen first and the justification then fills whatever slack the break
+      // left -- and because on a ragged block the breaker is the ONLY thing
+      // deciding the edge.
+      StrId::STR_LINE_BREAKS,
       StrId::STR_JUSTIFY_THRESHOLD,
       // The ligature master. It always shows, whatever the family carries: it
       // is the one row that means something on a face with no ligatures at all,

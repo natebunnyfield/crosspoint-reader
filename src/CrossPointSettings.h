@@ -1,6 +1,7 @@
 #pragma once
 #include <ArduinoJson.h>
 #include <Epub/AutoJustify.h>
+#include <Epub/LineBreakMode.h>
 #include <Epub/ReaderRenderSpec.h>
 #include <LigatureControl.h>
 #include <PersistableStore.h>
@@ -420,11 +421,34 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   static constexpr uint8_t sleepTimeoutMinutes = 10;
   // E-ink refresh frequency (default 15 pages)
   static constexpr uint8_t refreshFrequency = REFRESH_15;
-  // Pinned to 1 by normalizeRetiredSettings() now that the Reader tab is
-  // withdrawn; the default matches so fresh installs agree. It shipped 0, and a
-  // device that has one lands on 1 the next time settings.json is read — which
-  // re-renders cached sections, since hyphenation is part of ReaderRenderSpec.
-  static constexpr uint8_t hyphenationEnabled = 1;
+  // WHICH LINE BREAKER RUNS. Not a hyphen switch, whatever the field is called:
+  // 1 is the first-fit greedy breaker that splits words, 0 is the total-fit
+  // dynamic program that does not. The values, the default and the whole
+  // argument are in lib/Epub/Epub/LineBreakMode.h; the row a reader sees is
+  // Typography Settings > Line Breaks, whose two labels name the trade rather
+  // than the flag.
+  //
+  // Frozen at 1 by the 2026-08-21 reduction and UNFROZEN on 2026-08-25 (owner
+  // ruling: "unfreeze hyphenation and get the better line breaker"). The
+  // default is unchanged and a fresh install renders exactly as before.
+  //
+  // ONE CLASS OF CARD DOES MOVE ON ITS OWN, and it is deliberate. Between
+  // 2026-08-04 (cc6937b97) and the freeze, normalizeRetiredSettings() PINNED
+  // this to 1 on every load, so a card still carrying "hyphenationEnabled": 0
+  // from the era when the old Hyphenation toggle was on screen has been
+  // rendering at 1 regardless. That pin is gone, so fromJson honors the 0 again
+  // and the device switches to the DP and repaginates without the row being
+  // touched. Honoring it is the right call — it is a real choice made when a
+  // row for it existed, and a row for it exists again; discarding a stored
+  // preference because we changed our minds twice is the worse option. The
+  // window is narrow (a save after 2026-08-04 wrote 1; a save after 2026-08-21
+  // wrote no key at all), but it is not empty, so it is written down here
+  // rather than described as impossible.
+  //
+  // It is part of ReaderRenderSpec and is written into every section file and
+  // compared on load (Section.cpp), so moving it repaginates cached books by
+  // itself. No new spec field, no SECTION_FILE_VERSION bump.
+  uint8_t hyphenationEnabled = linebreak::STORED_DEFAULT;
 
   // Reader screen margin settings
   // Extra margin in pixels, added on top of the panel's bezel margins

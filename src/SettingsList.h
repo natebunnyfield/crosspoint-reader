@@ -345,6 +345,54 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // ReaderRenderSpec — flipping it repaginates on the next section load.
     v.push_back(SettingInfo::Toggle(StrId::STR_LINE_GRID, &CrossPointSettings::lineGridEnabled, "lineGrid",
                                     StrId::STR_CAT_READER));
+    // LINE BREAKS (owner ruling 2026-08-25: "unfreeze hyphenation and get the
+    // better line breaker"). This is the `hyphenationEnabled` field, unfrozen.
+    // The row is NOT called Hyphenation because that name describes a
+    // side-effect and hides the switch: the flag picks between two different
+    // line-breaking algorithms, and one of them had never run in a shipped
+    // build. See lib/Epub/Epub/LineBreakMode.h.
+    //
+    //   Hyphenated   first-fit greedy that splits words at legal hyphenation
+    //                points. Lines fill to the measure. THE SHIPPED DEFAULT,
+    //                and what every build since the 2026-08-21 freeze has
+    //                drawn.
+    //   Whole Words  the total-fit dynamic program, minimizing the sum of
+    //                squared trailing slack across the paragraph. No split
+    //                words -- except one too wide for a line on its own, which
+    //                still breaks rather than run off the glass.
+    //
+    // The second label is "Whole Words" and not "Even Spacing" BECAUSE THE PAGE
+    // WAS MEASURED. The survey predicted the optimizer would set more evenly;
+    // over 394 paragraphs at six measure/size pairs the opposite held on every
+    // justified one, since the DP may not use the hyphen points that let the
+    // greedy fill fit. Whole words is the claim that survives. The trade the
+    // row actually sells is hyphens against no hyphens -- 489 hyphenated lines
+    // against 33 in the X3's own 512 px, 12 pt configuration.
+    // (test/line_break_quality, docs/line-breaking-2026-08-25.md.)
+    //
+    // ENUM rather than Toggle, and the LABELS are indexed BY STORED VALUE --
+    // linebreak::STORED_WHOLE_WORDS is 0 and STORED_HYPHENATED is 1, which is
+    // what a settings.json written before the freeze already carries under this
+    // exact key. A Toggle would have rendered "On/Off" against a name that is
+    // not a question, and re-pointing the two values to read better would have
+    // silently restyled every book on a device that still has an old save.
+    // withDisplayOrder puts the default FIRST in the picker without touching
+    // what either choice stores.
+    //
+    // No book can override this and none tries: CssParser has no branch for
+    // `hyphens`, `orphans` or `widows` (CssParser.cpp:467-569 is the whole
+    // property list), so a stylesheet's opinion about line breaking never
+    // survives parsing. The 2026-08-25 override ruling -- a typography setting
+    // is a default a book's own CSS beats where the book was explicit -- has
+    // nothing to bite on here, and there is no stored per-book value to honor.
+    {
+      std::vector<StrId> breakLabels(2);
+      breakLabels[linebreak::STORED_WHOLE_WORDS] = StrId::STR_LINE_BREAKS_WHOLE_WORDS;
+      breakLabels[linebreak::STORED_HYPHENATED] = StrId::STR_LINE_BREAKS_HYPHENATED;
+      v.push_back(SettingInfo::Enum(StrId::STR_LINE_BREAKS, &CrossPointSettings::hyphenationEnabled,
+                                    std::move(breakLabels), "hyphenationEnabled", StrId::STR_CAT_READER)
+                      .withDisplayOrder({linebreak::STORED_HYPHENATED, linebreak::STORED_WHOLE_WORDS}));
+    }
     // Line Spacing. Its row was deleted by the 2026-08-21 reduction and is
     // REINSTATED here by the 2026-08-24 ruling above -- which supersedes that
     // one FOR THIS FIELD ONLY. The field itself never went: it is the one entry

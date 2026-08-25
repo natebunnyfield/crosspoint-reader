@@ -14,6 +14,7 @@
 
 #include "AutoJustify.h"
 #include "BookNotes.h"
+#include "LineBreakMode.h"
 #include "hyphenation/Hyphenator.h"
 
 constexpr int MAX_COST = std::numeric_limits<int>::max();
@@ -747,7 +748,16 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
       styleMask |= static_cast<uint8_t>(1u << (static_cast<uint8_t>(s) & 0x03));
     }
     if (styleMask == 0) styleMask = 0x01;  // defensive: regular only
-    renderer.ensureSdCardFontReady(fontId, words, hyphenationEnabled, styleMask);
+    // includeHyphen is UNCONDITIONALLY true, and used to be this flag. Both
+    // breakers can emit '-': the total-fit one still splits a word too wide to
+    // fit a line even on its own (its pre-pass, computeLineBreaks below). While
+    // the flag was frozen at 1 that distinction could not be reached; unfreezing
+    // it made `false` reachable for the first time, and with it a hyphen whose
+    // advance is absent from the table -- so getTextAdvanceX would fall to an
+    // on-demand SD read mid-layout, and SdCardFont loads measure-kern rows only
+    // for the codepoints handed to buildAdvanceTable, so a hyphen-terminated
+    // line could measure without a kern drawText then applies. It is one glyph.
+    renderer.ensureSdCardFontReady(fontId, words, /*includeHyphen=*/true, styleMask);
   }
 
   // Automatic justification (owner ruling 2026-08-23, replacing the Text
@@ -806,12 +816,19 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
   const int pageWidth = viewportWidth;
   auto wordWidths = calculateWordWidths(renderer, fontId);
 
+  // The flag selects an ALGORITHM, not a glyph. Routed through linebreak:: so
+  // the mapping from the stored byte to the breaker has one definition and a
+  // test that fails if anyone re-points it -- see lib/Epub/Epub/LineBreakMode.h
+  // for why the two are coupled to one flag at all.
   std::vector<size_t> lineBreakIndices;
-  if (hyphenationEnabled) {
+  if (linebreak::splitsWordsAtLineEnds(linebreak::modeFor(hyphenationEnabled))) {
     // Use greedy layout that can split words mid-loop when a hyphenated prefix fits.
     lineBreakIndices =
         computeHyphenatedLineBreaks(renderer, fontId, pageWidth, wordWidths, wordContinues, wordNoSpaceBefore);
   } else {
+    // Total-fit: minimizes the sum of squared trailing slack over the whole
+    // paragraph. Whole words only, apart from its own pre-pass on a word too
+    // wide to fit a line even alone.
     lineBreakIndices = computeLineBreaks(renderer, fontId, pageWidth, wordWidths, wordContinues, wordNoSpaceBefore);
   }
   const size_t lineCount = includeLastLine ? lineBreakIndices.size() : lineBreakIndices.size() - 1;

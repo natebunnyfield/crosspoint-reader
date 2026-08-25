@@ -213,11 +213,20 @@ configuration.** It is written, it works, and nothing can reach it.
 the pattern language comes from `dc:language` via
 `Hyphenator::setPreferredLanguage`).
 
-**Effect size:** large and two-sided. Off, the right edge of a ragged paragraph
-gets noticeably more even (that is what the DP buys) and the rag gets deeper on
-justified text. This is the one row on the page where the label understates what
-it does — worth saying so in the row's help text, or worth splitting into two
-rows.
+**SHIPPED 2026-08-25 as the Line Breaks row, and the paragraph that used to sit
+here was wrong.** It read: *"Off, the right edge of a ragged paragraph gets
+noticeably more even (that is what the DP buys) and the rag gets deeper on
+justified text."* Measured over 394 paragraphs at six measure/size pairs, the
+opposite holds where it matters: on a JUSTIFIED page the greedy breaker is both
+tighter and more even in all six, because the DP may not use the hyphen points
+that let a greedy fill fit. On a ragged page the two are close and the sign moves
+with the size. The one large, reliable effect is the hyphens themselves — 489
+hyphenated lines against 33 at the X3's 512 px measure and 12 pt.
+
+The prediction above was drafted into the row as a label, "Even Spacing", and had
+to be withdrawn before it shipped. The labels are **Hyphenated** and **Whole
+Words**, which are true in every configuration. Full table, the coupling answer,
+timings and the rendered proof: `docs/line-breaking-2026-08-25.md`.
 
 ### 3.4 Widow and orphan control — implemented, hardcoded keep-2/2
 

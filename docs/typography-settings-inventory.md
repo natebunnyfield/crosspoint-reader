@@ -26,7 +26,7 @@ assumed each was web-only taste; the code behind them is intact.
 |---|---|---|
 | **Text Anti-aliasing** | `textAntiAliasing = TEXT_AA_STANDARD` | `OFF / STANDARD / CRISP / DARK` — CRISP hardens dark-gray edges to black and keeps light; DARK darkens every edge one level |
 | Extra Paragraph Spacing | `extraParagraphSpacing = 1` | on / off |
-| Hyphenation | `hyphenationEnabled = 1` | on / off |
+| ~~Hyphenation~~ | ~~`hyphenationEnabled = 1`~~ | **UNFROZEN 2026-08-25** as the **Line Breaks** row on Typography Settings. Not a hyphen switch: it picks between two line breakers, and the labels say so — Hyphenated / Whole Words. `docs/line-breaking-2026-08-25.md` |
 | Paragraph Alignment | `paragraphAlignment = JUSTIFIED` | **conflicts with the 2026-08-23 ruling** that made this automatic via the threshold; re-adding it would undo that control |
 | System Font | `systemFont` | UI chrome, not reading text |
 | Long-press behavior | `longPressButtonBehavior` | input mapping rather than typography |
