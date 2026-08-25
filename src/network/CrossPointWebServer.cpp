@@ -1405,6 +1405,14 @@ void CrossPointWebServer::handlePostSettings() {
     }
   }
 
+  // The ligature preference is also held as a PARSED copy inside lib/EpdFont,
+  // which the loop above cannot reach: it writes the byte and the char[] and
+  // stops. Both ligature rows are ordinary getSettingsList() entries, so a POST
+  // persists them correctly and then changes nothing at all until the next
+  // boot -- which reads as a setting the web UI accepts and ignores. Re-push
+  // unconditionally: it parses at most a couple of dozen pairs, and it cannot
+  // be wrong for a POST that touched neither row.
+  SETTINGS.applyLigaturePreference();
   SETTINGS.saveToFile();
 
   LOG_DBG("WEB", "Applied %d setting(s)", applied);

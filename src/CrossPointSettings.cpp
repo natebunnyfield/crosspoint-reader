@@ -310,6 +310,20 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   // Pin values whose UI has been withdrawn back into a valid, reachable state.
   normalizeRetiredSettings();
 
+  // The ligature spec is loaded above by the generic string path, but the font
+  // layer holds its own parsed copy and cannot read this struct. Push it now,
+  // before the first page is measured: a preference applied one render late
+  // would show as a page that changes under the reader.
+  //
+  // Canonicalized on the way in so a hand-edited or API-written value is
+  // stored the way the model spells it. The re-save is deliberate but NOT
+  // requested here -- an unusual spelling costs nothing until the next
+  // ordinary save, and requesting one on every boot that reads an unordered
+  // file would write the card on every boot.
+  const std::string canonical = ligatures::canonicalize(ligaturesOff);
+  copyToField(ligaturesOff, canonical.c_str(), sizeof(ligaturesOff));
+  applyLigaturePreference();
+
   if (needsResave) {
     LOG_DBG("CPS", "Resaving settings to update format");
     requestResave();
@@ -340,7 +354,23 @@ ReaderRenderSpec CrossPointSettings::readerRenderSpec(const uint16_t viewportWid
   // offered. The spec is what the cache compares and what layout obeys, so it
   // is the last place worth being sure.
   spec.justifyThresholdChars = static_cast<uint8_t>(autojustify::clampThreshold(justifyThresholdChars));
+  // Canonicalized inside fingerprint(), so a hand edit that only re-ordered
+  // the spec produces the same word and does not repaginate the card. See
+  // lib/EpdFont/LigatureControl.h.
+  spec.ligatureFingerprint = ligatures::fingerprint(ligaturesEnabled != 0, ligaturesOff);
   return spec;
+}
+
+void CrossPointSettings::applyLigaturePreference() const {
+  // Pushes the stored preference down to the font layer, which sits under this
+  // struct and cannot read it. Called from fromJson() below and from the
+  // Typography screen -- the two places the value can change.
+  //
+  // A fresh install calls NEITHER: PersistableStore::loadFromFile() returns
+  // early when there is no settings.json, so fromJson never runs. That is why
+  // ligatures:: defaults to "everything allowed" rather than to an unset
+  // state -- it is already correct for the device nobody tests on.
+  ligatures::configure(ligaturesEnabled != 0, ligaturesOff);
 }
 
 float CrossPointSettings::getReaderLineCompression() const {

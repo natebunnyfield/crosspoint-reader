@@ -2,6 +2,7 @@
 
 #include <Utf8.h>
 
+#include "LigatureControl.h"
 #include "MissingGlyphLedger.h"
 
 #include <algorithm>
@@ -143,12 +144,25 @@ uint32_t EpdFont::applyLigatures(uint32_t cp, const char*& text) const {
   if (!data->ligaturePairs || data->ligaturePairCount == 0) {
     return cp;
   }
+  // The owner's per-ligature preference (lib/EpdFont/LigatureControl.h, owner
+  // ruling 2026-08-24). Asked HERE rather than inside getLigature(), so that
+  // getLigature stays the honest answer to "what does this face carry" -- the
+  // Typography screen enumerates a family's pairs through that table, and a
+  // query that already hid the suppressed ones could not draw the rows that
+  // switch them back on.
+  if (!ligatures::enabled()) return cp;
   while (true) {
     const auto saved = reinterpret_cast<const uint8_t*>(text);
     const uint32_t nextCp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text));
     if (nextCp == 0) break;
     const uint32_t lig = getLigature(cp, nextCp);
-    if (lig == 0) {
+    // A suppressed pair stops the chain exactly as a missing one does: the
+    // text cursor rewinds and `cp` stands. That is what makes a CHAINED
+    // ligature behave sensibly -- switch Edgar's `ff` off and its `ffi`
+    // (U+FB00 + i) becomes unreachable too, because the left side it needs is
+    // never produced. Switching `ffi` off alone leaves `ff` running with a
+    // plain `i` beside it, which is the other half of the same rule.
+    if (lig == 0 || !ligatures::allowed(cp, nextCp)) {
       text = reinterpret_cast<const char*>(saved);
       break;
     }

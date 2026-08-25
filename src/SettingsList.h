@@ -251,7 +251,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // docs/settings-reduction-plan.md): 23 rows deleted, their fields now
     // static constexpr in CrossPointSettings.h. The SIMULATOR split went with
     // keepScreenAwake's row.
-    constexpr size_t FIXED_ENTRY_COUNT = 11;
+    // 13 since 2026-08-24: the two ligature rows below. They are entries in
+    // this list purely for PERSISTENCE and the web settings API -- the device
+    // edits them on the Typography screen, which builds its own rows because
+    // the per-pair ones depend on which family is loaded.
+    constexpr size_t FIXED_ENTRY_COUNT = 13;
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
@@ -387,6 +391,31 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
           },
           "justifyThreshold", StrId::STR_CAT_SYSTEM));
     }
+    // LIGATURES (owner ruling 2026-08-24: "give a full subpage of Typography
+    // Settings that gives all available typography options with full
+    // granularity, including toggling each individual ligature"). Two rows,
+    // and BOTH carry STR_CAT_READER on purpose.
+    //
+    // Reader is a withdrawn category, so rebuildSettingsLists() drops these
+    // from the device Settings list -- which is what is wanted here, and the
+    // opposite of the reason Line Grid and Justified Text above carry
+    // STR_CAT_SYSTEM. The device edits ligatures on the TYPOGRAPHY screen
+    // (SettingAction::Typography), and it has to: the individual rows are one
+    // per pair the CURRENTLY LOADED family carries, so they cannot be a fixed
+    // list here at all. Edgar ships fourteen pairs across its styles and
+    // Almendra four, and neither set is knowable when this static list is
+    // built.
+    //
+    // Being here anyway is not decoration. This list is what
+    // CrossPointSettings::toJson/fromJson iterate and what the web settings
+    // API serves, so a row deleted from it is a setting that stops persisting
+    // -- the trap documented at the head of this file and paid for twice. The
+    // generic loop handles both of these without another hand-written key:
+    // valuePtr for the toggle, stringOffset for the spec.
+    v.push_back(SettingInfo::Toggle(StrId::STR_LIGATURES, &CrossPointSettings::ligaturesEnabled, "ligatures",
+                                    StrId::STR_CAT_READER));
+    v.push_back(SettingInfo::String(StrId::STR_LIGATURES_OFF, SETTINGS.ligaturesOff, sizeof(SETTINGS.ligaturesOff),
+                                    "ligaturesOff", StrId::STR_CAT_READER));
         // The reader is portrait-only; there is no orientation setting.
         // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
     // legacy Off/On toggle (persisted files round-trip), 2+ appended.

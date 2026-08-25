@@ -28,6 +28,7 @@ g++ -std=gnu++2a -O1 -DCROSSPOINT_RENDER_SCALE="$SCALE" -include Arduino.h -o "$
   "$R/lib/GfxRenderer/GfxRenderer.cpp" "$R/lib/GfxRenderer/Bitmap.cpp" \
   "$R/lib/GfxRenderer/BitmapHelpers.cpp" "$R/lib/GfxRenderer/FontCacheManager.cpp" \
   "$R/lib/EpdFont/EpdFont.cpp" "$R/lib/EpdFont/EpdFontFamily.cpp" \
+  "$R/lib/EpdFont/LigatureControl.cpp" \
   "$R/lib/EpdFont/FontDecompressor.cpp" "$R/lib/EpdFont/SdCardFont.cpp" \
   "$R/lib/Utf8/Utf8.cpp" "$R/lib/MiniBidi/BidiUtils.cpp" "$R/lib/Memory/BuildScratch.cpp" \
   "$R"/lib/InflateReader/*.cpp tinflate.o minibidi.o uzlib_checksums.o \

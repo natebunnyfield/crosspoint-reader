@@ -21,6 +21,10 @@ enum class SettingAction {
   Language,
   DeviceOwner,
   TextSettings,
+  // The granular typographic controls, chiefly the per-ligature toggles
+  // (owner ruling 2026-08-24). Not persisted anywhere -- this enum names
+  // device-only ACTIONS, which carry no key -- so it may be reordered freely.
+  Typography,
   PairBluetoothKeyboard,
   ForgetBluetoothKeyboard,
   Colophon,

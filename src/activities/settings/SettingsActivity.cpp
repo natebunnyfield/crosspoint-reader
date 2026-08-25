@@ -23,6 +23,7 @@
 #endif
 #include "SdCardFontSystem.h"
 #include "SettingsList.h"
+#include "TypographySettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "activities/util/TextEntryFactory.h"
@@ -67,9 +68,44 @@ void SettingsActivity::rebuildSettingsLists() {
   // Informational, so it sits last: who wrote this firmware and what it is
   // built out of. Nothing here changes a setting.
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_COLOPHON, SettingAction::Colophon));
-  // Text Settings leads the list: it is the reading screen's own settings
-  // (font family, size, live preview). Typing Redraw Delay and Editor Font are
-  // the first System entries the shared list contributes; Screen Margin follows.
+  // THE HEAD OF THE LIST, in order, and this comment is the only place it is
+  // written down -- the two rows it used to name (Typing Redraw Delay, Screen
+  // Margin) had both been gone for days and it sent a reader to the owner with
+  // a wrong question about ordering. As it actually stands:
+  //
+  //   Text Settings        (inserted here, and it leads: font family, size,
+  //                         live preview -- the reading screen's own settings)
+  //   Typography Settings  (inserted here, owner ruling 2026-08-24:
+  //                         "Typography Settings should be between Text
+  //                         Settings and Editing Font")
+  //   Editor Font          | the STR_CAT_SYSTEM rows the shared list
+  //   Line Grid            | contributes, in getSettingsList() order
+  //   Justified Text
+  //   Dark Mode
+  //   Keyboard
+  //   Sleep Screen
+  //   Clock UTC Offset
+  //   ... then the device-only ACTIONs appended above.
+  //
+  // Read off a rendered Settings screen on 2026-08-24, not off this file --
+  // the loop above drops every row whose category is not STR_CAT_SYSTEM, so
+  // reading getSettingsList() in order gives a longer list than the device
+  // shows. Editor Font SIZE and Focus Reading are the two that look like they
+  // belong here and do not: both carry STR_CAT_READER and never arrive.
+  //
+  // Two rows that a reader may go looking for and will not find: Typing Redraw
+  // Delay and Screen Margin. Both were WITHDRAWN, not deleted, and both VALUES
+  // still apply -- the debounce is `static constexpr displayDebounce` at 250 ms
+  // (CrossPointSettings.h) and still governs how long typing settles before
+  // the panel redraws; the margin persists and is card-controlled (removed
+  // 2026-08-22 by owner layout-exactness order). Their StrIds are still in the
+  // translations, along with 70-odd others, because deleting a key renumbers
+  // StrId for every language for a few bytes of flash.
+  //
+  // The two inserts are written back-to-front on purpose: each goes to
+  // begin(), so the LAST one inserted ends up first.
+  deviceSettings.insert(deviceSettings.begin(),
+                        SettingInfo::Action(StrId::STR_TYPOGRAPHY_SETTINGS, SettingAction::Typography));
   deviceSettings.insert(deviceSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
   // Manage Fonts is withdrawn. SD card fonts are still discovered and
@@ -354,6 +390,13 @@ void SettingsActivity::toggleCurrentSetting() {
                                  SETTINGS.saveToFile();
                                  rebuildSettingsLists();
                                });
+        break;
+      case SettingAction::Typography:
+        // The screen applies and saves as it goes, exactly like Text Settings
+        // above; this refreshes nothing on the parent list, which carries no
+        // typography row to re-render, and only re-saves for the same
+        // belt-and-braces reason every other sub-screen here does.
+        startActivityForResult(std::make_unique<TypographySettingsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::Language: {
         // Show the language list in the in-place option popup rather than

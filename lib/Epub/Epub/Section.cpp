@@ -155,7 +155,19 @@ namespace {
 //      CSS_CACHE_VERSION moves with it: nothing links the two mechanically
 //      (grep -- the section header does not carry it), so the pairing is by
 //      hand, exactly as it was for v47.
-constexpr uint8_t SECTION_FILE_VERSION = 50;
+// v51: per-ligature control becomes a setting (owner ruling 2026-08-24, "give
+//      a full subpage of Typography Settings that gives all available
+//      typography options with full granularity, including toggling each
+//      individual ligature"). Header grows four bytes --
+//      spec.ligatureFingerprint, after justifyThresholdChars -- and that word
+//      is the whole point: a ligature sets two or three letters as one glyph
+//      with one advance, so switching `st` off widens every word containing it
+//      and moves the line breaks after it. Every other field a v50 file
+//      compares would have matched across such a change, so without the new
+//      word the setting would have been inert on every already-paginated book
+//      until the cache was cleared by hand. The bump itself is for the v50
+//      files already on cards, which carry no such word.
+constexpr uint8_t SECTION_FILE_VERSION = 51;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
@@ -179,7 +191,8 @@ constexpr size_t PAGE_WRITE_BUFFER_SIZE = 1024;
 constexpr uint32_t HEADER_SIZE = sizeof(uint8_t) + sizeof(int) + sizeof(float) + sizeof(bool) + sizeof(uint8_t) +
                                  sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(bool) + sizeof(bool) +
                                  sizeof(uint8_t) + sizeof(bool) + sizeof(bool) + sizeof(uint8_t) + sizeof(uint32_t) +
-                                 sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t);
+                                 sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) +
+                                 sizeof(uint32_t);
 }  // namespace
 
 // Out-of-line so the unique_ptr<ChapterHtmlSlimParser> in BuildContext can be
@@ -231,8 +244,8 @@ void Section::writeSectionFileHeader(const ReaderRenderSpec& spec) {
                                    sizeof(spec.hyphenationEnabled) + sizeof(spec.embeddedStyle) +
                                    sizeof(spec.imageRendering) + sizeof(spec.focusReadingEnabled) +
                                    sizeof(spec.lineGridEnabled) + sizeof(spec.justifyThresholdChars) +
-                                   sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) +
-                                   sizeof(uint32_t),
+                                   sizeof(spec.ligatureFingerprint) + sizeof(uint32_t) + sizeof(uint32_t) +
+                                   sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t),
                 "Header size mismatch");
   // Written as the incomplete sentinel; finalizeBuild() patches it to
   // SECTION_FILE_VERSION as the last step, committing the file.
@@ -249,6 +262,7 @@ void Section::writeSectionFileHeader(const ReaderRenderSpec& spec) {
   serialization::writePod(file, spec.focusReadingEnabled);
   serialization::writePod(file, spec.lineGridEnabled);
   serialization::writePod(file, spec.justifyThresholdChars);
+  serialization::writePod(file, spec.ligatureFingerprint);
   serialization::writePod(file, pageCount);  // Placeholder for page count (will be initially 0, patched later)
   serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for LUT offset (patched later)
   serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for anchor map offset (patched later)
@@ -287,6 +301,7 @@ bool Section::loadSectionFile(const ReaderRenderSpec& spec) {
     bool fileFocusReadingEnabled;
     bool fileLineGridEnabled;
     uint8_t fileJustifyThresholdChars;
+    uint32_t fileLigatureFingerprint;
     serialization::readPod(file, fileFontId);
     serialization::readPod(file, fileLineCompression);
     serialization::readPod(file, fileExtraParagraphSpacing);
@@ -299,6 +314,7 @@ bool Section::loadSectionFile(const ReaderRenderSpec& spec) {
     serialization::readPod(file, fileFocusReadingEnabled);
     serialization::readPod(file, fileLineGridEnabled);
     serialization::readPod(file, fileJustifyThresholdChars);
+    serialization::readPod(file, fileLigatureFingerprint);
 
     if (spec.fontId != fileFontId || spec.lineCompression != fileLineCompression ||
         spec.extraParagraphSpacing != fileExtraParagraphSpacing || spec.paragraphAlignment != fileParagraphAlignment ||
@@ -306,7 +322,8 @@ bool Section::loadSectionFile(const ReaderRenderSpec& spec) {
         spec.hyphenationEnabled != fileHyphenationEnabled || spec.embeddedStyle != fileEmbeddedStyle ||
         spec.imageRendering != fileImageRendering || spec.focusReadingEnabled != fileFocusReadingEnabled ||
         spec.lineGridEnabled != fileLineGridEnabled ||
-        spec.justifyThresholdChars != fileJustifyThresholdChars) {
+        spec.justifyThresholdChars != fileJustifyThresholdChars ||
+        spec.ligatureFingerprint != fileLigatureFingerprint) {
       file.close();
       LOG_ERR("SCT", "Deserialization failed: Parameters do not match");
       clearCache();

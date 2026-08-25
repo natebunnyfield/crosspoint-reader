@@ -55,6 +55,25 @@ struct ReaderRenderSpec {
   // would be accepted against every stale cache on the card and do nothing at
   // all until the book was cleared. Defaults to autojustify::THRESHOLD_CHARS.
   uint8_t justifyThresholdChars = autojustify::THRESHOLD_CHARS;
+  // Identity of the per-ligature preference (owner ruling 2026-08-24), as
+  // ligatures::fingerprint(enabled, spec) -- see lib/EpdFont/LigatureControl.h.
+  // A 32-bit hash rather than the spec string itself, because this struct is
+  // written into every section file and compared field by field on load: a
+  // variable-length field would change the header's shape, and nothing here
+  // needs to READ the preference back, only to notice that it moved.
+  //
+  // In the spec because a ligature changes a glyph's ADVANCE -- `st` set as
+  // one shape is narrower than s followed by t -- so switching one moves every
+  // line break after it on the line. Without this field a card full of
+  // paginated books would keep its old breaks against a header that compared
+  // equal, and the toggle would look inert until the cache was cleared by
+  // hand: exactly the failure justifyThresholdChars was added to avoid, one
+  // field above.
+  //
+  // 0 is deliberately not the fingerprint of any real preference, so a
+  // default-constructed spec cannot compare equal to a configured one by
+  // accident.
+  uint32_t ligatureFingerprint = 0;
 
   // A cheap identity for "the measure this book was laid out to", used by
   // booknotes::Notes to decide whether a stored layout-scope note still
@@ -86,6 +105,10 @@ struct ReaderRenderSpec {
     // narrowest paragraph on this page" is describing a page that no longer
     // exists.
     mix(static_cast<uint32_t>(justifyThresholdChars));
+    // Already a 32-bit hash, so it goes in whole. Same argument as the
+    // threshold above: switching a ligature moves line breaks, so a stored
+    // layout-scope note describes a page that no longer exists.
+    mix(ligatureFingerprint);
     return h;
   }
 };

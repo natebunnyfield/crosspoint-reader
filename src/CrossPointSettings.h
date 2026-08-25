@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <Epub/AutoJustify.h>
 #include <Epub/ReaderRenderSpec.h>
+#include <LigatureControl.h>
 #include <PersistableStore.h>
 
 #include <cstdint>
@@ -385,6 +386,36 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Its row has a getter/setter and no valuePtr, so it persists BY HAND in
   // toJson/fromJson -- see the note on screenMargin there.
   uint8_t justifyThresholdChars = autojustify::THRESHOLD_CHARS;
+  // Ligature substitution, master switch. Owner ruling 2026-08-24: "give a
+  // full subpage of Typography Settings that gives all available typography
+  // options with full granularity, including toggling each individual
+  // ligature." Defaults ON, which is what every build before it did, so an
+  // upgraded card renders identically until a row is touched.
+  //
+  // It is a switch rather than a mode, and it DOMINATES the per-pair list
+  // below: with it off the Typography screen stops offering the individual
+  // rows instead of drawing rows whose value is a lie. Turning it back on
+  // restores whatever per-pair choices were stored, because those live in
+  // their own field and are never cleared by this one.
+  uint8_t ligaturesEnabled = 1;
+  // Which INDIVIDUAL ligature pairs are switched off, as the comma-separated
+  // spec ligatures::canonicalize() defines -- "st" is the s+t pair, "fh" is
+  // f+h. Empty means every ligature the face carries is allowed, which is the
+  // shipped default.
+  //
+  // A string, not a bitmask, because the set of ligatures is PER FAMILY and
+  // open-ended: Edgar ships nine Private Use Area pairs that Almendra does not
+  // have, so there is no fixed enumeration a bit index could refer to. Keyed
+  // by the INPUT pair rather than the output codepoint for the same reason --
+  // U+E000 means `fb` only in Edgar, while s+t is s+t in every face ever cut.
+  // The whole argument, including Almendra emitting its `fh` as the codepoint
+  // that means `ff`, is in lib/EpdFont/LigatureControl.h.
+  //
+  // Sized from ligatures::SPEC_BUF_SIZE so the model owns the cap and this
+  // field cannot silently truncate a spec the model would accept. Persisted by
+  // the generic string path in toJson/fromJson via its SettingInfo::String row
+  // in SettingsList.h, which also serves it over the web settings API.
+  char ligaturesOff[ligatures::SPEC_BUF_SIZE] = "";
   // Auto-sleep timeout setting (default 10 minutes). Legacy sleepTimeout enum values are migration-only.
   static constexpr uint8_t sleepTimeoutMinutes = 10;
   // E-ink refresh frequency (default 15 pages)
@@ -523,6 +554,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // passing it in keeps a spec from ever existing in a half-filled state.
   // Unlocked for the same reason as readerRenderSpec(); see the note above.
   ReaderRenderSpec readerRenderSpec(uint16_t viewportWidth, uint16_t viewportHeight) const;
+
+  // Push the stored ligature preference down into lib/EpdFont, which cannot
+  // include this header. Idempotent; call it after anything writes either
+  // ligature field.
+  void applyLigaturePreference() const;
 
   static const char* getFilePath() { return "/.crosspoint/settings.json"; }
   void toJson(JsonDocument& doc) const;
