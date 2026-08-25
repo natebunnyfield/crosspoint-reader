@@ -1209,11 +1209,17 @@ std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& r
 
       // Ragged right (any non-justified alignment): hyphenation is only a
       // RESCUE against a conspicuously short line. Once the line has reached
-      // ~70% of the measure the ragged edge is accepted and the word moves
-      // down whole; under 70% (and always for an oversized first word, where
-      // lineWidth is 0) the split logic runs exactly as for justified text.
+      // linebreak::RAGGED_HYPHEN_GATE_PCT of the measure the ragged edge is
+      // accepted and the word moves down whole; under it (and always for an
+      // oversized first word, where lineWidth is 0) the split logic runs
+      // exactly as for justified text.
+      //
+      // The gate and the 2026-08-27 sweep that kept it at 70 are in
+      // LineBreakMode.h. This read `lineWidth * 10 >= effectivePageWidth * 7`;
+      // the x100 form is that same comparison scaled by ten on BOTH sides, so
+      // it is exact and not merely equivalent at the default.
       const bool raggedSkipsHyphen = blockStyle.alignment != CssTextAlign::Justify && !isFirstWord &&
-                                     lineWidth * 10 >= effectivePageWidth * 7;
+                                     lineWidth * 100 >= effectivePageWidth * linebreak::raggedHyphenGatePct();
 
       if (!raggedSkipsHyphen && availableWidth > 0 &&
           hyphenateWordAtIndex(currentIndex, availableWidth, renderer, fontId, wordWidths, allowFallbackBreaks)) {

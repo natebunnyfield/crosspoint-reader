@@ -132,4 +132,52 @@ constexpr bool usesTotalFit(const Mode mode) { return mode == Mode::WholeWords; 
 constexpr bool splitsWordsAtLineEnds(const uint8_t stored) { return splitsWordsAtLineEnds(modeFor(stored)); }
 constexpr bool usesTotalFit(const uint8_t stored) { return usesTotalFit(modeFor(stored)); }
 
+
+
+// ---------------------------------------------------------------------------
+// THE RAGGED HYPHENATION GATE
+// ---------------------------------------------------------------------------
+//
+// On a RAGGED block the greedy breaker does not hyphenate to pack the line; it
+// hyphenates only as a RESCUE against a conspicuously short line. Once the line
+// has already reached this share of the measure, the ragged edge is accepted and
+// the overflowing word travels down whole. Below it -- and always for an
+// oversized first word, where lineWidth is 0 -- the split logic runs exactly as
+// it does for justified text. `ParsedText.cpp`'s `raggedSkipsHyphen` is the one
+// consumer.
+//
+// A JUSTIFIED block never reaches the gate at all (`blockStyle.alignment !=
+// CssTextAlign::Justify` is the first term of that condition), so moving this
+// number cannot change a justified page. Note that "justified" means AFTER
+// auto-justification has had its say: a block demoted for a narrow measure is
+// ragged, and the gate then applies to it.
+//
+// 70 SWEPT AND KEPT, 2026-08-27. Measured at 14 pt / 512 px -- the shipped
+// default size at the X3's own measure -- across gate values 40..100 in
+// single-point steps, over the same 394-paragraph corpus as the rest of
+// test/line_break_quality. See docs/line-breaking-2026-08-25.md section 9.
+// Moving this number is a change to DEFAULT rendering and therefore costs a
+// SECTION_FILE_VERSION bump and a repagination of every book on every card;
+// the sweep did not find a value worth that.
+inline constexpr int RAGGED_HYPHEN_GATE_PCT = 70;
+
+// The gate as the breaker reads it. Fixed in every shipped configuration.
+//
+// CROSSPOINT_RAGGED_GATE_TUNABLE makes it settable, and is defined by exactly
+// one target: test/line_break_quality, whose DISABLED_RaggedGateSweep has to
+// walk the value inside a single process. Sweeping it by rebuilding the binary
+// per point would be sixty builds of the layout engine and the built-in faces
+// to answer one question. Nothing else may define it -- a mutable layout
+// parameter on a device is a way for two pages of the same book to disagree.
+#ifdef CROSSPOINT_RAGGED_GATE_TUNABLE
+inline int& raggedHyphenGatePctRef() {
+  static int value = RAGGED_HYPHEN_GATE_PCT;
+  return value;
+}
+inline int raggedHyphenGatePct() { return raggedHyphenGatePctRef(); }
+inline void setRaggedHyphenGatePct(const int pct) { raggedHyphenGatePctRef() = pct; }
+#else
+constexpr int raggedHyphenGatePct() { return RAGGED_HYPHEN_GATE_PCT; }
+#endif
+
 }  // namespace linebreak

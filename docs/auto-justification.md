@@ -309,13 +309,19 @@ exists.
 in `computeLineBreaks`. That DP is dead code in every shipped configuration.
 Fixing that is roadmap **T1** and is out of scope here; nothing below changes it.
 
-Alignment reaches line breaking at exactly **one** point,
-`ParsedText.cpp:1160-1164`:
+Alignment reaches line breaking at exactly **one** point, `ParsedText.cpp`'s
+`raggedSkipsHyphen` (grep the name — this citation has already moved once):
 
 ```cpp
 const bool raggedSkipsHyphen = blockStyle.alignment != CssTextAlign::Justify && !isFirstWord &&
-                               lineWidth * 10 >= effectivePageWidth * 7;
+                               lineWidth * 100 >= effectivePageWidth * linebreak::raggedHyphenGatePct();
 ```
+
+The 70 now lives in `lib/Epub/Epub/LineBreakMode.h` as
+`linebreak::RAGGED_HYPHEN_GATE_PCT`. It read `lineWidth * 10 >=
+effectivePageWidth * 7` until 2026-08-27; the ×100 form is that comparison
+scaled by ten on both sides, exact for every width, and the value is unchanged.
+It was swept 40–100 and kept — `docs/line-breaking-2026-08-25.md` §9.
 
 A non-justified block skips the hyphenation attempt once the line has already
 reached 70% of the measure and lets the word wrap whole; a justified block

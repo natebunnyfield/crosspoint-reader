@@ -33,6 +33,14 @@ add_executable(LineBreakQualityTest
   ${CP_PREVIEW}/uzlib_checksums.c
 )
 
+# The ragged hyphenation gate becomes settable at runtime for THIS TARGET ONLY
+# (lib/Epub/Epub/LineBreakMode.h). DISABLED_RaggedGateSweep walks it 40..100 in
+# single-point steps inside one process; rebuilding the layout engine and the
+# built-in faces sixty times to answer one question is the alternative. No other
+# target may define it -- on a device a mutable layout parameter is a way for two
+# pages of the same book to disagree about where the lines go.
+target_compile_definitions(LineBreakQualityTest PRIVATE CROSSPOINT_RAGGED_GATE_TUNABLE)
+
 target_compile_options(LineBreakQualityTest PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-include$<SEMICOLON>Arduino.h>
 )

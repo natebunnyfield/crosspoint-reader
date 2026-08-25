@@ -7,8 +7,11 @@ hyphenation and get the better line breaker"*).
 Everything in §0–§7 was read or measured at `81c5a8a05`. **§8 is a second dated
 pass, 2026-08-26, measured at `8f6e0294f`**, added after the owner asked how
 "winning" was being defined in §3 — it re-runs the comparison as a 2×2 with
-worst-line, river and hyphen-run metrics. Where a claim is inferred rather than
-measured, it says so.
+worst-line, river and hyphen-run metrics. **§9 is a third, 2026-08-27**: the
+ragged hyphenation gate that §7 and §8j both list as untouched, swept 40–100 at
+14 pt / 512 px. Its verdict is that **70 stays** and that nothing about what the
+device draws has changed. Where a claim is inferred rather than measured, it
+says so.
 
 **Read this before touching `ParsedText::computeLineBreaks` or
 `computeHyphenatedLineBreaks`.** Two of the sections below overturn something
@@ -414,6 +417,9 @@ are mine, not its.
   (`ParsedText.cpp`) suppresses hyphenation once a ragged line has reached 70% of
   the measure, which is most of why the greedy rag is uneven at 18 pt. Moving it
   is a change to the DEFAULT rendering and nobody asked for one.
+  **SUPERSEDED 2026-08-27 — the owner asked, and §9 is the sweep.** It kept 70.
+  Note that the "uneven at 18 pt" claim above **remains unverified**: §9 measures
+  14 pt only, on the owner's instruction, and says so.
 * **A per-book override.** §0: there is nothing to override.
 
 ---
@@ -979,3 +985,406 @@ are mine.
   change to the default rendering and nobody asked for one. It is worth noting
   that §8f now measures its effect: the ragged hyphen density is 0.5–2.7% at
   12 pt against 15% justified, which is that 70% gate doing its work.
+  **SUPERSEDED 2026-08-27 — §9 sweeps it, and keeps 70.** §9d's 1.86% at 14 pt
+  agrees with the 12 pt band quoted here.
+
+---
+
+## 9. The ragged hyphenation gate, swept — 2026-08-27
+
+Owner: *"rerun for dialing in the optimal ragged gate."* Scope narrowed twice
+during the run — *"just measure at 14"*, then *"only 512"* — so this is one
+configuration measured densely rather than a grid measured coarsely.
+
+`raggedSkipsHyphen` suppresses hyphenation once a ragged line has already
+reached 70% of the measure. §7 and §8j both list it as untouched and both give
+the same reason (it is a change to DEFAULT rendering and nobody asked for one).
+The owner has now asked.
+
+**The answer is that 70 stays.** The curve has a knee, the knee is in the
+neighbourhood of 70–75, and nothing in the band is worth what moving it costs.
+The rest of this section is the evidence, including the two places where a
+different threshold would have picked 75 and the one place where moving up makes
+a line worse.
+
+### 9a. What was measured, and what was not
+
+| | |
+|---|---|
+| Configuration | **14 pt Libre Franklin at a 512 px measure**, ragged. One only. |
+| Why that one | 14 is `CrossPointSettings::DEFAULT_FONT_POINT_SIZE` and 512 is the X3's portrait measure at the default screen margin — this is the page a reader who has changed nothing is looking at. |
+| Gate values | **40 to 100 in single-point steps.** 61 points. |
+| Corpus | The §8a corpus, rebuilt by `tools/linebreak_corpus.py` from the same two books: **394 paragraphs, 22,881 words** — reproduced exactly, to the paragraph and to the word. |
+| Instrument | `test/line_break_quality`, `DISABLED_RaggedGateSweep`. No new harness. |
+| Commit | measured at `81d0098`-era working tree, with the three live tests below. |
+
+**Is 14 pt at 512 px even a ragged page?** Yes, and it was printed rather than
+assumed: the alphabet measures 401 px, which is **~36 characters per line**,
+under `autojustify::THRESHOLD_CHARS` of 40, so auto-justification demotes the
+block and the ragged branch runs. This gate is therefore live on the default
+device in the default configuration — which is more than could be said for it
+before this was checked.
+
+**Explicitly NOT covered, and not to be inferred from the above:**
+
+* **12, 16 and 18 pt.** Only 14 was measured.
+* **400 px and 640 px.** Only 512 was measured.
+* **§7's claim that this gate is "most of why the greedy rag is uneven at
+  18 pt" is UNVERIFIED and stays that way.** It was not measured here and the
+  14 pt result must not be read as settling it. 18 pt is the size where this
+  gate is most likely to matter — a wider glyph on the same measure means fewer
+  words per line, so the gate's threshold is crossed by a different population
+  of lines — and it is the one corner this sweep deliberately did not visit.
+
+### 9b. Justified pages are untouched — measured, not argued
+
+The gate's condition begins `blockStyle.alignment != CssTextAlign::Justify`, so
+a justified block cannot reach it. That is an argument. This is the measurement,
+at both ends of the legal range and at the shipped value:
+
+| gate | lines | mean gap | sd | p95 | hyphenated | ladders |
+|---:|---:|---:|---:|---:|---:|---:|
+| 40 | 3564 | 14.2677 | 10.1408 | 28.0000 | 590 | 13 |
+| 70 | 3564 | 14.2677 | 10.1408 | 28.0000 | 590 | 13 |
+| 100 | 3564 | 14.2677 | 10.1408 | 28.0000 | 590 | 13 |
+
+Identical in every column at every precision printed.
+`LineBreakQuality.MovingTheRaggedGateCannotChangeAJustifiedPage` pins it.
+
+**"Justified" here means AFTER auto-justification**, and that distinction is the
+whole reason this sweep is about the default page at all: a block demoted for a
+narrow measure IS ragged, and the gate applies to it in full. 14 pt at 512 px is
+exactly such a block.
+
+One consistency check falls out of the sweep and is worth keeping: at gate 100
+the gate can never fire, so the ragged page hyphenates on the same rule a
+justified page does — and it produces **590 hyphenated lines, the same 590** the
+justified arm produces. Two independent paths to one number.
+
+### 9c. What "good rag" means, stated before anything was ranked
+
+Ranking on "less rag" would quietly re-derive justified text, so the definition
+came first:
+
+* **A ragged setting is supposed to look ragged.** A mean shortfall near zero is
+  a failure, not a win. **Depth is reported and is not the ranking key.**
+* **The named defect of ragged setting is a HOLE** — one line conspicuously
+  shorter than the lines around it, which reads as a paragraph break that is not
+  there. This is the defect the gate's own comment says it exists to rescue
+  against, so it is what the gate is judged on. Measured two ways: **absolutely**
+  (a line ending short of 75% / 67% / 60% of the measure) and **relative to the
+  line's own neighbours** (shorter than both by more than 15% / 25% of the
+  measure), because a short line among short lines is not a hole.
+* **The other named defect is a rag so deep the column loses its shape**, which
+  p95, p99 and the per-paragraph worst carry.
+
+All thresholds were fixed before the first run and none was moved afterwards.
+Two of them would have picked a different winner; §9f says so rather than
+quietly dropping them.
+
+**There is no run-to-run noise here.** The layout is deterministic — two full
+sweeps diff byte-identical — so "inside noise" below means "too small to be
+seen", not "inside a sampling error". Where that judgment is made, the numbers
+are given.
+
+### 9d. The curve
+
+14 pt @ 512 px, ragged, 394 paragraphs. Shortfall figures are percentages OF THE
+MEASURE; `h25/h33/h40` are counts of lines ending short of 75% / 67% / 60% of
+it; `rel15` is the count of lines shorter than BOTH neighbours by more than 15%.
+Density is on the **page denominator** (all lines), the convention §8f settled.
+
+| gate | lines | hy | dens/all | dens/brk | run2 | run3+ | longest | mean | sd | p95 | p99 | paraWorst | max | h25 | h33 | h40 | rel15 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 40 | 4042 | 4 | 0.10% | 0.11% | 0 | 0 | 1 | 10.07 | 7.82 | 25.39 | 34.18 | 22.53 | 57.03 | 187 | 45 | 16 | 123 |
+| 50 | 4042 | 6 | 0.15% | 0.16% | 0 | 0 | 1 | 10.05 | 7.76 | 25.20 | 34.18 | 22.40 | 51.17 | 186 | 44 | 14 | 123 |
+| 60 | 4037 | 18 | 0.45% | 0.49% | 0 | 0 | 1 | 9.95 | 7.53 | 24.80 | 32.62 | 21.86 | 51.17 | 174 | 34 | 4 | 114 |
+| 65 | 4034 | 32 | 0.79% | 0.88% | 1 | 0 | 2 | 9.85 | 7.32 | 24.22 | 31.05 | 21.38 | 51.17 | 158 | 18 | 4 | 107 |
+| 67 | 4031 | 42 | 1.04% | 1.15% | 1 | 0 | 2 | 9.80 | 7.22 | 24.02 | 30.08 | 21.04 | 51.17 | 148 | **8** | 4 | 97 |
+| 69 | 4025 | 64 | 1.59% | 1.76% | 2 | 1 | 3 | 9.66 | 7.02 | 23.44 | 28.32 | 20.53 | 51.17 | 126 | 7 | **3** | 89 |
+| **70** | **4023** | **75** | **1.86%** | **2.07%** | **2** | **1** | **3** | **9.56** | **6.92** | **23.05** | **27.54** | **20.27** | **51.17** | **114** | **7** | **3** | **83** |
+| 72 | 4018 | 106 | 2.64% | 2.92% | 3 | 1 | 3 | 9.43 | 6.74 | 22.46 | 26.95 | 19.82 | 51.17 | 84 | 7 | 3 | 72 |
+| 75 | 4012 | 170 | 4.24% | 4.70% | 7 | 1 | 3 | 9.16 | 6.41 | 20.90 | 24.41 | 18.87 | **68.36** | **19** | 7 | 3 | 46 |
+| 80 | 3989 | 330 | 8.27% | 9.18% | 25 | 2 | 3 | 8.39 | 5.74 | 18.16 | 21.88 | 16.89 | 68.36 | 16 | 7 | 3 | **18** |
+| 85 | 3966 | 529 | 13.34% | 14.81% | 64 | 12 | 5 | 7.56 | 5.44 | 16.80 | 22.27 | 15.93 | 68.36 | 15 | 8 | 4 | 22 |
+| 90 | 3959 | 588 | 14.85% | 16.49% | 73 | 13 | 6 | 7.36 | 5.44 | 16.80 | 22.27 | 15.80 | 68.36 | 16 | 8 | 4 | 21 |
+| 100 | 3959 | 590 | 14.90% | 16.55% | 75 | 13 | 6 | 7.35 | 5.44 | 16.80 | 22.27 | 15.79 | 68.36 | 16 | 8 | 4 | 21 |
+
+The full 61-row table is what the instrument prints; the rows above are the ones
+that carry the shape. **The shape is three regions, and two of them are dead:**
+
+* **40–65 — a plateau where the gate is effectively OFF.** Hyphen density runs
+  0.10–0.79% and every rag statistic is within a few percent of its value at 40.
+  Twenty-five points of gate buy almost nothing, because a ragged line that is
+  under 65% full when a word overflows is uncommon.
+* **66–88 — the live band.** Everything moves, and it moves fast: density goes
+  from 0.92% to 14.72% and the deep-hole counts collapse.
+* **89–100 — a plateau where the gate is effectively ALWAYS OFF.** From 89 up
+  the page barely moves — 3959 lines throughout, 588 hyphens becoming 590, every
+  rag figure fixed to within 0.01 of the measure — and from **92 upward it is
+  bit-identical to gate 100** in every column. A line is essentially never 89%
+  full at the moment a word overflows, so the gate stops binding.
+
+**So the exact value only matters between about 66 and 88, and 70 is inside that
+band near its lower edge.** If the answer had been "the curve is flat, the number
+does not matter", this section would say so; it is not flat.
+
+### 9e. The knee
+
+The trade is rag against hyphens, so the knee is where a further point of gate
+stops buying rag and only buys hyphens. Measured as holes removed per hyphen
+added, from 70:
+
+| move | hyphens added | h25 removed | rate |
+|---|---:|---:|---:|
+| 70 → 72 | +31 | −30 | 0.97 |
+| 70 → 75 | +95 | −95 | 1.00 |
+| 70 → 80 | +255 | −98 | 0.38 |
+| 70 → 85 | +454 | −99 | 0.22 |
+| 70 → 100 | +515 | −98 | 0.19 |
+
+**The knee on that metric is 75.** Up to it, one hyphen removes one moderately
+short line; past it the same hyphens buy nothing, because the population of
+moderately short lines has been exhausted.
+
+But the three hole thresholds do not knee together, and that is the finding:
+
+| metric | what it counts | knees at | value at 70 |
+|---|---|---:|---:|
+| **h40** | lines ending short of **60%** of the measure | steep part ends at 60, **floor of 3 reached at 69** and held to 81 | 3 — its floor |
+| **h33** | short of **67%** | steep part ends at 67, **floor of 7 reached at 69** and held to 81 | 7 — its floor |
+| **h25** | short of **75%** | **75–76** | 114 → floors at 15–16 |
+| **rel>15** | shorter than both neighbours by >15% | **80**, then REVERSES (18 at 80, 22 at 85) | 83 |
+
+**And both strict thresholds REVERSE above 81**: h33 goes 7 → 8 at gate 82 and
+stays there to 100, h40 goes 3 → 4 at the same point. So the top of the live
+band is not merely a waste of hyphens — on the metrics that name the
+conspicuous defect it is actively worse than 70.
+
+**The two strictest thresholds — the ones that name a line a reader would
+actually take for a paragraph break — both reach their floor at 69 and hold it,
+unchanged, all the way to 81. 70 sits one point past both.** What a higher gate buys is
+h25: lines that end between 67% and 75% of the measure, which on a 36-character
+line is a line four to nine characters short of full. That is ordinary ragged
+setting, not a defect.
+
+### 9f. The two readings that would have picked 75, reported rather than buried
+
+Honesty requires both, since the thresholds were fixed in advance:
+
+1. **h25 says 75.** 114 lines short of 75% of the measure at gate 70 against 19
+   at gate 75 — one line in 35 becoming one line in 211 — bought with 95
+   additional hyphens, taking density from 1.86% to 4.24%. Ladders do not move
+   (1 either way), the longest run does not move (3), and 4.24% is still far
+   under the 14.90% a justified page at this size carries. That is a real,
+   cheap, defensible improvement and it is why this is a **marginal** call rather
+   than an obvious one.
+2. **relP95 keeps improving all the way up** — 12.30 at 70, 10.94 at 75, 9.77 at
+   80, 9.57 at 90 — and never reverses. Read alone it argues for the top of the
+   band.
+
+Against them: `rel>15` **reverses** above 80 (18 at 80, 22 at 85, 21 at 100), the
+strict absolute thresholds are already flat at 70, and §9g is worse than either.
+
+### 9g. The line that gets worse, which the mean hides
+
+The lesson of the previous two rounds, applied. Every mean, sd and percentile in
+the table improves monotonically as the gate rises. **The single deepest line
+does not.**
+
+| gate | five deepest shortfalls, % of measure |
+|---:|---|
+| 65 | 51.17 · 50.20 · 42.58 · 40.04 · 37.11 |
+| 70 | 51.17 · 50.20 · 42.58 · 37.11 · 36.52 |
+| 74 | 51.17 · 50.20 · 42.58 · 37.11 · 36.52 |
+| **75** | **68.36** · 51.17 · 50.20 · 37.11 · 36.52 |
+| 80 | 68.36 · 51.17 · 50.20 · 37.11 · 36.52 |
+| 85 | 68.36 · 51.17 · 50.20 · **46.09** · 37.11 |
+| 100 | 68.36 · 51.17 · 50.20 · 46.09 · 37.11 |
+
+At exactly the gate where h25 bottoms out, a line appears that ends at **31.6%
+of the measure** — seventeen points of measure worse than anything below gate
+75 — and it never goes away. The neighbour-relative worst moves with it, 40.82
+to 49.41. A fifth line at 46.09 joins them at 85.
+
+**The mechanism is not the obvious one, and the obvious one was tested and
+found absent.** The natural guess is that hyphenating leaves a wide remainder
+which starts the next line and digs a deeper hole than the hyphen prevented. The
+instrument counts exactly that (`afterHy`: very deep lines whose predecessor
+ended in a hyphen) and it is **0 at every gate from 40 to 100**. So the deep line
+is not downstream of a hyphen; it is a paragraph that broke differently several
+lines earlier and left one line facing a word it cannot split at all.
+
+**Weight it honestly: it is one line in 22,881 words**, and §8h already ruled the
+single worst line non-load-bearing because it behaves like a coin flip. This one
+is not a coin flip — it is a monotone step that persists from 75 to 100 — but it
+is still one line, and it is reported as a reason not to move rather than as a
+result on its own.
+
+### 9h. Recommendation: leave it at 70. No change shipped.
+
+Plainly, since that is what was asked. **`raggedSkipsHyphen` stays at 70 and
+nothing about what the device draws has changed.**
+
+* The two strictest hole metrics — the ones that name the defect the gate exists
+  to rescue against — **hit their floor at 69 and hold it to 81, then get
+  WORSE.** 70 is one point past both knees, and no higher value improves either.
+* The one metric that wants 75 is counting lines four to nine characters short
+  of full, which is what ragged setting looks like.
+* Moving to 75 costs **2.3× the hyphens** and makes **the deepest line in the
+  corpus 17 points of measure worse**, permanently.
+* Above 80 the rag stops improving (`rel>15` reverses) while density climbs to
+  13–15% and ladders go from 2 to 13. Above 88 the gate is inert.
+* And the price of any move at all is §9i.
+
+This is the **marginal** outcome the brief named, and marginal means leave it.
+
+### 9i. What a change would have cost, recorded because it nearly applied
+
+Stated in full so that the next person to reach for this number knows the bill
+before they start, and so that a future change does not skip it:
+
+**Moving this constant changes DEFAULT rendering.** Every ragged block in every
+book breaks differently. That is not a repaint — it is different line breaks,
+which means different page boundaries, which means **every already-paginated
+book on every card is stale**.
+
+`hyphenationEnabled` got away without a `SECTION_FILE_VERSION` bump (§0) because
+it is *itself* a `ReaderRenderSpec` field, already written into the section file
+and already compared on load, so moving it invalidates caches by itself. **The
+ragged gate is not a spec field and cannot become one** — it is a compile-time
+constant of the layout engine, identical for every book and every setting, so
+there is nothing for a header comparison to notice. A build with a different
+gate loads a v51 section file, finds every spec field equal, accepts it, and
+renders **the old line breaks out of cache** — exactly the silent failure
+`justifyThresholdChars` and the ligature fingerprint were both added to
+`ReaderRenderSpec` to avoid.
+
+So a change here requires **`SECTION_FILE_VERSION` 51 → 52**, and the cost of
+that is a full repagination of every book on every card on the next open. Not
+a corruption risk, but not free either, and invisible until the reader wonders
+why a familiar book is grinding.
+
+**A 95-line reduction in moderately short lines does not buy that.**
+
+### 9j. Metrics measured and dropped
+
+Recorded with their numbers so the next pass does not pay for them again.
+
+* **Mean shortfall and its sd** — reported, **not ranked**, by construction
+  (§9c). Across the entire 40→100 sweep the mean moves only 10.07% → 7.35% of
+  the measure and the sd 7.82 → 5.44. Both are monotone and both measure *rag
+  depth*, which is the thing a ragged setting is supposed to have. Ranking on
+  either is a request for justified text.
+* **`afterHy`, deep lines following a hyphenated line** — dropped as a null.
+  **0 at every one of the 61 gate values.** The mechanism it was built to test
+  (a hyphen's remainder digging the next line's hole) does not occur in this
+  corpus at all. Kept in the instrument with its reason, because a null that
+  nobody records gets re-guessed.
+* **`h33` and `h40`** — measured, and they are the reason for the verdict, but
+  they are **flat across most of the sweep and cannot rank inside the live
+  band**: h33 is 7 and h40 is 3 for every gate from 69 to 81, and both step
+  back up (to 8 and 4) at 82 and hold that to 100. They say "70 is past the
+  knee, and the top of the band is worse" and nothing finer. Quoting them as though they
+  discriminate between 70 and 75 would be reading four significant figures off a
+  flat line.
+* **Line count / book length** — measured, and too small to weigh. The whole
+  sweep spans 4042 lines at gate 40 to 3959 at gate 100, **2.05%**; the
+  70→75 move is 11 lines in 4023, **0.27%**. A quarter of one percent of book
+  length is not an argument in either direction.
+* **`p99` shortfall** — dropped as non-monotone in the wrong way to be useful:
+  it falls 27.54 → 21.88 from 70 to 80 and then **rises** to 22.27 at 85 and
+  stays. It carries the same story as §9g's max with less resolution, and the
+  max tells it better.
+* **`run2` and the longest run** — reported, not decisive at the values in
+  question. Runs of two go 2 → 7 across 70→75, which is 7 pairs in 4012 lines;
+  the longest run is 3 at both. They only become an argument above 82, where
+  ladders go 5 → 8 → 10 → 12 → 13, and nothing was proposing to go there.
+
+### 9k. The adversarial pass on §9
+
+Run read-only against the diff, as the standing rule requires. **It reported
+CLEAN on all seven areas it was pointed at and found no structural defect**,
+which is worth recording in full so the next pass does not re-derive it:
+
+* the ×100 rewrite is exact, both operands are `int`, the largest reachable
+  product is 2048 × 100 = 204,800, and `raggedHyphenGatePct()` folds to the
+  literal 70 in every shipping build;
+* `CROSSPOINT_RAGGED_GATE_TUNABLE` exists in exactly two places — the `#ifdef`
+  and the one test target — and is absent from `platformio.ini` and every other
+  build file;
+* the appended namespace in `LineBreakMode.h` opens once and closes once with
+  nothing orphaned;
+* none of the three new tests is vacuous or tautological — it confirmed that
+  `threshold=0` really justifies and `threshold=255` really goes ragged from the
+  instrument's own log lines, and that `GateScope` cannot leak a value between
+  tests;
+* the sweep's shortfall arithmetic, its paragraph-final exclusion and the
+  neighbour-relative index range are correct, and the 14 pt face is genuinely
+  installed rather than silently falling back;
+* every number, ratio and range endpoint it spot-checked in §9d–§9g matches
+  the instrument's output, including the two claims already corrected once.
+
+**One judgment of its own was overruled, and the assertion outlived it.** It
+argued that no negative `effectivePageWidth` is reachable, so the exactness test
+need only sweep positive widths. `effectivePageWidth` is `pageWidth -
+firstLineIndent` with nothing clamping the difference, and a book whose CSS asks
+for a text-indent wider than the measure makes it negative;
+`TheRaggedGateIsSeventyAndTheRewriteIsExact` now sweeps a negative band as well.
+Cheap, and it does not depend on anyone's reading of reachability.
+
+It also noted that the saved sweep artifact predated §4 of the instrument; that
+was an artifact-capture order problem, not a doc error, and the artifact has
+been regenerated whole.
+
+It agreed the verdict is **marginal but defensible**, and it built the strongest
+case for 75 that the data supports — which is §9f, and is the reason §9f is in
+the section at all.
+
+It did not build or run anything, so §9l's pass counts and build results are
+mine.
+
+### 9l. Verified
+
+* Host suite **547 → 550**, all passing, plus two disabled instruments
+  (`Sweep` and the new `RaggedGateSweep`). Measured with this diff alone; a
+  concurrent unrelated change was landing in the same tree while this ran and
+  takes the tree total past 550, which is not this section's doing. The three
+  new live tests are
+  `TheRaggedGateIsSeventyAndTheRewriteIsExact`,
+  `MovingTheRaggedGateCannotChangeAJustifiedPage` and
+  `TheRaggedGateBindsOnARaggedPage`.
+* Desktop canary `pio run -e simulator` SUCCESS.
+* ESP32 device build `pio run -e default` SUCCESS (flash 76.9%).
+* Two full sweeps diff byte-identical, which is what says there is no noise
+  floor to read the small differences against.
+
+### 9m. What DID change in the tree, and why it is a no-op
+
+The verdict is "no change", but the sweep needed the gate to move, so three
+things landed:
+
+1. **`lib/Epub/Epub/LineBreakMode.h`** now owns the constant as
+   `linebreak::RAGGED_HYPHEN_GATE_PCT = 70`, with the sweep's conclusion beside
+   it, and exposes `raggedHyphenGatePct()`. In every shipped configuration that
+   is a `constexpr` returning 70.
+2. **`ParsedText.cpp`'s `raggedSkipsHyphen`** reads
+   `lineWidth * 100 >= effectivePageWidth * raggedHyphenGatePct()` where it read
+   `lineWidth * 10 >= effectivePageWidth * 7`. **That is the same comparison
+   scaled by ten on both sides**, so it is exact rather than merely equivalent
+   at typical widths — an integer rewrite that agreed at 512 px and disagreed at
+   some other measure would move line breaks in books nobody sweeps.
+   `TheRaggedGateIsSeventyAndTheRewriteIsExact` checks both forms against each
+   other for **every width from 1 to 2048 px and every line width inside it**,
+   and that test also fails if anyone edits the 70. A negative band is swept
+   too — see §9k.
+3. **`CROSSPOINT_RAGGED_GATE_TUNABLE`** makes the gate settable at runtime, and
+   is defined by **exactly one target**: `test/line_break_quality`. Sweeping 61
+   points by rebuilding the layout engine and the built-in faces once per point
+   was the alternative. Nothing else may define it — on a device a mutable
+   layout parameter is a way for two pages of the same book to disagree about
+   where the lines go.
+
+`tools/linebreak_corpus.py` is unchanged and reproduced the §8a corpus exactly
+(394 paragraphs, 22,881 words), which is the second time that script has paid
+for itself.

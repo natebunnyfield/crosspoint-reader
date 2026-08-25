@@ -51,7 +51,9 @@ struct ReaderRenderSpec {
   // section file, and in the comparison on load -- because moving it moves line
   // BREAKS, not just painted x: a narrower block stops being justified, and the
   // ragged branch also stops hyphenating lines already past 70% of the measure
-  // (ParsedText.cpp's raggedSkipsHyphen). Without it here a threshold change
+  // (ParsedText.cpp's raggedSkipsHyphen; the 70 is
+  // linebreak::RAGGED_HYPHEN_GATE_PCT, swept and kept 2026-08-27 --
+  // docs/line-breaking-2026-08-25.md section 9). Without it here a threshold change
   // would be accepted against every stale cache on the card and do nothing at
   // all until the book was cleared. Defaults to autojustify::THRESHOLD_CHARS.
   uint8_t justifyThresholdChars = autojustify::THRESHOLD_CHARS;

@@ -40,8 +40,18 @@
 //     can never be hyphenated, and leaving it out inflates that figure to
 //     15-17%. HyphenRuns reports both.
 //
-// The full tables are in docs/line-breaking-2026-08-25.md; DISABLED_Sweep at
-// the foot of this file is the instrument that produced both of them.
+// THEN, 2026-08-27, IT SWEPT THE RAGGED GATE. `raggedSkipsHyphen` gives up on
+// hyphenation once a ragged line has reached 70% of the measure, and sections 7
+// and 8j both listed it as untouched. Swept 40..100 in single-point steps at
+// 14 pt / 512 px -- the shipped default size at the X3's own measure, and the
+// owner's scope for the run -- the curve has a live band of roughly 66..88 with
+// dead plateaux either side, and 70 sits one point past the knee of the two
+// strictest hole metrics. It KEPT 70; nothing about what the device draws
+// changed. DISABLED_RaggedGateSweep is that instrument.
+//
+// The full tables are in docs/line-breaking-2026-08-25.md; DISABLED_Sweep and
+// DISABLED_RaggedGateSweep at the foot of this file are the instruments that
+// produced them.
 //
 // What the live tests pin is only what held in EVERY configuration:
 //   * justified -- greedy sets tighter AND more evenly. Assert the direction,
@@ -55,6 +65,8 @@
 //   * worst line -- at equal hyphenation the DP protects the loosest line.
 //   * rivers -- the metric clears its ragged null, and hyphens reduce rivers.
 //   * hyphen runs -- the run counter is wired to the same lines as the rest.
+//   * the ragged gate -- it is 70, the x100 rewrite is exact at every width, it
+//     cannot reach a justified page, and it DOES move a ragged one.
 
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
@@ -98,6 +110,10 @@ class Gfx {
     cache_.setFontDecompressor(&decompressor_);
     renderer_.setFontCacheManager(&cache_);
     renderer_.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, lfReader12_);
+    // 14 pt is CrossPointSettings::DEFAULT_FONT_POINT_SIZE -- the size a reader
+    // who has changed nothing is looking at. Added 2026-08-27 for the ragged
+    // gate sweep (section 9), which is measured at that size and nowhere else.
+    renderer_.insertFont(LIBREFRANKLIN_READER_14_FONT_ID, lfReader14_);
     renderer_.insertFont(LIBREFRANKLIN_READER_18_FONT_ID, lfReader18_);
     // WITHOUT THIS THE GREEDY BREAKER CANNOT HYPHENATE AT ALL, and the whole
     // suite silently measures two breakers that both set whole words.
@@ -113,6 +129,9 @@ class Gfx {
   EpdFont lfr12R_{&librefranklin_reader_12_regular}, lfr12B_{&librefranklin_reader_12_bold},
       lfr12I_{&librefranklin_reader_12_italic}, lfr12BI_{&librefranklin_reader_12_bolditalic};
   EpdFontFamily lfReader12_{&lfr12R_, &lfr12B_, &lfr12I_, &lfr12BI_};
+  EpdFont lfr14R_{&librefranklin_reader_14_regular}, lfr14B_{&librefranklin_reader_14_bold},
+      lfr14I_{&librefranklin_reader_14_italic}, lfr14BI_{&librefranklin_reader_14_bolditalic};
+  EpdFontFamily lfReader14_{&lfr14R_, &lfr14B_, &lfr14I_, &lfr14BI_};
   EpdFont lfr18R_{&librefranklin_reader_18_regular}, lfr18B_{&librefranklin_reader_18_bold},
       lfr18I_{&librefranklin_reader_18_italic}, lfr18BI_{&librefranklin_reader_18_bolditalic};
   EpdFontFamily lfReader18_{&lfr18R_, &lfr18B_, &lfr18I_, &lfr18BI_};
@@ -1516,5 +1535,359 @@ TEST(LineBreakQuality, DISABLED_Sweep) {
                h.runs2, h.runs3plus, h.longest);
       }
     }
+  }
+}
+
+// ===========================================================================
+// The ragged hyphenation gate, swept.  2026-08-27.
+// ===========================================================================
+//
+// `raggedSkipsHyphen` (ParsedText.cpp, now reading linebreak::raggedHyphenGatePct)
+// suppresses hyphenation once a ragged line has already reached 70% of the
+// measure. Section 7 and section 8j of docs/line-breaking-2026-08-25.md both
+// list it as untouched; this is the sweep the owner asked for.
+//
+// ONE CONFIGURATION, deliberately, and it is the one that ships: 14 pt
+// (CrossPointSettings::DEFAULT_FONT_POINT_SIZE) at 512 px (the X3's portrait
+// measure at the default screen margin). Owner scope, 2026-08-27, narrowed
+// twice: "just measure at 14", then "only 512". The saving is spent on stepping
+// the gate by ONE point across 40..100 instead of by five across a grid of
+// sizes and measures nobody reads at. 12 / 16 / 18 pt and 400 / 640 px are
+// therefore NOT covered by this sweep and the doc says so; in particular
+// section 7's claim that this gate is "most of why the greedy rag is uneven at
+// 18 pt" stays UNVERIFIED.
+//
+// WHAT GOOD RAG MEANS, stated before anything is ranked, because "less rag" is
+// not the goal and ranking on depth alone would quietly re-derive justified
+// text:
+//
+//   * A ragged setting is SUPPOSED to look ragged. Mean shortfall near zero is
+//     a failure, not a win -- it is justified text without the justification.
+//     So depth is REPORTED and is not the ranking key.
+//   * The named defect of ragged setting is a HOLE: one line conspicuously
+//     shorter than the lines around it, which reads as a paragraph break that
+//     is not there. This is the defect the gate's own comment says it exists to
+//     rescue against, so it is the metric the gate must be judged on. Measured
+//     two ways -- absolutely (shortfall past a share of the measure) and
+//     relative to the line's own neighbours, since a short line among short
+//     lines is not a hole.
+//   * The other named defect is a rag so deep the column loses its shape,
+//     which p95 and the per-paragraph worst carry.
+//
+// And the cost side, which is what a higher gate buys the rag with: hyphen
+// density on the page denominator, runs of two, and ladders of three or more.
+namespace {
+
+// The rag, as a distribution of SHORTFALL from the measure. Every figure is a
+// percentage OF THE MEASURE so the numbers mean the same thing whatever the
+// measure is, and paragraph-final lines are excluded throughout -- a final line
+// is where the text ran out, not a decision the breaker made.
+struct RagShape {
+  int lines = 0;
+  double meanPct = 0.0;  // rag DEPTH. Reported, not ranked -- see above.
+  double sdPct = 0.0;    // how active the edge is
+  double p95Pct = 0.0;
+  double p99Pct = 0.0;
+  double maxPct = 0.0;         // the single shortest line in the corpus
+  double meanParaMaxPct = 0.0; // mean over paragraphs of that paragraph's shortest line
+  int holes25 = 0;             // lines ending short of 75% of the measure
+  int holes33 = 0;
+  int holes40 = 0;
+  // A hole RELATIVE to its neighbours: this line's shortfall less the larger of
+  // the two lines beside it, within the paragraph. Positive means it is shorter
+  // than both. Interior lines only, since an edge line has one neighbour and a
+  // one-sided comparison is a different quantity.
+  int relHoles15 = 0;  // shorter than both neighbours by more than 15% of the measure
+  int relHoles25 = 0;
+  double relP95Pct = 0.0;
+  double relMaxPct = 0.0;
+};
+
+RagShape ragShapeOf(const Corpus& c, const double measurePx) {
+  RagShape r;
+  std::vector<double> s;      // shortfall, % of measure
+  std::vector<double> rel;    // neighbour-relative hole depth, % of measure
+  int paras = 0;
+  for (const auto& para : c) {
+    std::vector<double> pv;
+    for (const auto& l : para) {
+      if (l.isFinal) continue;
+      pv.push_back(100.0 * (measurePx - l.end) / measurePx);
+    }
+    if (pv.empty()) continue;
+    paras++;
+    double worst = 0.0;
+    for (const double v : pv) worst = std::max(worst, v);
+    r.meanParaMaxPct += worst;
+    for (size_t i = 0; i < pv.size(); ++i) {
+      s.push_back(pv[i]);
+      if (pv[i] > 25.0) r.holes25++;
+      if (pv[i] > 33.0) r.holes33++;
+      if (pv[i] > 40.0) r.holes40++;
+      if (i > 0 && i + 1 < pv.size()) {
+        const double d = pv[i] - std::max(pv[i - 1], pv[i + 1]);
+        rel.push_back(d);
+        if (d > 15.0) r.relHoles15++;
+        if (d > 25.0) r.relHoles25++;
+      }
+    }
+  }
+  if (paras > 0) r.meanParaMaxPct /= paras;
+  r.lines = static_cast<int>(s.size());
+  if (!s.empty()) {
+    for (const double v : s) r.meanPct += v;
+    r.meanPct /= s.size();
+    for (const double v : s) {
+      const double d = v - r.meanPct;
+      r.sdPct += d * d;
+      r.maxPct = std::max(r.maxPct, v);
+    }
+    r.sdPct = std::sqrt(r.sdPct / s.size());
+    r.p95Pct = percentile(s, 0.95);
+    r.p99Pct = percentile(s, 0.99);
+  }
+  if (!rel.empty()) {
+    for (const double v : rel) r.relMaxPct = std::max(r.relMaxPct, v);
+    r.relP95Pct = percentile(rel, 0.95);
+  }
+  return r;
+}
+
+// A gate value applied for the duration of a scope. Restores whatever was live
+// before, so a sweep row cannot leak into the next measurement -- the same
+// discipline HyphenationScope enforces for the trie, and for the same reason:
+// this suite's oldest failure mode is an arm quietly measured under the
+// previous arm's global.
+class GateScope {
+ public:
+  explicit GateScope(const int pct) : previous_(linebreak::raggedHyphenGatePct()) {
+    linebreak::setRaggedHyphenGatePct(pct);
+  }
+  ~GateScope() { linebreak::setRaggedHyphenGatePct(previous_); }
+  GateScope(const GateScope&) = delete;
+  GateScope& operator=(const GateScope&) = delete;
+
+ private:
+  const int previous_;
+};
+
+constexpr int kGateFont = LIBREFRANKLIN_READER_14_FONT_ID;
+
+}  // namespace
+
+// The gate as it shipped, and as it still ships. `raggedSkipsHyphen` read
+// `lineWidth * 10 >= effectivePageWidth * 7` until 2026-08-27, when it became
+// `lineWidth * 100 >= effectivePageWidth * raggedHyphenGatePct()` so the sweep
+// could walk it. That is the same comparison scaled by ten on BOTH sides, so it
+// must be EXACT and not merely equivalent at typical widths -- an integer
+// rewrite that agrees on 512 px and disagrees on some other measure would move
+// line breaks in books nobody sweeps. Checked over every measure the engine can
+// be handed and every line width inside it.
+TEST(LineBreakQuality, TheRaggedGateIsSeventyAndTheRewriteIsExact) {
+  EXPECT_EQ(linebreak::RAGGED_HYPHEN_GATE_PCT, 70)
+      << "moving this is a change to DEFAULT rendering: it needs a SECTION_FILE_VERSION bump, "
+         "which repaginates every book on every card. See docs/line-breaking-2026-08-25.md section 9.";
+  for (int width = 1; width <= 2048; ++width) {
+    for (int lineWidth = 0; lineWidth <= width; ++lineWidth) {
+      const bool before = lineWidth * 10 >= width * 7;
+      const bool after = lineWidth * 100 >= width * linebreak::RAGGED_HYPHEN_GATE_PCT;
+      ASSERT_EQ(before, after) << "width " << width << ", lineWidth " << lineWidth;
+    }
+  }
+  // NEGATIVE WIDTHS TOO. `effectivePageWidth` is `pageWidth - firstLineIndent`
+  // (ParsedText.cpp), and nothing clamps that difference -- a book whose CSS
+  // asks for a text-indent wider than the measure makes it negative. Both forms
+  // then compare a non-negative left side against a negative right side and say
+  // true, but "both say true" is the claim, so it is checked rather than
+  // reasoned about. Adversarial review, 2026-08-27, judged this path
+  // unreachable; the sweep is cheap and the assertion outlives the judgment.
+  for (int width = -2048; width < 0; ++width) {
+    for (int lineWidth = 0; lineWidth <= 2048; lineWidth += 7) {
+      ASSERT_EQ(lineWidth * 10 >= width * 7, lineWidth * 100 >= width * linebreak::RAGGED_HYPHEN_GATE_PCT)
+          << "width " << width << ", lineWidth " << lineWidth;
+    }
+  }
+}
+
+// THE GATE MUST NOT BE ABLE TO REACH A JUSTIFIED PAGE. Its condition begins
+// `blockStyle.alignment != CssTextAlign::Justify`, so this is structural -- but
+// "structural" is an argument, and the 2026-08-27 sweep had to report the
+// measurement. Both ends of the legal range against the shipped value, and the
+// page has to come out identical in every statistic, hyphens included.
+//
+// Note what "justified" means here: AFTER auto-justification. A block demoted
+// for a narrow measure is ragged and the gate does apply to it, which is the
+// case the next test covers.
+TEST(LineBreakQuality, MovingTheRaggedGateCannotChangeAJustifiedPage) {
+  Stats reference;
+  int referenceHyphens = 0;
+  for (const int gate : {40, linebreak::RAGGED_HYPHEN_GATE_PCT, 100}) {
+    const GateScope g(gate);
+    const Corpus laid =
+        layoutCorpus(paragraphs(), Cell::GreedyHyphenated, CssTextAlign::Justify, kGateFont, kMeasure, /*threshold=*/0);
+    Stats st;
+    st.accumulate(gapSamplesOf(laid));
+    const int hy = hyphenatedLinesOf(laid);
+    if (gate == 40) {
+      reference = st;
+      referenceHyphens = hy;
+      ASSERT_GT(st.lineCount, 0);
+      continue;
+    }
+    EXPECT_EQ(st.lineCount, reference.lineCount) << "gate " << gate;
+    EXPECT_DOUBLE_EQ(st.mean, reference.mean) << "gate " << gate;
+    EXPECT_DOUBLE_EQ(st.stddev, reference.stddev) << "gate " << gate;
+    EXPECT_EQ(hy, referenceHyphens) << "gate " << gate;
+  }
+}
+
+// ...AND IT MUST REACH A RAGGED ONE. The precondition for the test above, and
+// this suite's oldest failure mode: two identical rows are what a DEAD axis
+// produces as well as an immune one, and the harness has shipped a dead axis
+// twice (the missing trie, and the 2x2's fourth cell). Asserting the direction
+// as well as the difference, because the sign is the whole model -- a higher
+// gate means hyphenate for longer, so it must produce MORE hyphens and a
+// SHALLOWER rag.
+TEST(LineBreakQuality, TheRaggedGateBindsOnARaggedPage) {
+  const auto ragged = [](const int gate) {
+    const GateScope g(gate);
+    return layoutCorpus(paragraphs(), Cell::GreedyHyphenated, CssTextAlign::Justify, kGateFont, kMeasure,
+                        /*threshold=*/255);
+  };
+  const RagShape low = ragShapeOf(ragged(40), kMeasure);
+  const RagShape shipped = ragShapeOf(ragged(linebreak::RAGGED_HYPHEN_GATE_PCT), kMeasure);
+  const RagShape high = ragShapeOf(ragged(100), kMeasure);
+
+  const int hyLow = hyphenatedLinesOf(ragged(40));
+  const int hyShipped = hyphenatedLinesOf(ragged(linebreak::RAGGED_HYPHEN_GATE_PCT));
+  const int hyHigh = hyphenatedLinesOf(ragged(100));
+
+  // MONOTONE, not strict at every step. The built-in specimen is a few hundred
+  // words; on it the 40 and 70 arms both hyphenate zero ragged lines, which is
+  // a fact about the specimen and not about the gate (the 394-paragraph corpus
+  // in the sweep separates them 4 against 75). The strict inequality is
+  // therefore asserted end to end, where the specimen does carry it, and the
+  // shipped value is pinned between the two ends.
+  EXPECT_LT(hyLow, hyHigh) << "a higher gate must hyphenate for longer";
+  EXPECT_LE(hyLow, hyShipped);
+  EXPECT_LE(hyShipped, hyHigh);
+  EXPECT_GT(low.meanPct, high.meanPct) << "fewer hyphens must leave a DEEPER rag";
+  EXPECT_GT(low.p95Pct, high.p95Pct);
+  EXPECT_GT(shipped.lines, 0);
+}
+
+// THE SWEEP. Disabled like DISABLED_Sweep -- it wants the book corpus, which is
+// not checked in (tools/linebreak_corpus.py rebuilds it).
+//
+//   CROSSPOINT_LINEBREAK_CORPUS=/tmp/corpus.txt \
+//     build/test/line_break_quality/LineBreakQualityTest \
+//     --gtest_also_run_disabled_tests --gtest_filter='*RaggedGateSweep*'
+TEST(LineBreakQuality, DISABLED_RaggedGateSweep) {
+  const char* path = std::getenv("CROSSPOINT_LINEBREAK_CORPUS");
+  ASSERT_NE(path, nullptr) << "set CROSSPOINT_LINEBREAK_CORPUS to a plain-text corpus, one paragraph per line";
+  std::ifstream in(path);
+  ASSERT_TRUE(in.good()) << "cannot read " << path;
+  std::vector<std::string> corpus;
+  for (std::string line; std::getline(in, line);) {
+    if (line.size() > 40) corpus.push_back(line);
+  }
+  ASSERT_FALSE(corpus.empty());
+  size_t words = 0;
+  for (const auto& p : corpus) words += splitWords(p).size();
+  printf("corpus: %zu paragraphs, %zu words\n", corpus.size(), words);
+
+  // Does 14 pt at 512 px actually LAND ragged on a shipped device? The gate only
+  // ever runs on a ragged block, so if auto-justification keeps this
+  // configuration justified the whole sweep is about a page the default reader
+  // never sees. Printed rather than assumed.
+  {
+    // The same measurement ParsedText makes: the width of autojustify::ALPHABET
+    // in the reading face, which is what charsPerLine divides the measure by.
+    const int alphabetPx =
+        Gfx::instance().renderer().getTextAdvanceX(kGateFont, autojustify::ALPHABET, EpdFontFamily::REGULAR);
+    printf("14 pt @ 512: alphabet %d px, ~%d chars/line, threshold %d -> %s\n", alphabetPx,
+           autojustify::charsPerLine(kMeasure, alphabetPx), autojustify::THRESHOLD_CHARS,
+           autojustify::shouldJustify(kMeasure, alphabetPx, autojustify::THRESHOLD_CHARS) ? "JUSTIFIED" : "RAGGED");
+  }
+
+  // -------------------------------------------------------------------------
+  // 1. Justified text must not move. The gate's condition begins
+  //    `alignment != CssTextAlign::Justify`, so a justified block can never
+  //    reach it -- but that is an argument, and this is the measurement.
+  printf("\n=== 1. Justified is untouched (gate 40 vs 70 vs 100) ===\n\n");
+  printf("%-6s %6s %8s %8s %8s %6s %6s\n", "gate", "lines", "mean", "sd", "p95", "hy", "run3+");
+  for (const int gate : {40, 70, 100}) {
+    const GateScope g(gate);
+    const Corpus laid = layoutCorpus(corpus, Cell::GreedyHyphenated, CssTextAlign::Justify, kGateFont, kMeasure, 0);
+    Stats st;
+    st.accumulate(gapSamplesOf(laid));
+    const Worst w = worstOf(laid, naturalSpacePx(kGateFont));
+    const HyphenRuns h = hyphenRunsOf(laid);
+    printf("%-6d %6d %8.4f %8.4f %8.4f %6d %6d\n", gate, st.lineCount, st.mean, st.stddev, w.p95, h.hyphenatedLines,
+           h.runs3plus);
+  }
+
+  // -------------------------------------------------------------------------
+  // 2. The curve. One row per gate point, ragged, 14 pt at 512.
+  printf("\n=== 2. The ragged gate curve, 14 pt @ 512 px ===\n");
+  printf("shortfall figures are %% of the measure; hole counts are line counts.\n\n");
+  printf("%-5s %6s %6s %7s %7s %6s %6s %6s %6s %6s %6s %6s %7s %7s %6s %6s %6s %6s\n", "gate", "lines", "hy",
+         "dns/all", "dns/brk", "run2", "run3+", "hyMax", "mean", "sd", "p95", "p99", "paraMax", "max", "h25", "h33",
+         "h40", "rel15");
+  for (int gate = 40; gate <= 100; ++gate) {
+    const GateScope g(gate);
+    const Corpus laid = layoutCorpus(corpus, Cell::GreedyHyphenated, CssTextAlign::Justify, kGateFont, kMeasure, 255);
+    const HyphenRuns h = hyphenRunsOf(laid);
+    const RagShape r = ragShapeOf(laid, kMeasure);
+    printf("%-5d %6d %6d %6.2f%% %6.2f%% %6d %6d %6d %6.2f %6.2f %6.2f %6.2f %7.2f %7.2f %6d %6d %6d %6d\n", gate,
+           h.allLines, h.hyphenatedLines, h.densityPct, h.densityOfBreakablePct, h.runs2, h.runs3plus, h.longest,
+           r.meanPct, r.sdPct, r.p95Pct, r.p99Pct, r.meanParaMaxPct, r.maxPct, r.holes25, r.holes33, r.holes40,
+           r.relHoles15);
+  }
+
+  // -------------------------------------------------------------------------
+  // 3. The neighbour-relative hole, printed on its own because it is the metric
+  //    most likely to be inside noise and the doc has to quote its numbers when
+  //    it drops it.
+  printf("\n=== 3. Neighbour-relative holes ===\n\n");
+  printf("%-5s %8s %8s %8s %8s\n", "gate", "rel>15", "rel>25", "relP95", "relMax");
+  for (int gate = 40; gate <= 100; gate += 5) {
+    const GateScope g(gate);
+    const Corpus laid = layoutCorpus(corpus, Cell::GreedyHyphenated, CssTextAlign::Justify, kGateFont, kMeasure, 255);
+    const RagShape r = ragShapeOf(laid, kMeasure);
+    printf("%-5d %8d %8d %8.2f %8.2f\n", gate, r.relHoles15, r.relHoles25, r.relP95Pct, r.relMaxPct);
+  }
+
+  // -------------------------------------------------------------------------
+  // 4. THE WORST LINE, and the direction it moves.
+  //
+  // The mean and the percentiles both improve monotonically as the gate rises.
+  // The single deepest line does NOT -- it steps from 51.17% of the measure to
+  // 68.36% at gate 75 and stays there. An average hides exactly this, which is
+  // the lesson the previous two rounds recorded, so it is printed on its own
+  // with the five deepest lines behind it rather than as one number in a wide
+  // row. `afterHy` is the count of very deep lines whose PREDECESSOR ended in a
+  // hyphen: the mechanism to test is that hyphenating leaves a remainder which
+  // has to start the next line and can leave a deeper hole than the one the
+  // hyphen prevented.
+  printf("\n=== 4. The five deepest lines, and what precedes them ===\n\n");
+  printf("%-5s  %-44s %8s\n", "gate", "five deepest shortfalls (% of measure)", "afterHy");
+  for (const int gate : {65, 70, 72, 74, 75, 76, 80, 85, 100}) {
+    const GateScope g(gate);
+    const Corpus laid = layoutCorpus(corpus, Cell::GreedyHyphenated, CssTextAlign::Justify, kGateFont, kMeasure, 255);
+    std::vector<double> deep;
+    int afterHy = 0;
+    for (const auto& para : laid) {
+      for (size_t i = 0; i < para.size(); ++i) {
+        if (para[i].isFinal) continue;
+        const double sf = 100.0 * (kMeasure - para[i].end) / kMeasure;
+        deep.push_back(sf);
+        if (sf > 40.0 && i > 0 && para[i - 1].hyphenated) afterHy++;
+      }
+    }
+    std::sort(deep.rbegin(), deep.rend());
+    printf("%-5d  ", gate);
+    for (int i = 0; i < 5 && i < static_cast<int>(deep.size()); ++i) printf("%8.2f", deep[i]);
+    printf("    %8d\n", afterHy);
   }
 }
