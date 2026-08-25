@@ -13,7 +13,7 @@
 // 2. THE REGISTRATION. GfxRenderer::clearSdCardFonts() used to clear the hi-res
 //    map outright. Every reader font or size change routes through
 //    SdCardFontManager::unloadAll() -> clearSdCardFonts(), so the moment the UI
-//    faces gained 2x companions, the first font-size change in Text Settings
+//    faces gained 2x companions, the first font-size change in Reader Font
 //    wiped them and the chrome fell back to replicated 1x pixels until reboot.
 //    The reader itself looked fine throughout, because loadFile() re-registers
 //    the reader font on the way back in -- which is exactly why the bug read as
@@ -348,7 +348,7 @@ TEST_F(ChromeHiRes, ChangingTheSettingASecondTimeRebindsBothHalves) {
 }
 
 // The regression, stated the way the bug was reported: change the reader font
-// size in Text Settings and the chrome stops rendering at 2x.
+// size in Reader Font and the chrome stops rendering at 2x.
 TEST_F(ChromeHiRes, SurvivesAReaderFontSizeChange) {
   const auto& fam = registry_.getFamilies()[0];
   uint8_t lo = 0, hi = 0;

@@ -1,6 +1,6 @@
 # Font dates — source data for `src/FontDisplayNames.h`
 
-Editable source of truth for the Text Settings picker's designer/lineage subtitles
+Editable source of truth for the Reader Font picker's designer/lineage subtitles
 and the picker's ordering. Edit this table, then update `kEntries` in
 `src/FontDisplayNames.h` to match.
 

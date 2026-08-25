@@ -381,7 +381,7 @@ rename the output back to the 1x filenames, which is what
 
 **A companion is matched per POINT SIZE, so a set can be complete for one size
 slot and missing for the next.** The lookup is by exact filename and the
-filename carries the size, so changing the reader's size in Text Settings can
+filename carries the size, so changing the reader's size in Reader Font can
 move it onto a slot with no 2x file — the page then renders 1x-replicated at
 half the resolution the build asked for. That used to happen in silence; since
 2026-08-04 it logs

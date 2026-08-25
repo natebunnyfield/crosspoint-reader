@@ -557,12 +557,12 @@ TEST(EditorFonts, ResolveAt14PtReturnsFourteenPtId) {
 // The reading list has TWO consumers, and they must offer the same families.
 // ---------------------------------------------------------------------------
 
-// Text Settings lists the SD families minus the writing-only editor faces
+// Reader Font lists the SD families minus the writing-only editor faces
 // (FontSelectionActivity.cpp). Holding a side button inside a book cycles the
 // reader font through what is meant to be the SAME list -- and did not: it
 // walked the raw registry, so it stepped onto Space Mono, IBM Plex Mono and the
 // iA monos, families the picker will not show and therefore cannot display as
-// current. Owner bug report 2026-08-11: "only fonts in Text Settings list
+// current. Owner bug report 2026-08-11: "only fonts in Reader Font list
 // should be selected."
 //
 // Parsing the source is deliberate, the same call OmitFontsTest makes: both
@@ -594,11 +594,11 @@ TEST(EditorFonts, TheInBookFontCycleAppliesTheWritingOnlyFilter) {
   }
   ASSERT_TRUE(inCycle) << "cycleReaderFontFamily not found -- this test has stopped guarding anything";
   EXPECT_TRUE(sawCall) << "cycleReaderFontFamily does not CALL readingfonts::offeredForReading, so holding a side "
-                          "button can select a font Text Settings does not list";
+                          "button can select a font Reader Font does not list";
 }
 
 // Retired families are withheld from reading. Rosarivo was A-tier'd on
-// 2026-08-07 and still appeared in Text Settings on 2026-08-11, because that
+// 2026-08-07 and still appeared in Reader Font on 2026-08-11, because that
 // ruling reached sd-fonts.yaml's installed_families -- what a NEW card is given
 // -- and nothing that governs a card already provisioned.
 TEST(ReadingFontList, RetiredFamiliesAreNotOfferedForReading) {

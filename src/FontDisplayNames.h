@@ -324,7 +324,7 @@ inline constexpr Entry kEntries[] = {
     {"Venetian301", "Venetian 301", "Bruce Rogers;", "1914 New York; 1990 Cambridge, Mass.", 1914},
     // --- The editor (writing) group ---------------------------------------
     // Colophons for the Editor Font picker, which presents and sorts its list
-    // identically to Text Settings (owner ruling 2026-08-09). The keys are the
+    // identically to Reader Font (owner ruling 2026-08-09). The keys are the
     // same on-card directory names editorfonts::Entry::family already carries
     // (EditorFonts.h:21), so this needs no second key space and no parallel
     // table — which is what a parallel table would have cost: two tables keyed

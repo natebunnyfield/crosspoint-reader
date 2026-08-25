@@ -251,11 +251,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // docs/settings-reduction-plan.md): 23 rows deleted, their fields now
     // static constexpr in CrossPointSettings.h. The SIMULATOR split went with
     // keepScreenAwake's row.
-    // 13 since 2026-08-24: the two ligature rows below. They are entries in
+    // 14 since 2026-08-24: the two ligature rows below, plus Line Spacing,
+    // whose row came back with the Typography screen. They are entries in
     // this list purely for PERSISTENCE and the web settings API -- the device
     // edits them on the Typography screen, which builds its own rows because
     // the per-pair ones depend on which family is loaded.
-    constexpr size_t FIXED_ENTRY_COUNT = 13;
+    constexpr size_t FIXED_ENTRY_COUNT = 14;
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
@@ -298,7 +299,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       for (size_t i = 0; i < editorfonts::FAMILY_COUNT; i++) {
         s.enumStringValues.emplace_back(editorfonts::FAMILIES[i].label);
       }
-      // Reverse chronological by lineage, exactly like Text Settings' reading
+      // Reverse chronological by lineage, exactly like the Reader Font screen's reading
       // list (owner ruling 2026-08-09). See editorfonts::displayOrder().
       s.withDisplayOrder(editorfonts::displayOrder());
       v.push_back(std::move(s));
@@ -320,11 +321,49 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // stay in the string table — an unused string costs a few bytes of flash,
     // while deleting them renumbers StrId for every translation.
     //
+    // THE TYPOGRAPHY BLOCK. Owner ruling 2026-08-24: "put or move line grid,
+    // line spacing, letter spacing, justified text to Typography Settings."
+    //
+    // All three carry STR_CAT_READER, which is a WITHDRAWN category that
+    // rebuildSettingsLists() drops -- so they leave the device's flat Settings
+    // list while this list goes on persisting them (toJson/fromJson iterate it)
+    // and the web settings API goes on serving them. That is the whole move:
+    // the rows are not redefined on the Typography screen, they are SELECTED
+    // out of this list by nameId (see TypographySettingsActivity::rebuildRows),
+    // so each row still has exactly one definition -- one label, one key, one
+    // accessor -- and moving it between screens cannot change what it stores.
+    //
+    // LETTER SPACING IS DELIBERATELY ABSENT from that ruling's four. There is
+    // no letterSpacing field and no tracking anywhere in the layout engine, so
+    // it is a new feature (a per-glyph advance adjustment, therefore
+    // re-pagination and a section-cache bump), not a move. A row for a setting
+    // with no renderer behind it is worse than no row; it is being scoped
+    // separately.
+    //
     // Line Grid (2026-08-22, default off): every vertical advance rounds UP to
     // a whole line-height so all baselines share one grid. Part of
     // ReaderRenderSpec — flipping it repaginates on the next section load.
     v.push_back(SettingInfo::Toggle(StrId::STR_LINE_GRID, &CrossPointSettings::lineGridEnabled, "lineGrid",
-                                    StrId::STR_CAT_SYSTEM));
+                                    StrId::STR_CAT_READER));
+    // Line Spacing. Its row was deleted by the 2026-08-21 reduction and is
+    // REINSTATED here by the 2026-08-24 ruling above -- which supersedes that
+    // one FOR THIS FIELD ONLY. The field itself never went: it is the one entry
+    // in CrossPointSettings' reading-taste block that stayed non-constexpr,
+    // because the reader has a designed chord (Confirm held + a side button)
+    // that steps it on-device, and deleting a live gesture's backing value
+    // would have been silent capability removal.
+    //
+    // The labels are indexed BY ENUM VALUE, not pushed in list order, so a
+    // reordered LINE_COMPRESSION can never silently re-point a saved
+    // settings.json at a different spacing.
+    {
+      std::vector<StrId> spacingLabels(CrossPointSettings::LINE_COMPRESSION_COUNT);
+      spacingLabels[CrossPointSettings::TIGHT] = StrId::STR_TIGHT;
+      spacingLabels[CrossPointSettings::NORMAL] = StrId::STR_NORMAL;
+      spacingLabels[CrossPointSettings::WIDE] = StrId::STR_WIDE;
+      v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing,
+                                    std::move(spacingLabels), "lineSpacing", StrId::STR_CAT_READER));
+    }
     // Justified Text (owner ruling 2026-08-24: "make justified or ragged right
     // character count an ios app setting"). The DECISION stays automatic -- the
     // measure still decides, per block -- and this row sets the character count
@@ -389,7 +428,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             if (index >= static_cast<uint8_t>(autojustify::THRESHOLD_CHOICE_COUNT)) return;
             SETTINGS.justifyThresholdChars = static_cast<uint8_t>(autojustify::THRESHOLD_CHOICES[index]);
           },
-          "justifyThreshold", StrId::STR_CAT_SYSTEM));
+          "justifyThreshold", StrId::STR_CAT_READER));
     }
     // LIGATURES (owner ruling 2026-08-24: "give a full subpage of Typography
     // Settings that gives all available typography options with full
@@ -434,8 +473,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // --- System ---
     // The System block is contributed to the device list in the order below.
     // Typing Redraw Delay and Editor Font (both STR_CAT_SYSTEM) already appear
-    // above in the Reader section so they sort to their natural position. Text
-    // Settings — the device-only action — is inserted above the whole shared
+    // above in the Reader section so they sort to their natural position. Reader
+    // Font — the device-only action — is inserted above the whole shared
     // list by SettingsActivity::rebuildSettingsLists(). Screen Margin's row was
     // removed 2026-08-22; see the note above buildEditorFontSizeSetting().
     // Whole-screen polarity. A TOGGLE rather than a Light/Dark ENUM because the

@@ -22,6 +22,7 @@
 #include "SdFirmwareUpdateActivity.h"
 #endif
 #include "SdCardFontSystem.h"
+#include "SettingRowUi.h"
 #include "SettingsList.h"
 #include "TypographySettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
@@ -46,7 +47,7 @@ void SettingsActivity::rebuildSettingsLists() {
     // by normalizeRetiredSettings() or left holding whatever is stored; see
     // that function for which is which.
     //
-    // What the Reader tab kept: the Text Settings action (font family and size,
+    // What the Reader tab kept: the Reader Font action (font family and size,
     // appended below) and Screen Margin, which now carries STR_CAT_SYSTEM and
     // so arrives through this loop.
     if (setting.category != StrId::STR_CAT_SYSTEM) continue;
@@ -68,24 +69,36 @@ void SettingsActivity::rebuildSettingsLists() {
   // Informational, so it sits last: who wrote this firmware and what it is
   // built out of. Nothing here changes a setting.
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_COLOPHON, SettingAction::Colophon));
+  // "Reader Font" was called "Text Settings" until 2026-08-24, when the owner
+  // renamed it ("rename Text Settings to Reader Font"). Only the visible
+  // string moved: StrId::STR_TEXT_SETTINGS is unchanged, so no stored value
+  // and no web-API key is affected, and the id still reads TEXT_SETTINGS
+  // everywhere. The translations file cannot carry this note -- its parser
+  // accepts only KEY: "value" lines (scripts/gen_i18n.py) -- so it lives
+  // here, at the row itself. Comments elsewhere that quote a dated ruling
+  // verbatim still say "Text Settings"; they mean this row.
+  //
   // THE HEAD OF THE LIST, in order, and this comment is the only place it is
   // written down -- the two rows it used to name (Typing Redraw Delay, Screen
   // Margin) had both been gone for days and it sent a reader to the owner with
   // a wrong question about ordering. As it actually stands:
   //
-  //   Text Settings        (inserted here, and it leads: font family, size,
+  //   Reader Font        (inserted here, and it leads: font family, size,
   //                         live preview -- the reading screen's own settings)
   //   Typography Settings  (inserted here, owner ruling 2026-08-24:
   //                         "Typography Settings should be between Text
   //                         Settings and Editing Font")
   //   Editor Font          | the STR_CAT_SYSTEM rows the shared list
-  //   Line Grid            | contributes, in getSettingsList() order
-  //   Justified Text
-  //   Dark Mode
+  //   Dark Mode            | contributes, in getSettingsList() order
   //   Keyboard
   //   Sleep Screen
   //   Clock UTC Offset
   //   ... then the device-only ACTIONs appended above.
+  //
+  // Line Grid and Justified Text used to sit between Editor Font and Dark Mode.
+  // They moved to Typography Settings on 2026-08-24 -- their category is
+  // STR_CAT_READER now, so the loop above drops them here. This block is why
+  // that had to be edited in the same commit as the move.
   //
   // Read off a rendered Settings screen on 2026-08-24, not off this file --
   // the loop above drops every row whose category is not STR_CAT_SYSTEM, so
@@ -109,7 +122,7 @@ void SettingsActivity::rebuildSettingsLists() {
   deviceSettings.insert(deviceSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
   // Manage Fonts is withdrawn. SD card fonts are still discovered and
-  // selectable from Text Settings.
+  // selectable from Reader Font.
 
   settingsCount = static_cast<int>(deviceSettings.size());
   if (selectedSettingIndex >= settingsCount) {
@@ -270,90 +283,26 @@ void SettingsActivity::toggleCurrentSetting() {
     return;
   }
 
-  if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
-    // Toggle the boolean value using the member pointer
-    const bool currentValue = SETTINGS.*(setting.valuePtr);
-    SETTINGS.*(setting.valuePtr) = !currentValue;
-    if (darkModeChanged) display.setInverted(SETTINGS.darkMode != 0);
-  } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
-    const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
-    const size_t choiceCount = setting.enumCount();
-    if (choiceCount > 1) {
-      const auto valuePtr = setting.valuePtr;
-      // The picker lists choices in DISPLAY order; the setting stores an INDEX.
-      // Carry the mapping into the callback by value -- capturing `setting` by
-      // reference would dangle, because onSelect calls rebuildSettingsLists()
-      // and that replaces the vector this reference points into.
-      const std::vector<uint8_t> order = setting.resolvedDisplayOrder();
-      auto onSelect = [this, valuePtr, order](int idx) {
-        if (idx < 0 || idx >= static_cast<int>(order.size())) return;
-        SETTINGS.*valuePtr = order[static_cast<size_t>(idx)];
-        // systemFont's row is gone (hardcoded Libre Franklin, 2026-08-21), so
-        // no popup can change the chrome face and the applySystemFont
-        // re-bind that used to sit here left with it.
-        SETTINGS.saveToFile();
-        rebuildSettingsLists();
-      };
-      // A runtime-labeled row keeps its choices in enumStringValues and leaves
-      // enumValues EMPTY, so it needs the string overload. Reaching for the
-      // StrId overload regardless is what left Typing Redraw Delay with no
-      // picker: the gate above saw 0 choices and never got here at all.
-      const int currentPos = static_cast<int>(setting.positionOfStored(currentValue));
-      if (!setting.enumStringValues.empty()) {
-        optionPopup.show(setting.nameId, setting.orderedEnumStringValues(), currentPos, std::move(onSelect));
-      } else {
-        const std::vector<StrId> ordered = setting.orderedEnumValues();
-        optionPopup.show(setting.nameId, ordered.data(), static_cast<int>(ordered.size()), currentPos,
-                         std::move(onSelect));
-      }
-      requestUpdate();
-      return;
-    }
-    // Guard the modulus. A row with no choices at all must not divide by zero:
-    // that is UB, and on RISC-V it does not trap — it returns the dividend, so
-    // the stored index just climbs until the value column renders blank.
-    if (choiceCount == 0) return;
-    SETTINGS.*(setting.valuePtr) = (currentValue + 1) % static_cast<uint8_t>(choiceCount);
-  } else if (setting.type == SettingType::ENUM && setting.valueGetter && setting.valueSetter) {
-    const uint8_t totalValues = setting.enumStringValues.empty()
-                                    ? static_cast<uint8_t>(setting.enumValues.size())
-                                    : static_cast<uint8_t>(setting.enumStringValues.size());
-    const uint8_t cur = setting.valueGetter();
-    if (totalValues > 1) {
-      const auto valueSetter = setting.valueSetter;
-      // Same display-order mapping as the valuePtr path above, and captured by
-      // value for the same reason.
-      const std::vector<uint8_t> order = setting.resolvedDisplayOrder();
-      auto onSelect = [this, valueSetter, order](int idx) {
-        if (idx < 0 || idx >= static_cast<int>(order.size())) return;
-        valueSetter(order[static_cast<size_t>(idx)]);
-        SETTINGS.saveToFile();
-        rebuildSettingsLists();
-      };
-      const int currentPos = static_cast<int>(setting.positionOfStored(cur));
-      if (!setting.enumStringValues.empty()) {
-        optionPopup.show(setting.nameId, setting.orderedEnumStringValues(), currentPos, std::move(onSelect));
-      } else {
-        const std::vector<StrId> ordered = setting.orderedEnumValues();
-        optionPopup.show(setting.nameId, ordered.data(), static_cast<int>(ordered.size()), currentPos,
-                         std::move(onSelect));
-      }
-      requestUpdate();
-      return;
-    }
-    // Guard the modulus. A row with no choices at all must not divide by zero:
-    // that is UB, and on RISC-V it does not trap — it returns the dividend, so
-    // the stored index just climbs until the value column renders blank.
-    if (totalValues == 0) return;
-    setting.valueSetter((cur + 1) % totalValues);
-  } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
-    const int8_t currentValue = SETTINGS.*(setting.valuePtr);
-    if (currentValue + setting.valueRange.step > setting.valueRange.max) {
-      SETTINGS.*(setting.valuePtr) = setting.valueRange.min;
-    } else {
-      SETTINGS.*(setting.valuePtr) = currentValue + setting.valueRange.step;
-    }
-  } else if (setting.type == SettingType::ACTION) {
+  // The generic row kinds -- toggle in place, step a lone choice, or open the
+  // picker -- are settingrow::activate(), shared with the Typography screen so
+  // the two cannot drift. Everything above this point is a row Settings treats
+  // specially; everything below is the ACTION rows, which are device-only and
+  // have no counterpart there.
+  if (setting.type != SettingType::ACTION) {
+    const bool opened = settingrow::activate(setting, optionPopup, [this, darkModeChanged] {
+      // Panel polarity has to reach the driver before this screen repaints,
+      // or the row reads "on" over a still-white page until something else
+      // forces a refresh.
+      if (darkModeChanged) display.setInverted(SETTINGS.darkMode != 0);
+      SETTINGS.saveToFile();
+      // rebuildSettingsLists() clamps selectedSettingIndex to the new count.
+      rebuildSettingsLists();
+    });
+    if (opened) requestUpdate();
+    return;
+  }
+
+  {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
     switch (setting.action) {
@@ -392,7 +341,7 @@ void SettingsActivity::toggleCurrentSetting() {
                                });
         break;
       case SettingAction::Typography:
-        // The screen applies and saves as it goes, exactly like Text Settings
+        // The screen applies and saves as it goes, exactly like Reader Font
         // above; this refreshes nothing on the parent list, which carries no
         // typography row to re-render, and only re-saves for the same
         // belt-and-braces reason every other sub-screen here does.
@@ -449,14 +398,10 @@ void SettingsActivity::toggleCurrentSetting() {
         // Do nothing
         break;
     }
-    return;  // Results will be handled in the result handler, so we can return early here
-  } else {
-    return;
   }
-
-  SETTINGS.saveToFile();
-  // rebuildSettingsLists() clamps selectedSettingIndex to the new count itself.
-  rebuildSettingsLists();
+  // Every ACTION either opens a sub-activity whose result handler persists, or
+  // has already done its work above. Nothing to save here: the generic rows
+  // returned earlier, through settingrow::activate's onChanged.
 }
 
 
@@ -487,41 +432,14 @@ void SettingsActivity::render(RenderLock&&) {
       [&settings](int index) { return std::string(I18N.get(settings[index].nameId)); }, nullptr, nullptr,
       [&settings](int i) {
         const auto& setting = settings[i];
-        std::string valueText = "";
-        if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
-          const bool value = SETTINGS.*(setting.valuePtr);
-          valueText = value ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
-        } else if (setting.type == SettingType::ENUM && (setting.valuePtr != nullptr || setting.valueGetter)) {
-          // WHERE THE VALUE COMES FROM AND WHERE THE LABEL COMES FROM ARE
-          // INDEPENDENT. A row supplies its value through either a member
-          // pointer or a getter, and its labels through either translated
-          // StrIds (enumValues) or strings it builds at runtime
-          // (enumStringValues) -- any combination is legal. This used to pick
-          // the label source off the value source, so a row with valuePtr was
-          // forced down the enumValues path: the UTC offset row builds its own
-          // labels and leaves enumValues empty, and rendering it indexed that
-          // empty vector with 48 (UTC+00:00) and segfaulted at address 0x60.
-          // enumStringValues wins whenever populated, matching what the option
-          // popup (totalValues, above) and the web settings API already do.
-          const uint8_t value = setting.valuePtr != nullptr ? SETTINGS.*(setting.valuePtr) : setting.valueGetter();
-          // Both indexes are bounds-checked: a stored value can outlive the
-          // label list it was written against (a font uninstalled, an enum
-          // shortened), and neither vector is guaranteed to cover it.
-          if (!setting.enumStringValues.empty()) {
-            if (value < setting.enumStringValues.size()) valueText = setting.enumStringValues[value];
-          } else if (value < setting.enumValues.size()) {
-            valueText = I18N.get(setting.enumValues[value]);
-          }
-        } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
-          if (setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) {
-            // The stored byte is a biased quarter-hour count; show the offset it
-            // means. Same helper the picker uses.
-            valueText = formatUtcOffset(SETTINGS.*(setting.valuePtr));
-          } else {
-            valueText = std::to_string(SETTINGS.*(setting.valuePtr));
-          }
+        // The stored byte here is a biased quarter-hour count; show the offset
+        // it means, using the same helper the picker does. Every other row is
+        // the generic shape, shared with the Typography screen.
+        if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr &&
+            setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) {
+          return formatUtcOffset(SETTINGS.*(setting.valuePtr));
         }
-        return valueText;
+        return settingrow::valueText(setting);
       },
       true);
 
@@ -530,9 +448,11 @@ void SettingsActivity::render(RenderLock&&) {
   // in this hint — there is no second tab to switch to.
   auto opensSubScreen = [](const SettingInfo& setting) {
     if (setting.type == SettingType::ACTION) return true;
+    // Two rows Settings intercepts before the generic path, both opening a
+    // sub-activity rather than a popup.
     if (setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) return true;
-    if (setting.type == SettingType::ENUM && setting.enumCount() > 1) return true;
-    return false;
+    if (setting.nameId == StrId::STR_EDITOR_FONT) return true;
+    return settingrow::opensPicker(setting);
   };
   const bool onRow = selectedSettingIndex >= 0 && selectedSettingIndex < settingsCount;
   const auto confirmLabel = (onRow && opensSubScreen(settings[selectedSettingIndex])) ? tr(STR_SELECT) : tr(STR_TOGGLE);

@@ -325,7 +325,7 @@ def main() -> int:
     if reference is not None:
         prune_cut_families(Path(args.fs_dir), reference | editor_families(), buildable)
 
-    print("\nDone. Launch the simulator; the families appear in Text Settings.")
+    print("\nDone. Launch the simulator; the families appear in Reader Font.")
     return 0
 
 

@@ -188,7 +188,7 @@ TEST(EditorFontPreview, OutOfRangeRowIsNotAvailable) {
   EXPECT_FALSE(isAvailable(200, yes, onCard));
 }
 
-// --- Row presentation: parity with Text Settings ----------------------------
+// --- Row presentation: parity with Reader Font ----------------------------
 //
 // Owner ruling 2026-08-09: this picker presents its list identically to the
 // reading picker -- typeface-name title, "Designer · YEAR PLACE" colophon

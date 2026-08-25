@@ -116,7 +116,7 @@ int SdCardFontManager::loadFile(const SdCardFontFileInfo& file, const char* fami
     // That silence was the real defect. The companion is found by exact
     // filename and the filename carries the point size, so a set can be
     // complete for one size slot and missing for the next: the reader changes
-    // size in Text Settings, the page quietly renders at half the resolution
+    // size in Reader Font, the page quietly renders at half the resolution
     // the build asked for, and nothing says why. The fault also lives on the
     // CARD rather than in the code -- install-sim-fonts.py cannot regenerate
     // these and prunes orphans whenever a size ramp changes -- so without this

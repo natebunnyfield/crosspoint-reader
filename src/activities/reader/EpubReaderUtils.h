@@ -14,7 +14,7 @@ namespace EpubReaderUtils {
 // paragraph index the reader was on, and 12 adds the word anchor (the Section
 // v35 chapter-global source byte offset of the page's first word, uint32 LE).
 // The anchors are what let a font or size change land back on the same TEXT: a
-// page index means nothing once the chapter re-paginates, and the Text Settings
+// page index means nothing once the chapter re-paginates, and the Reader Font
 // paths tear the reader down, so an in-memory anchor cannot survive them. The
 // word anchor is exact where the paragraph is not (chapters without <p>). Older
 // files simply read short and degrade, ultimately to the proportional remap.

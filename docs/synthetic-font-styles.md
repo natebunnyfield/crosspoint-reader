@@ -158,7 +158,7 @@ converter-internal route is good enough to build.
   after 2-bit quantization.
 - **No dropped glyphs**: glyph count and coverage identical to the regular
   style's.
-- **Eyeball pass on-device**: the Text Settings preview renders one line per
+- **Eyeball pass on-device**: the Reader Font preview renders one line per
   style (regular/bold/italic/bold-italic), so the picker itself is the
   acceptance specimen — verify in the simulator, then on the panel.
 

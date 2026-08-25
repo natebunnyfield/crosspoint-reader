@@ -8,7 +8,7 @@
 #include "components/themes/BaseTheme.h"
 #include "util/ButtonNavigator.h"
 
-// The Editor Font picker, with a specimen pane like Text Settings.
+// The Editor Font picker, with a specimen pane like Reader Font.
 //
 // It replaces a five-name OptionPopup. These faces are a monospace, a duospace,
 // a quattrospace and two true monos, and the whole difference between them is

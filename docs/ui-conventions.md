@@ -32,7 +32,7 @@ one by drawing with that call and turning the finished framebuffer 180 degrees
 | Alert (single OK) | `OptionPopup` with one option | File Manager message popup |
 
 A **dedicated screen** is justified only by content that a popup cannot carry:
-live preview (Text Settings), a file listing (browser, firmware picker), or a
+live preview (Reader Font), a file listing (browser, firmware picker), or a
 multi-step flow (WiFi join). "It's a choice" is never by itself a reason for a
 screen — the audit deleted four activities whose entire content was one choice
 (NetworkModeSelection, Confirmation, LanguageSelect, and the end-of-book menu).

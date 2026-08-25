@@ -70,9 +70,11 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // ramp, so its row carries a getter/setter and no valuePtr and the loop
   // above skips it. Stored as the character COUNT, never the picker index.
   doc["justifyThreshold"] = justifyThresholdChars;
-  // lineSpacing: its settings row was deleted 2026-08-21 but the reader's
-  // Confirm+side chord still steps it, so it persists by hand like screenMargin.
-  doc["lineSpacing"] = lineSpacing;
+  // lineSpacing is NOT hand-written any more. It was, for as long as it had no
+  // row -- a getter-less field the generic loop above would have skipped. The
+  // 2026-08-24 Typography ruling gave it a row again, with a valuePtr and the
+  // key "lineSpacing", so that loop carries it and a second write here would be
+  // two writers of one key.
   // The resolved point size is written too, and is what pre-slot firmware reads
   // back from "fontSize" if this card is moved to an older build.
   doc["fontSize"] = fontPointSize;
@@ -246,10 +248,10 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   // the documented default rather than snapping to a neighbour.
   justifyThresholdChars =
       static_cast<uint8_t>(autojustify::clampThreshold(doc["justifyThreshold"] | autojustify::THRESHOLD_CHARS));
-  // lineSpacing: manual for the same reason as its toJson line -- row deleted,
-  // chord lives. Clamped to the enum, defaulting NORMAL.
-  const uint8_t storedLs = doc["lineSpacing"] | (uint8_t)NORMAL;
-  lineSpacing = storedLs < LINE_COMPRESSION_COUNT ? storedLs : (uint8_t)NORMAL;
+  // lineSpacing is loaded by the generic ENUM path above now that it has a row
+  // again (see toJson). That path clamps against enumCount() -- 3, the same
+  // LINE_COMPRESSION_COUNT this used -- and falls back to the field's own
+  // initializer, which is NORMAL. Byte-for-byte what the hand-written pair did.
   // SD card font family name — not in SettingsList, load manually
   const char* sfn = doc["sdFontFamilyName"] | "";
   strncpy(sdFontFamilyName, sfn, sizeof(sdFontFamilyName) - 1);

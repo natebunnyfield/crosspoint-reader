@@ -58,7 +58,7 @@ run recent-books \
   "8000:$OUT/04-recent-books.bmp"
 
 # Settings is ONE tab, so no tab cycling: the list is focused on entry and the
-# first row is Text Settings. Do not add blind DOWN/ENTER steps here — they walk
+# first row is Reader Font. Do not add blind DOWN/ENTER steps here — they walk
 # into the Screen Margin popup and CHANGE the margin, which correctly
 # invalidates every cached section and fills the log with
 # "[SCT] Deserialization failed", looking exactly like a regression.

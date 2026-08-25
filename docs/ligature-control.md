@@ -7,7 +7,8 @@ so.
 Owner ruling, verbatim: *"give a full subpage of Typography Settings that gives
 all available typography options with full granularity, including toggling each
 individual ligature."* Placement ruling, same day: *"Typography Settings should
-be between Text Settings and Editing Font."*
+be between Text Settings and Editing Font."* — that first screen is named
+**Reader Font** since 2026-08-24; the quote keeps the words he used.
 
 What produced it: *"almendra has at least one distracting ligature (st)"*, then
 *"can the weirder ligatures (like st) be a firmware setting?"* So `st` is the
@@ -99,6 +100,54 @@ draw" figure in the code comments is the union. Almendra is four either way.
 * **A "reset all" action row.** The master switch already reaches "no ligatures
   anywhere" in one press, and per-pair state is preserved across it, so the
   reset would only ever discard work.
+
+## 4b. The screen, as it ships
+
+Owner ruling 2026-08-24, after the ligature work landed: *"put or move line
+grid, line spacing, letter spacing, justified text to Typography Settings"* and
+*"rename Text Settings to Reader Font."*
+
+**Typography Settings**, top to bottom — coarse to fine, so the rows most
+readers want are not below fourteen ligature toggles:
+
+| Row | Kind | Where it came from |
+|---|---|---|
+| Line Spacing | enum, Tight/Normal/Wide | row REINSTATED (deleted 2026-08-21) |
+| Line Grid | toggle | moved off the Settings list |
+| Justified Text | enum, the character ladder | moved off the Settings list |
+| Ligatures | toggle, master | new |
+| one row per pair | toggle | new; from the loaded family's own table |
+
+**Settings**, after the moves: Reader Font · Typography Settings · Editor Font ·
+Dark Mode · Keyboard · Sleep Screen · Clock UTC Offset · then the device-only
+actions.
+
+Three things about how the move was done:
+
+* **The rows are SELECTED out of `getSettingsList()`, not redefined.** Each keeps
+  its one definition — one label, one JSON key, one accessor — so appearing on a
+  different screen cannot change what it stores or what the web API calls it.
+  The move itself is one word per row: `STR_CAT_SYSTEM` → `STR_CAT_READER`,
+  which is the withdrawn category `rebuildSettingsLists()` drops.
+* **Line Spacing's row came back, and only its row.** The FIELD never went: it is
+  the one entry in the reading-taste block that stayed non-`constexpr`, because
+  the reader has a designed chord (Confirm held + a side button) that steps it.
+  The 2026-08-24 ruling supersedes the 2021-08-21 reduction **for this field
+  only**. Its hand-written `toJson`/`fromJson` pair is retired with the row's
+  return — a row with a `valuePtr` is carried by the generic loop, and two
+  writers of one key is the thing that pair existed to work around.
+* **Letter spacing is deliberately absent.** There is no `letterSpacing` field
+  and no tracking anywhere in the layout engine, so it is a new feature — a
+  per-glyph advance adjustment, therefore re-pagination and a section-cache
+  bump — not a move. A row for a setting with no renderer behind it is worse
+  than no row.
+
+`settingrow::valueText` / `activate` ([SettingRowUi.h](../src/activities/settings/SettingRowUi.h))
+are shared by both screens, so a row cannot draw or behave one way on Settings
+and another way here. That file exists because the alternative was a second copy
+of four separately-paid-for traps (`enumCount()` vs `enumValues.size()`, label
+source independent of value source, bounds-checked indexes, display order
+carried by value).
 
 ## 5. Where the change lands
 
@@ -244,6 +293,21 @@ returns a nonsense but bounded label. No real font can produce that table; the
 guard exists so that a corrupt one cannot spin.
 
 ## 8. Known, deliberate, not fixed
+
+**The empty state pads three rows.** When the master switch is on and the loaded
+family carries no pairs, the Ligatures row gets a subtitle explaining why there
+is nothing under it — and `LyraTheme::getListRowStep` sizes **every** row in a
+list from one `hasSubtitle` flag, so Line Spacing, Line Grid and Justified Text
+each draw a blank second line's worth of height too. Hit-testing and paging stay
+correct (`loop()` is passed the same flag), so this is purely vertical padding.
+
+Not fixed, for two reasons. The flag lives in shared theme code that every list
+in the app sizes itself from, and per-row heights would be a change to all of
+them for one screen's cosmetics. And the state is **unreachable on a shipped
+card**: rendered 2026-08-24, every reading family present — Almendra, Coelacanth,
+Edgar, InknutJunicode, LibreFranklin, LibrisADF, TeXGyreHeros, TeXGyreSchola —
+draws pair rows. Only a user-installed face with no ligature table reaches it.
+Found by adversarial review, not by looking at the screen.
 
 * **The SD-font prewarm still warms suppressed ligatures' glyphs**
   (`SdCardFont.cpp:1007`, `FontDecompressor.cpp:319`). Those walk the pair table

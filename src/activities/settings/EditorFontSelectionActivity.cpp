@@ -22,8 +22,8 @@ namespace {
 // not fit on one. Both the page stride and drawList have to be told, or paging
 // skips rows.
 //
-// Owner ruling 2026-08-09: this list presents and sorts identically to Text
-// Settings. The subtitle used to be the availability note alone; it is now the
+// Owner ruling 2026-08-09: this list presents and sorts identically to Reader
+// Font. The subtitle used to be the availability note alone; it is now the
 // colophon with that note prepended (editorfonts::rowSubtitle).
 constexpr int kColophonLines = 5;
 

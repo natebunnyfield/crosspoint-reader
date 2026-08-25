@@ -117,7 +117,7 @@ struct SettingInfo {
   StrId category = StrId::STR_NONE_OPT;  // Category for web UI grouping
   bool obfuscated = false;               // Save/load via base64 obfuscation (passwords)
   // There is no inTextSettings flag any more. It marked the two rows the
-  // Text Settings screen covers (font family and size) so the flat Reader list
+  // Reader Font screen covers (font family and size) so the flat Reader list
   // could hide them; the Reader tab is withdrawn, so nothing reads it and the
   // list it referred to does not exist.
 

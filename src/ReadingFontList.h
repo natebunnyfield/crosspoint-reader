@@ -2,11 +2,11 @@
 
 // Which SD families the reader offers — ONE question, asked by every consumer.
 //
-// There are two of those: Text Settings (FontSelectionActivity) and the in-book
+// There are two of those: Reader Font (FontSelectionActivity) and the in-book
 // cycle on a held side button (EpubReaderActivity::cycleReaderFontFamily). They
 // must offer the same set, and on 2026-08-11 they did not: the picker filtered
 // writing-only editor faces and the cycle walked the raw registry, so holding a
-// side button selected fonts Text Settings would not list. The comment above the
+// side button selected fonts Reader Font would not list. The comment above the
 // cycle claimed the two matched; a comment cannot notice when it stops being
 // true.
 //
@@ -32,11 +32,14 @@ bool isRetired(const char* family);
 bool offeredForReading(const char* family);
 
 // ...and the ORDER, which is the other half of "the same list" and was the half
-// still wrong after 2026-08-11 fixed the set. Text Settings sorts reverse
+// still wrong after 2026-08-11 fixed the set. Reader Font sorts reverse
 // chronologically by lineage year, ties by display name; the in-book cycle
 // walked raw registry order, so a shake or a held side button stepped through
 // the same families in a different sequence than the picker shows them. Owner
 // 2026-08-23: "make sure font change order always follows Text Settings order."
+//
+// That quote predates the 2026-08-24 rename: the screen it names is called
+// READER FONT now. Same screen, same order, same rule.
 //
 // True when `a` sorts BEFORE `b`, i.e. usable directly as a std::sort
 // comparator on family directory names. Both consumers call this rather than

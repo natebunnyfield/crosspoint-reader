@@ -2,7 +2,7 @@
 //
 // THE BUG THIS SUITE EXISTS FOR (now fixed at the root)
 //
-// A single Back tap inside Text Settings threw the user out of their book to
+// A single Back tap inside Reader Font threw the user out of their book to
 // Home. FontSelectionActivity finished on the Back PRESS, so it was already
 // gone when the RELEASE edge arrived one frame later; EpubReaderActivity — by
 // then current again — acts on the Back release (short press -> onGoHome) and

@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "activities/Activity.h"
+#include "activities/settings/SettingsActivity.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
 // Typography Settings — the granular typographic controls, on their own screen.
@@ -17,7 +19,7 @@
 // including toggling each individual ligature."* Placement ruling, same day:
 // *"Typography Settings should be between Text Settings and Editing Font"* —
 // so it is an ACTION row on the Settings list, opening this screen, exactly
-// the shape Text Settings already has.
+// the shape Reader Font already has.
 //
 // WHY IT IS A SCREEN AND NOT ROWS ON THE SETTINGS LIST
 //
@@ -38,15 +40,26 @@ class TypographySettingsActivity final : public Activity {
   void render(RenderLock&&) override;
 
  private:
-  // One row. `pair` is 0 for the rows that are not a ligature (the master
-  // switch), which is safe because no real pair packs to 0 — U+0000 is not a
-  // codepoint any face maps.
+  // One row, of two kinds.
+  //
+  // A SETTING row is a SettingInfo lifted straight out of getSettingsList() --
+  // Line Spacing, Line Grid, Justified Text and the Ligatures master. It is
+  // SELECTED, never redefined: the label, the JSON key and the accessor all
+  // stay in that one list, so a row appearing on this screen instead of the
+  // Settings list cannot change what it stores or what the web API calls it.
+  //
+  // A LIGATURE row is one input pair of the loaded family, which no static list
+  // can express -- see the class comment.
   struct Row {
-    StrId nameId = StrId::STR_NONE_OPT;  // used when `label` is empty
-    std::string label;                   // the letters a ligature spells, e.g. "st"
+    bool isLigature = false;
+    // Ligature rows: the letters the pair spells ("st", "ffi") and the pair
+    // itself. `label` is empty on a setting row, whose title comes from its
+    // SettingInfo.
+    std::string label;
     uint32_t leftCp = 0;
     uint32_t rightCp = 0;
-    bool isLigature = false;
+    // Setting rows only.
+    SettingInfo setting;
   };
 
   // Collects the ligature pairs the active reading family carries, as the
@@ -57,6 +70,9 @@ class TypographySettingsActivity final : public Activity {
   // as "this face has no gy ligature", which is false.
   void rebuildRows();
   void toggleCurrentRow();
+  // Persist, push the ligature preference down to the font layer, and
+  // rebuild the row set. Every write on this screen ends here.
+  void applyAndRebuild();
 
   // True when the only row is the master switch and ligatures are ON, i.e.
   // this face carries nothing to toggle. That state draws a SUBTITLE under the
@@ -67,7 +83,12 @@ class TypographySettingsActivity final : public Activity {
   // hit-testing rows it did not draw.
   bool isEmptyState() const;
 
+  // Row titles, for the list and for the picker. A setting row's title is its
+  // SettingInfo's translated name; a ligature row's is the letters it spells.
+  std::string rowTitle(const Row& row) const;
+
   ButtonNavigator buttonNavigator_;
   std::vector<Row> rows_;
+  OptionPopup optionPopup_;
   int selectedIndex_ = 0;
 };

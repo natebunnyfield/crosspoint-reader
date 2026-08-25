@@ -1212,7 +1212,7 @@ families:
     #
     # The same cut mis-maps eight Latin-1 symbols: the cmap entry names the
     # right character but points at a different outline, identically in all
-    # four styles. ¾ rendering as "ffl" is visible in the Text Settings
+    # four styles. ¾ rendering as "ffl" is visible in the Reader Font
     # specimen line. Dropped so Noto supplies them; there is no correct outline
     # in the font to point at. Verified on a rendered contact sheet of all 231
     # cmap codepoints against Noto (tools/font-cmap-audit.py):
@@ -1393,9 +1393,10 @@ families:
 
   # ── Editor group ───────────────────────────────────────────────────────────
   # Owner ruling 2026-08-05: these live in their own EDITOR font group, chosen
-  # by a CrossPoint setting under Text Settings. They are NOT reading faces and
-  # do NOT join the six-family S tier — keep the two lists separate when
-  # deciding what goes on a card. IBM Plex Mono (above) is the fifth member.
+  # by the Editor Font row in Settings, which is not the Reader Font screen.
+  # They are NOT reading faces and do NOT join the six-family S tier — keep the
+  # two lists separate when deciding what goes on a card. IBM Plex Mono (above)
+  # is the fifth member.
   # All OFL; iA's faces are the "S" (narrow) cuts from github.com/iaolo/iA-Fonts.
 
   - name: NittiTypewriter

@@ -19,6 +19,14 @@
 //   1. the stored value survives a round trip through the picker, and
 //   2. a bad or stale order table degrades to identity, never hiding a choice.
 //
+// WHAT THIS FILE DOES NOT COVER, since it has been read as covering it: the
+// order of ROWS on a settings SCREEN. Everything here is about the order of
+// CHOICES inside one row's picker. Nothing in test/ pins which rows the device
+// Settings list shows or what order they come in -- when Line Grid, Line
+// Spacing and Justified Text moved to the Typography screen on 2026-08-24, not
+// one assertion in this suite changed. That order is verified by rendering the
+// screen; see docs/ligature-control.md.
+//
 // The editor-font case calls the REAL editorfonts::displayOrder() against the
 // REAL table, so it cannot drift from what ships. The debounce and sleep-screen
 // tables are restated here: both live inside CrossPointSettings, which drags in
@@ -93,7 +101,12 @@ TEST(SettingDisplayOrder, SleepScreenPutsNoneFirstAndKeepsCalendarsTogether) {
   EXPECT_EQ(pickRow(order, labels.size(), /*stored=*/0, /*position=*/0), 5);
 }
 
-TEST(SettingDisplayOrder, EditorFontSortsLikeTextSettings) {
+// Named for the reading picker, which was called "Text Settings" until
+// 2026-08-24 and is called READER FONT now (owner: "rename Text Settings to
+// Reader Font"). Only the visible string moved -- StrId::STR_TEXT_SETTINGS,
+// the screen and this sort rule are all unchanged -- but a test named after a
+// row nobody can find is a test nobody trusts.
+TEST(SettingDisplayOrder, EditorFontSortsLikeReaderFont) {
   // Owner ruling 2026-08-09: the Editor Font list presents and sorts exactly
   // like the reading picker -- reverse chronological by each family's EARLIEST
   // (creation) year from FontDisplayNames, ties broken by the row's own title.

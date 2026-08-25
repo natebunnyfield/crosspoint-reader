@@ -1,7 +1,8 @@
-// Owner ruling 2026-08-05: the EDITOR font group is its own list, chosen by a
-// CrossPoint setting under Text Settings. These are writing faces, NOT reading
-// faces — they do not join the six-family reading S tier, and a card carrying
-// them is not thereby carrying a seventh reading family.
+// Owner ruling 2026-08-05: the EDITOR font group is its own list, chosen by its
+// own Settings row -- Editor Font, which is NOT the Reader Font screen. These
+// are writing faces, NOT reading faces: they do not join the six-family reading
+// S tier, and a card carrying them is not thereby carrying a seventh reading
+// family.
 //
 // The persisted form is the family NAME, not this list's order (2026-08-15,
 // see migrateLegacyStoredIndex below). Recipes live in
@@ -48,7 +49,7 @@ struct Entry {
   // change -- one more value per row -- instead of another structural edit to
   // every consumer, which is what widening this from a scalar cost.
   int builtinFontId[SIZE_COUNT];
-  // Also offered as a READING face in Text Settings. The ruling at the top of
+  // Also offered as a READING face in Reader Font. The ruling at the top of
   // this file -- writing faces are not reading faces -- now holds with NO
   // exceptions: Quattro was the one the owner asked for on 2026-08-09 and the
   // one the owner removed on 2026-08-21 ("remove ia quattro from reading
@@ -267,10 +268,10 @@ bool isWritingOnlyFamily(const char* family);
 // could in principle be reordered directly — but the permutation stays: it
 // keeps the on-screen order derived from lineage dates rather than from
 // whatever order the rows happen to sit in, which is what makes it agree with
-// Text Settings automatically. Nothing here moves a stored value.
+// Reader Font automatically. Nothing here moves a stored value.
 //
-// Owner ruling 2026-08-09: this list presents and sorts IDENTICALLY to Text
-// Settings. That is the reading picker's comparator, restated —
+// Owner ruling 2026-08-09: this list presents and sorts IDENTICALLY to Reader
+// Font. That is the reading picker's comparator, restated —
 // FontSelectionActivity.cpp:136-141 — reverse chronological by each family's
 // earliest (creation) year from FontDisplayNames, undated families last, ties
 // broken by the row's own displayed title.

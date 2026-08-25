@@ -160,7 +160,7 @@ void EpubReaderActivity::onEnter() {
     }
     if (dataSize >= 8) {
       // Re-arms the exact reposition across an activity teardown, which is what
-      // the Text Settings font and size controls go through.
+      // the Reader Font screen's family and size controls go through.
       pendingParagraphAnchor = static_cast<uint16_t>(data[6] + (data[7] << 8));
     }
     if (dataSize == 12) {
@@ -682,7 +682,7 @@ void EpubReaderActivity::stepReaderFontSize(const int delta) {
   // "the end of the range must be perceptible" reason
   // ReaderUtils::steppedLineSpacing clamps.
   // Steps the SLOT. Mirrors FontSelectionActivity::changeFontSize so a side-button
-  // hold and the Text Settings control walk the same ramp.
+  // hold and the Reader Font control walk the same ramp.
   const std::vector<uint8_t> sizes = readerFontPointSizes(&sdFontSystem.registry(), SETTINGS.sdFontFamilyName);
   if (sizes.empty()) return;
   int nextSlot = static_cast<int>(SETTINGS.fontSizeSlot) + delta;
@@ -822,9 +822,11 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
   // THE WRITING-ONLY FILTER IS PART OF THAT LIST and was missing here. The picker skips
   // editor faces that are not also reading faces (FontSelectionActivity.cpp, the
   // isWritingOnlyFamily continue); this cycle walked the raw registry, so holding a side
-  // button stepped onto Space Mono, IBM Plex Mono and the iA monos -- families Text
-  // Settings will not list, and therefore cannot show you as current or let you leave by
-  // the same route you arrived. Owner bug report 2026-08-11: "only fonts in Text Settings
+  // button stepped onto Space Mono, IBM Plex Mono and the iA monos -- families Reader
+  // Font will not list, and therefore cannot show you as current or let you leave by
+  // the same route you arrived. NOTE: that screen is called READER FONT since
+  // 2026-08-24; the quotes in this file keep the words the owner used.
+  // Owner bug report 2026-08-11: "only fonts in Text Settings
   // list should be selected."
   //
   // Indices into the registry, not a copy of the names: SETTINGS.sdFontFamilyName resolves
@@ -838,7 +840,7 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
   }
   // ...AND IN THE PICKER'S ORDER, which is the half that was still wrong after
   // the 2026-08-11 fix matched the SETS. This walked raw registry order --
-  // whatever order the card was scanned in -- while Text Settings shows newest
+  // whatever order the card was scanned in -- while Reader Font shows newest
   // lineage first, so a step landed on a face several rows from the one the
   // picker sits next to. Owner 2026-08-23: "make sure font change order always
   // follows Text Settings order." The comparator is readingfonts::sortsBefore

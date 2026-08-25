@@ -9,6 +9,9 @@
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "SdCardFontSystem.h"
+#include "SettingRowUi.h"
+#include "SettingsList.h"
 #include "activities/RenderLock.h"
 #include "components/UITheme.h"
 
@@ -39,17 +42,50 @@ void TypographySettingsActivity::onExit() {
 }
 
 bool TypographySettingsActivity::isEmptyState() const {
-  return rows_.size() <= 1 && SETTINGS.ligaturesEnabled != 0;
+  // "Ligatures are on, and this face has none to offer." Counts LIGATURE rows
+  // specifically -- it used to test the whole row count against 1, which was
+  // right when the master switch was the only other row and became wrong the
+  // moment Line Spacing, Line Grid and Justified Text moved in beside it.
+  if (SETTINGS.ligaturesEnabled == 0) return false;
+  return std::none_of(rows_.begin(), rows_.end(), [](const Row& r) { return r.isLigature; });
+}
+
+std::string TypographySettingsActivity::rowTitle(const Row& row) const {
+  return row.isLigature ? row.label : std::string(I18N.get(row.setting.nameId));
 }
 
 void TypographySettingsActivity::rebuildRows() {
   rows_.clear();
 
-  // The master switch always leads, whatever the family carries. It is the one
-  // row that means something on a face with no ligatures at all, and it is
-  // what makes "no ligatures anywhere" reachable without visiting every family
-  // on the card and switching its pairs off one at a time.
-  rows_.push_back(Row{StrId::STR_LIGATURES, "", 0, 0, false});
+  // THE SCREEN'S ORDER, and why it is this one. Vertical rhythm first (how far
+  // apart the lines sit, then whether they share a grid), then the horizontal
+  // decision (justification), then the glyph-level detail (ligatures) and its
+  // per-pair rows. Coarse to fine, so the rows a reader is most likely to want
+  // are not below fourteen ligature toggles.
+  //
+  // SELECTED from getSettingsList(), not redefined here: each row keeps its one
+  // definition, so this screen cannot drift from what persists or from what the
+  // web settings API serves. A row that is not in that list -- because someone
+  // withdrew it -- simply does not appear, rather than appearing dead.
+  static constexpr StrId kSettingRows[] = {
+      StrId::STR_LINE_SPACING,
+      StrId::STR_LINE_GRID,
+      StrId::STR_JUSTIFY_THRESHOLD,
+      // The ligature master. It always shows, whatever the family carries: it
+      // is the one row that means something on a face with no ligatures at all,
+      // and it is what makes "no ligatures anywhere" reachable without visiting
+      // every family on the card and switching its pairs off one at a time.
+      StrId::STR_LIGATURES,
+  };
+  const auto shared = getSettingsList(&sdFontSystem.registry());
+  for (const StrId wanted : kSettingRows) {
+    const auto found = std::find_if(shared.begin(), shared.end(),
+                                    [wanted](const SettingInfo& s) { return s.nameId == wanted; });
+    if (found == shared.end()) continue;
+    Row row;
+    row.setting = *found;
+    rows_.push_back(std::move(row));
+  }
 
   // With substitution off the per-pair rows would be drawing values that
   // describe nothing on the page. Rather than render them as lies, or invent a
@@ -103,17 +139,29 @@ void TypographySettingsActivity::toggleCurrentRow() {
   const Row row = rows_[selectedIndex_];  // by value: rebuildRows() replaces the vector below
 
   if (!row.isLigature) {
-    SETTINGS.ligaturesEnabled = SETTINGS.ligaturesEnabled ? 0 : 1;
-  } else {
+    // Exactly what the Settings list does with the same SettingInfo --
+    // settingrow::activate is shared with it precisely so a row cannot behave
+    // one way there and another way here.
+    const bool opened = settingrow::activate(row.setting, optionPopup_, [this] { applyAndRebuild(); });
+    if (opened) requestUpdate();
+    return;
+  }
+
+  {
     const bool nowSuppressed = !ligatures::specSuppresses(SETTINGS.ligaturesOff, row.leftCp, row.rightCp);
     const std::string next = ligatures::specWith(SETTINGS.ligaturesOff, row.leftCp, row.rightCp, nowSuppressed);
     strncpy(SETTINGS.ligaturesOff, next.c_str(), sizeof(SETTINGS.ligaturesOff) - 1);
     SETTINGS.ligaturesOff[sizeof(SETTINGS.ligaturesOff) - 1] = '\0';
   }
 
+  applyAndRebuild();
+}
+
+void TypographySettingsActivity::applyAndRebuild() {
   // Push to the font layer before anything else can draw. The rows themselves
   // are set in the UI face, which carries its own ligatures, so a stale
-  // preference would be visible on this very screen.
+  // preference would be visible on this very screen. Harmless for the three
+  // spacing rows, which do not touch it -- it re-parses a bounded list.
   SETTINGS.applyLigaturePreference();
   SETTINGS.saveToFile();
 
@@ -124,6 +172,8 @@ void TypographySettingsActivity::toggleCurrentRow() {
 }
 
 void TypographySettingsActivity::loop() {
+  if (optionPopup_.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     toggleCurrentRow();
     requestUpdate();
@@ -183,6 +233,10 @@ void TypographySettingsActivity::loop() {
 }
 
 void TypographySettingsActivity::render(RenderLock&&) {
+  // The picker draws over everything and owns the frame while it is up, exactly
+  // as on the Settings list.
+  if (optionPopup_.processRender(renderer, mappedInput)) return;
+
   renderer.clearScreen();
 
   const auto pageWidth = renderer.getScreenWidth();
@@ -194,34 +248,35 @@ void TypographySettingsActivity::render(RenderLock&&) {
   const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const Rect listRect{0, listTop, pageWidth, pageHeight - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing};
 
-  if (isEmptyState()) {
-    // The master row alone: this face carries nothing to switch. Say so, rather
-    // than leaving a one-row list that reads as a screen that failed to load.
-    GUI.drawList(
-        renderer, listRect, 1, selectedIndex_, [](int) { return std::string(tr(STR_LIGATURES)); },
-        [](int) { return std::string(tr(STR_NO_LIGATURES)); }, nullptr,
-        [](int) {
-          // I18N.get, not tr(): the macro pastes StrId:: onto its argument, so
-          // it cannot take an expression that chooses between two ids.
-          return std::string(I18N.get(SETTINGS.ligaturesEnabled ? StrId::STR_STATE_ON : StrId::STR_STATE_OFF));
-        },
-        true);
-  } else {
-    const auto& rows = rows_;
-    GUI.drawList(
-        renderer, listRect, static_cast<int>(rows.size()), selectedIndex_,
-        [&rows](int i) { return rows[i].label.empty() ? std::string(I18N.get(rows[i].nameId)) : rows[i].label; },
-        nullptr, nullptr,
-        [&rows](int i) {
-          const Row& row = rows[i];
-          const bool on = row.isLigature ? !ligatures::specSuppresses(SETTINGS.ligaturesOff, row.leftCp, row.rightCp)
-                                         : SETTINGS.ligaturesEnabled != 0;
-          return std::string(I18N.get(on ? StrId::STR_STATE_ON : StrId::STR_STATE_OFF));
-        },
-        true);
-  }
+  // In the empty state the ligature master carries a SUBTITLE saying why there
+  // are no pair rows under it. Only that row does, and only then -- which is
+  // why isEmptyState() is also what loop() passes as `hasSubtitle`.
+  const bool emptyState = isEmptyState();
+  const auto& rows = rows_;
+  GUI.drawList(
+      renderer, listRect, static_cast<int>(rows.size()), selectedIndex_,
+      [this, &rows](int i) { return rowTitle(rows[i]); },
+      emptyState ? std::function<std::string(int)>([&rows](int i) {
+        return rows[i].setting.nameId == StrId::STR_LIGATURES ? std::string(tr(STR_NO_LIGATURES)) : std::string();
+      })
+                 : nullptr,
+      nullptr,
+      [&rows](int i) {
+        const Row& row = rows[i];
+        if (!row.isLigature) return settingrow::valueText(row.setting);
+        // A ligature row's value is not a stored byte but a membership test
+        // against the suppression set, so it cannot go through valueText.
+        const bool on = !ligatures::specSuppresses(SETTINGS.ligaturesOff, row.leftCp, row.rightCp);
+        return std::string(I18N.get(on ? StrId::STR_STATE_ON : StrId::STR_STATE_OFF));
+      },
+      true);
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_TOGGLE), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  // "Select" for the two rows that open a picker, "Toggle" for the rest -- the
+  // same rule the Settings list states, through the same predicate.
+  const bool onRow = selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(rows_.size());
+  const bool picks = onRow && !rows_[selectedIndex_].isLigature && settingrow::opensPicker(rows_[selectedIndex_].setting);
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), picks ? tr(STR_SELECT) : tr(STR_TOGGLE), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();
