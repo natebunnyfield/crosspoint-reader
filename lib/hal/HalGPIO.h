@@ -77,6 +77,42 @@ struct ReadAloudWordRect {
   uint16_t byteLen;
 };
 
+#ifndef CROSSPOINT_READING_PAGE_SAMPLE
+#define CROSSPOINT_READING_PAGE_SAMPLE
+struct ReadingPageSample {
+  // WHICH PAGE. Same tuple publishReaderPageIdentity carries, and it must be
+  // computed the same way -- readerBookKey(), never std::hash.
+  uint64_t bookKey = 0;
+  int32_t spineIndex = 0;
+  int32_t pageInSpine = 0;
+  // "epub" / "txt" / "xtc". A literal with static lifetime, never owned.
+  const char* format = "";
+
+  // HOW MUCH TEXT WAS ON IT. words counts non-blank tokens, chars their UTF-8
+  // bytes, lines the PageLine elements that carried any. A reader that cannot
+  // count (TXT, XTC -- no laid-out Page to walk) publishes 0/0/0, which the
+  // analysis reads as "no denominator" and excludes from every rate rather
+  // than treating as an empty page.
+  uint32_t words = 0;
+  uint32_t chars = 0;
+  uint32_t lines = 0;
+
+  // WHAT IT WAS SET TO. Typography only: the host owns its own dials (palette,
+  // render scale, polarity) and adds them on its side, so nothing display-side
+  // is plumbed through here.
+  const char* fontFamily = "";   // SETTINGS.sdFontFamilyName, or "" for built-in
+  uint8_t fontPointSize = 0;     // resolved pt for the active family + slot
+  uint8_t fontSizeSlot = 0;      // S/M/L/XL, the persisted truth
+  uint8_t lineSpacing = 0;       // TIGHT / NORMAL / WIDE
+  uint8_t lineGridEnabled = 0;
+  uint8_t justifyThresholdChars = 0;
+  uint8_t ligaturesEnabled = 0;
+  const char* ligaturesOff = "";  // the comma-separated per-pair spec
+  uint8_t lineBreakMode = 0;      // SETTINGS.hyphenationEnabled
+  uint8_t screenMargin = 0;
+};
+#endif
+
 class HalGPIO {
 #if CROSSPOINT_EMULATED == 0
   InputManager inputMgr;
@@ -279,6 +315,37 @@ class HalGPIO {
   // screenKey is the FNV-1a of the activity's name, which must be stable across
   // builds and platforms for the same reason bookKey above must be.
   void publishScreenIdentity(uint32_t /*screenKey*/) {}
+
+  // WHAT THE READER JUST PUT ON GLASS, AND WHAT IT WAS SET TO WHEN IT DID.
+  //
+  // Firmware-facing half of the same host-capability split as the four channels
+  // above: an inline no-op here, a real sink in the simulator. It exists for the
+  // owner's reading-usage experiment -- which font, which size, which spacing
+  // actually got the most reading done -- and the design, the schema and the
+  // power estimate are in crosspoint-simulator/docs/reading-experiments.md.
+  //
+  // WHY IT IS NOT publishReaderPageIdentity WITH MORE FIELDS. That channel is
+  // about PAPER: the simulator seeds a sheet from it, it is consumed on the
+  // present path, and it is superseded rather than cleared. This one is about a
+  // LEDGER, is consumed by a file append, and carries the settings the identity
+  // channel has no business knowing. Two consumers, two lifetimes, two channels.
+  //
+  // COST. Everything in the struct is a field read except `words`/`chars`/
+  // `lines`, which are one walk of the already-laid-out page's element list --
+  // no measurement, no string building, no allocation. That is the same walk
+  // captureReadAloudPage does, minus the expensive half. Measure it against the
+  // 30-130 ms a page turn costs before believing it matters.
+  //
+  // The struct is MIRRORED in the simulator's own src/HalGPIO.h, which shadows
+  // this header on a simulator build, and the shared guard macro keeps a
+  // translation unit that sees both from redefining it -- exactly the
+  // arrangement readerBookKey() above uses, for exactly the same reason. The
+  // POD itself sits at namespace scope beside ReadAloudWordRect, which is where
+  // the simulator's copy lives too (its src/ReadingChannel.h).
+  //
+  // Called from the render path's commitment point, exactly once per page the
+  // reader actually shows -- never from a prewarm scan of the next one.
+  void publishReadingPage(const ReadingPageSample& /*sample*/) {}
 
   // Verify power button was held long enough after wakeup.
   // Returns true if verification succeeded, false if device should return to sleep.

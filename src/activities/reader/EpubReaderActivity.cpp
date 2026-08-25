@@ -25,6 +25,7 @@
 #include "EpubReaderUtils.h"
 #include "MappedInputManager.h"
 #include "ReadAloudCapture.h"
+#include "PageTextMetrics.h"
 #include "ReaderFontSizes.h"
 #include "ReaderUtils.h"
 #include "ReadingFontList.h"
@@ -1599,6 +1600,65 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
   readaloud::buildCapture(lines.data(), lines.size(), metrics, text, rects);
   gpio.publishReadAloudPage(text.c_str(), text.size(), rects.data(), rects.size());
 }
+
+// The reading-usage ledger's page record. Same seam and same one-shot
+// guarantee as captureReadAloudPage above -- renderContents IS the commitment
+// that this page is the one being displayed -- and deliberately NOT folded
+// into it: that function is gated on readAloudCaptureWanted() and does not run
+// at all unless something is speaking, while this must run on every page.
+//
+// It is one walk of an already-laid-out element list with no measurement, no
+// allocation past the two vectors it does not build, and no string work. A
+// no-op on device: the publish below compiles to nothing (lib/hal/HalGPIO.h),
+// but the WALK does not, so it is skipped there.
+//
+// THE SWITCH IS `SIMULATOR`, NOT `CROSSPOINT_EMULATED`. The latter reads like
+// the right one and is a trap: it is tested in two places (lib/hal/HalGPIO.h
+// and the simulator's own src/HalGPIO.h) and DEFINED in none, so
+// `#if CROSSPOINT_EMULATED == 0` is true on every build there has ever been.
+// A guard written with it would compile this out in the simulator too, which
+// is the one place it has to run, and nothing would say so.
+void publishReadingSample(const Page& page, const Epub& book, const int spineIndex, const int pageInSpine) {
+#ifndef SIMULATOR
+  (void)page;
+  (void)book;
+  (void)spineIndex;
+  (void)pageInSpine;
+#else
+  pagemetrics::Counter counter;
+  for (const auto& el : page.elements) {
+    if (el->getTag() != TAG_PageLine) continue;
+    const auto& line = static_cast<const PageLine&>(*el);
+    const auto& block = line.getBlock();
+    if (!block || !block->valid() || block->isEmpty()) continue;
+    counter.beginLine();
+    const uint16_t n = block->wordCount();
+    for (uint16_t i = 0; i < n; i++) counter.addToken(block->wordText(i));
+    counter.endLine();
+  }
+  const pagemetrics::Counts counts = counter.result();
+
+  ReadingPageSample sample;
+  sample.bookKey = readerBookKey(book.getPath());
+  sample.spineIndex = static_cast<int32_t>(spineIndex);
+  sample.pageInSpine = static_cast<int32_t>(pageInSpine);
+  sample.format = "epub";
+  sample.words = counts.words;
+  sample.chars = counts.chars;
+  sample.lines = counts.lines;
+  sample.fontFamily = SETTINGS.sdFontFamilyName;
+  sample.fontPointSize = SETTINGS.fontPointSize;
+  sample.fontSizeSlot = SETTINGS.fontSizeSlot;
+  sample.lineSpacing = SETTINGS.lineSpacing;
+  sample.lineGridEnabled = SETTINGS.lineGridEnabled;
+  sample.justifyThresholdChars = SETTINGS.justifyThresholdChars;
+  sample.ligaturesEnabled = SETTINGS.ligaturesEnabled;
+  sample.ligaturesOff = SETTINGS.ligaturesOff;
+  sample.lineBreakMode = SETTINGS.hyphenationEnabled;
+  sample.screenMargin = SETTINGS.screenMargin;
+  gpio.publishReadingPage(sample);
+#endif
+}
 }  // namespace
 
 void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int orientedMarginTop,
@@ -1633,6 +1693,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // watermark rather than a count.
   gpio.publishReaderPageIdentity(readerBookKey(epub->getPath()), currentSpineIndex,
                                  section ? section->currentPage : 0);
+
+  // ...and how much text was on it, plus what it was set to. Beside the
+  // identity for the same one-shot reason, a separate channel because it feeds
+  // a file rather than the paper (crosspoint-simulator/docs/reading-experiments.md).
+  publishReadingSample(*page, *epub, currentSpineIndex, section ? section->currentPage : 0);
 
   // The image pixel-cache RAM slot lives for exactly one page render (it feeds
   // the BW double-refresh and every grayscale band pass); release it on every

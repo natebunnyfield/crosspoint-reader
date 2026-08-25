@@ -9,6 +9,12 @@ fs_
 # drops one here. It is host state (window, appearance, pad dials), not firmware
 # state, and nothing in this repo should carry it.
 /settings.json
+# The desktop simulator's reading ledger and its rotated generations. Written
+# beside the simulated card, like settings.json above and for the same reason --
+# a host artifact is not a file the firmware should ever see.
+# crosspoint-simulator/docs/reading-experiments.md
+/reading.jsonl
+/reading.jsonl.*
 lib/EpdFont/fontsrc
 lib/I18n/I18nKeys.h
 lib/I18n/I18nStrings.h
