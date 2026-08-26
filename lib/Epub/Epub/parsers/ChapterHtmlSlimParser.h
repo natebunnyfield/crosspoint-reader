@@ -222,6 +222,19 @@ class ChapterHtmlSlimParser {
   // Retire whatever the streaming path is holding, in ordinary flow, BEFORE a
   // table emitter takes the page cursor as its own origin.
   void retirePendingBlockBeforeTable();
+  // Vertical pixels the still-unlaid pending block WOULD take if it were
+  // retired now -- the caption's height, measured before it is spent. Returns 0
+  // when nothing is pending, and 0 when what is pending is longer than
+  // kMaxLeadLines, because a whole paragraph is not a caption and dragging one
+  // into the table's keep group would only ever make the group unkeepable.
+  // Non-destructive: see the .cpp for what that costs and why it is the only
+  // honest way to ask.
+  static constexpr int kMaxLeadLines = 3;
+  int measureUnlaidLeadHeight() const;
+  // Complete the page if the table's header (with `leadHeight` px of caption
+  // above it) would otherwise be the last thing on it. Returns true if it did.
+  // See tablecolumns::breakBeforeHeaderKeep for the rule and its degradation.
+  bool breakBeforeStrandedTableHeader(const tablecolumns::Plan& plan, int leadHeight);
   bool listItemBulletOnly = false;  // true when currentTextBlock has only the <li> marker
 
   // --- List rendering (numbers + hanging indent, 2026-08-22) --------------

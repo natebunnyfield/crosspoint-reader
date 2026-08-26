@@ -135,4 +135,33 @@ Plan planColumns(const std::vector<Row>& rows, const int viewportWidth, const in
   return plan;
 }
 
+bool breakBeforeHeaderKeep(const int cursorY, const int freshPageStartY, const int viewportHeight,
+                           const bool hasContent, const int leadHeight, const int headerHeight,
+                           const int* bodyRowHeights, const int bodyRowCount) {
+  // An empty page has nothing above the header to strand it against, and
+  // breaking it would publish a blank page. This is also the base case that
+  // makes the caller's second, post-lead call a no-op after the first one has
+  // already broken.
+  if (!hasContent) return false;
+
+  const int maxKeep = bodyRowCount < kKeepBodyRows ? bodyRowCount : kKeepBodyRows;
+  // A table with no body rows at all still has a header worth keeping with its
+  // caption, so the ladder's bottom rung is 0 rows in that case and 1 otherwise
+  // -- a header alone on a page is only acceptable when there is nothing that
+  // could have followed it.
+  const int minKeep = bodyRowCount > 0 ? 1 : 0;
+
+  int group = leadHeight + headerHeight;
+  for (int k = 0; k < maxKeep; k++) group += bodyRowHeights[k];
+
+  for (int k = maxKeep; k >= minKeep; k--) {
+    if (cursorY + group <= viewportHeight) return false;        // intact where it stands
+    if (freshPageStartY + group <= viewportHeight) return true;  // breaking helps
+    if (k > minKeep) group -= bodyRowHeights[k - 1];             // ask for one row less
+  }
+  // Not even the smallest group fits an empty page: the constraint yields and
+  // the table paginates as it always did.
+  return false;
+}
+
 }  // namespace tablecolumns

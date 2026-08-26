@@ -107,4 +107,56 @@ inline int columnStartY(const int rowTop, const int cursorY, const bool rowTopIs
   return (rowTopIsClear && samePageAsRowStart) ? rowTop : cursorY;
 }
 
+// How many body rows a table's header row must keep with it (owner 2026-08-26,
+// from two screenshots of his own reading: "don't split up table header or
+// caption from rest (when possible). intact is best"). The reported page ended
+// with the caption, the header row and its rule, then half a page of nothing,
+// and the first body row opened the page after -- so the reader turned the page
+// carrying three column names in their head.
+//
+// Two is the typographic convention and it is the same number the prose
+// widow/orphan control already uses (keep-2/2,
+// ChapterHtmlSlimParser::flushPendingLines).
+inline constexpr int kKeepBodyRows = 2;
+
+// Whether the caller must complete the page BEFORE emitting a table's leading
+// group, so that group travels intact onto the next one.
+//
+// The group is, in order: an optional LEAD (a <caption>, or whatever short
+// block is still unlaid immediately above the table -- `leadHeight`, 0 when
+// there is none or when it is too tall to be worth carrying), the HEADER row
+// with its rule, and the first `kKeepBodyRows` body rows.
+//
+// "(when possible)" is the whole of the owner's ruling that this function
+// encodes. A table can be taller than a page, and a header that cannot be kept
+// with any row at all must NOT be allowed to blank the page it is on and then
+// strand itself again on the next one. So the constraint DEGRADES and then
+// YIELDS, in this order:
+//
+//   header + lead + 2 rows   the wanted group
+//   header + lead + 1 row    a header with one row under it still reads
+//   nothing                  it does not fit a whole empty page either; place
+//                            it where it stands, which is today's behaviour
+//
+// and at every rung the answer is "break" only when breaking actually HELPS --
+// the group must fail to fit here AND fit on an empty page. That pair of tests
+// is what makes this terminate: a break can never leave the group in a worse
+// place than it started.
+//
+// `hasContent` is the same statement one step earlier -- an empty page has
+// nothing above the header to strand it against, and breaking it would publish
+// a blank one. The parser checks that itself before it does any measuring, so
+// in the shipping build this parameter always arrives true; it is the tests'
+// lever on the base case and it belongs here rather than only at the call site,
+// because a second caller would otherwise have to remember it.
+//
+// Heights are whole vertical consumption including gaps, rules and any
+// line-grid rounding: the caller measures, this decides. Passing them slightly
+// HIGH is safe (an early break costs some white space at the foot of a page);
+// passing them low is not, because the row loop's own per-row break would then
+// split the group after all.
+bool breakBeforeHeaderKeep(int cursorY, int freshPageStartY, int viewportHeight, bool hasContent, int leadHeight,
+                           int headerHeight, const int* bodyRowHeights, int bodyRowCount);
+
 }  // namespace tablecolumns
+

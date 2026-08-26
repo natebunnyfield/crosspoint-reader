@@ -522,6 +522,183 @@ void ChapterHtmlSlimParser::retirePendingBlockBeforeTable() {
   startNewTextBlock(BlockStyle());
 }
 
+// --- Keep the header with its rows (owner 2026-08-26) ----------------------
+//
+// "don't split up table header or caption from rest (when possible). intact is
+// best", sent with two consecutive pages: the first ended with the caption
+// "Effort-to-payoff, best first", the header row `Addition | Effort | What it
+// buys`, its rule, and then half a page of nothing; the second opened on the
+// first body row. The rule is `tablecolumns::breakBeforeHeaderKeep` -- what
+// lives here is the MEASURING, which is the half that needs the parser's state.
+//
+// Both halves of the group have to be measured before EITHER is emitted, and
+// that is the whole difficulty. The caption is not in the table buffer: it sits
+// unlaid in the streaming block (see retirePendingBlockBeforeTable above), and
+// the instant it is retired it belongs to this page and cannot travel. So its
+// height has to be known while it is still only potential.
+
+// Exactly the vertical distance retirePendingBlockBeforeTable() is about to
+// spend, or 0 when there is nothing pending or what is pending is a paragraph
+// rather than a caption.
+int ChapterHtmlSlimParser::measureUnlaidLeadHeight() const {
+  if (!currentTextBlock || currentTextBlock->isEmpty()) return 0;
+  const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
+  if (lineHeight <= 0) return 0;
+
+  // A word ceiling BEFORE the copy below, not after the line count. The block
+  // that happens to be pending above a table is whatever the document left
+  // there, and ParsedText's own header records why that matters: `words` is a
+  // deque specifically because a CJK paragraph runs to thousands of tokens and
+  // a contiguous allocation that size aborts the firmware on a fragmented C3
+  // heap. Copying such a block to discover it is not a caption would double it
+  // while the original is live. No line can hold more tokens than its measure
+  // divided by a space, so kMaxLeadLines lines cannot hold more than this and
+  // anything past it is not a caption.
+  const int spaceWidth = std::max(1, renderer.getSpaceWidth(fontId));
+  if (currentTextBlock->size() > static_cast<size_t>(kMaxLeadLines) * (viewportWidth / spaceWidth + 1)) return 0;
+
+  const BlockStyle& blockStyle = currentTextBlock->getBlockStyle();
+  const int horizontalInset = blockStyle.totalHorizontalInset();
+  const uint16_t effectiveWidth =
+      (horizontalInset < viewportWidth) ? static_cast<uint16_t>(viewportWidth - horizontalInset) : viewportWidth;
+
+  // layoutAndExtractLines() ERASES the words it consumes, so the block cannot
+  // be asked how tall it is without spending it. The probe therefore runs on a
+  // COPY. The alternative -- a second, non-destructive path through the line
+  // breaker -- is a second definition of where the lines go, and two of those
+  // disagreeing is a class of bug no render shows. A caption is a handful of
+  // words and this runs once per table.
+  const auto snap = [&](const int y) {
+    if (!lineGridEnabled || y <= 0) return y;
+    const int rem = y % lineHeight;
+    return rem != 0 ? y + lineHeight - rem : y;
+  };
+
+  ParsedText probe(*currentTextBlock);
+  int lineCount = 0;
+  int linesHeight = 0;
+  probe.layoutAndExtractLines(
+      renderer, fontId, effectiveWidth,
+      [&](const std::shared_ptr<TextBlock>& line) {
+        lineCount++;
+        // placeLineOnPage snaps after EVERY line, not once at the end: a ruby
+        // line advances by more than one line-height and the grid rounds that
+        // up. Accumulating the raw advances would report a caption SHORTER than
+        // it is, which is the one direction that can leave it alone on a page.
+        if (line) linesHeight = snap(linesHeight + lineAdvanceOf(*line));
+      },
+      /*includeLastLine=*/true, justifyThresholdChars);
+  // Nothing, or too much: a whole paragraph happens to be pending above plenty
+  // of tables, and hauling one into the keep group would only ever make the
+  // group too tall to keep -- which would cost the header its keep as well as
+  // the paragraph its place. Above the ceiling the lead is simply not part of
+  // the group; it is laid out where it stands and the header keeps with its
+  // rows alone.
+  if (lineCount == 0 || lineCount > kMaxLeadLines) return 0;
+
+  // The same arithmetic makePages() performs, in the same order. Kept in step
+  // with it by proximity and by the test that pins a caption's page.
+  int y = currentPageNextY;
+  if (currentPage && !currentPage->elements.empty()) {
+    int topSpacing = blockStyle.marginTop > 0 ? blockStyle.marginTop : 0;
+    if (blockStyle.paddingTop > 0) topSpacing += blockStyle.paddingTop;
+    const int gapCap = lineHeight / 2;
+    const int budget = gapCap > prevBlockBottomApplied_ ? gapCap - prevBlockBottomApplied_ : 0;
+    if (topSpacing > budget) topSpacing = budget;
+    y = snap(y + topSpacing + sceneBreakLiftPx_);
+  }
+  y += linesHeight;
+  int bottomSpacing = blockStyle.marginBottom > 0 ? blockStyle.marginBottom : 0;
+  if (blockStyle.paddingBottom > 0) bottomSpacing += blockStyle.paddingBottom;
+  if (extraParagraphSpacing) bottomSpacing += lineHeight / 2;
+  const int gapCap = lineHeight / 2;
+  if (bottomSpacing > gapCap) bottomSpacing = gapCap;
+  y = snap(y + bottomSpacing);
+  return y - currentPageNextY;
+}
+
+bool ChapterHtmlSlimParser::breakBeforeStrandedTableHeader(const tablecolumns::Plan& plan, const int leadHeight) {
+  if (!tableBufHasHeader || tableBuf.empty()) return false;
+  // An empty page has nothing above the header to strand it against, and a
+  // break here would publish a blank one.
+  if (!currentPage || currentPage->elements.empty()) return false;
+
+  const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
+  if (lineHeight <= 0) return false;
+  const int rowGap = std::max(2, lineHeight / 4);
+  constexpr int kRuleThickness = 2;
+
+  const auto snap = [&](const int y) {
+    if (!lineGridEnabled || y <= 0) return y;
+    const int rem = y % lineHeight;
+    return rem != 0 ? y + lineHeight - rem : y;
+  };
+
+  // A row costs more than its text. Every cell is an ordinary text block, so
+  // makePages() adds the paragraph's BOTTOM SPACING under it before the row gap
+  // is applied -- half a line whenever the reader has paragraph spacing on,
+  // which is the shipped default. measureRowHeight() answers about the text
+  // only; it is used elsewhere to ask "is this row taller than a page", where
+  // that is the right question. Here it is not, and the difference is a whole
+  // body row at 14 pt: modelling a row at 43 px instead of 60 said a group of
+  // three fitted in 695 px of a 700 px page, and the render put the third row
+  // on the next one.
+  const int cellBottomSpacing = extraParagraphSpacing ? lineHeight / 2 : 0;
+
+  // Measured from a FRESH page's origin -- which is where the group lands if
+  // this returns true, and which is also grid-aligned, so the same numbers
+  // over-state the current page's need by at most one grid step. Over-stating
+  // is the safe direction: it costs white space, never a split group.
+  int y = 0;
+  // TWO snaps, because the row loop performs two: makePages() ends with one
+  // after the cell's bottom spacing, and the loop adds the row gap and snaps
+  // again. Collapsing them into a single snap of the sum under-measures a row
+  // by a whole line-height whenever Line Grid is on -- snap(M + L + L/4) is
+  // M + 2L, snap(M + 0.75L) is M + L -- which is the direction
+  // breakBeforeHeaderKeep says is unsafe: the page is completed and the group
+  // is split anyway. Line Grid is off by default, which is why the render did
+  // not show it; the sweep in tests/table_keep_together runs an arm with it on.
+  const auto consumeRow = [&](const size_t r) {
+    const bool headerRow = (r == 0);
+    y = snap(y + measureRowHeight(tableBuf[r], plan, headerRow) + cellBottomSpacing);
+    y = snap(y + rowGap);
+    if (headerRow) y = snap(y + kRuleThickness + rowGap);
+  };
+
+  consumeRow(0);
+  const int headerHeight = y;
+
+  int bodyHeights[tablecolumns::kKeepBodyRows] = {};
+  int bodyCount = 0;
+  for (size_t r = 1; r < tableBuf.size() && bodyCount < tablecolumns::kKeepBodyRows; r++) {
+    const int before = y;
+    consumeRow(r);
+    bodyHeights[bodyCount++] = y - before;
+  }
+
+  if (!tablecolumns::breakBeforeHeaderKeep(currentPageNextY, /*freshPageStartY=*/0, viewportHeight,
+                                           /*hasContent=*/true, leadHeight, headerHeight, bodyHeights, bodyCount)) {
+    return false;
+  }
+
+  // The next page opens on whatever is still unlaid -- the caption, when one is
+  // travelling with the header -- and on the table itself otherwise.
+  // pageStartAnchor() folds in the bytes of a block that has NOT been laid yet,
+  // so it names a position past text that is about to open the new page; keyed
+  // on what is actually pending rather than on leadHeight, which is 0 both for
+  // "nothing pending" and for "pending, but not a caption".
+  const uint32_t anchor = pendingTextIsUnlaid() ? chapterSourceBytes_ : pageStartAnchor();
+  completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, anchor);
+  completedPageCount++;
+  currentPage = makeUniqueNoThrow<Page>();
+  if (!currentPage) {
+    noteAllocationFailure("Page before a table header");
+    return true;
+  }
+  currentPageNextY = 0;
+  return true;
+}
+
 // The pre-2026-08-19 shape, rebuilt from the buffer: one paragraph per cell,
 // each prefixed with the column name (and the row name in bold, for the first
 // cell of a row). Kept because it is the only thing that works for a table the
@@ -799,10 +976,47 @@ int ChapterHtmlSlimParser::measureRowHeight(const tablecolumns::Row& row, const 
 }
 
 void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan& plan) {
-  // Establishes tablecolumns::columnStartY's `rowTopIsClear` precondition for
-  // the first row: nothing unlaid may be owed a place at the row top the
-  // columns are about to rewind to.
-  retirePendingBlockBeforeTable();
+  // Keep-with-next, first pass: BEFORE the caption is retired, because retiring
+  // it spends it on this page. A part-built word has to be flushed first or the
+  // block it belongs to measures short -- retirePendingBlockBeforeTable() does
+  // the same thing for the same reason, one step later.
+  if (partWordBufferIndex > 0) {
+    flushPartWordBuffer();
+  }
+  // Keep-with-next. There are two moments at which the page can be completed
+  // and EXACTLY ONE of them is used, decided by whether a caption is travelling:
+  //
+  //   a caption is pending   Decide BEFORE it is retired, with its height in
+  //                          the group, and then never ask again. Retiring it
+  //                          spends it on this page, so a later break could
+  //                          only ever leave it behind -- which is half of what
+  //                          the report is about. If the group cannot be kept
+  //                          at all the constraint yields WITH the caption
+  //                          still attached to its header, rather than buying a
+  //                          row back by stranding it.
+  //   nothing is pending,    Decide AFTER, against the real cursor. This is the
+  //   or what is pending     one that fires for a table with no caption. The
+  //   is a paragraph         cursor here is the honest one: measureUnlaidLead-
+  //                          Height() answers 0 both for "nothing pending" and
+  //                          for "pending, but a whole paragraph" -- and in the
+  //                          second case the cursor BEFORE the retire is stale,
+  //                          because that paragraph is about to be laid on this
+  //                          page. Deciding against it breaks early, and then
+  //                          the second decision breaks again after the
+  //                          paragraph, leaving it alone on a page of its own.
+  //                          Reachable from any `<div>text<table>`, which is
+  //                          the shape B-037's adversarial pass also found.
+  const int leadHeight = measureUnlaidLeadHeight();
+  if (leadHeight > 0) {
+    breakBeforeStrandedTableHeader(plan, leadHeight);
+    // Establishes tablecolumns::columnStartY's `rowTopIsClear` precondition for
+    // the first row: nothing unlaid may be owed a place at the row top the
+    // columns are about to rewind to.
+    retirePendingBlockBeforeTable();
+  } else {
+    retirePendingBlockBeforeTable();
+    breakBeforeStrandedTableHeader(plan, 0);
+  }
   // Table rows between two paragraphs break their margin adjacency (2026-08-22).
   resetInterBlockCollapse();
   const int lineHeight = renderer.getLineHeight(fontId, lineCompression);

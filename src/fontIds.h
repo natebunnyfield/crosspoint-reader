@@ -6,6 +6,14 @@
 // editor monospace ids below: the values are opaque handles (insertFont/drawText
 // keys; SdCardFontManager::computeFontId guards collisions at runtime), checked
 // non-zero and non-colliding when added.
+// XXS and XS, added 2026-08-26 (owner: "cut XS and XXS versions of every s
+// tiers shipping font"). The built-in ramp keeps its own 2 pt step and extends
+// downward to 8/10 rather than adopting the SD families' point sizes; the
+// offset between the two ramps is measured in ReaderFontSizes.h. Values are
+// the same SHA-256-sum-mod-2^32 build-font-ids.sh computes over the four style
+// headers, checked non-zero and non-colliding against every id in this file.
+#define LIBREFRANKLIN_READER_8_FONT_ID (-1089830612)
+#define LIBREFRANKLIN_READER_10_FONT_ID (-1064831052)
 #define LIBREFRANKLIN_READER_12_FONT_ID (912744121)
 #define LIBREFRANKLIN_READER_14_FONT_ID (-1054793780)
 #define LIBREFRANKLIN_READER_16_FONT_ID (1734005343)
@@ -72,6 +80,8 @@
 
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
+static_assert(LIBREFRANKLIN_READER_8_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(LIBREFRANKLIN_READER_10_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(LIBREFRANKLIN_READER_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(LIBREFRANKLIN_READER_14_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(LIBREFRANKLIN_READER_16_FONT_ID != 0, "Font ID collision with sentinel");

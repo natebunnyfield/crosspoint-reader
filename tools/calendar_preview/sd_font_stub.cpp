@@ -150,6 +150,24 @@ std::vector<const char*> searchRoots(bool* disabled) {
 
 }  // namespace
 
+// How many ordinal slots this family actually installs. The specimen modes used
+// to loop a hardcoded 4; the installed families went to SIX on 2026-08-26 (XXS
+// and XS), and a hardcoded bound does not fail — it silently stops photographing
+// the top of the ramp, which is exactly the kind of miss a specimen tool cannot
+// afford. Falls back to READER_FONT_SLOT_COUNT's worth when the family cannot be
+// found, so the caller still reports "missing at slot N" rather than doing
+// nothing at all.
+int installedOrdinalCount(const char* familyName) {
+  if (familyName == nullptr || familyName[0] == '\0') return 0;
+  bool disabled = false;
+  for (const char* root : searchRoots(&disabled)) {
+    const std::string hostDir = std::string("./fs_") + root + "/" + familyName;
+    const std::vector<uint8_t> sizes = installedSizes(hostDir, familyName);
+    if (!sizes.empty()) return static_cast<int>(sizes.size());
+  }
+  return disabled ? 0 : 6;
+}
+
 // Ordinal-slot loader, for the `reading` specimen mode. Declared in
 // render_harness.cpp; not part of the firmware's SdCardFontSystem API, because
 // on the device the user picks from the family's own size list directly.

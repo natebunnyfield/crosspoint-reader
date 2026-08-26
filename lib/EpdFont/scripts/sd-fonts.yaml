@@ -74,12 +74,46 @@
 #   Extracted static fonts are cached in instanced_fonts/ (gitignored).
 #   Requires fonttools: pip install -r requirements.txt
 #
-# Slot uniformity (2026-08-02, curated reader families):
-#   The four sizes of every curated family are chosen so the same ordinal
+# Slot uniformity (2026-08-02, curated reader families; extended to six slots
+# 2026-08-26):
+#   The SIX sizes of every INSTALLED family are chosen so the same ordinal
 #   slot shows the same MEASURED letter size and leading, not the same
 #   nominal point size:
-#     x-height  12 / 14 / 16 / 18 px   (slots 0-3, regular style)
-#     advanceY  34 / 40 / 46 / 51 px
+#     x-height   8 / 10 / 12 / 14 / 16 / 18 px  (slots 0-5, regular style)
+#     advanceY  23 / 28 /  34 / 40 / 46 / 51 px
+#   Slots 0-1 are XXS and XS, added 2026-08-26 (owner: "cut XS and XXS
+#   versions of every s tiers shipping font"). They were derived the same way
+#   the original four were and NOT by taking two points off each ramp: the
+#   anchor is x-height, so the point size that reaches 10 px and 8 px differs
+#   per family exactly as it does at the other slots. Only the eight in
+#   `installed_families:` were extended; every buildable-only recipe below
+#   keeps its four sizes, which is why READER_FONT_SLOT_COUNT's label fallback
+#   (SettingsList.h) still matters.
+#
+#   MEASURED at 6-11 pt across all eight, 2026-08-26, and the picks are the
+#   x-height matches: Edgar 8/10, TeX Gyre Schola 8/10, Libris 8/10,
+#   Coelacanth 9/11, Libre Franklin 7/9, TeX Gyre Heros 7/9, Almendra 6/8,
+#   InknutJunicode 7/9 (its ramp has always run +1, 13/15/17/19, so its new
+#   slots are 9 and 11 px of x-height, not 8 and 10).
+#
+#   COELACANTH XXS WAS ALSO A CHOICE: 8 pt and 9 pt BOTH build to x-height 8
+#   (hinting skips the value between them), so x-height alone does not decide
+#   it. 9 pt wins on the other two measurements — advanceY 25 continues this
+#   family's own loose 25/30/36/41/49/55 leading ramp where 8 pt's 22 would
+#   break it, and cap height 15 continues 15/18/21/23/28/32. It is the
+#   long-extender face, so it runs looser than the tier at every slot; that is
+#   ink, not drift, and the new slots inherit it.
+#
+#   ALMENDRA XXS WAS A REAL CHOICE, not an automatic one. 6 pt gives x-height
+#   8 exactly and advanceY 19; 7 pt gives x-height 9 and advanceY 23, which
+#   fits the leading ramp better. 6 pt wins on two counts: it keeps the 2 px
+#   x-height step every other family has, and at 7 pt XXS and XS would have
+#   been one x-height pixel apart — two adjacent picker slots that barely
+#   differ. The cost is that Almendra's XXS line is proportionally tight
+#   (19 px on x-height 8, against ~23 elsewhere), which is a whole-pixel
+#   rounding artifact of a 6 pt cut and not a collision: the plain-text
+#   clearance audit reads +4 there, better than shipped Coelacanth's +1.
+#
 #   metrics overrides implement the leading: the .cpfont's
 #   advanceY = ceil((ascent - descent)/1000 * pt * 150/72). Two floors bound
 #   it per family: advanceY never drops below the worst-style plain-text ink
@@ -94,9 +128,12 @@
 #
 #   The advanceY line above is the TARGET; read the shipped files before
 #   matching a new family to it. Edgar and TeX Gyre Schola both build to
-#   34/39/45/51, not 34/40/46/51 — slots 1 and 2 land a pixel under and no
-#   span fixes only those two. Rosarivo is 32/39/45/51, Coelacanth 36/41/49/55
-#   (floor-bound). The formula is also not plain ceil(): FreeType rounds
+#   23/28/34/39/45/51, not the 34/40/46/51 the original four slots targeted —
+#   slots 3 and 4 land a pixel under and no span fixes only those two.
+#   Rosarivo is 32/39/45/51, Coelacanth 25/30/36/41/49/55 (floor-bound), and
+#   Almendra 19/26/32/39/45/55.
+#
+#   The formula is also not plain ceil(): FreeType rounds
 #   face.size.height to whole pixels before fontconvert's norm_ceil sees it,
 #   so a span has to be checked against the built file, not computed.
 
@@ -423,7 +460,7 @@ families:
     # PUA-encoded at U+E000-E008 by add_pua_ligs.py, which is what gets Edgar to
     # 13 ligature pairs (14 in the italics) instead of the bare 5.
     intervals: reading,(0x2100-0x214F),(0x0250-0x02AF),(0xE000-0xE008)
-    sizes: [12, 14, 16, 18]
+    sizes: [8, 10, 12, 14, 16, 18]
     # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four, and
     # the ascender clears accented capitals at every size (the defect the
     # earlier 952/-284 metrics had; its 1052/-305 fix is superseded by this
@@ -473,7 +510,7 @@ families:
   - name: TeXGyreSchola
     description: "GUST's Century Schoolbook revival (Latin, Greek, Cyrillic)"
     intervals: reading
-    sizes: [12, 14, 16, 18]
+    sizes: [8, 10, 12, 14, 16, 18]
     # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four.
     # Native 1135/-332 (1.467 em) gave the loosest leading in the set
     # (advY 37-55); this span brings it to the shared rhythm.
@@ -593,7 +630,7 @@ families:
     # Pulling 55 down to 51 is a 0.927 factor, which would take the two exact
     # slots to 36 and 42 and slot 0 to 30. Four px loose at the largest size,
     # with three slots right, is the better page. Leave it.
-    sizes: [10, 12, 14, 17]
+    sizes: [6, 8, 10, 12, 14, 17]
     metrics: {ascent: 1114, descent: -429, linegap: 0}
     # raw.githubusercontent ofl/almendra paths error out; these are the static
     # TTFs the css2 API serves for ital,wght 0,400 / 0,700 / 1,400 / 1,700 —
@@ -619,7 +656,7 @@ families:
     # plain-ink span + 0.13 em exceeds the uniform leading at every slot, so it
     # keeps the minimum ink-safe leading instead (still far tighter than the
     # old 43-64 px range).
-    sizes: [13, 15, 18, 20]
+    sizes: [9, 11, 13, 15, 18, 20]
     metrics: {ascent: 929, descent: -384, linegap: 0}
     # Upstream (CTAN) ships Regular/Bold/Italic but no BoldItalic, so
     # bolditalic emboldens the real Italic — never sheared. Measured: italic
@@ -870,7 +907,7 @@ families:
     # y_ratio is left at its 0.5 default: the horizontal stem grows twice as
     # fast as the vertical, which is what stops a faux bold eating its own
     # x-height. Do not raise it without re-measuring the x-height ramp.
-    sizes: [10, 12, 14, 16]
+    sizes: [7, 9, 10, 12, 14, 16]
     metrics: {ascent: 1203, descent: -340, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
@@ -1006,7 +1043,7 @@ families:
     # Uniform slots: xh 12/14/16/18 exact on all four; advY 33/39/46/52,
     # slots 0/2/3 within a pixel. Best-rounded face in the grotesque bench:
     # counters intact, 99% of Latin Extended-A, a real drawn italic.
-    sizes: [10, 12, 14, 16]
+    sizes: [7, 9, 10, 12, 14, 16]
     metrics: {ascent: 1202, descent: -359, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 400}}
@@ -1042,7 +1079,7 @@ families:
     # 20 pt, well above slot 3. Nothing to gain from a bigger ramp: 13/15/17/20
     # measures xh 13/15/17/22 and 14/16/18/20 measures 14/16/18/22, both worse
     # on x-height AND on leading, and neither clears accented capitals.
-    sizes: [12, 14, 16, 18]
+    sizes: [8, 10, 12, 14, 16, 18]
     # Span 1369 (ascent 1050 = accented-cap top 985 + the 65/1000 pad exactly;
     # descent -319 against an ink bottom of -200). NOT the 1351 the bench's
     # sweep computed: 1351 is right under the header's ceil() formula but the
@@ -1135,7 +1172,7 @@ families:
     # and for the same reason: at 11 pt one pixel of leading costs ~44 units of
     # span, so every span that lands 34 at slot 0 drags the rest down with it
     # (the 34 band measures 37/43/49 through 38/44/50).
-    sizes: [11, 12, 14, 16]
+    sizes: [7, 9, 11, 12, 14, 16]
     # Span 1542, read back from the BUILT files and NOT computed: the header's
     # ceil() formula puts the 35/39/45/51 band at 1520-1527, and it is wrong by
     # 20 units, because FreeType rounds face.size.height to whole pixels before

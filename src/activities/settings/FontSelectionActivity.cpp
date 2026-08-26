@@ -384,7 +384,7 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
   if (pointSize > 0) {
     // Slot first, then what it resolves to on this family: the slot is the thing
     // the owner selected and the only part that means the same across families.
-    static constexpr const char* SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"S", "M", "L", "XL"};
+    static constexpr const char* SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"XXS", "XS", "S", "M", "L", "XL"};
     const uint8_t slot = SETTINGS.fontSizeSlot < READER_FONT_SLOT_COUNT ? SETTINGS.fontSizeSlot : 0;
     snprintf(scratch, sizeof(scratch), "%s \"%s\" — %s (%upt)", tr(STR_PREVIEW), fontName ? fontName : "",
              SLOT_NAMES[slot], pointSize);

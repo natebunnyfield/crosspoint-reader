@@ -133,6 +133,172 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 
 ## FIXED
 
+### [B-038] A table's header row, and its caption, stranded at the foot of a page — FIXED 2026-08-26
+**severity: high · scope: reader, EPUB table layout (T-012 columns path) · fixed 2026-08-26, reproduced and re-rendered before/after**
+
+Owner, with two consecutive pages of his own reading: *"don't split up table
+header or caption from rest (when possible). intact is best"*. The first page
+ended with the section heading, its intro paragraph, the caption line
+**"Effort-to-payoff, best first"**, the header row `Addition | Effort | What it
+buys`, the rule under it — and then roughly half a page of nothing. The second
+page opened on the first body row. The reader turns the page carrying three
+column names in their head, and the page they leave is half empty.
+
+**The book is identified**: `claude-tools` `nutrition/04-add.xhtml`, and the
+caption is a real `<caption>` element inside `<table>`, not a preceding
+paragraph. That distinction is the whole shape of the fix (see the sibling case
+at the foot).
+
+**Mechanism.** `emitBufferedTableAsColumns` breaks pages ROW BY ROW
+(`ChapterHtmlSlimParser.cpp`, the `needed` test in the row loop). Each row asks
+only whether IT fits, so a header row that fits at the foot of a page is drawn
+there, and the first body row — which does not fit — opens the next one. Nothing
+in that loop knows a header is worthless without a row under it. The caption
+compounds it: `retirePendingBlockBeforeTable()` lays the caption out in ordinary
+flow BEFORE the row loop starts (B-037's fix, and correctly so), which spends it
+on the page the header is about to leave.
+
+**Fixed** with a keep-with-next, in the shape the prose widow/orphan control
+already uses (keep-2/2, `flushPendingLines`). The rule is a pure function,
+`tablecolumns::breakBeforeHeaderKeep` (`TableColumnLayout.cpp`, eight tests):
+the group is the caption, the header with its rule and the first
+`kKeepBodyRows` = 2 body rows, and the page is completed ahead of it when that
+group does not fit where it stands AND does fit an empty page. The owner's own
+"(when possible)" is the ladder: two rows, then one, then **yield** — a group
+too tall for a whole empty page is placed where it stands exactly as before,
+because breaking would blank this page and strand the header again on the next.
+That pair of tests is also what makes it terminate: after a break the page is
+empty, and an empty page is never broken.
+
+The parser side is the MEASURING, and two things about it are load-bearing:
+
+* `measureUnlaidLeadHeight()` has to answer how tall the caption is while it is
+  still only potential — once retired it belongs to this page and cannot travel.
+  `ParsedText::layoutAndExtractLines` ERASES the words it consumes, so the probe
+  runs on a COPY of the block. A second, non-destructive path through the line
+  breaker would be a second definition of where the lines go. A pending block
+  over `kMaxLeadLines` = 3 lines is NOT a caption — plenty of tables follow a
+  whole paragraph — and is measured as 0 so it cannot make the group unkeepable.
+* A row costs more than its text. Every cell is an ordinary text block, so
+  `makePages()` adds the paragraph's bottom spacing under it before the row gap
+  — half a line whenever paragraph spacing is on, which is the shipped default.
+  `measureRowHeight()` answers about the text only, which is right for its other
+  caller ("is this row taller than a page") and wrong here. Measured: modelling
+  a body row at 43 px instead of 60 said a group of three fitted in 695 px of a
+  700 px page, and the render put the third row on the next one.
+
+`SECTION_FILE_VERSION` 51 → 52. It moves page BOUNDARIES and grows no header
+field, so it is the same kind of bump as v50; without it a section served from a
+v51 cache is never parsed again and a reader who saw the reported page would go
+on seeing it. Every book on every card repaginates once.
+
+Flash +2,542 bytes (5,304,235 -> 5,306,777, `pio run -e default`, back-to-back
+builds of the same tree).
+
+**Two limits, stated rather than papered over.** First, the keep is measured
+with `measureRowHeight`, which wraps a cell through `GfxRenderer::wrappedText`
+(greedy, whole words) while the cell is actually SET by
+`ParsedText::layoutAndExtractLines` (total fit, or greedy with hyphens). The two
+can disagree about a cell's line count, so a group can be measured short, and
+then the row loop's own per-row break splits it anyway after the page was
+completed for nothing. That disagreement predates this change -- the row loop's
+existing `needed` test uses the same measure -- and it costs white space rather
+than a wrong render, so it is recorded here rather than fixed with a fudge
+factor nobody measured. Second, a keep-with-next always MOVES white space
+rather than removing it: the page before the table ends earlier than it used to.
+That is the trade the ruling asks for ("intact is best") and it is visible in
+the after render.
+
+**Evidence.** `test/epubs/test_table_keep.epub` — the reported table, cells
+verbatim, set out at fourteen different heights on the page so one rung always
+strands whatever the reading size. Rendered in the desktop simulator (X3, 14 pt,
+light, native 528x792) at rung 3: BEFORE, the page ends caption / header / rule
+and 40% white, and the next page opens on `Canned beans and lentils`; AFTER, the
+caption, the header, the rule and that first row are on one page together. The
+four page images:
+[claude.ai/code/artifact/4522bb50-3522-4c7f-9486-a18b9ea6f71c](https://claude.ai/code/artifact/4522bb50-3522-4c7f-9486-a18b9ea6f71c).
+
+**Coverage.** `test/table_keep_together/` is the first host suite that links
+`ChapterHtmlSlimParser` — it paginates real XHTML through the real layout engine
+and asserts which page each cell lands on, sweeping the preceding prose from 0
+to 14 paragraphs so the header arrives at every height on the page. Two of its
+five tests fail against the pre-fix tree and pass after. That closes the gap
+B-037 stated in its own entry ("no host test links ChapterHtmlSlimParser, so the
+emitter half of this fix is covered by render only").
+
+**The adversarial pass found three real defects in the first version of this
+fix**, all of them on 2026-08-26, and every one of them is now a test:
+
+1. **Two breaks in a row, and a paragraph alone on a page.**
+   `measureUnlaidLeadHeight()` answers 0 both for "nothing is pending" and for
+   "pending, but a whole paragraph rather than a caption" — and in the second
+   case the page cursor before the retire is STALE, because that paragraph is
+   about to be laid on this page. The first version decided against it, broke
+   early, then broke again after the paragraph. Reachable from any
+   `<div>text<table>`, which is the shape B-037's own adversarial pass found.
+   There is now exactly ONE decision point, chosen by whether a caption is
+   travelling: with one, decide before it is retired and never ask again (a
+   later break could only leave it behind); without one, decide after, against
+   the honest cursor. Pinned by `LooseProseAboveATableCostsAtMostOnePage`, whose
+   bound is the honest statement of what a keep may cost — one page, measured
+   against the same document with its header row demoted so the keep cannot
+   fire.
+2. **The row model under-measured by a whole line-height per row with Line Grid
+   on.** The row loop snaps TWICE (`makePages` after the cell's bottom spacing,
+   then the loop after the row gap); the model snapped once, over the sum.
+   `snap(M + L + L/4)` is `M + 2L`, `snap(M + 0.75L)` is `M + L` — about 129 px
+   short on a three-row group in a 700 px page, in the direction that completes
+   a page and splits the group anyway. Line Grid defaults off, so no render
+   showed it, and every test arm ran with it off. There is a `lineGridEnabled`
+   arm now.
+3. **A ruby line in a caption under-measured**, because the probe accumulated
+   raw line advances while `placeLineOnPage` snaps after EVERY line. That is the
+   one direction that can leave a caption alone on a page.
+
+Two more of its findings were fixed as risks rather than bugs: the probe copied
+an arbitrarily large `ParsedText` BEFORE finding out the block was too long to
+be a caption (`ParsedText.h` records that a CJK paragraph runs to thousands of
+tokens and that a contiguous allocation that size aborts on a fragmented C3
+heap), so a word ceiling now runs before the copy; and the anchor at the break
+is keyed on `pendingTextIsUnlaid()` rather than on `leadHeight`, which is 0 for
+two different situations.
+
+**What that pass checked and found CLEAN**, so the next one does not re-derive
+it: `breakBeforeHeaderKeep`'s bounds and overflow behaviour, swept by hand
+(a null `bodyRowHeights` with count 0 never dereferences; the `[k-1]` read is
+bounded on every iteration); termination and the impossibility of a blank page;
+`ParsedText`'s copyability (all members are value types, no raw pointers, no
+retained iterators) and the probe's side effects (the only global write is a
+`booknotes` raise that is idempotent and that the real layout makes anyway);
+the probe's arithmetic against `makePages()` term by term; the cell-cost model;
+the anchor, footnote, `pendingAnchorId` and xpath handling at the break; the
+untouched rotated / flattened / key-block / `abandonTableBuffer` paths and the
+B-037 `<li>`-holding-a-table case; the row loop's state after a break; the
+allocation-failure path; and that `SECTION_FILE_VERSION` 52 is sufficient —
+`SECTION_FILE_PARTIAL_VERSION` is derived from it, and neither `CSS_CACHE_VERSION`
+nor `BOOK_CACHE_VERSION` governs anything this change touches.
+
+**Two siblings found and deliberately left**, both recorded so the next pass
+does not re-derive them:
+
+1. **A caption written as a PARAGRAPH above the table is still stranded.**
+   `</p>` calls `startNewTextBlock` (`ChapterHtmlSlimParser.cpp`, the
+   `headerOrBlockTag` branch of `endElement`), so such a paragraph is already
+   laid out on the page by the time `<table>` is even seen — there is nothing
+   pending to measure and nothing to carry. Fixing it means either lifting
+   already-placed lines off a finished page or holding block placement past the
+   block boundary; both are a second mechanism. Not the reported case (the
+   report's caption is a real `<caption>`), but the same defect to a reader.
+2. **The ROTATED emitter separates a caption from its table by construction.**
+   `emitBufferedTableRotated` retires the caption in upright flow and then gives
+   the table a page of its own, so the caption is ALWAYS on the page before.
+   Carrying it would mean drawing it as rotated text with the table, which is a
+   change to that emitter's geometry rather than to its page breaking.
+
+A THIRD case has the same shape and is explicitly out of scope: an `<h1>`–`<h6>`
+immediately followed by a paragraph has no keep either, so a heading can be the
+last thing on a page. One mechanism at a time.
+
 ### [B-037] A table's `<caption>` printed under its own header row — FIXED 2026-08-23
 **severity: high · scope: reader, EPUB table layout (T-012 columns path) · fixed 2026-08-23, verified by render**
 

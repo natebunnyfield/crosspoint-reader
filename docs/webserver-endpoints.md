@@ -216,8 +216,8 @@ Example item:
   "name": "Reader Font Size",
   "category": "Reader",
   "type": "enum",
-  "value": 1,
-  "options": ["12 pt", "14 pt", "16 pt", "18 pt"]
+  "value": 3,
+  "options": ["XXS (8pt)", "XS (10pt)", "S (12pt)", "M (14pt)", "L (16pt)", "XL (18pt)"]
 }
 ```
 

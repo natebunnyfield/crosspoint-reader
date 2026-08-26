@@ -430,8 +430,22 @@ void CrossPointSettings::clearSdFontFamily() {
 
 int CrossPointSettings::getSmallestReaderFontId() const {
   // SD families: ask the resolver for the smallest point size the family has,
-  // walking up only until something resolves. Built-ins: 12 is the floor of
-  // BUILTIN_READER_POINT_SIZES and always registered.
+  // walking up only until something resolves. Built-ins: 12 pt, or the reader's
+  // own size when that is already smaller.
+  //
+  // 12 is DELIBERATELY not the floor of BUILTIN_READER_POINT_SIZES any more —
+  // XXS (8) and XS (10) were added below it on 2026-08-26 and this stayed at
+  // 12, because this is the wide-table STEP-DOWN and following the ramp all the
+  // way down would have silently re-rendered every over-wide table two slots
+  // smaller than before, which nothing asked for.
+  //
+  // But it cannot be a bare constant either, which is what it was for the first
+  // few hours of that change. `tableFontForRotation()`
+  // (ChapterHtmlSlimParser.h) takes this face UNCONDITIONALLY when it is
+  // non-zero, so on a page set at 8 pt a rotated table would have come back at
+  // 12 — a "size down" that is a size UP, inverting the feature. Clamp to the
+  // body size and the step is monotone again: 12 pt at S and above, the
+  // reader's own face at XS and XXS, never larger than the text around it.
   //
   // MEASURED 2026-08-23: for an SD family this loop returns on its FIRST
   // iteration whatever size it asks for, because resolveFontId ignores
@@ -450,7 +464,15 @@ int CrossPointSettings::getSmallestReaderFontId() const {
       if (id != 0) return id;
     }
   }
-  return LIBREFRANKLIN_READER_12_FONT_ID;
+  // Deliberately routed through getReaderFontId() rather than a second `case`
+  // ladder: there is exactly one mapping from point size to built-in font id
+  // and a copy of it here would be a second thing to keep true. Reaching this
+  // line with an SD family set means its resolver returned nothing for every
+  // ramp size, so getReaderFontId() falls through to the same built-in it
+  // would pick anyway.
+  const uint8_t bodyPt =
+      snapToNearestPointSize(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), fontPointSize);
+  return bodyPt < 12 ? getReaderFontId() : LIBREFRANKLIN_READER_12_FONT_ID;
 }
 
 int CrossPointSettings::getReaderFontId() const {
@@ -471,6 +493,10 @@ int CrossPointSettings::getReaderFontId() const {
   const uint8_t pt =
       snapToNearestPointSize(BUILTIN_READER_POINT_SIZES, std::size(BUILTIN_READER_POINT_SIZES), fontPointSize);
   switch (pt) {
+    case 8:
+      return LIBREFRANKLIN_READER_8_FONT_ID;
+    case 10:
+      return LIBREFRANKLIN_READER_10_FONT_ID;
     case 12:
       return LIBREFRANKLIN_READER_12_FONT_ID;
     case 16:

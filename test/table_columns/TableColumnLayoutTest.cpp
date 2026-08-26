@@ -209,3 +209,97 @@ TEST(TableColumnStartY, TheAnswerIsNeverAboveTheCursorUnlessTheRowTopIsClear) {
     }
   }
 }
+
+// --- breakBeforeHeaderKeep: does the header travel with its rows? ----------
+//
+// Owner 2026-08-26: "don't split up table header or caption from rest (when
+// possible). intact is best". The whole rule is here; the parser only measures.
+// See test/table_keep_together for the same rule exercised through the real
+// paginator on a real document.
+
+namespace {
+// A page 700 tall; a header that costs 70 with its rule, body rows 60 each,
+// and a one-line caption at 52. The figures are the ones measured at 14 pt in
+// TableKeepTogetherTest, so the arithmetic below is the arithmetic that ships.
+constexpr int kPage = 700;
+constexpr int kHeader = 70;
+constexpr int kCaption = 52;
+const int kRows[2] = {60, 60};
+}  // namespace
+
+TEST(TableHeaderKeep, LeavesAGroupThatAlreadyFitsAlone) {
+  // 400 + 52 + 70 + 60 + 60 = 642, under the page. Nothing to do.
+  EXPECT_FALSE(breakBeforeHeaderKeep(400, 0, kPage, true, kCaption, kHeader, kRows, 2));
+}
+
+TEST(TableHeaderKeep, BreaksWhenTheHeaderWouldBeTheLastThingOnThePage) {
+  // THE REPORTED CASE. 556 + 70 + 60 = 686 fits, so the header and one row land
+  // and the rest of the table opens the next page; 556 + 70 + 60 + 60 = 746
+  // does not, and 0 + 190 does. So break, and all three travel.
+  EXPECT_TRUE(breakBeforeHeaderKeep(556, 0, kPage, true, 0, kHeader, kRows, 2));
+}
+
+TEST(TableHeaderKeep, CarriesTheCaptionWithIt) {
+  // 600 + 70 + 60 + 60 = 790 already fails without the caption. With it the
+  // group is 242 and still fits an empty page, so the caption travels too.
+  EXPECT_TRUE(breakBeforeHeaderKeep(600, 0, kPage, true, kCaption, kHeader, kRows, 2));
+}
+
+TEST(TableHeaderKeep, DegradesToOneRowBeforeGivingUp) {
+  // A page with room for the header and one row but not two, on a table whose
+  // two-row group would not fit an empty page either (rows 400 tall here). The
+  // ladder drops to one row, finds that DOES need a break, and takes it.
+  const int tallRows[2] = {400, 400};
+  EXPECT_TRUE(breakBeforeHeaderKeep(300, 0, kPage, true, 0, kHeader, tallRows, 2));
+  // ...and from a cursor where header + one row still fits, it does not.
+  EXPECT_FALSE(breakBeforeHeaderKeep(200, 0, kPage, true, 0, kHeader, tallRows, 2));
+}
+
+TEST(TableHeaderKeep, YieldsRatherThanBlankingAPage) {
+  // "(when possible)". A header plus one row taller than a whole empty page has
+  // nowhere to be kept: breaking would publish a blank page and strand the
+  // header again on the next one. The constraint gives way.
+  const int hugeRows[2] = {900, 900};
+  EXPECT_FALSE(breakBeforeHeaderKeep(300, 0, kPage, true, 0, kHeader, hugeRows, 2));
+  EXPECT_FALSE(breakBeforeHeaderKeep(699, 0, kPage, true, kCaption, kHeader, hugeRows, 2));
+}
+
+TEST(TableHeaderKeep, NeverBreaksAnEmptyPage) {
+  // Nothing above the header to strand it against. This is also what makes the
+  // parser's second call a no-op after its first one has already broken.
+  EXPECT_FALSE(breakBeforeHeaderKeep(0, 0, kPage, false, kCaption, kHeader, kRows, 2));
+  EXPECT_FALSE(breakBeforeHeaderKeep(690, 0, kPage, false, kCaption, kHeader, kRows, 2));
+}
+
+TEST(TableHeaderKeep, AHeaderOnlyTableStillKeepsItsCaption) {
+  // No body rows at all: the ladder's bottom rung is the caption and the header
+  // together, because there is nothing that could have followed them.
+  EXPECT_TRUE(breakBeforeHeaderKeep(600, 0, kPage, true, kCaption, kHeader, nullptr, 0));
+  EXPECT_FALSE(breakBeforeHeaderKeep(400, 0, kPage, true, kCaption, kHeader, nullptr, 0));
+}
+
+TEST(TableHeaderKeep, ABreakIsOnlyEverAskedForWhenItHelps) {
+  // The property that makes this terminate, swept rather than sampled: it may
+  // return true ONLY when the group fails to fit where it stands AND fits an
+  // empty page. Otherwise a break would produce the same stranding one page
+  // later, having blanked a page on the way.
+  for (int cursor = 0; cursor <= kPage; cursor += 25) {
+    for (const int rowH : {20, 60, 200, 400, 900}) {
+      const int rows[2] = {rowH, rowH};
+      for (int count = 0; count <= 2; count++) {
+        for (const int lead : {0, kCaption}) {
+          if (!breakBeforeHeaderKeep(cursor, 0, kPage, true, lead, kHeader, rows, count)) continue;
+          // Some rung of the ladder must be both too big for here and small
+          // enough for an empty page.
+          bool justified = false;
+          for (int k = count; k >= (count > 0 ? 1 : 0); k--) {
+            int group = lead + kHeader + k * rowH;
+            if (cursor + group > kPage && group <= kPage) justified = true;
+          }
+          EXPECT_TRUE(justified) << "asked for a pointless break at cursor " << cursor << " rowH " << rowH
+                                 << " count " << count << " lead " << lead;
+        }
+      }
+    }
+  }
+}

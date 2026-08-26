@@ -335,6 +335,22 @@ CP_HIRES_FAMILY(nittitypewriter14, 3, nittitypewriter_14_regular, nittitypewrite
 #endif
 
 #ifndef OMIT_FONTS
+// XXS (8 pt) and XS (10 pt), added 2026-08-26 with the two new reader slots.
+// The built-in ramp is {8,10,12,14,16,18} and keeps its own 2 pt step; it does
+// NOT match the SD families' point sizes, so the same slot reads one step
+// larger here than on an installed family. Measured in src/ReaderFontSizes.h.
+EpdFont lfReader8RegularFont(&librefranklin_reader_8_regular);
+EpdFont lfReader8BoldFont(&librefranklin_reader_8_bold);
+EpdFont lfReader8ItalicFont(&librefranklin_reader_8_italic);
+EpdFont lfReader8BoldItalicFont(&librefranklin_reader_8_bolditalic);
+EpdFontFamily librefranklinReader8FontFamily(&lfReader8RegularFont, &lfReader8BoldFont, &lfReader8ItalicFont,
+                                             &lfReader8BoldItalicFont);
+EpdFont lfReader10RegularFont(&librefranklin_reader_10_regular);
+EpdFont lfReader10BoldFont(&librefranklin_reader_10_bold);
+EpdFont lfReader10ItalicFont(&librefranklin_reader_10_italic);
+EpdFont lfReader10BoldItalicFont(&librefranklin_reader_10_bolditalic);
+EpdFontFamily librefranklinReader10FontFamily(&lfReader10RegularFont, &lfReader10BoldFont, &lfReader10ItalicFont,
+                                              &lfReader10BoldItalicFont);
 EpdFont lfReader12RegularFont(&librefranklin_reader_12_regular);
 EpdFont lfReader12BoldFont(&librefranklin_reader_12_bold);
 EpdFont lfReader12ItalicFont(&librefranklin_reader_12_italic);
@@ -353,14 +369,16 @@ EpdFontFamily librefranklinReader12FontFamily(&lfReader12RegularFont, &lfReader1
   EpdFontFamily librefranklinReader##sz##HiRes##t##FontFamily(                             \
       &lfReader##sz##HiRes##t##R, &lfReader##sz##HiRes##t##B, &lfReader##sz##HiRes##t##I,   \
       &lfReader##sz##HiRes##t##BI)
-// 12/16/18 only: 14 pt is declared OUTSIDE this block, beside its own 1x twin,
-// because OMIT_FONTS strips the other three and 14 is the default reading size
+// 8/10/12/16/18: 14 pt is declared OUTSIDE this block, beside its own 1x twin,
+// because OMIT_FONTS strips the other five and 14 is the default reading size
 // every build must have. Getting this wrong is a link error naming a family
 // that exists in one configuration and not the other.
 #if CROSSPOINT_RENDER_SCALE >= 2
+CP_READER_HIRES(8, 2); CP_READER_HIRES(10, 2);
 CP_READER_HIRES(12, 2); CP_READER_HIRES(16, 2); CP_READER_HIRES(18, 2);
 #endif
 #if CROSSPOINT_RENDER_SCALE >= 3
+CP_READER_HIRES(8, 3); CP_READER_HIRES(10, 3);
 CP_READER_HIRES(12, 3); CP_READER_HIRES(16, 3); CP_READER_HIRES(18, 3);
 #endif
 #endif
@@ -700,6 +718,10 @@ void setupDisplayAndFonts(bool seamless = false) {
                                     librefranklinReader14HiRes##t##FontFamily)
 #else
 #define CP_REG_HIRES_READER(t)                                                       \
+  renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_8_FONT_ID,                  \
+                                    librefranklinReader8HiRes##t##FontFamily);       \
+  renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_10_FONT_ID,                 \
+                                    librefranklinReader10HiRes##t##FontFamily);      \
   renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_12_FONT_ID,                 \
                                     librefranklinReader12HiRes##t##FontFamily);      \
   renderer.registerHiResBuiltinFont(LIBREFRANKLIN_READER_14_FONT_ID,                 \
@@ -726,6 +748,8 @@ void setupDisplayAndFonts(bool seamless = false) {
           (int)cp::renderScale());
 #endif
 #ifndef OMIT_FONTS
+  renderer.insertFont(LIBREFRANKLIN_READER_8_FONT_ID, librefranklinReader8FontFamily);
+  renderer.insertFont(LIBREFRANKLIN_READER_10_FONT_ID, librefranklinReader10FontFamily);
   renderer.insertFont(LIBREFRANKLIN_READER_12_FONT_ID, librefranklinReader12FontFamily);
   renderer.insertFont(LIBREFRANKLIN_READER_16_FONT_ID, librefranklinReader16FontFamily);
   renderer.insertFont(LIBREFRANKLIN_READER_18_FONT_ID, librefranklinReader18FontFamily);

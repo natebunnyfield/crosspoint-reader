@@ -70,6 +70,10 @@ extern SdCardFontSystem sdFontSystem;
 // sd_font_stub.cpp. Loads a family's Nth installed size rather than the size
 // nearest a nominal 12/14/16/18 — see the comment on renderReadingSpecimen().
 int loadSdFontByOrdinal(const char* familyName, uint8_t ordinal, GfxRenderer& renderer);
+// Slots this family installs — SIX for every installed family since 2026-08-26,
+// four for a buildable-only recipe. The specimen loops below take their bound
+// from this rather than a literal, so a ramp that grows is photographed whole.
+int installedOrdinalCount(const char* familyName);
 
 // Global font objects, mirroring src/main.cpp — including ALL FOUR styles per
 // family. Registering only regular+bold here would make italic silently fall
@@ -250,6 +254,9 @@ bool renderCalendarWestside(int year, int month, int day, const char* outPath) {
 // One page per point size: four sizes of two families would overflow the 792px
 // panel and silently clip.
 bool renderFontSpecimen(const char* famA, const char* famB, const char* outDir) {
+  // Four, deliberately: this A/B mode is keyed on NOMINAL point size
+  // (kPointSizes / sd_font_stub's nominalPointSize, both 12/14/16/18), not on
+  // the reader's ordinal slots, so the six-slot ramp does not reach it.
   for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
     const int idA = sdFontSystem.loadForDisplay(famA, sizeEnum, renderer);
     const int idB = sdFontSystem.loadForDisplay(famB, sizeEnum, renderer);
@@ -565,7 +572,8 @@ bool renderInlineSpecimen(const char* family, const char* outDir) {
   static const char* kPara5 = "the sum of the parts is not the whole of it";
   static const char* kPara6 = "<i>the sum of the parts is not the whole of it</i>";
 
-  for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
+  const int slots = installedOrdinalCount(family);
+  for (uint8_t sizeEnum = 0; sizeEnum < slots; ++sizeEnum) {
     const int id = loadSdFontByOrdinal(family, sizeEnum, renderer);
     if (id == 0) {
       fprintf(stderr, "%s: missing at slot %u\n", family, sizeEnum);
@@ -725,7 +733,8 @@ bool drawReadingPage(const char* family, uint8_t sizeEnum, uint8_t clearValue, b
 }  // namespace
 
 bool renderReadingSpecimen(const char* family, const char* outDir) {
-  for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
+  const int slots = installedOrdinalCount(family);
+  for (uint8_t sizeEnum = 0; sizeEnum < slots; ++sizeEnum) {
     if (!drawReadingPage(family, sizeEnum, 0xFF, /*report=*/true)) return false;
     char path[256];
     snprintf(path, sizeof(path), "%s/reading_%s_%u.bmp", outDir, family, sizeEnum);
@@ -818,7 +827,8 @@ bool renderReadingAaSpecimen(const char* family, const char* outDir) {
 
   renderer.setGrayscaleAaStrength(GfxRenderer::AA_STANDARD);
 
-  for (uint8_t sizeEnum = 0; sizeEnum < 4; ++sizeEnum) {
+  const int slots = installedOrdinalCount(family);
+  for (uint8_t sizeEnum = 0; sizeEnum < slots; ++sizeEnum) {
     // Pass 0 draws AND writes the BMP + stats (it is renderReadingSpecimen's
     // own body); passes 1 and 2 only need the same glyphs re-drawn, so the
     // whole specimen is replayed each time with the render mode changed.

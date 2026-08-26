@@ -71,7 +71,16 @@ HIRES_SCALES=(${CROSSPOINT_HIRES_SCALES:-2 3})
 # uncompressed, no --pnum), and distinct symbols mean regenerating one set can
 # never silently downgrade the other — the trap the old shared Noto 12 pt cut
 # carried.
-LIBREFRANKLIN_READER_SIZES=(12 14 16 18)
+# Six sizes since 2026-08-26 (owner: "cut XS and XXS versions of every s tiers
+# shipping font"). This ramp keeps its own 2 pt step and is NOT the SD
+# families' ramp — the same slot reads one step larger here. See
+# src/ReaderFontSizes.h for the measured offset.
+# Adding one here also needs: a header include in builtinFonts/all.h (1x and
+# every hi-res tier), an id in src/fontIds.h, the EpdFont/EpdFontFamily globals
+# plus CP_READER_HIRES and the insertFont call in src/main.cpp, and a case in
+# CrossPointSettings::getReaderFontId(). Miss the last one and the size is
+# selectable but renders as 14 pt, silently.
+LIBREFRANKLIN_READER_SIZES=(8 10 12 14 16 18)
 
 for size in ${LIBREFRANKLIN_READER_SIZES[@]}; do
   for style in ${READER_FONT_STYLES[@]}; do

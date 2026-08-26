@@ -22,6 +22,44 @@ italic — Junicode Expanded SemiBold at ENLA 14, x1.25, word space −0.09 em; 
 first installed family whose roman and italic come from different typefaces.
 Details in the `installed_families:` comment block in `sd-fonts.yaml`.
 
+## Six size slots, not four (2026-08-26)
+
+Every family in `installed_families:` ships **six** cuts — XXS / XS / S / M /
+L / XL — since the owner's 2026-08-26 ruling, "cut XS and XXS versions of every
+s tiers shipping font". `READER_FONT_SLOT_COUNT` is 6 and the built-in Libre
+Franklin fallback ramp is `{8,10,12,14,16,18}` to match.
+
+**The two new slots were inserted in size order and nothing was migrated.** That
+is the owner's own scope ruling — "the reindexing never matters because it is
+just me using this" — so every stored `fontSizeSlot`, which is an INDEX, shifted
+meaning by two exactly once and the cost was one re-pick. Do not read that as a
+finding that the field is safe: `CrossPointSettings.h` still carries the scars
+from 1.4 and 1.5, and the waiver holds only while the population is one.
+
+**Point sizes still differ per family, because the anchor is x-height.** The new
+slots were derived by sweeping every installed family from 6 to 11 pt and
+reading x-height back out of the built `.cpfont`s, exactly as the original four
+were — NOT by subtracting two points from each ramp, which would have been wrong
+in both directions (Libre Franklin reaches at 10 pt what Coelacanth needs 13 pt
+for). Seven families land on x-height 8 and 10 px; Inknut/Junicode lands on 9
+and 11 because its whole ramp has always run a pixel large. The picks, the
+Almendra 6-vs-7 pt call and the measured advanceY ramps live in the
+`Slot uniformity` comment block in `lib/EpdFont/scripts/sd-fonts.yaml`, which is
+the authority.
+
+**A buildable-only recipe still ships four**, and that is fine: a family whose
+count is not exactly `READER_FONT_SLOT_COUNT` falls back to point-size-only
+labels in the picker (`buildFontSizeSetting`, `src/SettingsList.h`) rather than
+inventing names, and `findClosestReaderSize` clamps the top two slots onto its
+largest cut. `test/reader_font_sizes` pins both behaviours, along with the four
+places the ramp is written down — miss the `case` in `getReaderFontId()` and a
+slot is selectable, labelled, and renders at 14 pt with nothing in the log.
+
+Measured cost of the two slots, 2026-08-26: installed fonts +14,958,002 bytes
+(CPZ1 1x+2x, 51.9 → 66.2 MB) and firmware flash +266,882 bytes (76.9% → 81.0%),
+the latter being the built-in fallback's own 8 and 10 pt cuts. Full write-up and
+the rendered proof pages: `TODO.md` T-023.
+
 **Physical device SD cards are re-verified per provisioning, not per ruling.**
 BUNNYFIELDS was reprovisioned and hash-verified with the then-six on
 2026-08-15 and has NOT been reprovisioned since TeX Gyre Heros joined;

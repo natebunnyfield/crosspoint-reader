@@ -94,7 +94,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // "fontSizeSlot" key exists precisely because 0..3 is ambiguous in the old one.
   static constexpr uint8_t LEGACY_FONT_SIZE_MAX = 3;
   static constexpr uint8_t DEFAULT_FONT_POINT_SIZE = 14;
-  static constexpr uint8_t DEFAULT_FONT_SIZE_SLOT = 1;  // M, = 14pt on the built-in ramp
+  // M. Moved 1 -> 3 on 2026-08-26 when XXS and XS were inserted below S: the
+  // slot is an INDEX, so the default has to move with the insertion or a fresh
+  // install reads at XS. Still 14 pt on the built-in ramp.
+  static constexpr uint8_t DEFAULT_FONT_SIZE_SLOT = 3;  // M, = 14pt on the built-in ramp
   enum LINE_COMPRESSION { TIGHT = 0, NORMAL = 1, WIDE = 2, LINE_COMPRESSION_COUNT };
   enum PARAGRAPH_ALIGNMENT {
     JUSTIFIED = 0,

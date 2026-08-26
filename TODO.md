@@ -131,7 +131,85 @@ shipping eight families' worth of them.
 2x, every existing install still rendering the size it rendered before the
 update, a measured installed-size figure, and a rendered page at each new size.
 
-Not started.
+**DONE 2026-08-26.** The ramp is `{XXS, XS, S, M, L, XL}`, inserted in size
+order, no migration, per the ruling above. Proof page (every family, both new
+slots, native panel pixels): https://claude.ai/code/artifact/7fa23ef7-b0ba-4ccd-9356-ea8f76273adb
+
+**8 pt IS legible, on all eight** — the gating question, answered against
+rendered pages rather than reasoning. Four styles, accented capitals, the math
+row and the confusables row all hold at the new bottom slot. The stems survive
+because the panel has four gray levels to spend on them; a 1-bit panel is what
+would have killed this, not a small one. **Almendra is the marginal one** and is
+the one to re-judge if any gets rejected: the lightest face in the set, and its
+XXS line is proportionally the tightest at 19 px of leading against 23
+everywhere else. That is whole-pixel rounding on a 6 pt cut, not a collision —
+the plain-text clearance audit (`~/Downloads/crosspoint_fonts_s_tier_sources/cpfont_render.py`)
+reads +4 there, better than shipped Coelacanth's +1, and all sixteen new cuts
+pass it.
+
+**The sizes are NOT "two points off each ramp", and that matters.** The eight
+families have never shared point sizes, they share measured x-height — so the
+new slots were derived the way the original four were, by sweeping every family
+6-11 pt and reading x-height back out of the built `.cpfont`s. The picks:
+Edgar 8/10, TeX Gyre Schola 8/10, Libris 8/10, Coelacanth 9/11, Libre
+Franklin 7/9, TeX Gyre Heros 7/9, Inknut 7/9, Almendra 6/8. Seven land on
+x-height 8/10 exactly; Inknut lands on 9/11 because its whole ramp has always
+run +1. Derivation and the Almendra 6-vs-7 pt call are written up in the
+`Slot uniformity` block of `sd-fonts.yaml`.
+
+**Measured cost** (the estimates in this entry were both wrong, in opposite
+directions):
+- **Installed fonts +14,958,002 B.** CPZ1 1x+2x seed tree 51.9 MB -> 66.2 MB,
+  +27.5%. Raw +35.4 MB (179.6 -> 206.7 MB), so +20.7% raw, not the +50% guessed
+  above — file size goes as ppem^2 and these are the smallest cuts in the set.
+  The new files compress WORSE than the old (0.40 vs 0.30) because small glyph
+  bitmaps hold less redundancy per byte. The "117.7 MB -> 34.8 MB" figure quoted
+  above is stale: it is `docs/seed-font-compression.md`'s SEVEN-family, 56-file
+  measurement, and the tree is eight families / 64 files now.
+- **Firmware flash +266,882 B**, 76.9% -> 81.0% of 6,553,600 (`-e default`).
+  RAM +64 B. That is the built-in Libre Franklin fallback gaining its own 8 and
+  10 pt cuts in four styles across all three tiers. It is not optional: the slot
+  is an index into whatever ramp is active, so a reader with no SD family would
+  otherwise pick a slot the binary cannot draw.
+
+**Adversarial review found one real regression in this change, now fixed.**
+`getSmallestReaderFontId()` is the wide-table step-down and returned a bare
+`LIBREFRANKLIN_READER_12_FONT_ID`. That was safe while 12 was the FLOOR of the
+ramp; with XXS and XS below it, a reader on slot 0 or 1 got a rotated wide table
+set at 12 pt on a page set at 8 or 10 — a "size down" that is a size up, and
+`tableFontForRotation()` (`ChapterHtmlSlimParser.h:209`) takes it
+unconditionally. It clamps to the body size now, so the step is monotone at
+every slot. `TheWideTableStepDownIsClampedToTheBodySize` pins it.
+
+The same review found the FIRST version of
+`EveryBuiltinRampSizeHasAFontIdCase` was not testing what it claimed: it
+searched the whole rest of the file rather than the function, and asserted the
+`case` and the id SEPARATELY, so a transposed ladder
+(`case 8: return ..._10_FONT_ID;`) passed it — the exact bug class the test is
+named for. It asserts the pairing by regex now, bounded to the function, and
+both a transposed ladder and a wrong `default:` arm are proven to fail it.
+
+Also corrected on the way past: `lib/hal/HalGPIO.h:105` and the `/api/settings`
+example in `docs/webserver-endpoints.md` both still said S/M/L/XL — stale as of
+this change, not before it.
+
+**Two follow-ups, both deliberate, neither blocking:**
+1. `crosspoint-simulator/ios/seedfonts/` still holds the four-size tree. It is a
+   different repo and was out of this task's lane; copy the 32 new files across
+   (1x + 2x, from `fs_/fonts/`) before the next TestFlight build or the phone
+   offers two slots it cannot render.
+2. `fallbackReaderLineHeight()` in `src/activities/reader/EpubReaderActivity.cpp`
+   still lists only 12/14/16/18. It picks the nearest built-in line height for
+   read-aloud rects when no SD font is resident, so at XXS it over-estimates by
+   ~10 px rather than breaking. Left alone because that file was another agent's
+   lane at the time; adding `{8, ...}` and `{10, ...}` to `kBuiltins` closes it.
+
+Also fixed on the way past, because it would have gone silent: the four specimen
+loops in `tools/calendar_preview/render_harness.cpp` were a hardcoded `< 4`, so
+after this landed they would have stopped photographing the top of every ramp
+without failing. They take their bound from `installedOrdinalCount()` now. The
+A/B `fonts` mode deliberately still says 4 — it is keyed on nominal point size,
+not on slots.
 
 
 ### [T-022] Claude results: the FRONT pair should page too

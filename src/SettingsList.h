@@ -78,7 +78,7 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
 // see what a slot resolves to on this family — "M (15pt)".
 //
 // Families that ship exactly READER_FONT_SLOT_COUNT sizes (every family
-// CrossPoint ships) get S/M/L/XL names. A family with a different count — a
+// CrossPoint ships) get XXS/XS/S/M/L/XL names. A family with a different count — a
 // partial install, or a user-built family — falls back to point-size-only
 // labels rather than inventing names, so no installed size becomes unreachable.
 //
@@ -91,7 +91,7 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
 
   // "pt" is deliberately not translated: it is the typographic unit symbol,
   // written the same way in every language CrossPoint ships.
-  static constexpr const char* SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"S", "M", "L", "XL"};
+  static constexpr const char* SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"XXS", "XS", "S", "M", "L", "XL"};
   const bool named = sizes.size() == READER_FONT_SLOT_COUNT;
   std::vector<std::string> labels;
   labels.reserve(sizes.size());

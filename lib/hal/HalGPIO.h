@@ -102,7 +102,7 @@ struct ReadingPageSample {
   // is plumbed through here.
   const char* fontFamily = "";   // SETTINGS.sdFontFamilyName, or "" for built-in
   uint8_t fontPointSize = 0;     // resolved pt for the active family + slot
-  uint8_t fontSizeSlot = 0;      // S/M/L/XL, the persisted truth
+  uint8_t fontSizeSlot = 0;      // XXS/XS/S/M/L/XL, the persisted truth
   uint8_t lineSpacing = 0;       // TIGHT / NORMAL / WIDE
   uint8_t lineGridEnabled = 0;
   uint8_t justifyThresholdChars = 0;

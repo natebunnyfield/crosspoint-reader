@@ -167,7 +167,18 @@ namespace {
 //      word the setting would have been inert on every already-paginated book
 //      until the cache was cleared by hand. The bump itself is for the v50
 //      files already on cards, which carry no such word.
-constexpr uint8_t SECTION_FILE_VERSION = 51;
+// v52: a table's header row, and any caption above it, keep with the first body
+//      rows (owner ruling 2026-08-26, "don't split up table header or caption
+//      from rest (when possible). intact is best"). A LAYOUT change and nothing
+//      else -- no header field grows, exactly as for v50. It moves page
+//      BOUNDARIES: emitBufferedTableAsColumns now completes the page ahead of a
+//      header that would otherwise be the last thing on it, so every page after
+//      that table in the section shifts. A section served from a v51 cache is
+//      never parsed again, so without the bump the fix would apply only to
+//      books that had never been opened -- and a reader who saw the reported
+//      page would go on seeing it. Every book on every card repaginates once,
+//      which is the cost of the bump and is accepted.
+constexpr uint8_t SECTION_FILE_VERSION = 52;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
