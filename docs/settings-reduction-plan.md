@@ -84,11 +84,11 @@ list row, the JSON key, and any pin; consumers read the constant.
 | `pwrBtnFootnoteBack` | 1 | 1 | **MED-HIGH** | Sub-option of a pinned setting. |
 | `backShortToFileBrowser` | 0 | 0 | **MED-HIGH** | Navigation tweak nobody can reach. |
 | `sideButtonLayout` | PREV_NEXT | PREV_NEXT | **MED** | You are right-handed and ruled CCW out; Up=Prev matches. But it also carries DISABLED, which a pocket-carry user genuinely wants. Deleting kills that escape hatch. |
-| `lineSpacing` | NORMAL | NORMAL | **MED** | Reading-taste, but you withdrew the Reader tab yourself. Risk: cache-invalidation key — hardcoding simplifies the invalidation matrix. |
+| ~~`lineSpacing`~~ | NORMAL | **ROW RESTORED 2026-08-25** | — | Back as a row on Typography Settings, owner: "put or move line grid, line spacing, letter spacing, justified text to Typography Settings". The field was never `constexpr` — the reader's Confirm+side chord always stepped it on-device, so only the row had gone. |
 | `paragraphAlignment` | JUSTIFIED | JUSTIFIED | **MED** | Same class. BOOK_STYLE exists because someone cared once; was it you? |
 | `extraParagraphSpacing` | 1 (on) | 1 | **MED** | Same class. |
 | `embeddedStyle` | 1 (on) | 1 | **MED** | Whether EPUB CSS is honored. Off is the escape for a badly-styled book — a real reader need, reachable only via web today. |
-| `hyphenationEnabled` | 1 (on) | 1 | **MED** | You invested in the hyphenation trie; off exists for debugging. |
+| ~~`hyphenationEnabled`~~ | 1 (on) | **UNFROZEN 2026-08-25** | — | Now the **Word Breaking** row (Allow hyphens / Keep words whole). "Off exists for debugging" understated it: the flag SWITCHES THE LINE BREAKER, and the total-fit branch was dead code in every shipped build. See `docs/line-breaking-2026-08-25.md`. |
 | `textAntiAliasing` | STANDARD | ? | **LOW-MED** | Four modes and you personally compared AA looks during the CRT work. Likelier: trim to 2 (Off/Standard) than hardcode 1. |
 | `imageRendering` | DISPLAY | DISPLAY | **LOW-MED** | Suppress/placeholder are real memory-pressure escapes on 380KB. I would keep the enum internal even if the row dies. |
 | `clockHasBeenSynced` | 0 | make internal | **HIGH** | Not a preference at all — an NTP debounce flag wearing a toggle costume. Persist it outside the settings list. |
