@@ -181,7 +181,8 @@ currently doing nothing must not repaginate.
 ## 6. The proof, measured
 
 Specimen: `fs_/books/ligatures.epub`, four paragraphs — `stst stst stst`,
-`ff ff ff`, `fh fh fh`, `fi fl`. Almendra, slot XL (17 pt), X3 geometry,
+`ff ff ff`, `fh fh fh`, `fi fl`. Almendra, slot M — 17 pt when this was
+measured, 14 pt since its ramp moved on 2026-08-26 — X3 geometry,
 `CROSSPOINT_SIM_GRAIN_SEED=1` pinned (without it the sim's per-launch grain seed
 is ~2 code values and swamps the effect — `crosspoint-simulator/CLAUDE.md`).
 Card state rebuilt identically for each arm.
@@ -225,7 +226,7 @@ cat > fs_/.crosspoint/state.json <<'J'
 {"openEpubPath":"/books/ligatures.epub","readerActivityLoadCount":0,"showBootScreen":false}
 J
 cat > fs_/.crosspoint/settings.json <<'J'
-{"sdFontFamilyName":"Almendra","fontSizeSlot":3,"fontSize":17,"ligatures":1,"ligaturesOff":"st,fh"}
+{"sdFontFamilyName":"Almendra","fontSizeSlot":3,"fontSize":14,"ligatures":1,"ligaturesOff":"st,fh"}
 J
 CROSSPOINT_SIM_GRAIN_SEED=1 \
 CROSSPOINT_SIM_INPUT_SCRIPT='9000:QUIT' \

@@ -92,9 +92,21 @@
 #
 #   MEASURED at 6-11 pt across all eight, 2026-08-26, and the picks are the
 #   x-height matches: Edgar 8/10, TeX Gyre Schola 8/10, Libris 8/10,
-#   Coelacanth 9/11, Libre Franklin 7/9, TeX Gyre Heros 7/9, Almendra 6/8,
+#   Coelacanth 9/11, Libre Franklin 7/9, TeX Gyre Heros 7/9,
 #   InknutJunicode 7/9 (its ramp has always run +1, 13/15/17/19, so its new
-#   slots are 9 and 11 px of x-height, not 8 and 10).
+#   slots are 9 and 11 px of x-height, not 8 and 10). Almendra was 6/8 here
+#   and no longer is -- see the next paragraph, and do not re-add it.
+#
+#   ALMENDRA IS NO LONGER ONE OF THEM. Later the same day the owner reported
+#   it still reading small, and the x-height anchor turned out to be the
+#   reason rather than the fix: at matched x-height that face carries a fifth
+#   less ink per character than any other installed family. Its ramp is
+#   anchored on INK PER CHARACTER instead and runs 8/10/12/14/16/18, two
+#   x-height pixels over this table at every slot. Its recipe carries the
+#   measurement; docs/almendra-size-match-2026-08-26.md carries all eight
+#   families' numbers. Nothing else moved — the other seven are still
+#   x-height matches, and the anchor stays x-height for every family that
+#   does not measurably break it.
 #
 #   COELACANTH XXS WAS ALSO A CHOICE: 8 pt and 9 pt BOTH build to x-height 8
 #   (hinting skips the value between them), so x-height alone does not decide
@@ -104,15 +116,17 @@
 #   long-extender face, so it runs looser than the tier at every slot; that is
 #   ink, not drift, and the new slots inherit it.
 #
-#   ALMENDRA XXS WAS A REAL CHOICE, not an automatic one. 6 pt gives x-height
-#   8 exactly and advanceY 19; 7 pt gives x-height 9 and advanceY 23, which
-#   fits the leading ramp better. 6 pt wins on two counts: it keeps the 2 px
-#   x-height step every other family has, and at 7 pt XXS and XS would have
-#   been one x-height pixel apart — two adjacent picker slots that barely
-#   differ. The cost is that Almendra's XXS line is proportionally tight
-#   (19 px on x-height 8, against ~23 elsewhere), which is a whole-pixel
-#   rounding artifact of a 6 pt cut and not a collision: the plain-text
-#   clearance audit reads +4 there, better than shipped Coelacanth's +1.
+#   ALMENDRA'S XXS WAS A REAL CHOICE, and it was OVERTAKEN the same day.
+#   The 6-vs-7 pt argument below is kept because its second half is the
+#   warning that the whole ramp then failed: 6 pt won on x-height (8 px
+#   exactly, keeping the 2 px step) but its advanceY came out 19 against ~23
+#   everywhere else — a family whose glyphs match on x-height and whose LINE
+#   is four pixels short is a family whose letters are carrying less than the
+#   slot is sized for, which is exactly what the ink measurement later found
+#   at all six slots. The XXS is 8 pt now and the line is 23. The original
+#   note, for the record: 6 pt gives x-height 8 exactly and advanceY 19; 7 pt
+#   gives x-height 9 and advanceY 23; 6 pt kept the 2 px x-height step and
+#   kept XXS and XS more than one x-height pixel apart.
 #
 #   metrics overrides implement the leading: the .cpfont's
 #   advanceY = ceil((ascent - descent)/1000 * pt * 150/72). Two floors bound
@@ -131,7 +145,9 @@
 #   23/28/34/39/45/51, not the 34/40/46/51 the original four slots targeted —
 #   slots 3 and 4 land a pixel under and no span fixes only those two.
 #   Rosarivo is 32/39/45/51, Coelacanth 25/30/36/41/49/55 (floor-bound), and
-#   Almendra 19/26/32/39/45/55.
+#   Almendra 23/29/34/40/46/51 since 2026-08-26 — Libris ADF's ramp exactly,
+#   and the closest to this target of the eight. It was 19/26/32/39/45/55 on
+#   the x-height-anchored ramp its recipe describes.
 #
 #   The formula is also not plain ceil(): FreeType rounds
 #   face.size.height to whole pixels before fontconvert's norm_ceil sees it,
@@ -614,24 +630,82 @@ families:
     # on 2026-08-20. Costs 0.97 -> 4.11 MB per tier, which was the owner's call
     # to make rather than mine.
     intervals: reading
-    # READ BACK from the built .cpfonts on 2026-08-24, correcting a computed
-    # column that was off by a pixel at two slots (it said 33/39/46/55): xh
-    # 12/14/16/18 — EXACT at all four — and advY 32/39/45/55, against the
-    # tier's 34/39/45/51.
+    # THE ONE INSTALLED FAMILY NOT ANCHORED ON X-HEIGHT, since 2026-08-26
+    # (owner: "increase all of almendra's font sizes to better match other
+    # fonts"). Its old ramp 6/8/10/12/14/17 matched the tier's x-height
+    # 8/10/12/14/16/18 EXACTLY at all six slots and still read small on the
+    # page, because x-height is a proxy for apparent size and this face breaks
+    # the proxy: it is the lightest in the set and the most large-on-body.
     #
-    # The hinted build measures ~0.55 em x-height (the old "0.485, standard
-    # ramp" estimate read two slots big), and its xh curve is nonlinear: 18 px
-    # needs 17 pt while 16 px needs only 14 pt, so slot 3 runs +4 px loose —
-    # one span cannot fit the 14->17 pt jump. xh takes priority.
+    # THE METRIC THAT EXPLAINS IT IS INK PER CHARACTER — the count of ink
+    # levels (0-3, summed and divided by 3) a .cpfont actually stores for a
+    # fixed 176-character passage, measured on the shipped 1x files of all
+    # eight installed families. At MATCHED x-height Almendra was BELOW the
+    # tier's lightest family at every slot, by 41 / 39 / 15 / 20 / 22 / 11 %:
     #
-    # Re-checked at promotion, because a trial's fit is allowed to be rough and
-    # an installed family's is not: no `metrics:` span and no
-    # `line_height_scale` fixes slot 3, since both are FAMILY-WIDE multipliers.
-    # Pulling 55 down to 51 is a 0.927 factor, which would take the two exact
-    # slots to 36 and 42 and slot 0 to 30. Four px loose at the largest size,
-    # with three slots right, is the better page. Leave it.
-    sizes: [6, 8, 10, 12, 14, 17]
-    metrics: {ascent: 1114, descent: -429, linegap: 0}
+    #   slot        0      1      2      3      4      5
+    #   Almendra 10.59  17.96  30.06  41.20  55.64  81.59   (old ramp)
+    #   lightest 17.87  29.28  35.19  51.79  70.99  91.64   (LibreFranklin)
+    #   median   20.62  31.60  45.75  57.24  83.00 103.10
+    #
+    # Scaled for size (ink per character / x-height squared) slot 3 reads
+    # 0.210 against 0.264 for the next-lightest — Almendra carries a FIFTH
+    # less ink per letter than any other installed face. Cap height and set
+    # width say the same thing more weakly (cap 18 against a 19-23 band, mean
+    # advance 11.81 against 12.20-15.74) and ascender height says nothing at
+    # all: 20 px sits inside the tier's 19-24. Page blackness — ink as a
+    # fraction of line-box area — is 10.1-11.0 % against a tier band of
+    # 11.1-14.2 %, and that one is SCALE-INVARIANT: raising the ramp does not
+    # move it, and it is the residual this change does not fix. It cannot be
+    # fixed by a point size; a heavier cut of the face would be the only
+    # answer and Almendra ships none.
+    #
+    # +2 pt AT EVERY SLOT is what the measurement asks for, uniformly — it is
+    # the smallest whole-point rise that puts all six slots inside the tier's
+    # ink-per-character band, and no slot needs more. The new ramp is the
+    # tier's own canonical 8/10/12/14/16/18 (Edgar, TeX Gyre Schola and Libris
+    # all use it).
+    #
+    # READ BACK from the built .cpfonts on 2026-08-26: xh 10/12/14/16/17/20
+    # (+2 over the tier, +1 at slot 4 because 16 pt renders 17 px and the
+    # 17 pt that would render 18 is not on the ramp -- what hinting skips
+    # near there is 19, not 18), cap
+    # 13/15/18/21/23/27 against the tier's median 12/15/17/20/23/27 — EXACT
+    # at three slots and +1 at the other three, which is the closest any
+    # single metric gets — and advY 23/29/34/40/46/51.
+    #
+    # THE SPAN CAME DOWN 1543 -> 1368 IN THE SAME CHANGE, and that is not a
+    # separate feature: advanceY = ceil((ascent - descent)/1000 * pt *
+    # 150/72), so +2 pt at the old span would have dragged the leading to
+    # 26/33/39/46/52/58, +3..+7 loose against the tier's 23/28/34/40/46/51 and
+    # 11 lines per page where every other family gives 13. 1010/-358 lands
+    # 23/29/34/40/46/51, which is Libris ADF's shipped ramp exactly. Swept and
+    # MEASURED, not computed (FreeType rounds face.size.height to whole pixels
+    # before norm_ceil sees it): the 1352-1372 band is the one that lands it.
+    # Both floors hold at the new sizes — advY clears the worst-style
+    # plain-text ink span + 0.13 em by 3/5/5/7/8/8 px, and the declared
+    # ascender clears the tallest accented capital (Å, then Ä at 18 pt) by
+    # +1/+2/+3/+3/+4/+3 px.
+    #
+    # The old recipe's note that no span fixes slot 3 was TRUE and is now
+    # moot: it was reasoning about a ramp anchored on x-height, where slot 3
+    # needed 17 pt for 18 px while slot 2 needed only 14 pt for 16. Re-anchored
+    # on ink, the point sizes are evenly spaced again and one span fits them.
+    #
+    # A 3x TIER OF THIS FAMILY NEEDS --drop-codepoints 0x2E3B, and it needed
+    # it before the +2 as well -- this is NOT a regression, and the first
+    # draft of this note claimed it was. Same glyph and same reason as TeX
+    # Gyre Heros below: U+2E3B THREE-EM DASH comes from the fallback chain and
+    # measures 207 px at 2x/18 pt against EpdGlyph's uint8 cap of 255. At 3x
+    # that projects to ~310 px on the new top size and ~293 on the old one --
+    # both over. The 3x tree on fs_/fonts/Almendra/3x/ agrees: the dash is
+    # there at 18 and 24 pt and gone above. 1x and 2x have 150 and 48 px of
+    # headroom, so this costs nothing today, and 3x was dropped 2026-08-23.
+    #
+    # Full write-up, every family's numbers and the three rejected
+    # alternatives: docs/almendra-size-match-2026-08-26.md.
+    sizes: [8, 10, 12, 14, 16, 18]
+    metrics: {ascent: 1010, descent: -358, linegap: 0}
     # raw.githubusercontent ofl/almendra paths error out; these are the static
     # TTFs the css2 API serves for ital,wght 0,400 / 0,700 / 1,400 / 1,700 —
     # all four styles are real.

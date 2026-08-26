@@ -1049,8 +1049,8 @@ cannot render a codepoint the build pruned. There is no scaling path except the
 
 An italic can therefore have a different `advanceY` from the regular in the
 same file, a different ligature set, and a completely different kern class
-partition. In the worked example all four Almendra styles share `advanceY=45`,
-`ascender=33`, `descender=−13`, but their kern class counts are 10×6, 8×8, 10×5
+partition. In the worked example all four Almendra styles share `advanceY=40`,
+`ascender=30`, `descender=−11`, but their kern class counts are 10×6, 8×8, 10×5
 and 8×4 respectively — four genuinely different matrices.
 
 ### 5.4 "Kern and ligature application are runtime table lookups" — what that
@@ -1675,6 +1675,16 @@ The silent ones first, since those are what cost time.
 this walk and the tables in §2 disagreed, the tables were wrong and were
 corrected.*
 
+*Re-read 2026-08-26, after Almendra's metrics span moved 1543 → 1368 with its
+new point-size ramp (`docs/almendra-size-match-2026-08-26.md`). Six cells
+changed and nothing else did: `advanceY` 45 → **40**, `ascender` 33 → **30**,
+`descender` −13 → **−11**, in all four styles, plus the three bytes those
+occupy in the TOC hexdump. Everything structural — 61 intervals, 2,676 glyphs,
+`dataOffset` 160, four ligature pairs, the four kern matrices, the file's
+1,089,413 bytes — is unchanged, because the point size did not move: 14 pt was
+slot 4 on the old ramp and is slot 3 on the new one, and only the leading was
+retuned.*
+
 ### 10.1 The header
 
 ```
@@ -1697,7 +1707,7 @@ Four entries, 32 bytes each, at offsets 32 / 64 / 96 / 128. The first, at
 offset 32:
 
 ```
-00000020: 0000 0000 3d00 0000 740a 0000 2d21 00f3  ....=...t...-!..
+00000020: 0000 0000 3d00 0000 740a 0000 281e 00f5  ....=...t...(...
 00000030: ff0c 0009 000a 0604 a000 0000 0000 0000  ................
 ```
 
@@ -1709,9 +1719,9 @@ Field by field:
 | 1 | `00 00 00` | pad | zero |
 | 4 | `3D 00 00 00` | `intervalCount` | **61** |
 | 8 | `74 0A 00 00` | `glyphCount` | **2676** |
-| 12 | `2D` | `advanceY` | **45** px |
-| 13 | `21 00` | `ascender` | **33** px |
-| 15 | `F3 FF` | `descender` | **−13** px |
+| 12 | `28` | `advanceY` | **40** px |
+| 13 | `1E 00` | `ascender` | **30** px |
+| 15 | `F5 FF` | `descender` | **−11** px |
 | 17 | `0C 00` | `kernLeftEntryCount` | **12** |
 | 19 | `09 00` | `kernRightEntryCount` | **9** |
 | 21 | `0A` | `kernLeftClassCount` | **10** |
@@ -1728,10 +1738,10 @@ All four entries:
 
 | styleId | intervals | glyphs | advY | asc | desc | kernL | kernR | kLC | kRC | ligs | dataOffset |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 regular | 61 | 2676 | 45 | 33 | −13 | 12 | 9 | 10 | 6 | 4 | 160 |
-| 1 bold | 61 | 2676 | 45 | 33 | −13 | 9 | 9 | 8 | 8 | 2 | 270,649 |
-| 2 italic | 61 | 2676 | 45 | 33 | −13 | 11 | 8 | 10 | 5 | 2 | 545,120 |
-| 3 bold-italic | 61 | 2676 | 45 | 33 | −13 | 9 | 13 | 8 | 4 | 2 | 815,861 |
+| 0 regular | 61 | 2676 | 40 | 30 | −11 | 12 | 9 | 10 | 6 | 4 | 160 |
+| 1 bold | 61 | 2676 | 40 | 30 | −11 | 9 | 9 | 8 | 8 | 2 | 270,649 |
+| 2 italic | 61 | 2676 | 40 | 30 | −11 | 11 | 8 | 10 | 5 | 2 | 545,120 |
+| 3 bold-italic | 61 | 2676 | 40 | 30 | −11 | 9 | 13 | 8 | 4 | 2 | 815,861 |
 
 Note §5.3 in the concrete: the four styles agree on coverage and vertical
 metrics and share nothing else — four different kern matrices (10×6, 8×8, 10×5,

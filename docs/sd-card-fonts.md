@@ -42,10 +42,17 @@ reading x-height back out of the built `.cpfont`s, exactly as the original four
 were — NOT by subtracting two points from each ramp, which would have been wrong
 in both directions (Libre Franklin reaches at 10 pt what Coelacanth needs 13 pt
 for). Seven families land on x-height 8 and 10 px; Inknut/Junicode lands on 9
-and 11 because its whole ramp has always run a pixel large. The picks, the
-Almendra 6-vs-7 pt call and the measured advanceY ramps live in the
+and 11 because its whole ramp has always run a pixel large. The picks and the
+measured advanceY ramps live in the
 `Slot uniformity` comment block in `lib/EpdFont/scripts/sd-fonts.yaml`, which is
 the authority.
+
+**Almendra is the exception, and it stopped being an x-height match the same
+day** — see [almendra-size-match-2026-08-26.md](almendra-size-match-2026-08-26.md).
+Its ramp is anchored on ink per character and runs 8/10/12/14/16/18, two
+x-height pixels over the table at every slot. Every other family is still an
+x-height match; the anchor changes only for a face that measurably breaks the
+proxy.
 
 **A buildable-only recipe still ships four**, and that is fine: a family whose
 count is not exactly `READER_FONT_SLOT_COUNT` falls back to point-size-only

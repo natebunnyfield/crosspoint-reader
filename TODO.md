@@ -147,12 +147,23 @@ the plain-text clearance audit (`~/Downloads/crosspoint_fonts_s_tier_sources/cpf
 reads +4 there, better than shipped Coelacanth's +1, and all sixteen new cuts
 pass it.
 
+> **SUPERSEDED for Almendra, 2026-08-26** (owner: *"increase all of almendra's
+> font sizes to better match other fonts"*). It WAS the one that got rejected,
+> and the 19 px line above was the visible edge of why. Its ramp is now
+> 8/10/12/14/16/18, anchored on ink per character rather than x-height, with
+> the metrics span retuned so the leading lands 23/29/34/40/46/51. So its XXS
+> is 8 pt and its XXS line is 23, and the `Almendra 6/8` pick below is retired.
+> Nothing else in this entry moved — 8 pt is still legible on all eight, and
+> Almendra now reaches that slot at 8 pt rather than 6. Full account:
+> `docs/almendra-size-match-2026-08-26.md`.
+
 **The sizes are NOT "two points off each ramp", and that matters.** The eight
 families have never shared point sizes, they share measured x-height — so the
 new slots were derived the way the original four were, by sweeping every family
 6-11 pt and reading x-height back out of the built `.cpfont`s. The picks:
 Edgar 8/10, TeX Gyre Schola 8/10, Libris 8/10, Coelacanth 9/11, Libre
-Franklin 7/9, TeX Gyre Heros 7/9, Inknut 7/9, Almendra 6/8. Seven land on
+Franklin 7/9, TeX Gyre Heros 7/9, Inknut 7/9, Almendra 6/8 (retired
+2026-08-26 — see the note above). Seven land on
 x-height 8/10 exactly; Inknut lands on 9/11 because its whole ramp has always
 run +1. Derivation and the Almendra 6-vs-7 pt call are written up in the
 `Slot uniformity` block of `sd-fonts.yaml`.

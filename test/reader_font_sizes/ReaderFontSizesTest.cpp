@@ -270,7 +270,7 @@ TEST(ReaderFontSizes, EveryInstalledFamilyShipsExactlyTheSlotCount) {
 TEST(ReaderFontSizes, EachSlotSelectsItsOwnFileInASixSizeFamily) {
   SdCardFontFamilyInfo fam;
   fam.name = "Almendra";
-  for (const uint8_t pt : {6, 8, 10, 12, 14, 17}) {
+  for (const uint8_t pt : {8, 10, 12, 14, 16, 18}) {
     fam.files.push_back({"/fonts/Almendra/Almendra_" + std::to_string(pt) + ".cpfont", pt, 0});
   }
   uint8_t last = 0;
