@@ -579,6 +579,21 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Unlocked for the same reason as readerRenderSpec(); see the note above.
   ReaderRenderSpec readerRenderSpec(uint16_t viewportWidth, uint16_t viewportHeight) const;
 
+  // Rewrite `ligaturesOff` into the canonical form the model uses: parsed,
+  // sorted, deduped, malformed tokens dropped. Returns true if the stored text
+  // changed. Idempotent.
+  //
+  // EVERY WRITER MUST GO THROUGH THIS. The spec arrives from three places that
+  // can all spell it loosely -- a hand-edited settings.json, the web settings
+  // API, and an older build's file -- and canonicalize() is what makes
+  // `"fh,st,st"` and `"st,fh"` the same preference with the same fingerprint.
+  // Until 2026-08-25 only fromJson() called it, so a POST of `"st, fh"` was
+  // stored verbatim, echoed back verbatim by the settings GET, and then
+  // silently became `"st"` on the next boot: the space makes ` fh` three
+  // codepoints, which is a malformed token and is dropped. The web UI showed a
+  // value the device did not have and would never have again.
+  bool normalizeLigatureSpec();
+
   // Push the stored ligature preference down into lib/EpdFont, which cannot
   // include this header. Idempotent; call it after anything writes either
   // ligature field.

@@ -114,9 +114,14 @@ struct ReadingPageSample {
 #endif
 
 class HalGPIO {
-#if CROSSPOINT_EMULATED == 0
+  // No `#if CROSSPOINT_EMULATED == 0` around this. The macro is DEFINED
+  // NOWHERE -- not in any platformio.ini, CMakeLists, header or script -- so
+  // the guard evaluated 0 == 0 and was true on every build there has ever
+  // been. Removed 2026-08-25; it was vestigial and, worse, it read like a
+  // working device/simulator switch, which is exactly the mistake
+  // EpubReaderActivity.cpp's note at the SIMULATOR check warns about. The
+  // switch is `SIMULATOR`.
   InputManager inputMgr;
-#endif
 
   bool lastUsbConnected = false;
   bool usbStateChanged = false;

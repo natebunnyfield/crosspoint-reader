@@ -322,8 +322,7 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   // requested here -- an unusual spelling costs nothing until the next
   // ordinary save, and requesting one on every boot that reads an unordered
   // file would write the card on every boot.
-  const std::string canonical = ligatures::canonicalize(ligaturesOff);
-  copyToField(ligaturesOff, canonical.c_str(), sizeof(ligaturesOff));
+  normalizeLigatureSpec();
   applyLigaturePreference();
 
   if (needsResave) {
@@ -361,6 +360,13 @@ ReaderRenderSpec CrossPointSettings::readerRenderSpec(const uint16_t viewportWid
   // lib/EpdFont/LigatureControl.h.
   spec.ligatureFingerprint = ligatures::fingerprint(ligaturesEnabled != 0, ligaturesOff);
   return spec;
+}
+
+bool CrossPointSettings::normalizeLigatureSpec() {
+  const std::string canonical = ligatures::canonicalize(ligaturesOff);
+  if (canonical == ligaturesOff) return false;
+  copyToField(ligaturesOff, canonical.c_str(), sizeof(ligaturesOff));
+  return true;
 }
 
 void CrossPointSettings::applyLigaturePreference() const {

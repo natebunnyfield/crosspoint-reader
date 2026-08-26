@@ -94,12 +94,18 @@ class CssParser {
   void clear() { rulesBySelector_.clear(); }
 
   /**
-   * Check if CSS rules cache file exists
+   * Is there a cache file that THIS build can load?
+   *
+   * Answers about the version, not merely about the file: a css_rules.cache
+   * written by an older CSS_CACHE_VERSION reads as absent, because every caller
+   * uses this to decide whether the stylesheet still needs parsing and a stale
+   * file that skipped the parse produced an empty rule set. See the note at the
+   * definition.
    */
   bool hasCache() const;
 
   /**
-   * Delete CSS rules cache file exists
+   * Delete the CSS rules cache file, whatever version it is.
    */
   void deleteCache() const;
 

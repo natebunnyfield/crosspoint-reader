@@ -31,8 +31,22 @@ enum class SettingAction {
 };
 
 struct SettingInfo {
-  StrId nameId;
-  SettingType type;
+  // BOTH DEFAULTED, and not for tidiness. Every other member of this struct
+  // already carried an initializer, so a default-constructed SettingInfo left
+  // exactly these two indeterminate -- and one is default-constructed on every
+  // LIGATURE row of the Typography screen (TypographySettingsActivity::Row
+  // holds a SettingInfo that a ligature row never fills). That screen then
+  // reads `rows[i].setting.nameId == StrId::STR_LIGATURES` without first asking
+  // whether the row is a setting row, so the comparison was against an
+  // indeterminate enum: undefined behavior, and observably it could match
+  // STR_LIGATURES by accident and show the wrong empty-state text.
+  //
+  // STR_NONE_OPT and an ACTION carrying SettingAction::None are the INERT pair:
+  // settingrow::activate() falls through every branch for them (TOGGLE and ENUM
+  // both require a valuePtr or accessors), so an unfilled row does nothing when
+  // pressed rather than toggling whatever the garbage named.
+  StrId nameId = StrId::STR_NONE_OPT;
+  SettingType type = SettingType::ACTION;
   uint8_t CrossPointSettings::* valuePtr = nullptr;
   std::vector<StrId> enumValues;
   std::vector<std::string> enumStringValues;  // runtime alternative to StrId enumValues (for SD card fonts etc.)

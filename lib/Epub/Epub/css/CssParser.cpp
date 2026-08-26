@@ -874,10 +874,61 @@ CssStyle CssParser::parseInlineStyle(std::string_view styleValue) { return parse
 // Cache file name (version is CssParser::CSS_CACHE_VERSION)
 constexpr char rulesCache[] = "/css_rules.cache";
 
-bool CssParser::hasCache() const { return Storage.exists((cachePath + rulesCache).c_str()); }
+// EXISTENCE IS NOT VALIDITY, and this is a GATE rather than a paragraph.
+//
+// This was a bare `Storage.exists()` until 2026-08-25, which made it a test of
+// the wrong question in the one place it decides whether the stylesheet gets
+// parsed at all. parseCssFiles() returns early when hasCache() is true, and the
+// FULL RE-INDEX path (Epub.cpp, after buildBookBin) calls parseCssFiles()
+// directly. It does not go through the metadata path's
+// `!hasCache() || !loadFromCache()`, whose failed load deletes a stale file as
+// a side effect. So a css_rules.cache written by an older CSS_CACHE_VERSION
+// survived a re-index and the parse was skipped, leaving the parser with ZERO
+// rules resident. Section.cpp's own loadFromCache() then rejected the version
+// and returned false with only a LOG_ERR, so every section built during that
+// session was laid out against an EMPTY rule set and committed as valid at the
+// current section version. A whole book could be read once with none of its
+// stylesheet applied -- every margin, indent and alignment gone -- and nothing
+// said so louder than one log line.
+//
+// SCOPE, traced rather than assumed: this is one session per book, not
+// permanent. The failing load deletes the stale file on its way out, so the
+// NEXT open takes Epub::load's warm branch, finds no cache, reparses and wipes
+// the section directory. And it needs skipLoadingCss == false, which today is
+// only ReaderActivity opening a book with embedded styles on. That is still the
+// common case after a firmware update that moves the book.bin and CSS cache
+// versions together -- the re-index and the stale cache arrive at once.
+//
+// Section.cpp's version-pairing note says the CSS and section versions are kept
+// in step by hand; this was a third path that neither the note nor the pairing
+// covered. Reading the version byte here costs one open on a path whose only
+// true answer is followed by an open anyway.
+bool CssParser::hasCache() const {
+  if (cachePath.empty()) return false;
+  const std::string path = cachePath + rulesCache;
+  // exists() first so a legitimately absent cache does not log an open failure
+  // on every book that has never been parsed.
+  if (!Storage.exists(path.c_str())) return false;
+  HalFile file;
+  if (!Storage.openFileForRead("CSS", path, file)) return false;
+  uint8_t version = 0;
+  const bool current = file.read(&version, 1) == 1 && version == CssParser::CSS_CACHE_VERSION;
+  file.close();
+  if (!current) {
+    LOG_DBG("CSS", "Cache version %u is not %u; treating as absent so it is reparsed", version,
+            CssParser::CSS_CACHE_VERSION);
+  }
+  return current;
+}
 
 void CssParser::deleteCache() const {
-  if (hasCache()) Storage.remove((cachePath + rulesCache).c_str());
+  // NOT gated on hasCache(): that now answers "is there a CURRENT cache", and a
+  // delete asked for by a caller has to remove a stale one too -- otherwise the
+  // metadata path's deleteCache() would leave behind exactly the file whose
+  // staleness sent it down that branch.
+  if (cachePath.empty()) return;
+  const std::string path = cachePath + rulesCache;
+  if (Storage.exists(path.c_str())) Storage.remove(path.c_str());
 }
 
 bool CssParser::saveToCache() const {

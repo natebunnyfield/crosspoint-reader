@@ -1405,18 +1405,37 @@ void CrossPointWebServer::handlePostSettings() {
     }
   }
 
-  // The ligature preference is also held as a PARSED copy inside lib/EpdFont,
-  // which the loop above cannot reach: it writes the byte and the char[] and
-  // stops. Both ligature rows are ordinary getSettingsList() entries, so a POST
-  // persists them correctly and then changes nothing at all until the next
-  // boot -- which reads as a setting the web UI accepts and ignores. Re-push
-  // unconditionally: it parses at most a couple of dozen pairs, and it cannot
-  // be wrong for a POST that touched neither row.
+  // The ligature preference needs two things the generic loop above cannot do,
+  // because that loop writes the byte and the char[] and stops.
+  //
+  // First, CANONICALIZE. The stored spec has to be the canonical spelling --
+  // sorted, deduped, malformed tokens dropped -- and until 2026-08-25 only
+  // fromJson() did that. So a POST of `"st, fh"` was stored verbatim and the
+  // settings GET echoed it back verbatim, while the next boot canonicalized it
+  // to `"st"`: the space makes ` fh` three codepoints, which is a malformed
+  // token and is dropped. The API accepted a value, showed it back, and threw
+  // half of it away out of sight. Normalizing HERE means what is stored is what
+  // is echoed, and the drop -- if there is one -- happens where the client can
+  // see it rather than at the next power-on.
+  //
+  // Second, RE-PUSH. lib/EpdFont holds its own parsed copy and cannot read this
+  // struct, so without this a POST persists correctly and then changes nothing
+  // until the next boot. Unconditional: it parses at most a couple of dozen
+  // pairs, and it cannot be wrong for a POST that touched neither row.
+  const bool ligatureSpecRewritten = SETTINGS.normalizeLigatureSpec();
   SETTINGS.applyLigaturePreference();
   SETTINGS.saveToFile();
 
   LOG_DBG("WEB", "Applied %d setting(s)", applied);
-  server->send(200, "text/plain", String("Applied ") + String(applied) + " setting(s)");
+  String reply = String("Applied ") + String(applied) + " setting(s)";
+  if (ligatureSpecRewritten) {
+    // SURFACED, not silent. The client asked for something this device cannot
+    // hold, and the honest answer is the value it actually has -- a toggle row
+    // that quietly loses a pair reads as a setting that does not stick.
+    LOG_DBG("WEB", "Ligature spec canonicalized to '%s'", SETTINGS.ligaturesOff);
+    reply += String("; ligaturesOff stored as \"") + String(SETTINGS.ligaturesOff) + String("\"");
+  }
+  server->send(200, "text/plain", reply);
 }
 
 // Uses POST (not HTTP DELETE) because ESP32 WebServer doesn't support DELETE with body.

@@ -1613,11 +1613,12 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
 // but the WALK does not, so it is skipped there.
 //
 // THE SWITCH IS `SIMULATOR`, NOT `CROSSPOINT_EMULATED`. The latter reads like
-// the right one and is a trap: it is tested in two places (lib/hal/HalGPIO.h
-// and the simulator's own src/HalGPIO.h) and DEFINED in none, so
-// `#if CROSSPOINT_EMULATED == 0` is true on every build there has ever been.
+// the right one and is a trap: it was DEFINED NOWHERE, so
+// `#if CROSSPOINT_EMULATED == 0` was true on every build there has ever been.
 // A guard written with it would compile this out in the simulator too, which
-// is the one place it has to run, and nothing would say so.
+// is the one place it has to run, and nothing would say so. Its use in
+// lib/hal/HalGPIO.h was deleted 2026-08-25 as vestigial; the simulator's own
+// src/HalGPIO.h still tests it, so the trap is still live.
 void publishReadingSample(const Page& page, const Epub& book, const int spineIndex, const int pageInSpine) {
 #ifndef SIMULATOR
   (void)page;

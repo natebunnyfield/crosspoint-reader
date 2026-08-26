@@ -351,7 +351,7 @@ void Epub::parseCssFiles() const {
 
   // See if we have a cached version of the CSS rules
   if (cssParser->hasCache()) {
-    LOG_DBG("EBP", "CSS cache exists, skipping parseCssFiles");
+    LOG_DBG("EBP", "Current-version CSS cache present, skipping parseCssFiles");
     return;
   }
 

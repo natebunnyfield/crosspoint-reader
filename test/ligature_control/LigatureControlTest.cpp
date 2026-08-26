@@ -144,6 +144,55 @@ TEST(LigatureSpec, TheCeilingRefusesRatherThanDropping) {
   EXPECT_TRUE(ligatures::specSuppresses(overflowed.c_str(), 0x0041, 0x0042));
 }
 
+TEST(LigatureSpec, DuplicatesDoNotSpendCeilingSlots) {
+  // The bug this pins, fixed 2026-08-25: the parse loop bounded on
+  // `count < MAX_SUPPRESSED` while sort/unique ran AFTER it, so duplicate
+  // tokens spent slots that no pair ever occupied. Twenty-four `st`s followed
+  // by `fh` stopped the scan at the twenty-fourth `st` and dropped `fh`
+  // outright, then collapsed to a one-pair spec -- a silent loss on a string
+  // reachable from a hand-edited settings.json and from the web settings API.
+  //
+  // TheCeilingRefusesRatherThanDropping above does NOT cover this: it builds
+  // its spec through specWith(), which hands parse() an already-canonical
+  // string, so it never gets a duplicate anywhere near the ceiling. This one
+  // feeds the raw parser.
+  std::string spec;
+  for (size_t i = 0; i < ligatures::MAX_SUPPRESSED; i++) {
+    if (!spec.empty()) spec += ',';
+    spec += "st";
+  }
+  spec += ",fh";
+
+  const std::string canonical = ligatures::canonicalize(spec.c_str());
+  EXPECT_EQ(canonical, "fh,st");
+  EXPECT_TRUE(ligatures::specSuppresses(canonical.c_str(), CP_S, CP_T));
+  EXPECT_TRUE(ligatures::specSuppresses(canonical.c_str(), CP_F, CP_H))
+      << "a pair after twenty-four duplicates must survive";
+  // And the same must be true of the value the section cache keys on, which is
+  // computed from its own parse() call: a fingerprint off the truncated spec
+  // would have matched a page laid out with `fh` still substituting.
+  EXPECT_EQ(ligatures::fingerprint(true, spec.c_str()), ligatures::fingerprint(true, "fh,st"));
+}
+
+TEST(LigatureSpec, TheCeilingStillHoldsAgainstDistinctPairs) {
+  // The dedupe fix must not have turned the ceiling into a suggestion. Feed the
+  // raw parser MAX_SUPPRESSED + 4 DISTINCT pairs and exactly MAX_SUPPRESSED
+  // survive.
+  std::string spec;
+  for (size_t i = 0; i < ligatures::MAX_SUPPRESSED + 4; i++) {
+    if (!spec.empty()) spec += ',';
+    // Distinct BMP pairs, ascending, so the overflow is the tail.
+    spec += static_cast<char>('A' + static_cast<int>(i));
+    spec += 'B';
+  }
+  const std::string canonical = ligatures::canonicalize(spec.c_str());
+  // MAX_SUPPRESSED pairs, two ASCII bytes each, MAX_SUPPRESSED-1 commas.
+  EXPECT_EQ(canonical.size(), ligatures::MAX_SUPPRESSED * 3 - 1);
+  EXPECT_TRUE(ligatures::specSuppresses(canonical.c_str(), 'A', 'B'));
+  EXPECT_FALSE(ligatures::specSuppresses(canonical.c_str(),
+                                         'A' + static_cast<uint32_t>(ligatures::MAX_SUPPRESSED), 'B'));
+}
+
 TEST(LigatureSpec, TheFullSetFitsTheSettingsField) {
   // CrossPointSettings sizes its char[] from SPEC_BUF_SIZE, so the worst case
   // the model will accept has to fit it -- otherwise a spec the model

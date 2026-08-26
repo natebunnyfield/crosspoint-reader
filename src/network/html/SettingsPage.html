@@ -92,6 +92,18 @@
     .setting-control {
       flex-shrink: 0;
     }
+    /* Format hint under a free-text control. A bare text box says nothing about
+       its format, and the one row that has this ("Ligatures Off") sits directly
+       under a toggle whose name it repeats. */
+    .setting-hint {
+      margin-top: 4px;
+      font-size: 0.78em;
+      line-height: 1.35;
+      color: var(--label-color);
+      opacity: 0.72;
+      text-align: right;
+      max-width: 22em;
+    }
     .setting-control select,
     .setting-control input[type="number"],
     .setting-control input[type="text"],
@@ -359,12 +371,30 @@
     if (setting.type === 'string') {
       const inputType = setting.name.toLowerCase().includes('password') ? 'password' : 'text';
       const val = setting.value || '';
+      // A bare text box says nothing about its format, and "Ligatures Off" sits
+      // directly under the "Ligatures" toggle, so it reads like that toggle's
+      // state rather than a list. It is a comma-separated list of LETTER PAIRS
+      // to suppress -- exactly two characters per item, no spaces -- and the
+      // device drops anything else on the way in, so a hint here is the
+      // difference between typing "st, fh" and getting "st".
+      const hint = STRING_HINTS[setting.key];
       return '<input type="' + inputType + '" id="' + id + '" value="' + escapeHtml(val) + '"' +
-        ' oninput="handleSettingChanged(\'' + setting.key + '\')">';
+        (hint ? ' placeholder="' + escapeHtml(hint.placeholder) + '" title="' + escapeHtml(hint.title) + '"' : '') +
+        ' oninput="handleSettingChanged(\'' + setting.key + '\')">' +
+        (hint ? '<div class="setting-hint">' + escapeHtml(hint.title) + '</div>' : '');
     }
 
     return '';
   }
+
+  // Format hints for free-text settings. Keyed by the settings API key, so a
+  // row that has no hint renders exactly as before.
+  const STRING_HINTS = {
+    ligaturesOff: {
+      placeholder: 'st,fh',
+      title: 'Comma-separated letter pairs to suppress, two characters each and no spaces \u2014 for example st,fh. Anything else in the list is dropped.'
+    }
+  };
 
   function getValue(setting) {
     const el = document.getElementById('setting-' + setting.key);

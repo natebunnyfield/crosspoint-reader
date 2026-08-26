@@ -10,7 +10,9 @@ namespace {
 
 // Parse a spec into canonical packed pairs: sorted ascending, deduped,
 // malformed tokens dropped. Fills `out` (capacity MAX_SUPPRESSED) and returns
-// how many pairs it holds.
+// how many pairs it holds. The MAX_SUPPRESSED ceiling counts DISTINCT pairs --
+// see the insertion below, and the note there for what happened when it did
+// not.
 //
 // "Malformed" is anything that is not exactly two codepoints between commas.
 // It is dropped rather than treated as a parse failure because this string
@@ -35,7 +37,7 @@ size_t parse(const char* spec, uint32_t (&out)[MAX_SUPPRESSED]) {
   if (!spec || !*spec) return 0;
 
   const char* cursor = spec;
-  while (*cursor && count < MAX_SUPPRESSED) {
+  while (*cursor) {
     // Take one comma-delimited token.
     const char* tokenEnd = strchr(cursor, ',');
     const size_t tokenLen = tokenEnd ? static_cast<size_t>(tokenEnd - cursor) : strlen(cursor);
@@ -62,15 +64,36 @@ size_t parse(const char* spec, uint32_t (&out)[MAX_SUPPRESSED]) {
     // packs each side into 16 bits, so getLigature() already refuses them.
     // Accepting one here would store a pair that can never match.
     if (exhausted && leftCp <= 0xFFFFu && rightCp <= 0xFFFFu) {
-      out[count++] = packPair(leftCp, rightCp);
+      // Insert in sorted position, skipping a pair already held. The array is
+      // kept sorted and unique AS IT IS BUILT rather than sorted and uniqued
+      // afterwards, because THE CAP HAS TO COUNT DISTINCT PAIRS.
+      //
+      // Until 2026-08-25 the loop bounded on `count < MAX_SUPPRESSED` and the
+      // sort/unique ran after it, so duplicates spent slots: twenty-four copies
+      // of `st` followed by `fh` stopped the scan at the twenty-fourth `st` and
+      // dropped `fh` entirely, then collapsed to a one-pair spec. Reachable
+      // from a hand-edited settings.json and from the web settings API, both of
+      // which are exactly the loose spellings this parser exists to tolerate --
+      // and the failure is silent, since canonicalize() cheerfully returns the
+      // shortened spec. Duplicates are the ONE malformation the header promises
+      // costs nothing (`"fh,st,st"` and `"st,fh"` are the same preference).
+      const uint32_t packed = packPair(leftCp, rightCp);
+      const size_t at = static_cast<size_t>(std::lower_bound(out, out + count, packed) - out);
+      const bool present = at < count && out[at] == packed;
+      if (!present) {
+        // Twenty-four DISTINCT pairs is the ceiling; a twenty-fifth ends the
+        // scan, which is the same refusal specWith() makes at its own ceiling.
+        if (count >= MAX_SUPPRESSED) break;
+        std::move_backward(out + at, out + count, out + count + 1);
+        out[at] = packed;
+        count++;
+      }
     }
 
     if (!tokenEnd) break;
     cursor = tokenEnd + 1;
   }
 
-  std::sort(out, out + count);
-  count = static_cast<size_t>(std::unique(out, out + count) - out);
   return count;
 }
 

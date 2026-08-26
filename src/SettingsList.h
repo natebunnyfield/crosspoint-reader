@@ -3,6 +3,7 @@
 #include <BoardConfig.h>
 #include <HalClock.h>
 #include <I18n.h>
+#include <Logging.h>
 #include <SdCardFontRegistry.h>
 
 #include <algorithm>
@@ -256,7 +257,15 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // this list purely for PERSISTENCE and the web settings API -- the device
     // edits them on the Typography screen, which builds its own rows because
     // the per-pair ones depend on which family is loaded.
-    constexpr size_t FIXED_ENTRY_COUNT = 14;
+    // 15 since 2026-08-25: Line Breaks. It arrived without bumping this, which
+    // is the drift in the other direction from the one described above -- an
+    // UNDER-reserve is just as invisible as an over-reserve, it costs one
+    // realloc and a full move of the vector on the first call and nothing
+    // announces it. NOTHING ENFORCES THIS NUMBER: it is not derivable at
+    // compile time, no host test builds this list, and the loop below is the
+    // cheapest thing that turns a drift into something a log will say. Whoever
+    // adds the sixteenth unconditional push_back moves it.
+    constexpr size_t FIXED_ENTRY_COUNT = 15;
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
@@ -426,10 +435,24 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // header that matched. Being here also means the X3 and X4 get the control,
     // not only a phone, and the web settings API serves it for free.
     //
-    // STR_CAT_SYSTEM for the reason Line Grid above and Dark Mode below carry
-    // it: Reader is a withdrawn category that rebuildSettingsLists() drops, so
-    // a STR_CAT_READER row would persist and serve the API while being
-    // invisible on the device -- which is the whole point of adding it.
+    // STR_CAT_READER, and that is not the same thing as invisible. This said
+    // STR_CAT_SYSTEM "for the reason Line Grid above and Dark Mode below carry
+    // it" until 2026-08-25, and both halves of that had stopped being true: the
+    // row below carries STR_CAT_READER, and so does Line Grid. The comment
+    // survived the commit that moved them (f5287c630, owner: "put or move line
+    // grid, line spacing, letter spacing, justified text to Typography
+    // Settings"), where the move was literally one word each,
+    // STR_CAT_SYSTEM -> STR_CAT_READER. Left standing it gave a confident
+    // reason to change them back, which would have silently reversed the
+    // ruling.
+    //
+    // What the category decides is only whether rebuildSettingsLists() keeps
+    // the row on the MAIN Settings list; it does drop STR_CAT_READER. The
+    // Typography screen does not consult it at all -- TypographySettingsActivity
+    // SELECTS rows out of getSettingsList() by nameId -- so this row is on
+    // Typography, persists through toJson/fromJson, and serves the web settings
+    // API exactly as before. Dark Mode below is still STR_CAT_SYSTEM because it
+    // is on no subpage and the main list is the only place it can live.
     //
     // DynamicEnum, not Enum, so the stored byte is the character COUNT and not
     // this list's index. Same shape as screenMargin, and for the same payoff: a
@@ -484,9 +507,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // and BOTH carry STR_CAT_READER on purpose.
     //
     // Reader is a withdrawn category, so rebuildSettingsLists() drops these
-    // from the device Settings list -- which is what is wanted here, and the
-    // opposite of the reason Line Grid and Justified Text above carry
-    // STR_CAT_SYSTEM. The device edits ligatures on the TYPOGRAPHY screen
+    // from the main device Settings list -- which is what is wanted here. This
+    // said it was "the opposite of the reason Line Grid and Justified Text
+    // above carry STR_CAT_SYSTEM" until 2026-08-25; those two rows carry
+    // STR_CAT_READER, and have since f5287c630 moved them to this same screen,
+    // so it is the SAME reason and not the opposite one. The device edits
+    // ligatures on the TYPOGRAPHY screen
     // (SettingAction::Typography), and it has to: the individual rows are one
     // per pair the CURRENTLY LOADED family carries, so they cannot be a fixed
     // list here at all. Edgar ships fourteen pairs across its styles and
@@ -617,6 +643,14 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // so the row reads "UTC+5:45" rather than "141".
     v.push_back(SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &CrossPointSettings::clockUtcOffsetQ, {0, 104, 1},
                                    "clockUtcOffsetQ", StrId::STR_CAT_SYSTEM));
+
+    // The gate for FIXED_ENTRY_COUNT above. Runs ONCE, on the first call, and
+    // says nothing when the count is right. It deliberately does not assert:
+    // a reserve that is one short costs a realloc, and aborting a reader over
+    // that would be far worse than the drift.
+    if (v.size() != FIXED_ENTRY_COUNT) {
+      LOG_ERR("SET", "FIXED_ENTRY_COUNT is %zu but the fixed block pushes %zu; update it", FIXED_ENTRY_COUNT, v.size());
+    }
     return v;
   }();
 
