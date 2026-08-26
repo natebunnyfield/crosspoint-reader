@@ -60,6 +60,52 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-023] XS and XXS sizes for every shipping family
+
+Owner, 2026-08-25: *"cut XS and XXS versions of every s tiers shipping font."*
+
+The reader ramp is `BUILTIN_READER_POINT_SIZES[] = {12, 14, 16, 18}` — S, M, L,
+XL, with M the default. XS and XXS are two more sizes BELOW that, presumably
+10 pt and 8 pt, for all eight shipping families. `sd-fonts.yaml` carries
+`sizes: [12, 14, 16, 18]` per family and would gain them.
+
+**THE TRAP, and it is the reason this is written up rather than just done.**
+`fontSizeSlot` is persisted as an INDEX, not a point size. Inserting sizes below
+S re-points every value already stored on every card: a reader sitting on M (1)
+would silently land on a different size after the update. This is the same
+"append, never insert" discipline the preset list and the settings enums follow,
+and this exact field has been through it twice already — the comment at
+`CrossPointSettings.h:90-95` records that 1.5 stored an absolute point size and
+broke every family switch, and that 1.4 stored a 0..3 slot in the same key, which
+is why `fontSizeSlot` exists as a separate key at all.
+
+So the ramp must either be APPENDED to (XS and XXS take indices 4 and 5, and the
+picker sorts for display rather than storing sort order — the same split the
+preset list already uses) or migrated deliberately through
+`fontSlotNeedsMigration`, which exists for precisely this and is consumed at
+`SdCardFontSystem.cpp:55`. Decide which BEFORE building fonts; the font build is
+the cheap half.
+
+**Cost to weigh before starting.** The seed tree is 316 MB for eight families at
+four sizes and two tiers. Two more sizes is roughly +50% on the font payload, so
+expect a materially larger app — the installed figure is what matters, since CPZ1
+squeezed 117.7 MB to 34.8 MB and the ratio should hold. Measure it rather than
+estimating.
+
+**And check legibility before committing to 8 pt.** Glyphs are 2-bit with four
+levels, quantized at build time from FreeType coverage at the target ppem. At
+8 pt the stems are close to one pixel and the quantizer has almost nothing to
+work with; whether XXS is readable on the panel is an empirical question, not a
+build-configuration one. Render a page at both new sizes and look before
+shipping eight families' worth of them.
+
+**What "done" looks like:** both sizes present for all eight families at 1x and
+2x, every existing install still rendering the size it rendered before the
+update, a measured installed-size figure, and a rendered page at each new size.
+
+Not started.
+
+
 ### [T-022] Claude results: the FRONT pair should page too
 
 Owner, 2026-08-24: *"in claude results, front rocker switch should activate
