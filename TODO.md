@@ -79,7 +79,17 @@ and this exact field has been through it twice already — the comment at
 broke every family switch, and that 1.4 stored a 0..3 slot in the same key, which
 is why `fontSizeSlot` exists as a separate key at all.
 
-So the ramp must either be APPENDED to (XS and XXS take indices 4 and 5, and the
+**OWNER RULING 2026-08-26: INSERT IN SIZE ORDER AND MIGRATE.** Asked with both
+options and their costs, he chose the ordered ramp over the append. So indices
+stay in size order forever after -- `{8,10,12,14,16,18}` -- and every card
+already holding 0..3 must be shifted +2 exactly once. That migration is now the
+whole risk of this item: get it wrong and every reader silently reads at a
+different size, which is the failure this field already carries scars from
+twice. It must be idempotent or version-gated so it cannot run twice and shift
+by four.
+
+The alternative, kept because it is what makes the ruling reversible: the ramp
+could have been APPENDED to (XS and XXS take indices 4 and 5, and the
 picker sorts for display rather than storing sort order — the same split the
 preset list already uses) or migrated deliberately through
 `fontSlotNeedsMigration`, which exists for precisely this and is consumed at
