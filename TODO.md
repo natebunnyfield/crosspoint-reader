@@ -79,7 +79,25 @@ and this exact field has been through it twice already — the comment at
 broke every family switch, and that 1.4 stored a 0..3 slot in the same key, which
 is why `fontSizeSlot` exists as a separate key at all.
 
-**OWNER RULING 2026-08-26: INSERT IN SIZE ORDER AND MIGRATE.** Asked with both
+**OWNER RULING 2026-08-26, IN TWO PARTS. Insert in size order, and DO NOT
+BUILD A MIGRATION:** *"the reindexing never matters because it is just me using
+this."*
+
+That second half removes the entire risk of this item, so read it before
+inheriting the caution below. There is one user. If a stored slot shifts
+meaning, the cost is that he re-picks his size once -- not a silent fleet-wide
+regression. So the ramp simply becomes `{8,10,12,14,16,18}` in order, no
+`fontSlotNeedsMigration` path, no version gate, no idempotence proof.
+
+**This is a scope ruling, not a claim that the field is safe.** The scars below
+are real and the discipline still applies to anything that ships beyond one
+device; it is waived here because the population is one. If this fork ever gains
+users, the migration is the thing to build first.
+
+The superseded reasoning, kept because it is what makes the waiver a decision
+rather than an oversight:
+
+~~INSERT IN SIZE ORDER AND MIGRATE.~~ Asked with both
 options and their costs, he chose the ordered ramp over the append. So indices
 stay in size order forever after -- `{8,10,12,14,16,18}` -- and every card
 already holding 0..3 must be shifted +2 exactly once. That migration is now the
