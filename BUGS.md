@@ -1699,7 +1699,7 @@ users actually see.
 paths never write through the link. Would halve the visible footprint to
 ~58 MB with no capability change.
 
-### [B-030] Edgar -> Inknut at XL renders smaller than Edgar at L — REPRODUCED 2026-08-27, NOT a slot bug
+### [B-030] Edgar -> Inknut at XL renders smaller than Edgar at L — CLOSED 2026-08-27, working as designed
 **severity: medium (the control looks broken) · scope: reader font size · filed and reproduced 2026-08-27**
 
 Owner, from the device: *"in reading mode, switch from edgar to inknut seems to
@@ -1759,8 +1759,26 @@ owner's. Options, with what each costs:
 3. **Split the difference** — normalise on a blend. Cost: neither property holds
    exactly, and the blend weight is a new unmeasured constant.
 
-Recorded rather than acted on. `docs/almendra-anchored-sizing-2026-08-27.md`
-carries the measurement either choice has to argue with.
+**OWNER RULING, 2026-08-27, and this closes it:** *"we used words per book to
+generate sizes, but switching between fonts should only be ranked size."*
+
+So the two questions are separated rather than traded off. Words per page stays
+the method that GENERATED the ramps — option 1, no multiplier or ramp changes.
+And a slot is a **RANK**, not a physical size: switching a font carries the rank
+across and nothing else is promised. That is already exactly what the code does,
+verified above — slot 5 in, slot 5 out.
+
+**No code change. Nothing to fix.** The behaviour reported is the design, and
+the reason it reads as a size loss is that a rank is not a size: XL means "the
+largest of this family's six", and for a wide heavy face that lands at fewer
+effective points because it has to, to hold the same words.
+
+Kept in the tracker rather than deleted, because "the largest size got smaller
+when I switched fonts" is a report anyone would file again, and the measurement
+above is the answer to it. The three options and their costs stay below as the
+record of what was weighed.
+
+`docs/almendra-anchored-sizing-2026-08-27.md` carries the measurement.
 
 ### [B-001] Quick Resume pin made the sleep-screen setting a lying control
 **severity: high · fixed 2026-08-03 · `6bb7efc8`, `780982ed`**
