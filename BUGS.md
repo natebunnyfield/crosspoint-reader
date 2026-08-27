@@ -34,6 +34,30 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-039] Inknut's L slot drew half-size glyphs on a full-size grid — FIXED 2026-08-26
+**severity: high (visible on every page of one shipping family) · scope: font
+build tooling · found by owner report, fixed same day**
+
+`build/seedfonts/InknutJunicode/2x/InknutJunicode_14.cpfont` was a **14 ppem**
+render — the 2x cut of the 7 pt slot — sitting under the 14 pt slot's filename.
+The renderer takes the pen from the base 1x font and the ink from the
+companion, so the advance grid was right and the letters were half-size: ink
+filled **0.45** of its advance instead of 0.89, and the line box was 90 device
+px around 45 px glyphs. Owner: "L size inknut is missized."
+
+Cause: `U+2E3B` rasterises 289x5 px at 32 ppem and cannot be written to
+`EpdGlyph`'s uint8 width, so `build-sd-fonts.py --scale 2` aborted; the rename
+to slot names runs only on success, so fontconvert's ppem names survived, and
+`2 x 7 = 14` collides with a real slot. The drop table that knew this lived in
+`install-sim-fonts.py`, which writes the card and never the bundle tree.
+
+Fixed by moving `tier_drops:`/`hires_drops:` into `sd-fonts.yaml`, discarding a
+failed build's own output, and gating the rename on a well-formed tier. Card
+was never affected; no other family was. Full account and every measurement:
+[docs/inknut-l-slot-2026-08-26.md](docs/inknut-l-slot-2026-08-26.md).
+
+**Not confirmed on a phone** — no TestFlight build in that session.
+
 ### [B-036] A line with a missing glyph measures narrower than it draws — FIXED 2026-08-20
 **severity: low · scope: text layout · found and fixed same day**
 

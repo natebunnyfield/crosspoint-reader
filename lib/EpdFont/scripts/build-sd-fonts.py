@@ -601,7 +601,23 @@ def build_family(
     output_dir = output_base / name if scale == 1 else output_base / name / f"{scale}x"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    def rename_to_slot_names() -> None:
+    # Every .cpfont already here before this run. A hi-res build that FAILS
+    # leaves fontconvert's partial output behind under rasterisation-ppem names,
+    # and one of those names can collide with a real slot -- 2 x 7 pt is
+    # "<Family>_14.cpfont", which is also the 14 pt slot's filename. That file
+    # then loads as the 14 pt companion and draws half-size glyphs on a
+    # full-size advance grid. Discarding exactly what this run created is the
+    # only precise way to undo it; deleting by name pattern would take out a
+    # good file from an earlier build. See docs/inknut-l-slot-2026-08-26.md.
+    preexisting = {p.name for p in output_dir.glob("*.cpfont")}
+
+    def discard_partial_output() -> None:
+        """Remove the .cpfont files THIS run produced. Called on failure only."""
+        for f in output_dir.glob("*.cpfont"):
+            if f.name not in preexisting:
+                f.unlink()
+
+    def rename_to_slot_names() -> str:
         """Give a hi-res cut the 1x filename it must load under.
 
         fontconvert names each file for the ppem it rasterised, so a 3x cut of a
@@ -611,13 +627,56 @@ def build_family(
         here rather than teaching fontconvert a second naming rule keeps the
         number in a filename meaning one thing everywhere: the size SLOT, not the
         rasterisation.
+
+        Returns "" on success, or the reason the tier is not well-formed.
+
+        TWO-PHASE, because a ramp can map one file's ppem name onto another
+        file's slot name: with sizes [7, ..., 14] at scale 2 the 7 pt cut is
+        built as _14 and the 14 pt cut's slot name IS _14. Renaming in place
+        happened to work only because `sizes:` is ascending; parking every file
+        under a temporary name first makes it work whatever the order.
         """
         if scale == 1:
-            return
+            return ""
+        staged = []
         for base in family["sizes"]:
             built = output_dir / f"{name}_{base * scale}.cpfont"
             if built.exists():
-                built.replace(output_dir / f"{name}_{base}.cpfont")
+                tmp = output_dir / f"{name}_{base}.cpfont.slot"
+                built.replace(tmp)
+                staged.append((tmp, output_dir / f"{name}_{base}.cpfont"))
+        for tmp, final in staged:
+            tmp.replace(final)
+
+        # A GATE, not a comment. Every slot must exist under its 1x name and no
+        # rasterisation-ppem file may survive: those two conditions are exactly
+        # what a half-finished tier violates, and nothing downstream checks --
+        # SdCardFontManager finds the companion by exact filename and a wrong
+        # one loads as happily as a right one.
+        missing = [b for b in family["sizes"]
+                   if not (output_dir / f"{name}_{b}.cpfont").is_file()]
+        if missing:
+            return (f"{scale}x tier is incomplete: no file for slot(s) "
+                    f"{', '.join(str(m) for m in missing)}")
+        # An orphan THIS RUN made is fatal: it means the rename did not cover
+        # what fontconvert wrote, which is the state that shipped a 14 ppem file
+        # as the 14 pt slot. A PRE-EXISTING orphan is a stale cut from an older
+        # ramp -- dead weight (lookup is by 1x filename, so nothing can reach
+        # it) but not this build's doing, and failing on it would reject a
+        # perfectly good ramp change and then discard the good output with it.
+        # Say so and carry on; install-sim-fonts.py prunes them on the card.
+        slot_names = {f"{name}_{b}.cpfont" for b in family["sizes"]}
+        here = {f.name for f in output_dir.glob("*.cpfont")}
+        made_orphans = sorted(here - slot_names - preexisting)
+        if made_orphans:
+            return (f"{scale}x tier carries file(s) this build made that are not "
+                    f"slot names and will never load: {', '.join(made_orphans)}")
+        stale = sorted((here - slot_names) & preexisting)
+        if stale:
+            print(f"  {name}: WARNING: {scale}x carries {len(stale)} file(s) from an "
+                  f"older ramp that nothing can load: {', '.join(stale)}",
+                  file=sys.stderr)
+        return ""
 
     styles = family.get("styles", {})
     intervals = family["intervals"]
@@ -784,14 +843,19 @@ def build_family(
 
             if proc.returncode != 0:
                 err = "".join(stderr_lines).strip()
+                discard_partial_output()
                 return name, False, err or f"Exit code {proc.returncode}"
-            rename_to_slot_names()
+            problem = rename_to_slot_names()
+            if problem:
+                discard_partial_output()
+                return name, False, problem
             return name, True, ""
         else:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout,
             )
             if result.returncode != 0:
+                discard_partial_output()
                 return name, False, result.stderr.strip() or f"Exit code {result.returncode}"
             # The pruning audit (fontconvert_sdcard.py "PRUNED ...") arrives on
             # the child's stderr, which this non-verbose path captures and, on
@@ -802,7 +866,10 @@ def build_family(
             for line in result.stderr.splitlines():
                 if "PRUNED" in line:
                     print(f"  {name}: {line.strip()}", file=sys.stderr)
-            rename_to_slot_names()
+            problem = rename_to_slot_names()
+            if problem:
+                discard_partial_output()
+                return name, False, problem
             return name, True, ""
     except subprocess.TimeoutExpired as e:
         elapsed = time.monotonic() - start
@@ -811,8 +878,10 @@ def build_family(
         if captured:
             lines = captured.strip().splitlines()
             tail = "\n    Last output:\n" + "\n".join(f"    | {l}" for l in lines[-20:])
+        discard_partial_output()
         return name, False, f"Timed out after {elapsed:.0f}s{tail}"
     except Exception as e:
+        discard_partial_output()
         return name, False, str(e)
 
 
@@ -866,6 +935,19 @@ def main():
         config = yaml.safe_load(f)
 
     extra_drops = [int(c, 0) for c in args.drop_codepoints.split(",") if c.strip()]
+
+    def _codepoints(values) -> list[int]:
+        """Accept 0x2E3B (PyYAML resolves it to an int) and "0x2E3B" alike."""
+        return [v if isinstance(v, int) else int(str(v), 0) for v in (values or ())]
+
+    # Tier drops come from the RECIPE, so every caller gets them -- the direct
+    # `--only X --scale 2` invocation that fills build/seedfonts as much as
+    # install-sim-fonts.py's orchestrated run. They used to live only in the
+    # latter, and the tree the iOS bundle is built from was the one that paid:
+    # docs/inknut-l-slot-2026-08-26.md.
+    tier_drops = {int(k): _codepoints(v)
+                  for k, v in (config.get("tier_drops") or {}).items()}
+    global_tier_drops = tier_drops.get(args.scale, [])
 
     families = config.get("families", [])
     if not families:
@@ -966,7 +1048,9 @@ def main():
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(build_family, family, output_base, verbose, timeout, args.scale,
-                            extra_drops): family["name"]
+                            sorted(set(extra_drops) | set(global_tier_drops) | set(
+                                _codepoints((family.get("hires_drops") or {}).get(args.scale)))
+                            )): family["name"]
             for family in families
         }
         for future in as_completed(futures):

@@ -194,7 +194,7 @@
 # source of truth — delete any cut family from it by hand, since nothing in this
 # repo can reach it.
 #
-# build-sd-fonts.py reads only `families:` and ignores this key.
+# build-sd-fonts.py reads `families:` and `tier_drops:`; it ignores this key.
 installed_families:
   - Edgar
   - Coelacanth
@@ -242,6 +242,38 @@ installed_families:
 # picker labels stay in src/FontDisplayNames.h, exactly as for the C tier cuts —
 # a card provisioned before the ruling still carries them. Putting either back
 # in this list is a regression, not a restoration; it needs a fresh ruling.
+
+# ── Codepoints a HI-RES TIER cannot express ─────────────────────────────────
+#
+# EpdGlyph stores glyph width/height in uint8, so a glyph rasterising over
+# 255 px on either axis cannot be written and fontconvert_sdcard.py raises
+# rather than truncating (fontconvert_sdcard.py:1265-1281). The offender is a
+# property of the SIZE, not of the family: U+2E3B THREE-EM DASH is 93 px wide
+# at Inknut's 16 pt slot, 289 px at that slot's 2x cut, and unbuildable there.
+#
+# THIS BELONGS HERE, IN THE RECIPE, and it cost a shipped regression to learn
+# that. The tables lived in scripts/install-sim-fonts.py, which writes the
+# simulator's CARD and nothing else — so `build-sd-fonts.py --only X --scale 2`,
+# which is the documented way to fill the iOS bundle's `build/seedfonts` tree
+# (docs/ios-app-size.md), had no idea the drop was needed. It aborted at the
+# top size, its partial output kept fontconvert's rasterisation-ppem filenames
+# because the rename to slot names only runs on success, and one of those names
+# COLLIDED with a real slot: `2x/InknutJunicode_14.cpfont` became the 2x cut of
+# the 7 pt slot. The L size then drew 14 ppem glyphs on a 28 ppem advance grid
+# — correct spacing, half-size letters, a gap after every character. See
+# docs/inknut-l-slot-2026-08-26.md.
+#
+# A drop is TIER-LOCAL, never a removal: the codepoint is still in every tier
+# where it fits, and a glyph missing from the hi-res cut alone renders
+# 1x-replicated (SdCardFontManager falls back per glyph), which is a resolution
+# loss on one character and nothing else.
+#
+# `tier_drops:` is the GLOBAL layer, keyed by scale. A family that needs more
+# carries its own `hires_drops:` and the two are unioned.
+tier_drops:
+  # 3x: the three-em dash comes out 276x8 px on every family whose `reading`
+  # intervals reach U+2E00-2E7F (Edgar, LibreFranklin, TeXGyreSchola).
+  3: [0x2E3B]
 
 families:
   # ── Serif ──────────────────────────────────────────────────────────────
@@ -732,6 +764,10 @@ families:
     # old 43-64 px range).
     sizes: [9, 11, 13, 15, 18, 20]
     metrics: {ascent: 929, descent: -384, linegap: 0}
+    # The pointing hands, supplied by the fallback chain, rasterise 265x126 px
+    # against this family's metrics at 3x. Still present in its 1x and 2x.
+    hires_drops:
+      3: [0x261C, 0x261E]
     # Upstream (CTAN) ships Regular/Bold/Italic but no BoldItalic, so
     # bolditalic emboldens the real Italic — never sheared. Measured: italic
     # stems 0.069 em; embolden_em 0.037 + y_ratio 0.35 lands 1.49-1.55x stems
@@ -983,6 +1019,15 @@ families:
     # x-height. Do not raise it without re-measuring the x-height ramp.
     sizes: [7, 9, 10, 12, 14, 16]
     metrics: {ascent: 1203, descent: -340, linegap: 0}
+    # This family's em is wide enough (its italic carries scale: 1.2) that
+    # U+2E3B overflows EpdGlyph already at 2x -- 289x5 px on the 16 pt slot --
+    # and U+2E3A TWO-EM DASH joins it at 3x (286x8 px). Both arrived with the
+    # move to `reading` intervals on 2026-08-20, whose U+2E00-2E7F block
+    # latin-ext never reached. They CANNOT go in the global `tier_drops:`:
+    # Edgar, TeXGyreSchola and LibreFranklin all ship U+2E3B at 2x today.
+    hires_drops:
+      2: [0x2E3B]
+      3: [0x2E3A]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}

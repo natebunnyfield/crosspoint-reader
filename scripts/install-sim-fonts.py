@@ -58,37 +58,29 @@ EDITOR_FONTS = REPO / "src/notes/EditorFonts.h"
 # is not -- see the hi-res install block in main() for the case that proved it.
 HIRES_TIERS = (2, 3)
 
-# Codepoints omitted from ONE hi-res tier because they cannot be expressed there.
+# Codepoints omitted from ONE hi-res tier used to be TWO TABLES HERE, and that
+# is the whole story of docs/inknut-l-slot-2026-08-26.md.
 #
 # EpdGlyph stores glyph width/height in uint8, so anything rasterising over
-# 255 px is unrepresentable and the build aborts rather than truncating. At 3x,
-# U+2E3B THREE-EM DASH comes out 276x8 px on the families whose `reading`
-# intervals reach it (Edgar, LibreFranklin, TeXGyreSchola), which is what
-# build-sd-fonts.py's --drop-codepoints help means by "the offender is
-# size-dependent rather than a property of the family".
+# 255 px is unrepresentable and the build aborts rather than truncating. Which
+# codepoint offends is a property of the SIZE, not of the family, so the drop
+# is tier-local: U+2E3B is still built into the tiers where it fits and only a
+# host build at the affected tier falls back for it, per glyph.
 #
-# This is a TIER-LOCAL omission, not a removal from the font: U+2E3B is still
-# built into 1x and 2x, where it fits, and only a 3x host build falls back for
-# it. That also reproduces the 3x set already on the cards, which was built
-# out-of-band the same way -- verified 2026-08-20 by reading the shipped files:
-# U+2E3B is present in Edgar 1x and 2x and absent from Edgar 3x.
-TIER_OVERSIZED_DROPS = {3: ("0x2E3B",)}
-
-# And the PER-FAMILY layer of the same problem. InknutJunicode's em is wide
-# enough (its styles carry a scale override) that U+2E3B overflows already at
-# 2x (289x5 px) and U+2E3A TWO-EM DASH joins it at 3x (286x8 px) -- both hit
-# for the first time when the family moved to the `reading` intervals
-# (2026-08-20), whose U+2E00-2E7F block latin-ext never reached. These CANNOT
-# go into TIER_OVERSIZED_DROPS: Edgar, TeXGyreSchola and LibreFranklin all
-# ship U+2E3B at 2x and U+2E3A at 3x today (verified against the installed
-# files), and a global drop would silently remove them. Families listed here
-# are built by their own build-sd-fonts invocation with the union of drops.
-FAMILY_TIER_DROPS = {
-    "InknutJunicode": {2: ("0x2E3B",), 3: ("0x2E3A",)},
-    # The pointing hands, supplied by the fallback chain, rasterise 265x126 px
-    # against Coelacanth's metrics at 3x. Still in its 1x and 2x.
-    "Coelacanth": {3: ("0x261C", "0x261E")},
-}
+# The tables now live in sd-fonts.yaml -- `tier_drops:` at the top level and
+# `hires_drops:` per family -- because this script is not the only caller.
+# `build-sd-fonts.py --only X --scale 2` is the documented way to fill the iOS
+# bundle's build/seedfonts tree (docs/ios-app-size.md), it never comes through
+# here, and with the knowledge parked in this file it had no way to know that
+# InknutJunicode cannot build a 2x tier at all. It aborted, left partial output
+# under fontconvert's rasterisation-ppem names, and one of those names collided
+# with a real slot.
+#
+# build-sd-fonts.py resolves both layers PER FAMILY now, so this script passes
+# no --drop-codepoints of its own and no longer has to split a tier into one
+# invocation per distinct drop set. That split existed only because
+# --drop-codepoints is global to a run, and batching families with different
+# needs would have stripped a codepoint from a family that carries it fine.
 
 
 def displayname_families() -> list[str]:
@@ -225,29 +217,17 @@ def main() -> int:
     # sizes once shipped a 5-size Junicode.)
     first_invocation = True
     for tier in (1, *HIRES_TIERS):
-        # Families needing their own extra drops at this tier build in their
-        # own invocation -- --drop-codepoints is global to a run, so batching
-        # them with the rest would strip those codepoints from families that
-        # carry them fine (see FAMILY_TIER_DROPS).
-        groups: dict[tuple[str, ...], list[str]] = {}
-        for fam in families:
-            extra = tuple(FAMILY_TIER_DROPS.get(fam, {}).get(tier, ()))
-            groups.setdefault(extra, []).append(fam)
-        for extra, group in sorted(groups.items()):
-            cmd = [sys.executable, str(SCRIPTS / "build-sd-fonts.py"),
-                   "--only", ",".join(group), "--output-dir", str(out_dir)]
-            if first_invocation:
-                # --clean rmtree's the whole output dir; once, up front.
-                cmd.append("--clean")
-                first_invocation = False
-            if tier != 1:
-                cmd.extend(["--scale", str(tier)])
-            drops = tuple(TIER_OVERSIZED_DROPS.get(tier, ())) + extra
-            if drops:
-                cmd.extend(["--drop-codepoints", ",".join(drops)])
-            result = subprocess.run(cmd, cwd=SCRIPTS)
-            if result.returncode != 0:
-                return result.returncode
+        cmd = [sys.executable, str(SCRIPTS / "build-sd-fonts.py"),
+               "--only", ",".join(families), "--output-dir", str(out_dir)]
+        if first_invocation:
+            # --clean rmtree's the whole output dir; once, up front.
+            cmd.append("--clean")
+            first_invocation = False
+        if tier != 1:
+            cmd.extend(["--scale", str(tier)])
+        result = subprocess.run(cmd, cwd=SCRIPTS)
+        if result.returncode != 0:
+            return result.returncode
 
     fonts_root = Path(args.fs_dir) / "fonts"
     fonts_root.mkdir(parents=True, exist_ok=True)
