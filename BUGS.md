@@ -1699,6 +1699,69 @@ users actually see.
 paths never write through the link. Would halve the visible footprint to
 ~58 MB with no capability change.
 
+### [B-030] Edgar -> Inknut at XL renders smaller than Edgar at L — REPRODUCED 2026-08-27, NOT a slot bug
+**severity: medium (the control looks broken) · scope: reader font size · filed and reproduced 2026-08-27**
+
+Owner, from the device: *"in reading mode, switch from edgar to inknut seems to
+lose the font size (XL becomes L)."*
+
+**The slot is NOT lost.** Reproduced headlessly on the simulator card, slot
+pinned to 5, switching only the family:
+
+```
+[SDFS] Slot 5 resolves to 18 pt   (Edgar)
+[SDFS] Slot 5 resolves to 16 pt   (InknutJunicode)
+```
+
+`fontSizeSlot` is untouched by the switch — the in-reader cycle writes only
+`sdFontFamilyName`, and `resolveReaderPointSize` refreshes the derived point
+size without touching the slot, exactly as its comment promises. So this is not
+B-030-as-filed; the report is accurate about the SYMPTOM and wrong only about
+the cause, which is worth stating because the obvious fix (persist the slot
+harder) would change nothing.
+
+**What actually happens.** The two families spend their slots on different point
+sizes, and since 2026-08-27 they also carry different `scale:` multipliers from
+the Almendra-anchored normalisation:
+
+| | slot 5 (XL) | k | effective |
+|---|---:|---:|---:|
+| Edgar | 18 pt | 0.960 | **17.28** |
+| Inknut Junicode | 16 pt | 0.917 | **14.67** |
+
+A 15.1 % drop. Edgar's **L** is 16 x 0.960 = 15.36, so Inknut's XL renders
+slightly SMALLER than Edgar's L. The owner's description is not an
+approximation — it is literally what the glass shows.
+
+**And it is partly a consequence of a change he approved.** Before the
+normalisation the same pair was 18 vs 16 pt, a 11.1 % drop; the multipliers
+widened it to 15.1 %. The pre-existing half is the ramps themselves, which have
+always differed.
+
+**The tension this exposes, which is the real finding.** The normalisation
+target is WORDS PER PAGE, and at XL it succeeds precisely — Edgar 74.19,
+Inknut 74.64 words on a full page, measured the same day. Equal text per page
+and equal apparent glyph size are DIFFERENT targets, and for a wide, heavy face
+like Inknut they pull in opposite directions: fitting the same words requires
+smaller glyphs. A slot cannot mean both "the same amount of book" and "the same
+size of letter" across faces.
+
+So this is not a defect to patch but a target to choose, and the choice is the
+owner's. Options, with what each costs:
+
+1. **Keep words-per-page.** Book length stays consistent whichever face is
+   chosen — the property just shipped and measured. Cost: this report stays
+   true, and switching faces at a fixed slot visibly changes letter size.
+2. **Normalise on x-height instead.** Letters look the same size across faces.
+   Cost: gives up the equal-book-length property entirely, and reinstates the
+   151-page spread the normalisation removed. This was the ORIGINAL anchor and
+   was abandoned on measurement — see `docs/words-per-page-2026-08-26.md`.
+3. **Split the difference** — normalise on a blend. Cost: neither property holds
+   exactly, and the blend weight is a new unmeasured constant.
+
+Recorded rather than acted on. `docs/almendra-anchored-sizing-2026-08-27.md`
+carries the measurement either choice has to argue with.
+
 ### [B-001] Quick Resume pin made the sleep-screen setting a lying control
 **severity: high · fixed 2026-08-03 · `6bb7efc8`, `780982ed`**
 
