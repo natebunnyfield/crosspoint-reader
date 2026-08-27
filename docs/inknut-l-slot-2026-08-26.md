@@ -226,3 +226,48 @@ that page in place rather than publishing a second one.
 * **Not confirmed on a phone.** No TestFlight build in this session. The fix is
   a file on disk and the render is the real firmware's, but nobody has seen it
   on glass.
+
+## Both loose ends closed, same day
+
+Written later on 2026-08-26, against `crosspoint-simulator` at `1b9b787`.
+
+**1. There is now a mechanical gate on the shipping tree.** The section above
+records that every gate we had passed this build and a human looking at a page
+was the only thing that caught it. `crosspoint-simulator/tools/validate_seed_fonts.py`
+is the answer to that: it reads each `.cpfont`'s own 32-byte header and style
+TOC and refuses a tree where a hi-res tier's `advanceY`, `ascender` or
+`descender` is not that tier's multiple of the 1x base — plus a missing
+companion, an orphan name, a non-ascending ramp, a stale charset, a style set
+that disagrees, and a 1x ramp that disagrees with `sd-fonts.yaml`'s `sizes:`.
+No rasterizer, no rendering, 0.11 s for the eight-family tree. It runs at iOS
+configure time (un-skippable — every iOS build configures) and again as a named
+section in `ios/testflight.sh` (visible — the deploy sends cmake's stdout to
+`/dev/null`). No override flag.
+
+Fault-injected against the real tree: the exact broken file reconstructed by
+copying the 7 pt 2x cut over the 14 pt 2x name is rejected with
+*"THIS FILE IS NOT A 2x RENDER OF 14 pt. styles 0,1,2,3 advance_y 45 where a 2x
+cut needs ~90 (1x reads 45; ratio 1.000, not 2.000)"*, exit 1, naming the path.
+The tolerance is 3 px at 2x against a worst real rounding of 1, measured across
+all eight families and all four styles. Writeup:
+`crosspoint-simulator/docs/seed-font-integrity-gate.md`.
+
+**2. The card's Almendra is reprovisioned.** `python3 scripts/install-sim-fonts.py
+--families Almendra` rebuilt all three tiers on the superseded
+`6/8/10/12/14/17` ramp and pruned the two stale slots from each:
+
+```
+  pruned stale fonts/Almendra/Almendra_17.cpfont
+  pruned stale fonts/Almendra/Almendra_6.cpfont
+  installed Almendra 2x: 6 sizes ... 3x: 6 sizes ... 1x: 6 sizes
+```
+
+`fs_/fonts/` now passes the gate clean at **1x, 2x and 3x, all eight families**.
+Before the rebuild it failed on exactly one thing — Almendra's ramp — which the
+gate found on its own, having been told nothing about it.
+
+**3. `crosspoint-simulator/docs/ios-app-size.md` is corrected**, which the
+section above called the one loose end. Its recipe block already carried the
+drop-table correction; what was still stale was "every tier the app can render
+— 1x, 2x and 3x, since `renderScale` defaults to 3" (the ceiling has been 2
+since 2026-08-23), and it now points at the gate.
