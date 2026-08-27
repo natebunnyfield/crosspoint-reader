@@ -1,0 +1,24 @@
+VCOELship        slot 0  pt  9  lineH 23  meanLines 29.08  wordsPerPage  342.62  tokensPerPage  345.17  charsPerPage  1531.4  wordsPerLine 11.78  fullPages 24
+VCOELship        slot 1  pt 11  lineH 28  meanLines 24.29  wordsPerPage  237.31  tokensPerPage  239.46  charsPerPage  1059.8  wordsPerLine  9.77  fullPages 35
+VCOELship        slot 2  pt 13  lineH 34  meanLines 19.96  wordsPerPage  168.12  tokensPerPage  169.94  charsPerPage   751.8  wordsPerLine  8.42  fullPages 50
+VCOELship        slot 3  pt 15  lineH 39  meanLines 17.56  wordsPerPage  127.32  tokensPerPage  128.86  charsPerPage   569.1  wordsPerLine  7.25  fullPages 66
+VCOELship        slot 4  pt 18  lineH 46  meanLines 14.94  wordsPerPage   89.35  tokensPerPage   89.44  charsPerPage   398.7  wordsPerLine  5.98  fullPages 95
+VCOELship        slot 5  pt 20  lineH 52  meanLines 13.17  wordsPerPage   71.21  tokensPerPage   71.41  charsPerPage   318.3  wordsPerLine  5.41  fullPages 120
+B VCOELship        slot 0  pt  9  lineH 23  meanLines 30.29  wordsPerPage  328.40  tokensPerPage  333.16  charsPerPage  1711.0  wordsPerLine 10.84  fullPages 45
+B VCOELship        slot 1  pt 11  lineH 28  meanLines 25.28  wordsPerPage  224.75  tokensPerPage  228.87  charsPerPage  1171.4  wordsPerLine  8.89  fullPages 67
+B VCOELship        slot 2  pt 13  lineH 34  meanLines 20.81  wordsPerPage  157.22  tokensPerPage  160.53  charsPerPage   819.3  wordsPerLine  7.55  fullPages 96
+B VCOELship        slot 3  pt 15  lineH 39  meanLines 18.15  wordsPerPage  118.23  tokensPerPage  121.35  charsPerPage   616.7  wordsPerLine  6.52  fullPages 129
+B VCOELship        slot 4  pt 18  lineH 46  meanLines 15.47  wordsPerPage   81.86  tokensPerPage   82.21  charsPerPage   425.2  wordsPerLine  5.29  fullPages 186
+B VCOELship        slot 5  pt 20  lineH 52  meanLines 13.65  wordsPerPage   65.50  tokensPerPage   65.94  charsPerPage   340.4  wordsPerLine  4.80  fullPages 233
+VCOELramp        slot 0  pt  9  lineH 23  meanLines 29.08  wordsPerPage  342.62  tokensPerPage  345.17  charsPerPage  1531.4  wordsPerLine 11.78  fullPages 24
+VCOELramp        slot 1  pt 11  lineH 28  meanLines 24.29  wordsPerPage  237.31  tokensPerPage  239.46  charsPerPage  1059.8  wordsPerLine  9.77  fullPages 35
+VCOELramp        slot 2  pt 13  lineH 34  meanLines 19.96  wordsPerPage  168.12  tokensPerPage  169.94  charsPerPage   751.8  wordsPerLine  8.42  fullPages 50
+VCOELramp        slot 3  pt 15  lineH 39  meanLines 17.56  wordsPerPage  127.32  tokensPerPage  128.86  charsPerPage   569.1  wordsPerLine  7.25  fullPages 66
+VCOELramp        slot 4  pt 17  lineH 44  meanLines 15.79  wordsPerPage   99.65  tokensPerPage   99.78  charsPerPage   444.4  wordsPerLine  6.31  fullPages 85
+VCOELramp        slot 5  pt 19  lineH 49  meanLines 14.07  wordsPerPage   79.81  tokensPerPage   79.92  charsPerPage   356.6  wordsPerLine  5.67  fullPages 107
+B VCOELramp        slot 0  pt  9  lineH 23  meanLines 30.29  wordsPerPage  328.40  tokensPerPage  333.16  charsPerPage  1711.0  wordsPerLine 10.84  fullPages 45
+B VCOELramp        slot 1  pt 11  lineH 28  meanLines 25.28  wordsPerPage  224.75  tokensPerPage  228.87  charsPerPage  1171.4  wordsPerLine  8.89  fullPages 67
+B VCOELramp        slot 2  pt 13  lineH 34  meanLines 20.81  wordsPerPage  157.22  tokensPerPage  160.53  charsPerPage   819.3  wordsPerLine  7.55  fullPages 96
+B VCOELramp        slot 3  pt 15  lineH 39  meanLines 18.15  wordsPerPage  118.23  tokensPerPage  121.35  charsPerPage   616.7  wordsPerLine  6.52  fullPages 129
+B VCOELramp        slot 4  pt 17  lineH 44  meanLines 16.42  wordsPerPage   92.15  tokensPerPage   92.45  charsPerPage   478.6  wordsPerLine  5.61  fullPages 165
+B VCOELramp        slot 5  pt 19  lineH 49  meanLines 14.60  wordsPerPage   73.36  tokensPerPage   73.82  charsPerPage   381.2  wordsPerLine  5.03  fullPages 208

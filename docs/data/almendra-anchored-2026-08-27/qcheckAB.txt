@@ -1,0 +1,24 @@
+WINKN            slot 0  pt  7  lineH 21  meanLines 32.17  wordsPerPage  352.35  tokensPerPage  354.96  charsPerPage  1571.0  wordsPerLine 10.95  fullPages 23
+WINKN            slot 1  pt  9  lineH 27  meanLines 25.53  wordsPerPage  221.29  tokensPerPage  223.42  charsPerPage   991.4  wordsPerLine  8.67  fullPages 38
+WINKN            slot 2  pt 11  lineH 32  meanLines 21.67  wordsPerPage  155.52  tokensPerPage  157.13  charsPerPage   694.9  wordsPerLine  7.18  fullPages 54
+WINKN            slot 3  pt 12  lineH 35  meanLines 19.80  wordsPerPage  130.40  tokensPerPage  130.43  charsPerPage   582.6  wordsPerLine  6.59  fullPages 65
+WINKN            slot 4  pt 14  lineH 41  meanLines 17.53  wordsPerPage   99.74  tokensPerPage   99.89  charsPerPage   444.9  wordsPerLine  5.69  fullPages 85
+WINKN            slot 5  pt 16  lineH 47  meanLines 15.25  wordsPerPage   74.64  tokensPerPage   75.01  charsPerPage   333.5  wordsPerLine  4.90  fullPages 114
+B WINKN            slot 0  pt  7  lineH 21  meanLines 33.86  wordsPerPage  338.39  tokensPerPage  343.09  charsPerPage  1764.4  wordsPerLine  9.99  fullPages 44
+B WINKN            slot 1  pt  9  lineH 27  meanLines 26.45  wordsPerPage  206.23  tokensPerPage  210.47  charsPerPage  1075.1  wordsPerLine  7.80  fullPages 73
+B WINKN            slot 2  pt 11  lineH 32  meanLines 22.42  wordsPerPage  143.74  tokensPerPage  146.97  charsPerPage   749.1  wordsPerLine  6.41  fullPages 105
+B WINKN            slot 3  pt 12  lineH 35  meanLines 20.65  wordsPerPage  120.61  tokensPerPage  120.94  charsPerPage   626.4  wordsPerLine  5.84  fullPages 126
+B WINKN            slot 4  pt 14  lineH 41  meanLines 17.89  wordsPerPage   89.03  tokensPerPage   89.67  charsPerPage   462.7  wordsPerLine  4.98  fullPages 171
+B WINKN            slot 5  pt 16  lineH 47  meanLines 15.66  wordsPerPage   67.31  tokensPerPage   68.15  charsPerPage   350.1  wordsPerLine  4.30  fullPages 227
+WLIBF            slot 0  pt  7  lineH 22  meanLines 29.68  wordsPerPage  368.59  tokensPerPage  371.14  charsPerPage  1643.5  wordsPerLine 12.42  fullPages 22
+WLIBF            slot 1  pt  9  lineH 29  meanLines 23.24  wordsPerPage  226.00  tokensPerPage  227.95  charsPerPage  1010.0  wordsPerLine  9.72  fullPages 37
+WLIBF            slot 2  pt 11  lineH 35  meanLines 19.60  wordsPerPage  158.06  tokensPerPage  159.79  charsPerPage   706.1  wordsPerLine  8.06  fullPages 53
+WLIBF            slot 3  pt 13  lineH 42  meanLines 16.73  wordsPerPage  113.68  tokensPerPage  115.13  charsPerPage   509.4  wordsPerLine  6.79  fullPages 75
+WLIBF            slot 4  pt 14  lineH 45  meanLines 15.53  wordsPerPage   97.67  tokensPerPage   97.79  charsPerPage   436.1  wordsPerLine  6.29  fullPages 87
+WLIBF            slot 5  pt 16  lineH 51  meanLines 13.76  wordsPerPage   75.74  tokensPerPage   75.85  charsPerPage   338.5  wordsPerLine  5.50  fullPages 113
+B WLIBF            slot 0  pt  7  lineH 22  meanLines 31.52  wordsPerPage  356.71  tokensPerPage  361.88  charsPerPage  1860.2  wordsPerLine 11.32  fullPages 42
+B WLIBF            slot 1  pt  9  lineH 29  meanLines 24.39  wordsPerPage  215.39  tokensPerPage  218.99  charsPerPage  1122.3  wordsPerLine  8.83  fullPages 70
+B WLIBF            slot 2  pt 11  lineH 35  meanLines 20.40  wordsPerPage  147.69  tokensPerPage  150.83  charsPerPage   769.8  wordsPerLine  7.24  fullPages 103
+B WLIBF            slot 3  pt 13  lineH 42  meanLines 17.25  wordsPerPage  104.99  tokensPerPage  107.63  charsPerPage   547.4  wordsPerLine  6.09  fullPages 145
+B WLIBF            slot 4  pt 14  lineH 45  meanLines 15.88  wordsPerPage   88.52  tokensPerPage   88.83  charsPerPage   459.8  wordsPerLine  5.57  fullPages 172
+B WLIBF            slot 5  pt 16  lineH 51  meanLines 14.08  wordsPerPage   68.35  tokensPerPage   68.87  charsPerPage   355.1  wordsPerLine  4.85  fullPages 223

@@ -1,0 +1,18 @@
+installed_families: []
+tier_drops:
+  3: [11835]
+families:
+- name: VCOELship
+  description: Coelacanth k=0.9437
+  intervals: reading
+  sizes: [9, 11, 13, 15, 18, 20]
+  metrics: {ascent: 877, descent: -362, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf', scale: 0.9437}
+- name: VCOELramp
+  description: Coelacanth k=0.9437
+  intervals: reading
+  sizes: [9, 11, 13, 15, 17, 19]
+  metrics: {ascent: 877, descent: -362, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf', scale: 0.9437}

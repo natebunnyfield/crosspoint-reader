@@ -1,0 +1,108 @@
+installed_families: []
+tier_drops:
+  3: [11835]
+families:
+- name: PCOEL
+  description: Coelacanth k=0.9399
+  intervals: reading
+  sizes: [9, 11, 13, 15, 18, 20]
+  metrics: {ascent: 873, descent: -361, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf', scale: 0.9399}
+- name: QCOEL
+  description: Coelacanth k=0.8929
+  intervals: reading
+  sizes: [9, 12, 14, 16, 18, 21]
+  metrics: {ascent: 829, descent: -343, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf', scale: 0.8929}
+- name: PEDGA
+  description: Edgar k=0.9601
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 990, descent: -307, linegap: 0}
+  styles:
+    regular: {path: local_fonts/Edgar-Regular.ttf, scale: 0.9601}
+- name: QEDGA
+  description: Edgar k=0.8893
+  intervals: reading
+  sizes: [9, 11, 13, 15, 17, 19]
+  metrics: {ascent: 917, descent: -285, linegap: 0}
+  styles:
+    regular: {path: local_fonts/Edgar-Regular.ttf, scale: 0.8893}
+- name: PINKN
+  description: InknutJunicode k=0.9292
+  intervals: reading
+  sizes: [7, 9, 10, 12, 14, 16]
+  metrics: {ascent: 1118, descent: -316, linegap: 0}
+  styles:
+    regular: {url: 'https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf', scale: 0.9292}
+- name: QINKN
+  description: InknutJunicode k=0.9171
+  intervals: reading
+  sizes: [7, 9, 11, 12, 14, 16]
+  metrics: {ascent: 1103, descent: -312, linegap: 0}
+  styles:
+    regular: {url: 'https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf', scale: 0.9171}
+- name: PLIBF
+  description: LibreFranklin k=1.0096
+  intervals: reading
+  sizes: [7, 9, 10, 12, 14, 16]
+  metrics: {ascent: 1214, descent: -362, linegap: 0}
+  styles:
+    regular:
+      url: https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf
+      variable: &id001 {wght: 400}
+      scale: 1.0096
+- name: QLIBF
+  description: LibreFranklin k=0.9833
+  intervals: reading
+  sizes: [7, 9, 11, 13, 14, 16]
+  metrics: {ascent: 1182, descent: -353, linegap: 0}
+  styles:
+    regular:
+      url: https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf
+      variable: *id001
+      scale: 0.9833
+- name: PLIBR
+  description: LibrisADF k=1.0267
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 1078, descent: -328, linegap: 0}
+  styles:
+    regular: {url: 'https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf', scale: 1.0267}
+- name: QLIBR
+  description: LibrisADF k=1.0237
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 1075, descent: -327, linegap: 0}
+  styles:
+    regular: {url: 'https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf', scale: 1.0237}
+- name: PHERO
+  description: TeXGyreHeros k=1.0144
+  intervals: reading
+  sizes: [7, 9, 11, 12, 14, 16]
+  metrics: {ascent: 1041, descent: -523, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf', scale: 1.0144}
+- name: QHERO
+  description: TeXGyreHeros k=1.0192
+  intervals: reading
+  sizes: [7, 9, 11, 12, 14, 16]
+  metrics: {ascent: 1046, descent: -526, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf', scale: 1.0192}
+- name: PSCHO
+  description: TeXGyreSchola k=0.9460
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 992, descent: -286, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf', scale: 0.946}
+- name: QSCHO
+  description: TeXGyreSchola k=0.9448
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 991, descent: -285, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf', scale: 0.9448}

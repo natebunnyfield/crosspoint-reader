@@ -1,0 +1,108 @@
+installed_families: []
+tier_drops:
+  3: [11835]
+families:
+- name: BCOEL
+  description: Coelacanth k=1.0266 sizes=[8, 10, 12, 14, 16, 18]
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 954, descent: -394, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf', scale: 1.0266}
+- name: ACOEL
+  description: Coelacanth k=0.9437 sizes=[9, 11, 13, 15, 18, 20]
+  intervals: reading
+  sizes: [9, 11, 13, 15, 18, 20]
+  metrics: {ascent: 877, descent: -362, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf', scale: 0.9437}
+- name: BEDGA
+  description: Edgar k=1.0020 sizes=[8, 10, 11, 13, 15, 17]
+  intervals: reading
+  sizes: [8, 10, 11, 13, 15, 17]
+  metrics: {ascent: 1033, descent: -321, linegap: 0}
+  styles:
+    regular: {path: local_fonts/Edgar-Regular.ttf, scale: 1.002}
+- name: AEDGA
+  description: Edgar k=0.9594 sizes=[8, 10, 12, 14, 16, 18]
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 989, descent: -307, linegap: 0}
+  styles:
+    regular: {path: local_fonts/Edgar-Regular.ttf, scale: 0.9594}
+- name: BINKN
+  description: InknutJunicode k=1.0076 sizes=[6, 8, 10, 11, 13, 15]
+  intervals: reading
+  sizes: [6, 8, 10, 11, 13, 15]
+  metrics: {ascent: 1212, descent: -343, linegap: 0}
+  styles:
+    regular: {url: 'https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf', scale: 1.0076}
+- name: AINKN
+  description: InknutJunicode k=0.9319 sizes=[7, 9, 10, 12, 14, 16]
+  intervals: reading
+  sizes: [7, 9, 10, 12, 14, 16]
+  metrics: {ascent: 1121, descent: -317, linegap: 0}
+  styles:
+    regular: {url: 'https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf', scale: 0.9319}
+- name: BLIBF
+  description: LibreFranklin k=0.9961 sizes=[7, 9, 11, 12, 14, 16]
+  intervals: reading
+  sizes: [7, 9, 11, 12, 14, 16]
+  metrics: {ascent: 1197, descent: -358, linegap: 0}
+  styles:
+    regular:
+      url: https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf
+      variable: &id001 {wght: 400}
+      scale: 0.9961
+- name: ALIBF
+  description: LibreFranklin k=1.0082 sizes=[7, 9, 10, 12, 14, 16]
+  intervals: reading
+  sizes: [7, 9, 10, 12, 14, 16]
+  metrics: {ascent: 1212, descent: -362, linegap: 0}
+  styles:
+    regular:
+      url: https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf
+      variable: *id001
+      scale: 1.0082
+- name: BLIBR
+  description: LibrisADF k=1.0151 sizes=[8, 10, 12, 14, 16, 18]
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 1066, descent: -324, linegap: 0}
+  styles:
+    regular: {url: 'https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf', scale: 1.0151}
+- name: ALIBR
+  description: LibrisADF k=1.0235 sizes=[8, 10, 12, 14, 16, 18]
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 1075, descent: -326, linegap: 0}
+  styles:
+    regular: {url: 'https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf', scale: 1.0235}
+- name: BHERO
+  description: TeXGyreHeros k=1.0075 sizes=[7, 9, 11, 13, 14, 16]
+  intervals: reading
+  sizes: [7, 9, 11, 13, 14, 16]
+  metrics: {ascent: 1034, descent: -520, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf', scale: 1.0075}
+- name: AHERO
+  description: TeXGyreHeros k=1.0167 sizes=[7, 9, 11, 12, 14, 16]
+  intervals: reading
+  sizes: [7, 9, 11, 12, 14, 16]
+  metrics: {ascent: 1043, descent: -525, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf', scale: 1.0167}
+- name: BSCHO
+  description: TeXGyreSchola k=0.9917 sizes=[8, 10, 11, 13, 15, 17]
+  intervals: reading
+  sizes: [8, 10, 11, 13, 15, 17]
+  metrics: {ascent: 1040, descent: -300, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf', scale: 0.9917}
+- name: ASCHO
+  description: TeXGyreSchola k=0.9472 sizes=[8, 10, 12, 14, 16, 18]
+  intervals: reading
+  sizes: [8, 10, 12, 14, 16, 18]
+  metrics: {ascent: 994, descent: -286, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf', scale: 0.9472}

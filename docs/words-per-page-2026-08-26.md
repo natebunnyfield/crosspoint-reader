@@ -19,6 +19,14 @@ fits. Words per full page *is* how much text fits: it composes advance widths,
 x-height, leading, word spacing, hyphenation and line breaking into the single
 number a reader experiences.
 
+> **Superseded in part, 2026-08-27.** The METRIC and the METHOD here stand and
+> are reused unchanged. The TARGET in §6 — the tier median — was replaced by the
+> owner with Almendra: see
+> [almendra-anchored-sizing-2026-08-27.md](almendra-anchored-sizing-2026-08-27.md),
+> which carries the built-and-measured multipliers, what they cost in absolute
+> book length, and a correction to `sd-fonts.yaml`'s claim about Almendra's
+> x-height at the L slot.
+
 Rendered proof: the Artifact **Words Per Page**,
 <https://claude.ai/code/artifact/f1e772ba-e3a0-40a0-aa6d-305b817cad42>.
 

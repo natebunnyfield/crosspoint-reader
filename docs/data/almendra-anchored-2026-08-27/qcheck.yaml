@@ -1,0 +1,21 @@
+installed_families: []
+tier_drops:
+  3: [11835]
+families:
+- name: WINKN
+  description: InknutJunicode k=0.9171 ramp [7, 9, 11, 12, 14, 16]
+  intervals: reading
+  sizes: [7, 9, 11, 12, 14, 16]
+  metrics: {ascent: 1103, descent: -312, linegap: 0}
+  styles:
+    regular: {url: 'https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf', scale: 0.9171}
+- name: WLIBF
+  description: LibreFranklin k=0.9833 ramp [7, 9, 11, 13, 14, 16]
+  intervals: reading
+  sizes: [7, 9, 11, 13, 14, 16]
+  metrics: {ascent: 1182, descent: -353, linegap: 0}
+  styles:
+    regular:
+      url: https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf
+      variable: {wght: 400}
+      scale: 0.9833

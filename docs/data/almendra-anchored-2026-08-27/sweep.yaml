@@ -1,0 +1,107 @@
+installed_families: []
+tier_drops:
+  3: [11835]
+families:
+- name: SCOEL
+  description: Coelacanth k=1.0000 sweep
+  intervals: reading
+  sizes: &id001 [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+  metrics: {ascent: 929, descent: -384, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf'}
+- name: KCOEL
+  description: Coelacanth k=0.9437 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 877, descent: -362, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf', scale: 0.9437}
+- name: SEDGA
+  description: Edgar k=1.0000 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1031, descent: -320, linegap: 0}
+  styles:
+    regular: {path: local_fonts/Edgar-Regular.ttf}
+- name: KEDGA
+  description: Edgar k=0.9594 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 989, descent: -307, linegap: 0}
+  styles:
+    regular: {path: local_fonts/Edgar-Regular.ttf, scale: 0.9594}
+- name: SINKN
+  description: InknutJunicode k=1.0000 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1203, descent: -340, linegap: 0}
+  styles:
+    regular: {url: 'https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf'}
+- name: KINKN
+  description: InknutJunicode k=0.9319 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1121, descent: -317, linegap: 0}
+  styles:
+    regular: {url: 'https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf', scale: 0.9319}
+- name: SLIBF
+  description: LibreFranklin k=1.0000 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1202, descent: -359, linegap: 0}
+  styles:
+    regular:
+      url: https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf
+      variable: &id002 {wght: 400}
+- name: KLIBF
+  description: LibreFranklin k=1.0082 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1212, descent: -362, linegap: 0}
+  styles:
+    regular:
+      url: https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf
+      variable: *id002
+      scale: 1.0082
+- name: SLIBR
+  description: LibrisADF k=1.0000 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1050, descent: -319, linegap: 0}
+  styles:
+    regular: {url: 'https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf'}
+- name: KLIBR
+  description: LibrisADF k=1.0235 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1075, descent: -326, linegap: 0}
+  styles:
+    regular: {url: 'https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf', scale: 1.0235}
+- name: SHERO
+  description: TeXGyreHeros k=1.0000 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1026, descent: -516, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf'}
+- name: KHERO
+  description: TeXGyreHeros k=1.0167 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1043, descent: -525, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf', scale: 1.0167}
+- name: SSCHO
+  description: TeXGyreSchola k=1.0000 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 1049, descent: -302, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf'}
+- name: KSCHO
+  description: TeXGyreSchola k=0.9472 sweep
+  intervals: reading
+  sizes: *id001
+  metrics: {ascent: 994, descent: -286, linegap: 0}
+  styles:
+    regular: {url: 'https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf', scale: 0.9472}
