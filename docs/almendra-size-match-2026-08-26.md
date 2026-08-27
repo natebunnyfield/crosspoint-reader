@@ -70,7 +70,27 @@ lightest and median:
 Worst at the small end, which is where the complaint is loudest on a 528 px
 column.
 
-### 1c. Page blackness — the residual this change does NOT fix
+### 1c. Page blackness — CORRECTED: this change DID fix it
+
+**This section's conclusion was wrong and is superseded (2026-08-26, same day,
+`docs/size-ramp-band-2026-08-26.md`).** It reported page blackness as the
+residual the +2 leaves behind, on the reasoning that blackness is
+scale-invariant so only a heavier roman could move it. Scale-invariance is true
+and the inference from it was not: **the metrics span came down with the ramp,
+and that is what moved it.** Measured 10.10–11.00% before and **11.42–12.19%**
+after — in band at all six slots.
+
+Proved at a FIXED point size, which is what separates the two causes: 6 pt on
+the old 1543 span reads 10.89%, and on today's 1368 span reads **12.165%**,
+matching the advanceY change 19 → 17 exactly. Nothing about the glyphs changed;
+the lines got tighter, so the same ink covers less page.
+
+**So the heavier roman this section calls for is not needed**, and the family
+having none is not the limitation it was written up as. The original reasoning
+is kept below because the scale-invariance measurement is sound and worth not
+re-running — it is only the conclusion drawn from it that failed.
+
+### 1c (superseded). Page blackness — the residual this change does NOT fix
 
 Ink as a fraction of line-box area (advance width × advanceY), which is what
 the eye integrates as type colour:
