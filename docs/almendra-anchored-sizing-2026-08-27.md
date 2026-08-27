@@ -253,7 +253,47 @@ full integer sweep (`sweep.txt`), the two ramp-change replication arms
 (`coelAB.txt`, `qcheckAB.txt`), and the final tables (`tables.md`,
 `cannot.md`, `FINAL.json`, `PROPOSAL.json`).
 
-**Status: PROPOSAL. Nothing was applied.** No font, recipe or ramp in
+## ADOPTED, 2026-08-27, and re-measured on the shipped build
+
+Owner: yes. Applied to `lib/EpdFont/scripts/sd-fonts.yaml` — seven families
+carry a family-wide `scale:` on all four styles with `metrics:` multiplied by
+the same k, and Inknut Junicode's S slot moved 10 → 11 pt. Almendra is verified
+**byte-identical**: it is the anchor and does not move.
+
+**The proposal was re-measured against the tree that actually shipped**, not
+against the scratch candidates it was fitted on — that tree was lost when the
+run producing it was killed, so a proposal verified only there would have been
+verified on nothing.
+
+| | proposal predicted | measured on the shipped build |
+|---|---:|---:|
+| tier rms vs anchor | 3.60 % | **3.58 %** |
+| ratio max/min at M | 1.071 | **1.068** |
+| ratio at XXS / XS / S / L / XL | 1.074 / 1.114 / 1.140 / 1.116 / 1.069 | 1.074 / 1.114 / 1.140 / 1.116 / **1.083** |
+
+Same instrument, same corpus (passage A), so the comparison is like for like.
+Five of seven families reproduce to **0.05 words per page**. Two do not: Edgar's
+M slot by 2.43 and TeX Gyre Heros's XL by 3.11, which is the whole of the XL
+ratio's drift from 1.069 to 1.083. Both are within the ±1 % the document already
+claims for k and are consistent with integer rounding of `metrics:`; neither was
+re-tuned, because tuning a family to one corpus is the mistake §2b exists to
+record.
+
+**Two operational notes for the next ramp change.** Moving a slot's point size
+leaves the OLD file behind — Inknut's 10 pt survived the rebuild at all three
+tiers and had to be deleted by hand; `tools/validate_seed_fonts.py` catches it
+as an orphan, which is what that gate is for. And the 3x trees on disk are now
+**stale**, built against the pre-adoption recipe; they are excluded at bundle
+time so nothing ships from them, but re-enabling 3x means rebuilding them first.
+
+The instrument is now in the repo at `tools/words_per_page/` rather than in a
+scratch directory, for the reason its README gives.
+
+---
+
+**Status: ADOPTED and shipped. Superseding "PROPOSAL" below.**
+
+**Status was: PROPOSAL. Nothing was applied.** No font, recipe or ramp in
 `lib/EpdFont/scripts/sd-fonts.yaml` was changed. Adopting this means editing
 `scale:` and `metrics:` for seven families and one point size for Inknut
 Junicode, then rebuilding the seed tree and re-running

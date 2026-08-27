@@ -41,6 +41,21 @@
 #                    inherited by any `from:` style. Not a styling knob:
 #                    requires a measured x-height mismatch against the style
 #                    it sits beside.
+#
+#                    SECOND SANCTIONED USE, 2026-08-27: normalising WORDS PER
+#                    PAGE across families. Seven families carry a family-wide
+#                    `scale:` on all four styles (with `metrics:` multiplied by
+#                    the same k) so that a book is close to the same length
+#                    whichever face renders it. Owner ruling, anchored on
+#                    Almendra, which is why Almendra alone carries none. This
+#                    is NOT the mixed-source x-height case above and does not
+#                    contradict the "not a styling knob" line: it is still a
+#                    measured correction, and the measurement is the real
+#                    firmware paginator over two prose corpora, recorded in
+#                    docs/almendra-anchored-sizing-2026-08-27.md. Do not
+#                    revert a family's k on the grounds that its roman and
+#                    italic share a source — that is the FIRST use's rule, not
+#                    this one.
 #                  path: relative to lib/EpdFont (for committed fonts)
 #                  url:  download URL (for fonts not in the repo)
 #                  zip + member: release-archive URL plus the font's path inside
@@ -513,12 +528,12 @@ families:
     # the ascender clears accented capitals at every size (the defect the
     # earlier 952/-284 metrics had; its 1052/-305 fix is superseded by this
     # slot-uniform span, which keeps the same clearance).
-    metrics: {ascent: 1031, descent: -320, linegap: 0}
+    metrics: {ascent: 990, descent: -307, linegap: 0}
     styles:
-      regular:    {path: "local_fonts/Edgar-Regular.ttf"}
-      bold:       {path: "local_fonts/Edgar-Bold.ttf"}
-      italic:     {path: "local_fonts/Edgar-Italic.ttf"}
-      bolditalic: {path: "local_fonts/Edgar-BoldItalic.ttf"}
+      regular:    {scale: 0.96, path: "local_fonts/Edgar-Regular.ttf"}
+      bold:       {scale: 0.96, path: "local_fonts/Edgar-Bold.ttf"}
+      italic:     {scale: 0.96, path: "local_fonts/Edgar-Italic.ttf"}
+      bolditalic: {scale: 0.96, path: "local_fonts/Edgar-BoldItalic.ttf"}
 
   - name: GTAlpinaCond
     description: "GT Alpina Condensed, tightest set in the tier (Latin)"
@@ -562,14 +577,14 @@ families:
     # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four.
     # Native 1135/-332 (1.467 em) gave the loosest leading in the set
     # (advY 37-55); this span brings it to the shared rhythm.
-    metrics: {ascent: 1049, descent: -302, linegap: 0}
+    metrics: {ascent: 993, descent: -286, linegap: 0}
     # Freely licensed (GUST Font License), so this one needs no local files and
     # rebuilds on any machine.
     styles:
-      regular:    {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf"}
-      bold:       {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-bold.otf"}
-      italic:     {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-italic.otf"}
-      bolditalic: {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-bolditalic.otf"}
+      regular:    {scale: 0.947, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-regular.otf"}
+      bold:       {scale: 0.947, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-bold.otf"}
+      italic:     {scale: 0.947, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-italic.otf"}
+      bolditalic: {scale: 0.947, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreschola-bolditalic.otf"}
 
   # C TIER since 2026-08-12 (owner ruling): cut, recipe only. Never in
   # installed_families:, so there is nothing to strip from a surface — it was
@@ -763,7 +778,7 @@ families:
     # keeps the minimum ink-safe leading instead (still far tighter than the
     # old 43-64 px range).
     sizes: [9, 11, 13, 15, 18, 20]
-    metrics: {ascent: 929, descent: -384, linegap: 0}
+    metrics: {ascent: 877, descent: -362, linegap: 0}
     # The pointing hands, supplied by the fallback chain, rasterise 265x126 px
     # against this family's metrics at 3x. Still present in its 1x and 2x.
     hires_drops:
@@ -774,10 +789,10 @@ families:
     # with hairline growth held near stem growth (default y_ratio flattened
     # the face's contrast). See docs/synthetic-font-styles.md.
     styles:
-      regular:    {url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf"}
-      bold:       {url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthBold.otf"}
-      italic:     {url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthItalic.otf"}
-      bolditalic: {from: italic, synthetic: {embolden_em: 0.037, y_ratio: 0.35}}
+      regular:    {scale: 0.944, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf"}
+      bold:       {scale: 0.944, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthBold.otf"}
+      italic:     {scale: 0.944, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthItalic.otf"}
+      bolditalic: {scale: 0.944, from: italic, synthetic: {embolden_em: 0.037, y_ratio: 0.35}}
 
   - name: InknutAntiqua62
     description: "Sturdy slab antiqua for literary fiction (Latin)"
@@ -1017,8 +1032,8 @@ families:
     # y_ratio is left at its 0.5 default: the horizontal stem grows twice as
     # fast as the vertical, which is what stops a faux bold eating its own
     # x-height. Do not raise it without re-measuring the x-height ramp.
-    sizes: [7, 9, 10, 12, 14, 16]
-    metrics: {ascent: 1203, descent: -340, linegap: 0}
+    sizes: [7, 9, 11, 12, 14, 16]
+    metrics: {ascent: 1103, descent: -312, linegap: 0}
     # This family's em is wide enough (its italic carries scale: 1.2) that
     # U+2E3B overflows EpdGlyph already at 2x -- 289x5 px on the 16 pt slot --
     # and U+2E3A TWO-EM DASH joins it at 3x (286x8 px). Both arrived with the
@@ -1029,14 +1044,14 @@ families:
       2: [0x2E3B]
       3: [0x2E3A]
     styles:
-      regular:    {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
-      bold:       {url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
+      regular:    {scale: 0.917, url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
+      bold:       {scale: 0.917, url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
       italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
-                   variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07}
+                   variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.101, word_space_em: -0.07}
       bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
-                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.2, word_space_em: -0.07,
+                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.101, word_space_em: -0.07,
                    synthetic: {embolden_em: 0.042}}
 
   - name: LibreCaslonText
@@ -1163,12 +1178,12 @@ families:
     # slots 0/2/3 within a pixel. Best-rounded face in the grotesque bench:
     # counters intact, 99% of Latin Extended-A, a real drawn italic.
     sizes: [7, 9, 10, 12, 14, 16]
-    metrics: {ascent: 1202, descent: -359, linegap: 0}
+    metrics: {ascent: 1212, descent: -362, linegap: 0}
     styles:
-      regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 400}}
-      bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 700}}
-      italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
-      bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+      regular:    {scale: 1.008, url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 400}}
+      bold:       {scale: 1.008, url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {scale: 1.008, url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 400}}
+      bolditalic: {scale: 1.008, url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librefranklin/LibreFranklin-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
 
   - name: LibrisADF
     description: "ADF's Lydian revival, calligraphic humanist sans — winner of the blind serif bench, reclassified sans (Latin)"
@@ -1210,7 +1225,7 @@ families:
     # bump has 4 units of slack either way. Unlike Edgar and TeX Gyre Schola,
     # which share these four point sizes and whose slots 1-2 no span can fix,
     # here one can.
-    metrics: {ascent: 1050, descent: -319, linegap: 0}
+    metrics: {ascent: 1078, descent: -328, linegap: 0}
     # GPL v2+ with font exception (Libris-Std-20110117/NOTICE.txt), so like
     # TeX Gyre Schola this one needs no local files and rebuilds on any machine.
     # All four styles are real cuts. Coverage: printable ASCII + Latin-1 100%,
@@ -1237,10 +1252,10 @@ families:
     # filename or size, only by reading its kern matrix back. Bench comparison:
     # lib/EpdFont/scripts/libris-kern-bench.yaml.
     styles:
-      regular:    {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf"}
-      bold:       {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Bold.otf"}
-      italic:     {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Italic.otf"}
-      bolditalic: {url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-BoldItalic.otf"}
+      regular:    {scale: 1.027, url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Regular.otf"}
+      bold:       {scale: 1.027, url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Bold.otf"}
+      italic:     {scale: 1.027, url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-Italic.otf"}
+      bolditalic: {scale: 1.027, url: "https://salsa.debian.org/fonts-team/fonts-adf/-/raw/master/Libris-Std-20110117/OTF/LibrisADFStd-BoldItalic.otf"}
 
   - name: TeXGyreHeros
     description: "GUST's Helvetica revival, via URW Nimbus Sans (Latin)"
@@ -1306,12 +1321,12 @@ families:
     # four styles. Well clear of the leading floor, which is only 1096 here
     # (ink 747/-219 plus 0.13 em) — this face's line span is set by the small
     # point sizes its large x-height forces, not by its ink.
-    metrics: {ascent: 1026, descent: -516, linegap: 0}
+    metrics: {ascent: 1040, descent: -523, linegap: 0}
     styles:
-      regular:    {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf"}
-      bold:       {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bold.otf"}
-      italic:     {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-italic.otf"}
-      bolditalic: {url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf"}
+      regular:    {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf"}
+      bold:       {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bold.otf"}
+      italic:     {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-italic.otf"}
+      bolditalic: {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf"}
 
   - name: HostGrotesk
     description: "Host Grotesk, Element Type's contemporary grotesque (Latin)"
