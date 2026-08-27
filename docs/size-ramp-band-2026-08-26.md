@@ -1,5 +1,22 @@
 # Which families would benefit from enlarging: the band, and the answer
 
+> **SUPERSEDED THE SAME DAY by `docs/words-per-page-2026-08-26.md`.** The owner
+> proposed a better normalisation — *"how many words fit in a text filled page…
+> so that page length a book is close to the same for each font size,
+> irrespective of font used"* — and he is right: that is the OUTCOME, where
+> x-height and ink per character are proxies for it. Two conclusions here did
+> not survive the better metric. **This document's XXS overshoot claim for
+> Almendra is WRONG** — words per page says Almendra's XXS fits 6% MORE than the
+> tier median, i.e. still marginally small, and dropping it to 7 pt would put it
+> 35% over. x-height sees a tall lowercase; the page counts a narrow set. And
+> the Libre Franklin S candidate this document rated WEAK is **confirmed and
+> generalised**: the same defect sits at Inknut's S and Heros' S, and all three
+> are the families whose ramp has a 1 pt step.
+>
+> What still stands: the anchor-error mechanism, the ranking that put Almendra
+> first, and the finding that ink per character cannot detect a family set too
+> large. Read those; do not quote the recommendations.
+
 *2026-08-26. Firmware `135eb0769`, simulator `5fde54c`, seed tree
 `crosspoint-simulator/build/seedfonts`. Every number is READ BACK from built
 `.cpfont` files or from the real `GfxRenderer` through
