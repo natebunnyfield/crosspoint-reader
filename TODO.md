@@ -60,6 +60,53 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-024] Say what SCRIPT Almendra descends from, in the font metainfo
+**scope: font metadata · asked 2026-08-27 · FUTURE, not scheduled**
+
+Owner: *"add something about chancery hand script or whatever is accurate for
+almendra's 1350 london author."*
+
+The row today (`src/FontDisplayNames.h`) carries stages and places but says
+nothing about the HAND:
+
+```
+{"Almendra", "Almendra", "; Ana Sanfelippo", "1350 London; 2011 Buenos Aires", 1350},
+```
+
+**There is a citable source and it should be the one quoted.** Almendra's own
+upstream `DESCRIPTION.en_us.html` names *"the chancery and gothic hands"*. That
+is the face's own claim about itself, which is exactly the standard the rest of
+this table holds to, and it is already recorded in the comment block above the
+row.
+
+**Two accuracy traps, both worth getting right before writing the string.**
+
+1. **Do not source the script to "1350 London".** That stage is an OWNER RULING
+   (2026-08-24), not a citation — no source names a 1350 model or London, and
+   `docs/font-dates.md` has flagged it as uncited since 2026-08-12. The script
+   line must stand on the upstream description, independently. Attaching it to
+   the 1350 stage would quietly promote a ruling into evidence, which the
+   comment block above the row explicitly warns against.
+
+2. **"Chancery hand" is arguably early for 1350 anyway.** English Chancery hand
+   in the usual sense belongs to roughly the turn of the fifteenth century; the
+   documentary hand of 1350s London is better described as Anglicana, or court
+   hand. So if the string is meant to sit beside "1350 London" and read as
+   period-accurate, "chancery" is the wrong word for that date even though it is
+   the right word for the FACE. The clean resolution is to describe the face's
+   models ("after the chancery and gothic hands") rather than the date's script,
+   which is both citable and true.
+
+Check first whether there is anywhere to PUT it. The picker's colophon renders
+name, author and stages; a script line may need a new field rather than being
+crammed into an existing one, and `previewColophonLines`/`previewColophonHeight`
+in `FontSelectionActivity.cpp` decide the pane's height. A field that does not
+fit is worse than no field.
+
+Almendra is the only ORIGINAL design in the installed set — every other family
+is a revival with a named model — so whatever shape this takes should not assume
+every row has a script to name.
+
 ### [T-023] XS and XXS sizes for every shipping family
 
 Owner, 2026-08-25: *"cut XS and XXS versions of every s tiers shipping font."*
