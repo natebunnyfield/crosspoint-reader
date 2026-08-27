@@ -384,10 +384,16 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
   if (pointSize > 0) {
     // Slot first, then what it resolves to on this family: the slot is the thing
     // the owner selected and the only part that means the same across families.
-    static constexpr const char* SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"XXS", "XS", "S", "M", "L", "XL"};
-    const uint8_t slot = SETTINGS.fontSizeSlot < READER_FONT_SLOT_COUNT ? SETTINGS.fontSizeSlot : 0;
-    snprintf(scratch, sizeof(scratch), "%s \"%s\" — %s (%upt)", tr(STR_PREVIEW), fontName ? fontName : "",
-             SLOT_NAMES[slot], pointSize);
+    // ONE definition of the slot name, shared with the Font Size settings row
+    // (readerSlotLabel, src/ReaderFontSizes.h). This site used to carry its own
+    // copy of the names AND its own out-of-range rule -- it clamped a too-large
+    // slot to index 0, so a family with more installed sizes than there are
+    // names showed the LARGEST size as "XXS". Owner report 2026-08-27.
+    //
+    // The label already carries the point size, so nothing is appended here.
+    const std::vector<uint8_t> sizes = readerFontPointSizes(registry_, SETTINGS.sdFontFamilyName);
+    snprintf(scratch, sizeof(scratch), "%s \"%s\" — %s", tr(STR_PREVIEW), fontName ? fontName : "",
+             readerSlotLabel(sizes, SETTINGS.fontSizeSlot).c_str());
   } else {
     snprintf(scratch, sizeof(scratch), "%s \"%s\"", tr(STR_PREVIEW), fontName ? fontName : "");
   }

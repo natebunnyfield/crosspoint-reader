@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 // Reader font size is stored as a SLOT (see CrossPointSettings::fontSizeSlot),
@@ -55,8 +56,47 @@ std::vector<uint8_t> readerFontPointSizes(const SdCardFontRegistry* registry, co
 
 // Number of size slots the UI offers (XXS / XS / S / M / L / XL). Families that
 // ship a different count fall back to labelling by point size — see
-// buildFontSizeSetting.
+// readerSlotLabel below.
 inline constexpr uint8_t READER_FONT_SLOT_COUNT = 6;
+
+// THE slot names, in ONE place. They were written out twice — here's worth of
+// them in SettingsList.h and a second copy in FontSelectionActivity.cpp — and
+// the two copies did not merely risk drifting, they had already DISAGREED about
+// the case that matters: an out-of-range slot. SettingsList clamped it to the
+// LAST name; FontSelectionActivity clamped it to index 0, so the largest size on
+// the card announced itself as "XXS". Owner report 2026-08-27: "XXL is shown as
+// XXS."
+inline constexpr const char* READER_SLOT_NAMES[READER_FONT_SLOT_COUNT] = {
+    "XXS", "XS", "S", "M", "L", "XL"};
+
+// Whether a family's installed size count earns the XXS..XL names at all.
+//
+// A family may ship MORE than six sizes — a user-built family, or a card that
+// has lived through a ramp change and kept the file the old ramp vacated
+// (nothing on a real SD card prunes; today's Inknut 10 -> 11 pt move leaves a
+// 10 pt file behind on every card that already had one). Those extra sizes stay
+// REACHABLE on purpose: the stepper clamps to what is installed, so no size a
+// user put on the card becomes unselectable. What they must not do is borrow a
+// name, because there are only six names and the seventh slot is not "XXL" —
+// it has no name at all.
+inline constexpr bool readerSlotsAreNamed(size_t installedCount) {
+  return installedCount == READER_FONT_SLOT_COUNT;
+}
+
+// The label for one slot: "M (14pt)" when the family ships exactly the six the
+// names describe, bare "14pt" otherwise.
+//
+// `slot` is clamped to the LAST installed size, never to the first. That
+// direction is the whole bug: a slot past the end is a slot too LARGE, and
+// answering it with the smallest name is the one answer that is not merely
+// imprecise but backwards.
+inline std::string readerSlotLabel(const std::vector<uint8_t>& sizes, uint8_t slot) {
+  if (sizes.empty()) return std::string();
+  const size_t i = slot < sizes.size() ? slot : sizes.size() - 1;
+  const std::string pt = std::to_string(sizes[i]) + "pt";
+  if (!readerSlotsAreNamed(sizes.size())) return pt;
+  return std::string(READER_SLOT_NAMES[i]) + " (" + pt + ")";
+}
 
 // Point size for `slot` within `sizes` (ascending, non-empty); slot is clamped
 // into range. Raw-range overload for callers that must not allocate.

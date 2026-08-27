@@ -91,13 +91,10 @@ inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
 
   // "pt" is deliberately not translated: it is the typographic unit symbol,
   // written the same way in every language CrossPoint ships.
-  static constexpr const char* SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"XXS", "XS", "S", "M", "L", "XL"};
-  const bool named = sizes.size() == READER_FONT_SLOT_COUNT;
   std::vector<std::string> labels;
   labels.reserve(sizes.size());
   for (size_t i = 0; i < sizes.size(); i++) {
-    const std::string pt = std::to_string(sizes[i]) + "pt";
-    labels.push_back(named ? std::string(SLOT_NAMES[i]) + " (" + pt + ")" : pt);
+    labels.push_back(readerSlotLabel(sizes, static_cast<uint8_t>(i)));
   }
 
   SettingInfo s;
