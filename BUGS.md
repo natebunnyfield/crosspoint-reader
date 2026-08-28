@@ -2006,6 +2006,45 @@ users actually see.
 paths never write through the link. Would halve the visible footprint to
 ~58 MB with no capability change.
 
+### [B-041] CI has never run on this fork — every workflow reports zero runs
+**severity: medium (no automated verification exists) · scope: build / release · found 2026-08-28**
+
+Found while asking why a pushed tag produced no release. Every workflow on
+`natebunnyfield/crosspoint-reader` has **zero runs, ever**:
+
+```
+ci.yml                    0 runs
+pr-formatting-check.yml   0 runs
+release-fonts.yml         0 runs
+release_candidate.yml     0 runs
+release.yml               0 runs      <- the one that should publish firmware.bin
+```
+
+Not a configuration the repo can see as wrong: `actions/permissions` reports
+`enabled: true, allowed_actions: all`, and all five workflows report state
+`active`. They are simply never triggered — the shape GitHub gives a FORK whose
+Actions have not been turned on in the UI, where the API can report enabled
+while nothing dispatches.
+
+**Two consequences, and the second is the larger one.**
+
+*Releases are hand-assembled.* `release.yml` triggers on `push: tags: '*'` and
+would attach `firmware.bin` — the asset `OtaUpdater` looks for by name. It has
+never fired, so 1.5.14-BD through 1.5.17-BD were all assembled by hand. A tag
+push alone publishes nothing, which is exactly what happened on 2026-08-28: the
+tag went up and no release appeared until one was created manually.
+
+*And no automated build has ever verified anything here.* Every green result
+this repo has ever reported came from a local run on one machine. That is not a
+disaster — the host suite is fast and gets run — but "CI is green" has never
+been a true statement about this fork, and anything relying on it (a PR check, a
+release gate) is relying on something that does not exist.
+
+**Close by** enabling Actions in the repository's Actions tab, then pushing a
+throwaway tag to confirm `release.yml` fires and attaches the three assets.
+Until then `scripts/release.sh` does the same work locally, with the same
+checks, and refuses rather than repairs.
+
 ### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
 
