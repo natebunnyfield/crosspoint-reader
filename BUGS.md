@@ -414,9 +414,19 @@ has performed yet.
 > image with `CROSSPOINT_RC_HASH` set, stage that, and update from it. Do not
 > flash the image currently on the card.
 >
-> Deliberately not staged automatically. Putting a firmware image on the owner's
-> card is not a step to take unasked, and the wrong image on a card is exactly
-> the failure this entry is about.
+> **STAGED 2026-08-28.** `20260828T2010Z-crosspoint-fbd3129d.bin` is now on the
+> card beside the old one, built from `gh_release` and verified in place:
+> descriptor version **1.5.16-BD** (the B-033 stamper ran), appended SHA256
+> valid, image magic `0xE9`.
+>
+> Copying it is not a flash — `SdFirmwareUpdateActivity` is a file picker, so
+> nothing is written to the device until it is chosen. That is why staging was
+> safe to do and the update itself is not mine to perform.
+>
+> **Pick the 2026-08-28 file, not the 2026-08-17 one.** The older image is still
+> there and still stamped `1.5.0-BNY`; it is left rather than deleted because
+> removing a firmware image from someone's card is a worse default than leaving
+> two and saying which is which.
 
 **Close by:** reflashing with the variable set, or SD Firmware Update from the
 card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
