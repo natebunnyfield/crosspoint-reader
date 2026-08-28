@@ -135,8 +135,8 @@ seen again, the useful first fact is the FORMAT: `-dev-` means the default env,
 `-rc+` the RC env, a bare triple a literal in the ini, and `-N-g<sha>` means
 something outside this repo's build path generated it.
 
-### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3
-**severity: low · scope: release · found 2026-08-19**
+### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
+**severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
 
 Tags `1.5.3`, `1.5.4`, `1.5.5` and `1.5.6` exist locally with no releases on this
 fork — they are upstream's, arriving through the `upstream` remote. The fork is
@@ -150,6 +150,35 @@ publish, on a machine where the fetch happened to have run.
 **Close by** choosing a namespace and writing it down — a prefix the fork owns
 (`bd/1.5.3`), or skipping to a range upstream will not reach. Either is fine;
 discovering the clash mid-release is not.
+
+## Closed 2026-08-28. The namespace was already chosen; only the writing-down
+## was missing.
+
+The predicted failure did not occur, and the fork is now at **1.5.16-BD** —
+fourteen releases past the point this entry expected `git tag` to fail
+mid-publish. Checked rather than assumed:
+
+* every fork release tag carries a **suffix**: `1.5.1-BNY`, `1.5.1-B2`, then
+  `1.5.2-BD` through `1.5.16-BD`, seventeen in all;
+* every BARE `1.5.N` tag is upstream's, authored by `0x1abin` and `Uri Tauber`;
+* `1.5.3` through `1.5.6` do exist locally, exactly as this entry warned — and
+  the fork tagged `1.5.3-BD` … `1.5.6-BD` straight past them without a clash.
+
+**So the suffix IS the namespace**, and it is the same suffix the version string
+already carries for the Settings corner and the OTA screen. It was not adopted
+as a tag policy; it just fell out of tagging with the full version string, which
+happens to include the fork marker. That is why this entry could be written at
+all — the practice was invisible because nobody had stated it.
+
+**The rule, stated:** *a fork release tag is its full version string, suffix
+included.* `1.5.17-BD`, never `1.5.17`. A bare `1.5.N` tag in this repo is
+upstream's and must not be created here. Nothing needs changing to comply —
+seventeen tags already do — and `[crosspoint] version` in `platformio.ini`
+carries the suffix, so a tag taken from it is correct by construction.
+
+No prefix scheme is needed. `bd/1.5.3` was one of the two options this entry
+offered and it would be a second, redundant namespace on top of the one already
+working.
 
 
 ### [B-006] X4 running firmware carries an empty version stamp
