@@ -204,6 +204,24 @@ produced this entry cannot recur.
 badly-stamped firmware. Still OPEN because that is an on-device action nobody
 has performed yet.
 
+> **THE STAGED IMAGE IS NOW SIXTEEN VERSIONS STALE — checked 2026-08-28.**
+> The card mounted as `BUNNYFIELDS` carries
+> `20260817T2333Z-crosspoint-9aae0b3f.bin`, and `strings` on it reports
+> **`1.5.0-BNY`**. The fork is at **1.5.16-BD**.
+>
+> So following the "close by" instruction below TODAY would fix the stamp and
+> **downgrade the device to August firmware** — losing every fix since,
+> including the untrusted-input memory-safety work (B-023, B-024), the bare-`new`
+> sweep (B-031, B-032) and everything shipped this week.
+>
+> **The close action has therefore changed**: build a CURRENT `gh_release`
+> image with `CROSSPOINT_RC_HASH` set, stage that, and update from it. Do not
+> flash the image currently on the card.
+>
+> Deliberately not staged automatically. Putting a firmware image on the owner's
+> card is not a step to take unasked, and the wrong image on a card is exactly
+> the failure this entry is about.
+
 **Close by:** reflashing with the variable set, or SD Firmware Update from the
 card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
 so a same-code reflash is accepted):
