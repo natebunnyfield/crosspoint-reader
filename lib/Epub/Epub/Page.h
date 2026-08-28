@@ -118,6 +118,13 @@ class PageHorizontalRule final : public PageElement {
   bool serialize(serialization::BufferedFileWriter& out) override;
   PageElementTag getTag() const override { return TAG_PageHorizontalRule; }
   static std::unique_ptr<PageHorizontalRule> deserialize(HalFile& file);
+
+  // For tests: the two rules this class draws are visually distinct on purpose
+  // -- an <hr> section break is a quarter of the measure at 2 px, a flattened
+  // table's row separator is the full measure at 1 px -- and a test that cannot
+  // read the geometry cannot tell which one it got.
+  uint16_t getWidth() const { return width; }
+  uint8_t getThickness() const { return thickness; }
 };
 
 class Page {

@@ -743,7 +743,12 @@ void ChapterHtmlSlimParser::emitBufferedTableFlattened() {
 
   // With no header row, EVERY row is data -- starting at 1 would silently eat
   // the first row of a table that simply did not use <thead>.
-  for (size_t r = tableBufHasHeader ? 1 : 0; r < tableBuf.size(); r++) {
+  const size_t firstDataRow = tableBufHasHeader ? 1 : 0;
+  for (size_t r = firstDataRow; r < tableBuf.size(); r++) {
+    // BETWEEN records, so not before the first -- a rule above row one would
+    // be separating the table from whatever precedes it, which is a different
+    // decision and not the one asked for.
+    if (r > firstDataRow) emitTableRowSeparator();
     const tablecolumns::Row& row = tableBuf[r];
     const std::string rowLabel =
         row.empty() ? std::string() : TableCellLabel::normalize(tablecolumns::cellText(row[0]));
@@ -1166,6 +1171,62 @@ void ChapterHtmlSlimParser::emitHorizontalRule(const BlockStyle& blockStyle) {
   }
 }
 
+// A hairline between the RECORDS of a flattened table.
+//
+// Owner 2026-08-27: "for flat table view, put a line separator between
+// records/rows." A flattened table is one text block per CELL, so without this
+// the only thing telling a reader where one record ends and the next begins is
+// the cell labels -- and in a two-column table there are no labels at all
+// (TableCellLabel::forCell returns "" there, because name-then-value already
+// reads as a pair). Those tables ran together completely.
+//
+// NOT emitHorizontalRule. That is the <hr> section break: a quarter of the
+// measure, centred, 2 px thick, with half a line of air above and below. It is
+// a decorative pause. This is STRUCTURE, so it runs the full measure at 1 px
+// with a quarter line of air -- enough to divide, little enough that a
+// ten-row table does not become mostly whitespace.
+//
+// A separator that lands FIRST on a page is dropped. It would be dividing the
+// page break from nothing, and the break already does that job better than a
+// line can.
+void ChapterHtmlSlimParser::emitTableRowSeparator() {
+  if (partWordBufferIndex > 0) {
+    flushPartWordBuffer();
+  }
+  resetInterBlockCollapse();
+
+  if (!currentPage) {
+    currentPage.reset(new (std::nothrow) Page());
+    if (!currentPage) {
+      LOG_ERR("EHP", "Failed to create page for table row separator");
+      return;
+    }
+    currentPageNextY = 0;
+  }
+
+  const int16_t lineHeight = static_cast<int16_t>(renderer.getLineHeight(fontId, lineCompression));
+  const int16_t air = std::max<int16_t>(1, static_cast<int16_t>(lineHeight / 4));
+  constexpr uint8_t kThickness = 1;
+  const int16_t width = std::max<int16_t>(1, static_cast<int16_t>(viewportWidth));
+  const int16_t totalHeight = static_cast<int16_t>(air + kThickness + air);
+
+  // Would it be the first thing on the page? Then it divides nothing. This
+  // covers both an empty page and one this separator is about to overflow.
+  if (currentPage->elements.empty()) return;
+  if (currentPageNextY + totalHeight > viewportHeight) return;
+
+  currentPageNextY = static_cast<int16_t>(currentPageNextY + air);
+  auto rule = std::shared_ptr<PageHorizontalRule>(
+      new (std::nothrow) PageHorizontalRule(static_cast<uint16_t>(width), kThickness, 0, currentPageNextY));
+  if (!rule) {
+    LOG_ERR("EHP", "Failed to create table row separator");
+    return;
+  }
+  currentPage->elements.push_back(rule);
+  currentPageNextY = static_cast<int16_t>(currentPageNextY + kThickness + air);
+  snapToLineGrid();
+}
+
 void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char* name, const XML_Char** atts) {
   auto* self = static_cast<ChapterHtmlSlimParser*>(userData);
 
@@ -1335,6 +1396,23 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   }
 
   if (self->tableDepth == 1 && strcmp(name, "tr") == 0) {
+    // A RECORD BOUNDARY on the streaming path (owner 2026-08-27, "for flat
+    // table view, put a line separator between records/rows").
+    //
+    // This is the path most flat tables actually take, which the first version
+    // of this change missed. emitBufferedTableFlattened() only ever sees the
+    // rows buffered before the column planner gave up -- abandonTableBuffer()
+    // flushes those and hands EVERYTHING AFTER to the streaming path, so a
+    // table that flattens because it is too wide gets one row flattened and the
+    // rest streamed. Both paths need the separator or it appears on the first
+    // record and then stops.
+    //
+    // Gated on tableEmittedDataCell so it fires only BETWEEN records: false
+    // until this table has emitted something, which makes the first <tr> silent
+    // without needing to know whether the table had a header.
+    if (!self->tableBuffering && self->tableEmittedDataCell) {
+      self->emitTableRowSeparator();
+    }
     if (self->tableBuffering) {
       if (self->tableBuf.size() >= tablecolumns::kMaxRows) {
         self->abandonTableBuffer();

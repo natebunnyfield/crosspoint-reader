@@ -191,6 +191,80 @@ bool lineHasWord(const std::string& line, const std::string& word) {
   return false;
 }
 
+// The RULES on each page: width and thickness, in document order. Separate
+// from layout() because that helper keeps only PageLine elements and drops
+// everything else, which is exactly what made the row separators invisible to
+// every existing case here.
+struct RuleGeom {
+  int width;
+  int thickness;
+};
+
+std::vector<std::vector<RuleGeom>> layoutRules(const std::string& bodyHtml) {
+  char path[] = "/tmp/cp_table_rules_XXXXXX";
+  const int fd = mkstemp(path);
+  if (fd < 0) {
+    ADD_FAILURE() << "mkstemp failed";
+    return {};
+  }
+  const std::string doc =
+      "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+      "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\"><head><title>t</title></head><body>" +
+      bodyHtml + "</body></html>";
+  const ssize_t wrote = ::write(fd, doc.data(), doc.size());
+  ::close(fd);
+  if (wrote != static_cast<ssize_t>(doc.size())) {
+    ADD_FAILURE() << "short write of the fixture";
+    ::remove(path);
+    return {};
+  }
+
+  std::vector<std::vector<RuleGeom>> pages;
+  const std::string filepath(path);
+  ChapterHtmlSlimParser parser(
+      nullptr, filepath, Gfx::instance().renderer(), LIBREFRANKLIN_READER_14_FONT_ID,
+      /*smallFontId=*/0, /*lineCompression=*/1.0f, /*extraParagraphSpacing=*/true,
+      /*paragraphAlignment=*/0, kViewportWidth, kViewportHeight, /*hyphenationEnabled=*/false,
+      /*focusReadingEnabled=*/false, /*lineGrid=*/false,
+      /*justifyThresholdChars=*/autojustify::THRESHOLD_CHARS,
+      [&pages](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
+        std::vector<RuleGeom> rules;
+        for (const auto& element : page->elements) {
+          const auto rule = std::dynamic_pointer_cast<PageHorizontalRule>(element);
+          if (!rule) continue;
+          rules.push_back({rule->getWidth(), rule->getThickness()});
+        }
+        pages.push_back(std::move(rules));
+      },
+      /*embeddedStyle=*/false, /*contentBase=*/"", /*imageBasePath=*/"");
+  parser.parseAndBuildPages();
+  ::remove(path);
+  return pages;
+}
+
+int totalRules(const std::vector<std::vector<RuleGeom>>& pages) {
+  int n = 0;
+  for (const auto& page : pages) n += static_cast<int>(page.size());
+  return n;
+}
+
+// SIX columns, one past tablecolumns::kMaxColumns, so the column planner gives
+// up and the table takes the FLATTENED path. That is the path the separators
+// live on, and picking the trigger deterministically beats hoping a wide table
+// happens not to fit.
+std::string flatTable(const int dataRows, const int cols = 6) {
+  std::string html = "<table><tr>";
+  for (int c = 0; c < cols; c++) html += "<th>H" + std::to_string(c) + "</th>";
+  html += "</tr>";
+  for (int r = 0; r < dataRows; r++) {
+    html += "<tr>";
+    for (int c = 0; c < cols; c++)
+      html += "<td>r" + std::to_string(r) + "c" + std::to_string(c) + "</td>";
+    html += "</tr>";
+  }
+  return html + "</table>";
+}
+
 // Index of the first page carrying `word`, or -1.
 int pageOf(const std::vector<PageLines>& pages, const std::string& word) {
   for (size_t p = 0; p < pages.size(); p++) {
@@ -219,6 +293,73 @@ std::string reportedTable(const bool withCaption) {
          "<tr><td>Kale</td><td>Chop</td><td>Iron</td></tr>"
          "<tr><td>Oats</td><td>Soak</td><td>Bulk</td></tr>"
          "</tbody></table>";
+}
+
+// --- The flattened table's row separators (owner 2026-08-27) --------------
+//
+// "for flat table view, put a line separator between records/rows."
+//
+// A flattened table is one text block per CELL, so without a separator the only
+// thing marking where one record ends is the cell labels -- and a two-column
+// table has none at all, because name-then-value already reads as a pair. Those
+// ran together completely.
+
+TEST(TableRowSeparator, OneAtEveryRowBoundaryAndNoneAtTheTableEnds) {
+  // A separator sits at every boundary BETWEEN rows, which for a table with a
+  // header means one under the header as well -- a rule under the head is
+  // ordinary table typography and it is still a row boundary. So N data rows
+  // under a header give N separators: head|r0, r0|r1, ... r(N-2)|r(N-1).
+  EXPECT_EQ(totalRules(layoutRules(flatTable(1))), 1) << "the rule under the header";
+  EXPECT_EQ(totalRules(layoutRules(flatTable(2))), 2);
+  EXPECT_EQ(totalRules(layoutRules(flatTable(3))), 3);
+  EXPECT_EQ(totalRules(layoutRules(flatTable(6))), 6);
+
+  // Never before the first row or after the last: those boundaries divide the
+  // table from the prose around it, which is a different decision and not the
+  // one asked for. With no header there is no head rule either, so a headerless
+  // table of N rows has N-1.
+  std::string noHead = "<table><td>stray</td>";
+  for (int r = 0; r < 4; r++) {
+    noHead += "<tr>";
+    for (int c = 0; c < 6; c++) noHead += "<td>r" + std::to_string(r) + "c" + std::to_string(c) + "</td>";
+    noHead += "</tr>";
+  }
+  noHead += "</table>";
+  EXPECT_EQ(totalRules(layoutRules(noHead)), 3) << "four records, three boundaries between them";
+}
+
+TEST(TableRowSeparator, IsFullMeasureAndHairlineNotAnHrSectionBreak) {
+  const auto pages = layoutRules(flatTable(3));
+  int seen = 0;
+  for (const auto& page : pages) {
+    for (const RuleGeom& r : page) {
+      EXPECT_EQ(r.thickness, 1) << "a row separator is a hairline; the <hr> break is 2 px";
+      EXPECT_EQ(r.width, kViewportWidth) << "a row separator runs the full measure; the <hr> break is a quarter";
+      seen++;
+    }
+  }
+  EXPECT_GT(seen, 0) << "no separators were emitted at all";
+}
+
+// The two-column case is the one that most needed this: TableCellLabel emits no
+// prefix there, so the cells carry nothing at all to mark a record boundary.
+TEST(TableRowSeparator, TwoColumnTablesGetThemToo) {
+  // Force flattening with a cell outside any row, since two columns would
+  // otherwise lay out happily as columns.
+  std::string html = "<table><td>stray</td><tr><td>a</td><td>1</td></tr>";
+  html += "<tr><td>b</td><td>2</td></tr><tr><td>c</td><td>3</td></tr></table>";
+  EXPECT_GT(totalRules(layoutRules(html)), 0);
+}
+
+// The <hr> section break must be unchanged by all of this.
+TEST(TableRowSeparator, AnHrInProseIsStillTheQuarterWidthSectionBreak) {
+  const auto pages = layoutRules("<p>before</p><hr/><p>after</p>");
+  ASSERT_EQ(totalRules(pages), 1);
+  for (const auto& page : pages)
+    for (const RuleGeom& r : page) {
+      EXPECT_EQ(r.thickness, 2);
+      EXPECT_LT(r.width, kViewportWidth) << "the section break must not have become full-measure";
+    }
 }
 
 TEST(TableKeepTogether, HeaderTravelsWithItsFirstBodyRows) {

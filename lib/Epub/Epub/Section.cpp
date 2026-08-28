@@ -178,7 +178,11 @@ namespace {
 //      books that had never been opened -- and a reader who saw the reported
 //      page would go on seeing it. Every book on every card repaginates once,
 //      which is the cost of the bump and is accepted.
-constexpr uint8_t SECTION_FILE_VERSION = 52;
+// v53: a flattened table emits a full-width hairline between records (owner
+// 2026-08-27). It adds PageHorizontalRule elements and consumes vertical
+// space, so pagination moves -- a cache built by v52 would render the same
+// book with no separators and different page breaks, silently.
+constexpr uint8_t SECTION_FILE_VERSION = 53;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

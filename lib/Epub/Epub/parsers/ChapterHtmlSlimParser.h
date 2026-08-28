@@ -301,6 +301,15 @@ class ChapterHtmlSlimParser {
   static void applyTextDecorationToEntry(StyleStackEntry& entry, const CssStyle& css);
   void pushDecorationStyleEntry(CssTextDecoration defaultDecoration, const CssStyle& cssStyle);
   void emitHorizontalRule(const BlockStyle& blockStyle);
+
+  // A full-width hairline between the RECORDS of a flattened table (owner
+  // 2026-08-27: "for flat table view, put a line separator between records/
+  // rows"). Deliberately not emitHorizontalRule: that one is the <hr> section
+  // break -- quarter width, centred, 2 px, half a line of air above and below
+  // -- which is a decorative pause between paragraphs. A row separator is
+  // structure, so it runs the full measure, is 1 px, and takes as little
+  // vertical space as still reads as a division.
+  void emitTableRowSeparator();
   // XML callbacks
   static void XMLCALL startElement(void* userData, const XML_Char* name, const XML_Char** atts);
   static void XMLCALL characterData(void* userData, const XML_Char* s, int len);
