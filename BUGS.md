@@ -244,9 +244,44 @@ was written at once, by something that had just compiled against this project.
 `~/.platformio/packages` except one comment in `tools/stack_budget/`, and the
 other chips are untouched, so it was not a broad package operation.
 
-**Deliberately not done here.** Reinstalling rewrites a shared toolchain outside
-this repository and forces a large re-download; that is the owner's machine and
-his call. And this entry has now been closed wrongly
+### A repo-side fix EXISTS: the symbol is weak
+
+`nm --defined-only` on the archive reports:
+
+```
+esp_app_desc.c.o:
+00000000 V esp_app_desc
+```
+
+`V` is a **weak object symbol**. ESP-IDF marks it weak precisely so an
+application can override it: a strong definition in this project would win at
+link time with no duplicate-symbol error, and the archive member would simply
+never be pulled. So the descriptor can be corrected **without touching the
+toolchain at all** — which makes this fixable in-repo, and reinstalling the
+package the fallback rather than the remedy.
+
+**Why it is not written yet, and this is a real blocker rather than caution.**
+Overriding means supplying the WHOLE `esp_app_desc_t`, not just the version
+field, and the struct's tail is not all inert padding on current IDF:
+`min_efuse_blk_rev_full`, `max_efuse_blk_rev_full` and `mmu_page_size` are read
+by the BOOTLOADER. The values currently in the image are correct because
+Espressif's build computed them; hand-writing a replacement means reproducing
+them, and guessing wrong there does not produce a wrong version string — it
+produces an image the bootloader may refuse.
+
+That is the one failure this repository's own OTA design exists to prevent (see
+the five-step no-brick chain in `OnlineFirmwareUpdateActivity.h`), and it is not
+verifiable off-device: reading the fields back proves the struct is well-formed,
+not that the bootloader accepts it.
+
+**Close by** taking those three fields from a known-good image rather than
+inventing them — the current `firmware.bin` at offset `0x20` has them — and
+defining the override from `CROSSPOINT_VERSION` with everything else preserved.
+Then confirm on hardware before any release uses it.
+
+**Reinstalling the package remains the zero-risk alternative.** It rewrites a
+shared toolchain outside this repository and forces a large re-download; that is
+the owner's machine and his call. And this entry has now been closed wrongly
 once and given a wrong remedy twice — each time by reasoning one step past the
 evidence — so the third answer is the one that gets checked before it is acted
 on.
