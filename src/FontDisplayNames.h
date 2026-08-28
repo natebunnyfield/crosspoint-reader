@@ -127,8 +127,47 @@ inline constexpr Entry kEntries[] = {
     // the picker beside Inknut rather than leading it. A 2011 key put it first,
     // which is where an original 2011 face belongs -- and that placement is
     // what the ruling changes.
+    // TWO STAGES, and stage 1 names a STYLE rather than a face. Owner
+    // 2026-08-27: "add a style for author and a rough year and place for when
+    // this style started or peaked or earliest established."
+    //
+    // So the author slot carries the HAND and the stage carries when and where
+    // that hand was established — not a typeface Sanfelippo copied, because
+    // there is none. That distinction is the whole reason this row can have a
+    // first stage at all now: the earlier attempt failed because it tried to
+    // name a MODEL, and an original design has no model.
+    //
+    // WHY THE CHANCERY HAND, of the two her description names. It is the term
+    // she uses first, and it is the one with a hard dated milestone: Ludovico
+    // degli Arrighi published `La Operina da imparare di scrivere littera
+    // cancellarescha` in ROME in 1522 — the first printed manual of the
+    // cancelleresca, and the point at which the hand stopped being a papal
+    // chancery house practice and became a taught, codified style. That is
+    // "earliest established" in the strongest sense available, with a real
+    // place attached.
+    //
+    // Two things it is NOT, both worth stating so they are not re-litigated.
+    // It is not a claim that Sanfelippo worked from Arrighi — she names a class
+    // of hands, not a manual. And it does not cover the GOTHIC half of her
+    // description: textura peaks around 1300 in northern France, two centuries
+    // and a country away, and no single date-and-place can hold both. The
+    // gothic half is acknowledged here and in docs/font-dates.md rather than
+    // being averaged into a fiction, which is exactly what "1350 London" was.
+    //
+    // If the earlier ANCHOR is ever wanted instead, the humanist cursive this
+    // grew out of is c. 1420 Florence (Niccoli, Poggio) — earlier, and vaguer,
+    // because it names a practice rather than a publication.
+    //
+    // SORT: 1522 seats the face between Inknut (1469) and the later revivals,
+    // which is the old end of the picker again — reached this time by a date
+    // that is defensible rather than by a placement decision.
+    //
+    // --- The history of this row, kept because it was contested twice --------
+    //
     // ONE STAGE, 2026-08-27, replacing the 1350 London ruling at the owner's
-    // word: "replace 1350 london with something more accurate."
+    // word: "replace 1350 london with something more accurate." Superseded
+    // hours later by the two-stage form above, which satisfies the same
+    // accuracy requirement AND restores a first stage.
     //
     // There is nothing accurate to put in a first stage, and that is the
     // finding rather than a gap. Every other row's stage 1 is a dated
@@ -153,7 +192,7 @@ inline constexpr Entry kEntries[] = {
     // placement the 2026-08-24 ruling had deliberately overridden. If the old
     // position is wanted back it is this integer and nothing else; do not
     // reintroduce a fictional stage to get it.
-    {"Almendra", "Almendra", "Ana Sanfelippo", "2011 Buenos Aires", 2011},
+    {"Almendra", "Almendra", "Chancery hand; Ana Sanfelippo", "1522 Rome; 2011 Buenos Aires", 1522},
     // Three revisions in one stage: Carter & Cone recut Dwiggins' Caledonia in
     // Cambridge across 1988, 1994 and 2026, so those years share a place and
     // take commas; the 1938 Linotype original is a separate stage. Dwiggins drew
