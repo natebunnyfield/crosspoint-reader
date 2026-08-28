@@ -1,0 +1,101 @@
+"""Write the real version into the ESP-IDF app descriptor, post-link.
+
+B-033. The descriptor's `version` field is supposed to carry this build's
+version. It does not: `esp_app_desc.c.o` arrives PREBUILT inside
+`~/.platformio/packages/framework-arduinoespressif32-libs/esp32c3/lib/libesp_app_format.a`,
+already compiled -- on 2026-08-21, against this project -- so every image since
+has shipped `1.5.1-B2-43-g7211621a3` no matter what the source tree says. That
+string is what OTA metadata and the web UI's build line report. The BOOT SCREEN
+was always right, because that reads `CROSSPOINT_VERSION`, a define this repo
+owns.
+
+WHY A POST-BUILD PATCH RATHER THAN A SOURCE OVERRIDE. `esp_app_desc` is a weak
+symbol, so a strong definition here would win at link time -- but overriding it
+means supplying the WHOLE struct, and its tail is not padding:
+`min_efuse_blk_rev_full`, `max_efuse_blk_rev_full` and `mmu_page_size` are read
+by the bootloader. Hardcoding them would fix a stale string by introducing a
+stale struct -- the identical bug one field over, and the next framework bump
+would silently invalidate it. This patch touches THIRTY-TWO BYTES and leaves
+every field the bootloader reads exactly as Espressif's build computed it.
+
+WHAT IT DOES, and each step refuses rather than guesses:
+
+  1. finds the descriptor at offset 0x20 (24-byte image header + 8-byte segment
+     header) and verifies its magic is 0xABCD5432 -- if the layout ever moves,
+     this does nothing rather than corrupting a byte range;
+  2. writes the version, NUL-padded to 32 bytes, truncating at 31 characters so
+     the field is always terminated;
+  3. recomputes the appended SHA256 when the image declares one (extended
+     header byte 23), because the descriptor lives inside a hashed segment and a
+     patched image with a stale hash is an image the bootloader rejects.
+
+A patched image is byte-identical to the original except those 32 bytes and the
+32-byte hash.
+"""
+import hashlib
+import struct
+
+Import("env")  # noqa: F821
+
+DESC_OFFSET = 0x20
+DESC_MAGIC = 0xABCD5432
+VERSION_OFFSET = DESC_OFFSET + 16
+VERSION_LEN = 32
+HASH_APPENDED_BYTE = 23
+
+
+def _version_from_flags(env):
+    """The CROSSPOINT_VERSION define this build is using, or None.
+
+    Read from the build flags rather than recomputed, so this can never disagree
+    with what the boot screen shows -- making them agree is the entire point.
+    """
+    for item in env.get("CPPDEFINES", []):
+        if isinstance(item, (list, tuple)) and len(item) == 2 and item[0] == "CROSSPOINT_VERSION":
+            return str(item[1]).strip().strip('\\"').strip('"')
+    return None
+
+
+def stamp(source, target, env):
+    path = str(target[0])
+    if not path.endswith(".bin"):
+        return
+
+    version = _version_from_flags(env)
+    if not version:
+        print("stamp_app_desc: no CROSSPOINT_VERSION define found; leaving the descriptor alone")
+        return
+
+    with open(path, "rb") as fh:
+        image = bytearray(fh.read())
+
+    if len(image) < DESC_OFFSET + 256:
+        print("stamp_app_desc: image too short for an app descriptor; skipped")
+        return
+
+    magic = struct.unpack_from("<I", image, DESC_OFFSET)[0]
+    if magic != DESC_MAGIC:
+        print(f"stamp_app_desc: no descriptor magic at 0x{DESC_OFFSET:X} "
+              f"(found 0x{magic:08X}); skipped rather than guessed")
+        return
+
+    was = bytes(image[VERSION_OFFSET:VERSION_OFFSET + VERSION_LEN]).split(b"\0")[0].decode(errors="replace")
+    if was == version:
+        return  # already correct; nothing to do and nothing to say
+
+    field = version.encode()[: VERSION_LEN - 1].ljust(VERSION_LEN, b"\0")
+    image[VERSION_OFFSET:VERSION_OFFSET + VERSION_LEN] = field
+
+    if image[HASH_APPENDED_BYTE] == 1:
+        image[-32:] = hashlib.sha256(bytes(image[:-32])).digest()
+        rehashed = ", sha256 recomputed"
+    else:
+        rehashed = ""
+
+    with open(path, "wb") as fh:
+        fh.write(bytes(image))
+
+    print(f"stamp_app_desc: app descriptor version {was!r} -> {version!r}{rehashed}")
+
+
+env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", stamp)  # noqa: F821

@@ -274,10 +274,50 @@ the five-step no-brick chain in `OnlineFirmwareUpdateActivity.h`), and it is not
 verifiable off-device: reading the fields back proves the struct is well-formed,
 not that the bootloader accepts it.
 
-**Close by** taking those three fields from a known-good image rather than
-inventing them — the current `firmware.bin` at offset `0x20` has them — and
-defining the override from `CROSSPOINT_VERSION` with everything else preserved.
-Then confirm on hardware before any release uses it.
+## FIXED 2026-08-28 — and not by the override, because that would have been the
+## same bug one field over
+
+The weak-symbol override was the obvious fix and it is the wrong one.
+Overriding means supplying the WHOLE struct, so the bootloader-read fields
+would have to be hardcoded here — and the next framework bump would silently
+invalidate them. That is B-033 again, one field across: a value frozen in a
+place nobody looks.
+
+**`scripts/stamp_app_desc.py` patches thirty-two bytes after the link instead.**
+It finds the descriptor at `0x20`, verifies the magic is `0xABCD5432`, writes
+the `CROSSPOINT_VERSION` this build is already using — read from the build
+flags, so it cannot disagree with the boot screen — and recomputes the appended
+SHA256, because the descriptor sits inside a hashed segment and a patched image
+with a stale hash is one the bootloader rejects. Every field Espressif's build
+computed is left exactly as it was. If the magic is ever absent it does
+nothing and says so, rather than corrupting a byte range.
+
+Verified on a real `gh_release` build:
+
+```
+stamp_app_desc: app descriptor version '1.5.1-B2-43-g7211621a3' -> '1.5.16-BD', sha256 recomputed
+
+version        : 1.5.16-BD          <- was the August string
+project_name   : crosspoint-reader
+idf_ver        : 5.5.2.260206
+secure_version : 0   (was 0)        <- bootloader-read, unchanged
+min_efuse_blk  : 0   (was 0)
+max_efuse_blk  : 199 (was 199)
+mmu_page_size  : 16  (was 16)
+sha256 VALID   : True
+magic byte     : 0xE9
+```
+
+**Device-confirm still owed.** Byte-level verification proves the image is
+well-formed and self-consistent; it cannot prove the bootloader accepts it. The
+no-brick chain applies as always -- a rejected image fails
+`esp_ota_end()` verification or reverts on the next boot -- but the first OTA
+onto real hardware is the confirmation.
+
+**The toolchain is still polluted**, and this does not clean it: the stale
+object remains in the package cache and any OTHER esp32c3 project on this
+machine still links it. Reinstalling the package is the fix for that, and it is
+now optional rather than blocking.
 
 **Reinstalling the package remains the zero-risk alternative.** It rewrites a
 shared toolchain outside this repository and forces a large re-download; that is
