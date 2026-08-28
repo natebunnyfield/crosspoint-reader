@@ -60,6 +60,54 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-025] Configurable gestures in the iOS app
+**scope: ios input · asked 2026-08-28 · FUTURE, not scheduled**
+
+Owner: *"make gestures configureable in ios app settings. list all possible
+gestures and give a well ordered, logically list of what they can be assigned
+to."*
+
+Two deliverables, and the LIST is the hard half — the settings plumbing is
+ordinary once the vocabulary is fixed.
+
+**The gestures that exist today**, which is where the list starts rather than
+ends (`ios/CrossPointZenRecognizers.mm`, `ios/ZenVerbs.h`,
+`ios/ZenHoldRouting.h`): 1-finger tap; 1-finger swipe left/right; 2-finger
+swipe left/right/up/down; 2-finger tap; 3-finger tap; 4-finger tap; pinch;
+spread; 1-finger hold above the paper; 1-finger hold on the paper; shake. Some
+are zen-only today and some are always on, and that split is itself a thing a
+configuration screen has to decide whether to expose.
+
+**What they can be assigned to** is the firmware's button vocabulary — the
+front cluster (Back, Confirm, Left, Right) and the side pair (PageBack,
+PageForward), plus POWER and the host-only actions zen adds. Read
+`MappedInputManager` for the authoritative set, and note the front/side
+distinction in `CLAUDE.md`: it has been mixed up four separate times and a
+configuration UI that gets it wrong will teach the mistake to the owner.
+
+**Three things to settle before building anything.**
+
+1. **Which gestures are reassignable at all.** The 1-finger hold above the paper
+   toggles zen, and if it can be reassigned there must be another way back into
+   zen or the mode becomes unreachable — the same trap the Presets list was
+   added to fix for the palette drawers.
+2. **Whether a gesture may be assigned to nothing.** Probably yes, and probably
+   the most-wanted setting: the owner has twice asked for gestures to stop
+   firing accidentally.
+3. **What happens to a conflict.** Two gestures on one action is harmless; one
+   gesture on two actions is not, and the UI should make the second impossible
+   rather than resolve it at runtime.
+
+The ordering he asked for should follow the HAND, not the code: finger count
+ascending, then tap before swipe before hold, because that is the order someone
+scanning for "what can two fingers do" reads in. Not the order the recognizers
+happen to be installed in.
+
+Note every surface dial that reached Settings.app before 2026-08-23 was removed
+on that date, and a new appearance row has to earn itself against that ruling —
+but this is INPUT, not appearance, and the Zen and Read Aloud groups show input
+and behaviour rows are still welcome.
+
 ### [T-024] Say what SCRIPT Almendra descends from, in the font metainfo
 **scope: font metadata · asked 2026-08-27 · FUTURE, not scheduled**
 

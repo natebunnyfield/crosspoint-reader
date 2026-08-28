@@ -1699,6 +1699,40 @@ users actually see.
 paths never write through the link. Would halve the visible footprint to
 ~58 MB with no capability change.
 
+### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — FOUND 2026-08-28 on the owner's card
+**severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
+
+Found while reading the card's crash reports for the OTA work, not reported —
+so nobody has said how often it happens, and that is the first thing to
+establish.
+
+```
+CrossPoint version: 1.5.9-BD
+Panic reason: abort() was called at PC 0x421c764d on core 0
+[336467] [ERR] [SDCF] buildAdvanceTable: failed to allocate codepoint buffer (16384 bytes)
+   ... the same line 13 times, ~350 ms apart ...
+[276]  [INF] [HW] Using cached device type: X3
+```
+
+**What the shape says.** Thirteen consecutive failures to get 16 KB, then an
+`abort()`. So this is not one unlucky allocation — the heap was exhausted and
+stayed exhausted while the reader retried, which means the retry itself is part
+of the story: something asked, failed, and asked again without releasing
+whatever had filled the heap.
+
+The last two lines are from the REBOOT (`[276]`, a fresh millis), so the abort
+is the end of that boot's log, not a recovery.
+
+**Where to look, in order.** `SdCardFont::buildAdvanceTable` and what holds
+memory across its retries; whether the failure path frees the partial table
+before the next attempt; and what else was live at the time — 16 KB is not a
+large ask, so the interesting question is what had already taken the heap. The
+X3 has ~400 KB and the surrounding code is written for that, so a single
+runaway consumer is more likely than genuine pressure.
+
+**Not reproduced.** No card state was captured beyond the report, and the log
+tail does not say which family or which book was open.
+
 ### [B-030] Edgar -> Inknut at XL renders smaller than Edgar at L — CLOSED 2026-08-27, working as designed
 **severity: medium (the control looks broken) · scope: reader font size · filed and reproduced 2026-08-27**
 
