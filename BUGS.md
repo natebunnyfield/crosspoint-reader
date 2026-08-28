@@ -314,10 +314,35 @@ no-brick chain applies as always -- a rejected image fails
 `esp_ota_end()` verification or reverts on the next boot -- but the first OTA
 onto real hardware is the confirmation.
 
-**The toolchain is still polluted**, and this does not clean it: the stale
-object remains in the package cache and any OTHER esp32c3 project on this
-machine still links it. Reinstalling the package is the fix for that, and it is
-now optional rather than blocking.
+### CORRECTION 2026-08-28: "polluted" was too strong, and I had said it loudly
+
+Having called this a polluted toolchain and recommended a reinstall, I looked at
+how `crosspoint-reader` appears in the OTHER esp32c3 libraries. It is a BUILD
+PATH:
+
+```
+/Users/natebunnyfield/src/wt-ship/crosspoint-reader     (libfatfs.a, libespressif__mdns.a,
+                                                         libesp_bootloader_format.a, ...)
+```
+
+That is ordinary debug/assert path leakage from compilation, present in any
+locally built object and harmless. So the accurate description is not "a build
+leaked into a shared package" — it is that **the esp32c3 lib set was built
+locally on 2026-08-21 from the `wt-ship` worktree and cached**, which is what
+this toolchain does. `esp_app_desc.c.o` froze that moment's version along with
+everything else, and is the one object where the frozen value is not inert.
+
+**So there is nothing to clean up, and the reinstall is withdrawn as a
+recommendation.** Rebuilding 260 MB of esp32c3 libraries to correct one string
+that `stamp_app_desc.py` already corrects would be effort spent on the wrong
+layer. Another project on this machine linking these libs would inherit the
+stale descriptor, which matters only if it ships OTA metadata and does not stamp
+its own — worth knowing, not worth a rebuild.
+
+The earlier alarm in this entry is left in place rather than deleted, because
+the reasoning that produced it is the useful part: a project's own name inside a
+framework library DOES look like contamination until you check what form the
+string takes.
 
 **Reinstalling the package remains the zero-risk alternative.** It rewrites a
 shared toolchain outside this repository and forces a large re-download; that is
