@@ -198,9 +198,31 @@ be reinstalled — and then finding what wrote into `~/.platformio/packages` on
 2026-08-21, because a toolchain package that a project build can mutate will do
 it again.
 
-**Deliberately not done here.** Reinstalling a framework package rewrites a
-shared toolchain outside this repository and forces a large re-download; that is
-the owner's machine and his call. And this entry has now been closed wrongly
+### Two more facts, and they make the remedy safe rather than risky
+
+Checked before recommending a reinstall, because "restore the toolchain" is a
+bad thing to be wrong about:
+
+* **The package is STOCK, not a custom build.** `package.json` reports
+  `framework-arduinoespressif32-libs` version **5.5.0+sha.87912cd291**, from
+  `espressif/esp32-arduino-lib-builder`. So a reinstall re-fetches a pinned,
+  published artifact — it does not discard a bespoke toolchain someone built on
+  purpose. That was the risk worth ruling out: if these libs HAD been custom-built
+  for this firmware's sdkconfig, replacing them would have been destructive.
+* **Only esp32c3 is affected** — this project's target. `strings` finds
+  `crosspoint-reader` in the esp32c3 `libesp_app_format.a` and **zero** times in
+  the esp32 and esp32s3 copies of the same library.
+
+Every `.a` in `esp32c3/lib/` shares one mtime, `Aug 21 01:16`, one minute after
+the descriptor's own compile stamp of `01:15:06`. So the whole esp32c3 lib set
+was written at once, by something that had just compiled against this project.
+**What did it is still unknown** — nothing in this repo references
+`~/.platformio/packages` except one comment in `tools/stack_budget/`, and the
+other chips are untouched, so it was not a broad package operation.
+
+**Deliberately not done here.** Reinstalling rewrites a shared toolchain outside
+this repository and forces a large re-download; that is the owner's machine and
+his call. And this entry has now been closed wrongly
 once and given a wrong remedy twice — each time by reasoning one step past the
 evidence — so the third answer is the one that gets checked before it is acted
 on.
