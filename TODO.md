@@ -60,6 +60,45 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-026] Long-select a font in the reader font list to deactivate / reactivate it
+**scope: reader font picker · asked 2026-08-28 · FUTURE, not scheduled**
+
+Owner: *"long select on a font in reader font deactivate/reactivates it."*
+
+A hide/show toggle for installed families, so the in-reader font cycle steps
+past the ones not currently wanted without deleting anything from the card.
+
+**Why it is worth doing rather than just installing fewer fonts.** The reader
+cycles families with a side-button hold (`EpubReaderActivity`, the
+`sdFontFamilyName` walk), and that walk visits every readable family on the
+card. Eight shipping families plus anything installed over WebDAV makes the
+cycle long, and the only way to shorten it today is to delete a font — which
+throws away megabytes of `.cpfont` that then have to be downloaded again.
+
+**Where it lives.** `FontSelectionActivity` already has a long-press handler and
+a `readable[]` index list that the reader's cycle walks; the natural shape is a
+per-family `active` flag beside the credential-store pattern, persisted on the
+card, with `readable[]` filtered by it.
+
+**Four things to settle first.**
+
+1. **The last active font cannot be deactivated.** Deactivating everything would
+   leave the reader with no family to cycle to. The UI should refuse rather than
+   recover.
+2. **What a deactivated font looks like in the picker.** It must stay VISIBLE
+   there — that is the only place to turn it back on — so it needs a state that
+   reads as off without reading as broken.
+3. **The active font's own case.** Deactivating the family currently being read
+   has to move the reader somewhere, and "the next active one" is the obvious
+   answer but should be stated rather than assumed.
+4. **Whether the built-in fallback participates.** It is not on the card and
+   cannot be deleted, so it may be the right permanent floor for rule 1.
+
+Note the standing rule this sits next to: never silently remove user-facing
+capability. Deactivation is the owner doing it deliberately and reversibly,
+which is the opposite case — but the reversibility is what makes it so, and
+point 2 is therefore load-bearing rather than cosmetic.
+
 ### [T-025] Configurable gestures in the iOS app
 **scope: ios input · asked 2026-08-28 · FUTURE, not scheduled**
 
