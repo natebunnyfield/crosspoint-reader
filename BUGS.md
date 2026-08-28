@@ -170,12 +170,45 @@ compile-time define this repo controls. What is stale is the **ESP-IDF app
 descriptor**, which is what OTA metadata and the web UI report — exactly the
 "likeliest visible symptom" the original entry predicted.
 
-**Close by** setting the app descriptor version explicitly rather than letting
-it inherit a cached one — ESP-IDF honours `PROJECT_VER`, and pointing it at
-`${crosspoint.version}` would make the descriptor and the display agree by
-construction. Not done here: it is a build-system change to a release path, and
-this entry has now been closed wrongly once by someone confident on less
-evidence than that deserves.
+## The library member, and what it proves
+
+`esp_app_desc.c.o` inside that archive carries three strings together:
+
+```
+1.5.1-B2-43-g7211621a3
+crosspoint-reader
+01:15:06   Aug 21 2026
+```
+
+**This project's own name and an August 21 build timestamp are inside a shared
+PlatformIO framework package.** `esp_app_desc.c` is ESP-IDF's; the values in it
+are this repo's. So on 2026-08-21 a build compiled that translation unit and the
+result was written into `~/.platformio/packages/framework-arduinoespressif32-libs/`,
+where it has been linked into every binary since — and would be linked into any
+OTHER project built with that package on this machine.
+
+**So `PROJECT_VER` is NOT the fix**, and the previous "close by" was wrong for a
+second time. `PROJECT_VER` is consumed when `esp_app_desc.c` is COMPILED, and
+that object is never recompiled: it arrives prebuilt. Nothing in this repository
+can change what is already baked into it.
+
+**Close by** restoring the framework package so the descriptor is generated
+rather than inherited — the package is polluted with a build artifact and should
+be reinstalled — and then finding what wrote into `~/.platformio/packages` on
+2026-08-21, because a toolchain package that a project build can mutate will do
+it again.
+
+**Deliberately not done here.** Reinstalling a framework package rewrites a
+shared toolchain outside this repository and forces a large re-download; that is
+the owner's machine and his call. And this entry has now been closed wrongly
+once and given a wrong remedy twice — each time by reasoning one step past the
+evidence — so the third answer is the one that gets checked before it is acted
+on.
+
+**What is safe to rely on meanwhile:** the DISPLAYED version is unaffected.
+`CROSSPOINT_VERSION` is a compile-time define this repo owns, it reads
+`1.5.16-BD` correctly, and OTA's `isNewer()` parses the numeric triple from it.
+Only the app descriptor — OTA metadata and the web UI's build line — is stale.
 
 ### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
 **severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
