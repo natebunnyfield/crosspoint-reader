@@ -105,7 +105,13 @@ inline constexpr Entry kEntries[] = {
     // Buenos Aires is where it was drawn: it was Sanfelippo's graduation
     // typeface at the CDT UBA typography postgraduate program.
     //
-    // OWNER RULING 2026-08-24: "use 1350 London for origin of Alemendra."
+    // OWNER RULING 2026-08-24 — SUPERSEDED 2026-08-27 ("replace 1350 london
+    // with something more accurate"). Kept in full because the reasoning on
+    // both sides is the useful part, and because the research pass below is
+    // what the replacement is built on. The row now carries one stage; see the
+    // comment immediately above it.
+    //
+    // The 2026-08-24 ruling was: "use 1350 London for origin of Alemendra."
     // Restored after a research pass had removed it, so the reasoning on both
     // sides is recorded here rather than lost.
     //
@@ -121,7 +127,33 @@ inline constexpr Entry kEntries[] = {
     // the picker beside Inknut rather than leading it. A 2011 key put it first,
     // which is where an original 2011 face belongs -- and that placement is
     // what the ruling changes.
-    {"Almendra", "Almendra", "; Ana Sanfelippo", "1350 London; 2011 Buenos Aires", 1350},
+    // ONE STAGE, 2026-08-27, replacing the 1350 London ruling at the owner's
+    // word: "replace 1350 london with something more accurate."
+    //
+    // There is nothing accurate to put in a first stage, and that is the
+    // finding rather than a gap. Every other row's stage 1 is a dated
+    // historical MODEL with a place -- Inknut's 1469 Venice is Jenson, and it
+    // can be pointed at. Almendra is an ORIGINAL design and points at no
+    // exemplar: its own description names "the chancery and gothic hands",
+    // which are CLASSES of scribal writing worked by anonymous hands across
+    // centuries and two regions. Cancelleresca is 16th-century Italian and
+    // textura is 13th-15th-century northern European, so no single date and no
+    // single place covers both, and any pair invented to fill the slot would be
+    // the same uncited inference "1350 London" was.
+    //
+    // 1350 London was wrong twice over, which is what retired it. English
+    // chancery hand is c. 1400+, fifty years after that date; the hand actually
+    // written in 1350s London was Anglicana, with textura for formal books. So
+    // the stage named a script that was not yet in use in the place it named.
+    //
+    // SORT CONSEQUENCE, stated because it is visible: the key moves 1350 ->
+    // 2011, so Almendra leaves the old end of the picker beside Inknut and
+    // sorts to the FRONT. Under the list's own rule -- reverse chronological by
+    // original date -- that is where a 2011 original belongs, and it is the
+    // placement the 2026-08-24 ruling had deliberately overridden. If the old
+    // position is wanted back it is this integer and nothing else; do not
+    // reintroduce a fictional stage to get it.
+    {"Almendra", "Almendra", "Ana Sanfelippo", "2011 Buenos Aires", 2011},
     // Three revisions in one stage: Carter & Cone recut Dwiggins' Caledonia in
     // Cambridge across 1988, 1994 and 2026, so those years share a place and
     // take commas; the 1938 Linotype original is a separate stage. Dwiggins drew
