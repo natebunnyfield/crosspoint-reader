@@ -137,30 +137,42 @@ inline constexpr Entry kEntries[] = {
     // first stage at all now: the earlier attempt failed because it tried to
     // name a MODEL, and an original design has no model.
     //
-    // WHY THE CHANCERY HAND, of the two her description names. It is the term
-    // she uses first, and it is the one with a hard dated milestone: Ludovico
-    // degli Arrighi published `La Operina da imparare di scrivere littera
-    // cancellarescha` in ROME in 1522 — the first printed manual of the
-    // cancelleresca, and the point at which the hand stopped being a papal
-    // chancery house practice and became a taught, codified style. That is
-    // "earliest established" in the strongest sense available, with a real
-    // place attached.
+    // WHY BLACKLETTER, AND WHY c. 1450 MAINZ. Owner 2026-08-27: "use c. 1450
+    // mainz or something more accurate for blackletter type used in print."
     //
-    // Two things it is NOT, both worth stating so they are not re-litigated.
-    // It is not a claim that Sanfelippo worked from Arrighi — she names a class
-    // of hands, not a manual. And it does not cover the GOTHIC half of her
-    // description: textura peaks around 1300 in northern France, two centuries
-    // and a country away, and no single date-and-place can hold both. The
-    // gothic half is acknowledged here and in docs/font-dates.md rather than
-    // being averaged into a fiction, which is exactly what "1350 London" was.
+    // Gutenberg's workshop in Mainz cut the earliest European printing types
+    // around 1450 — the so-called DK (Donatus-Kalender) type, followed by the
+    // 42-line Bible type of about 1454. Both are BLACKLETTER: textura, modelled
+    // on the Mainz liturgical manuscript hand. So "c. 1450 Mainz" is the point
+    // the gothic hand became TYPE rather than writing, which is the milestone
+    // that matters for a typeface's lineage.
     //
-    // If the earlier ANCHOR is ever wanted instead, the humanist cursive this
-    // grew out of is c. 1420 Florence (Niccoli, Poggio) — earlier, and vaguer,
-    // because it names a practice rather than a publication.
+    // The "c." is doing real work and should not be sharpened. The earliest
+    // types are not firmly dated — the DK type is placed anywhere in 1449-1452
+    // on typographic evidence — so 1450 is an honest round number and 1454
+    // would be a false precision about a different, later type.
     //
-    // SORT: 1522 seats the face between Inknut (1469) and the later revivals,
-    // which is the old end of the picker again — reached this time by a date
-    // that is defensible rather than by a placement decision.
+    // Blackletter also fits the FACE better than the chancery hand this
+    // replaces. Almendra is upright, dark and pen-formed; cancelleresca is a
+    // cursive italic. Her description names both classes, and this is the half
+    // the letterforms actually favour.
+    //
+    // What it is NOT: a claim that Sanfelippo worked from Gutenberg. She names
+    // a class of hands, not a printer. The stage dates the STYLE, which is
+    // exactly what the owner asked the first stage to carry.
+    //
+    // Anchors considered and not used, so they are not re-proposed:
+    //   * textura as MANUSCRIPT hand, peak c. 1300 northern France — earlier,
+    //     but it predates type and this table's stage 1 is a lineage of faces;
+    //   * the chancery half, Arrighi's `La Operina`, Rome 1522 — a crisp date
+    //     for the OTHER hand she names, but a cursive italic, which Almendra
+    //     is not;
+    //   * the humanist cursive that grew into it, c. 1420 Florence — vaguer,
+    //     and again the wrong half.
+    //
+    // SORT: 1450 seats the face just before Inknut (1469), at the old end of
+    // the picker — reached by a defensible date rather than by a placement
+    // decision, which is what separates this from "1350 London".
     //
     // --- The history of this row, kept because it was contested twice --------
     //
@@ -192,7 +204,7 @@ inline constexpr Entry kEntries[] = {
     // placement the 2026-08-24 ruling had deliberately overridden. If the old
     // position is wanted back it is this integer and nothing else; do not
     // reintroduce a fictional stage to get it.
-    {"Almendra", "Almendra", "Chancery hand; Ana Sanfelippo", "1522 Rome; 2011 Buenos Aires", 1522},
+    {"Almendra", "Almendra", "Blackletter; Ana Sanfelippo", "c. 1450 Mainz; 2011 Buenos Aires", 1450},
     // Three revisions in one stage: Carter & Cone recut Dwiggins' Caledonia in
     // Cambridge across 1988, 1994 and 2026, so those years share a place and
     // take commas; the 1938 Linotype original is a separate stage. Dwiggins drew

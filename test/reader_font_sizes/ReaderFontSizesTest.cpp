@@ -228,15 +228,37 @@ TEST(ReaderFontSizes, EveryBuiltinRampSizeHasItsGeneratedHeadersIncluded) {
       << "convert-builtin-fonts.sh would not regenerate the ramp this build declares; expected " << want;
 }
 
-// Both SLOT_NAMES arrays. There are two — the settings list and the font
-// picker — and they have to carry the same six names in the same order, since
-// they label the same stored index on two different screens.
-TEST(ReaderFontSizes, BothSlotNameTablesCarryTheSixNamesInOrder) {
+// THE SLOT NAMES, and there is now exactly ONE table.
+//
+// This case used to require TWO — the settings list and the font picker each
+// carried their own copy, and it checked they agreed. They did not: they had
+// already drifted on the case that mattered, an out-of-range slot, which one
+// clamped to the LAST name and the other to index 0. So the picker announced
+// the largest installed size as "XXS" (owner report 2026-08-27).
+//
+// The fix consolidated both onto readerSlotLabel() in src/ReaderFontSizes.h, so
+// asserting that two tables exist is now asserting the bug back. The names
+// themselves, the out-of-range direction and the absence of a second copy are
+// covered by test/reader_slot_label/; what stays here is the one-table
+// invariant, checked from this side too because this is the test a change to
+// the ramp is most likely to be run against.
+TEST(ReaderFontSizes, ThereIsExactlyOneSlotNameTable) {
   const std::string want = R"({"XXS", "XS", "S", "M", "L", "XL"})";
+  // Whitespace-insensitive: the declaration wraps, and a test that forces a
+  // header to keep one particular line break is a test about formatting.
+  auto squeeze = [](std::string t) {
+    std::string out;
+    for (char c : t)
+      if (c != ' ' && c != '\n' && c != '\t' && c != '\r') out += c;
+    return out;
+  };
+  const std::string wantTight = squeeze(want);
+  EXPECT_NE(squeeze(slurp("src/ReaderFontSizes.h")).find("READER_SLOT_NAMES[READER_FONT_SLOT_COUNT]=" + wantTight),
+            std::string::npos)
+      << "src/ReaderFontSizes.h does not label the six slots XXS..XL in size order";
   for (const char* rel : {"src/SettingsList.h", "src/activities/settings/FontSelectionActivity.cpp"}) {
-    const std::string src = slurp(rel);
-    EXPECT_NE(src.find("SLOT_NAMES[READER_FONT_SLOT_COUNT] = " + want), std::string::npos)
-        << rel << " does not label the six slots XXS..XL in size order";
+    EXPECT_EQ(squeeze(slurp(rel)).find(wantTight), std::string::npos)
+        << rel << " has grown its own copy of the slot names again; call readerSlotLabel()";
   }
 }
 
