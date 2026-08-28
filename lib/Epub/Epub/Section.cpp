@@ -182,7 +182,12 @@ namespace {
 // 2026-08-27). It adds PageHorizontalRule elements and consumes vertical
 // space, so pagination moves -- a cache built by v52 would render the same
 // book with no separators and different page breaks, silently.
-constexpr uint8_t SECTION_FILE_VERSION = 53;
+// v54: the same again for the KEY BLOCK fallback, which v53 missed. That is
+// the emitter a table reaches when it does not FIT (as opposed to the abandon
+// path, for a table too wide), and it is the one most readers actually see,
+// because a narrow table stops fitting the moment the font goes up. A v53
+// cache would still hold separator-less pages for those tables.
+constexpr uint8_t SECTION_FILE_VERSION = 54;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

@@ -352,6 +352,49 @@ TEST(TableRowSeparator, TwoColumnTablesGetThemToo) {
 }
 
 // The <hr> section break must be unchanged by all of this.
+// THE KEY BLOCK, which is the emitter the owner was actually looking at.
+//
+// The fallback order is columns upright, then a clockwise page, then the key
+// block. A table that is too WIDE or malformed abandons mid-parse and goes to
+// emitBufferedTableFlattened(); a table that simply does not FIT arrives at the
+// key block instead. The first version of this change instrumented only the
+// abandon path, so a three-column table read at a large font — which is where
+// the report came from — got no separators at all.
+//
+// Three long columns at the reader's default size will not fit as columns, so
+// this lands on the key block. If a future layout change makes it fit again
+// this test starts asserting nothing, which is why it also checks that the
+// records really were stacked rather than tabulated.
+TEST(TableRowSeparator, TheKeyBlockFallbackGetsThemToo) {
+  // A cell tall enough that NO row can move as a unit — neither upright nor on
+  // the clockwise page — which is what drives the fallback past both and into
+  // the key block. Three columns, so it never touches the abandon path.
+  std::string tall;
+  for (int i = 0; i < 220; i++) tall += "payload" + std::to_string(i) + " ";
+  std::string html =
+      "<table><tr><th>Addition</th><th>Effort</th><th>What it buys</th></tr>";
+  for (const char* name : {"Beans", "Frozen", "Eggs"}) {
+    html += std::string("<tr><td>") + name + "</td><td>Effort here</td><td>" + tall + "</td></tr>";
+  }
+  html += "</table>";
+
+  // Confirm it really is the stacked form: in the key block each cell is its
+  // own paragraph, so a column header sits alone rather than beside a datum.
+  const auto pages = layout(html);
+  EXPECT_GE(pageOf(pages, "Addition"), 0) << "the fixture did not reach the key block";
+
+  // Four boundaries exist here (under the head, then between each pair of
+  // records) but the count is FIXTURE-DEPENDENT and deliberately asserted as a
+  // floor. These cells are tall enough to push records onto fresh pages, and a
+  // boundary that coincides with a page break is dropped on purpose — a rule
+  // first on a page divides nothing, and the break already says what it would
+  // have said. Measured here: 2 survive, 2 land on breaks.
+  //
+  // The floor is what matters. Before this change the key block emitted ZERO,
+  // and zero is the bug the owner reported.
+  EXPECT_GE(totalRules(layoutRules(html)), 2) << "the key block emitted no separators at all";
+}
+
 TEST(TableRowSeparator, AnHrInProseIsStillTheQuarterWidthSectionBreak) {
   const auto pages = layoutRules("<p>before</p><hr/><p>after</p>");
   ASSERT_EQ(totalRules(pages), 1);

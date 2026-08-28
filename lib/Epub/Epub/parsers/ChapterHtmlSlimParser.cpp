@@ -745,10 +745,12 @@ void ChapterHtmlSlimParser::emitBufferedTableFlattened() {
   // the first row of a table that simply did not use <thead>.
   const size_t firstDataRow = tableBufHasHeader ? 1 : 0;
   for (size_t r = firstDataRow; r < tableBuf.size(); r++) {
-    // BETWEEN records, so not before the first -- a rule above row one would
-    // be separating the table from whatever precedes it, which is a different
-    // decision and not the one asked for.
-    if (r > firstDataRow) emitTableRowSeparator();
+    // Every row boundary, which includes under the header when there is one --
+    // the same rule the key block uses, written the same way so the two flatten
+    // paths cannot disagree about where a line goes. Never before the FIRST
+    // row of a headerless table: that boundary divides the table from the prose
+    // above it, which is a different decision and not the one asked for.
+    if (r > firstDataRow || tableBufHasHeader) emitTableRowSeparator();
     const tablecolumns::Row& row = tableBuf[r];
     const std::string rowLabel =
         row.empty() ? std::string() : TableCellLabel::normalize(tablecolumns::cellText(row[0]));
@@ -952,7 +954,29 @@ void ChapterHtmlSlimParser::emitBufferedTableKeyBlock() {
     }
   }
 
-  for (size_t r = tableBufHasHeader ? 1 : 0; r < tableBuf.size(); r++) {
+  // A HAIRLINE AT EVERY ROW BOUNDARY (owner 2026-08-27, "for flat table view,
+  // put a line separator between records/rows", and from the device the next
+  // day: "between cycle and eggs" — the end of one record and the start of the
+  // next).
+  //
+  // THIS is the emitter the owner was looking at, which the first attempt got
+  // wrong. The fallback order is columns upright, then a clockwise page, then
+  // THIS key block; `emitBufferedTableFlattened()` is a different function on a
+  // different trigger (the column planner ABANDONING mid-parse, on a table too
+  // wide or malformed). A table that simply does not FIT arrives here, and a
+  // narrow table only stops fitting when the reader turns the font up — which
+  // is exactly the case the report came from and the one no test covered.
+  //
+  // Each cell is its own paragraph here, so without a rule the only cue that a
+  // record ended is a paragraph break identical to the one BETWEEN that
+  // record's own cells. The stack reads as one undifferentiated column of
+  // fragments.
+  //
+  // The header block gets one under it too: a rule under the head is ordinary
+  // table typography, and it is also a row boundary.
+  const size_t firstDataRow = tableBufHasHeader ? 1 : 0;
+  for (size_t r = firstDataRow; r < tableBuf.size(); r++) {
+    if (r > firstDataRow || tableBufHasHeader) emitTableRowSeparator();
     for (const tablecolumns::Cell& cell : tableBuf[r]) {
       startNewTextBlock(blockStyle());
       nextWordContinues = false;
