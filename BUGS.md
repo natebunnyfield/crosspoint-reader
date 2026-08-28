@@ -85,8 +85,8 @@ sidebearing gap, not equality.
 The trigger population also shrank in the same pass: the coverage fill below
 removed the everyday holes.
 
-### [B-033] The release binary carries a stale provenance stamp
-**severity: low · scope: build / release · handed over 2026-08-19, mechanism unconfirmed**
+### [B-033] The release binary carries a stale provenance stamp — CLOSED 2026-08-28, not reproducible and the format is no longer producible
+**severity: low · scope: build / release · handed over 2026-08-19, closed 2026-08-28**
 
 Reported by the session that cut the 1.5.2-BD release: the binary contains
 `1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
@@ -105,6 +105,35 @@ finding which committed artifact carries it (start by decompressing the
 generated HTML headers and grepping those), then regenerating it — or, if it is
 baked into a committed `.gz`, making the generator stamp it at build time so it
 cannot go stale again.
+
+## Closed 2026-08-28. Both halves of the lead were wrong.
+
+**The web UI does not carry it.** The suggested first step was to decompress the
+generated HTML headers and grep them. Done: `src/network/html/*.generated.h`
+are gzip blobs as expected, they decompress cleanly, and **none contains a
+version-like string at all**. They are also NOT COMMITTED — `git ls-files` lists
+only the `.html` sources and `js/`, so they are regenerated every build and
+could not have gone stale even if they had carried it.
+
+**The string is not in the tree.** A full `grep -a` across the working tree,
+excluding `.git`, `.pio` and `fs_`, finds `1.5.1-BNY` in exactly one file:
+`BUGS.md`, this entry. No committed artifact carries it, compressed or
+otherwise.
+
+**And the current build cannot produce that FORMAT.** `scripts/git_branch.py`
+emits `{base}-dev-{branch}-{sha}` for the default env and `{base}-rc+{hash}` for
+`gh_release_rc`; every other env takes a literal from the ini. The reported
+string `1.5.1-BNY-2-g78be6b97f` is `git describe --tags` output — base, commits
+since the tag, `g` plus the hash — a shape none of those three paths emits. The
+script also caches nothing: `inject_version` recomputes on every invocation and
+appends the define, so there is no store for a value to go stale in.
+
+So whatever produced that stamp is not in this tree, and the closest thing to a
+mechanism is that the inspected binary predated the current `git_branch.py`.
+Closed rather than left open with a disproved lead. If a stale stamp is ever
+seen again, the useful first fact is the FORMAT: `-dev-` means the default env,
+`-rc+` the RC env, a bare triple a literal in the ini, and `-N-g<sha>` means
+something outside this repo's build path generated it.
 
 ### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3
 **severity: low · scope: release · found 2026-08-19**
