@@ -86,7 +86,7 @@ The trigger population also shrank in the same pass: the coverage fill below
 removed the everyday holes.
 
 ### [B-033] The release binary carries a stale provenance stamp — REOPENED and MECHANISM FOUND 2026-08-28
-**severity: low · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
+**severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
 
 Reported by the session that cut the 1.5.2-BD release: the binary contains
 `1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
@@ -197,6 +197,30 @@ rather than inherited — the package is polluted with a build artifact and shou
 be reinstalled — and then finding what wrote into `~/.platformio/packages` on
 2026-08-21, because a toolchain package that a project build can mutate will do
 it again.
+
+### The descriptor is LIVE, so this is not cosmetic
+
+Read straight out of the shipped image rather than inferred. `esp_app_desc_t`
+sits at offset `0x20` (24-byte image header + 8-byte segment header) and its
+magic checks out as `0xABCD5432`:
+
+```
+version     : 1.5.1-B2-43-g7211621a3
+project_name: crosspoint-reader
+date/time   : Aug 21 2026 01:15:06
+idf_ver     : 5.5.2.260206
+```
+
+So the stale string is not a leftover sitting unused in a library — it IS the
+descriptor the image carries. **Every release built on this machine reports an
+August 21 version in its OTA metadata and its web UI build line**, whatever the
+boot screen says.
+
+Severity raised from low to **medium** on that. The original entry called the
+web UI "the likeliest visible symptom" and hedged it; this confirms it, and adds
+OTA metadata alongside. `project_name: crosspoint-reader` in a supposedly
+generic ESP-IDF library is also the proof that the object was compiled for this
+project and frozen, rather than shipped that way by Espressif.
 
 ### Two more facts, and they make the remedy safe rather than risky
 
