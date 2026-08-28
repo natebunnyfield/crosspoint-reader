@@ -60,6 +60,36 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-027] Two-finger hold on Manage Files should open the Menu action
+**scope: ios input / manage files · asked 2026-08-28 · FUTURE, not scheduled**
+
+Owner: *"holding down two fingers on manage files needs to bring up Menu
+action."*
+
+Manage Files has a per-item Menu action that the front cluster reaches; on the
+phone there is no equivalent, so the screen is browse-only by touch.
+
+**It composes with T-025 rather than preceding it.** A two-finger hold is a new
+gesture in a vocabulary that is about to become configurable, so building it as
+a hardcoded binding now means unpicking it later. The cheap order is to add the
+GESTURE here with a fixed binding, and let T-025's configuration layer adopt it
+as one more assignable row when that lands.
+
+**What has to be checked first.** Two-finger is currently the SELECT gesture
+family (2-tap is Confirm, 2-swipe is font size), and a two-finger HOLD is
+unclaimed — verify that against `ios/CrossPointZenRecognizers.mm` before
+assuming, because the recognizer set has grown twice this week. It must also not
+fight the one-finger hold added 2026-08-27: that one is `numberOfTouchesRequired
+= 1` and this would be 2, so they are mutually exclusive by construction, but
+the simultaneity note in that file explains why that needs stating rather than
+assuming.
+
+**And it is screen-scoped, which nothing in the gesture layer currently is.**
+Every recognizer today is either always-on or zen-only; "only on Manage Files"
+is a third kind. Whether that is a per-activity enable or a gesture that fires
+everywhere and is ignored elsewhere is the design question, and the second is
+usually the one that ages better.
+
 ### [T-026] Long-select a font in the reader font list to deactivate / reactivate it
 **scope: reader font picker · asked 2026-08-28 · FUTURE, not scheduled**
 
