@@ -235,6 +235,36 @@ class ChapterHtmlSlimParser {
   // above it) would otherwise be the last thing on it. Returns true if it did.
   // See tablecolumns::breakBeforeHeaderKeep for the rule and its degradation.
   bool breakBeforeStrandedTableHeader(const tablecolumns::Plan& plan, int leadHeight);
+
+  // --- Definition lists: keep the term with its definition (2026-08-28) ----
+  // A <dt> stranded at the foot of a page is the table-header defect one
+  // element over -- the reader turns the page carrying the term and finds what
+  // defines it overleaf. Set when a <dt> block opens; READ AND CLEARED by
+  // makePages(), which is where that block is finally laid out (one block
+  // behind: makePages runs when the NEXT block opens, or at </dt>).
+  //
+  // "Keep with next" here means ROOM FOR THE DEFINITION TO START, not "the
+  // whole <dd> travels with it". The parser is streaming: at the moment the
+  // term is laid out its definition has not been read, so its height is not a
+  // number anyone has. A whole-group keep would need the buffering the table
+  // path has, and a <dl> is not bounded the way a table is.
+  bool keepTermWithNext_ = false;
+  // How much room that is: THREE lines, which is the worst case over the
+  // widow/orphan rule that runs after this decision. One line -- the classical
+  // keep-with-next -- was measurably wrong: keep-2/2 moves a whole three-line
+  // definition rather than starting it under a term, so the term stranded
+  // anyway. The derivation and the measurements are at the definition of
+  // breakBeforeStrandedTerm; do not lower this without re-running that sweep.
+  static constexpr int kKeepRoomLines = 3;
+  // The same ceiling measureUnlaidLeadHeight uses, for the same reason: a
+  // "term" running past three lines is a paragraph wearing a <dt>, and hauling
+  // one to the next page costs more white space than the strand costs the
+  // reader.
+  static constexpr int kMaxTermLines = 3;
+  // Complete the page if the pending <dt> block would otherwise be the last
+  // thing on it. Returns true if it did. Consumes keepTermWithNext_.
+  bool breakBeforeStrandedTerm();
+
   bool listItemBulletOnly = false;  // true when currentTextBlock has only the <li> marker
 
   // --- List rendering (numbers + hanging indent, 2026-08-22) --------------

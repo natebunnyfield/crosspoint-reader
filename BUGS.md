@@ -34,6 +34,53 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-042] A definition list rendered as one unbroken blob — FIXED 2026-08-28
+**severity: high (every `<dl>` in every book) · scope: chapter parsing /
+layout · found by owner report, fixed same day**
+
+`dl`, `dt` and `dd` appeared **nowhere** in `lib/Epub/`. They were not in
+`BLOCK_TAGS`, so `startElement` fell through to its INLINE branch and no block
+ever opened: a term ran straight into its own definition mid-line. Owner's
+screenshot, a quiz book — *"…opens which novel?**A Tale of Two Cities (Dickens,
+1859)**The two cities are London and Paris…"*.
+
+The bold in that screenshot is the tell that this is structural and not a
+styling bug: the inline branch reads `font-weight` off the resolved CSS, so the
+book's `dt { font-weight: bold }` was honored the whole time. Only the block
+half was missing.
+
+Fixed by adding the three tags to `BLOCK_TAGS`, giving `<dl>` the container
+text-indent reset (and no step of its own — a step there would indent the term
+too), and giving `<dd>` the same 1.5 em default step `<ul>`/`<ol>` take **only
+when the publisher gave it no left inset of its own**. The reported book states
+`dd { margin: 0.25em 0 0.25em 1em }` and `CssParser` already resolved it, so
+the book's own 1 em decides the indent; hardcoding one would have misrendered
+every book whose `dd` margin differs. A `<dt>` also keeps with **three lines**
+of room for its definition to start, so a term is not stranded at a page foot —
+the shape of B-038's answer for tables, with the group keep replaced by a room
+requirement because the `<dl>` path is streamed where the table path is
+buffered.
+
+Three lines, not the classical one: this engine runs widow/orphan keep-2/2 on
+the `<dd>` *after* the term's keep has declined, so a one-line rule let a
+three-line definition move away wholesale and strand the term anyway — 4 of 41
+page alignments, measured. Adversarial review caught that after the first
+version was already written up as done; the trade-off table and the cost (zero
+extra pages on the reported book) are in the doc.
+
+`SECTION_FILE_VERSION` 54 → 55: three pagination changes ride it, and a section
+served from a stale cache would go on showing the reported page.
+
+Full account, including what the CSS layer does and does NOT honor
+(`font-size`, `color` and `border-left` on `dd.why`: no, deliberately), the
+keep-with-next decision and its one accepted false positive, and before/after
+renders of the owner's own book at the page in his screenshot:
+[docs/definition-lists-2026-08-28.md](docs/definition-lists-2026-08-28.md).
+Host coverage: `test/definition_list/`, 16 cases, 9 of which fail against the
+pre-fix tree and two more of which fail against the first, wrong keep rule.
+
+**Not confirmed on a device** — verified headlessly and by render only.
+
 ### [B-039] Inknut's L slot drew half-size glyphs on a full-size grid — FIXED 2026-08-26
 **severity: high (visible on every page of one shipping family) · scope: font
 build tooling · found by owner report, fixed same day**

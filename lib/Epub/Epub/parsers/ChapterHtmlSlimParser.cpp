@@ -47,7 +47,17 @@ constexpr size_t TEXT_BLOCK_SOFT_FLUSH_WORDS_WITH_CSS = 320;
 constexpr size_t MAX_ANCHORS_PER_CHAPTER = 1024;
 
 constexpr const char* HEADER_TAGS[] = {"h1", "h2", "h3", "h4", "h5", "h6"};
-constexpr const char* BLOCK_TAGS[] = {"p", "li", "div", "br", "blockquote", "ul", "ol"};
+// "dl", "dt" and "dd" joined this list on 2026-08-28. Until then the parser
+// had never heard of them, so they fell through to the INLINE branch at the
+// foot of startElement: no block opened, no line broke, and a definition list
+// rendered as one unbroken run -- question, answer and note concatenated
+// mid-line ("...opens which novel?A Tale of Two Cities (Dickens, 1859)The two
+// cities are London and Paris..."). Owner report against a quiz book,
+// 2026-08-28. Note what was NOT broken and is therefore not fixed here: the
+// book's `dt { font-weight: bold }` was already being honored, because the
+// inline branch reads font-weight off the resolved CSS. Only the BLOCK half of
+// a definition list was missing.
+constexpr const char* BLOCK_TAGS[] = {"p", "li", "div", "br", "blockquote", "ul", "ol", "dl", "dt", "dd"};
 
 // Default indent per list nesting level, applied to a <ul>/<ol> that carries no
 // publisher left margin/padding of its own (there is no UA stylesheet). 1.5 em
@@ -58,6 +68,16 @@ constexpr const char* BLOCK_TAGS[] = {"p", "li", "div", "br", "blockquote", "ul"
 // 2026-08-22, F2). Deeper nests hit that same clamp and compress
 // proportionally instead of crushing the text.
 constexpr float LIST_INDENT_STEP_EM = 1.5f;
+
+// A <dd> with no publisher left inset of its own takes the SAME step, for the
+// same reason and under the same clamp: the indent is the only thing that says
+// "this defines the term above it", since a definition list has no marker to
+// carry the relationship. Deliberately not the browser UA's 40 px (~2.5 em) --
+// this measure is ~27 chars at 18 pt, and 2.5 em of it is a quarter of the
+// line. Publisher CSS still wins outright, which is the case that matters:
+// every real book that ships a <dl> also ships a `dd { margin-left: ... }`,
+// and hardcoding over it would misrender all of them.
+constexpr float DEFINITION_INDENT_STEP_EM = LIST_INDENT_STEP_EM;
 constexpr const char* BOLD_TAGS[] = {"b", "strong"};
 constexpr const char* ITALIC_TAGS[] = {"i", "em"};
 constexpr const char* UNDERLINE_TAGS[] = {"u", "ins"};
@@ -344,6 +364,13 @@ void ChapterHtmlSlimParser::flushPartWordBuffer() {
 // start a new text block if needed
 void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
   nextWordContinues = false;  // New block = new paragraph, no continuation
+  // The two early returns below merge into the existing block instead of
+  // retiring it, so makePages() -- the only consumer of keepTermWithNext_ --
+  // never runs and the flag would otherwise outlive the <dt> that set it and
+  // land on whatever block came next. Cleared here rather than at the returns
+  // because every caller that means to set it does so AFTER this call.
+  const bool keepTermBefore = keepTermWithNext_;
+  keepTermWithNext_ = false;
   if (currentTextBlock) {
     // already have a text block running and it is empty - just reuse it
     if (currentTextBlock->isEmpty()) {
@@ -384,6 +411,9 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
       return;
     }
 
+    // Past both merge paths: this block is genuinely being retired, so the
+    // term flag is handed to the only thing that consumes it.
+    keepTermWithNext_ = keepTermBefore;
     makePages();
   }
   // If the pending anchor is a TOC chapter boundary, force a page break after the previous
@@ -615,6 +645,132 @@ int ChapterHtmlSlimParser::measureUnlaidLeadHeight() const {
   if (bottomSpacing > gapCap) bottomSpacing = gapCap;
   y = snap(y + bottomSpacing);
   return y - currentPageNextY;
+}
+
+// A <dt> must not be the last thing on a page. Same defect as a stranded table
+// header, one element over -- and the same shape of answer: measure what is
+// about to be laid out, and if it would end the page, end the page BEFORE it
+// instead. What differs is that a table has its rows buffered and can measure
+// the whole keep group, while a <dl> is streamed: when the term is laid out
+// its definition has not been read yet, so the room it needs has to be
+// derived rather than measured.
+//
+// HOW MUCH ROOM, and why it is THREE lines and not one. The first version of
+// this asked whether ONE line of the next block would fit, which is the
+// classical typesetter's "keep with next" -- and it did not work, because this
+// layout engine also runs widow/orphan keep-2/2 (addLineToPage,
+// flushPendingLines) AFTER this decision, on the <dd> itself. The room a
+// definition actually needs before any of it can land here depends on how long
+// it is:
+//
+//   1-2 lines   1 line   flushPendingLines exempts short paragraphs outright
+//   3 lines     3 lines  all-or-nothing: a 2/1 split widows, a 1/2 orphans
+//   4+ lines    2 lines  orphan control: first line needs a second under it
+//
+// The term is laid out before the definition has been read, so its length is
+// not knowable here and the requirement is the worst case, 3. Measured against
+// the wrong answer: with a one-line model, a THREE-line definition stranded
+// its term on 4 of 41 page alignments and a longer one on 1 of 41 -- and
+// every definition in the reported book is three lines or more at the device
+// measure. With three, 0 of 41 at every length swept.
+//
+// It over-breaks in one case: a one-line definition with exactly one or two
+// lines of room left. That costs white space at the foot of a page, which is
+// the direction this whole pass is allowed to err in.
+//
+// The three refusals below all mean "breaking would not help": an empty page
+// has nothing above to strand the term against; a term that already overflows
+// this page is being broken by the natural rule and there is nothing to keep;
+// and a term that cannot fit a fresh page with its room would be stranded on
+// the next page too, so the break would only cost a page.
+bool ChapterHtmlSlimParser::breakBeforeStrandedTerm() {
+  const bool keep = keepTermWithNext_;
+  keepTermWithNext_ = false;
+  if (!keep) return false;
+  if (!currentTextBlock || currentTextBlock->isEmpty()) return false;
+  if (!currentPage || currentPage->elements.empty()) return false;
+
+  const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
+  if (lineHeight <= 0) return false;
+
+  // Word ceiling BEFORE the copy, exactly as measureUnlaidLeadHeight does it
+  // and for the identical reason: the probe copies the block, and a CJK
+  // paragraph mislabelled <dt> would double a deque of thousands of tokens on
+  // a fragmented 380 KB heap. No kMaxTermLines lines can hold more tokens than
+  // this.
+  const int spaceWidth = std::max(1, renderer.getSpaceWidth(fontId));
+  if (currentTextBlock->size() > static_cast<size_t>(kMaxTermLines) * (viewportWidth / spaceWidth + 1)) return false;
+
+  const BlockStyle& blockStyle = currentTextBlock->getBlockStyle();
+  const int horizontalInset = blockStyle.totalHorizontalInset();
+  const uint16_t effectiveWidth =
+      (horizontalInset < viewportWidth) ? static_cast<uint16_t>(viewportWidth - horizontalInset) : viewportWidth;
+
+  const auto snap = [&](const int y) {
+    if (!lineGridEnabled || y <= 0) return y;
+    const int rem = y % lineHeight;
+    return rem != 0 ? y + lineHeight - rem : y;
+  };
+
+  // Non-destructive probe on a COPY -- layoutAndExtractLines() erases what it
+  // consumes, and a second line-breaking path would be a second definition of
+  // where the lines go. See measureUnlaidLeadHeight for the full argument.
+  ParsedText probe(*currentTextBlock);
+  int lineCount = 0;
+  // Two heights, because the page cursor and the page FIT are different
+  // questions and conflating them costs a keep. `linesHeight` is what
+  // placeLineOnPage actually spends -- the full leaded advance of every line,
+  // snapped after each. `heightBeforeLast` + `lastFitExtent` is what the page
+  // has to hold, because the LAST line on a page fits by its INK extent
+  // (lineFitExtentOf), which for the built-in faces is a whole line-height
+  // smaller than the advance. Measuring the fit with advances refuses keeps
+  // the real layout would have accepted -- and that refusal is a SPLIT, not
+  // white space, so it is not on the safe side of the trade.
+  int linesHeight = 0;
+  int heightBeforeLast = 0;
+  int lastFitExtent = 0;
+  probe.layoutAndExtractLines(
+      renderer, fontId, effectiveWidth,
+      [&](const std::shared_ptr<TextBlock>& line) {
+        lineCount++;
+        if (!line) return;
+        heightBeforeLast = linesHeight;
+        lastFitExtent = lineFitExtentOf(*line);
+        linesHeight = snap(linesHeight + lineAdvanceOf(*line));
+      },
+      /*includeLastLine=*/true, justifyThresholdChars);
+  if (lineCount == 0 || lineCount > kMaxTermLines) return false;
+
+  // The same arithmetic makePages() is about to perform, in the same order.
+  // Read before makePages' resetInterBlockCollapse(), so the collapse state
+  // here is the state that pass will use.
+  const int gapCap = lineHeight / 2;
+  int topSpacing = blockStyle.marginTop > 0 ? blockStyle.marginTop : 0;
+  if (blockStyle.paddingTop > 0) topSpacing += blockStyle.paddingTop;
+  const int budget = gapCap > prevBlockBottomApplied_ ? gapCap - prevBlockBottomApplied_ : 0;
+  if (topSpacing > budget) topSpacing = budget;
+  const int termTop = snap(currentPageNextY + topSpacing + sceneBreakLiftPx_);
+  if (termTop + heightBeforeLast + lastFitExtent > viewportHeight) {
+    return false;  // the natural break already moves it
+  }
+
+  int bottomSpacing = blockStyle.marginBottom > 0 ? blockStyle.marginBottom : 0;
+  if (blockStyle.paddingBottom > 0) bottomSpacing += blockStyle.paddingBottom;
+  if (extraParagraphSpacing) bottomSpacing += lineHeight / 2;
+  if (bottomSpacing > gapCap) bottomSpacing = gapCap;
+  const int keepRoom = kKeepRoomLines * lineHeight;
+  const int afterTerm = snap(termTop + linesHeight + bottomSpacing);
+  if (afterTerm + keepRoom <= viewportHeight) return false;  // the definition can still start here
+
+  // Would a fresh page hold the term AND that room? The fresh page opens
+  // empty, so its top spacing collapses away (makePages' page-top rule) and
+  // the term starts at 0.
+  if (snap(linesHeight + bottomSpacing) + keepRoom > viewportHeight) return false;
+
+  // Nothing of this block has been laid, so chapterSourceBytes_ is still its
+  // first byte -- exactly where the new page begins.
+  breakPageBefore(chapterSourceBytes_);
+  return true;
 }
 
 bool ChapterHtmlSlimParser::breakBeforeStrandedTableHeader(const tablecolumns::Plan& plan, const int leadHeight) {
@@ -2049,9 +2205,33 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       if (cssStyle.hasTextAlign() && cssStyle.textAlign != elementStyle.alignment) {
         booknotes::current().raise(booknotes::Note::AlignmentOverridden);
       }
+      const bool isDefinitionList = strcmp(name, "dl") == 0;
+      const bool isDefinitionTerm = strcmp(name, "dt") == 0;
+      const bool isDefinitionBody = strcmp(name, "dd") == 0;
       const bool isListContainer = strcmp(name, "ul") == 0 || strcmp(name, "ol") == 0;
       const bool isListItem = strcmp(name, "li") == 0;
+      // A <dl> is a container in exactly the sense <ul> is -- it groups items
+      // that set their own indent -- so it takes the container's text-indent
+      // reset below and nothing else. It gets NO step of its own: the step
+      // belongs on the <dd>, or a <dt> would be indented too and the term
+      // would stop being distinguishable from its definition.
+      const bool isGroupContainer = isListContainer || isDefinitionList;
       std::string listMarker;
+      if (isDefinitionBody) {
+        // The <dd>'s indent under its <dt> IS the definition-list
+        // relationship -- there is no marker, and inventing one would be a
+        // bullet the document never asked for. Same rule as a list
+        // container's step: applied only when the publisher gave this element
+        // no left inset of its own, so `dd { margin-left: 1em }` (or an
+        // explicit 0) wins. padding-left is checked as well as margin-left
+        // because a book that rules a note off with `border-left` states the
+        // offset as padding -- the reported book's own `dd.why` does exactly
+        // that, and double-indenting it would be this reader inventing a
+        // nesting level the document does not have.
+        if (!cssStyle.hasMarginLeft() && !cssStyle.hasPaddingLeft()) {
+          elementStyle.marginLeft = static_cast<int16_t>(emSize * DEFINITION_INDENT_STEP_EM);
+        }
+      }
       if (isListContainer) {
         // One indent step per nesting level, but only when the publisher gave
         // this list no left inset of its own — explicit CSS (including an
@@ -2109,11 +2289,12 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       auto accumulated = clampAccumulatedHorizontalInsets(
           self->blockStyleStack.back().getCombinedBlockStyle(elementStyle, BlockStyle::CombineAxis::Horizontal),
           self->viewportWidth);
-      if (isListContainer) {
+      if (isGroupContainer) {
         // A list container never carries a first-line indent: an ancestor
         // paragraph's text-indent (or an outer item's hanging indent, for a
         // list nested inside <li>) must not leak onto this list's items —
-        // each <li> sets its own.
+        // each <li> sets its own. A <dl> is the same case: the terms and
+        // definitions under it are their own blocks.
         accumulated.textIndent = 0;
         accumulated.textIndentDefined = false;
       }
@@ -2134,6 +2315,12 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         self->listItemBulletOnly = true;
         self->listMarkerGluePending_ = true;
       }
+      // A <dt> alone at the foot of a page is the table-header defect one
+      // element over: the reader turns the page carrying the term and finds
+      // its definition overleaf. Set here rather than read off the tag in
+      // makePages() because by then the tag is long closed -- makePages() runs
+      // when the NEXT block opens. Cleared by whoever consumes it.
+      self->keepTermWithNext_ = isDefinitionTerm;
     }
   } else if (matches(name, UNDERLINE_TAGS, std::size(UNDERLINE_TAGS))) {
     // Flush buffer before style change so preceding text gets current style
@@ -2742,6 +2929,7 @@ bool ChapterHtmlSlimParser::beginParse() {
   blockStyleStack.push_back(rootBlockStyle);
   listStack_.clear();
   listMarkerGluePending_ = false;
+  keepTermWithNext_ = false;
 
   auto paragraphAlignmentBlockStyle = BlockStyle();
   paragraphAlignmentBlockStyle.textAlignDefined = true;
@@ -2865,6 +3053,13 @@ bool ChapterHtmlSlimParser::finishParse() {
 
   // Process last page if there is still text
   if (currentTextBlock) {
+    // A term still pending at the end of the file has nothing to be kept WITH,
+    // so the keep would only push it onto a page of its own. Reaches here only
+    // when the </dt> never arrived (a truncated or unclosed chapter) -- a
+    // well-formed </dt> retires its block long before this. A properly closed
+    // <dt> that nothing follows is NOT covered, and cannot be: see
+    // test/definition_list, ATrailingTermIsKeptAnywayAndCostsAtMostAShortPage.
+    keepTermWithNext_ = false;
     makePages();
     if (!pendingAnchorId.empty()) {
       anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
@@ -3141,6 +3336,18 @@ void ChapterHtmlSlimParser::makePages() {
   }
 
   const int lineHeight = renderer.getLineHeight(fontId, lineCompression);
+
+  // Keep a definition-list term with its definition. Must run BEFORE the top
+  // spacing is spent and before resetInterBlockCollapse() below, because it
+  // models both. Consumes keepTermWithNext_ whether or not it breaks, so a
+  // block that is not a term can never inherit the flag.
+  //
+  // The re-check is not defensive noise: breakPageBefore() leaves currentPage
+  // NULL when the replacement Page cannot be allocated (it calls
+  // noteAllocationFailure and returns), and everything below dereferences it.
+  // Every breakBeforeStrandedTableHeader caller does the same re-test for the
+  // same reason.
+  if (breakBeforeStrandedTerm() && !currentPage) return;
 
   // Apply top spacing before the paragraph (stored in pixels) — but NOT at the
   // top of a page. Classic page-top margin collapse: space-before exists to

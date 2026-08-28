@@ -187,7 +187,16 @@ namespace {
 // path, for a table too wide), and it is the one most readers actually see,
 // because a narrow table stops fitting the moment the font goes up. A v53
 // cache would still hold separator-less pages for those tables.
-constexpr uint8_t SECTION_FILE_VERSION = 54;
+// v55: <dl>, <dt> and <dd> are block-level (owner report 2026-08-28, a quiz
+// book whose every question ran straight into its own answer mid-line). Three
+// pagination changes ride the one bump: the three tags now open blocks where
+// they were inline, so lines break in different places; a <dd> with no
+// publisher left inset takes a 1.5 em step, which narrows its measure and
+// rewraps it; and a <dt> keeps with one line of what follows, which completes
+// the page ahead of a term that would otherwise end it. A section served from
+// a v54 cache is never parsed again, so without the bump the reader who sent
+// the screenshot would go on seeing exactly that page.
+constexpr uint8_t SECTION_FILE_VERSION = 55;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
