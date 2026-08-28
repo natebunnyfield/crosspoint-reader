@@ -2040,10 +2040,34 @@ disaster — the host suite is fast and gets run — but "CI is green" has never
 been a true statement about this fork, and anything relying on it (a PR check, a
 release gate) is relying on something that does not exist.
 
-**Close by** enabling Actions in the repository's Actions tab, then pushing a
-throwaway tag to confirm `release.yml` fires and attaches the three assets.
-Until then `scripts/release.sh` does the same work locally, with the same
-checks, and refuses rather than repairs.
+### Everything the API can rule out, ruled out 2026-08-28
+
+Checked so the next session does not re-diagnose it, and so the remaining fix is
+known to be a UI action rather than a misconfiguration:
+
+| checked | value |
+|---|---|
+| `repos/.../actions/permissions` | `enabled: true, allowed_actions: all` |
+| every workflow's `state` | `active` — **not** `disabled_fork` or `disabled_manually` |
+| repo `disabled` | `false` |
+| visibility | **public** (so Actions minutes are free and billing cannot be the cause) |
+| total runs, whole repo, all time | **1** — a Dependabot graph update on 2026-08-04 |
+
+And the decisive one: `scripts/release.sh` pushed tag `1.5.18-BD` at 20:57, and
+twenty seconds later the repo's total run count was still **1**. A live tag push
+against an `on: push: tags: '*'` workflow reporting `active` dispatched nothing.
+
+That is the behaviour GitHub gives a FORK whose workflows have not been enabled
+through the Actions tab banner. The REST API reports the repository-level
+permission, which is on, and offers no endpoint for that fork-level enable —
+`workflows/{id}/enable` only lifts `disabled_manually`, and these are already
+`active`. So this cannot be closed from a shell.
+
+**Close by** opening the repository's Actions tab and enabling workflows, then
+pushing a throwaway tag to confirm `release.yml` fires and attaches the three
+assets. Until then `scripts/release.sh` is the mechanism rather than a fallback:
+it does the same work locally, with the same checks, and refuses rather than
+repairs.
 
 ### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
