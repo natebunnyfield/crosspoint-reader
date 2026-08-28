@@ -9,28 +9,124 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "WifiCredentialStore.h"
+#include "network/OtaPreflight.h"
 
 void OnlineFirmwareUpdateActivity::onEnter() {
   Activity::onEnter();
   LOG_INF("OTA", "OnlineFirmwareUpdateActivity build=%s %s", __DATE__, __TIME__);
 
-  // The check needs a connection and this screen does not offer to make one:
-  // joining a network is Settings' job and it already has a whole screen for it.
-  // Saying so is more useful than a generic failure after a 30 s timeout.
+  // THE SCREEN NOW BRINGS THE NETWORK UP ITSELF (owner 2026-08-28). It used to
+  // answer "not connected" with "go to Settings", which sent the owner to
+  // another screen to supply a network the device had already saved. If there
+  // is a last-used SSID with a stored credential, join it here.
+  //
+  // And even when the link is ALREADY up we still go through CONNECTING, which
+  // is the half that fixes "github.com not found": WL_CONNECTED means
+  // ASSOCIATED, not resolvable. The pre-flight waits for the resolver before
+  // any fetch starts. See network/OtaPreflight.h.
+  beginMs = millis();
+  linkMs = 0;
+  haveCredential = false;
+  joiningSsid.clear();
+
   if (WiFi.status() != WL_CONNECTED) {
-    state = State::NO_WIFI;
-    requestUpdate();
-    return;
+    const std::string last = WIFI_STORE.getLastConnectedSsid();
+    if (!last.empty()) {
+      if (const auto cred = WIFI_STORE.findCredential(last)) {
+        joiningSsid = cred->ssid;
+        haveCredential = true;
+        LOG_INF("OTA", "No link; rejoining last network \"%s\"", joiningSsid.c_str());
+        WiFi.begin(cred->ssid.c_str(), cred->password.c_str());
+      }
+    }
+    if (!haveCredential) {
+      LOG_INF("OTA", "No link and no saved network to rejoin");
+      state = State::NO_WIFI;
+      requestUpdate();
+      return;
+    }
+  } else {
+    haveCredential = true;  // already associated; nothing to join
+    linkMs = millis();
   }
 
-  state = State::CHECKING;
+  state = State::CONNECTING;
   requestUpdate();
+}
+
+// Waits for BOTH conditions the check needs: an association, and a resolver
+// that answers for the host the check will actually use. Returns true when the
+// screen may proceed; sets a terminal state and returns false when it may not.
+bool OnlineFirmwareUpdateActivity::preflight() {
+  const bool linkUp = WiFi.status() == WL_CONNECTED;
+  if (linkUp && linkMs == 0) {
+    linkMs = millis();
+    LOG_INF("OTA", "Associated%s%s; waiting for the resolver", joiningSsid.empty() ? "" : " with ",
+            joiningSsid.c_str());
+  }
+
+  // Only ask the resolver once the link is up, and no more often than the
+  // retry gap: hostByName() blocks, and asking with no link just burns the
+  // timeout. The host is the one the check fetches, because resolving any
+  // other proves nothing about this record.
+  bool dnsOk = false;
+  if (linkUp) {
+    const uint32_t now = millis();
+    if (lastDnsTryMs == 0 || now - lastDnsTryMs >= otapreflight::kDnsRetryMs) {
+      lastDnsTryMs = now;
+      IPAddress addr;
+      dnsOk = WiFi.hostByName(OtaUpdater::releaseHost(), addr) == 1;
+      if (dnsOk) LOG_INF("OTA", "Resolver answered for %s", OtaUpdater::releaseHost());
+    } else {
+      dnsOk = dnsResolved;
+    }
+    if (dnsOk) dnsResolved = true;
+  }
+
+  const uint32_t sinceBegin = millis() - beginMs;
+  const uint32_t sinceLink = linkMs == 0 ? 0 : millis() - linkMs;
+  const otapreflight::Phase phase =
+      otapreflight::decide(haveCredential, linkUp, dnsResolved, sinceBegin, sinceLink);
+
+  switch (phase) {
+    case otapreflight::Phase::Ready:
+      return true;
+    case otapreflight::Phase::Connecting:
+    case otapreflight::Phase::Resolving:
+      return false;
+    case otapreflight::Phase::NoCredential:
+      state = State::NO_WIFI;
+      break;
+    case otapreflight::Phase::ConnectFailed:
+      LOG_ERR("OTA", "Could not join \"%s\" in %u ms", joiningSsid.c_str(),
+              (unsigned)otapreflight::kConnectTimeoutMs);
+      state = State::NO_WIFI;
+      break;
+    case otapreflight::Phase::DnsFailed:
+      // Associated but nothing resolves. Reported as its own thing rather than
+      // as "GitHub is unreachable", because the network is the part that is
+      // wrong and saying so is what makes it fixable.
+      LOG_ERR("OTA", "Associated but no DNS after %u ms", (unsigned)otapreflight::kDnsTimeoutMs);
+      errorMessage = tr(STR_UPDATE_CHECK_FAILED);
+      state = State::FAILED;
+      break;
+  }
+  requestUpdate();
+  return false;
 }
 
 void OnlineFirmwareUpdateActivity::loop() {
   // First pass after the CHECKING frame is on screen. Doing this in onEnter()
   // would block before anything had been painted, so the owner would stare at
   // the previous screen for the length of a TLS handshake.
+  if (state == State::CONNECTING) {
+    if (!preflight()) return;
+    state = State::CHECKING;
+    requestUpdate();
+    return;
+  }
+
   if (state == State::CHECKING && !checkStarted) {
     checkStarted = true;
     runCheck();
@@ -184,6 +280,15 @@ void OnlineFirmwareUpdateActivity::render(RenderLock&&) {
   const auto top = (pageHeight - lineHeight) / 2;
 
   switch (state) {
+    case State::CONNECTING:
+      // Deliberately reuses the "checking" wording rather than adding a string
+      // for a state that is usually gone in under a second. What the owner
+      // needs to know is that the screen is working, not which of two network
+      // preconditions it is on; the [OTA] log carries that distinction for
+      // anyone diagnosing it.
+      renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_FOR_UPDATES));
+      break;
+
     case State::CHECKING:
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_FOR_UPDATES));
       break;

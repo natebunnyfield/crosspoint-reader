@@ -13,8 +13,9 @@
  * the whole flow; there is no picker and no settings sub-tree, because the ask
  * was one button.
  *
+ *   CONNECTING  joining the last-used network, then waiting for DNS
  *   CHECKING    fetch the latest release JSON (OtaUpdater::checkForUpdate)
- *   NO_WIFI     no connection -- say so and point at Settings
+ *   NO_WIFI     nothing saved to join -- say so and point at Settings
  *   UP_TO_DATE  nothing newer published
  *   CONFIRMING  "Update firmware?" with the version, Cancel / Confirm
  *   UPDATING    streaming into the inactive slot, progress bar
@@ -42,6 +43,7 @@
 class OnlineFirmwareUpdateActivity : public Activity {
  public:
   enum class State {
+    CONNECTING,  // joining the last-used network, or waiting for its resolver
     CHECKING,
     NO_WIFI,
     UP_TO_DATE,
@@ -74,8 +76,23 @@ class OnlineFirmwareUpdateActivity : public Activity {
   // onEnter cannot block on the network before its first paint, or the screen
   // arrives already finished. loop() does the check on its first pass instead.
   bool checkStarted = false;
+  // The pre-flight (network/OtaPreflight.h). `beginMs` is when the join was
+  // issued, `linkMs` when the association came up -- 0 until it does, because
+  // the DNS budget must start from the LINK and not from the join, or a slow
+  // association eats the resolver's whole window.
+  uint32_t beginMs = 0;
+  uint32_t linkMs = 0;
+  bool haveCredential = false;
+  std::string joiningSsid;
+  // The resolver is asked at most once per kDnsRetryMs, and the answer is
+  // LATCHED: hostByName() blocks, so re-asking on every loop pass would stall
+  // the screen, and a record that resolved once does not stop existing.
+  uint32_t lastDnsTryMs = 0;
+  bool dnsResolved = false;
 
   void runCheck();
+  // Returns true once the network is usable and the check may start.
+  bool preflight();
   void promptConfirmation();
   void performUpdate();
   const char* messageForError(OtaUpdater::OtaUpdaterError err) const;

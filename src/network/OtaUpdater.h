@@ -37,5 +37,10 @@ class OtaUpdater {
   bool isUpdateNewer() const;
   const std::string& getLatestVersion() const;
   OtaUpdaterError checkForUpdate();
+
+  // The host the release check contacts. Exposed so the pre-flight can resolve
+  // THE SAME name before any fetch starts -- resolving a different host would
+  // prove nothing about this record, which is the whole point of the check.
+  static const char* releaseHost() { return "api.github.com"; }
   OtaUpdaterError installUpdate(ProgressCallback onProgress = nullptr, void* ctx = nullptr);
 };
