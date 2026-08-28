@@ -1699,7 +1699,7 @@ users actually see.
 paths never write through the link. Would halve the visible footprint to
 ~58 MB with no capability change.
 
-### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — FOUND 2026-08-28 on the owner's card
+### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
 
 Found while reading the card's crash reports for the OTA work, not reported —
@@ -1732,6 +1732,39 @@ runaway consumer is more likely than genuine pressure.
 
 **Not reproduced.** No card state was captured beyond the report, and the log
 tail does not say which family or which book was open.
+
+## What was changed, 2026-08-28
+
+`buildAdvanceTableRange` asked for the WORST CASE on every call: 4096
+codepoints is 16 KB, `new[]`-ed and freed per invocation. On a device with
+~400 KB the number that matters is not free heap but the largest CONTIGUOUS
+block, and a 16 KB request stops being satisfiable long after churn has broken
+the heap up — which is exactly the shape of thirteen consecutive failures with
+the device otherwise running.
+
+It now starts at **256 codepoints (1 KB)** and quadruples only when a scan
+actually fills the buffer, so the common call — a page of text needs a couple of
+hundred distinct codepoints — never asks for more than 1 KB. The scan restarts
+after a growth rather than resuming, because `collectUniqueCodepoints` dedupes
+and a rescan is therefore idempotent; at most two growths separate 256 from the
+cap.
+
+**A failed growth is no longer fatal.** The buffer already holds a full set of
+codepoints at that point, and `hitCap` already means "layout may be
+approximate" — an outcome this function has always been able to return and the
+reader has always survived. Only the first 1 KB allocation can still fail the
+call outright, and it is the one most likely to succeed.
+
+**This is a mitigation, not a diagnosis.** It removes the largest recurring
+contiguous request on the font path, which is the thing most likely to fail on
+a fragmented heap and the thing the log actually recorded. It does NOT explain
+what had already consumed the heap, and the `abort()` itself came from some
+OTHER allocation — a plain `new` failing under `-fno-exceptions` aborts, and
+the nothrow site here returns instead. So if the crash recurs, the next step is
+to find that allocation, not to shrink this one further.
+
+577 tests pass, desktop canary green. Device-confirm only: nothing host-side
+reproduces a fragmented ESP32 heap.
 
 ### [B-030] Edgar -> Inknut at XL renders smaller than Edgar at L — CLOSED 2026-08-27, working as designed
 **severity: medium (the control looks broken) · scope: reader font size · filed and reproduced 2026-08-27**

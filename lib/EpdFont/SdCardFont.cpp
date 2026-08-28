@@ -1553,19 +1553,57 @@ int SdCardFont::buildAdvanceTableRange(Iter begin, Iter end, bool includeSpace, 
 
   // +2 reserved slots for space and hyphen injected after the main scan.
   static constexpr uint32_t MAX_UNIQUE_CODEPOINTS = 4096;
-  uint32_t* codepoints = new (std::nothrow) uint32_t[MAX_UNIQUE_CODEPOINTS + 2];
+
+  // GROWS FROM SMALL RATHER THAN ASKING FOR THE CAP UP FRONT (B-040).
+  //
+  // This used to allocate the worst case every time: 4096 codepoints is 16 KB,
+  // new[]-ed and freed on every call. On the owner's card that allocation
+  // failed THIRTEEN TIMES in a row and the boot ended in abort() -- and on a
+  // device with ~400 KB the interesting number is not the total free heap but
+  // the largest CONTIGUOUS block, which a 16 KB request outlives long after
+  // churn has broken the heap up. Asking for the cap on a page that needs two
+  // hundred codepoints spent the scarcest resource on the commonest call.
+  //
+  // Real text needs a fraction of the cap, so start at 256 and quadruple only
+  // when a scan actually fills the buffer. The scan is restarted after a
+  // growth rather than resumed: collectUniqueCodepoints dedupes, so a rescan is
+  // idempotent, and at most two growths separate 256 from the cap.
+  //
+  // A growth that FAILS is not fatal. The buffer already holds a full set of
+  // codepoints and `hitCap` already means "layout may be approximate" -- a
+  // documented, survivable outcome that this function has always been able to
+  // return. Only the first, smallest allocation can still fail the call
+  // outright, and at 1 KB it is the one most likely to succeed.
+  uint32_t capacity = 256;
+  uint32_t* codepoints = new (std::nothrow) uint32_t[capacity + 2];
   if (!codepoints) {
-    LOG_ERR("SDCF", "buildAdvanceTable: failed to allocate codepoint buffer (%u bytes)", MAX_UNIQUE_CODEPOINTS * 4);
+    LOG_ERR("SDCF", "buildAdvanceTable: failed to allocate codepoint buffer (%u bytes)", (capacity + 2) * 4);
     return -1;
   }
   uint32_t cpCount = 0;
   bool hitCap = false;
 
-  for (auto it = begin; it != end && !hitCap; ++it) {
-    hitCap = collectUniqueCodepoints(asCStr(*it), codepoints, cpCount, MAX_UNIQUE_CODEPOINTS);
-  }
-  if (extraText && !hitCap) {
-    hitCap = collectUniqueCodepoints(extraText, codepoints, cpCount, MAX_UNIQUE_CODEPOINTS);
+  for (;;) {
+    cpCount = 0;
+    hitCap = false;
+    for (auto it = begin; it != end && !hitCap; ++it) {
+      hitCap = collectUniqueCodepoints(asCStr(*it), codepoints, cpCount, capacity);
+    }
+    if (extraText && !hitCap) {
+      hitCap = collectUniqueCodepoints(extraText, codepoints, cpCount, capacity);
+    }
+    if (!hitCap || capacity >= MAX_UNIQUE_CODEPOINTS) break;
+
+    const uint32_t nextCapacity = std::min<uint32_t>(capacity * 4, MAX_UNIQUE_CODEPOINTS);
+    uint32_t* grown = new (std::nothrow) uint32_t[nextCapacity + 2];
+    if (!grown) {
+      LOG_ERR("SDCF", "buildAdvanceTable: could not grow codepoint buffer to %u; layout may be approximate",
+              nextCapacity);
+      break;
+    }
+    delete[] codepoints;
+    codepoints = grown;
+    capacity = nextCapacity;
   }
 
   if (includeSpace && std::none_of(codepoints, codepoints + cpCount, [](uint32_t c) { return c == ' '; }))
@@ -1574,8 +1612,7 @@ int SdCardFont::buildAdvanceTableRange(Iter begin, Iter end, bool includeSpace, 
     codepoints[cpCount++] = '-';
 
   if (hitCap) {
-    LOG_ERR("SDCF", "buildAdvanceTable: unique codepoint cap (%u) hit, layout may be approximate",
-            MAX_UNIQUE_CODEPOINTS);
+    LOG_ERR("SDCF", "buildAdvanceTable: unique codepoint cap (%u) hit, layout may be approximate", capacity);
   }
   std::sort(codepoints, codepoints + cpCount);
   int totalMissed = fetchAdvancesForCodepoints(codepoints, cpCount, styleMask);
