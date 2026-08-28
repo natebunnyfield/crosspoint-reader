@@ -85,8 +85,8 @@ sidebearing gap, not equality.
 The trigger population also shrank in the same pass: the coverage fill below
 removed the everyday holes.
 
-### [B-033] The release binary carries a stale provenance stamp — CLOSED 2026-08-28, not reproducible and the format is no longer producible
-**severity: low · scope: build / release · handed over 2026-08-19, closed 2026-08-28**
+### [B-033] The release binary carries a stale provenance stamp — REOPENED and MECHANISM FOUND 2026-08-28
+**severity: low · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
 
 Reported by the session that cut the 1.5.2-BD release: the binary contains
 `1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
@@ -134,6 +134,48 @@ Closed rather than left open with a disproved lead. If a stale stamp is ever
 seen again, the useful first fact is the FORMAT: `-dev-` means the default env,
 `-rc+` the RC env, a bare triple a literal in the ini, and `-N-g<sha>` means
 something outside this repo's build path generated it.
+
+## That closure was WRONG, and the next build proved it within the hour
+
+I closed this saying the `-N-g<sha>` format was no longer producible. Then a
+fresh `gh_release` build, made for B-006, came out containing
+**`1.5.1-B2-43-g7211621a3`** — that exact shape, alongside the correct
+`1.5.16-BD`. The closing reasoning was right about `git_branch.py` and wrong
+about the conclusion: I checked the paths I knew about and treated that as
+checking all of them.
+
+**The mechanism, found by following it rather than reasoning about it:**
+
+* `git describe` in this repo today returns `1.5.16-BD-49-g093a4b129` — current.
+  So the binary's string is not this build's describe.
+* `7211621a3` IS a commit in this repo, just an older one than HEAD. So it is a
+  describe of THIS project, taken at some earlier moment and kept.
+* Grepping the build tree finds it only in `firmware.bin` and `firmware.elf` —
+  no object file in `.pio` carries it, which is why a rebuild never clears it.
+* Grepping wider finds the carrier:
+  **`~/.platformio/packages/framework-arduinoespressif32-libs/esp32c3/lib/libesp_app_format.a`**.
+
+It is baked into a **prebuilt library in the PlatformIO package cache**, outside
+the repository. That accounts for every clue the original report left and that I
+mis-read:
+
+| the 2026-08-19 evidence | why |
+|---|---|
+| survives `pio run -t clean` | clean empties `.pio/build`, not `~/.platformio/packages` |
+| `grep` cannot find it in the tree | it is not in the tree |
+| the shape is `git describe` | ESP-IDF stamps the app descriptor's version from `git describe` |
+
+The DISPLAYED version was always right because `CROSSPOINT_VERSION` is a
+compile-time define this repo controls. What is stale is the **ESP-IDF app
+descriptor**, which is what OTA metadata and the web UI report — exactly the
+"likeliest visible symptom" the original entry predicted.
+
+**Close by** setting the app descriptor version explicitly rather than letting
+it inherit a cached one — ESP-IDF honours `PROJECT_VER`, and pointing it at
+`${crosspoint.version}` would make the descriptor and the display agree by
+construction. Not done here: it is a build-system change to a release path, and
+this entry has now been closed wrongly once by someone confident on less
+evidence than that deserves.
 
 ### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
 **severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
