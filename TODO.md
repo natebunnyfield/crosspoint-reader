@@ -91,43 +91,69 @@ everywhere and is ignored elsewhere is the design question, and the second is
 usually the one that ages better.
 
 ### [T-026] Long-select a font in the reader font list to deactivate / reactivate it
-**scope: reader font picker · asked 2026-08-28 · FUTURE, not scheduled**
+**scope: reader font picker · asked 2026-08-28 · DONE 2026-08-29 (reader picker)
+· OPEN: whether the EDITOR font screen gets the same gesture**
 
 Owner: *"long select on a font in reader font deactivate/reactivates it."*
+Restated 2026-08-29 as *"allow deactivation/reactivation of fonts by long hold
+in font selection screens"* -- plural, which is the open half below.
 
-A hide/show toggle for installed families, so the in-reader font cycle steps
-past the ones not currently wanted without deleting anything from the card.
+**Shipped.** A hold on Confirm past `ReaderUtils::SKIP_HOLD_MS` in Reader Font
+switches the highlighted family off or back on. `SETTINGS.fontsOff` stores the
+families switched OFF as a comma-separated list of directory names; the model
+and every refusal are `src/FontActivation.h`, host-tested and mutation-tested.
+The in-book cycle skips them (`EpubReaderActivity::cycleReaderFontFamily`); the
+PICKER does not, because it is the only place to turn one back on.
 
-**Why it is worth doing rather than just installing fewer fonts.** The reader
-cycles families with a side-button hold (`EpubReaderActivity`, the
-`sdFontFamilyName` walk), and that walk visits every readable family on the
-card. Eight shipping families plus anything installed over WebDAV makes the
-cycle long, and the only way to shorten it today is to delete a font — which
-throws away megabytes of `.cpfont` that then have to be downloaded again.
+**The four things it said to settle, as built.**
 
-**Where it lives.** `FontSelectionActivity` already has a long-press handler and
-a `readable[]` index list that the reader's cycle walks; the natural shape is a
-per-family `active` flag beside the credential-store pattern, persisted on the
-card, with `readable[]` filtered by it.
+1. *Last active cannot be deactivated* -- refused, spec untouched, and the
+   caption says "Last active font". Counted over the families the PICKER
+   offers, not the raw registry: a count including writing-only faces would let
+   the last reading family be switched off.
+2. *What it looks like* -- the row keeps its normal drawing and gains an "Off"
+   badge where the applied row says "Selected". Off, not broken.
+3. *The active font's own case* -- deactivating the family being read moves the
+   reader to the next ACTIVE family in the picker's order, which is the order
+   the cycle walks, so "next" means the same thing in both places.
+4. *The built-in fallback* -- it does not participate. It is listed only when
+   nothing else is, which is the state rule 1 already protects, so a hold on it
+   is refused with the same message.
 
-**Four things to settle first.**
+**One claim in the original entry was wrong** and is corrected here rather than
+left: it said "`FontSelectionActivity` already has a long-press handler". Neither
+font screen had one. Confirm had to move from the press edge to the release
+edge to make room for a hold, because a press-edge action fires before a hold
+can be recognised.
 
-1. **The last active font cannot be deactivated.** Deactivating everything would
-   leave the reader with no family to cycle to. The UI should refuse rather than
-   recover.
-2. **What a deactivated font looks like in the picker.** It must stay VISIBLE
-   there — that is the only place to turn it back on — so it needs a state that
-   reads as off without reading as broken.
-3. **The active font's own case.** Deactivating the family currently being read
-   has to move the reader somewhere, and "the next active one" is the obvious
-   answer but should be stated rather than assumed.
-4. **Whether the built-in fallback participates.** It is not on the card and
-   cannot be deleted, so it may be the right permanent floor for rule 1.
+**Verified headlessly, from a restored card each time** (`fs_/.crosspoint/`
+carried state between the first two arms and made a correct round trip read as a
+failure -- the trap `CLAUDE.md` documents, paid again):
 
-Note the standing rule this sits next to: never silently remove user-facing
-capability. Deactivation is the owner doing it deliberately and reversibly,
-which is the opposite case — but the reversibility is what makes it so, and
-point 2 is therefore load-bearing rather than cosmetic.
+- one hold on a non-applied row -> `fontsOff = 'TeXGyreHeros'`, row shows "Off"
+- hold, then hold again, from a clean card -> `fontsOff = ''` (byte round trip)
+- every family but one switched off, hold on the survivor -> spec UNCHANGED,
+  caption reads "Last active font"
+
+That also answers a question worth recording: **`getHeldTime()` does work under
+`QTAP:<BUTTON>:<holdMs>`**, so hold gestures ARE headlessly testable here. The
+`SDL_PushEvent` limitation in `CLAUDE.md` applies to `RAWKEY`, not to `QTAP`,
+which writes `syntheticButtonDown[]` directly.
+
+**STILL OPEN: the editor font screen.** The owner's 2026-08-29 wording is
+plural, but `EditorFontSelectionActivity` is a different shape and the feature
+does not obviously carry over:
+
+- it lists a FIXED compiled table (`editorfonts::FAMILIES`), not the SD
+  registry, so several rows are built-ins with no card directory name --
+  `fontsOff` is keyed by directory name and cannot address them;
+- there is **no editor font cycle**. Checked: `NoteEditorActivity` resolves one
+  font and nothing steps through the list. Deactivation's whole value in the
+  reader was shortening a cycle without deleting `.cpfont` files, and that value
+  does not exist here -- it would only hide rows on the one screen you must
+  visit to unhide them.
+
+So it is a decision, not an oversight. Left for the owner.
 
 ### [T-024] Say what SCRIPT Almendra descends from, in the font metainfo
 **scope: font metadata · asked 2026-08-27 · FUTURE, not scheduled**
