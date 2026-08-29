@@ -58,7 +58,7 @@ struct Entry {
   // the next's. 0 — the value every row that omits it gets — means no break,
   // which is every family whose stages are all one typeface's story.
   //
-  // It exists for the compound families, today only Inknut Antiqua + Junicode,
+  // It exists for the compound families, today only Inknut + Junicode,
   // whose four stages are two typefaces with a model and a digitisation each.
   // Run together they read as one four-step lineage of one face, which is
   // exactly wrong: nothing in "1469 Venice / 2014 Amsterdam / 1703 Oxford /
@@ -246,7 +246,11 @@ inline constexpr Entry kEntries[] = {
     // The trailing 2 is `groupBreakAfter`: a blank line after stage 2, which is
     // where Inknut's story ends and Junicode's begins. The ONLY row in the
     // table that sets it.
-    {"InknutJunicode", "Inknut Antiqua + Junicode", "; Claus Eggers S\xC3\xB8rensen; ; Peter S. Baker",
+    // Displayed as "Inknut + Junicode", not "Inknut Antiqua + Junicode" (owner
+    // 2026-08-28). The KEY stays `InknutJunicode` -- it is the directory name
+    // on the card and the string SdCardFontRegistry matches, so moving it would
+    // orphan every installed copy. Only the label changed.
+    {"InknutJunicode", "Inknut + Junicode", "; Claus Eggers S\xC3\xB8rensen; ; Peter S. Baker",
      "1469 Venice; 2014 Amsterdam; 1703 Oxford; 1998, 2023 Charlottesville, Virginia", 1469, 2},
     {"LibreCaslonText", "Libre Caslon Text", "William Caslon; Pablo Impallari & Rodrigo Fuenzalida",
      "1722 London; 2012 Rosario, Argentina", 1722},
@@ -537,7 +541,7 @@ constexpr size_t kMaxStackedInfoLines = 4;
 //
 // FIVE lines is the worst case, and two different rows reach it. A two-stage
 // family in the roomy form spends person / year-place / blank / person /
-// year-place (Edgar, Coelacanth). Inknut Antiqua + Junicode takes the bulleted
+// year-place (Edgar, Coelacanth). Inknut + Junicode takes the bulleted
 // form instead -- four stages, six lines of info, so one bulleted line each --
 // and its `groupBreakAfter` blank brings that back to five as well. Both
 // pickers' `kColophonLines` is 5 and neither has slack; a sixth line would be

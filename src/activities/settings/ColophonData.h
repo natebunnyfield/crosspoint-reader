@@ -303,7 +303,7 @@ inline constexpr ColophonTech COLOPHON_TECH[] = {
      "Nguyen, 2016 Rosario, Argentina"},
     {"Writing faces", "iA Writer Quattro, PragmataPro, Nitti Typewriter, 12 pt"},
     {"Card fonts",
-     "48 buildable families. Six installed: Coelacanth, Edgar, Inknut Antiqua + Junicode, Libre Franklin, "
+     "48 buildable families. Six installed: Coelacanth, Edgar, Inknut + Junicode, Libre Franklin, "
      "Libris, TeX Gyre Schola"},
     {nullptr, "Simulator"},
     {"Purpose", "Runs this same firmware on a Mac, on Linux and on iPhone"},
