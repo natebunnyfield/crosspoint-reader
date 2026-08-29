@@ -130,6 +130,34 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Install PlatformIO Core
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      # test/CMakeLists.txt globs .pio/libdeps/*/ArduinoJson and .../JPEGDEC
+      # (patched by scripts/patch_jpegdec.py during the build) at CONFIGURE
+      # time, and the suites that need them FATAL_ERROR without it -- see
+      # test/progressive_jpeg/CMakeLists.txt's own error message, which names
+      # this exact command. Without this step the job never reaches ctest.
+      - name: Build firmware (populates .pio/libdeps for the CMake test suite)
+        run: pio run -e default
+
       - name: Install build tools
         run: |
           sudo apt-get update
