@@ -96,10 +96,35 @@ void CrossPointWebServerActivity::onEnter() {
   connectedSSID.clear();
   lastHandleClientTime = 0;
 
+#ifdef CROSSPOINT_NO_SOFTAP
+  // ONE MODE LEFT, SO THERE IS NO CHOICE TO PRESENT (owner ruling, ios/WIFI.md
+  // Phase 4). Create Hotspot needs an 802.11 radio the host will not hand over
+  // -- an app cannot bring up an access point on iOS at any entitlement tier,
+  // and WiFiClass::softAP() reports that by returning false. A popup offering
+  // one option is a keypress that can only go one way, and a one-row version of
+  // this screen is not parity with an X3 either: parity ended the moment the
+  // second row went.
+  //
+  // Back out of the WiFi list therefore goes Home rather than here; see
+  // onWifiSelectionComplete().
+  //
+  // The state is moved off MODE_SELECTION BEFORE the dispatch, not by it.
+  // `currentActivity` is assigned and the render lock released before
+  // onEnter() runs (ActivityManager.cpp), so a render notification left over
+  // from the outgoing screen can land in the window between the reset block
+  // above and onNetworkModeSelected() reaching its own assignment -- and
+  // render()'s MODE_SELECTION branch would then draw a bare "File Transfer"
+  // header over a popup this build never shows. Microseconds and cosmetic, but
+  // it costs one line to make the state unobservable instead of merely brief.
+  LOG_DBG("WEBACT", "Single network mode on this build; joining directly");
+  state = WebServerActivityState::WIFI_SELECTION;
+  onNetworkModeSelected(NetworkMode::JOIN_NETWORK);
+#else
   // Show the network mode choice in place, rather than pushing a whole activity for it.
   LOG_DBG("WEBACT", "Showing network mode popup...");
   showNetworkModePopup();
   requestUpdate();
+#endif
 }
 
 void CrossPointWebServerActivity::onExit() {
@@ -169,19 +194,41 @@ void CrossPointWebServerActivity::onWifiSelectionComplete(const bool connected) 
     // Start the web server
     startWebServer();
   } else {
+#ifdef CROSSPOINT_NO_SOFTAP
+    // Nothing to go back TO -- the mode popup this build skips was the only
+    // thing between the WiFi list and Home. Leaving instead of re-entering the
+    // list is what makes Back on that screen mean Back.
+    //
+    // TURN THE RADIO BACK OFF FIRST, or opening File Transfer and immediately
+    // changing your mind RESTARTS THE APP. onExit()'s guard is
+    // `WiFi.getMode() != WIFI_MODE_NULL`, and skipping the mode popup means
+    // onEnter() now always reaches WiFi.mode(WIFI_STA) -- so a cancel that used
+    // to leave the mode NULL and skip silentRestart() would instead take the
+    // in-process longjmp reboot for having done nothing at all. Nothing else on
+    // this path clears it: disconnect(false) does not, and
+    // WifiSelectionActivity::onExit deliberately leaves WiFi state to its
+    // parent. This restores exactly the pre-gate behavior for "opened, backed
+    // out, never connected", and leaves the post-transfer reboot -- the one
+    // ios/WIFI.md finding 8 asks for -- untouched.
+    WiFi.mode(WIFI_OFF);
+    onGoHome();
+#else
     // User cancelled - go back to mode selection
     state = WebServerActivityState::MODE_SELECTION;
     showNetworkModePopup();
     requestUpdate();
+#endif
   }
 }
 
+#ifndef CROSSPOINT_NO_SOFTAP
 void CrossPointWebServerActivity::showNetworkModePopup() {
   static constexpr StrId MODE_OPTIONS[] = {StrId::STR_JOIN_NETWORK, StrId::STR_CREATE_HOTSPOT};
   networkModePopup.show(StrId::STR_FILE_TRANSFER, MODE_OPTIONS, 2, 0, [this](int index) {
     onNetworkModeSelected(index == 0 ? NetworkMode::JOIN_NETWORK : NetworkMode::CREATE_HOTSPOT);
   });
 }
+#endif
 
 void CrossPointWebServerActivity::startAccessPoint() {
   LOG_DBG("WEBACT", "Starting Access Point mode...");
@@ -285,6 +332,7 @@ void CrossPointWebServerActivity::startWebServer() {
 }
 
 void CrossPointWebServerActivity::loop() {
+#ifndef CROSSPOINT_NO_SOFTAP
   if (state == WebServerActivityState::MODE_SELECTION) {
     networkModePopup.handleInput(mappedInput, [this] { requestUpdate(); });
     if (!networkModePopup.isActive() && state == WebServerActivityState::MODE_SELECTION) {
@@ -294,6 +342,7 @@ void CrossPointWebServerActivity::loop() {
     }
     return;
   }
+#endif
 
   // Handle different states
   if (state == WebServerActivityState::SERVER_RUNNING) {

@@ -11,6 +11,28 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#ifdef SIMULATOR
+#include <SimHostSettings.h>
+#endif
+
+namespace {
+// WHERE the owner should go to set the token, which is not the same sentence on
+// every build this firmware runs on. settings.json on the card is the truth on
+// an X3 and on the desktop simulator; on a phone that file cannot be opened at
+// all, and printing it there was advice nobody could follow -- the whole reason
+// Update Library was unreachable on iOS. The host says whether it has a
+// settings surface of its own; see SimHostSettings.h.
+// Returns the resolved string, not the id: tr() is a macro that pastes
+// `StrId::` onto its argument, so it cannot take a value chosen at runtime.
+const char* needsTokenHint() {
+#ifdef SIMULATOR
+  if (sim_host_settings::hasSettingsSurface()) {
+    return I18N.get(StrId::STR_LIBRARY_NEEDS_TOKEN_HINT_HOST);
+  }
+#endif
+  return I18N.get(StrId::STR_LIBRARY_NEEDS_TOKEN_HINT);
+}
+}  // namespace
 
 void LibraryUpdateActivity::onEnter() {
   Activity::onEnter();
@@ -152,7 +174,7 @@ void LibraryUpdateActivity::render(RenderLock&&) {
       const int hintY = top + lineHeight + metrics.verticalSpacing;
       const Rect hintBounds{metrics.contentSidePadding, hintY, pageWidth - metrics.contentSidePadding * 2,
                             pageHeight - hintY};
-      UITheme::drawCenteredWrappedText(renderer, hintBounds, UI_10_FONT_ID, tr(STR_LIBRARY_NEEDS_TOKEN_HINT), 3, true,
+      UITheme::drawCenteredWrappedText(renderer, hintBounds, UI_10_FONT_ID, needsTokenHint(), 3, true,
                                        EpdFontFamily::REGULAR, UITheme::TextVerticalAlignment::TOP);
       const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
       GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

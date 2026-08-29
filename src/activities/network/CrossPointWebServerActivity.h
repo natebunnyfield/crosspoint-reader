@@ -60,7 +60,12 @@ class CrossPointWebServerActivity final : public Activity {
   void renderServerRunning() const;
   void renderWifiIndicator(int subHeaderTop) const;
 
+  // Absent under CROSSPOINT_NO_SOFTAP: with Create Hotspot gone there is one
+  // mode left and onEnter() goes straight to it. The popup MEMBER stays, so the
+  // state enum and the two OptionPopup call sites keep one shape across builds.
+#ifndef CROSSPOINT_NO_SOFTAP
   void showNetworkModePopup();
+#endif
   void onNetworkModeSelected(NetworkMode mode);
   void onWifiSelectionComplete(bool connected);
   void startAccessPoint();

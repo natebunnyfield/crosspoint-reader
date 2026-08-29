@@ -18,6 +18,13 @@
 
 #include "CrossPointSettings.h"
 #include "LibrarySyncPlan.h"
+#ifdef SIMULATOR
+// The host's own settings surface, where a platform with no way to edit the
+// card's settings.json keeps this token instead. Simulator-only by
+// construction: the header is part of the simulator library and folds to a
+// constant everywhere but a phone. See SimHostSettings.h.
+#include <SimHostSettings.h>
+#endif
 
 namespace {
 
@@ -44,10 +51,39 @@ constexpr int SYNC_RECORDS_VERSION = 1;
 // the publisher starts stamping them.
 constexpr int MAX_MANIFEST_VERSION = 1;
 
+// The token, from wherever this build's owner can actually set one.
+//
+// SETTINGS.githubToken is the answer on hardware, where it is hand-edited into
+// /.crosspoint/settings.json on the card. A HOST BUILD MAY HAVE NO WAY TO EDIT
+// THAT FILE -- an iPhone does not -- so the simulator offers a settings surface
+// of its own and it wins when it holds anything. It is deliberately not copied
+// INTO SETTINGS at boot: that field is persisted by the next settings save, and
+// on iOS the directory it saves to is served over the LAN by File Transfer and
+// WebDAV. One fewer copy of a credential, for no loss of function.
+//
+// NEVER LOG THE RETURN VALUE, here or at any call site.
+std::string githubTokenValue() {
+#ifdef SIMULATOR
+  char hosted[sizeof(SETTINGS.githubToken)] = {};
+  const size_t hostedLength = sim_host_settings::githubToken(hosted, sizeof(hosted));
+  if (hostedLength != 0) {
+    // Length only. A token longer than the field is a paste error, and it will
+    // fail authentication with a 401 that says nothing about why -- so the one
+    // place that can tell says so, without the bytes.
+    if (hostedLength > sizeof(hosted) - 1) {
+      LOG_ERR("LIB", "host GitHub token is %u bytes; the field holds %u -- truncated, and it will not authenticate",
+              static_cast<unsigned>(hostedLength), static_cast<unsigned>(sizeof(hosted) - 1));
+    }
+    return std::string(hosted);
+  }
+#endif
+  return std::string(SETTINGS.githubToken);
+}
+
 std::string bearerHeaderValue() {
   // Built in one place so no call site ever holds the raw token where a log
   // line could pick it up. NEVER log the returned value.
-  return std::string("Bearer ") + SETTINGS.githubToken;
+  return std::string("Bearer ") + githubTokenValue();
 }
 
 // Streaming parse of the release-by-tag JSON, collecting EVERY asset's API
@@ -221,8 +257,9 @@ void hexDigest(const unsigned char digest[32], char outHex[65]) {
 }  // namespace
 
 LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
-  if (SETTINGS.githubToken[0] == '\0') {
-    // Not an error to retry — the screen tells the owner where the token goes.
+  if (githubTokenValue().empty()) {
+    // Not an error to retry — the screen tells the owner where the token goes,
+    // and on a host build that is the host's settings app rather than a file.
     return NO_TOKEN;
   }
 
