@@ -24,13 +24,27 @@ size unselectable would be a silent loss of something the user put there.
 
 Nothing on a real SD card prunes. When a slot's point size moves, the file the
 old ramp vacated stays. Inknut Junicode's S slot went **10 → 11 pt** on
-2026-08-27, so every card that already held a 10 pt Inknut now has seven files:
+2026-08-27, so every card that already held a 10 pt Inknut then had seven files:
 7, 9, 10, 11, 12, 14, 16.
 
-The iOS app is the exception and prunes: `seedBundledFontFamilies()` either
-symlinks the family directory straight at the bundle (so the card cannot drift
-from it) or falls back to copy+prune. Only **bundled** families are pruned —
-user-installed ones are left alone, which is correct.
+**And on 2026-08-28 the whole ramp moved again**, to `8 10 12 14 16 18` at
+`scale: 0.805` (step evenness; `inknut-step-evenness-2026-08-28.md`). A card
+carrying both of the earlier ramps now holds **nine** Inknut files — 7, 8, 9,
+10, 11, 12, 14, 16, 18 — of which only six are slots. This is the same
+mechanism, not a new one, and it is why the point below about a stale
+provisioning run matters more each time a ramp moves.
+
+The iOS app is the exception and prunes: `seedBundledFontFamilies()` CLONES the
+family directory from the bundle (APFS `clonefile` — a real writable directory
+sharing storage until something changes) or falls back to copy+prune. Only
+**bundled** families are pruned — user-installed ones are left alone, which is
+correct.
+
+It **symlinked** until 2026-08-28, and that is why the owner could not modify
+the fonts folder: the link pointed at the read-only app bundle, so every write
+got `EROFS`. A leftover symlink from an older install is now removed on sight,
+because otherwise the upgrade keeps the indirection and nothing appears to
+change.
 
 ### ...and on that card two adjacent slots render IDENTICALLY
 
@@ -42,6 +56,14 @@ size**, and pressing size-up at slot 2 changes nothing a reader can see. That
 is not a stepper bug — the stepper moved — and no label is wrong; the two files
 simply draw the same picture. It is one more reason the orphan is worth
 deleting off a card rather than living with.
+
+**SUPERSEDED 2026-08-28 as a live defect, kept as the mechanism.** That 10-vs-11
+collision was the visible half of a ramp fault that has since been re-fitted out:
+Inknut is `8 10 12 14 16 18` at `scale: 0.805` now, so no two of its slots render
+alike (advanceY 21/26/31/36/41/47). The paragraph stays because the FAILURE MODE
+does — a point size whose product with `scale:` lands where another slot already
+renders is invisible to every gate we have, and the next family to carry a
+multiplier can reproduce it exactly.
 
 ### A stale HIDDEN root shadows the bundle entirely
 

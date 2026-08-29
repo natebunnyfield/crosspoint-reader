@@ -381,3 +381,34 @@ disagree.
 `scale:` and `metrics:` for seven families and one point size for Inknut
 Junicode, then rebuilding the seed tree and re-running
 `tools/validate_seed_fonts.py`.
+
+---
+
+## RULED, 2026-08-28 — and none of the three options was taken
+
+Owner: *"re-fit Inknut Junicode's `k` optimising STEP EVENNESS as well as
+absolute words-per-page."* — option (c) above, and the re-fit's answer turned
+out to be a fourth thing: **`scale: 0.805` with the ANCHOR'S OWN RAMP,
+`sizes: [8, 10, 12, 14, 16, 18]`.**
+
+The cause was the 1 pt step, not `k`. Inknut needs about 0.813 of Almendra's
+rendered size at every slot, so divide the anchor's ramp by a `k` near 0.92 and
+the ideal sizes are 7.03 8.87 10.72 12.43 14.23 15.86 — 10.72 rounds up and
+12.43 rounds down, which is the collapse, arithmetically. Divide by a `k` near
+0.81 and the ideal ramp IS the anchor's, already integral.
+
+Both objectives improve at once, so no weighting was load-bearing: words-per-page
+rms against the anchor falls 3.77 → 2.30 % (passage A) and 4.17 → 1.61 % (B),
+and the worst adjacent-step error against the anchor's own progression falls
+−10.2 → +2.2 % and −11.2 → +1.1 %.
+
+**Option (b), reverting S to 10 pt, was BUILT and MEASURED and it is worse on
+both counts** — it takes the collapse to XS → S at ×1.162, half again worse than
+the defect it removes, and leaves S 15.6 % over the anchor. The measurement
+exists so that option is not re-proposed. Option (c) as a plain ramp tweak
+(M → 13 pt) relocates the collapse to L, as §2b would have predicted.
+
+Ten candidate `(k, ramp)` arms, both corpora, the leading band, the tier effect and the
+rendered proof: [inknut-step-evenness-2026-08-28.md](inknut-step-evenness-2026-08-28.md).
+Every table above still stands as written for the other seven families; only the
+Inknut row of §1 and §2, and the §5 Inknut M cell, are superseded.

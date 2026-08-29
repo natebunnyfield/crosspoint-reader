@@ -1032,26 +1032,105 @@ families:
     # y_ratio is left at its 0.5 default: the horizontal stem grows twice as
     # fast as the vertical, which is what stops a faux bold eating its own
     # x-height. Do not raise it without re-measuring the x-height ramp.
-    sizes: [7, 9, 11, 12, 14, 16]
-    metrics: {ascent: 1103, descent: -312, linegap: 0}
+    #
+    # ── RE-FIT 2026-08-28: k 0.917 -> 0.805, ramp -> the anchor's own ───────
+    # Owner ruling, after the 2026-08-27 normalisation shipped a HALF STEP at
+    # S -> M: "re-fit Inknut Junicode's k optimising STEP EVENNESS as well as
+    # absolute words-per-page."
+    #
+    # The 2026-08-27 fit optimised each slot's ABSOLUTE words per page against
+    # Almendra and constrained no slot against its NEIGHBOUR. It landed
+    # `sizes: [7, 9, 11, 12, 14, 16]` at k = 0.917, where 11 x 0.917 = 10.09 --
+    # so the 11 pt file measured byte for byte what the old 10 pt file measured
+    # (advanceY 32, x-height 12, cap 17), the S slot was pinned while M, L and
+    # XL shrank, and the words-per-page step across S -> M collapsed to x1.192
+    # against the anchor's x1.328. Every other step in the tier is wider.
+    #
+    # THE CAUSE IS THE 1 PT STEP, not k. Inknut needs about 0.813 of Almendra's
+    # rendered size at every slot (measured: 0.806 / 0.813 / 0.819 / 0.814 /
+    # 0.816 / 0.808 across the six). Divide the anchor's 8 10 12 14 16 18 by a
+    # k near 0.92 and the ideal ramp is 7.03 8.87 10.72 12.43 14.23 15.86 --
+    # rounding 10.72 up and 12.43 down puts those two slots 1 pt apart and the
+    # collapse is arithmetic. Divide by a k near 0.81 and the ideal ramp IS
+    # 8 10 12 14 16 18: the anchor's own geometric progression, integers
+    # already, so the step shape is inherited rather than approximated.
+    #
+    # MEASURED, both corpora, on built files through tools/words_per_page
+    # (ten candidate arms; the joint search is in
+    # docs/inknut-step-evenness-2026-08-28.md):
+    #
+    #                              rms vs anchor   worst step error vs anchor
+    #   k=0.917 7 9 11 12 14 16     3.8 / 4.2 %      -10.2 / -11.2 %  <- shipped
+    #   k=0.917 7 9 10 12 14 16     7.7 / 7.2 %      -16.8 / -17.7 %  <- revert S
+    #   k=0.905 7 9 11 13 14 16     4.4 / 5.0 %      -10.7 / -10.9 %
+    #   k=0.883 7 9 11 13 15 17     5.3 / 6.0 %       +5.3 /  +7.5 %
+    #   k=0.805 8 10 12 14 16 18    2.3 / 1.6 %       +2.2 /  +1.1 %  <- this
+    #
+    # Reverting S to 10 pt was measured, not assumed, and it is WORSE on both
+    # objectives: it moves the collapse to XS -> S at x1.162 and leaves S 15 %
+    # over the anchor. Do not re-propose it.
+    #
+    # THE LEADING BAND STILL HOLDS. Clearance over the worst-style plain-text
+    # ink span is 2/3/4/5/6/7 px against the shipped 2/3/4/4/6/8 -- equal or
+    # looser at four slots, 1 px tighter at XL -- and 0.149-0.232 of the drawn
+    # em against the +-65/1000 (0.13 em) floor. The declared ascender clears
+    # the tallest accented capital by 1/1/1/2/2/2 px against the shipped
+    # 1/1/1/1/2/1. Both floors are scale-covariant: k multiplies `metrics:`
+    # and the outlines together, so the ratios move only by quantisation.
+    #
+    # metrics: is the same base span as always, 1203/-340, times k. The
+    # italic's x1.2 from JunicodeVF is multiplied by k too (1.2 x 0.805 =
+    # 0.966), which PRESERVES the round-17 fit exactly in design units -- and
+    # in rendered pixels it improves: the italic's x-height now sits 1 px under
+    # the roman's at five slots and level at XL, where the shipped 12 pt slot
+    # was 2 px under, the worst mismatch in the family.
+    #
+    # No two slots render alike: advanceY 21/26/31/36/41/47, x-height
+    # 8/9/11/13/15/17, cap 11/14/16/19/22/24.
+    #
+    # THE X-HEIGHT RAMP IS NOT THE EVEN 8/10/12/14/16/18 this family carried
+    # before 2026-08-27, and getting it back costs the whole normalisation.
+    # Inknut renders 1.113 px of x-height per unit of effective size (measured
+    # across four built arms), so a uniform 2 pt step at k = 0.805 buys 1.79 px
+    # and five whole-2 px steps need k >= 0.898. That arm was BUILT: at k=0.898
+    # the x-height ramp comes back exactly as 8/10/12/14/16/18 and Inknut lands
+    # 16-21 % UNDER the anchor's words per page at every slot -- a family a
+    # fifth larger than everything else on the card, which is the defect the
+    # anchoring exists to remove. The pre-2026-08-27 even ramp reached the same
+    # place the same way: an irregular point ramp (7 9 10 12 14 16) at k = 1.
+    # The RAMP buys step evenness, `k` sets absolute size, and even x-height
+    # PIXELS are only reachable at a `k` that abandons the anchor. The anchor's
+    # own rendered x-height is 9/11/13/15/16/19 -- steps 2/2/2/1/3 -- so it is
+    # not even either.
+    sizes: [8, 10, 12, 14, 16, 18]
+    metrics: {ascent: 968, descent: -274, linegap: 0}
     # This family's em is wide enough (its italic carries scale: 1.2) that
-    # U+2E3B overflows EpdGlyph already at 2x -- 289x5 px on the 16 pt slot --
-    # and U+2E3A TWO-EM DASH joins it at 3x (286x8 px). Both arrived with the
-    # move to `reading` intervals on 2026-08-20, whose U+2E00-2E7F block
-    # latin-ext never reached. They CANNOT go in the global `tier_drops:`:
-    # Edgar, TeXGyreSchola and LibreFranklin all ship U+2E3B at 2x today.
+    # U+2E3B overflows EpdGlyph already at 2x -- 289x5 px, measured on the top
+    # slot when that slot was 16 pt at k = 0.917 -- and U+2E3A TWO-EM DASH joins
+    # it at 3x (286x8 px). Both arrived with the move to `reading` intervals on
+    # 2026-08-20, whose U+2E00-2E7F block latin-ext never reached. They CANNOT
+    # go in the global `tier_drops:`: Edgar, TeXGyreSchola and LibreFranklin all
+    # ship U+2E3B at 2x today.
+    #
+    # STILL NEEDED after the 2026-08-28 re-fit, and the top slot is 18 pt now:
+    # the binding size went DOWN, 18 x 0.805 = 14.49 against 16 x 0.917 = 14.67,
+    # so nothing new can overflow. Three middle slots did grow slightly (XXS
+    # +0.3 %, M +2.4 %, L +0.3 %) -- which is safe because the cap binds at the
+    # largest slot and because fontconvert_sdcard.py RAISES on an over-extent
+    # glyph rather than truncating it (fontconvert_sdcard.py:1265-1281), so a
+    # build that completes has proved the point. Both tiers built clean.
     hires_drops:
       2: [0x2E3B]
       3: [0x2E3A]
     styles:
-      regular:    {scale: 0.917, url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
-      bold:       {scale: 0.917, url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
+      regular:    {scale: 0.805, url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Regular.ttf"}
+      bold:       {scale: 0.805, url: "https://raw.githubusercontent.com/clauseggers/Inknut-Antiqua/master/TTF-OTF/InknutAntiqua-Bold.ttf"}
       italic:     {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
-                   variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 1.101, word_space_em: -0.07}
+                   variable: {wght: 600, wdth: 125, ENLA: 14}, scale: 0.966, word_space_em: -0.07}
       bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
-                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 1.101, word_space_em: -0.07,
+                   variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 0.966, word_space_em: -0.07,
                    synthetic: {embolden_em: 0.042}}
 
   - name: LibreCaslonText
