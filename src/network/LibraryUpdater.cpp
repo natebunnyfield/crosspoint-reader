@@ -281,10 +281,23 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
         releaseParser.feed(reinterpret_cast<const char*>(data), len);
         return true;
       });
+  if (fetched == HttpDownloader::UNAUTHORIZED) {
+    // GitHub answered, and the answer was "not you". Reported apart from
+    // HTTP_ERROR because that one says "could not reach GitHub" and sends the
+    // owner to debug a network that is working. This became the LIKELY failure
+    // the moment the token stopped coming from a carefully edited file: typed
+    // on a phone keyboard, a wrong token is the first thing to suspect.
+    LOG_ERR("LIB", "GitHub rejected the token (401/403)");
+    return BAD_TOKEN;
+  }
   if (fetched == HttpDownloader::NOT_FOUND) {
-    // GitHub answered; the answer is "no such release" (or the token cannot
-    // see the repo — GitHub reports both as 404 for a private repo).
-    LOG_DBG("LIB", "No library release at %s", libraryReleaseUrl);
+    // GitHub answered; the answer is "no such release" — OR the token cannot
+    // see the repo, because GitHub deliberately reports both as 404 for a
+    // PRIVATE repo rather than confirming it exists. So this branch cannot
+    // distinguish them and its message must not claim to: a well-formed token
+    // missing the repo's scope lands here, not in BAD_TOKEN above, which only
+    // catches a token GitHub rejects outright.
+    LOG_DBG("LIB", "No library release at %s (or the token cannot see the repo)", libraryReleaseUrl);
     return NO_RELEASE;
   }
   if (fetched != HttpDownloader::OK) {

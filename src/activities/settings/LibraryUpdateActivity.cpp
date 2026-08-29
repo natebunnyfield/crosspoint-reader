@@ -86,7 +86,16 @@ void LibraryUpdateActivity::runSync() {
     // debug Wi-Fi over a release that was never published.
     // Three distinct causes, three distinct sentences. "Check failed" sends the
     // owner to debug Wi-Fi over a manifest GitHub served perfectly.
-    errorMessage = err == LibraryUpdater::NO_RELEASE      ? tr(STR_LIBRARY_NO_RELEASE)
+    // BAD_TOKEN joins them for the same reason, and it is now the most likely
+    // of the four: the token used to come from a file edited deliberately on a
+    // computer, and now it is typed on a phone keyboard.
+    //
+    // NO_RELEASE's wording carries the ambiguity rather than hiding it. GitHub
+    // answers 404 for a PRIVATE repo whether the release is missing or the
+    // token cannot see it — it will not confirm the repo exists — so this
+    // screen genuinely cannot tell those apart and must not pretend to.
+    errorMessage = err == LibraryUpdater::NO_RELEASE        ? tr(STR_LIBRARY_NO_RELEASE)
+                   : err == LibraryUpdater::BAD_TOKEN       ? tr(STR_LIBRARY_BAD_TOKEN)
                    : err == LibraryUpdater::MANIFEST_TOO_NEW ? tr(STR_LIBRARY_MANIFEST_TOO_NEW)
                                                              : tr(STR_UPDATE_CHECK_FAILED);
     RenderLock lock(*this);

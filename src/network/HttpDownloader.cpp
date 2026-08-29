@@ -107,6 +107,14 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
       LOG_ERR("HTTP", "wolfSSL 404: %s", url.c_str());
       return HttpDownloader::NOT_FOUND;
     }
+    if (status == 401 || status == 403) {
+      // Reached, answered, and the answer was "not you". The credential is
+      // wrong, expired or unscoped -- never the network. The status is logged
+      // and the token is NOT: it is the thing being complained about, which is
+      // exactly when it is most tempting to print.
+      LOG_ERR("HTTP", "wolfSSL %d (credentials): %s", status, url.c_str());
+      return HttpDownloader::UNAUTHORIZED;
+    }
     if (status != 200) {
       LOG_ERR("HTTP", "wolfSSL unexpected status: %d", status);
       return HttpDownloader::HTTP_ERROR;
@@ -193,6 +201,12 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     LOG_ERR("HTTP", "404: %s", url.c_str());
     esp_http_client_cleanup(client);
     return HttpDownloader::NOT_FOUND;
+  }
+  if (status == 401 || status == 403) {
+    // Same again for the credential. Reached and answered "not you".
+    LOG_ERR("HTTP", "%d (credentials): %s", status, url.c_str());
+    esp_http_client_cleanup(client);
+    return HttpDownloader::UNAUTHORIZED;
   }
   if (status != 200) {
     LOG_ERR("HTTP", "unexpected status: %d", status);

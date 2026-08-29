@@ -29,6 +29,14 @@ class HttpDownloader {
     // Collapsing them printed "Could not reach GitHub" at an owner whose device
     // had reached GitHub perfectly and been told the fork has no releases.
     NOT_FOUND,
+    // 401 and 403, kept apart for the SAME reason 404 is, and it became the
+    // likely failure the moment the token stopped coming from a carefully
+    // edited file. The library release lives in a private repo; a token that is
+    // mistyped, expired, or missing the repo's scope is answered by GitHub, not
+    // by silence -- so reporting it as "could not reach GitHub" sends the owner
+    // to debug WiFi that is working perfectly. Typed on a phone keyboard, a
+    // wrong token is now the FIRST thing to suspect rather than the last.
+    UNAUTHORIZED,
   };
 
   /**
