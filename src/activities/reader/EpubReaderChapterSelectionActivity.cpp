@@ -61,8 +61,7 @@ void EpubReaderChapterSelectionActivity::loop() {
       // The notes row. Push the verbose screen rather than leaving this one:
       // Back from there comes straight back to the chapter list, with the
       // highlight where it was.
-      startActivityForResult(std::make_unique<BookNotesActivity>(renderer, mappedInput),
-                             [](const ActivityResult&) {});
+      startActivityForResult(std::make_unique<BookNotesActivity>(renderer, mappedInput), [](const ActivityResult&) {});
       return;
     }
     const auto tocItem = epub->getTocItem(selectorIndex - noteRowCount);
@@ -182,7 +181,7 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
   // The notes row previews nothing -- it is not a place in the book -- so the
   // tick stays where the reader is.
   const auto selectedItem = (noteRowCount != 0 && selectorIndex == 0) ? BookMetadataCache::TocEntry{}
-                                                                     : epub->getTocItem(selectorIndex - noteRowCount);
+                                                                      : epub->getTocItem(selectorIndex - noteRowCount);
   if (selectedItem.spineIndex != -1) {
     float chapterFrac = epub->calculateProgress(selectedItem.spineIndex, 0.0f);
     chapterFrac = chapterFrac < 0.0f ? 0.0f : (chapterFrac > 1.0f ? 1.0f : chapterFrac);

@@ -183,10 +183,12 @@ TEST(SettingDisplayOrder, EditorFamiliesAreRecognisedByName) {
   EXPECT_TRUE(editorfonts::isWritingOnlyFamily("iawriterquattro"))
       << "Quattro left the reading list on 2026-08-21 (owner: 'remove ia quattro from reading fonts')";
   EXPECT_TRUE(editorfonts::isWritingOnlyFamily("iAWriterDuo")) << "Duo stays writing-only";
-  EXPECT_FALSE(editorfonts::isEditorFamily("IAWRITERMONO")) << "Mono was removed from FAMILIES; isEditorFamily returns false for former faces";
+  EXPECT_FALSE(editorfonts::isEditorFamily("IAWRITERMONO"))
+      << "Mono was removed from FAMILIES; isEditorFamily returns false for former faces";
 
   // Reading families and junk must NOT be filtered.
-  for (const char* reading : {"Coelacanth", "TeXGyreSchola", "LibreFranklin", "TeXGyreHeros", "Edgar", "", "iAWriter"}) {
+  for (const char* reading :
+       {"Coelacanth", "TeXGyreSchola", "LibreFranklin", "TeXGyreHeros", "Edgar", "", "iAWriter"}) {
     EXPECT_FALSE(editorfonts::isEditorFamily(reading)) << reading << " is not an editor face";
   }
   EXPECT_FALSE(editorfonts::isEditorFamily(nullptr));
@@ -237,9 +239,9 @@ TEST(SettingDisplayOrder, SubsetIsHonoredOnlyWhenAskedFor) {
 }
 
 TEST(SettingDisplayOrder, SubsetStillRejectsDuplicatesAndRange) {
-  EXPECT_EQ(settingorder::resolve({1, 1}, 12, true).size(), 12u);   // dup -> identity
-  EXPECT_EQ(settingorder::resolve({12}, 12, true).size(), 12u);     // range -> identity
-  EXPECT_EQ(settingorder::resolve({}, 12, true).size(), 12u);       // empty -> identity
+  EXPECT_EQ(settingorder::resolve({1, 1}, 12, true).size(), 12u);  // dup -> identity
+  EXPECT_EQ(settingorder::resolve({12}, 12, true).size(), 12u);    // range -> identity
+  EXPECT_EQ(settingorder::resolve({}, 12, true).size(), 12u);      // empty -> identity
 }
 
 TEST(SettingDisplayOrder, WithdrawnValueStillDecodesToPositionZero) {

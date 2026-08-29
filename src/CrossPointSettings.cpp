@@ -29,8 +29,6 @@ void copyToField(char* dest, const char* src, const size_t maxLen) {
 
 }  // namespace
 
-
-
 void CrossPointSettings::toJson(JsonDocument& doc) const {
   const CrossPointSettings& s = *this;
 

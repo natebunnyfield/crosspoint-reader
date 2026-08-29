@@ -182,8 +182,8 @@ TEST(ReaderFontSizes, EveryBuiltinRampSizeHasAFontIdCase) {
           << "the default arm of getReaderFontId() does not return " << id;
       continue;
     }
-    EXPECT_TRUE(std::regex_search(body, std::regex("case " + std::to_string(pt) + R"(:\s*\n?\s*return\s+)" + id +
-                                                   R"(\s*;)")))
+    EXPECT_TRUE(
+        std::regex_search(body, std::regex("case " + std::to_string(pt) + R"(:\s*\n?\s*return\s+)" + id + R"(\s*;)")))
         << "getReaderFontId() does not map " << int(pt) << " pt to " << id
         << " — that slot is selectable in the picker and renders as some other size, silently";
   }

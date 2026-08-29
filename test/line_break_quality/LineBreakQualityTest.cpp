@@ -74,9 +74,9 @@
 #include <builtinFonts/all.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -393,7 +393,8 @@ void layoutParagraph(const std::string& text, const int fontId, const uint16_t m
 
   std::vector<std::shared_ptr<TextBlock>> lines;
   block.layoutAndExtractLines(
-      Gfx::instance().renderer(), fontId, measure, [&](const std::shared_ptr<TextBlock>& line) { lines.push_back(line); },
+      Gfx::instance().renderer(), fontId, measure,
+      [&](const std::shared_ptr<TextBlock>& line) { lines.push_back(line); },
       /*includeLastLine=*/true, justifyThresholdChars);
 
   auto& r = Gfx::instance().renderer();
@@ -949,9 +950,8 @@ TEST(LineBreakQuality, TotalFitCostsASmallMultipleOfGreedy) {
           int seen = 0;
           const auto t0 = std::chrono::steady_clock::now();
           block.layoutAndExtractLines(
-              Gfx::instance().renderer(), kRaggedFont, kMeasure,
-              [&seen](const std::shared_ptr<TextBlock>&) { seen++; }, /*includeLastLine=*/true,
-              autojustify::THRESHOLD_CHARS);
+              Gfx::instance().renderer(), kRaggedFont, kMeasure, [&seen](const std::shared_ptr<TextBlock>&) { seen++; },
+              /*includeLastLine=*/true, autojustify::THRESHOLD_CHARS);
           total += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
           lines += seen;
         }
@@ -1368,12 +1368,9 @@ TEST(LineBreakQuality, DISABLED_Sweep) {
     uint16_t measure;
   };
   const Cfg cfgs[] = {
-      {"LF 12pt @ 400", LIBREFRANKLIN_READER_12_FONT_ID, 400},
-      {"LF 12pt @ 512", LIBREFRANKLIN_READER_12_FONT_ID, 512},
-      {"LF 12pt @ 640", LIBREFRANKLIN_READER_12_FONT_ID, 640},
-      {"LF 18pt @ 400", LIBREFRANKLIN_READER_18_FONT_ID, 400},
-      {"LF 18pt @ 512", LIBREFRANKLIN_READER_18_FONT_ID, 512},
-      {"LF 18pt @ 640", LIBREFRANKLIN_READER_18_FONT_ID, 640},
+      {"LF 12pt @ 400", LIBREFRANKLIN_READER_12_FONT_ID, 400}, {"LF 12pt @ 512", LIBREFRANKLIN_READER_12_FONT_ID, 512},
+      {"LF 12pt @ 640", LIBREFRANKLIN_READER_12_FONT_ID, 640}, {"LF 18pt @ 400", LIBREFRANKLIN_READER_18_FONT_ID, 400},
+      {"LF 18pt @ 512", LIBREFRANKLIN_READER_18_FONT_ID, 512}, {"LF 18pt @ 640", LIBREFRANKLIN_READER_18_FONT_ID, 640},
   };
 
   // The river tolerance, in SPACE WIDTHS. Swept rather than picked: this is the
@@ -1588,9 +1585,9 @@ struct RagShape {
   double sdPct = 0.0;    // how active the edge is
   double p95Pct = 0.0;
   double p99Pct = 0.0;
-  double maxPct = 0.0;         // the single shortest line in the corpus
-  double meanParaMaxPct = 0.0; // mean over paragraphs of that paragraph's shortest line
-  int holes25 = 0;             // lines ending short of 75% of the measure
+  double maxPct = 0.0;          // the single shortest line in the corpus
+  double meanParaMaxPct = 0.0;  // mean over paragraphs of that paragraph's shortest line
+  int holes25 = 0;              // lines ending short of 75% of the measure
   int holes33 = 0;
   int holes40 = 0;
   // A hole RELATIVE to its neighbours: this line's shortfall less the larger of
@@ -1605,8 +1602,8 @@ struct RagShape {
 
 RagShape ragShapeOf(const Corpus& c, const double measurePx) {
   RagShape r;
-  std::vector<double> s;      // shortfall, % of measure
-  std::vector<double> rel;    // neighbour-relative hole depth, % of measure
+  std::vector<double> s;    // shortfall, % of measure
+  std::vector<double> rel;  // neighbour-relative hole depth, % of measure
   int paras = 0;
   for (const auto& para : c) {
     std::vector<double> pv;
@@ -1831,9 +1828,9 @@ TEST(LineBreakQuality, DISABLED_RaggedGateSweep) {
   // 2. The curve. One row per gate point, ragged, 14 pt at 512.
   printf("\n=== 2. The ragged gate curve, 14 pt @ 512 px ===\n");
   printf("shortfall figures are %% of the measure; hole counts are line counts.\n\n");
-  printf("%-5s %6s %6s %7s %7s %6s %6s %6s %6s %6s %6s %6s %7s %7s %6s %6s %6s %6s\n", "gate", "lines", "hy",
-         "dns/all", "dns/brk", "run2", "run3+", "hyMax", "mean", "sd", "p95", "p99", "paraMax", "max", "h25", "h33",
-         "h40", "rel15");
+  printf("%-5s %6s %6s %7s %7s %6s %6s %6s %6s %6s %6s %6s %7s %7s %6s %6s %6s %6s\n", "gate", "lines", "hy", "dns/all",
+         "dns/brk", "run2", "run3+", "hyMax", "mean", "sd", "p95", "p99", "paraMax", "max", "h25", "h33", "h40",
+         "rel15");
   for (int gate = 40; gate <= 100; ++gate) {
     const GateScope g(gate);
     const Corpus laid = layoutCorpus(corpus, Cell::GreedyHyphenated, CssTextAlign::Justify, kGateFont, kMeasure, 255);

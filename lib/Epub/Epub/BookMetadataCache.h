@@ -80,9 +80,9 @@ class BookMetadataCache {
   // once padding is counted, and the verifying read is one seek per TOC entry
   // against the linear scan of up to `spineCount` entries this index replaced.
   struct SpineHrefIndexEntry {
-    uint64_t hrefHash;   // FNV-1a 64-bit hash
+    uint64_t hrefHash;    // FNV-1a 64-bit hash
     uint32_t hrefOffset;  // byte offset of this entry in the temp spine file
-    uint16_t hrefLen;    // length for collision reduction
+    uint16_t hrefLen;     // length for collision reduction
     int16_t spineIndex;
   };
   std::deque<SpineHrefIndexEntry> spineHrefIndex;

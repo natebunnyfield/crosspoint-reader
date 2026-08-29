@@ -14,10 +14,10 @@
 // reported as a bug.
 #include <gtest/gtest.h>
 
-#include "LigatureControl.h"
-
 #include <iterator>
 #include <string>
+
+#include "LigatureControl.h"
 
 namespace {
 
@@ -124,9 +124,7 @@ TEST(LigatureSpec, AddingTwiceIsNotTwoEntries) {
   EXPECT_EQ(ligatures::specWith(once.c_str(), CP_S, CP_T, true), once);
 }
 
-TEST(LigatureSpec, RemovingSomethingAbsentIsANoOp) {
-  EXPECT_EQ(ligatures::specWith("st", CP_F, CP_I, false), "st");
-}
+TEST(LigatureSpec, RemovingSomethingAbsentIsANoOp) { EXPECT_EQ(ligatures::specWith("st", CP_F, CP_I, false), "st"); }
 
 TEST(LigatureSpec, TheCeilingRefusesRatherThanDropping) {
   // A suppression that vanished to make room for a newer one would read as a
@@ -189,8 +187,8 @@ TEST(LigatureSpec, TheCeilingStillHoldsAgainstDistinctPairs) {
   // MAX_SUPPRESSED pairs, two ASCII bytes each, MAX_SUPPRESSED-1 commas.
   EXPECT_EQ(canonical.size(), ligatures::MAX_SUPPRESSED * 3 - 1);
   EXPECT_TRUE(ligatures::specSuppresses(canonical.c_str(), 'A', 'B'));
-  EXPECT_FALSE(ligatures::specSuppresses(canonical.c_str(),
-                                         'A' + static_cast<uint32_t>(ligatures::MAX_SUPPRESSED), 'B'));
+  EXPECT_FALSE(
+      ligatures::specSuppresses(canonical.c_str(), 'A' + static_cast<uint32_t>(ligatures::MAX_SUPPRESSED), 'B'));
 }
 
 TEST(LigatureSpec, TheFullSetFitsTheSettingsField) {
@@ -313,6 +311,4 @@ TEST(LigatureSpelling, AnUnproducedLeftSideIsLeftAsItsOwnCharacter) {
   EXPECT_EQ(ligatures::spellPair(EDGAR, std::size(EDGAR), 0xFB06, CP_I), "\xEF\xAC\x86i");
 }
 
-TEST(LigatureSpelling, AnEmptyTableIsHandled) {
-  EXPECT_EQ(ligatures::spellPair(nullptr, 0, CP_S, CP_T), "st");
-}
+TEST(LigatureSpelling, AnEmptyTableIsHandled) { EXPECT_EQ(ligatures::spellPair(nullptr, 0, CP_S, CP_T), "st"); }

@@ -9,9 +9,8 @@
 #include <cstring>
 #include <memory>
 
-#include "MissingGlyphLedger.h"
-
 #include "EpdFontFamily.h"
+#include "MissingGlyphLedger.h"
 
 static_assert(sizeof(EpdGlyph) == 16, "EpdGlyph must be 16 bytes to match .cpfont file layout");
 static_assert(sizeof(EpdUnicodeInterval) == 12, "EpdUnicodeInterval must be 12 bytes to match .cpfont file layout");
@@ -620,8 +619,8 @@ void SdCardFont::loadMeasureKernRows(PerStyle& s, const uint32_t* codepoints, co
     if (!isNeeded && !isResident) continue;
     newClasses[out] = static_cast<uint8_t>(lc);
     if (isResident) {
-      memcpy(newRows + static_cast<uint32_t>(out) * rowBytes, s.measureKernRows + static_cast<uint32_t>(oldIdx) * rowBytes,
-             rowBytes);
+      memcpy(newRows + static_cast<uint32_t>(out) * rowBytes,
+             s.measureKernRows + static_cast<uint32_t>(oldIdx) * rowBytes, rowBytes);
       oldIdx++;
     } else {
       const uint32_t rowFileOff = s.kernMatrixFileOffset + (lc - 1u) * rowBytes;

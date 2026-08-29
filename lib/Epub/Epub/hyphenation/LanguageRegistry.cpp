@@ -18,8 +18,7 @@ using EntryArray = std::array<LanguageEntry, 2>;
 // A book in any other language simply goes unhyphenated: getLanguageHyphenatorForPrimaryTag
 // returns nullptr for an unknown tag, which is the same path an untagged EPUB already took.
 const EntryArray& entries() {
-  static const EntryArray kEntries = {{{"english", "en", &englishHyphenator},
-                                       {"spanish", "es", &spanishHyphenator}}};
+  static const EntryArray kEntries = {{{"english", "en", &englishHyphenator}, {"spanish", "es", &spanishHyphenator}}};
   return kEntries;
 }
 

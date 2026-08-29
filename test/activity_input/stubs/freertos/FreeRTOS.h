@@ -23,8 +23,7 @@ struct HostPortMux {
   int unused;
 };
 typedef HostPortMux portMUX_TYPE;
-#define portMUX_INITIALIZER_UNLOCKED \
-  { 0 }
+#define portMUX_INITIALIZER_UNLOCKED {0}
 
 inline void taskENTER_CRITICAL(portMUX_TYPE*) {}
 inline void taskEXIT_CRITICAL(portMUX_TYPE*) {}

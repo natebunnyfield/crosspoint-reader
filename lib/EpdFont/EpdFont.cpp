@@ -2,10 +2,10 @@
 
 #include <Utf8.h>
 
+#include <algorithm>
+
 #include "LigatureControl.h"
 #include "MissingGlyphLedger.h"
-
-#include <algorithm>
 
 void EpdFont::getTextBounds(const char* string, const int startX, const int startY, int* minX, int* minY, int* maxX,
                             int* maxY) const {

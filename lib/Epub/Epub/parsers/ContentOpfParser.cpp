@@ -1,17 +1,15 @@
 #include "ContentOpfParser.h"
 
-#include "Epub/BookNotes.h"
-
 #include <FsHelpers.h>
 #include <Logging.h>
 #include <Serialization.h>
 #include <XmlParserUtils.h>
 
-#include "XmlEncodingSupport.h"
-
 #include <cctype>
 
 #include "Epub/BookMetadataCache.h"
+#include "Epub/BookNotes.h"
+#include "XmlEncodingSupport.h"
 
 namespace {
 constexpr char MEDIA_TYPE_NCX[] = "application/x-dtbncx+xml";

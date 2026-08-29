@@ -38,9 +38,7 @@ const HolidayEntry HOLIDAY_TABLE[static_cast<size_t>(HolidayId::HolidayIdCount)]
     /* Navidad             */ {"Navidad", HolidayRule::FixedDate, 12, 25, 0, 0, REGION_CR | REGION_US},
 };
 
-uint8_t holidayRegions(HolidayId id) {
-  return HOLIDAY_TABLE[static_cast<size_t>(id)].regions;
-}
+uint8_t holidayRegions(HolidayId id) { return HOLIDAY_TABLE[static_cast<size_t>(id)].regions; }
 
 // Zeller's Congruence, standardised to 0=Sun..6=Sat.
 uint8_t weekdayOf(uint16_t year, uint8_t month, uint8_t day) {

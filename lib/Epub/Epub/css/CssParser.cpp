@@ -1,8 +1,5 @@
 #include "CssParser.h"
 
-#include "Epub/BookNotes.h"
-#include "CssUnits.h"
-
 #include <Arduino.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -16,6 +13,9 @@
 #include <cstring>
 #include <string_view>
 #include <type_traits>
+
+#include "CssUnits.h"
+#include "Epub/BookNotes.h"
 
 namespace {
 

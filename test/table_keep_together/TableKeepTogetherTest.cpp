@@ -31,7 +31,6 @@
 #include <GfxRenderer.h>
 #include <builtinFonts/all.h>
 #include <gtest/gtest.h>
-
 #include <unistd.h>
 
 #include <cstdio>
@@ -258,8 +257,7 @@ std::string flatTable(const int dataRows, const int cols = 6) {
   html += "</tr>";
   for (int r = 0; r < dataRows; r++) {
     html += "<tr>";
-    for (int c = 0; c < cols; c++)
-      html += "<td>r" + std::to_string(r) + "c" + std::to_string(c) + "</td>";
+    for (int c = 0; c < cols; c++) html += "<td>r" + std::to_string(r) + "c" + std::to_string(c) + "</td>";
     html += "</tr>";
   }
   return html + "</table>";
@@ -371,8 +369,7 @@ TEST(TableRowSeparator, TheKeyBlockFallbackGetsThemToo) {
   // the key block. Three columns, so it never touches the abandon path.
   std::string tall;
   for (int i = 0; i < 220; i++) tall += "payload" + std::to_string(i) + " ";
-  std::string html =
-      "<table><tr><th>Addition</th><th>Effort</th><th>What it buys</th></tr>";
+  std::string html = "<table><tr><th>Addition</th><th>Effort</th><th>What it buys</th></tr>";
   for (const char* name : {"Beans", "Frozen", "Eggs"}) {
     html += std::string("<tr><td>") + name + "</td><td>Effort here</td><td>" + tall + "</td></tr>";
   }
@@ -512,8 +509,7 @@ TEST(TableKeepTogether, LooseProseAboveATableCostsAtMostOnePage) {
     const int header = pageOf(pages, "Addition");
     ASSERT_GE(header, 0) << "header row missing entirely, fillers=" << n;
     EXPECT_EQ(pageOf(pages, "Beans"), header) << "first body row left behind, fillers=" << n;
-    EXPECT_LE(pages.size(), control.size() + 1)
-        << "the keep spent more than one page, fillers=" << n;
+    EXPECT_LE(pages.size(), control.size() + 1) << "the keep spent more than one page, fillers=" << n;
     for (size_t p = 0; p < pages.size(); p++) {
       EXPECT_FALSE(pages[p].empty()) << "blank page " << p << ", fillers=" << n;
     }
@@ -583,8 +579,7 @@ TEST(TableKeepTogether, ProseWidowOrphanControlStillHolds) {
     for (size_t p = 0; p < linesPerPage.size(); p++) {
       // keep-2/2: a page may hold none of the paragraph, all of it, or at least
       // two of its lines. Exactly one is an orphan or a widow.
-      EXPECT_NE(linesPerPage[p], 1) << "a single line of the paragraph alone on page " << p
-                                    << ", fillers=" << n;
+      EXPECT_NE(linesPerPage[p], 1) << "a single line of the paragraph alone on page " << p << ", fillers=" << n;
     }
   }
 }

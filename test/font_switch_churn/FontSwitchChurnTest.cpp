@@ -19,16 +19,15 @@
 // (see stubs/HalStorage.h), so this exercises production discovery and loading
 // rather than a mock.
 
-#include <gtest/gtest.h>
-
 #include <GfxRenderer.h>
 #include <SdCardFont.h>
 #include <SdCardFontManager.h>
 #include <SdCardFontRegistry.h>
+#include <gtest/gtest.h>
 
 #include <algorithm>
-#include <cstdlib>
 #include <cmath>
+#include <cstdlib>
 #include <new>
 #include <string>
 #include <vector>
@@ -140,8 +139,7 @@ class FontSwitchChurn : public ::testing::Test {
     const auto* expected = fam.findClosestReaderSize(slot);
     ASSERT_NE(expected, nullptr) << fam.name << " has no file for slot " << static_cast<int>(slot);
     EXPECT_EQ(manager_.currentPointSize(), expected->pointSize)
-        << "resident point size must be findClosestReaderSize(slot=" << static_cast<int>(slot) << ") for "
-        << fam.name;
+        << "resident point size must be findClosestReaderSize(slot=" << static_cast<int>(slot) << ") for " << fam.name;
     EXPECT_NE(manager_.getFontId(fam.name), 0);
   }
 
@@ -190,7 +188,8 @@ TEST_F(FontSwitchChurn, SelectingBuiltinAfterSdFamilyUnloadsTheCpfont) {
 TEST_F(FontSwitchChurn, ResidentSizeAlwaysMatchesClosestReaderSize) {
   for (const auto& fam : registry_.getFamilies()) {
     for (const uint8_t slot : kSizeSlots) {
-      ASSERT_TRUE(manager_.loadFamily(fam, *renderer_, ptForSlot(fam, slot))) << fam.name << " slot " << static_cast<int>(slot);
+      ASSERT_TRUE(manager_.loadFamily(fam, *renderer_, ptForSlot(fam, slot)))
+          << fam.name << " slot " << static_cast<int>(slot);
       expectExactlyResident(fam, slot);
     }
   }
@@ -228,8 +227,7 @@ TEST_F(FontSwitchChurn, HeapDoesNotGrowAcrossSwitches) {
   // band, and larger still if more than one is retained.
   constexpr long long kNoiseToleranceBytes = 512;
   for (size_t i = 2; i < liveAfterRound.size(); ++i) {
-    const long long delta =
-        static_cast<long long>(liveAfterRound[i]) - static_cast<long long>(liveAfterRound[1]);
+    const long long delta = static_cast<long long>(liveAfterRound[i]) - static_cast<long long>(liveAfterRound[1]);
     EXPECT_LE(std::llabs(delta), kNoiseToleranceBytes)
         << "live heap moved between settled rounds: round1=" << liveAfterRound[1] << " round" << i << "="
         << liveAfterRound[i] << " (delta " << delta << " bytes) — a switch is leaking";

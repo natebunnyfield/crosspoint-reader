@@ -95,9 +95,9 @@ void LibraryUpdateActivity::runSync() {
     // whether the release is missing or the token cannot see it, so the release
     // endpoint alone cannot separate them; asking about the repo can, and it
     // costs one request on a path that has already failed.
-    errorMessage = err == LibraryUpdater::NO_RELEASE        ? tr(STR_LIBRARY_NO_RELEASE)
-                   : err == LibraryUpdater::NO_REPO_ACCESS  ? tr(STR_LIBRARY_NO_REPO_ACCESS)
-                   : err == LibraryUpdater::BAD_TOKEN       ? tr(STR_LIBRARY_BAD_TOKEN)
+    errorMessage = err == LibraryUpdater::NO_RELEASE         ? tr(STR_LIBRARY_NO_RELEASE)
+                   : err == LibraryUpdater::NO_REPO_ACCESS   ? tr(STR_LIBRARY_NO_REPO_ACCESS)
+                   : err == LibraryUpdater::BAD_TOKEN        ? tr(STR_LIBRARY_BAD_TOKEN)
                    : err == LibraryUpdater::MANIFEST_TOO_NEW ? tr(STR_LIBRARY_MANIFEST_TOO_NEW)
                                                              : tr(STR_UPDATE_CHECK_FAILED);
     RenderLock lock(*this);
@@ -203,8 +203,8 @@ void LibraryUpdateActivity::render(RenderLock&&) {
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_LIBRARY_SYNCING), true, EpdFontFamily::BOLD);
       int y = top + lineHeight + metrics.verticalSpacing;
       char bookLine[48];
-      snprintf(bookLine, sizeof(bookLine), tr(STR_LIBRARY_BOOK_PROGRESS_FORMAT),
-               static_cast<unsigned>(currentBook + 1), static_cast<unsigned>(updater.getBooks().size()));
+      snprintf(bookLine, sizeof(bookLine), tr(STR_LIBRARY_BOOK_PROGRESS_FORMAT), static_cast<unsigned>(currentBook + 1),
+               static_cast<unsigned>(updater.getBooks().size()));
       renderer.drawCenteredText(UI_10_FONT_ID, y, bookLine);
       y += lineHeight + metrics.verticalSpacing;
       const std::string& file = updater.getBooks()[currentBook].file;

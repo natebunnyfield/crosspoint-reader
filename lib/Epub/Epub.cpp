@@ -232,9 +232,8 @@ void Epub::scanZipForBookNotes() const {
     if (!sawEncryption && path == "META-INF/encryption.xml") {
       sawEncryption = true;
     }
-    if (!sawFont &&
-        (FsHelpers::checkFileExtension(path, ".ttf") || FsHelpers::checkFileExtension(path, ".otf") ||
-         FsHelpers::checkFileExtension(path, ".woff") || FsHelpers::checkFileExtension(path, ".woff2"))) {
+    if (!sawFont && (FsHelpers::checkFileExtension(path, ".ttf") || FsHelpers::checkFileExtension(path, ".otf") ||
+                     FsHelpers::checkFileExtension(path, ".woff") || FsHelpers::checkFileExtension(path, ".woff2"))) {
       sawFont = true;
     }
   });

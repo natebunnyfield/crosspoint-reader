@@ -37,8 +37,7 @@ void confirmBootIfPending() {
   } else {
     // Leave it pending rather than trying to force it: a failure here means the
     // next boot reverts to the previous image, which is the safe direction.
-    LOG_ERR("OTA", "could not confirm new firmware (%s); it will roll back on the next boot",
-            esp_err_to_name(err));
+    LOG_ERR("OTA", "could not confirm new firmware (%s); it will roll back on the next boot", esp_err_to_name(err));
   }
 }
 

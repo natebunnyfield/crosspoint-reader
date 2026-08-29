@@ -15,20 +15,16 @@
 // than judged by eye on a device.
 
 #include <gtest/gtest.h>
-
 #include <string.h>
 
 #include "FontActivation.h"
 
 using fontactivation::Result;
 
-
 const char* kFamilies[] = {"Edgar", "Coelacanth", "InknutJunicode", "LibreFranklin"};
 constexpr size_t kFamilyCount = sizeof(kFamilies) / sizeof(kFamilies[0]);
 
-void expectSpec(const char* got, const char* want, const char* what) {
-  EXPECT_STREQ(got, want) << what;
-}
+void expectSpec(const char* got, const char* want, const char* what) { EXPECT_STREQ(got, want) << what; }
 
 // A whole-token match, never a substring. This is the check that stops
 // deactivating one family from hiding another whose name contains it.
@@ -74,28 +70,23 @@ TEST(FontActivation, RemovalLeavesNoStraySeparator) {
   strcpy(spec, "A,B");
   fontactivation::removeToken(spec, "Z");
   expectSpec(spec, "A,B", "remove absent is a no-op");
-
 }
 
 // A full round trip returns the spec to byte-identical, which is what makes
 // deactivation reversible rather than merely undoable-looking.
 TEST(FontActivation, ToggleRoundTrip) {
   char spec[fontactivation::SPEC_BUF_SIZE] = "";
-  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Edgar", kFamilies, kFamilyCount) ==
-         Result::Deactivated);
+  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Edgar", kFamilies, kFamilyCount) == Result::Deactivated);
   expectSpec(spec, "Edgar", "after deactivate");
   EXPECT_TRUE(fontactivation::isDeactivated(spec, "Edgar"));
 
-  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", kFamilies, kFamilyCount) ==
-         Result::Deactivated);
+  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", kFamilies, kFamilyCount) == Result::Deactivated);
   expectSpec(spec, "Edgar,Coelacanth", "after second deactivate");
 
-  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Edgar", kFamilies, kFamilyCount) ==
-         Result::Reactivated);
+  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Edgar", kFamilies, kFamilyCount) == Result::Reactivated);
   expectSpec(spec, "Coelacanth", "after reactivate from the front");
 
-  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", kFamilies, kFamilyCount) ==
-         Result::Reactivated);
+  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", kFamilies, kFamilyCount) == Result::Reactivated);
   expectSpec(spec, "", "round trip returns to empty");
 }
 
@@ -103,24 +94,21 @@ TEST(FontActivation, ToggleRoundTrip) {
 // deactivating the last one is refused, and refused WITHOUT modifying the spec.
 TEST(FontActivation, LastActiveIsRefused) {
   char spec[fontactivation::SPEC_BUF_SIZE] = "";
-  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Edgar", kFamilies, kFamilyCount) ==
-         Result::Deactivated);
-  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", kFamilies, kFamilyCount) ==
-         Result::Deactivated);
+  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Edgar", kFamilies, kFamilyCount) == Result::Deactivated);
+  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", kFamilies, kFamilyCount) == Result::Deactivated);
   EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "InknutJunicode", kFamilies, kFamilyCount) ==
-         Result::Deactivated);
+              Result::Deactivated);
   EXPECT_TRUE(fontactivation::activeCount(spec, kFamilies, kFamilyCount) == 1);
 
   char before[fontactivation::SPEC_BUF_SIZE];
   strcpy(before, spec);
   EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "LibreFranklin", kFamilies, kFamilyCount) ==
-         Result::RefusedLast);
+              Result::RefusedLast);
   expectSpec(spec, before, "a refused toggle must not modify the spec");
 
   // Reactivating anything is still allowed at the floor -- the rule bounds
   // deactivation only, or the state would be a trap.
-  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Edgar", kFamilies, kFamilyCount) ==
-         Result::Reactivated);
+  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Edgar", kFamilies, kFamilyCount) == Result::Reactivated);
 }
 
 // The count is taken over the families the PICKER offers. A count over the raw
@@ -134,8 +122,7 @@ TEST(FontActivation, CountIsOverTheOfferedSet) {
   EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", onlyTwo, 2) == Result::RefusedLast);
   // Against the wider list the same toggle is fine, which is exactly the
   // difference the caller must get right.
-  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", kFamilies, kFamilyCount) ==
-         Result::Deactivated);
+  EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "Coelacanth", kFamilies, kFamilyCount) == Result::Deactivated);
 }
 
 // A name carrying the separator cannot be stored, and is refused rather than
@@ -166,5 +153,3 @@ TEST(FontActivation, CapIsEnforcedNotTruncated) {
   EXPECT_TRUE(fontactivation::toggle(spec, sizeof(spec), "CCC", wider, 4) == Result::NoRoom);
   expectSpec(spec, "AAA,BBB", "a refused toggle must not truncate the spec");
 }
-
-

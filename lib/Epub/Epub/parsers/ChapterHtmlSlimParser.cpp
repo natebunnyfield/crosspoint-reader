@@ -5,6 +5,7 @@
 #include <HalStorage.h>
 #include <Logging.h>
 #include <Memory.h>
+#include <MissingGlyphLedger.h>
 #include <Utf8.h>
 #include <XmlParserUtils.h>
 #include <expat.h>
@@ -17,12 +18,11 @@
 #include "Epub.h"
 #include "Epub/BookNotes.h"
 #include "Epub/Page.h"
-#include "XmlEncodingSupport.h"
-#include <MissingGlyphLedger.h>
 #include "Epub/converters/ImageDecoderFactory.h"
 #include "Epub/converters/ImageDimsProbe.h"
 #include "Epub/converters/ImageToFramebufferDecoder.h"
 #include "Epub/htmlEntities.h"
+#include "XmlEncodingSupport.h"
 
 // Minimum file size (in bytes) to show indexing popup - smaller chapters don't benefit from it
 constexpr size_t MIN_SIZE_FOR_POPUP = 10 * 1024;  // 10KB
@@ -101,9 +101,8 @@ constexpr const char* IMAGE_TAGS[] = {"img", "image"};
 //   video,
 //   audio  their child content is the FALLBACK, shown precisely when the object
 //          cannot be rendered, which here is always.
-constexpr const char* SKIP_TAGS[] = {"head",  "rp",     "script",     "style",         "noscript",
-                                     "title", "desc",   "annotation", "annotation-xml", "template",
-                                     "iframe"};
+constexpr const char* SKIP_TAGS[] = {"head", "rp",         "script",         "style",    "noscript", "title",
+                                     "desc", "annotation", "annotation-xml", "template", "iframe"};
 
 bool isWhitespace(const char c) { return c == ' ' || c == '\r' || c == '\n' || c == '\t'; }
 
@@ -1076,7 +1075,7 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
   }
 
   currentPageNextY = static_cast<int16_t>(viewportHeight);  // the page is spoken for
-  resetInterBlockCollapse();  // a full-page table breaks paragraph adjacency (2026-08-22)
+  resetInterBlockCollapse();                                // a full-page table breaks paragraph adjacency (2026-08-22)
   tableEmittedDataCell = true;
   completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
   completedPageCount++;
@@ -1243,8 +1242,8 @@ void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan&
     const int rowStartPage = completedPageCount;
     int16_t rowBottom = rowTop;
     for (size_t c = 0; c < row.size() && c < plan.columnCount; c++) {
-      currentPageNextY = static_cast<int16_t>(tablecolumns::columnStartY(
-          rowTop, currentPageNextY, rowTopIsClear, completedPageCount == rowStartPage));
+      currentPageNextY = static_cast<int16_t>(
+          tablecolumns::columnStartY(rowTop, currentPageNextY, rowTopIsClear, completedPageCount == rowStartPage));
       auto cellStyle = BlockStyle();
       cellStyle.marginLeft = static_cast<int16_t>(plan.x[c]);
       cellStyle.marginRight = static_cast<int16_t>(viewportWidth - (plan.x[c] + plan.w[c]));

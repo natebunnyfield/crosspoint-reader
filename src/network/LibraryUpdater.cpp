@@ -31,7 +31,8 @@ namespace {
 // THE CONTENT REPO, not the firmware repo: books come from the claude-tools
 // library release, tagged library-latest and refreshed in place by its
 // scripts/publish_library.py. The repo is private; see the class comment.
-constexpr char libraryReleaseUrl[] = "https://api.github.com/repos/natebunnyfield/claude-tools/releases/tags/library-latest";
+constexpr char libraryReleaseUrl[] =
+    "https://api.github.com/repos/natebunnyfield/claude-tools/releases/tags/library-latest";
 constexpr char manifestAssetName[] = "manifest.json";
 // The repo itself, probed ONLY to disambiguate a 404 on the release above.
 // GitHub answers 404 for a private repo whether the release is missing or the
@@ -285,8 +286,8 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
     return OOM_ERROR;
   }
   LibraryReleaseParser& releaseParser = *parser;
-  const HttpDownloader::DownloadError fetched =
-      HttpDownloader::fetchUrlWithHeaders(libraryReleaseUrl, apiHeaders, [&releaseParser](const uint8_t* data, size_t len) {
+  const HttpDownloader::DownloadError fetched = HttpDownloader::fetchUrlWithHeaders(
+      libraryReleaseUrl, apiHeaders, [&releaseParser](const uint8_t* data, size_t len) {
         releaseParser.feed(reinterpret_cast<const char*>(data), len);
         return true;
       });
@@ -306,8 +307,8 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
     // costs one extra request, only on the failure path, and turns "one of two
     // things is wrong" into an answer.
     size_t repoBytes = 0;
-    const HttpDownloader::DownloadError repoSeen = HttpDownloader::fetchUrlWithHeaders(
-        libraryRepoUrl, apiHeaders, [&repoBytes](const uint8_t*, size_t len) {
+    const HttpDownloader::DownloadError repoSeen =
+        HttpDownloader::fetchUrlWithHeaders(libraryRepoUrl, apiHeaders, [&repoBytes](const uint8_t*, size_t len) {
           repoBytes += len;
           return true;
         });

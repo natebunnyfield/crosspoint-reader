@@ -715,8 +715,7 @@ bool drawReadingPage(const char* family, uint8_t sizeEnum, uint8_t clearValue, b
     y += lineH / 2;
     y = drawWrapped(id, kItalic, EpdFontFamily::ITALIC, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
     y += lineH / 2;
-    y = drawWrapped(id, kBoldItalic, EpdFontFamily::BOLD_ITALIC, margin, y, colW, lineH, pageBottom, nullptr,
-                    nullptr);
+    y = drawWrapped(id, kBoldItalic, EpdFontFamily::BOLD_ITALIC, margin, y, colW, lineH, pageBottom, nullptr, nullptr);
 
     // Set width is the other half of "readable" on a 528px column: a wider
     // face at the same x-height fits fewer words per line and so more page

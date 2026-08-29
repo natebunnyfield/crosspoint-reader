@@ -404,7 +404,7 @@ class ChapterHtmlSlimParser {
   bool finishParse();  // flush the trailing page and tear down; returns true
   void abortParse();
   // Disarm the missing-glyph ledger and raise the note. See the .cpp.
-  void reportMissingGlyphs();   // tear down without flushing (error / abandon)
+  void reportMissingGlyphs();  // tear down without flushing (error / abandon)
 
   void addLineToPage(std::shared_ptr<TextBlock> line);
   const std::vector<std::pair<std::string, uint16_t>>& getAnchors() const { return anchorData; }

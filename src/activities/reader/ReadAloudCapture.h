@@ -43,8 +43,8 @@ struct CaptureToken {
 // join from reaching across that gap, exactly as the original loop reset its
 // pending-join flag on any non-PageLine element.
 struct CaptureLine {
-  int x;      // line left in page space (line.xPos + xOffset)
-  int yTop;   // line top  in page space (line.yPos + yOffset)
+  int x;     // line left in page space (line.xPos + xOffset)
+  int yTop;  // line top  in page space (line.yPos + yOffset)
   const CaptureToken* tokens;
   size_t count;
   bool hyphenBarrierBefore;

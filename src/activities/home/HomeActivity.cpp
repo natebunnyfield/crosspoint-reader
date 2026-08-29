@@ -285,9 +285,9 @@ void HomeActivity::loop() {
     if (splitPages && selectorIndex < bookCount) {
       selectorIndex = bookCount;  // covers -> first menu row
     } else if (selectorIndex < lastRow) {
-      selectorIndex = lastRow;    // already on the last page -> its last row
+      selectorIndex = lastRow;  // already on the last page -> its last row
     } else {
-      return;                     // already there; no redraw
+      return;  // already there; no redraw
     }
     requestUpdate();
   });
@@ -295,9 +295,9 @@ void HomeActivity::loop() {
   buttonNavigator.onPagePrevious([this, bookCount, splitPages, menuCount] {
     if (menuCount <= 0) return;
     if (splitPages && selectorIndex >= bookCount) {
-      selectorIndex = 0;          // menu -> first cover
+      selectorIndex = 0;  // menu -> first cover
     } else if (selectorIndex > 0) {
-      selectorIndex = 0;          // already on the first page -> its first row
+      selectorIndex = 0;  // already on the first page -> its first row
     } else {
       return;
     }

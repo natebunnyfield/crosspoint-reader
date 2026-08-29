@@ -1,7 +1,5 @@
 #include "BookMetadataCache.h"
 
-#include "Epub/BookNotes.h"
-
 #include <BufferedFile.h>
 #include <Logging.h>
 #include <Serialization.h>
@@ -10,6 +8,7 @@
 
 #include <deque>
 
+#include "Epub/BookNotes.h"
 #include "FsHelpers.h"
 
 namespace {

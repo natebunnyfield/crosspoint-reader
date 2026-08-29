@@ -86,8 +86,7 @@ inline constexpr uint8_t READER_FONT_SLOT_COUNT = 6;
 // LAST name; FontSelectionActivity clamped it to index 0, so the largest size on
 // the card announced itself as "XXS". Owner report 2026-08-27: "XXL is shown as
 // XXS."
-inline constexpr const char* READER_SLOT_NAMES[READER_FONT_SLOT_COUNT] = {
-    "XXS", "XS", "S", "M", "L", "XL"};
+inline constexpr const char* READER_SLOT_NAMES[READER_FONT_SLOT_COUNT] = {"XXS", "XS", "S", "M", "L", "XL"};
 
 // Whether a family's installed size count earns the XXS..XL names at all.
 //
@@ -99,9 +98,7 @@ inline constexpr const char* READER_SLOT_NAMES[READER_FONT_SLOT_COUNT] = {
 // user put on the card becomes unselectable. What they must not do is borrow a
 // name, because there are only six names and the seventh slot is not "XXL" —
 // it has no name at all.
-inline constexpr bool readerSlotsAreNamed(size_t installedCount) {
-  return installedCount == READER_FONT_SLOT_COUNT;
-}
+inline constexpr bool readerSlotsAreNamed(size_t installedCount) { return installedCount == READER_FONT_SLOT_COUNT; }
 
 // The label for one slot: "M (14pt)" when the family ships exactly the six the
 // names describe, bare "14pt" otherwise.

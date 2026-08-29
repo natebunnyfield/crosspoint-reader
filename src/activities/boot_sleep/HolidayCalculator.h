@@ -20,30 +20,30 @@ inline constexpr uint8_t REGION_CR = 1 << 0;
 inline constexpr uint8_t REGION_US = 1 << 1;
 
 enum class HolidayId : uint8_t {
-  AnoNuevo = 0,            // Jan 1            CR + US
-  DiaDeMlk,                // 3rd Mon Jan      US
-  DiaDeLosPresidentes,     // 3rd Mon Feb      US
-  JuevesSanto,             // Easter - 3       CR
-  ViernesSanto,            // Easter - 2       CR
-  JuanSantamaria,          // Apr 11           CR
-  DiaDelTrabajoCR,         // May 1            CR
-  DiaDeLosCaidos,          // last Mon May     US (Memorial Day)
-  Juneteenth,              // Jun 19           US
-  IndependenciaUS,         // Jul 4            US
-  AnexionNicoya,           // Jul 25           CR
-  VirgenDeLosAngeles,      // Aug 2            CR
-  DiaDeLaMadre,            // Aug 15           CR
-  DiaDeLaPersonaNegra,     // Aug 31           CR
-  DiaDelTrabajoUS,         // 1st Mon Sep      US (Labor Day)
-  IndependenciaCR,         // Sep 15           CR
-  DiaDeLosPueblosIndigenas,// 2nd Mon Oct      US (Columbus / Indigenous Peoples')
-  EncuentroDeLasCulturas,  // Oct 12           CR
-  DiaDeLosVeteranos,       // Nov 11           US
-  AccionDeGracias,         // 4th Thu Nov      US
-  ViernesNegro,            // 4th Thu Nov + 1  US
-  AbolicionDelEjercito,    // Dec 1            CR
-  NocheBuena,              // Dec 24           US
-  Navidad,                 // Dec 25           CR + US
+  AnoNuevo = 0,              // Jan 1            CR + US
+  DiaDeMlk,                  // 3rd Mon Jan      US
+  DiaDeLosPresidentes,       // 3rd Mon Feb      US
+  JuevesSanto,               // Easter - 3       CR
+  ViernesSanto,              // Easter - 2       CR
+  JuanSantamaria,            // Apr 11           CR
+  DiaDelTrabajoCR,           // May 1            CR
+  DiaDeLosCaidos,            // last Mon May     US (Memorial Day)
+  Juneteenth,                // Jun 19           US
+  IndependenciaUS,           // Jul 4            US
+  AnexionNicoya,             // Jul 25           CR
+  VirgenDeLosAngeles,        // Aug 2            CR
+  DiaDeLaMadre,              // Aug 15           CR
+  DiaDeLaPersonaNegra,       // Aug 31           CR
+  DiaDelTrabajoUS,           // 1st Mon Sep      US (Labor Day)
+  IndependenciaCR,           // Sep 15           CR
+  DiaDeLosPueblosIndigenas,  // 2nd Mon Oct      US (Columbus / Indigenous Peoples')
+  EncuentroDeLasCulturas,    // Oct 12           CR
+  DiaDeLosVeteranos,         // Nov 11           US
+  AccionDeGracias,           // 4th Thu Nov      US
+  ViernesNegro,              // 4th Thu Nov + 1  US
+  AbolicionDelEjercito,      // Dec 1            CR
+  NocheBuena,                // Dec 24           US
+  Navidad,                   // Dec 25           CR + US
   HolidayIdCount,
 };
 
@@ -103,9 +103,7 @@ uint8_t daysInMonth(uint16_t year, uint8_t month);
 void addDays(YMD& date, int32_t days);
 
 // Return true if `a` and `b` refer to the same calendar date.
-inline bool sameDate(const YMD& a, const YMD& b) {
-  return a.year == b.year && a.month == b.month && a.day == b.day;
-}
+inline bool sameDate(const YMD& a, const YMD& b) { return a.year == b.year && a.month == b.month && a.day == b.day; }
 
 // Order two dates chronologically.
 inline bool dateLess(const YMD& a, const YMD& b) {

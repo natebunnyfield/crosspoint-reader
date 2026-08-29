@@ -7,9 +7,9 @@
 #include <WiFi.h>
 
 #include "MappedInputManager.h"
+#include "WifiCredentialStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "WifiCredentialStore.h"
 #include "network/OtaPreflight.h"
 
 void OnlineFirmwareUpdateActivity::onEnter() {
@@ -86,8 +86,7 @@ bool OnlineFirmwareUpdateActivity::preflight() {
 
   const uint32_t sinceBegin = millis() - beginMs;
   const uint32_t sinceLink = linkMs == 0 ? 0 : millis() - linkMs;
-  const otapreflight::Phase phase =
-      otapreflight::decide(haveCredential, linkUp, dnsResolved, sinceBegin, sinceLink);
+  const otapreflight::Phase phase = otapreflight::decide(haveCredential, linkUp, dnsResolved, sinceBegin, sinceLink);
 
   switch (phase) {
     case otapreflight::Phase::Ready:
@@ -99,8 +98,7 @@ bool OnlineFirmwareUpdateActivity::preflight() {
       state = State::NO_WIFI;
       break;
     case otapreflight::Phase::ConnectFailed:
-      LOG_ERR("OTA", "Could not join \"%s\" in %u ms", joiningSsid.c_str(),
-              (unsigned)otapreflight::kConnectTimeoutMs);
+      LOG_ERR("OTA", "Could not join \"%s\" in %u ms", joiningSsid.c_str(), (unsigned)otapreflight::kConnectTimeoutMs);
       state = State::NO_WIFI;
       break;
     case otapreflight::Phase::DnsFailed:

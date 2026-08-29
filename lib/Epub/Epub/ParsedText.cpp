@@ -324,20 +324,20 @@ struct HangFraction {
 };
 
 constexpr HangFraction HANG_FRACTIONS[] = {
-    {'.', 4, 4},     {',', 4, 4},     {';', 2, 0},     {':', 2, 0},     {'!', 2, 0},
-    {'?', 2, 0},     {'-', 2, 2},     {'\'', 2, 2},    {'"', 2, 2},     {0x2010, 2, 2},  // hyphen
-    {0x2018, 2, 2},                                                                      // ‘
-    {0x2019, 2, 2},                                                                      // ’
-    {0x201C, 2, 2},                                                                      // “
-    {0x201D, 2, 2},                                                                      // ”
-    {0x201A, 0, 2},                                                                      // ‚
-    {0x201E, 0, 2},                                                                      // „
-    {0x00AB, 0, 2},                                                                      // «
-    {0x2039, 0, 2},                                                                      // ‹
-    {0x2013, 0, 1},                                                                      // –
-    {0x2014, 0, 1},                                                                      // —
-    {0x2015, 0, 1},                                                                      // ―
-    {'(', 0, 1},     {'[', 0, 1},     {'{', 0, 1},
+    {'.', 4, 4},    {',', 4, 4}, {';', 2, 0},  {':', 2, 0}, {'!', 2, 0},
+    {'?', 2, 0},    {'-', 2, 2}, {'\'', 2, 2}, {'"', 2, 2}, {0x2010, 2, 2},  // hyphen
+    {0x2018, 2, 2},                                                          // ‘
+    {0x2019, 2, 2},                                                          // ’
+    {0x201C, 2, 2},                                                          // “
+    {0x201D, 2, 2},                                                          // ”
+    {0x201A, 0, 2},                                                          // ‚
+    {0x201E, 0, 2},                                                          // „
+    {0x00AB, 0, 2},                                                          // «
+    {0x2039, 0, 2},                                                          // ‹
+    {0x2013, 0, 1},                                                          // –
+    {0x2014, 0, 1},                                                          // —
+    {0x2015, 0, 1},                                                          // ―
+    {'(', 0, 1},    {'[', 0, 1}, {'{', 0, 1},
 };
 
 uint8_t hangQuarters(const uint32_t cp, const bool leading) {
@@ -349,8 +349,8 @@ uint8_t hangQuarters(const uint32_t cp, const bool leading) {
 
 // `glyph` is a NUL-terminated single UTF-8 sequence, so the advance measured is
 // the punctuation's alone and never the word it sits in.
-int hangWidthOfGlyph(const GfxRenderer& renderer, const int fontId, const char* glyph,
-                     const EpdFontFamily::Style style, const bool leading) {
+int hangWidthOfGlyph(const GfxRenderer& renderer, const int fontId, const char* glyph, const EpdFontFamily::Style style,
+                     const bool leading) {
   const auto* ptr = reinterpret_cast<const unsigned char*>(glyph);
   const uint32_t cp = utf8NextCodepoint(&ptr);
   const uint8_t quarters = hangQuarters(cp, leading);
@@ -775,7 +775,7 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
   // font -- so the second call sees Left, matches nothing, and no block can
   // oscillate between pages. See AutoJustify.h for the threshold and its
   // source, the ladder the Justified Text settings row offers, and
-// docs/auto-justification.md for the measurement method.
+  // docs/auto-justification.md for the measurement method.
   if (blockStyle.alignment == CssTextAlign::Justify) {
     const int alphabetPx = measureLowercaseAlphabet(renderer, fontId);
     if (!autojustify::shouldJustify(viewportWidth, alphabetPx, justifyThresholdChars)) {
@@ -1438,11 +1438,10 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
   // pagination is byte-identical — only the space distribution and the paint x
   // of the trailing word change. RTL/bidi lines are left out: after visual
   // reordering the trailing LOGICAL token is not the trailing VISUAL one.
-  const int hangWidth =
-      (effectiveAlignment == CssTextAlign::Justify && !isLastLine && !blockStyle.isRtl && !hasRtlWord &&
-       !lineWords.empty())
-          ? trailingHangWidth(renderer, fontId, lineWords.back(), lineWordStyles.back())
-          : 0;
+  const int hangWidth = (effectiveAlignment == CssTextAlign::Justify && !isLastLine && !blockStyle.isRtl &&
+                         !hasRtlWord && !lineWords.empty())
+                            ? trailingHangWidth(renderer, fontId, lineWords.back(), lineWordStyles.back())
+                            : 0;
 
   // Optical margin alignment, left edge: a line that BEGINS with an opening
   // quote, an opening bracket or a dash is shifted LEFT by that glyph's hang

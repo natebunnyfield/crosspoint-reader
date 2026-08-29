@@ -152,12 +152,12 @@ TEST(XmlEncodings, NoTableCanBeOneExpatWouldRefuse) {
   //
   // The high half is all this stores, so the low half is identity by
   // construction. What can still go wrong is a value expat cannot express.
-  for (const char* name : {"windows-1250", "windows-1251", "windows-1252", "windows-1253", "windows-1254",
-                           "windows-1255", "windows-1256", "windows-1257", "windows-1258", "windows-874",
-                           "iso-8859-2", "iso-8859-3", "iso-8859-4", "iso-8859-5", "iso-8859-6", "iso-8859-7",
-                           "iso-8859-8", "iso-8859-9", "iso-8859-10", "iso-8859-13", "iso-8859-14", "iso-8859-15",
-                           "iso-8859-16", "koi8-r", "koi8-u", "macintosh", "x-mac-cyrillic", "x-mac-greek",
-                           "x-mac-ce"}) {
+  for (const char* name :
+       {"windows-1250", "windows-1251", "windows-1252",   "windows-1253", "windows-1254", "windows-1255",
+        "windows-1256", "windows-1257", "windows-1258",   "windows-874",  "iso-8859-2",   "iso-8859-3",
+        "iso-8859-4",   "iso-8859-5",   "iso-8859-6",     "iso-8859-7",   "iso-8859-8",   "iso-8859-9",
+        "iso-8859-10",  "iso-8859-13",  "iso-8859-14",    "iso-8859-15",  "iso-8859-16",  "koi8-r",
+        "koi8-u",       "macintosh",    "x-mac-cyrillic", "x-mac-greek",  "x-mac-ce"}) {
     const uint16_t* t = table(name);
     ASSERT_NE(t, nullptr) << name;
     for (unsigned byte = 0x80; byte <= 0xFF; ++byte) {
@@ -175,11 +175,11 @@ TEST(XmlEncodings, EveryCodePageIsDistinctFromEveryOther) {
   // Two rows pointing at the same 128 numbers means one of them is a
   // copy-paste, and the symptom is a whole language decoded as another.
   static constexpr const char* kNames[] = {
-      "windows-1250", "windows-1251", "windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
-      "windows-1257", "windows-1258", "windows-874",  "iso-8859-2",   "iso-8859-3",   "iso-8859-4",   "iso-8859-5",
-      "iso-8859-6",   "iso-8859-7",   "iso-8859-8",   "iso-8859-9",   "iso-8859-10",  "iso-8859-13",  "iso-8859-14",
-      "iso-8859-15",  "iso-8859-16",  "koi8-r",       "koi8-u",       "macintosh",    "x-mac-cyrillic",
-      "x-mac-greek",  "x-mac-ce"};
+      "windows-1250", "windows-1251", "windows-1252",   "windows-1253", "windows-1254", "windows-1255",
+      "windows-1256", "windows-1257", "windows-1258",   "windows-874",  "iso-8859-2",   "iso-8859-3",
+      "iso-8859-4",   "iso-8859-5",   "iso-8859-6",     "iso-8859-7",   "iso-8859-8",   "iso-8859-9",
+      "iso-8859-10",  "iso-8859-13",  "iso-8859-14",    "iso-8859-15",  "iso-8859-16",  "koi8-r",
+      "koi8-u",       "macintosh",    "x-mac-cyrillic", "x-mac-greek",  "x-mac-ce"};
   const size_t count = sizeof(kNames) / sizeof(kNames[0]);
   EXPECT_EQ(count, xmlencodings::kSingleByteEncodingCount) << "a code page was added without a row here";
   for (size_t i = 0; i < count; ++i) {
@@ -207,16 +207,14 @@ TEST(XmlEncodings, ARealSentenceRoundTripsThroughTheShippedTable) {
   ASSERT_NE(t, nullptr);
 
   // "A publisher\x92s \x93curly quotes\x94 \x97 caf\xE9, na\xEFve, \xA350\x85"
-  static const unsigned char kBytes[] = {'A',  ' ',  'p',  'u',  'b',  'l',  'i',  's',  'h',  'e',  'r',  0x92,
-                                         's',  ' ',  0x93, 'c',  'u',  'r',  'l',  'y',  ' ',  'q',  'u',  'o',
-                                         't',  'e',  's',  0x94, ' ',  0x97, ' ',  'c',  'a',  'f',  0xE9, ',',
-                                         ' ',  'n',  'a',  0xEF, 'v',  'e',  ',',  ' ',  0xA3, '5',  '0',  0x85};
-  static const uint32_t kExpected[] = {'A',    ' ',    'p',    'u',    'b',    'l',    'i',    's',
-                                       'h',    'e',    'r',    0x2019, 's',    ' ',    0x201C, 'c',
-                                       'u',    'r',    'l',    'y',    ' ',    'q',    'u',    'o',
-                                       't',    'e',    's',    0x201D, ' ',    0x2014, ' ',    'c',
-                                       'a',    'f',    0x00E9, ',',    ' ',    'n',    'a',    0x00EF,
-                                       'v',    'e',    ',',    ' ',    0x00A3, '5',    '0',    0x2026};
+  static const unsigned char kBytes[] = {'A', ' ', 'p',  'u',  'b', 'l',  'i', 's', 'h',  'e', 'r',  0x92,
+                                         's', ' ', 0x93, 'c',  'u', 'r',  'l', 'y', ' ',  'q', 'u',  'o',
+                                         't', 'e', 's',  0x94, ' ', 0x97, ' ', 'c', 'a',  'f', 0xE9, ',',
+                                         ' ', 'n', 'a',  0xEF, 'v', 'e',  ',', ' ', 0xA3, '5', '0',  0x85};
+  static const uint32_t kExpected[] = {'A', ' ', 'p',    'u',    'b', 'l',    'i', 's', 'h',    'e', 'r',    0x2019,
+                                       's', ' ', 0x201C, 'c',    'u', 'r',    'l', 'y', ' ',    'q', 'u',    'o',
+                                       't', 'e', 's',    0x201D, ' ', 0x2014, ' ', 'c', 'a',    'f', 0x00E9, ',',
+                                       ' ', 'n', 'a',    0x00EF, 'v', 'e',    ',', ' ', 0x00A3, '5', '0',    0x2026};
   static_assert(sizeof(kBytes) / sizeof(kBytes[0]) == sizeof(kExpected) / sizeof(kExpected[0]),
                 "the two sides of the round trip must describe the same text");
 

@@ -404,8 +404,6 @@ void SettingsActivity::toggleCurrentSetting() {
   // returned earlier, through settingrow::activate's onChanged.
 }
 
-
-
 void SettingsActivity::render(RenderLock&&) {
   if (optionPopup.processRender(renderer, mappedInput)) return;
 

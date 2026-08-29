@@ -350,8 +350,7 @@ bool Section::loadSectionFile(const ReaderRenderSpec& spec) {
         spec.viewportWidth != fileViewportWidth || spec.viewportHeight != fileViewportHeight ||
         spec.hyphenationEnabled != fileHyphenationEnabled || spec.embeddedStyle != fileEmbeddedStyle ||
         spec.imageRendering != fileImageRendering || spec.focusReadingEnabled != fileFocusReadingEnabled ||
-        spec.lineGridEnabled != fileLineGridEnabled ||
-        spec.justifyThresholdChars != fileJustifyThresholdChars ||
+        spec.lineGridEnabled != fileLineGridEnabled || spec.justifyThresholdChars != fileJustifyThresholdChars ||
         spec.ligatureFingerprint != fileLigatureFingerprint) {
       file.close();
       LOG_ERR("SCT", "Deserialization failed: Parameters do not match");
@@ -581,9 +580,9 @@ bool Section::startBuild(const ReaderRenderSpec& spec, const std::function<void(
   // context for the parser's whole lifetime.
   BuildContext* ctxPtr = ctx.get();
   ctx->parser = makeUniqueNoThrow<ChapterHtmlSlimParser>(
-      epub, ctxPtr->parsePath, renderer, spec.fontId, spec.smallFontId, spec.lineCompression, spec.extraParagraphSpacing,
-      spec.paragraphAlignment, spec.viewportWidth, spec.viewportHeight, spec.hyphenationEnabled,
-      spec.focusReadingEnabled, spec.lineGridEnabled, spec.justifyThresholdChars,
+      epub, ctxPtr->parsePath, renderer, spec.fontId, spec.smallFontId, spec.lineCompression,
+      spec.extraParagraphSpacing, spec.paragraphAlignment, spec.viewportWidth, spec.viewportHeight,
+      spec.hyphenationEnabled, spec.focusReadingEnabled, spec.lineGridEnabled, spec.justifyThresholdChars,
       [this, ctxPtr](std::unique_ptr<Page> page, const uint16_t paragraphIndex, const uint16_t listItemIndex,
                      const uint32_t wordAnchor) {
         ctxPtr->lut.push_back({this->onPageComplete(std::move(page)), paragraphIndex, listItemIndex, wordAnchor});

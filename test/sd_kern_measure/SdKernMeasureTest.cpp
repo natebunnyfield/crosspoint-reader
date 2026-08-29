@@ -26,12 +26,11 @@
 //      builds the per-page mini matrix — measure and draw agree in both
 //      orders.
 
-#include <gtest/gtest.h>
-
 #include <GfxRenderer.h>
 #include <SdCardFont.h>
 #include <SdCardFontManager.h>
 #include <SdCardFontRegistry.h>
+#include <gtest/gtest.h>
 
 #include <deque>
 #include <string>

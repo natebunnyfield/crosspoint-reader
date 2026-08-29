@@ -170,8 +170,7 @@ TEST(ReadAloudCapture, ResidentFontGluesAdjacentPunctuation) {
 // rejoined (hyphen dropped) with a resident font.
 TEST(ReadAloudCapture, ResidentFontRejoinsHyphenSplitWord) {
   PageBuilder page;
-  page.line(86, 506, {tok("find", 0, 90), tok("for-", 245, 61)})
-      .line(86, 561, {tok("giveness", 0, 134)});
+  page.line(86, 506, {tok("find", 0, 90), tok("for-", 245, 61)}).line(86, 561, {tok("giveness", 0, 134)});
 
   std::vector<Rect> rects;
   const std::string text = page.run(residentFont(), rects);

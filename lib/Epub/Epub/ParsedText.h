@@ -104,6 +104,5 @@ class ParsedText {
   // Bringhurst's 40 without threading it.
   void layoutAndExtractLines(const GfxRenderer& renderer, int fontId, uint16_t viewportWidth,
                              const std::function<void(std::shared_ptr<TextBlock>)>& processLine,
-                             bool includeLastLine = true,
-                             int justifyThresholdChars = autojustify::THRESHOLD_CHARS);
+                             bool includeLastLine = true, int justifyThresholdChars = autojustify::THRESHOLD_CHARS);
 };

@@ -132,8 +132,6 @@ constexpr bool usesTotalFit(const Mode mode) { return mode == Mode::WholeWords; 
 constexpr bool splitsWordsAtLineEnds(const uint8_t stored) { return splitsWordsAtLineEnds(modeFor(stored)); }
 constexpr bool usesTotalFit(const uint8_t stored) { return usesTotalFit(modeFor(stored)); }
 
-
-
 // ---------------------------------------------------------------------------
 // THE RAGGED HYPHENATION GATE
 // ---------------------------------------------------------------------------

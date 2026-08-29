@@ -85,8 +85,8 @@ void TypographySettingsActivity::rebuildRows() {
   };
   const auto shared = getSettingsList(&sdFontSystem.registry());
   for (const StrId wanted : kSettingRows) {
-    const auto found = std::find_if(shared.begin(), shared.end(),
-                                    [wanted](const SettingInfo& s) { return s.nameId == wanted; });
+    const auto found =
+        std::find_if(shared.begin(), shared.end(), [wanted](const SettingInfo& s) { return s.nameId == wanted; });
     if (found == shared.end()) continue;
     Row row;
     row.setting = *found;
@@ -252,7 +252,8 @@ void TypographySettingsActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_TYPOGRAPHY_SETTINGS));
 
   const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const Rect listRect{0, listTop, pageWidth, pageHeight - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing};
+  const Rect listRect{0, listTop, pageWidth,
+                      pageHeight - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing};
 
   // In the empty state the ligature master carries a SUBTITLE saying why there
   // are no pair rows under it. Only that row does, and only then -- which is
@@ -280,7 +281,8 @@ void TypographySettingsActivity::render(RenderLock&&) {
   // "Select" for the two rows that open a picker, "Toggle" for the rest -- the
   // same rule the Settings list states, through the same predicate.
   const bool onRow = selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(rows_.size());
-  const bool picks = onRow && !rows_[selectedIndex_].isLigature && settingrow::opensPicker(rows_[selectedIndex_].setting);
+  const bool picks =
+      onRow && !rows_[selectedIndex_].isLigature && settingrow::opensPicker(rows_[selectedIndex_].setting);
   const auto labels =
       mappedInput.mapLabels(tr(STR_BACK), picks ? tr(STR_SELECT) : tr(STR_TOGGLE), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

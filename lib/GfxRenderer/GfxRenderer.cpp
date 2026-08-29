@@ -819,7 +819,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     // where they fall on the line.
     if (prevCp != 0) {
       const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // 4.4 FP
-      lastBaseX += fp4::toPixel(prevAdvanceFP + kernFP);  // snap 12.4 FP to nearest pixel
+      lastBaseX += fp4::toPixel(prevAdvanceFP + kernFP);                     // snap 12.4 FP to nearest pixel
     }
 
     lastBaseLeft = glyph ? glyph->left : 0;
@@ -2752,7 +2752,7 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
     // matching drawText so measurement and rendering agree exactly.
     if (prevCp != 0) {
       const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // B-036
-      widthPx += fp4::toPixel(prevAdvanceFP + kernFP);  // snap 12.4 FP to nearest pixel
+      widthPx += fp4::toPixel(prevAdvanceFP + kernFP);                       // snap 12.4 FP to nearest pixel
     }
     prevAdvanceFP = glyph ? glyph->advanceX : 0;
     if ((style & (EpdFontFamily::SUP | EpdFontFamily::SUB)) != 0) {
@@ -2948,7 +2948,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
     if (prevCp != 0) {
       const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // B-036
-      lastBaseY -= fp4::toPixel(prevAdvanceFP + kernFP);  // snap 12.4 FP to nearest pixel
+      lastBaseY -= fp4::toPixel(prevAdvanceFP + kernFP);                     // snap 12.4 FP to nearest pixel
     }
 
     lastBaseLeft = glyph ? glyph->left : 0;
@@ -3055,9 +3055,8 @@ void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int 
     // rotation runs the other way down the page.
     if (prevCp != 0) {
       const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // B-036
-      lastBaseY += fp4::toPixel(prevAdvanceFP + kernFP);  // +: this run DESCENDS the page
+      lastBaseY += fp4::toPixel(prevAdvanceFP + kernFP);                     // +: this run DESCENDS the page
     }
-
 
     lastBaseLeft = glyph ? glyph->left : 0;
     lastBaseWidth = glyph ? glyph->width : 0;

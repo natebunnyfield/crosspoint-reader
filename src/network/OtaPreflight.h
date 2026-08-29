@@ -51,12 +51,12 @@ inline constexpr uint32_t kDnsTimeoutMs = 8000;
 inline constexpr uint32_t kDnsRetryMs = 500;
 
 enum class Phase {
-  Connecting,   // WiFi.begin() issued, waiting for association
-  Resolving,    // associated; waiting for the resolver to answer
-  Ready,        // both hold -- start the check
-  NoCredential, // nothing saved to try; this is the old NO_WIFI case
-  ConnectFailed,// never associated inside kConnectTimeoutMs
-  DnsFailed,    // associated but never resolved inside kDnsTimeoutMs
+  Connecting,     // WiFi.begin() issued, waiting for association
+  Resolving,      // associated; waiting for the resolver to answer
+  Ready,          // both hold -- start the check
+  NoCredential,   // nothing saved to try; this is the old NO_WIFI case
+  ConnectFailed,  // never associated inside kConnectTimeoutMs
+  DnsFailed,      // associated but never resolved inside kDnsTimeoutMs
 };
 
 // What the screen should be doing, from what it can observe.
@@ -84,12 +84,18 @@ constexpr bool isWaiting(Phase p) { return p == Phase::Connecting || p == Phase:
 
 constexpr const char* phaseName(Phase p) {
   switch (p) {
-    case Phase::Connecting: return "connecting";
-    case Phase::Resolving: return "resolving";
-    case Phase::Ready: return "ready";
-    case Phase::NoCredential: return "no-credential";
-    case Phase::ConnectFailed: return "connect-failed";
-    case Phase::DnsFailed: return "dns-failed";
+    case Phase::Connecting:
+      return "connecting";
+    case Phase::Resolving:
+      return "resolving";
+    case Phase::Ready:
+      return "ready";
+    case Phase::NoCredential:
+      return "no-credential";
+    case Phase::ConnectFailed:
+      return "connect-failed";
+    case Phase::DnsFailed:
+      return "dns-failed";
   }
   return "?";
 }

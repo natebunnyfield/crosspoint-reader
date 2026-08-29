@@ -57,12 +57,12 @@ struct Rendered {
 };
 
 constexpr Rendered kRendered[] = {
-    {"LibrisADF", 12, 512, 270, 50.0},       {"LibrisADF", 14, 512, 318, 43.6},
-    {"LibrisADF", 16, 512, 364, 37.0},       {"LibrisADF", 18, 512, 412, 35.6},
-    {"LibreFranklin", 14, 512, 346, 43.1},   {"LibreFranklin", 18, 512, 456, 31.1},
-    {"TeXGyreSchola", 14, 512, 397, 38.4},   {"TeXGyreSchola", 18, 512, 510, 25.7},
-    {"Coelacanth", 14, 512, 365, 41.9},      {"Coelacanth", 18, 512, 483, 28.6},
-    {"InknutJunicode", 14, 512, 412, 34.4},  {"Edgar", 14, 512, 388, 39.5},
+    {"LibrisADF", 12, 512, 270, 50.0},      {"LibrisADF", 14, 512, 318, 43.6},
+    {"LibrisADF", 16, 512, 364, 37.0},      {"LibrisADF", 18, 512, 412, 35.6},
+    {"LibreFranklin", 14, 512, 346, 43.1},  {"LibreFranklin", 18, 512, 456, 31.1},
+    {"TeXGyreSchola", 14, 512, 397, 38.4},  {"TeXGyreSchola", 18, 512, 510, 25.7},
+    {"Coelacanth", 14, 512, 365, 41.9},     {"Coelacanth", 18, 512, 483, 28.6},
+    {"InknutJunicode", 14, 512, 412, 34.4}, {"Edgar", 14, 512, 388, 39.5},
     {"TeXGyreHeros", 14, 512, 323, 44.6},
 };
 
@@ -106,10 +106,17 @@ TEST(AutoJustify, ReproducesBringhurstsCopyfittingTable) {
   };
   constexpr Cell kCells[] = {
       // The band this constant is fitted to.
-      {120, 20, 56, 1}, {120, 30, 84, 1}, {125, 24, 65, 1}, {130, 26, 67, 1},
-      {130, 30, 78, 1}, {140, 30, 73, 1}, {140, 20, 48, 1},
+      {120, 20, 56, 1},
+      {120, 30, 84, 1},
+      {125, 24, 65, 1},
+      {130, 26, 67, 1},
+      {130, 30, 78, 1},
+      {140, 30, 73, 1},
+      {140, 20, 48, 1},
       // The ends of the table, where the book's own constant differs from ours.
-      {80, 20, 80, 4},  {200, 30, 53, 2}, {360, 40, 40, 3},
+      {80, 20, 80, 4},
+      {200, 30, 53, 2},
+      {360, 40, 40, 3},
   };
   for (const auto& c : kCells) {
     const int got = autojustify::charsPerLine(c.picas * 12, c.alphabetPt);
@@ -298,7 +305,7 @@ TEST(AutoJustifyThreshold, BothEndpointsLeaveTheOtherRegimeReachable) {
   // Instrument: the widest and narrowest settings in the 2026-08-23 calibration
   // sweep, at the X3's 512 px portrait measure.
   constexpr int kMeasurePx = 512;
-  constexpr int kWidestAlphabetPx = 270;   // LibrisADF 12 pt -> est 53 ch/line
+  constexpr int kWidestAlphabetPx = 270;     // LibrisADF 12 pt -> est 53 ch/line
   constexpr int kNarrowestAlphabetPx = 510;  // TeXGyre Schola 18 pt -> est 28
 
   const int widest = autojustify::charsPerLine(kMeasurePx, kWidestAlphabetPx);

@@ -23,13 +23,13 @@
 #include "EpubReaderChapterSelectionActivity.h"
 #include "EpubReaderFootnotesActivity.h"
 #include "EpubReaderUtils.h"
+#include "FontActivation.h"
 #include "MappedInputManager.h"
-#include "ReadAloudCapture.h"
 #include "PageTextMetrics.h"
+#include "ReadAloudCapture.h"
 #include "ReaderFontSizes.h"
 #include "ReaderUtils.h"
 #include "ReadingFontList.h"
-#include "FontActivation.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "components/UITheme.h"
@@ -1707,8 +1707,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // (spineIndex, pageInSpine) is the ordinal -- there is no book-cumulative
   // page number here, only the current Section's pagination, and pageCount is a
   // watermark rather than a count.
-  gpio.publishReaderPageIdentity(readerBookKey(epub->getPath()), currentSpineIndex,
-                                 section ? section->currentPage : 0);
+  gpio.publishReaderPageIdentity(readerBookKey(epub->getPath()), currentSpineIndex, section ? section->currentPage : 0);
 
   // ...and how much text was on it, plus what it was set to. Beside the
   // identity for the same one-shot reason, a separate channel because it feeds

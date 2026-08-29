@@ -13,13 +13,13 @@
 #include <SdCardFont.h>
 #include <SdCardFontManager.h>
 #include <SdCardFontSystem.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include <sys/stat.h>
-#include <dirent.h>
 #include <vector>
 
 SdCardFontSystem sdFontSystem;
@@ -105,8 +105,7 @@ int registerFromPath(const std::string& path, GfxRenderer& renderer) {
   // AND inserted into the flash font map as an EpdFontFamily wrapping its four
   // styles, which is what getFontAscenderSize/getGlyph/drawText look up.
   renderer.registerSdCardFont(id, font);
-  EpdFontFamily family(font->getEpdFont(0), font->getEpdFont(1), font->getEpdFont(2),
-                       font->getEpdFont(3));
+  EpdFontFamily family(font->getEpdFont(0), font->getEpdFont(1), font->getEpdFont(2), font->getEpdFont(3));
   renderer.insertFont(id, family);
   fprintf(stderr, "[stub] loaded %s as id %d (%u styles)\n", path.c_str(), id, font->styleCount());
 #if CROSSPOINT_RENDER_SCALE > 1
@@ -119,13 +118,12 @@ int registerFromPath(const std::string& path, GfxRenderer& renderer) {
   const std::string hiResPath =
       slash == std::string::npos
           ? std::string()
-          : path.substr(0, slash + 1) + std::to_string(CROSSPOINT_RENDER_SCALE) + "x/" +
-                path.substr(slash + 1);
+          : path.substr(0, slash + 1) + std::to_string(CROSSPOINT_RENDER_SCALE) + "x/" + path.substr(slash + 1);
   auto* hiRes = hiResPath.empty() ? nullptr : new SdCardFont();
   if (hiRes != nullptr && hiRes->load(hiResPath.c_str())) {
-    renderer.registerHiResFont(id, hiRes,
-                               EpdFontFamily(hiRes->getEpdFont(0), hiRes->getEpdFont(1),
-                                             hiRes->getEpdFont(2), hiRes->getEpdFont(3)));
+    renderer.registerHiResFont(
+        id, hiRes,
+        EpdFontFamily(hiRes->getEpdFont(0), hiRes->getEpdFont(1), hiRes->getEpdFont(2), hiRes->getEpdFont(3)));
     fprintf(stderr, "[stub] hi-res companion %s -> id %d\n", hiResPath.c_str(), id);
   } else {
     delete hiRes;
@@ -187,8 +185,7 @@ int loadSdFontByOrdinal(const char* familyName, uint8_t ordinal, GfxRenderer& re
   return 0;
 }
 
-int SdCardFontSystem::loadForDisplay(const char* familyName, uint8_t fontSizeEnum,
-                                     GfxRenderer& renderer) {
+int SdCardFontSystem::loadForDisplay(const char* familyName, uint8_t fontSizeEnum, GfxRenderer& renderer) {
   if (familyName == nullptr || familyName[0] == '\0') return 0;
 
   // CPFONT_DIR pins a single device-style root (e.g. "/.fonts"); unset means
@@ -199,8 +196,8 @@ int SdCardFontSystem::loadForDisplay(const char* familyName, uint8_t fontSizeEnu
 
   const uint8_t want = nominalPointSize(fontSizeEnum);
   std::string path;
-  for (const char* root : (pinned != nullptr ? std::vector<const char*>{pinned}
-                                             : std::vector<const char*>{kRoots[0], kRoots[1]})) {
+  for (const char* root :
+       (pinned != nullptr ? std::vector<const char*>{pinned} : std::vector<const char*>{kRoots[0], kRoots[1]})) {
     // SdCardFont::load() goes through the stub HalStorage, which sandboxes SD
     // paths under ./fs_ — so the scan must use that prefix while the
     // device-style path is what gets passed in.

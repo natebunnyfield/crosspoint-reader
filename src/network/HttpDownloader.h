@@ -60,8 +60,7 @@ class HttpDownloader {
    * words in front of a person.
    */
   static DownloadError fetchUrlWithStatus(const std::string& url, const DataCallback& onData,
-                                          const std::string& username = "",
-                                          const std::string& password = "");
+                                          const std::string& username = "", const std::string& password = "");
 
   // Extra request headers, sent verbatim. Exists for the GitHub asset API,
   // where a private repo needs "Authorization: Bearer <token>" plus

@@ -31,7 +31,7 @@
 
 namespace {
 
-const std::vector<uint8_t> kSix{7, 9, 11, 12, 14, 16};      // a shipping ramp
+const std::vector<uint8_t> kSix{7, 9, 11, 12, 14, 16};        // a shipping ramp
 const std::vector<uint8_t> kSeven{7, 9, 10, 11, 12, 14, 16};  // + the orphan
 const std::vector<uint8_t> kFour{12, 14, 16, 18};             // NittiTypewriter
 
@@ -79,8 +79,7 @@ TEST(ReaderSlotLabel, EmptyIsEmptyRatherThanUndefined) {
 TEST(ReaderSlotLabel, TheNamesAreTheSixAndInThisOrder) {
   ASSERT_EQ(READER_FONT_SLOT_COUNT, 6);
   const char* want[] = {"XXS", "XS", "S", "M", "L", "XL"};
-  for (int i = 0; i < READER_FONT_SLOT_COUNT; i++)
-    EXPECT_STREQ(READER_SLOT_NAMES[i], want[i]);
+  for (int i = 0; i < READER_FONT_SLOT_COUNT; i++) EXPECT_STREQ(READER_SLOT_NAMES[i], want[i]);
 }
 
 // There must be exactly ONE name table. Both screens used to carry their own.

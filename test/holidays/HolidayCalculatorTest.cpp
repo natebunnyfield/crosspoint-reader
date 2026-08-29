@@ -5,11 +5,11 @@
 using calendar::addDays;
 using calendar::computeEaster;
 using calendar::daysInMonth;
-using calendar::holidayRegions;
 using calendar::HolidayId;
+using calendar::holidayRegions;
+using calendar::isValidDate;
 using calendar::REGION_CR;
 using calendar::REGION_US;
-using calendar::isValidDate;
 using calendar::resolveHoliday;
 using calendar::sameDate;
 using calendar::weekdayOf;
@@ -261,8 +261,7 @@ TEST(ResolveHoliday, HolidaysAlwaysReturnValidDates) {
   for (uint16_t y = 2020; y <= 2050; ++y) {
     for (uint8_t i = 0; i < static_cast<uint8_t>(HolidayId::HolidayIdCount); ++i) {
       const YMD d = resolveHoliday(static_cast<HolidayId>(i), y);
-      EXPECT_TRUE(isValidDate(d.year, d.month, d.day))
-          << "invalid holiday date for id=" << (int)i << " year=" << y;
+      EXPECT_TRUE(isValidDate(d.year, d.month, d.day)) << "invalid holiday date for id=" << (int)i << " year=" << y;
     }
   }
 }

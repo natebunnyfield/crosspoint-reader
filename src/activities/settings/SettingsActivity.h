@@ -249,7 +249,6 @@ class SettingsActivity final : public Activity {
   // web settings API.
   std::vector<SettingInfo> deviceSettings;
 
-
   OptionPopup optionPopup;
 
   void toggleCurrentSetting();

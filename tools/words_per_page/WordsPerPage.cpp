@@ -25,7 +25,6 @@
 #include <GfxRenderer.h>
 #include <SdCardFont.h>
 #include <builtinFonts/all.h>
-
 #include <dirent.h>
 
 #include <algorithm>
@@ -90,17 +89,17 @@ int registerSdFont(const std::string& path) {
   }
   const int id = nextId++;
   g_renderer->registerSdCardFont(id, font);
-  g_renderer->insertFont(id, EpdFontFamily(font->getEpdFont(0), font->getEpdFont(1), font->getEpdFont(2),
-                                           font->getEpdFont(3)));
+  g_renderer->insertFont(
+      id, EpdFontFamily(font->getEpdFont(0), font->getEpdFont(1), font->getEpdFont(2), font->getEpdFont(3)));
 #if CROSSPOINT_RENDER_SCALE > 1
   const size_t slash = path.find_last_of('/');
-  const std::string hiResPath = path.substr(0, slash + 1) + std::to_string(CROSSPOINT_RENDER_SCALE) + "x/" +
-                                path.substr(slash + 1);
+  const std::string hiResPath =
+      path.substr(0, slash + 1) + std::to_string(CROSSPOINT_RENDER_SCALE) + "x/" + path.substr(slash + 1);
   auto* hiRes = new SdCardFont();
   if (hiRes->load(hiResPath.c_str())) {
-    g_renderer->registerHiResFont(id, hiRes,
-                                  EpdFontFamily(hiRes->getEpdFont(0), hiRes->getEpdFont(1), hiRes->getEpdFont(2),
-                                                hiRes->getEpdFont(3)));
+    g_renderer->registerHiResFont(
+        id, hiRes,
+        EpdFontFamily(hiRes->getEpdFont(0), hiRes->getEpdFont(1), hiRes->getEpdFont(2), hiRes->getEpdFont(3)));
   } else {
     delete hiRes;
     std::fprintf(stderr, "WARNING: no hi-res companion at %s\n", hiResPath.c_str());
@@ -243,8 +242,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::printf("# family=%s scale=%d viewport=%ux%u slots=%zu\n", family.c_str(), CROSSPOINT_RENDER_SCALE,
-              viewportWidth, viewportHeight, sizes.size());
+  std::printf("# family=%s scale=%d viewport=%ux%u slots=%zu\n", family.c_str(), CROSSPOINT_RENDER_SCALE, viewportWidth,
+              viewportHeight, sizes.size());
 
   for (size_t slot = 0; slot < sizes.size(); slot++) {
     if (onlySlot >= 0 && static_cast<int>(slot) != onlySlot) continue;
@@ -285,11 +284,12 @@ int main(int argc, char** argv) {
       continue;
     }
     const double lineH = renderer.getLineHeight(fontId, 1.0f);
-    std::printf("%-16s slot %zu  pt %2d  lineH %2d  meanLines %5.2f  wordsPerPage %7.2f  "
-                "tokensPerPage %7.2f  charsPerPage %7.1f  wordsPerLine %5.2f  fullPages %d\n",
-                family.c_str(), slot, pointSize, static_cast<int>(lineH), static_cast<double>(sl) / n,
-                static_cast<double>(sw) / n, static_cast<double>(st) / n, static_cast<double>(sc) / n,
-                static_cast<double>(sw) / static_cast<double>(sl), n);
+    std::printf(
+        "%-16s slot %zu  pt %2d  lineH %2d  meanLines %5.2f  wordsPerPage %7.2f  "
+        "tokensPerPage %7.2f  charsPerPage %7.1f  wordsPerLine %5.2f  fullPages %d\n",
+        family.c_str(), slot, pointSize, static_cast<int>(lineH), static_cast<double>(sl) / n,
+        static_cast<double>(sw) / n, static_cast<double>(st) / n, static_cast<double>(sc) / n,
+        static_cast<double>(sw) / static_cast<double>(sl), n);
     if (dumpPage >= 0 && dumpPage < static_cast<int>(kept.size())) {
       // The reader paints the page capInkTrim px higher than the layout's y —
       // EpubReaderActivity::renderContents' paintMarginTop.
@@ -299,8 +299,7 @@ int main(int argc, char** argv) {
       char out[1024];
       std::snprintf(out, sizeof out, "%s/page_%s_%zu.pgm", dumpDir ? dumpDir : ".", family.c_str(), slot);
       writePgm(out, renderer);
-      std::fprintf(stderr, "wrote %s (page %d of %zu, %d words)\n", out, dumpPage, kept.size(),
-                   pages[dumpPage].words);
+      std::fprintf(stderr, "wrote %s (page %d of %zu, %d words)\n", out, dumpPage, kept.size(), pages[dumpPage].words);
     }
     std::fflush(stdout);
   }

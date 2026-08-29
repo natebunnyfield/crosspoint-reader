@@ -54,11 +54,11 @@ constexpr size_t SPEC_BUF_SIZE = 256;
 constexpr char kSeparator = ',';
 
 enum class Result {
-  Deactivated,   // was active, now off
-  Reactivated,   // was off, now active
-  RefusedLast,   // would have left zero active families; the reader needs one
-  RefusedName,   // the family name contains the separator and cannot be stored
-  NoRoom,        // the spec buffer cannot hold another name
+  Deactivated,  // was active, now off
+  Reactivated,  // was off, now active
+  RefusedLast,  // would have left zero active families; the reader needs one
+  RefusedName,  // the family name contains the separator and cannot be stored
+  NoRoom,       // the spec buffer cannot hold another name
 };
 
 // True when `family` appears as a whole token in `spec`.
@@ -127,8 +127,7 @@ inline size_t activeCount(const char* spec, const char* const* families, size_t 
 // built-in the picker does not even list once SD families exist. The UI refuses
 // rather than recovering, because a silent recovery here is indistinguishable
 // from the toggle not working.
-inline Result toggle(char* spec, size_t cap, const char* family, const char* const* families,
-                     size_t familyCount) {
+inline Result toggle(char* spec, size_t cap, const char* family, const char* const* families, size_t familyCount) {
   if (spec == nullptr || family == nullptr || *family == '\0') return Result::RefusedName;
   if (strchr(family, kSeparator) != nullptr) return Result::RefusedName;
 

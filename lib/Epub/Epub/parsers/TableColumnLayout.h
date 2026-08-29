@@ -102,8 +102,7 @@ Plan planColumns(const std::vector<Row>& rows, int viewportWidth, int spaceWidth
 // When either fails the answer is `cursorY` -- carry on below whatever is
 // already there. A column out of line reads badly; a column printed on top of
 // another cannot be read at all.
-inline int columnStartY(const int rowTop, const int cursorY, const bool rowTopIsClear,
-                        const bool samePageAsRowStart) {
+inline int columnStartY(const int rowTop, const int cursorY, const bool rowTopIsClear, const bool samePageAsRowStart) {
   return (rowTopIsClear && samePageAsRowStart) ? rowTop : cursorY;
 }
 
@@ -159,4 +158,3 @@ bool breakBeforeHeaderKeep(int cursorY, int freshPageStartY, int viewportHeight,
                            int headerHeight, const int* bodyRowHeights, int bodyRowCount);
 
 }  // namespace tablecolumns
-

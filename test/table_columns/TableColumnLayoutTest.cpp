@@ -200,8 +200,7 @@ TEST(TableColumnStartY, TheAnswerIsNeverAboveTheCursorUnlessTheRowTopIsClear) {
           const int y = columnStartY(rowTop, cursor, clear, samePage);
           if (y < cursor) {
             EXPECT_TRUE(clear && samePage)
-                << "rewound to " << y << " from " << cursor << " with clear=" << clear
-                << " samePage=" << samePage;
+                << "rewound to " << y << " from " << cursor << " with clear=" << clear << " samePage=" << samePage;
             EXPECT_EQ(y, rowTop);
           }
         }
@@ -296,8 +295,8 @@ TEST(TableHeaderKeep, ABreakIsOnlyEverAskedForWhenItHelps) {
             int group = lead + kHeader + k * rowH;
             if (cursor + group > kPage && group <= kPage) justified = true;
           }
-          EXPECT_TRUE(justified) << "asked for a pointless break at cursor " << cursor << " rowH " << rowH
-                                 << " count " << count << " lead " << lead;
+          EXPECT_TRUE(justified) << "asked for a pointless break at cursor " << cursor << " rowH " << rowH << " count "
+                                 << count << " lead " << lead;
         }
       }
     }

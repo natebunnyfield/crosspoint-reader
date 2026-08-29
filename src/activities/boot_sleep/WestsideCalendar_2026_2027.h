@@ -64,7 +64,6 @@ constexpr WestsideEvent WESTSIDE_2026_2027[] = {
     {"Last day of school (12:00)", 2027, 5, 28, 28, false},
 };
 
-constexpr size_t WESTSIDE_2026_2027_COUNT =
-    sizeof(WESTSIDE_2026_2027) / sizeof(WESTSIDE_2026_2027[0]);
+constexpr size_t WESTSIDE_2026_2027_COUNT = sizeof(WESTSIDE_2026_2027) / sizeof(WESTSIDE_2026_2027[0]);
 
 }  // namespace calendar

@@ -1,5 +1,3 @@
-#include "FirmwareFlasher.h"
-
 #include <Arduino.h>
 #include <HalStorage.h>
 #include <Logging.h>
@@ -11,6 +9,7 @@
 #include <cstring>
 #include <memory>
 
+#include "FirmwareFlasher.h"
 #include "FirmwareImageFormat.h"
 
 // The READ-ONLY half of the firmware updater: name a result, learn the running

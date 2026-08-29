@@ -4,9 +4,8 @@
 #include <Logging.h>
 #include <XmlParserUtils.h>
 
-#include "XmlEncodingSupport.h"
-
 #include "Epub/BookMetadataCache.h"
+#include "XmlEncodingSupport.h"
 
 bool TocNavParser::setup() {
   parser = XML_ParserCreate(nullptr);

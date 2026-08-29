@@ -48,8 +48,8 @@ class LibraryUpdateActivity : public Activity {
   State state = State::CHECKING;
   LibraryUpdater updater;
   std::string errorMessage;
-  size_t currentBook = 0;   // index into the manifest while SYNCING
-  unsigned updated = 0;     // ADDED + UPDATED
+  size_t currentBook = 0;  // index into the manifest while SYNCING
+  unsigned updated = 0;    // ADDED + UPDATED
   unsigned unchanged = 0;
   unsigned errors = 0;
   unsigned int lastRenderedPercent = 101;

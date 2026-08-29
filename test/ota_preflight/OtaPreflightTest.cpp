@@ -18,9 +18,9 @@
 #include "network/OtaPreflight.h"
 
 using otapreflight::decide;
-using otapreflight::Phase;
 using otapreflight::kConnectTimeoutMs;
 using otapreflight::kDnsTimeoutMs;
+using otapreflight::Phase;
 
 namespace {
 

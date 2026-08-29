@@ -47,9 +47,7 @@ EntryObservations g_obs;
 class TextEntryParent final : public Activity {
  public:
   TextEntryParent(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string initial, size_t maxLength)
-      : Activity("TestTextEntryParent", renderer, mappedInput),
-        initial(std::move(initial)),
-        maxLength(maxLength) {}
+      : Activity("TestTextEntryParent", renderer, mappedInput), initial(std::move(initial)), maxLength(maxLength) {}
 
   void loop() override {
     if (launched) return;

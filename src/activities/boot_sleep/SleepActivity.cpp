@@ -84,8 +84,7 @@ void SleepActivity::onEnter() {
   }
 }
 
-void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks, const calendar::Style style,
-                                              const bool dark) const {
+void SleepActivity::renderCalendarSleepScreen(const uint8_t weeks, const calendar::Style style, const bool dark) const {
   // The calendar needs a trustworthy wall clock. X3 has a DS3231; X4 does not,
   // and its internal RTC drifts badly across deep sleep (see SCOPE.md), so
   // fall back to the stock sleep image rather than showing a wrong date.

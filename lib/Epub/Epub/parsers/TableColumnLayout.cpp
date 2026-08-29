@@ -155,7 +155,7 @@ bool breakBeforeHeaderKeep(const int cursorY, const int freshPageStartY, const i
   for (int k = 0; k < maxKeep; k++) group += bodyRowHeights[k];
 
   for (int k = maxKeep; k >= minKeep; k--) {
-    if (cursorY + group <= viewportHeight) return false;        // intact where it stands
+    if (cursorY + group <= viewportHeight) return false;         // intact where it stands
     if (freshPageStartY + group <= viewportHeight) return true;  // breaking helps
     if (k > minKeep) group -= bodyRowHeights[k - 1];             // ask for one row less
   }

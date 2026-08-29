@@ -267,7 +267,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.reserve(FIXED_ENTRY_COUNT);
 
     // --- Display ---
-            
+
     // --- Reader ---
     // Built-in font-family entry. Replaced per-call with a registry-aware
     // version when SD fonts are installed. Libre Franklin is the only built-in
@@ -415,8 +415,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       spacingLabels[CrossPointSettings::TIGHT] = StrId::STR_TIGHT;
       spacingLabels[CrossPointSettings::NORMAL] = StrId::STR_NORMAL;
       spacingLabels[CrossPointSettings::WIDE] = StrId::STR_WIDE;
-      v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing,
-                                    std::move(spacingLabels), "lineSpacing", StrId::STR_CAT_READER));
+      v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing, std::move(spacingLabels),
+                                    "lineSpacing", StrId::STR_CAT_READER));
     }
     // Justified Text (owner ruling 2026-08-24: "make justified or ragged right
     // character count an ios app setting"). The DECISION stays automatic -- the
@@ -535,21 +535,21 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // way to clear the whole set at once.
     v.push_back(SettingInfo::String(StrId::STR_FONTS_OFF, SETTINGS.fontsOff, sizeof(SETTINGS.fontsOff), "fontsOff",
                                     StrId::STR_CAT_READER));
-        // The reader is portrait-only; there is no orientation setting.
-        // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
+    // The reader is portrait-only; there is no orientation setting.
+    // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
     // legacy Off/On toggle (persisted files round-trip), 2+ appended.
-        
+
     // --- Controls ---
     // Category is STR_CAT_CONTROLS (not STR_CAT_SYSTEM), so rebuildSettingsLists()
     // drops these rows from the device UI — Controls is a withdrawn tab. They
     // stay in getSettingsList() for persistence (fromJson/toJson) and the web
     // settings API. Category is not persisted, so this change has no impact on
     // saved settings.json files.
-            // Third label = stored value 2 = FONT_SIZE_STEP. The order of this array IS
+    // Third label = stored value 2 = FONT_SIZE_STEP. The order of this array IS
     // the persisted encoding, so append only — see LONG_PRESS_BUTTON_BEHAVIOR in
     // CrossPointSettings.h for why the retired ORIENTATION_CHANGE slot was reused
     // rather than a fourth value added.
-                
+
     // --- System ---
     // The System block is contributed to the device list in the order below.
     // Typing Redraw Delay and Editor Font (both STR_CAT_SYSTEM) already appear
@@ -589,13 +589,13 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // Noto font DATA is gone — applySystemFont() binds Libre Franklin
     // regardless of the stored byte — so the labels are a decode surface, not
     // an offer.
-        // Which text-entry keyboard every entry field opens (searches, WiFi
+    // Which text-entry keyboard every entry field opens (searches, WiFi
     // passwords, owner name, renames). Order must match
     // CrossPointSettings::KEYBOARD_LAYOUT -- the index IS the persisted value.
     v.push_back(SettingInfo::Enum(StrId::STR_KEYBOARD, &CrossPointSettings::keyboardLayout,
                                   {StrId::STR_KEYBOARD_DAISY, StrId::STR_KEYBOARD_GRID13, StrId::STR_KEYBOARD_QWERTY},
                                   "keyboard", StrId::STR_CAT_SYSTEM));
-        // Filed under System, next to Time to Sleep, because that is the row it
+    // Filed under System, next to Time to Sleep, because that is the row it
     // qualifies: it decides what an inactivity-timeout sleep DRAWS, and while it
     // is ON the Sleep Screen setting is bypassed entirely on that path
     // (SleepActivity::onEnter checks it before the sleepScreen switch). It was
@@ -603,7 +603,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // control over the dominant sleep path lived on the web UI. It is also no
     // longer pinned in normalizeRetiredSettings() — a visible row that a reload
     // silently reverts is worse than no row.
-        // The sleep image itself, moved out of the withdrawn Display tab for the same
+    // The sleep image itself, moved out of the withdrawn Display tab for the same
     // reason as the row above: with no device control, the only way to reach
     // Custom was BmpViewerActivity's "set as sleep screen" side effect or the web
     // UI, and an owner whose stored mode was anything else had no way back.
@@ -634,7 +634,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                 CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
                                 CrossPointSettings::CALENDAR_DARK, CrossPointSettings::CALENDAR_WESTSIDE,
                                 CrossPointSettings::CALENDAR_WESTSIDE_DARK}));
-        
+
     // Clock entries. Kept after the status bar was removed because the calendar
     // sleep screen shifts the RTC's UTC date by clockUtcOffsetQ
     // (SleepActivity.cpp) and WifiSelectionActivity drives the NTP re-sync.

@@ -6,9 +6,9 @@
 #include <LigatureControl.h>
 #include <PersistableStore.h>
 
-#include "FontActivation.h"
-
 #include <cstdint>
+
+#include "FontActivation.h"
 
 class CrossPointSettings : public PersistableStore<CrossPointSettings> {
  private:
@@ -625,7 +625,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   static const char* getFilePath() { return "/.crosspoint/settings.json"; }
   void toJson(JsonDocument& doc) const;
   bool fromJson(JsonVariantConst doc);
-
 
  private:
   // Pins values whose UI has been withdrawn back into a valid, reachable

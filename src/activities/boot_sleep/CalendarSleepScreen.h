@@ -47,8 +47,7 @@ class CalendarSleepScreen {
   //
   // `style` selects the holiday data source and locale; defaults to SpanishCR
   // so all existing callers are unaffected.
-  static void render(GfxRenderer& renderer, const YMD& today, uint8_t weeks = 5,
-                     Style style = Style::SpanishCR);
+  static void render(GfxRenderer& renderer, const YMD& today, uint8_t weeks = 5, Style style = Style::SpanishCR);
 };
 
 }  // namespace calendar

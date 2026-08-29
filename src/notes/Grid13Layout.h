@@ -68,15 +68,31 @@ namespace grid13 {
 // Return beneath that (owner ruling 2026-08-11), so the three read as one
 // right-hand column the way they do on a keyboard. Their displaced pair, = and
 // +, moves down to row 3.
-inline const fui::KeyboardKey SL_NUMSHIFT[] = {UK("~", "~", '~'), UK("!", "!", '!'), UK("@", "@", '@'),
-                                               UK("#", "#", '#'), UK("$", "$", '$'), UK("%", "%", '%'),
-                                               UK("^", "^", '^'), UK("&", "&", '&'), UK("*", "*", '*'),
-                                               UK("(", "(", '('), UK(")", ")", ')'), UK("_", "_", '_'),
+inline const fui::KeyboardKey SL_NUMSHIFT[] = {UK("~", "~", '~'),
+                                               UK("!", "!", '!'),
+                                               UK("@", "@", '@'),
+                                               UK("#", "#", '#'),
+                                               UK("$", "$", '$'),
+                                               UK("%", "%", '%'),
+                                               UK("^", "^", '^'),
+                                               UK("&", "&", '&'),
+                                               UK("*", "*", '*'),
+                                               UK("(", "(", '('),
+                                               UK(")", ")", ')'),
+                                               UK("_", "_", '_'),
                                                UKS("DEL", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1)};
-inline const fui::KeyboardKey SL_NUM[] = {UK("`", "`", '`'), UK("1", "1", '1'), UK("2", "2", '2'),
-                                          UK("3", "3", '3'), UK("4", "4", '4'), UK("5", "5", '5'),
-                                          UK("6", "6", '6'), UK("7", "7", '7'), UK("8", "8", '8'),
-                                          UK("9", "9", '9'), UK("0", "0", '0'), UK("-", "-", '-'),
+inline const fui::KeyboardKey SL_NUM[] = {UK("`", "`", '`'),
+                                          UK("1", "1", '1'),
+                                          UK("2", "2", '2'),
+                                          UK("3", "3", '3'),
+                                          UK("4", "4", '4'),
+                                          UK("5", "5", '5'),
+                                          UK("6", "6", '6'),
+                                          UK("7", "7", '7'),
+                                          UK("8", "8", '8'),
+                                          UK("9", "9", '9'),
+                                          UK("0", "0", '0'),
+                                          UK("-", "-", '-'),
                                           UKSP(1)};
 // Everything a keyboard keeps outside its number row, and every alt in the
 // layout (owner ruling: "move all alts to row 3").
@@ -110,9 +126,8 @@ inline const fui::KeyboardKey SL_NZ[] = {UK("n", "n", 'n'), UK("o", "o", 'o'), U
 // separate bottom row any more: Del, Space and Return ride the symbol row, and
 // the row they used to occupy is now the gap keyboardRect() leaves under the
 // keyboard.
-inline const fui::KeyboardRow SL_ROWS[] = {{SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0},
-                                           {SL_SYM, 13, 0},      {SL_AM, 13, 0},
-                                           {SL_NZ, 13, 0}};
+inline const fui::KeyboardRow SL_ROWS[] = {
+    {SL_NUMSHIFT, 13, 0}, {SL_NUM, 13, 0}, {SL_SYM, 13, 0}, {SL_AM, 13, 0}, {SL_NZ, 13, 0}};
 inline const fui::KeyboardLayout SL_LAYOUT{SL_ROWS, 5};
 
 #undef UK

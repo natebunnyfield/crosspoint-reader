@@ -31,7 +31,7 @@ constexpr const char* TRANSCRIPT_PATH = "/claude-chat.md";
 constexpr const char* MODEL = "claude-haiku-4-5";
 constexpr int MAX_TOKENS = 1024;
 constexpr uint32_t WIFI_TIMEOUT_MS = 20000;  // whole-search budget
-constexpr uint32_t MIN_ATTEMPT_MS = 6000;   // per-network cap when several are saved
+constexpr uint32_t MIN_ATTEMPT_MS = 6000;    // per-network cap when several are saved
 // Conversation memory for this editor session. In RAM only — /claude-chat.md is
 // the durable record, and re-parsing it would mean holding the whole file.
 // Both caps exist because history inflates the request body, which on device

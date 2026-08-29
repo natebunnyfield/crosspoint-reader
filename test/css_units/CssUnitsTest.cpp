@@ -139,8 +139,8 @@ TEST(CssLengths, EveryAbsoluteUnitSurvivesTheDeclarationPath) {
     float expectPx;
   };
   constexpr Case kCases[] = {
-      {"margin-left: 1in", 150.0f},   {"margin-left: 10mm", 59.055f}, {"margin-left: 12pt", 25.0f},
-      {"margin-left: 1pc", 25.0f},    {"margin-left: 4Q", 5.9055f},   {"margin-left: 0.5in", 75.0f},
+      {"margin-left: 1in", 150.0f},    {"margin-left: 10mm", 59.055f}, {"margin-left: 12pt", 25.0f},
+      {"margin-left: 1pc", 25.0f},     {"margin-left: 4Q", 5.9055f},   {"margin-left: 0.5in", 75.0f},
       {"margin-left: -2mm", -11.811f},
   };
   for (const auto& c : kCases) {
@@ -372,7 +372,8 @@ TEST(CssImportant, TheSpacedSpellingIsTheSameAnnotation) {
   EXPECT_EQ(keyword.fontWeight, CssFontWeight::Bold) << "any CSS whitespace separates them, not only a space";
 
   keyword = parse("font-style: italic !   IMPORTANT   ");
-  EXPECT_EQ(keyword.fontStyle, CssFontStyle::Italic) << "case-insensitive and run-length-insensitive, as the fused spelling is";
+  EXPECT_EQ(keyword.fontStyle, CssFontStyle::Italic)
+      << "case-insensitive and run-length-insensitive, as the fused spelling is";
 }
 
 TEST(CssImportant, AValueIsNotAnAnnotationJustBecauseItEndsInTheKeyword) {

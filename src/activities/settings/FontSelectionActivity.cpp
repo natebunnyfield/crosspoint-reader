@@ -9,12 +9,11 @@
 #include <cstring>
 
 #include "CrossPointSettings.h"
+#include "FontActivation.h"
 #include "FontDisplayNames.h"
 #include "MappedInputManager.h"
 #include "ReaderFontSizes.h"
 #include "ReadingFontList.h"
-#include "FontActivation.h"
-#include "activities/reader/ReaderUtils.h"
 #include "SdCardFontSystem.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
@@ -361,8 +360,8 @@ void FontSelectionActivity::toggleSelectedFontActive() {
   }
 
   const std::string family = font.name;
-  const fontactivation::Result result = fontactivation::toggle(
-      SETTINGS.fontsOff, sizeof(SETTINGS.fontsOff), family.c_str(), offered.data(), offered.size());
+  const fontactivation::Result result = fontactivation::toggle(SETTINGS.fontsOff, sizeof(SETTINGS.fontsOff),
+                                                               family.c_str(), offered.data(), offered.size());
 
   switch (result) {
     case fontactivation::Result::RefusedLast:
@@ -396,7 +395,7 @@ void FontSelectionActivity::toggleSelectedFontActive() {
           if (fontactivation::isDeactivated(SETTINGS.fontsOff, fonts_[candidate].name.c_str())) continue;
           const int keepCursor = selectedIndex_;
           selectedIndex_ = candidate;
-          applySelectedFont();  // moves previewFontIndex_ too
+          applySelectedFont();          // moves previewFontIndex_ too
           selectedIndex_ = keepCursor;  // the cursor stays on the row just toggled
           break;
         }

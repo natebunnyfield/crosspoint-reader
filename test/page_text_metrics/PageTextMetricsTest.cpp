@@ -13,9 +13,9 @@
 // by exactly the amount that arm splits words, which is a confound perfectly
 // aligned with the treatment. It would look like an effect.
 
-#include "PageTextMetrics.h"
-
 #include <gtest/gtest.h>
+
+#include "PageTextMetrics.h"
 
 namespace {
 

@@ -228,9 +228,9 @@ TEST(SleepScreenPolicy, DarkChangesOnlyThePolarity) {
 // dark rendition existed, so inventing one for them would change what an old
 // save draws.
 TEST(SleepScreenPolicy, WithdrawnWeekCountRowsFoldOntoTheLightClassicScreen) {
-  for (const uint8_t mode : {CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR,
-                             CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE,
-                             CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX}) {
+  for (const uint8_t mode :
+       {CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FOUR, CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_FIVE,
+        CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_SIX}) {
     const auto p = sleepscreen::calendarPlanFor(mode);
     EXPECT_TRUE(p.isCalendar) << modeName(mode) << " must still draw a calendar";
     EXPECT_EQ(p.style, calendar::Style::SpanishCR);

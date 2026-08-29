@@ -188,8 +188,7 @@ inline int charsPerLine(const int measurePx, const int alphabetPx) {
 // back empty) returns TRUE: justification is the alignment that was asked for,
 // and the fallback must be "leave the request alone", not "silently restyle the
 // book because a metric was missing".
-inline bool shouldJustify(const int measurePx, const int alphabetPx,
-                          const int thresholdChars = THRESHOLD_CHARS) {
+inline bool shouldJustify(const int measurePx, const int alphabetPx, const int thresholdChars = THRESHOLD_CHARS) {
   if (alphabetPx <= 0) return true;
   return charsPerLine(measurePx, alphabetPx) >= thresholdChars;
 }

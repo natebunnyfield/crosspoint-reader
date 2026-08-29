@@ -55,8 +55,7 @@ class HalFile {
     if (f) fclose(f);
   }
   HalFile(HalFile&& o) noexcept
-      : f(o.f), isDir_(o.isDir_), name_(std::move(o.name_)), entries_(std::move(o.entries_)),
-        nextEntry_(o.nextEntry_) {
+      : f(o.f), isDir_(o.isDir_), name_(std::move(o.name_)), entries_(std::move(o.entries_)), nextEntry_(o.nextEntry_) {
     o.f = nullptr;
   }
   HalFile& operator=(HalFile&& o) noexcept {

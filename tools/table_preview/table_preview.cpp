@@ -209,10 +209,18 @@ struct Row {
 };
 static const char* kHead[3] = {"Voyage", "Departed", "Days"};
 static const Row kRows[] = {
-    {{"Beagle, first survey", "1826", "1,461"}, },
-    {{"Beagle, second survey with FitzRoy", "1831", "1,741"}, },
-    {{"Erebus and Terror", "1839", "1,428"}, },
-    {{"Challenger", "1872", "1,251"}, },
+    {
+        {"Beagle, first survey", "1826", "1,461"},
+    },
+    {
+        {"Beagle, second survey with FitzRoy", "1831", "1,741"},
+    },
+    {
+        {"Erebus and Terror", "1839", "1,428"},
+    },
+    {
+        {"Challenger", "1872", "1,251"},
+    },
 };
 static constexpr int kRowCount = sizeof(kRows) / sizeof(kRows[0]);
 
@@ -555,8 +563,7 @@ static int smallLineH() { return renderer.getLineHeight(SMALL); }
 //
 // Reading runs toward decreasing portrait y, and rows march toward increasing
 // portrait x, so: portrait x = down, portrait y = screenHeight - across.
-static void drawLandscape(int across, int down, const char* text,
-                          EpdFontFamily::Style style = EpdFontFamily::REGULAR) {
+static void drawLandscape(int across, int down, const char* text, EpdFontFamily::Style style = EpdFontFamily::REGULAR) {
   renderer.drawTextRotated90CW(SMALL, down, renderer.getScreenHeight() - across, text, true, style);
 }
 
@@ -676,13 +683,14 @@ static void renderWideRotated(const bool fullPage) {
 
   int bottom = down;
   for (int c = 0; c < 5; c++) {
-    bottom = std::max(bottom, drawLandscapeWrapped(left + cols.x[c], down, cols.w[c], kWideHead[c], EpdFontFamily::BOLD));
+    bottom =
+        std::max(bottom, drawLandscapeWrapped(left + cols.x[c], down, cols.w[c], kWideHead[c], EpdFontFamily::BOLD));
   }
   down = bottom + pad;
   // The header rule runs along the landscape reading direction, which on the
   // portrait page is a VERTICAL line at x = down.
-  renderer.drawLine(down, renderer.getScreenHeight() - (left + cols.right), down,
-                    renderer.getScreenHeight() - left, 2, true);
+  renderer.drawLine(down, renderer.getScreenHeight() - (left + cols.right), down, renderer.getScreenHeight() - left, 2,
+                    true);
   down += pad + 2;
 
   for (int r = 0; r < kWideRowCount; r++) {

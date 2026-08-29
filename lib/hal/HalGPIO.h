@@ -100,10 +100,10 @@ struct ReadingPageSample {
   // WHAT IT WAS SET TO. Typography only: the host owns its own dials (palette,
   // render scale, polarity) and adds them on its side, so nothing display-side
   // is plumbed through here.
-  const char* fontFamily = "";   // SETTINGS.sdFontFamilyName, or "" for built-in
-  uint8_t fontPointSize = 0;     // resolved pt for the active family + slot
-  uint8_t fontSizeSlot = 0;      // XXS/XS/S/M/L/XL, the persisted truth
-  uint8_t lineSpacing = 0;       // TIGHT / NORMAL / WIDE
+  const char* fontFamily = "";  // SETTINGS.sdFontFamilyName, or "" for built-in
+  uint8_t fontPointSize = 0;    // resolved pt for the active family + slot
+  uint8_t fontSizeSlot = 0;     // XXS/XS/S/M/L/XL, the persisted truth
+  uint8_t lineSpacing = 0;      // TIGHT / NORMAL / WIDE
   uint8_t lineGridEnabled = 0;
   uint8_t justifyThresholdChars = 0;
   uint8_t ligaturesEnabled = 0;

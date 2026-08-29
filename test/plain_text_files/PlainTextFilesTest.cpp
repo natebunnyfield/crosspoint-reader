@@ -7,9 +7,8 @@
 // the editor font would have changed nothing visible, because a .json could not
 // be viewed in the first place. That is the kind of half-delivery this pins.
 
-#include <gtest/gtest.h>
-
 #include <FsHelpers.h>
+#include <gtest/gtest.h>
 
 TEST(PlainTextFiles, TheNamedUnstyledFormatsAllOpen) {
   for (const char* name : {"notes.txt", "config.json", "run.log", "rows.csv", "feed.xml", "conf.yaml", "conf.yml",

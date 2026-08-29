@@ -26,8 +26,7 @@ namespace {
 //
 // The asset the parser looks for is unchanged: a release with a firmware.bin
 // attached. Publish one and the device sees it.
-constexpr char latestReleaseUrl[] =
-    "https://api.github.com/repos/natebunnyfield/crosspoint-reader/releases/latest";
+constexpr char latestReleaseUrl[] = "https://api.github.com/repos/natebunnyfield/crosspoint-reader/releases/latest";
 }  // namespace
 
 OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
