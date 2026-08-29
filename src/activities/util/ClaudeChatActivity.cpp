@@ -421,12 +421,20 @@ void ClaudeChatActivity::loop() {
     // Step by what the ANSWER view shows, not the prompt view's smaller count,
     // or paging skips lines it never displayed.
     const size_t step = answerLinesOnScreen() > 1 ? answerLinesOnScreen() - 1 : 1;
-    if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Down)) {
+    // T-022: front Left/Right page here too, through this same block, so the
+    // two pairs cannot drift apart. Right mirrors Down (next), Left mirrors Up
+    // (previous) -- the FRONT cluster only, not the reader's PageBack/Forward
+    // aliases, since Left/Right elsewhere in this activity (repeatCol, below)
+    // already read the raw front buttons the same way. Prompt-view column
+    // navigation is untouched: this block only runs in View::Answer.
+    if (!sideHandled && (mappedInput.wasReleased(MappedInputManager::Button::Down) ||
+                         mappedInput.wasReleased(MappedInputManager::Button::Right))) {
       if (answerTop + step < answerLines.size()) answerTop += step;
       requestUpdate();
       return;
     }
-    if (!sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Up)) {
+    if (!sideHandled && (mappedInput.wasReleased(MappedInputManager::Button::Up) ||
+                         mappedInput.wasReleased(MappedInputManager::Button::Left))) {
       answerTop = answerTop > step ? answerTop - step : 0;
       requestUpdate();
       return;
