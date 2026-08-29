@@ -291,6 +291,89 @@ scratch directory, for the reason its README gives.
 
 ---
 
+## WHAT THIS DOCUMENT DID NOT MEASURE — Inknut's S → M step, 2026-08-28
+
+*Written from an owner report the day after adoption — "check inknut's sizes.
+they seem fucked and switching between doesn't work as spec'd" — and the
+measurement it triggered. Numbers below are read back from the shipped
+`.cpfont` headers in `crosspoint-simulator/build/seedfonts`, not modeled.*
+
+**Every table above optimises one slot's ABSOLUTE words per page against the
+anchor. Nothing above constrains a slot against its own NEIGHBOUR.** §6 is the
+only progression measurement in the document and its subject is Almendra's
+progression, not the progression of the family whose ramp changed. So the one
+ramp change §2b adopted — Inknut Junicode's S slot, 10 → 11 pt — went in with
+its neighbour effect unmeasured.
+
+The residuals in §1 already show it. Inknut's per-slot error against the anchor
+runs +0.8 / −2.7 / **−4.5 / +6.4** / +3.6 / −1.9 %. Adjacent pairs therefore
+disagree by 3.5, 1.8, **10.9**, 2.8 and 5.5 points: S and M straddle the anchor
+from opposite sides and the swing across that one step is twice the next worst
+in the family. A collapsed step is exactly what that looks like.
+
+Measured on the built files, regular style:
+
+| | XXS | XS | S | M | L | XL |
+|---|---:|---:|---:|---:|---:|---:|
+| point size | 7 | 9 | 11 | 12 | 14 | 16 |
+| x-height, px | 8 | 10 | 12 | **13** | 15 | 17 |
+| advanceY, px | 21 | 27 | 32 | **35** | 41 | 47 |
+| step in advanceY | — | ×1.286 | ×1.185 | **×1.094** | ×1.171 | ×1.146 |
+| words per full page (§2) | 352.4 | 221.3 | 155.5 | 130.4 | 99.7 | 74.6 |
+| step in words per page | — | ×1.593 | ×1.423 | **×1.192** | ×1.308 | ×1.336 |
+
+The anchor's own S → M is ×1.328. Inknut's is ×1.192 — the smallest step
+anywhere in the tier, and the only one under ×1.2 that this document created.
+
+**Before adoption Inknut's x-height ramp was 8 / 10 / 12 / 14 / 16 / 18 —
+even at every step, which only Libris ADF also manages.** It is 8 / 10 / 12 /
+**13** / 15 / 17 now. Rendered book pages at all six slots show S and M at
+visibly the same size while every other step reads as a step.
+
+**Why the mechanism is the S-slot move and not `k`.** `k = 0.917` shrinks all
+six slots together and would have left the ramp's shape alone. The S slot's
+point size was then raised to cancel `k` at that one slot (11 × 0.917 = 10.09,
+and the 11 pt file measures byte-for-byte what the old 10 pt file measured —
+advanceY 32, x-height 12, cap 17). Nothing compensated M, L or XL. So the
+bottom half of the ramp sits on the tier median and the top half sits a slot
+low, and the discontinuity lands between them:
+
+| against tier median | XXS | XS | S | M | L | XL |
+|---|---:|---:|---:|---:|---:|---:|
+| advanceY | −2.0 | −1.5 | −1.5 | **−4.0** | **−5.0** | **−4.5** |
+| x-height | 0 | 0 | 0 | −0.5 | −0.5 | −0.5 |
+
+Inknut is now the SMALLEST family in the tier at M, L and XL. That part is the
+normalisation working as ruled — it is the widest face in the set and had to
+shrink — but it is also what an owner sees first, and this document should have
+said so in the adoption notes.
+
+**No integer ramp fixes it at `k = 0.917`, which is §2a restated.** S at 10 pt
+overshoots the anchor by about +15 %; M at 13 pt undershoots by about −9.5 %
+and merely relocates the collapse onto M → L. The three honest options are
+(a) accept the step as the price of the per-slot match, (b) revert Inknut's S
+slot to 10 pt, which restores the even x-height ramp and puts the collapse back
+at XS → S where it sat before this document and where nothing was reported, or
+(c) re-fit Inknut's `k` against progression as well as absolutes. **This is an
+owner ruling and nothing here has been changed.**
+
+**A gate is not free either.** `validate_seed_fonts.py` check E requires only
+that advanceY strictly INCREASE, so a half step passes. A step-evenness check
+would have caught this before the build — but TeX Gyre Heros already ships
+×1.083 at the same S → M pair and Libre Franklin ×1.100 at XS → S, both
+predating this document, so such a check cannot land as a hard failure without
+a ruling on those two as well.
+
+**Checked and CLEAN, same pass:** the seed tree passes
+`validate_seed_fonts.py --recipe` (8 families, 1x + 2x); the 2x companions pass
+the tier-scale check; a family switch preserves the slot (rendered: Almendra
+"M (14pt)" → Inknut "M (12pt)"); and `ensureLoaded` re-resolves
+`fontPointSize` from the slot on every family change
+(`SdCardFontSystem.cpp:128-146`), so the label and the rendered page cannot
+disagree.
+
+---
+
 **Status: ADOPTED and shipped. Superseding "PROPOSAL" below.**
 
 **Status was: PROPOSAL. Nothing was applied.** No font, recipe or ramp in

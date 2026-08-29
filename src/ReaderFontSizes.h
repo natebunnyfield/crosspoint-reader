@@ -8,12 +8,32 @@
 #include <vector>
 
 // Reader font size is stored as a SLOT (see CrossPointSettings::fontSizeSlot),
-// not an absolute point size. Families ship deliberately harmonized ramps —
-// sd-fonts.yaml anchors each ramp on x-height so slot 2 of one family reads as
-// the same apparent size as slot 2 of another, even though the point sizes
-// differ (Lora 15pt vs Venetian301 19pt). Matching on absolute pt across a
-// family switch throws that harmonization away and silently moves the reader
-// several steps; the slot is the unit that actually carries meaning.
+// not an absolute point size. Families ship deliberately harmonized ramps, so
+// slot 2 of one family is meant to read as the same apparent size as slot 2 of
+// another even though the point sizes differ (Lora 15pt vs Venetian301 19pt).
+// Matching on absolute pt across a family switch throws that harmonization away
+// and silently moves the reader several steps; the slot is the unit that
+// actually carries meaning.
+//
+// WHAT THE RAMPS ARE HARMONIZED ON HAS CHANGED TWICE, and this comment said
+// "x-height" through both. It is no longer the whole answer:
+//
+//   - x-height, 2026-08-02 .. 2026-08-26. Still the anchor for a family with
+//     no `scale:`.
+//   - ink per character for Almendra alone, 2026-08-26
+//     (docs/almendra-size-match-2026-08-26.md).
+//   - WORDS PER FULL PAGE for the other seven installed families since
+//     2026-08-27 (docs/almendra-anchored-sizing-2026-08-27.md): each carries a
+//     family-wide `scale:` fitted so a book is about the same length whichever
+//     face renders it, anchored on Almendra.
+//
+// So a slot no longer promises the same MEASURED letter size across families —
+// it promises about the same amount of text on the page. Measured on the
+// shipped .cpfonts at slot 3 (M): advanceY runs 35 (Inknut Junicode) to 41
+// (Libris ADF), and x-height 13 to 15. Do not "fix" a family back onto the
+// x-height table on the strength of that spread; it is the normalisation
+// working, and reverting one family's k is the mistake sd-fonts.yaml's
+// `scale:` schema warns about by name.
 //
 // CrossPointSettings::fontPointSize remains as the RESOLVED size for the active
 // family, so the render loop still has a plain point size to hand.

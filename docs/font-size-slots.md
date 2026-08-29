@@ -32,6 +32,29 @@ symlinks the family directory straight at the bundle (so the card cannot drift
 from it) or falls back to copy+prune. Only **bundled** families are pruned —
 user-installed ones are left alone, which is correct.
 
+### ...and on that card two adjacent slots render IDENTICALLY
+
+Measured 2026-08-28 off the built files. The vacated 10 pt Inknut and the new
+11 pt Inknut are the SAME RENDER: advanceY 32, x-height 12, cap height 17 in
+both, because `scale: 0.917` puts 11 pt back where 10 pt used to sit
+(11 × 0.917 = 10.09). So on a seven-size card slots **2 and 3 are the same
+size**, and pressing size-up at slot 2 changes nothing a reader can see. That
+is not a stepper bug — the stepper moved — and no label is wrong; the two files
+simply draw the same picture. It is one more reason the orphan is worth
+deleting off a card rather than living with.
+
+### A stale HIDDEN root shadows the bundle entirely
+
+`SdCardFontRegistry::discover()` scans `/.fonts` first and `/fonts` second and
+**de-dupes by family name, first scan wins**
+(`lib/EpdFont/SdCardFontRegistry.cpp:184-215`). The two roots are never merged.
+So a `/.fonts/InknutJunicode` left behind by an older provisioning run makes the
+bundle's `/fonts/InknutJunicode` unreachable — the iOS prune above still runs,
+still succeeds, and still has no effect on what the reader loads. Symptom: a
+ramp that will not change no matter how many builds ship. Check
+`SD font system ready (N families discovered)` against what is actually on the
+card, and check both roots before concluding a rebuild did not take.
+
 ## The bug
 
 The slot NAME was written out twice, and the two copies disagreed about the case
