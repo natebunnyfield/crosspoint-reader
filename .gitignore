@@ -95,3 +95,9 @@ sleep.bmp
 
 # SPIKE (branch spike/ble-editor): serial capture output, regenerated per run.
 spike-capture.log
+
+# tools/words_per_page builds a host binary and its objects in place; the
+# sources are tracked, the artifacts are not. An agent left a set of these
+# untracked on 2026-08-28 and they would have gone into a font commit.
+tools/words_per_page/*.o
+tools/words_per_page/wpp[0-9]
