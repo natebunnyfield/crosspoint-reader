@@ -526,6 +526,15 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                     StrId::STR_CAT_READER));
     v.push_back(SettingInfo::String(StrId::STR_LIGATURES_OFF, SETTINGS.ligaturesOff, sizeof(SETTINGS.ligaturesOff),
                                     "ligaturesOff", StrId::STR_CAT_READER));
+
+    // Which installed families are switched OFF (src/FontActivation.h). Here
+    // for the same reason ligaturesOff is: this list is what toJson/fromJson
+    // iterate, so a field with no row here is a field that stops persisting.
+    // There is no device UI row -- the toggle is a long hold in the font
+    // pickers -- but the web settings API serves it, which is also the only
+    // way to clear the whole set at once.
+    v.push_back(SettingInfo::String(StrId::STR_FONTS_OFF, SETTINGS.fontsOff, sizeof(SETTINGS.fontsOff), "fontsOff",
+                                    StrId::STR_CAT_READER));
         // The reader is portrait-only; there is no orientation setting.
         // Values follow CrossPointSettings::TEXT_ANTIALIASING: 0/1 are the
     // legacy Off/On toggle (persisted files round-trip), 2+ appended.

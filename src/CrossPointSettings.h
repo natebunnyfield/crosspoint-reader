@@ -6,6 +6,8 @@
 #include <LigatureControl.h>
 #include <PersistableStore.h>
 
+#include "FontActivation.h"
+
 #include <cstdint>
 
 class CrossPointSettings : public PersistableStore<CrossPointSettings> {
@@ -501,6 +503,24 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t focusReadingEnabled = 0;
   // SD card font family name (empty = use built-in fontFamily)
   char sdFontFamilyName[32] = "";
+  // WHICH INSTALLED FAMILIES THE READER CURRENTLY WANTS -- a comma-separated
+  // list of the ones switched OFF, toggled by a long hold in the font pickers.
+  //
+  // The OFF set rather than the ON set, deliberately: a family installed over
+  // WebDAV must arrive ACTIVE, and with an ON list every new font would land
+  // deactivated and look broken.
+  //
+  // A string for the same reason ligaturesOff is one -- the set of families is
+  // open-ended (a card carries whatever was put on it, including families this
+  // project has never heard of), so there is no fixed enumeration a bit index
+  // could refer to. Keying by directory name also means the list survives the
+  // registry being reordered and a family being removed and re-added.
+  //
+  // The model, every refusal, and the rule that the last active family cannot
+  // be switched off live in src/FontActivation.h. Persisted by the generic
+  // string path in toJson/fromJson via its SettingInfo::String row in
+  // SettingsList.h, which also serves it over the web settings API.
+  char fontsOff[fontactivation::SPEC_BUF_SIZE] = "";
   // Owner name, shown on the sleep screens ("whose device is this"). Set from
   // Settings > System > Device owner; empty hides the line.
   char ownerName[48] = "";

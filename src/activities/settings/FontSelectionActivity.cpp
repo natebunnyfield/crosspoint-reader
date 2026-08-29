@@ -13,6 +13,8 @@
 #include "MappedInputManager.h"
 #include "ReaderFontSizes.h"
 #include "ReadingFontList.h"
+#include "FontActivation.h"
+#include "activities/reader/ReaderUtils.h"
 #include "SdCardFontSystem.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
@@ -198,7 +200,31 @@ void FontSelectionActivity::loop() {
   // Applying is never lost — every other row still does it, and the applied row
   // has nothing left to apply. The specimen swap lives here because that is
   // exactly where a user sits while judging the face they just chose.
-  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+  // CONFIRM IS A TAP, AND A HOLD IS A DIFFERENT GESTURE.
+  //
+  // The tap moved from the PRESS edge to the RELEASE edge when the hold was
+  // added, and it had to: a press-edge action fires before any hold can be
+  // recognised, so the font would already have been applied by the time the
+  // button had been held long enough to mean something else. This is the same
+  // shape the reader's side button already uses -- the hold fires AT the
+  // threshold while the button is still down (immediate feedback, no waiting
+  // for a lift), and marks the release it will end with as spent so the tap
+  // branch does not also run.
+  //
+  // Moving Confirm to release is safe here for the reason the Back comment
+  // above gives: ActivityManager::swallowUntilIdle() runs at every activity
+  // swap, so the press that launched this screen cannot leak its release in.
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm)) {
+    if (!confirmHoldFired_ && mappedInput.getHeldTime() >= ReaderUtils::SKIP_HOLD_MS) {
+      confirmHoldFired_ = true;
+      toggleSelectedFontActive();
+    }
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    const bool spent = confirmHoldFired_;
+    confirmHoldFired_ = false;  // the gesture is over: re-arm for the next one
+    if (spent) return;
     if (selectedIndex_ == previewFontIndex_) {
       proseSpecimen_ = !proseSpecimen_;
       requestUpdate();
@@ -247,21 +273,25 @@ void FontSelectionActivity::loop() {
   static const std::vector<MappedInputManager::Button> kPreviousButtons = {MappedInputManager::Button::Left};
 
   buttonNavigator_.onRelease(kNextButtons, [this, listSize] {
+    notice_.clear();  // a one-shot line: it must not outlive the row it was about
     selectedIndex_ = ButtonNavigator::nextIndex(selectedIndex_, listSize);
     requestUpdate();
   });
 
   buttonNavigator_.onRelease(kPreviousButtons, [this, listSize] {
+    notice_.clear();
     selectedIndex_ = ButtonNavigator::previousIndex(selectedIndex_, listSize);
     requestUpdate();
   });
 
   buttonNavigator_.onContinuous(kNextButtons, [this, listSize, pageItems] {
+    notice_.clear();
     selectedIndex_ = ButtonNavigator::nextPageIndex(selectedIndex_, listSize, pageItems);
     requestUpdate();
   });
 
   buttonNavigator_.onContinuous(kPreviousButtons, [this, listSize, pageItems] {
+    notice_.clear();
     selectedIndex_ = ButtonNavigator::previousPageIndex(selectedIndex_, listSize, pageItems);
     requestUpdate();
   });
@@ -303,6 +333,78 @@ void FontSelectionActivity::changeFontSize(int delta) {
   }
   // Outside the lock: requestUpdate only sets a deferred flag / notifies the
   // render task. requestUpdateAndWait would deadlock (ActivityManager.cpp:303).
+  requestUpdate();
+}
+
+void FontSelectionActivity::toggleSelectedFontActive() {
+  if (selectedIndex_ < 0 || selectedIndex_ >= static_cast<int>(fonts_.size())) return;
+  const auto& font = fonts_[selectedIndex_];
+
+  // The built-in is not on the card and cannot be switched off. It is listed
+  // only when nothing else is (see rebuild()), which is exactly the state the
+  // last-active rule protects -- so refusing here is the same rule, one layer
+  // out.
+  if (font.isBuiltin) {
+    notice_ = tr(STR_FONT_LAST_ACTIVE);
+    requestUpdate();
+    return;
+  }
+
+  // The count is taken over the families THIS PICKER offers, not the raw
+  // registry: a count including writing-only editor faces would let the last
+  // READING family be switched off, and the symptom would surface later as a
+  // font cycle that does nothing.
+  std::vector<const char*> offered;
+  offered.reserve(fonts_.size());
+  for (const auto& f : fonts_) {
+    if (!f.isBuiltin) offered.push_back(f.name.c_str());
+  }
+
+  const std::string family = font.name;
+  const fontactivation::Result result = fontactivation::toggle(
+      SETTINGS.fontsOff, sizeof(SETTINGS.fontsOff), family.c_str(), offered.data(), offered.size());
+
+  switch (result) {
+    case fontactivation::Result::RefusedLast:
+      notice_ = tr(STR_FONT_LAST_ACTIVE);
+      requestUpdate();
+      return;
+    case fontactivation::Result::RefusedName:
+    case fontactivation::Result::NoRoom:
+      // Both are storage refusals rather than policy ones, and both are rare
+      // enough that a dedicated string would be a string nobody ever reads.
+      // Saying nothing, though, is the one thing that must not happen: the
+      // hold would look unrecognised.
+      notice_ = tr(STR_FONTS_OFF);
+      requestUpdate();
+      return;
+    case fontactivation::Result::Reactivated:
+      notice_.clear();
+      break;
+    case fontactivation::Result::Deactivated:
+      notice_.clear();
+      // DEACTIVATING THE FAMILY BEING READ HAS TO MOVE THE READER. Leaving it
+      // applied would put the reader on a font its own cycle can no longer
+      // reach, so the next ACTIVE family in this list's order takes over --
+      // the same order the in-book cycle walks, so "next" means the same thing
+      // in both places. The last-active rule above guarantees one exists.
+      if (selectedIndex_ == previewFontIndex_) {
+        const int count = static_cast<int>(fonts_.size());
+        for (int step = 1; step < count; step++) {
+          const int candidate = (selectedIndex_ + step) % count;
+          if (fonts_[candidate].isBuiltin) continue;
+          if (fontactivation::isDeactivated(SETTINGS.fontsOff, fonts_[candidate].name.c_str())) continue;
+          const int keepCursor = selectedIndex_;
+          selectedIndex_ = candidate;
+          applySelectedFont();  // moves previewFontIndex_ too
+          selectedIndex_ = keepCursor;  // the cursor stays on the row just toggled
+          break;
+        }
+      }
+      break;
+  }
+
+  SETTINGS.saveToFile();
   requestUpdate();
 }
 
@@ -396,6 +498,15 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
              readerSlotLabel(sizes, SETTINGS.fontSizeSlot).c_str());
   } else {
     snprintf(scratch, sizeof(scratch), "%s \"%s\"", tr(STR_PREVIEW), fontName ? fontName : "");
+  }
+
+  // A REFUSAL SPEAKS HERE, replacing the caption for one render. The caption is
+  // where the eye already is (it names the family being judged), and a refusal
+  // that drew nothing at all would be indistinguishable from the hold never
+  // having been recognised -- which is the failure mode this whole line exists
+  // to prevent.
+  if (!notice_.empty()) {
+    snprintf(scratch, sizeof(scratch), "%s", notice_.c_str());
   }
 
   // Name, then credit — the order every crediting convention uses, from a
@@ -664,6 +775,14 @@ void FontSelectionActivity::render(RenderLock&&) {
       // it describes.
       nullptr, nullptr,
       [this](int index) -> std::string {
+        // A DEACTIVATED FAMILY STAYS LISTED, and says so here. The picker is
+        // the only place to turn it back on, so filtering it out would make a
+        // long hold a one-way door. "Off" beside the row is the state; the
+        // row itself is drawn exactly as any other, because a deactivated font
+        // is switched off, not broken.
+        if (!fonts_[index].isBuiltin && fontactivation::isDeactivated(SETTINGS.fontsOff, fonts_[index].name.c_str())) {
+          return tr(STR_FONT_OFF);
+        }
         if (index == previewFontIndex_) return tr(STR_SELECTED);
         return "";
       },

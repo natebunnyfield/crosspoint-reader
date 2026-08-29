@@ -24,6 +24,10 @@ class FontSelectionActivity final : public Activity {
   // Applies the highlighted font immediately and stays on screen. There is no
   // commit step: the user leaves with Back and keeps whatever is applied.
   void applySelectedFont();
+  // Long hold on Confirm: switch the highlighted family off, or back on.
+  // Every refusal (the last active family, an unstorable name, a full spec)
+  // is decided by src/FontActivation.h and reported through notice_.
+  void toggleSelectedFontActive();
   // Step the reader font size by `delta` through the point sizes the active
   // family actually ships, clamped at both ends, and reload the SD font at the
   // new size. Bound to the side buttons so a font can be judged at the size it
@@ -74,6 +78,14 @@ class FontSelectionActivity final : public Activity {
   // passage, which is what actually shows how a face reads at length. Toggled
   // with Confirm while the cursor sits on the applied font — see loop().
   bool proseSpecimen_ = false;
+  // Latched when a Confirm hold has already fired, so the release that ends
+  // the hold does not also apply the font. Cleared on that release.
+  bool confirmHoldFired_ = false;
+  // A one-shot line shown under the preview caption, for the cases where the
+  // toggle REFUSES. A success needs no notice -- the row's own "Off" flipping
+  // is the feedback -- but a refusal that drew nothing would be
+  // indistinguishable from the hold not being recognised at all.
+  std::string notice_;
 
   ThemeMetrics metrics_ = {};
   int afterHeader = 0;

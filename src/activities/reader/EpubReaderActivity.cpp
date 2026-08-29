@@ -29,6 +29,7 @@
 #include "ReaderFontSizes.h"
 #include "ReaderUtils.h"
 #include "ReadingFontList.h"
+#include "FontActivation.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "components/UITheme.h"
@@ -837,6 +838,20 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
   readable.reserve(families.size());
   for (int i = 0; i < static_cast<int>(families.size()); i++) {
     if (!readingfonts::offeredForReading(families[i].name.c_str())) continue;
+    // ...AND SKIP THE ONES THE OWNER SWITCHED OFF. This is the point of the
+    // whole deactivation feature: shortening THIS cycle without deleting
+    // megabytes of .cpfont that would have to be downloaded again. It is
+    // asked here and NOT inside offeredForReading, because the picker must go
+    // on listing a deactivated family -- it is the only place to turn one back
+    // on (src/FontActivation.h).
+    //
+    // The currently applied family is included even if deactivated, so a card
+    // whose settings were edited by hand cannot leave the cycle unable to step
+    // off the font it is on.
+    if (fontactivation::isDeactivated(SETTINGS.fontsOff, families[i].name.c_str()) &&
+        strcmp(SETTINGS.sdFontFamilyName, families[i].name.c_str()) != 0) {
+      continue;
+    }
     readable.push_back(i);
   }
   // ...AND IN THE PICKER'S ORDER, which is the half that was still wrong after
