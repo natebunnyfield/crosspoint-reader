@@ -33,6 +33,15 @@ namespace {
 // scripts/publish_library.py. The repo is private; see the class comment.
 constexpr char libraryReleaseUrl[] = "https://api.github.com/repos/natebunnyfield/claude-tools/releases/tags/library-latest";
 constexpr char manifestAssetName[] = "manifest.json";
+// The repo itself, probed ONLY to disambiguate a 404 on the release above.
+// GitHub answers 404 for a private repo whether the release is missing or the
+// token cannot see the repo -- it will not confirm the repo exists to someone
+// who may not be entitled to know. So the release endpoint alone cannot tell
+// "nothing published" from "wrong token", and the owner is left guessing at the
+// one moment he most needs to be told. Asking about the REPO separates them:
+// 404 here means the token cannot see it, 200 means it can and the release
+// really is absent.
+constexpr char libraryRepoUrl[] = "https://api.github.com/repos/natebunnyfield/claude-tools";
 constexpr char booksDir[] = "/books/";
 constexpr size_t SHA_CHUNK = 1024;
 
@@ -291,14 +300,24 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
     return BAD_TOKEN;
   }
   if (fetched == HttpDownloader::NOT_FOUND) {
-    // GitHub answered; the answer is "no such release" — OR the token cannot
-    // see the repo, because GitHub deliberately reports both as 404 for a
-    // PRIVATE repo rather than confirming it exists. So this branch cannot
-    // distinguish them and its message must not claim to: a well-formed token
-    // missing the repo's scope lands here, not in BAD_TOKEN above, which only
-    // catches a token GitHub rejects outright.
-    LOG_DBG("LIB", "No library release at %s (or the token cannot see the repo)", libraryReleaseUrl);
-    return NO_RELEASE;
+    // A 404 here is AMBIGUOUS and the screen used to have to say so. GitHub
+    // answers 404 for a private repo whether the release is missing or the
+    // token cannot see it. So ask about the REPO, which separates them: this
+    // costs one extra request, only on the failure path, and turns "one of two
+    // things is wrong" into an answer.
+    size_t repoBytes = 0;
+    const HttpDownloader::DownloadError repoSeen = HttpDownloader::fetchUrlWithHeaders(
+        libraryRepoUrl, apiHeaders, [&repoBytes](const uint8_t*, size_t len) {
+          repoBytes += len;
+          return true;
+        });
+    if (repoSeen == HttpDownloader::OK) {
+      LOG_DBG("LIB", "Repo is visible; the release really is absent");
+      return NO_RELEASE;
+    }
+    LOG_ERR("LIB", "The token cannot see %s (release 404, repo %s)", libraryRepoUrl,
+            repoSeen == HttpDownloader::NOT_FOUND ? "404" : "unreachable");
+    return NO_REPO_ACCESS;
   }
   if (fetched != HttpDownloader::OK) {
     LOG_ERR("LIB", "Release fetch failed");

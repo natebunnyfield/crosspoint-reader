@@ -90,11 +90,13 @@ void LibraryUpdateActivity::runSync() {
     // of the four: the token used to come from a file edited deliberately on a
     // computer, and now it is typed on a phone keyboard.
     //
-    // NO_RELEASE's wording carries the ambiguity rather than hiding it. GitHub
-    // answers 404 for a PRIVATE repo whether the release is missing or the
-    // token cannot see it — it will not confirm the repo exists — so this
-    // screen genuinely cannot tell those apart and must not pretend to.
+    // NO_RELEASE and NO_REPO_ACCESS were ONE message until the updater learned
+    // to probe the repo after a 404. GitHub answers 404 for a private repo
+    // whether the release is missing or the token cannot see it, so the release
+    // endpoint alone cannot separate them; asking about the repo can, and it
+    // costs one request on a path that has already failed.
     errorMessage = err == LibraryUpdater::NO_RELEASE        ? tr(STR_LIBRARY_NO_RELEASE)
+                   : err == LibraryUpdater::NO_REPO_ACCESS  ? tr(STR_LIBRARY_NO_REPO_ACCESS)
                    : err == LibraryUpdater::BAD_TOKEN       ? tr(STR_LIBRARY_BAD_TOKEN)
                    : err == LibraryUpdater::MANIFEST_TOO_NEW ? tr(STR_LIBRARY_MANIFEST_TOO_NEW)
                                                              : tr(STR_UPDATE_CHECK_FAILED);

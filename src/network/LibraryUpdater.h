@@ -44,6 +44,7 @@ class LibraryUpdater {
     NO_TOKEN,     // SETTINGS.githubToken is empty — say so, do nothing else
     HTTP_ERROR,   // could not reach GitHub (or a non-404 failure)
     BAD_TOKEN,    // GitHub answered 401/403: the token is wrong, expired or unscoped
+    NO_REPO_ACCESS,  // the token is valid but cannot see the library repo
     NO_RELEASE,   // GitHub answered 404: no library-latest release published
     NO_MANIFEST,  // release exists but carries no manifest.json asset
     JSON_PARSE_ERROR,
