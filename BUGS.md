@@ -2053,68 +2053,314 @@ users actually see.
 paths never write through the link. Would halve the visible footprint to
 ~58 MB with no capability change.
 
-### [B-041] CI has never run on this fork — every workflow reports zero runs
-**severity: medium (no automated verification exists) · scope: build / release · found 2026-08-28**
+### [B-041] The original ask — get Actions running — is DONE. CI now runs, and every workflow that ran on 2026-08-29 is RED — FOUND 2026-08-28, RECONFIRMED AND REWRITTEN 2026-08-29
+**severity: medium (no automated verification is currently trustworthy) · scope: build / release · found 2026-08-28, CI enabled and now red as of 2026-08-29**
 
-Found while asking why a pushed tag produced no release. Every workflow on
-`natebunnyfield/crosspoint-reader` has **zero runs, ever**:
+**The premise this entry used to carry — "CI has never run on this fork, every
+workflow reports zero runs" — is FALSE as of 2026-08-29 and must not be quoted
+as current.** Actions were enabled sometime between the 2026-08-28 finding and
+today. Confirmed live:
 
 ```
-ci.yml                    0 runs
-pr-formatting-check.yml   0 runs
-release-fonts.yml         0 runs
-release_candidate.yml     0 runs
-release.yml               0 runs      <- the one that should publish firmware.bin
+gh api 'repos/natebunnyfield/crosspoint-reader/actions/runs?per_page=20' \
+  --jq '.workflow_runs[] | "\(.id) \(.name) \(.status) \(.conclusion) \(.created_at)"'
+
+33235711071  CI (build)                  completed  failure  2026-08-29T05:14:52Z
+33232852213  Compile Release             completed  failure  2026-08-29T04:02:32Z
+33232779945  CI (build)                  completed  failure  2026-08-29T04:00:50Z
+33232779110  CI (build)                  completed  failure  2026-08-29T04:00:49Z
+33232573504  Compile Release Candidate   completed  skipped  2026-08-29T03:55:26Z
+30941258592  Graph Update: pip …         completed  success  2026-08-04T19:00:21Z
 ```
 
-Not a configuration the repo can see as wrong: `actions/permissions` reports
-`enabled: true, allowed_actions: all`, and all five workflows report state
-`active`. They are simply never triggered — the shape GitHub gives a FORK whose
-Actions have not been turned on in the UI, where the API can report enabled
-while nothing dispatches.
+Six runs total, five from today. So the fix for the original bug (enable
+Actions) already shipped and needs no further action. **The bug this entry now
+tracks is different: every workflow that actually ran today FAILED or was
+correctly SKIPPED, and none of the three failures is the same cause.**
 
-**Two consequences, and the second is the larger one.**
+**`CI (build)` (`.github/workflows/ci.yml`, triggers on push to `main` and on
+PRs) — FAILED, three times.** Its jobs, from run `33235711071`:
 
-*Releases are hand-assembled.* `release.yml` triggers on `push: tags: '*'` and
-would attach `firmware.bin` — the asset `OtaUpdater` looks for by name. It has
-never fired, so 1.5.14-BD through 1.5.17-BD were all assembled by hand. A tag
-push alone publishes nothing, which is exactly what happened on 2026-08-28: the
-tag went up and no release appeared until one was created manually.
-
-*And no automated build has ever verified anything here.* Every green result
-this repo has ever reported came from a local run on one machine. That is not a
-disaster — the host suite is fast and gets run — but "CI is green" has never
-been a true statement about this fork, and anything relying on it (a PR check, a
-release gate) is relying on something that does not exist.
-
-### Everything the API can rule out, ruled out 2026-08-28
-
-Checked so the next session does not re-diagnose it, and so the remaining fix is
-known to be a UI action rather than a misconfiguration:
-
-| checked | value |
+| job | result |
 |---|---|
-| `repos/.../actions/permissions` | `enabled: true, allowed_actions: all` |
-| every workflow's `state` | `active` — **not** `disabled_fork` or `disabled_manually` |
-| repo `disabled` | `false` |
-| visibility | **public** (so Actions minutes are free and billing cannot be the cause) |
-| total runs, whole repo, all time | **1** — a Dependabot graph update on 2026-08-04 |
+| `build` (`pio run -e default -e sticky`) | **success** |
+| `clang-format` | failure |
+| `cppcheck` | failure |
+| `unit-tests` | failure |
+| `test-status` ("Test Status", the PR-required gate) | failure |
 
-And the decisive one: `scripts/release.sh` pushed tag `1.5.18-BD` at 20:57, and
-twenty seconds later the repo's total run count was still **1**. A live tag push
-against an `on: push: tags: '*'` workflow reporting `active` dispatched nothing.
+`test-status` is exactly the "bare `exit 1`" the earlier spot-check described —
+confirmed against the checked-in YAML, `.github/workflows/ci.yml`:
 
-That is the behaviour GitHub gives a FORK whose workflows have not been enabled
-through the Actions tab banner. The REST API reports the repository-level
-permission, which is on, and offers no endpoint for that fork-level enable —
-`workflows/{id}/enable` only lifts `disabled_manually`, and these are already
-`active`. So this cannot be closed from a shell.
+```yaml
+  test-status:
+    name: Test Status
+    needs: [build, clang-format, cppcheck, unit-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail because needed jobs failed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
+```
 
-**Close by** opening the repository's Actions tab and enabling workflows, then
-pushing a throwaway tag to confirm `release.yml` fires and attaches the three
-assets. Until then `scripts/release.sh` is the mechanism rather than a fallback:
-it does the same work locally, with the same checks, and refuses rather than
-repairs.
+That reading holds, but "something is currently failing" undersold it — three
+of the four jobs it gates on are failing, for three unrelated reasons, verified
+from each job's own log:
+
+1. **`clang-format` — a real formatting drift**, not a CI defect. The diff shown
+   in the log reflows a `std::fprintf` call across two lines in what the log
+   context shows is the render-harness code; `bin/clang-format-fix` closes it.
+2. **`cppcheck` — 32 pre-existing low-severity findings**, mostly
+   `useStlAlgorithm` and `knownConditionTrueFalse` style notes across
+   `src/activities/*`, `src/notes/BleHidHost.cpp`, `src/components/**`. The step
+   is `pio check --fail-on-defect low --fail-on-defect medium --fail-on-defect
+   high` — `low` is in that list, so any style note fails the job. Zero HIGH or
+   MEDIUM findings; the table it printed was `HIGH 0 / MEDIUM 0 / LOW 32`.
+3. **`unit-tests` — never actually runs the tests.** It fails at CMake configure,
+   not at `ctest`:
+   ```
+   CMake Error at sleep_screen/CMakeLists.txt:18 (message):
+     ArduinoJson not found under .pio/libdeps/*/ArduinoJson/src (nor the primary
+     checkout's).
+     Run any PlatformIO build first, e.g.: pio run -e simulator
+   ```
+   This job never runs `pio run` — only the separate `build` job does, in a
+   different container — so `.pio/libdeps` is empty and `test/CMakeLists.txt`
+   can't find the vendored ArduinoJson dependency. The 353+ host tests this repo
+   otherwise runs clean (see `tests/run_all.sh` in `../crosspoint-simulator` and
+   `CLAUDE.md`) are not what failed; the CI job simply never got far enough to
+   try them.
+
+**`Compile Release` (`.github/workflows/release.yml`, triggers on tag push,
+ran here for tag `1.5.21-BD`) — FAILED, on the seed-font integrity gate, not on
+a code or config defect.** The build log:
+
+```
+lib/EpdFont/scripts/convert-builtin-fonts.sh   (needs lib/EpdFont/local_fonts/)
+
+REFUSING TO BUILD. This is a release environment, and a release
+built without these faces loses PragmataPro and NittiTypewriter
+from the device with no error and a smaller binary (B-029).
+Override with CROSSPOINT_ALLOW_MISSING_EDITOR_FACES=1 if that is
+genuinely what you want.
+```
+
+This is the [B-029] gate working as designed: the commercial editor faces
+(PragmataPro, NittiTypewriter) are not and should not be checked into the repo,
+so a fresh GitHub-hosted runner has no `lib/EpdFont/local_fonts/` and the
+release build correctly refuses rather than silently shipping a smaller binary.
+Whether that means `release.yml` should carry those fonts as a repo secret /
+protected artifact, or should stay hand-run via `scripts/release.sh` (which
+already does the same work locally, with the same checks) is a design
+decision, not a bug fix — recorded here rather than answered.
+
+**`Compile Release Candidate` (`.github/workflows/release_candidate.yml`) —
+correctly SKIPPED.** Its job guard is `if:
+startsWith(github.ref_name, 'release/')`; the run in question was on `main`, so
+the skip is the workflow behaving exactly as written, not a CI problem.
+
+**Not this entry's job to fix.** A later agent owns the actual repair
+(`bin/clang-format-fix`, a decision on the 32 cppcheck low findings, and making
+`unit-tests` run `pio run` — or otherwise populate `.pio/libdeps` — before its
+CMake configure step). This entry's job was to make the record match what `gh
+api` and the workflow YAML actually show, which it now does.
+
+**Next step for whoever picks this up:** run `bin/clang-format-fix` and commit;
+decide fix-vs-suppress for the 32 cppcheck low findings (`pio check
+--fail-on-defect low ...` is what turns style notes into build failures); and
+give the `unit-tests` job in `ci.yml` a `pio run -e simulator` (or equivalent)
+step before its `cmake -S test -B build/test` step so `ArduinoJson` is present
+under `.pio/libdeps` and the job reaches `ctest` at all. The `Compile Release`
+failure needs an owner ruling on where CI gets the commercial fonts from, not a
+code fix.
+
+## Follow-up 2026-08-29: (1) and (3) fixed and proved locally; (2) enumerated; a NEW,
+## separate `unit-tests` blocker found underneath the one this entry already named
+
+Re-confirmed all four problems against the live API and the checked-in YAML
+before touching anything, per standing instruction. No push is possible from
+this environment, so nothing here is a green CI run — every claim below is a
+local reproduction of the exact command the workflow runs, shown going from red
+to green (or, for the one that is still red, shown red with the reason).
+
+**1. `clang-format` — fixed, and the earlier description of scope was too
+narrow.** The prior pass read the failing job's log tail, which only showed a
+`std::fprintf` reflow in the render-harness code, and inferred the drift was
+small. Reproducing the job's own command
+(`bin/clang-format-fix`, which resolves to `clang-format -style=file -i` over
+every tracked `.c/.cpp/.h/.hpp` file except the three excluded trees) against
+`clang-format-21.1.8` — the exact version `ci.yml` installs, built locally via
+`brew install llvm@21` since Homebrew's default `clang-format` is 22.1.8 and
+does sort `#include`s differently between the two majors — found **91 files**
+with real drift, not one. All of it is mechanical: trailing-comment alignment,
+collapsed blank lines, `using`-declaration alphabetical order, macro
+continuation-backslash alignment, and re-wrapped long lines. No logic changed
+in any of them (spot-checked several full diffs before applying). Applied with
+the same binary and flags the workflow uses; a second pass now reports 0 files
+needing changes — verified by running the same 91-file check again post-fix.
+
+**2. `cppcheck` — reproduced exactly, 32 LOW findings, 0 MEDIUM/HIGH, matching
+the job's own printed table.** `pio check --fail-on-defect low --fail-on-defect
+medium --fail-on-defect high` locally: `[FAILED] ... HIGH 0 / MEDIUM 0 / LOW
+32`, 83 s. Not fixed or suppressed, per instruction — enumerated and graded
+below. Grouped by rule (`[low:style] [rule]` tag), with a genuine/noise call
+made by reading the flagged code, not just the message text:
+
+| rule | count | file:line |
+|---|---:|---|
+| `useStlAlgorithm` | 12 | `src/FontDisplayNames.h:507`, `src/activities/boot_sleep/CalendarSleepScreen.cpp:143`, `lib/EpdFont/MissingGlyphLedger.h:76` (×3, one per TU that includes it), `src/activities/reader/EpubReaderActivity.cpp:1605`, `src/activities/settings/FontSelectionActivity.cpp:669,706,711`, `src/activities/util/ClaudeChatActivity.cpp:175`, `src/activities/util/DaisyEntryActivity.cpp:124`, `src/activities/util/PrettyView.cpp:129` |
+| `knownConditionTrueFalse` | 10 | `src/activities/home/FileBrowserActivity.cpp:41`, `src/activities/reader/EpubReaderActivity.cpp:277` (×2 conditions), `:1558`, `src/activities/settings/ColophonActivity.cpp:216`, `src/activities/util/NoteEditorActivity.cpp:787` (×2 conditions), `src/components/UITheme.cpp:62,63`, `src/notes/BleHidHost.cpp:493` |
+| `constParameterReference` | 3 | `src/activities/boot_sleep/CalendarSleepScreen.cpp:348,392`, `src/notes/MarkdownRender.cpp:37` |
+| `unusedStructMember` | 2 | `src/activities/reader/EpubReaderActivity.cpp:54` (`ProgressRange::start`), `src/notes/BleHidHost.cpp:170` (`ReportInfo::endHandle`) |
+| `constVariable` / `constVariableReference` | 2 | `src/components/themes/BaseTheme.cpp:828,861` |
+| `duplicateValueTernary` | 1 | `src/activities/network/WifiSelectionActivity.cpp:547` |
+| `variableScope` | 1 | `src/activities/settings/OnlineFirmwareUpdateActivity.cpp:73` |
+| `shadowFunction` | 1 | `src/notes/BleHidHost.cpp:336` |
+
+*Noise (12 + 3 + 2 + 1 = 18, `useStlAlgorithm` / `constParameterReference` /
+`constVariable(Reference)` / `variableScope`): pure style opinions, zero
+behavior implication, cheapest bucket to either fix in bulk or suppress
+wholesale.*
+
+*`knownConditionTrueFalse` (10) is NOT one bucket — read individually, it
+splits three ways:*
+- *Deliberately defensive, cppcheck correctly reading a guard as always-true
+  given ONLY this TU's single-threaded view: `EpubReaderActivity.cpp:277`'s
+  re-check under `RenderLock` exists because another THREAD can replace
+  `section` between the outer peek and the lock (the comment two lines above it
+  says so explicitly) — cppcheck cannot model that race, so it flags the
+  correct, load-bearing re-check as redundant. Do not "simplify" this one.*
+- *Provably true by design and commented as such: `FileBrowserActivity.cpp:41`
+  (`showsHiddenEntries()` is a switch that always returns false today,
+  deliberately kept as a switch so a future enum case fails to compile silently
+  — `FileBrowserActivity.h:31-37`); `UITheme.cpp:62-63` (`getOrientation()` is
+  `static constexpr`, and this codebase is portrait-only, so the landscape
+  branches are unreachable by design, not by accident); `EpubReaderActivity.cpp:1558`
+  (`gpio.readAloudCaptureWanted()` is a hard `return false` in the device HAL —
+  `lib/hal/HalGPIO.h:262` — read-aloud capture is a simulator/iOS-only feature by
+  architecture, so this is always-true on every device build and that is
+  correct).*
+- *Genuinely worth a look: `ColophonActivity.cpp:216`'s `span > 0 ? span : 1` —
+  the function returns early at line 200 whenever `total <= linesPerPage`, so
+  past that point `span = total - linesPerPage` is provably `> 0` and the `: 1`
+  fallback is dead; harmless, cheap to delete. `NoteEditorActivity.cpp:787` is
+  more interesting: it is a byte-for-byte SECOND copy of the `if (oomFailed ||
+  !buf) { ... return; }` block at line 772 — 13 lines of genuinely dead,
+  duplicated code, not a defensive re-check (no lock, no thread boundary, no
+  comment explaining a second check is needed). Worth removing; not removed
+  here, since item scope was "enumerate," not "fix."*
+
+*`unusedStructMember` (2): `ProgressRange::start` (`EpubReaderActivity.cpp:54`)
+traces to `getPageProgressRange()` having **zero call sites anywhere in the
+tree** (checked repo-wide) — the whole function looks like leftover dead code
+from a removed progress-percentage feature; `unusedFunction` is suppressed
+repo-wide so only the member finding surfaces. `ReportInfo::endHandle`
+(`BleHidHost.cpp:170`) is declared, never assigned, never read — only
+mentioned in a comment at line 273 describing a `[valHandle+1, endHandle]`
+subscription window that was apparently never wired up. Both look like real,
+harmless leftovers.*
+
+*`duplicateValueTernary` (1): `AUTO_CONNECTION_TIMEOUT_MS` and
+`CONNECTION_TIMEOUT_MS` (`WifiSelectionActivity.h:99-100`) are both literally
+`15000` — two distinctly-named constants for auto-connect vs. manual-connect
+timeouts that currently resolve to the same value, making the ternary at
+`:547` a no-op either way. The separate names strongly suggest these were
+meant to diverge (auto-connect on boot arguably shouldn't wait as long as a
+user-initiated connect); this may be the actual, mildly interesting finding in
+the whole set. Not changed — a tuning decision, not a mechanical fix.*
+
+*`shadowFunction` (1): `BleHidHost.cpp:336`'s local `uint16_t end = gSvcEnd;`
+shadows a function named `end` elsewhere in scope. No call to that function
+happens inside the shadowing block, so it is inert today but a legitimate
+hygiene flag — a future edit inside that block that tries to call `end(...)`
+would silently resolve to the local variable instead of erroring.*
+
+**Owner decision, not made here:** fix the ~18 style items in bulk (safe,
+mechanical), triage the 10 `knownConditionTrueFalse` individually per the
+three-way split above (2 are load-bearing and must not be "fixed", 2 are
+provably-correct-by-design and should probably get an `// cppcheck-suppress`
+with the reason inline rather than a code change, 2 are genuinely dead code
+worth deleting), decide the `WifiSelectionActivity` timeout question, and
+decide whether to loosen `--fail-on-defect low` to `medium` in the meantime so
+the gate stops blocking on style while these get worked through. All are
+options with counts now, not a diff.
+
+**3. `unit-tests` — the described CONFIGURE failure is fixed and verified from
+a clean checkout, but a SECOND, independent BUILD-time failure sits directly
+underneath it and was not visible until the first one was cleared.**
+
+Mechanism reconfirmed exactly as described: `test/CMakeLists.txt:94` globs
+`.pio/libdeps/*/ArduinoJson/src`, and `test/activity_input/CMakeLists.txt:48-53`
+plus `test/progressive_jpeg/CMakeLists.txt:8-19` `FATAL_ERROR` when it's empty
+(the latter also needs JPEGDEC PATCHED in place by
+`scripts/patch_jpegdec.py`, which only runs as a `pio run` pre-build script —
+`pio pkg install` alone would not do it). `ci.yml`'s `unit-tests` job never ran
+`pio run` before `cmake -S test -B build/test`, so on a fresh checkout the glob
+is empty and configure aborts — reproduced by cloning this repo into a scratch
+dir with no `.pio/`:
+```
+CMake Error at sleep_screen/CMakeLists.txt:18 (message):
+  ArduinoJson not found under .pio/libdeps/*/ArduinoJson/src (nor the primary
+  checkout's).
+```
+Fixed in `.github/workflows/ci.yml`: the `unit-tests` job now installs
+PlatformIO Core and runs `pio run -e default` (matching
+`test/progressive_jpeg/CMakeLists.txt`'s own recommended command, so both
+ArduinoJson and a patched JPEGDEC land under `.pio/libdeps` in one step) before
+`cmake -S test -B build/test`. Verified end to end in the same clean clone:
+`pio run -e default` succeeds (5:22 on a cold toolchain download), then
+`cmake -S test -B build/test -G Ninja -DCMAKE_BUILD_TYPE=Release` configures
+clean with no FATAL_ERROR — the exact failure above is gone.
+
+**But `cmake --build build/test` then fails on ONE target, `ActivityInputTest`
+— link error, not a configure or ArduinoJson problem, and pre-existing in the
+primary checkout too (not a clone artifact):**
+```
+Undefined symbols for architecture arm64:
+  "PersistableStoreBase::writeDocToFile(char const*, ArduinoJson::V742HB42::JsonDocument const&)"
+  "CrossPointSettings::toJson(ArduinoJson::V742HB42::JsonDocument&) const"
+    referenced from: PersistableStore<CrossPointSettings>::saveToFile() const in FontSelectionActivity.cpp.o
+ld: symbol(s) not found for architecture arm64
+```
+Traced to `SETTINGS.saveToFile();` at `src/activities/settings/FontSelectionActivity.cpp:406`,
+added by `00ae42356` ("feat: switch a font off with a long hold in Reader
+Font"), the commit immediately below current HEAD — landed 2026-08-29, the
+same day as this follow-up, and not yet flagged anywhere because CI has never
+gotten far enough to reach this target before today. `test/activity_input/CMakeLists.txt`'s
+own header comment says the exclusion is deliberate: *"CrossPointSettings —
+real class and real field defaults, but the .cpp is not linked (JsonSettingsIO
+/ ArduinoJson / file I/O)."* The new call needs exactly the two symbols that
+exclusion leaves undefined. Every OTHER test target in the suite links and its
+tests pass — confirmed with `cmake --build build/test -- -k 0` (keep going past
+the first failure) and `ctest --test-dir build/test --output-on-failure -j`:
+560/560 runnable tests pass, and the ONE failure is a
+`gtest_discover_tests`-generated placeholder, `ActivityInputTest_NOT_BUILT`,
+which reports "Unable to find executable" because the real binary never linked.
+
+This is not the workflow bug item (3) named, and not something to fix
+unilaterally — the CMakeLists exclusion was a deliberate choice (avoiding real
+file I/O in a host test target) that a new feature commit has now outgrown, so
+the actual fix is a design call: link `CrossPointSettings.cpp` +
+`PersistableStore.cpp` (+ whatever they pull in) into `ActivityInputTest` for
+real, or give the target a targeted double for
+`PersistableStore<CrossPointSettings>::saveToFile()` the way `CrossPointSettings`
+itself is already doubled for I/O reasons, or route the new long-hold-to-deactivate
+feature's persistence through a path this test target doesn't touch. **Net: the
+`unit-tests` job is fixed for the failure this entry named, but will still be
+red today for an unrelated, newer reason — a fully green run needs both.**
+
+**`Compile Release` / `Compile Release Candidate` — reconfirmed, unchanged.**
+The B-029 seed-font gate is still refusing correctly (no
+`lib/EpdFont/local_fonts/` on a hosted runner); not disabled, not touched. The
+three options from the prior pass stand and are restated here rather than
+decided: (a) skip that workflow on CI entirely, (b) provide the commercial
+fonts to CI via a secret / protected artifact, or (c) accept a permanently red
+release workflow and keep releasing via `scripts/release.sh` by hand, which
+already runs the same gate locally. `Compile Release Candidate`'s
+`startsWith(github.ref_name, 'release/')` guard is confirmed correct by
+reading; the skip on a `main` push is the workflow behaving exactly as
+written.
 
 ### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
@@ -2183,8 +2429,13 @@ to find that allocation, not to shrink this one further.
 577 tests pass, desktop canary green. Device-confirm only: nothing host-side
 reproduces a fragmented ESP32 heap.
 
-### [B-030] Edgar -> Inknut at XL renders smaller than Edgar at L — CLOSED 2026-08-27, working as designed
+### [B-043] Edgar -> Inknut at XL renders smaller than Edgar at L — CLOSED 2026-08-27, working as designed
 **severity: medium (the control looks broken) · scope: reader font size · filed and reproduced 2026-08-27**
+
+Filed as B-030; renumbered B-043 on 2026-08-29 to resolve a duplicate-id
+collision with the unrelated allocation-safety entry above that had already
+claimed B-030. Follow an old B-030 reference here if it lands you on this
+entry instead.
 
 Owner, from the device: *"in reading mode, switch from edgar to inknut seems to
 lose the font size (XL becomes L)."*
@@ -2200,7 +2451,7 @@ pinned to 5, switching only the family:
 `fontSizeSlot` is untouched by the switch — the in-reader cycle writes only
 `sdFontFamilyName`, and `resolveReaderPointSize` refreshes the derived point
 size without touching the slot, exactly as its comment promises. So this is not
-B-030-as-filed; the report is accurate about the SYMPTOM and wrong only about
+B-030-as-filed (now [B-043]); the report is accurate about the SYMPTOM and wrong only about
 the cause, which is worth stating because the obvious fix (persist the slot
 harder) would change nothing.
 

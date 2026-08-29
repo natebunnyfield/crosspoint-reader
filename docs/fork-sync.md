@@ -163,6 +163,16 @@ On 2026-08-03 `~/src/xteink/crosspoint-reader` held 451 lines of a ring-clock
 activity that existed on no branch and no remote and would have been lost;
 it is now `rescue/ring-clock` on the fork.
 
+**`gh` follows `origin`, not this doc's advice — a bare invocation in this
+checkout resolves to UPSTREAM.** `gh run list`, `gh pr list`, and
+`gh api repos/...` with no `--repo` all default to the repo `gh` infers from
+context, which for the `~/src/crosspoint-reader` clone is
+`crosspoint-reader/crosspoint-reader` (upstream), not the fork — `origin` here
+being the fork doesn't change what `gh` picks. Always pass
+`--repo natebunnyfield/crosspoint-reader` explicitly, including inside
+`gh api` endpoint paths (`gh api repos/natebunnyfield/crosspoint-reader/...`).
+This already caused one near-misdiagnosis: [B-041], 2026-08-29.
+
 ## Submodule
 
 `freeink-sdk` is pinned at a commit ahead of its own `main`

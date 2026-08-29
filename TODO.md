@@ -60,8 +60,37 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
-### [T-027] Two-finger hold on Manage Files should open the Menu action
-**scope: ios input / manage files · asked 2026-08-28 · FUTURE, not scheduled**
+### [T-027] Rewrite hold-for-action to fit the gesture model
+**scope: firmware input + ios gestures · asked 2026-08-28 · RESCOPED 2026-08-29 · BLOCKED on an owner ruling**
+
+**Rescoped by owner ruling 2026-08-29**, which rejected all three shapes this
+entry was about to be built as (a new action in the iOS gesture table, a
+hard-wired binding in `FileManagerActivity`, or not at all):
+
+> *"we need to rewrite that and any 'hold for action' to be friendly to how we
+> do gestures now"*
+
+So this is no longer "add one binding". The firmware grew its hold-for-action
+behavior one activity at a time, before the gesture model existed. The survey
+that had to exist before anything could be proposed is
+[docs/hold-gestures.md](docs/hold-gestures.md), measured at `b398d45`:
+**nine distinct hold thresholds** across ten files, **30 `getHeldTime()` call
+sites**, two different constants both named `LONG_PRESS_MS` holding 500 and
+1000, and four thresholds declared as file-local or function-local `constexpr`
+where nothing can reuse them — against the gesture model's ONE table, ONE
+threshold (750 ms) and appendable action list.
+
+`SETTINGS.longPressButtonBehavior` is the one hold that is already
+reconfigurable, and it is shaped the opposite way (a behavior selector, not a
+binding). Its release-triggered edge cases are load-bearing and are cited in the
+survey.
+
+**Blocked**: whether the firmware grows its own binding table, adopts the
+simulator's, or merely converges on one threshold and one helper — and whether
+this applies to hardware at all, given X3 and X4 have no touch. More than one
+defensible answer, so it goes to the owner before code moves.
+
+The original ask, which this now subsumes:
 
 Owner: *"holding down two fingers on manage files needs to bring up Menu
 action."*
@@ -155,8 +184,178 @@ does not obviously carry over:
 
 So it is a decision, not an oversight. Left for the owner.
 
-### [T-024] Say what SCRIPT Almendra descends from, in the font metainfo
-**scope: font metadata · asked 2026-08-27 · FUTURE, not scheduled**
+### [T-022] Claude results: the FRONT pair should page too
+
+Owner, 2026-08-24: *"in claude results, front rocker switch should activate
+PgUp / PgDn (currently side buttons work but front ones don't)."*
+
+Taken at face value and consistent with the code. In `ClaudeChatActivity`, the
+paging is bound to `Button::Up` / `Button::Down`, which in this firmware's
+vocabulary is the SIDE pair — the physical rocker (`:424`, `:429`, `:482`,
+`:487`). The FRONT cluster's `Left` / `Right` are spent on `repeatCol`
+(`:480-481`), which is column navigation, so in the results view the front pair
+does nothing for scrolling.
+
+**What "done" looks like:** in the results view — and only there — the front
+`Left`/`Right` page the same way the side rocker does, sharing one code path so
+the two cannot drift. Everywhere else in that activity the front pair keeps its
+current job.
+
+**The thing to get right:** `repeatCol` owns `Left`/`Right` for the composer and
+the daisy picker, so this is a per-VIEW binding, not a global remap. Establish
+which views are live when results are on screen (`panel.isDaisy()` already gates
+two of the four sites) and bind only there. A global change would break column
+navigation in the composer, which is the kind of regression that only shows up
+when someone tries to type.
+
+**Also check the X4.** `HalGPIO::hasEdgeSideButtons()` is FALSE for X4, so on
+that board the side rocker is not on the edge at all — which is the profile
+where a working front binding matters most. Whatever lands should be verified
+against an X4 profile as well as X3.
+
+Not started.
+
+
+### [T-017] Light sleep (#2525) is on main and unconfirmed on device
+**scope: verification · opened 2026-08-15**
+
+`dfe44fb15` (the merge) and `816011c42` (the perf commit) carry upstream #2525
+— light-sleep between input polls when idle, a two-stage idle backoff
+(downclock at 500 ms, sleep at 1 s, replacing the flat 3 s window), and a CPU
+downclock during the e-ink BUSY wait. Both are confirmed ancestors of `main`
+(`git merge-base --is-ancestor`). Upstream measured it on an X3 with a Nordic
+PPK2: idle 9.68 mA → 2.78 mA, session average ~11.6 → ~3.6 mA, which is the
+~3.2x active-reading-time figure.
+
+**Corrected 2026-08-29: the hash this entry originally cited, `ade9dac91`, was
+wrong.** `git log -1` shows it is `docs(todo): T-009, side buttons drawn on the
+UI` — an unrelated docs commit. Both this entry and [T-018] were authored
+together in `ae3eaaf0e`, and `ade9dac91` was simply `main`'s tip on the day that
+commit was written — [T-018] uses it correctly, as the snapshot the SDK-pin
+gitlink was checked against, but this entry copy-pasted the same hash to name
+the feature commit itself, which it never was. If this correction is ever
+reverted, that is why the wrong hash keeps coming back.
+
+**None of that is confirmed here.** Host evidence only: five environments build
+from a cold cache (`default` RAM 16.5%, Flash 64.4%), ASAN clean, and a headless
+session boots, opens a book, idles past both thresholds and turns pages. Power
+and felt timing cannot be observed off-device at all.
+
+Its stated dependency on freeink-sdk PR#8 is already satisfied —
+`setBusyWaitSliceHook` exists in the pinned SDK (`FreeInkDisplay.h:260`), so no
+submodule bump is owed.
+
+**What to watch on device:** input latency after the device has been idle;
+whether page turns still feel immediate; and that USB serial still works while
+connected, since light sleep is deliberately suppressed on USB (it kills the CDC
+link).
+
+**Done looks like:** confirmed on an X3 or X4, or a reported regression with
+enough detail to trace. Separate from [T-008], which covers the 2026-08-06
+backlog; this is one named commit.
+
+### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
+**scope: verification · opened 2026-08-07**
+
+Build, package and TestFlight are DONE. The device half is not, and the two keep
+getting reported together, so this entry exists to keep them apart.
+
+**Done 2026-08-07, from a clean tree at `91b4a8fc`:**
+
+| Artifact | State |
+|---|---|
+| `gh_release` firmware | built, staged at `~/crosspoint-archive/staged/20260808T0201Z-crosspoint-91b4a8fc.bin`, sha256 `96f77816…` |
+| Mac app (`CrossPointX3.app`) | packaged and `verify`-clean (all 3 purpose strings); NOT TestFlighted, per owner ruling |
+| iOS TestFlight | **build-38 uploaded**, 19,545,915 bytes, delivery `d3e7a3ba` |
+
+**Superseded on the TestFlight line, 2026-08-17: build-82 is up** — 50 MB IPA,
+delivery `3f4451a4`, tagged and pushed as `build-82` in the simulator repo. It
+carries firmware `c36dba242` (this file's T-015 fix) and simulator `2e9e4c3`,
+on top of the iPad-landscape change `eaaa048`. All four `testflight.sh` gates
+passed: desktop canary, source set current (132 TUs), `crosspoint_core` carries
+`SIMULATOR_DEVICE_X3` + `CROSSPOINT_RENDER_SCALE=3`, and no purpose string is
+demanded by the binary.
+
+One honest caveat, so nobody tests the wrong thing: **the progressive-JPEG fix
+is NOT exercised by this build.** It lives in a JPEGDEC patch, and the iOS
+target substitutes stb_image for JPEGDEC entirely — that path was already
+correct there. The fix needs the device.
+
+**Where the two repos stand against build-82, re-measured 2026-08-17 15:25:**
+
+| Repo | Against the build |
+|---|---|
+| firmware | build-82 carries `c36dba242`, which is still the newest **code** on `main` — the only commit since is `809702e91`, docs. So the firmware half of build-82 is current. |
+| simulator | `main` has moved **9 commits past the tag**: the page-colour button, the palette rework (Sepia CRT retired, Reading at three paper temperatures replacing Soft and Cool Gray), and `ST-009`. None of it is on TestFlight. |
+
+That split matters when reading the simulator's "SHIPPED, unverified on the
+phone" items: `ST-008`, `ST-004` and `ST-006` are testable in build-82, the
+palette work is not in any build yet.
+
+The rest of the entry below is unchanged and still owed.
+
+**DONE 2026-08-18 — the bin is staged and the checklist is written.**
+`~/crosspoint-archive/staged/20260818T2146Z-crosspoint-b39eea60.bin`, built from
+`/private/tmp/rel-wt` at `b39eea60c`, 4,955,360 bytes, sha256 `b1baea7b…`,
+Flash 75.4% / RAM 16.5%, version string `1.5.0-B2`. The ordered checklist is
+[docs/device-verification-checklist.md](docs/device-verification-checklist.md)
+and it, not this entry, is what to work through with the device in hand.
+
+**It was checked against [B-029] after linking**, which is the whole reason that
+figure is recorded: the commercial editor faces are gitignored, a worktree build
+without them succeeds silently and 430,674 bytes smaller, and 68.8% flash would
+have been the only visible sign. `nm firmware.elf | grep -c
+"nittitypewriter\|pragmatapro"` reports 100 on this bin. Since `b39eea60c` the
+check is mechanical — a release env refuses to build without them — so this is
+belt and braces rather than the only guard. The superseded `2c17295f` bin was
+deleted rather than left beside it. Cards are NOT reprovisioned — that still
+waits for a mount.
+
+**Owner ruling 2026-08-17: stage a bin and write one checklist.** Asked what to
+prepare for the device batch. A `gh_release` build from a clean throwaway
+worktree at current `main`, named `<UTC>-crosspoint-<sha>.bin` and staged in
+`~/crosspoint-archive/staged/`, plus a single ordered checklist covering every
+device-blocked item across both trackers — what to flash, what to watch, what
+supersedes what. Cards are NOT reprovisioned as part of this; that waits for a
+mount. The point is that one card mount plus one sitting then closes nine items
+instead of rediscovering them from four tracker entries.
+
+**Not done — needs the hardware in hand:**
+
+- **The SD cards.** None were mounted, so `cpcards` never ran. They are still on
+  `bb614f73`, roughly forty commits back. This is the only step blocked on a
+  physical act.
+- **Confirm on device**, since it will be in hand anyway: the seven Lucide icons
+  on Home, the caret advancing a full space in Create Note, the clock preview on
+  the offset screen, and the WebDAV update flow — that last one matters most,
+  because its erase-write-reboot step is the ONLY part that cannot be exercised
+  off-device at all.
+- **One-button firmware update** (`ee6fad7e5`, Home → Update Firmware,
+  2026-08-16). Added after this list was written. `CROSSPOINT_NO_DEVICE_FLASH`
+  (`HomeActivity.cpp:34-39`) compiles the Home row out for **iOS only** — that
+  is where `CrossPointIOSExclusions.cmake` defines it — so build-82 does not
+  carry the row, while the desktop simulator does draw it. (Corrected
+  2026-08-19: this entry previously claimed no host build could reach it.)
+  What still cannot be exercised anywhere but the device is the install itself. What to watch is the whole chain — check, install,
+  reboot, and the **rollback**, which is the part that was genuinely missing
+  before that commit (`network/OtaCommit.cpp` confirming a healthy boot). Full
+  write-up in [docs/one-button-firmware-update.md](docs/one-button-firmware-update.md).
+- **Older debt, still unconfirmed:** power-off-while-typing (build-33+), iOS file
+  transfer (build-37), B-018 back-nav, B-017's notes half.
+
+**What this loop taught, worth keeping:** the iOS archive found a link error that
+neither the device nor the desktop build could see — `SdFirmwareUpdateActivity`
+is excluded from the iOS source set, and a new call into it from a shared TU only
+fails when that target links. The iOS archive belongs IN the loop, not after it.
+`xcodebuild -target CrossPointX3 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO` is
+the cheap version and needs no keychain.
+
+---
+
+## Finished
+
+### [T-024] Say what SCRIPT Almendra descends from, in the font metainfo — DONE 2026-08-29
+**scope: font metadata · asked 2026-08-27 · DONE 2026-08-29**
 
 Owner: *"add something about chancery hand script or whatever is accurate for
 almendra's 1350 london author."*
@@ -202,7 +401,27 @@ Almendra is the only ORIGINAL design in the installed set — every other family
 is a revival with a named model — so whatever shape this takes should not assume
 every row has a script to name.
 
-### [T-023] XS and XXS sizes for every shipping family
+**CLOSED 2026-08-29.** Shipped. `src/FontDisplayNames.h:207` now reads
+`{"Almendra", "Almendra", "Blackletter; Ana Sanfelippo", "c. 1450 Mainz; 2011 Buenos Aires", 1450}`
+— two stages, sort key 1450. The derivation comment above the row
+(`src/FontDisplayNames.h:86-207`) records how it was settled: Almendra is an
+original design with no dated model to point at, so stage 1 names the HAND
+(Blackletter) rather than a face, anchored on c. 1450 Mainz — when Gutenberg's
+workshop cut the earliest blackletter type — rather than on the manuscript hand
+itself; stage 2 keeps the 2011 Buenos Aires origin, which is also the sort key
+that was live before this closed. **"Chancery hand" — this entry's own
+suggested wording — was explicitly rejected as period-wrong**: the comment
+records that English chancery hand is c. 1400+, fifty years after the retired
+"1350 London" placement it would have sat beside, and that the hand actually
+current in 1350s London was Anglicana, with textura for formal books — so
+chancery was the wrong word for that date even though, per Almendra's own
+upstream description (which names "the chancery and gothic hands"), it is a
+right word for the face in general. Blackletter was picked instead because the
+letterforms favor it: Almendra is upright, dark and pen-formed, and
+cancelleresca — the chancery half of that same description — is a cursive
+italic, which Almendra is not.
+
+### [T-023] XS and XXS sizes for every shipping family — DONE 2026-08-26, filed 2026-08-29
 
 Owner, 2026-08-25: *"cut XS and XXS versions of every s tiers shipping font."*
 
@@ -364,165 +583,13 @@ without failing. They take their bound from `installedOrdinalCount()` now. The
 A/B `fonts` mode deliberately still says 4 — it is keyed on nominal point size,
 not on slots.
 
-
-### [T-022] Claude results: the FRONT pair should page too
-
-Owner, 2026-08-24: *"in claude results, front rocker switch should activate
-PgUp / PgDn (currently side buttons work but front ones don't)."*
-
-Taken at face value and consistent with the code. In `ClaudeChatActivity`, the
-paging is bound to `Button::Up` / `Button::Down`, which in this firmware's
-vocabulary is the SIDE pair — the physical rocker (`:424`, `:429`, `:482`,
-`:487`). The FRONT cluster's `Left` / `Right` are spent on `repeatCol`
-(`:480-481`), which is column navigation, so in the results view the front pair
-does nothing for scrolling.
-
-**What "done" looks like:** in the results view — and only there — the front
-`Left`/`Right` page the same way the side rocker does, sharing one code path so
-the two cannot drift. Everywhere else in that activity the front pair keeps its
-current job.
-
-**The thing to get right:** `repeatCol` owns `Left`/`Right` for the composer and
-the daisy picker, so this is a per-VIEW binding, not a global remap. Establish
-which views are live when results are on screen (`panel.isDaisy()` already gates
-two of the four sites) and bind only there. A global change would break column
-navigation in the composer, which is the kind of regression that only shows up
-when someone tries to type.
-
-**Also check the X4.** `HalGPIO::hasEdgeSideButtons()` is FALSE for X4, so on
-that board the side rocker is not on the edge at all — which is the profile
-where a working front binding matters most. Whatever lands should be verified
-against an X4 profile as well as X3.
-
-Not started.
-
-
-### [T-017] Light sleep (#2525) is on main and unconfirmed on device
-**scope: verification · opened 2026-08-15**
-
-`ade9dac91` carries upstream #2525 — light-sleep between input polls when idle,
-a two-stage idle backoff (downclock at 500 ms, sleep at 1 s, replacing the flat
-3 s window), and a CPU downclock during the e-ink BUSY wait. Upstream measured
-it on an X3 with a Nordic PPK2: idle 9.68 mA → 2.78 mA, session average
-~11.6 → ~3.6 mA, which is the ~3.2x active-reading-time figure.
-
-**None of that is confirmed here.** Host evidence only: five environments build
-from a cold cache (`default` RAM 16.5%, Flash 64.4%), ASAN clean, and a headless
-session boots, opens a book, idles past both thresholds and turns pages. Power
-and felt timing cannot be observed off-device at all.
-
-Its stated dependency on freeink-sdk PR#8 is already satisfied —
-`setBusyWaitSliceHook` exists in the pinned SDK (`FreeInkDisplay.h:260`), so no
-submodule bump is owed.
-
-**What to watch on device:** input latency after the device has been idle;
-whether page turns still feel immediate; and that USB serial still works while
-connected, since light sleep is deliberately suppressed on USB (it kills the CDC
-link).
-
-**Done looks like:** confirmed on an X3 or X4, or a reported regression with
-enough detail to trace. Separate from [T-008], which covers the 2026-08-06
-backlog; this is one named commit.
-
-### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
-**scope: verification · opened 2026-08-07**
-
-Build, package and TestFlight are DONE. The device half is not, and the two keep
-getting reported together, so this entry exists to keep them apart.
-
-**Done 2026-08-07, from a clean tree at `91b4a8fc`:**
-
-| Artifact | State |
-|---|---|
-| `gh_release` firmware | built, staged at `~/crosspoint-archive/staged/20260808T0201Z-crosspoint-91b4a8fc.bin`, sha256 `96f77816…` |
-| Mac app (`CrossPointX3.app`) | packaged and `verify`-clean (all 3 purpose strings); NOT TestFlighted, per owner ruling |
-| iOS TestFlight | **build-38 uploaded**, 19,545,915 bytes, delivery `d3e7a3ba` |
-
-**Superseded on the TestFlight line, 2026-08-17: build-82 is up** — 50 MB IPA,
-delivery `3f4451a4`, tagged and pushed as `build-82` in the simulator repo. It
-carries firmware `c36dba242` (this file's T-015 fix) and simulator `2e9e4c3`,
-on top of the iPad-landscape change `eaaa048`. All four `testflight.sh` gates
-passed: desktop canary, source set current (132 TUs), `crosspoint_core` carries
-`SIMULATOR_DEVICE_X3` + `CROSSPOINT_RENDER_SCALE=3`, and no purpose string is
-demanded by the binary.
-
-One honest caveat, so nobody tests the wrong thing: **the progressive-JPEG fix
-is NOT exercised by this build.** It lives in a JPEGDEC patch, and the iOS
-target substitutes stb_image for JPEGDEC entirely — that path was already
-correct there. The fix needs the device.
-
-**Where the two repos stand against build-82, re-measured 2026-08-17 15:25:**
-
-| Repo | Against the build |
-|---|---|
-| firmware | build-82 carries `c36dba242`, which is still the newest **code** on `main` — the only commit since is `809702e91`, docs. So the firmware half of build-82 is current. |
-| simulator | `main` has moved **9 commits past the tag**: the page-colour button, the palette rework (Sepia CRT retired, Reading at three paper temperatures replacing Soft and Cool Gray), and `ST-009`. None of it is on TestFlight. |
-
-That split matters when reading the simulator's "SHIPPED, unverified on the
-phone" items: `ST-008`, `ST-004` and `ST-006` are testable in build-82, the
-palette work is not in any build yet.
-
-The rest of the entry below is unchanged and still owed.
-
-**DONE 2026-08-18 — the bin is staged and the checklist is written.**
-`~/crosspoint-archive/staged/20260818T2146Z-crosspoint-b39eea60.bin`, built from
-`/private/tmp/rel-wt` at `b39eea60c`, 4,955,360 bytes, sha256 `b1baea7b…`,
-Flash 75.4% / RAM 16.5%, version string `1.5.0-B2`. The ordered checklist is
-[docs/device-verification-checklist.md](docs/device-verification-checklist.md)
-and it, not this entry, is what to work through with the device in hand.
-
-**It was checked against [B-029] after linking**, which is the whole reason that
-figure is recorded: the commercial editor faces are gitignored, a worktree build
-without them succeeds silently and 430,674 bytes smaller, and 68.8% flash would
-have been the only visible sign. `nm firmware.elf | grep -c
-"nittitypewriter\|pragmatapro"` reports 100 on this bin. Since `b39eea60c` the
-check is mechanical — a release env refuses to build without them — so this is
-belt and braces rather than the only guard. The superseded `2c17295f` bin was
-deleted rather than left beside it. Cards are NOT reprovisioned — that still
-waits for a mount.
-
-**Owner ruling 2026-08-17: stage a bin and write one checklist.** Asked what to
-prepare for the device batch. A `gh_release` build from a clean throwaway
-worktree at current `main`, named `<UTC>-crosspoint-<sha>.bin` and staged in
-`~/crosspoint-archive/staged/`, plus a single ordered checklist covering every
-device-blocked item across both trackers — what to flash, what to watch, what
-supersedes what. Cards are NOT reprovisioned as part of this; that waits for a
-mount. The point is that one card mount plus one sitting then closes nine items
-instead of rediscovering them from four tracker entries.
-
-**Not done — needs the hardware in hand:**
-
-- **The SD cards.** None were mounted, so `cpcards` never ran. They are still on
-  `bb614f73`, roughly forty commits back. This is the only step blocked on a
-  physical act.
-- **Confirm on device**, since it will be in hand anyway: the seven Lucide icons
-  on Home, the caret advancing a full space in Create Note, the clock preview on
-  the offset screen, and the WebDAV update flow — that last one matters most,
-  because its erase-write-reboot step is the ONLY part that cannot be exercised
-  off-device at all.
-- **One-button firmware update** (`ee6fad7e5`, Home → Update Firmware,
-  2026-08-16). Added after this list was written. `CROSSPOINT_NO_DEVICE_FLASH`
-  (`HomeActivity.cpp:34-39`) compiles the Home row out for **iOS only** — that
-  is where `CrossPointIOSExclusions.cmake` defines it — so build-82 does not
-  carry the row, while the desktop simulator does draw it. (Corrected
-  2026-08-19: this entry previously claimed no host build could reach it.)
-  What still cannot be exercised anywhere but the device is the install itself. What to watch is the whole chain — check, install,
-  reboot, and the **rollback**, which is the part that was genuinely missing
-  before that commit (`network/OtaCommit.cpp` confirming a healthy boot). Full
-  write-up in [docs/one-button-firmware-update.md](docs/one-button-firmware-update.md).
-- **Older debt, still unconfirmed:** power-off-while-typing (build-33+), iOS file
-  transfer (build-37), B-018 back-nav, B-017's notes half.
-
-**What this loop taught, worth keeping:** the iOS archive found a link error that
-neither the device nor the desktop build could see — `SdFirmwareUpdateActivity`
-is excluded from the iOS source set, and a new call into it from a shared TU only
-fails when that target links. The iOS archive belongs IN the loop, not after it.
-`xcodebuild -target CrossPointX3 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO` is
-the cheap version and needs no keychain.
-
----
-
-## Finished
+**Filed 2026-08-29.** The "DONE 2026-08-26" note above was correct but this
+entry was never moved out of `## OPEN` into `## Finished`. Re-confirmed at
+filing time: `src/ReaderFontSizes.h:70` is
+`BUILTIN_READER_POINT_SIZES[] = {8, 10, 12, 14, 16, 18}`, and the adversarial
+review's clamp fix — `getSmallestReaderFontId()` clamping the wide-table
+step-down to body size at the new XS/XXS slots — is
+`src/CrossPointSettings.cpp:431-472`.
 
 ### [T-025] Configurable gestures in the iOS app — RE-CUT AND SHIPPED 2026-08-28
 **scope: ios input · asked 2026-08-28 · closed 2026-08-28, reopened and re-closed the same day · SHIPPED, UNCONFIRMED on device**
