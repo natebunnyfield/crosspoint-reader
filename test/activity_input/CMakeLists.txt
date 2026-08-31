@@ -15,6 +15,12 @@
 #                        suite depends on, are mirrored exactly.
 #   * CrossPointSettings — real class and real field defaults, but the .cpp is
 #                        not linked (JsonSettingsIO / ArduinoJson / file I/O).
+#                        toJson() and PersistableStoreBase::writeDocToFile()
+#                        get no-op bodies in HostHarness.cpp instead (T-026,
+#                        00ae42356, made SETTINGS.saveToFile() reachable from
+#                        FontSelectionActivity) — no test here asserts on
+#                        persisted content, only on the in-memory fields the
+#                        input handling wrote.
 #   * SdCardFontSystem — doubled so ensureLoaded() can be observed, which is how
 #                        the RenderLock tests check the lock is actually held.
 #   * HalGPIO          — stubs/HalGPIO.h, the scriptable input seam.

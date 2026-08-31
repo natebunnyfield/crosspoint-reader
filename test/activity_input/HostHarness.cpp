@@ -142,6 +142,20 @@ int CrossPointSettings::getReaderFontId() const {
   return 0;
 }
 
+// T-026 (00ae42356) added SETTINGS.saveToFile() to the font-deactivation path
+// (FontSelectionActivity.cpp:406), so PersistableStore<CrossPointSettings>::
+// saveToFile() (PersistableStore.h:102) is now reachable from this link for
+// the first time. Its body calls exactly two things: toJson() below, and
+// PersistableStoreBase::writeDocToFile() (PersistableStore.cpp), which does
+// real SD file I/O this suite deliberately keeps out (see this directory's
+// CMakeLists.txt header comment). Both are no-ops here: no test in this
+// suite asserts anything about persisted content, only about the in-memory
+// fields the activity's input handling wrote directly (e.g. SETTINGS.fontsOff,
+// SETTINGS.fontFamily) — confirmed by grep across test/ before adding this.
+// A silent no-op is therefore honest, not a shortcut around a real assertion.
+bool PersistableStoreBase::writeDocToFile(const char*, const JsonDocument&) { return true; }
+void CrossPointSettings::toJson(JsonDocument&) const {}
+
 // ============================================================================
 // UITheme is the REAL one now.
 //
