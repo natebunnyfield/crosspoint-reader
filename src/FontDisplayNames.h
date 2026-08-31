@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -503,10 +505,9 @@ inline constexpr Entry kEntries[] = {
 
 inline const Entry* find(const char* directory) {
   if (directory == nullptr || directory[0] == '\0') return nullptr;
-  for (const auto& e : kEntries) {
-    if (std::strcmp(e.directory, directory) == 0) return &e;
-  }
-  return nullptr;
+  const auto it = std::find_if(std::begin(kEntries), std::end(kEntries),
+                               [directory](const Entry& e) { return std::strcmp(e.directory, directory) == 0; });
+  return it != std::end(kEntries) ? &*it : nullptr;
 }
 
 // Earliest (creation) year for a family, for ordering the picker reverse

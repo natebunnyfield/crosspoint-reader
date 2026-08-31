@@ -70,8 +70,8 @@ bool OnlineFirmwareUpdateActivity::preflight() {
   // retry gap: hostByName() blocks, and asking with no link just burns the
   // timeout. The host is the one the check fetches, because resolving any
   // other proves nothing about this record.
-  bool dnsOk = false;
   if (linkUp) {
+    bool dnsOk;
     const uint32_t now = millis();
     if (lastDnsTryMs == 0 || now - lastDnsTryMs >= otapreflight::kDnsRetryMs) {
       lastDnsTryMs = now;

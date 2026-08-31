@@ -212,8 +212,10 @@ void ColophonActivity::drawScrollBar() const {
   int thumbH = trackHeight * linesPerPage / total;
   if (thumbH < MIN_THUMB_HEIGHT) thumbH = MIN_THUMB_HEIGHT;
   if (thumbH > trackHeight) thumbH = trackHeight;
+  // span > 0 always: the early return above guarantees total > linesPerPage
+  // past this point.
   const int span = total - linesPerPage;
-  const int thumbY = contentTop + (trackHeight - thumbH) * topLine / (span > 0 ? span : 1);
+  const int thumbY = contentTop + (trackHeight - thumbH) * topLine / span;
   renderer.fillRect(trackX, thumbY, metrics.scrollBarWidth, thumbH, true);
 }
 

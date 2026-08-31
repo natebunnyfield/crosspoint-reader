@@ -59,7 +59,14 @@ int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader
   if (hasTabBar) {
     reservedHeight += metrics.tabBarHeight;
   }
+  // GfxRenderer::orientation is `static constexpr Portrait` (GfxRenderer.h)
+  // -- this codebase is portrait-only today, so both landscape comparisons
+  // are compile-time true by design, not by accident. Kept explicit (rather
+  // than deleted) so the check does its job again the day a landscape
+  // orientation ships. Not a bug.
+  // cppcheck-suppress knownConditionTrueFalse
   if (hasButtonHints && orientation != GfxRenderer::Orientation::LandscapeClockwise &&
+      // cppcheck-suppress knownConditionTrueFalse
       orientation != GfxRenderer::Orientation::LandscapeCounterClockwise) {
     reservedHeight += metrics.verticalSpacing + metrics.buttonHintsHeight;
   }

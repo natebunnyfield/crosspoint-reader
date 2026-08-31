@@ -7,6 +7,7 @@
 #include <Memory.h>
 
 #include <algorithm>
+#include <iterator>
 
 #include "CrossPointSettings.h"
 #include "SdCardFontSystem.h"
@@ -172,7 +173,7 @@ void ClaudeChatActivity::layoutAnswer() {
       answerLines.emplace_back();
     } else {
       const auto wrapped = renderer.wrappedText(editorFontId, para.c_str(), maxWidth, 200);
-      for (const auto& w : wrapped) answerLines.push_back(w);
+      std::copy(wrapped.begin(), wrapped.end(), std::back_inserter(answerLines));
     }
     if (nl >= answer.size()) break;
     start = nl + 1;

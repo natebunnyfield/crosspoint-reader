@@ -167,7 +167,6 @@ struct ChrInfo {
 struct ReportInfo {
   uint16_t valHandle;
   uint16_t cccdHandle;
-  uint16_t endHandle;
 };
 
 State gState = State::Off;
@@ -326,20 +325,16 @@ void discoverDescriptorsNext() {
 // --- GATT: characteristics ---------------------------------------------------
 
 void onCharsDone() {
-  // Report characteristic ranges end just before the next characteristic
-  // declaration (or at the end of the HID service for the last one).
+  // Reports are identified by their value handle alone now: descriptor
+  // discovery runs ONCE over the whole HID service range (see onDsc() below)
+  // rather than per-report windows, so a report's end-of-range handle is not
+  // needed here any more.
   gReportCount = 0;
   for (size_t i = 0; i < gChrCount && gReportCount < MAX_REPORTS; ++i) {
     const bool isReport = gChrs[i].uuid16 == UUID_REPORT || gChrs[i].uuid16 == UUID_BOOT_KBD_INPUT;
     if (!isReport) continue;
     if ((gChrs[i].properties & BLE_GATT_CHR_PROP_NOTIFY) == 0) continue;
-    uint16_t end = gSvcEnd;
-    for (size_t j = 0; j < gChrCount; ++j) {
-      if (gChrs[j].defHandle > gChrs[i].defHandle && gChrs[j].defHandle - 1 < end) {
-        end = gChrs[j].defHandle - 1;
-      }
-    }
-    gReports[gReportCount++] = ReportInfo{gChrs[i].valHandle, 0, end};
+    gReports[gReportCount++] = ReportInfo{gChrs[i].valHandle, 0};
   }
   LOG_INF(TAG, "HID service: %u chrs, %u notifiable input report(s)", (unsigned)gChrCount, (unsigned)gReportCount);
   if (gReportCount == 0) {
@@ -489,8 +484,11 @@ int onGapEvent(ble_gap_event* event, void* /*arg*/) {
       if (markSeen(event->disc.addr.val)) {
         // First sighting of this address: dump everything about it once.
         char hex[3 * 31 + 1] = {0};
-        const uint8_t n = event->disc.length_data > 31 ? 31 : event->disc.length_data;
-        for (uint8_t i = 0; i < n; ++i) snprintf(hex + i * 3, 4, "%02x ", event->disc.data[i]);
+        // Named apart from the `n` above (name length, out of scope by now) --
+        // cppcheck's flow analysis conflated the two same-named variables
+        // across these sibling blocks and misreported this loop as dead.
+        const uint8_t rawLen = event->disc.length_data > 31 ? 31 : event->disc.length_data;
+        for (uint8_t i = 0; i < rawLen; ++i) snprintf(hex + i * 3, 4, "%02x ", event->disc.data[i]);
         char uuids[64] = {0};
         int off = 0;
         for (uint8_t i = 0; i < fields.num_uuids16 && off < (int)sizeof(uuids) - 8; ++i) {

@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 
 // Which of a book's characters the reading font has no shape for.
 //
@@ -73,7 +75,7 @@ class Ledger {
   // far, exactly like the layout-scope notes it feeds. booknotes::Notes owns
   // both lifetimes so there is one place that can get it wrong.
   void reset() {
-    for (auto& slot : slots) slot = 0;
+    std::fill(std::begin(slots), std::end(slots), 0);
     distinctCount = 0;
     saturated = false;
   }

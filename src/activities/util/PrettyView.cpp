@@ -7,7 +7,9 @@
 #include <Logging.h>
 #include <Memory.h>
 
+#include <algorithm>
 #include <cstring>
+#include <iterator>
 
 namespace {
 
@@ -126,10 +128,7 @@ std::string prettyHtml(const std::string& in) {
     static const char* kBlocks[] = {"p",       "div",     "br",     "li",     "tr",         "h1", "h2",
                                     "h3",      "h4",      "h5",     "h6",     "ul",         "ol", "table",
                                     "section", "article", "header", "footer", "blockquote", "hr", "title"};
-    for (const char* b : kBlocks) {
-      if (t == b) return true;
-    }
-    return false;
+    return std::any_of(std::begin(kBlocks), std::end(kBlocks), [&t](const char* b) { return t == b; });
   };
   const auto emitNewline = [&out] {
     if (!out.empty() && out.back() != '\n') out += '\n';

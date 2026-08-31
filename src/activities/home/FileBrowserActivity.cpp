@@ -38,6 +38,11 @@ void FileBrowserActivity::loadFiles() {
 
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(fileNameBuffer.get(), NAME_BUFFER_SIZE);
+    // showsHiddenEntries() is a switch that always returns false today
+    // (FileBrowserActivity.h), deliberately kept as a switch rather than
+    // `return false` so a future Mode enumerator fails to compile under
+    // -Wswitch instead of silently falling through. Not a bug.
+    // cppcheck-suppress knownConditionTrueFalse
     if ((!showsHiddenEntries() && fileNameBuffer[0] == '.') ||
         strcmp(fileNameBuffer.get(), "System Volume Information") == 0) {
       continue;

@@ -543,9 +543,12 @@ void WifiSelectionActivity::checkConnectionStatus() {
     return;
   }
 
-  // Check for timeout
-  const unsigned long timeoutMs = autoConnecting ? AUTO_CONNECTION_TIMEOUT_MS : CONNECTION_TIMEOUT_MS;
-  if (millis() - connectionStartTime > timeoutMs) {
+  // Check for timeout. Auto-connect and manual connect share one timeout
+  // (unified 2026-08-02, commit 1e48ced: "the auto timeout matches the manual
+  // 15s") -- the all-channel scan, WPA handshake and DHCP take the same real
+  // time regardless of who initiated the attempt, and `autoConnecting` no
+  // longer picks between two values.
+  if (millis() - connectionStartTime > CONNECTION_TIMEOUT_MS) {
     WiFi.disconnect();
     connectionError = tr(STR_ERROR_CONNECTION_TIMEOUT);
     appendDisconnectReason(connectionError);

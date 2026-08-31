@@ -784,21 +784,6 @@ void NoteEditorActivity::render(RenderLock&&) {
     return;
   }
 
-  if (oomFailed || !buf) {
-    // Wrapped and translated for the same reason as Claude's hint: a raw
-    // drawText of a long English literal overflows once the editor font is a
-    // monospace face, and it is user-facing text, so it must go through tr().
-    const auto oomLines = renderer.wrappedText(editorFontId, tr(STR_EDITOR_OOM), maxWidth, 3);
-    for (size_t n = 0; n < oomLines.size(); ++n) {
-      renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
-                        oomLines[n].c_str());
-    }
-    const auto oomLabels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
-    GUI.drawButtonHints(renderer, oomLabels.btn1, oomLabels.btn2, oomLabels.btn3, oomLabels.btn4);
-    renderer.displayBuffer();
-    return;
-  }
-
   const size_t cl = lineOfCursor();
   for (size_t n = 0; n < static_cast<size_t>(maxLines) && topLine + n < lines.size(); ++n) {
     const DisplayLine& dl = lines[topLine + n];

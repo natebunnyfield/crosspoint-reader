@@ -49,13 +49,13 @@ struct Fragment {
 //
 // getTextAdvanceX is the renderer's own answer to the same question, and it
 // snaps its fixed-point arithmetic exactly the way drawText does.
-int advanceOf(GfxRenderer& renderer, int fontId, const char* piece, EpdFontFamily::Style style);
+int advanceOf(const GfxRenderer& renderer, int fontId, const char* piece, EpdFontFamily::Style style);
 
 // Width the line OCCUPIES once drawn: the hanging indent plus the advance of
 // every styled span, markers excluded. Equal to what drawLine() returns when
 // called with originX 0, by construction -- both walk the same spans in the
 // same order -- so a caller that wraps on this wraps on what it will draw.
-int measureLine(GfxRenderer& renderer, int fontId, int indentStep, const char* text, size_t len);
+int measureLine(const GfxRenderer& renderer, int fontId, int indentStep, const char* text, size_t len);
 
 // Pen x, relative to originX, at which SOURCE byte `column` is drawn.
 //
@@ -64,7 +64,7 @@ int measureLine(GfxRenderer& renderer, int fontId, int indentStep, const char* t
 // the end of the run it closes. That is the honest answer for a caret: it sits
 // against the text the typist is editing rather than floating in the gap where
 // the markers used to be.
-int caretX(GfxRenderer& renderer, int fontId, int indentStep, const char* text, size_t len, size_t column);
+int caretX(const GfxRenderer& renderer, int fontId, int indentStep, const char* text, size_t len, size_t column);
 
 // Greedy wrap of one markdown SOURCE line into fragments that each render
 // within `maxWidth`.
@@ -81,7 +81,7 @@ int caretX(GfxRenderer& renderer, int fontId, int indentStep, const char* text, 
 // fragment keep the paragraph break. Returns the fragment count, capped at
 // maxFragments. Measurement is measureLine on the candidate substring -- the
 // same call the caller will draw with -- so wrap and draw cannot disagree.
-size_t wrapLine(GfxRenderer& renderer, int fontId, int indentStep, const char* text, size_t len, int maxWidth,
+size_t wrapLine(const GfxRenderer& renderer, int fontId, int indentStep, const char* text, size_t len, int maxWidth,
                 Fragment* out, size_t maxFragments);
 
 // Draw one display line of markdown at `y`, with its block marker in the gutter
@@ -96,7 +96,7 @@ size_t wrapLine(GfxRenderer& renderer, int fontId, int indentStep, const char* t
 // wrapLine() never need this; the Editor Font specimen is one fixed string
 // measured against five faces of different widths -- the widest overran the
 // pane and the last word was sliced by the panel edge. Pass 0 for no bound.
-int drawLine(GfxRenderer& renderer, int fontId, int indentStep, int originX, int y, const char* text, size_t len,
+int drawLine(const GfxRenderer& renderer, int fontId, int indentStep, int originX, int y, const char* text, size_t len,
              int maxX = 0);
 
 }  // namespace mdrender

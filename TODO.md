@@ -60,6 +60,68 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-028] Give the font-family step channel a direction, and wire "previous font" end to end
+**scope: firmware + simulator HAL · asked 2026-08-29 · PARTIALLY SHIPPED — the channel carries direction, nothing reads it yet**
+
+Owner: *"allow previous font to be an assignable gesture action."* The iOS half
+shipped 2026-08-29: `Action::FontFamilyStepBack = 12` exists in
+`../crosspoint-simulator/ios/GestureBindings.h`, is offered in Settings.app and
+bindable, but does nothing when fired — it deliberately logs "font family step
+BACK (offered, not wired -- no direction on the firmware's host channel)"
+rather than faking it. Full account, including the shake-outside-zen fix that
+shipped alongside it: `../crosspoint-simulator/docs/zen-mode.md`, "Shake fires
+outside zen, and 'previous font' is now assignable".
+
+**What shipped this session**: `../crosspoint-simulator/src/FontFamilyStepChannel.h`
+now carries a signed delta (+1/-1) instead of a bare boolean, chosen over an
+enum because it is the exact shape `EpubReaderActivity::cycleReaderFontFamily(int
+delta)` already takes and a held side button already uses
+(`held.next ? +1 : -1`, `src/activities/reader/EpubReaderActivity.cpp:601`).
+`inject()` and `consume()` kept their original zero-argument shapes so
+`crosspoint-simulator/src/HalGPIO.cpp`'s existing two call sites compile and
+behave exactly as before — this change is additive only, and the shake, which
+already worked, is untouched.
+
+**What is still open, and why it could not go further this session.** The
+firmware's `EpubReaderActivity.cpp:412-414` still hardcodes
+`cycleReaderFontFamily(+1)`, because reading `direction()` from the reader
+needs a NEW `HalGPIO` method, and per this project's HAL stub rule that method
+has to exist, with the identical signature, on BOTH halves:
+
+1. `crosspoint-reader/lib/hal/HalGPIO.h:276`'s inline no-op (mine, firmware) —
+   would need e.g. `bool consumeFontFamilyStep(int& delta)` returning false and
+   leaving `delta` untouched, so it stays a no-op on device.
+2. `crosspoint-simulator/src/HalGPIO.h` (declares `consumeFontFamilyStep()` /
+   `injectFontFamilyStep()`, `HalGPIO.cpp` implements them) — the matching real
+   implementation, reading `FontFamilyStepChannel::direction()`.
+
+**(1) and (2) have to land in the SAME change.** The desktop canary
+(`pio run -e simulator`, run from this repo) builds `EpubReaderActivity.cpp`
+against `crosspoint-simulator`'s `HalGPIO` — confirmed via
+`platformio.ini`'s `[env:simulator]`: `lib_ignore = hal` excludes this repo's
+own `lib/hal/` entirely, and `lib_deps` pulls in
+`simulator=symlink://../crosspoint-simulator`, whose `src/HalGPIO.h` supplies
+the class firmware code actually links against for that env. Landing only the
+firmware side (this repo) would leave `EpubReaderActivity.cpp` calling a method
+`crosspoint-simulator`'s `HalGPIO` does not declare, breaking that canary; the
+reverse (simulator-only) leaves the reader still hardcoded to +1. This session
+was scoped to firmware plus exactly one simulator file
+(`FontFamilyStepChannel.h`) and could not touch `crosspoint-simulator/src/HalGPIO.{h,cpp}`,
+so (1) and (2) are left for whoever next has write access to both.
+
+3. Once (1) and (2) exist, `EpubReaderActivity.cpp:412-414` reads the delta and
+   calls `cycleReaderFontFamily(delta)` instead of the hardcoded `+1` — no
+   further reader changes needed, `cycleReaderFontFamily` already accepts
+   either sign.
+4. `../crosspoint-simulator/ios/CrossPointZenRecognizers.mm`'s
+   `FontFamilyStepBack` case calls the new `injectFontFamilyStep(-1)` instead
+   of only logging.
+
+Done looks like: a device shake bound forward and a gesture bound to "Previous
+Reading Font" both step the reading font family, in opposite directions, and
+`FontFamilyStepChannel`'s comment block (its own "still open" section) is
+deleted because it is no longer true.
+
 ### [T-027] Rewrite hold-for-action to fit the gesture model
 **scope: firmware input + ios gestures · asked 2026-08-28 · RESCOPED 2026-08-29 · BLOCKED on an owner ruling**
 
@@ -118,71 +180,6 @@ Every recognizer today is either always-on or zen-only; "only on Manage Files"
 is a third kind. Whether that is a per-activity enable or a gesture that fires
 everywhere and is ignored elsewhere is the design question, and the second is
 usually the one that ages better.
-
-### [T-026] Long-select a font in the reader font list to deactivate / reactivate it
-**scope: reader font picker · asked 2026-08-28 · DONE 2026-08-29 (reader picker)
-· OPEN: whether the EDITOR font screen gets the same gesture**
-
-Owner: *"long select on a font in reader font deactivate/reactivates it."*
-Restated 2026-08-29 as *"allow deactivation/reactivation of fonts by long hold
-in font selection screens"* -- plural, which is the open half below.
-
-**Shipped.** A hold on Confirm past `ReaderUtils::SKIP_HOLD_MS` in Reader Font
-switches the highlighted family off or back on. `SETTINGS.fontsOff` stores the
-families switched OFF as a comma-separated list of directory names; the model
-and every refusal are `src/FontActivation.h`, host-tested and mutation-tested.
-The in-book cycle skips them (`EpubReaderActivity::cycleReaderFontFamily`); the
-PICKER does not, because it is the only place to turn one back on.
-
-**The four things it said to settle, as built.**
-
-1. *Last active cannot be deactivated* -- refused, spec untouched, and the
-   caption says "Last active font". Counted over the families the PICKER
-   offers, not the raw registry: a count including writing-only faces would let
-   the last reading family be switched off.
-2. *What it looks like* -- the row keeps its normal drawing and gains an "Off"
-   badge where the applied row says "Selected". Off, not broken.
-3. *The active font's own case* -- deactivating the family being read moves the
-   reader to the next ACTIVE family in the picker's order, which is the order
-   the cycle walks, so "next" means the same thing in both places.
-4. *The built-in fallback* -- it does not participate. It is listed only when
-   nothing else is, which is the state rule 1 already protects, so a hold on it
-   is refused with the same message.
-
-**One claim in the original entry was wrong** and is corrected here rather than
-left: it said "`FontSelectionActivity` already has a long-press handler". Neither
-font screen had one. Confirm had to move from the press edge to the release
-edge to make room for a hold, because a press-edge action fires before a hold
-can be recognised.
-
-**Verified headlessly, from a restored card each time** (`fs_/.crosspoint/`
-carried state between the first two arms and made a correct round trip read as a
-failure -- the trap `CLAUDE.md` documents, paid again):
-
-- one hold on a non-applied row -> `fontsOff = 'TeXGyreHeros'`, row shows "Off"
-- hold, then hold again, from a clean card -> `fontsOff = ''` (byte round trip)
-- every family but one switched off, hold on the survivor -> spec UNCHANGED,
-  caption reads "Last active font"
-
-That also answers a question worth recording: **`getHeldTime()` does work under
-`QTAP:<BUTTON>:<holdMs>`**, so hold gestures ARE headlessly testable here. The
-`SDL_PushEvent` limitation in `CLAUDE.md` applies to `RAWKEY`, not to `QTAP`,
-which writes `syntheticButtonDown[]` directly.
-
-**STILL OPEN: the editor font screen.** The owner's 2026-08-29 wording is
-plural, but `EditorFontSelectionActivity` is a different shape and the feature
-does not obviously carry over:
-
-- it lists a FIXED compiled table (`editorfonts::FAMILIES`), not the SD
-  registry, so several rows are built-ins with no card directory name --
-  `fontsOff` is keyed by directory name and cannot address them;
-- there is **no editor font cycle**. Checked: `NoteEditorActivity` resolves one
-  font and nothing steps through the list. Deactivation's whole value in the
-  reader was shortening a cycle without deleting `.cpfont` files, and that value
-  does not exist here -- it would only hide rows on the one screen you must
-  visit to unhide them.
-
-So it is a decision, not an oversight. Left for the owner.
 
 ### [T-022] Claude results: the FRONT pair should page too
 
@@ -353,6 +350,90 @@ the cheap version and needs no keychain.
 ---
 
 ## Finished
+
+### [T-026] Long-select a font in the reader font list to deactivate / reactivate it — DONE 2026-08-29
+**scope: reader font picker · asked 2026-08-28 · reader picker DONE 2026-08-29
+· editor half RULED OUT 2026-08-29 · CLOSED**
+
+**Closed 2026-08-29.** The reader half shipped (`src/FontActivation.h`,
+`src/activities/settings/FontSelectionActivity.cpp:339-407`, the
+`STR_FONT_LAST_ACTIVE` refusal path, `ReaderUtils::SKIP_HOLD_MS` at
+`src/activities/reader/ReaderUtils.h:19` used at `FontSelectionActivity.cpp:218`).
+
+**The EDITOR half is ruled out, owner 2026-08-29**, asked directly whether font
+deactivation should apply to `EditorFontSelectionActivity` at all. It should
+not. That screen is keyed off the COMPILED `editorfonts::FAMILIES` table
+(`EditorFontSelectionActivity.cpp:112,352,394,406`) rather than the SD-card font
+registry the reader scans, and there is no cycle function for it anywhere in
+`src/` -- verified by grep across `EditorFontSelectionActivity.cpp` and
+`NoteEditorActivity.cpp`. Deactivating entries in a fixed list of a few faces
+buys little, and each is there because it earns its place for note-taking.
+Building it would also need somewhere to persist "deactivated" for a compiled
+table, plus an editor equivalent of the last-active refusal.
+
+Recorded as a RULING rather than a deferral: it stops appearing in triage.
+
+
+Owner: *"long select on a font in reader font deactivate/reactivates it."*
+Restated 2026-08-29 as *"allow deactivation/reactivation of fonts by long hold
+in font selection screens"* -- plural, which is the open half below.
+
+**Shipped.** A hold on Confirm past `ReaderUtils::SKIP_HOLD_MS` in Reader Font
+switches the highlighted family off or back on. `SETTINGS.fontsOff` stores the
+families switched OFF as a comma-separated list of directory names; the model
+and every refusal are `src/FontActivation.h`, host-tested and mutation-tested.
+The in-book cycle skips them (`EpubReaderActivity::cycleReaderFontFamily`); the
+PICKER does not, because it is the only place to turn one back on.
+
+**The four things it said to settle, as built.**
+
+1. *Last active cannot be deactivated* -- refused, spec untouched, and the
+   caption says "Last active font". Counted over the families the PICKER
+   offers, not the raw registry: a count including writing-only faces would let
+   the last reading family be switched off.
+2. *What it looks like* -- the row keeps its normal drawing and gains an "Off"
+   badge where the applied row says "Selected". Off, not broken.
+3. *The active font's own case* -- deactivating the family being read moves the
+   reader to the next ACTIVE family in the picker's order, which is the order
+   the cycle walks, so "next" means the same thing in both places.
+4. *The built-in fallback* -- it does not participate. It is listed only when
+   nothing else is, which is the state rule 1 already protects, so a hold on it
+   is refused with the same message.
+
+**One claim in the original entry was wrong** and is corrected here rather than
+left: it said "`FontSelectionActivity` already has a long-press handler". Neither
+font screen had one. Confirm had to move from the press edge to the release
+edge to make room for a hold, because a press-edge action fires before a hold
+can be recognised.
+
+**Verified headlessly, from a restored card each time** (`fs_/.crosspoint/`
+carried state between the first two arms and made a correct round trip read as a
+failure -- the trap `CLAUDE.md` documents, paid again):
+
+- one hold on a non-applied row -> `fontsOff = 'TeXGyreHeros'`, row shows "Off"
+- hold, then hold again, from a clean card -> `fontsOff = ''` (byte round trip)
+- every family but one switched off, hold on the survivor -> spec UNCHANGED,
+  caption reads "Last active font"
+
+That also answers a question worth recording: **`getHeldTime()` does work under
+`QTAP:<BUTTON>:<holdMs>`**, so hold gestures ARE headlessly testable here. The
+`SDL_PushEvent` limitation in `CLAUDE.md` applies to `RAWKEY`, not to `QTAP`,
+which writes `syntheticButtonDown[]` directly.
+
+**STILL OPEN: the editor font screen.** The owner's 2026-08-29 wording is
+plural, but `EditorFontSelectionActivity` is a different shape and the feature
+does not obviously carry over:
+
+- it lists a FIXED compiled table (`editorfonts::FAMILIES`), not the SD
+  registry, so several rows are built-ins with no card directory name --
+  `fontsOff` is keyed by directory name and cannot address them;
+- there is **no editor font cycle**. Checked: `NoteEditorActivity` resolves one
+  font and nothing steps through the list. Deactivation's whole value in the
+  reader was shortening a cycle without deleting `.cpfont` files, and that value
+  does not exist here -- it would only hide rows on the one screen you must
+  visit to unhide them.
+
+So it is a decision, not an oversight. Left for the owner.
 
 ### [T-024] Say what SCRIPT Almendra descends from, in the font metainfo — DONE 2026-08-29
 **scope: font metadata · asked 2026-08-27 · DONE 2026-08-29**

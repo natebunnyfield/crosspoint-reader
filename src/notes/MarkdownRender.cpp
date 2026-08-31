@@ -34,11 +34,12 @@ bool isBreakSpace(char c) { return c == ' ' || c == '\t'; }
 
 }  // namespace
 
-int advanceOf(GfxRenderer& renderer, int fontId, const char* piece, EpdFontFamily::Style style) {
+int advanceOf(const GfxRenderer& renderer, int fontId, const char* piece, EpdFontFamily::Style style) {
   return renderer.getTextAdvanceX(fontId, piece, style);
 }
 
-int measureLine(GfxRenderer& renderer, const int fontId, const int indentStep, const char* text, const size_t len) {
+int measureLine(const GfxRenderer& renderer, const int fontId, const int indentStep, const char* text,
+                const size_t len) {
   if (text == nullptr || len == 0) return 0;
   const mdspans::Line md = mdspans::analyze(text, len);
 
@@ -53,7 +54,7 @@ int measureLine(GfxRenderer& renderer, const int fontId, const int indentStep, c
   return x;
 }
 
-int caretX(GfxRenderer& renderer, const int fontId, const int indentStep, const char* text, const size_t len,
+int caretX(const GfxRenderer& renderer, const int fontId, const int indentStep, const char* text, const size_t len,
            const size_t column) {
   if (text == nullptr || len == 0) return 0;
   const mdspans::Line md = mdspans::analyze(text, len);
@@ -81,7 +82,7 @@ int caretX(GfxRenderer& renderer, const int fontId, const int indentStep, const 
   return x;  // past the last span: a closing marker, or the end of the line
 }
 
-size_t wrapLine(GfxRenderer& renderer, const int fontId, const int indentStep, const char* text, const size_t len,
+size_t wrapLine(const GfxRenderer& renderer, const int fontId, const int indentStep, const char* text, const size_t len,
                 const int maxWidth, Fragment* out, const size_t maxFragments) {
   if (out == nullptr || maxFragments == 0) return 0;
   if (text == nullptr || len == 0 || maxWidth <= 0) {
@@ -124,7 +125,7 @@ size_t wrapLine(GfxRenderer& renderer, const int fontId, const int indentStep, c
   return count;
 }
 
-int drawLine(GfxRenderer& renderer, int fontId, int indentStep, int originX, int y, const char* text, size_t len,
+int drawLine(const GfxRenderer& renderer, int fontId, int indentStep, int originX, int y, const char* text, size_t len,
              int maxX) {
   const mdspans::Line md = mdspans::analyze(text, len);
 

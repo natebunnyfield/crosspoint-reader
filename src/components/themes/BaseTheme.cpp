@@ -825,7 +825,7 @@ void drawGeneratedCoverBand(const GfxRenderer& renderer, const int x, const int 
         const int cxm = (cx0 + cx1) / 2;
         const int phase = (col % 2 == 0) ? 0 : step / 2;
         for (int ry = y - step + phase; ry < y + h; ry += step) {
-          int xs[6] = {cx0, cxm, cx1, cx1, cxm, cx0};
+          const int xs[6] = {cx0, cxm, cx1, cx1, cxm, cx0};
           int ys[6] = {ry, ry + drop, ry, ry + stripe, ry + drop + stripe, ry + stripe};
           for (int& v : ys) v = std::clamp(v, y, y + h);
           renderer.fillPolygon(xs, ys, 6, true);
@@ -858,7 +858,7 @@ void drawGeneratedCoverBand(const GfxRenderer& renderer, const int x, const int 
       const int cell = 5 * t;
       for (int ry = y + t; ry + cell <= y + h; ry += cell + 2 * t) {
         for (int cx = x; cx < x + w; cx += cell) {
-          for (const auto& rct : KEY_RECTS) {
+          for (const int (&rct)[4] : KEY_RECTS) {
             const int rx = cx + rct[0] * t;
             const int rw = std::min(rct[2] * t, x + w - rx);
             if (rw > 0) renderer.fillRect(rx, ry + rct[1] * t, rw, rct[3] * t, true);

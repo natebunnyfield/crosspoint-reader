@@ -2,9 +2,11 @@
 
 #include <I18n.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <initializer_list>
 
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
@@ -120,9 +122,10 @@ void DaisyEntryActivity::longPick(const int slot) {
 // which does not avoid the collision — it guarantees one.
 int DaisyEntryActivity::labelFontId() const {
   // Largest first. UI_10 is the reading size; SMALL is the fallback.
-  for (const int id : {UI_10_FONT_ID, SMALL_FONT_ID}) {
-    if (columnFits(renderer.getLineHeight(id))) return id;
-  }
+  const std::initializer_list<int> candidates = {UI_10_FONT_ID, SMALL_FONT_ID};
+  const auto it = std::find_if(candidates.begin(), candidates.end(),
+                               [this](int id) { return columnFits(renderer.getLineHeight(id)); });
+  if (it != candidates.end()) return *it;
   // Nothing fits: take the smallest and let it overlap rather than draw
   // nothing, but say so — this means the geometry needs revisiting, not that
   // the owner did something wrong.

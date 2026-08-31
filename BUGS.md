@@ -2362,6 +2362,69 @@ already runs the same gate locally. `Compile Release Candidate`'s
 reading; the skip on a `main` push is the workflow behaving exactly as
 written.
 
+## Follow-up 2026-08-29 (later the same day): `ActivityInputTest`'s link failure closed — the double option, not the real-.cpp option
+
+The decision the prior follow-up left open ("link the real .cpp for real, or
+double `saveToFile()`, or reroute the feature's persistence") was made and
+implemented: **doubled**, matching the existing `SdCardFontSystem` /
+`CrossPointSettings::getReaderFontId()` pattern in this same target rather than
+pulling `CrossPointSettings.cpp` / `PersistableStore.cpp` (and their
+`JsonSettingsIO` / real SD file I/O) into a suite that is deliberately
+hermetic. `FontSelectionActivity` was not dropped from the target either — both
+alternatives were considered and rejected, per instruction.
+
+Two out-of-line no-op bodies added to `test/activity_input/HostHarness.cpp`
+(next to the existing `CrossPointSettings` double section, `HostHarness.cpp`
+~144-156):
+```cpp
+bool PersistableStoreBase::writeDocToFile(const char*, const JsonDocument&) { return true; }
+void CrossPointSettings::toJson(JsonDocument&) const {}
+```
+This satisfies both symbols the linker named (`PersistableStoreBase::
+writeDocToFile`, `CrossPointSettings::toJson`) without linking
+`PersistableStore.cpp` or `CrossPointSettings.cpp`. `test/activity_input/
+CMakeLists.txt`'s header comment was extended (not rewritten) to say so.
+
+**Checked whether the no-op is honest before writing it, per instruction:**
+`find test -type f \( -name '*.cpp' -o -name '*.h' \) -print0 | xargs -0 grep -l
+'saveToFile\|writeDocToFile'` across the whole `test/` tree returns only the
+two new call sites — **no test anywhere in this suite asserts on persisted
+(file or JSON) content**; the only settings-related assertions
+(`ActivityInputTest.cpp:612,622,631`) read `SETTINGS.fontSizeSlot` directly,
+the in-memory field the input handling wrote, not anything written to disk. So
+a silent no-op is the correct double, not a shortcut past a real assertion.
+
+**Reproduced red, then green, exactly as CI runs it:**
+- `pio run -e default` — success (92 s).
+- `cmake -S test -B build/test` (clean `build/test`) then `cmake --build
+  build/test` — **before the fix**: every other target built; `ActivityInputTest`
+  failed at link with the exact two undefined symbols quoted in the follow-up
+  above. **After the fix**: full `cmake --build build/test` (all targets)
+  completed with no errors, `ActivityInputTest` present and linked
+  (`build/test/activity_input/ActivityInputTest`, 2,092,592 bytes).
+- `ctest --test-dir build/test --output-on-failure`: **100% tests passed out of
+  601** (2 disabled by design: `LineBreakQuality.Sweep`,
+  `LineBreakQuality.RaggedGateSweep`). All 37 cases that live in the
+  `ActivityInputTest` binary (`ActivityInput.*`, `TypedTextEntry.*`,
+  `ClaudeChatSend.*`, `ListPaging.*` — ctest test IDs 258-294) are in that
+  passing count, including the pre-existing `ActivityInput.
+  SideButtonChangesFontSizeUnderTheRenderLock` case that reads
+  `SETTINGS.fontSizeSlot`. Nothing newly-running failed.
+- `pio run -e simulator` — success (7 s), confirming the firmware (which links
+  the *real* `CrossPointSettings.cpp` / `PersistableStore.cpp`, unaffected by
+  this test-only double) still builds.
+
+**Not this pass's job, left alone:** the `clang-format` / `cppcheck` /
+`Compile Release` items above are unchanged by this pass. `ci.yml` itself was
+not touched here — the prior follow-up already added the `pio run -e default`
+step ahead of the CMake configure; this pass only closes the build-time gap it
+found underneath. **Net: with both follow-ups applied, `unit-tests`
+configures, builds every target including `ActivityInputTest`, and 100% of the
+601 runnable tests pass locally** — the remaining red CI jobs are
+`clang-format` (fixed, needs commit+push), `cppcheck` (32 LOW findings,
+enumerated, awaiting a fix/suppress ruling), and `Compile Release` (awaiting a
+CI-fonts ruling), none of which this pass touched.
+
 ### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
 

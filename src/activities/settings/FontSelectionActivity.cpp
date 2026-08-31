@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
+#include <numeric>
 
 #include "CrossPointSettings.h"
 #include "FontActivation.h"
@@ -665,9 +667,9 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
     const int italicLines = maxLines >= 4 ? 2 : (maxLines >= 2 ? 1 : 0);
     const int bodyLines = std::max(1, maxLines - italicLines);
 
-    for (auto& line : renderer.wrappedText(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE), width, bodyLines)) {
-      lines.push_back({std::move(line), EpdFontFamily::REGULAR, 0});
-    }
+    auto bodyWrapped = renderer.wrappedText(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE), width, bodyLines);
+    std::transform(bodyWrapped.begin(), bodyWrapped.end(), std::back_inserter(lines),
+                   [](std::string& line) { return SpecimenLine{std::move(line), EpdFontFamily::REGULAR, 0}; });
     if (italicLines > 0) {
       bool first = true;
       for (auto& line : renderer.wrappedText(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE_ITALIC), width, italicLines,
@@ -702,13 +704,14 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
     // Translations that have not been given a multi-line specimen are a single
     // string and keep the original wrap-in-regular behavior, so nothing breaks
     // for the other 28 languages.
-    for (auto& line : renderer.wrappedText(fontId, previewText, width, maxLines)) {
-      lines.push_back({std::move(line), EpdFontFamily::REGULAR, 0});
-    }
+    auto wrapped = renderer.wrappedText(fontId, previewText, width, maxLines);
+    std::transform(wrapped.begin(), wrapped.end(), std::back_inserter(lines),
+                   [](std::string& line) { return SpecimenLine{std::move(line), EpdFontFamily::REGULAR, 0}; });
   }
 
-  int blockHeight = 0;
-  for (const auto& line : lines) blockHeight += line.gapBefore + lineStep;
+  int blockHeight = std::accumulate(lines.begin(), lines.end(), 0, [lineStep](int acc, const SpecimenLine& line) {
+    return acc + line.gapBefore + lineStep;
+  });
   blockHeight = std::max(0, blockHeight - 2);
 
   const int textBottomLimit = top + height - labelReserved;

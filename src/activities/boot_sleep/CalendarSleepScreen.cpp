@@ -139,10 +139,9 @@ struct CalendarFonts {
 // against builds that omit a face (OMIT_FONTS) rather than drawing nothing.
 int firstAvailable(const GfxRenderer& renderer, std::initializer_list<int> candidates) {
   const auto& fontMap = renderer.getFontMap();
-  for (const int id : candidates) {
-    if (id != 0 && fontMap.count(id) > 0) return id;
-  }
-  return 0;
+  const auto it = std::find_if(candidates.begin(), candidates.end(),
+                               [&fontMap](int id) { return id != 0 && fontMap.count(id) > 0; });
+  return it != candidates.end() ? *it : 0;
 }
 
 CalendarFonts resolveFonts(GfxRenderer& renderer) {
@@ -345,7 +344,7 @@ void formatHeader(char* buf, size_t bufSize, const YMD& first, const YMD& last, 
 // Drawing
 // ---------------------------------------------------------------------------
 
-void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const YMD& date, bool isToday,
+void drawDayCell(const GfxRenderer& renderer, const Layout& L, int row, int col, const YMD& date, bool isToday,
                  bool isHoliday, bool showMonthSubscript) {
   const int cx = L.colCentreX(col);
   const int cy = L.rowCentreY(row);
@@ -389,7 +388,7 @@ void drawDayCell(GfxRenderer& renderer, const Layout& L, int row, int col, const
   }
 }
 
-void drawHeader(GfxRenderer& renderer, const Layout& L, const YMD& first, const YMD& last) {
+void drawHeader(const GfxRenderer& renderer, const Layout& L, const YMD& first, const YMD& last) {
   char header[80];
   const int avail = L.screenW - 2 * L.marginX;
   formatHeader(header, sizeof(header), first, last, renderer, L.fonts.display, avail, L.style);
