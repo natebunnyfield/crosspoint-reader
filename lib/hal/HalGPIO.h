@@ -273,7 +273,11 @@ class HalGPIO {
   // the poll folds away on device. The simulator implements it for real; the
   // contract lives in its src/FontFamilyStepChannel.h (consume-once, bursts
   // collapse to one step).
-  bool consumeFontFamilyStep() { return false; }
+  // Signed since 2026-08-29: 0 none, +1 next family, -1 previous. It was a
+  // bool until "previous font" became an assignable gesture action and the
+  // channel needed a direction to carry. Constant 0 here, so the poll still
+  // folds away on device.
+  int consumeFontFamilyStep() { return 0; }
 
   // The reader's FINAL text-block insets — top after the paint-time cap-ink
   // trim, then right, bottom, left — in FRAMEBUFFER pixels (logical px times

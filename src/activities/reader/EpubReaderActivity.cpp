@@ -50,24 +50,6 @@ bool isInReadFolder(const std::string& path) {
   return path.size() > n && path.compare(0, n, READ_FOLDER) == 0 && path[n] == '/';
 }
 
-struct ProgressRange {
-  float start;
-  float end;
-};
-
-ProgressRange getPageProgressRange(const std::shared_ptr<Epub>& epub, const int spineIndex, const int page,
-                                   const int pageCount) {
-  if (pageCount <= 1) {
-    return {epub->calculateProgress(spineIndex, 0.0f), epub->calculateProgress(spineIndex, 1.0f)};
-  }
-
-  const float step = 1.0f / static_cast<float>(pageCount - 1);
-  const float anchor = std::clamp(static_cast<float>(page) * step, 0.0f, 1.0f);
-  const float start = std::max(0.0f, anchor - (step * 0.5f));
-  const float end = std::min(1.0f, anchor + (step * 0.5f));
-  return {epub->calculateProgress(spineIndex, start), epub->calculateProgress(spineIndex, end)};
-}
-
 // Pick a non-colliding destination path inside /Read/ for a finished book.
 // Mirrors the suffixing scheme used elsewhere: "name.epub" -> "name (2).epub", etc.
 std::string buildReadFolderDestination(const std::string& srcPath) {
@@ -274,6 +256,12 @@ void EpubReaderActivity::loop() {
     RenderLock lock;  // the page table must not change under the scan
     // Re-check under the lock: peek() and acquisition are not atomic, so the render
     // task may have reset/replaced the section or moved the page in between.
+    // cppcheck's single-threaded flow analysis cannot see that mutation and
+    // reports both conditions as redundant given the outer check a few lines
+    // up; they are not -- this re-check is load-bearing and guards a real
+    // cross-thread race. Do not "simplify" it away.
+    // cppcheck-suppress knownConditionTrueFalse
+    // cppcheck-suppress knownConditionTrueFalse
     if (section && !section->isBuilding() &&
         (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage)) {
       idlePrewarmSpine = currentSpineIndex;
@@ -400,18 +388,21 @@ void EpubReaderActivity::loop() {
     pendingReadFolderMove = false;
   }
 
-  // Host shake -> next reading font family (owner 2026-08-22: "change reader
-  // font on shake in zen mode"). A host-capability channel like the keyboard
-  // one: on device consumeFontFamilyStep() is an inline constant-false no-op
+  // Host shake -> step the reading font family (owner 2026-08-22: "change
+  // reader font on shake in zen mode"). SIGNED since 2026-08-29: the host can
+  // ask for the PREVIOUS family too, which is an assignable gesture action on
+  // iOS. The sign is passed straight to cycleReaderFontFamily, which has always
+  // taken a delta -- the held side button calls it with -1 at :601. A host-capability channel like the keyboard
+  // one: on device consumeFontFamilyStep() is an inline constant-zero no-op
   // (lib/hal/HalGPIO.h) and this branch folds away; the simulator implements
   // it for real (iOS shake while zen is on, SHAKE in a desktop input script).
   // Polled here and nowhere else — the reader is the one place a family step
   // means something — and routed through the SAME cycle the held side button
   // uses, so persistence, position preservation and repagination are that
   // path's, not a second copy.
-  if (gpio.consumeFontFamilyStep()) {
-    LOG_DBG("ERS", "Host font-family step (shake)");
-    cycleReaderFontFamily(+1);
+  if (const int step = gpio.consumeFontFamilyStep(); step != 0) {
+    LOG_DBG("ERS", "Host font-family step (%s)", step < 0 ? "previous" : "next");
+    cycleReaderFontFamily(step);
     return;
   }
 
@@ -1555,6 +1546,11 @@ int fallbackReaderLineHeight(const GfxRenderer& renderer) {
 
 void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const int fontId, const int xOffset,
                           const int yOffset) {
+  // Correctly always-true on a device build: HalGPIO::readAloudCaptureWanted()
+  // is a hard `return false` in lib/hal/HalGPIO.h, by architecture -- capture
+  // is a simulator/iOS-only feature, and this HAL entry point exists so the
+  // firmware compiles the same code path on every platform. Not a bug.
+  // cppcheck-suppress knownConditionTrueFalse
   if (!gpio.readAloudCaptureWanted()) return;
 
   // Flatten the display list into the pure grouping's inputs. Token text points
@@ -1601,9 +1597,9 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
   // `tokens` is complete and will not reallocate; now point the lines at it.
   std::vector<readaloud::CaptureLine> lines;
   lines.reserve(spans.size());
-  for (const auto& s : spans) {
-    lines.push_back({s.x, s.yTop, tokens.data() + s.begin, s.count, s.barrierBefore});
-  }
+  std::transform(spans.begin(), spans.end(), std::back_inserter(lines), [&tokens](const LineSpan& s) {
+    return readaloud::CaptureLine{s.x, s.yTop, tokens.data() + s.begin, s.count, s.barrierBefore};
+  });
 
   readaloud::CaptureMetrics metrics;
   metrics.lineHeight = renderer.getLineHeight(fontId);
