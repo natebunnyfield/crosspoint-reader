@@ -625,30 +625,9 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  const unsigned long heldMs = (touch.prev || touch.next) ? touch.heldMs : mappedInput.getHeldTime();
-  const bool longPress = heldMs > ReaderUtils::SKIP_HOLD_MS;
-
-  if (longPress && SETTINGS.longPressButtonBehavior == SETTINGS.CHAPTER_SKIP) {
-    if (!nextTriggered && section && section->currentPage > 0) {
-      section->currentPage = 0;
-      requestUpdate();
-      return;
-    }
-
-    // We don't want to delete the section mid-render, so grab the semaphore
-    {
-      RenderLock lock(*this);
-      nextPageNumber = 0;
-      if (nextTriggered) {
-        currentSpineIndex++;
-      } else if (currentSpineIndex > 0) {
-        currentSpineIndex--;
-      }
-      section.reset();
-    }
-    requestUpdate();
-    return;
-  }
+  // Chapter skip (long-press page-turn -> jump a whole chapter) was retired
+  // 2026-09-01 (owner ruling, docs/hold-gestures.md). Page turning below is
+  // now unconditional on hold duration.
 
   // NOTE: the font-size step is handled ABOVE, on the held state, before detectPageTurn.
   // It used to live here keyed off the release edge; that is what made it feel laggy.

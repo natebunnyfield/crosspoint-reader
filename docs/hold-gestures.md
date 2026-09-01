@@ -56,6 +56,33 @@ Not one hold. Nine, spread across ten files, none of them agreeing.
 | 1500 | `HOLD_MS` | `src/activities/util/ClaudeChatActivity.cpp:265` | (local constant) |
 | 1500 | `HOLD_MS` | `src/activities/util/NoteEditorActivity.cpp:328` | (local constant) |
 
+**Post-kill update, 2026-09-01:** the table above is left as surveyed
+2026-08-29 — it is measurement of what was there, not a living reference —
+but three of its rows describe thresholds that no longer exist or have moved,
+per the RULING below:
+
+- The two **1500 ms `HOLD_MS`** rows (`ClaudeChatActivity.cpp:265`,
+  `NoteEditorActivity.cpp:328`) are GONE: both were the BLE-pairing hold
+  (`pollPairingGestures()`), deleted along with the function.
+- The **1000 ms `GO_HOME_MS`** row underclaimed the count — it was actually
+  TWO constants of the same name and value, one in `FileBrowserActivity.cpp:19`
+  (held Back -> root folder) and one in `FileManagerActivity.cpp:21` (held
+  Back -> root folder AND, on a separate line the row's "held Confirm -> menu"
+  fragment was trying to also describe, held Confirm -> action menu). The held-Back
+  half of both is gone. Both constants survive, renamed and narrowed to the
+  gesture that is left: `DELETE_HOLD_MS` in `FileBrowserActivity.cpp:22` (held
+  Confirm -> delete) and `CONFIRM_HOLD_MS` in `FileManagerActivity.cpp:23`
+  (held Confirm -> action menu, unchanged).
+- **700 ms `SKIP_HOLD_MS`** loses "chapter skip" from its gate list — the
+  CHAPTER_SKIP branches that read it in `EpubReaderActivity.cpp` and
+  `XtcReaderActivity.cpp` are deleted — but the constant itself stays exactly
+  as it was, still gating the font-family hold and font de/reactivate.
+
+Net count: **six** thresholds gone or merged away, so what was "nine, across
+ten files" is now effectively seven live gates across nine files (the touch,
+daisywheel/keyboard, clear-all, recent-book and zen-hold rows are all
+untouched).
+
 Four of these are file-local `constexpr` declared inside a `.cpp`, so nothing
 can see or reuse them. Two different constants are both named `LONG_PRESS_MS`
 and hold different values (500 and 1000). Four sites named `HOLD_MS` /
@@ -125,11 +152,11 @@ where it is typing ergonomics:
 
 | Hold | Fate | Notes |
 |---|---|---|
-| Up/Down 1500 ms -> BLE pairing (ClaudeChat, NoteEditor) | **KILL** | The silent display-stall trigger. Pairing itself must remain reachable -- the code's own comment says Daisy users pair from Settings, so that path exists; verify it covers everyone before deleting the gesture. |
-| Held Back 1000 ms -> Home (FileBrowser, FileManager `GO_HOME_MS`) | **KILL** | Back keeps its ordinary single-press meaning. |
-| `SKIP_HOLD_MS` chapter skip (`longPressButtonBehavior = CHAPTER_SKIP`) | **KILL** | FONT_SIZE_STEP was NOT named and stays. The setting persists as an integer, so CHAPTER_SKIP is retired the way renderScale=3 was: a stored value maps to a survivor, the option leaves the picker, nothing renumbers. |
-| Daisywheel / keyboard hold -> uppercase | **KEEP** | |
-| Delete hold -> clear-all | **KEEP** | |
+| Up/Down 1500 ms -> BLE pairing (ClaudeChat, NoteEditor) | **KILL — DONE 2026-09-01** | The silent display-stall trigger. Verified pairing remains reachable for everyone (not Daisy-only) at Settings -> Pair Bluetooth Keyboard / Forget Bluetooth Keyboard (`SettingsActivity.cpp:61-62,309-320`) before removing `pollPairingGestures()` from both activities. No gesture equivalent of the killed "hold Down: disconnect, keeping the bond" remains — Settings only offers Forget, which drops the bond too. |
+| Held Back 1000 ms -> Home (FileBrowser, FileManager `GO_HOME_MS`) | **KILL — DONE 2026-09-01** | Back is now a single ordinary short press in both activities; the `lockLongPressBack` guard machinery it needed is gone with it. `GO_HOME_MS` survived under a new name in each file (`DELETE_HOLD_MS` in FileBrowserActivity, `CONFIRM_HOLD_MS` in FileManagerActivity) because both files also reuse that same 1000 ms threshold for an UNNAMED, still-live gesture on a different button — held Confirm -> delete in FileBrowserActivity, held Confirm -> action menu in FileManagerActivity. Neither was touched. |
+| `SKIP_HOLD_MS` chapter skip (`longPressButtonBehavior = CHAPTER_SKIP`) | **KILL — DONE 2026-09-01** | Re-survey finding: `longPressButtonBehavior` was already a `static constexpr = FONT_SIZE_STEP` (2026-08-21 settings reduction, `CrossPointSettings.h:479`), never read from settings.json and with no picker row since that date — CHAPTER_SKIP was already unreachable before this ruling. There was no live value to remap at read time; the CHAPTER_SKIP branches in `EpubReaderActivity.cpp`/`XtcReaderActivity.cpp` were dead code (comparing one compile-time constant to another) and are now removed. The enum value stays defined at its slot (tombstoned, `CrossPointSettings.h:154`) per the append-only rule. |
+| Daisywheel / keyboard hold -> uppercase | **KEEP** | Untouched. |
+| Delete hold -> clear-all | **KEEP** | Untouched. |
 
 Not named, therefore untouched: font-size step (the shipped default),
 font de/reactivate in the reader font list (shipped 2026-08-29), the

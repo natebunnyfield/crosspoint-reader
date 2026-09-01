@@ -417,8 +417,13 @@ bool MappedInputManager::isPressed(const Button button) const {
     // swallow, holding Back out of the note editor satisfied Manage Files'
     // isPressed(Back) && getHeldTime() >= GO_HOME_MS branch on its first
     // frames and jumped to the SD root instead of the note's folder
-    // (input-edge audit 2026-08-21, finding 1). Only the swap-held buttons
-    // are gated: a fresh press's level reads normally.
+    // (input-edge audit 2026-08-21, finding 1). That specific Back-hold
+    // destination was retired 2026-09-01 (docs/hold-gestures.md), but the
+    // same class of bug is exactly as live for the held-Confirm gestures
+    // that replaced it (FileBrowserActivity's delete hold,
+    // FileManagerActivity's action-menu hold) or any future hold elsewhere —
+    // hence this gate staying general rather than naming one button. Only
+    // the swap-held buttons are gated: a fresh press's level reads normally.
     if (mapButtonInMask(button, swallowMask_)) return false;
   }
   return mapButton(button, &HalGPIO::isPressed);

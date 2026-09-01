@@ -48,11 +48,12 @@ void ClaudeChatActivity::onEnter() {
 
   // The on-screen keyboard is the default. BLE only comes up when a keyboard is
   // already bonded — it costs ~72 KB of heap and a CPU-clock lock, which an
-  // owner with none paired should not pay. Hold Up to pair on demand.
+  // owner with none paired should not pay. Pairing lives in Settings > Pair
+  // Bluetooth Keyboard.
   if (blekbd::hasBondedKeyboard()) {
     blekbd::begin();
   } else {
-    LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (hold Up to pair)");
+    LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (pair from Settings)");
   }
   panel.begin(/*okIsDone=*/true);  // OK asks Claude here
 
@@ -253,42 +254,6 @@ void ClaudeChatActivity::send() {
   requestUpdate();
 }
 
-// Hold Up to pair a BLE keyboard, hold Down to disconnect one keeping the
-// bond. Short presses of the same buttons still navigate, so the gesture only
-// fires past the hold threshold and swallows the release that follows.
-void ClaudeChatActivity::pollPairingGestures() {
-  // In DAISY, Up/Down are the wheel's pick buttons and holding them means
-  // uppercase — so the pairing gesture cannot live there too, or one long press
-  // would type a capital AND start Bluetooth. Daisy users pair from Settings.
-  if (panel.isDaisy()) return;
-
-  constexpr uint32_t HOLD_MS = 1500;
-  const bool up = mappedInput.isPressed(MappedInputManager::Button::Up);
-  const bool down = mappedInput.isPressed(MappedInputManager::Button::Down);
-  if (!up && !down) {
-    sideHeldSince = 0;
-    return;
-  }
-  if (sideHeldSince == 0) {
-    sideHeldSince = millis();
-    sideHandled = false;
-    return;
-  }
-  if (sideHandled || millis() - sideHeldSince < HOLD_MS) return;
-
-  sideHandled = true;
-  if (up) {
-    if (blekbd::state() == blekbd::State::Off) {
-      LOG_INF(TAG, "hold Up: starting BLE to pair");
-      blekbd::begin();
-    }
-  } else {
-    LOG_INF(TAG, "hold Down: disconnecting keyboard, bond kept");
-    blekbd::disconnectKeepingBond();
-  }
-  requestUpdate();
-}
-
 // Re-wrap the prompt for display. Called from loop() under the render lock.
 void ClaudeChatActivity::relayoutPrompt() {
   promptLines.clear();
@@ -416,8 +381,6 @@ void ClaudeChatActivity::loop() {
     return;
   }
 
-  pollPairingGestures();
-
   if (view == View::Answer) {
     // Step by what the ANSWER view shows, not the prompt view's smaller count,
     // or paging skips lines it never displayed.
@@ -428,14 +391,14 @@ void ClaudeChatActivity::loop() {
     // aliases, since Left/Right elsewhere in this activity (repeatCol, below)
     // already read the raw front buttons the same way. Prompt-view column
     // navigation is untouched: this block only runs in View::Answer.
-    if (!sideHandled && (mappedInput.wasReleased(MappedInputManager::Button::Down) ||
-                         mappedInput.wasReleased(MappedInputManager::Button::Right))) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Down) ||
+        mappedInput.wasReleased(MappedInputManager::Button::Right)) {
       if (answerTop + step < answerLines.size()) answerTop += step;
       requestUpdate();
       return;
     }
-    if (!sideHandled && (mappedInput.wasReleased(MappedInputManager::Button::Up) ||
-                         mappedInput.wasReleased(MappedInputManager::Button::Left))) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Up) ||
+        mappedInput.wasReleased(MappedInputManager::Button::Left)) {
       answerTop = answerTop > step ? answerTop - step : 0;
       requestUpdate();
       return;
@@ -462,7 +425,7 @@ void ClaudeChatActivity::loop() {
                             {MappedInputManager::Button::Confirm, 1},
                             {MappedInputManager::Button::Down, 2}};
       for (const auto& pk : picks) {
-        // Up/Down only pick in daisy; elsewhere they page and long-hold pairs.
+        // Up/Down only pick in daisy; elsewhere they page.
         if (!panel.isDaisy() && pk.slot != 1) continue;
 
         if (mappedInput.wasPressed(pk.button) && pickSlot < 0) {
@@ -488,12 +451,12 @@ void ClaudeChatActivity::loop() {
     // twelve presses (and twelve e-ink repaints) to cross it.
     if (repeatCol(MappedInputManager::Button::Left, -1)) return;
     if (repeatCol(MappedInputManager::Button::Right, 1)) return;
-    if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Up)) {
+    if (!panel.isDaisy() && mappedInput.wasReleased(MappedInputManager::Button::Up)) {
       panel.moveRow(-1);
       requestUpdate();
       return;
     }
-    if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Down)) {
+    if (!panel.isDaisy() && mappedInput.wasReleased(MappedInputManager::Button::Down)) {
       panel.moveRow(1);
       requestUpdate();
       return;

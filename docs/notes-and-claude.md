@@ -51,17 +51,20 @@ Buttons in Create Note / Claude:
 | Confirm (hold) | type its uppercase / alternate |
 | **Confirm (hold) on SPACE** | Create Note only: enter **caret mode** — see below |
 | Up / Down (short) | move between keyboard rows |
-| **Up (hold 1.5 s)** | start Bluetooth and pair a keyboard |
-| **Down (hold 1.5 s)** | disconnect the keyboard, **keeping** the bond |
 | Back | save and leave |
+
+**Up/Down hold-to-pair and hold-to-disconnect were retired 2026-09-01**
+(owner ruling, [hold-gestures.md](hold-gestures.md): "kill ble pairing") — the
+silent trigger for `nimble_port_init()`'s ~65 KB alloc and the display-stall
+path it opened, found 2026-08-29. Pairing itself did not go with it: it moved
+to **Settings → Pair Bluetooth Keyboard** / **Forget Bluetooth Keyboard**,
+which already existed and already worked for every keyboard user, Daisy or
+not. There is no gesture equivalent of "disconnect, keeping the bond" any
+more — Settings only offers Forget, which drops the bond too.
 
 Row navigation is bound to the **physical** Up/Down, not to PageBack/PageForward.
 That matters: those two return false when Side Buttons is set to Disabled, which
-left the default 13-Grid able to reach only its number row and nothing else, and
-made the pairing hold move the selector the wrong way under the NEXT_PREV swap.
-
-Forgetting a bond entirely is deliberately NOT a gesture — it is
-**Settings → Forget Bluetooth Keyboard**, alongside **Pair Bluetooth Keyboard**.
+left the default 13-Grid able to reach only its number row and nothing else.
 
 ### Caret mode (hold the space bar)
 
@@ -83,9 +86,11 @@ status band carries `STR_KB_HINT_MOVE_CURSOR` in place of the byte count, and
 the Confirm hint reads **Done**.
 
 **Why hold-space and not hold-Up**, which is what the full-screen
-`KeyboardEntryActivity` uses for its own `cursorMode`: in this editor hold-Up
-and hold-Down are already the Bluetooth pairing gestures. Hold-space was free —
-`keyboardAltOutputFor` returns `nullptr` for `KeyKind::Space`, so a long press on
+`KeyboardEntryActivity` uses for its own `cursorMode`: at the time this shipped,
+hold-Up and hold-Down in this editor were already the Bluetooth pairing
+gestures (retired 2026-09-01, above — the choice was never revisited after).
+Hold-space was free — `keyboardAltOutputFor` returns `nullptr` for
+`KeyKind::Space`, so a long press on
 it fell back to `keyboardOutputFor` and typed the same plain space a tap does.
 That also makes a resulting `' '` an exact sentinel for the gesture, which is how
 the editor detects it without KeyboardPanel needing to know anything about it;

@@ -540,15 +540,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // legacy Off/On toggle (persisted files round-trip), 2+ appended.
 
     // --- Controls ---
-    // Category is STR_CAT_CONTROLS (not STR_CAT_SYSTEM), so rebuildSettingsLists()
-    // drops these rows from the device UI — Controls is a withdrawn tab. They
-    // stay in getSettingsList() for persistence (fromJson/toJson) and the web
-    // settings API. Category is not persisted, so this change has no impact on
-    // saved settings.json files.
-    // Third label = stored value 2 = FONT_SIZE_STEP. The order of this array IS
-    // the persisted encoding, so append only — see LONG_PRESS_BUTTON_BEHAVIOR in
-    // CrossPointSettings.h for why the retired ORIENTATION_CHANGE slot was reused
-    // rather than a fourth value added.
+    // The withdrawn Controls tab once had a row here for
+    // LONG_PRESS_BUTTON_BEHAVIOR (Off/Chapter Skip/Font Size Step), kept
+    // in getSettingsList() after rebuildSettingsLists() dropped it from the
+    // device UI so it would still persist (fromJson/toJson) and serve the web
+    // settings API. That row is gone: longPressButtonBehavior became a
+    // `static constexpr = FONT_SIZE_STEP` in the 2026-08-21 settings
+    // reduction, so it is no longer in getSettingsList() at all and nothing
+    // here persists or serves it any more. See LONG_PRESS_BUTTON_BEHAVIOR in
+    // CrossPointSettings.h for the enum's history — including why the retired
+    // ORIENTATION_CHANGE slot was reused rather than a fourth value added,
+    // and CHAPTER_SKIP's 2026-09-01 retirement (docs/hold-gestures.md).
 
     // --- System ---
     // The System block is contributed to the device list in the order below.

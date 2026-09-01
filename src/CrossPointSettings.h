@@ -151,7 +151,23 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // enough to still hold 2 now reads as FONT_SIZE_STEP instead of OFF — which is the new
   // default anyway — and the ORIENTATION_CHANGE line in normalizeRetiredSettings() had to
   // go, or it would wipe this value on every single load.
-  enum LONG_PRESS_BUTTON_BEHAVIOR { OFF = 0, CHAPTER_SKIP = 1, FONT_SIZE_STEP = 2, LONG_PRESS_BUTTON_BEHAVIOR_COUNT };
+  //
+  // RETIRED 2026-09-01 (owner ruling, docs/hold-gestures.md: "kill chapter skip"):
+  // CHAPTER_SKIP was already unreachable before this — longPressButtonBehavior below
+  // has been a `static constexpr = FONT_SIZE_STEP` since the 2026-08-21 settings
+  // reduction, so it is never read from settings.json and no picker row has offered
+  // CHAPTER_SKIP since that date. This is a tombstone, not a live migration: the
+  // value stays DEFINED (never renumber a persisted enum — SettingsList.h's
+  // append-only rule) but nothing in the firmware compares against it any more,
+  // and every caller that used to branch on it now takes the FONT_SIZE_STEP path
+  // unconditionally — the least surprising landing for anyone who had chapter
+  // skip selected, since it is also what every other value already collapses to.
+  enum LONG_PRESS_BUTTON_BEHAVIOR {
+    OFF = 0,
+    CHAPTER_SKIP = 1,  // retired; see comment above — never reassign this slot
+    FONT_SIZE_STEP = 2,
+    LONG_PRESS_BUTTON_BEHAVIOR_COUNT
+  };
 
   // Order is the picker's order and the persisted value, so it is frozen:
   // Ubuntu must stay 0 or every settings.json that already names a system font

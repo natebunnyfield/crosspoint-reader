@@ -633,6 +633,25 @@ TEST_F(ActivityInput, SideButtonChangesFontSizeUnderTheRenderLock) {
   EXPECT_EQ(SETTINGS.fontSizeSlot, kTopSlot) << "font size slot wrapped instead of clamping";
 }
 
+// Chapter skip (LONG_PRESS_BUTTON_BEHAVIOR::CHAPTER_SKIP) was retired
+// 2026-09-01 (owner ruling, docs/hold-gestures.md: "kill chapter skip"), by
+// which point longPressButtonBehavior had already been a
+// `static constexpr = FONT_SIZE_STEP` since the 2026-08-21 settings
+// reduction -- it is not read from settings.json and there is no picker row,
+// so there is no load-time value to remap the way sleepScreen's retired
+// CALENDAR_FOUR/FIVE/SIX are (see SleepScreenPolicyTest). What CAN drift
+// silently is the enum's numeric encoding: it is append-only (SettingsList.h),
+// so CHAPTER_SKIP's slot must never be reassigned and FONT_SIZE_STEP must stay
+// the value every reader actually gets. This pins both.
+TEST(LongPressButtonBehavior, ChapterSkipIsRetiredButItsSlotIsPinned) {
+  static_assert(CrossPointSettings::OFF == 0, "slot 0 is append-only encoding, never renumber");
+  static_assert(CrossPointSettings::CHAPTER_SKIP == 1,
+               "CHAPTER_SKIP's slot is retired, not free -- never reassign it");
+  static_assert(CrossPointSettings::FONT_SIZE_STEP == 2, "slot 2 is append-only encoding, never renumber");
+  EXPECT_EQ(SETTINGS.longPressButtonBehavior, CrossPointSettings::FONT_SIZE_STEP)
+      << "every reader must land on FONT_SIZE_STEP now that CHAPTER_SKIP is unreachable";
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {

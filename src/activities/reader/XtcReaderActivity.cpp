@@ -116,20 +116,17 @@ void XtcReaderActivity::loop() {
     return;
   }
 
-  const unsigned long heldMs = (touch.prev || touch.next) ? touch.heldMs : mappedInput.getHeldTime();
-  const bool skipPages =
-      SETTINGS.longPressButtonBehavior == SETTINGS.CHAPTER_SKIP && heldMs > ReaderUtils::SKIP_HOLD_MS;
-  const int skipAmount = skipPages ? 10 : 1;
-
+  // Chapter-skip long-press-to-skip-10 was retired 2026-09-01 (owner ruling,
+  // docs/hold-gestures.md); every page turn now moves one page.
   if (prevTriggered) {
-    if (currentPage >= static_cast<uint32_t>(skipAmount)) {
-      currentPage -= skipAmount;
+    if (currentPage >= 1) {
+      currentPage -= 1;
     } else {
       currentPage = 0;
     }
     requestUpdate();
   } else if (nextTriggered) {
-    currentPage += skipAmount;
+    currentPage += 1;
     if (currentPage >= xtc->getPageCount()) {
       currentPage = xtc->getPageCount();  // Allow showing "End of book"
     }

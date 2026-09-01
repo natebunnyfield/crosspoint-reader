@@ -55,12 +55,10 @@ class NoteEditorActivity final : public Activity {
   // text area's bottom and the strip's top cannot drift apart.
   int panelTop = 0;
   int statusHeight = 0;  // reserved band between text and panel
-  uint32_t sideHeldSince = 0;
   uint32_t pickHeldSince = 0;
   uint32_t colRepeatAt = 0;
   int pickSlot = -1;
   bool pickFired = false;
-  bool sideHandled = false;
 
   // Caret mode: hold Confirm on the SPACE key and the four direction buttons
   // stop driving the key grid and drive the text cursor instead. Without it the
@@ -102,7 +100,6 @@ class NoteEditorActivity final : public Activity {
   void loopCaretMode();
   bool repeatCaret(MappedInputManager::Button button, CaretDir dir);
   void moveCaret(CaretDir dir);
-  void pollPairingGestures();
   void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
   bool save();
   // Shared exit for Back and keyboard Done: saves, then routes to FileManager

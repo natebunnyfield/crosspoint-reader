@@ -18,7 +18,6 @@ class FileManagerActivity final : public Activity {
   OptionPopup popup;
 
   size_t selectorIndex = 0;
-  bool lockLongPressBack = false;
   // True when this activity (or its action popup) consumed a press whose
   // release must not also act on the list below.
   bool lockNextConfirmRelease = false;

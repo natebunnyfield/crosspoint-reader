@@ -16,7 +16,10 @@
 #include "util/FsOps.h"
 
 namespace {
-constexpr unsigned long GO_HOME_MS = 1000;
+// Held Back -> root folder was killed 2026-09-01 (owner ruling,
+// docs/hold-gestures.md); this threshold now gates only held Confirm ->
+// delete (Books mode).
+constexpr unsigned long DELETE_HOLD_MS = 1000;
 constexpr size_t NAME_BUFFER_SIZE = 500;
 }  // namespace
 
@@ -87,8 +90,6 @@ void FileBrowserActivity::onEnter() {
     basepath = "/";
     loadFiles();
   } else if (!root.isDirectory()) {
-    lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
-
     const std::string oldPath = basepath;
     basepath = FsHelpers::extractFolderPath(basepath);
     loadFiles();
@@ -115,28 +116,6 @@ void FileBrowserActivity::loop() {
   // dismiss cannot leak its release into the handlers below (input-edge audit
   // 2026-08-21, finding 2 pattern).
   if (deletePopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
-
-  // Long press BACK (1s+) goes to root folder (Books mode only).
-  // In firmware-pick mode we keep navigation simple: short Back = up dir / cancel.
-  if (mode == Mode::Books && mappedInput.isPressed(MappedInputManager::Button::Back) &&
-      mappedInput.getHeldTime() >= GO_HOME_MS && basepath != "/" && !lockLongPressBack) {
-    basepath = "/";
-    loadFiles();
-    selectorIndex = 0;
-    requestUpdate();
-    return;
-  }
-
-  // Use a level read (!isPressed) instead of wasReleased to clear the lock:
-  // arriving here via the reader's long-press-Back exit, the central
-  // swallowUntilIdle() suppresses the release edge, so an edge-read lock never
-  // cleared — long-press-to-root stayed dead for the session and the next Back
-  // tap was eaten (input-edge audit 2026-08-21, finding 3; the missed twin of
-  // the B-026 fix in FileManagerActivity).
-  if (lockLongPressBack && !mappedInput.isPressed(MappedInputManager::Button::Back)) {
-    lockLongPressBack = false;
-    return;
-  }
 
   const int pathReserved = renderer.getLineHeight(SMALL_FONT_ID) + UITheme::getInstance().getMetrics().verticalSpacing;
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, pathReserved);
@@ -166,7 +145,7 @@ void FileBrowserActivity::loop() {
       return;
     }
 
-    if (mode == Mode::Books && mappedInput.getHeldTime() >= GO_HOME_MS) {
+    if (mode == Mode::Books && mappedInput.getHeldTime() >= DELETE_HOLD_MS) {
       // --- LONG PRESS ACTION: DELETE FILE OR DIRECTORY ---
       std::string cleanBasePath = basepath;
       if (cleanBasePath.back() != '/') cleanBasePath += "/";
@@ -175,10 +154,9 @@ void FileBrowserActivity::loop() {
       std::string heading = tr(STR_DELETE) + std::string("? ");
       const char* options[] = {tr(STR_CANCEL), tr(STR_CONFIRM)};
       deletePopup.show(heading.c_str(), options, 2, 0, [this, fullPath](int idx) {
-        // The confirmation popup acts on button press; if that button is still
-        // held when we resume, swallow its release so it doesn't also act here
-        // (Back would go up a directory, Confirm would open the selection).
-        lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
+        // The confirmation popup acts on button press; if Confirm is still
+        // held when we resume, swallow its release so it doesn't also open
+        // the selection here.
         lockNextConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
         if (idx == 1) {
           LOG_DBG("FileBrowser", "Attempting to delete: %s", fullPath.c_str());
@@ -235,29 +213,27 @@ void FileBrowserActivity::loop() {
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    // Short press: go up one directory, or go home if at root
-    if (mappedInput.getHeldTime() < GO_HOME_MS) {
-      if (basepath != "/") {
-        const std::string oldPath = basepath;
+    // Go up one directory, or go home if at root.
+    if (basepath != "/") {
+      const std::string oldPath = basepath;
 
-        basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
-        if (basepath.empty()) basepath = "/";
-        loadFiles();
+      basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
+      if (basepath.empty()) basepath = "/";
+      loadFiles();
 
-        const auto pos = oldPath.find_last_of('/');
-        const std::string dirName = oldPath.substr(pos + 1) + "/";
-        selectorIndex = findEntry(dirName);
+      const auto pos = oldPath.find_last_of('/');
+      const std::string dirName = oldPath.substr(pos + 1) + "/";
+      selectorIndex = findEntry(dirName);
 
-        requestUpdate();
-      } else if (mode == Mode::PickFirmware) {
-        // Firmware picker at root: cancel back to caller instead of going home.
-        ActivityResult res;
-        res.isCancelled = true;
-        setResult(std::move(res));
-        finish();
-      } else {
-        onGoHome();
-      }
+      requestUpdate();
+    } else if (mode == Mode::PickFirmware) {
+      // Firmware picker at root: cancel back to caller instead of going home.
+      ActivityResult res;
+      res.isCancelled = true;
+      setResult(std::move(res));
+      finish();
+    } else {
+      onGoHome();
     }
   }
 

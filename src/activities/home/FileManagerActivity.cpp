@@ -18,7 +18,9 @@
 #include "util/FsOps.h"
 
 namespace {
-constexpr unsigned long GO_HOME_MS = 1000;
+// Held Back -> SD root was killed 2026-09-01 (owner ruling, docs/hold-gestures.md);
+// this threshold now gates only held Confirm -> action menu.
+constexpr unsigned long CONFIRM_HOLD_MS = 1000;
 constexpr size_t NAME_BUFFER_SIZE = 500;
 constexpr size_t MAX_RENAME_LEN = 100;
 
@@ -309,11 +311,7 @@ void FileManagerActivity::runMenuAction(const MenuAction action) {
 void FileManagerActivity::viewFile(const std::string& entry) {
   if (entry.empty() || entry.back() == '/') return;
   startActivityForResult(std::make_unique<TextViewerActivity>(renderer, mappedInput, fullPathOf(entry), entry),
-                         [this](const ActivityResult&) {
-                           // swallowUntilIdle() covers press/release edges. Keep lockLongPressBack:
-                           // it guards isPressed(Back) long-press, which swallow does not suppress.
-                           lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
-                         });
+                         [](const ActivityResult&) {});
 }
 
 void FileManagerActivity::startRename(const std::string& entry, const std::string& seedName) {
@@ -324,9 +322,6 @@ void FileManagerActivity::startRename(const std::string& entry, const std::strin
   startActivityForResult(makeTextEntryActivity(renderer, mappedInput, tr(STR_NEW_NAME),
                                                seedName.empty() ? oldName : seedName, MAX_RENAME_LEN),
                          [this, oldFull, oldName, isDirectory](const ActivityResult& res) {
-                           // swallowUntilIdle() covers press/release edges. Keep lockLongPressBack:
-                           // isPressed(Back) long-press is not suppressed by swallow.
-                           lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
                            if (res.isCancelled) return;
                            const auto* kb = std::get_if<KeyboardResult>(&res.data);
                            if (!kb) return;
@@ -558,9 +553,8 @@ void FileManagerActivity::confirmDelete(const std::string& entry) {
   const std::string heading = tr(STR_DELETE) + std::string("? ");
   const char* options[] = {tr(STR_CANCEL), tr(STR_CONFIRM)};
   popup.show(heading.c_str(), options, 2, 0, [this, fullPath](int idx) {
-    // The confirmation popup acts on button press; if that button is still
-    // held when we resume, swallow its release so it doesn't also act here.
-    lockLongPressBack = mappedInput.isPressed(MappedInputManager::Button::Back);
+    // The confirmation popup acts on button press; if Confirm is still held
+    // when we resume, swallow its release so it doesn't also act here.
     lockNextConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
     if (idx != 1) return;
 
@@ -604,26 +598,6 @@ void FileManagerActivity::loop() {
     return;
   }
 
-  // Long press BACK (1s+) jumps to the SD root.
-  if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= GO_HOME_MS &&
-      basepath != "/" && !lockLongPressBack) {
-    basepath = "/";
-    loadFiles();
-    selectorIndex = 0;
-    requestUpdate();
-    return;
-  }
-
-  // Use a level read (!isPressed) instead of wasReleased: the edge read has a
-  // side effect of clearing the swallowUntilIdle() latch, which then lets the
-  // short-press wasReleased check below fire in the same frame and cause a
-  // second navigation (the B-018 double-consume regression that re-surfaced
-  // when the central swallow replaced backPressSeen — see BUGS.md).
-  if (lockLongPressBack && !mappedInput.isPressed(MappedInputManager::Button::Back)) {
-    lockLongPressBack = false;
-    return;
-  }
-
   // Long press CONFIRM (1s+): action menu, fired while the button is still
   // held. Release-driven detection is not enough here: the simulator's
   // getHeldTime() reads 0 on the release frame, and acting mid-hold gives
@@ -632,7 +606,7 @@ void FileManagerActivity::loop() {
   // release lands in the popup, which only acts on press edges.
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) confirmPressSeen = true;
   if (confirmPressSeen && mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
-      mappedInput.getHeldTime() >= GO_HOME_MS) {
+      mappedInput.getHeldTime() >= CONFIRM_HOLD_MS) {
     confirmPressSeen = false;
     if (!moveSourcePath.empty()) {
       performMoveHere();
@@ -666,7 +640,7 @@ void FileManagerActivity::loop() {
     // Long press: while armed, paste directly; otherwise open action menu.
     // Normally fired mid-hold in loop(); this release path still catches a hold
     // that completed inside a render stall.
-    if (mappedInput.getHeldTime() >= GO_HOME_MS) {
+    if (mappedInput.getHeldTime() >= CONFIRM_HOLD_MS) {
       if (!moveSourcePath.empty()) {
         performMoveHere();
       } else {
@@ -709,23 +683,21 @@ void FileManagerActivity::loop() {
       lockNextBackRelease = false;
       return;
     }
-    // Short press: go up one directory, or go home if at root
-    if (mappedInput.getHeldTime() < GO_HOME_MS) {
-      if (basepath != "/") {
-        const std::string oldPath = basepath;
+    // Go up one directory, or go home if at root.
+    if (basepath != "/") {
+      const std::string oldPath = basepath;
 
-        basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
-        if (basepath.empty()) basepath = "/";
-        loadFiles();
+      basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
+      if (basepath.empty()) basepath = "/";
+      loadFiles();
 
-        const auto pos = oldPath.find_last_of('/');
-        const std::string dirName = oldPath.substr(pos + 1) + "/";
-        selectorIndex = findEntry(dirName);
+      const auto pos = oldPath.find_last_of('/');
+      const std::string dirName = oldPath.substr(pos + 1) + "/";
+      selectorIndex = findEntry(dirName);
 
-        requestUpdate();
-      } else {
-        onGoHome();
-      }
+      requestUpdate();
+    } else {
+      onGoHome();
     }
     return;
   }

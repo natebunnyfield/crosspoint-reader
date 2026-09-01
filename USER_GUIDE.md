@@ -276,10 +276,12 @@ Changing the font, font size, or line spacing keeps your reading position: the r
 
 - **Side Button Layout (reader)**: Swap the order of the up and down volume buttons from "Prev/Next" (default) to "Next/Prev". You can also disable them entirely. This change is only in effect when reading.
 
-- **Long-press Chapter Skip**: Set whether long-pressing page turn buttons skips to the next/previous chapter:
-  
-  - "Chapter Skip" (default) - Long-pressing skips to next/previous chapter
-  - "Page Scroll" - Long-pressing scrolls a page up/down
+- **Long-press page turn behavior**: no longer configurable. Long-pressing the
+  side page-turn buttons always steps the reader font size (smaller on
+  page-back, larger on page-forward); a tap still turns the page. Chapter Skip
+  was retired 2026-09-01 (owner ruling, [docs/hold-gestures.md](docs/hold-gestures.md))
+  and had already been unreachable behind the withdrawn Controls tab since
+  2026-08-21 before that.
 - **Long-press Menu**: Selects the function bound to holding the menu button (Confirm) while reading an EPUB. **Cycles through the available functions** each time the setting is selected — additional functions may be added in future releases, so this is not a binary on/off toggle. A short press of Confirm always opens the reader menu as normal:
   - "Bookmark" (default) - Hold Confirm (~0.4 second) to drop a bookmark at the current page.
   - "KOSync" - Hold Confirm (~1 second) to launch KOReader sync directly.

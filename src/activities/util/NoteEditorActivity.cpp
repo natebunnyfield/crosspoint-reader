@@ -130,7 +130,7 @@ void NoteEditorActivity::onEnter() {
   if (blekbd::hasBondedKeyboard()) {
     blekbd::begin();
   } else {
-    LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (hold Up to pair)");
+    LOG_INF(TAG, "no bonded keyboard; on-screen keyboard only (pair from Settings)");
   }
 
   // Load an existing note so Edit-from-Manage-Files is a real edit, not a
@@ -315,44 +315,6 @@ void NoteEditorActivity::handleKey(int key) {
   }
 }
 
-// Hold Up to pair a BLE keyboard, hold Down to disconnect one (the bond is
-// kept, so it reconnects next time; forgetting it entirely lives in Settings).
-// A short press of the same buttons still pages, so the gesture only fires once
-// the hold threshold passes and it swallows the release that follows.
-void NoteEditorActivity::pollPairingGestures() {
-  // In DAISY, Up/Down are the wheel's pick buttons and holding them means
-  // uppercase — so the pairing gesture cannot live there too, or one long press
-  // would type a capital AND start Bluetooth. Daisy users pair from Settings.
-  if (panel.isDaisy()) return;
-
-  constexpr uint32_t HOLD_MS = 1500;
-  const bool up = mappedInput.isPressed(MappedInputManager::Button::Up);
-  const bool down = mappedInput.isPressed(MappedInputManager::Button::Down);
-
-  if (!up && !down) {
-    sideHeldSince = 0;
-    return;
-  }
-  if (sideHeldSince == 0) {
-    sideHeldSince = millis();
-    sideHandled = false;
-    return;
-  }
-  if (sideHandled || millis() - sideHeldSince < HOLD_MS) return;
-
-  sideHandled = true;
-  if (up) {
-    if (blekbd::state() == blekbd::State::Off) {
-      LOG_INF(TAG, "hold Up: starting BLE to pair");
-      blekbd::begin();
-    }
-  } else {
-    LOG_INF(TAG, "hold Down: disconnecting keyboard, bond kept");
-    blekbd::disconnectKeepingBond();
-  }
-  requestUpdate();
-}
-
 // One column step on press, then repeats while held. Returns true when it
 // consumed the button this tick.
 bool NoteEditorActivity::repeatCol(const MappedInputManager::Button button, const int delta) {
@@ -425,8 +387,7 @@ bool NoteEditorActivity::repeatCaret(const MappedInputManager::Button button, co
 
 // Caret mode owns the tick outright — the keyboard panel takes no input at all
 // while it is up, the same way an OptionPopup gates the top of a loop().
-// pollPairingGestures() is therefore NOT reached, which is the point: holding
-// Up here means "cursor up", not "start Bluetooth".
+// Holding Up here means "cursor up".
 void NoteEditorActivity::loopCaretMode() {
   // Back or Confirm PRESS leaves. Press, not release: the release that ends the
   // long press on space has not arrived yet and must not read as an exit. Back
@@ -609,8 +570,6 @@ void NoteEditorActivity::loop() {
     }
   }
 
-  pollPairingGestures();
-
   // KEYBOARD DRAIN AND REPAINT COME BEFORE THE panelHidden GUARD, and must stay
   // there. They used to sit at the very bottom of loop(), below the early
   // return -- so with a phone's software keyboard up (the only state in which
@@ -660,8 +619,7 @@ void NoteEditorActivity::loop() {
   if (panelHidden) return;
 
   // Front buttons drive the on-screen keyboard: Left/Right move along a row,
-  // Confirm types the selected key. Side buttons move between rows — a long
-  // hold on those is the pairing gesture, handled above.
+  // Confirm types the selected key. Side buttons move between rows.
   // Pick buttons. In the GRIDS only Confirm types, and holding it yields the
   // alt output (uppercase for a letter) exactly as the full-screen keyboard
   // does. In DAISY the three buttons pick top/middle/bottom of the current
@@ -676,7 +634,7 @@ void NoteEditorActivity::loop() {
                           {MappedInputManager::Button::Confirm, 1},
                           {MappedInputManager::Button::Down, 2}};
     for (const auto& pk : picks) {
-      // Up/Down only pick in daisy; elsewhere they page and long-hold pairs.
+      // Up/Down only pick in daisy; elsewhere they page.
       if (!panel.isDaisy() && pk.slot != 1) continue;
 
       if (mappedInput.wasPressed(pk.button) && pickSlot < 0) {
@@ -703,12 +661,12 @@ void NoteEditorActivity::loop() {
   // twelve presses (and twelve e-ink repaints) to cross it.
   if (repeatCol(MappedInputManager::Button::Left, -1)) return;
   if (repeatCol(MappedInputManager::Button::Right, 1)) return;
-  if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Up)) {
+  if (!panel.isDaisy() && mappedInput.wasReleased(MappedInputManager::Button::Up)) {
     panel.moveRow(-1);
     requestUpdate();
     return;
   }
-  if (!panel.isDaisy() && !sideHandled && mappedInput.wasReleased(MappedInputManager::Button::Down)) {
+  if (!panel.isDaisy() && mappedInput.wasReleased(MappedInputManager::Button::Down)) {
     panel.moveRow(1);
     requestUpdate();
     return;

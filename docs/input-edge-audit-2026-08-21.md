@@ -5,6 +5,15 @@ Read-only audit of the stale-edge bug class, run after the owner's
 Surveyed at the commit before that fix; confidence per row. The class:
 an edge produced for one consumer read by a second after a boundary.
 
+**Findings 1 and 3, ARCHIVE note (2026-09-01):** the mechanism both describe —
+held-Back-to-SD-root (`GO_HOME_MS`) and its `lockLongPressBack` guard in
+`FileBrowserActivity`/`FileManagerActivity` — was removed entirely (owner
+ruling, [hold-gestures.md](hold-gestures.md): "kill back to home"). Back is
+now a single ordinary short press everywhere in both activities, so this
+mechanism cannot recur; the findings below are kept as a record of the
+stale-edge bug class, not as a description of current code, and their
+file:line citations no longer resolve to what they name.
+
 ## The model (verified)
 
 - Edges recomputed and cleared at the top of every `update()`

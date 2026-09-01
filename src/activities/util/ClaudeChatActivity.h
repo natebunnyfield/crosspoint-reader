@@ -40,12 +40,10 @@ class ClaudeChatActivity final : public Activity {
   int panelHeight = 0;
   int panelTop = 0;
   int statusHeight = 0;  // reserved band between text and panel
-  uint32_t sideHeldSince = 0;
   uint32_t pickHeldSince = 0;
   uint32_t colRepeatAt = 0;
   int pickSlot = -1;
   bool pickFired = false;
-  bool sideHandled = false;
 
   int editorFontId = 0;
   int lineHeight = 1;
@@ -66,7 +64,6 @@ class ClaudeChatActivity final : public Activity {
   // The vertical bands. Re-runnable, because a host keyboard can rise or fall
   // at any moment and the panel band depends on it.
   void applyLayout();
-  void pollPairingGestures();
   void send();
   void setPhase(const char* phase);
   void layoutAnswer();
