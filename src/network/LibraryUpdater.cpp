@@ -266,7 +266,7 @@ void hexDigest(const unsigned char digest[32], char outHex[65]) {
 
 }  // namespace
 
-LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
+LibraryUpdater::LibraryError LibraryUpdater::fetchManifest(StepCallback onStep, void* ctx) {
   if (githubTokenValue().empty()) {
     // Not an error to retry — the screen tells the owner where the token goes,
     // and on a host build that is the host's settings app rather than a file.
@@ -286,6 +286,7 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
     return OOM_ERROR;
   }
   LibraryReleaseParser& releaseParser = *parser;
+  if (onStep) onStep(ctx, CheckStep::CONTACTING);
   const HttpDownloader::DownloadError fetched = HttpDownloader::fetchUrlWithHeaders(
       libraryReleaseUrl, apiHeaders, [&releaseParser](const uint8_t* data, size_t len) {
         releaseParser.feed(reinterpret_cast<const char*>(data), len);
@@ -352,6 +353,7 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest() {
       {"Authorization", bearerHeaderValue()},
   };
 
+  if (onStep) onStep(ctx, CheckStep::READING);
   std::string manifestBody;
   const HttpDownloader::DownloadError manifestFetched = HttpDownloader::fetchUrlWithHeaders(
       manifestAsset->url, assetHeaders, [&manifestBody](const uint8_t* data, size_t len) {

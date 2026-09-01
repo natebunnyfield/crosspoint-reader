@@ -46,6 +46,10 @@ class LibraryUpdateActivity : public Activity {
 
  private:
   State state = State::CHECKING;
+  // Which network step the manifest check is on. The whole check runs inside
+  // one loop() call, so without this the screen sits on one static line and
+  // takes no input until it returns -- the "hangs on kickoff" report.
+  LibraryUpdater::CheckStep checkStep = LibraryUpdater::CheckStep::CONTACTING;
   LibraryUpdater updater;
   std::string errorMessage;
   size_t currentBook = 0;  // index into the manifest while SYNCING

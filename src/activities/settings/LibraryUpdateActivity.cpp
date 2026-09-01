@@ -70,7 +70,18 @@ void LibraryUpdateActivity::loop() {
 }
 
 void LibraryUpdateActivity::runSync() {
-  const LibraryUpdater::LibraryError err = updater.fetchManifest();
+  // Repaint between the check's network steps. immediate=true for the same
+  // reason the per-book progress callback uses it: this runs inside a blocking
+  // call that will not drain the flag for us.
+  auto stepCb = +[](void* ctx, LibraryUpdater::CheckStep step) {
+    auto* self = static_cast<LibraryUpdateActivity*>(ctx);
+    {
+      RenderLock lock(*self);
+      self->checkStep = step;
+    }
+    self->requestUpdate(true);
+  };
+  const LibraryUpdater::LibraryError err = updater.fetchManifest(stepCb, this);
 
   if (err == LibraryUpdater::NO_TOKEN) {
     LOG_INF("LIB", "no GitHub token configured");
@@ -163,9 +174,27 @@ void LibraryUpdateActivity::render(RenderLock&&) {
   const auto top = (pageHeight - lineHeight) / 2;
 
   switch (state) {
-    case State::CHECKING:
-      renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_FOR_UPDATES));
+    case State::CHECKING: {
+      // Two lines and a two-step bar, not one static line. The whole check runs
+      // inside one loop() call -- nothing repaints and no button is read until
+      // it returns -- so a single frozen line reads as a hang. The step
+      // callback repaints between the two network requests, which is the only
+      // honest motion available here.
+      //
+      // A bar rather than a spinner because this is e-ink: an animation costs a
+      // panel refresh per frame, and two steps cost two.
+      const bool reading = checkStep == LibraryUpdater::CheckStep::READING;
+      renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_FOR_UPDATES), true, EpdFontFamily::BOLD);
+      int y = top + lineHeight + metrics.verticalSpacing;
+      renderer.drawCenteredText(UI_10_FONT_ID, y,
+                                reading ? tr(STR_LIBRARY_READING_MANIFEST) : tr(STR_LIBRARY_CONTACTING));
+      y += lineHeight + metrics.verticalSpacing;
+      GUI.drawProgressBar(
+          renderer,
+          Rect{metrics.contentSidePadding, y, pageWidth - metrics.contentSidePadding * 2, metrics.progressBarHeight},
+          reading ? 1 : 0, 2);
       break;
+    }
 
     case State::NO_WIFI: {
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_NEEDS_WIFI), true, EpdFontFamily::BOLD);

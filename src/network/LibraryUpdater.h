@@ -66,8 +66,26 @@ class LibraryUpdater {
     std::string sha256;  // expected digest, lowercase hex
   };
 
+  // Which network step fetchManifest() is on, so the screen can say something
+  // truer than "Checking for updates" while it blocks.
+  //
+  // The whole check runs inside one Activity::loop() call, so nothing repaints
+  // and no button is read until it returns. On a slow network that is a dead
+  // screen for seconds -- reported as the update "hanging on kickoff". These
+  // steps are what it is actually doing, and the activity repaints between them
+  // exactly as the per-book sync already does.
+  //
+  // Named steps rather than a spinner because this panel is e-ink: an animation
+  // costs a refresh per frame, and two honest labels cost two.
+  enum class CheckStep {
+    CONTACTING,  // asking GitHub for the release
+    READING,     // fetching manifest.json from that release
+  };
+  using StepCallback = void (*)(void* ctx, CheckStep step);
+
   // Fetches the release JSON and manifest.json. On OK, getBooks() is the plan.
-  LibraryError fetchManifest();
+  // onStep, when given, fires before each network request.
+  LibraryError fetchManifest(StepCallback onStep = nullptr, void* ctx = nullptr);
 
   const std::vector<Book>& getBooks() const { return books; }
 
