@@ -32,6 +32,32 @@ inline SizeVerdict sizeVerdict(bool existsOnCard, size_t cardBytes, size_t manif
   return SizeVerdict::CHECK_SHA;
 }
 
+// OVERALL progress across the whole sync, 0-100.
+//
+// The screen used to show the CURRENT BOOK's byte progress and nothing else --
+// LibraryUpdater resets processedSize/totalSize per book -- so a 17-book sync
+// drew seventeen separate fills from 0 to 100 and never told the reader how far
+// through the job they were. That is a busy indicator, not a progress one.
+//
+// Book count is the honest denominator. Byte totals are NOT knowable up front:
+// a book is downloaded only if the compare says it changed, so summing the
+// manifest would promise work that mostly will not happen and the bar would
+// stall near zero on a library that is already current.
+//
+// `done` books completed, `bookPct` the current book's own 0-100, so a sync of
+// 4 books halfway through the second reads (1 + 0.5) / 4 = 37%. Monotonic by
+// construction as long as the caller only ever advances `done`.
+inline unsigned int overallPercent(size_t done, size_t total, unsigned int bookPct) {
+  if (total == 0) return 0;
+  if (done >= total) return 100;
+  if (bookPct > 100) bookPct = 100;
+  // Scale first, divide once: (done*100 + bookPct) / total keeps the whole
+  // thing in integers without losing the part-book term to truncation.
+  const size_t scaled = done * 100u + bookPct;
+  const size_t pct = scaled / total;
+  return pct > 100 ? 100u : static_cast<unsigned int>(pct);
+}
+
 // Case-insensitive hex compare: GitHub tooling and openssl disagree about hex
 // case, and a case-sensitive compare would re-download the whole library
 // forever without ever reporting anything wrong.

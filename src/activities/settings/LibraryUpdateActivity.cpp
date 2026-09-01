@@ -1,3 +1,4 @@
+#include "network/LibrarySyncPlan.h"
 #include "LibraryUpdateActivity.h"
 
 #include <Arduino.h>
@@ -195,7 +196,14 @@ void LibraryUpdateActivity::render(RenderLock&&) {
     case State::SYNCING: {
       const size_t total = updater.getTotalSize();
       const size_t processed = updater.getProcessedSize();
-      const unsigned int pct = total > 0 ? static_cast<unsigned int>((processed * 100) / total) : 0;
+      // The CURRENT book's own progress; LibraryUpdater resets these per book.
+      const unsigned int bookPct = total > 0 ? static_cast<unsigned int>((processed * 100) / total) : 0;
+      // ...and the bar shows the WHOLE JOB. Per-book was seventeen fills from 0
+      // to 100 on a seventeen-book sync, which says "busy" and never says "how
+      // far". librarysync::overallPercent carries the reasoning, including why
+      // the denominator is books rather than bytes.
+      const unsigned int pct =
+          librarysync::overallPercent(currentBook, updater.getBooks().size(), bookPct);
       // Once per percent, same e-ink reasoning as the OTA screen.
       if (pct == lastRenderedPercent) return;
       lastRenderedPercent = pct;
