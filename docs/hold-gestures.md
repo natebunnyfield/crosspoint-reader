@@ -111,3 +111,27 @@ do have touch). That is an architectural choice with more than one defensible
 answer, and it goes to the owner before any code moves.
 
 **Nothing in this file has been changed in code.** It is measurement only.
+
+## RULING, owner 2026-09-01: which holds die and which live
+
+Asked what replaces hold, against full menu-ization and a staged plan, he drew
+the line himself, verbatim:
+
+> "kill ble pairing, kill back to home, kill chapter skip, keep daisywheel
+> uppercase and clear-all"
+
+So hold as a trigger DIES where it is invisible or navigational, and SURVIVES
+where it is typing ergonomics:
+
+| Hold | Fate | Notes |
+|---|---|---|
+| Up/Down 1500 ms -> BLE pairing (ClaudeChat, NoteEditor) | **KILL** | The silent display-stall trigger. Pairing itself must remain reachable -- the code's own comment says Daisy users pair from Settings, so that path exists; verify it covers everyone before deleting the gesture. |
+| Held Back 1000 ms -> Home (FileBrowser, FileManager `GO_HOME_MS`) | **KILL** | Back keeps its ordinary single-press meaning. |
+| `SKIP_HOLD_MS` chapter skip (`longPressButtonBehavior = CHAPTER_SKIP`) | **KILL** | FONT_SIZE_STEP was NOT named and stays. The setting persists as an integer, so CHAPTER_SKIP is retired the way renderScale=3 was: a stored value maps to a survivor, the option leaves the picker, nothing renumbers. |
+| Daisywheel / keyboard hold -> uppercase | **KEEP** | |
+| Delete hold -> clear-all | **KEEP** | |
+
+Not named, therefore untouched: font-size step (the shipped default),
+font de/reactivate in the reader font list (shipped 2026-08-29), the
+recent-books hold, the touch-side keyboard holds, and the iOS gesture model's
+own 750 ms hold, which is bindable and was never in question.
