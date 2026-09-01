@@ -3,6 +3,7 @@
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Memory.h>
@@ -138,6 +139,15 @@ void FileManagerActivity::onEnter() {
   // Entered from the home menu with Confirm still held: swallow that release
   // so the first entry doesn't self-activate.
   lockNextConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
+
+  // Drain any action-menu request the host channel is still holding. The
+  // channel (crosspoint-simulator's src/OpenActionMenuChannel.h) has no
+  // notion of which activity is current, so a gesture bound to it and fired
+  // on a different screen minutes ago -- Home, Settings, mid-book -- would
+  // otherwise sit pending and pop the menu the instant this screen is
+  // entered, with no visible cause. Discarding here means only a request
+  // fired WHILE this activity is already active can open it.
+  gpio.consumeOpenActionMenu();
 
   loadFiles();
   requestUpdate();
@@ -594,6 +604,25 @@ void FileManagerActivity::loop() {
       // release-driven, so swallow the matching release.
       if (mappedInput.isPressed(MappedInputManager::Button::Confirm)) lockNextConfirmRelease = true;
       if (mappedInput.isPressed(MappedInputManager::Button::Back)) lockNextBackRelease = true;
+    }
+    return;
+  }
+
+  // A bindable gesture asking for the action menu (the touch route in,
+  // alongside held Confirm below). A host-capability channel like the shake
+  // one: on device consumeOpenActionMenu() is an inline constant-false no-op
+  // (lib/hal/HalGPIO.h) and this branch folds away; the simulator implements
+  // it for real (a gesture bound to Action::OpenActionMenu in
+  // ios/GestureBindings.h, or OPENMENU in a desktop input script). Polled
+  // only here -- the menu means something only in this activity -- and only
+  // reached once the popup-active early return above has passed, so a
+  // request fired while a popup is up stays pending and surfaces the menu
+  // on the frame after the popup closes, rather than stacking on top of it.
+  if (gpio.consumeOpenActionMenu()) {
+    if (!moveSourcePath.empty()) {
+      performMoveHere();
+    } else {
+      openActionMenu();
     }
     return;
   }

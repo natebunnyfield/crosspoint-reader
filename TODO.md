@@ -119,7 +119,36 @@ is a third kind. Whether that is a per-activity enable or a gesture that fires
 everywhere and is ignored elsewhere is the design question, and the second is
 usually the one that ages better.
 
-
+**The original ask is now satisfiable, 2026-09-01 — via T-025's configuration
+layer directly, skipping the "add it as a fixed binding first" step this entry
+proposed above.** `Action::OpenActionMenu` (13) was appended to
+`gesturebind::Action` in `ios/GestureBindings.h` (crosspoint-simulator),
+offered in both the global and zone action lists with NO default binding —
+the owner picks which gesture, if any, including the two-finger hold the
+original ask named. Fully wired end to end: `performGestureAction` in
+`ios/CrossPointZenRecognizers.mm` dispatches it through a new consume-once
+channel (`src/OpenActionMenuChannel.h`, `HalGPIO::injectOpenActionMenu`), and
+this repo's `FileManagerActivity::loop()` polls the matching
+`HalGPIO::consumeOpenActionMenu()` and calls `openActionMenu()` — the same
+call held Confirm already makes. Device-side no-op mirrors every other host
+channel here (`lib/hal/HalGPIO.h`, `consumeOpenActionMenu() { return false;
+}`), so nothing changes on hardware. Screen-scoped exactly as the paragraph
+above anticipated: the channel is polled only in `FileManagerActivity`, is
+drained on that activity's `onEnter()` so a gesture fired on another screen
+cannot surface the menu late, and a binding fired elsewhere logs a distinct
+"fires only in Manage Files" line rather than doing nothing silently.
+**This resolves the two-finger-hold ask** (UNCONFIRMED on device — UIKit
+recognizers and gesture bindings cannot be exercised headlessly; the channel
+and the poll are host-tested). **It does NOT close this entry**: the BLOCKED
+architectural question above — whether the FIRMWARE grows its own binding
+table, adopts the simulator's, or converges on one threshold and helper for
+every OTHER hold in `docs/hold-gestures.md`'s survey — is untouched. Button
+access to the same menu also got a second, separate look the same day (see
+that session's report): short Confirm on a file already opens it via `View`,
+which is real, primary, one-press behavior, so it was NOT swapped for a
+menu-open; held Confirm (~1000 ms, untouched by the 2026-09-01
+hold-for-action ruling in `docs/hold-gestures.md`) remains the only button
+route in.
 
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
 **scope: verification · opened 2026-08-15**

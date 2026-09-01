@@ -279,6 +279,19 @@ class HalGPIO {
   // folds away on device.
   int consumeFontFamilyStep() { return 0; }
 
+  // --- Action-menu channel ---------------------------------------------------
+  //
+  // A no-op here for the same host-capability reason the channels above are:
+  // Manage Files' per-item action menu is reachable on this board by held
+  // Confirm, and a touchscreen host has no equivalent trigger for it. A host
+  // gesture -- a bindable action in the iOS gesture table -- injects one
+  // request; FileManagerActivity polls this in its input handling and, when
+  // true, calls openActionMenu() exactly as held Confirm does. Constant
+  // false, so the poll folds away on device. The simulator implements it for
+  // real; the contract lives in its src/OpenActionMenuChannel.h
+  // (consume-once, no direction, bursts collapse to one open).
+  bool consumeOpenActionMenu() { return false; }
+
   // The reader's FINAL text-block insets — top after the paint-time cap-ink
   // trim, then right, bottom, left — in FRAMEBUFFER pixels (logical px times
   // the active render scale). A no-op here for the same reason the read-aloud
