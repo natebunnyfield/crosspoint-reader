@@ -4,6 +4,21 @@
 was found by grep and read in place; the citations are what was actually there
 on that commit, not what an earlier doc claimed.
 
+**Citation check, 2026-08-30: `b398d45` does not resolve in this repository**
+(`git cat-file -t b398d45` -> "Not a valid object name"; no matching sha under
+`git log --all --oneline`). Left as written rather than repointed to a guess —
+whoever wrote it either mistyped the short sha or the commit it named was later
+rewritten. **The counts below have also since moved**: firmware work landed
+between 2026-08-29 and 2026-08-30 (the font-activation feature, T-026) added at
+least one more file (`ReaderUtils.h` now carries live `getHeldTime()` call
+sites it did not before). A raw `grep -rn "getHeldTime()" src/ lib/` today
+returns matches in 15 files rather than the 10 listed below, but that count
+mixes call sites with declarations and comments and is not a clean recount
+against this doc's own methodology — re-survey properly (call sites only,
+`.cpp`/inline-header logic, not `MappedInputManager.h`'s declaration or
+comments) before relying on an exact number for T-027; do not read "15" as this
+doc's replacement figure.
+
 ## Why this file exists
 
 T-027 was filed as "two-finger hold on Manage Files should open the Menu
@@ -30,15 +45,15 @@ Not one hold. Nine, spread across ten files, none of them agreeing.
 | 350 | `TOUCH_LONG_PRESS_MS` | `src/activities/util/KeyboardEntryActivity.h:141` | touch alt-output on a key |
 | 500 | `LONG_PRESS_MS` | `src/activities/util/DaisyEntryActivity.h:84` | daisywheel alt output |
 | 500 | `LONG_PRESS_MS` | `src/activities/util/KeyboardEntryActivity.h:139` | button alt output |
-| 500 | `LONG_PRESS_MS` | `src/activities/util/ClaudeChatActivity.cpp:455` | (local constant) |
+| 500 | `LONG_PRESS_MS` | `src/activities/util/ClaudeChatActivity.cpp:456` | (local constant) |
 | 500 | `LONG_PRESS_MS` | `src/activities/util/NoteEditorActivity.cpp:670` | (local constant) |
 | 700 | `SKIP_HOLD_MS` | `src/activities/reader/ReaderUtils.h:19` | chapter skip; font-family hold; font de/reactivate |
-| **750** | `zenhold::kHoldMs` | `crosspoint-simulator/ios/CrossPointZenRecognizers.mm:674` | **the iOS gesture model's ONE hold** |
+| **750** | `zenhold::kHoldMs` | `crosspoint-simulator/ios/ZenHoldRouting.h:38` | **the iOS gesture model's ONE hold** |
 | 900 | `TOUCH_DEL_LONG_PRESS_MS` | `src/activities/util/KeyboardEntryActivity.h:142` | touch clear-all |
 | 1000 | `LONG_PRESS_MS` | `src/activities/home/RecentBooksActivity.cpp:17` | recent-book action |
 | 1000 | `GO_HOME_MS` | `src/activities/home/FileBrowserActivity.cpp:19` | held Back → Home; held Confirm → menu |
 | 1500 | `DEL_LONG_PRESS_MS` | `src/activities/util/KeyboardEntryActivity.h:140` | button clear-all |
-| 1500 | `HOLD_MS` | `src/activities/util/ClaudeChatActivity.cpp:264` | (local constant) |
+| 1500 | `HOLD_MS` | `src/activities/util/ClaudeChatActivity.cpp:265` | (local constant) |
 | 1500 | `HOLD_MS` | `src/activities/util/NoteEditorActivity.cpp:328` | (local constant) |
 
 Four of these are file-local `constexpr` declared inside a `.cpp`, so nothing

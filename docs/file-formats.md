@@ -6,7 +6,26 @@ All POD fields are written in the ESP32 little-endian representation used by
 
 ## `book.bin`
 
-### Version 10
+### Version 10, superseded by Version 11 (2026-08-23) — struct unchanged, meaning changed
+
+**Current version is 11**, not 10 — `BOOK_CACHE_VERSION` at
+`lib/Epub/Epub/BookMetadataCache.cpp:29`. Check the live value with
+`grep -n 'BOOK_CACHE_VERSION = ' lib/Epub/Epub/BookMetadataCache.cpp` rather
+than trusting a number here; it will drift again. The ImHex pattern below still
+describes the v10 byte layout, which v11 does not change — no field was added
+or resized.
+
+**Why it bumped anyway, `ef33faef4` ("fix(cache): bump BOOK_CACHE_VERSION — a
+warm book skipped the day's work"):** `Epub::load()` returns early on a warm
+metadata cache, above the only call to `scanZipForBookNotes()`, so a book
+already indexed on a card silently kept whatever DRM/embedded-font/TOC
+conclusions an OLDER firmware had reached for it — including a non-UTF-8 TOC
+that had failed to parse and committed an empty one, with no way back short of
+a manual Clear Cache. The rule this restates, from `Section.cpp`'s own
+version-bump ladder below: bump when the format changes, when pagination
+changes, **or when anything the cached pass DECIDED changes** — a cache is a
+record of conclusions, and a conclusion reached by code that has since been
+fixed is stale even though the bytes on disk still parse the same way.
 
 `book.bin` stores EPUB metadata plus lookup tables for spine and TOC entries.
 The current firmware writes this version from `BookMetadataCache`.
@@ -18,7 +37,7 @@ import std.mem;
 import std.string;
 import std.core;
 
-#define EXPECTED_VERSION 10
+#define EXPECTED_VERSION 11  // was 10; the v11 bump changed no byte layout, see above
 #define MAX_STRING_LENGTH 65535
 
 struct String {
@@ -90,7 +109,45 @@ if (parsedSize != fileSize) {
 
 ## `section.bin`
 
-### Version 30
+### Version 30, twenty-five bumps behind — current is 55
+
+**Current version is 55**, not 30 — `SECTION_FILE_VERSION` at
+`lib/Epub/Epub/Section.cpp:199`. Check the live value with
+`grep -n 'SECTION_FILE_VERSION = ' lib/Epub/Epub/Section.cpp` rather than
+trusting a number here; this constant has moved on every few days of work and
+the ImHex pattern below (still `EXPECTED_VERSION 30`, matching the prose
+changelog's newest fully-described entry, v37) has not been kept in step with
+the fields v38-v55 added. Treat the pattern as a v30 snapshot, not as
+current-format documentation, until someone rewrites it against the live
+`SectionBin::write`/`::read` in `Section.cpp`.
+
+**Versions 38-55, not yet described in prose here — one line each, from the
+commit that bumped the constant, verified 2026-08-30 by walking
+`git log -p --follow -- lib/Epub/Epub/Section.cpp` for every added
+`SECTION_FILE_VERSION = N` line.** These are pointers for whoever writes the
+real changelog entries next, not full descriptions — read the cited commit
+before relying on any of them for a field layout:
+
+| v | commit | what the commit subject says |
+|---:|---|---|
+| 38 | `8f97e7184` | exact page geometry — margin row retired, baseline, bottom, sinkage, insets |
+| 39 | `ae6981ddf` | hanging punctuation, alignment setting, widows, line grid, chapter bar |
+| 40 | `2f182a86f` | inter-block gaps cap at half a line |
+| 41 | `8e2d4afdb` | blockquote inset clipping and dash-led lines; block audit recorded |
+| 42 | `6378eb167` | lists: real numbers, hanging indents, capped nesting |
+| 43 | `bdfe5f663` | punctuation hangs off the LEFT edge too |
+| 44 | `7b75aa06d` | the measure decides justified or ragged, not a setting (matches the inline comment on `paragraphAlignment` below) |
+| 45 | `ac8dc109c` | sparse ruby, and the book tells you what was done to it |
+| 46 | `2efd1ff70` | non-UTF-8 books open, missing glyphs show, library sync skips unchanged |
+| 47 | `3c631dd75` | a centimetre is 59 pixels, not one |
+| 48 | `a72786082` | a caption nobody laid out was printed over by every column |
+| 49 | `eb35311b9` | the justification threshold is a setting, on the screen that can hold it |
+| 50 | `aa144fd77` | the spaced `! important`, and a count that doubled |
+| 51 | `c07025310` | Typography Settings, with per-ligature control |
+| 52 | `0d58d4e9d` | XS and XXS sizes, and a table header keeps its rows |
+| 53 | `070ab4e64` | a hairline between the records of a flattened table |
+| 54 | `d624ae638` | the separators went in the wrong emitter — the key block had none |
+| 55 | `03a5a027f` | a definition list reads as one, instead of as a wall of text ([B-042]) |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

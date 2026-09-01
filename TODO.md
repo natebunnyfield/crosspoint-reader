@@ -60,68 +60,6 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
-### [T-028] Give the font-family step channel a direction, and wire "previous font" end to end
-**scope: firmware + simulator HAL · asked 2026-08-29 · PARTIALLY SHIPPED — the channel carries direction, nothing reads it yet**
-
-Owner: *"allow previous font to be an assignable gesture action."* The iOS half
-shipped 2026-08-29: `Action::FontFamilyStepBack = 12` exists in
-`../crosspoint-simulator/ios/GestureBindings.h`, is offered in Settings.app and
-bindable, but does nothing when fired — it deliberately logs "font family step
-BACK (offered, not wired -- no direction on the firmware's host channel)"
-rather than faking it. Full account, including the shake-outside-zen fix that
-shipped alongside it: `../crosspoint-simulator/docs/zen-mode.md`, "Shake fires
-outside zen, and 'previous font' is now assignable".
-
-**What shipped this session**: `../crosspoint-simulator/src/FontFamilyStepChannel.h`
-now carries a signed delta (+1/-1) instead of a bare boolean, chosen over an
-enum because it is the exact shape `EpubReaderActivity::cycleReaderFontFamily(int
-delta)` already takes and a held side button already uses
-(`held.next ? +1 : -1`, `src/activities/reader/EpubReaderActivity.cpp:601`).
-`inject()` and `consume()` kept their original zero-argument shapes so
-`crosspoint-simulator/src/HalGPIO.cpp`'s existing two call sites compile and
-behave exactly as before — this change is additive only, and the shake, which
-already worked, is untouched.
-
-**What is still open, and why it could not go further this session.** The
-firmware's `EpubReaderActivity.cpp:412-414` still hardcodes
-`cycleReaderFontFamily(+1)`, because reading `direction()` from the reader
-needs a NEW `HalGPIO` method, and per this project's HAL stub rule that method
-has to exist, with the identical signature, on BOTH halves:
-
-1. `crosspoint-reader/lib/hal/HalGPIO.h:276`'s inline no-op (mine, firmware) —
-   would need e.g. `bool consumeFontFamilyStep(int& delta)` returning false and
-   leaving `delta` untouched, so it stays a no-op on device.
-2. `crosspoint-simulator/src/HalGPIO.h` (declares `consumeFontFamilyStep()` /
-   `injectFontFamilyStep()`, `HalGPIO.cpp` implements them) — the matching real
-   implementation, reading `FontFamilyStepChannel::direction()`.
-
-**(1) and (2) have to land in the SAME change.** The desktop canary
-(`pio run -e simulator`, run from this repo) builds `EpubReaderActivity.cpp`
-against `crosspoint-simulator`'s `HalGPIO` — confirmed via
-`platformio.ini`'s `[env:simulator]`: `lib_ignore = hal` excludes this repo's
-own `lib/hal/` entirely, and `lib_deps` pulls in
-`simulator=symlink://../crosspoint-simulator`, whose `src/HalGPIO.h` supplies
-the class firmware code actually links against for that env. Landing only the
-firmware side (this repo) would leave `EpubReaderActivity.cpp` calling a method
-`crosspoint-simulator`'s `HalGPIO` does not declare, breaking that canary; the
-reverse (simulator-only) leaves the reader still hardcoded to +1. This session
-was scoped to firmware plus exactly one simulator file
-(`FontFamilyStepChannel.h`) and could not touch `crosspoint-simulator/src/HalGPIO.{h,cpp}`,
-so (1) and (2) are left for whoever next has write access to both.
-
-3. Once (1) and (2) exist, `EpubReaderActivity.cpp:412-414` reads the delta and
-   calls `cycleReaderFontFamily(delta)` instead of the hardcoded `+1` — no
-   further reader changes needed, `cycleReaderFontFamily` already accepts
-   either sign.
-4. `../crosspoint-simulator/ios/CrossPointZenRecognizers.mm`'s
-   `FontFamilyStepBack` case calls the new `injectFontFamilyStep(-1)` instead
-   of only logging.
-
-Done looks like: a device shake bound forward and a gesture bound to "Previous
-Reading Font" both step the reading font family, in opposite directions, and
-`FontFamilyStepChannel`'s comment block (its own "still open" section) is
-deleted because it is no longer true.
-
 ### [T-027] Rewrite hold-for-action to fit the gesture model
 **scope: firmware input + ios gestures · asked 2026-08-28 · RESCOPED 2026-08-29 · BLOCKED on an owner ruling**
 
@@ -181,36 +119,6 @@ is a third kind. Whether that is a per-activity enable or a gesture that fires
 everywhere and is ignored elsewhere is the design question, and the second is
 usually the one that ages better.
 
-### [T-022] Claude results: the FRONT pair should page too
-
-Owner, 2026-08-24: *"in claude results, front rocker switch should activate
-PgUp / PgDn (currently side buttons work but front ones don't)."*
-
-Taken at face value and consistent with the code. In `ClaudeChatActivity`, the
-paging is bound to `Button::Up` / `Button::Down`, which in this firmware's
-vocabulary is the SIDE pair — the physical rocker (`:424`, `:429`, `:482`,
-`:487`). The FRONT cluster's `Left` / `Right` are spent on `repeatCol`
-(`:480-481`), which is column navigation, so in the results view the front pair
-does nothing for scrolling.
-
-**What "done" looks like:** in the results view — and only there — the front
-`Left`/`Right` page the same way the side rocker does, sharing one code path so
-the two cannot drift. Everywhere else in that activity the front pair keeps its
-current job.
-
-**The thing to get right:** `repeatCol` owns `Left`/`Right` for the composer and
-the daisy picker, so this is a per-VIEW binding, not a global remap. Establish
-which views are live when results are on screen (`panel.isDaisy()` already gates
-two of the four sites) and bind only there. A global change would break column
-navigation in the composer, which is the kind of regression that only shows up
-when someone tries to type.
-
-**Also check the X4.** `HalGPIO::hasEdgeSideButtons()` is FALSE for X4, so on
-that board the side rocker is not on the edge at all — which is the profile
-where a working front binding matters most. Whatever lands should be verified
-against an X4 profile as well as X3.
-
-Not started.
 
 
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
@@ -350,6 +258,70 @@ the cheap version and needs no keychain.
 ---
 
 ## Finished
+
+### [T-022] Claude results: the FRONT pair should page too — DONE 2026-08-29
+**scope: firmware input · asked 2026-08-24 · CLOSED — found already shipped while auditing this file**
+
+Owner, 2026-08-24: *"in claude results, front rocker switch should activate
+PgUp / PgDn (currently side buttons work but front ones don't)."*
+
+**Shipped by `1fc105832`** ("feat(claude): front Left/Right page the answer
+view"), which names T-022 in its own commit message — this entry was still
+marked "Not started" in the OPEN section when found, purely a tracker miss, not
+an unshipped feature. Verified against the current tree,
+`src/activities/util/ClaudeChatActivity.cpp:421-435`: the next/previous-page
+block that used to check only `Button::Down` / `Button::Up` now also accepts
+`Button::Right` / `Button::Left` respectively, OR'd into the same two
+`wasReleased` conditions rather than added as a second path — exactly the "one
+code path so the two cannot drift" criterion this entry asked for. The block
+lives inside the section that only runs in the results view, so prompt-view
+`repeatCol` column navigation (composer, daisy picker) is untouched, matching
+the "per-VIEW binding, not a global remap" requirement. Not board-conditional
+per the commit message: `MappedInputManager::mapButton` makes
+`Left`/`Right`/`Up`/`Down` universal on every profile and
+`isNavDirectionSwapped()` always returns false, so this covers X4 (no edge side
+buttons) the same as X3 without a separate check.
+
+### [T-028] Give the font-family step channel a direction, and wire "previous font" end to end — DONE 2026-08-29/30
+**scope: firmware + simulator HAL · asked 2026-08-29 · CLOSED — both halves shipped**
+
+Owner: *"allow previous font to be an assignable gesture action."*
+
+**What shipped, across two sessions.** 2026-08-29
+(`../crosspoint-simulator/src/FontFamilyStepChannel.h`, commit
+`0863464`/iOS side) gave the channel a signed delta and made
+`Action::FontFamilyStepBack` bindable in Settings.app, but left it logging
+"offered, not wired" because nothing on the firmware side could read a
+direction yet. The four items that entry listed as still open are now all
+done, confirmed by reading the current tree rather than trusting the prior
+note:
+
+1. `lib/hal/HalGPIO.h:280` — no longer the bare-bool no-op the entry described;
+   it is `int consumeFontFamilyStep() { return 0; }`, changed by commit
+   `be43e4846` ("feat(reader): the host font-family step carries a
+   direction"), with a comment recording the bool-to-int history right above
+   it (`HalGPIO.h:274-279`).
+2. `../crosspoint-simulator/src/HalGPIO.h:257-258` declares the matching
+   `int consumeFontFamilyStep();` / `void injectFontFamilyStep(int delta =
+   +1);`, implemented in `../crosspoint-simulator/src/HalGPIO.cpp:1299-1303`
+   (commit `ca41866`, "feat(hal): the font-family step channel carries a
+   direction") — landed the same shape (1) needed, in the same repo pair.
+3. `src/activities/reader/EpubReaderActivity.cpp:403-405` reads the delta and
+   calls `cycleReaderFontFamily(step)` — no hardcoded `+1` remains at that
+   site.
+4. `../crosspoint-simulator/ios/CrossPointZenRecognizers.mm:257-266`'s
+   `FontFamilyStepBack` case now calls `gpio.injectFontFamilyStep(-1)`, with a
+   comment dated "WIRED 2026-08-29" — no longer only logging.
+
+`FontFamilyStepChannel.h`'s "still open" comment block, which the entry said
+should be deleted once this shipped, is gone — grepped for "still open" in
+that file and found nothing.
+
+**Net:** a device shake bound forward and a gesture bound to "Previous Reading
+Font" now step the reading font family in opposite directions, on device via
+the no-op (folds away) and on the simulator/iOS for real. Not device-confirmed
+— host-side and simulator-side reads only, per the usual "device: unconfirmed"
+caveat for anything gated behind the HAL no-op.
 
 ### [T-026] Long-select a font in the reader font list to deactivate / reactivate it — DONE 2026-08-29
 **scope: reader font picker · asked 2026-08-28 · reader picker DONE 2026-08-29

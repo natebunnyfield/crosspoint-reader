@@ -148,8 +148,10 @@ housekeeping.
 
 Multiple clones is what actually costs time here. The live pair is:
 
-- `~/src/crosspoint-reader` — firmware. `origin` **and** `fork` are
-  `natebunnyfield/crosspoint-reader`; `upstream` is the project.
+- `~/src/crosspoint-reader` — firmware. `origin` is
+  `natebunnyfield/crosspoint-reader`; `upstream` is the project. There is no
+  separate `fork` remote — confirmed via `git remote -v` (2026-08-30); an
+  earlier version of this line claimed one existed.
 - `~/src/crosspoint-simulator` — simulator. `origin` is
   `natebunnyfield/crosspoint-simulator`, `upstream` the project.
 
@@ -214,16 +216,23 @@ offset by 1 px) but the owner ruled the sweep closed. Full note in
 no includer, no reference in either repo, and absent from `firmware.elf` — and
 therefore costing nothing.
 
-**The page palette is now a fourteen-row dial**, host-side only. Nothing here
-reaches device firmware: it is a simulator/iOS presentation choice, and the
-device has no Settings.app to expose it. The presets, their measured contrast,
-the one deliberate exemption (Solarized, whose low contrast is the palette's
-thesis) and the phosphor research behind the CRT rows live in
+**The page palette was a fourteen-row dial when this was written (2026-08-15/16)
+— stale, confirmed against `crosspoint-simulator/CLAUDE.md` 2026-08-30.** It has
+since grown to a **42-phosphor + 10-paper, 52-preset** registry, and then most
+of it froze: the shipped page (India stock / Sanguine ink light, the owner's
+four-gun dark mix) no longer reads from the preset store at all as of
+2026-08-24, and the Settings.app row that once exposed it is gone. Nothing here
+reaches device firmware either way — it is a simulator/iOS presentation choice,
+and the device has no Settings.app to expose it. The presets, their measured
+contrast and the phosphor research behind the CRT rows live in
 `crosspoint-simulator/ios/README.md` and
-`crosspoint-simulator/docs/crt-phosphor-presets.md`.
+`crosspoint-simulator/docs/crt-phosphor-presets.md`; the freeze itself is
+`crosspoint-simulator/CLAUDE.md`'s "The color dials, and the one rule they all
+share" table — read that file for current behavior, not this paragraph.
 
 The trap that keeps recurring there, recorded here because it is a *fork*
 discipline issue and not a palette one: **a preset persists as an integer**, so
 rows append and never insert, and the test's "unknown preset" sentinel has to
-stay ahead of the enum. It has been walked four times (7 → 11 → 13 → 14) and
-each time it caught the collision instead of shipping one.
+stay ahead of the enum. It was walked four times (7 → 11 → 13 → 14) as of this
+paragraph's writing and has been walked **ten** times as of 2026-08-30 (up to
+56) — each time it caught the collision instead of shipping one.

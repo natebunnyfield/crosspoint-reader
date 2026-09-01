@@ -1118,12 +1118,20 @@ rm -rf /path/to/sd/.crosspoint/epub_<hash>/sections/
 
 **Source**: `lib/Epub/Epub/Section.cpp`, `lib/Epub/Epub/BookMetadataCache.cpp`
 
-**Current Versions** (as of docs/file-formats.md):
-- `book.bin`: **Version 10** (metadata structure)
-- `section.bin`: **Version 35** (layout structure; v35 added the per-page
-  word-anchor LUT used for exact reposition after font/size changes, and made
-  h1-h3 headings force a page break so a page-top heading stays pinned across
-  reflows)
+**Current Versions** — these move often; check the live constants rather than
+trusting a number written here (this line was wrong by 1 and by 20 versions
+respectively when checked 2026-08-30 against the actual constants):
+```bash
+grep -n 'BOOK_CACHE_VERSION = ' lib/Epub/Epub/BookMetadataCache.cpp   # 11 as of 2026-08-30
+grep -n 'SECTION_FILE_VERSION = ' lib/Epub/Epub/Section.cpp           # 55 as of 2026-08-30
+```
+- `book.bin`: metadata structure. `docs/file-formats.md` has the full pattern
+  and the v10->v11 rationale (a warm-cache staleness bug, not a byte-layout
+  change).
+- `section.bin`: layout structure. `docs/file-formats.md` has the full pattern
+  for the byte layout as of v30/v37 and a pointer table (commit sha + subject,
+  not yet expanded to full field-level entries) for every bump since, v38
+  through the current v55.
 - `progress.bin`: **no version byte** — its LENGTH discriminates. 4 bytes =
   spine+page, 6 adds the chapter page count, 8 adds the paragraph index the
   reader was on, 12 adds the page's word anchor (uint32 LE source byte
