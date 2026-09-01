@@ -1,8 +1,27 @@
 name: Compile Release
+# MANUAL DISPATCH ONLY since 2026-08-31, by owner ruling: "don't run Compile
+# Release on CI at all."
+#
+# It used to fire on every tag push, and it FAILED every time -- not from a code
+# fault but because the B-029 seed-font gate refuses a build with the commercial
+# editor faces absent, and `lib/EpdFont/local_fonts/` is gitignored and cannot
+# be in a fresh CI checkout. The gate is correct: it exists because a release
+# built from a fresh clone once silently dropped those faces.
+#
+# The alternative considered and rejected was shipping the fonts to CI. They are
+# 3.8 MB across 25 files -- about 81x GitHub's 48 KB Actions-secret cap, so they
+# cannot be a secret -- and this fork is PUBLIC, so an encrypted archive
+# committed here would be publicly downloadable ciphertext of licensed fonts. A
+# private fonts repo with only a token as the secret would have worked, and the
+# owner chose not to take on that machinery.
+#
+# So this workflow runs where the fonts actually live: deliberately, by hand.
+# Releases are built the way they always have been. What is lost is CI coverage
+# of the release path, which means a release-only break is found at release
+# time -- accepted, and stated here so nobody re-adds the tag trigger and
+# rediscovers the red badge.
 on:
-  push:
-    tags:
-      - '*'
+  workflow_dispatch:
 
 jobs:
   build-release:

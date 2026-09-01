@@ -501,6 +501,31 @@ push, and the `Compile Release` job stays red until the private-repo fetch is
 built regardless.
 
 
+#### Resolved 2026-08-31: Compile Release no longer runs on CI
+
+Owner ruling, asked directly against writing the private-repo + token machinery
+or leaving the check red: **"don't run Compile Release on CI at all."**
+
+`.github/workflows/release.yml` fired on every tag push and failed every time --
+not from a code fault, but because the B-029 seed-font gate correctly refuses a
+build with the commercial editor faces absent, and `lib/EpdFont/local_fonts/` is
+gitignored and cannot be in a fresh checkout. It is now `workflow_dispatch`
+only, matching `release_candidate.yml`, with the whole argument written into the
+file so nobody re-adds the trigger and rediscovers the red badge.
+
+The rejected alternative, measured rather than assumed: the fonts are 3.8 MB
+across 25 files, about **81x GitHub's 48 KB Actions-secret cap**, so they cannot
+be a secret; and this fork is PUBLIC, so an encrypted archive committed here
+would be publicly downloadable ciphertext of licensed fonts. A private fonts
+repo with only a token as the secret would have worked and was offered.
+
+**What this costs, stated plainly:** no CI coverage of the release path, so a
+release-only break is found at release time. Accepted.
+
+With this, every CI check that CAN pass does: cppcheck clean, clang-format
+clean, the unit-tests configure fixed and ActivityInputTest linking again at
+601/601.
+
 ### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
 
