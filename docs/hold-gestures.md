@@ -162,3 +162,16 @@ Not named, therefore untouched: font-size step (the shipped default),
 font de/reactivate in the reader font list (shipped 2026-08-29), the
 recent-books hold, the touch-side keyboard holds, and the iOS gesture model's
 own 750 ms hold, which is bindable and was never in question.
+
+## Follow-on, 2026-09-02: the surviving holds share one broken timer
+
+`docs/ux-navigation-audit-2026-09-02.md` found that every hold that reads
+`mappedInput.getHeldTime()` raw is measuring the FIRST button of a chord, not
+its own: the SDK stamps `buttonPressStart` only when nothing was already down
+(`freeink-sdk/libs/hardware/InputManager/src/InputManager.cpp:252-254`). So
+"hold Right to page, tap Confirm" fires the Confirm HOLD on Confirm's first
+frame — clear-all on the keyboard, font deactivation on the font picker, the
+delete prompt in the browser. Six sites; the two that already stamp their own
+press time (`EpubReaderActivity`, `DaisyEntryActivity`) are the pattern. Any
+"friendly to how we do gestures now" rewrite of T-027 has to start with a
+per-button hold helper, or it inherits this.
