@@ -145,7 +145,11 @@ void FileBrowserActivity::loop() {
       return;
     }
 
-    if (mode == Mode::Books && mappedInput.getHeldTime() >= DELETE_HOLD_MS) {
+    // Confirm's OWN press length (this runs on its release frame), or a touch
+    // long-tap's contact time. The global timer measured the chord's first
+    // button, so a Confirm tapped while a page button was still down opened
+    // the delete prompt (docs/ux-navigation-audit-2026-09-02.md F10).
+    if (mode == Mode::Books && mappedInput.getHeldTime(MappedInputManager::Button::Confirm) >= DELETE_HOLD_MS) {
       // --- LONG PRESS ACTION: DELETE FILE OR DIRECTORY ---
       std::string cleanBasePath = basepath;
       if (cleanBasePath.back() != '/') cleanBasePath += "/";

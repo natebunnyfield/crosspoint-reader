@@ -175,3 +175,27 @@ delete prompt in the browser. Six sites; the two that already stamp their own
 press time (`EpubReaderActivity`, `DaisyEntryActivity`) are the pattern. Any
 "friendly to how we do gestures now" rewrite of T-027 has to start with a
 per-button hold helper, or it inherits this.
+
+**DONE 2026-09-02.** `src/ButtonHoldTimer.h` (pure, one slot per physical
+button, stamped from raw press edges in `MappedInputManager::update()`) and
+`MappedInputManager::getHeldTime(Button)` (swallow-gated like `isPressed()`,
+reports the finished length on the release frame, keeps the touch-tap
+override so X4 Pro / Sticky long-tap-to-delete survives). The six raw sites
+read it now. The global `getHeldTime()` stays for `ButtonNavigator`'s
+auto-repeat, where the chord's first button is the right answer.
+
+## RULING, owner 2026-09-02: the reader's held Back dies too
+
+The 09-01 kill left one held-Back in the firmware: the reader's 1000 ms
+`GO_BACK_OR_HOME_MS` → file browser (`ReaderUtils.h`, F8 in the audit —
+the chord bug made it fire on a Back TAP while a side button was down).
+Asked keep-and-retime or kill, verbatim option chosen: **"Kill it."**
+
+| Hold | Fate | Notes |
+|---|---|---|
+| Held Back 1000 ms -> file browser (reader, `handleBackNavigation`) | **KILL — DONE 2026-09-02** | Back in Epub / Xtc / Txt / Bmp readers is one short press → `popActivity()`. `GO_HOME_MS` and `GO_BACK_OR_HOME_MS` deleted; `SKIP_HOLD_MS` is the only constant left in `ReaderUtils.h`. The file browser stays reachable from Home. `SETTINGS.backShortToFileBrowser` (already a constexpr 0) is now read by nothing — tombstoned, not deleted. `handleBackNavigation`'s signature is kept so the four callers did not change. |
+
+There is now NO held-Back anywhere in the firmware. Every surviving hold is
+on Confirm (delete / action menu / recent-book action / font de-reactivate /
+clear-all / uppercase), Up/Right (keyboard alt output) or a side button (font
+size step).

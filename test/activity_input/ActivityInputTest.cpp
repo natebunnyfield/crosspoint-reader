@@ -49,6 +49,7 @@
 #include "HostHarness.h"
 #include "MappedInputManager.h"
 #include "ReaderFontSizes.h"
+#include "activities/reader/ReaderUtils.h"
 #include "activities/Activity.h"
 #include "activities/RenderLock.h"
 #include "activities/settings/FontSelectionActivity.h"
@@ -650,6 +651,85 @@ TEST(LongPressButtonBehavior, ChapterSkipIsRetiredButItsSlotIsPinned) {
   static_assert(CrossPointSettings::FONT_SIZE_STEP == 2, "slot 2 is append-only encoding, never renumber");
   EXPECT_EQ(SETTINGS.longPressButtonBehavior, CrossPointSettings::FONT_SIZE_STEP)
       << "every reader must land on FONT_SIZE_STEP now that CHAPTER_SKIP is unreachable";
+}
+
+// ---- the chord timer (docs/ux-navigation-audit-2026-09-02.md F4/F9/F10) ----
+//
+// The SDK's getHeldTime() is one stopwatch stamped by the FIRST button down; in
+// a chord it answers that button's time for whichever button is asked about.
+// The stub scripts that global figure (simSetHeldTime), while
+// MappedInputManager::getHeldTime(Button) stamps its own press off millis() —
+// real wall-clock in this harness — so the two can be made to disagree exactly
+// the way a device does: Right held for 900 ms, Confirm just pressed.
+
+TEST_F(ActivityInput, PerButtonHeldTimeIsTheButtonsOwnPressNotTheChords) {
+  host::setRootActivity(makeFontSelection());
+
+  host::pressFrame(HalGPIO::BTN_RIGHT);
+  host::buttons().simSetHeldTime(900);  // the global timer: Right has been down 900 ms
+  host::pressFrame(HalGPIO::BTN_CONFIRM);
+
+  const MappedInputManager& in = host::input();
+  ASSERT_GE(in.getHeldTime(), 900u) << "the global timer is the chord's first button, by SDK design";
+  EXPECT_LT(in.getHeldTime(MappedInputManager::Button::Confirm), 100u)
+      << "Confirm's own press is one frame old; reading the chord's time here is the F9 defect";
+  // Right's own press is a few ms old too: the per-button read must not be
+  // the stub's scripted 900 either, and the first-pressed button is never
+  // younger than the second.
+  EXPECT_LT(in.getHeldTime(MappedInputManager::Button::Right), 900u)
+      << "the per-button timer handed back the global stub's figure";
+  EXPECT_GE(in.getHeldTime(MappedInputManager::Button::Right), in.getHeldTime(MappedInputManager::Button::Confirm));
+  EXPECT_TRUE(in.isPressed(MappedInputManager::Button::Right));
+
+  host::releaseFrame(HalGPIO::BTN_CONFIRM);
+  host::releaseFrame(HalGPIO::BTN_RIGHT);
+  host::buttons().simSetHeldTime(0);
+}
+
+// F9 end to end: hold Right to page the font list, tap Confirm. Before the
+// per-button timer the Confirm HOLD fired on Confirm's press frame (its
+// toggle, plus a requestUpdate for the notice) and the release was then
+// "spent" — no specimen swap. Now the press frame does nothing and the release
+// is an ordinary tap: exactly one requestUpdate, on the release.
+TEST_F(ActivityInput, FontListHoldDoesNotFireOnATapInsideAChord) {
+  host::setRootActivity(makeFontSelection());
+  host::pressFrame(HalGPIO::BTN_RIGHT);
+  host::buttons().simSetHeldTime(900);
+  host::frame();
+  host::resetCounters();
+
+  host::pressFrame(HalGPIO::BTN_CONFIRM);
+  EXPECT_EQ(host::counters().updates, 0)
+      << "Confirm's hold fired on its first frame because Right had been down 900 ms — the F9 defect";
+  EXPECT_EQ(host::fontSystemCalls().ensureLoaded, 0);
+
+  // The press-frame zero above is the discriminating line: under the defect
+  // the toggle's own requestUpdate already made this 1 and the spent release
+  // added nothing, so the total reads 1 either way. This pins only that the
+  // release is still a tap (one swap), not that the hold did not fire.
+  host::releaseFrame(HalGPIO::BTN_CONFIRM);
+  EXPECT_EQ(host::counters().updates, 1) << "the release must be an ordinary tap (one specimen swap)";
+  EXPECT_EQ(host::currentActivityName(), "FontSelect");
+
+  host::releaseFrame(HalGPIO::BTN_RIGHT);
+  host::buttons().simSetHeldTime(0);
+}
+
+// And the hold still works when it is Confirm's OWN press that is long: the
+// fix must not have turned the hold off. Confirm is pressed alone, the harness
+// clock is real, so the test waits out SKIP_HOLD_MS.
+TEST_F(ActivityInput, FontListHoldStillFiresOnConfirmsOwnLongPress) {
+  host::setRootActivity(makeFontSelection());
+  host::resetCounters();
+
+  host::pressFrame(HalGPIO::BTN_CONFIRM);
+  EXPECT_EQ(host::counters().updates, 0);
+  usleep((ReaderUtils::SKIP_HOLD_MS + 50) * 1000);
+  host::frame();
+  EXPECT_EQ(host::counters().updates, 1) << "the hold did not fire at SKIP_HOLD_MS on Confirm's own press";
+
+  host::releaseFrame(HalGPIO::BTN_CONFIRM);
+  EXPECT_EQ(host::counters().updates, 1) << "a release after a fired hold is spent; it must not also swap";
 }
 
 }  // namespace

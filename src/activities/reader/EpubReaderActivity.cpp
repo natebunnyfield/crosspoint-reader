@@ -463,15 +463,13 @@ void EpubReaderActivity::loop() {
   // SETTINGS.sideButtonLayout is SIDE_BUTTONS_DISABLED — that setting withdraws side PAGING,
   // not the side buttons themselves, and the chord has to be reachable wherever the font
   // gestures are.
-  // On the end-of-book screen a short Back goes home (same as Confirm and PageForward).
-  if (atEndOfBook && mappedInput.wasReleased(MappedInputManager::Button::Back) &&
-      mappedInput.getHeldTime() < ReaderUtils::GO_BACK_OR_HOME_MS) {
+  // On the end-of-book screen Back goes home (same as Confirm and PageForward).
+  if (atEndOfBook && mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     onGoHome();
     return;
   }
-  // Short press Back restores position when viewing a footnote (takes priority over navigation)
-  if (footnoteDepth > 0 && mappedInput.wasReleased(MappedInputManager::Button::Back) &&
-      mappedInput.getHeldTime() < ReaderUtils::GO_BACK_OR_HOME_MS) {
+  // Back restores position when viewing a footnote (takes priority over navigation)
+  if (footnoteDepth > 0 && mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     restoreSavedPosition();
     return;
   }

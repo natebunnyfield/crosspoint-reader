@@ -81,9 +81,8 @@ void XtcReaderActivity::loop() {
     return;
   }
 
-  // On the end-of-book screen a short Back goes home.
-  if (atEndOfBook && mappedInput.wasReleased(MappedInputManager::Button::Back) &&
-      mappedInput.getHeldTime() < ReaderUtils::GO_BACK_OR_HOME_MS) {
+  // On the end-of-book screen Back goes home.
+  if (atEndOfBook && mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     onGoHome();
     return;
   }

@@ -26,6 +26,9 @@ class FileManagerActivity final : public Activity {
   // long-press action menu so a press carried in from another screen can't
   // trigger it.
   bool confirmPressSeen = false;
+  // The mid-hold action already fired for this press; its release must not
+  // act again. Cleared on the next Confirm press edge.
+  bool confirmHoldSpent = false;
 
   std::string basepath = "/";
   std::vector<std::string> files;  // directories carry a trailing '/'

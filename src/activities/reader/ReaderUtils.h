@@ -14,8 +14,6 @@
 
 namespace ReaderUtils {
 
-constexpr unsigned long GO_HOME_MS = 1000;
-constexpr unsigned long GO_BACK_OR_HOME_MS = GO_HOME_MS;
 constexpr unsigned long SKIP_HOLD_MS = 700;
 
 enum ReaderTouchAction : freeink::ui::ActionId {
@@ -251,28 +249,21 @@ struct BackNavCallback {
 };
 
 // Returns true if the back button was consumed (caller should return).
-// Long press (>= GO_BACK_OR_HOME_MS):
-// - default: go to file browser
-// - with backShortToFileBrowser: go home
-// Short press (< GO_BACK_OR_HOME_MS):
-// - default: go home
-// - with backShortToFileBrowser: go to file browser.
+//
+// Back in a reader is ONE gesture: a press, acted on at release, pops the
+// reader. Until 2026-09-02 a 1 s hold went to the file browser instead
+// (`backShortToFileBrowser` swapped the two, and has been a constexpr 0 since
+// the settings reduction). Owner ruling 2026-09-02 killed the hold, matching
+// the 2026-09-01 ruling that removed held-Back from FileBrowser and
+// FileManager (docs/hold-gestures.md): the hold was the last held-Back in the
+// firmware, it was timed on the SDK's global chord timer
+// (docs/ux-navigation-audit-2026-09-02.md F8), and the file browser is one
+// press away on Home. `goHome` and `filePath` stay in the signature so the
+// four callers did not have to move; neither is read.
 inline bool handleBackNavigation(const MappedInputManager& mappedInput, ActivityManager& activityManager,
-                                 const char* filePath, BackNavCallback goHome) {
-  if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= GO_BACK_OR_HOME_MS) {
-    if (SETTINGS.backShortToFileBrowser) {
-      goHome.fn(goHome.ctx);
-    } else {
-      activityManager.goToFileBrowser(filePath);
-    }
-    return true;
-  }
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back) && mappedInput.getHeldTime() < GO_BACK_OR_HOME_MS) {
-    if (SETTINGS.backShortToFileBrowser) {
-      activityManager.goToFileBrowser(filePath);
-    } else {
-      activityManager.popActivity();
-    }
+                                 const char* /*filePath*/, BackNavCallback /*goHome*/) {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+    activityManager.popActivity();
     return true;
   }
   return false;

@@ -215,8 +215,12 @@ void FontSelectionActivity::loop() {
   // Moving Confirm to release is safe here for the reason the Back comment
   // above gives: ActivityManager::swallowUntilIdle() runs at every activity
   // swap, so the press that launched this screen cannot leak its release in.
+  //
+  // Confirm's OWN press time: the global timer measures the chord's first
+  // button, so paging the list on a held Right and tapping Confirm deactivated
+  // the font on Confirm's first frame (docs/ux-navigation-audit-2026-09-02.md F9).
   if (mappedInput.isPressed(MappedInputManager::Button::Confirm)) {
-    if (!confirmHoldFired_ && mappedInput.getHeldTime() >= ReaderUtils::SKIP_HOLD_MS) {
+    if (!confirmHoldFired_ && mappedInput.getHeldTime(MappedInputManager::Button::Confirm) >= ReaderUtils::SKIP_HOLD_MS) {
       confirmHoldFired_ = true;
       toggleSelectedFontActive();
     }

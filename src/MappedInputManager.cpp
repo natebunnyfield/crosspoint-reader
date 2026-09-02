@@ -335,6 +335,22 @@ bool MappedInputManager::isAnyPhysicalButtonHeld() const {
 
 void MappedInputManager::update() const {
   gpio.update();
+  {
+    // Per-button press stamps, from the RAW edges: a press is a physical fact
+    // whatever the swallow thinks of it. The swallow is applied at read time,
+    // in getHeldTime(Button), the same way isPressed() applies it.
+    static_assert(HalGPIO::BTN_POWER + 1 == buttonhold::kButtons, "one hold slot per physical button");
+    uint8_t presses = 0;
+    uint8_t releases = 0;
+    uint8_t levels = 0;
+    for (uint8_t i = 0; i <= HalGPIO::BTN_POWER; ++i) {
+      const uint8_t bit = static_cast<uint8_t>(1u << i);
+      if (gpio.wasPressed(i)) presses |= bit;
+      if (gpio.wasReleased(i)) releases |= bit;
+      if (gpio.isPressed(i)) levels |= bit;
+    }
+    holdTimer_.frame(millis(), presses, releases, levels);
+  }
   if (!swallowActive_) return;
   // A new frame began, so the arming frame is over and this frame's swallow
   // state can be settled ONCE, here, rather than lazily in whichever gated
@@ -446,6 +462,34 @@ unsigned long MappedInputManager::getHeldTime() const {
   }
   touchHeldOverrideValid = false;
   return gpio.getHeldTime();
+}
+
+unsigned long MappedInputManager::getHeldTime(const Button button) const {
+  if (swallowActive_) {
+    // Same gate as isPressed()/wasReleased(): a hold that crossed an activity
+    // boundary belongs to the departed activity, and its release is stale.
+    if (swallowArmingFrame_) return 0;
+    if (mapButtonInMask(button, swallowMask_) || mapButtonInMask(button, staleReleaseMask_)) return 0;
+  }
+  // The one physical button this logical one resolves to (SIDE_BUTTONS_DISABLED
+  // resolves PageBack/PageForward to nothing, so they read 0 here as they do
+  // everywhere else). NavNext and friends recurse to a single index too.
+  uint8_t idx = buttonhold::kButtons;
+  mapButton(button, [&idx](const uint8_t i) {
+    idx = i;
+    return true;
+  });
+  if (idx >= buttonhold::kButtons) return 0;
+  if (gpio.isPressed(idx) || gpio.wasReleased(idx)) return holdTimer_.heldMs(idx, millis());
+  // No press of this button in flight. A touch tap may be standing in for it
+  // (the touch boards' long-tap-to-delete reaches the same release path), so
+  // the tap's contact time is answered under the same window the global timer
+  // used — read, not retired: getHeldTime() still owns the retirement.
+  if (!gpio.wasAnyPressed() && !gpio.wasAnyReleased() && touchHeldOverrideValid &&
+      millis() - touchHeldOverrideAt <= TOUCH_HELD_OVERRIDE_WINDOW_MS) {
+    return touchHeldOverrideMs;
+  }
+  return 0;
 }
 
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,

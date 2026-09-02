@@ -661,7 +661,7 @@ void KeyboardEntryActivity::loop() {
   }
 
   if (upHeld && !upLongHandled && mappedInput.isPressed(MappedInputManager::Button::Up) &&
-      mappedInput.getHeldTime() > LONG_PRESS_MS) {
+      mappedInput.getHeldTime(MappedInputManager::Button::Up) > LONG_PRESS_MS) {
     cursorMode = true;
     upLongHandled = true;
     hintVisible = true;
@@ -735,7 +735,7 @@ void KeyboardEntryActivity::loop() {
   });
 
   if (rightHeld && !rightLongHandled && mappedInput.isPressed(MappedInputManager::Button::Right) &&
-      mappedInput.getHeldTime() > LONG_PRESS_MS) {
+      mappedInput.getHeldTime(MappedInputManager::Button::Right) > LONG_PRESS_MS) {
     if (cursorMode && inputType == InputType::Password && !togglePos) {
       savedCursorPos = rightStartCursorPos;
       togglePos = true;
@@ -766,15 +766,18 @@ void KeyboardEntryActivity::loop() {
   const fui::KeyboardKey* selKey = selectedKey();
   const bool selectedDel = selKey && selKey->value == fui::QWERTY_KEY_BACKSPACE;
 
+  // Confirm's OWN press time, not the chord's: with the global timer, paging
+  // the grid on a held Right and tapping Confirm fired clear-all on Confirm's
+  // first frame (docs/ux-navigation-audit-2026-09-02.md F4).
   if (confirmHeld && !confirmLongHandled && mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
-      mappedInput.getHeldTime() > DEL_LONG_PRESS_MS && selectedDel) {
+      mappedInput.getHeldTime(MappedInputManager::Button::Confirm) > DEL_LONG_PRESS_MS && selectedDel) {
     clearAllOrAltOnSelected();
     confirmLongHandled = true;
     requestUpdate();
   }
 
   if (confirmHeld && !confirmLongHandled && mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
-      mappedInput.getHeldTime() > LONG_PRESS_MS) {
+      mappedInput.getHeldTime(MappedInputManager::Button::Confirm) > LONG_PRESS_MS) {
     if (!selectedDel && clearAllOrAltOnSelected()) {
       requestUpdate();
       confirmLongHandled = true;

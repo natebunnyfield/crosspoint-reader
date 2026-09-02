@@ -604,6 +604,8 @@ void FileManagerActivity::loop() {
       // release-driven, so swallow the matching release.
       if (mappedInput.isPressed(MappedInputManager::Button::Confirm)) lockNextConfirmRelease = true;
       if (mappedInput.isPressed(MappedInputManager::Button::Back)) lockNextBackRelease = true;
+      // A hold that opened this popup is spent by the popup itself.
+      confirmHoldSpent = false;
     }
     return;
   }
@@ -628,15 +630,26 @@ void FileManagerActivity::loop() {
   }
 
   // Long press CONFIRM (1s+): action menu, fired while the button is still
-  // held. Release-driven detection is not enough here: the simulator's
-  // getHeldTime() reads 0 on the release frame, and acting mid-hold gives
-  // feedback the moment the threshold is crossed. confirmPressSeen gates out
-  // presses carried in from the home menu or a child activity. The eventual
-  // release lands in the popup, which only acts on press edges.
-  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) confirmPressSeen = true;
+  // held, timed on Confirm's OWN press (the global timer measured whichever
+  // button went down first, so a Confirm tapped during a held page button
+  // opened the menu at once — docs/ux-navigation-audit-2026-09-02.md F10).
+  // Acting mid-hold gives feedback the moment the threshold is crossed.
+  // confirmPressSeen gates out presses carried in from the home menu or a
+  // child activity. The eventual release lands in the popup, which only acts
+  // on press edges.
+  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+    confirmPressSeen = true;
+    confirmHoldSpent = false;
+  }
   if (confirmPressSeen && mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
-      mappedInput.getHeldTime() >= CONFIRM_HOLD_MS) {
+      mappedInput.getHeldTime(MappedInputManager::Button::Confirm) >= CONFIRM_HOLD_MS) {
     confirmPressSeen = false;
+    // The release of this press is spent. The action-menu branch parks it in
+    // a popup, but performMoveHere() opens none on its success and
+    // same-directory paths, and the per-button timer answers the finished
+    // press length on the release frame -- so without this latch the paste
+    // was followed by the action menu (adversarial review, 2026-09-02).
+    confirmHoldSpent = true;
     if (!moveSourcePath.empty()) {
       performMoveHere();
     } else {
@@ -657,6 +670,10 @@ void FileManagerActivity::loop() {
       lockNextConfirmRelease = false;
       return;
     }
+    if (confirmHoldSpent) {
+      confirmHoldSpent = false;
+      return;
+    }
     if (files.empty()) {
       // Empty folder: while armed, paste directly (consistent with non-empty case).
       if (!moveSourcePath.empty()) performMoveHere();
@@ -668,8 +685,10 @@ void FileManagerActivity::loop() {
 
     // Long press: while armed, paste directly; otherwise open action menu.
     // Normally fired mid-hold in loop(); this release path still catches a hold
-    // that completed inside a render stall.
-    if (mappedInput.getHeldTime() >= CONFIRM_HOLD_MS) {
+    // that completed inside a render stall. The per-button timer answers the
+    // finished press length on the release frame (the global one read 0 there
+    // on the simulator), and a touch long-tap's contact time on a touch board.
+    if (mappedInput.getHeldTime(MappedInputManager::Button::Confirm) >= CONFIRM_HOLD_MS) {
       if (!moveSourcePath.empty()) {
         performMoveHere();
       } else {

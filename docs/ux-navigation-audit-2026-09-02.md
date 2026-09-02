@@ -1,8 +1,58 @@
 # UI/UX navigation audit — firmware (2026-09-02)
 
-**Read-only. Nothing in this file has been changed in code.** Owner asked for
-a finding pass ("take a pass at finding ui/ux bugs, especially around
-navigation"); which of these get fixed is a separate ruling.
+Owner asked for a finding pass ("take a pass at finding ui/ux bugs,
+especially around navigation"). The findings below are the pass as written;
+**status per finding, 2026-09-02 (same day), after the owner's ruling
+"Chord timer + iOS P1s":**
+
+| Finding | Status |
+|---|---|
+| F4, F9, F10 | **FIXED** — `src/ButtonHoldTimer.h` + `MappedInputManager::getHeldTime(Button)`, all six raw sites converted (KeyboardEntry x4, FontSelection, RecentBooks, FileBrowser, FileManager x2). Pinned by `test/button_hold_timer/` (pure chord truth table) and three `ActivityInput` cases (`PerButtonHeldTime…`, `FontListHoldDoesNotFireOnATapInsideAChord`, `FontListHoldStillFiresOnConfirmsOwnLongPress`); the chord case was run against the old site first and FAILED there. |
+| F8 | **KILLED** — owner ruling 2026-09-02 (`docs/hold-gestures.md`): the reader's held-Back destination is gone, not re-timed. Back in a reader is one short press → pop. `GO_HOME_MS` / `GO_BACK_OR_HOME_MS` deleted from `ReaderUtils.h`. |
+| everything else | open, as written |
+
+Deliberately NOT converted, because nothing asked for it and each is a
+proposal rather than a fix: `ButtonNavigator.cpp` hold-to-repeat stays on
+the global timer (a chord there only starts auto-repeat early, which is
+harmless); `EpubReaderActivity.cpp`'s side font hold keeps its own stamp and
+its "next wins if both down" comment; `DaisyEntryActivity` keeps its own
+stamp; `SETTINGS.backShortToFileBrowser` (`CrossPointSettings.h`) is now read
+by nothing and is left tombstoned rather than deleted.
+
+**Adversarial review of the fix, same day** (read-only refuting agent over the
+diff; 21/21 host tests, `-Wall -Wextra -pedantic` clean). Three findings, all
+taken; nothing confirmed as a regression:
+
+- **FileManager hold-to-paste double-fired into the action menu.** The mid-hold
+  branch relied on its action leaving a popup up to eat the release, but
+  `performMoveHere()` opens none on its success and same-directory paths, and
+  the per-button timer answers the finished press length on the release frame
+  — so paste, then `openActionMenu()`. Pre-existing on DEVICE (the SDK's global
+  timer also reports the full length on the last-button-up frame); previously
+  invisible on the simulator, which read 0 there. `confirmHoldSpent` latch now,
+  the shape the other five sites already had. Not host-tested: no
+  `FileManagerActivity` harness exists.
+- **A missed press edge read as uptime.** `pressStartMs` initialised to 0, so a
+  button already down when the first frame arrived — the only path is
+  `setup()`'s absorb loop, which the boot swallow masks today — would have read
+  `millis()`: past every threshold. `started[]` flag; reads 0 until an edge is
+  seen. Pinned by `ADownButtonWhosePressWasNeverSeenReadsZero`. Plus a
+  `static_assert` tying `kButtons` to `HalGPIO::BTN_POWER + 1`.
+- **Test quality.** One tautology (`EXPECT_GE(unsigned, 0)`) replaced with
+  `< 900` and a first-pressed-is-older check; the release-frame count in the
+  chord test is annotated as non-discriminating (it reads 1 with or without
+  the defect — the press-frame zero is the line that fails).
+
+Checked and found CLEAN by that review, so the next pass need not: `mapButton`
+fan-out (every `Button` invokes at most one index); touch long-tap-to-delete
+(both call sites take the override branch, same frame); override retirement
+(bounded by the 250 ms window, no converted site reaches it); the SDK's
+synthesized-Confirm clicks (650/400/650 ms emit thresholds all below every
+converted hold threshold, so no gesture changes); swallow gating (fed before
+the early return, read-gated by a superset of `isPressed()`'s masks); HAL reads
+are non-consuming; single per-frame pump; reader-kill completeness (no
+`GO_HOME_MS`/`GO_BACK_OR_HOME_MS` reference in `src/`, `test/`, `lib/`; all four
+`handleBackNavigation` callers compile; Txt and Bmp had no guard to remove).
 
 Surveyed at `822483b3d` (fork `main`). One read-only hunting agent over
 `src/activities/**`, `src/MappedInputManager.*`, `src/util/ButtonNavigator.*`,
@@ -36,7 +86,7 @@ long list — so "held Right, then tapped Confirm" is a gesture readers make.
 Severity is for the owner's own devices (X3 hardware and the iOS X3 app,
 neither of which has firmware touch). Touch-only findings are marked.
 
-### F4 — P1 — Keyboard: a Confirm tap while Left/Right is held wipes the field. VERIFIED
+### F4 — P1 — Keyboard: a Confirm tap while Left/Right is held wipes the field. VERIFIED — FIXED 2026-09-02
 
 `src/activities/util/KeyboardEntryActivity.cpp:769-782`; thresholds
 `KeyboardEntryActivity.h:135-136` (`LONG_PRESS_MS = 500`,
@@ -73,7 +123,7 @@ the Settings row on the MENU page, the book a page away. Fix:
 The fresh-boot case (`NONE` → index 0 = a cover) is deliberate — it is the
 Resume-on-Back feature at `HomeActivity.cpp:323` — and NOT filed.
 
-### F8 — P1 — Reader: tap Back while a side button is held → file browser. VERIFIED
+### F8 — P1 — Reader: tap Back while a side button is held → file browser. VERIFIED — KILLED 2026-09-02
 
 `src/activities/reader/ReaderUtils.h:262`, from `EpubReaderActivity.cpp:479`
 and `XtcReaderActivity.cpp`. `isPressed(Back) && getHeldTime() >=
@@ -85,7 +135,7 @@ lifting: the LONG-press destination fires on Back's press edge. Note the
 destination. Same button, two screens, two meanings — that half is an
 owner call, the chord false-trigger is a bug either way.
 
-### F9 — P1 — Font picker: Confirm while paging DEACTIVATES the font. VERIFIED
+### F9 — P1 — Font picker: Confirm while paging DEACTIVATES the font. VERIFIED — FIXED 2026-09-02
 
 `src/activities/settings/FontSelectionActivity.cpp:218-224`, `SKIP_HOLD_MS
 = 700`. Paging is `onContinuous(kNextButtons)` (`:288`). Hold Right ~1 s to
@@ -117,7 +167,7 @@ Fix: clear the latch in both result handlers.
 name into `goToFileManager` and `findEntry()` it on enter (the helper
 already exists for rename/move).
 
-### F10 — P2 — Same chord false-trigger, three more sites. VERIFIED
+### F10 — P2 — Same chord false-trigger, three more sites. VERIFIED — FIXED 2026-09-02
 
 Each ends in a Cancel-default popup, so lower blast radius:
 `FileBrowserActivity.cpp:148` (hold Right to page, tap Confirm → Delete?

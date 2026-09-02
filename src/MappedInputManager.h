@@ -4,6 +4,8 @@
 
 #include <functional>
 
+#include "ButtonHoldTimer.h"
+
 class GfxRenderer;
 
 class MappedInputManager {
@@ -86,7 +88,17 @@ class MappedInputManager {
   bool wasMenuGesture() const;
   bool wasAnyPressed() const;
   bool wasAnyReleased() const;
+  // The SDK's ONE global stopwatch: how long since the FIRST button of the
+  // current chord went down, whichever button is asked about. Fine for
+  // ButtonNavigator's auto-repeat; wrong for any per-button hold gesture —
+  // use getHeldTime(Button) for those (src/ButtonHoldTimer.h says why).
   unsigned long getHeldTime() const;
+  // How long THIS button's own press has lasted: live while it is down, the
+  // finished length on its release frame, 0 otherwise. Swallow-gated like
+  // isPressed()/wasReleased(), so a hold carried across an activity swap
+  // still reads 0 until it is released. On a touch board a tap's contact time
+  // stands in for the button, exactly as the global timer let it.
+  unsigned long getHeldTime(Button button) const;
   const GfxRenderer& getRenderer() const { return renderer; }
   Labels mapLabels(const char* back, const char* confirm, const char* previous, const char* next) const;
   // Maps four screen-direction labels onto the two physical front-button roles
@@ -151,6 +163,9 @@ class MappedInputManager {
   bool listItemFromPoint(int x, int y, int& index, int itemCount, int selectedIndex, int listTop, int listHeight,
                          bool hasSubtitle) const;
   void rememberTouchHeldTime() const;
+
+  // Per-button press stamps, advanced by update(); see getHeldTime(Button).
+  mutable buttonhold::Timer holdTimer_;
 
   mutable bool touchHeldOverrideValid = false;
   mutable unsigned long touchHeldOverrideMs = 0;
