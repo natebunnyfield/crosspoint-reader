@@ -60,8 +60,20 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
-### [T-027] Rewrite hold-for-action to fit the gesture model
-**scope: firmware input + ios gestures · asked 2026-08-28 · RESCOPED 2026-08-29 · BLOCKED on an owner ruling**
+### [T-027] Rewrite hold-for-action to fit the gesture model — CLOSED AS DONE 2026-09-03
+**scope: firmware input + ios gestures · asked 2026-08-28 · RESCOPED 2026-08-29 · RULED CLOSED 2026-09-03**
+
+**Owner ruling 2026-09-03: "Close as done."** Asked how to close the
+architectural half (converge the surviving thresholds on one constant, grow a
+firmware binding table, or leave open), he chose to close it on what has
+already landed: the 09-01 kills (BLE pairing, back-to-home, chapter skip), the
+09-02 held-Back kill, the per-button `ButtonHoldTimer` at all six raw
+`getHeldTime()` sites, and the two-finger-hold ask wired through
+`Action::OpenActionMenu`. The eleven surviving thresholds (350 / 500 / 700 /
+900 / 1000 / 1500 ms across eight files, listed in `docs/hold-gestures.md`)
+stay as they are: every one is on a button, and they are the typing and list
+holds he named KEEP. Not converged, by ruling -- do not re-propose a shared
+constant or a firmware binding table under this id. Original entry follows.
 
 **Rescoped by owner ruling 2026-08-29**, which rejected all three shapes this
 entry was about to be built as (a new action in the iOS gesture table, a

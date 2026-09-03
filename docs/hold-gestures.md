@@ -199,3 +199,16 @@ There is now NO held-Back anywhere in the firmware. Every surviving hold is
 on Confirm (delete / action menu / recent-book action / font de-reactivate /
 clear-all / uppercase), Up/Right (keyboard alt output) or a side button (font
 size step).
+
+## RULING, owner 2026-09-03: T-027 closed as done; the surviving thresholds stay
+
+Asked whether the firmware should converge its remaining holds on one
+threshold (750 ms, the iOS gesture hold), grow its own binding table, or
+close, he chose **"Close as done."** What closed it: the 09-01 and 09-02
+kills above, `ButtonHoldTimer` at every raw site, and `Action::OpenActionMenu`
+for the two-finger hold. The eleven surviving constants -- `SKIP_HOLD_MS` 700,
+`LONG_PRESS_MS` 500 (Daisy, keyboard, NoteEditor, ClaudeChat) and 1000
+(RecentBooks), `CONFIRM_HOLD_MS` / `DELETE_HOLD_MS` 1000, `DEL_LONG_PRESS_MS`
+1500, `TOUCH_LONG_PRESS_MS` 350, `TOUCH_DEL_LONG_PRESS_MS` 900 -- are all on
+buttons and all typing or list ergonomics, and they stay. No firmware binding
+table. This is a ruling, not a deferral: neither shape goes back into triage.
