@@ -76,6 +76,15 @@ void RecentBooksStore::updateBook(const std::string& path, const std::string& ti
   }
 }
 
+void RecentBooksStore::resetCoverForPath(const std::string& path, const std::string& newCoverBmpPath) {
+  auto it =
+      std::find_if(recentBooks.begin(), recentBooks.end(), [&](const RecentBook& book) { return book.path == path; });
+  if (it != recentBooks.end() && it->coverBmpPath != newCoverBmpPath) {
+    it->coverBmpPath = newCoverBmpPath;
+    saveToFile();
+  }
+}
+
 bool RecentBooksStore::removeByPath(const std::string& path) {
   auto it =
       std::find_if(recentBooks.begin(), recentBooks.end(), [&](const RecentBook& book) { return book.path == path; });

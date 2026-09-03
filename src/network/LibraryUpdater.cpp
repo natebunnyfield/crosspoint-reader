@@ -18,6 +18,7 @@
 
 #include "CrossPointSettings.h"
 #include "LibrarySyncPlan.h"
+#include "RecentBooksStore.h"
 #ifdef SIMULATOR
 // The host's own settings surface, where a platform with no way to edit the
 // card's settings.json keeps this token instead. Simulator-only by
@@ -689,6 +690,20 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
       Storage.removeDir(cachePath.c_str());
       LOG_DBG("LIB", "Cleared stale cache for %s", book.file.c_str());
     }
+
+    // The on-disk cache above is one of two caches keyed by this book's path.
+    // The other is RecentBooksStore's JSON ledger: if this book was ever opened
+    // and its cover previously failed to generate (no cover.png existed yet, or
+    // an undecodable format like SVG), generateThumbBmp() wrote coverBmpPath =
+    // "" there, and nothing except re-opening the book would ever try again --
+    // a Library sync that finally gives the book a working cover had no effect
+    // on the Home screen's Recent grid until the book was opened once more.
+    // Confirmed live 2026-09-02: Tico Spanish's cover only appeared after it
+    // was manually opened, on a device where the synced file already had a
+    // correct cover.png. Un-sticking the sentinel here removes that manual
+    // step, matching what opening the book already does (a fresh addBook()
+    // call with a non-empty templated path).
+    RECENT_BOOKS.resetCoverForPath(destPath, cachePath + "/thumb_[HEIGHT].bmp");
   }
 
   // The digest is known for certain here -- it was computed over the bytes as

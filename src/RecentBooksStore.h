@@ -37,6 +37,19 @@ class RecentBooksStore : public PersistableStore<RecentBooksStore> {
   void updateBook(const std::string& path, const std::string& title, const std::string& author,
                   const std::string& coverBmpPath);
 
+  // Un-stick the "this book has no cover" sentinel after the book's content changed underneath
+  // it. generateThumbBmp() writes coverBmpPath = "" the first time it fails (no cover in the
+  // OPF, or a format the device can't decode), and nothing normally clears that -- it is a
+  // deliberate cache, so a coverless book is not re-decoded on every Home render. But a Library
+  // sync CAN change what generateThumbBmp would find (a book re-published with a cover it did
+  // not have before, or in a format it can now decode), and syncing already clears the sibling
+  // on-disk /.crosspoint/epub_<hash> cache for exactly this reason. This does the same job for
+  // this JSON-backed ledger: restores coverBmpPath to newCoverBmpPath (the fresh
+  // epub.getThumbBmpPath() template) so the next Home render gives generateThumbBmp() one more
+  // try, WITHOUT touching title or author. No-op if no entry matches path (a book that has
+  // never been opened has no recent-list entry to fix, and needs none). Persists on success.
+  void resetCoverForPath(const std::string& path, const std::string& newCoverBmpPath);
+
   // Remove the entry whose path matches (used when a book is removed from recents or finished/read).
   // Returns true if an entry was found and removed (no-op + false otherwise).
   // Persistence is best-effort: a failed save is logged, not reflected in the return.
