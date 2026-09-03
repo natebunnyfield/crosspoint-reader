@@ -134,6 +134,12 @@ class ActivityManager {
   // instead of jumping to the top of the list. Set by the goTo* wrappers, so a
   // new home row inherits the behavior without having to remember anything.
   HomeMenuItem lastHomeMenuItem = HomeMenuItem::NONE;
+  // The recent-book cover Home was left through, when it was a cover and not a
+  // menu row. HomeActivity::recordFocus sets it and resets lastHomeMenuItem to
+  // NONE at the same time; the goTo* wrappers leave it alone, since a menu row
+  // takes precedence (src/activities/home/HomeLanding.h). Without it, Back from
+  // a book opened off a cover landed on whatever menu row was visited last.
+  std::string lastHomeBookPath;
 
   bool preventAutoSleep() const;
   bool isReaderActivity() const;

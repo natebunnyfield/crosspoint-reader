@@ -8,6 +8,7 @@ especially around navigation"). The findings below are the pass as written;
 | Finding | Status |
 |---|---|
 | F4, F9, F10 | **FIXED** — `src/ButtonHoldTimer.h` + `MappedInputManager::getHeldTime(Button)`, all six raw sites converted (KeyboardEntry x4, FontSelection, RecentBooks, FileBrowser, FileManager x2). Pinned by `test/button_hold_timer/` (pure chord truth table) and three `ActivityInput` cases (`PerButtonHeldTime…`, `FontListHoldDoesNotFireOnATapInsideAChord`, `FontListHoldStillFiresOnConfirmsOwnLongPress`); the chord case was run against the old site first and FAILED there. |
+| F5 | **FIXED** 2026-09-02, after the owner re-reported it in his own words (*"on back button, navigates go to last home menu item, but should go back to last home menu item or hovered book, whatever was actually last focused"*). NOT the fix proposed below: `NONE` in `goToReader` would land every return on cover 0, not on the cover left from, and `goToReader` is also the file browser's and Recents' route. Instead `HomeActivity::recordFocus` — called on every leave from Home, the Back-opens-most-recent shortcut included — records what the SELECTOR was on: a cover by path into `ActivityManager::lastHomeBookPath` (resetting `lastHomeMenuItem`), a menu row into `lastHomeMenuItem`; `goHome()` hands both to Home, and `src/activities/home/HomeLanding.h` (pure) picks the row: menu row if one is in charge, else the cover found BY PATH (the reader re-adds the book to the recents on open, so it comes back at cover 0 whichever cover it left from), else 0. Pinned by `test/home_landing/` (7 cases, one modeling the shipped wiring and reproducing the reported landing). Proven headless on the X3 canary with the new `[HOME] Landing on row` line: Recents row → Back → row 1; resume shortcut pressed with the selector on the Recents row → Back → row 1 (the shortcut is not a focus — adversarial review, same day, which also found the path search mostly redundant with cover 0 being both the re-added book and the fallback: kept, since it is what keeps a HOVERED cover under the resume shortcut); cover → Back → **row 0** (the shipped code printed row 1 there). Review checked CLEAN: every Home→book path goes through Home's own `onSelectBook`/`activateSelection`; all nine menu rows set the row via their `goTo*`; FileBrowser pushes its reader and Recents uses the base `onSelectBook`, so neither changes; bounds vs `getMenuItemCount()`; `homeContinueReadingInMenu` index space; string lifetime across `replaceActivity`; the activity harness needs no model of the new member. |
 | F8 | **KILLED** — owner ruling 2026-09-02 (`docs/hold-gestures.md`): the reader's held-Back destination is gone, not re-timed. Back in a reader is one short press → pop. `GO_HOME_MS` / `GO_BACK_OR_HOME_MS` deleted from `ReaderUtils.h`. |
 | everything else | open, as written |
 
@@ -111,7 +112,7 @@ with four networks found there is no button that moves the highlight down.
 The hints say the intent was never list nav (`mapLabels(BACK, CONNECT,
 forgetLabel, RETRY)` `:877`). Fix: move Retry/Forget off the front pair.
 
-### F5 — P1 — Back out of a book lands Home on the last MENU row. VERIFIED
+### F5 — P1 — Back out of a book lands Home on the last MENU row. VERIFIED — FIXED 2026-09-02 (see the status table; the fix below was NOT the one taken)
 
 `src/activities/ActivityManager.cpp:248-250`: `goToReader` is the one
 `goTo*` wrapper that does not set `lastHomeMenuItem`. `goHome()` reuses it
@@ -247,7 +248,8 @@ its own `wasPressed(Confirm)` handler (`.cpp:93`).
   `pageDown/pageUp` clamp and return false as documented.
 - `src/activities/ActivityManager.cpp`: push/pop/replace/
   `ReplaceCurrentOnly`, `swallowUntilIdle()` at all four transition points,
-  `goToSleep`'s `processPendingTransitions()`. Only gap is F5.
+  `goToSleep`'s `processPendingTransitions()`. Only gap was F5, fixed the
+  same day.
 - `src/components/OptionPopup.h`: `drainingClosePress` requires level-low
   AND no latched edge; touch-close skips the drain; layout cache
   invalidated on `show()`/`setInfoLines`. FileManager gates on `isActive()`

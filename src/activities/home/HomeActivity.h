@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <string>
 #include <vector>
 
 #include "./FileBrowserActivity.h"
@@ -28,6 +29,8 @@ class HomeActivity final : public Activity {
   int coverRectH = 0;
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
+  // The cover to land on when initialMenuItem is NONE; empty = the top one.
+  const std::string initialBookPath;
 
   // Menu order, owner ruling 2026-08-06. FIVE things encode this list: these two
   // maps, the menuItems/menuIcons vectors in HomeActivity.cpp, and
@@ -76,6 +79,7 @@ class HomeActivity final : public Activity {
     if (idx == i) return HomeMenuItem::SETTINGS_MENU;
     return HomeMenuItem::NONE;
   }
+  void recordFocus();  // remember selectorIndex for goHome(), see HomeLanding.h
   void onSelectBook(const std::string& path);
   void onFileBrowserOpen();
   void onRecentsOpen();
@@ -98,8 +102,10 @@ class HomeActivity final : public Activity {
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                        HomeMenuItem initialMenuItemValue = HomeMenuItem::NONE)
-      : Activity("Home", renderer, mappedInput), initialMenuItem(initialMenuItemValue) {}
+                        HomeMenuItem initialMenuItemValue = HomeMenuItem::NONE, std::string initialBookPathValue = {})
+      : Activity("Home", renderer, mappedInput),
+        initialMenuItem(initialMenuItemValue),
+        initialBookPath(std::move(initialBookPathValue)) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

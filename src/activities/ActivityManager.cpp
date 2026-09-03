@@ -280,7 +280,9 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
   // is set by the goTo* wrappers instead, so a new row inherits this and there
   // is no name list left to forget.
   if (initialMenuItem == HomeMenuItem::NONE) initialMenuItem = lastHomeMenuItem;
-  replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem));
+  // The cover path only matters when no menu row is in charge; HomeActivity
+  // applies that precedence, so it is handed over unconditionally.
+  replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem, lastHomeBookPath));
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 

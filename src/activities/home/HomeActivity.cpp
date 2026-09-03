@@ -17,6 +17,7 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "HomeLanding.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
@@ -127,8 +128,11 @@ void HomeActivity::onEnter() {
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
 
-  const auto base = static_cast<int>(recentBooks.size());
-  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem);
+  // Menu row, else the cover Home was left through, else the top cover.
+  selectorIndex = homelanding::selectorIndex(initialMenuItem != HomeMenuItem::NONE, menuItemToIndex(initialMenuItem),
+                                             initialBookPath, recentBooks);
+  LOG_DBG("HOME", "Landing on row %d of %d (%d covers)", selectorIndex, getMenuItemCount(),
+          static_cast<int>(recentBooks.size()));
 
   // Trigger first update
   requestUpdate();
@@ -182,6 +186,7 @@ void HomeActivity::loop() {
   const auto& metrics = UITheme::getInstance().getMetrics();
 
   auto activateSelection = [this] {
+    recordFocus();
     if (selectorIndex < recentBooks.size()) {
       onSelectBook(recentBooks[selectorIndex].path);
       return;
@@ -320,7 +325,10 @@ void HomeActivity::loop() {
   // book directly (recentBooks is most-recent-first and already pruned of
   // files missing from the SD card). swallowUntilIdle() in ActivityManager
   // covers the stale release from the previous activity's exit press.
+  // The shortcut is not a focus: Back from that book lands on the row the
+  // selector was on when Back was pressed (adversarial review 2026-09-02).
   if (mappedInput.wasReleased(MappedInputManager::Button::Back) && !recentBooks.empty()) {
+    recordFocus();
     onSelectBook(recentBooks[0].path);
     return;
   }
@@ -495,6 +503,18 @@ void HomeActivity::render(RenderLock&&) {
   } else if (!recentsLoaded && !recentsLoading) {
     recentsLoading = true;
     loadRecentCovers(metrics.homeCoverHeight);
+  }
+}
+
+void HomeActivity::recordFocus() {
+  // What Home is leaving from, for goHome() to land on (HomeLanding.h). A cover
+  // is remembered by path; a menu row is set here AND by the goTo* wrapper it
+  // opens, so the row is right even for a leave that opens no wrapper.
+  if (selectorIndex < static_cast<int>(recentBooks.size())) {
+    activityManager.lastHomeMenuItem = HomeMenuItem::NONE;
+    activityManager.lastHomeBookPath = recentBooks[selectorIndex].path;
+  } else {
+    activityManager.lastHomeMenuItem = indexToMenuItem(selectorIndex - static_cast<int>(recentBooks.size()));
   }
 }
 
