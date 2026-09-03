@@ -235,9 +235,10 @@ void ActivityManager::goToFileBrowser(std::string path) {
   replaceActivity(std::make_unique<FileBrowserActivity>(renderer, mappedInput, std::move(path)));
 }
 
-void ActivityManager::goToFileManager(std::string startPath) {
+void ActivityManager::goToFileManager(std::string startPath, std::string focusEntry) {
   lastHomeMenuItem = HomeMenuItem::MANAGE_FILES;
-  replaceActivity(std::make_unique<FileManagerActivity>(renderer, mappedInput, std::move(startPath)));
+  replaceActivity(
+      std::make_unique<FileManagerActivity>(renderer, mappedInput, std::move(startPath), std::move(focusEntry)));
 }
 
 void ActivityManager::goToRecentBooks() {

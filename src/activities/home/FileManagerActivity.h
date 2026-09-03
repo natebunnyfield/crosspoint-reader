@@ -18,6 +18,7 @@ class FileManagerActivity final : public Activity {
   OptionPopup popup;
 
   size_t selectorIndex = 0;
+  std::string focusEntry;  // consumed by onEnter()
   // True when this activity (or its action popup) consumed a press whose
   // release must not also act on the list below.
   bool lockNextConfirmRelease = false;
@@ -65,8 +66,13 @@ class FileManagerActivity final : public Activity {
 
  public:
   // startPath: directory to open initially (empty = SD root "/").
-  explicit FileManagerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string startPath = {})
-      : Activity("FileManager", renderer, mappedInput), basepath(startPath.empty() ? "/" : std::move(startPath)) {}
+  // focusEntry: list entry (a file name, or "dir/") to open the list on;
+  // empty = row 0. Set by the note editor on its way back (audit F7).
+  explicit FileManagerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string startPath = {},
+                               std::string focusEntry = {})
+      : Activity("FileManager", renderer, mappedInput),
+        focusEntry(std::move(focusEntry)),
+        basepath(startPath.empty() ? "/" : std::move(startPath)) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

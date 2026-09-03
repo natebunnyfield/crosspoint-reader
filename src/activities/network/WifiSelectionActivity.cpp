@@ -725,23 +725,25 @@ void WifiSelectionActivity::loop() {
         return;
       }
 
-      // The SIDE pair pages by a whole screenful; the FRONT pair below steps one
-      // row. They used to be the same action (docs/ui-conventions.md, "Side
-      // buttons should page, not repeat the front buttons"). pageDown/pageUp
-      // clamp at the ends and return false when nothing moved, so a scan that
-      // found only a handful of networks costs no redraw.
-      const int networkCount = static_cast<int>(networks.size());
-      buttonNavigator.onPageNext([this, networkCount, pageItems] {
-        int index = static_cast<int>(selectedNetworkIndex);
-        if (!ButtonNavigator::pageDown(index, networkCount, pageItems)) return;
-        selectedNetworkIndex = static_cast<size_t>(index);
+      // The SIDE pair STEPS the list here, one row per press, wrapping -- this
+      // screen is on the paging ruling's exemption list (docs/ui-conventions.md)
+      // because its FRONT pair already means something else: Right is always
+      // Retry (it returns above, so onNext below never fires on a press), and
+      // Left is Forget on a network with a saved password -- on any other it
+      // falls through to onPrevious and steps UP, unlabeled. f278be2fc turned
+      // the side pair into a screenful page anyway, and on a list that fits
+      // one screen (the common case) pageDown returns false -- so no button
+      // moved the highlight DOWN at all (docs/ux-navigation-audit-2026-09-02.md,
+      // F3). Restoring upstream's shape costs the long-list page: a 30-SSID
+      // scan on a board with no touch is a held DOWN rather than four presses
+      // (the swipes below still page). Owner ruling 2026-09-02, "All three".
+      buttonNavigator.onPageNext([this] {
+        selectedNetworkIndex = ButtonNavigator::nextIndex(selectedNetworkIndex, networks.size());
         requestUpdate();
       });
 
-      buttonNavigator.onPagePrevious([this, networkCount, pageItems] {
-        int index = static_cast<int>(selectedNetworkIndex);
-        if (!ButtonNavigator::pageUp(index, networkCount, pageItems)) return;
-        selectedNetworkIndex = static_cast<size_t>(index);
+      buttonNavigator.onPagePrevious([this] {
+        selectedNetworkIndex = ButtonNavigator::previousIndex(selectedNetworkIndex, networks.size());
         requestUpdate();
       });
     }

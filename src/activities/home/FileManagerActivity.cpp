@@ -150,6 +150,14 @@ void FileManagerActivity::onEnter() {
   gpio.consumeOpenActionMenu();
 
   loadFiles();
+  // Re-focus the entry a replacing child (the note editor) sent us back to.
+  // findEntry() answers 0 for a name that is gone -- deleted or renamed in
+  // the editor -- which is the same row a fresh entry lands on.
+  if (!focusEntry.empty()) {
+    selectorIndex = findEntry(focusEntry);
+    LOG_DBG("FileManager", "Re-focused '%s' at row %zu", focusEntry.c_str(), selectorIndex);
+    focusEntry.clear();
+  }
   requestUpdate();
 }
 
@@ -289,6 +297,10 @@ void FileManagerActivity::runMenuAction(const MenuAction action) {
       // Was an early return above this switch, which left 'Edit' unhandled here
       // and -Wswitch firing -- so the compiler stopped checking the rest of the
       // enum for this function. Same behavior, in the place that gets checked.
+      // The editor REPLACES this activity (heap for NimBLE, see
+      // ActivityManager::goToNoteEditor), so the folder is rebuilt from
+      // scratch on the way back. The editor hands the file's name back so the
+      // rebuilt list opens on it rather than on row 0 (audit F7, 2026-09-02).
       if (!files.empty()) activityManager.goToNoteEditor(fullPathOf(files[selectorIndex]), basepath);
       break;
     case MenuAction::MoveHere:
@@ -321,7 +333,18 @@ void FileManagerActivity::runMenuAction(const MenuAction action) {
 void FileManagerActivity::viewFile(const std::string& entry) {
   if (entry.empty() || entry.back() == '/') return;
   startActivityForResult(std::make_unique<TextViewerActivity>(renderer, mappedInput, fullPathOf(entry), entry),
-                         [](const ActivityResult&) {});
+                         [this](const ActivityResult&) {
+                           // The action menu closed on a Confirm PRESS and loop()
+                           // latched lockNextConfirmRelease for the release --
+                           // but the release landed in the viewer, where
+                           // ActivityManager's swallowUntilIdle() ate it. This
+                           // activity is popped back to, not re-entered, so
+                           // nothing re-derived the latch and the first Confirm
+                           // on any file after Back did nothing (audit F6,
+                           // 2026-09-02). Move / Duplicate / Summarize stay
+                           // in-activity, so their next release clears it.
+                           lockNextConfirmRelease = false;
+                         });
 }
 
 void FileManagerActivity::startRename(const std::string& entry, const std::string& seedName) {
@@ -332,6 +355,11 @@ void FileManagerActivity::startRename(const std::string& entry, const std::strin
   startActivityForResult(makeTextEntryActivity(renderer, mappedInput, tr(STR_NEW_NAME),
                                                seedName.empty() ? oldName : seedName, MAX_RENAME_LEN),
                          [this, oldFull, oldName, isDirectory](const ActivityResult& res) {
+                           // Same as viewFile: the keyboard swallowed the release
+                           // this latch was waiting for. Cleared before every
+                           // early return below, or a cancelled rename would
+                           // still eat the next Confirm (audit F6).
+                           lockNextConfirmRelease = false;
                            if (res.isCancelled) return;
                            const auto* kb = std::get_if<KeyboardResult>(&res.data);
                            if (!kb) return;

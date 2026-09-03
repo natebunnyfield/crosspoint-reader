@@ -235,6 +235,17 @@ consumes it even though no firmware code does.
   are the coarse value step), the keyboards / note editor / Claude chat (side
   buttons are bespoke picks), and every reader (`PageBack`/`PageForward`).
 
+  **Exempt since 2026-09-02: `WifiSelectionActivity`** — the side pair STEPS
+  the networks, one row per press, wrapping. Its front pair already means
+  something else, which is what this list is for: Right is always Retry
+  (`onNext` is dead for presses), Left is Forget on a network with a saved
+  password and otherwise falls through to a step UP, unlabeled — a pre-existing
+  asymmetry, not a clean split. `f278be2fc` made the side pair page anyway,
+  and on a scan that fits one screen `pageDown` returns false, so no button
+  moved the highlight DOWN at all (`docs/ux-navigation-audit-2026-09-02.md`,
+  F3). The trade: a long list (30 SSIDs on an X3/X4, which have no swipe) is
+  now stepped with a held DOWN rather than paged. Swipes still page.
+
   **The `EditorFontSelectionActivity` half of that exemption was ASPIRATIONAL
   when written, and is only true from 2026-08-18.** `f278be2fc` copied the
   sentence over from `FontSelectionActivity` and left the screen's own comment

@@ -184,7 +184,11 @@ void NoteEditorActivity::exitEditor() {
   if (returnDir.empty()) {
     finish();
   } else {
-    activityManager.goToFileManager(returnDir);
+    // Back to the folder we came from, ON the note we edited: the manager is
+    // rebuilt (replaceActivity both ways), so it needs the name to re-focus
+    // (audit F7, 2026-09-02). The name is `path` past its last '/'.
+    const size_t slash = path.rfind('/');
+    activityManager.goToFileManager(returnDir, slash == std::string::npos ? path : path.substr(slash + 1));
   }
 }
 

@@ -108,7 +108,7 @@ class ActivityManager {
   void goToSettings();
   void goToFileBrowser(std::string path = {});
   // startPath: the directory to open initially (empty = SD root "/").
-  void goToFileManager(std::string startPath = {});
+  void goToFileManager(std::string startPath = {}, std::string focusEntry = {});
   void goToRecentBooks();
   void goToReader(std::string path, bool allowFastInitialRefresh = false);
   void goToSleep(bool fromTimeout = false);
