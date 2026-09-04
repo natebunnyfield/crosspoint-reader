@@ -98,6 +98,37 @@ OTHER allocation — a plain `new` failing under `-fno-exceptions` aborts, and
 the nothrow site here returns instead. So if the crash recurs, the next step is
 to find that allocation, not to shrink this one further.
 
+**Headless allocation audit, 2026-09-04 (narrows it, does not close it).** A
+bare-`new` audit of the font and render paths:
+
+- Every `new` in `lib/EpdFont/*.cpp` is `new (std::nothrow)` (18 sites), and
+  each is checked -- a failure returns nullptr / notdef, never aborts. The
+  abort is NOT the font path failing to guard its own allocations.
+- The glyph/render path (`lib/GfxRenderer/*.cpp`) has no plain throwing `new`
+  either; Bitmap, BitmapHelpers and the PNG chain all carry the nothrow +
+  check pattern with the `-fno-exceptions` reason in a comment.
+- What is left is the STL containers on the PARSE path -- `ParsedText`'s
+  `std::deque<std::string> words` and the per-word vectors
+  (`lib/Epub/Epub/ParsedText.h`), grown by `addWord`. These throw
+  `std::bad_alloc` on OOM, which `-fno-exceptions` turns into `abort()`. The
+  named field crash is exactly there ("bad_alloc in ParsedText::addWord",
+  `EpubReaderActivity.h`). The BACKGROUND build already gates on both a
+  free-heap floor and a max-alloc-block floor (`buildTickHeapGate`,
+  fragmentation-aware -- 32 KB free / 16 KB largest), but the FOREGROUND
+  render builds the page it needs REGARDLESS of that floor, so it is the one
+  path that can still reach a throwing parse allocation under pressure.
+
+So the residual is one of two things, and both need the device: decode the
+panic PC (0x421c764d) from the real backtrace to name the exact allocation,
+or rework the foreground parse path to fail gracefully instead of aborting --
+which means pre-flighting each parse allocation against `getMaxAllocHeap()`
+(the STL containers cannot be made nothrow without a custom allocator), and
+the thresholds are tuned against real device fragmentation numbers (the
+comment's "34.7 KB free but 11 KB largest block" is a measured device state,
+not a host one). The mitigation shipped (growable buffer + the background
+gate) stands; this audit rules out the two allocation classes it is NOT and
+points the next device session straight at the foreground parse path.
+
 577 tests pass, desktop canary green. Device-confirm only: nothing host-side
 reproduces a fragmented ESP32 heap.
 
