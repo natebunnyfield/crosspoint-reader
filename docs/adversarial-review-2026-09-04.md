@@ -183,8 +183,20 @@ the decoder cannot write past the screen. So the reader-side defense is: the
 dimension guard (now overflow-safe) gates entry, and the draw callback clamps
 output.
 
+The EPUB image `src` -> path resolution was read statically 2026-09-04 and
+found SANDBOXED: `Epub::readItemContentsToStream` runs the href through
+`FsHelpers::normalisePath` (which pops `..` at the root and drops a leading
+`/`, so neither a traversal nor an absolute path survives) and then reads from
+the EPUB **zip by entry name** -- it never touches the card filesystem, so an
+`<img src="../../../etc/passwd">` becomes a missing zip lookup. The cache
+WRITE path is reader-controlled (`img_<spine>_<counter><ext>`, the src does
+not name it) and the extension cannot carry a `/` because
+`isFormatSupported(resolvedPath)` gates entry, which requires the last path
+segment to end in a known image extension, so `rfind('.')` lands in that
+segment. No traversal on read or write.
+
 Not fuzzed this session, for a future pass: the vendored JPEGDEC and PNGdec
 INTERNAL MCU/scan loops (an automated cyber safeguard stopped the crafted-JPEG
 pass mid-run; the code is third-party, kept patched from upstream via
-`scripts/jpegdec_patches/` and gated by the two defenses above), and the EPUB
-image `src` -> card-path resolution.
+`scripts/jpegdec_patches/` and gated by the dimension guard and the
+output-clamping draw callback above).
