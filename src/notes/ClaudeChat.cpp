@@ -15,6 +15,7 @@
 
 #include "CrossPointSettings.h"
 #include "WifiCredentialStore.h"
+#include "util/CardSecret.h"
 
 namespace claudechat {
 namespace {
@@ -100,18 +101,9 @@ bool appendToTranscript(const std::string& text) {
   return written == text.size();
 }
 
-bool readApiKey(std::string& outKey) {
-  HalFile f;
-  if (!Storage.openFileForRead(TAG, KEY_PATH, f)) return false;
-  char buf[256];
-  const int n = f.read(buf, sizeof(buf) - 1);
-  if (n <= 0) return false;
-  buf[n] = '\0';
-  outKey = buf;
-  // Trim trailing newline/whitespace an editor leaves behind.
-  while (!outKey.empty() && (outKey.back() == '\n' || outKey.back() == '\r' || outKey.back() == ' ')) outKey.pop_back();
-  return !outKey.empty();
-}
+// The reader lives in util/CardSecret.h so /github-token.txt (Update Library)
+// behaves exactly like this file does.
+bool readApiKey(std::string& outKey) { return cardsecret::readOneLine(TAG, KEY_PATH, outKey); }
 
 bool connectWifi(std::string& outErr, void (*statusCb)(void*, const char*), void* ctx) {
   WIFI_STORE.loadFromFile();
