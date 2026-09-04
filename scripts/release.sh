@@ -58,7 +58,7 @@ step "Verify the image says what the source says"
 # it post-link. If that stamper ever silently stops running, THIS is where it
 # shows -- which is the whole reason the check is here and not in a comment.
 python3 - "$BIN" "$VERSION" <<'PY'
-import hashlib, struct, sys
+import functools, hashlib, operator, struct, sys
 path, want = sys.argv[1], sys.argv[2]
 b = open(path, "rb").read()
 o = 0x20
@@ -71,9 +71,29 @@ got = b[o+16:o+48].split(b"\0")[0].decode(errors="replace")
 if got != want:
     sys.exit(f"REFUSED: descriptor says {got!r}, platformio.ini says {want!r} "
              f"-- stamp_app_desc.py did not run, or ran wrong (B-033)")
+# The XOR checksum byte is what the stamper left stale in 1.5.17-BD..1.5.21-BD
+# (B-046): the device validator, esp_ota_end() and the bootloader all check it,
+# and a sha256 recomputed over a stale byte is a valid hash of an invalid image.
+pos, acc = 24, 0xEF
+for _ in range(b[1]):
+    if pos + 8 > len(b):
+        sys.exit("REFUSED: segment table overruns the file")
+    n = struct.unpack_from("<I", b, pos + 4)[0]
+    pos += 8
+    if pos + n > len(b):
+        sys.exit("REFUSED: a segment overruns the file")
+    acc = functools.reduce(operator.xor, b[pos:pos + n], acc)
+    pos += n
+pad_end = (pos + 16) & ~15
+if pad_end + (32 if b[23] == 1 else 0) != len(b):
+    sys.exit("REFUSED: segment table does not add up to the file size")
+if b[pad_end - 1] != acc:
+    sys.exit(f"REFUSED: image checksum byte is 0x{b[pad_end - 1]:02X} but the segment data says 0x{acc:02X}; "
+             "the device validator and the bootloader will reject this (B-046)")
 if b[23] == 1 and hashlib.sha256(b[:-32]).digest() != b[-32:]:
     sys.exit("REFUSED: appended sha256 does not match; the bootloader will reject this")
 print(f"  descriptor: {got}")
+print(f"  checksum:   valid")
 print(f"  sha256:     valid")
 PY
 

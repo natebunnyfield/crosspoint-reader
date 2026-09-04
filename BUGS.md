@@ -34,6 +34,68 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-046] Every release image since 1.5.17-BD fails firmware validation: the descriptor stamper left the XOR checksum stale — FIXED 2026-09-04 (scripts/stamp_app_desc.py), re-upload of the 1.5.17-BD..1.5.21-BD assets owed
+**severity: high (no release since 1.5.17-BD installs by any path) · scope: build / release, `scripts/stamp_app_desc.py` · found 2026-09-04 from a device: SD Card Firmware Update said "Invalid firmware file" for the latest release's `firmware.bin`**
+
+An ESP image carries two integrity marks over its segment data: the appended
+SHA256 trailer, and one byte before it — the XOR of every segment data byte,
+seeded with 0xEF, sitting in the last byte of the 16-byte pad after the final
+segment. `scripts/stamp_app_desc.py` (B-033) rewrites the 32-byte version field
+of the app descriptor, which is segment data, then recomputed the SHA256 and
+left the XOR byte as esptool wrote it. A valid hash of an invalid image. Three
+things check that byte, so three install paths refused it:
+
+| path | where it fails | what the user sees |
+|---|---|---|
+| SD Card Firmware Update | `validateImageFile()` → `BAD_CHECKSUM` (`src/network/FirmwareImageValidator.cpp`; the same code on the August builds) | "Invalid firmware file" |
+| Home → Update Firmware (online) | `esp_ota_end()` → `esp_image_verify()` → `verify_checksum` | install failed |
+| USB `write_flash` of `firmware.bin` alone | the bootloader's own `esp_image_verify` | "Checksum failed", boots the other slot |
+
+**Which releases, checked rather than assumed** — each `firmware.bin` pulled
+from GitHub on 2026-09-04 and walked with the validator's own arithmetic:
+
+| release | descriptor | XOR byte | SHA256 |
+|---|---|---|---|
+| 1.5.14-BD, 1.5.15-BD, 1.5.16-BD | stale `1.5.1-B2-43-g7211621a3` (stamper not yet in the tree) | valid | valid |
+| 1.5.17-BD, 1.5.18-BD, 1.5.19-BD, 1.5.20-BD, 1.5.21-BD | stamped | **stale** | valid |
+
+The proof it is the stamper and nothing else: for 1.5.21-BD the stored byte
+is 0xD9 and the data says 0x9F, and XOR-ing the old descriptor field against
+the new one gives exactly that difference, 0x46. The image staged on the
+BUNNYFIELDS card on 2026-08-28 for B-006 was built with the same stamper and is
+unflashable too; the B-006 note there said "appended SHA256 valid", which was
+true and not the check that mattered.
+
+**Why the test did not catch it.** `test/stamp_app_desc/` fed the script a flat
+blob with a descriptor and a hash but no segment table, so there was no
+checksum byte for it to leave stale. The fixture is a real image now.
+
+**FIXED 2026-09-04.**
+* `scripts/stamp_app_desc.py` walks the segment table before it writes: a
+  layout that does not add up to the file size, or a checksum byte that is
+  already wrong, is not esptool's output and is left alone. After the version
+  rewrite it recomputes the XOR byte from the data, then the SHA256 as before.
+* `scripts/release.sh`'s verify step walks the same table and refuses an image
+  whose checksum byte disagrees with its segment data — run against the
+  published 1.5.21-BD it says `REFUSED: image checksum byte is 0xD9 but the
+  segment data says 0x9F`; against a correct image, `checksum: valid`.
+* `test/stamp_app_desc/stamp_app_desc_test.py` builds a real single-segment
+  image with a padded checksum byte and an independent re-implementation of the
+  validator's walk. Failing-first confirmed: 6 of its checks fail against the
+  shipped stamper and all pass against the fixed one.
+* End to end: the shipped 1.5.21-BD image with its descriptor reverted to the
+  stale string reproduces esptool's output; the fixed stamper run on that
+  yields an image that passes the validator and is byte-identical to the
+  published file except the checksum byte and the 32-byte trailer.
+
+**Still owed, and why this sits in OPEN:** the assets on releases 1.5.17-BD
+through 1.5.21-BD are still the broken bytes, and `OtaUpdater` fetches whatever
+`firmware.bin` hangs on the latest release. Rebuild each with the fixed
+stamper (or repair in place — exactly 33 bytes move, and `release.sh`'s gate
+now proves the result) and replace the asset. Until then 1.5.16-BD is the
+newest release a device will accept, and it carries the stale descriptor of
+B-033.
+
 ### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
 
@@ -403,6 +465,13 @@ on.
 `1.5.16-BD` correctly, and OTA's `isNewer()` parses the numeric triple from it.
 Only the app descriptor — OTA metadata and the web UI's build line — is stale.
 
+**2026-09-04 addendum.** The stamper's SHA256 step was right and not
+sufficient: the descriptor is also covered by the image's one-byte XOR
+checksum, which the stamper left stale, so every release it touched
+(1.5.17-BD..1.5.21-BD) failed validation on the device. Mechanism, proof and
+fix under [B-046]; the "first-OTA confirm owed" above cannot be collected
+until those assets are re-uploaded.
+
 ### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
 **severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
 
@@ -506,6 +575,12 @@ so a same-code reflash is accepted):
 ```bash
 CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
 ```
+
+> **2026-09-04: the bin staged 2026-08-28 does not flash.** It was built with
+> the stamper of B-033 and carries the stale checksum byte of [B-046]; the
+> device answers "Invalid firmware file". "Appended SHA256 valid" above was a
+> true statement about the wrong check. Stage a bin built after the B-046 fix
+> (its `release.sh` gate now proves the checksum) before performing this.
 
 ---
 
