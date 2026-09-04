@@ -34,6 +34,205 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-046] Every release image since 1.5.17-BD fails firmware validation: the descriptor stamper left the XOR checksum stale — FIXED 2026-09-04 (scripts/stamp_app_desc.py), re-upload of the 1.5.17-BD..1.5.21-BD assets owed
+**severity: high (no release since 1.5.17-BD installs by any path) · scope: build / release, `scripts/stamp_app_desc.py` · found 2026-09-04 from a device: SD Card Firmware Update said "Invalid firmware file" for the latest release's `firmware.bin`**
+
+An ESP image carries two integrity marks over its segment data: the appended
+SHA256 trailer, and one byte before it — the XOR of every segment data byte,
+seeded with 0xEF, sitting in the last byte of the 16-byte pad after the final
+segment. `scripts/stamp_app_desc.py` (B-033) rewrites the 32-byte version field
+of the app descriptor, which is segment data, then recomputed the SHA256 and
+left the XOR byte as esptool wrote it. A valid hash of an invalid image. Three
+things check that byte, so three install paths refused it:
+
+| path | where it fails | what the user sees |
+|---|---|---|
+| SD Card Firmware Update | `validateImageFile()` → `BAD_CHECKSUM` (`src/network/FirmwareImageValidator.cpp`; the same code on the August builds) | "Invalid firmware file" |
+| Home → Update Firmware (online) | `esp_ota_end()` → `esp_image_verify()` → `verify_checksum` | install failed |
+| USB `write_flash` of `firmware.bin` alone | the bootloader's own `esp_image_verify` | "Checksum failed", boots the other slot |
+
+**Which releases, checked rather than assumed** — each `firmware.bin` pulled
+from GitHub on 2026-09-04 and walked with the validator's own arithmetic:
+
+| release | descriptor | XOR byte | SHA256 |
+|---|---|---|---|
+| 1.5.14-BD, 1.5.15-BD, 1.5.16-BD | stale `1.5.1-B2-43-g7211621a3` (stamper not yet in the tree) | valid | valid |
+| 1.5.17-BD, 1.5.18-BD, 1.5.19-BD, 1.5.20-BD, 1.5.21-BD | stamped | **stale** | valid |
+
+The proof it is the stamper and nothing else: for 1.5.21-BD the stored byte
+is 0xD9 and the data says 0x9F, and XOR-ing the old descriptor field against
+the new one gives exactly that difference, 0x46. The image staged on the
+BUNNYFIELDS card on 2026-08-28 for B-006 was built with the same stamper and is
+unflashable too; the B-006 note there said "appended SHA256 valid", which was
+true and not the check that mattered.
+
+**Why the test did not catch it.** `test/stamp_app_desc/` fed the script a flat
+blob with a descriptor and a hash but no segment table, so there was no
+checksum byte for it to leave stale. The fixture is a real image now.
+
+**FIXED 2026-09-04.**
+* `scripts/stamp_app_desc.py` walks the segment table before it writes: a
+  layout that does not add up to the file size, or a checksum byte that is
+  already wrong, is not esptool's output and is left alone. After the version
+  rewrite it recomputes the XOR byte from the data, then the SHA256 as before.
+* `scripts/release.sh`'s verify step walks the same table and refuses an image
+  whose checksum byte disagrees with its segment data — run against the
+  published 1.5.21-BD it says `REFUSED: image checksum byte is 0xD9 but the
+  segment data says 0x9F`; against a correct image, `checksum: valid`.
+* `test/stamp_app_desc/stamp_app_desc_test.py` builds a real single-segment
+  image with a padded checksum byte and an independent re-implementation of the
+  validator's walk. Failing-first confirmed: 6 of its checks fail against the
+  shipped stamper and all pass against the fixed one.
+* End to end: the shipped 1.5.21-BD image with its descriptor reverted to the
+  stale string reproduces esptool's output; the fixed stamper run on that
+  yields an image that passes the validator and is byte-identical to the
+  published file except the checksum byte and the 32-byte trailer.
+
+**Still owed, and why this sits in OPEN:** the assets on releases 1.5.17-BD
+through 1.5.21-BD are still the broken bytes, and `OtaUpdater` fetches whatever
+`firmware.bin` hangs on the latest release. Rebuild each with the fixed
+stamper (or repair in place — exactly 33 bytes move, and `release.sh`'s gate
+now proves the result) and replace the asset. Until then 1.5.16-BD is the
+newest release a device will accept, and it carries the stale descriptor of
+B-033.
+
+### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
+**severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
+
+Tags `1.5.3`, `1.5.4`, `1.5.5` and `1.5.6` exist locally with no releases on this
+fork — they are upstream's, arriving through the `upstream` remote. The fork is
+at **1.5.2** and numbers upward, so its next minor lands on a tag that already
+means something else.
+
+Nothing is broken yet, and that is exactly why it is worth deciding now rather
+than during a release: `git tag 1.5.3` will simply fail, in the middle of a
+publish, on a machine where the fetch happened to have run.
+
+**Close by** choosing a namespace and writing it down — a prefix the fork owns
+(`bd/1.5.3`), or skipping to a range upstream will not reach. Either is fine;
+discovering the clash mid-release is not.
+
+## Closed 2026-08-28. The namespace was already chosen; only the writing-down
+## was missing.
+
+The predicted failure did not occur, and the fork is now at **1.5.16-BD** —
+fourteen releases past the point this entry expected `git tag` to fail
+mid-publish. Checked rather than assumed:
+
+* every fork release tag carries a **suffix**: `1.5.1-BNY`, `1.5.1-B2`, then
+  `1.5.2-BD` through `1.5.16-BD`, seventeen in all;
+* every BARE `1.5.N` tag is upstream's, authored by `0x1abin` and `Uri Tauber`;
+* `1.5.3` through `1.5.6` do exist locally, exactly as this entry warned — and
+  the fork tagged `1.5.3-BD` … `1.5.6-BD` straight past them without a clash.
+
+**So the suffix IS the namespace**, and it is the same suffix the version string
+already carries for the Settings corner and the OTA screen. It was not adopted
+as a tag policy; it just fell out of tagging with the full version string, which
+happens to include the fork marker. That is why this entry could be written at
+all — the practice was invisible because nobody had stated it.
+
+**The rule, stated:** *a fork release tag is its full version string, suffix
+included.* `1.5.17-BD`, never `1.5.17`. A bare `1.5.N` tag in this repo is
+upstream's and must not be created here. Nothing needs changing to comply —
+seventeen tags already do — and `[crosspoint] version` in `platformio.ini`
+carries the suffix, so a tag taken from it is correct by construction.
+
+No prefix scheme is needed. `bd/1.5.3` was one of the two options this entry
+offered and it would be a second, redundant namespace on top of the one already
+working.
+
+
+### [B-006] X4 running firmware carries an empty version stamp
+**severity: low · scope: device provisioning · found 2026-08-02**
+
+The X4 runs a build stamped `1.5.0-BNY-rc+` — empty suffix. `gh_release_rc`
+composes its version as `1.5.0-BNY-rc+${sysenv.CROSSPOINT_RC_HASH}`
+(`platformio.ini:186`), and the flash was run without that variable set. The
+code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
+feeds the OTA version comparison, and it makes the running build
+unidentifiable after the fact.
+
+**Root cause fixed and verified 2026-08-08.** `platformio.ini` no longer
+interpolates `${sysenv.CROSSPOINT_RC_HASH}`; `scripts/git_branch.py` owns the
+version and, with the variable unset, warns loudly and stamps `-rc+unset`.
+Confirmed by building `gh_release_rc` with the variable removed from the
+environment: the binary contains `1.5.0-BNY-rc+unset`, so the empty suffix that
+produced this entry cannot recur.
+
+**Now staged:** both cards carry `20260807T0709Z-crosspoint-e194ab7b.bin`, a
+`gh_release` build stamped `1.5.0-BNY` with no empty `+` suffix (confirmed by
+`strings` on the binary), so SD Firmware Update from the card will replace the
+badly-stamped firmware. Still OPEN because that is an on-device action nobody
+has performed yet.
+
+> **THE STAGED IMAGE IS NOW SIXTEEN VERSIONS STALE — checked 2026-08-28.**
+> The card mounted as `BUNNYFIELDS` carries
+> `20260817T2333Z-crosspoint-9aae0b3f.bin`, and `strings` on it reports
+> **`1.5.0-BNY`**. The fork is at **1.5.16-BD**.
+>
+> So following the "close by" instruction below TODAY would fix the stamp and
+> **downgrade the device to August firmware** — losing every fix since,
+> including the untrusted-input memory-safety work (B-023, B-024), the bare-`new`
+> sweep (B-031, B-032) and everything shipped this week.
+>
+> **The close action has therefore changed**: build a CURRENT `gh_release`
+> image with `CROSSPOINT_RC_HASH` set, stage that, and update from it. Do not
+> flash the image currently on the card.
+>
+> **STAGED 2026-08-28.** `20260828T2010Z-crosspoint-fbd3129d.bin` is now on the
+> card beside the old one, built from `gh_release` and verified in place:
+> descriptor version **1.5.16-BD** (the B-033 stamper ran), appended SHA256
+> valid, image magic `0xE9`.
+>
+> Copying it is not a flash — `SdFirmwareUpdateActivity` is a file picker, so
+> nothing is written to the device until it is chosen. That is why staging was
+> safe to do and the update itself is not mine to perform.
+>
+> **Pick the 2026-08-28 file, not the 2026-08-17 one.** The older image is still
+> there and still stamped `1.5.0-BNY`; it is left rather than deleted because
+> removing a firmware image from someone's card is a worse default than leaving
+> two and saying which is which.
+
+**Close by:** reflashing with the variable set, or SD Firmware Update from the
+card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
+so a same-code reflash is accepted):
+```bash
+CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
+```
+
+> **2026-09-04: the bin staged 2026-08-28 does not flash.** It was built with
+> the stamper of B-033 and carries the stale checksum byte of [B-046]; the
+> device answers "Invalid firmware file". "Appended SHA256 valid" above was a
+> true statement about the wrong check. Stage a bin built after the B-046 fix
+> (its `release.sh` gate now proves the checksum) before performing this.
+
+---
+
+## FIXED
+
+### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
+**severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
+
+Reported by the session that cut the 1.5.2-BD release: the binary contains
+`1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
+DISPLAYED version is correct** (1.5.2-BD on the boot screen); this is provenance
+metadata, so the likeliest visible symptom is the web UI reporting an old build.
+
+What that session established, and it is the useful half:
+
+* it survives `pio run -t clean`, so it is not a stale object;
+* plain `grep` cannot find the string in the tree, which points at a
+  **committed compressed asset** — most probably the gzipped web UI that
+  `scripts/build_html.py` embeds.
+
+Deliberately filed without a mechanism rather than guessed at. **Close by**
+finding which committed artifact carries it (start by decompressing the
+generated HTML headers and grepping those), then regenerating it — or, if it is
+baked into a committed `.gz`, making the generator stamp it at build time so it
+cannot go stale again.
+
+Shipped in build-170 (2026-09-04). Moved out of OPEN under the silence-closes-a-shipped-fix ruling (owner 2026-09-04: "presume fixed, close them"). The stamp fix is byte-verified on a gh_release build; the first-OTA bootloader accept is presumed good unless re-raised.
+
 ## Closed 2026-08-28. Both halves of the lead were wrong.
 
 **The web UI does not carry it.** The suggested first step was to decompress the
@@ -284,137 +483,13 @@ on.
 `1.5.16-BD` correctly, and OTA's `isNewer()` parses the numeric triple from it.
 Only the app descriptor — OTA metadata and the web UI's build line — is stale.
 
-### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
-**severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
-
-Tags `1.5.3`, `1.5.4`, `1.5.5` and `1.5.6` exist locally with no releases on this
-fork — they are upstream's, arriving through the `upstream` remote. The fork is
-at **1.5.2** and numbers upward, so its next minor lands on a tag that already
-means something else.
-
-Nothing is broken yet, and that is exactly why it is worth deciding now rather
-than during a release: `git tag 1.5.3` will simply fail, in the middle of a
-publish, on a machine where the fetch happened to have run.
-
-**Close by** choosing a namespace and writing it down — a prefix the fork owns
-(`bd/1.5.3`), or skipping to a range upstream will not reach. Either is fine;
-discovering the clash mid-release is not.
-
-## Closed 2026-08-28. The namespace was already chosen; only the writing-down
-## was missing.
-
-The predicted failure did not occur, and the fork is now at **1.5.16-BD** —
-fourteen releases past the point this entry expected `git tag` to fail
-mid-publish. Checked rather than assumed:
-
-* every fork release tag carries a **suffix**: `1.5.1-BNY`, `1.5.1-B2`, then
-  `1.5.2-BD` through `1.5.16-BD`, seventeen in all;
-* every BARE `1.5.N` tag is upstream's, authored by `0x1abin` and `Uri Tauber`;
-* `1.5.3` through `1.5.6` do exist locally, exactly as this entry warned — and
-  the fork tagged `1.5.3-BD` … `1.5.6-BD` straight past them without a clash.
-
-**So the suffix IS the namespace**, and it is the same suffix the version string
-already carries for the Settings corner and the OTA screen. It was not adopted
-as a tag policy; it just fell out of tagging with the full version string, which
-happens to include the fork marker. That is why this entry could be written at
-all — the practice was invisible because nobody had stated it.
-
-**The rule, stated:** *a fork release tag is its full version string, suffix
-included.* `1.5.17-BD`, never `1.5.17`. A bare `1.5.N` tag in this repo is
-upstream's and must not be created here. Nothing needs changing to comply —
-seventeen tags already do — and `[crosspoint] version` in `platformio.ini`
-carries the suffix, so a tag taken from it is correct by construction.
-
-No prefix scheme is needed. `bd/1.5.3` was one of the two options this entry
-offered and it would be a second, redundant namespace on top of the one already
-working.
-
-
-### [B-006] X4 running firmware carries an empty version stamp
-**severity: low · scope: device provisioning · found 2026-08-02**
-
-The X4 runs a build stamped `1.5.0-BNY-rc+` — empty suffix. `gh_release_rc`
-composes its version as `1.5.0-BNY-rc+${sysenv.CROSSPOINT_RC_HASH}`
-(`platformio.ini:186`), and the flash was run without that variable set. The
-code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
-feeds the OTA version comparison, and it makes the running build
-unidentifiable after the fact.
-
-**Root cause fixed and verified 2026-08-08.** `platformio.ini` no longer
-interpolates `${sysenv.CROSSPOINT_RC_HASH}`; `scripts/git_branch.py` owns the
-version and, with the variable unset, warns loudly and stamps `-rc+unset`.
-Confirmed by building `gh_release_rc` with the variable removed from the
-environment: the binary contains `1.5.0-BNY-rc+unset`, so the empty suffix that
-produced this entry cannot recur.
-
-**Now staged:** both cards carry `20260807T0709Z-crosspoint-e194ab7b.bin`, a
-`gh_release` build stamped `1.5.0-BNY` with no empty `+` suffix (confirmed by
-`strings` on the binary), so SD Firmware Update from the card will replace the
-badly-stamped firmware. Still OPEN because that is an on-device action nobody
-has performed yet.
-
-> **THE STAGED IMAGE IS NOW SIXTEEN VERSIONS STALE — checked 2026-08-28.**
-> The card mounted as `BUNNYFIELDS` carries
-> `20260817T2333Z-crosspoint-9aae0b3f.bin`, and `strings` on it reports
-> **`1.5.0-BNY`**. The fork is at **1.5.16-BD**.
->
-> So following the "close by" instruction below TODAY would fix the stamp and
-> **downgrade the device to August firmware** — losing every fix since,
-> including the untrusted-input memory-safety work (B-023, B-024), the bare-`new`
-> sweep (B-031, B-032) and everything shipped this week.
->
-> **The close action has therefore changed**: build a CURRENT `gh_release`
-> image with `CROSSPOINT_RC_HASH` set, stage that, and update from it. Do not
-> flash the image currently on the card.
->
-> **STAGED 2026-08-28.** `20260828T2010Z-crosspoint-fbd3129d.bin` is now on the
-> card beside the old one, built from `gh_release` and verified in place:
-> descriptor version **1.5.16-BD** (the B-033 stamper ran), appended SHA256
-> valid, image magic `0xE9`.
->
-> Copying it is not a flash — `SdFirmwareUpdateActivity` is a file picker, so
-> nothing is written to the device until it is chosen. That is why staging was
-> safe to do and the update itself is not mine to perform.
->
-> **Pick the 2026-08-28 file, not the 2026-08-17 one.** The older image is still
-> there and still stamped `1.5.0-BNY`; it is left rather than deleted because
-> removing a firmware image from someone's card is a worse default than leaving
-> two and saying which is which.
-
-**Close by:** reflashing with the variable set, or SD Firmware Update from the
-card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
-so a same-code reflash is accepted):
-```bash
-CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
-```
-
----
-
-## FIXED
-
-### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
-**severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
-
-Reported by the session that cut the 1.5.2-BD release: the binary contains
-`1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
-DISPLAYED version is correct** (1.5.2-BD on the boot screen); this is provenance
-metadata, so the likeliest visible symptom is the web UI reporting an old build.
-
-What that session established, and it is the useful half:
-
-* it survives `pio run -t clean`, so it is not a stale object;
-* plain `grep` cannot find the string in the tree, which points at a
-  **committed compressed asset** — most probably the gzipped web UI that
-  `scripts/build_html.py` embeds.
-
-Deliberately filed without a mechanism rather than guessed at. **Close by**
-finding which committed artifact carries it (start by decompressing the
-generated HTML headers and grepping those), then regenerating it — or, if it is
-baked into a committed `.gz`, making the generator stamp it at build time so it
-cannot go stale again.
-
-Shipped in build-170 (2026-09-04). Moved out of OPEN under the silence-closes-a-shipped-fix ruling (owner 2026-09-04: "presume fixed, close them"). The stamp fix is byte-verified on a gh_release build; the first-OTA bootloader accept is presumed good unless re-raised.
-
+**2026-09-04 addendum.** The stamper's SHA256 step was right and not
+sufficient: the descriptor is also covered by the image's one-byte XOR
+checksum, which the stamper left stale, so every release it touched
+(1.5.17-BD..1.5.21-BD) fails validation on the device. Mechanism, proof and
+fix under [B-046], which is the open item. This entry stays closed as ruled,
+but "the first-OTA bootloader accept is presumed good" above cannot hold for
+any image the stamper produced before that fix; it is collected by B-046.
 
 ### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
