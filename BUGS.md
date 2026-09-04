@@ -34,6 +34,35 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-045] A crafted card font reads ~16 KB past a 1-byte glyph buffer (heap overflow)
+**severity: high (memory safety, remote-reachable) · scope: SD font loading + glyph decode · found 2026-09-04 by a crafted-input hunt (ASan), reproduced and FIXED the same day**
+
+A `.cpfont` on the card is untrusted input: a Wi-Fi peer can PUT one through
+WebDAV (`crosspoint-simulator/docs/network-surface-hunt-2026-09-04.md`). The
+loader validated the header, the style TOC and the interval table
+exhaustively but trusted every glyph's `width`/`height`/`dataLength`, and the
+renderer's 2-bit decode (`GfxRenderer.cpp`, `bitmap[pixelPosition >> 2]` for
+`pixelPosition` in `[0, width*height)`) reads `ceil(width*height/4)` bytes
+without consulting `dataLength`. A 93-byte font whose single glyph declares
+255x255 in a 1-byte bitmap made `onGlyphMiss` allocate 1 byte and the decode
+read 16257 bytes past it -- an unmapped-page abort on device, an ASan
+heap-buffer-overflow on the host. The prewarm/mini path
+(`SdCardFont.cpp`, sizes `miniBitmap` to the sum of `dataLength`) has the
+same shape. The only geometry-vs-data check in the tree was build-time
+(`scripts/verify_compression.py`), which never sees a card-side file.
+
+**FIXED 2026-09-04.** `glyphGeometryFitsData()` compares `dataLength` against
+the bytes `width*height` needs at the font's bit depth, at BOTH load sites:
+`onGlyphMiss` refuses the glyph (returns notdef), the prewarm loop blanks it
+(`width=height=dataLength=0`, so the decode is a no-op). Reproduced under
+ASan with the reviewer's harness before the fix and confirmed refused after
+(`Overflow: U+0041 ... declares 255x255 px in 1 bytes -- refused`, `getGlyph`
+null, no ASan report). Pinned by `test/malformed_font/` (2 cases: the crafted
+glyph refused, a well-proportioned one still loads); the assertion
+discriminates against the pre-fix tree, which returned a non-null glyph
+carrying the bad geometry. ctest 627/627, X3 canary, pio check PASSED.
+
+
 ### [B-044] WebSocket `START` accepts an absurd size and writes until the peer disconnects
 **severity: low (latent) · scope: `src/network/CrossPointWebServer.cpp` WS upload · found 2026-09-04 by the simulator's network-surface hunt (`crosspoint-simulator/docs/network-surface-hunt-2026-09-04.md`, finding 10)**
 

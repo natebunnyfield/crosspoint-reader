@@ -12,6 +12,19 @@
 #include "EpdFontFamily.h"
 #include "MissingGlyphLedger.h"
 
+// The bytes a glyph's bitmap MUST hold for its declared geometry at the
+// font's bit depth. A card-side .cpfont is untrusted input (a Wi-Fi peer can
+// PUT one through WebDAV), and the renderer decodes width*height pixels out
+// of a dataLength-sized buffer without ever consulting dataLength: a glyph
+// declaring 255x255 with a 1-byte bitmap read ~16 KB past its allocation
+// (ASan, crafted-input hunt 2026-09-04). The build-time check in
+// scripts/verify_compression.py never sees a file that arrived on the card.
+static bool glyphGeometryFitsData(const EpdGlyph& g, const bool is2Bit) {
+  const uint32_t pixels = static_cast<uint32_t>(g.width) * g.height;
+  const uint32_t needed = is2Bit ? (pixels * 2u + 7u) / 8u : (pixels + 7u) / 8u;
+  return g.dataLength >= needed;
+}
+
 static_assert(sizeof(EpdGlyph) == 16, "EpdGlyph must be 16 bytes to match .cpfont file layout");
 static_assert(sizeof(EpdUnicodeInterval) == 12, "EpdUnicodeInterval must be 12 bytes to match .cpfont file layout");
 static_assert(sizeof(EpdKernClassEntry) == 3, "EpdKernClassEntry must be 3 bytes to match .cpfont file layout");
@@ -1201,6 +1214,15 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
       freeStyleMiniData(s);
       return static_cast<int>(cpCount);
     }
+    if (!glyphGeometryFitsData(s.miniGlyphs[mapIdx], s.header.is2Bit)) {
+      // Blank the glyph rather than fail the page: width/height 0 makes the
+      // decode a no-op and dataLength 0 means no bitmap is read for it.
+      LOG_ERR("SDCF", "Prewarm: glyph %d style %u declares %ux%u px in %u bytes -- blanked", gIdx, styleIdx,
+              s.miniGlyphs[mapIdx].width, s.miniGlyphs[mapIdx].height, s.miniGlyphs[mapIdx].dataLength);
+      s.miniGlyphs[mapIdx].width = 0;
+      s.miniGlyphs[mapIdx].height = 0;
+      s.miniGlyphs[mapIdx].dataLength = 0;
+    }
     lastReadIndex = gIdx;
   }
 
@@ -1738,6 +1760,11 @@ const EpdGlyph* SdCardFont::onGlyphMiss(void* ctx, uint32_t codepoint) {
   }
   if (file.read(reinterpret_cast<uint8_t*>(&tempGlyph), sizeof(EpdGlyph)) != sizeof(EpdGlyph)) {
     LOG_ERR("SDCF", "Overflow: failed to read glyph metadata for U+%04X style %u", codepoint, styleIdx);
+    return nullptr;
+  }
+  if (!glyphGeometryFitsData(tempGlyph, s.header.is2Bit)) {
+    LOG_ERR("SDCF", "Overflow: U+%04X style %u declares %ux%u px in %u bytes -- refused", codepoint, styleIdx,
+            tempGlyph.width, tempGlyph.height, tempGlyph.dataLength);
     return nullptr;
   }
 
