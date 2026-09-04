@@ -23,6 +23,7 @@
 //   5. A rectangle running off the screen flips only the on-screen part.
 
 #include <GfxRenderer.h>
+#include <ImageToFramebufferDecoder.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -168,6 +169,35 @@ TEST_F(ImagePolarity, DoesNothingOutsideTheBwPass) {
   r->preserveImagePolarity(13, 7, 29, 21);
   r->setRenderMode(GfxRenderer::BW);
   EXPECT_EQ(cleared().count, 0);
+}
+
+class DimensionProbe : public ImageToFramebufferDecoder {
+ public:
+  bool decodeToFramebuffer(const std::string&, GfxRenderer&, const RenderConfig&) override { return false; }
+  bool getDimensions(const std::string&, ImageDimensions&) const override { return false; }
+  const char* getFormatName() const override { return "probe"; }
+  bool validate(int w, int h) { return validateImageDimensions(w, h, "probe"); }
+};
+
+// The image-dimension guard is a security control: a Wi-Fi peer can PUT a
+// cover onto the card, and width*height computed as `int` OVERFLOWS -- a
+// 65535x65535 image wrapped the product negative and PASSED the
+// > MAX_SOURCE_PIXELS check that exists to reject it (UBSan, crafted-input
+// hunt 2026-09-04). It is bounded in 64 bits now.
+TEST(ImageDimensionGuard, RejectsAGeometryThatOverflowsSignedInt) {
+  DimensionProbe p;
+  EXPECT_FALSE(p.validate(65535, 65535));
+  EXPECT_FALSE(p.validate(46341, 46341));
+  EXPECT_FALSE(p.validate(8, 2147483647));
+  EXPECT_FALSE(p.validate(0, 5));
+  EXPECT_FALSE(p.validate(-1, -1));
+}
+
+TEST(ImageDimensionGuard, AcceptsAnImageWithinTheBudget) {
+  DimensionProbe p;
+  EXPECT_TRUE(p.validate(2048, 1536));
+  EXPECT_TRUE(p.validate(800, 600));
+  EXPECT_FALSE(p.validate(2048, 1537));
 }
 
 }  // namespace

@@ -10,6 +10,8 @@ set(CP_PREVIEW "${REPO_ROOT}/tools/calendar_preview")
 add_executable(ImagePolarityTest
   ImagePolarityTest.cpp
   ${REPO_ROOT}/lib/GfxRenderer/GfxRenderer.cpp
+  # The image-dimension guard's overflow pin (ValidatesImageDimensions* below).
+  ${REPO_ROOT}/lib/Epub/Epub/converters/ImageToFramebufferDecoder.cpp
   ${REPO_ROOT}/lib/GfxRenderer/Bitmap.cpp
   ${REPO_ROOT}/lib/GfxRenderer/BitmapHelpers.cpp
   ${REPO_ROOT}/lib/GfxRenderer/FontCacheManager.cpp
@@ -39,6 +41,7 @@ target_include_directories(ImagePolarityTest PRIVATE
   ${REPO_ROOT}/src
   ${REPO_ROOT}/lib/GfxRenderer
   ${REPO_ROOT}/lib/EpdFont
+  ${REPO_ROOT}/lib/Epub/Epub/converters
   ${REPO_ROOT}/lib/Utf8
   ${REPO_ROOT}/lib/MiniBidi
   ${REPO_ROOT}/lib/Memory
