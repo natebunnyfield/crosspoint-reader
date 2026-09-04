@@ -11,10 +11,12 @@
 // glyph is refused. Built under ASan in the sanitizer job, a regression also
 // trips the overflow directly.
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -84,10 +86,24 @@ std::vector<uint8_t> craftedFont(uint8_t w, uint8_t h, uint16_t dataLength) {
   return f;
 }
 
+// A card root this test OWNS, so it never depends on CMake passing
+// CROSSPOINT_TEST_SD (it does not, and CI's working dir has no ./fs_ -- the
+// first CI run of this suite failed exactly there). Created once, and the
+// stub HalStorage reads the env var on every call, so setting it here points
+// both the write below and SdCardFont::load at the same directory.
+std::string cardRoot() {
+  static std::string root = [] {
+    char tmpl[] = "/tmp/cp_malformed_font_XXXXXX";
+    const char* dir = ::mkdtemp(tmpl);
+    std::string r = dir ? std::string(dir) : std::string("/tmp/cp_malformed_font");
+    ::setenv("CROSSPOINT_TEST_SD", r.c_str(), 1);
+    return r;
+  }();
+  return root;
+}
+
 std::string writeTempFont(const std::vector<uint8_t>& bytes, const std::string& name) {
-  const char* base = std::getenv("CROSSPOINT_TEST_SD");
-  std::string root = (base && *base) ? base : std::string("./fs_");
-  const std::string path = root + name;
+  const std::string path = cardRoot() + name;
   FILE* fp = std::fopen(path.c_str(), "wb");
   if (fp) {
     std::fwrite(bytes.data(), 1, bytes.size(), fp);
