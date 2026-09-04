@@ -567,9 +567,22 @@ void WebDAVHandler::handleMove(WebServer& s) {
   clearBookCache(srcPath.c_str());
   bool success = false;
   if (caseOnly) {
-    const String tmpPath = dstPath + ".casemove";
-    if (Storage.exists(tmpPath.c_str())) Storage.remove(tmpPath.c_str());
-    success = Storage.rename(srcPath.c_str(), tmpPath.c_str()) && Storage.rename(tmpPath.c_str(), dstPath.c_str());
+    // Rename through a temporary so the case-insensitive filesystem does not
+    // see the destination as already-existing (it IS the source). The temp
+    // name carries millis() so it will not collide with a real user file --
+    // and if one somehow sits there, refuse rather than delete it (static
+    // review 2026-09-04: an unconditional remove destroyed an unrelated file).
+    const String tmpPath = dstPath + ".casemove-" + String(millis());
+    if (Storage.exists(tmpPath.c_str())) {
+      s.send(500, "text/plain", "Move temp path is occupied");
+      return;
+    }
+    if (Storage.rename(srcPath.c_str(), tmpPath.c_str())) {
+      success = Storage.rename(tmpPath.c_str(), dstPath.c_str());
+      // The second leg failed: put the source back rather than orphaning it
+      // at the temp path (the old single-rename left the source intact).
+      if (!success) Storage.rename(tmpPath.c_str(), srcPath.c_str());
+    }
   } else {
     HalFile file = Storage.open(srcPath.c_str());
     if (!file) {
