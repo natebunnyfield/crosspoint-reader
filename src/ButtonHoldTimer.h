@@ -57,7 +57,16 @@ struct Timer {
       // the global timer answered 0 on the simulator and whatever the chord's
       // first button measured on the device.
       releasedThisFrame[i] = rel;
-      if (rel) releasedHeldMs[i] = started[i] ? nowMs - pressStartMs[i] : 0;
+      if (rel) {
+        releasedHeldMs[i] = started[i] ? nowMs - pressStartMs[i] : 0;
+        // The press is spent. Without this, `started` covered only a
+        // button's FIRST unseen press: a later level with no press edge
+        // (one consumed by a gpio.update() outside the pump -- the boot-time
+        // waitForPowerRelease poll, which on iOS survives the longjmp reboot
+        // together with this timer) read now minus the PREVIOUS press's
+        // stamp. Adversarial review 2026-09-04, latent.
+        started[i] = false;
+      }
       down[i] = ((levels >> i) & 1u) != 0;
     }
   }
@@ -66,9 +75,12 @@ struct Timer {
   // the finished length on its release frame, 0 when it is not in play. Never
   // another button's time.
   unsigned long heldMs(const uint8_t i, const unsigned long nowMs) const {
-    if (i >= kButtons || !started[i]) return 0;
-    if (down[i]) return nowMs - pressStartMs[i];
+    if (i >= kButtons) return 0;
+    // The release frame first: its press was spent by frame(), so `started`
+    // is already false there and the finished length lives in releasedHeldMs.
     if (releasedThisFrame[i]) return releasedHeldMs[i];
+    if (!started[i]) return 0;
+    if (down[i]) return nowMs - pressStartMs[i];
     return 0;
   }
 };

@@ -581,6 +581,16 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
   if (index >= books.size()) return BookResult::FAILED;
   const Book& book = books[index];
 
+  // Reset the per-book counters HERE, before the compare stage, not at the
+  // download. The activity repaints the whole-sync bar the moment it moves
+  // currentBook on, and it computes this book's share from these two -- so
+  // while this book was still being stamped and sha-checked (seconds on a
+  // large epub) the bar showed the PREVIOUS book's final 100%, one book
+  // ahead of the truth, then fell back when the download started. A two-book
+  // sync read 50 -> 100 -> 50 -> 100 (adversarial review 2026-09-04).
+  processedSize = 0;
+  totalSize = 0;
+
   loadSyncRecords();
 
   const std::string destPath = booksDir + book.file;

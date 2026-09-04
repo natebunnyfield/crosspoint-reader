@@ -334,6 +334,11 @@ void FileManagerActivity::viewFile(const std::string& entry) {
   if (entry.empty() || entry.back() == '/') return;
   startActivityForResult(std::make_unique<TextViewerActivity>(renderer, mappedInput, fullPathOf(entry), entry),
                          [this](const ActivityResult&) {
+                           // A pop is not an entry: onEnter's drain does not run
+                           // here, so an OpenActionMenu gesture fired INSIDE the
+                           // viewer would sit latched and pop the menu on the
+                           // first frame back (adversarial review 2026-09-04).
+                           gpio.consumeOpenActionMenu();
                            // The action menu closed on a Confirm PRESS and loop()
                            // latched lockNextConfirmRelease for the release --
                            // but the release landed in the viewer, where
@@ -355,6 +360,7 @@ void FileManagerActivity::startRename(const std::string& entry, const std::strin
   startActivityForResult(makeTextEntryActivity(renderer, mappedInput, tr(STR_NEW_NAME),
                                                seedName.empty() ? oldName : seedName, MAX_RENAME_LEN),
                          [this, oldFull, oldName, isDirectory](const ActivityResult& res) {
+                           gpio.consumeOpenActionMenu();  // as in viewFile: a pop is not an entry
                            // Same as viewFile: the keyboard swallowed the release
                            // this latch was waiting for. Cleared before every
                            // early return below, or a cancelled rename would

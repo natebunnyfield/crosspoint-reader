@@ -60,6 +60,22 @@ TEST(ButtonHoldTimer, ADownButtonWhosePressWasNeverSeenReadsZero) {
   EXPECT_EQ(t.heldMs(kConfirm, 52700), 700u);
 }
 
+TEST(ButtonHoldTimer, ALevelWithNoPressEdgeAfterAnEarlierPressReadsZero) {
+  // The second unseen press, not the first: an earlier press/release pair
+  // must not leave a stamp behind for a later edge-less level to read
+  // (adversarial review 2026-09-04 -- `started` was never cleared).
+  buttonhold::Timer t;
+  t.frame(1000, bit(1), 0, bit(1));
+  t.frame(1300, 0, bit(1), 0);
+  EXPECT_EQ(t.heldMs(1, 1300), 300u) << "the release frame still reports the finished press";
+  t.frame(1350, 0, 0, 0);
+  // A press edge consumed outside the pump: the level appears with no edge.
+  t.frame(9000, 0, 0, bit(1));
+  EXPECT_EQ(t.heldMs(1, 9000), 0u) << "read the previous press's stamp: 8000 ms of phantom hold";
+  t.frame(9050, 0, 0, bit(1));
+  EXPECT_EQ(t.heldMs(1, 9050), 0u);
+}
+
 TEST(ButtonHoldTimer, NotInPlayReadsZero) {
   buttonhold::Timer t;
   EXPECT_EQ(t.heldMs(kConfirm, 12345), 0u) << "never pressed";
