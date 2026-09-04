@@ -57,14 +57,29 @@ never silently cycle; the popup is what shows the user the alternative.
   **pushes**; `finish()` pops, and an empty-stack pop lands on Home. Where
   Back-to-Home highlights (`lastHomeMenuItem`) is the launcher's job.
 - Activities exit on Back **press**, not release.
+- **Confirm fires on PRESS on some lists and on RELEASE on others, and that is
+  a convention, not a bug** (audit 2026-09-02, F13 — an inventory, ruled
+  "write it down"). Press-edge screens: Settings, Wi-Fi selection, Typography,
+  Colophon, the editor font list. Release-edge screens: the file browser, Manage
+  Files, Recent Books, the chapter list. The rule that decides which: **a screen
+  whose Confirm ALSO has a hold meaning (delete, action menu, recent-book
+  action, font de/reactivate) must fire its tap on RELEASE**, because a press
+  edge cannot know yet whether a hold is coming — `FontSelectionActivity`'s
+  migration comment is the worked example. A screen with no Confirm hold may
+  fire on press, and should keep doing so (a release-fired tap feels a frame
+  late on e-ink). Do not "fix" the inventory screen by screen; a screen moves
+  from press to release only when it grows a hold.
 - `ActivityManager` arms `MappedInputManager::swallowUntilIdle()` on every
   activity swap: the incoming activity never sees the press/release edge that
   drove the transition. **Do not add per-activity release latches for
   child-exit leakage** — that central swallow is the mechanism. Latches remain
   legitimate only for intra-activity cases (popup closes, chord gestures) where
   no swap occurs.
-- Readers route Back through `ReaderUtils::handleBackNavigation` (honors
-  `backShortToFileBrowser`, short/long split). All of Epub/Xtc/Txt/Bmp do.
+- Readers route Back through `ReaderUtils::handleBackNavigation`, which since
+  the 2026-09-02 ruling (`docs/hold-gestures.md`) is ONE short press →
+  `popActivity()`: the held-Back-to-file-browser split is dead and
+  `backShortToFileBrowser` is a tombstone read by nothing. All of
+  Epub/Xtc/Txt/Bmp still go through it, so the signature stayed.
 - End of book: minimal centered end screen; Confirm/Back/forward go Home,
   paging back returns into the book (and disarms the read-folder move). There
   is deliberately no suggestions menu (owner ruling, 2026-08-08).

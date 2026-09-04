@@ -311,6 +311,29 @@ bool KeyboardEntryActivity::syncSelectionToValue(const int16_t value) {
   return false;
 }
 
+// One caret step on press, then repeats while held -- NoteEditorActivity's
+// repeatCaret timing (600 ms, then 300 ms: one step per e-ink refresh, since a
+// caret stepping faster than the panel can show it runs blind). Returns true
+// when the caret moved. `repeatAt` is per button so Left and Right cannot
+// share a deadline.
+bool KeyboardEntryActivity::repeatCursor(const MappedInputManager::Button button, uint32_t& repeatAt, const int dir) {
+  constexpr uint32_t FIRST_REPEAT_MS = 600;
+  constexpr uint32_t NEXT_REPEAT_MS = 300;
+  if (mappedInput.wasReleased(button)) repeatAt = 0;
+  const bool press = mappedInput.wasPressed(button);
+  const bool due = !press && mappedInput.isPressed(button) && repeatAt != 0 && millis() >= repeatAt;
+  if (!press && !due) return false;
+  repeatAt = millis() + (press ? FIRST_REPEAT_MS : NEXT_REPEAT_MS);
+  if (dir < 0) {
+    if (cursorPos == 0) return false;
+    cursorPos = utf8Prev(text, cursorPos);
+  } else {
+    if (cursorPos >= text.length()) return false;
+    cursorPos = utf8Next(text, cursorPos);
+  }
+  return true;
+}
+
 size_t KeyboardEntryActivity::utf8Prev(const std::string& s, size_t pos) {
   if (pos == 0) return 0;
   pos--;
@@ -707,16 +730,21 @@ void KeyboardEntryActivity::loop() {
     requestUpdate();
   });
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
-    if (cursorMode) {
-      if (togglePos) {
+  // Cursor mode: the caret steps on PRESS and repeats while held, the same
+  // cadence as NoteEditorActivity::repeatCaret. It stepped once per RELEASE --
+  // sixty presses across a sixty-character field, while the very same button
+  // auto-repeated across the grid (docs/ux-navigation-audit-2026-09-02.md,
+  // F14). Left's toggle-position restore stays on release: that press has
+  // no repeat meaning.
+  if (cursorMode) {
+    if (togglePos) {
+      if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
         cursorPos = savedCursorPos;
         togglePos = false;
         requestUpdate();
-      } else if (cursorPos > 0) {
-        cursorPos = utf8Prev(text, cursorPos);
-        requestUpdate();
       }
+    } else if (repeatCursor(MappedInputManager::Button::Left, cursorLeftRepeatAt, -1)) {
+      requestUpdate();
     }
   }
 
@@ -744,14 +772,22 @@ void KeyboardEntryActivity::loop() {
     }
   }
 
+  // Right repeats too, except in a PASSWORD field, where a held Right is the
+  // reveal-position gesture (above) and the step has to wait for the release
+  // to know the hold did not fire.
+  if (cursorMode && inputType != InputType::Password && !togglePos &&
+      repeatCursor(MappedInputManager::Button::Right, cursorRightRepeatAt, +1)) {
+    requestUpdate();
+  }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
     if (cursorMode && inputType == InputType::Password) {
       rightHeld = false;
       rightLongHandled = false;
-    }
-    if (cursorMode && !togglePos && cursorPos < text.length()) {
-      cursorPos = utf8Next(text, cursorPos);
-      requestUpdate();
+      if (!togglePos && cursorPos < text.length()) {
+        cursorPos = utf8Next(text, cursorPos);
+        requestUpdate();
+      }
     }
     if (cursorMode) return;
     rightHeld = false;

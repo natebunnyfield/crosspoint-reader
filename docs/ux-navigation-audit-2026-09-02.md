@@ -11,7 +11,11 @@ especially around navigation"). The findings below are the pass as written;
 | F5 | **FIXED** 2026-09-02, after the owner re-reported it in his own words (*"on back button, navigates go to last home menu item, but should go back to last home menu item or hovered book, whatever was actually last focused"*). NOT the fix proposed below: `NONE` in `goToReader` would land every return on cover 0, not on the cover left from, and `goToReader` is also the file browser's and Recents' route. Instead `HomeActivity::recordFocus` — called on every leave from Home, the Back-opens-most-recent shortcut included — records what the SELECTOR was on: a cover by path into `ActivityManager::lastHomeBookPath` (resetting `lastHomeMenuItem`), a menu row into `lastHomeMenuItem`; `goHome()` hands both to Home, and `src/activities/home/HomeLanding.h` (pure) picks the row: menu row if one is in charge, else the cover found BY PATH (the reader re-adds the book to the recents on open, so it comes back at cover 0 whichever cover it left from), else 0. Pinned by `test/home_landing/` (7 cases, one modeling the shipped wiring and reproducing the reported landing). Proven headless on the X3 canary with the new `[HOME] Landing on row` line: Recents row → Back → row 1; resume shortcut pressed with the selector on the Recents row → Back → row 1 (the shortcut is not a focus — adversarial review, same day, which also found the path search mostly redundant with cover 0 being both the re-added book and the fallback: kept, since it is what keeps a HOVERED cover under the resume shortcut); cover → Back → **row 0** (the shipped code printed row 1 there). Review checked CLEAN: every Home→book path goes through Home's own `onSelectBook`/`activateSelection`; all nine menu rows set the row via their `goTo*`; FileBrowser pushes its reader and Recents uses the base `onSelectBook`, so neither changes; bounds vs `getMenuItemCount()`; `homeContinueReadingInMenu` index space; string lifetime across `replaceActivity`; the activity harness needs no model of the new member. |
 | F8 | **KILLED** — owner ruling 2026-09-02 (`docs/hold-gestures.md`): the reader's held-Back destination is gone, not re-timed. Back in a reader is one short press → pop. `GO_HOME_MS` / `GO_BACK_OR_HOME_MS` deleted from `ReaderUtils.h`. |
 | F3, F6, F7 | **FIXED** 2026-09-02, owner ruling "All three". **F3 — NOT the fix proposed below.** The proposal was to move Retry/Forget off the front pair so Left/Right step the list; that invents a new home for two actions the hints already name, which is an architectural choice nobody asked for. Instead the SIDE pair steps the networks (`ButtonNavigator::nextIndex`/`previousIndex`, wrapping) and the front pair keeps Retry and Forget — upstream's shape, and the screen joins the paging ruling's exemption list in `docs/ui-conventions.md` (a screen whose front pair already means something else is exactly what that list is for). If Left/Right stepping is what was wanted, say so and it is one more edit. **F6** — `lockNextConfirmRelease = false` in both the View and the Rename result handlers (`FileManagerActivity.cpp`). **F7** — `goToFileManager(startPath, focusEntry)` carries the edited note's basename out of `NoteEditorActivity::exitEditor()`, and `FileManagerActivity::onEnter` `findEntry()`s it once, logging `[FileManager] Re-focused '<name>' at row N`. No pure unit in any of the three, so the pin is the real firmware under a script on a scratch card: `crosspoint-simulator/tests/test_manage_files_and_wifi_nav.sh` (in `run_all.sh`). F6's arm was measured to FAIL on the pre-fix tree (TextViewer entered once, not twice); F7's arm reads the `Re-focused 'note1.md' at row 2` line; F3's arm (four networks, one Down, Confirm → `Connecting to Bravo`) discriminates by construction — pre-fix `pageDown` returns false on a one-screen list (`ButtonNavigator.cpp:156`), so the old tree connects to Alpha — but was NOT run against a pre-fix binary. F7's arm was strengthened after review to also ACT on the row (menu → Move → `armMove entry='note1.md'`), since the log line alone would pass a tree that computed the row and then lost it. **Adversarial review of the diff, same day** (read-only, tried to disprove each): nothing would-ship. Two survived and are recorded, not fixed: (a) F3 gives up screenful paging on the Wi-Fi list, and on X3/X4 (no touch) a 30-SSID scan is a held DOWN rather than four presses — a deliberate trade under the ruling, now stated in the code comment and `ui-conventions.md`; (b) the front pair is not the clean Retry/Forget split the first draft of the comment claimed — Left steps UP on an unsaved network, unlabeled, pre-existing — comment and doc corrected. CLEAN: `onEnter` runs only on a fresh activity (`ActivityManager.cpp:180,212`; the pop path never calls it), so a View/Rename return cannot reset the row; no separate scroll offset (`drawList` derives the page from `selectorIndex`, `BaseTheme.cpp:297`, `LyraTheme.cpp:200`); the basename matches the listing form byte for byte and the editor cannot rename; only two `startActivityForResult` sites exist in FileManager, both cleared; clearing the latch in the handler cannot eat a needed release because `swallowUntilIdle()` runs first (`ActivityManager.cpp:130`) and the stale-release mask covers a still-held Confirm; `nextIndex`/`previousIndex` guard an empty list and every path back to `NETWORK_LIST` resets the index; `WifiSelectionActivity` is the ONLY `onPageNext` caller that touches `Button::Right`/`Left`, so F3 has no sibling. |
-| everything else | open, as written |
+| F11, F15 | **FIXED** 2026-09-04. `ClaudeChatActivity.cpp` answer view reads the side pair as `PageNext`/`PagePrevious` (so `sideButtonLayout` is honored like every other paging surface) and calls `requestUpdate()` only when `answerTop` actually moved. Note `sideButtonLayout` is a `static constexpr` today, so F11 was latent rather than visible; the fix is the convention, not a symptom. |
+| F14 | **FIXED** 2026-09-04. Cursor mode steps the caret on PRESS and auto-repeats while held — `KeyboardEntryActivity::repeatCursor`, `repeatCaret`'s 600/300 ms cadence, one deadline per button. Right stays release-driven in a PASSWORD field, where a held Right is the reveal-position gesture. Pinned by `test/activity_input/KeyboardCursorRepeatTest.cpp` (4 cases; the first EXPECT — one update on the press frame — reads 0 on the release-driven tree by construction). `KeyboardEntryActivity.cpp` is linked into `ActivityInputTest` for it. |
+| F13 | **WRITTEN DOWN** 2026-09-04 as a convention in `docs/ui-conventions.md` (Navigation contracts): release-edge Confirm is required exactly where Confirm also has a hold meaning; press-edge elsewhere; no screen-by-screen migration. |
+| F12, F16 | open, as written. F12 (no hints during a synchronous exchange) is a design proposal; F16 (`IntervalSelectionActivity` unreachable) is upstream's code and nothing on the fork constructs it — deleting it widens the fork for no user-visible gain, so it stays. |
+| F1, F2 | open, TOUCH BOARDS ONLY (X4 Pro, Sticky) — unreachable on every device the owner has; shippable to upstream. |
 
 Deliberately NOT converted, because nothing asked for it and each is a
 proposal rather than a fix: `ButtonNavigator.cpp` hold-to-repeat stays on
@@ -176,7 +180,7 @@ Each ends in a Cancel-default popup, so lower blast radius:
 instead of open), `RecentBooksActivity.cpp:69-74` (→ Remove from recents?),
 `FileManagerActivity.cpp:637-638`, `:672` (→ action menu instead of open).
 
-### F11 — P2 — Claude answer pages backwards under swapped side buttons. VERIFIED
+### F11 — P2 — Claude answer pages backwards under swapped side buttons. VERIFIED — FIXED 2026-09-04
 
 `ClaudeChatActivity.cpp:394-405` reads raw `Button::Up/Down`; every other
 paging surface reads `PageNext/PagePrevious`, which honor
@@ -205,7 +209,7 @@ synchronously inside `loop()`; each `setPhase` blocks in
 `requestUpdateAndWait()` (`:152`). `View::Working` draws no button hints.
 Worst-case duration bounded only by the HTTP timeout, which was not read.
 
-### F13 — P2 — Confirm fires on PRESS on some lists and on RELEASE on others. VERIFIED (inventory)
+### F13 — P2 — Confirm fires on PRESS on some lists and on RELEASE on others. VERIFIED (inventory) — CONVENTION WRITTEN 2026-09-04
 
 Press: `SettingsActivity.cpp:154,164`, `WifiSelectionActivity.cpp:670-683`,
 `TypographySettingsActivity.cpp:189`, `ColophonActivity.cpp:171`,
@@ -216,14 +220,14 @@ grow a hold without first moving its tap (the migration
 `FontSelectionActivity.cpp:204-217` documents). A convention to write down,
 not a bug to fix screen by screen.
 
-### F14 — P2 — Keyboard cursor mode has no auto-repeat. VERIFIED
+### F14 — P2 — Keyboard cursor mode has no auto-repeat. VERIFIED — FIXED 2026-09-04
 
 `KeyboardEntryActivity.cpp:704-708`, `:731-735`: `if (cursorMode) return;`
 in the continuous callbacks, move on `wasReleased`. 60 presses to cross a
 60-character field; the same button repeats outside cursor mode.
 `NoteEditorActivity.cpp:368-386` already has the `repeatCaret` timer to copy.
 
-### F15 — P2 — Paging past the end of a Claude answer still refreshes. VERIFIED
+### F15 — P2 — Paging past the end of a Claude answer still refreshes. VERIFIED — FIXED 2026-09-04
 
 `ClaudeChatActivity.cpp:396-398`, `:402-404`: `requestUpdate()` outside the
 bounds check. One-line fix.

@@ -67,6 +67,7 @@ endif()
 add_executable(ActivityInputTest
   ActivityInputTest.cpp
   TypedTextEntryTest.cpp
+  KeyboardCursorRepeatTest.cpp
   ClaudeChatSendTest.cpp
   ListPagingTest.cpp
   HostHarness.cpp
@@ -84,6 +85,10 @@ add_executable(ActivityInputTest
   # SDK keyboard component in with it, and is covered end-to-end by the
   # simulator instead — that file says which half is tested where.
   ${REPO_ROOT}/src/activities/util/DaisyEntryActivity.cpp
+  # The grid keyboard too, since 2026-09-04: ClaudeChat below already pays
+  # for the SDK keyboard component, so the cursor-mode auto-repeat
+  # (KeyboardCursorRepeatTest.cpp) costs nothing further to link.
+  ${REPO_ROOT}/src/activities/util/KeyboardEntryActivity.cpp
   ${REPO_ROOT}/src/util/ButtonNavigator.cpp
   # Claude chat + its on-screen keyboard panel (ClaudeChatSendTest.cpp). This
   # DOES drag the SDK keyboard component in, which is why the note above says

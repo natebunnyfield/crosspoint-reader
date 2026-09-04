@@ -90,6 +90,8 @@ class KeyboardEntryActivity : public Activity {
   bool rightLongHandled = false;
   size_t savedCursorPos = 0;
   size_t rightStartCursorPos = 0;
+  uint32_t cursorLeftRepeatAt = 0;  // repeatCursor deadlines, one per button
+  uint32_t cursorRightRepeatAt = 0;
 
   // Tap/hold routing (threshold long-press, release swallow, slide re-arm)
   // lives in the SDK; loop() feeds it the level-triggered touch state.
@@ -133,6 +135,7 @@ class KeyboardEntryActivity : public Activity {
   bool backspaceUtf8();
   static size_t utf8Prev(const std::string& s, size_t pos);
   static size_t utf8Next(const std::string& s, size_t pos);
+  bool repeatCursor(MappedInputManager::Button button, uint32_t& repeatAt, int dir);
 
   freeink::ui::Rect keyboardRect() const;
 

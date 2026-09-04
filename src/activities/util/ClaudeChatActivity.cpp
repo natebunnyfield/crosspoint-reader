@@ -386,21 +386,30 @@ void ClaudeChatActivity::loop() {
     // or paging skips lines it never displayed.
     const size_t step = answerLinesOnScreen() > 1 ? answerLinesOnScreen() - 1 : 1;
     // T-022: front Left/Right page here too, through this same block, so the
-    // two pairs cannot drift apart. Right mirrors Down (next), Left mirrors Up
-    // (previous) -- the FRONT cluster only, not the reader's PageBack/Forward
-    // aliases, since Left/Right elsewhere in this activity (repeatCol, below)
-    // already read the raw front buttons the same way. Prompt-view column
-    // navigation is untouched: this block only runs in View::Answer.
-    if (mappedInput.wasReleased(MappedInputManager::Button::Down) ||
+    // two pairs cannot drift apart. Right mirrors PageNext, Left mirrors
+    // PagePrevious -- the FRONT cluster only, not the reader's
+    // PageBack/Forward aliases, since Left/Right elsewhere in this activity
+    // (repeatCol, below) already read the raw front buttons the same way.
+    // Prompt-view column navigation is untouched: this block only runs in
+    // View::Answer. The SIDE pair is read as PageNext/PagePrevious, which
+    // honor sideButtonLayout the way every other paging surface does; raw
+    // Up/Down paged this answer backwards under a swapped layout
+    // (docs/ux-navigation-audit-2026-09-02.md, F11). And a press past either
+    // end moves nothing, so it refreshes nothing (F15).
+    if (mappedInput.wasReleased(MappedInputManager::Button::PageNext) ||
         mappedInput.wasReleased(MappedInputManager::Button::Right)) {
-      if (answerTop + step < answerLines.size()) answerTop += step;
-      requestUpdate();
+      if (answerTop + step < answerLines.size()) {
+        answerTop += step;
+        requestUpdate();
+      }
       return;
     }
-    if (mappedInput.wasReleased(MappedInputManager::Button::Up) ||
+    if (mappedInput.wasReleased(MappedInputManager::Button::PagePrevious) ||
         mappedInput.wasReleased(MappedInputManager::Button::Left)) {
-      answerTop = answerTop > step ? answerTop - step : 0;
-      requestUpdate();
+      if (answerTop > 0) {
+        answerTop = answerTop > step ? answerTop - step : 0;
+        requestUpdate();
+      }
       return;
     }
   }
