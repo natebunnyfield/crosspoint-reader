@@ -174,6 +174,17 @@ survivors, both FIXED the same day:
    capped at 512 assets, which no real release approaches. The card-side
    `library_sync.json` was already capped (`MAX_LEDGER_BYTES`).
 
-Not covered by either pass, for a future session: the progressive-JPEG and
-PNG decoders' internal MCU/scan loops below the dimension guard (the vendored
-JPEGDEC and PNGdec), and the EPUB image `src` -> path resolution.
+The reader's own handoff boundary to the vendored decoders was read
+statically 2026-09-04 and found sound: the JPEG draw callback
+(`JpegToFramebufferConverter.cpp`) rejects non-positive stride/blockH/validW,
+clamps `dstYEnd`/`dstXEnd` to the screen buffer (`clampXMax`/`clampYMax`) and
+returns early on an empty range before any write, so a wrong-sized block from
+the decoder cannot write past the screen. So the reader-side defense is: the
+dimension guard (now overflow-safe) gates entry, and the draw callback clamps
+output.
+
+Not fuzzed this session, for a future pass: the vendored JPEGDEC and PNGdec
+INTERNAL MCU/scan loops (an automated cyber safeguard stopped the crafted-JPEG
+pass mid-run; the code is third-party, kept patched from upstream via
+`scripts/jpegdec_patches/` and gated by the two defenses above), and the EPUB
+image `src` -> card-path resolution.
