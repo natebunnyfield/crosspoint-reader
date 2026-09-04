@@ -19,6 +19,7 @@
 #include "CrossPointSettings.h"
 #include "LibrarySyncPlan.h"
 #include "RecentBooksStore.h"
+#include "util/CardSecret.h"
 #ifdef SIMULATOR
 // The host's own settings surface, where a platform with no way to edit the
 // card's settings.json keeps this token instead. Simulator-only by
@@ -62,15 +63,25 @@ constexpr int SYNC_RECORDS_VERSION = 1;
 // the publisher starts stamping them.
 constexpr int MAX_MANIFEST_VERSION = 1;
 
-// The token, from wherever this build's owner can actually set one.
+// Where the token lives on the card: one line, hand-placed, the same pattern
+// as /claude-key.txt. Read through util/CardSecret.h so the two files behave
+// identically (trailing newline trimmed, empty means "not configured").
+constexpr const char* GITHUB_TOKEN_PATH = "/github-token.txt";
+
+// The token, from wherever this build's owner can actually set one, in order:
 //
-// SETTINGS.githubToken is the answer on hardware, where it is hand-edited into
-// /.crosspoint/settings.json on the card. A HOST BUILD MAY HAVE NO WAY TO EDIT
-// THAT FILE -- an iPhone does not -- so the simulator offers a settings surface
-// of its own and it wins when it holds anything. It is deliberately not copied
-// INTO SETTINGS at boot: that field is persisted by the next settings save, and
-// on iOS the directory it saves to is served over the LAN by File Transfer and
-// WebDAV. One fewer copy of a credential, for no loss of function.
+//   1. the simulator's own settings surface, when it holds anything. A HOST
+//      BUILD MAY HAVE NO WAY TO EDIT A FILE ON THE CARD -- an iPhone does not.
+//   2. /github-token.txt on the card root. Wins over the settings field
+//      because a file the owner placed there is the more deliberate act, and
+//      it does not round-trip through a settings save.
+//   3. SETTINGS.githubToken, hand-edited into /.crosspoint/settings.json --
+//      the original home, kept so existing cards keep working.
+//
+// Nothing here is copied INTO SETTINGS: that field is persisted by the next
+// settings save, and on iOS the directory it saves to is served over the LAN
+// by File Transfer and WebDAV. One fewer copy of a credential, for no loss of
+// function. (The token file is served the same way; see the doc.)
 //
 // NEVER LOG THE RETURN VALUE, here or at any call site.
 std::string githubTokenValue() {
@@ -88,6 +99,8 @@ std::string githubTokenValue() {
     return std::string(hosted);
   }
 #endif
+  std::string fromFile;
+  if (cardsecret::readOneLine("LIB", GITHUB_TOKEN_PATH, fromFile)) return fromFile;
   return std::string(SETTINGS.githubToken);
 }
 
