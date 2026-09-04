@@ -21,4 +21,5 @@ class BmpViewerActivity final : public Activity {
   std::string filePath;
   std::vector<std::string> siblingImages;
   int currentImageIndex = -1;
+  bool imageValid = false;  // the file decoded; Confirm may make it the sleep cover
 };

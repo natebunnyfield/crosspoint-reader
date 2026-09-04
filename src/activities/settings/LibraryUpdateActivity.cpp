@@ -118,6 +118,17 @@ void LibraryUpdateActivity::runSync() {
     return;
   }
 
+  if (updater.getBooks().empty()) {
+    // fetchManifest returns OK with zero books when no entry has a matching
+    // asset (a half-published release). The SYNCING frame indexes
+    // getBooks()[currentBook], which on an empty vector is a LoadProhibited
+    // panic (second-pass audit, 2026-09-04). Nothing to sync is DONE.
+    RenderLock lock(*this);
+    state = State::DONE;
+    requestUpdate();
+    return;
+  }
+
   {
     RenderLock lock(*this);
     state = State::SYNCING;

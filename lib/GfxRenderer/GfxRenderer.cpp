@@ -2079,7 +2079,9 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
     // samples at the centre of its logical pixel, so the shape stays where the
     // logical form put it while its edges gain RENDER_SCALE times the detail.
     {
-      constexpr int S = RENDER_SCALE;
+      // The latched factor, not the ceiling RENDER_SCALE -- the one misuse
+      // GfxRenderer.h's own comment on that constant warns about.
+      const int S = cp::renderScale();
       const int dax = ax * S + S / 2, day = ay * S + S / 2;
       const int dbx = bx * S + S / 2, dby = by * S + S / 2;
       const int dcx = cx * S + S / 2, dcy = cy * S + S / 2;

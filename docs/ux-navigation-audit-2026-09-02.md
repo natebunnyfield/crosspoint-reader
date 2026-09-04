@@ -16,6 +16,7 @@ especially around navigation"). The findings below are the pass as written;
 | F13 | **WRITTEN DOWN** 2026-09-04 as a convention in `docs/ui-conventions.md` (Navigation contracts): release-edge Confirm is required exactly where Confirm also has a hold meaning; press-edge elsewhere; no screen-by-screen migration. |
 | F12, F16 | open, as written. F12 (no hints during a synchronous exchange) is a design proposal; F16 (`IntervalSelectionActivity` unreachable) is upstream's code and nothing on the fork constructs it — deleting it widens the fork for no user-visible gain, so it stays. |
 | F1, F2 | open, TOUCH BOARDS ONLY (X4 Pro, Sticky) — unreachable on every device the owner has; shippable to upstream. |
+| **Second pass, 2026-09-04** — over the `## Not read` list below | Eight survivors, seven FIXED the same day, one recorded. See `## Second pass, 2026-09-04` at the foot. |
 
 Deliberately NOT converted, because nothing asked for it and each is a
 proposal rather than a fix: `ButtonNavigator.cpp` hold-to-repeat stays on
@@ -296,3 +297,47 @@ its own `wasPressed(Confirm)` handler (`.cpp:93`).
 `PrettyView`, `XtcReader*` beyond its `handleBackNavigation` call,
 `BookNotesActivity`, `EpubReaderFootnotesActivity`, `notes/KeyboardPanel.cpp`,
 `lib/GfxRenderer/**`. A second pass starts there.
+
+## Second pass, 2026-09-04 — the `## Not read` list
+
+A read-only refuting pass over exactly the files the first pass skipped, told
+to disprove each candidate first and to list what it found CLEAN. Verified by
+reading at `7cabffea0`; nothing in `build/test` covered these paths.
+
+| # | Where | What | Status |
+|---|---|---|---|
+| 1 | `BookNotesActivity.cpp` | Paging by a flat `contentHeight / lineHeight` while `render()` inserts a half-line gap before every headline: ~2 lines skipped per page, and the last `ceil(G/2)` lines of the final note unreachable. | **FIXED** — `linesFrom()` / `pageStartBefore()` lay the page out the way `render()` does; the side pair, swipes and hold-repeat page by what fits; `maxScroll` is the start of the last page. Not pinned by a test (the harness has no BookNotes fixture); verified by reading the two paths side by side. |
+| 2 | `LibraryUpdateActivity.cpp` | `fetchManifest` returns OK with zero books (every entry can `continue` on a missing asset); the SYNCING frame indexed `getBooks()[currentBook]` on an empty vector — a LoadProhibited panic. | **FIXED** — zero books is DONE. |
+| 3 | `BmpViewerActivity.cpp` | Raw `Button::Up/Down` step siblings, ignoring `sideButtonLayout` (F11's class). | **FIXED** — `PagePrevious`/`PageNext`. |
+| 4 | `OnlineFirmwareUpdateActivity.cpp` | CONNECTING is a live loop that never read Back: 20 s connect + 8 s DNS with no hint bar when the saved network is out of range. | **FIXED** — Back finishes during CONNECTING, and the frame draws the Back hint. |
+| 5 | `BmpViewerActivity::onExit` | The only `onExit` that paints (clear + present); a Quick Resume sleep from the viewer saves a blank frame with the moon on it. Only when the sleep MODE is Quick Resume. | **RECORDED, not fixed** — the clear exists to take the image's ghost off the panel before the browser repaints; dropping it trades a blank Quick Resume frame for ghosting on every exit. An owner call. |
+| 6 | `BmpViewerActivity.cpp` | Confirm on the "Invalid BMP" screen still copied the bad file over `/sleep.bmp` and switched the sleep screen to CUSTOM. | **FIXED** — `imageValid` gates it. |
+| 7 | `ClockOffsetActivity.cpp` | `pageItems` from the full content height while `render()` reserves a preview row on an RTC board: on a 15-row list the side pair was dead. Latent (needs a custom offset row). | **FIXED** — one row fewer when the preview shows. |
+| 8 | `lib/GfxRenderer/GfxRenderer.cpp` `fillPolygon` | The triangle branch read `RENDER_SCALE` (the ceiling) where every other primitive reads `cp::renderScale()` — the misuse the header's own comment names. Invisible while the latch equals the ceiling. | **FIXED** — reads the latched factor. |
+
+No survivor in: raw global `getHeldTime()` (only the documented single-button
+site in `EpubReaderActivity`), overflow/allocation from untrusted input in
+`Bitmap.cpp` / `PrettyView` / `BitmapHelpers`, the wake path.
+
+CLEAN, with what was checked: `BootActivity` (draw-only); `SleepActivity`
+RTC-less fallback, polarity reset order, rotation window, cover fallbacks;
+`SleepScreenPolicy` (pure, tested); `CalendarSleepScreen` legend arrays, row
+math, week clamp, 24 labels vs the enum; `HolidayCalculator` Zeller, Meeus,
+`addDays`, local-date bound, `nth == -1`; `main.cpp` wake path; the web-server
+activity's popup/abandon/hand-off paths (the double header is cosmetic);
+`OnlineFirmwareUpdate` beyond #4; `SdFirmwareUpdate` recovery loop, TOCTOU
+re-validation, SUCCESS gating; `LibraryUpdater::syncBook` `.part` handling
+(never reports success on a partial; `remove` before `rename` could lose the
+old copy on a rename failure, reported FAILED — not filed); `Colophon` clamps
+and `appendAddress`; `ClearCache` popup semantics; `XtcReader` end-of-book,
+progress clamp, 2-bit planes (a dead `wasReleased(Back)` at end-of-book —
+cosmetic); the Xtc chapter list; `EpubReaderFootnotes`; `PrettyView`'s every
+binary reader bounds-checked against `data.size()`; `KeyboardPanel` clamps
+(its file-scope comment describes a static mirror that no longer exists —
+stale comment); `Bitmap.cpp` re-checked for the 24-byte class (`planes == 0`
+first, dimensions ≤ 0 rejected, `rowBytes` capped, palette ≤ 256, all six bpp
+row indices); `BitmapHelpers` error rows; `GfxRenderer.cpp` `drawPixel`,
+`fillRectImpl`, `drawBitmap*` allocations, draw/measure kern parity,
+`fillRoundedRect`, `readFramebufferRegion` (the bottom-up `break` at
+`:1829` would drop an image whose bottom rows land off-screen; every in-scope
+caller fits it first — not filed).

@@ -119,6 +119,13 @@ void OnlineFirmwareUpdateActivity::loop() {
   // would block before anything had been painted, so the owner would stare at
   // the previous screen for the length of a TLS handshake.
   if (state == State::CONNECTING) {
+    // A live loop, so it can read Back -- it did not, and with the saved
+    // network out of range the owner stared at "Checking for updates" for
+    // the 20 s connect budget plus 8 s of DNS (second-pass audit 2026-09-04).
+    if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+      finish();
+      return;
+    }
     if (!preflight()) return;
     state = State::CHECKING;
     requestUpdate();
@@ -285,6 +292,10 @@ void OnlineFirmwareUpdateActivity::render(RenderLock&&) {
       // preconditions it is on; the [OTA] log carries that distinction for
       // anyone diagnosing it.
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_FOR_UPDATES));
+      {
+        const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+        GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+      }
       break;
 
     case State::CHECKING:

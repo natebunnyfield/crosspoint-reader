@@ -42,7 +42,14 @@ class BookNotesActivity final : public Activity {
   };
 
   void buildLines();
-  int visibleLineCount() const;
+  // The lines that fit on one page starting at `start`, laid out the way
+  // render() lays them (a headline's half-line gap counts except at the top),
+  // and the start of the page that ends just before `end`. Paging by a flat
+  // contentHeight / lineHeight skipped ~2 lines per page and could never
+  // scroll the last lines into view (second-pass audit, 2026-09-04).
+  int linesFrom(size_t start) const;
+  size_t pageStartBefore(size_t end) const;
+  int contentHeightPx() const;
 
   std::vector<Line> lines;
   int scrollLine = 0;

@@ -4,6 +4,7 @@
 #include <HalClock.h>
 #include <I18n.h>
 
+#include <algorithm>
 #include <cstdio>
 
 #include "CrossPointSettings.h"
@@ -128,7 +129,11 @@ void ClockOffsetActivity::loop() {
       break;
   }
 
-  const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false);
+  // One row fewer when render() reserves the preview line under the list;
+  // paging against the full height made the side pair dead on a real
+  // two-page list (second-pass audit, 2026-09-04).
+  const int pageItems = std::max(
+      1, UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false) - (halClock.isAvailable() ? 1 : 0));
   const auto swipe = mappedInput.wasSwipe();
   if (swipe == MappedInputManager::SwipeDir::Up) {
     selectedIndex = ButtonNavigator::nextPageIndex(selectedIndex, itemCount, pageItems);

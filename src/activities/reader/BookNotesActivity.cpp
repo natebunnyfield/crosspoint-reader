@@ -74,13 +74,42 @@ static_assert(sizeof(kNotes) / sizeof(kNotes[0]) == static_cast<size_t>(booknote
 
 }  // namespace
 
-int BookNotesActivity::visibleLineCount() const {
+int BookNotesActivity::contentHeightPx() const {
   auto metrics = UITheme::getInstance().getMetrics();
   Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
-  const int lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
-  return lineHeight > 0 ? std::max(1, contentHeight / lineHeight) : 1;
+  return screen.height - contentTop - metrics.verticalSpacing;
+}
+
+int BookNotesActivity::linesFrom(const size_t start) const {
+  const int lineHeight = std::max(1, renderer.getLineHeight(UI_10_FONT_ID));
+  const int contentHeight = contentHeightPx();
+  int y = 0;
+  int n = 0;
+  for (size_t i = start; i < lines.size(); i++) {
+    if (lines[i].gapBefore && y > 0) y += lineHeight / 2;
+    if (y + lineHeight > contentHeight) break;
+    y += lineHeight;
+    n++;
+  }
+  return std::max(1, n);
+}
+
+size_t BookNotesActivity::pageStartBefore(const size_t end) const {
+  const int lineHeight = std::max(1, renderer.getLineHeight(UI_10_FONT_ID));
+  const int contentHeight = contentHeightPx();
+  // Walking back, a line's gap is charged whether or not it ends up first on
+  // the page: an overestimate, so the page found always fits when drawn.
+  int y = 0;
+  size_t i = end;
+  while (i > 0) {
+    const size_t k = i - 1;
+    const int h = lineHeight + (lines[k].gapBefore ? lineHeight / 2 : 0);
+    if (y + h > contentHeight) break;
+    y += h;
+    i = k;
+  }
+  return i;
 }
 
 void BookNotesActivity::buildLines() {
@@ -177,15 +206,18 @@ void BookNotesActivity::loop() {
     return;
   }
 
-  const int perPage = visibleLineCount();
-  const int maxScroll = std::max(0, static_cast<int>(lines.size()) - perPage);
+  const int maxScroll = static_cast<int>(pageStartBefore(lines.size()));
 
-  auto scrollBy = [this, maxScroll](const int delta) {
-    const int target = std::clamp(scrollLine + delta, 0, maxScroll);
+  auto scrollTo = [this, maxScroll](const int want) {
+    const int target = std::clamp(want, 0, maxScroll);
     if (target == scrollLine) return;
     scrollLine = target;
     requestUpdate();
   };
+  auto scrollBy = [&scrollTo, this](const int delta) { scrollTo(scrollLine + delta); };
+  // A screenful is whatever fits, which depends on the headlines on it.
+  auto pageForward = [&scrollTo, this] { scrollTo(scrollLine + linesFrom(static_cast<size_t>(scrollLine))); };
+  auto pageBack = [&scrollTo, this] { scrollTo(static_cast<int>(pageStartBefore(static_cast<size_t>(scrollLine)))); };
 
   // A wall of prose has no rows to step through, so BOTH pairs page: the front
   // pair by three lines (a nudge, for the last line half off the bottom) and
@@ -193,20 +225,20 @@ void BookNotesActivity::loop() {
   // else in this firmware.
   const auto swipe = mappedInput.wasSwipe();
   if (swipe == MappedInputManager::SwipeDir::Up) {
-    scrollBy(perPage);
+    pageForward();
     return;
   }
   if (swipe == MappedInputManager::SwipeDir::Down) {
-    scrollBy(-perPage);
+    pageBack();
     return;
   }
 
   buttonNavigator.onNextRelease([&scrollBy] { scrollBy(3); });
   buttonNavigator.onPreviousRelease([&scrollBy] { scrollBy(-3); });
-  buttonNavigator.onNextContinuous([&scrollBy, perPage] { scrollBy(perPage); });
-  buttonNavigator.onPreviousContinuous([&scrollBy, perPage] { scrollBy(-perPage); });
-  buttonNavigator.onPageNext([&scrollBy, perPage] { scrollBy(perPage); });
-  buttonNavigator.onPagePrevious([&scrollBy, perPage] { scrollBy(-perPage); });
+  buttonNavigator.onNextContinuous([&pageForward] { pageForward(); });
+  buttonNavigator.onPreviousContinuous([&pageBack] { pageBack(); });
+  buttonNavigator.onPageNext([&pageForward] { pageForward(); });
+  buttonNavigator.onPagePrevious([&pageBack] { pageBack(); });
 }
 
 void BookNotesActivity::render(RenderLock&&) {

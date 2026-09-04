@@ -118,6 +118,7 @@ void BmpViewerActivity::onEnter() {
       // Single pass for non-grayscale images
 
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+      imageValid = true;
 
     } else {
       // Handle file parsing error
@@ -250,18 +251,24 @@ void BmpViewerActivity::loop() {
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    doSetSleepCover();
+    // Only a file that decoded: the error screens draw a Back hint alone,
+    // and copying an unreadable file over /sleep.bmp lost a working cover
+    // (second-pass audit, 2026-09-04).
+    if (imageValid) doSetSleepCover();
     return;
   }
 
+  // The side pair steps siblings as PagePrevious/PageNext, honoring
+  // sideButtonLayout like every other paging surface; raw Up/Down stepped
+  // the gallery backward under a swapped layout (audit F11's class).
   if (mappedInput.wasReleased(MappedInputManager::Button::Left) ||
-      mappedInput.wasReleased(MappedInputManager::Button::Up)) {
+      mappedInput.wasReleased(MappedInputManager::Button::PagePrevious)) {
     openSibling(-1);
     return;
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Right) ||
-      mappedInput.wasReleased(MappedInputManager::Button::Down)) {
+      mappedInput.wasReleased(MappedInputManager::Button::PageNext)) {
     openSibling(1);
     return;
   }
