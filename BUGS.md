@@ -96,103 +96,119 @@ now proves the result) and replace the asset. Until then 1.5.16-BD is the
 newest release a device will accept, and it carries the stale descriptor of
 B-033.
 
-### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
-**severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
+### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
+**severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
 
-Found while reading the card's crash reports for the OTA work, not reported —
-so nobody has said how often it happens, and that is the first thing to
-establish.
+Tags `1.5.3`, `1.5.4`, `1.5.5` and `1.5.6` exist locally with no releases on this
+fork — they are upstream's, arriving through the `upstream` remote. The fork is
+at **1.5.2** and numbers upward, so its next minor lands on a tag that already
+means something else.
 
+Nothing is broken yet, and that is exactly why it is worth deciding now rather
+than during a release: `git tag 1.5.3` will simply fail, in the middle of a
+publish, on a machine where the fetch happened to have run.
+
+**Close by** choosing a namespace and writing it down — a prefix the fork owns
+(`bd/1.5.3`), or skipping to a range upstream will not reach. Either is fine;
+discovering the clash mid-release is not.
+
+## Closed 2026-08-28. The namespace was already chosen; only the writing-down
+## was missing.
+
+The predicted failure did not occur, and the fork is now at **1.5.16-BD** —
+fourteen releases past the point this entry expected `git tag` to fail
+mid-publish. Checked rather than assumed:
+
+* every fork release tag carries a **suffix**: `1.5.1-BNY`, `1.5.1-B2`, then
+  `1.5.2-BD` through `1.5.16-BD`, seventeen in all;
+* every BARE `1.5.N` tag is upstream's, authored by `0x1abin` and `Uri Tauber`;
+* `1.5.3` through `1.5.6` do exist locally, exactly as this entry warned — and
+  the fork tagged `1.5.3-BD` … `1.5.6-BD` straight past them without a clash.
+
+**So the suffix IS the namespace**, and it is the same suffix the version string
+already carries for the Settings corner and the OTA screen. It was not adopted
+as a tag policy; it just fell out of tagging with the full version string, which
+happens to include the fork marker. That is why this entry could be written at
+all — the practice was invisible because nobody had stated it.
+
+**The rule, stated:** *a fork release tag is its full version string, suffix
+included.* `1.5.17-BD`, never `1.5.17`. A bare `1.5.N` tag in this repo is
+upstream's and must not be created here. Nothing needs changing to comply —
+seventeen tags already do — and `[crosspoint] version` in `platformio.ini`
+carries the suffix, so a tag taken from it is correct by construction.
+
+No prefix scheme is needed. `bd/1.5.3` was one of the two options this entry
+offered and it would be a second, redundant namespace on top of the one already
+working.
+
+
+### [B-006] X4 running firmware carries an empty version stamp
+**severity: low · scope: device provisioning · found 2026-08-02**
+
+The X4 runs a build stamped `1.5.0-BNY-rc+` — empty suffix. `gh_release_rc`
+composes its version as `1.5.0-BNY-rc+${sysenv.CROSSPOINT_RC_HASH}`
+(`platformio.ini:186`), and the flash was run without that variable set. The
+code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
+feeds the OTA version comparison, and it makes the running build
+unidentifiable after the fact.
+
+**Root cause fixed and verified 2026-08-08.** `platformio.ini` no longer
+interpolates `${sysenv.CROSSPOINT_RC_HASH}`; `scripts/git_branch.py` owns the
+version and, with the variable unset, warns loudly and stamps `-rc+unset`.
+Confirmed by building `gh_release_rc` with the variable removed from the
+environment: the binary contains `1.5.0-BNY-rc+unset`, so the empty suffix that
+produced this entry cannot recur.
+
+**Now staged:** both cards carry `20260807T0709Z-crosspoint-e194ab7b.bin`, a
+`gh_release` build stamped `1.5.0-BNY` with no empty `+` suffix (confirmed by
+`strings` on the binary), so SD Firmware Update from the card will replace the
+badly-stamped firmware. Still OPEN because that is an on-device action nobody
+has performed yet.
+
+> **THE STAGED IMAGE IS NOW SIXTEEN VERSIONS STALE — checked 2026-08-28.**
+> The card mounted as `BUNNYFIELDS` carries
+> `20260817T2333Z-crosspoint-9aae0b3f.bin`, and `strings` on it reports
+> **`1.5.0-BNY`**. The fork is at **1.5.16-BD**.
+>
+> So following the "close by" instruction below TODAY would fix the stamp and
+> **downgrade the device to August firmware** — losing every fix since,
+> including the untrusted-input memory-safety work (B-023, B-024), the bare-`new`
+> sweep (B-031, B-032) and everything shipped this week.
+>
+> **The close action has therefore changed**: build a CURRENT `gh_release`
+> image with `CROSSPOINT_RC_HASH` set, stage that, and update from it. Do not
+> flash the image currently on the card.
+>
+> **STAGED 2026-08-28.** `20260828T2010Z-crosspoint-fbd3129d.bin` is now on the
+> card beside the old one, built from `gh_release` and verified in place:
+> descriptor version **1.5.16-BD** (the B-033 stamper ran), appended SHA256
+> valid, image magic `0xE9`.
+>
+> Copying it is not a flash — `SdFirmwareUpdateActivity` is a file picker, so
+> nothing is written to the device until it is chosen. That is why staging was
+> safe to do and the update itself is not mine to perform.
+>
+> **Pick the 2026-08-28 file, not the 2026-08-17 one.** The older image is still
+> there and still stamped `1.5.0-BNY`; it is left rather than deleted because
+> removing a firmware image from someone's card is a worse default than leaving
+> two and saying which is which.
+
+**Close by:** reflashing with the variable set, or SD Firmware Update from the
+card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
+so a same-code reflash is accepted):
+```bash
+CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
 ```
-CrossPoint version: 1.5.9-BD
-Panic reason: abort() was called at PC 0x421c764d on core 0
-[336467] [ERR] [SDCF] buildAdvanceTable: failed to allocate codepoint buffer (16384 bytes)
-   ... the same line 13 times, ~350 ms apart ...
-[276]  [INF] [HW] Using cached device type: X3
-```
 
-**What the shape says.** Thirteen consecutive failures to get 16 KB, then an
-`abort()`. So this is not one unlucky allocation — the heap was exhausted and
-stayed exhausted while the reader retried, which means the retry itself is part
-of the story: something asked, failed, and asked again without releasing
-whatever had filled the heap.
+> **2026-09-04: the bin staged 2026-08-28 does not flash.** It was built with
+> the stamper of B-033 and carries the stale checksum byte of [B-046]; the
+> device answers "Invalid firmware file". "Appended SHA256 valid" above was a
+> true statement about the wrong check. Stage a bin built after the B-046 fix
+> (its `release.sh` gate now proves the checksum) before performing this.
 
-The last two lines are from the REBOOT (`[276]`, a fresh millis), so the abort
-is the end of that boot's log, not a recovery.
+---
 
-**Where to look, in order.** `SdCardFont::buildAdvanceTable` and what holds
-memory across its retries; whether the failure path frees the partial table
-before the next attempt; and what else was live at the time — 16 KB is not a
-large ask, so the interesting question is what had already taken the heap. The
-X3 has ~400 KB and the surrounding code is written for that, so a single
-runaway consumer is more likely than genuine pressure.
-
-**Not reproduced.** No card state was captured beyond the report, and the log
-tail does not say which family or which book was open.
-
-#### What was changed, 2026-08-28
-
-`buildAdvanceTableRange` asked for the WORST CASE on every call: 4096
-codepoints is 16 KB, `new[]`-ed and freed per invocation. On a device with
-~400 KB the number that matters is not free heap but the largest CONTIGUOUS
-block, and a 16 KB request stops being satisfiable long after churn has broken
-the heap up — which is exactly the shape of thirteen consecutive failures with
-the device otherwise running.
-
-It now starts at **256 codepoints (1 KB)** and quadruples only when a scan
-actually fills the buffer, so the common call — a page of text needs a couple of
-hundred distinct codepoints — never asks for more than 1 KB. The scan restarts
-after a growth rather than resuming, because `collectUniqueCodepoints` dedupes
-and a rescan is therefore idempotent; at most two growths separate 256 from the
-cap.
-
-**A failed growth is no longer fatal.** The buffer already holds a full set of
-codepoints at that point, and `hitCap` already means "layout may be
-approximate" — an outcome this function has always been able to return and the
-reader has always survived. Only the first 1 KB allocation can still fail the
-call outright, and it is the one most likely to succeed.
-
-**This is a mitigation, not a diagnosis.** It removes the largest recurring
-contiguous request on the font path, which is the thing most likely to fail on
-a fragmented heap and the thing the log actually recorded. It does NOT explain
-what had already consumed the heap, and the `abort()` itself came from some
-OTHER allocation — a plain `new` failing under `-fno-exceptions` aborts, and
-the nothrow site here returns instead. So if the crash recurs, the next step is
-to find that allocation, not to shrink this one further.
-
-**Headless allocation audit, 2026-09-04 (narrows it, does not close it).** A
-bare-`new` audit of the font and render paths:
-
-- Every `new` in `lib/EpdFont/*.cpp` is `new (std::nothrow)` (18 sites), and
-  each is checked -- a failure returns nullptr / notdef, never aborts. The
-  abort is NOT the font path failing to guard its own allocations.
-- The glyph/render path (`lib/GfxRenderer/*.cpp`) has no plain throwing `new`
-  either; Bitmap, BitmapHelpers and the PNG chain all carry the nothrow +
-  check pattern with the `-fno-exceptions` reason in a comment.
-- What is left is the STL containers on the PARSE path -- `ParsedText`'s
-  `std::deque<std::string> words` and the per-word vectors
-  (`lib/Epub/Epub/ParsedText.h`), grown by `addWord`. These throw
-  `std::bad_alloc` on OOM, which `-fno-exceptions` turns into `abort()`. The
-  named field crash is exactly there ("bad_alloc in ParsedText::addWord",
-  `EpubReaderActivity.h`). The BACKGROUND build already gates on both a
-  free-heap floor and a max-alloc-block floor (`buildTickHeapGate`,
-  fragmentation-aware -- 32 KB free / 16 KB largest), but the FOREGROUND
-  render builds the page it needs REGARDLESS of that floor, so it is the one
-  path that can still reach a throwing parse allocation under pressure.
-
-So the residual is one of two things, and both need the device: decode the
-panic PC (0x421c764d) from the real backtrace to name the exact allocation,
-or rework the foreground parse path to fail gracefully instead of aborting --
-which means pre-flighting each parse allocation against `getMaxAllocHeap()`
-(the STL containers cannot be made nothrow without a custom allocator), and
-the thresholds are tuned against real device fragmentation numbers (the
-comment's "34.7 KB free but 11 KB largest block" is a measured device state,
-not a host one). The mitigation shipped (growable buffer + the background
-gate) stands; this audit rules out the two allocation classes it is NOT and
-points the next device session straight at the foreground parse path.
-
-577 tests pass, desktop canary green. Device-confirm only: nothing host-side
-reproduces a fragmented ESP32 heap.
+## FIXED
 
 ### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
 **severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
@@ -214,6 +230,8 @@ finding which committed artifact carries it (start by decompressing the
 generated HTML headers and grepping those), then regenerating it — or, if it is
 baked into a committed `.gz`, making the generator stamp it at build time so it
 cannot go stale again.
+
+Shipped in build-170 (2026-09-04). Moved out of OPEN under the silence-closes-a-shipped-fix ruling (owner 2026-09-04: "presume fixed, close them"). The stamp fix is byte-verified on a gh_release build; the first-OTA bootloader accept is presumed good unless re-raised.
 
 ## Closed 2026-08-28. Both halves of the lead were wrong.
 
@@ -468,123 +486,111 @@ Only the app descriptor — OTA metadata and the web UI's build line — is stal
 **2026-09-04 addendum.** The stamper's SHA256 step was right and not
 sufficient: the descriptor is also covered by the image's one-byte XOR
 checksum, which the stamper left stale, so every release it touched
-(1.5.17-BD..1.5.21-BD) failed validation on the device. Mechanism, proof and
-fix under [B-046]; the "first-OTA confirm owed" above cannot be collected
-until those assets are re-uploaded.
+(1.5.17-BD..1.5.21-BD) fails validation on the device. Mechanism, proof and
+fix under [B-046], which is the open item. This entry stays closed as ruled,
+but "the first-OTA bootloader accept is presumed good" above cannot hold for
+any image the stamper produced before that fix; it is collected by B-046.
 
-### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
-**severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
+### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
+**severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
 
-Tags `1.5.3`, `1.5.4`, `1.5.5` and `1.5.6` exist locally with no releases on this
-fork — they are upstream's, arriving through the `upstream` remote. The fork is
-at **1.5.2** and numbers upward, so its next minor lands on a tag that already
-means something else.
+Found while reading the card's crash reports for the OTA work, not reported —
+so nobody has said how often it happens, and that is the first thing to
+establish.
 
-Nothing is broken yet, and that is exactly why it is worth deciding now rather
-than during a release: `git tag 1.5.3` will simply fail, in the middle of a
-publish, on a machine where the fetch happened to have run.
-
-**Close by** choosing a namespace and writing it down — a prefix the fork owns
-(`bd/1.5.3`), or skipping to a range upstream will not reach. Either is fine;
-discovering the clash mid-release is not.
-
-## Closed 2026-08-28. The namespace was already chosen; only the writing-down
-## was missing.
-
-The predicted failure did not occur, and the fork is now at **1.5.16-BD** —
-fourteen releases past the point this entry expected `git tag` to fail
-mid-publish. Checked rather than assumed:
-
-* every fork release tag carries a **suffix**: `1.5.1-BNY`, `1.5.1-B2`, then
-  `1.5.2-BD` through `1.5.16-BD`, seventeen in all;
-* every BARE `1.5.N` tag is upstream's, authored by `0x1abin` and `Uri Tauber`;
-* `1.5.3` through `1.5.6` do exist locally, exactly as this entry warned — and
-  the fork tagged `1.5.3-BD` … `1.5.6-BD` straight past them without a clash.
-
-**So the suffix IS the namespace**, and it is the same suffix the version string
-already carries for the Settings corner and the OTA screen. It was not adopted
-as a tag policy; it just fell out of tagging with the full version string, which
-happens to include the fork marker. That is why this entry could be written at
-all — the practice was invisible because nobody had stated it.
-
-**The rule, stated:** *a fork release tag is its full version string, suffix
-included.* `1.5.17-BD`, never `1.5.17`. A bare `1.5.N` tag in this repo is
-upstream's and must not be created here. Nothing needs changing to comply —
-seventeen tags already do — and `[crosspoint] version` in `platformio.ini`
-carries the suffix, so a tag taken from it is correct by construction.
-
-No prefix scheme is needed. `bd/1.5.3` was one of the two options this entry
-offered and it would be a second, redundant namespace on top of the one already
-working.
-
-
-### [B-006] X4 running firmware carries an empty version stamp
-**severity: low · scope: device provisioning · found 2026-08-02**
-
-The X4 runs a build stamped `1.5.0-BNY-rc+` — empty suffix. `gh_release_rc`
-composes its version as `1.5.0-BNY-rc+${sysenv.CROSSPOINT_RC_HASH}`
-(`platformio.ini:186`), and the flash was run without that variable set. The
-code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
-feeds the OTA version comparison, and it makes the running build
-unidentifiable after the fact.
-
-**Root cause fixed and verified 2026-08-08.** `platformio.ini` no longer
-interpolates `${sysenv.CROSSPOINT_RC_HASH}`; `scripts/git_branch.py` owns the
-version and, with the variable unset, warns loudly and stamps `-rc+unset`.
-Confirmed by building `gh_release_rc` with the variable removed from the
-environment: the binary contains `1.5.0-BNY-rc+unset`, so the empty suffix that
-produced this entry cannot recur.
-
-**Now staged:** both cards carry `20260807T0709Z-crosspoint-e194ab7b.bin`, a
-`gh_release` build stamped `1.5.0-BNY` with no empty `+` suffix (confirmed by
-`strings` on the binary), so SD Firmware Update from the card will replace the
-badly-stamped firmware. Still OPEN because that is an on-device action nobody
-has performed yet.
-
-> **THE STAGED IMAGE IS NOW SIXTEEN VERSIONS STALE — checked 2026-08-28.**
-> The card mounted as `BUNNYFIELDS` carries
-> `20260817T2333Z-crosspoint-9aae0b3f.bin`, and `strings` on it reports
-> **`1.5.0-BNY`**. The fork is at **1.5.16-BD**.
->
-> So following the "close by" instruction below TODAY would fix the stamp and
-> **downgrade the device to August firmware** — losing every fix since,
-> including the untrusted-input memory-safety work (B-023, B-024), the bare-`new`
-> sweep (B-031, B-032) and everything shipped this week.
->
-> **The close action has therefore changed**: build a CURRENT `gh_release`
-> image with `CROSSPOINT_RC_HASH` set, stage that, and update from it. Do not
-> flash the image currently on the card.
->
-> **STAGED 2026-08-28.** `20260828T2010Z-crosspoint-fbd3129d.bin` is now on the
-> card beside the old one, built from `gh_release` and verified in place:
-> descriptor version **1.5.16-BD** (the B-033 stamper ran), appended SHA256
-> valid, image magic `0xE9`.
->
-> Copying it is not a flash — `SdFirmwareUpdateActivity` is a file picker, so
-> nothing is written to the device until it is chosen. That is why staging was
-> safe to do and the update itself is not mine to perform.
->
-> **Pick the 2026-08-28 file, not the 2026-08-17 one.** The older image is still
-> there and still stamped `1.5.0-BNY`; it is left rather than deleted because
-> removing a firmware image from someone's card is a worse default than leaving
-> two and saying which is which.
-
-**Close by:** reflashing with the variable set, or SD Firmware Update from the
-card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
-so a same-code reflash is accepted):
-```bash
-CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
+```
+CrossPoint version: 1.5.9-BD
+Panic reason: abort() was called at PC 0x421c764d on core 0
+[336467] [ERR] [SDCF] buildAdvanceTable: failed to allocate codepoint buffer (16384 bytes)
+   ... the same line 13 times, ~350 ms apart ...
+[276]  [INF] [HW] Using cached device type: X3
 ```
 
-> **2026-09-04: the bin staged 2026-08-28 does not flash.** It was built with
-> the stamper of B-033 and carries the stale checksum byte of [B-046]; the
-> device answers "Invalid firmware file". "Appended SHA256 valid" above was a
-> true statement about the wrong check. Stage a bin built after the B-046 fix
-> (its `release.sh` gate now proves the checksum) before performing this.
+**What the shape says.** Thirteen consecutive failures to get 16 KB, then an
+`abort()`. So this is not one unlucky allocation — the heap was exhausted and
+stayed exhausted while the reader retried, which means the retry itself is part
+of the story: something asked, failed, and asked again without releasing
+whatever had filled the heap.
 
----
+The last two lines are from the REBOOT (`[276]`, a fresh millis), so the abort
+is the end of that boot's log, not a recovery.
 
-## FIXED
+**Where to look, in order.** `SdCardFont::buildAdvanceTable` and what holds
+memory across its retries; whether the failure path frees the partial table
+before the next attempt; and what else was live at the time — 16 KB is not a
+large ask, so the interesting question is what had already taken the heap. The
+X3 has ~400 KB and the surrounding code is written for that, so a single
+runaway consumer is more likely than genuine pressure.
+
+**Not reproduced.** No card state was captured beyond the report, and the log
+tail does not say which family or which book was open.
+
+#### What was changed, 2026-08-28
+
+`buildAdvanceTableRange` asked for the WORST CASE on every call: 4096
+codepoints is 16 KB, `new[]`-ed and freed per invocation. On a device with
+~400 KB the number that matters is not free heap but the largest CONTIGUOUS
+block, and a 16 KB request stops being satisfiable long after churn has broken
+the heap up — which is exactly the shape of thirteen consecutive failures with
+the device otherwise running.
+
+It now starts at **256 codepoints (1 KB)** and quadruples only when a scan
+actually fills the buffer, so the common call — a page of text needs a couple of
+hundred distinct codepoints — never asks for more than 1 KB. The scan restarts
+after a growth rather than resuming, because `collectUniqueCodepoints` dedupes
+and a rescan is therefore idempotent; at most two growths separate 256 from the
+cap.
+
+**A failed growth is no longer fatal.** The buffer already holds a full set of
+codepoints at that point, and `hitCap` already means "layout may be
+approximate" — an outcome this function has always been able to return and the
+reader has always survived. Only the first 1 KB allocation can still fail the
+call outright, and it is the one most likely to succeed.
+
+**This is a mitigation, not a diagnosis.** It removes the largest recurring
+contiguous request on the font path, which is the thing most likely to fail on
+a fragmented heap and the thing the log actually recorded. It does NOT explain
+what had already consumed the heap, and the `abort()` itself came from some
+OTHER allocation — a plain `new` failing under `-fno-exceptions` aborts, and
+the nothrow site here returns instead. So if the crash recurs, the next step is
+to find that allocation, not to shrink this one further.
+
+**Headless allocation audit, 2026-09-04 (narrows it, does not close it).** A
+bare-`new` audit of the font and render paths:
+
+- Every `new` in `lib/EpdFont/*.cpp` is `new (std::nothrow)` (18 sites), and
+  each is checked -- a failure returns nullptr / notdef, never aborts. The
+  abort is NOT the font path failing to guard its own allocations.
+- The glyph/render path (`lib/GfxRenderer/*.cpp`) has no plain throwing `new`
+  either; Bitmap, BitmapHelpers and the PNG chain all carry the nothrow +
+  check pattern with the `-fno-exceptions` reason in a comment.
+- What is left is the STL containers on the PARSE path -- `ParsedText`'s
+  `std::deque<std::string> words` and the per-word vectors
+  (`lib/Epub/Epub/ParsedText.h`), grown by `addWord`. These throw
+  `std::bad_alloc` on OOM, which `-fno-exceptions` turns into `abort()`. The
+  named field crash is exactly there ("bad_alloc in ParsedText::addWord",
+  `EpubReaderActivity.h`). The BACKGROUND build already gates on both a
+  free-heap floor and a max-alloc-block floor (`buildTickHeapGate`,
+  fragmentation-aware -- 32 KB free / 16 KB largest), but the FOREGROUND
+  render builds the page it needs REGARDLESS of that floor, so it is the one
+  path that can still reach a throwing parse allocation under pressure.
+
+So the residual is one of two things, and both need the device: decode the
+panic PC (0x421c764d) from the real backtrace to name the exact allocation,
+or rework the foreground parse path to fail gracefully instead of aborting --
+which means pre-flighting each parse allocation against `getMaxAllocHeap()`
+(the STL containers cannot be made nothrow without a custom allocator), and
+the thresholds are tuned against real device fragmentation numbers (the
+comment's "34.7 KB free but 11 KB largest block" is a measured device state,
+not a host one). The mitigation shipped (growable buffer + the background
+gate) stands; this audit rules out the two allocation classes it is NOT and
+points the next device session straight at the foreground parse path.
+
+577 tests pass, desktop canary green. Device-confirm only: nothing host-side
+reproduces a fragmented ESP32 heap.
+
+Shipped in build-170 (2026-09-04, `1e2b193`). Moved out of OPEN under the owner's 2026-09-02 ruling that silence closes a shipped fix (owner reaffirmed 2026-09-04: "presume fixed, close them"). The mitigation (growable buffer + background heap gate) and the 2026-09-04 allocation audit stand; if a large book still aborts on the phone the owner re-raises and this reopens on the foreground parse-path lead the audit named.
+
 
 ### [B-045] A crafted card font reads ~16 KB past a 1-byte glyph buffer (heap overflow)
 **severity: high (memory safety, remote-reachable) · scope: SD font loading + glyph decode · found 2026-09-04 by a crafted-input hunt (ASan), reproduced and FIXED the same day**

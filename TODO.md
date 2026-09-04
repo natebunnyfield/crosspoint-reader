@@ -60,43 +60,7 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
-### [T-017] Light sleep (#2525) is on main and unconfirmed on device
-**scope: verification · opened 2026-08-15**
-
-`dfe44fb15` (the merge) and `816011c42` (the perf commit) carry upstream #2525
-— light-sleep between input polls when idle, a two-stage idle backoff
-(downclock at 500 ms, sleep at 1 s, replacing the flat 3 s window), and a CPU
-downclock during the e-ink BUSY wait. Both are confirmed ancestors of `main`
-(`git merge-base --is-ancestor`). Upstream measured it on an X3 with a Nordic
-PPK2: idle 9.68 mA → 2.78 mA, session average ~11.6 → ~3.6 mA, which is the
-~3.2x active-reading-time figure.
-
-**Corrected 2026-08-29: the hash this entry originally cited, `ade9dac91`, was
-wrong.** `git log -1` shows it is `docs(todo): T-009, side buttons drawn on the
-UI` — an unrelated docs commit. Both this entry and [T-018] were authored
-together in `ae3eaaf0e`, and `ade9dac91` was simply `main`'s tip on the day that
-commit was written — [T-018] uses it correctly, as the snapshot the SDK-pin
-gitlink was checked against, but this entry copy-pasted the same hash to name
-the feature commit itself, which it never was. If this correction is ever
-reverted, that is why the wrong hash keeps coming back.
-
-**None of that is confirmed here.** Host evidence only: five environments build
-from a cold cache (`default` RAM 16.5%, Flash 64.4%), ASAN clean, and a headless
-session boots, opens a book, idles past both thresholds and turns pages. Power
-and felt timing cannot be observed off-device at all.
-
-Its stated dependency on freeink-sdk PR#8 is already satisfied —
-`setBusyWaitSliceHook` exists in the pinned SDK (`FreeInkDisplay.h:260`), so no
-submodule bump is owed.
-
-**What to watch on device:** input latency after the device has been idle;
-whether page turns still feel immediate; and that USB serial still works while
-connected, since light sleep is deliberately suppressed on USB (it kills the CDC
-link).
-
-**Done looks like:** confirmed on an X3 or X4, or a reported regression with
-enough detail to trace. Separate from [T-008], which covers the 2026-08-06
-backlog; this is one named commit.
+## Finished
 
 ### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
 **scope: verification · opened 2026-08-07**
@@ -196,7 +160,49 @@ the cheap version and needs no keychain.
 
 ---
 
-## Finished
+Shipped in build-170 (2026-09-04). Closed under the silence-closes-a-shipped-fix ruling (owner 2026-09-04: "presume fixed, close them").
+
+
+### [T-017] Light sleep (#2525) is on main and unconfirmed on device
+**scope: verification · opened 2026-08-15**
+
+`dfe44fb15` (the merge) and `816011c42` (the perf commit) carry upstream #2525
+— light-sleep between input polls when idle, a two-stage idle backoff
+(downclock at 500 ms, sleep at 1 s, replacing the flat 3 s window), and a CPU
+downclock during the e-ink BUSY wait. Both are confirmed ancestors of `main`
+(`git merge-base --is-ancestor`). Upstream measured it on an X3 with a Nordic
+PPK2: idle 9.68 mA → 2.78 mA, session average ~11.6 → ~3.6 mA, which is the
+~3.2x active-reading-time figure.
+
+**Corrected 2026-08-29: the hash this entry originally cited, `ade9dac91`, was
+wrong.** `git log -1` shows it is `docs(todo): T-009, side buttons drawn on the
+UI` — an unrelated docs commit. Both this entry and [T-018] were authored
+together in `ae3eaaf0e`, and `ade9dac91` was simply `main`'s tip on the day that
+commit was written — [T-018] uses it correctly, as the snapshot the SDK-pin
+gitlink was checked against, but this entry copy-pasted the same hash to name
+the feature commit itself, which it never was. If this correction is ever
+reverted, that is why the wrong hash keeps coming back.
+
+**None of that is confirmed here.** Host evidence only: five environments build
+from a cold cache (`default` RAM 16.5%, Flash 64.4%), ASAN clean, and a headless
+session boots, opens a book, idles past both thresholds and turns pages. Power
+and felt timing cannot be observed off-device at all.
+
+Its stated dependency on freeink-sdk PR#8 is already satisfied —
+`setBusyWaitSliceHook` exists in the pinned SDK (`FreeInkDisplay.h:260`), so no
+submodule bump is owed.
+
+**What to watch on device:** input latency after the device has been idle;
+whether page turns still feel immediate; and that USB serial still works while
+connected, since light sleep is deliberately suppressed on USB (it kills the CDC
+link).
+
+**Done looks like:** confirmed on an X3 or X4, or a reported regression with
+enough detail to trace. Separate from [T-008], which covers the 2026-08-06
+backlog; this is one named commit.
+
+Shipped in build-170 (2026-09-04). Closed under the silence-closes-a-shipped-fix ruling (owner 2026-09-04: "presume fixed, close them").
+
 
 ### [T-027] Rewrite hold-for-action to fit the gesture model — CLOSED AS DONE 2026-09-03
 **scope: firmware input + ios gestures · asked 2026-08-28 · RESCOPED 2026-08-29 · RULED CLOSED 2026-09-03**
