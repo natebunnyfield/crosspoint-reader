@@ -96,20 +96,13 @@ int BookNotesActivity::linesFrom(const size_t start) const {
 }
 
 size_t BookNotesActivity::pageStartBefore(const size_t end) const {
-  const int lineHeight = std::max(1, renderer.getLineHeight(UI_10_FONT_ID));
-  const int contentHeight = contentHeightPx();
-  // Walking back, a line's gap is charged whether or not it ends up first on
-  // the page: an overestimate, so the page found always fits when drawn.
-  int y = 0;
-  size_t i = end;
-  while (i > 0) {
-    const size_t k = i - 1;
-    const int h = lineHeight + (lines[k].gapBefore ? lineHeight / 2 : 0);
-    if (y + h > contentHeight) break;
-    y += h;
-    i = k;
-  }
-  return i;
+  // The furthest-back start from which render() still reaches line end-1,
+  // asked of linesFrom() itself so the two can never disagree: a walk that
+  // charged every gap put a headline that topped the page one line off it
+  // on the way back (review 2026-09-04, modeled at 8.7% of pages).
+  size_t start = end;
+  while (start > 0 && (start - 1) + static_cast<size_t>(linesFrom(start - 1)) >= end) start--;
+  return start;
 }
 
 void BookNotesActivity::buildLines() {

@@ -60,6 +60,9 @@ void BmpViewerActivity::loadSiblingImages() {
 
 void BmpViewerActivity::onEnter() {
   Activity::onEnter();
+  // Per file: openSibling() re-enters with a new path, and a bad sibling
+  // after a good one must not inherit the good one's gate (review 2026-09-04).
+  imageValid = false;
 
   if (siblingImages.empty() && !filePath.empty()) {
     loadSiblingImages();

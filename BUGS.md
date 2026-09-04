@@ -34,6 +34,21 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-044] WebSocket `START` accepts an absurd size and writes until the peer disconnects
+**severity: low (latent) · scope: `src/network/CrossPointWebServer.cpp` WS upload · found 2026-09-04 by the simulator's network-surface hunt (`crosspoint-simulator/docs/network-surface-hunt-2026-09-04.md`, finding 10)**
+
+`START:name:<size>:/books` parses the size with `toInt()`, which saturates at
+`LONG_MAX`, so `START:hugesize.txt:99999999999999999999999:/books` answers
+`READY` and the upload can never complete: the handler writes every BIN
+frame to the card until the peer disconnects, at which point the partial is
+removed. No data loss, no crash — a peer can fill the card for as long as it
+stays connected, which the 256 MB overflow guard on a single frame does not
+prevent across frames. Fix shape: refuse a size above the card's free space
+(or a fixed ceiling) at `START`. Found alongside the case-only MOVE data
+loss, which WAS fixed the same day (`handleMove`, `strcasecmp` → rename
+through a temporary name).
+
+
 **Relocated here 2026-08-30, content otherwise unchanged except for heading
 level.** `[B-041]` and `[B-040]` used to sit far down this file, past the point
 where `scripts/tracker-check.sh` stops counting open items — its `open_ids()`

@@ -7,6 +7,7 @@
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <strings.h>
 
 #include <memory>
 #include <new>
@@ -547,7 +548,13 @@ void WebDAVHandler::handleMove(WebServer& s) {
     }
   }
 
-  bool dstExists = Storage.exists(dstPath.c_str());
+  // A case-only rename (Case.txt -> case.txt): on a case-insensitive
+  // filesystem -- the card's FAT, a Mac's APFS -- the destination "exists"
+  // because it IS the source, and the overwrite below removed it, then failed
+  // to open it: 500, source gone (network hunt 2026-09-04). Renamed through
+  // a temporary name instead, and never treated as an overwrite.
+  const bool caseOnly = strcasecmp(srcPath.c_str(), dstPath.c_str()) == 0;
+  bool dstExists = !caseOnly && Storage.exists(dstPath.c_str());
   if (dstExists && !overwrite) {
     s.send(412, "text/plain", "Destination exists and Overwrite is F");
     return;
@@ -557,15 +564,21 @@ void WebDAVHandler::handleMove(WebServer& s) {
     Storage.remove(dstPath.c_str());
   }
 
-  HalFile file = Storage.open(srcPath.c_str());
-  if (!file) {
-    s.send(500, "text/plain", "Failed to open source");
-    return;
-  }
-
   clearBookCache(srcPath.c_str());
-  bool success = file.rename(dstPath.c_str());
-  file.close();
+  bool success = false;
+  if (caseOnly) {
+    const String tmpPath = dstPath + ".casemove";
+    if (Storage.exists(tmpPath.c_str())) Storage.remove(tmpPath.c_str());
+    success = Storage.rename(srcPath.c_str(), tmpPath.c_str()) && Storage.rename(tmpPath.c_str(), dstPath.c_str());
+  } else {
+    HalFile file = Storage.open(srcPath.c_str());
+    if (!file) {
+      s.send(500, "text/plain", "Failed to open source");
+      return;
+    }
+    success = file.rename(dstPath.c_str());
+    file.close();
+  }
 
   if (success) {
     s.send(dstExists ? 204 : 201);

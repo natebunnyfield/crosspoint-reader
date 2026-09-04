@@ -118,3 +118,31 @@ boundary questions; `PageNext` under `SIDE_BUTTONS_DISABLED`; the compare
 stage's `i/N` reading; the result lambda runs before the manager's next
 `loop()`; `__LINUX__` reaches nothing but JPEGDEC; `ChrInfo` has one
 aggregate init and only named reads.
+
+## Third pass, same day — over the seven-fix batch (`fc077e634`)
+
+Two survived, both fixed in the commit that adds this section:
+
+1. **`BmpViewerActivity::imageValid` was never cleared**, so the "Invalid
+   BMP" gate held only for the file the viewer opened on: step to a bad
+   sibling and Confirm still copied it over `/sleep.bmp` — the exact failure
+   the batch claimed closed. Reset at the top of `onEnter()`, which
+   `openSibling()` re-enters.
+2. **Book Notes paged back one line short of a headline** that topped the
+   page (modeled: 8.7% of pages): the backward walk charged every gap where
+   `render()` skips the first line's. `pageStartBefore` now asks
+   `linesFrom()` itself for the furthest-back start that still reaches the
+   line, so the two cannot disagree.
+
+CLEAN: `linesFrom` matches `render()` line for line; no line unreachable
+from `maxScroll` (asserted over 20,000 random documents); empty `lines`
+safe; the ±3 nudge cannot strand; ButtonNavigator invokes its callbacks
+synchronously; the DONE frame's counters initialize to 0 and
+`requestUpdate()` under the render lock is the pattern its neighbors use;
+`wasReleased(PageNext)` maps through `sideButtonLayout`; no side hold in the
+viewer; Back during CONNECTING leaves the link exactly as the pre-existing
+dismiss path did; the braced `labels` block; `-1` on the clock list is exact
+on both panels (631/40 vs 575/40, 639/40 vs 583/40); `cp::renderScale()`
+visible and used only in runtime arithmetic. Noted, pre-existing: a headline
+advances by the UI_10 line height while drawing in UI_12; the clock list's
+touch hit-test still uses the un-reserved height (touch boards).
