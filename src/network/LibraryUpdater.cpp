@@ -588,8 +588,7 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
   // large epub) the bar showed the PREVIOUS book's final 100%, one book
   // ahead of the truth, then fell back when the download started. A two-book
   // sync read 50 -> 100 -> 50 -> 100 (adversarial review 2026-09-04).
-  processedSize = 0;
-  totalSize = 0;
+  resetBookProgress();
 
   loadSyncRecords();
 

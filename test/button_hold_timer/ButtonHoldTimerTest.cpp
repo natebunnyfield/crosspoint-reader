@@ -76,6 +76,29 @@ TEST(ButtonHoldTimer, ALevelWithNoPressEdgeAfterAnEarlierPressReadsZero) {
   EXPECT_EQ(t.heldMs(1, 9050), 0u);
 }
 
+TEST(ButtonHoldTimer, AReleaseAndARepressInOneFrameArmTheNewPress) {
+  // A host can deliver KEY_UP and KEY_DOWN for one button inside one pump.
+  // The release must spend the OLD press and the re-press must start the new
+  // one, or every hold on that press is dead (review 2026-09-04, second pass).
+  buttonhold::Timer t;
+  t.frame(1000, bit(1), 0, bit(1));
+  t.frame(1400, bit(1), bit(1), bit(1));  // release + re-press, level down
+  EXPECT_EQ(t.heldMs(1, 1400), 400u) << "the release frame reports the finished first press";
+  t.frame(1500, 0, 0, bit(1));
+  EXPECT_EQ(t.heldMs(1, 1500), 100u) << "the re-press is dead";
+  t.frame(2000, 0, 0, bit(1));
+  EXPECT_EQ(t.heldMs(1, 2000), 600u);
+}
+
+TEST(ButtonHoldTimer, ASynthesizedClickStillReadsZero) {
+  // Sticky's ConfirmPowerHold emits press+release with the level already up.
+  buttonhold::Timer t;
+  t.frame(1000, bit(1), bit(1), 0);
+  EXPECT_EQ(t.heldMs(1, 1000), 0u);
+  t.frame(1050, 0, 0, 0);
+  EXPECT_EQ(t.heldMs(1, 1050), 0u);
+}
+
 TEST(ButtonHoldTimer, NotInPlayReadsZero) {
   buttonhold::Timer t;
   EXPECT_EQ(t.heldMs(kConfirm, 12345), 0u) << "never pressed";

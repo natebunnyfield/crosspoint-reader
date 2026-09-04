@@ -96,6 +96,15 @@ class LibraryUpdater {
 
   size_t getProcessedSize() const { return processedSize; }
   size_t getTotalSize() const { return totalSize; }
+  // Zero the per-book counters. syncBook() does this first thing, but the
+  // activity repaints the whole-sync bar the moment it moves currentBook on,
+  // BEFORE syncBook runs -- so it calls this under its render lock first, or
+  // a tick between the two paints the previous book's 100% (review
+  // 2026-09-04, second pass).
+  void resetBookProgress() {
+    processedSize = 0;
+    totalSize = 0;
+  }
 
   // Write the ledger if a syncBook() changed it. Call once when the run ends.
   // Deliberately NOT written per book: the first run touches every entry, and a

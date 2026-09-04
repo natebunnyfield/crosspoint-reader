@@ -79,3 +79,42 @@ unchanged. Pinned by `ALevelWithNoPressEdgeAfterAnEarlierPressReadsZero`.
   a byte-identical duplicate; `dnsOk` scope move sound; Colophon `span > 0`
   guaranteed; the `const&`, algorithm rewrites, typed references and the
   Wi-Fi timeout unification preserve semantics.
+
+## Sanitizers, same day — CLEAN
+
+The whole host suite (`test/`, 623 cases after the day's additions) built
+and run under `-fsanitize=address,undefined` (Debug, `detect_leaks=0`):
+100% passed, no AddressSanitizer report, no UBSan `runtime error` line. A
+negative result, recorded so the next pass does not pay for it again; the
+2026-08-23 review's memory-safety find came from exactly this kind of run.
+Note the build needs `-j4` on this Mac — an unbounded `-j` across the ~65
+test targets exhausts the process table (`posix_spawn failed`).
+
+## Second pass, same day — over the fixes above
+
+A second read-only reviewer over `df3598872`, `222e3f4f1`, `8678d7c78`,
+`e484edb75`. Three survived; all fixed in the commit that adds this section.
+
+1. **`ButtonHoldTimer`: a release and a re-press of one button in ONE frame
+   left the new press dead** (latent, host-only — a device's edges are level
+   diffs and cannot produce the shape; a KEY_UP/KEY_DOWN inside one pump or two
+   queued QTAPs can). `frame()` processed the press first, then the release
+   cleared `started`. Order swapped: release spends the old press, then the
+   press arms the new one. Two new cases pin it, including the Sticky
+   synthesized click still reading 0.
+2. **The sync-bar counter reset was not ordered before the repaint it feeds**
+   (latent, ~0.1% per book): the activity notified the render task and THEN
+   `syncBook` zeroed the counters a few stores later. `resetBookProgress()` is
+   now called under the activity's render lock before the notify, and
+   `syncBook` still calls it first.
+3. **Pre-existing: `cursorPos` could exceed the text** in a password field —
+   a Confirm hold on DEL is not gated on cursor mode, so the restore on Left's
+   release could put a saved position past a cleared string. Clamped.
+
+CLEAN: every asked walk of the timer (synthesized click, boot-time release
+with no press, release-driven sites, touch override untouched); the cursor
+repeat's toggle-position, password, early-return, ButtonNavigator and
+boundary questions; `PageNext` under `SIDE_BUTTONS_DISABLED`; the compare
+stage's `i/N` reading; the result lambda runs before the manager's next
+`loop()`; `__LINUX__` reaches nothing but JPEGDEC; `ChrInfo` has one
+aggregate init and only named reads.

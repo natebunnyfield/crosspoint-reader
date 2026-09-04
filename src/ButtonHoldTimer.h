@@ -47,10 +47,6 @@ struct Timer {
     for (uint8_t i = 0; i < kButtons; ++i) {
       const bool bit = ((pressEdges >> i) & 1u) != 0;
       const bool rel = ((releaseEdges >> i) & 1u) != 0;
-      if (bit) {
-        pressStartMs[i] = nowMs;
-        started[i] = true;
-      }
       // Its own press's length, kept for exactly the frame the release edge is
       // visible: the release-driven hold checks (FileBrowserActivity's delete,
       // FileManagerActivity's action-menu stall catch) read it there, where
@@ -66,6 +62,16 @@ struct Timer {
         // together with this timer) read now minus the PREVIOUS press's
         // stamp. Adversarial review 2026-09-04, latent.
         started[i] = false;
+      }
+      // The press AFTER the release, so a release and a re-press of the same
+      // button in one frame (a host can: a KEY_UP and KEY_DOWN inside one
+      // ~10 ms pump, two queued QTAPs on one button) leaves the NEW press
+      // armed rather than dead for its whole hold. The device cannot produce
+      // that shape -- its edges are level diffs -- and its synthesized click
+      // (press+release, level 0) still reads 0 below.
+      if (bit) {
+        pressStartMs[i] = nowMs;
+        started[i] = true;
       }
       down[i] = ((levels >> i) & 1u) != 0;
     }

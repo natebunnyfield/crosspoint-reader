@@ -137,6 +137,7 @@ void LibraryUpdateActivity::runSync() {
       RenderLock lock(*this);
       currentBook = i;
       lastRenderedPercent = 101;
+      updater.resetBookProgress();  // before the repaint below can read them
     }
     requestUpdate(true);
     switch (updater.syncBook(i, progressCb, this)) {

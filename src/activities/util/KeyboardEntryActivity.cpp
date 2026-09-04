@@ -739,7 +739,9 @@ void KeyboardEntryActivity::loop() {
   if (cursorMode) {
     if (togglePos) {
       if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
-        cursorPos = savedCursorPos;
+        // Clamped: a Confirm hold on DEL is not gated on cursor mode, so the
+        // text can have been cleared under a saved position past its end.
+        cursorPos = savedCursorPos < text.length() ? savedCursorPos : text.length();
         togglePos = false;
         requestUpdate();
       }
