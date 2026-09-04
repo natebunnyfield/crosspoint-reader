@@ -1642,7 +1642,22 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
             wsServer->sendTXT(num, "ERROR:Invalid START format");
             return;
           }
-          wsUploadSize = sizeToken.toInt();
+          // toInt() saturates at LONG_MAX, so a START naming an absurd size
+          // (99999999999999999999999) opened an upload that could never
+          // complete and blocked every other START until the peer disconnected
+          // (B-044). A single WS upload is one book or font; cap it well above
+          // any real file so a bogus size is refused rather than parked.
+          // The token is already all-digits (checked above), so 0 is the
+          // legitimate zero-byte upload and negatives cannot occur; only the
+          // upper bound matters -- toInt() saturates at LONG_MAX.
+          constexpr long kMaxWsUploadBytes = 512L * 1024 * 1024;
+          const long parsedSize = sizeToken.toInt();
+          if (parsedSize > kMaxWsUploadBytes) {
+            LOG_DBG("WS", "START rejected: size %ld exceeds %ld", parsedSize, kMaxWsUploadBytes);
+            wsServer->sendTXT(num, "ERROR:Invalid START format");
+            return;
+          }
+          wsUploadSize = static_cast<size_t>(parsedSize);
           wsUploadPath = msg.substring(secondColon + 1);
           wsUploadReceived = 0;
           wsLastProgressSent = 0;

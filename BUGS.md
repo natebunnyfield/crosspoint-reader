@@ -34,6 +34,452 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
+**severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
+
+Found while reading the card's crash reports for the OTA work, not reported —
+so nobody has said how often it happens, and that is the first thing to
+establish.
+
+```
+CrossPoint version: 1.5.9-BD
+Panic reason: abort() was called at PC 0x421c764d on core 0
+[336467] [ERR] [SDCF] buildAdvanceTable: failed to allocate codepoint buffer (16384 bytes)
+   ... the same line 13 times, ~350 ms apart ...
+[276]  [INF] [HW] Using cached device type: X3
+```
+
+**What the shape says.** Thirteen consecutive failures to get 16 KB, then an
+`abort()`. So this is not one unlucky allocation — the heap was exhausted and
+stayed exhausted while the reader retried, which means the retry itself is part
+of the story: something asked, failed, and asked again without releasing
+whatever had filled the heap.
+
+The last two lines are from the REBOOT (`[276]`, a fresh millis), so the abort
+is the end of that boot's log, not a recovery.
+
+**Where to look, in order.** `SdCardFont::buildAdvanceTable` and what holds
+memory across its retries; whether the failure path frees the partial table
+before the next attempt; and what else was live at the time — 16 KB is not a
+large ask, so the interesting question is what had already taken the heap. The
+X3 has ~400 KB and the surrounding code is written for that, so a single
+runaway consumer is more likely than genuine pressure.
+
+**Not reproduced.** No card state was captured beyond the report, and the log
+tail does not say which family or which book was open.
+
+#### What was changed, 2026-08-28
+
+`buildAdvanceTableRange` asked for the WORST CASE on every call: 4096
+codepoints is 16 KB, `new[]`-ed and freed per invocation. On a device with
+~400 KB the number that matters is not free heap but the largest CONTIGUOUS
+block, and a 16 KB request stops being satisfiable long after churn has broken
+the heap up — which is exactly the shape of thirteen consecutive failures with
+the device otherwise running.
+
+It now starts at **256 codepoints (1 KB)** and quadruples only when a scan
+actually fills the buffer, so the common call — a page of text needs a couple of
+hundred distinct codepoints — never asks for more than 1 KB. The scan restarts
+after a growth rather than resuming, because `collectUniqueCodepoints` dedupes
+and a rescan is therefore idempotent; at most two growths separate 256 from the
+cap.
+
+**A failed growth is no longer fatal.** The buffer already holds a full set of
+codepoints at that point, and `hitCap` already means "layout may be
+approximate" — an outcome this function has always been able to return and the
+reader has always survived. Only the first 1 KB allocation can still fail the
+call outright, and it is the one most likely to succeed.
+
+**This is a mitigation, not a diagnosis.** It removes the largest recurring
+contiguous request on the font path, which is the thing most likely to fail on
+a fragmented heap and the thing the log actually recorded. It does NOT explain
+what had already consumed the heap, and the `abort()` itself came from some
+OTHER allocation — a plain `new` failing under `-fno-exceptions` aborts, and
+the nothrow site here returns instead. So if the crash recurs, the next step is
+to find that allocation, not to shrink this one further.
+
+577 tests pass, desktop canary green. Device-confirm only: nothing host-side
+reproduces a fragmented ESP32 heap.
+
+### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
+**severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
+
+Reported by the session that cut the 1.5.2-BD release: the binary contains
+`1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
+DISPLAYED version is correct** (1.5.2-BD on the boot screen); this is provenance
+metadata, so the likeliest visible symptom is the web UI reporting an old build.
+
+What that session established, and it is the useful half:
+
+* it survives `pio run -t clean`, so it is not a stale object;
+* plain `grep` cannot find the string in the tree, which points at a
+  **committed compressed asset** — most probably the gzipped web UI that
+  `scripts/build_html.py` embeds.
+
+Deliberately filed without a mechanism rather than guessed at. **Close by**
+finding which committed artifact carries it (start by decompressing the
+generated HTML headers and grepping those), then regenerating it — or, if it is
+baked into a committed `.gz`, making the generator stamp it at build time so it
+cannot go stale again.
+
+## Closed 2026-08-28. Both halves of the lead were wrong.
+
+**The web UI does not carry it.** The suggested first step was to decompress the
+generated HTML headers and grep them. Done: `src/network/html/*.generated.h`
+are gzip blobs as expected, they decompress cleanly, and **none contains a
+version-like string at all**. They are also NOT COMMITTED — `git ls-files` lists
+only the `.html` sources and `js/`, so they are regenerated every build and
+could not have gone stale even if they had carried it.
+
+**The string is not in the tree.** A full `grep -a` across the working tree,
+excluding `.git`, `.pio` and `fs_`, finds `1.5.1-BNY` in exactly one file:
+`BUGS.md`, this entry. No committed artifact carries it, compressed or
+otherwise.
+
+**And the current build cannot produce that FORMAT.** `scripts/git_branch.py`
+emits `{base}-dev-{branch}-{sha}` for the default env and `{base}-rc+{hash}` for
+`gh_release_rc`; every other env takes a literal from the ini. The reported
+string `1.5.1-BNY-2-g78be6b97f` is `git describe --tags` output — base, commits
+since the tag, `g` plus the hash — a shape none of those three paths emits. The
+script also caches nothing: `inject_version` recomputes on every invocation and
+appends the define, so there is no store for a value to go stale in.
+
+So whatever produced that stamp is not in this tree, and the closest thing to a
+mechanism is that the inspected binary predated the current `git_branch.py`.
+Closed rather than left open with a disproved lead. If a stale stamp is ever
+seen again, the useful first fact is the FORMAT: `-dev-` means the default env,
+`-rc+` the RC env, a bare triple a literal in the ini, and `-N-g<sha>` means
+something outside this repo's build path generated it.
+
+## That closure was WRONG, and the next build proved it within the hour
+
+I closed this saying the `-N-g<sha>` format was no longer producible. Then a
+fresh `gh_release` build, made for B-006, came out containing
+**`1.5.1-B2-43-g7211621a3`** — that exact shape, alongside the correct
+`1.5.16-BD`. The closing reasoning was right about `git_branch.py` and wrong
+about the conclusion: I checked the paths I knew about and treated that as
+checking all of them.
+
+**The mechanism, found by following it rather than reasoning about it:**
+
+* `git describe` in this repo today returns `1.5.16-BD-49-g093a4b129` — current.
+  So the binary's string is not this build's describe.
+* `7211621a3` IS a commit in this repo, just an older one than HEAD. So it is a
+  describe of THIS project, taken at some earlier moment and kept.
+* Grepping the build tree finds it only in `firmware.bin` and `firmware.elf` —
+  no object file in `.pio` carries it, which is why a rebuild never clears it.
+* Grepping wider finds the carrier:
+  **`~/.platformio/packages/framework-arduinoespressif32-libs/esp32c3/lib/libesp_app_format.a`**.
+
+It is baked into a **prebuilt library in the PlatformIO package cache**, outside
+the repository. That accounts for every clue the original report left and that I
+mis-read:
+
+| the 2026-08-19 evidence | why |
+|---|---|
+| survives `pio run -t clean` | clean empties `.pio/build`, not `~/.platformio/packages` |
+| `grep` cannot find it in the tree | it is not in the tree |
+| the shape is `git describe` | ESP-IDF stamps the app descriptor's version from `git describe` |
+
+The DISPLAYED version was always right because `CROSSPOINT_VERSION` is a
+compile-time define this repo controls. What is stale is the **ESP-IDF app
+descriptor**, which is what OTA metadata and the web UI report — exactly the
+"likeliest visible symptom" the original entry predicted.
+
+## The library member, and what it proves
+
+`esp_app_desc.c.o` inside that archive carries three strings together:
+
+```
+1.5.1-B2-43-g7211621a3
+crosspoint-reader
+01:15:06   Aug 21 2026
+```
+
+**This project's own name and an August 21 build timestamp are inside a shared
+PlatformIO framework package.** `esp_app_desc.c` is ESP-IDF's; the values in it
+are this repo's. So on 2026-08-21 a build compiled that translation unit and the
+result was written into `~/.platformio/packages/framework-arduinoespressif32-libs/`,
+where it has been linked into every binary since — and would be linked into any
+OTHER project built with that package on this machine.
+
+**So `PROJECT_VER` is NOT the fix**, and the previous "close by" was wrong for a
+second time. `PROJECT_VER` is consumed when `esp_app_desc.c` is COMPILED, and
+that object is never recompiled: it arrives prebuilt. Nothing in this repository
+can change what is already baked into it.
+
+**Close by** restoring the framework package so the descriptor is generated
+rather than inherited — the package is polluted with a build artifact and should
+be reinstalled — and then finding what wrote into `~/.platformio/packages` on
+2026-08-21, because a toolchain package that a project build can mutate will do
+it again.
+
+### The descriptor is LIVE, so this is not cosmetic
+
+Read straight out of the shipped image rather than inferred. `esp_app_desc_t`
+sits at offset `0x20` (24-byte image header + 8-byte segment header) and its
+magic checks out as `0xABCD5432`:
+
+```
+version     : 1.5.1-B2-43-g7211621a3
+project_name: crosspoint-reader
+date/time   : Aug 21 2026 01:15:06
+idf_ver     : 5.5.2.260206
+```
+
+So the stale string is not a leftover sitting unused in a library — it IS the
+descriptor the image carries. **Every release built on this machine reports an
+August 21 version in its OTA metadata and its web UI build line**, whatever the
+boot screen says.
+
+Severity raised from low to **medium** on that. The original entry called the
+web UI "the likeliest visible symptom" and hedged it; this confirms it, and adds
+OTA metadata alongside. `project_name: crosspoint-reader` in a supposedly
+generic ESP-IDF library is also the proof that the object was compiled for this
+project and frozen, rather than shipped that way by Espressif.
+
+### Two more facts, and they make the remedy safe rather than risky
+
+Checked before recommending a reinstall, because "restore the toolchain" is a
+bad thing to be wrong about:
+
+* **The package is STOCK, not a custom build.** `package.json` reports
+  `framework-arduinoespressif32-libs` version **5.5.0+sha.87912cd291**, from
+  `espressif/esp32-arduino-lib-builder`. So a reinstall re-fetches a pinned,
+  published artifact — it does not discard a bespoke toolchain someone built on
+  purpose. That was the risk worth ruling out: if these libs HAD been custom-built
+  for this firmware's sdkconfig, replacing them would have been destructive.
+* **Only esp32c3 is affected** — this project's target. `strings` finds
+  `crosspoint-reader` in the esp32c3 `libesp_app_format.a` and **zero** times in
+  the esp32 and esp32s3 copies of the same library.
+
+Every `.a` in `esp32c3/lib/` shares one mtime, `Aug 21 01:16`, one minute after
+the descriptor's own compile stamp of `01:15:06`. So the whole esp32c3 lib set
+was written at once, by something that had just compiled against this project.
+**What did it is still unknown** — nothing in this repo references
+`~/.platformio/packages` except one comment in `tools/stack_budget/`, and the
+other chips are untouched, so it was not a broad package operation.
+
+### A repo-side fix EXISTS: the symbol is weak
+
+`nm --defined-only` on the archive reports:
+
+```
+esp_app_desc.c.o:
+00000000 V esp_app_desc
+```
+
+`V` is a **weak object symbol**. ESP-IDF marks it weak precisely so an
+application can override it: a strong definition in this project would win at
+link time with no duplicate-symbol error, and the archive member would simply
+never be pulled. So the descriptor can be corrected **without touching the
+toolchain at all** — which makes this fixable in-repo, and reinstalling the
+package the fallback rather than the remedy.
+
+**Why it is not written yet, and this is a real blocker rather than caution.**
+Overriding means supplying the WHOLE `esp_app_desc_t`, not just the version
+field, and the struct's tail is not all inert padding on current IDF:
+`min_efuse_blk_rev_full`, `max_efuse_blk_rev_full` and `mmu_page_size` are read
+by the BOOTLOADER. The values currently in the image are correct because
+Espressif's build computed them; hand-writing a replacement means reproducing
+them, and guessing wrong there does not produce a wrong version string — it
+produces an image the bootloader may refuse.
+
+That is the one failure this repository's own OTA design exists to prevent (see
+the five-step no-brick chain in `OnlineFirmwareUpdateActivity.h`), and it is not
+verifiable off-device: reading the fields back proves the struct is well-formed,
+not that the bootloader accepts it.
+
+## FIXED 2026-08-28 — and not by the override, because that would have been the
+## same bug one field over
+
+The weak-symbol override was the obvious fix and it is the wrong one.
+Overriding means supplying the WHOLE struct, so the bootloader-read fields
+would have to be hardcoded here — and the next framework bump would silently
+invalidate them. That is B-033 again, one field across: a value frozen in a
+place nobody looks.
+
+**`scripts/stamp_app_desc.py` patches thirty-two bytes after the link instead.**
+It finds the descriptor at `0x20`, verifies the magic is `0xABCD5432`, writes
+the `CROSSPOINT_VERSION` this build is already using — read from the build
+flags, so it cannot disagree with the boot screen — and recomputes the appended
+SHA256, because the descriptor sits inside a hashed segment and a patched image
+with a stale hash is one the bootloader rejects. Every field Espressif's build
+computed is left exactly as it was. If the magic is ever absent it does
+nothing and says so, rather than corrupting a byte range.
+
+Verified on a real `gh_release` build:
+
+```
+stamp_app_desc: app descriptor version '1.5.1-B2-43-g7211621a3' -> '1.5.16-BD', sha256 recomputed
+
+version        : 1.5.16-BD          <- was the August string
+project_name   : crosspoint-reader
+idf_ver        : 5.5.2.260206
+secure_version : 0   (was 0)        <- bootloader-read, unchanged
+min_efuse_blk  : 0   (was 0)
+max_efuse_blk  : 199 (was 199)
+mmu_page_size  : 16  (was 16)
+sha256 VALID   : True
+magic byte     : 0xE9
+```
+
+**Device-confirm still owed.** Byte-level verification proves the image is
+well-formed and self-consistent; it cannot prove the bootloader accepts it. The
+no-brick chain applies as always -- a rejected image fails
+`esp_ota_end()` verification or reverts on the next boot -- but the first OTA
+onto real hardware is the confirmation.
+
+### CORRECTION 2026-08-28: "polluted" was too strong, and I had said it loudly
+
+Having called this a polluted toolchain and recommended a reinstall, I looked at
+how `crosspoint-reader` appears in the OTHER esp32c3 libraries. It is a BUILD
+PATH:
+
+```
+/Users/natebunnyfield/src/wt-ship/crosspoint-reader     (libfatfs.a, libespressif__mdns.a,
+                                                         libesp_bootloader_format.a, ...)
+```
+
+That is ordinary debug/assert path leakage from compilation, present in any
+locally built object and harmless. So the accurate description is not "a build
+leaked into a shared package" — it is that **the esp32c3 lib set was built
+locally on 2026-08-21 from the `wt-ship` worktree and cached**, which is what
+this toolchain does. `esp_app_desc.c.o` froze that moment's version along with
+everything else, and is the one object where the frozen value is not inert.
+
+**So there is nothing to clean up, and the reinstall is withdrawn as a
+recommendation.** Rebuilding 260 MB of esp32c3 libraries to correct one string
+that `stamp_app_desc.py` already corrects would be effort spent on the wrong
+layer. Another project on this machine linking these libs would inherit the
+stale descriptor, which matters only if it ships OTA metadata and does not stamp
+its own — worth knowing, not worth a rebuild.
+
+The earlier alarm in this entry is left in place rather than deleted, because
+the reasoning that produced it is the useful part: a project's own name inside a
+framework library DOES look like contamination until you check what form the
+string takes.
+
+**Reinstalling the package remains the zero-risk alternative.** It rewrites a
+shared toolchain outside this repository and forces a large re-download; that is
+the owner's machine and his call. And this entry has now been closed wrongly
+once and given a wrong remedy twice — each time by reasoning one step past the
+evidence — so the third answer is the one that gets checked before it is acted
+on.
+
+**What is safe to rely on meanwhile:** the DISPLAYED version is unaffected.
+`CROSSPOINT_VERSION` is a compile-time define this repo owns, it reads
+`1.5.16-BD` correctly, and OTA's `isNewer()` parses the numeric triple from it.
+Only the app descriptor — OTA metadata and the web UI's build line — is stale.
+
+### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
+**severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
+
+Tags `1.5.3`, `1.5.4`, `1.5.5` and `1.5.6` exist locally with no releases on this
+fork — they are upstream's, arriving through the `upstream` remote. The fork is
+at **1.5.2** and numbers upward, so its next minor lands on a tag that already
+means something else.
+
+Nothing is broken yet, and that is exactly why it is worth deciding now rather
+than during a release: `git tag 1.5.3` will simply fail, in the middle of a
+publish, on a machine where the fetch happened to have run.
+
+**Close by** choosing a namespace and writing it down — a prefix the fork owns
+(`bd/1.5.3`), or skipping to a range upstream will not reach. Either is fine;
+discovering the clash mid-release is not.
+
+## Closed 2026-08-28. The namespace was already chosen; only the writing-down
+## was missing.
+
+The predicted failure did not occur, and the fork is now at **1.5.16-BD** —
+fourteen releases past the point this entry expected `git tag` to fail
+mid-publish. Checked rather than assumed:
+
+* every fork release tag carries a **suffix**: `1.5.1-BNY`, `1.5.1-B2`, then
+  `1.5.2-BD` through `1.5.16-BD`, seventeen in all;
+* every BARE `1.5.N` tag is upstream's, authored by `0x1abin` and `Uri Tauber`;
+* `1.5.3` through `1.5.6` do exist locally, exactly as this entry warned — and
+  the fork tagged `1.5.3-BD` … `1.5.6-BD` straight past them without a clash.
+
+**So the suffix IS the namespace**, and it is the same suffix the version string
+already carries for the Settings corner and the OTA screen. It was not adopted
+as a tag policy; it just fell out of tagging with the full version string, which
+happens to include the fork marker. That is why this entry could be written at
+all — the practice was invisible because nobody had stated it.
+
+**The rule, stated:** *a fork release tag is its full version string, suffix
+included.* `1.5.17-BD`, never `1.5.17`. A bare `1.5.N` tag in this repo is
+upstream's and must not be created here. Nothing needs changing to comply —
+seventeen tags already do — and `[crosspoint] version` in `platformio.ini`
+carries the suffix, so a tag taken from it is correct by construction.
+
+No prefix scheme is needed. `bd/1.5.3` was one of the two options this entry
+offered and it would be a second, redundant namespace on top of the one already
+working.
+
+
+### [B-006] X4 running firmware carries an empty version stamp
+**severity: low · scope: device provisioning · found 2026-08-02**
+
+The X4 runs a build stamped `1.5.0-BNY-rc+` — empty suffix. `gh_release_rc`
+composes its version as `1.5.0-BNY-rc+${sysenv.CROSSPOINT_RC_HASH}`
+(`platformio.ini:186`), and the flash was run without that variable set. The
+code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
+feeds the OTA version comparison, and it makes the running build
+unidentifiable after the fact.
+
+**Root cause fixed and verified 2026-08-08.** `platformio.ini` no longer
+interpolates `${sysenv.CROSSPOINT_RC_HASH}`; `scripts/git_branch.py` owns the
+version and, with the variable unset, warns loudly and stamps `-rc+unset`.
+Confirmed by building `gh_release_rc` with the variable removed from the
+environment: the binary contains `1.5.0-BNY-rc+unset`, so the empty suffix that
+produced this entry cannot recur.
+
+**Now staged:** both cards carry `20260807T0709Z-crosspoint-e194ab7b.bin`, a
+`gh_release` build stamped `1.5.0-BNY` with no empty `+` suffix (confirmed by
+`strings` on the binary), so SD Firmware Update from the card will replace the
+badly-stamped firmware. Still OPEN because that is an on-device action nobody
+has performed yet.
+
+> **THE STAGED IMAGE IS NOW SIXTEEN VERSIONS STALE — checked 2026-08-28.**
+> The card mounted as `BUNNYFIELDS` carries
+> `20260817T2333Z-crosspoint-9aae0b3f.bin`, and `strings` on it reports
+> **`1.5.0-BNY`**. The fork is at **1.5.16-BD**.
+>
+> So following the "close by" instruction below TODAY would fix the stamp and
+> **downgrade the device to August firmware** — losing every fix since,
+> including the untrusted-input memory-safety work (B-023, B-024), the bare-`new`
+> sweep (B-031, B-032) and everything shipped this week.
+>
+> **The close action has therefore changed**: build a CURRENT `gh_release`
+> image with `CROSSPOINT_RC_HASH` set, stage that, and update from it. Do not
+> flash the image currently on the card.
+>
+> **STAGED 2026-08-28.** `20260828T2010Z-crosspoint-fbd3129d.bin` is now on the
+> card beside the old one, built from `gh_release` and verified in place:
+> descriptor version **1.5.16-BD** (the B-033 stamper ran), appended SHA256
+> valid, image magic `0xE9`.
+>
+> Copying it is not a flash — `SdFirmwareUpdateActivity` is a file picker, so
+> nothing is written to the device until it is chosen. That is why staging was
+> safe to do and the update itself is not mine to perform.
+>
+> **Pick the 2026-08-28 file, not the 2026-08-17 one.** The older image is still
+> there and still stamped `1.5.0-BNY`; it is left rather than deleted because
+> removing a firmware image from someone's card is a worse default than leaving
+> two and saying which is which.
+
+**Close by:** reflashing with the variable set, or SD Firmware Update from the
+card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
+so a same-code reflash is accepted):
+```bash
+CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
+```
+
+---
+
+## FIXED
+
 ### [B-045] A crafted card font reads ~16 KB past a 1-byte glyph buffer (heap overflow)
 **severity: high (memory safety, remote-reachable) · scope: SD font loading + glyph decode · found 2026-09-04 by a crafted-input hunt (ASan), reproduced and FIXED the same day**
 
@@ -61,9 +507,9 @@ null, no ASan report). Pinned by `test/malformed_font/` (2 cases: the crafted
 glyph refused, a well-proportioned one still loads); the assertion
 discriminates against the pre-fix tree, which returned a non-null glyph
 carrying the bad geometry. ctest 627/627, X3 canary, pio check PASSED.
+Moved to FIXED 2026-09-04: fixed and pinned the same day (`test/malformed_font/`), CI green.
 
-
-### [B-044] WebSocket `START` accepts an absurd size and writes until the peer disconnects
+### [B-044] WebSocket `START` accepted an absurd size and wrote until the peer disconnected — FIXED 2026-09-04
 **severity: low (latent) · scope: `src/network/CrossPointWebServer.cpp` WS upload · found 2026-09-04 by the simulator's network-surface hunt (`crosspoint-simulator/docs/network-surface-hunt-2026-09-04.md`, finding 10)**
 
 `START:name:<size>:/books` parses the size with `toInt()`, which saturates at
@@ -105,6 +551,15 @@ long-standing convention in this file's older entries — B-033's "## Closed",
 "## FIXED 2026-08-28", and others further down, all left as they were rather
 than demoted, since they sit safely inside what is genuinely archival material
 now — makes a recurrence likely.
+
+**FIXED 2026-09-04.** `START` caps the declared size at 512 MB (a single WS
+upload is one book or font; no real file approaches it) and refuses anything
+larger, so `toInt()`'s LONG_MAX saturation no longer opens an upload that can
+never complete and blocks every other START. Verified: `START:...:99999999999999999999999:...`
+and 512 MB+1 → `ERROR:Invalid START format`, a 100-byte START → `READY`. The
+zero-byte upload path is unchanged (the token is validated all-digits, so 0
+stays the legitimate empty-file case).
+Moved to FIXED 2026-09-04.
 
 ### [B-041] The original ask — get Actions running — is DONE. CI now runs, and every workflow that ran on 2026-08-29 is RED — FOUND 2026-08-28, RECONFIRMED AND REWRITTEN 2026-08-29, NARROWED 2026-08-30, GREEN-ABLE 2026-08-31, RED AGAIN 2026-09-01→03 on three jobs, FIXED and GREEN ON GITHUB 2026-09-04 (run 33847931384)
 **severity: medium (no automated verification is currently trustworthy) · scope: build / release · found 2026-08-28, CI enabled and red 2026-08-29, green-able 2026-08-31, red again on every push 2026-09-01→03, green on GitHub 2026-09-04**
@@ -604,452 +1059,7 @@ Actions were enabled on 2026-08-28.
 it: a check nobody watches is a check that goes red silently. `gh run list
 --repo natebunnyfield/crosspoint-reader --limit 3` after every push to `main`
 is the whole discipline, and it is not automated.
-
-### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
-**severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
-
-Found while reading the card's crash reports for the OTA work, not reported —
-so nobody has said how often it happens, and that is the first thing to
-establish.
-
-```
-CrossPoint version: 1.5.9-BD
-Panic reason: abort() was called at PC 0x421c764d on core 0
-[336467] [ERR] [SDCF] buildAdvanceTable: failed to allocate codepoint buffer (16384 bytes)
-   ... the same line 13 times, ~350 ms apart ...
-[276]  [INF] [HW] Using cached device type: X3
-```
-
-**What the shape says.** Thirteen consecutive failures to get 16 KB, then an
-`abort()`. So this is not one unlucky allocation — the heap was exhausted and
-stayed exhausted while the reader retried, which means the retry itself is part
-of the story: something asked, failed, and asked again without releasing
-whatever had filled the heap.
-
-The last two lines are from the REBOOT (`[276]`, a fresh millis), so the abort
-is the end of that boot's log, not a recovery.
-
-**Where to look, in order.** `SdCardFont::buildAdvanceTable` and what holds
-memory across its retries; whether the failure path frees the partial table
-before the next attempt; and what else was live at the time — 16 KB is not a
-large ask, so the interesting question is what had already taken the heap. The
-X3 has ~400 KB and the surrounding code is written for that, so a single
-runaway consumer is more likely than genuine pressure.
-
-**Not reproduced.** No card state was captured beyond the report, and the log
-tail does not say which family or which book was open.
-
-#### What was changed, 2026-08-28
-
-`buildAdvanceTableRange` asked for the WORST CASE on every call: 4096
-codepoints is 16 KB, `new[]`-ed and freed per invocation. On a device with
-~400 KB the number that matters is not free heap but the largest CONTIGUOUS
-block, and a 16 KB request stops being satisfiable long after churn has broken
-the heap up — which is exactly the shape of thirteen consecutive failures with
-the device otherwise running.
-
-It now starts at **256 codepoints (1 KB)** and quadruples only when a scan
-actually fills the buffer, so the common call — a page of text needs a couple of
-hundred distinct codepoints — never asks for more than 1 KB. The scan restarts
-after a growth rather than resuming, because `collectUniqueCodepoints` dedupes
-and a rescan is therefore idempotent; at most two growths separate 256 from the
-cap.
-
-**A failed growth is no longer fatal.** The buffer already holds a full set of
-codepoints at that point, and `hitCap` already means "layout may be
-approximate" — an outcome this function has always been able to return and the
-reader has always survived. Only the first 1 KB allocation can still fail the
-call outright, and it is the one most likely to succeed.
-
-**This is a mitigation, not a diagnosis.** It removes the largest recurring
-contiguous request on the font path, which is the thing most likely to fail on
-a fragmented heap and the thing the log actually recorded. It does NOT explain
-what had already consumed the heap, and the `abort()` itself came from some
-OTHER allocation — a plain `new` failing under `-fno-exceptions` aborts, and
-the nothrow site here returns instead. So if the crash recurs, the next step is
-to find that allocation, not to shrink this one further.
-
-577 tests pass, desktop canary green. Device-confirm only: nothing host-side
-reproduces a fragmented ESP32 heap.
-
-### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
-**severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
-
-Reported by the session that cut the 1.5.2-BD release: the binary contains
-`1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
-DISPLAYED version is correct** (1.5.2-BD on the boot screen); this is provenance
-metadata, so the likeliest visible symptom is the web UI reporting an old build.
-
-What that session established, and it is the useful half:
-
-* it survives `pio run -t clean`, so it is not a stale object;
-* plain `grep` cannot find the string in the tree, which points at a
-  **committed compressed asset** — most probably the gzipped web UI that
-  `scripts/build_html.py` embeds.
-
-Deliberately filed without a mechanism rather than guessed at. **Close by**
-finding which committed artifact carries it (start by decompressing the
-generated HTML headers and grepping those), then regenerating it — or, if it is
-baked into a committed `.gz`, making the generator stamp it at build time so it
-cannot go stale again.
-
-## Closed 2026-08-28. Both halves of the lead were wrong.
-
-**The web UI does not carry it.** The suggested first step was to decompress the
-generated HTML headers and grep them. Done: `src/network/html/*.generated.h`
-are gzip blobs as expected, they decompress cleanly, and **none contains a
-version-like string at all**. They are also NOT COMMITTED — `git ls-files` lists
-only the `.html` sources and `js/`, so they are regenerated every build and
-could not have gone stale even if they had carried it.
-
-**The string is not in the tree.** A full `grep -a` across the working tree,
-excluding `.git`, `.pio` and `fs_`, finds `1.5.1-BNY` in exactly one file:
-`BUGS.md`, this entry. No committed artifact carries it, compressed or
-otherwise.
-
-**And the current build cannot produce that FORMAT.** `scripts/git_branch.py`
-emits `{base}-dev-{branch}-{sha}` for the default env and `{base}-rc+{hash}` for
-`gh_release_rc`; every other env takes a literal from the ini. The reported
-string `1.5.1-BNY-2-g78be6b97f` is `git describe --tags` output — base, commits
-since the tag, `g` plus the hash — a shape none of those three paths emits. The
-script also caches nothing: `inject_version` recomputes on every invocation and
-appends the define, so there is no store for a value to go stale in.
-
-So whatever produced that stamp is not in this tree, and the closest thing to a
-mechanism is that the inspected binary predated the current `git_branch.py`.
-Closed rather than left open with a disproved lead. If a stale stamp is ever
-seen again, the useful first fact is the FORMAT: `-dev-` means the default env,
-`-rc+` the RC env, a bare triple a literal in the ini, and `-N-g<sha>` means
-something outside this repo's build path generated it.
-
-## That closure was WRONG, and the next build proved it within the hour
-
-I closed this saying the `-N-g<sha>` format was no longer producible. Then a
-fresh `gh_release` build, made for B-006, came out containing
-**`1.5.1-B2-43-g7211621a3`** — that exact shape, alongside the correct
-`1.5.16-BD`. The closing reasoning was right about `git_branch.py` and wrong
-about the conclusion: I checked the paths I knew about and treated that as
-checking all of them.
-
-**The mechanism, found by following it rather than reasoning about it:**
-
-* `git describe` in this repo today returns `1.5.16-BD-49-g093a4b129` — current.
-  So the binary's string is not this build's describe.
-* `7211621a3` IS a commit in this repo, just an older one than HEAD. So it is a
-  describe of THIS project, taken at some earlier moment and kept.
-* Grepping the build tree finds it only in `firmware.bin` and `firmware.elf` —
-  no object file in `.pio` carries it, which is why a rebuild never clears it.
-* Grepping wider finds the carrier:
-  **`~/.platformio/packages/framework-arduinoespressif32-libs/esp32c3/lib/libesp_app_format.a`**.
-
-It is baked into a **prebuilt library in the PlatformIO package cache**, outside
-the repository. That accounts for every clue the original report left and that I
-mis-read:
-
-| the 2026-08-19 evidence | why |
-|---|---|
-| survives `pio run -t clean` | clean empties `.pio/build`, not `~/.platformio/packages` |
-| `grep` cannot find it in the tree | it is not in the tree |
-| the shape is `git describe` | ESP-IDF stamps the app descriptor's version from `git describe` |
-
-The DISPLAYED version was always right because `CROSSPOINT_VERSION` is a
-compile-time define this repo controls. What is stale is the **ESP-IDF app
-descriptor**, which is what OTA metadata and the web UI report — exactly the
-"likeliest visible symptom" the original entry predicted.
-
-## The library member, and what it proves
-
-`esp_app_desc.c.o` inside that archive carries three strings together:
-
-```
-1.5.1-B2-43-g7211621a3
-crosspoint-reader
-01:15:06   Aug 21 2026
-```
-
-**This project's own name and an August 21 build timestamp are inside a shared
-PlatformIO framework package.** `esp_app_desc.c` is ESP-IDF's; the values in it
-are this repo's. So on 2026-08-21 a build compiled that translation unit and the
-result was written into `~/.platformio/packages/framework-arduinoespressif32-libs/`,
-where it has been linked into every binary since — and would be linked into any
-OTHER project built with that package on this machine.
-
-**So `PROJECT_VER` is NOT the fix**, and the previous "close by" was wrong for a
-second time. `PROJECT_VER` is consumed when `esp_app_desc.c` is COMPILED, and
-that object is never recompiled: it arrives prebuilt. Nothing in this repository
-can change what is already baked into it.
-
-**Close by** restoring the framework package so the descriptor is generated
-rather than inherited — the package is polluted with a build artifact and should
-be reinstalled — and then finding what wrote into `~/.platformio/packages` on
-2026-08-21, because a toolchain package that a project build can mutate will do
-it again.
-
-### The descriptor is LIVE, so this is not cosmetic
-
-Read straight out of the shipped image rather than inferred. `esp_app_desc_t`
-sits at offset `0x20` (24-byte image header + 8-byte segment header) and its
-magic checks out as `0xABCD5432`:
-
-```
-version     : 1.5.1-B2-43-g7211621a3
-project_name: crosspoint-reader
-date/time   : Aug 21 2026 01:15:06
-idf_ver     : 5.5.2.260206
-```
-
-So the stale string is not a leftover sitting unused in a library — it IS the
-descriptor the image carries. **Every release built on this machine reports an
-August 21 version in its OTA metadata and its web UI build line**, whatever the
-boot screen says.
-
-Severity raised from low to **medium** on that. The original entry called the
-web UI "the likeliest visible symptom" and hedged it; this confirms it, and adds
-OTA metadata alongside. `project_name: crosspoint-reader` in a supposedly
-generic ESP-IDF library is also the proof that the object was compiled for this
-project and frozen, rather than shipped that way by Espressif.
-
-### Two more facts, and they make the remedy safe rather than risky
-
-Checked before recommending a reinstall, because "restore the toolchain" is a
-bad thing to be wrong about:
-
-* **The package is STOCK, not a custom build.** `package.json` reports
-  `framework-arduinoespressif32-libs` version **5.5.0+sha.87912cd291**, from
-  `espressif/esp32-arduino-lib-builder`. So a reinstall re-fetches a pinned,
-  published artifact — it does not discard a bespoke toolchain someone built on
-  purpose. That was the risk worth ruling out: if these libs HAD been custom-built
-  for this firmware's sdkconfig, replacing them would have been destructive.
-* **Only esp32c3 is affected** — this project's target. `strings` finds
-  `crosspoint-reader` in the esp32c3 `libesp_app_format.a` and **zero** times in
-  the esp32 and esp32s3 copies of the same library.
-
-Every `.a` in `esp32c3/lib/` shares one mtime, `Aug 21 01:16`, one minute after
-the descriptor's own compile stamp of `01:15:06`. So the whole esp32c3 lib set
-was written at once, by something that had just compiled against this project.
-**What did it is still unknown** — nothing in this repo references
-`~/.platformio/packages` except one comment in `tools/stack_budget/`, and the
-other chips are untouched, so it was not a broad package operation.
-
-### A repo-side fix EXISTS: the symbol is weak
-
-`nm --defined-only` on the archive reports:
-
-```
-esp_app_desc.c.o:
-00000000 V esp_app_desc
-```
-
-`V` is a **weak object symbol**. ESP-IDF marks it weak precisely so an
-application can override it: a strong definition in this project would win at
-link time with no duplicate-symbol error, and the archive member would simply
-never be pulled. So the descriptor can be corrected **without touching the
-toolchain at all** — which makes this fixable in-repo, and reinstalling the
-package the fallback rather than the remedy.
-
-**Why it is not written yet, and this is a real blocker rather than caution.**
-Overriding means supplying the WHOLE `esp_app_desc_t`, not just the version
-field, and the struct's tail is not all inert padding on current IDF:
-`min_efuse_blk_rev_full`, `max_efuse_blk_rev_full` and `mmu_page_size` are read
-by the BOOTLOADER. The values currently in the image are correct because
-Espressif's build computed them; hand-writing a replacement means reproducing
-them, and guessing wrong there does not produce a wrong version string — it
-produces an image the bootloader may refuse.
-
-That is the one failure this repository's own OTA design exists to prevent (see
-the five-step no-brick chain in `OnlineFirmwareUpdateActivity.h`), and it is not
-verifiable off-device: reading the fields back proves the struct is well-formed,
-not that the bootloader accepts it.
-
-## FIXED 2026-08-28 — and not by the override, because that would have been the
-## same bug one field over
-
-The weak-symbol override was the obvious fix and it is the wrong one.
-Overriding means supplying the WHOLE struct, so the bootloader-read fields
-would have to be hardcoded here — and the next framework bump would silently
-invalidate them. That is B-033 again, one field across: a value frozen in a
-place nobody looks.
-
-**`scripts/stamp_app_desc.py` patches thirty-two bytes after the link instead.**
-It finds the descriptor at `0x20`, verifies the magic is `0xABCD5432`, writes
-the `CROSSPOINT_VERSION` this build is already using — read from the build
-flags, so it cannot disagree with the boot screen — and recomputes the appended
-SHA256, because the descriptor sits inside a hashed segment and a patched image
-with a stale hash is one the bootloader rejects. Every field Espressif's build
-computed is left exactly as it was. If the magic is ever absent it does
-nothing and says so, rather than corrupting a byte range.
-
-Verified on a real `gh_release` build:
-
-```
-stamp_app_desc: app descriptor version '1.5.1-B2-43-g7211621a3' -> '1.5.16-BD', sha256 recomputed
-
-version        : 1.5.16-BD          <- was the August string
-project_name   : crosspoint-reader
-idf_ver        : 5.5.2.260206
-secure_version : 0   (was 0)        <- bootloader-read, unchanged
-min_efuse_blk  : 0   (was 0)
-max_efuse_blk  : 199 (was 199)
-mmu_page_size  : 16  (was 16)
-sha256 VALID   : True
-magic byte     : 0xE9
-```
-
-**Device-confirm still owed.** Byte-level verification proves the image is
-well-formed and self-consistent; it cannot prove the bootloader accepts it. The
-no-brick chain applies as always -- a rejected image fails
-`esp_ota_end()` verification or reverts on the next boot -- but the first OTA
-onto real hardware is the confirmation.
-
-### CORRECTION 2026-08-28: "polluted" was too strong, and I had said it loudly
-
-Having called this a polluted toolchain and recommended a reinstall, I looked at
-how `crosspoint-reader` appears in the OTHER esp32c3 libraries. It is a BUILD
-PATH:
-
-```
-/Users/natebunnyfield/src/wt-ship/crosspoint-reader     (libfatfs.a, libespressif__mdns.a,
-                                                         libesp_bootloader_format.a, ...)
-```
-
-That is ordinary debug/assert path leakage from compilation, present in any
-locally built object and harmless. So the accurate description is not "a build
-leaked into a shared package" — it is that **the esp32c3 lib set was built
-locally on 2026-08-21 from the `wt-ship` worktree and cached**, which is what
-this toolchain does. `esp_app_desc.c.o` froze that moment's version along with
-everything else, and is the one object where the frozen value is not inert.
-
-**So there is nothing to clean up, and the reinstall is withdrawn as a
-recommendation.** Rebuilding 260 MB of esp32c3 libraries to correct one string
-that `stamp_app_desc.py` already corrects would be effort spent on the wrong
-layer. Another project on this machine linking these libs would inherit the
-stale descriptor, which matters only if it ships OTA metadata and does not stamp
-its own — worth knowing, not worth a rebuild.
-
-The earlier alarm in this entry is left in place rather than deleted, because
-the reasoning that produced it is the useful part: a project's own name inside a
-framework library DOES look like contamination until you check what form the
-string takes.
-
-**Reinstalling the package remains the zero-risk alternative.** It rewrites a
-shared toolchain outside this repository and forces a large re-download; that is
-the owner's machine and his call. And this entry has now been closed wrongly
-once and given a wrong remedy twice — each time by reasoning one step past the
-evidence — so the third answer is the one that gets checked before it is acted
-on.
-
-**What is safe to rely on meanwhile:** the DISPLAYED version is unaffected.
-`CROSSPOINT_VERSION` is a compile-time define this repo owns, it reads
-`1.5.16-BD` correctly, and OTA's `isNewer()` parses the numeric triple from it.
-Only the app descriptor — OTA metadata and the web UI's build line — is stale.
-
-### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
-**severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
-
-Tags `1.5.3`, `1.5.4`, `1.5.5` and `1.5.6` exist locally with no releases on this
-fork — they are upstream's, arriving through the `upstream` remote. The fork is
-at **1.5.2** and numbers upward, so its next minor lands on a tag that already
-means something else.
-
-Nothing is broken yet, and that is exactly why it is worth deciding now rather
-than during a release: `git tag 1.5.3` will simply fail, in the middle of a
-publish, on a machine where the fetch happened to have run.
-
-**Close by** choosing a namespace and writing it down — a prefix the fork owns
-(`bd/1.5.3`), or skipping to a range upstream will not reach. Either is fine;
-discovering the clash mid-release is not.
-
-## Closed 2026-08-28. The namespace was already chosen; only the writing-down
-## was missing.
-
-The predicted failure did not occur, and the fork is now at **1.5.16-BD** —
-fourteen releases past the point this entry expected `git tag` to fail
-mid-publish. Checked rather than assumed:
-
-* every fork release tag carries a **suffix**: `1.5.1-BNY`, `1.5.1-B2`, then
-  `1.5.2-BD` through `1.5.16-BD`, seventeen in all;
-* every BARE `1.5.N` tag is upstream's, authored by `0x1abin` and `Uri Tauber`;
-* `1.5.3` through `1.5.6` do exist locally, exactly as this entry warned — and
-  the fork tagged `1.5.3-BD` … `1.5.6-BD` straight past them without a clash.
-
-**So the suffix IS the namespace**, and it is the same suffix the version string
-already carries for the Settings corner and the OTA screen. It was not adopted
-as a tag policy; it just fell out of tagging with the full version string, which
-happens to include the fork marker. That is why this entry could be written at
-all — the practice was invisible because nobody had stated it.
-
-**The rule, stated:** *a fork release tag is its full version string, suffix
-included.* `1.5.17-BD`, never `1.5.17`. A bare `1.5.N` tag in this repo is
-upstream's and must not be created here. Nothing needs changing to comply —
-seventeen tags already do — and `[crosspoint] version` in `platformio.ini`
-carries the suffix, so a tag taken from it is correct by construction.
-
-No prefix scheme is needed. `bd/1.5.3` was one of the two options this entry
-offered and it would be a second, redundant namespace on top of the one already
-working.
-
-
-### [B-006] X4 running firmware carries an empty version stamp
-**severity: low · scope: device provisioning · found 2026-08-02**
-
-The X4 runs a build stamped `1.5.0-BNY-rc+` — empty suffix. `gh_release_rc`
-composes its version as `1.5.0-BNY-rc+${sysenv.CROSSPOINT_RC_HASH}`
-(`platformio.ini:186`), and the flash was run without that variable set. The
-code is identical to `crosspoint-880ba0f9.bin`; only the stamp is wrong. It
-feeds the OTA version comparison, and it makes the running build
-unidentifiable after the fact.
-
-**Root cause fixed and verified 2026-08-08.** `platformio.ini` no longer
-interpolates `${sysenv.CROSSPOINT_RC_HASH}`; `scripts/git_branch.py` owns the
-version and, with the variable unset, warns loudly and stamps `-rc+unset`.
-Confirmed by building `gh_release_rc` with the variable removed from the
-environment: the binary contains `1.5.0-BNY-rc+unset`, so the empty suffix that
-produced this entry cannot recur.
-
-**Now staged:** both cards carry `20260807T0709Z-crosspoint-e194ab7b.bin`, a
-`gh_release` build stamped `1.5.0-BNY` with no empty `+` suffix (confirmed by
-`strings` on the binary), so SD Firmware Update from the card will replace the
-badly-stamped firmware. Still OPEN because that is an on-device action nobody
-has performed yet.
-
-> **THE STAGED IMAGE IS NOW SIXTEEN VERSIONS STALE — checked 2026-08-28.**
-> The card mounted as `BUNNYFIELDS` carries
-> `20260817T2333Z-crosspoint-9aae0b3f.bin`, and `strings` on it reports
-> **`1.5.0-BNY`**. The fork is at **1.5.16-BD**.
->
-> So following the "close by" instruction below TODAY would fix the stamp and
-> **downgrade the device to August firmware** — losing every fix since,
-> including the untrusted-input memory-safety work (B-023, B-024), the bare-`new`
-> sweep (B-031, B-032) and everything shipped this week.
->
-> **The close action has therefore changed**: build a CURRENT `gh_release`
-> image with `CROSSPOINT_RC_HASH` set, stage that, and update from it. Do not
-> flash the image currently on the card.
->
-> **STAGED 2026-08-28.** `20260828T2010Z-crosspoint-fbd3129d.bin` is now on the
-> card beside the old one, built from `gh_release` and verified in place:
-> descriptor version **1.5.16-BD** (the B-033 stamper ran), appended SHA256
-> valid, image magic `0xE9`.
->
-> Copying it is not a flash — `SdFirmwareUpdateActivity` is a file picker, so
-> nothing is written to the device until it is chosen. That is why staging was
-> safe to do and the update itself is not mine to perform.
->
-> **Pick the 2026-08-28 file, not the 2026-08-17 one.** The older image is still
-> there and still stamped `1.5.0-BNY`; it is left rather than deleted because
-> removing a firmware image from someone's card is a worse default than leaving
-> two and saying which is which.
-
-**Close by:** reflashing with the variable set, or SD Firmware Update from the
-card (`SdFirmwareUpdateActivity` is a plain file picker with no version gate,
-so a same-code reflash is accepted):
-```bash
-CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /dev/cu.usbmodem2401
-```
-
----
-
-## FIXED
+Moved to FIXED 2026-09-04: CI runs green on GitHub (run 33847931384 and every run since). The recurring "watch the badge after every push" lesson stays in the body.
 
 ### [B-042] A definition list rendered as one unbroken blob — FIXED 2026-08-28
 **severity: high (every `<dl>` in every book) · scope: chapter parsing /
