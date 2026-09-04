@@ -34,6 +34,16 @@ target_compile_definitions(ProgressiveJpegTest PRIVATE
   CROSSPOINT_JPEG_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
 )
 
+# JPEGDEC.h picks its host branch (stdio, no Arduino.h) on `__MACH__ ||
+# __LINUX__ || ...`, and `__LINUX__` is JPEGDEC's own spelling -- GCC defines
+# `__linux__`, never `__LINUX__` -- so on Ubuntu the header fell through to
+# `#include <Arduino.h>` and CI's unit-tests job died at this target
+# (2026-09-04) while every Mac took the host branch through `__MACH__`.
+# Same branch on both, stated once, here.
+if(NOT APPLE)
+  target_compile_definitions(ProgressiveJpegTest PRIVATE __LINUX__=1)
+endif()
+
 # Vendored third-party code: its warnings are not ours to fix, and -Werror-clean
 # is not a promise this suite can keep for it.
 target_compile_options(ProgressiveJpegTest PRIVATE -Wno-unused-parameter)
