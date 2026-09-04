@@ -399,7 +399,10 @@ void EpubReaderActivity::loop() {
   // Polled here and nowhere else — the reader is the one place a family step
   // means something — and routed through the SAME cycle the held side button
   // uses, so persistence, position preservation and repagination are that
-  // path's, not a second copy.
+  // path's, not a second copy. On the device HAL the stub returns a constant
+  // 0, so cppcheck reads the condition as always false; the simulator's HAL
+  // is where it is live (B-041, the readAloudCaptureWanted precedent).
+  // cppcheck-suppress knownConditionTrueFalse
   if (const int step = gpio.consumeFontFamilyStep(); step != 0) {
     LOG_DBG("ERS", "Host font-family step (%s)", step < 0 ? "previous" : "next");
     cycleReaderFontFamily(step);

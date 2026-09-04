@@ -62,8 +62,8 @@ long-standing convention in this file's older entries — B-033's "## Closed",
 than demoted, since they sit safely inside what is genuinely archival material
 now — makes a recurrence likely.
 
-### [B-041] The original ask — get Actions running — is DONE. CI now runs, and every workflow that ran on 2026-08-29 is RED — FOUND 2026-08-28, RECONFIRMED AND REWRITTEN 2026-08-29, NARROWED 2026-08-30 — cppcheck and clang-format both clean now, one blocker left
-**severity: medium (no automated verification is currently trustworthy) · scope: build / release · found 2026-08-28, CI enabled and now red as of 2026-08-29, narrowed to one job 2026-08-30 (fixes not yet pushed)**
+### [B-041] The original ask — get Actions running — is DONE. CI now runs, and every workflow that ran on 2026-08-29 is RED — FOUND 2026-08-28, RECONFIRMED AND REWRITTEN 2026-08-29, NARROWED 2026-08-30, GREEN-ABLE 2026-08-31, RED AGAIN 2026-09-01→03 on three jobs, all FIXED 2026-09-04 (unconfirmed on a CI run until the push lands)
+**severity: medium (no automated verification is currently trustworthy) · scope: build / release · found 2026-08-28, CI enabled and red 2026-08-29, green-able 2026-08-31, red again on every push 2026-09-01→03, fixed in tree 2026-09-04**
 
 **The premise this entry used to carry — "CI has never run on this fork, every
 workflow reports zero runs" — is FALSE as of 2026-08-29 and must not be quoted
@@ -525,6 +525,31 @@ release-only break is found at release time. Accepted.
 With this, every CI check that CAN pass does: cppcheck clean, clang-format
 clean, the unit-tests configure fixed and ActivityInputTest linking again at
 601/601.
+
+#### Red again 2026-09-01→03, on three jobs — all fixed 2026-09-04
+
+The paragraph above was true for one day. Every push from 2026-09-01 through
+2026-09-03 (`gh run list --repo natebunnyfield/crosspoint-reader`, eight runs,
+all `failure`; latest `33779976692`) failed three of the four jobs, none of
+them the blocker this entry was narrowed to. Nobody looked, because the badge
+is not in anyone's path — the same mechanism as the original "zero runs, ever".
+
+| job | what was red | fix |
+|---|---|---|
+| `unit-tests` (Build step) | `lib/FsHelpers/FsHelpers.cpp:14: error: 'uint8_t' does not name a type` — the file uses `uint8_t` five times and never includes `<cstdint>`. Apple libc++ pulls it in transitively; Ubuntu's libstdc++ does not, which is why every local run reported 601/601 green while CI was red. Blocked THREE test targets (`plain_text_files`, `definition_list`, `table_keep_together`). | `#include <cstdint>` |
+| `clang-format` | four files drifted in `5dcd2ba11`, `682514416`, `7125a6d5e`: `FontSelectionActivity.cpp:223` (121-col line), `LibraryUpdateActivity.cpp:1,234` (include order, a needless wrap), `test/activity_input/ActivityInputTest.cpp:52,649`, `test/home_landing/HomeLandingTest.cpp:27-30,60-61`. | formatted; the local binary is clang-format 22 against CI's 21, and the diff matched CI's printout line for line |
+| `cppcheck` | three new LOW findings: `BleHidHost.cpp:491` (the loop whose COMMENT already says cppcheck misreads it — the comment was written, the suppression never added), `EpubReaderActivity.cpp:403` (`consumeFontFamilyStep()` is a constant 0 on the device HAL, the `readAloudCaptureWanted()` shape this entry already documents), `BleHidHost.cpp:161` (`ChrInfo::defHandle` written by the aggregate init and read by nothing — a real unused member). | two `// cppcheck-suppress knownConditionTrueFalse`; `defHandle` removed from the struct and its one initializer |
+
+Verified locally 2026-09-04: `pio check --fail-on-defect low --fail-on-defect
+medium --fail-on-defect high` PASSED; `ctest` 622/622 in `build/test`
+(macOS — the `<cstdint>` fix is the one thing this machine cannot prove, and it
+is a one-line include). What is NOT yet true: a green run on GitHub. The next
+push is the evidence; if it is red, this entry reopens on that run's log.
+
+**The recurring lesson**, since this is the third time this entry has recorded
+it: a check nobody watches is a check that goes red silently. `gh run list
+--repo natebunnyfield/crosspoint-reader --limit 3` after every push to `main`
+is the whole discipline, and it is not automated.
 
 ### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
 **severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**

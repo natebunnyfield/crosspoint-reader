@@ -220,7 +220,8 @@ void FontSelectionActivity::loop() {
   // button, so paging the list on a held Right and tapping Confirm deactivated
   // the font on Confirm's first frame (docs/ux-navigation-audit-2026-09-02.md F9).
   if (mappedInput.isPressed(MappedInputManager::Button::Confirm)) {
-    if (!confirmHoldFired_ && mappedInput.getHeldTime(MappedInputManager::Button::Confirm) >= ReaderUtils::SKIP_HOLD_MS) {
+    if (!confirmHoldFired_ &&
+        mappedInput.getHeldTime(MappedInputManager::Button::Confirm) >= ReaderUtils::SKIP_HOLD_MS) {
       confirmHoldFired_ = true;
       toggleSelectedFontActive();
     }

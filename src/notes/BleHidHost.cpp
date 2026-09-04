@@ -158,7 +158,6 @@ constexpr size_t MAX_REPORTS = 10;
 constexpr size_t RING_SIZE = 128;  // power of two
 
 struct ChrInfo {
-  uint16_t defHandle;
   uint16_t valHandle;
   uint16_t uuid16;
   uint8_t properties;
@@ -359,7 +358,7 @@ int onChr(uint16_t /*connHandle*/, const ble_gatt_error* error, const ble_gatt_c
   }
   if (chr == nullptr || gChrCount >= MAX_CHRS) return 0;
   const uint16_t uuid16 = ble_uuid_u16(&chr->uuid.u);
-  gChrs[gChrCount++] = ChrInfo{chr->def_handle, chr->val_handle, uuid16, chr->properties};
+  gChrs[gChrCount++] = ChrInfo{chr->val_handle, uuid16, chr->properties};
   LOG_DBG(TAG, "chr uuid=0x%04x val=0x%04x props=0x%02x", uuid16, chr->val_handle, chr->properties);
   return 0;
 }
@@ -486,8 +485,11 @@ int onGapEvent(ble_gap_event* event, void* /*arg*/) {
         char hex[3 * 31 + 1] = {0};
         // Named apart from the `n` above (name length, out of scope by now) --
         // cppcheck's flow analysis conflated the two same-named variables
-        // across these sibling blocks and misreported this loop as dead.
+        // across these sibling blocks and misreported this loop as dead. The
+        // rename did not stop it (CI, 2026-09-03), so the suppression is here
+        // too -- the comment alone left the gate red.
         const uint8_t rawLen = event->disc.length_data > 31 ? 31 : event->disc.length_data;
+        // cppcheck-suppress knownConditionTrueFalse
         for (uint8_t i = 0; i < rawLen; ++i) snprintf(hex + i * 3, 4, "%02x ", event->disc.data[i]);
         char uuids[64] = {0};
         int off = 0;

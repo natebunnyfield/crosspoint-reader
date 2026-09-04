@@ -24,10 +24,8 @@ constexpr int kFileBrowserMenuIndex = 1;
 std::vector<Cover> covers() { return {{"/books/a.epub"}, {"/books/b.epub"}, {"/books/c.epub"}}; }
 
 TEST(HomeLanding, AMenuRowLandsPastTheCovers) {
-  EXPECT_EQ(homelanding::selectorIndex(true, kSettingsMenuIndex, "", covers()),
-            3 + kSettingsMenuIndex);
-  EXPECT_EQ(homelanding::selectorIndex(true, kFileBrowserMenuIndex, "", covers()),
-            3 + kFileBrowserMenuIndex);
+  EXPECT_EQ(homelanding::selectorIndex(true, kSettingsMenuIndex, "", covers()), 3 + kSettingsMenuIndex);
+  EXPECT_EQ(homelanding::selectorIndex(true, kFileBrowserMenuIndex, "", covers()), 3 + kFileBrowserMenuIndex);
 }
 
 TEST(HomeLanding, NoCoversNoMenuRowIsTheTop) {
@@ -57,8 +55,7 @@ TEST(HomeLanding, ACoverNoLongerListedFallsToTheTop) {
 // A menu row set AFTER a cover wins: the goTo* wrappers never clear the cover
 // path, so this precedence is what keeps a stale path harmless.
 TEST(HomeLanding, AMenuRowBeatsAStaleCoverPath) {
-  EXPECT_EQ(homelanding::selectorIndex(true, kSettingsMenuIndex, "/books/b.epub", covers()),
-            3 + kSettingsMenuIndex);
+  EXPECT_EQ(homelanding::selectorIndex(true, kSettingsMenuIndex, "/books/b.epub", covers()), 3 + kSettingsMenuIndex);
 }
 
 // The reported sequence, against the wiring that shipped it. Before this

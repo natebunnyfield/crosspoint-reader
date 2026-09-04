@@ -49,9 +49,9 @@
 #include "HostHarness.h"
 #include "MappedInputManager.h"
 #include "ReaderFontSizes.h"
-#include "activities/reader/ReaderUtils.h"
 #include "activities/Activity.h"
 #include "activities/RenderLock.h"
+#include "activities/reader/ReaderUtils.h"
 #include "activities/settings/FontSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "components/UITheme.h"
@@ -646,8 +646,7 @@ TEST_F(ActivityInput, SideButtonChangesFontSizeUnderTheRenderLock) {
 // the value every reader actually gets. This pins both.
 TEST(LongPressButtonBehavior, ChapterSkipIsRetiredButItsSlotIsPinned) {
   static_assert(CrossPointSettings::OFF == 0, "slot 0 is append-only encoding, never renumber");
-  static_assert(CrossPointSettings::CHAPTER_SKIP == 1,
-               "CHAPTER_SKIP's slot is retired, not free -- never reassign it");
+  static_assert(CrossPointSettings::CHAPTER_SKIP == 1, "CHAPTER_SKIP's slot is retired, not free -- never reassign it");
   static_assert(CrossPointSettings::FONT_SIZE_STEP == 2, "slot 2 is append-only encoding, never renumber");
   EXPECT_EQ(SETTINGS.longPressButtonBehavior, CrossPointSettings::FONT_SIZE_STEP)
       << "every reader must land on FONT_SIZE_STEP now that CHAPTER_SKIP is unreachable";

@@ -1,4 +1,3 @@
-#include "network/LibrarySyncPlan.h"
 #include "LibraryUpdateActivity.h"
 
 #include <Arduino.h>
@@ -12,6 +11,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/LibrarySyncPlan.h"
 #ifdef SIMULATOR
 #include <SimHostSettings.h>
 #endif
@@ -231,8 +231,7 @@ void LibraryUpdateActivity::render(RenderLock&&) {
       // to 100 on a seventeen-book sync, which says "busy" and never says "how
       // far". librarysync::overallPercent carries the reasoning, including why
       // the denominator is books rather than bytes.
-      const unsigned int pct =
-          librarysync::overallPercent(currentBook, updater.getBooks().size(), bookPct);
+      const unsigned int pct = librarysync::overallPercent(currentBook, updater.getBooks().size(), bookPct);
       // Once per percent, same e-ink reasoning as the OTA screen.
       if (pct == lastRenderedPercent) return;
       lastRenderedPercent = pct;
