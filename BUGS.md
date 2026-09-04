@@ -618,106 +618,7 @@ to find that allocation, not to shrink this one further.
 577 tests pass, desktop canary green. Device-confirm only: nothing host-side
 reproduces a fragmented ESP32 heap.
 
-
-### [B-042] A definition list rendered as one unbroken blob — FIXED 2026-08-28
-**severity: high (every `<dl>` in every book) · scope: chapter parsing /
-layout · found by owner report, fixed same day**
-
-`dl`, `dt` and `dd` appeared **nowhere** in `lib/Epub/`. They were not in
-`BLOCK_TAGS`, so `startElement` fell through to its INLINE branch and no block
-ever opened: a term ran straight into its own definition mid-line. Owner's
-screenshot, a quiz book — *"…opens which novel?**A Tale of Two Cities (Dickens,
-1859)**The two cities are London and Paris…"*.
-
-The bold in that screenshot is the tell that this is structural and not a
-styling bug: the inline branch reads `font-weight` off the resolved CSS, so the
-book's `dt { font-weight: bold }` was honored the whole time. Only the block
-half was missing.
-
-Fixed by adding the three tags to `BLOCK_TAGS`, giving `<dl>` the container
-text-indent reset (and no step of its own — a step there would indent the term
-too), and giving `<dd>` the same 1.5 em default step `<ul>`/`<ol>` take **only
-when the publisher gave it no left inset of its own**. The reported book states
-`dd { margin: 0.25em 0 0.25em 1em }` and `CssParser` already resolved it, so
-the book's own 1 em decides the indent; hardcoding one would have misrendered
-every book whose `dd` margin differs. A `<dt>` also keeps with **three lines**
-of room for its definition to start, so a term is not stranded at a page foot —
-the shape of B-038's answer for tables, with the group keep replaced by a room
-requirement because the `<dl>` path is streamed where the table path is
-buffered.
-
-Three lines, not the classical one: this engine runs widow/orphan keep-2/2 on
-the `<dd>` *after* the term's keep has declined, so a one-line rule let a
-three-line definition move away wholesale and strand the term anyway — 4 of 41
-page alignments, measured. Adversarial review caught that after the first
-version was already written up as done; the trade-off table and the cost (zero
-extra pages on the reported book) are in the doc.
-
-`SECTION_FILE_VERSION` 54 → 55: three pagination changes ride it, and a section
-served from a stale cache would go on showing the reported page.
-
-Full account, including what the CSS layer does and does NOT honor
-(`font-size`, `color` and `border-left` on `dd.why`: no, deliberately), the
-keep-with-next decision and its one accepted false positive, and before/after
-renders of the owner's own book at the page in his screenshot:
-[docs/definition-lists-2026-08-28.md](docs/definition-lists-2026-08-28.md).
-Host coverage: `test/definition_list/`, 16 cases, 9 of which fail against the
-pre-fix tree and two more of which fail against the first, wrong keep rule.
-
-**Not confirmed on a device** — verified headlessly and by render only.
-
-### [B-039] Inknut's L slot drew half-size glyphs on a full-size grid — FIXED 2026-08-26
-**severity: high (visible on every page of one shipping family) · scope: font
-build tooling · found by owner report, fixed same day**
-
-`build/seedfonts/InknutJunicode/2x/InknutJunicode_14.cpfont` was a **14 ppem**
-render — the 2x cut of the 7 pt slot — sitting under the 14 pt slot's filename.
-The renderer takes the pen from the base 1x font and the ink from the
-companion, so the advance grid was right and the letters were half-size: ink
-filled **0.45** of its advance instead of 0.89, and the line box was 90 device
-px around 45 px glyphs. Owner: "L size inknut is missized."
-
-Cause: `U+2E3B` rasterises 289x5 px at 32 ppem and cannot be written to
-`EpdGlyph`'s uint8 width, so `build-sd-fonts.py --scale 2` aborted; the rename
-to slot names runs only on success, so fontconvert's ppem names survived, and
-`2 x 7 = 14` collides with a real slot. The drop table that knew this lived in
-`install-sim-fonts.py`, which writes the card and never the bundle tree.
-
-Fixed by moving `tier_drops:`/`hires_drops:` into `sd-fonts.yaml`, discarding a
-failed build's own output, and gating the rename on a well-formed tier. Card
-was never affected; no other family was. Full account and every measurement:
-[docs/inknut-l-slot-2026-08-26.md](docs/inknut-l-slot-2026-08-26.md).
-
-**Not confirmed on a phone** — no TestFlight build in that session.
-
-### [B-036] A line with a missing glyph measures narrower than it draws — FIXED 2026-08-20
-**severity: low · scope: text layout · found and fixed same day**
-
-Measurement and rendering disagree about kerning after a missing glyph.
-`getTextBounds` resets `prevCp = 0` when a codepoint has no glyph
-(`lib/EpdFont/EpdFont.cpp:38`), so the pair spanning the gap takes no kern —
-but `drawText` and `getTextAdvanceX` keep `prevCp = cp` unconditionally
-(`lib/GfxRenderer/GfxRenderer.cpp:802`, `:2662`) and DO look the kern pair up.
-A wrapped line measured as exactly fitting can therefore draw a kerned pixel
-or two wider and clip at the margin — only on text containing a glyph the
-active font lacks, which is also exactly the text the coverage gaps in
-[docs/font-unicode-coverage.md](docs/font-unicode-coverage.md) produce.
-
-**Fixed** by making every draw/measure loop sever the pair in BOTH directions:
-the glyph is fetched before the kern, a missing one takes no kern in
-(`kernFP = glyph ? getKerning(...) : 0`) and resets `prevCp` so none is taken
-out. The into-the-hole half was found while writing the test — the original
-filing only caught the out-of-the-hole half. `test/missing_glyph_kern/` pins
-it with a synthetic font whose kern classes list a codepoint its intervals do
-not carry (the exact shape SD-font pruning produces): red on the old code,
-green on the fix. Note the two measurers report different metrics by design —
-bounds is ink extent, advance is advance sum — so the invariant is a constant
-sidebearing gap, not equality.
-
-The trigger population also shrank in the same pass: the coverage fill below
-removed the everyday holes.
-
-### [B-033] The release binary carries a stale provenance stamp — REOPENED and MECHANISM FOUND 2026-08-28
+### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
 **severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
 
 Reported by the session that cut the 1.5.2-BD release: the binary contains
@@ -1095,6 +996,110 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 ---
 
 ## FIXED
+
+### [B-042] A definition list rendered as one unbroken blob — FIXED 2026-08-28
+**severity: high (every `<dl>` in every book) · scope: chapter parsing /
+layout · found by owner report, fixed same day**
+
+`dl`, `dt` and `dd` appeared **nowhere** in `lib/Epub/`. They were not in
+`BLOCK_TAGS`, so `startElement` fell through to its INLINE branch and no block
+ever opened: a term ran straight into its own definition mid-line. Owner's
+screenshot, a quiz book — *"…opens which novel?**A Tale of Two Cities (Dickens,
+1859)**The two cities are London and Paris…"*.
+
+The bold in that screenshot is the tell that this is structural and not a
+styling bug: the inline branch reads `font-weight` off the resolved CSS, so the
+book's `dt { font-weight: bold }` was honored the whole time. Only the block
+half was missing.
+
+Fixed by adding the three tags to `BLOCK_TAGS`, giving `<dl>` the container
+text-indent reset (and no step of its own — a step there would indent the term
+too), and giving `<dd>` the same 1.5 em default step `<ul>`/`<ol>` take **only
+when the publisher gave it no left inset of its own**. The reported book states
+`dd { margin: 0.25em 0 0.25em 1em }` and `CssParser` already resolved it, so
+the book's own 1 em decides the indent; hardcoding one would have misrendered
+every book whose `dd` margin differs. A `<dt>` also keeps with **three lines**
+of room for its definition to start, so a term is not stranded at a page foot —
+the shape of B-038's answer for tables, with the group keep replaced by a room
+requirement because the `<dl>` path is streamed where the table path is
+buffered.
+
+Three lines, not the classical one: this engine runs widow/orphan keep-2/2 on
+the `<dd>` *after* the term's keep has declined, so a one-line rule let a
+three-line definition move away wholesale and strand the term anyway — 4 of 41
+page alignments, measured. Adversarial review caught that after the first
+version was already written up as done; the trade-off table and the cost (zero
+extra pages on the reported book) are in the doc.
+
+`SECTION_FILE_VERSION` 54 → 55: three pagination changes ride it, and a section
+served from a stale cache would go on showing the reported page.
+
+Full account, including what the CSS layer does and does NOT honor
+(`font-size`, `color` and `border-left` on `dd.why`: no, deliberately), the
+keep-with-next decision and its one accepted false positive, and before/after
+renders of the owner's own book at the page in his screenshot:
+[docs/definition-lists-2026-08-28.md](docs/definition-lists-2026-08-28.md).
+Host coverage: `test/definition_list/`, 16 cases, 9 of which fail against the
+pre-fix tree and two more of which fail against the first, wrong keep rule.
+
+**Not confirmed on a device** — verified headlessly and by render only.
+
+Moved to FIXED 2026-09-04 under the 2026-09-02 ruling that silence closes a shipped fix (device confirm was the only thing owed).
+
+### [B-039] Inknut's L slot drew half-size glyphs on a full-size grid — FIXED 2026-08-26
+**severity: high (visible on every page of one shipping family) · scope: font
+build tooling · found by owner report, fixed same day**
+
+`build/seedfonts/InknutJunicode/2x/InknutJunicode_14.cpfont` was a **14 ppem**
+render — the 2x cut of the 7 pt slot — sitting under the 14 pt slot's filename.
+The renderer takes the pen from the base 1x font and the ink from the
+companion, so the advance grid was right and the letters were half-size: ink
+filled **0.45** of its advance instead of 0.89, and the line box was 90 device
+px around 45 px glyphs. Owner: "L size inknut is missized."
+
+Cause: `U+2E3B` rasterises 289x5 px at 32 ppem and cannot be written to
+`EpdGlyph`'s uint8 width, so `build-sd-fonts.py --scale 2` aborted; the rename
+to slot names runs only on success, so fontconvert's ppem names survived, and
+`2 x 7 = 14` collides with a real slot. The drop table that knew this lived in
+`install-sim-fonts.py`, which writes the card and never the bundle tree.
+
+Fixed by moving `tier_drops:`/`hires_drops:` into `sd-fonts.yaml`, discarding a
+failed build's own output, and gating the rename on a well-formed tier. Card
+was never affected; no other family was. Full account and every measurement:
+[docs/inknut-l-slot-2026-08-26.md](docs/inknut-l-slot-2026-08-26.md).
+
+**Not confirmed on a phone** — no TestFlight build in that session.
+
+Moved to FIXED 2026-09-04 under the 2026-09-02 ruling that silence closes a shipped fix (device confirm was the only thing owed).
+
+### [B-036] A line with a missing glyph measures narrower than it draws — FIXED 2026-08-20
+**severity: low · scope: text layout · found and fixed same day**
+
+Measurement and rendering disagree about kerning after a missing glyph.
+`getTextBounds` resets `prevCp = 0` when a codepoint has no glyph
+(`lib/EpdFont/EpdFont.cpp:38`), so the pair spanning the gap takes no kern —
+but `drawText` and `getTextAdvanceX` keep `prevCp = cp` unconditionally
+(`lib/GfxRenderer/GfxRenderer.cpp:802`, `:2662`) and DO look the kern pair up.
+A wrapped line measured as exactly fitting can therefore draw a kerned pixel
+or two wider and clip at the margin — only on text containing a glyph the
+active font lacks, which is also exactly the text the coverage gaps in
+[docs/font-unicode-coverage.md](docs/font-unicode-coverage.md) produce.
+
+**Fixed** by making every draw/measure loop sever the pair in BOTH directions:
+the glyph is fetched before the kern, a missing one takes no kern in
+(`kernFP = glyph ? getKerning(...) : 0`) and resets `prevCp` so none is taken
+out. The into-the-hole half was found while writing the test — the original
+filing only caught the out-of-the-hole half. `test/missing_glyph_kern/` pins
+it with a synthetic font whose kern classes list a codepoint its intervals do
+not carry (the exact shape SD-font pruning produces): red on the old code,
+green on the fix. Note the two measurers report different metrics by design —
+bounds is ink extent, advance is advance sum — so the invariant is a constant
+sidebearing gap, not equality.
+
+The trigger population also shrank in the same pass: the coverage fill below
+removed the everyday holes.
+
+Moved to FIXED 2026-09-04 under the 2026-09-02 ruling that silence closes a shipped fix (B-036 had no device caveat at all and was a filing error).
 
 ### [B-038] A table's header row, and its caption, stranded at the foot of a page — FIXED 2026-08-26
 **severity: high · scope: reader, EPUB table layout (T-012 columns path) · fixed 2026-08-26, reproduced and re-rendered before/after**

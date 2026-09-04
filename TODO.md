@@ -60,108 +60,6 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
-### [T-027] Rewrite hold-for-action to fit the gesture model — CLOSED AS DONE 2026-09-03
-**scope: firmware input + ios gestures · asked 2026-08-28 · RESCOPED 2026-08-29 · RULED CLOSED 2026-09-03**
-
-**Owner ruling 2026-09-03: "Close as done."** Asked how to close the
-architectural half (converge the surviving thresholds on one constant, grow a
-firmware binding table, or leave open), he chose to close it on what has
-already landed: the 09-01 kills (BLE pairing, back-to-home, chapter skip), the
-09-02 held-Back kill, the per-button `ButtonHoldTimer` at all six raw
-`getHeldTime()` sites, and the two-finger-hold ask wired through
-`Action::OpenActionMenu`. The eleven surviving thresholds (350 / 500 / 700 /
-900 / 1000 / 1500 ms across eight files, listed in `docs/hold-gestures.md`)
-stay as they are: every one is on a button, and they are the typing and list
-holds he named KEEP. Not converged, by ruling -- do not re-propose a shared
-constant or a firmware binding table under this id. Original entry follows.
-
-**Rescoped by owner ruling 2026-08-29**, which rejected all three shapes this
-entry was about to be built as (a new action in the iOS gesture table, a
-hard-wired binding in `FileManagerActivity`, or not at all):
-
-> *"we need to rewrite that and any 'hold for action' to be friendly to how we
-> do gestures now"*
-
-So this is no longer "add one binding". The firmware grew its hold-for-action
-behavior one activity at a time, before the gesture model existed. The survey
-that had to exist before anything could be proposed is
-[docs/hold-gestures.md](docs/hold-gestures.md), measured at `b398d45`:
-**nine distinct hold thresholds** across ten files, **30 `getHeldTime()` call
-sites**, two different constants both named `LONG_PRESS_MS` holding 500 and
-1000, and four thresholds declared as file-local or function-local `constexpr`
-where nothing can reuse them — against the gesture model's ONE table, ONE
-threshold (750 ms) and appendable action list.
-
-`SETTINGS.longPressButtonBehavior` is the one hold that is already
-reconfigurable, and it is shaped the opposite way (a behavior selector, not a
-binding). Its release-triggered edge cases are load-bearing and are cited in the
-survey.
-
-**Blocked**: whether the firmware grows its own binding table, adopts the
-simulator's, or merely converges on one threshold and one helper — and whether
-this applies to hardware at all, given X3 and X4 have no touch. More than one
-defensible answer, so it goes to the owner before code moves.
-
-The original ask, which this now subsumes:
-
-Owner: *"holding down two fingers on manage files needs to bring up Menu
-action."*
-
-Manage Files has a per-item Menu action that the front cluster reaches; on the
-phone there is no equivalent, so the screen is browse-only by touch.
-
-**It composes with T-025 rather than preceding it.** A two-finger hold is a new
-gesture in a vocabulary that is about to become configurable, so building it as
-a hardcoded binding now means unpicking it later. The cheap order is to add the
-GESTURE here with a fixed binding, and let T-025's configuration layer adopt it
-as one more assignable row when that lands.
-
-**What has to be checked first.** Two-finger is currently the SELECT gesture
-family (2-tap is Confirm, 2-swipe is font size), and a two-finger HOLD is
-unclaimed — verify that against `ios/CrossPointZenRecognizers.mm` before
-assuming, because the recognizer set has grown twice this week. It must also not
-fight the one-finger hold added 2026-08-27: that one is `numberOfTouchesRequired
-= 1` and this would be 2, so they are mutually exclusive by construction, but
-the simultaneity note in that file explains why that needs stating rather than
-assuming.
-
-**And it is screen-scoped, which nothing in the gesture layer currently is.**
-Every recognizer today is either always-on or zen-only; "only on Manage Files"
-is a third kind. Whether that is a per-activity enable or a gesture that fires
-everywhere and is ignored elsewhere is the design question, and the second is
-usually the one that ages better.
-
-**The original ask is now satisfiable, 2026-09-01 — via T-025's configuration
-layer directly, skipping the "add it as a fixed binding first" step this entry
-proposed above.** `Action::OpenActionMenu` (13) was appended to
-`gesturebind::Action` in `ios/GestureBindings.h` (crosspoint-simulator),
-offered in both the global and zone action lists with NO default binding —
-the owner picks which gesture, if any, including the two-finger hold the
-original ask named. Fully wired end to end: `performGestureAction` in
-`ios/CrossPointZenRecognizers.mm` dispatches it through a new consume-once
-channel (`src/OpenActionMenuChannel.h`, `HalGPIO::injectOpenActionMenu`), and
-this repo's `FileManagerActivity::loop()` polls the matching
-`HalGPIO::consumeOpenActionMenu()` and calls `openActionMenu()` — the same
-call held Confirm already makes. Device-side no-op mirrors every other host
-channel here (`lib/hal/HalGPIO.h`, `consumeOpenActionMenu() { return false;
-}`), so nothing changes on hardware. Screen-scoped exactly as the paragraph
-above anticipated: the channel is polled only in `FileManagerActivity`, is
-drained on that activity's `onEnter()` so a gesture fired on another screen
-cannot surface the menu late, and a binding fired elsewhere logs a distinct
-"fires only in Manage Files" line rather than doing nothing silently.
-**This resolves the two-finger-hold ask** (UNCONFIRMED on device — UIKit
-recognizers and gesture bindings cannot be exercised headlessly; the channel
-and the poll are host-tested). **It does NOT close this entry**: the BLOCKED
-architectural question above — whether the FIRMWARE grows its own binding
-table, adopts the simulator's, or converges on one threshold and helper for
-every OTHER hold in `docs/hold-gestures.md`'s survey — is untouched. Button
-access to the same menu also got a second, separate look the same day (see
-that session's report): short Confirm on a file already opens it via `View`,
-which is real, primary, one-press behavior, so it was NOT swapped for a
-menu-open; held Confirm (~1000 ms, untouched by the 2026-09-01
-hold-for-action ruling in `docs/hold-gestures.md`) remains the only button
-route in.
-
 ### [T-017] Light sleep (#2525) is on main and unconfirmed on device
 **scope: verification · opened 2026-08-15**
 
@@ -299,6 +197,108 @@ the cheap version and needs no keychain.
 ---
 
 ## Finished
+
+### [T-027] Rewrite hold-for-action to fit the gesture model — CLOSED AS DONE 2026-09-03
+**scope: firmware input + ios gestures · asked 2026-08-28 · RESCOPED 2026-08-29 · RULED CLOSED 2026-09-03**
+
+**Owner ruling 2026-09-03: "Close as done."** Asked how to close the
+architectural half (converge the surviving thresholds on one constant, grow a
+firmware binding table, or leave open), he chose to close it on what has
+already landed: the 09-01 kills (BLE pairing, back-to-home, chapter skip), the
+09-02 held-Back kill, the per-button `ButtonHoldTimer` at all six raw
+`getHeldTime()` sites, and the two-finger-hold ask wired through
+`Action::OpenActionMenu`. The eleven surviving thresholds (350 / 500 / 700 /
+900 / 1000 / 1500 ms across eight files, listed in `docs/hold-gestures.md`)
+stay as they are: every one is on a button, and they are the typing and list
+holds he named KEEP. Not converged, by ruling -- do not re-propose a shared
+constant or a firmware binding table under this id. Original entry follows.
+
+**Rescoped by owner ruling 2026-08-29**, which rejected all three shapes this
+entry was about to be built as (a new action in the iOS gesture table, a
+hard-wired binding in `FileManagerActivity`, or not at all):
+
+> *"we need to rewrite that and any 'hold for action' to be friendly to how we
+> do gestures now"*
+
+So this is no longer "add one binding". The firmware grew its hold-for-action
+behavior one activity at a time, before the gesture model existed. The survey
+that had to exist before anything could be proposed is
+[docs/hold-gestures.md](docs/hold-gestures.md), measured at `b398d45`:
+**nine distinct hold thresholds** across ten files, **30 `getHeldTime()` call
+sites**, two different constants both named `LONG_PRESS_MS` holding 500 and
+1000, and four thresholds declared as file-local or function-local `constexpr`
+where nothing can reuse them — against the gesture model's ONE table, ONE
+threshold (750 ms) and appendable action list.
+
+`SETTINGS.longPressButtonBehavior` is the one hold that is already
+reconfigurable, and it is shaped the opposite way (a behavior selector, not a
+binding). Its release-triggered edge cases are load-bearing and are cited in the
+survey.
+
+**Blocked**: whether the firmware grows its own binding table, adopts the
+simulator's, or merely converges on one threshold and one helper — and whether
+this applies to hardware at all, given X3 and X4 have no touch. More than one
+defensible answer, so it goes to the owner before code moves.
+
+The original ask, which this now subsumes:
+
+Owner: *"holding down two fingers on manage files needs to bring up Menu
+action."*
+
+Manage Files has a per-item Menu action that the front cluster reaches; on the
+phone there is no equivalent, so the screen is browse-only by touch.
+
+**It composes with T-025 rather than preceding it.** A two-finger hold is a new
+gesture in a vocabulary that is about to become configurable, so building it as
+a hardcoded binding now means unpicking it later. The cheap order is to add the
+GESTURE here with a fixed binding, and let T-025's configuration layer adopt it
+as one more assignable row when that lands.
+
+**What has to be checked first.** Two-finger is currently the SELECT gesture
+family (2-tap is Confirm, 2-swipe is font size), and a two-finger HOLD is
+unclaimed — verify that against `ios/CrossPointZenRecognizers.mm` before
+assuming, because the recognizer set has grown twice this week. It must also not
+fight the one-finger hold added 2026-08-27: that one is `numberOfTouchesRequired
+= 1` and this would be 2, so they are mutually exclusive by construction, but
+the simultaneity note in that file explains why that needs stating rather than
+assuming.
+
+**And it is screen-scoped, which nothing in the gesture layer currently is.**
+Every recognizer today is either always-on or zen-only; "only on Manage Files"
+is a third kind. Whether that is a per-activity enable or a gesture that fires
+everywhere and is ignored elsewhere is the design question, and the second is
+usually the one that ages better.
+
+**The original ask is now satisfiable, 2026-09-01 — via T-025's configuration
+layer directly, skipping the "add it as a fixed binding first" step this entry
+proposed above.** `Action::OpenActionMenu` (13) was appended to
+`gesturebind::Action` in `ios/GestureBindings.h` (crosspoint-simulator),
+offered in both the global and zone action lists with NO default binding —
+the owner picks which gesture, if any, including the two-finger hold the
+original ask named. Fully wired end to end: `performGestureAction` in
+`ios/CrossPointZenRecognizers.mm` dispatches it through a new consume-once
+channel (`src/OpenActionMenuChannel.h`, `HalGPIO::injectOpenActionMenu`), and
+this repo's `FileManagerActivity::loop()` polls the matching
+`HalGPIO::consumeOpenActionMenu()` and calls `openActionMenu()` — the same
+call held Confirm already makes. Device-side no-op mirrors every other host
+channel here (`lib/hal/HalGPIO.h`, `consumeOpenActionMenu() { return false;
+}`), so nothing changes on hardware. Screen-scoped exactly as the paragraph
+above anticipated: the channel is polled only in `FileManagerActivity`, is
+drained on that activity's `onEnter()` so a gesture fired on another screen
+cannot surface the menu late, and a binding fired elsewhere logs a distinct
+"fires only in Manage Files" line rather than doing nothing silently.
+**This resolves the two-finger-hold ask** (UNCONFIRMED on device — UIKit
+recognizers and gesture bindings cannot be exercised headlessly; the channel
+and the poll are host-tested). **It does NOT close this entry**: the BLOCKED
+architectural question above — whether the FIRMWARE grows its own binding
+table, adopts the simulator's, or converges on one threshold and helper for
+every OTHER hold in `docs/hold-gestures.md`'s survey — is untouched. Button
+access to the same menu also got a second, separate look the same day (see
+that session's report): short Confirm on a file already opens it via `View`,
+which is real, primary, one-press behavior, so it was NOT swapped for a
+menu-open; held Confirm (~1000 ms, untouched by the 2026-09-01
+hold-for-action ruling in `docs/hold-gestures.md`) remains the only button
+route in.
 
 ### [T-022] Claude results: the FRONT pair should page too — DONE 2026-08-29
 **scope: firmware input · asked 2026-08-24 · CLOSED — found already shipped while auditing this file**
