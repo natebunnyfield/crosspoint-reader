@@ -199,7 +199,13 @@ class LibraryReleaseParser {
       case Position::IN_ASSET_OBJECT:
         self->assetDepth--;
         if (self->assetDepth == 0) {
-          if (!self->current.name.empty() && !self->current.url.empty()) {
+          // Capped: the release JSON comes from the network (the fixed
+          // api.github.com endpoint today, but a hostile or MITM'd response
+          // could stream assets without end and grow this vector until the
+          // ~380 KB device heap is exhausted -- crafted-input hunt 2026-09-04).
+          // A real release has a handful of assets; kMaxAssets is generous.
+          constexpr size_t kMaxAssets = 512;
+          if (!self->current.name.empty() && !self->current.url.empty() && self->assets.size() < kMaxAssets) {
             self->assets.push_back(self->current);
           }
           self->position = Position::IN_ASSETS_ARRAY;

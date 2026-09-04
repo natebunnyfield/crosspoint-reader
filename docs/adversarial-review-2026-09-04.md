@@ -146,3 +146,34 @@ on both panels (631/40 vs 575/40, 639/40 vs 583/40); `cp::renderScale()`
 visible and used only in runtime arithmetic. Noted, pre-existing: a headline
 advances by the UI_10 line height while drawing in UI_12; the clock list's
 touch hit-test still uses the un-reserved height (touch boards).
+
+## Crafted-input hunt, follow-up (EPUB / CSS / JSON / text / images), 2026-09-04
+
+A second read-only ASan/UBSan pass over the four parser families the first
+crafted-input hunt skipped — every one reachable from a file a Wi-Fi peer can
+PUT over WebDAV. No memory corruption of B-045's class was found; the zip
+reader, the expat-fed OPF/NCX/XHTML, the CSS parser, the streaming JSON
+parser (fuzzed with deep nesting, 10^6-digit numbers, token storms) and the
+text/markdown/UTF-8 paths are guarded (details in the CLEAN list of the
+agent's report; the load-bounding is B-023/B-024's and holds). Two latent
+survivors, both FIXED the same day:
+
+1. **`ImageToFramebufferDecoder::validateImageDimensions` computed `width *
+   height` as signed `int`** — a crafted cover (65535x65535, or a PNG IHDR
+   with `height = 0x7FFFFFFF`, which PNGdec's open path does not bound)
+   overflowed the product negative and PASSED the `> MAX_SOURCE_PIXELS` guard
+   that exists to reject it. UB under UBSan. Blunted downstream (the row
+   buffers size off width alone and JPEGDEC streams MCUs, so it aborts the
+   decode rather than over-reading), but the guard did not guard and the
+   multiply was UB. Each dimension is now bounded first and the product taken
+   in `int64_t`, the shape `Bitmap.cpp` already uses.
+2. **`LibraryReleaseParser` accumulated an unbounded `std::vector<Asset>`**
+   from the GitHub release JSON, with no total cap — a hostile or MITM'd
+   response could stream assets until the ~380 KB device heap is out. Not the
+   card-PUT model (the URL is the fixed api.github.com endpoint), so low;
+   capped at 512 assets, which no real release approaches. The card-side
+   `library_sync.json` was already capped (`MAX_LEDGER_BYTES`).
+
+Not covered by either pass, for a future session: the progressive-JPEG and
+PNG decoders' internal MCU/scan loops below the dimension guard (the vendored
+JPEGDEC and PNGdec), and the EPUB image `src` -> path resolution.
