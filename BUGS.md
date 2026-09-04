@@ -34,125 +34,6 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
-### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
-**severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
-
-Found while reading the card's crash reports for the OTA work, not reported —
-so nobody has said how often it happens, and that is the first thing to
-establish.
-
-```
-CrossPoint version: 1.5.9-BD
-Panic reason: abort() was called at PC 0x421c764d on core 0
-[336467] [ERR] [SDCF] buildAdvanceTable: failed to allocate codepoint buffer (16384 bytes)
-   ... the same line 13 times, ~350 ms apart ...
-[276]  [INF] [HW] Using cached device type: X3
-```
-
-**What the shape says.** Thirteen consecutive failures to get 16 KB, then an
-`abort()`. So this is not one unlucky allocation — the heap was exhausted and
-stayed exhausted while the reader retried, which means the retry itself is part
-of the story: something asked, failed, and asked again without releasing
-whatever had filled the heap.
-
-The last two lines are from the REBOOT (`[276]`, a fresh millis), so the abort
-is the end of that boot's log, not a recovery.
-
-**Where to look, in order.** `SdCardFont::buildAdvanceTable` and what holds
-memory across its retries; whether the failure path frees the partial table
-before the next attempt; and what else was live at the time — 16 KB is not a
-large ask, so the interesting question is what had already taken the heap. The
-X3 has ~400 KB and the surrounding code is written for that, so a single
-runaway consumer is more likely than genuine pressure.
-
-**Not reproduced.** No card state was captured beyond the report, and the log
-tail does not say which family or which book was open.
-
-#### What was changed, 2026-08-28
-
-`buildAdvanceTableRange` asked for the WORST CASE on every call: 4096
-codepoints is 16 KB, `new[]`-ed and freed per invocation. On a device with
-~400 KB the number that matters is not free heap but the largest CONTIGUOUS
-block, and a 16 KB request stops being satisfiable long after churn has broken
-the heap up — which is exactly the shape of thirteen consecutive failures with
-the device otherwise running.
-
-It now starts at **256 codepoints (1 KB)** and quadruples only when a scan
-actually fills the buffer, so the common call — a page of text needs a couple of
-hundred distinct codepoints — never asks for more than 1 KB. The scan restarts
-after a growth rather than resuming, because `collectUniqueCodepoints` dedupes
-and a rescan is therefore idempotent; at most two growths separate 256 from the
-cap.
-
-**A failed growth is no longer fatal.** The buffer already holds a full set of
-codepoints at that point, and `hitCap` already means "layout may be
-approximate" — an outcome this function has always been able to return and the
-reader has always survived. Only the first 1 KB allocation can still fail the
-call outright, and it is the one most likely to succeed.
-
-**This is a mitigation, not a diagnosis.** It removes the largest recurring
-contiguous request on the font path, which is the thing most likely to fail on
-a fragmented heap and the thing the log actually recorded. It does NOT explain
-what had already consumed the heap, and the `abort()` itself came from some
-OTHER allocation — a plain `new` failing under `-fno-exceptions` aborts, and
-the nothrow site here returns instead. So if the crash recurs, the next step is
-to find that allocation, not to shrink this one further.
-
-**Headless allocation audit, 2026-09-04 (narrows it, does not close it).** A
-bare-`new` audit of the font and render paths:
-
-- Every `new` in `lib/EpdFont/*.cpp` is `new (std::nothrow)` (18 sites), and
-  each is checked -- a failure returns nullptr / notdef, never aborts. The
-  abort is NOT the font path failing to guard its own allocations.
-- The glyph/render path (`lib/GfxRenderer/*.cpp`) has no plain throwing `new`
-  either; Bitmap, BitmapHelpers and the PNG chain all carry the nothrow +
-  check pattern with the `-fno-exceptions` reason in a comment.
-- What is left is the STL containers on the PARSE path -- `ParsedText`'s
-  `std::deque<std::string> words` and the per-word vectors
-  (`lib/Epub/Epub/ParsedText.h`), grown by `addWord`. These throw
-  `std::bad_alloc` on OOM, which `-fno-exceptions` turns into `abort()`. The
-  named field crash is exactly there ("bad_alloc in ParsedText::addWord",
-  `EpubReaderActivity.h`). The BACKGROUND build already gates on both a
-  free-heap floor and a max-alloc-block floor (`buildTickHeapGate`,
-  fragmentation-aware -- 32 KB free / 16 KB largest), but the FOREGROUND
-  render builds the page it needs REGARDLESS of that floor, so it is the one
-  path that can still reach a throwing parse allocation under pressure.
-
-So the residual is one of two things, and both need the device: decode the
-panic PC (0x421c764d) from the real backtrace to name the exact allocation,
-or rework the foreground parse path to fail gracefully instead of aborting --
-which means pre-flighting each parse allocation against `getMaxAllocHeap()`
-(the STL containers cannot be made nothrow without a custom allocator), and
-the thresholds are tuned against real device fragmentation numbers (the
-comment's "34.7 KB free but 11 KB largest block" is a measured device state,
-not a host one). The mitigation shipped (growable buffer + the background
-gate) stands; this audit rules out the two allocation classes it is NOT and
-points the next device session straight at the foreground parse path.
-
-577 tests pass, desktop canary green. Device-confirm only: nothing host-side
-reproduces a fragmented ESP32 heap.
-
-### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
-**severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
-
-Reported by the session that cut the 1.5.2-BD release: the binary contains
-`1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
-DISPLAYED version is correct** (1.5.2-BD on the boot screen); this is provenance
-metadata, so the likeliest visible symptom is the web UI reporting an old build.
-
-What that session established, and it is the useful half:
-
-* it survives `pio run -t clean`, so it is not a stale object;
-* plain `grep` cannot find the string in the tree, which points at a
-  **committed compressed asset** — most probably the gzipped web UI that
-  `scripts/build_html.py` embeds.
-
-Deliberately filed without a mechanism rather than guessed at. **Close by**
-finding which committed artifact carries it (start by decompressing the
-generated HTML headers and grepping those), then regenerating it — or, if it is
-baked into a committed `.gz`, making the generator stamp it at build time so it
-cannot go stale again.
-
 ## Closed 2026-08-28. Both halves of the lead were wrong.
 
 **The web UI does not carry it.** The suggested first step was to decompress the
@@ -510,6 +391,131 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 ---
 
 ## FIXED
+
+### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
+**severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
+
+Reported by the session that cut the 1.5.2-BD release: the binary contains
+`1.5.1-BNY-2-g78be6b97f` while `git describe` returns `1.5.1-B2-34-…`. **The
+DISPLAYED version is correct** (1.5.2-BD on the boot screen); this is provenance
+metadata, so the likeliest visible symptom is the web UI reporting an old build.
+
+What that session established, and it is the useful half:
+
+* it survives `pio run -t clean`, so it is not a stale object;
+* plain `grep` cannot find the string in the tree, which points at a
+  **committed compressed asset** — most probably the gzipped web UI that
+  `scripts/build_html.py` embeds.
+
+Deliberately filed without a mechanism rather than guessed at. **Close by**
+finding which committed artifact carries it (start by decompressing the
+generated HTML headers and grepping those), then regenerating it — or, if it is
+baked into a committed `.gz`, making the generator stamp it at build time so it
+cannot go stale again.
+
+Shipped in build-170 (2026-09-04). Moved out of OPEN under the silence-closes-a-shipped-fix ruling (owner 2026-09-04: "presume fixed, close them"). The stamp fix is byte-verified on a gh_release build; the first-OTA bootloader accept is presumed good unless re-raised.
+
+
+### [B-040] The reader aborts on a 16 KB allocation while building a font's advance table — MITIGATED 2026-08-28, unconfirmed on device
+**severity: high (hard crash) · scope: SD font loading · found 2026-08-28 in `/Volumes/BUNNYFIELDS/crash_report.txt`**
+
+Found while reading the card's crash reports for the OTA work, not reported —
+so nobody has said how often it happens, and that is the first thing to
+establish.
+
+```
+CrossPoint version: 1.5.9-BD
+Panic reason: abort() was called at PC 0x421c764d on core 0
+[336467] [ERR] [SDCF] buildAdvanceTable: failed to allocate codepoint buffer (16384 bytes)
+   ... the same line 13 times, ~350 ms apart ...
+[276]  [INF] [HW] Using cached device type: X3
+```
+
+**What the shape says.** Thirteen consecutive failures to get 16 KB, then an
+`abort()`. So this is not one unlucky allocation — the heap was exhausted and
+stayed exhausted while the reader retried, which means the retry itself is part
+of the story: something asked, failed, and asked again without releasing
+whatever had filled the heap.
+
+The last two lines are from the REBOOT (`[276]`, a fresh millis), so the abort
+is the end of that boot's log, not a recovery.
+
+**Where to look, in order.** `SdCardFont::buildAdvanceTable` and what holds
+memory across its retries; whether the failure path frees the partial table
+before the next attempt; and what else was live at the time — 16 KB is not a
+large ask, so the interesting question is what had already taken the heap. The
+X3 has ~400 KB and the surrounding code is written for that, so a single
+runaway consumer is more likely than genuine pressure.
+
+**Not reproduced.** No card state was captured beyond the report, and the log
+tail does not say which family or which book was open.
+
+#### What was changed, 2026-08-28
+
+`buildAdvanceTableRange` asked for the WORST CASE on every call: 4096
+codepoints is 16 KB, `new[]`-ed and freed per invocation. On a device with
+~400 KB the number that matters is not free heap but the largest CONTIGUOUS
+block, and a 16 KB request stops being satisfiable long after churn has broken
+the heap up — which is exactly the shape of thirteen consecutive failures with
+the device otherwise running.
+
+It now starts at **256 codepoints (1 KB)** and quadruples only when a scan
+actually fills the buffer, so the common call — a page of text needs a couple of
+hundred distinct codepoints — never asks for more than 1 KB. The scan restarts
+after a growth rather than resuming, because `collectUniqueCodepoints` dedupes
+and a rescan is therefore idempotent; at most two growths separate 256 from the
+cap.
+
+**A failed growth is no longer fatal.** The buffer already holds a full set of
+codepoints at that point, and `hitCap` already means "layout may be
+approximate" — an outcome this function has always been able to return and the
+reader has always survived. Only the first 1 KB allocation can still fail the
+call outright, and it is the one most likely to succeed.
+
+**This is a mitigation, not a diagnosis.** It removes the largest recurring
+contiguous request on the font path, which is the thing most likely to fail on
+a fragmented heap and the thing the log actually recorded. It does NOT explain
+what had already consumed the heap, and the `abort()` itself came from some
+OTHER allocation — a plain `new` failing under `-fno-exceptions` aborts, and
+the nothrow site here returns instead. So if the crash recurs, the next step is
+to find that allocation, not to shrink this one further.
+
+**Headless allocation audit, 2026-09-04 (narrows it, does not close it).** A
+bare-`new` audit of the font and render paths:
+
+- Every `new` in `lib/EpdFont/*.cpp` is `new (std::nothrow)` (18 sites), and
+  each is checked -- a failure returns nullptr / notdef, never aborts. The
+  abort is NOT the font path failing to guard its own allocations.
+- The glyph/render path (`lib/GfxRenderer/*.cpp`) has no plain throwing `new`
+  either; Bitmap, BitmapHelpers and the PNG chain all carry the nothrow +
+  check pattern with the `-fno-exceptions` reason in a comment.
+- What is left is the STL containers on the PARSE path -- `ParsedText`'s
+  `std::deque<std::string> words` and the per-word vectors
+  (`lib/Epub/Epub/ParsedText.h`), grown by `addWord`. These throw
+  `std::bad_alloc` on OOM, which `-fno-exceptions` turns into `abort()`. The
+  named field crash is exactly there ("bad_alloc in ParsedText::addWord",
+  `EpubReaderActivity.h`). The BACKGROUND build already gates on both a
+  free-heap floor and a max-alloc-block floor (`buildTickHeapGate`,
+  fragmentation-aware -- 32 KB free / 16 KB largest), but the FOREGROUND
+  render builds the page it needs REGARDLESS of that floor, so it is the one
+  path that can still reach a throwing parse allocation under pressure.
+
+So the residual is one of two things, and both need the device: decode the
+panic PC (0x421c764d) from the real backtrace to name the exact allocation,
+or rework the foreground parse path to fail gracefully instead of aborting --
+which means pre-flighting each parse allocation against `getMaxAllocHeap()`
+(the STL containers cannot be made nothrow without a custom allocator), and
+the thresholds are tuned against real device fragmentation numbers (the
+comment's "34.7 KB free but 11 KB largest block" is a measured device state,
+not a host one). The mitigation shipped (growable buffer + the background
+gate) stands; this audit rules out the two allocation classes it is NOT and
+points the next device session straight at the foreground parse path.
+
+577 tests pass, desktop canary green. Device-confirm only: nothing host-side
+reproduces a fragmented ESP32 heap.
+
+Shipped in build-170 (2026-09-04, `1e2b193`). Moved out of OPEN under the owner's 2026-09-02 ruling that silence closes a shipped fix (owner reaffirmed 2026-09-04: "presume fixed, close them"). The mitigation (growable buffer + background heap gate) and the 2026-09-04 allocation audit stand; if a large book still aborts on the phone the owner re-raises and this reopens on the foreground parse-path lead the audit named.
+
 
 ### [B-045] A crafted card font reads ~16 KB past a 1-byte glyph buffer (heap overflow)
 **severity: high (memory safety, remote-reachable) · scope: SD font loading + glyph decode · found 2026-09-04 by a crafted-input hunt (ASan), reproduced and FIXED the same day**
