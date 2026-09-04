@@ -62,8 +62,8 @@ long-standing convention in this file's older entries — B-033's "## Closed",
 than demoted, since they sit safely inside what is genuinely archival material
 now — makes a recurrence likely.
 
-### [B-041] The original ask — get Actions running — is DONE. CI now runs, and every workflow that ran on 2026-08-29 is RED — FOUND 2026-08-28, RECONFIRMED AND REWRITTEN 2026-08-29, NARROWED 2026-08-30, GREEN-ABLE 2026-08-31, RED AGAIN 2026-09-01→03 on three jobs, all FIXED 2026-09-04 (unconfirmed on a CI run until the push lands)
-**severity: medium (no automated verification is currently trustworthy) · scope: build / release · found 2026-08-28, CI enabled and red 2026-08-29, green-able 2026-08-31, red again on every push 2026-09-01→03, fixed in tree 2026-09-04**
+### [B-041] The original ask — get Actions running — is DONE. CI now runs, and every workflow that ran on 2026-08-29 is RED — FOUND 2026-08-28, RECONFIRMED AND REWRITTEN 2026-08-29, NARROWED 2026-08-30, GREEN-ABLE 2026-08-31, RED AGAIN 2026-09-01→03 on three jobs, FIXED and GREEN ON GITHUB 2026-09-04 (run 33847931384)
+**severity: medium (no automated verification is currently trustworthy) · scope: build / release · found 2026-08-28, CI enabled and red 2026-08-29, green-able 2026-08-31, red again on every push 2026-09-01→03, green on GitHub 2026-09-04**
 
 **The premise this entry used to carry — "CI has never run on this fork, every
 workflow reports zero runs" — is FALSE as of 2026-08-29 and must not be quoted
@@ -545,6 +545,16 @@ medium --fail-on-defect high` PASSED; `ctest` 622/622 in `build/test`
 (macOS — the `<cstdint>` fix is the one thing this machine cannot prove, and it
 is a one-line include). What is NOT yet true: a green run on GitHub. The next
 push is the evidence; if it is red, this entry reopens on that run's log.
+
+The push of those fixes turned up a FOURTH red, hidden behind the
+`<cstdint>` one: `ProgressiveJpegTest` failed with `JPEGDEC.h:22: fatal
+error: Arduino.h: No such file or directory`. JPEGDEC's host branch keys on
+`__MACH__ || __LINUX__ || …`, and GCC defines `__linux__`, never `__LINUX__`
+(JPEGDEC's own spelling), so Ubuntu fell through to the Arduino include while
+every Mac took the host branch. `e484edb75` defines it for the target on
+non-Apple hosts. **Run `33847931384` on that commit: unit-tests, build,
+clang-format, cppcheck, Test Status — all green.** The first green run since
+Actions were enabled on 2026-08-28.
 
 **The recurring lesson**, since this is the third time this entry has recorded
 it: a check nobody watches is a check that goes red silently. `gh run list
