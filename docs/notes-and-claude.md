@@ -285,7 +285,9 @@ they do not fit in heap together. Measured on device: TLS completes with
 14,780 B free.
 
 **Setup:** put your API key in `/claude-key.txt` on the card (one line), and
-join the WiFi network once so the credential is stored.
+join the WiFi network once so the credential is stored. The same one-line file
+pattern serves Update Library: `/github-token.txt` holds its GitHub token, and
+both files go through one reader (`src/util/CardSecret.h`).
 
 ### Security posture — read before shipping this
 

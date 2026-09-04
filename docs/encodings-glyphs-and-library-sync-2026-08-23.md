@@ -284,6 +284,17 @@ a boundary value, so a note added tomorrow is covered the day it is added.
 
 ## 3. Update Library: hash only when size or mtime moved
 
+### The token, since 2026-09-04
+
+The GitHub fine-grained PAT the fetch authenticates with is read from
+`/github-token.txt` on the card root first -- one line, hand-placed, the same
+pattern and the same reader as `/claude-key.txt` (`src/util/CardSecret.h`).
+The `githubToken` field in `/.crosspoint/settings.json` is the fallback, kept
+so cards that already carry it keep working; the file wins when both are
+present. On the simulator the host's own settings surface still comes first.
+Like the Claude key, the file sits on the card root, which File Transfer and
+WebDAV serve, so it is readable on the LAN while transfer mode is on.
+
 ### What it did
 
 `syncBook` asked `sizeVerdict`, and on CHECK_SHA read the entire book off the
