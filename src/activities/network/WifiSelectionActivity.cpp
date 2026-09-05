@@ -682,13 +682,13 @@ void WifiSelectionActivity::loop() {
       return;
     }
 
-    if (mappedInput.wasPressed(MappedInputManager::Button::Right)) {
+    if (mappedInput.wasPressed(MappedInputManager::Button::Left)) {
       startWifiScan();
       return;
     }
 
-    const bool leftPressed = mappedInput.wasPressed(MappedInputManager::Button::Left);
-    if (leftPressed) {
+    const bool rightPressed = mappedInput.wasPressed(MappedInputManager::Button::Right);
+    if (rightPressed) {
       const bool hasSavedPassword = !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword;
       if (hasSavedPassword) {
         selectedSSID = networks[selectedNetworkIndex].ssid;
@@ -727,10 +727,13 @@ void WifiSelectionActivity::loop() {
 
       // The SIDE pair STEPS the list here, one row per press, wrapping -- this
       // screen is on the paging ruling's exemption list (docs/ui-conventions.md)
-      // because its FRONT pair already means something else: Right is always
-      // Retry (it returns above, so onNext below never fires on a press), and
-      // Left is Forget on a network with a saved password -- on any other it
-      // falls through to onPrevious and steps UP, unlabeled. f278be2fc turned
+      // because its FRONT pair already means something else: Left (the third
+      // front button) is always Retry (it returns above, so onPrevious below
+      // never fires on a press), and Right is Forget on a network with a saved
+      // password -- on any other it falls through to onNext and steps DOWN,
+      // unlabeled. Until 2026-09-05 it was the mirror image (Retry on Right,
+      // Forget on Left); the owner asked for Retry on the third front button,
+      // and Forget took the slot Retry vacated. f278be2fc turned
       // the side pair into a screenful page anyway, and on a list that fits
       // one screen (the common case) pageDown returns false -- so no button
       // moved the highlight DOWN at all (docs/ux-navigation-audit-2026-09-02.md,
@@ -876,7 +879,7 @@ void WifiSelectionActivity::renderNetworkList(const Rect* screen, const ThemeMet
   const bool hasSavedPassword = !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword;
   const char* forgetLabel = hasSavedPassword ? tr(STR_FORGET_BUTTON) : "";
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONNECT), forgetLabel, tr(STR_RETRY));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONNECT), tr(STR_RETRY), forgetLabel);
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 

@@ -252,10 +252,13 @@ consumes it even though no firmware code does.
 
   **Exempt since 2026-09-02: `WifiSelectionActivity`** — the side pair STEPS
   the networks, one row per press, wrapping. Its front pair already means
-  something else, which is what this list is for: Right is always Retry
-  (`onNext` is dead for presses), Left is Forget on a network with a saved
-  password and otherwise falls through to a step UP, unlabeled — a pre-existing
-  asymmetry, not a clean split. `f278be2fc` made the side pair page anyway,
+  something else, which is what this list is for: Left (the third front
+  button) is always Retry (`onPrevious` is dead for presses), Right is Forget
+  on a network with a saved password and otherwise falls through to a step
+  DOWN, unlabeled — a pre-existing asymmetry, not a clean split. It was the
+  mirror image (Retry on Right, Forget on Left) until 2026-09-05, when the
+  owner asked for Retry on the third front button and Forget took the vacated
+  Right. `f278be2fc` made the side pair page anyway,
   and on a scan that fits one screen `pageDown` returns false, so no button
   moved the highlight DOWN at all (`docs/ux-navigation-audit-2026-09-02.md`,
   F3). The trade: a long list (30 SSIDs on an X3/X4, which have no swipe) is
