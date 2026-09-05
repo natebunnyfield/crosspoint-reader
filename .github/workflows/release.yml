@@ -8,18 +8,27 @@ name: Compile Release
 # be in a fresh CI checkout. The gate is correct: it exists because a release
 # built from a fresh clone once silently dropped those faces.
 #
-# The alternative considered and rejected was shipping the fonts to CI. They are
-# 3.8 MB across 25 files -- about 81x GitHub's 48 KB Actions-secret cap, so they
-# cannot be a secret -- and this fork is PUBLIC, so an encrypted archive
-# committed here would be publicly downloadable ciphertext of licensed fonts. A
-# private fonts repo with only a token as the secret would have worked, and the
-# owner chose not to take on that machinery.
+# The alternative considered and rejected on 2026-08-31 was shipping the fonts
+# to CI. They are 3.8 MB across 25 files -- about 81x GitHub's 48 KB
+# Actions-secret cap, so they cannot be a secret -- and this fork is PUBLIC, so
+# an encrypted archive committed here would be publicly downloadable ciphertext
+# of licensed fonts. A private fonts repo with only a token as the secret would
+# have worked, and the owner chose not to take on that machinery.
 #
-# So this workflow runs where the fonts actually live: deliberately, by hand.
-# Releases are built the way they always have been. What is lost is CI coverage
-# of the release path, which means a release-only break is found at release
-# time -- accepted, and stated here so nobody re-adds the tag trigger and
-# rediscovers the red badge.
+# Reversed 2026-09-05, owner ruling: "build and configure and use private repo
+# to clear commercial font issues". The machinery now exists and is shared with
+# the simulator's TestFlight iOS workflow: a private mirror of
+# lib/EpdFont/local_fonts/ (natebunnyfield/crosspoint-local-fonts), read
+# through a read-only deploy key held in the LOCAL_FONTS_SSH_KEY secret, both
+# created by crosspoint-simulator/ios/setup-local-fonts-repo.sh on the Mac.
+# The mirror carries the generated pragmatapro_*.h / nitti*.h under
+# builtinFonts/, so no font conversion runs here: the headers are copied in
+# and the B-029 gate sees a complete release. Without the secret the workflow
+# behaves exactly as before and the gate fails, loudly.
+#
+# Still manual dispatch, not a tag trigger: releases are cut by
+# scripts/release.sh where the tag and the publish happen. This run is CI
+# coverage of the release path and an artifact, not a release.
 on:
   workflow_dispatch:
 
@@ -30,6 +39,44 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+
+      - name: Licensed font sources
+        # `secrets` cannot be read in a step-level `if`; the presence goes
+        # through an output.
+        id: local_fonts
+        env:
+          LOCAL_FONTS_SSH_KEY: ${{ secrets.LOCAL_FONTS_SSH_KEY }}
+        run: |
+          if [ -n "$LOCAL_FONTS_SSH_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "LOCAL_FONTS_SSH_KEY set: the private mirror supplies lib/EpdFont/local_fonts/"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::LOCAL_FONTS_SSH_KEY not set: the commercial editor faces are absent and the B-029 gate will refuse this release build. Run crosspoint-simulator/ios/setup-local-fonts-repo.sh on the Mac once."
+          fi
+
+      - name: Check out licensed font sources
+        if: ${{ steps.local_fonts.outputs.present == 'true' }}
+        uses: actions/checkout@v6
+        with:
+          repository: natebunnyfield/crosspoint-local-fonts
+          ssh-key: ${{ secrets.LOCAL_FONTS_SSH_KEY }}
+          path: lib/EpdFont/local_fonts
+
+      - name: Install the commercial editor faces
+        # The mirror's builtinFonts/ holds the glyph tables
+        # convert-builtin-fonts.sh generated on the Mac; copying them in is
+        # what check_editor_faces.py (B-029) looks for. Fails here, with the
+        # count, rather than at the gate with a longer message.
+        if: ${{ steps.local_fonts.outputs.present == 'true' }}
+        run: |
+          src=lib/EpdFont/local_fonts/builtinFonts
+          if [ ! -d "$src" ] || [ -z "$(ls "$src"/*.h 2>/dev/null)" ]; then
+            echo "::error::the private mirror carries no builtinFonts/*.h; on the Mac run lib/EpdFont/scripts/convert-builtin-fonts.sh, then crosspoint-simulator/ios/setup-local-fonts-repo.sh again."
+            exit 1
+          fi
+          cp "$src"/*.h lib/EpdFont/builtinFonts/
+          echo "installed $(ls lib/EpdFont/builtinFonts | grep -c 'pragmatapro_\|nittitypewriter_') editor-face headers"
 
       - uses: actions/setup-python@v6
         with:
