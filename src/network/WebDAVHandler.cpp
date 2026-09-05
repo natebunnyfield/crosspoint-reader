@@ -332,11 +332,53 @@ void WebDAVHandler::handleGet(WebServer& s) {
   }
 
   String contentType = getMimeType(path);
+
+  // Stream the body through a transient heap buffer, the shape
+  // CrossPointWebServer::handleDownload uses. This was `client.write(file)`,
+  // which does not stream: HalFile is a Print, not a Stream, so the only
+  // overload that call could bind was write(uint8_t), reached through
+  // HalFile's operator bool -- one byte, value 0x01, then the connection sat
+  // until the keep-alive closed it. Every WebDAV GET of a file answered that
+  // way, with a truthful Content-Length in front of it.
+  //
+  // Heap rather than stack for the 4 KB buffer (handleDownload's note: this
+  // frame runs on the 8 KB loopTask stack under the request-parse frames),
+  // allocated before the headers go out so an OOM can still be a 500.
+  // Declared with the explicit pointer type rather than through
+  // makeUniqueNoThrow: cppcheck cannot see through that template's return
+  // type, takes buffer.get() for a void* and flags the pointer arithmetic
+  // below as undefined (arithOperationsOnVoidPointer). handleDownload's
+  // spelling passes the same check.
+  constexpr size_t chunkSize = 4096;
+  auto buffer = std::unique_ptr<uint8_t[]>(new (std::nothrow) uint8_t[chunkSize]);
+  if (!buffer) {
+    LOG_ERR("DAV", "OOM: %u bytes for GET buffer", static_cast<unsigned>(chunkSize));
+    file.close();
+    s.send(500, "text/plain", "Out of memory");
+    return;
+  }
+
   s.setContentLength(file.size());
   s.send(200, contentType.c_str(), "");
 
   NetworkClient client = s.client();
-  client.write(file);
+  bool ok = true;
+  while (ok && file.available()) {
+    const int result = file.read(buffer.get(), chunkSize);
+    if (result <= 0) break;
+    const size_t bytesRead = static_cast<size_t>(result);
+    size_t totalWritten = 0;
+    while (totalWritten < bytesRead) {
+      resetTaskWatchdogIfSubscribed();
+      const size_t wrote = client.write(buffer.get() + totalWritten, bytesRead - totalWritten);
+      if (wrote == 0) {
+        ok = false;
+        break;
+      }
+      totalWritten += wrote;
+    }
+  }
+  client.clear();
   file.close();
 }
 
