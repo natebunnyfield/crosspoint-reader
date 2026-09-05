@@ -6,6 +6,7 @@
 // or spaces an editor leaves behind never reach the Authorization header. A
 // stray "\n" on the end of a token is the classic silent 401.
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -21,9 +22,15 @@ class CardSecretTest : public ::testing::Test {
   std::filesystem::path root;
 
   void SetUp() override {
-    root = std::filesystem::temp_directory_path() / "crosspoint-card-secret-test";
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
+    // A directory of this process's own. gtest_discover_tests registers every
+    // case as its own ctest test, and ctest runs them in parallel, so a fixed
+    // name here let one case's fixture file appear in another's "missing
+    // file" check (seen once on CI, 2026-09-05: MissingFileIsNotConfigured
+    // read the token a sibling had just written).
+    std::string tmpl = (std::filesystem::temp_directory_path() / "crosspoint-card-secret-XXXXXX").string();
+    char* made = mkdtemp(tmpl.data());
+    ASSERT_NE(made, nullptr) << "mkdtemp failed for " << tmpl;
+    root = made;
     setenv("CROSSPOINT_TEST_SD", root.string().c_str(), 1);
   }
   void TearDown() override { std::filesystem::remove_all(root); }
