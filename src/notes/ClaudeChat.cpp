@@ -16,6 +16,14 @@
 #include "CrossPointSettings.h"
 #include "WifiCredentialStore.h"
 #include "util/CardSecret.h"
+#ifdef SIMULATOR
+// The host's own settings surface, where a platform with no way to edit the
+// card's /claude-key.txt keeps this key instead. Simulator-only by
+// construction: the header is part of the simulator library and folds to a
+// constant everywhere but a phone. See SimHostSettings.h and
+// LibraryUpdater.cpp's githubTokenValue(), which this mirrors.
+#include <SimHostSettings.h>
+#endif
 
 namespace claudechat {
 namespace {
@@ -103,7 +111,37 @@ bool appendToTranscript(const std::string& text) {
 
 // The reader lives in util/CardSecret.h so /github-token.txt (Update Library)
 // behaves exactly like this file does.
-bool readApiKey(std::string& outKey) { return cardsecret::readOneLine(TAG, KEY_PATH, outKey); }
+//
+// On a host build, the key may instead come from the host's own settings
+// surface -- a phone cannot edit a file on the card, the same problem
+// LibraryUpdater's githubTokenValue() (LibraryUpdater.cpp) solves for the
+// GitHub token, and this mirrors that function line for line. Checked FIRST
+// and only when it returns something: a file the owner placed on the card is
+// still honored if the host field is empty.
+//
+// NEVER LOG THE RETURN VALUE, here or at any call site.
+bool readApiKey(std::string& outKey) {
+#ifdef SIMULATOR
+  // Sized to match cardsecret::readOneLine's own cap (256 bytes, less the
+  // terminator) rather than to any particular key format, so a key that fits
+  // through the card file also fits through the host settings surface.
+  constexpr size_t kApiKeyBufSize = 256;
+  char hosted[kApiKeyBufSize] = {};
+  const size_t hostedLength = sim_host_settings::claudeApiKey(hosted, sizeof(hosted));
+  if (hostedLength != 0) {
+    // Length only. A key longer than the field is a paste error, and it will
+    // fail authentication with an error that says nothing about why -- so the
+    // one place that can tell says so, without the bytes.
+    if (hostedLength > sizeof(hosted) - 1) {
+      LOG_ERR(TAG, "host Claude API key is %u bytes; the field holds %u -- truncated, and it will not authenticate",
+              static_cast<unsigned>(hostedLength), static_cast<unsigned>(sizeof(hosted) - 1));
+    }
+    outKey = hosted;
+    return true;
+  }
+#endif
+  return cardsecret::readOneLine(TAG, KEY_PATH, outKey);
+}
 
 bool connectWifi(std::string& outErr, void (*statusCb)(void*, const char*), void* ctx) {
   WIFI_STORE.loadFromFile();
