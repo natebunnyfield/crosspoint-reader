@@ -55,3 +55,21 @@ The same as for the iOS deploy: allow the SSH-launched `osascript` to control
 Terminal under Privacy & Security > Automation (the prompt appears on the
 Mac's screen the first time), and the Mac must be logged in and unlocked when
 you fire.
+
+## Or from anywhere, without the Mac at all
+
+The same wrapper runs on a hosted runner as **Cut release**
+(`.github/workflows/cut-release.yml`), with the licensed editor faces fetched
+from the private fonts mirror the way Compile Release does. Anything with `gh`
+can fire it, a Claude session included:
+
+```bash
+gh workflow run cut-release.yml --repo natebunnyfield/crosspoint-reader
+gh workflow run cut-release.yml --repo natebunnyfield/crosspoint-reader -f dry_run=true
+```
+
+Same bump, same `release.sh`, same ntfy result on the phone. The bump commit
+and the tag are pushed with the workflow's own token, so they do not trigger
+CI; the release build is the check. A dry run bumps nothing and pushes nothing:
+`release.sh --dry-run` tolerates an already-tagged version so the path can be
+rehearsed on `main` as it stands.

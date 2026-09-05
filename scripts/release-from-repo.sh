@@ -20,7 +20,12 @@
 #      this and lets release.sh refuse instead.
 #   5. ./scripts/release.sh, which builds, verifies the image against the
 #      source (B-033, B-046), tags, and publishes with gh. CROSSPOINT_DRY_RUN=1
-#      passes --dry-run: everything except the tag and the publish.
+#      passes --dry-run: everything except the tag and the publish, and step 4
+#      is skipped too, so a rehearsal never pushes anything.
+#
+# The same script is what .github/workflows/cut-release.yml runs on a hosted
+# runner, with the licensed faces from the private mirror instead of the Mac's
+# folder; nothing here is Mac-only except the ~/.platformio path it prunes.
 #
 # Environment (KEY=VALUE arguments to the AppleScript arrive here through env):
 #   CROSSPOINT_FIRMWARE_DIR   checkout to release from   (~/src/crosspoint-reader)
@@ -86,7 +91,9 @@ say "Version"
 VERSION=$(sed -n 's/^version *= *//p' platformio.ini | head -1 | tr -d ' ')
 [[ -n "$VERSION" ]] || die "no [crosspoint] version in platformio.ini"
 git fetch -q --tags origin
-if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "  dry run: no bump, no tag, no publish (release.sh --dry-run tolerates an existing tag)"
+elif git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
   [[ "$AUTO_BUMP" == "1" ]] || die "tag $VERSION already exists and CROSSPOINT_AUTO_BUMP=0"
   NEW=$(python3 - "$VERSION" <<'PY'
 import re, sys

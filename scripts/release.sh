@@ -35,8 +35,16 @@ echo "  version: $VERSION"
 [[ "$VERSION" == *-* ]] || die "version '$VERSION' has no fork suffix; a bare tag is upstream's (B-034)"
 
 [[ -z "$(git status --porcelain)" ]] || die "working tree is dirty; a release must be reproducible from a commit"
-[[ -z "$(git log --oneline '@{u}'..HEAD 2>/dev/null)" ]] || die "unpushed commits; push before tagging or the tag names something nobody else has"
-git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null && die "tag $VERSION already exists; bump [crosspoint] version first"
+# The next two guard the TAG and the PUBLISH, which a dry run never reaches:
+# a dry run of an already-tagged version is exactly how a release path is
+# rehearsed (scripts/release-from-repo.sh, cut-release.yml), so they apply to
+# a real cut only.
+if [[ $DRY -eq 0 ]]; then
+  [[ -z "$(git log --oneline '@{u}'..HEAD 2>/dev/null)" ]] || die "unpushed commits; push before tagging or the tag names something nobody else has"
+  git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null && die "tag $VERSION already exists; bump [crosspoint] version first"
+else
+  git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null && echo "  (dry run: tag $VERSION already exists; a real cut would refuse here)"
+fi
 
 REMOTE_URL=$(git remote get-url origin)
 # The push hazard from CLAUDE.md: two dead clones point origin at UPSTREAM, and

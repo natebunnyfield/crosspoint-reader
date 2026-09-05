@@ -1,0 +1,132 @@
+# Cut a firmware release from a hosted runner, with nobody at any keyboard.
+#
+# This runs the SAME scripts/release-from-repo.sh the Mac's
+# scripts/release.applescript hands to Terminal.app: pull main, bump the patch
+# version if the current one is already tagged, then scripts/release.sh
+# unchanged (build gh_release, verify the image against the source, tag,
+# publish with gh). The two launchers differ only in where the licensed
+# editor faces come from: the Mac has lib/EpdFont/local_fonts/, the runner
+# gets the private mirror through the LOCAL_FONTS_SSH_KEY deploy key, the
+# same way Compile Release does. Owner ask, 2026-09-05: "make an applescript
+# to cut releases without me running anything", then "you run the applescript
+# to release" -- a Claude session cannot reach the Mac, but it can dispatch
+# this.
+#
+# Dispatch from anywhere with gh:
+#   gh workflow run cut-release.yml --repo natebunnyfield/crosspoint-reader
+#   gh workflow run cut-release.yml --repo natebunnyfield/crosspoint-reader -f dry_run=true
+#
+# The result reaches the phone through the wrapper's ntfy notification, the
+# same topic as the iOS deploy. Pushes made with GITHUB_TOKEN (the bump commit,
+# the tag) do not trigger other workflows, so CI does not re-run on the bump;
+# the release build itself is the check.
+
+name: Cut release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and verify only. No bump, no tag, no publish.
+        type: boolean
+        default: false
+      auto_bump:
+        description: >-
+          Bump the patch version (and push main) when the current version is
+          already tagged. Off means release.sh refuses instead.
+        type: boolean
+        default: true
+
+permissions:
+  contents: write # the bump commit, the tag, the release
+
+concurrency:
+  group: cut-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0 # release.sh compares against the last tag; the bump lists the commits since it
+          submodules: recursive
+
+      - name: Licensed font sources
+        # Required here, unlike Compile Release: a release without the editor
+        # faces is exactly what B-029 exists to refuse, so stop before the
+        # build rather than after it.
+        env:
+          LOCAL_FONTS_SSH_KEY: ${{ secrets.LOCAL_FONTS_SSH_KEY }}
+        run: |
+          [ -n "$LOCAL_FONTS_SSH_KEY" ] || { echo "::error::LOCAL_FONTS_SSH_KEY is not set; the commercial editor faces cannot be fetched and B-029 would refuse the release. Run crosspoint-simulator/ios/setup-local-fonts-repo.sh on the Mac once."; exit 1; }
+          echo "deploy key present"
+
+      - name: Check out licensed font sources
+        uses: actions/checkout@v6
+        with:
+          repository: natebunnyfield/crosspoint-local-fonts
+          ssh-key: ${{ secrets.LOCAL_FONTS_SSH_KEY }}
+          path: lib/EpdFont/local_fonts
+
+      - name: Install the commercial editor faces
+        run: |
+          src=lib/EpdFont/local_fonts/builtinFonts
+          if [ ! -d "$src" ] || [ -z "$(ls "$src"/*.h 2>/dev/null)" ]; then
+            echo "::error::the private mirror carries no builtinFonts/*.h; on the Mac run lib/EpdFont/scripts/convert-builtin-fonts.sh, then crosspoint-simulator/ios/setup-local-fonts-repo.sh again."
+            exit 1
+          fi
+          cp "$src"/*.h lib/EpdFont/builtinFonts/
+          echo "installed $(ls lib/EpdFont/builtinFonts | grep -c 'pragmatapro_\|nittitypewriter_') editor-face headers"
+          # The mirror is a nested checkout inside a gitignored folder; the
+          # wrapper and release.sh both require a clean tree, so prove it here.
+          [ -z "$(git status --porcelain)" ] || { echo "::error::the tree is not clean after installing the faces:"; git status --short; exit 1; }
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Install PlatformIO Core
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Git identity for the bump commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Cut the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CROSSPOINT_FIRMWARE_DIR: ${{ github.workspace }}
+          CROSSPOINT_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+          CROSSPOINT_AUTO_BUMP: ${{ inputs.auto_bump && '1' || '0' }}
+          # Never prune the runner's caches: it has the space, and the build
+          # cache is what keeps the next run short.
+          CROSSPOINT_MIN_FREE_GB: "0"
+        run: scripts/release-from-repo.sh
+
+      - name: Upload the built image
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrossPoint-release-${{ github.run_number }}
+          if-no-files-found: ignore
+          path: |
+            .pio/build/gh_release/bootloader.bin
+            .pio/build/gh_release/firmware.bin
+            .pio/build/gh_release/partitions.bin
