@@ -97,7 +97,13 @@ class HalFile : public Print {
   bool close();
   HalFile openNextFile();
   bool isOpen() const;
-  operator bool() const;
+  // explicit on purpose. A HalFile is a Print, not a Stream, so a call such as
+  // NetworkClient::write(file) cannot bind the stream-copying overload; with
+  // an implicit conversion it silently bound write(uint8_t) instead and sent
+  // one byte of value 0x01 in place of the file (WebDAV GET, fixed 2026-09-05).
+  // Contextual tests -- if (file), !file, file && x -- still work; anything
+  // that wants a bool value must say so with static_cast<bool> or isOpen().
+  explicit operator bool() const;
 };
 
 // Downstream code must use Storage instead of SdMan
