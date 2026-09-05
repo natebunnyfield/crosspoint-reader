@@ -321,6 +321,14 @@ A `git worktree` at the intended sha is the belt-and-braces version. The main
 checkout routinely carries another session's WIP — on 2026-08-04 it literally
 did, mid-task, while a shipping binary was being built from it.
 
+**Cutting a release from a phone.** `scripts/release.applescript` hands
+`scripts/release-from-repo.sh` to Terminal.app on the Mac: pull `main`
+`--ff-only`, prune the build trees if the disk is under 6 GB, bump the patch
+version and push if the current one is already tagged, then `release.sh`
+unchanged (build, verify, tag, publish), with the result on the phone as an
+ntfy notification. `ssh <mac> 'osascript ~/src/crosspoint-reader/scripts/release.applescript'`.
+[docs/release-from-phone.md](docs/release-from-phone.md).
+
 ---
 
 ## Coding Standards
