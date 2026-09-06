@@ -109,19 +109,19 @@ if (parsedSize != fileSize) {
 
 ## `section.bin`
 
-### Version 30, twenty-five bumps behind — current is 55
+### Version 30, twenty-six bumps behind — current is 56
 
-**Current version is 55**, not 30 — `SECTION_FILE_VERSION` at
+**Current version is 56**, not 30 — `SECTION_FILE_VERSION` at
 `lib/Epub/Epub/Section.cpp:199`. Check the live value with
 `grep -n 'SECTION_FILE_VERSION = ' lib/Epub/Epub/Section.cpp` rather than
 trusting a number here; this constant has moved on every few days of work and
 the ImHex pattern below (still `EXPECTED_VERSION 30`, matching the prose
 changelog's newest fully-described entry, v37) has not been kept in step with
-the fields v38-v55 added. Treat the pattern as a v30 snapshot, not as
+the fields v38-v56 added. Treat the pattern as a v30 snapshot, not as
 current-format documentation, until someone rewrites it against the live
 `SectionBin::write`/`::read` in `Section.cpp`.
 
-**Versions 38-55, not yet described in prose here — one line each, from the
+**Versions 38-56, not yet described in prose here — one line each, from the
 commit that bumped the constant, verified 2026-08-30 by walking
 `git log -p --follow -- lib/Epub/Epub/Section.cpp` for every added
 `SECTION_FILE_VERSION = N` line.** These are pointers for whoever writes the
@@ -148,6 +148,7 @@ before relying on any of them for a field layout:
 | 53 | `070ab4e64` | a hairline between the records of a flattened table |
 | 54 | `d624ae638` | the separators went in the wrong emitter — the key block had none |
 | 55 | `03a5a027f` | a definition list reads as one, instead of as a wall of text ([B-042]) |
+| 56 | `d6e855e50` | the chapter break falls before a heading that holds its own anchor ([B-047]) |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
