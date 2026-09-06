@@ -60,7 +60,19 @@ void LibraryUpdateActivity::loop() {
   // First pass after the CHECKING frame is on screen -- onEnter waited for it.
   if (state == State::CHECKING && !checkStarted) {
     checkStarted = true;
-    runSync();
+    runCheck();
+    return;
+  }
+
+  // ONE BOOK PER TICK, then back to the main loop. The whole sync used to run
+  // inside a single loop() call, and a host build presents pixels only between
+  // loop() calls: it showed the first SYNCING frame and then nothing until the
+  // summary, every "Book N of M" frame converted and never presented. Returning
+  // between books gives the host one present per book and costs the device
+  // nothing -- skipLoopDelay() is true while SYNCING, so the next tick follows
+  // at once. See the header.
+  if (state == State::SYNCING) {
+    syncNextBook();
     return;
   }
 
@@ -75,7 +87,7 @@ void LibraryUpdateActivity::loop() {
   }
 }
 
-void LibraryUpdateActivity::runSync() {
+void LibraryUpdateActivity::runCheck() {
   // Repaint between the check's network steps. immediate=true for the same
   // reason the per-book progress callback uses it: this runs inside a blocking
   // call that will not drain the flag for us.
@@ -144,7 +156,26 @@ void LibraryUpdateActivity::runSync() {
     RenderLock lock(*this);
     state = State::SYNCING;
   }
+  // Waited for, like the CHECKING frame in onEnter and for the same reason:
+  // the next tick blocks on the first download, and "Book 1 of N" over a bar
+  // at zero must be on the panel before it does. The books themselves are
+  // loop()'s, one per tick.
   requestUpdateAndWait();
+}
+
+void LibraryUpdateActivity::syncNextBook() {
+  const auto& books = updater.getBooks();
+  if (nextBook >= books.size()) {
+    // The tick after the last book, so its 100% frame had a tick of its own to
+    // reach a host's glass before the summary replaces it.
+    // One write at the end of the run, not one per book: see flushSyncRecords.
+    updater.flushSyncRecords();
+    LOG_INF("LIB", "library sync done: %u updated, %u unchanged, %u errors", updated, unchanged, errors);
+    RenderLock lock(*this);
+    state = State::DONE;
+    requestUpdate();
+    return;
+  }
 
   auto progressCb = +[](void* ctx) {
     auto* self = static_cast<LibraryUpdateActivity*>(ctx);
@@ -153,36 +184,26 @@ void LibraryUpdateActivity::runSync() {
     self->requestUpdate(true);
   };
 
-  const auto& books = updater.getBooks();
-  for (size_t i = 0; i < books.size(); ++i) {
-    {
-      RenderLock lock(*this);
-      currentBook = i;
-      lastRenderedPercent = 101;
-      updater.resetBookProgress();  // before the repaint below can read them
-    }
-    requestUpdate(true);
-    switch (updater.syncBook(i, progressCb, this)) {
-      case LibraryUpdater::BookResult::ADDED:
-      case LibraryUpdater::BookResult::UPDATED:
-        updated++;
-        break;
-      case LibraryUpdater::BookResult::UNCHANGED:
-        unchanged++;
-        break;
-      case LibraryUpdater::BookResult::FAILED:
-        errors++;
-        break;
-    }
+  const size_t i = nextBook++;
+  {
+    RenderLock lock(*this);
+    currentBook = i;
+    lastRenderedPercent = 101;
+    updater.resetBookProgress();  // before the repaint below can read them
   }
-
-  // One write at the end of the run, not one per book: see flushSyncRecords.
-  updater.flushSyncRecords();
-
-  LOG_INF("LIB", "library sync done: %u updated, %u unchanged, %u errors", updated, unchanged, errors);
-  RenderLock lock(*this);
-  state = State::DONE;
-  requestUpdate();
+  requestUpdate(true);
+  switch (updater.syncBook(i, progressCb, this)) {
+    case LibraryUpdater::BookResult::ADDED:
+    case LibraryUpdater::BookResult::UPDATED:
+      updated++;
+      break;
+    case LibraryUpdater::BookResult::UNCHANGED:
+      unchanged++;
+      break;
+    case LibraryUpdater::BookResult::FAILED:
+      errors++;
+      break;
+  }
 }
 
 void LibraryUpdateActivity::render(RenderLock&&) {
