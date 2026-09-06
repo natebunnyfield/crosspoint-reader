@@ -1241,6 +1241,15 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       const auto page = section->findAnchor(pendingAnchor);
       if (page) {
         section->currentPage = *page;
+        // Consumed, exactly as the two anchor branches above do it. A named
+        // anchor is an EXACT position: rescaling it afterwards can only move it
+        // off the chapter it names, and applyDeferredReposition()'s proportional
+        // remap (which still runs below, and again from loop()) truncates, so it
+        // moves EARLIER. Reachable when the chapter was entered with the remap
+        // still armed -- a settings change captured a page and the rebuilt
+        // section has not consumed it yet -- and the pick names the same spine,
+        // which is every jump inside a multi-chapter file.
+        cachedChapterTotalPageCount = 0;
         LOG_DBG("ERS", "Resolved anchor '%s' to page %d", pendingAnchor.c_str(), *page);
       } else {
         LOG_DBG("ERS", "Anchor '%s' not found in section %d", pendingAnchor.c_str(), currentSpineIndex);

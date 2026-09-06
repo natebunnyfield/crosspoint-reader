@@ -34,6 +34,59 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-050] "176 still going a page before chapter that i navigated to" — NOT REPRODUCED; the whole book-to-page chain is now proven innocent
+**severity: medium (every Chapter Select pick lands wrong, on the owner's phone) · scope: unknown, but NOT `Epub`/`BookMetadataCache`/`Section`/`ChapterHtmlSlimParser` · reported 2026-09-06 (iOS TestFlight build 176 = simulator `4f8ce2f`, firmware `ec5cbd28` = 1.5.26-BD)**
+
+Owner, verbatim: *"176 still going a page before chapter that i navigated to."*
+Asked where the chapter's heading is on the page he lands on: *"Not on that
+page at all"* — the page carries previous-chapter text and the chapter opens on
+the next one. Asked whether it is one book or all: *"Every book I've tried."*
+
+This is the report [B-047] was filed against and did not close; 176 carries
+that fix.
+
+**What has been ruled out, with evidence.** `test/chapter_jump` (added by
+[B-049]) drives the real chain — a real `.epub` through `Epub::load()`,
+`BookMetadataCache`, `Section`, the parser and `Section::findAnchor` — and it
+was run over **the owner's actual library**, all twenty-three books from
+`~/src/claude-tools`, at twelve viewport geometries: **6,036 picks, every one
+of which opens on a page whose FIRST LINE is that chapter's heading.** Three
+build paths were checked separately, because the reader uses all three: a
+finished build, the incremental build-to-the-anchor the reader really runs for
+a fragment pick, and a suspended PARTIAL answering from its on-disk map (the
+state a card is in after a section-format bump). All three agree.
+
+So the page `findAnchor()` hands the reader is right, and the wrongness is
+added above it — in `EpubReaderActivity`'s state machine, or in the
+simulator/iOS harness.
+
+**Best-evidenced candidates, none proven:**
+
+* **A leaked page-back edge.** Landing on the previous chapter's LAST page is
+  exactly `pageTurn(false)` from page 0 (`EpubReaderActivity.cpp:955-966`), and
+  it is book-independent, which "every book" wants. Against it:
+  `ActivityManager::processPendingTransitions()` runs AFTER
+  `currentActivity->loop()`, so the reader's first `loop()` is a frame later,
+  and both the device's `InputManager` and the simulator's `HalGPIO` clear
+  press/release/tap edges at the frame boundary (`beginFrame()`, one firmware
+  `loop()` per frame). `docs/input-edge-audit-2026-08-21.md` audited the touch
+  path clean for the same reason.
+* **A rescaled anchor.** `applyDeferredReposition()`'s proportional remap
+  truncates, so it moves EARLIER, and until this session the named-anchor
+  branch did not consume `cachedChapterTotalPageCount` the way the word- and
+  paragraph-anchor branches beside it do. Fixed in the same commit as [B-049].
+  Not claimed as the cause: reaching it needs the remap still armed at the
+  moment of the pick, which a plain resume disarms in its first render.
+
+**What would settle it**, in order of cost: a serial or Xcode log of one pick —
+`ERS` logs `Resolved anchor '%s' to page %d` and every reposition that follows
+it, so the line either names the right page (and something later moves it) or
+does not (and the anchor map is wrong on HIS card, not in the source, which
+would mean a stale cache and not a code defect). Failing that: ask whether the
+chapters he picks are `h1`/`h2` openings or something quieter, whether it
+happens with Chapter Select only or also with an in-book TOC link, and whether
+the page he lands on changes if he clears `.crosspoint/` on the card.
+
 ### [B-048] Update Library on the X4: every book an error with no reason on screen, Wi-Fi that would not associate, then an abort() — the folder and the reason line FIXED 2026-09-06; the abort is unsymbolized
 **severity: high (a 22-book library that will not sync, and a crash) · scope: `src/network/LibraryUpdater.cpp`, `src/activities/settings/LibraryUpdateActivity.cpp`, the join path, one unknown abort · found 2026-09-06 from a panic record the owner pasted, with "Update Library results in 22 (all) errors"**
 
@@ -322,6 +375,64 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 
 ## FIXED
 
+### [B-049] A table of contents that comes back to a file it has already used lost every chapter break after the interruption — FIXED 2026-09-06 (lib/Epub/Epub/Section.cpp, section cache v57)
+**severity: medium (a Chapter Select pick opens on a page the PREVIOUS chapter is still running down) · scope: `Section::startBuild`'s TOC-anchor collection, the forced chapter break, the anchor map · found 2026-09-06 while root-causing the owner's "176 still going a page before chapter that i navigated to" — see [B-050], which this does NOT explain**
+
+A TOC entry with a fragment resolves through the anchor map the parser records
+while it paginates, and the parser also forces a page break in front of each id
+it is told is a TOC anchor (`flushPendingAnchor`). It is told which ids those
+are by `Section::startBuild`, which reads them out of the book's real table of
+contents:
+
+```cpp
+const int startTocIndex = epub->getTocIndexForSpineIndex(spineIndex);
+for (int i = startTocIndex; i < epub->getTocItemsCount(); i++) {
+  auto entry = epub->getTocItem(i);
+  if (entry.spineIndex != spineIndex) break;   // <-- assumes a TOC grouped by file
+  ...
+}
+```
+
+Starting at `getTocIndexForSpineIndex()` is right — that is the FIRST entry
+pointing at this spine, so nothing before it can. **Stopping at the first entry
+that names a different spine is not.** A table of contents that comes back to a
+file it has already used — an "Appendix" or "Notes" entry sitting between two
+chapters of one file, any nav that is not in spine order — silently lost every
+anchor after the interruption. Those chapters were then paginated with no
+forced break at all: they start in the middle of whatever page the previous
+chapter ended on, and their anchor-map entries name that page. Picking one from
+Chapter Select opens on previous-chapter text.
+
+Worst where the opening is an `h4`–`h6`, which is the case the fixture pins:
+`h1`–`h3` open a fresh page on their own (`ChapterHtmlSlimParser`'s header
+branch), which masks the missing break — so a book of `h2` chapters looks fine
+and a book of `h4` sub-chapters does not.
+
+**Fix.** `continue`, not `break`: collect every entry that names this spine,
+wherever it sits in the table. `SECTION_FILE_VERSION` 56 -> 57, because a v56
+cache of such a book holds both the wrong pagination and the wrong anchor map.
+
+**Pinned by `test/chapter_jump`**, a new suite that starts one layer above
+`test/toc_anchor_page`: a real `.epub` on disk through `Epub::load()` ->
+`BookMetadataCache` -> `Section` -> the parser -> `Section::findAnchor`, which
+is the only level at which the anchor LIST — as opposed to the parser's use of
+it — is observable at all. Twelve `h4` chapters whose TOC steps out to a second
+file and back, swept across eighteen viewport geometries so each opening falls
+at a different place on the page. `EveryPickOpensItsChapter` and
+`APartialAnswersTheSameAsAFinishedBuild` fail before the fix (e.g. "picking
+'Chapter Four' opens spine 0 page 3 of 40, which starts 'Filler paragraph
+number 2 runs'") and pass after; `IncrementalBuildLandsWhereTheFullBuildDoes`
+passed both ways and is there to pin the reader's build-to-the-anchor path.
+
+**Cost of the version bump:** every book on every card re-paginates once more,
+a week after v56 did the same. Unavoidable — the pagination is what changed.
+
+**Not observable here**: a device or a phone, and no book in the owner's
+library can reach this at all (their tables of contents are grouped by file —
+checked, all twenty-three). Verified instead that the fix is a byte-for-byte
+no-op on that library: 6,036 picks across every book at twelve geometries,
+identical landing pages before and after.
+
 ### [B-047] Chapter Select opened one page past a heading that carries its anchor inside it, and the heading sat alone on the page before — FIXED 2026-09-06 (lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp, section cache v56)
 **severity: medium (every Chapter Select pick in a Project Gutenberg-style book landed wrong, and every such chapter opened with a stranded heading) · scope: `ChapterHtmlSlimParser`, the TOC page break and the anchor map · found 2026-09-06 from the owner's report ("chapter selection is going to the page before intended place"), reproduced the same day by `test/toc_anchor_page` and fixed there**
 
@@ -363,6 +474,14 @@ paginate through the real parser, are unchanged.
 **Not observable here**: a device or a phone. The check is any Gutenberg book:
 pick a chapter from Chapter Select and the heading is the first line of the
 page shown, with the chapter's text under it.
+
+**Correction, 2026-09-06 (later the same day).** This entry reads as if it
+closed the owner's report. It did not. He is on build 176, which carries this
+fix (`50fe7db` is an ancestor of the pinned `ec5cbd28`), and re-reported: "176
+still going a page before chapter that i navigated to", on "every book I've
+tried". So the Gutenberg shape was a real defect and is really fixed — pinned
+at fifteen page positions — but it was not his instance, or not all of it. The
+live report is [B-050].
 
 
 ### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
