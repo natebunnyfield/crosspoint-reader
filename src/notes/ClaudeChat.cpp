@@ -167,6 +167,29 @@ bool connectWifi(std::string& outErr, void (*statusCb)(void*, const char*), void
     if (!cred) break;  // store shrank between the count and the read; use what we got
     creds.push_back(std::move(*cred));
   }
+#ifdef SIMULATOR
+  // A host build is already on the host's own network, and the simulator's
+  // WiFi.begin() reports THAT association whatever credentials it is handed
+  // (crosspoint-simulator src/WiFi.h) -- so a phone with no saved network,
+  // which is its normal state since it never needs one, must not be turned
+  // away below. TestFlight build-172 (2026-09-05) was: "no saved Wi-Fi
+  // network — connect once via File Transfer", for a phone that was online.
+  // Saved networks, when the card has any, still go through the loop below so
+  // the desktop simulator exercises the device path. No NTP here: the host's
+  // clock is the host's.
+  if (creds.empty()) {
+    statusCb(ctx, "wifi: host network");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin();
+    if (WiFi.status() != WL_CONNECTED) {
+      outErr = "the host has no network connection";
+      WiFi.mode(WIFI_OFF);
+      return false;
+    }
+    LOG_INF(TAG, "wifi: host association, ip=%s", WiFi.localIP().toString().c_str());
+    return true;
+  }
+#endif
   if (creds.empty()) {
     outErr = "no saved Wi-Fi network — connect once via File Transfer";
     return false;
