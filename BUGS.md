@@ -93,16 +93,22 @@ right above, means a stale cache and not a code defect. If they DISAGREE,
 something between them moved him, and a `Page turn back` line in between names
 it.
 
-**And it is now capturable without a Mac.** All three are `LOG_DBG`, so a
-release device build (`gh_release`, LOG_LEVEL=1) does not print them and the X4
-route needs `pio run -e default -t upload && pio device monitor`. The phone
-does not: the harness compiles at `LOG_LEVEL=2`, and the simulator's
-`src/FirmwareLogFile.h` writes the same lines to `diagnostics/firmware.log`
-inside the card root, which the Files app shows as On My iPhone > CrossPoint
-X3. Settings > CrossPoint X3 > **Diagnostics Log** on, pick a chapter, share
-the file. Before that existed the lines went to stderr, which a TestFlight
-build discards — the reason this report has twice been answered with reasoning
-instead of a reading of the state.
+**And it is now capturable without a Mac, from TestFlight build 177 on.** All
+three are `LOG_DBG`, so a release device build (`gh_release`, LOG_LEVEL=1) does
+not print them and the X4 route needs `pio run -e default -t upload && pio
+device monitor`. The phone does not: the harness compiles at `LOG_LEVEL=2`, and
+the simulator's `src/FirmwareLogFile.h` writes the same lines to
+`diagnostics/firmware.log` inside the card root, which the Files app shows as
+On My iPhone > CrossPoint X3. Settings > CrossPoint X3 > **Diagnostics Log**
+on, pick a chapter, background the app, share the file. Before that existed the
+lines went to stderr, which a TestFlight build discards — the reason this
+report has twice been answered with reasoning instead of a reading of the
+state, and the reason an earlier instruction here to read them in Console.app
+would not have worked.
+
+The `Cache found` / `Partial cache found` / `Cache not found, building` lines
+around them answer the other half for free: whether the section his pick landed
+in came off his card or was rebuilt on the spot.
 
 Still worth asking alongside it: whether the chapters he picks are `h1`/`h2`
 openings or something quieter, whether it happens with Chapter Select only or
@@ -276,12 +282,24 @@ checksum byte for it to leave stale. The fixture is a real image now.
   published file except the checksum byte and the 32-byte trailer.
 
 **Still owed, and why this sits in OPEN:** the assets on releases 1.5.17-BD
-through 1.5.21-BD are still the broken bytes, and `OtaUpdater` fetches whatever
-`firmware.bin` hangs on the latest release. Rebuild each with the fixed
+through 1.5.21-BD are still the broken bytes. Rebuild each with the fixed
 stamper (or repair in place — exactly 33 bytes move, and `release.sh`'s gate
-now proves the result) and replace the asset. Until then 1.5.16-BD is the
-newest release a device will accept, and it carries the stale descriptor of
-B-033.
+now proves the result) and replace the asset.
+
+**Corrected 2026-09-06 — the urgency is gone, and the sentence that used to
+sit here was wrong by five releases.** It read "1.5.16-BD is the newest release
+a device will accept". That stopped being true the moment the fix shipped:
+**1.5.22-BD carries it**, and every release from 1.5.22-BD on was cut through
+`scripts/release.sh`, whose verify step refuses an image whose checksum byte
+disagrees with its segment data — 1.5.22-BD and 1.5.23-BD from the Mac,
+1.5.24-BD through 1.5.26-BD from `cut-release.yml`, which runs the same script.
+`OtaUpdater` fetches whatever hangs on the LATEST release, so the online update
+path has worked since 1.5.22-BD and the broken window is now history nothing
+reaches for. (Inference from the release path, not a byte-level check of the
+published assets — this session had no way to download them.)
+
+What the backfill is still worth: a device pinned to one of those five tags by
+hand, and an honest archive. Neither is urgent.
 
 ### [B-034] Fork and upstream will collide in the tag namespace at 1.5.3 — CLOSED 2026-08-28, the collision never happened and the reason is now written down
 **severity: low · scope: release · found 2026-08-19 · closed 2026-08-28**
@@ -374,6 +392,25 @@ has performed yet.
 > Copying it is not a flash — `SdFirmwareUpdateActivity` is a file picker, so
 > nothing is written to the device until it is chosen. That is why staging was
 > safe to do and the update itself is not mine to perform.
+
+> **DO NOT FLASH THE STAGED IMAGE — it cannot install, and the update route has
+> changed (2026-09-06).** `20260828T2010Z-crosspoint-fbd3129d.bin` was built
+> with the stamper that [B-046] found leaves the image's XOR checksum byte
+> stale, so `validateImageFile()` refuses it with "Invalid firmware file". The
+> note above says "appended SHA256 valid", which was true and was not the check
+> that mattered.
+>
+> Nothing needs staging any more. Since 1.5.22-BD the published releases are
+> correctly stamped, so **Home → Update Firmware** (online) closes this: it
+> fetches the latest release, which is current by definition.
+>
+> **The device is still on the old stamp, confirmed independently.** The panic
+> record the owner pasted on 2026-09-06 ([B-048]) reports
+> `CrossPoint version: 1.5.0-BNY`, which dates the running build to before
+> 2026-08-18 (`da6736f`, when that literal left `platformio.ini`). The fork is
+> at 1.5.26-BD. So this entry is not a cosmetic stamp problem any more: the X4
+> is roughly a month behind, and every X4 symptom reported since — B-048's
+> included — was measured against code that old.
 >
 > **Pick the 2026-08-28 file, not the 2026-08-17 one.** The older image is still
 > there and still stamped `1.5.0-BNY`; it is left rather than deleted because
