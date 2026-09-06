@@ -12,6 +12,10 @@
 
 #include "MappedInputManager.h"
 #include "SilentRestart.h"
+#include "network/PeerUrl.h"
+#ifdef SIMULATOR
+#include <SimulatorNetworkPorts.h>  // the shim's 80 -> 8080 mapping, for the painted URL
+#endif
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #include "network/PendingFirmware.h"
@@ -39,6 +43,18 @@ std::string deviceIdLine() {
   char id[8];
   getDeviceIdHex(id, sizeof(id));
   return std::string(tr(STR_DEVICE_ID_PREFIX)) + id;
+}
+
+// The port a peer must use for the firmware's HTTP port: the port itself on
+// hardware, the simulator's mapping of it on a host build (80 -> 8080 by
+// default, because a host process cannot bind 80). See network/PeerUrl.h for
+// why this decides whether File Transfer works on a phone at all.
+uint16_t peerHttpPort(uint16_t firmwarePort) {
+#ifdef SIMULATOR
+  return static_cast<uint16_t>(crosspoint_simulator::mapFirmwarePort(firmwarePort));
+#else
+  return firmwarePort;
+#endif
 }
 
 // DNS server for captive portal (redirects all DNS queries to our IP)
@@ -521,6 +537,10 @@ void CrossPointWebServerActivity::renderServerRunning() const {
 
   int startY = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing * 2;
   int height10 = renderer.getLineHeight(UI_10_FONT_ID);
+  // Every address below carries this port when it is not 80. On hardware it is
+  // 80 and nothing on the screen changes.
+  const uint16_t port = peerHttpPort(webServer ? webServer->getPort() : peerurl::HTTP_DEFAULT_PORT);
+  const std::string localHostname = std::string(AP_HOSTNAME) + ".local";
   if (isApMode) {
     // AP mode display
     renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, startY, tr(STR_CONNECT_WIFI_HINT), true,
@@ -544,8 +564,8 @@ void CrossPointWebServerActivity::renderServerRunning() const {
                       EpdFontFamily::BOLD);
     startY += height10 + metrics.verticalSpacing * 2;
 
-    std::string hostnameUrl = std::string("http://") + AP_HOSTNAME + ".local/";
-    std::string ipUrl = tr(STR_OR_HTTP_PREFIX) + connectedIP + "/";
+    std::string hostnameUrl = peerurl::httpUrl(localHostname, port);
+    std::string ipUrl = tr(STR_OR_HTTP_PREFIX) + peerurl::hostWithPort(connectedIP, port) + "/";
 
     // Show QR code for URL
     const Rect qrBoundsUrl(metrics.contentSidePadding, startY, QR_CODE_WIDTH, QR_CODE_HEIGHT);
@@ -569,7 +589,7 @@ void CrossPointWebServerActivity::renderServerRunning() const {
     startY += height10 + metrics.verticalSpacing * 2;
 
     // Show QR code for URL
-    std::string webInfo = "http://" + connectedIP + "/";
+    std::string webInfo = peerurl::httpUrl(connectedIP, port);
     const Rect qrBounds((pageWidth - QR_CODE_WIDTH) / 2, startY, QR_CODE_WIDTH, QR_CODE_HEIGHT);
     QrUtils::drawQrCode(renderer, qrBounds, webInfo);
     startY += QR_CODE_HEIGHT + metrics.verticalSpacing * 2;
@@ -578,10 +598,16 @@ void CrossPointWebServerActivity::renderServerRunning() const {
     renderer.drawCenteredText(UI_10_FONT_ID, startY, webInfo.c_str(), true);
     startY += height10 + 5;
 
-    // Also show hostname URL
-    std::string hostnameUrl = std::string(tr(STR_OR_HTTP_PREFIX)) + AP_HOSTNAME + ".local/";
+#ifndef SIMULATOR
+    // Also show hostname URL. Hardware only: ESP-IDF's mDNS claims the
+    // hostname, so crosspoint.local resolves. A host build publishes a Bonjour
+    // SERVICE and no API lets it claim a .local hostname (crosspoint-simulator
+    // ios/WIFI.md, finding 6), so on a phone this line was a dead link under
+    // the one address that works.
+    std::string hostnameUrl = std::string(tr(STR_OR_HTTP_PREFIX)) + peerurl::hostWithPort(localHostname, port) + "/";
     renderer.drawCenteredText(SMALL_FONT_ID, startY, hostnameUrl.c_str(), true);
     startY += renderer.getLineHeight(SMALL_FONT_ID) + 5;
+#endif
 
     // Unit ID for per-device SD files (/sleep_<id>.bmp) — shown here because
     // this screen is where card syncs happen.
