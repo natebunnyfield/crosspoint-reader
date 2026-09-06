@@ -210,6 +210,49 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 
 ## FIXED
 
+### [B-047] Chapter Select opened one page past a heading that carries its anchor inside it, and the heading sat alone on the page before — FIXED 2026-09-06 (lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp, section cache v56)
+**severity: medium (every Chapter Select pick in a Project Gutenberg-style book landed wrong, and every such chapter opened with a stranded heading) · scope: `ChapterHtmlSlimParser`, the TOC page break and the anchor map · found 2026-09-06 from the owner's report ("chapter selection is going to the page before intended place"), reproduced the same day by `test/toc_anchor_page` and fixed there**
+
+A TOC entry with a fragment resolves through the anchor map the parser
+records while it paginates: `{id, page}`, with a forced page break in front of
+the id when it is a TOC anchor (`flushPendingAnchor()`). The id is captured in
+`startElement` and deferred to the NEXT block start, after the block before it
+has been laid out -- right for an id on the heading, on a wrapper `<div>` or
+`<section>`, or on an empty `<a>` before the heading, and `test/toc_anchor_page`
+shows all of those landing correctly at every page position.
+
+Project Gutenberg opens chapters differently: `<h2><a id="chap02"></a>CHAPTER
+II</h2>`. The heading's block is already running when the id shows up on the
+inline `<a>`, so "the next block start" is the first paragraph of the chapter.
+By then the heading has been laid out at the foot of the previous chapter's
+last page; the TOC break completes THAT page, and the anchor names the page
+after it. Two visible wrongs from one deferral: Chapter Select opened on the
+chapter's first paragraph with the heading on the page before, and the heading
+stood alone at the bottom of a page that otherwise ended the previous chapter.
+
+**Fix.** An id that arrives inside a block nothing has been added to names
+that block (`adoptPendingAnchorForBlock()`): a TOC anchor breaks the page
+there and then, before the block lays out a line, and the id is held until
+`placeLineOnPage()` puts the block's first line down -- the one moment the
+page is certain, whatever the break and the widow/orphan holdback decide. A
+block that lays out no line hands the id back to the ordinary deferral.
+`SECTION_FILE_VERSION` 55 -> 56, because a cached section holds both the
+pagination and the anchor map, and a v55 cache of such a book keeps both
+wrongs for good.
+
+**Pinned by `test/toc_anchor_page`**: seven chapter-opening shapes, each swept
+across fifteen page positions, asserting the anchor's page is the heading's
+page, the heading is that page's first line, and the chapter's first paragraph
+opens on the same page. The Gutenberg shape failed at every position before
+the fix and passes at every position after it; the other six passed before and
+after. `definition_list` and `table_keep_together`, the other two suites that
+paginate through the real parser, are unchanged.
+
+**Not observable here**: a device or a phone. The check is any Gutenberg book:
+pick a chapter from Chapter Select and the heading is the first line of the
+page shown, with the chapter's text under it.
+
+
 ### [B-033] The release binary carries a stale provenance stamp — REOPENED 2026-08-28, FIXED the same day (scripts/stamp_app_desc.py), first-OTA confirm owed
 **severity: MEDIUM (raised 2026-08-28 — the descriptor is live, not dead data) · scope: build / release · handed over 2026-08-19 · wrongly closed and reopened the same day**
 

@@ -321,6 +321,27 @@ void ChapterHtmlSlimParser::flushPendingAnchor() {
   pendingAnchorId.clear();
 }
 
+// The pending id names the block in progress (see the id handler in
+// startElement). A TOC anchor breaks the page here, while the block has not
+// laid out a line; the id itself is held until placeLineOnPage() puts the
+// block's first line down, which is the one moment the page is certain.
+void ChapterHtmlSlimParser::adoptPendingAnchorForBlock() {
+  if (pendingAnchorId.empty()) return;
+  if (std::find(tocAnchors.begin(), tocAnchors.end(), pendingAnchorId) != tocAnchors.end()) {
+    // A no-op on an empty or not-yet-opened page: the chapter is already
+    // starting where it should. Only a failed replacement Page stops this.
+    breakPageBefore(pageStartAnchor());
+    if (allocFailed_) return;
+  }
+  if (!blockAnchorId_.empty()) {
+    // Two ids before any text (<a id="a"></a><a id="b"></a>text): the first
+    // has nothing better than the page the block is about to open on.
+    anchorData.push_back({std::move(blockAnchorId_), static_cast<uint16_t>(completedPageCount)});
+  }
+  blockAnchorId_ = std::move(pendingAnchorId);
+  pendingAnchorId.clear();
+}
+
 // flush the contents of partWordBuffer to currentTextBlock
 void ChapterHtmlSlimParser::flushPartWordBuffer() {
   // Determine font style from depth-based tracking and CSS effective style
@@ -1453,6 +1474,24 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
             self->flushPendingAnchor();
           }
           self->pendingAnchorId = idValue;
+          // AN ID THAT ARRIVES INSIDE A BLOCK NOTHING HAS BEEN ADDED TO NAMES
+          // THAT BLOCK. Project Gutenberg opens every chapter as
+          // <h2><a id="chap02"></a>CHAPTER II</h2>: the heading's block is
+          // already running when the id shows up on the inline <a>. Deferred
+          // to the next block start, as the ids above are, the TOC page break
+          // fell AFTER the heading -- the heading was laid out at the foot of
+          // the previous chapter's last page, the break completed that page,
+          // and the anchor named the page after it. Chapter Select therefore
+          // opened one page past the heading, which sat alone on the page
+          // before (owner, 2026-09-06: "chapter selection is going to the page
+          // before intended place"; test/toc_anchor_page reproduces it and
+          // shows the six other openings were right). So: break the page now,
+          // before the block lays out, and record the anchor when the block's
+          // first line is placed -- the page that line lands on is the answer
+          // whatever the break decides.
+          if (self->currentTextBlock && self->currentTextBlock->isEmpty() && self->partWordBufferIndex == 0) {
+            self->adoptPendingAnchorForBlock();
+          }
         }
       } else if (strcmp(atts[i], "dir") == 0) {
         dirAttr = atts[i + 1];
@@ -3313,6 +3352,11 @@ void ChapterHtmlSlimParser::placeLineOnPage(std::shared_ptr<TextBlock> line, con
   // Apply horizontal left inset (margin + padding) as x position offset
   const int16_t xOffset = line->getBlockStyle().leftInset();
   currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, currentPageNextY));
+  // The block this line opens carries an id: this page is where it lands.
+  if (!blockAnchorId_.empty()) {
+    anchorData.push_back({std::move(blockAnchorId_), static_cast<uint16_t>(completedPageCount)});
+    blockAnchorId_.clear();
+  }
   currentPageNextY += lineHeight;
   // Line Grid: a ruby line advances by more than one line-height; round up so
   // the next baseline returns to the grid. No-op for plain lines already on it.
@@ -3408,6 +3452,18 @@ void ChapterHtmlSlimParser::makePages() {
   // Must run before the footnote fallback and bottom spacing below, and before
   // any non-line element (image, rule, table) is emitted onto the page.
   flushPendingLines();
+
+  // A block that laid out no line (an empty heading around its own anchor)
+  // never placed the id it was holding; hand it back to the ordinary deferral
+  // so the next block records it. Its TOC break, if any, has already happened
+  // and the fresh page is empty, so flushPendingAnchor() will not break twice.
+  if (!blockAnchorId_.empty()) {
+    if (!pendingAnchorId.empty()) {
+      anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
+    }
+    pendingAnchorId = std::move(blockAnchorId_);
+    blockAnchorId_.clear();
+  }
 
   // Fallback: transfer any remaining pending footnotes to current page.
   // Normally addLineToPage handles this via word-index tracking, but this catches
