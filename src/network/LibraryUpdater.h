@@ -97,6 +97,11 @@ class LibraryUpdater {
 
   size_t getProcessedSize() const { return processedSize; }
   size_t getTotalSize() const { return totalSize; }
+
+  // Why the most recent syncBook() answered FAILED (NONE after any other
+  // answer). The activity tallies these so the summary can say what to fix
+  // instead of "22 errors".
+  librarysync::FailureKind lastFailure() const { return lastFailure_; }
   // Zero the per-book counters. syncBook() does this first thing, but the
   // activity repaints the whole-sync bar the moment it moves currentBook on,
   // BEFORE syncBook runs -- so it calls this under its render lock first, or
@@ -127,6 +132,7 @@ class LibraryUpdater {
   };
 
   std::vector<Book> books;
+  librarysync::FailureKind lastFailure_ = librarysync::FailureKind::NONE;
   std::vector<StoredRecord> records;
   bool recordsLoaded = false;
   bool recordsDirty = false;

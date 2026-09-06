@@ -77,6 +77,10 @@ class LibraryUpdateActivity : public Activity {
   unsigned updated = 0;    // ADDED + UPDATED
   unsigned unchanged = 0;
   unsigned errors = 0;
+  // errors, by kind, so the summary can name the one that dominates.
+  unsigned storageErrors = 0;
+  unsigned networkErrors = 0;
+  unsigned verifyErrors = 0;
   unsigned int lastRenderedPercent = 101;
   // onEnter() paints and waits; the network work is loop()'s, on its first
   // pass, so that nothing blocks before the frame is displayed (see above).

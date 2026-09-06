@@ -21,6 +21,10 @@ namespace libdouble {
 struct Script {
   LibraryUpdater::LibraryError checkResult = LibraryUpdater::OK;
   size_t books = 0;  // manifest entries fetchManifest() returns on OK
+  // The first `failedBooks` syncBook() calls answer FAILED with this kind;
+  // the rest answer UNCHANGED.
+  size_t failedBooks = 0;
+  librarysync::FailureKind failureKind = librarysync::FailureKind::STORAGE;
 };
 
 // What the activity did, in the order it did it.

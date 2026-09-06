@@ -134,4 +134,29 @@ inline bool isSafeFileName(const char* name) {
   return true;
 }
 
+// Why a book's sync FAILED, so the summary can name the thing to fix.
+//
+// The owner's report that made this exist (2026-09-06): "Update Library
+// results in 22 (all) errors" -- a number with no noun, from a screen that
+// counted failures without keeping their reasons. Each FAILED return in
+// LibraryUpdater::syncBook names one of these; the activity tallies them and
+// shows the one that dominates.
+enum class FailureKind {
+  NONE,
+  STORAGE,  // the card: the library folder could not be made, the .part could not be opened or written, the rename
+            // failed
+  NETWORK,  // the download did not complete: no route, TLS, a non-200 answer, a short body
+  VERIFY,   // the bytes arrived and do not match the manifest's size or sha256
+};
+
+// The kind to show for a run. STORAGE wins a tie, then NETWORK: a card that
+// cannot be written makes the other two moot, and a network that cannot be
+// reached makes verification moot. NONE only when nothing failed.
+inline FailureKind dominantFailure(unsigned storage, unsigned network, unsigned verify) {
+  if (storage == 0 && network == 0 && verify == 0) return FailureKind::NONE;
+  if (storage >= network && storage >= verify) return FailureKind::STORAGE;
+  if (network >= verify) return FailureKind::NETWORK;
+  return FailureKind::VERIFY;
+}
+
 }  // namespace librarysync

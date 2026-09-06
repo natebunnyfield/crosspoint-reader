@@ -73,6 +73,12 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
   processedSize = 1000;
   totalSize = 1000;
   if (onProgress) onProgress(ctx);
+  const libdouble::Script& s = state().script;
+  if (index < s.failedBooks) {
+    lastFailure_ = s.failureKind;
+    return BookResult::FAILED;
+  }
+  lastFailure_ = librarysync::FailureKind::NONE;
   return BookResult::UNCHANGED;
 }
 
