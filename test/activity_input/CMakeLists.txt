@@ -70,6 +70,8 @@ add_executable(ActivityInputTest
   KeyboardCursorRepeatTest.cpp
   ClaudeChatSendTest.cpp
   ListPagingTest.cpp
+  LibraryUpdateFirstFrameTest.cpp
+  LibraryUpdaterDouble.cpp
   HostHarness.cpp
   # activity + input layer under test
   ${REPO_ROOT}/src/MappedInputManager.cpp
@@ -96,6 +98,11 @@ add_executable(ActivityInputTest
   # blekbd and claudechat::runExchange are doubled inside the test file; both
   # reach ESP-IDF and neither is under test.
   ${REPO_ROOT}/src/activities/util/ClaudeChatActivity.cpp
+  # Update Library (LibraryUpdateFirstFrameTest.cpp): the REAL screen, over a
+  # LibraryUpdater double (LibraryUpdaterDouble.cpp -- the network and the
+  # card are not under test) and stubs/WiFi.h. Its header pulls only
+  # LibrarySyncPlan.h, which is pure, so nothing else comes with it.
+  ${REPO_ROOT}/src/activities/settings/LibraryUpdateActivity.cpp
   ${REPO_ROOT}/src/notes/KeyboardPanel.cpp
   ${REPO_ROOT}/src/notes/EditorFonts.cpp
   ${REPO_ROOT}/src/ReadingFontList.cpp

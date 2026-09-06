@@ -22,6 +22,17 @@
  *   FAILED      a reason, and Back
  *
  * Books on the card that the manifest does not mention are never touched.
+ *
+ * THE FIRST FRAME IS ON THE PANEL BEFORE ANY NETWORK CALL, and onEnter() waits
+ * for it rather than merely requesting it. A deferred requestUpdate() there
+ * is only a flag until the transition tick ends, when it becomes one notify to
+ * the render task (ActivityManager.cpp:87-92) -- and the very next loop() tick
+ * is the one that blocks on the manifest check. On device the paint raced the
+ * TLS handshake; on a host build, which presents pixels only from its main
+ * thread after loop() returns, the reader kept looking at Home until the whole
+ * sync had finished. requestUpdateAndWait() in onEnter() is the same move
+ * SleepActivity makes and main.cpp makes at boot: the frame is displayed
+ * before onEnter returns, and the check starts on the tick after.
  */
 class LibraryUpdateActivity : public Activity {
  public:
@@ -57,8 +68,8 @@ class LibraryUpdateActivity : public Activity {
   unsigned unchanged = 0;
   unsigned errors = 0;
   unsigned int lastRenderedPercent = 101;
-  // Same reason as the OTA screen: onEnter cannot block on the network before
-  // its first paint, so loop() does the work on its first pass.
+  // onEnter() paints and waits; the network work is loop()'s, on its first
+  // pass, so that nothing blocks before the frame is displayed (see above).
   bool checkStarted = false;
 
   void runSync();
