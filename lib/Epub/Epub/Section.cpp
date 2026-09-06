@@ -196,7 +196,15 @@ namespace {
 // the page ahead of a term that would otherwise end it. A section served from
 // a v54 cache is never parsed again, so without the bump the reader who sent
 // the screenshot would go on seeing exactly that page.
-constexpr uint8_t SECTION_FILE_VERSION = 55;
+// v56: the chapter break for a TOC anchor that sits INSIDE its heading
+// (Gutenberg's <h2><a id="chap02"></a>CHAPTER II</h2>) now falls before the
+// heading, not after it (owner report 2026-09-06, "chapter selection is going
+// to the page before intended place"). Two things a v55 cache holds wrong for
+// such a book: the pagination (the heading was stranded alone at the foot of
+// the previous chapter's last page) and the anchor map (the entry named the
+// page after the heading, so Chapter Select opened one page past it). Both are
+// on disk, so both need the rebuild.
+constexpr uint8_t SECTION_FILE_VERSION = 56;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

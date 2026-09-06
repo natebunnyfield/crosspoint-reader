@@ -102,6 +102,7 @@ class ChapterHtmlSlimParser {
   // Completes the current page (if it holds anything) so the next placement
   // starts a fresh one. `anchor` is the source position the new page starts at.
   void breakPageBefore(uint32_t anchor);
+  void adoptPendingAnchorForBlock();
   // The leaded height this line advances the cursor by / the ink extent it
   // needs to FIT as the last line of a page (see placeLineOnPage).
   int lineAdvanceOf(const TextBlock& line) const;
@@ -287,7 +288,12 @@ class ChapterHtmlSlimParser {
   // Anchor-to-page mapping: tracks which page each HTML id attribute lands on
   int completedPageCount = 0;
   std::vector<std::pair<std::string, uint16_t>> anchorData;
-  std::string pendingAnchorId;          // deferred until after previous text block is flushed
+  std::string pendingAnchorId;  // deferred until after previous text block is flushed
+  // An id that names the block in progress (it arrived on an inline element
+  // before any text of the block: Gutenberg's <h2><a id=...></a>). Recorded
+  // when placeLineOnPage() puts the block's first line down. See
+  // adoptPendingAnchorForBlock().
+  std::string blockAnchorId_;
   std::vector<std::string> tocAnchors;  // the list of anchors that are TOC chapter boundaries
   uint16_t xpathParagraphIndex = 0;
   uint16_t xpathListItemIndex = 0;
