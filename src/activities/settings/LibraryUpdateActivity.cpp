@@ -47,11 +47,17 @@ void LibraryUpdateActivity::onEnter() {
   }
 
   state = State::CHECKING;
-  requestUpdate();
+  // WAIT for this paint, do not merely request it. The next loop() tick
+  // blocks on the network; a deferred request would still be a notification
+  // in flight when it does, and the reader would be looking at Home -- on a
+  // host that presents only between loop() calls, for the whole sync. The
+  // frame names what is about to happen (Contacting GitHub, bar at 0 of 2)
+  // and is displayed before this returns. See the header.
+  requestUpdateAndWait();
 }
 
 void LibraryUpdateActivity::loop() {
-  // First pass after the CHECKING frame is on screen — see the header.
+  // First pass after the CHECKING frame is on screen -- onEnter waited for it.
   if (state == State::CHECKING && !checkStarted) {
     checkStarted = true;
     runSync();
@@ -75,6 +81,11 @@ void LibraryUpdateActivity::runSync() {
   // call that will not drain the flag for us.
   auto stepCb = +[](void* ctx, LibraryUpdater::CheckStep step) {
     auto* self = static_cast<LibraryUpdateActivity*>(ctx);
+    // The frame onEnter waited for already names the first step, so the
+    // CONTACTING callback has nothing to add. Repainting it anyway cost a
+    // second, identical refresh that ran on top of the TLS handshake.
+    // checkStep has one writer, this task, so reading it here needs no lock.
+    if (step == self->checkStep) return;
     {
       RenderLock lock(*self);
       self->checkStep = step;
