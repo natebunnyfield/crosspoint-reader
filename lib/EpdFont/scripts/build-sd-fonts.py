@@ -27,6 +27,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -388,6 +389,249 @@ def apply_cmap_drops(source_path: Path, codepoints, family_name: str, style_name
     return cached
 
 
+# name -> the component glyphs it is built from. Only the Unicode presentation
+# forms are buildable, because `fontconvert_sdcard.py`'s extractor keeps a
+# ligature only when its OUTPUT has a cmap entry or its INPUT sequence is in
+# that file's STANDARD_LIGATURE_MAP, and `is_presentation_ligature()` then
+# restricts the output to U+FB00-FB06 or the PUA. Anything else -- oe, ae, ij --
+# is a LETTER substitution and is refused downstream anyway, correctly: nothing
+# in this pipeline knows the book's language.
+# name -> (output codepoint, component codepoints). Addressed by CODEPOINT and
+# never by glyph name: a face is free to call its U+FB01 glyph `fi`, `f_i` or
+# `uniFB01`, and the first version of this stage assumed `fi` and would have
+# told an AGL-named face that it "does not draw" a ligature it draws. The name
+# is then looked up through the face's own cmap, which also makes it impossible
+# to emit `sub f i by fi;` against a glyph that is NOT the U+FB01 one -- a
+# mis-mapped `fi` used to be accepted here and silently dropped downstream as a
+# LETTER substitution, on stderr a default build discards.
+SYNTH_LIGATURE_CODEPOINTS = {
+    "ff":  (0xFB00, (0x0066, 0x0066)),
+    "fi":  (0xFB01, (0x0066, 0x0069)),
+    "fl":  (0xFB02, (0x0066, 0x006C)),
+    "ffi": (0xFB03, (0x0066, 0x0066, 0x0069)),
+    "ffl": (0xFB04, (0x0066, 0x0066, 0x006C)),
+    "st":  (0xFB06, (0x0073, 0x0074)),
+}
+
+# Bumped whenever the rules this stage writes, or the way it writes them,
+# change. It is part of the cache key: without it a patched file produced by an
+# older, WRONGER version of this function stays eligible forever, because the
+# key's other components (source mtime, requested names) do not move when this
+# file is edited. That is not hypothetical -- the `tables={"GSUB"}` fix below
+# changed the output of this stage and nothing in the old key noticed.
+SYNTH_LIGATURE_STAGE_VERSION = 2
+
+
+def _load_fontconvert():
+    """Import fontconvert_sdcard.py as a module, for its interval and ligature logic.
+
+    The build normally shells out to it. Re-implementing `resolve_intervals` or
+    the extractor's filters here would put one rule in two places, and the whole
+    point of the post-condition below is to ask the REAL consumer whether it can
+    see the ligature -- an approximation of it would answer for a different
+    program.
+    """
+    import importlib.util
+    # SCRIPT_DIR on sys.path first: fontconvert_sdcard.py does
+    # `from cpfont_version import CPFONT_VERSION` at import time, which resolves
+    # only because it is normally run as a script FROM this directory.
+    if str(SCRIPT_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPT_DIR))
+    spec = importlib.util.spec_from_file_location("fontconvert_sdcard", FONTCONVERT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _verify_synth_ligatures(cached: Path, names: list, intervals: str,
+                            family_name: str, style_name: str) -> Path:
+    """POST-CONDITION: ask the real consumer whether it can see what we wrote.
+
+    `apply_synth_ligatures`'s other checks prove nothing was LOST. This proves
+    something was GAINED, which is the half the first version did not have --
+    and there are at least three silent routes from "liga written" to "ligs=0
+    in the .cpfont", none of which any other check catches:
+
+      1. `intervals:` that does not cover U+FB00-FB06. The extractor drops the
+         pair with a bare `continue`. Only latin-ext, reading and builtin carry
+         the block; ascii, latin1, greek, cyrillic and the rest do not.
+      2. `ffi`/`ffl` requested without `ff`. The extractor decomposes a 3-glyph
+         ligature into chained pairs and drops the chain when the prefix has no
+         rule of its own.
+      3. a ligature glyph mapped outside U+FB00-FB06, which
+         `is_presentation_ligature()` refuses as a LETTER substitution.
+
+    All three print to fontconvert's stderr, and build-sd-fonts echoes only
+    lines containing "PRUNED" on success -- so all three are invisible in a
+    default build. Hence a gate rather than a comment.
+
+    It runs on the CACHE-HIT path too, deliberately: the patched file does not
+    depend on `intervals:`, so a family that narrows its intervals would
+    otherwise keep a cached file that is fine on its own terms and produces no
+    ligatures at all in the build that uses it.
+    """
+    fc = _load_fontconvert()
+    resolved = fc.resolve_intervals(intervals)
+    codepoints = [cp for lo, hi in resolved for cp in range(lo, hi + 1)]
+    seen = {lig_cp for _, lig_cp in fc.extract_ligatures_fonttools(str(cached), codepoints)}
+    wanted = {SYNTH_LIGATURE_CODEPOINTS[n][0] for n in names}
+    lost = sorted(wanted - seen)
+    if lost:
+        cached.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"{family_name}/{style_name}: wrote `liga` for {', '.join(names)}, but "
+            f"fontconvert's own extractor cannot see "
+            f"{', '.join('U+%04X' % cp for cp in lost)} under intervals '{intervals}'. "
+            f"Most likely the intervals do not cover U+FB00-FB06, or a 3-glyph ligature "
+            f"was requested without its 2-glyph prefix.")
+    return cached
+
+
+def apply_synth_ligatures(source_path: Path, ligatures: list, intervals: str,
+                          family_name: str, style_name: str) -> Path:
+    """Write a minimal `liga` feature into a face that draws ligatures but has no GSUB.
+
+    Some commercial cuts ship the ligature OUTLINES and cmap them at
+    U+FB01/FB02 while carrying no `liga` rule to reach them -- DTL Romulus has
+    no GSUB table at all, DTL Fleischmann has one holding zero features. The
+    glyphs are there and the reader would use them; nothing in the file says
+    when. This stage supplies the missing rule and nothing else.
+
+    **It never invents an outline.** Every name listed must already exist as a
+    glyph in the face, with a cmap entry, and so must each of its components --
+    otherwise this raises rather than silently shipping a shorter list. A face
+    with no `ff` drawn cannot get an `ff` ligature here; that would be drawing,
+    not patching, and is out of scope for a build script.
+
+    **It refuses a face that already has `liga` or `rlig`.** A source that
+    gains one in a later release must be re-examined rather than patched over,
+    since the foundry's own rules are authoritative and would now be competing
+    with these.
+
+    Cached in PATCHED_DIR/<family>/liga/, its own directory for the same reason
+    apply_cmap_drops has one: apply_metrics_override's stale-file sweep globs
+    `<style>_*` directly in PATCHED_DIR/<family>/ and would otherwise delete
+    this function's output, which is that function's input.
+    """
+    from fontTools.ttLib import TTFont
+    from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
+
+    names = [str(n) for n in ligatures]
+    if not names:
+        return source_path
+    unknown = [n for n in names if n not in SYNTH_LIGATURE_CODEPOINTS]
+    if unknown:
+        raise RuntimeError(
+            f"{family_name}/{style_name}: synth_ligatures names {unknown}, which are not "
+            f"buildable presentation forms. Allowed: {sorted(SYNTH_LIGATURE_CODEPOINTS)}")
+
+    mtime = int(source_path.stat().st_mtime)
+    stamp = hashlib.sha1(
+        repr((SYNTH_LIGATURE_STAGE_VERSION, sorted(names),
+              sorted(SYNTH_LIGATURE_CODEPOINTS.items()))).encode()).hexdigest()[:8]
+    key = "-".join(names)
+    cached = (PATCHED_DIR / family_name / "liga"
+              / f"{style_name}_{key}_{stamp}_{mtime}{source_path.suffix}")
+    if cached.exists():
+        return _verify_synth_ligatures(cached, names, intervals, family_name, style_name)
+
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    for old in cached.parent.glob(f"{style_name}_*{source_path.suffix}"):
+        old.unlink()
+
+    font = TTFont(str(source_path), recalcBBoxes=False, recalcTimestamp=False)
+    try:
+        if "GSUB" in font:
+            gsub = font["GSUB"].table
+            existing = set()
+            if gsub is not None and gsub.FeatureList is not None:
+                existing = {fr.FeatureTag for fr in gsub.FeatureList.FeatureRecord}
+            if existing:
+                # ANY feature, not just liga/rlig: feaLib REPLACES the GSUB
+                # table rather than merging into it, so writing `liga` into a
+                # face that also carries smcp/onum/frac/dlig would delete those
+                # too. Nothing in this pipeline reads them today, which makes it
+                # exactly the silent kind of loss the GPOS bug already was.
+                raise RuntimeError(
+                    f"{family_name}/{style_name}: source already has GSUB features "
+                    f"{sorted(existing)}. This stage REPLACES GSUB, so it would delete them. "
+                    f"Remove synth_ligatures: -- the foundry's own rules win.")
+
+        # `or {}` because a face with only a Mac (1,0) cmap returns None here,
+        # and build_family catches RuntimeError only -- an AttributeError would
+        # escape the worker and kill the whole run with a traceback instead of
+        # one clean FAILED line. Same defence as fontconvert_sdcard.py:241.
+        cmap = font.getBestCmap() or {}
+        glyphs = set(font.getGlyphOrder())
+        rules = []
+        for n in names:
+            lig_cp, comp_cps = SYNTH_LIGATURE_CODEPOINTS[n]
+            need = [lig_cp] + list(comp_cps)
+            unmapped = [cp for cp in need if cp not in cmap]
+            if unmapped:
+                raise RuntimeError(
+                    f"{family_name}/{style_name}: synth_ligatures '{n}' needs "
+                    f"{', '.join('U+%04X' % cp for cp in unmapped)}, which this face does not "
+                    f"map. This stage patches, it does not draw -- drop '{n}' from the list.")
+            absent = [cmap[cp] for cp in need if cmap[cp] not in glyphs]
+            if absent:
+                raise RuntimeError(
+                    f"{family_name}/{style_name}: '{n}' maps to glyph(s) {absent} that are not "
+                    f"in the glyph order. The face's cmap disagrees with itself.")
+            out_glyph = cmap[lig_cp]
+            comp_glyphs = " ".join(cmap[cp] for cp in comp_cps)
+            rules.append(f"    sub {comp_glyphs} by {out_glyph};")
+
+        fea = ("languagesystem DFLT dflt;\n"
+               "languagesystem latn dflt;\n"
+               "feature liga {\n" + "\n".join(rules) + "\n} liga;\n")
+        print(f"  Synthesising liga: {family_name}/{style_name} -> {', '.join(names)}")
+
+        # `tables={"GSUB"}` is LOAD-BEARING, not tidiness. Without it feaLib
+        # builds every table the feature file could describe and REPLACES them
+        # -- and a .fea with no positioning rules builds an empty GPOS, so the
+        # face's kerning is deleted. Caught 2026-09-06 on DTL Romulus: the
+        # first cut of this stage dropped GPOS from all four styles, and only
+        # the bold showed it (kernL=0), because the other three happen to carry
+        # a legacy `kern` table that the converter also reads and that survived.
+        # All four faces hold ~1410 pairs; three of them were quietly reading
+        # them from the fallback path while the bold had none left.
+        gpos_before = None
+        if "GPOS" in font and font["GPOS"].table is not None:
+            gpos_before = len(font["GPOS"].table.LookupList.Lookup or []) \
+                if font["GPOS"].table.LookupList is not None else 0
+        addOpenTypeFeaturesFromString(font, fea, tables={"GSUB"})
+        gpos_after = None
+        if "GPOS" in font and font["GPOS"].table is not None:
+            gpos_after = len(font["GPOS"].table.LookupList.Lookup or []) \
+                if font["GPOS"].table.LookupList is not None else 0
+        if gpos_before != gpos_after:
+            raise RuntimeError(
+                f"{family_name}/{style_name}: writing `liga` changed GPOS from "
+                f"{gpos_before} lookups to {gpos_after}. This stage must add a "
+                f"substitution and touch nothing else -- kerning would be lost "
+                f"silently in any style with no legacy `kern` table to fall back on.")
+
+        # The signature covered the bytes this stage just changed, so it is now
+        # a signature over something that no longer exists.
+        if "DSIG" in font:
+            del font["DSIG"]
+
+        tmp_fd, tmp_name = tempfile.mkstemp(suffix=source_path.suffix, dir=cached.parent)
+        os.close(tmp_fd)
+        tmp_path = Path(tmp_name)
+        try:
+            font.save(str(tmp_path))
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
+    finally:
+        font.close()
+    tmp_path.replace(cached)
+    return _verify_synth_ligatures(
+        cached, names, intervals, family_name, style_name)
+
+
 def apply_metrics_override(source_path: Path, metrics: dict, family_name: str, style_name: str) -> Path:
     """Rewrite a font's vertical metrics before conversion.
 
@@ -744,6 +988,15 @@ def build_family(
             for style_name in list(resolved_styles):
                 resolved_styles[style_name] = apply_cmap_drops(
                     resolved_styles[style_name], drops, name, style_name)
+        # Family-level synthetic `liga`, after the cmap drops (so a dropped
+        # codepoint cannot be a ligature component) and before the metrics
+        # patch and `from:` aliasing (so both chain and synthetics inherit it).
+        synth_ligs = family.get("synth_ligatures")
+        if synth_ligs:
+            for style_name in list(resolved_styles):
+                resolved_styles[style_name] = apply_synth_ligatures(
+                    resolved_styles[style_name], synth_ligs, family["intervals"],
+                    name, style_name)
         # Family-level metrics override, applied to the real sources before
         # `from:` styles alias them, so synthetics inherit the patched file.
         metrics = family.get("metrics")

@@ -218,6 +218,44 @@ inline constexpr Entry kEntries[] = {
     {"Edgar", "Edgar", "William Caslon & Alexander Phemister; Tobias Frere-Jones & Nina St\xC3\xB6ssinger",
      "1722 London; 2025 Brooklyn", 1722},
     {"Coelacanth", "Coelacanth", "Bruce Rogers; Ben Whitmore", "1914 New York; 2014 Waiheke Island, New Zealand", 1914},
+    // Built 2026-09-06 and CUT the same day (owner: "drop dtlfleischmann, keep
+    // romulus"). The row stays, the way Freight Sans' and Lexica Ultralegible's
+    // do: the recipe in sd-fonts.yaml is still buildable, and a build with no
+    // row here shows the raw directory name in the picker. The face is
+    // commercial (Dutch Type Library) and reached no device card.
+    // Stage 1 is the MODEL and its date is the year Fleischmann began cutting
+    // exclusively for the Enschedes, per DTL's own page on the face
+    // (dutchtypelibrary.nl/DTLFleischmann.html), which also places him in
+    // Amsterdam from his own 1735 foundry to his death in 1768. The Enschede
+    // foundry those punches went to was in HAARLEM; the two cities disagree
+    // and DTL's page is the one followed, because it is the primary source for
+    // this revival and it is Fleischmann's own city that the column names.
+    // Stage 2's year is the one the SHIPPED FILE declares -- its name table
+    // reads "Version 3.0E/ Generated on 19-02-2000/ 2000 by Dutch Type
+    // Library" -- and DTL's own page agrees that a German specimen appeared in
+    // 2000. Three other years are in circulation and none is taken: DTL says
+    // the commission was 1992, Fonts In Use says the release was 1994, and the
+    // German Museum of Books and Writing dates the family to "between 1993 and
+    // 2006" alongside Prokyon and Antaris. It is the least certain field in
+    // this row. Leipzig is firm: the same museum page has Kaiser at Leipzig
+    // University through the 1990s and designing for DTL "since 1992".
+    // See docs/font-dates.md.
+    {"DTLFleischmann", "DTL Fleischmann", "Johann Michael Fleischmann; Erhard Kaiser",
+     "1743 Amsterdam; 2000 Leipzig", 1743},
+    // Added 2026-09-06 alongside DTL Fleischmann, same TestFlight trial, same
+    // terms -- commercial, on no device card. The digitiser is Frank E.
+    // Blokland, NOT Kaiser: DTL's own page heads the face "Jan van Krimpen |
+    // Frank E. Blokland", and the DTL Van Krimpen project it belongs to began
+    // when Blokland met Huib van Krimpen at ATypI Basel in autumn 1986. Stage
+    // 2's year is again the shipped file's own: "Copyright Dutch Type Library,
+    // 2003". Stage 1 is Wikipedia's dating of the metal original, "Romulus
+    // (1931, Enschede, also 1936 Monotype)", cut in Haarlem where van Krimpen
+    // worked for Koninklijke Joh. Enschede his whole career. The 1936 Monotype
+    // issue is deliberately NOT a third stage: it is the same design licensed
+    // out, not a redrawing. Note for anyone judging the specimen -- Romulus's
+    // sloped form is an OBLIQUE, not a true italic, by van Krimpen's design.
+    {"DTLRomulus", "DTL Romulus", "Jan van Krimpen; Frank E. Blokland",
+     "1931 Haarlem; 2003 's-Hertogenbosch", 1931},
     {"GoudyBookletter1911", "Goudy Bookletter", "Frederic W. Goudy; Barry Schwartz", "1911 New York; 2009 St. Paul",
      1911},
     // Born digital and revised where it was drawn, so one stage, comma'd years.

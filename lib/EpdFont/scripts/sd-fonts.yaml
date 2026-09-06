@@ -18,6 +18,27 @@
 #                conversion — the .cpfont's advanceY derives from hhea. For faces
 #                whose stock metrics are sized for scripts the built charset
 #                never includes.
+#   synth_ligatures: (optional) List of presentation-form ligature names —
+#                any of ff fi fl ffi ffl st — to reach with a `liga` feature
+#                written into the source at build time. For faces that DRAW the
+#                ligature and cmap it at U+FB00-FB06 but ship no GSUB rule to
+#                reach it, so the outline is present and unreachable (DTL
+#                Romulus has no GSUB table at all; DTL Fleischmann has one
+#                holding zero features). It NEVER draws an outline: every name
+#                and every component glyph must already exist and be encoded,
+#                or the build fails naming what is missing. It also refuses a
+#                source that already carries `liga`/`rlig`, so a face that
+#                gains one in a later release gets re-examined instead of
+#                patched over — and any OTHER pre-existing GSUB feature too,
+#                since feaLib REPLACES the table rather than merging into it.
+#                Two gates rather than two comments: GPOS lookup counts must
+#                not move, and fontconvert's own extractor must be able to SEE
+#                each requested ligature under this family's `intervals:`
+#                (which must therefore cover U+FB00-FB06 — only latin-ext,
+#                reading and builtin do). Nothing is needed at runtime — EpdFont's
+#                ligature lookup is a draw-time table walk, and LigatureControl
+#                keys its per-pair toggles on the INPUT pair, so each new pair
+#                gets its own switch in Typography Settings for free.
 #   drop_codepoints: (optional) Codepoints to delete from the source's cmap
 #                before conversion, so the Noto fallback supplies them. For
 #                sources whose cmap points at the WRONG outline: the converter
@@ -499,6 +520,116 @@ families:
       italic:     {path: "local_fonts/CaledoniaCC-Italic.ttf"}
       bold:       {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
       bolditalic: {from: italic, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
+
+  # **CUT 2026-09-06, the same day it was built** (owner ruling: "drop
+  # dtlfleischmann, keep romulus"). Recipe only — its .cpfont files are gone
+  # from the build output, from the iOS seed tree and from the render harness's
+  # font root, and there is nothing to strip from a device card because it
+  # never reached one. Do NOT re-add it to a surface without a fresh ruling.
+  #
+  # The recipe and its derivation stay, per this file's convention for cut
+  # families: the measurements below took a sweep to establish and the sources
+  # are gitignored, so deleting them would mean paying for the same sweep again
+  # if the face is ever reconsidered. The staged TTFs are left in
+  # lib/EpdFont/local_fonts/ for the same reason. `python3 build-sd-fonts.py
+  # --only DTLFleischmann` rebuilds it exactly as measured.
+  #
+  # Commercial (Dutch Type Library), so the FILES are never committed: put the
+  # four "T" (text) cuts in lib/EpdFont/local_fonts/ under the names below and
+  # this builds like any other family. Built 2026-09-06 for an iOS TestFlight
+  # trial alongside DTL Romulus, which is the one that stays. It was never in
+  # installed_families:, so it reached no device SD card and no simulator
+  # default install.
+  #
+  # The source is a Mac-charset cut: 247 codepoints, full Latin-1 plus ten of
+  # Latin Ext-A, fi/fl, the quote/dash tail and a handful of math signs. It has
+  # NO Greek and NO Cyrillic, so `reading` prunes hard and the Noto/Schola
+  # fallback chain supplies the rest — the same arrangement Edgar runs under.
+  #
+  # Measurements and derivation: docs/dtl-trial-fonts-2026-09-06.md.
+  #
+  # scale: 0.97 is a SLOT FIT, measured, not a preference. Native, the ramp
+  # lands x-height 8/10/12/14/16/19 — hinting skips 18 px entirely between
+  # 17 pt (17) and 18 pt (19), so no point size reaches the top slot. At
+  # k=0.97 all six land exactly on 8/10/12/14/16/18 at 8/10/12/14/16/18 pt.
+  # Swept k=0.88..1.08 x 5..29 pt, 2026-09-06; k=0.97 is the value closest to
+  # 1.0 that hits all six. This is the mixed-x-height rule's sibling, not the
+  # words-per-page normalisation of 2026-08-27 — DTL Fleischmann has NOT been
+  # run through the Almendra-anchored paginator measurement, and must be
+  # before it could join the tier.
+  - name: DTLFleischmann
+    description: "DTL Fleischmann, Kaiser after J. M. Fleischmann's Dutch baroque (Latin)"
+    intervals: reading
+    sizes: [8, 10, 12, 14, 16, 18]
+    # Uniform slots: xh 8/10/12/14/16/18 and advY 23/28/34/40/46/51 — exact on
+    # all six, and the declared ascender clears accented capitals at every size
+    # in all four styles (measured 2026-09-06; worst case is the regular's 37 px
+    # accent top at 18 pt against an ascender of 40). The span had to be
+    # 1365-1368/1000 to hit every advY target at once; 1366 is the middle of it.
+    # Stock metrics could not be used at all: the shipped Regular and Italic
+    # carry hhea 0/0/0, so FreeType falls back to the bbox and the leading is
+    # whatever the outlines happen to reach.
+    metrics: {ascent: 1046, descent: -320, linegap: 0}
+    styles:
+      regular:    {scale: 0.97, path: "local_fonts/DTLFleischmann-Regular.ttf"}
+      bold:       {scale: 0.97, path: "local_fonts/DTLFleischmann-Bold.ttf"}
+      italic:     {scale: 0.97, path: "local_fonts/DTLFleischmann-Italic.ttf"}
+      bolditalic: {scale: 0.97, path: "local_fonts/DTLFleischmann-BoldItalic.ttf"}
+
+  # The second half of the same 2026-09-06 iOS TestFlight trial, and the same
+  # terms: commercial (Dutch Type Library), files never committed, NOT in
+  # installed_families:, promotion needs its own ruling. Four "T" (text) cuts
+  # in lib/EpdFont/local_fonts/ under the names below. These are CFF/OTF, not
+  # TrueType like the Fleischmann pair.
+  #
+  # Also a Mac-charset cut: 247 codepoints (249 in the bold), full Latin-1,
+  # no Greek, no Cyrillic, and — like DTL Fleischmann — **no `liga` feature at
+  # all**: GSUB is absent entirely and GPOS carries only `kern`, so fi and fl
+  # exist as outlines at U+FB01/FB02 and nothing reaches them. See
+  # docs/dtl-trial-fonts-2026-09-06.md, which covers both families.
+  #
+  # NO `scale:`, and the tall ramp instead. Romulus is the SMALLEST-ON-BODY
+  # face in the whole file: x-height 398/1000 against DTL Fleischmann's 484 and
+  # a tier norm near 480. Two ways to put it on the slots were measured
+  # 2026-09-06 and they render within about 2% of each other, because matching
+  # x-height fixes the rendered size whichever lever gets you there:
+  #   (a) scale 1.18-1.23 with the ramp 8/10/12/14/16/18, or
+  #   (b) no scale with the ramp 9/12/14/17/19/22.
+  # (b) is taken, on the Venetian 301 and Coelacanth precedent — both are
+  # small-on-body faces that answer with a tall point ramp and carry no scale
+  # for it. It also keeps `scale:` meaning what its schema comment says it
+  # means; a 1.20 would be the largest in the file by a wide margin and would
+  # read as a styling knob.
+  - name: DTLRomulus
+    description: "DTL Romulus, Blokland after Jan van Krimpen's 1931 Enschede roman (Latin)"
+    intervals: reading
+    sizes: [9, 12, 14, 17, 19, 22]
+    # Uniform slots: xh 8/10/12/14/16/18 — EXACT on all six in the regular.
+    # advY 24/31/37/45/50/58, +1..+7 over the 23/28/34/40/46/51 target:
+    # FLOOR-BOUND, the same way Coelacanth and Venetian 301 are. Van Krimpen's
+    # extenders are long and the x-height is short, so at matched x-height the
+    # plain-ink span + 0.13 em exceeds the uniform leading at every slot — 50 px
+    # of ink at the top slot against a 51 px target line. This is the minimum
+    # ink-safe leading, not a preference; measured at all six sizes in all four
+    # styles.
+    #
+    # 877/-380 is the Coelacanth split (877/-362) with three more units of
+    # descent, and it is chosen the same way: DESCENDERS WIN. The descenders
+    # clear at every size in every style; accented capitals poke 1-3 px above
+    # the declared ascender, which no span inside the ink floor can also cover.
+    # Dropping to -377 would buy 1 px of leading at two slots and clip a
+    # descender at 14 pt, so it was not taken.
+    metrics: {ascent: 877, descent: -380, linegap: 0}
+    # The face draws fi and fl and cmaps them at U+FB01/FB02, and carries NO
+    # GSUB table at all, so both outlines shipped unreachable and every style
+    # built with ligs=0. ff/ffi/ffl are not listed because this face does not
+    # draw them — only fi and fl exist among its 251 glyphs.
+    synth_ligatures: [fi, fl]
+    styles:
+      regular:    {path: "local_fonts/DTLRomulus-Regular.otf"}
+      bold:       {path: "local_fonts/DTLRomulus-Bold.otf"}
+      italic:     {path: "local_fonts/DTLRomulus-Italic.otf"}
+      bolditalic: {path: "local_fonts/DTLRomulus-BoldItalic.otf"}
 
   # The four families below are commercial or webfont cuts: the FILES are never
   # committed or distributed, only these recipes. Put the sources in
