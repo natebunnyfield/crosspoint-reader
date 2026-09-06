@@ -242,8 +242,10 @@ inline constexpr Entry kEntries[] = {
     // See docs/font-dates.md.
     {"DTLFleischmann", "DTL Fleischmann", "Johann Michael Fleischmann; Erhard Kaiser",
      "1743 Amsterdam; 2000 Leipzig", 1743},
-    // Added 2026-09-06 alongside DTL Fleischmann, same TestFlight trial, same
-    // terms -- commercial, on no device card. The digitiser is Frank E.
+    // Added 2026-09-06 alongside DTL Fleischmann and PROMOTED the same day
+    // (owner: "add") -- installed_families:, so every surface. It is the ninth
+    // installed family and the first commercial one: the outlines are licensed
+    // and gitignored, so a clean clone cannot rebuild this family. The digitiser is Frank E.
     // Blokland, NOT Kaiser: DTL's own page heads the face "Jan van Krimpen |
     // Frank E. Blokland", and the DTL Van Krimpen project it belongs to began
     // when Blokland met Huib van Krimpen at ATypI Basel in autumn 1986. Stage

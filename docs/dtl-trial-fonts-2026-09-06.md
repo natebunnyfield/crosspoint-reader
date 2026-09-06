@@ -5,7 +5,29 @@ TestFlight trial. Fleischmann is §1–§6; Romulus is §7. Both are commercial
 (Dutch Type Library), both are Latin-only Mac-charset cuts, and **neither has a
 `liga` feature** — that shared defect is §5.*
 
-> ## OUTCOME, same day: Romulus stays, Fleischmann is cut
+> ## PROMOTED, same day: Romulus is the ninth installed family
+>
+> Owner ruling 2026-09-06, *"add"*: DTL Romulus goes into
+> `installed_families:` and ships on **every** surface — device SD cards, the
+> simulator's `fs_/fonts/` (installed at 1x, 2x and 3x), and the iOS seed set.
+> Its name came back out of `CROSSPOINT_IOS_TRIAL_FAMILIES`, which is FATAL to
+> leave alongside `installed_families:`.
+>
+> **Two things about this promotion are firsts, and both are load-bearing:**
+>
+> 1. **It is the first COMMERCIAL family in `installed_families:`.** The other
+>    eight rebuild from a URL or a committed file on any machine; this one's
+>    outlines are licensed and gitignored, so a clean clone builds eight
+>    families and skips the ninth with a note. Nothing in the repo can fix
+>    that for someone who does not have the files.
+> 2. **The trial it was built for never ran.** The build carrying it could not
+>    be archived — codesign `errSecInternalComponent`, and there is no Apple
+>    Distribution certificate on the Mac (the Development cert present was
+>    issued 2026-09-04, two days after the last archive that worked). So the
+>    ruling came from rendered specimens, not from the phone. Everything below
+>    is measured; none of it is device-confirmed.
+>
+> ## Earlier the same day: Romulus stays, Fleischmann is cut
 >
 > Owner ruling 2026-09-06, after seeing both rendered at all six slots:
 > *"drop dtlfleischmann, keep romulus."*

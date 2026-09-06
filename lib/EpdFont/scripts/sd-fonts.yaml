@@ -193,7 +193,7 @@
 # added 2026-08-03, three text grotesques the same day, two of those three cut
 # 2026-08-04, Lexica Ultralegible itself cut 2026-08-04, Quattrocento Sans
 # promoted 2026-08-04, TeX Gyre Heros added 2026-08-23, Almendra added
-# 2026-08-24): these eight, and only these eight, are INSTALLED on every surface — both device SD cards, the
+# 2026-08-24; DTL Romulus added 2026-09-06): these NINE, and only these nine, are INSTALLED on every surface — both device SD cards, the
 # simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
@@ -240,6 +240,25 @@ installed_families:
   - InknutJunicode
   - TeXGyreHeros
   - Almendra
+  - DTLRomulus
+# DTL Romulus joined on 2026-09-06 (owner ruling, promoting it straight out of
+# the iOS trial it was built for the day before it could be evaluated on the
+# phone — the upload was still blocked on a signing problem when the ruling
+# came). It is the ninth installed family and the first COMMERCIAL one in the
+# list: its outlines are licensed, gitignored, and cannot be redistributed, so
+# unlike the other eight this family cannot be rebuilt from a clean clone.
+# Anyone without lib/EpdFont/local_fonts/DTLRomulus-*.otf gets a build that
+# skips it and says so; that is a real difference from every other name here
+# and the reason this line deserves its own note.
+#
+# It displaces nothing: it is a Dutch baroque oldstyle and the first
+# small-on-body, long-extender text face in the tier, so no head-to-head is
+# owed. Its slots are x-height 8/10/12/14/16/18 exact on all six, on a tall
+# 9-22 pt ramp with no scale:; its leading is floor-bound at 24/31/37/45/50/58,
+# +1..+7 over the uniform target, for the same reason Coelacanth's and Venetian
+# 301's are. It is also the first family to carry synth_ligatures: — it draws
+# fi and fl and shipped no GSUB to reach them.
+# Measurements: docs/dtl-trial-fonts-2026-09-06.md.
 # Almendra joined on 2026-08-24 (owner ruling: "keep almendra but add in
 # accurate dates and authors"), out of the five-family trial the simulator
 # repo's docs/trial-fonts.md describes; the other four were declined the same
@@ -576,11 +595,17 @@ families:
       italic:     {scale: 0.97, path: "local_fonts/DTLFleischmann-Italic.ttf"}
       bolditalic: {scale: 0.97, path: "local_fonts/DTLFleischmann-BoldItalic.ttf"}
 
-  # The second half of the same 2026-09-06 iOS TestFlight trial, and the same
-  # terms: commercial (Dutch Type Library), files never committed, NOT in
-  # installed_families:, promotion needs its own ruling. Four "T" (text) cuts
-  # in lib/EpdFont/local_fonts/ under the names below. These are CFF/OTF, not
-  # TrueType like the Fleischmann pair.
+  # PROMOTED 2026-09-06 (owner ruling: "add"), straight out of the iOS trial it
+  # was built for. It is in installed_families: above, so it belongs on every
+  # surface — device SD cards, the simulator's fs_/fonts/, and the iOS seed
+  # tree — and its name has come back out of CROSSPOINT_IOS_TRIAL_FAMILIES in
+  # the simulator repo's ios/CMakeLists.txt, which refuses a family named in
+  # both lists.
+  #
+  # Commercial (Dutch Type Library) and the ONLY installed family that is:
+  # the four "T" (text) cuts live in lib/EpdFont/local_fonts/ (gitignored) and
+  # are never committed, so a clean clone cannot rebuild this one. These are
+  # CFF/OTF, not TrueType like the Fleischmann pair.
   #
   # Also a Mac-charset cut: 247 codepoints (249 in the bold), full Latin-1,
   # no Greek, no Cyrillic, and — like DTL Fleischmann — **no `liga` feature at
