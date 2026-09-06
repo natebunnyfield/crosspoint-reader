@@ -75,6 +75,48 @@ TEST_F(LibraryUpdateFirstFrame, OnlyTheReadingStepRepaints) {
   EXPECT_EQ(o.updatesAfterReadingStep, o.updatesAtFirstFetch + 1);
 }
 
+// The books sync ONE PER TICK, with the manifest check's tick and the summary's
+// tick on either side. A host presents only between ticks, so this is what
+// makes "Book N of M" and the bar visible there at all; before, the whole sync
+// ran inside the check's tick and the host went from "Book 1 of 3" straight to
+// the summary.
+TEST_F(LibraryUpdateFirstFrame, EachBookSyncsOnItsOwnTick) {
+  libdouble::script().books = 3;
+  host::setRootActivity(makeActivity());
+
+  // The check's tick: the manifest, the waited-for "Book 1 of 3" frame, and
+  // no download yet.
+  host::frame();
+  const auto& o = libdouble::observed();
+  ASSERT_EQ(o.fetchCalls, 1);
+  EXPECT_TRUE(o.syncedBooks.empty());
+  EXPECT_EQ(host::counters().updateAndWaits, 2);  // CHECKING, then SYNCING
+  ASSERT_NE(host::currentActivity(), nullptr);
+  EXPECT_TRUE(host::currentActivity()->preventAutoSleep());
+
+  // One book per tick, each with its own repaint request before the download.
+  for (size_t book = 0; book < 3; ++book) {
+    const int updatesBefore = host::counters().updates;
+    host::frame();
+    ASSERT_EQ(o.syncedBooks.size(), book + 1);
+    EXPECT_EQ(o.syncedBooks.back(), book);
+    EXPECT_GT(host::counters().updates, updatesBefore);
+    EXPECT_EQ(o.flushes, 0);
+    EXPECT_TRUE(host::currentActivity()->preventAutoSleep());
+  }
+
+  // The tick after the last book: one flush, then the summary.
+  host::frame();
+  EXPECT_EQ(o.syncedBooks.size(), 3u);
+  EXPECT_EQ(o.flushes, 1);
+  EXPECT_FALSE(host::currentActivity()->preventAutoSleep());
+
+  // Nothing further happens on later ticks.
+  host::frames(2);
+  EXPECT_EQ(o.syncedBooks.size(), 3u);
+  EXPECT_EQ(o.flushes, 1);
+}
+
 // No link: say so with a deferred paint -- nothing blocks after it, so there
 // is nothing to wait for -- and never reach the network.
 TEST_F(LibraryUpdateFirstFrame, NoWifiPaintsDeferredAndNeverFetches) {

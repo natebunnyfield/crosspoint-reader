@@ -33,6 +33,15 @@
  * sync had finished. requestUpdateAndWait() in onEnter() is the same move
  * SleepActivity makes and main.cpp makes at boot: the frame is displayed
  * before onEnter returns, and the check starts on the tick after.
+ *
+ * THE BOOKS SYNC ONE PER loop() TICK, not all inside one call. A host build
+ * presents only between loop() calls, so a sync that ran to completion inside
+ * one showed "Book 1 of N" and then the summary, with every frame in between
+ * converted and never presented. Each tick paints the book about to be synced,
+ * syncs it, and returns; the tick after the last book flushes the sync records
+ * and shows the summary. skipLoopDelay() keeps the ticks back to back on the
+ * device, where the render task was already painting concurrently and nothing
+ * changes but the shape of the code.
  */
 class LibraryUpdateActivity : public Activity {
  public:
@@ -63,7 +72,8 @@ class LibraryUpdateActivity : public Activity {
   LibraryUpdater::CheckStep checkStep = LibraryUpdater::CheckStep::CONTACTING;
   LibraryUpdater updater;
   std::string errorMessage;
-  size_t currentBook = 0;  // index into the manifest while SYNCING
+  size_t currentBook = 0;  // index into the manifest while SYNCING (the book on screen)
+  size_t nextBook = 0;     // first manifest index not yet synced; == books.size() means done
   unsigned updated = 0;    // ADDED + UPDATED
   unsigned unchanged = 0;
   unsigned errors = 0;
@@ -72,5 +82,6 @@ class LibraryUpdateActivity : public Activity {
   // pass, so that nothing blocks before the frame is displayed (see above).
   bool checkStarted = false;
 
-  void runSync();
+  void runCheck();      // the manifest check, on the first loop() tick
+  void syncNextBook();  // one book per SYNCING tick, then DONE
 };
