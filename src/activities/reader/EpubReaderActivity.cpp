@@ -920,6 +920,8 @@ void EpubReaderActivity::openChapterSelection() {
           const auto& chapterResult = std::get<ChapterResult>(result.data);
           RenderLock lock(*this);
 
+          LOG_DBG("ERS", "Chapter pick: spine %d anchor '%s'", chapterResult.spineIndex, chapterResult.anchor.c_str());
+
           currentSpineIndex = chapterResult.spineIndex;
 
           // If anchor is not empty, it will be used later to calculate the page number.
@@ -965,6 +967,10 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn) {
       }
     }
   }
+  // A jump that lands one page off is indistinguishable, from the outside, from a
+  // correct jump followed by a stray backward turn. This line separates them.
+  LOG_DBG("ERS", "Page turn %s -> spine %d page %d", isForwardTurn ? "fwd" : "back", currentSpineIndex,
+          section ? section->currentPage : -1);
   requestUpdate();
 }
 
@@ -1386,7 +1392,8 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 
     const auto start = millis();
     renderContents(std::move(p), orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
-    LOG_DBG("ERS", "Rendered page in %dms", millis() - start);
+    LOG_DBG("ERS", "Rendered spine %d page %d/%d in %dms", currentSpineIndex, section->currentPage,
+            static_cast<int>(section->pageCount), static_cast<int>(millis() - start));
     lastRenderCompleteMs = millis();
   }
   // Only persist when the position actually changed. render() also runs on re-renders that
