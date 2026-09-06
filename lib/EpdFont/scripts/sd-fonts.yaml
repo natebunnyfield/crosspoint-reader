@@ -628,23 +628,37 @@ families:
   - name: DTLRomulus
     description: "DTL Romulus, Blokland after Jan van Krimpen's 1931 Enschede roman (Latin)"
     intervals: reading
-    sizes: [9, 12, 14, 17, 19, 22]
-    # Uniform slots: xh 8/10/12/14/16/18 — EXACT on all six in the regular.
-    # advY 24/31/37/45/50/58, +1..+7 over the 23/28/34/40/46/51 target:
-    # FLOOR-BOUND, the same way Coelacanth and Venetian 301 are. Van Krimpen's
-    # extenders are long and the x-height is short, so at matched x-height the
-    # plain-ink span + 0.13 em exceeds the uniform leading at every slot — 50 px
-    # of ink at the top slot against a 51 px target line. This is the minimum
-    # ink-safe leading, not a preference; measured at all six sizes in all four
-    # styles.
+    sizes: [9, 11, 14, 15, 18, 20]
+    # RETUNED 2026-09-06 (owner ruling, after a rendered comparison): this
+    # family is anchored on LEADING, not on x-height. It is the second
+    # exception to the x-height anchor, and it is the opposite exception to
+    # Almendra's — Almendra reads SMALL at matched x-height and is anchored on
+    # ink per character; Romulus reads LOOSE at matched x-height and is
+    # anchored on the line.
     #
-    # 877/-380 is the Coelacanth split (877/-362) with three more units of
-    # descent, and it is chosen the same way: DESCENDERS WIN. The descenders
-    # clear at every size in every style; accented capitals poke 1-3 px above
-    # the declared ascender, which no span inside the ink floor can also cover.
-    # Dropping to -377 would buy 1 px of leading at two slots and clip a
-    # descender at 14 pt, so it was not taken.
-    metrics: {ascent: 877, descent: -380, linegap: 0}
+    # Measured against the built files of all nine installed families: on the
+    # x-height-anchored ramp (9/12/14/17/19/22, metrics 877/-380) it built
+    # advY 24/31/37/45/50/58 — total drift 23 px from the 23/28/34/40/46/51
+    # target, the WORST in the tier and the only family loose rather than
+    # tight (Inknut 20, Schola 14 and Edgar 11 all run tight). At the top slot
+    # it was 58 against a tier spread of 47-53.
+    #
+    # This ramp builds advY 24/29/37/40/48/53 — drift 10, mid-tier, between
+    # Libris ADF (6) and Edgar (11). It costs x-height at four of six slots:
+    # 8/9/12/13/15/17 against the 8/10/12/14/16/18 anchor.
+    #
+    # THE SIZES WERE NOT THE LEVER, and a future pass should not re-sweep them
+    # hoping otherwise: every 6-size ramp from 6 to 26 pt was tried, and the
+    # leading only tightens by rendering the face smaller, because the ratio of
+    # ink to x-height is a property of the drawing. Romulus has a short
+    # x-height (398/1000) and long extenders, so at matched x-height the plain
+    # ink alone nearly fills the tier's line. Both fits are floor-bound at
+    # ink + 0.13 em; neither can go tighter without lines touching.
+    #
+    # 902/-378 keeps DESCENDERS WINNING, as before: they clear at every size in
+    # every style, and accented capitals poke over the declared ascender, which
+    # no span inside the ink floor can also cover.
+    metrics: {ascent: 902, descent: -378, linegap: 0}
     # The face draws fi and fl and cmaps them at U+FB01/FB02, and carries NO
     # GSUB table at all, so both outlines shipped unreachable and every style
     # built with ligs=0. ff/ffi/ffl are not listed because this face does not

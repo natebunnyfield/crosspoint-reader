@@ -5,7 +5,22 @@ TestFlight trial. Fleischmann is §1–§6; Romulus is §7. Both are commercial
 (Dutch Type Library), both are Latin-only Mac-charset cuts, and **neither has a
 `liga` feature** — that shared defect is §5.*
 
-> ## PROMOTED, same day: Romulus is the ninth installed family
+> ## RETUNED, later the same day: anchored on leading, not x-height
+>
+> Owner ruling after a rendered three-way comparison (shipped fit / tighter fit
+> / Edgar): **Romulus takes the tighter fit.** Sizes `9/11/14/15/18/20`,
+> metrics `902/-378`. §7.2 and §7.3 below describe the SUPERSEDED
+> x-height-anchored fit and are kept because the measurements behind them are
+> what the ruling was made against; §10 carries the retune.
+>
+> The short version: measured across all nine installed families, the old fit
+> drifted **23 px** from the tier's leading — the worst in the set, and the
+> only family loose rather than tight. The new fit drifts **10**, mid-tier.
+> It costs 1–3 px of x-height at four of six slots. **The sizes were never the
+> lever** — every ramp from 6 to 26 pt was swept, and leading only tightens by
+> rendering the face smaller.
+>
+> ## PROMOTED, earlier the same day: Romulus is the ninth installed family
 >
 > Owner ruling 2026-09-06, *"add"*: DTL Romulus goes into
 > `installed_families:` and ships on **every** surface — device SD cards, the
@@ -632,3 +647,66 @@ pass re-reading the same ground:
   `earliestYear` conventions, and row order is irrelevant (linear `find_if`).
 - **`src/ReadingFontList.cpp:21`** `kRetired[]` still holds only `Rosarivo`, so
   nothing hides the new family from the picker.
+
+
+---
+
+## 10. The retune: anchored on leading (2026-09-06, after promotion)
+
+Owner: *"test out if there are a sizes for romulus to match other fonts
+better."* Tested, and the answer has two halves.
+
+### 10.1 The sizes are not the lever
+
+Every 6-size ramp between 6 and 26 pt was swept against two objectives at once:
+distance from the x-height anchor (8/10/12/14/16/18) and distance from the
+tier's measured leading. **No ramp improves the leading without shrinking the
+face.** The ratio of ink to x-height is a property of the drawing: Romulus has
+a 398/1000 x-height and long extenders, so at matched x-height the plain ink
+alone nearly fills the tier's line. Do not re-run this sweep hoping otherwise.
+
+### 10.2 What the tier actually measures
+
+Read from the `.cpfont` headers of all nine installed families, not from any
+doc:
+
+| family | s0 | s1 | s2 | s3 | s4 | s5 | drift |
+|---|---|---|---|---|---|---|---|
+| *target* | 23 | 28 | 34 | 40 | 46 | 51 | — |
+| Almendra | 23 | 29 | 34 | 40 | 46 | 51 | 1 |
+| Coelacanth | 23 | 28 | 34 | 39 | 46 | 52 | 2 |
+| TeX Gyre Heros | 23 | 29 | 36 | 39 | 46 | 52 | 5 |
+| Libre Franklin | 23 | 30 | 33 | 39 | 46 | 52 | 5 |
+| Libris ADF | 23 | 29 | 35 | 41 | 47 | 53 | 6 |
+| Edgar | 22 | 27 | 32 | 38 | 43 | 49 | 11 |
+| TeX Gyre Schola | 21 | 27 | 32 | 37 | 43 | 48 | 14 |
+| Inknut + Junicode | 21 | 26 | 31 | 36 | 41 | 47 | 20 |
+| **Romulus, old fit** | 24 | 31 | 37 | **45** | **50** | **58** | **23** |
+| **Romulus, new fit** | 24 | 29 | 37 | 40 | 48 | 53 | **10** |
+
+Two things this table settles. The tier's real leading is **looser than the
+nominal target** at slots 1–5 for most families, so the target is an aim rather
+than a description. And Romulus was not merely the worst fit — it was the only
+family drifting LOOSE; Inknut, Schola and Edgar all drift tight, which reads as
+a denser page rather than an airier one.
+
+### 10.3 The new fit
+
+`sizes: [9, 11, 14, 15, 18, 20]`, `metrics: {ascent: 902, descent: -378}`.
+Built and confirmed through the firmware's own renderer: advY
+**24/29/37/40/48/53**, `ligs=2` and `kernL=82 kernR=86` in all four styles.
+
+x-height becomes **8/9/12/13/15/17** against the 8/10/12/14/16/18 anchor — 1 px
+short at slots 1, 3 and 4, 1 px short at slot 5. That is the price, and it was
+paid deliberately.
+
+**This makes Romulus the second exception to the x-height anchor, and the
+opposite one to Almendra's.** Almendra reads SMALL at matched x-height and is
+anchored on ink per character; Romulus reads LOOSE at matched x-height and is
+anchored on the line. Neither is a licence to move a third family off the
+anchor without the same measurement.
+
+`902/-378` keeps descenders winning: they clear at every size in every style,
+and accented capitals poke above the declared ascender because no span inside
+the ink floor covers both. Both fits are floor-bound at ink + 0.13 em — neither
+could go tighter without lines touching.
