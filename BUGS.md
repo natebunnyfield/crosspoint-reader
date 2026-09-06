@@ -78,14 +78,36 @@ simulator/iOS harness.
   Not claimed as the cause: reaching it needs the remap still armed at the
   moment of the pick, which a plain resume disarms in its first render.
 
-**What would settle it**, in order of cost: a serial or Xcode log of one pick —
-`ERS` logs `Resolved anchor '%s' to page %d` and every reposition that follows
-it, so the line either names the right page (and something later moves it) or
-does not (and the anchor map is wrong on HIS card, not in the source, which
-would mean a stale cache and not a code defect). Failing that: ask whether the
-chapters he picks are `h1`/`h2` openings or something quieter, whether it
-happens with Chapter Select only or also with an in-book TOC link, and whether
-the page he lands on changes if he clears `.crosspoint/` on the card.
+**What would settle it: one log of one pick.** The reader now prints the whole
+story of a jump, three lines that did not all exist before 2026-09-06:
+
+```
+[..] [DBG] [ERS] Chapter pick: spine 3 anchor 'ch4'
+[..] [DBG] [ERS] Resolved anchor 'ch4' to page 7
+[..] [DBG] [ERS] Rendered spine 3 page 7/40 in 118ms
+```
+
+If the resolved and rendered pages AGREE and the heading is still not on the
+page, the anchor map on his card is wrong — which, since the source is proven
+right above, means a stale cache and not a code defect. If they DISAGREE,
+something between them moved him, and a `Page turn back` line in between names
+it.
+
+**And it is now capturable without a Mac.** All three are `LOG_DBG`, so a
+release device build (`gh_release`, LOG_LEVEL=1) does not print them and the X4
+route needs `pio run -e default -t upload && pio device monitor`. The phone
+does not: the harness compiles at `LOG_LEVEL=2`, and the simulator's
+`src/FirmwareLogFile.h` writes the same lines to `diagnostics/firmware.log`
+inside the card root, which the Files app shows as On My iPhone > CrossPoint
+X3. Settings > CrossPoint X3 > **Diagnostics Log** on, pick a chapter, share
+the file. Before that existed the lines went to stderr, which a TestFlight
+build discards — the reason this report has twice been answered with reasoning
+instead of a reading of the state.
+
+Still worth asking alongside it: whether the chapters he picks are `h1`/`h2`
+openings or something quieter, whether it happens with Chapter Select only or
+also with an in-book TOC link, and whether the page he lands on changes if he
+clears `.crosspoint/` on the card.
 
 ### [B-048] Update Library on the X4: every book an error with no reason on screen, Wi-Fi that would not associate, then an abort() — the folder and the reason line FIXED 2026-09-06; the abort is unsymbolized
 **severity: high (a 22-book library that will not sync, and a crash) · scope: `src/network/LibraryUpdater.cpp`, `src/activities/settings/LibraryUpdateActivity.cpp`, the join path, one unknown abort · found 2026-09-06 from a panic record the owner pasted, with "Update Library results in 22 (all) errors"**
