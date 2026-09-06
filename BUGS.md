@@ -92,7 +92,29 @@ did, eventually, hold. Nothing here changes; `reasonName()` could learn the
 32-39 block (`STA_LEAVING` among them) so the next record reads without this
 paragraph.
 
-**4. The abort. OPEN.** `abort()` at PC `0x421bb689`, with nothing logged at
+**Correction, 2026-09-06, after the Mac was checked: the abort and the
+library failure are almost certainly TWO INCIDENTS, not one.** This entry
+was written as though the pasted record described a single event. The
+version line in a crash report is the compile-time `CROSSPOINT_VERSION`
+(`lib/hal/HalSystem.cpp`, `getPanicInfo`), and `1.5.0-BNY` was the
+`[crosspoint] version` literal in `platformio.ini` only until 2026-08-18,
+when `da6736f` renamed it to `1.5.0-B2`. So the crash came from a build made
+on or before that date, while the "22 (all) errors" was observed on a
+current one. The Mac has exactly one ELF, `gh_release` built 2026-09-05, so
+the crashed image cannot be symbolized from anything on disk.
+
+Two claims in this entry were also wrong and are withdrawn. The
+`[WIFI]` diagnostics DID exist in the 1.5.0-BNY era -- `WifiDiagnostics.cpp`
+is present at `da6736f` -- so there is no contradiction to explain; the
+earlier "did not exist until 2026-08-28" came from reading a
+`--diff-filter=A` date out of `343379c`, which is a squashed import of 1072
+files and dates nothing. And the suggestion that a `platformio.local.ini`
+pinned the version is refuted: there is no such file on the Mac.
+
+None of this touches the /books fix or the failure-reason line, which stand
+on their own reading of the code and shipped in 1.5.26-BD.
+
+**4. The abort. OPEN, and now known to be STALE.** `abort()` at PC `0x421bb689`, with nothing logged at
 INF or ERR in the 130 s before it (the ring's last line is `lost_ip`). An
 abort with no ERR before it is not the sync's own failure path (every
 FAILED return there logs) and not the B-040 shape (thirteen allocation
@@ -100,11 +122,16 @@ failures logged first). Candidates, none tested: an assert in the Wi-Fi or
 lwIP stack on the lost lease; a bare `new` in a library (`std::string`,
 ArduinoJson) refusing under a heap wolfSSL had fragmented across many failed
 TLS sessions; something the owner did after `lost_ip` that logs only at DBG.
-It cannot be symbolized here: the version string `1.5.0-BNY` is not a
-version this tree produces (`da6736f` renamed it on 2026-08-18, and the
-`[WIFI]` diagnostics in the record did not exist until 2026-08-28), so the
-build is a local one whose ELF is on the Mac. **To close: on the Mac, from
-the checkout that built the device's image,**
+It cannot be symbolized: the build predates 2026-08-18 (see the correction
+above) and no ELF from that era survives on the Mac. **To close, in
+preference order:** (a) read the card's own archive,
+`/crash_reports/crash_<N>.txt`, for a report stamped a CURRENT version --
+the device keeps ten, and a recent abort is both more relevant and
+symbolizable against a build we can reproduce; (b) if this specific old
+abort is still wanted, rebuild `gh_release` at `da6736f^` and symbolize
+against that, accepting that toolchain drift since August may move the
+addresses; (c) wait for it to recur, now that a library failure logs its
+own reason. The address list, for whichever ELF turns out to match:
 
 ```
 ~/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-addr2line -pfiaC \
