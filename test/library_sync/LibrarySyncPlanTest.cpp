@@ -119,6 +119,27 @@ TEST(LibrarySyncPlan, ZeroIsALegitimateModificationTime) {
   EXPECT_EQ(librarysync::hashVerdict(stamp, recordMatching(stamp), kShaA), librarysync::HashVerdict::SKIP_HASH);
 }
 
+// The summary's reason line. "22 errors" with no noun sent the owner to
+// debug Wi-Fi over a card with no /books folder (2026-09-06); the line names
+// the kind that dominates, and a tie goes to the kind that makes the others
+// moot.
+TEST(LibrarySyncPlan, NoFailuresMeansNoReasonLine) {
+  EXPECT_EQ(librarysync::dominantFailure(0, 0, 0), librarysync::FailureKind::NONE);
+}
+
+TEST(LibrarySyncPlan, TheDominantFailureKindIsNamed) {
+  EXPECT_EQ(librarysync::dominantFailure(22, 0, 0), librarysync::FailureKind::STORAGE);
+  EXPECT_EQ(librarysync::dominantFailure(0, 22, 0), librarysync::FailureKind::NETWORK);
+  EXPECT_EQ(librarysync::dominantFailure(0, 0, 22), librarysync::FailureKind::VERIFY);
+  EXPECT_EQ(librarysync::dominantFailure(1, 20, 1), librarysync::FailureKind::NETWORK);
+  EXPECT_EQ(librarysync::dominantFailure(1, 1, 20), librarysync::FailureKind::VERIFY);
+}
+
+TEST(LibrarySyncPlan, ATieGoesToTheKindThatMakesTheOthersMoot) {
+  EXPECT_EQ(librarysync::dominantFailure(5, 5, 5), librarysync::FailureKind::STORAGE);
+  EXPECT_EQ(librarysync::dominantFailure(0, 5, 5), librarysync::FailureKind::NETWORK);
+}
+
 TEST(LibrarySyncPlan, SizeVerdictStillDecidesFirst) {
   EXPECT_EQ(librarysync::sizeVerdict(false, 0, 100), librarysync::SizeVerdict::DOWNLOAD);
   EXPECT_EQ(librarysync::sizeVerdict(true, 99, 100), librarysync::SizeVerdict::DOWNLOAD);

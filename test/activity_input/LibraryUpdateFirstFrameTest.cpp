@@ -117,6 +117,29 @@ TEST_F(LibraryUpdateFirstFrame, EachBookSyncsOnItsOwnTick) {
   EXPECT_EQ(o.flushes, 1);
 }
 
+// Every book failing on the card (no /books folder: the owner's "22 (all)
+// errors", 2026-09-06) still ends in the summary, with the failures tallied
+// by kind so that screen can name the folder rather than the count.
+TEST_F(LibraryUpdateFirstFrame, AllBooksFailingOnTheCardStillReachesTheSummary) {
+  libdouble::script().books = 3;
+  libdouble::script().failedBooks = 3;
+  libdouble::script().failureKind = librarysync::FailureKind::STORAGE;
+  host::setRootActivity(makeActivity());
+
+  host::frame();    // the check
+  host::frames(3);  // three books, each FAILED
+  const auto& o = libdouble::observed();
+  EXPECT_EQ(o.syncedBooks.size(), 3u);
+  EXPECT_EQ(o.flushes, 0);
+
+  const int updatesBefore = host::counters().updates;
+  host::frame();  // the tick after the last book: flush, then the summary
+  EXPECT_EQ(o.flushes, 1);
+  EXPECT_GT(host::counters().updates, updatesBefore);
+  ASSERT_NE(host::currentActivity(), nullptr);
+  EXPECT_FALSE(host::currentActivity()->preventAutoSleep());
+}
+
 // No link: say so with a deferred paint -- nothing blocks after it, so there
 // is nothing to wait for -- and never reach the network.
 TEST_F(LibraryUpdateFirstFrame, NoWifiPaintsDeferredAndNeverFetches) {

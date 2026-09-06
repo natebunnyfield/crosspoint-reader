@@ -202,6 +202,19 @@ void LibraryUpdateActivity::syncNextBook() {
       break;
     case LibraryUpdater::BookResult::FAILED:
       errors++;
+      switch (updater.lastFailure()) {
+        case librarysync::FailureKind::STORAGE:
+          storageErrors++;
+          break;
+        case librarysync::FailureKind::NETWORK:
+          networkErrors++;
+          break;
+        case librarysync::FailureKind::VERIFY:
+          verifyErrors++;
+          break;
+        case librarysync::FailureKind::NONE:
+          break;
+      }
       break;
   }
 }
@@ -302,6 +315,15 @@ void LibraryUpdateActivity::render(RenderLock&&) {
       char summary[64];
       snprintf(summary, sizeof(summary), tr(STR_LIBRARY_SUMMARY_FORMAT), updated, unchanged, errors);
       renderer.drawCenteredText(UI_10_FONT_ID, top + lineHeight + metrics.verticalSpacing, summary);
+      // "22 errors" sent the owner to debug Wi-Fi over a card with no /books
+      // folder (2026-09-06). One more line names the thing to fix.
+      const librarysync::FailureKind why = librarysync::dominantFailure(storageErrors, networkErrors, verifyErrors);
+      if (why != librarysync::FailureKind::NONE) {
+        const char* hint = why == librarysync::FailureKind::STORAGE   ? tr(STR_LIBRARY_ERRORS_STORAGE)
+                           : why == librarysync::FailureKind::NETWORK ? tr(STR_LIBRARY_ERRORS_NETWORK)
+                                                                      : tr(STR_LIBRARY_ERRORS_VERIFY);
+        renderer.drawCenteredText(SMALL_FONT_ID, top + 2 * (lineHeight + metrics.verticalSpacing), hint);
+      }
       const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
       GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
       break;

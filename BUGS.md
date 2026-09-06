@@ -34,6 +34,91 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-048] Update Library on the X4: every book an error with no reason on screen, Wi-Fi that would not associate, then an abort() — the folder and the reason line FIXED 2026-09-06; the abort is unsymbolized
+**severity: high (a 22-book library that will not sync, and a crash) · scope: `src/network/LibraryUpdater.cpp`, `src/activities/settings/LibraryUpdateActivity.cpp`, the join path, one unknown abort · found 2026-09-06 from a panic record the owner pasted, with "Update Library results in 22 (all) errors"**
+
+The record, trimmed to what matters:
+
+```
+CrossPoint version: 1.5.0-BNY
+Reset reason: 4
+Panic reason: abort() was called at PC 0x421bb689 on core 0
+[272716] [ERR] [WIFI] Connect to BUNNYFIELDS timed out after 15016 ms, last reason=36 (?)
+[283024] [INF] [WIFI] Connecting to BUNNYFIELDS (auto=0)
+[286469] [INF] [WIFI] EVT disconnected: reason=4 (ASSOC_EXPIRE)
+[289887] [INF] [WIFI] EVT disconnected: reason=2 (AUTH_EXPIRE)
+[298060] [ERR] [WIFI] Connect to BUNNYFIELDS timed out after 15017 ms, last reason=36 (?)
+[406466] [INF] [WIFI] EVT lost_ip
+```
+
+Three things in one report. Taken apart:
+
+**1. "22 (all) errors" — every book failed with the manifest check passing.
+FIXED for the cause the code supports.** The manifest is fetched through the
+same asset URL, redirect and TLS path as every book, so a network that served
+the manifest serves the books; a run in which the check passes and every
+download fails points at what happens AFTER the fetch begins, and the first
+thing `syncBook()` does there is open `/books/<name>.part` for writing.
+Nothing in the firmware creates `/books` -- not boot, not the updater, not
+the web server -- so a card that has never held a synced book (the owner's
+epubs live where he put them) fails that open for every book, and the only
+trace is a LOG_ERR the device cannot show. `syncBook()` now calls
+`Storage.ensureDirectoryExists("/books")` before the open (on the first
+download, not at boot: a card that never syncs should not grow an empty
+folder). Not proven against the card: the device's 16-line log ring held only
+Wi-Fi events by the time the record was written, so the per-book ERR lines
+that would settle it were gone. The check is the next run.
+
+**2. The screen said "22 errors" and nothing else. FIXED.** `BookResult::FAILED`
+carried no reason, so the summary could not name one, and the owner was sent
+to debug Wi-Fi over a card folder. Each FAILED return now sets a
+`librarysync::FailureKind` -- STORAGE (folder, open, write, rename), NETWORK
+(the fetch did not complete), VERIFY (bytes arrived and mismatch the
+manifest) -- the activity tallies them, and the summary paints one more line
+naming the kind that dominates (`dominantFailure()` in `LibrarySyncPlan.h`,
+pinned by `test/library_sync`; the all-failed run pinned in
+`test/activity_input`). Three strings: `STR_LIBRARY_ERRORS_STORAGE`,
+`_NETWORK`, `_VERIFY`.
+
+**3. The join failures are the router's, not the firmware's -- and the log
+says so, once decoded.** `AUTH_EXPIRE` (2) and `ASSOC_EXPIRE` (4) are the AP
+giving up on a handshake the station did not complete in time: weak signal,
+interference, a band-steering AP, or a 2.4 GHz radio the C3 cannot keep up
+with while power-saving. Reason 36, printed as `?`, is `STA_LEAVING`: the
+firmware's own `WiFi.disconnect()` at the 15 s join timeout
+(`WifiSelectionActivity.cpp`), so it is the timeout's echo, not a third
+cause. `lost_ip` 100 s later is the lease going after an association that
+did, eventually, hold. Nothing here changes; `reasonName()` could learn the
+32-39 block (`STA_LEAVING` among them) so the next record reads without this
+paragraph.
+
+**4. The abort. OPEN.** `abort()` at PC `0x421bb689`, with nothing logged at
+INF or ERR in the 130 s before it (the ring's last line is `lost_ip`). An
+abort with no ERR before it is not the sync's own failure path (every
+FAILED return there logs) and not the B-040 shape (thirteen allocation
+failures logged first). Candidates, none tested: an assert in the Wi-Fi or
+lwIP stack on the lost lease; a bare `new` in a library (`std::string`,
+ArduinoJson) refusing under a heap wolfSSL had fragmented across many failed
+TLS sessions; something the owner did after `lost_ip` that logs only at DBG.
+It cannot be symbolized here: the version string `1.5.0-BNY` is not a
+version this tree produces (`da6736f` renamed it on 2026-08-18, and the
+`[WIFI]` diagnostics in the record did not exist until 2026-08-28), so the
+build is a local one whose ELF is on the Mac. **To close: on the Mac, from
+the checkout that built the device's image,**
+
+```
+~/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-addr2line -pfiaC \
+  -e .pio/build/<env>/firmware.elf 0x421bb689 0x421BB68C 0x421BB6D8 0x421BB7FA \
+  0x421BC4C6 0x421BB944 0x42099A94 0x420429E8 0x42099DAC 0x420FD91A 0x4209EF72 \
+  0x420C24FA 0x420A0838 0x420C22B6 0x420C2B4C 0x4219F3F8 0x420D4DB8 0x420F1A84
+```
+
+(the PC, then every code address in the pasted stack, in order), and paste
+the result here. Also worth knowing which checkout stamps `1.5.0-BNY` --
+most likely a `platformio.local.ini` with a `[crosspoint] version` override,
+which would also mean every local build since August has reported the same
+string and OTA's `isNewer()` has been comparing against 1.5.0.
+
 ### [B-046] Every release image since 1.5.17-BD fails firmware validation: the descriptor stamper left the XOR checksum stale — FIXED 2026-09-04 (scripts/stamp_app_desc.py), re-upload of the 1.5.17-BD..1.5.21-BD assets owed
 **severity: high (no release since 1.5.17-BD installs by any path) · scope: build / release, `scripts/stamp_app_desc.py` · found 2026-09-04 from a device: SD Card Firmware Update said "Invalid firmware file" for the latest release's `firmware.bin`**
 

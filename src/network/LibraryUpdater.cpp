@@ -46,6 +46,9 @@ constexpr char manifestAssetName[] = "manifest.json";
 // really is absent.
 constexpr char libraryRepoUrl[] = "https://api.github.com/repos/natebunnyfield/claude-tools";
 constexpr char booksDir[] = "/books/";
+// The same folder without its trailing slash, for the directory calls: SdFat
+// resolves "/books/" as a path to a file named "" inside /books.
+constexpr char booksFolder[] = "/books";
 constexpr size_t SHA_CHUNK = 1024;
 
 // The ledger of "what this book looked like when its digest was last checked".
@@ -597,6 +600,7 @@ bool LibraryUpdater::computeCardSha256(const std::string& path, char outHex[65])
 }
 
 LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallback onProgress, void* ctx) {
+  lastFailure_ = librarysync::FailureKind::NONE;
   if (index >= books.size()) return BookResult::FAILED;
   const Book& book = books[index];
 
@@ -645,9 +649,25 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
   const std::string partPath = destPath + ".part";
   if (Storage.exists(partPath.c_str())) Storage.remove(partPath.c_str());
 
+  // NOTHING ELSE CREATES /books. A card that has never held a synced book --
+  // one loaded by hand, with its epubs at the root or in folders of the
+  // owner's own naming -- has no such folder, and every .part open below
+  // fails on it while the manifest check two screens earlier passes: every
+  // book an error, and the network blameless. That is the reading of the
+  // owner's "Update Library results in 22 (all) errors" (2026-09-06, B-048)
+  // that the code supports; the device's log ring held only Wi-Fi lines by
+  // then, so it is not proven. Made here, on the first download, rather
+  // than at boot: a card that never syncs should not grow an empty folder.
+  if (!Storage.ensureDirectoryExists(booksFolder)) {
+    LOG_ERR("LIB", "Cannot create %s on the card", booksFolder);
+    lastFailure_ = librarysync::FailureKind::STORAGE;
+    return BookResult::FAILED;
+  }
+
   HalFile out;
   if (!Storage.openFileForWrite("LIB", partPath, out)) {
     LOG_ERR("LIB", "Cannot open %s for write", partPath.c_str());
+    lastFailure_ = librarysync::FailureKind::STORAGE;
     return BookResult::FAILED;
   }
 
@@ -690,11 +710,28 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
   char gotSha[65];
   hexDigest(digest, gotSha);
 
-  if (fetched != HttpDownloader::OK || !writeOk || processedSize != book.bytes ||
-      !librarysync::shaMatches(gotSha, book.sha256.c_str())) {
+  // Three different failures used to share one line and one verdict. They
+  // are told apart now because each sends the owner somewhere else: a write
+  // that failed is the card, a fetch that failed is the network, and bytes
+  // that arrived but do not match are the manifest.
+  if (!writeOk) {
+    LOG_ERR("LIB", "Write of %s failed after %u bytes", partPath.c_str(), static_cast<unsigned>(processedSize));
+    Storage.remove(partPath.c_str());
+    lastFailure_ = librarysync::FailureKind::STORAGE;
+    return BookResult::FAILED;
+  }
+  if (fetched != HttpDownloader::OK) {
+    LOG_ERR("LIB", "Download of %s failed (%d) after %u of %u bytes", book.file.c_str(), static_cast<int>(fetched),
+            static_cast<unsigned>(processedSize), static_cast<unsigned>(book.bytes));
+    Storage.remove(partPath.c_str());
+    lastFailure_ = librarysync::FailureKind::NETWORK;
+    return BookResult::FAILED;
+  }
+  if (processedSize != book.bytes || !librarysync::shaMatches(gotSha, book.sha256.c_str())) {
     LOG_ERR("LIB", "Download of %s failed verification (%u of %u bytes)", book.file.c_str(),
             static_cast<unsigned>(processedSize), static_cast<unsigned>(book.bytes));
     Storage.remove(partPath.c_str());
+    lastFailure_ = librarysync::FailureKind::VERIFY;
     return BookResult::FAILED;
   }
 
@@ -702,6 +739,7 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
   if (!Storage.rename(partPath.c_str(), destPath.c_str())) {
     LOG_ERR("LIB", "Rename into place failed: %s", destPath.c_str());
     Storage.remove(partPath.c_str());
+    lastFailure_ = librarysync::FailureKind::STORAGE;
     return BookResult::FAILED;
   }
 
