@@ -204,7 +204,13 @@ namespace {
 // the previous chapter's last page) and the anchor map (the entry named the
 // page after the heading, so Chapter Select opened one page past it). Both are
 // on disk, so both need the rebuild.
-constexpr uint8_t SECTION_FILE_VERSION = 56;
+// v57: a TOC that comes back to a file it has already used keeps the chapter
+// breaks for the entries after the interruption. startBuild()'s anchor
+// collection stopped at the first entry naming another spine, so those chapters
+// were paginated with no forced break at all -- they started mid-page and their
+// anchor map entries name whatever page that turned out to be. Pagination and
+// anchor map again, so again a rebuild.
+constexpr uint8_t SECTION_FILE_VERSION = 57;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
@@ -569,16 +575,29 @@ bool Section::startBuild(const ReaderRenderSpec& spec, const std::function<void(
     }
   }
 
-  // Collect TOC anchors for this spine so the parser can insert page breaks at chapter boundaries
+  // Collect TOC anchors for this spine so the parser can insert page breaks at chapter boundaries.
+  //
+  // EVERY entry that names this spine, not just the first unbroken run of them.
+  // Starting at getTocIndexForSpineIndex() is right -- that is the FIRST entry
+  // pointing here, so nothing before it can -- but STOPPING at the first entry
+  // that names a different spine assumes a table of contents grouped by file.
+  // A table that comes back to a file it has already used (an "Appendix" or
+  // "Notes" entry sitting between two chapters of one file, or any nav that is
+  // not in spine order) silently lost every anchor after the interruption. A
+  // lost TOC anchor is a lost chapter break: the chapter no longer starts on a
+  // fresh page, so a Chapter Select pick opens on a page the PREVIOUS chapter
+  // is still running down -- and where the opening is an h4-h6, which does not
+  // break a page on its own, the heading can end up on the page after the one
+  // the anchor names. `continue`, not `break`.
   std::vector<std::string> tocAnchors;
   const int startTocIndex = epub->getTocIndexForSpineIndex(spineIndex);
   if (startTocIndex >= 0) {
     for (int i = startTocIndex; i < epub->getTocItemsCount(); i++) {
       auto entry = epub->getTocItem(i);
-      if (entry.spineIndex != spineIndex) break;
-      if (!entry.anchor.empty()) {
-        tocAnchors.push_back(std::move(entry.anchor));
+      if (entry.spineIndex != spineIndex || entry.anchor.empty()) {
+        continue;
       }
+      tocAnchors.push_back(std::move(entry.anchor));
     }
   }
 
