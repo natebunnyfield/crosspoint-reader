@@ -210,7 +210,25 @@ namespace {
 // were paginated with no forced break at all -- they started mid-page and their
 // anchor map entries name whatever page that turned out to be. Pagination and
 // anchor map again, so again a rebuild.
-constexpr uint8_t SECTION_FILE_VERSION = 57;
+// v58: the fonts themselves changed. `fontconvert_sdcard.py` was reading a
+// lookup's PairPos subtables as CUMULATIVE when OpenType says first-match-wins,
+// so any pair covered by both an explicit exception and a class rule got the
+// exception PLUS the rule it exists to override; and an explicit XAdvance of 0
+// ("do not kern this pair") was dropped rather than recorded. Seven shipped
+// families were rebuilt -- docs/kerning-subtable-precedence-2026-09-07.md.
+//
+// Nothing in this file's cache key depends on a font's CONTENT: it keys on
+// SECTION_FILE_VERSION, fontId, the viewport and the settings flags, and
+// fontId survives a .cpfont being replaced underneath it. So a book already
+// cached in one of those families would keep line breaks computed with the old
+// kerning indefinitely. Doves' "Tell Verse Well Yes" is 16 px wider at 18 pt
+// after the fix, which is far more than enough to move a break. Pagination is
+// on disk, so this is a rebuild like every entry above it.
+//
+// THIS IS THE VERSION TO BUMP WHENEVER A SHIPPED FONT'S METRICS OR KERNING
+// CHANGE, and it must ship in the SAME firmware as the fonts. Replacing a
+// .cpfont alone is silent: the layout is wrong and nothing detects it.
+constexpr uint8_t SECTION_FILE_VERSION = 58;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
