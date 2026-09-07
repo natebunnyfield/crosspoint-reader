@@ -1132,6 +1132,26 @@ def build_family(
                 synth_flags[style_name] = ",".join(
                     f"{k}={v}" for k, v in sorted(synth.items()))
 
+        # `synthetic:` ON A STYLE THAT HAS ITS OWN SOURCE, not derived from
+        # another. Added 2026-09-07 for the case the schema had no way to say:
+        # a family whose italic is BORROWED from another typeface and needs its
+        # ink matched to the roman it sits beside. Doves Type borrows
+        # Coelacanth's italic, whose stroke is 79% of Doves' at matched
+        # x-height -- emboldening it is the only lever that closes that gap,
+        # since `scale:` moves size and weight together and cannot change their
+        # ratio.
+        #
+        # Emboldening a REAL style was always supported; it just had to be
+        # spelled `from:`, which creates a NEW style rather than modifying an
+        # existing one (Caledonia CC's bolditalic emboldens its real italic
+        # exactly this way). This is the same machinery reached without the
+        # detour. Nothing changes for a style that does not ask for it.
+        for style_name, style_spec in styles.items():
+            if "from" in style_spec or "synthetic" not in style_spec:
+                continue
+            synth_flags[style_name] = ",".join(
+                f"{k}={v}" for k, v in sorted(style_spec["synthetic"].items()))
+
     except (FileNotFoundError, RuntimeError) as e:
         return name, False, str(e)
 
