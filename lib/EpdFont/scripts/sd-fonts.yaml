@@ -904,9 +904,14 @@ families:
   # `-Testing-BF674fd3...` and its README and LICENSE both read "for testing
   # purposes only" -- but the OWNER HOLDS A LICENCE BOUGHT SEPARATELY (ruling
   # 2026-09-07, "warbler was purchased elsewhere"), so it ships. The kit on disk
-  # is still the trial download; if the purchased files differ, restage them
-  # over these and rebuild -- the recipe does not care which bytes are behind
-  # the paths, and nothing here would notice the swap.
+  # is still the trial download, AND THAT IS THE SHIPPED STATE BY RULING
+  # (2026-09-07, asked directly before build 183: "ship 183 with the trial
+  # files as-is"). The licence question is settled and separate; this is only
+  # about which outlines are in the binary, and the owner chose these. If the
+  # purchased files ever turn out to differ, restage them over these paths and
+  # rebuild -- the recipe references paths, not bytes, and nothing here would
+  # notice the swap. Do not "fix" this by swapping files without asking; it was
+  # decided, not overlooked.
   # Staged under clean names in lib/EpdFont/local_fonts/ (gitignored), never
   # committed; a clean clone cannot rebuild this family, as with Romulus, Dante,
   # Lutetia Nova, Golden Cockerel and Doves.
