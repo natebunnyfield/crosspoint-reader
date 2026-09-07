@@ -222,3 +222,91 @@ Artifact: https://claude.ai/code/artifact/adef4939-b023-453d-8df2-4b8698665ad5
 **No change committed from this round** — it is a survey of the neighborhood
 around the shipped value, and the shipped value is still the only cell that is
 6/6 on x-height at its ink level.
+
+## Round four — V15 picked, and the baseline misalignment traced and fixed
+
+Owner off the 5x5 sheet, 2026-09-07: "V15 wins. can the vertical baseline
+misalignment be fixed?" V15 is `scale 1.115`, `embolden_em +0.010`,
+`y_ratio 0.35` — so the embolden is back, superseding the round-two ruling that
+set it to zero. It costs a whole pixel of x-height at every size; that is the
+smallest step the lever has (finding 2 above).
+
+### The misalignment is real, and it is two separate faults
+
+Measured off the built `.cpfont` glyph records — `top - height` per glyph, which
+is 0 for a letter sitting exactly on the baseline:
+
+**Fault 1, the italic: the two faces disagree about where the baseline is.**
+A face draws its flat-bottomed letters a couple of units below y=0 so the
+rasterizer has something to round; how far is the designer's choice. yMin
+histograms over 50 sampled glyphs:
+
+| face | flat-bottom mode | count |
+|---|---|---|
+| Doves roman | **-2**/1000 em | 24 of 50 |
+| Coelacanth Italic | **-10**/1000 em | 19 of 50 |
+
+Eight thousandths of an em, which at these ppems is the difference between
+rounding into the baseline row and rounding one row below it. Every flat-bottomed
+italic glyph sat one row low at 8-16 pt, and TWO rows low at 18 pt.
+
+**Fault 2, the synthetic bold: the embolden's own centering translate.**
+Emboldening grows the outline both ways and is then re-centered by translating
+back half the growth — including half the VERTICAL growth, which walks the glyph
+down off the baseline. Every flat-bottomed bold glyph was one row low at all six
+sizes. **This is not specific to Doves**: every synthetic bold in `sd-fonts.yaml`
+is built the same way and is presumably a row low the same way. Only Doves is
+corrected, because only Doves was measured. Fixing the rest wants its own
+measuring pass, not a copied constant.
+
+### 18 pt needed its own number, and here is why
+
+Not a fudge. Reading the outline's yMin in pixels before rounding, at
+`embolden 0.010`:
+
+| size | italic yMin (px) |
+|---|---|
+| 8 pt | -0.031 |
+| 12 pt | -0.047 |
+| **18 pt** | **-1.062** |
+
+At ppem 38 the CFF hinter snaps Coelacanth's baseline zone a whole pixel down.
+It is a discontinuity in the hinter, so no single em-relative number covers it.
+Forcing the autohinter and disabling hinting were both tried and both came out
+worse (23 and 43 misaligned glyph/size pairs against 6). Hence a per-size
+override.
+
+### What was added
+
+`baseline_shift_em` in the `synthetic:` block, applied as an
+`FT_Outline_Translate` in y AFTER the embolden and shear, so the number in the
+recipe is the shift that actually lands. `bitmap_top` comes out of
+`FT_Render_Glyph`, so it follows the outline and needs no correction.
+
+Any synthetic key may now also be written `key@<size>` to override that one
+point size. `synth_params_for_size()` already took the size, so this cost no
+plumbing; `build-sd-fonts.py` serializes the `synthetic:` dict generically and
+needed no change at all.
+
+Doves' values, all measured rather than fitted:
+
+| style | baseline_shift_em | @18 | why |
+|---|---|---|---|
+| bold | 0.0075 | — | exactly half the vertical growth: 0.043 x 0.35 / 2 |
+| italic | 0.010 | 0.036 | (10/897 - 2/1796) = 0.01003, the arithmetic of the two conventions |
+| bolditalic | 0.016 | 0.040 | the italic's fault plus its own heavier embolden |
+
+The italic's 0.010 sits mid-plateau: anything from 0.008 to 0.026 gives the same
+answer at 8-16 pt. 18 pt is clean from 0.033 upward, so 0.036 is mid-window too.
+
+### Verified on the built files
+
+Flat-bottomed glyphs (`x n o l H b E I`), italic and bolditalic, all six sizes:
+**0 of 96 off the roman's baseline row**, from 42 of 48 before. Bold: 0 of 48,
+from 48 of 48. The glyphs that still differ are `p q` (Coelacanth's descenders
+are genuinely deeper, -336/1000 em against Doves' -278) and `d u` (design, the
+italic simply does not dip where the roman does) — descender depth and drawing,
+not alignment.
+
+15/15 in `test/settings_display_order` still pass; Coelacanth rebuilds unchanged,
+so the converter change is inert for recipes that do not use the new key.

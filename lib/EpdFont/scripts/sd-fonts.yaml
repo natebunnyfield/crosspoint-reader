@@ -742,7 +742,18 @@ families:
       regular:    {scale: 0.88, path: "local_fonts/LutetiaNova-Book.ttf"}
       italic:     {scale: 0.88, path: "local_fonts/LutetiaNova-BookItalic.ttf"}
       bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
-      bolditalic: {from: italic, synthetic: {embolden_em: 0.036, y_ratio: 0.35}}
+      # Same baseline reconciliation as the italic it derives from -- it is a
+      # property of the SOURCE FACE, so every style cut from that file needs
+      # it. The embolden differs (a bold has to be bolder) and its centering
+      # translate pushes down a little harder, which is why this carries its
+      # own measured pair rather than the italic's.
+      bolditalic:
+        from: italic
+        synthetic:
+          embolden_em: 0.036
+          y_ratio: 0.35
+          baseline_shift_em: 0.016
+          "baseline_shift_em@18": 0.040
 
   # **CUT 2026-09-07** (owner ruling: "Drop DTL Romulus and Golden Cockerel
   # entirely"). Out of installed_families:, so it is on NO surface -- not a
@@ -852,12 +863,12 @@ families:
   # the page in front of him. Do not revert it to a lower scale on the strength
   # of the drift column alone.
   #
-  # embolden_em is ZERO on this style by the same ruling. The second sweep
-  # offered 0.012 and 0.020 -- both matched the roman's ink more closely on
-  # measurement, and both were declined. Coelacanth's lighter, more calligraphic
-  # colour against the Doves roman is the reason this italic was chosen over
-  # Junicode's in the first place; emboldening it argues with that choice.
-  # bolditalic still emboldens, because a bold has to.
+  # embolden_em 0.010 CAME BACK IN ROUND THREE and supersedes the round-two
+  # ruling that set it to zero. The 5x5 survey (see the doc) put the shipped
+  # build at 81% of the roman's ink -- 74% at 8 pt -- and the owner picked the
+  # +0.010 cell off the rendered sheet. It costs a pixel of x-height at every
+  # size, which is not a "slight" tweak but is the smallest step available:
+  # a swelling outline grows upward and at 16-38 ppem that is one whole row.
   #
   # Metrics moved with the italic: 998/-402 against the Junicode fit's
   # 1018/-362. Coelacanth's descenders are deeper (400/1000 against 360), so
@@ -909,12 +920,72 @@ families:
       # report was that both read LOW and generous is the direction of the
       # complaint. Leading is unaffected: the ink floor is 1380 and the drift 2
       # at every scale from 0.985 to 1.14, so this cost nothing.
-      italic:     {scale: 1.115, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthItalic.otf"}
+      italic:
+        scale: 1.115
+        url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthItalic.otf"
+        synthetic:
+          embolden_em: 0.010
+          y_ratio: 0.35
+          # BASELINE RECONCILIATION, not a design change. Two faces need not
+          # agree on how far below y=0 they draw a flat-bottomed letter, and
+          # these two do not: read off the yMin histograms of both sources,
+          # Doves puts its flat bottoms at -2/1000 em (24 of 50 sampled
+          # glyphs) and Coelacanth Italic at -10 (19 of 50). Mixed in one
+          # line that lands the italic a whole pixel low once the rounding
+          # falls the wrong way, which is what the owner saw at 18 pt
+          # ("can the vertical baseline misalignment be fixed?").
+          #
+          # 0.010 is the difference itself: (10/897 - 2/1796) = 0.01003 em,
+          # 897 and 1796 being the two faces' upems after their scales. It is
+          # not fitted, it is the arithmetic, and it sits in the middle of a
+          # measured plateau (anything from 0.008 to 0.026 gives the same
+          # answer at 8-16 pt).
+          #
+          # 18 pt NEEDS ITS OWN VALUE AND THIS IS NOT A FUDGE. At ppem 38 the
+          # CFF hinter snaps Coelacanth's baseline zone a whole pixel down --
+          # the outline's yMin measures -1.06 px there against -0.03 at 8 pt
+          # and -0.05 at 12 pt. It is a discontinuity in the hinter, so no
+          # single em-relative number can cover it; forcing the autohinter or
+          # disabling hinting was tried and both came out worse (23 and 43
+          # misaligned glyph/size pairs against 6). 0.036 sits mid-window:
+          # 18 pt is clean from 0.033 upward.
+          baseline_shift_em: 0.010
+          "baseline_shift_em@18": 0.036
       # No bold in either source, so both are synthetic. Doves' stem is
       # 0.182 of its x-height; 0.6 x the em-relative stem (0.072) is 0.043 for
       # a 1.6x target. The italic is lighter per em, hence its own number.
-      bold:       {from: regular, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
-      bolditalic: {from: italic, synthetic: {embolden_em: 0.036, y_ratio: 0.35}}
+      # baseline_shift_em here corrects the EMBOLDEN's own centering translate,
+      # which is a different fault from the italic's below. Emboldening grows
+      # the outline in both directions and is then re-centered by translating
+      # back half the growth -- including half the VERTICAL growth, which walks
+      # a synthetic bold down off the baseline. Measured on the built .cpfont:
+      # every flat-bottomed bold glyph sat one row below the roman at all six
+      # sizes before this. The correction is exactly half the vertical growth,
+      # embolden_em * y_ratio / 2 = 0.043 * 0.35 / 2 = 0.0075.
+      #
+      # THIS FAULT IS NOT SPECIFIC TO DOVES. Every synthetic bold in this file
+      # is built the same way and is presumably a row low the same way; only
+      # Doves is corrected here because only Doves was measured. See
+      # docs/doves-italic-tuning-2026-09-07.md before fixing the rest -- it
+      # wants its own measuring pass, not a copied constant.
+      bold:
+        from: regular
+        synthetic:
+          embolden_em: 0.043
+          y_ratio: 0.35
+          baseline_shift_em: 0.0075
+      # Same baseline reconciliation as the italic it derives from -- it is a
+      # property of the SOURCE FACE, so every style cut from that file needs
+      # it. The embolden differs (a bold has to be bolder) and its centering
+      # translate pushes down a little harder, which is why this carries its
+      # own measured pair rather than the italic's.
+      bolditalic:
+        from: italic
+        synthetic:
+          embolden_em: 0.036
+          y_ratio: 0.35
+          baseline_shift_em: 0.016
+          "baseline_shift_em@18": 0.040
 
   # Warbler Text, David Jonathan Ross's 2022 Modern after William Martin's 1790
   # types for William Bulmer (2026-09-07, owner: add WarblerText). Commercial
@@ -1781,7 +1852,26 @@ families:
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/rosarivo/Rosarivo-Regular.ttf"}
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/rosarivo/Rosarivo-Italic.ttf"}
-      bold:       {from: regular, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
+      # baseline_shift_em here corrects the EMBOLDEN's own centering translate,
+      # which is a different fault from the italic's below. Emboldening grows
+      # the outline in both directions and is then re-centered by translating
+      # back half the growth -- including half the VERTICAL growth, which walks
+      # a synthetic bold down off the baseline. Measured on the built .cpfont:
+      # every flat-bottomed bold glyph sat one row below the roman at all six
+      # sizes before this. The correction is exactly half the vertical growth,
+      # embolden_em * y_ratio / 2 = 0.043 * 0.35 / 2 = 0.0075.
+      #
+      # THIS FAULT IS NOT SPECIFIC TO DOVES. Every synthetic bold in this file
+      # is built the same way and is presumably a row low the same way; only
+      # Doves is corrected here because only Doves was measured. See
+      # docs/doves-italic-tuning-2026-09-07.md before fixing the rest -- it
+      # wants its own measuring pass, not a copied constant.
+      bold:
+        from: regular
+        synthetic:
+          embolden_em: 0.043
+          y_ratio: 0.35
+          baseline_shift_em: 0.0075
       bolditalic: {from: italic, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
 
   - name: Accanthis

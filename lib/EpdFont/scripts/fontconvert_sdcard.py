@@ -637,19 +637,38 @@ def synth_params_for_size(synthetic, size):
                    vertical growth eats x-height and closes counters, so it
                    gets half strength)
       slant_deg    oblique shear angle in degrees (0 = no shear)
+      baseline_shift_em
+                   raise (+) or lower (-) the whole outline, as a fraction of
+                   the em. NOT a design change: it reconciles two faces whose
+                   BASELINE CONVENTIONS differ. A face draws its flat-bottomed
+                   letters a couple of units below y=0 so the rasterizer has
+                   something to round; the amount is the designer's choice and
+                   two faces need not agree. Doves puts its flat bottoms at
+                   -2/1000 em and Coelacanth Italic at -10, so mixing them in
+                   one line lands the italic a whole pixel low once the
+                   rounding falls the wrong way. Measured, not guessed: read
+                   both faces' yMin histograms and shift by the difference.
 
-    Returns (x_strength, y_strength, shear_xy) where the strengths are 26.6
-    pixel units at this size's ppem (the converter renders at 150 DPI, so
-    ppem = size * 150 / 72) and shear_xy is the 16.16 matrix coefficient.
+    Returns (x_strength, y_strength, shear_xy, y_shift) where the strengths and
+    the shift are 26.6 pixel units at this size's ppem (the converter renders at
+    150 DPI, so ppem = size * 150 / 72) and shear_xy is the 16.16 matrix
+    coefficient.
     """
     ppem = size * 150.0 / 72.0
-    embolden_em = float(synthetic.get("embolden_em", 0.0))
-    y_ratio = float(synthetic.get("y_ratio", 0.5))
-    slant_deg = float(synthetic.get("slant_deg", 0.0))
+
+    def at_size(key, default):
+        """`key@<size>` wins over `key` for this one size."""
+        return float(synthetic.get(f"{key}@{size}", synthetic.get(key, default)))
+
+    embolden_em = at_size("embolden_em", 0.0)
+    y_ratio = at_size("y_ratio", 0.5)
+    slant_deg = at_size("slant_deg", 0.0)
+    baseline_shift_em = at_size("baseline_shift_em", 0.0)
     x_strength = int(round(embolden_em * ppem * 64))
     y_strength = int(round(x_strength * y_ratio))
     shear_xy = int(round(math.tan(math.radians(slant_deg)) * 0x10000)) if slant_deg else 0
-    return x_strength, y_strength, shear_xy
+    y_shift = int(round(baseline_shift_em * ppem * 64))
+    return x_strength, y_strength, shear_xy, y_shift
 
 
 def double_strike_px_for_size(synthetic, size):
@@ -821,12 +840,13 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         print(f"  [{style_label}] Spacing: tracking={track_adv / 65536:.2f} px, "
               f"word space {word_adv / 65536:+.2f} px (advance only)", file=sys.stderr)
 
-    synth_x, synth_y, synth_shear = (0, 0, 0)
+    synth_x, synth_y, synth_shear, synth_dy = (0, 0, 0, 0)
     ds_px = double_strike_px_for_size(synthetic, size)
     if synthetic:
-        synth_x, synth_y, synth_shear = synth_params_for_size(synthetic, size)
+        synth_x, synth_y, synth_shear, synth_dy = synth_params_for_size(synthetic, size)
         print(f"  [{style_label}] Synthetic: embolden x={synth_x} y={synth_y} (26.6 px units), "
-              f"shear xy={synth_shear} (16.16), double-strike {ds_px} px", file=sys.stderr)
+              f"shear xy={synth_shear} (16.16), baseline dy={synth_dy} (26.6 px units), "
+              f"double-strike {ds_px} px", file=sys.stderr)
         load_flags = freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP
     else:
         load_flags = freetype.FT_LOAD_RENDER
@@ -858,6 +878,15 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 m.yx = 0
                 m.yy = 0x10000
                 freetype.FT_Outline_Transform(outline_ref, ctypes.byref(m))
+            if synth_dy:
+                # LAST, and deliberately so. The embolden's centering translate
+                # already moved the outline down by half the y-strength; shear
+                # leaves y alone. Applying the baseline shift after both means
+                # the number in the recipe is the shift that actually lands,
+                # rather than one the later steps eat into. bitmap_top comes
+                # out of FT_Render_Glyph below, so it follows the outline and
+                # needs no correction of its own.
+                freetype.FT_Outline_Translate(outline_ref, 0, synth_dy)
             err = freetype.FT_Render_Glyph(slot._FT_GlyphSlot, freetype.FT_RENDER_MODE_NORMAL)
             if err:
                 raise RuntimeError(
@@ -1551,7 +1580,25 @@ def main():
                 sys.exit(1)
             key, _, value = part.partition("=")
             key = key.strip()
-            if key not in allowed:
+            # `key@<size>` overrides `key` for that one point size. Added for
+            # baseline_shift_em, where the defect being corrected is per-size:
+            # a hinter snaps the baseline zone differently at different ppems,
+            # so one em-relative number cannot serve every size. Any key may
+            # take the form; the base name still has to be a known one.
+            base_key, at, size_part = key.partition("@")
+            if at:
+                if base_key not in allowed:
+                    print(f"Error: --{flag}-{style_label}: unknown key '{base_key}' "
+                          f"in '{key}' (allowed: {', '.join(sorted(allowed))})",
+                          file=sys.stderr)
+                    sys.exit(1)
+                try:
+                    int(size_part)
+                except ValueError:
+                    print(f"Error: --{flag}-{style_label}: '{key}' — '{size_part}' "
+                          f"is not a point size", file=sys.stderr)
+                    sys.exit(1)
+            elif key not in allowed:
                 print(f"Error: --{flag}-{style_label}: unknown key '{key}' "
                       f"(allowed: {', '.join(sorted(allowed))})", file=sys.stderr)
                 sys.exit(1)
@@ -1563,7 +1610,7 @@ def main():
                 sys.exit(1)
         return spec
 
-    SYNTH_KEYS = {"embolden_em", "y_ratio", "slant_deg",
+    SYNTH_KEYS = {"embolden_em", "y_ratio", "slant_deg", "baseline_shift_em",
                   "double_strike_px", "double_strike_em",
                   "double_strike_dy", "double_strike_jitter_px",
                   "double_strike_ink_jitter", "double_strike_ink_min",
