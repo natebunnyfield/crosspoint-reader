@@ -281,7 +281,15 @@ TEST(SettingDisplayOrder, EveryFamilyCarriesAnEarliestOrigin) {
   // Listed EXHAUSTIVELY so a fourth divergence has to be added here on purpose
   // -- an origin that silently disagrees with its lineage is exactly the kind
   // of attribution this table exists to prevent.
-  const std::vector<std::string> kOriginDiffersFromFirstStage = {"Coelacanth", "DovesType", "Venetian301"};
+  //
+  // DanteMT joined them 2026-09-07: its origin became Griffo's 1501 Venice
+  // (owner ruling), so it too reaches back past its own 1954 first stage. Note
+  // it is NOT the same fact as the other three -- they are Jenson, this is
+  // Griffo, and the sources call Dante "influenced by (but not directly
+  // indebted to)" his types. Both the header row and docs/font-dates.md record
+  // it as a ruling rather than a citation.
+  const std::vector<std::string> kOriginDiffersFromFirstStage = {"Coelacanth", "DanteMT", "DovesType",
+                                                                 "Venetian301"};
 
   std::vector<std::string> diverged;
   for (const auto& e : FontDisplayNames::kEntries) {
@@ -319,18 +327,20 @@ TEST(SettingDisplayOrder, EveryFamilyCarriesAnEarliestOrigin) {
 // the case that proves the secondary key is wired: both originate c. 1470, and
 // only stage 1 (1914 against 1900) separates them.
 TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
-  std::vector<std::string> fams = {"Edgar",     "Coelacanth",   "TeXGyreSchola", "LibreFranklin",
-                                   "LibrisADF", "InknutJunicode", "TeXGyreHeros", "Almendra",
-                                   "DTLRomulus", "DanteMT",     "LutetiaNova",   "GoldenCockerel",
-                                   "DovesType"};
+  // The installed set, 2026-09-07: DTLRomulus and GoldenCockerel were cut
+  // ("Drop DTL Romulus and Golden Cockerel entirely") and are on no surface.
+  std::vector<std::string> fams = {"Edgar",     "Coelacanth",     "TeXGyreSchola", "LibreFranklin",
+                                   "LibrisADF", "InknutJunicode", "TeXGyreHeros",  "Almendra",
+                                   "DanteMT",   "LutetiaNova",    "DovesType"};
   std::stable_sort(fams.begin(), fams.end(), [](const std::string& a, const std::string& b) {
     return readingfonts::sortsBefore(a.c_str(), b.c_str());
   });
 
-  const std::vector<std::string> want = {"TeXGyreHeros", "DanteMT",     "LibrisADF",  "DTLRomulus",
-                                         "GoldenCockerel", "LutetiaNova", "TeXGyreSchola",
-                                         "LibreFranklin", "Edgar",      "Coelacanth", "DovesType",
-                                         "InknutJunicode", "Almendra"};
+  // Dante sits SEVENTH, not second: its origin became Griffo's 1501 Venice on
+  // 2026-09-07, so it sorts with the Venetians rather than with its own 1954.
+  const std::vector<std::string> want = {"TeXGyreHeros",  "LibrisADF", "LutetiaNova", "TeXGyreSchola",
+                                         "LibreFranklin", "Edgar",     "DanteMT",     "Coelacanth",
+                                         "DovesType",     "InknutJunicode", "Almendra"};
   EXPECT_EQ(fams, want);
 
   // The two Venetians tie on origin and are separated by stage 1 alone.

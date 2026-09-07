@@ -624,6 +624,24 @@ void FontSelectionActivity::renderPreviewPane(int top, int height, int fontId, c
 // break (one lineage stage per pair of lines), and an EMPTY segment is the
 // deliberate blank line between an originator and their digitiser, which has to
 // be emitted directly because wrappedText() has no words to lay out for it.
+namespace {
+
+// The first "YEAR PLACE" stage as the colophon draws it, for the redundancy
+// test above. The colophon body arrives as newline-separated segments built by
+// FontDisplayNames::subtitle(); the stage is the last line of the first
+// designer/years pair, i.e. the second line of the block. Returns empty when
+// the shape is anything else, which makes the caller print the origin -- the
+// safe direction, since a missing line is worse than a repeated one.
+std::string firstLineageStage(const std::string& colophonBody) {
+  const size_t firstNl = colophonBody.find('\n');
+  if (firstNl == std::string::npos) return std::string();
+  const size_t secondNl = colophonBody.find('\n', firstNl + 1);
+  return colophonBody.substr(firstNl + 1, secondNl == std::string::npos ? std::string::npos
+                                                                        : secondNl - firstNl - 1);
+}
+
+}  // namespace
+
 std::vector<std::string> FontSelectionActivity::previewColophonLines(int width) const {
   std::vector<std::string> out;
   if (width <= 0) return out;
@@ -657,8 +675,27 @@ std::vector<std::string> FontSelectionActivity::previewColophonLines(int width) 
   // the fact.
   //
   // Blank line under it: see kColophonLines for why it is load-bearing.
+  // DRAWN ONLY WHEN IT SAYS SOMETHING THE LINES BELOW DO NOT. Owner ruling
+  // 2026-09-07: *"remove redundant origin line, keep for sorting."*
+  //
+  // For ten of the thirteen installed families the origin IS the family's own
+  // first lineage stage, so the pane printed the same "YEAR PLACE" twice with
+  // the designer's name between them -- TeX Gyre Heros showed "1957
+  // Münchenstein, Switzerland" on line 1 and again on line 4. It only tells
+  // the reader something new for a face whose model predates its own first
+  // stage: Coelacanth and Doves Type (Jenson, c. 1470) and Venetian 301.
+  //
+  // The comparison is against the first stage's TEXT, not its year, because
+  // that is what is actually drawn below and therefore what would visibly
+  // repeat. A family whose origin shares the year but names a different place
+  // is not redundant and still prints.
+  //
+  // THE FIELD IS UNCHANGED AND STILL SORTS EVERY FAMILY. readingfonts::
+  // sortsBefore reads originYear() for all thirteen, redundant or not -- this
+  // suppresses a DRAWN LINE, nothing else. Dropping the data would silently
+  // reorder the picker and the in-book font cycle with it.
   const std::string origin = FontDisplayNames::origin(fonts_[previewFontIndex_].name);
-  if (!origin.empty()) {
+  if (!origin.empty() && origin != firstLineageStage(text)) {
     out.push_back(origin);
     out.push_back(std::string());
   }

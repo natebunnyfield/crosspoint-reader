@@ -348,7 +348,24 @@ inline constexpr Entry kEntries[] = {
     // stage: same design licensed for the machine, not a redrawing. Salfords
     // is Monotype's works near Redhill, Surrey -- the company's address, not
     // a page naming Carpenter's desk; docs/font-dates.md says so.
-    {"DanteMT", "Dante", "Giovanni Mardersteig; Ron Carpenter", "1954 Verona; 1993 Salfords, Surrey", "1954 Verona",
+    // ORIGIN IS GRIFFO, 1501 VENICE (owner ruling 2026-09-07, "research griffo
+    // 1501 as origin date and place for Dante"), and it is a RULING rather than
+    // a citation, exactly as Coelacanth's c. 1470 is.
+    //
+    // What the sources say: Wikipedia's Dante page has the face "influenced by
+    // (but not directly indebted to) the types cut by Francesco Griffo", and
+    // Mardersteig had already cut a face called Griffo before starting this
+    // one -- so the debt is acknowledged and indirect, not a model copied.
+    // Bringhurst: Dante "has more of Griffo's spirit than any other face now
+    // commercially available".
+    //
+    // 1501 Venice is Griffo's ITALIC, cut for Aldus Manutius and first used as
+    // the text face of the April 1501 octavo Virgil, the first book printed
+    // entirely in italic. Griffo's ROMAN is earlier -- 1495-96, the De Aetna
+    // type Bembo descends from. 1501 is the owner's pick of the two; the roman
+    // date is the alternative if a roman-led book face ever wants it. Do not
+    // quote this row as evidence for a Griffo attribution anywhere else.
+    {"DanteMT", "Dante", "Giovanni Mardersteig; Ron Carpenter", "1954 Verona; 1993 Salfords, Surrey", "1501 Venice",
      1954},
     // Added 2026-09-06 with Dante. Stage 1 is van Krimpen's Lutetia, cut for
     // Joh. Enschede in Haarlem and first shown at the 1925 Paris exposition
@@ -391,6 +408,32 @@ inline constexpr Entry kEntries[] = {
     // of ours. Same "c." as Coelacanth's, for the same reason.
     {"DovesType", "Doves Type", "Emery Walker & T. J. Cobden-Sanderson; Robert Green", "1900 Hammersmith; 2021 London",
      "c. 1470 Venice", 1900},
+    // Added 2026-09-07. Stage 1 is William Martin's types, cut around 1790 for
+    // William Bulmer's Shakspeare Press and used for the Boydell Shakespeare;
+    // Martin was a Birmingham type-founder out of the Baskerville circle, and
+    // the design sits between Baskerville and Bodoni. The face was named
+    // "Bulmer" only retrospectively, after the printer rather than the
+    // punchcutter -- Martin is credited here because he cut it.
+    //
+    // LONDON IS THE PRESS'S CITY, not a source placing Martin's bench.
+    // Wikipedia puts the Shakspeare Press at 3 Russell Court, off Cleveland
+    // Row, St James's, from the spring of 1790, and Martin was engaged for
+    // that project; no source found says where he cut the punches. Flagged in
+    // docs/font-dates.md rather than dressed up, on the Golden Cockerel and
+    // Dante precedent.
+    //
+    // Stage 2 is DJR's own interpretation, not a revival of a digitisation:
+    // Warbler Text went out to his Font of the Month Club in February 2022.
+    // "Western Massachusetts" is a REGION because DJR publishes no city --
+    // his own About page says only "the hills of Western Massachusetts" --
+    // and the rules allow the coarser place where no city is pinnable.
+    //
+    // ORIGIN is its own first stage, so no ancestor was invented. This face
+    // does NOT get Jenson: a Modern after Martin descends from Baskerville's
+    // line, and following any revival back to Venice is exactly the claim the
+    // earliestYear comment warns against.
+    {"WarblerText", "Warbler Text", "William Martin; David Jonathan Ross",
+     "1790 London; 2022 Western Massachusetts", "1790 London", 1790},
     {"GoudyBookletter1911", "Goudy Bookletter", "Frederic W. Goudy; Barry Schwartz", "1911 New York; 2009 St. Paul",
      "1911 New York", 1911},
     // Born digital and revised where it was drawn, so one stage, comma'd years.

@@ -193,7 +193,8 @@
 # added 2026-08-03, three text grotesques the same day, two of those three cut
 # 2026-08-04, Lexica Ultralegible itself cut 2026-08-04, Quattrocento Sans
 # promoted 2026-08-04, TeX Gyre Heros added 2026-08-23, Almendra added
-# 2026-08-24; DTL Romulus, Dante, Lutetia Nova, Golden Cockerel and Doves added 2026-09-06): these THIRTEEN, and only these thirteen, are INSTALLED on every surface — both device SD cards, the
+# 2026-08-24; Dante, Lutetia Nova and Doves added 2026-09-06; DTL Romulus and
+# Golden Cockerel CUT 2026-09-07): these ELEVEN, and only these eleven, are INSTALLED on every surface — both device SD cards, the
 # simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
@@ -240,10 +241,8 @@ installed_families:
   - InknutJunicode
   - TeXGyreHeros
   - Almendra
-  - DTLRomulus
   - DanteMT
   - LutetiaNova
-  - GoldenCockerel
   - DovesType
 # DTL Romulus joined on 2026-09-06 (owner ruling, promoting it straight out of
 # the iOS trial it was built for the day before it could be evaluated on the
@@ -744,6 +743,14 @@ families:
       bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
       bolditalic: {from: italic, synthetic: {embolden_em: 0.036, y_ratio: 0.35}}
 
+  # **CUT 2026-09-07** (owner ruling: "Drop DTL Romulus and Golden Cockerel
+  # entirely"). Out of installed_families:, so it is on NO surface -- not a
+  # device card, not the simulator's fs_/fonts/, not the iOS seed tree. The
+  # recipe and its measurements stay, per this file's convention for cut
+  # families: the sources are gitignored and the sweep cost real work, so a
+  # reconsideration should not pay for it twice. It shipped in builds 180-182.
+  # Re-adding it to a surface needs a fresh ruling, not a rebuild.
+  #
   # Golden Cockerel, ITC's 1996 digital cut of Eric Gill's 1929 type for the
   # Golden Cockerel Press (same 2026-09-06 ruling as Lutetia Nova). Commercial;
   # four TTFs came in the kit and TWO are text faces -- Roman and Italic. The
@@ -875,6 +882,134 @@ families:
       bold:       {from: regular, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
       bolditalic: {from: italic, synthetic: {embolden_em: 0.036, y_ratio: 0.35}}
 
+  # Warbler Text, David Jonathan Ross's 2022 Modern after William Martin's 1790
+  # types for William Bulmer (2026-09-07, owner: add WarblerText). Commercial
+  # (DJR Type LLC) and a TESTING/TRIAL cut: the kit's files are named
+  # `-Testing-BF674fd3...` and its README and LICENSE both read "for testing
+  # purposes only", so these outlines are not licensed for an e-book or an app.
+  # Staged under clean names in lib/EpdFont/local_fonts/ (gitignored), never
+  # committed; a clean clone cannot rebuild this family, as with Romulus, Dante,
+  # Lutetia Nova, Golden Cockerel and Doves.
+  #
+  # THE TEXT OPTICAL SIZE, AND THAT IS THE WHOLE POINT OF THE FAMILY. Warbler
+  # ships four optical sizes -- Text, Deck, Display, Banner -- and their measured
+  # x-heights fall exactly as an optical-size axis should: Text 463/1000,
+  # Deck 449, Display 439, Banner 433. This reader sets running prose at 8-18 pt,
+  # so Text is the cut, and it is also the largest-on-body of the four, which is
+  # what makes the slot fit land where it does.
+  #
+  # STATIC CUTS, NOT THE VARIABLE FONTS, and that was measured rather than
+  # assumed. The kit also holds WarblerVariableopszwght and
+  # WarblerVariable-Italicopszwght with axes opsz[15..96] and wght[400..700].
+  # `opsz` sounds like the better lever -- pin the optical size deliberately --
+  # but the axis MINIMUM is 15 and opsz 15 IS Text, so there is nothing below
+  # Text to reach and nothing to tune. The two VFs name exactly four instances
+  # between them (opsz 15 / wght 400 and 700, roman and italic), i.e. precisely
+  # the four static Text faces. Checked on 2026-09-07: instancing each VF at
+  # opsz 15 / wght 400 and 700 reproduces all 559 cmapped advance widths of the
+  # matching static face with ZERO differences, in all four styles. The statics
+  # win on being the authored CFF outlines rather than the VF's glyf conversion,
+  # and on needing no instancing step in the build.
+  #
+  # ALL FOUR STYLES ARE REAL. There IS a static WarblerText-Italic, and a Bold
+  # and a BoldItalic -- nothing is synthesised here, the first commercial family
+  # in this file of which that is true. Stems at 50 ppem from the middle row of
+  # `l`: Regular 80/1000 em, Italic 80, Bold 160 (2.00x), Bold Italic 140
+  # (1.75x). A real bold at 2.0x is what the designer drew; the synthetic-bold
+  # 1.6x target does not apply to a face that ships one.
+  #
+  # NATIVE `liga`, NO REPAIR NEEDED. GSUB carries 19-20 features; the converter's
+  # own extractor returns FIVE pairs per style (ff fi fl ffi ffl) in all four.
+  # Only U+FB01 and U+FB02 are cmapped -- ff, ffi and ffl are drawn as unencoded
+  # `f_f`, `f_f_i`, `f_f_l` -- and that is fine here, NOT a fallback hazard:
+  # extract_ligature_glyph_indices_fonttools() maps those three to their glyph
+  # IDs through STANDARD_LIGATURE_MAP and fontconvert rasterises them out of
+  # Warbler itself (fontconvert_sdcard.py:869,900). No `synth_ligatures:`.
+  # Eight more ligatures -- f_b f_h f_j f_k and the four ff-prefixed ones -- are
+  # drawn as unencoded `.liga` glyphs with no codepoint anywhere to carry them
+  # and are dropped with a warning, exactly as Doves' and Edgar's are.
+  #
+  # GPOS kern is enormous: 50,264 / 68,479 / 51,604 / 77,110 pairs expanded over
+  # the `reading` charset for regular/italic/bold/bolditalic -- an order above
+  # Dante's ~1,800 and well past Doves' 18,852.
+  #
+  # Latin-only, but the widest Latin in the file: 559 codepoints, 125 of Latin
+  # Ext-A (against Doves' 89 and Lutetia's 85) and 139 of Latin Extended
+  # Additional. Four Greek letters as symbols, no Cyrillic; `reading` prunes the
+  # rest to the fallback chain as for every other Latin-only family.
+  #
+  # NO `hires_drops:`, AND THAT WAS VERIFIED RATHER THAN OMITTED. Every family
+  # added on 2026-09-06 carries {2: [0x2E3B], 3: [0x2E3A, 0x2E3B]}; only Dante
+  # actually needed the 2x line, because the dash width scales with the TOP
+  # SLOT's point size and Dante's is 23 pt. This family's top slot is 18 pt, so
+  # 2x renders at 36 pt: the whole `reading` charset was rasterised through the
+  # real fallback chain at 1x/2x/3x on 2026-09-07 and the largest glyph is
+  # 105x53 / 207x102 / 312x154 px. Nothing crosses EpdGlyph's uint8 at 1x or 2x.
+  # At 3x exactly one does -- U+2E3B THREE-EM DASH at 312 px -- and the GLOBAL
+  # `tier_drops: 3: [0x2E3B]` above already covers it. U+2E3A stays at 207 px
+  # even at 3x and is not dropped. Re-verify this if the ramp ever grows.
+  #
+  # scale: 1.03 IS A SLOT FIT, swept jointly for x-height AND leading on
+  # 2026-09-07 across k = 0.85..1.30 (0.01, then 0.0025 near the winner) x every
+  # 6-size ramp from 6 to 31 pt x every (ascent, descent) split whose span clears
+  # the ink floor. THE RESULT IS DRIFT 0 -- x-height 8/10/12/14/16/18 EXACT and
+  # advanceY 23/28/34/40/46/51 EXACT, the tier's leading target hit on all six
+  # slots. That is the best fit in this file; Almendra's 1 and Doves' 2 were the
+  # previous best. The point sizes also land on the slot numbers.
+  #
+  # k=1.03 is the CENTRE of the drift-0 window, not its edge: every k from
+  # 1.0025 to 1.0575 scores 0 on this ramp, and 1.03 is the midpoint, so a
+  # rounding change at either end cannot walk the fit off. Not taken:
+  #   k=1.00, ramp 8/10/12/14/16/18 -- leading drift 0 but x-height 17 at the
+  #     top slot. The ANCHOR IS X-HEIGHT and it wins, as it did for Dante.
+  #   k=1.00, ramp 8/10/12/14/16/19 -- x-height exact, leading drift 3, and a
+  #     ramp that stops stepping by 2.
+  # The joint-sweep model was validated against real built files before it was
+  # trusted (24/24 exact on advanceY), and the winner was then re-measured from
+  # four actually-patched faces rather than from the arithmetic -- the Doves
+  # lesson in docs/three-faces-2026-09-06.md.
+  - name: WarblerText
+    description: "Warbler Text, Ross's 2022 Modern after William Martin's 1790 types for Bulmer (Latin)"
+    intervals: reading
+    sizes: [8, 10, 12, 14, 16, 18]
+    # Uniform slots: xh 8/10/12/14/16/18 EXACT and advY 23/28/34/40/46/51 EXACT
+    # (regular), measured from the built faces. DRIFT 0 -- the only family in
+    # this file that hits both targets on all six slots.
+    #
+    # NO TRADEOFF WAS NEEDED HERE, which is the other unusual thing about this
+    # family and is why it does not carry the "descenders win" note every other
+    # commercial addition does. Span 1367 sits above the ink floor (worst-style
+    # plain ink 1151 + 0.13 em = 1281) and inside the 1365..1368 window that
+    # holds the exact leading, which leaves enough room to satisfy BOTH edges:
+    #   descent -320 clears the deepest ink in the whole `reading` charset in
+    #     every style -- the Q tail at -299 in all four, and Gcommaaccent's
+    #     comma at -318/-319 in the bold pair;
+    #   ascent 1047 clears the accented capitals at 1040 (Aring, bold pair).
+    # The only ink that still pokes is the double-stacked Vietnamese, U+1EB2 at
+    # 1268/1000 em, which no family in this file covers.
+    #
+    # The italic and bold x-heights run 1-2 px over the roman at the upper slots
+    # (italic 8/10/12/14/17/19, bold 8/10/13/15/17/19, bolditalic
+    # 8/11/13/15/18/20). That is DJR's drawing -- Warbler Text measures 463/472/
+    # 484/492 per 1000 em across the four -- not a mismatch to correct. The slot
+    # anchor is the regular style, and per-style `scale:` is for MIXED-SOURCE
+    # families; these four are one typeface. Cap height is identical in all four
+    # at every slot (12/16/19/22/25/28).
+    metrics: {ascent: 1047, descent: -320, linegap: 0}
+    styles:
+      regular:    {scale: 1.03, path: "local_fonts/WarblerText-Regular.otf"}
+      italic:     {scale: 1.03, path: "local_fonts/WarblerText-Italic.otf"}
+      bold:       {scale: 1.03, path: "local_fonts/WarblerText-Bold.otf"}
+      bolditalic: {scale: 1.03, path: "local_fonts/WarblerText-BoldItalic.otf"}
+
+  # **CUT 2026-09-07** (owner ruling: "Drop DTL Romulus and Golden Cockerel
+  # entirely"). Out of installed_families:, so it is on NO surface -- not a
+  # device card, not the simulator's fs_/fonts/, not the iOS seed tree. The
+  # recipe and its measurements stay, per this file's convention for cut
+  # families: the sources are gitignored and the sweep cost real work, so a
+  # reconsideration should not pay for it twice. It shipped in builds 178-182.
+  # Re-adding it to a surface needs a fresh ruling, not a rebuild.
+  #
   - name: DTLRomulus
     description: "DTL Romulus, Blokland after Jan van Krimpen's 1931 Enschede roman (Latin)"
     intervals: reading
