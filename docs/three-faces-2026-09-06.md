@@ -282,8 +282,10 @@ because the report was that both read LOW and generous is the direction of the
 complaint. Matching x-height exactly instead is `scale: 1.065`, which leaves the
 caps 2–3 px short.
 
-**Leading was unaffected**: the ink floor is 1380 and the drift 2 at every scale
-from 0.985 to 1.14, so the correction cost nothing elsewhere.
+**Leading was unaffected by THAT correction**: the ink floor stayed 1380 and the
+drift unchanged at every scale from 0.985 to 1.14, so the scale fix cost nothing
+elsewhere. (The drift figure quoted here was 2 and is really 3 — see §7.2. The
+italic swap the next day moved it to 5.)
 
 ### 7.2 Slots
 
@@ -293,12 +295,29 @@ numbers.
 | slot | 0 | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|---|
 | x-height | 8 | 10 | 12 | 14 | 16 | 18 |
-| advY | 23 | 29 | 34 | 40 | 46 | 52 |
+| advY, as shipped **2026-09-07** | 23 | 29 | 35 | 41 | 47 | 52 |
+| advY, the Junicode fit it replaced | 23 | 29 | 35 | 40 | 46 | 52 |
 
-**Drift 2 — second only to Almendra's 1 in the whole file.** Metrics
-`1018/−362`, span 1380 the ink floor; Doves' ascenders are long, so accented
-capitals need 1080 against the declared 1018 and poke 62/1000 em, descenders
-winning as everywhere else.
+**CORRECTED TWICE, and both corrections are worth keeping.**
+
+This section first claimed `23/29/34/40/46/52` and **drift 2**. Two things were
+wrong with that. Slot 2 measured **35**, not 34 — found by the WarblerText build
+validating its advY model against real files rather than against this table, so
+the Junicode fit's real drift was **3**, not 2. And the italic changed the next
+day: Doves takes **Coelacanth's** italic now (owner ruling; see
+`docs/font-dates.md`), whose deeper extenders lift the shared ink floor, so the
+shipped leading is `23/29/35/41/47/52` and the drift is **5**.
+
+Metrics moved with it: **`998/−402`**, span 1400, against the Junicode fit's
+`1018/−362`. Coelacanth's descenders need 400/1000 where Junicode's needed 360,
+so descent grew and ascent gave way; accented capitals now poke 82/1000 em
+rather than 62. Descenders win, as everywhere else.
+
+**The lesson is the first correction, not the second.** A figure in a doc is not
+a measurement — it was copied from a sweep's prediction and never re-read off
+the built file, and it survived a build, a ship and a review before another
+family's arithmetic caught it. Read advY out of the `.cpfont` headers or the
+render harness, both of which print it.
 
 ### 7.3 The missing `fi`, and a new merge path
 
