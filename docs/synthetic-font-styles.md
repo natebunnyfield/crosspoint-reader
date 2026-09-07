@@ -125,7 +125,82 @@ outlines by hand.
 
 `embolden_em` is the x-strength as a fraction of the em (y gets half unless
 `y_ratio` overrides); per-size px strength = `embolden_em × ppem`, rounded to
-26.6. `slant_deg` is Goudy-only: **~11°** for an old-style like Kennerley
+26.6.
+
+**`baseline_shift_em` IS NOT OPTIONAL ON AN EMBOLDENED STYLE — added
+2026-09-07.** Emboldening grows the outline in BOTH directions and is then
+re-centered by translating back half the growth, including half the VERTICAL
+growth (`fontconvert_sdcard.py`, `FT_Outline_EmboldenXY` then
+`FT_Outline_Translate(-x/2, -y/2)`). That translate walks the glyph down off
+the baseline. Nothing detects it: the style renders, the advances are right,
+and every flat-bottomed letter simply sits one row lower than the roman beside
+it on the same line.
+
+Measured across the whole recipe file before the fix — comparing each synthetic
+style against **the style it was cut from**, where every glyph should keep its
+baseline row — **68% of glyphs were off, and after it 2%**:
+
+| family | style | before | after |
+|---|---|---|---|
+| Coelacanth | bolditalic | 61% | 4% |
+| InknutJunicode | bolditalic | 75% | 4% |
+| LutetiaNova | bold / bolditalic | 75% / 71% | 2% / 2% |
+| CaledoniaCC | bold / bolditalic | 51% / 52% | 0% / 0% |
+| GoldenCockerel | bold / bolditalic | 78% / 78% | 3% / 3% |
+| GoudyBookletter1911 | bold / bolditalic | 54% / 54% | 0% / 0% |
+| GoudyBookletter1911 | *italic — slant only, the control* | **0%** | **0%** |
+| LibreCaslonText | bolditalic | 67% | 1% |
+| Rosarivo | bold / bolditalic | 24% / 26% | 0% / 0% |
+
+Goudy's italic is the control that proves the mechanism: it is `from: regular`
+with `slant_deg` and NO embolden, and it was 0 of 2372 both before and after.
+Shear leaves y alone; the embolden's centering translate does not.
+
+**The value is arithmetic, not fitting:** `embolden_em × y_ratio / 2`, exactly
+half the vertical growth given back. Note `y_ratio` DEFAULTS TO 0.5 when the
+recipe omits it, so a style with no `y_ratio` needs a LARGER shift than its
+`embolden_em` alone suggests. A sweep of ±0.002 and +0.004 around the
+arithmetic value was run on the five worst families and is mostly a negative
+result — LutetiaNova and Doves got worse at every offset, InknutJunicode
+improved 3% (noise). Only Coelacanth's bolditalic gained enough to take
+(1148 → 740), so it carries 0.0085 against an arithmetic 0.0065. **Do not tune
+the others**; the residual 2% is glyphs whose rounded bottoms grow across a
+pixel boundary under the embolden itself, and chasing it is curve-fitting to
+rounding noise.
+
+It also reconciles two faces that simply disagree about where the baseline is,
+which is a different fault with the same symptom. A face draws its flat-bottomed
+letters a little below y=0 so the rasterizer has something to round, and how far
+is the designer's choice: Doves puts its flat bottoms at −2/1000 em, the
+Coelacanth italic it borrows at −10. Read both faces' yMin histograms and shift
+by the difference. See `doves-italic-tuning-2026-09-07.md`.
+
+**Per-size overrides.** Any synthetic key may also be written `key@<size>` to
+override that one point size:
+
+```yaml
+    italic:
+      scale: 1.115
+      url: "…/CoelacanthItalic.otf"
+      synthetic:
+        embolden_em: 0.010
+        y_ratio: 0.35
+        baseline_shift_em: 0.010
+        "baseline_shift_em@18": 0.036
+```
+
+That exists because the defect can be per-size: at ppem 38 the CFF hinter snaps
+Coelacanth's baseline zone a whole pixel down (outline yMin −1.062 px there
+against −0.031 at 8 pt and −0.047 at 12 pt), and no single em-relative number
+covers a discontinuity. Forcing the autohinter and disabling hinting were both
+tried and both came out worse (23 and 43 misaligned glyph/size pairs against 6).
+`synth_params_for_size()` already took the size, so this cost no plumbing.
+
+**Verify it off the BUILT file, never off the recipe.** Read each style's glyph
+records out of the `.cpfont` and compare `top - height` for the synthetic style
+against the style it was cut from; for flat-bottomed letters they must match
+exactly. `p` and `q` legitimately differ when the borrowed face has deeper
+descenders, and a letter like `d` or `u` can differ by design. `slant_deg` is Goudy-only: **~11°** for an old-style like Kennerley
 (gentle, like its 1918 italic; calibrate against Sorts Mill Goudy Italic's
 `post.italicAngle`; for reference, FreeType/crengine synthetic oblique is 12°,
 CSS oblique defaults to 14°, FontForge italicize ~13°). Caledonia CC has a

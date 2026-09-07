@@ -828,6 +828,34 @@ from `fontconvert.py` to make `face.size` current.
    ([:275-327](../lib/EpdFont/scripts/fontconvert_sdcard.py)). Format 2 iterates
    by class, not by glyph, to avoid O(glyphs²) on CJK. Only `Value1.XAdvance`
    is read; `Value2` is ignored.
+
+   **Within ONE lookup the subtables are FIRST-MATCH-WINS, not cumulative**
+   (corrected 2026-09-07, `_resolve_lookup_subtables`). OpenType says the
+   subtables of a lookup are searched in order and only the first match
+   applies; HarfBuzz's `OT::Lookup::dispatch` stops at the first subtable whose
+   `apply()` returns true. This matters because that is exactly how a
+   Monotype/DTL-style kern lookup is built — a small Format-1 subtable of
+   EXCEPTIONS in front of a big Format-2 class matrix — so the old summing
+   applied the exception AND the rule it was written to override. DanteMT is
+   622 exceptions in front of a 72×71 matrix.
+
+   Across **separate lookups** the values are still summed, because a shaper
+   runs every lookup of the feature in turn. Verified harmless: no pair is
+   carried by two different kern lookups in any of the 12 installed families.
+
+   A Format-1 `XAdvance` of **zero is recorded**; a Format-2 cell of zero is
+   not. Zero in Format 1 is the designer writing "this pair is an exception,
+   do not kern it" against a class rule that would otherwise fire, and dropping
+   it let the class value leak through. Zero in a class matrix just means "this
+   subtable has nothing to say" — which is also how HarfBuzz reads it, since
+   `PairPosFormat2::apply` returns false unless a nonzero value was applied
+   while `PairPosFormat1` returns true the moment the second glyph is found.
+
+   Measured against `hb-shape`, DanteMT-Regular, upem 2048, `T` advance 1300:
+   `Ta` → 1161 (class −139, correct before and after); `Tà` → 1265 (exception
+   −35 beats class −139; we shipped −174, five times too tight); `Tä` → 1300
+   (a zero exception, no kern at all; we shipped −139). Full account:
+   `kerning-subtable-precedence-2026-09-07.md`.
 4. **Overlay, not sum**: `raw_kern.update(gpos_kern)` — GPOS supersedes legacy
    pair for pair, and legacy-only pairs survive
    ([:418-424](../lib/EpdFont/scripts/fontconvert_sdcard.py)). The comment at

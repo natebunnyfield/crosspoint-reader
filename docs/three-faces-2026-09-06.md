@@ -361,3 +361,45 @@ kernR=279` — the richest kern classes in the file by a wide margin.
 italic), and the borrowed italic's *fit* was judged from a 1× plate at slot 3,
 where it reads as the same printer's ink. Whether it still does at slot 0 on
 glass is the part only the phone can answer.
+
+## 8. The checklist this file did not have (added 2026-09-07)
+
+Every family added since Dante hit at least one of these, and each was found
+by measurement rather than by review. Work through them for the NEXT family
+rather than rediscovering them.
+
+1. **Build all three tiers, not just 1x.** `--scale 1`, `--scale 2`, `--scale 3`.
+   The device reads 1x, but iOS and desktop host builds read the tier matching
+   their render scale, and a corrected 1x beside a stale hi-res tier is the
+   B-035 failure. Doves shipped a 3x that could not build at all and nobody
+   knew until the simulator staging aborted: `U+261C`/`U+261E`, the pointing
+   hands, rasterise 268x127 px at 18 pt x 3 and blow `EpdGlyph`'s uint8 width,
+   failing the WHOLE family. The fix is a `hires_drops:` entry, and the reason
+   it was missing is instructive — the glyphs are not Doves' own, they arrived
+   with the borrowed Coelacanth italic, whose own recipe had always dropped
+   them. **A borrowed face brings its whole glyph set, including the parts the
+   roman never had.**
+2. **Every synthetic style needs `baseline_shift_em`.** See
+   `synthetic-font-styles.md`; before 2026-09-07, 68% of glyphs in every
+   synthetic style in the file sat one row below the style they were cut from.
+3. **Verify against the BUILT `.cpfont`, never against the sweep's prediction.**
+   This file already records the Doves italic shipping 8% too small from an
+   arithmetic error. It happened twice more the same week: a drift figure
+   documented as 2 that was actually 3, copied from a prediction and never read
+   back; and two invalid measurement attempts (reading `scaled_fonts/`, where
+   the embolden has not been applied yet, and ink-density crops of rendered
+   PNGs, where line positions shift with scale so the crops are not comparable).
+   Read the 32-byte header and the 32-byte style TOC.
+4. **When a borrowed italic joins a roman, check the BASELINE CONVENTION, not
+   just size and weight.** Two faces need not agree on how far below y=0 they
+   draw a flat-bottomed letter. Doves is −2/1000 em, Coelacanth −10. That is
+   invisible in a specimen of the italic alone and obvious the moment the two
+   sit in one line.
+5. **A font change means a `SECTION_FILE_VERSION` bump.** `Section.cpp`'s cache
+   key has no dependency on a font's CONTENT, so replacing a `.cpfont` leaves
+   every already-cached book laid out with the old metrics. Bump it, and ship
+   it in the same firmware as the fonts.
+6. **The x-height ramp rounds.** A 5.5% span of `scale:` landed the identical
+   six pixel heights on Doves' italic. If a face reads wrong at one scale it
+   will usually read wrong at the next few, and the useful step is bigger than
+   it looks. Sweep and measure rather than nudging.

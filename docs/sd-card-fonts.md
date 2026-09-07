@@ -932,3 +932,42 @@ To list all presets with codepoint counts:
 `--force-autohint` — force FreeType's auto-hinter instead of the font's native hinting (useful when a font's built-in hints produce poor results at small sizes).
 
 Install custom fonts via the web interface or manual SD card copy.
+
+## Changing a shipped font is a FIRMWARE change (2026-09-07)
+
+`Section.cpp`'s pagination cache keys on `SECTION_FILE_VERSION`, `fontId`, the
+viewport and the settings flags. **Nothing in that key depends on a font's
+content**, and `fontId` survives a `.cpfont` being replaced underneath it. So
+swapping a font file alone leaves every already-cached book laid out with the
+old metrics, indefinitely, and nothing detects it — the book opens, renders,
+and its line breaks are simply from the previous font.
+
+The kerning fix on 2026-09-07 made Doves' `Tell Verse Well Yes` 16 px wider at
+18 pt, which is far more than enough to move a break. `SECTION_FILE_VERSION`
+went 57 → 58 for exactly that reason.
+
+So, whenever a shipped family's metrics or kerning change:
+
+1. Bump `SECTION_FILE_VERSION` in `lib/Epub/Epub/Section.cpp`, with a note
+   saying which fonts changed and why.
+2. Ship that firmware **in the same build** as the fonts. A card whose fonts
+   moved and whose firmware did not is the silent-wrong-output case.
+3. Rebuild all three tiers and restage — `scripts/install-sim-fonts.py` for
+   `fs_/fonts/`, `publish_fonts.py` for the private release, `cpcards` for
+   physical cards.
+
+Clearing `.crosspoint/` by hand also works and needs no firmware change, but
+`cpcards` does not do it, so it is a step that has to be remembered every time
+— and forgetting it looks exactly like the font change silently not working.
+
+### Renaming a family strands its setting
+
+`SETTINGS.sdFontFamilyName` persists the DIRECTORY NAME as a string. Renaming
+`DovesType` → `Doves` (2026-09-07) therefore leaves anyone whose setting still
+names the old string falling back to the built-in face, and leaves the old
+directory on the card as a duplicate in the picker. `install-sim-fonts.py`
+prunes only names on its known cut-list, so it did not remove it.
+
+Update Fonts now removes it automatically — the sync is a mirror, see the
+standing rulings above — but a card that never runs a sync keeps the orphan.
+Delete it by hand there.
