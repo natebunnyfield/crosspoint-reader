@@ -50,7 +50,13 @@ std::string normalisePath(const std::string& path) {
           if (!components.empty()) {
             components.pop_back();
           }
-        } else {
+        } else if (component != ".") {
+          // "." names the folder it already is in, so it must be DROPPED, not
+          // kept: the result of this function is compared with == to decide
+          // whether a TOC entry reaches a spine item, and "./Text/ch1.xhtml"
+          // has to come out equal to "Text/ch1.xhtml" or the whole contents of
+          // such a book resolves to nothing. Dropped before ".." is applied, so
+          // "a/./b/../c" still collapses to "a/c".
           components.push_back(component);
         }
       }

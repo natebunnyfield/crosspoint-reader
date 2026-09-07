@@ -434,6 +434,52 @@ CROSSPOINT_RC_HASH=880ba0f9 pio run -e gh_release_rc -t upload --upload-port /de
 
 ## FIXED
 
+### [B-051] Chapter Select did nothing on a whole book: a contents entry whose href does not match a spine href character-for-character is silently discarded — FIXED 2026-09-07 (lib/Epub/Epub.cpp, lib/FsHelpers/FsHelpers.cpp)
+**severity: high (every pick in an affected book goes nowhere) · scope: `Epub::parseTocNcxFile`, `FsHelpers::normalisePath`, `EpubReaderChapterSelectionActivity` · reported 2026-09-07: "selecting any chapter in Anatomy of a Heart epub ends up at the image before #13 no matter what", then "when I pick a chapter, it goes to the same spot in the epub"**
+
+**The shape of the failure, which is why it reads so oddly.** A TOC entry
+reaches a chapter only through an exact string comparison of hrefs
+(`BookMetadataCache.cpp:474`, and the hashed path above it). Miss, and the
+entry carries `spineIndex == -1`; Chapter Select then CANCELS the pick
+(`EpubReaderChapterSelectionActivity.cpp:68-72`), the reader's result handler
+ignores a cancelled result (`EpubReaderActivity.cpp:918`), and the page already
+on screen is repainted. Nothing moves, nothing is logged, and the owner sees
+"every chapter goes to the same spot" — the spot being wherever they happened
+to be reading. It is book-wide because the causes below are properties of the
+book's layout, not of one entry.
+
+**Two causes, both reproduced before they were fixed** (`test/toc_href_resolution/`,
+fixtures from `scripts/generate_toc_href_epubs.py`):
+
+* **An NCX that does not sit beside `content.opf`.** `src` in a navPoint is a
+  relative URI, so it resolves against the NCX document — but `Epub.cpp` passed
+  `contentBasePath`, the OPF's folder. A toc at `OEBPS/nav/toc.ncx` reaching
+  `../Text/ch1.xhtml` produced `Text/ch1.xhtml`, one folder short of every spine
+  item. The nav-document path already had this right and says so in a comment
+  (`Epub.cpp:203-205`); the NCX path never got the same treatment, and the two
+  agree whenever the NCX *is* beside the OPF, which is most books.
+* **`.` path segments.** `normalisePath` collapsed `..` and left `.` in place,
+  so a nav writing `./Text/ch1.xhtml` never compared equal to the spine's
+  `Text/ch1.xhtml`. Dropped now, before `..` is applied, so `a/./b/../c` still
+  collapses to `a/c`.
+
+**And the silence is fixed too**, which is the part that made this expensive:
+a dropped pick now logs `TOC entry '%s' reaches no spine item (href '%s')`.
+A dropped pick and a pick that lands on the wrong page were indistinguishable
+from outside, and the difference is the whole diagnosis.
+
+**Not claimed:** that this is what "Anatomy of a Heart" hits. The book was never
+shared, so the causes above are the ones the code provably has, found by reading
+the resolution path end to end — not by reproducing his copy. Both are
+all-or-nothing per book, which is the reported shape. If 1.5.28-BD does not fix
+it, the new `ECS` line settles the remaining question in one capture: present
+means the entry resolves and the wrongness is later; absent means the pick never
+reached the reader at all.
+
+There is one visible tell already: an unresolved entry raises
+`booknotes::Note::TocEntriesUnresolved` (`BookMetadataCache.cpp:468,481`), which
+puts a notes row at the top of Chapter Select.
+
 ### [B-049] A table of contents that comes back to a file it has already used lost every chapter break after the interruption — FIXED 2026-09-06 (lib/Epub/Epub/Section.cpp, section cache v57)
 **severity: medium (a Chapter Select pick opens on a page the PREVIOUS chapter is still running down) · scope: `Section::startBuild`'s TOC-anchor collection, the forced chapter break, the anchor map · found 2026-09-06 while root-causing the owner's "176 still going a page before chapter that i navigated to" — see [B-050], which this does NOT explain**
 
