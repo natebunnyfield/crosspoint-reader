@@ -310,3 +310,76 @@ not alignment.
 
 15/15 in `test/settings_display_order` still pass; Coelacanth rebuilds unchanged,
 so the converter change is inert for recipes that do not use the new key.
+
+## Round five — every synthetic bold in the file
+
+Owner, 2026-09-07: "redo synthetic bolds, show me before and after." The fault
+found in Doves' bold (round four, fault 2) was never Doves-specific; this is the
+pass that measures and corrects all of them.
+
+### The measurement that isolates it
+
+Comparing a synthetic style against the family's *regular* mixes the fault with
+real design differences — a face's own italic legitimately sits where it likes.
+The right comparison is **each synthetic style against the style it was cut
+from**, in the same built file. Embolden is symmetric and re-centered and shear
+leaves y alone, so every glyph should keep its baseline row. Anything that moves
+is the fault.
+
+`GoudyBookletter1911`'s italic is the control: it is `from: regular` with
+`slant_deg: 11` and NO embolden. It measured **0 of 2372** off, before and
+after. The shear is innocent; the embolden's centering translate is the cause.
+
+### Before and after
+
+Glyphs whose baseline row differs from their source style's, across every size:
+
+| family | style | cut from | before | after |
+|---|---|---|---|---|
+| Coelacanth | bolditalic | italic | 11006 / 17760 (61%) | 740 (4%) |
+| InknutJunicode | bolditalic | italic | 12148 / 16188 (75%) | 655 (4%) |
+| LutetiaNova | bold | regular | 11984 / 15876 (75%) | 357 (2%) |
+| LutetiaNova | bolditalic | italic | 11399 / 15876 (71%) | 340 (2%) |
+| CaledoniaCC | bold | regular | 1215 / 2376 (51%) | 13 (0%) |
+| CaledoniaCC | bolditalic | italic | 1246 / 2376 (52%) | 0 |
+| GoldenCockerel | bold | regular | 12444 / 15876 (78%) | 569 (3%) |
+| GoldenCockerel | bolditalic | italic | 12436 / 15876 (78%) | 629 (3%) |
+| GoudyBookletter1911 | bold | regular | 1283 / 2372 (54%) | 6 (0%) |
+| GoudyBookletter1911 | *italic (control)* | regular | **0** | **0** |
+| GoudyBookletter1911 | bolditalic | regular | 1283 / 2372 (54%) | 6 (0%) |
+| LibreCaslonText | bolditalic | italic | 1593 / 2376 (67%) | 25 (1%) |
+| Rosarivo | bold | regular | 588 / 2356 (24%) | 4 (0%) |
+| Rosarivo | bolditalic | italic | 635 / 2356 (26%) | 4 (0%) |
+| Doves | bold / bolditalic | regular / italic | (fixed in round four) | 329 / 316 |
+| **TOTAL** | | | **79260 / 116408 — 68%** | **3993 / 148358 — 2%** |
+
+### The value is arithmetic, not fitting
+
+`baseline_shift_em = embolden_em * y_ratio / 2` — exactly half the vertical
+growth the centering translate gives back. Note `y_ratio` DEFAULTS TO 0.5 when
+the recipe omits it, which is why InknutJunicode and GoudyBookletter1911 take
+larger shifts than their embolden alone suggests.
+
+A sweep of +-0.002 and +0.004 around the arithmetic value was run on the five
+families still above 1%, and it is mostly a negative result: LutetiaNova and
+Doves got WORSE at every offset, InknutJunicode improved 3% (noise). Only
+Coelacanth's bolditalic gained enough to take — 1148 to 740, a third — so it
+carries 0.0085 against an arithmetic 0.0065. **Do not tune the others**; the
+residual 2% is glyphs whose rounded bottoms grow across a pixel boundary under
+the embolden itself, and chasing it is curve-fitting to rounding noise.
+
+### Two things found on the way, both worth knowing
+
+1. **A `str.replace` of mine had cloned Doves' round-four edit into LutetiaNova's
+   bolditalic and Rosarivo's bold** — identical one-liners elsewhere in the file.
+   Both carried Doves' numbers and Doves' comment text. Reverted before this
+   pass measured anything, so the before column above is honest.
+2. **`InknutJunicode`'s bolditalic got heavier, and that is correct.** Its
+   `synthetic: {embolden_em: 0.042}` sits on a style with its OWN source, so it
+   was silently ignored until the build fix in `0cdfb922f`. Commit `15546fe75`
+   ("give InknutJunicode a bold italic that is actually bold", 2026-08-13) added
+   it deliberately, having measured that wght 700 alone produced no visible
+   bold — so the feature it intended had never once worked. It works now: at
+   14 pt the bolditalic's `l` is 10 px against the italic's 8 and the bold's 9.
+   This is a real, visible weight change to a shipped family, arrived at by
+   fixing a bug rather than by choosing it.

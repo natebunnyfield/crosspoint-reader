@@ -515,9 +515,9 @@ families:
     # gentle 1918 italic). Parameters derived in docs/synthetic-font-styles.md.
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/goudybookletter1911/GoudyBookletter1911.ttf"}
-      bold:       {from: regular, synthetic: {embolden_em: 0.039}}
+      bold:       {from: regular, synthetic: {embolden_em: 0.039, baseline_shift_em: 0.0098}}
       italic:     {from: regular, synthetic: {slant_deg: 11}}
-      bolditalic: {from: regular, synthetic: {embolden_em: 0.039, slant_deg: 11}}
+      bolditalic: {from: regular, synthetic: {embolden_em: 0.039, slant_deg: 11, baseline_shift_em: 0.0098}}
 
   # Caledonia CC (Carter & Cone) - commercial, so the files are never
   # committed or distributed; the family ships Regular and Italic only (no
@@ -541,8 +541,8 @@ families:
     styles:
       regular:    {path: "local_fonts/CaledoniaCC-Regular.ttf"}
       italic:     {path: "local_fonts/CaledoniaCC-Italic.ttf"}
-      bold:       {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
-      bolditalic: {from: italic, synthetic: {embolden_em: 0.045, y_ratio: 0.35}}
+      bold:       {from: regular, synthetic: {embolden_em: 0.045, y_ratio: 0.35, baseline_shift_em: 0.0079}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.045, y_ratio: 0.35, baseline_shift_em: 0.0079}}
 
   # **CUT 2026-09-06, the same day it was built** (owner ruling: "drop
   # dtlfleischmann, keep romulus"). Recipe only — its .cpfont files are gone
@@ -741,19 +741,8 @@ families:
     styles:
       regular:    {scale: 0.88, path: "local_fonts/LutetiaNova-Book.ttf"}
       italic:     {scale: 0.88, path: "local_fonts/LutetiaNova-BookItalic.ttf"}
-      bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
-      # Same baseline reconciliation as the italic it derives from -- it is a
-      # property of the SOURCE FACE, so every style cut from that file needs
-      # it. The embolden differs (a bold has to be bolder) and its centering
-      # translate pushes down a little harder, which is why this carries its
-      # own measured pair rather than the italic's.
-      bolditalic:
-        from: italic
-        synthetic:
-          embolden_em: 0.036
-          y_ratio: 0.35
-          baseline_shift_em: 0.016
-          "baseline_shift_em@18": 0.040
+      bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35, baseline_shift_em: 0.0084}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.036, y_ratio: 0.35, baseline_shift_em: 0.0063}}
 
   # **CUT 2026-09-07** (owner ruling: "Drop DTL Romulus and Golden Cockerel
   # entirely"). Out of installed_families:, so it is on NO surface -- not a
@@ -801,8 +790,8 @@ families:
     styles:
       regular:    {scale: 1.02, path: "local_fonts/GoldenCockerel-Roman.ttf"}
       italic:     {scale: 1.02, path: "local_fonts/GoldenCockerel-Italic.ttf"}
-      bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
-      bolditalic: {from: italic, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
+      bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35, baseline_shift_em: 0.0084}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.048, y_ratio: 0.35, baseline_shift_em: 0.0084}}
 
   # Doves Type, Robert Green's recovery of the Doves Press face (2026-09-06,
   # owner: "create a Doves font and create/borrow an italic from Coelacanth or
@@ -1461,7 +1450,7 @@ families:
       regular:    {scale: 0.944, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/Coelacanth.otf"}
       bold:       {scale: 0.944, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthBold.otf"}
       italic:     {scale: 0.944, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthItalic.otf"}
-      bolditalic: {scale: 0.944, from: italic, synthetic: {embolden_em: 0.037, y_ratio: 0.35}}
+      bolditalic: {scale: 0.944, from: italic, synthetic: {embolden_em: 0.037, y_ratio: 0.35, baseline_shift_em: 0.0085}}
 
   - name: InknutAntiqua62
     description: "Sturdy slab antiqua for literary fiction (Latin)"
@@ -1800,7 +1789,7 @@ families:
       bolditalic: {zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
                    variable: {wght: 700, wdth: 125, ENLA: 14}, scale: 0.966, word_space_em: -0.07,
-                   synthetic: {embolden_em: 0.042}}
+                   synthetic: {embolden_em: 0.042, baseline_shift_em: 0.0105}}
 
   - name: LibreCaslonText
     description: "Caslon revival tuned for body text (Latin)"
@@ -1818,7 +1807,7 @@ families:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librecaslontext/LibreCaslonText%5Bwght%5D.ttf", variable: {wght: 400}}
       bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/librecaslontext/LibreCaslonText%5Bwght%5D.ttf", variable: {wght: 700}}
       italic:     {url: "https://fonts.gstatic.com/s/librecaslontext/v5/DdT678IGsGw1aF1JU10PUbTvNNaDMfq91-c.ttf"}
-      bolditalic: {from: italic, synthetic: {embolden_em: 0.055, y_ratio: 0.35}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.055, y_ratio: 0.35, baseline_shift_em: 0.0096}}
 
   - name: Newsreader
     description: "Editorial serif with optical sizing pinned for text (Latin)"
@@ -1852,27 +1841,8 @@ families:
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/rosarivo/Rosarivo-Regular.ttf"}
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/rosarivo/Rosarivo-Italic.ttf"}
-      # baseline_shift_em here corrects the EMBOLDEN's own centering translate,
-      # which is a different fault from the italic's below. Emboldening grows
-      # the outline in both directions and is then re-centered by translating
-      # back half the growth -- including half the VERTICAL growth, which walks
-      # a synthetic bold down off the baseline. Measured on the built .cpfont:
-      # every flat-bottomed bold glyph sat one row below the roman at all six
-      # sizes before this. The correction is exactly half the vertical growth,
-      # embolden_em * y_ratio / 2 = 0.043 * 0.35 / 2 = 0.0075.
-      #
-      # THIS FAULT IS NOT SPECIFIC TO DOVES. Every synthetic bold in this file
-      # is built the same way and is presumably a row low the same way; only
-      # Doves is corrected here because only Doves was measured. See
-      # docs/doves-italic-tuning-2026-09-07.md before fixing the rest -- it
-      # wants its own measuring pass, not a copied constant.
-      bold:
-        from: regular
-        synthetic:
-          embolden_em: 0.043
-          y_ratio: 0.35
-          baseline_shift_em: 0.0075
-      bolditalic: {from: italic, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
+      bold:       {from: regular, synthetic: {embolden_em: 0.043, y_ratio: 0.35, baseline_shift_em: 0.0075}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.043, y_ratio: 0.35, baseline_shift_em: 0.0075}}
 
   - name: Accanthis
     description: "Arkandis Digital Foundry Garalde, cut from the blind serif bench (Latin)"
