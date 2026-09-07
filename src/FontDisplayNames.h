@@ -295,6 +295,20 @@ inline constexpr Entry kEntries[] = {
     // Ornaments cuts exist in the kit and have no slot in the reader.
     {"GoldenCockerel", "Golden Cockerel", "Eric Gill; Richard Dawson & Dave Farey",
      "1929 Waltham St Lawrence; 1996 London", 1929},
+    // Added 2026-09-06. Stage 1 is the Doves Press type: Emery Walker and
+    // T. J. Cobden-Sanderson had it cut after Jenson for their Hammersmith
+    // press, first used 1900. Stage 2 is Robert Green's recovery -- he redrew
+    // it from printed sheets over 2013-15 and then, famously, had the original
+    // matrices dredged from the Thames at Hammersmith, where Cobden-Sanderson
+    // had thrown them in 1916-17 so no one else could use the face. The
+    // digital revision this build ships is 2021.
+    //
+    // THE ROMAN IS ALL THERE EVER WAS. The Doves Press set everything roman
+    // and cut no italic, so this family's italic is BORROWED (Junicode,
+    // instanced to match) -- the only family in the picker whose italic is not
+    // its own, which is why the designer column names Green alone.
+    {"DovesType", "Doves Type", "Emery Walker & T. J. Cobden-Sanderson; Robert Green",
+     "1900 Hammersmith; 2021 London", 1900},
     {"GoudyBookletter1911", "Goudy Bookletter", "Frederic W. Goudy; Barry Schwartz", "1911 New York; 2009 St. Paul",
      1911},
     // Born digital and revised where it was drawn, so one stage, comma'd years.

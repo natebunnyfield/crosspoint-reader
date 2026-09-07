@@ -419,7 +419,7 @@ SYNTH_LIGATURE_CODEPOINTS = {
 # key's other components (source mtime, requested names) do not move when this
 # file is edited. That is not hypothetical -- the `tables={"GSUB"}` fix below
 # changed the output of this stage and nothing in the old key noticed.
-SYNTH_LIGATURE_STAGE_VERSION = 2
+SYNTH_LIGATURE_STAGE_VERSION = 4
 
 
 def _load_fontconvert():
@@ -487,6 +487,89 @@ def _verify_synth_ligatures(cached: Path, names: list, intervals: str,
     return cached
 
 
+def _ligature_lookups(font):
+    """Every LigatureSubst lookup reachable from `liga`/`rlig`, resolving extensions."""
+    if "GSUB" not in font or font["GSUB"].table is None:
+        return []
+    gsub = font["GSUB"].table
+    if gsub.FeatureList is None or gsub.LookupList is None:
+        return []
+    want = set()
+    for fr in gsub.FeatureList.FeatureRecord:
+        if fr.FeatureTag in ("liga", "rlig"):
+            want.update(fr.Feature.LookupListIndex)
+    out = []
+    for li in sorted(want):
+        for st in gsub.LookupList.Lookup[li].SubTable:
+            st = st.ExtSubTable if hasattr(st, "ExtSubTable") else st
+            if hasattr(st, "ligatures"):
+                out.append(st)
+    return out
+
+
+def _merge_ligature_rules(font, names, family_name, style_name):
+    """Append the missing ligature rules to the face's OWN liga lookup.
+
+    Adds nothing else and replaces nothing: the other features, the other
+    lookups, GPOS and every other table are the bytes they were. Refuses a rule
+    the face already has, so a foundry that adds f+i in a later release gets
+    re-examined rather than silently double-mapped.
+    """
+    from fontTools.ttLib.tables import otTables
+
+    cmap = font.getBestCmap() or {}
+    glyphs = set(font.getGlyphOrder())
+    subtables = _ligature_lookups(font)
+    if not subtables:
+        raise RuntimeError(f"{family_name}/{style_name}: no ligature lookup to merge into")
+    target = subtables[0]
+
+    added = []
+    # A style where every requested rule was already present adds nothing, and
+    # that is a valid outcome -- see the `already` branch below.
+    for n in names:
+        lig_cp, comp_cps = SYNTH_LIGATURE_CODEPOINTS[n]
+        need = [lig_cp] + list(comp_cps)
+        unmapped = [cp for cp in need if cp not in cmap]
+        if unmapped:
+            raise RuntimeError(
+                f"{family_name}/{style_name}: synth_ligatures '{n}' needs "
+                f"{', '.join('U+%04X' % cp for cp in unmapped)}, which this face does not map.")
+        out_glyph = cmap[lig_cp]
+        comps = [cmap[cp] for cp in comp_cps]
+        if any(g not in glyphs for g in [out_glyph] + comps):
+            raise RuntimeError(f"{family_name}/{style_name}: '{n}' maps to a glyph not in the order")
+        first, rest = comps[0], comps[1:]
+        # ALREADY THERE IS SUCCESS, NOT A CONFLICT. `synth_ligatures:` is a
+        # FAMILY key and a family can mix sources -- Doves borrows Junicode for
+        # its italic, and Junicode has had f+i all along. Refusing the build
+        # because one style already does what was asked for would make the key
+        # unusable on exactly the families that need it most. The requested
+        # end state is "this ligature fires", and it already does; the
+        # post-condition below still proves it through the real extractor, so
+        # a face that only APPEARS to have the rule is still caught.
+        already = None
+        for st in subtables:
+            for lig in st.ligatures.get(first, []):
+                if list(lig.Component) == rest:
+                    already = lig.LigGlyph
+        if already is not None:
+            print(f"  liga already present: {family_name}/{style_name} {n} "
+                  f"({' '.join(comps)} -> {already}), left alone")
+            continue
+        lig = otTables.Ligature()
+        lig.Component = rest
+        lig.LigGlyph = out_glyph
+        lig.CompCount = len(comps)
+        target.ligatures.setdefault(first, []).append(lig)
+        # Longest first: OpenType matches ligatures in list order, so an f+i
+        # appended ahead of nothing is fine, but a two-glyph rule sitting before
+        # a three-glyph one would shadow it.
+        target.ligatures[first].sort(key=lambda L: -len(L.Component))
+        added.append(n)
+    return added
+
+
 def apply_synth_ligatures(source_path: Path, ligatures: list, intervals: str,
                           family_name: str, style_name: str) -> Path:
     """Write a minimal `liga` feature into a face that draws ligatures but has no GSUB.
@@ -547,15 +630,46 @@ def apply_synth_ligatures(source_path: Path, ligatures: list, intervals: str,
             if gsub is not None and gsub.FeatureList is not None:
                 existing = {fr.FeatureTag for fr in gsub.FeatureList.FeatureRecord}
             if existing:
-                # ANY feature, not just liga/rlig: feaLib REPLACES the GSUB
-                # table rather than merging into it, so writing `liga` into a
-                # face that also carries smcp/onum/frac/dlig would delete those
-                # too. Nothing in this pipeline reads them today, which makes it
-                # exactly the silent kind of loss the GPOS bug already was.
-                raise RuntimeError(
-                    f"{family_name}/{style_name}: source already has GSUB features "
-                    f"{sorted(existing)}. This stage REPLACES GSUB, so it would delete them. "
-                    f"Remove synth_ligatures: -- the foundry's own rules win.")
+                # TWO PATHS FROM HERE, and which one runs is decided by whether
+                # the face already has a `liga`/`rlig` LIGATURE lookup to add to.
+                #
+                # feaLib REPLACES the GSUB table rather than merging into it, so
+                # writing `liga` into a face carrying smcp/onum/frac/dlig would
+                # delete those too -- the silent kind of loss the GPOS bug was.
+                # For a face with OTHER features but no ligature lookup there is
+                # nothing safe to do, so it is still refused.
+                #
+                # But a face can DRAW a ligature, cmap it, and simply have no
+                # rule reaching it, while carrying twenty other features that
+                # must survive. Doves Type Text is exactly that: `liga` covers
+                # ff, fl, ffi and ffl and has no f+i rule at all, and the face
+                # also carries calt, ccmp, smcp, ss01-ss08 and swsh. Replacing
+                # its GSUB to add one rule would cost all of them. So when a
+                # ligature lookup exists we MERGE into it -- appending a
+                # LigatureSubst entry with fontTools, touching no other lookup,
+                # no other feature and no other table.
+                if not _ligature_lookups(font):
+                    raise RuntimeError(
+                        f"{family_name}/{style_name}: source has GSUB features "
+                        f"{sorted(existing)} but no liga/rlig ligature lookup to merge into. "
+                        f"This stage would have to REPLACE GSUB and delete them. "
+                        f"Remove synth_ligatures: -- the foundry's own rules win.")
+                merged = _merge_ligature_rules(font, names, family_name, style_name)
+                if "DSIG" in font:
+                    del font["DSIG"]
+                tmp_fd, tmp_name = tempfile.mkstemp(suffix=source_path.suffix, dir=cached.parent)
+                os.close(tmp_fd)
+                tmp_path = Path(tmp_name)
+                try:
+                    font.save(str(tmp_path))
+                except Exception:
+                    tmp_path.unlink(missing_ok=True)
+                    raise
+                font.close()
+                tmp_path.replace(cached)
+                print(f"  Merged liga: {family_name}/{style_name} -> {', '.join(merged)} "
+                      f"(into the face's own lookup; {len(existing)} features preserved)")
+                return _verify_synth_ligatures(cached, names, intervals, family_name, style_name)
 
         # `or {}` because a face with only a Mac (1,0) cmap returns None here,
         # and build_family catches RuntimeError only -- an AttributeError would

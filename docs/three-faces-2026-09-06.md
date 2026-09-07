@@ -1,8 +1,8 @@
-# Dante, Lutetia Nova, Golden Cockerel — build notes and measurements
+# Dante, Lutetia Nova, Golden Cockerel, Doves — build notes and measurements
 
-*2026-09-06, evening. Three commercial faces from the iCloud `dtl` folder,
+*2026-09-06, evening. Four commercial faces from the iCloud `dtl` folder,
 built straight into `installed_families:` on the owner's instruction
-("commit and ship"), taking the tier from nine families to twelve. Every
+("commit and ship"), taking the tier from nine families to thirteen. Every
 number below is measured; the method is the one
 [docs/dtl-trial-fonts-2026-09-06.md](dtl-trial-fonts-2026-09-06.md) arrived at
 over the course of the same day, applied from the start rather than
@@ -199,3 +199,115 @@ compressed.
   cannot swallow the `b` — the hazard `docs/font-dates.md` records.
 - The Golden Cockerel Titling and Initials cuts were deliberately not staged;
   `local_fonts/` holds only the two text faces.
+
+
+---
+
+## 7. Doves Type (`DovesType`) — and the borrowed italic
+
+Added after the other three, on a separate instruction: *"create a Doves font
+and create/borrow an italic from Coelacanth or Junicode depending on what fits
+best with Doves (look at size and stroke width and counterspace)."*
+
+**Source.** *Doves Type Text*, Version 4.810, © Robert Green 2021. `upem` 2048,
+`hhea` 1832/−618/140. 551 glyphs, 335 codepoints, 89 of Latin Ext-A. GSUB with
+**21 features** — `liga`, `dlig`, `calt`, `ccmp`, `smcp`, `c2sc`, `ss01`–`ss08`,
+`swsh`, `locl`, `case`, `frac`, `ordn`, `sups`, `aalt` — and GPOS `kern`, `mark`,
+`mkmk` with **18,852 kern pairs**, the richest in the file. The Headline cut in
+the same kit is a display face and is not staged.
+
+### 7.1 The Doves Press had no italic
+
+Cobden-Sanderson set everything roman; no italic was ever cut, and Green cut
+none. So this family cannot have its own italic — it is the only one in the
+picker that borrows, and the owner's instruction was to pick the better of two.
+
+**The comparison, normalised to x-height**, because an italic borrowed for a
+roman is scaled to that roman's x-height and the comparison has to happen where
+the type will actually sit:
+
+| face | stem / x-ht | vs Doves | counter / x-ht | ink / x-ht |
+|---|---|---|---|---|
+| **Doves Text** (the roman) | 0.182 | 100% | 0.636 | 2.515 |
+| Coelacanth Italic | 0.143 | 79% | 0.486 | 2.179 *(+5 px combined)* |
+| Junicode SemiCondLight Italic | 0.111 | 61% | 0.444 | 2.179 |
+| **Junicode VF @ wght 550 / wdth 125** | **0.179** | **99%** | **0.538** | **2.179** |
+
+**Coelacanth loses on all three**, which is worth stating because it is the
+obvious first thought — both faces descend from Jenson and it is already in the
+tier. Its stroke is 79% of the roman's where a borrowed italic wants to read as
+the same printer's ink; its counters are the tightest of the three against
+Doves' very open ones; and its extenders are the longest in the whole file, so
+at matched x-height it adds 5 px to Doves' own 52 px ink span. That last one is
+not cosmetic: it raises the leading floor and costs the family **five points of
+drift** — a swept best of 10 against this recipe's 2.
+
+**Junicode is variable**, so neither stock weight had to be accepted. Instanced
+at `wght 550 / wdth 125 / ENLA 14` it is 99% of Doves' stroke, has the closest
+counters of the three, and fits inside the roman's own ink so it costs no
+leading at all. `ENLA 14` matches `InknutJunicode`'s instance of the same file —
+the enlarged-x-height axis, which is what makes the per-style scale land near
+1.0.
+
+**Per-style `scale: 0.985` on the italic is the schema's FIRST sanctioned use**
+— a mixed-source family whose roman and italic were never drawn to a shared
+x-height. It is measured, not chosen: it is what puts Junicode's x-height on
+Doves' at every slot.
+
+### 7.2 Slots
+
+`scale: 1.14`, ramp `8/10/12/14/16/18` — the point sizes land on the slot
+numbers.
+
+| slot | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| x-height | 8 | 10 | 12 | 14 | 16 | 18 |
+| advY | 23 | 29 | 34 | 40 | 46 | 52 |
+
+**Drift 2 — second only to Almendra's 1 in the whole file.** Metrics
+`1018/−362`, span 1380 the ink floor; Doves' ascenders are long, so accented
+capitals need 1080 against the declared 1018 and poke 62/1000 em, descenders
+winning as everywhere else.
+
+### 7.3 The missing `fi`, and a new merge path
+
+Doves **draws `fi`, cmaps it at U+FB01, and its own `liga` never reaches it** —
+the feature covers ff, fl, ffi and ffl and omits the commonest ligature in
+English. Four pairs extracted where five were drawn.
+
+`synth_ligatures:` could not fix this as it stood: it builds a GSUB with feaLib,
+which **replaces** the table, and Doves carries twenty other features that would
+have gone with it. The stage now has a second path:
+
+- **No GSUB, or no `liga`/`rlig` lookup** → build one with feaLib, as before,
+  still refusing a face with other features it would destroy.
+- **A ligature lookup already exists** → **merge**: append a `LigatureSubst`
+  entry to the face's own lookup with fontTools, touching no other lookup, no
+  other feature, and no other table.
+
+Verified on a `/tmp` copy: GSUB features 21 → 21, GPOS `kern`/`mark`/`mkmk`
+unchanged, glyph order identical, only `DSIG` removed, kern pairs 18,852 →
+18,852, and ligatures `FB00/FB02/FB03/FB04` → **`FB00/FB01/FB02/FB03/FB04`**.
+
+**An already-present rule is now a skip, not a refusal**, and Doves is exactly
+why: `synth_ligatures:` is a FAMILY key, the italic is Junicode, and Junicode
+has had f+i all along. Refusing the build because one style already does what
+was asked would make the key unusable on the families that most need it. The
+post-condition gate still proves the ligature through the real extractor, so a
+face that only *appears* to have the rule is still caught.
+
+**Not fixed, and deliberately:** Doves draws eight more ligatures — `f_b`,
+`f_h`, `f_j`, `f_k` and the four `ff`-prefixed ones — as unencoded `.liga`
+glyphs. The converter can only carry a ligature whose output has a codepoint,
+so they are dropped with a warning, exactly as Edgar's were before someone
+PUA-encoded that face's set. Doing the same here is a separate job.
+
+### 7.4 Built
+
+Renderer: `line 23/29/34/40/46/52`, `ligs=5` in every style, `kernL=246
+kernR=279` — the richest kern classes in the file by a wide margin.
+
+**Unconfirmed on device:** both bolds are synthetic (0.043 roman, 0.036
+italic), and the borrowed italic's *fit* was judged from a 1× plate at slot 3,
+where it reads as the same printer's ink. Whether it still does at slot 0 on
+glass is the part only the phone can answer.

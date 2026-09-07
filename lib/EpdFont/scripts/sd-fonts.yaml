@@ -193,7 +193,7 @@
 # added 2026-08-03, three text grotesques the same day, two of those three cut
 # 2026-08-04, Lexica Ultralegible itself cut 2026-08-04, Quattrocento Sans
 # promoted 2026-08-04, TeX Gyre Heros added 2026-08-23, Almendra added
-# 2026-08-24; DTL Romulus, Dante, Lutetia Nova and Golden Cockerel added 2026-09-06): these TWELVE, and only these twelve, are INSTALLED on every surface — both device SD cards, the
+# 2026-08-24; DTL Romulus, Dante, Lutetia Nova, Golden Cockerel and Doves added 2026-09-06): these THIRTEEN, and only these thirteen, are INSTALLED on every surface — both device SD cards, the
 # simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
@@ -244,6 +244,7 @@ installed_families:
   - DanteMT
   - LutetiaNova
   - GoldenCockerel
+  - DovesType
 # DTL Romulus joined on 2026-09-06 (owner ruling, promoting it straight out of
 # the iOS trial it was built for the day before it could be evaluated on the
 # phone — the upload was still blocked on a signing problem when the ruling
@@ -783,6 +784,77 @@ families:
       italic:     {scale: 1.02, path: "local_fonts/GoldenCockerel-Italic.ttf"}
       bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
       bolditalic: {from: italic, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
+
+  # Doves Type, Robert Green's recovery of the Doves Press face (2026-09-06,
+  # owner: "create a Doves font and create/borrow an italic from Coelacanth or
+  # Junicode depending on what fits best with Doves"). Commercial webfont
+  # (Doves Type Text, Version 4.810, (c) Robert Green 2021); the file is in
+  # lib/EpdFont/local_fonts/ and never committed. installed_families:.
+  #
+  # THE DOVES PRESS HAD NO ITALIC. Cobden-Sanderson set everything roman, so
+  # there is no historical italic to recover and Green cut none -- this family
+  # HAS to borrow one, which is what the owner asked for and why. The Headline
+  # cut in the same kit is a display face and is not staged.
+  #
+  # THE ITALIC IS JUNICODE, INSTANCED TO MATCH, and the choice was measured on
+  # the three axes the owner named -- size, stroke width, counter space -- with
+  # everything normalised to X-HEIGHT, because an italic borrowed for a roman
+  # is scaled to its x-height and the comparison has to happen there:
+  #
+  #   face                          stem/x-ht   vs Doves   counter/x-ht   ink/x-ht
+  #   Doves Text (the roman)            0.182       100%          0.636      2.515
+  #   Coelacanth Italic                 0.143        79%          0.486      2.179+
+  #   Junicode SemiCondLight It.        0.111        61%          0.444      2.179
+  #   Junicode VF @ wght 550 wdth 125   0.179        99%          0.538      2.179
+  #
+  # Coelacanth is the obvious first thought -- both faces descend from Jenson
+  # and it is already in the tier -- and it loses on all three. Its stroke is
+  # 79% of the roman's where a borrowed italic wants to look like the same
+  # printer's ink, its counters are the tightest of the three against Doves'
+  # very open ones, and its extenders are the longest in the whole file: at
+  # matched x-height it adds 5 px of ink span to Doves' own 52, which pushes
+  # the leading floor up and costs the family FIVE POINTS OF DRIFT (a swept
+  # best of 10 against this recipe's 2). Junicode is variable, so rather than
+  # taking either stock weight the italic is instanced at wght 550 / wdth 125:
+  # 99% of Doves' stroke, the closest counters of the three, and ink that fits
+  # inside the roman's own so it costs no leading at all.
+  #
+  # ENLA 14 matches InknutJunicode's instance of the same font -- the enlarged
+  # x-height axis, which is what makes a 1.0-ish per-style scale possible.
+  - name: DovesType
+    description: "Doves Type, Green's recovery of the Doves Press roman, with a Junicode italic (Latin)"
+    intervals: reading
+    sizes: [8, 10, 12, 14, 16, 18]
+    # Uniform slots: xh 8/10/12/14/16/18 EXACT, advY 23/29/34/40/46/52 --
+    # drift 2, second only to Almendra's 1 in the whole file, and the point
+    # sizes land on the slot numbers. Span 1380 is the ink floor. Doves'
+    # ascenders are long: accented capitals need 1080/1000 against a declared
+    # 1018 and poke 62/1000 em, DESCENDERS WINNING as everywhere else.
+    metrics: {ascent: 1018, descent: -362, linegap: 0}
+    hires_drops:
+      2: [0x2E3B]
+      3: [0x2E3A, 0x2E3B]
+    # The face draws fi and cmaps it at U+FB01 and its own `liga` has no f+i
+    # rule -- it covers ff, fl, ffi and ffl and simply omits the commonest
+    # ligature in English. This MERGES the missing rule into the face's own
+    # lookup rather than replacing its GSUB, which would have cost the other
+    # twenty features (calt, ccmp, smcp, ss01-ss08, swsh...). Asking for `fl`
+    # here is refused, because the face already has it.
+    synth_ligatures: [fi]
+    styles:
+      regular:    {scale: 1.14, path: "local_fonts/DovesType-Text.ttf"}
+      # Per-style scale, the FIRST sanctioned use in this file's schema: a
+      # mixed-source family whose roman and italic were never drawn to a shared
+      # x-height. 0.985 is measured, not chosen -- it is what puts Junicode's
+      # x-height on Doves' at every slot.
+      italic:     {scale: 0.985, zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
+                   member: "Junicode/VAR/JunicodeVF-Italic.ttf",
+                   variable: {wght: 550, wdth: 125, ENLA: 14}}
+      # No bold in either source, so both are synthetic. Doves' stem is
+      # 0.182 of its x-height; 0.6 x the em-relative stem (0.072) is 0.043 for
+      # a 1.6x target. The italic is lighter per em, hence its own number.
+      bold:       {from: regular, synthetic: {embolden_em: 0.043, y_ratio: 0.35}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.036, y_ratio: 0.35}}
 
   - name: DTLRomulus
     description: "DTL Romulus, Blokland after Jan van Krimpen's 1931 Enschede roman (Latin)"
