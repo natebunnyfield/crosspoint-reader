@@ -249,10 +249,41 @@ leading at all. `ENLA 14` matches `InknutJunicode`'s instance of the same file �
 the enlarged-x-height axis, which is what makes the per-style scale land near
 1.0.
 
-**Per-style `scale: 0.985` on the italic is the schema's FIRST sanctioned use**
-— a mixed-source family whose roman and italic were never drawn to a shared
-x-height. It is measured, not chosen: it is what puts Junicode's x-height on
-Doves' at every slot.
+**Per-style scale on the italic is the schema's FIRST sanctioned use** — a
+mixed-source family whose roman and italic were never drawn to a shared
+x-height.
+
+**It shipped wrong the first time, at `0.985`, and the owner caught it by eye**:
+*"x height seems too low, height of uppers is too low"* — of the italic, not the
+roman. He was right. The sweep that produced 0.985 had an arithmetic error in
+its cross-family ratio, and the built italic rendered **8% small**: x-height 12
+against the roman's 14 and cap 19 against 22 at slot 3.
+
+**The lesson, and it is cheap to apply:** a computed cross-family scale must be
+verified by measuring the two BUILT faces against each other, at every slot, not
+by trusting the arithmetic that produced it. The sweep measures candidate
+sources; only the built pair proves the fit. Two lines of freetype.
+
+**The corrected value is `1.130`**, fitted against both things the report
+named, measured from the built sources:
+
+| slot | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| roman x-height | 8 | 10 | 12 | 14 | 16 | 18 |
+| italic x-height | 8 | 10 | 12 | 15 | 17 | 19 |
+| roman cap | 13 | 16 | 19 | 22 | 25 | 29 |
+| italic cap | **13** | **16** | **19** | **22** | **25** | **29** |
+
+Caps land exactly at all six slots; x-height matches at the lower three and runs
+1 px generous at the upper three. **The two cannot both be exact** — Doves'
+capitals are 1.61× its x-height and Junicode's are 1.50×, so matching one
+overshoots the other. Caps were made exact and the x-height allowed to run over,
+because the report was that both read LOW and generous is the direction of the
+complaint. Matching x-height exactly instead is `scale: 1.065`, which leaves the
+caps 2–3 px short.
+
+**Leading was unaffected**: the ink floor is 1380 and the drift 2 at every scale
+from 0.985 to 1.14, so the correction cost nothing elsewhere.
 
 ### 7.2 Slots
 

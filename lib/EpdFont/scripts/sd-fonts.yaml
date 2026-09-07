@@ -845,9 +845,28 @@ families:
       regular:    {scale: 1.14, path: "local_fonts/DovesType-Text.ttf"}
       # Per-style scale, the FIRST sanctioned use in this file's schema: a
       # mixed-source family whose roman and italic were never drawn to a shared
-      # x-height. 0.985 is measured, not chosen -- it is what puts Junicode's
-      # x-height on Doves' at every slot.
-      italic:     {scale: 0.985, zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
+      # x-height.
+      #
+      # 1.130 IS THE SECOND VALUE HERE. The first build shipped 0.985, which
+      # was 8% too small -- an arithmetic error in the sweep that chose it, not
+      # a judgement -- and the owner caught it by eye ("x height seems too low,
+      # height of uppers is too low"): the italic rendered x-height 12 against
+      # the roman's 14 and cap 19 against 22 at slot 3. Never trust a computed
+      # cross-family scale without measuring the two BUILT faces against each
+      # other; that check is now in docs/three-faces-2026-09-06.md and it is
+      # cheap.
+      #
+      # 1.130 is fitted against BOTH of the things he named, from the built
+      # sources: caps land EXACTLY on the roman at all six slots
+      # (13/16/19/22/25/29) and x-heights match at the lower three and run 1 px
+      # generous at the upper three (8/10/12/15/17/19 against 8/10/12/14/16/18).
+      # The two cannot both be exact -- Doves' capitals are 1.61x its x-height
+      # and Junicode's are 1.50x, so matching one overshoots the other. Caps
+      # were made exact and the x-height allowed to run over, because the
+      # report was that both read LOW and generous is the direction of the
+      # complaint. Leading is unaffected: the ink floor is 1380 and the drift 2
+      # at every scale from 0.985 to 1.14, so this cost nothing.
+      italic:     {scale: 1.130, zip: "https://github.com/psb1558/Junicode-font/releases/download/v2.226/Junicode_2.226.zip",
                    member: "Junicode/VAR/JunicodeVF-Italic.ttf",
                    variable: {wght: 550, wdth: 125, ENLA: 14}}
       # No bold in either source, so both are synthetic. Doves' stem is
