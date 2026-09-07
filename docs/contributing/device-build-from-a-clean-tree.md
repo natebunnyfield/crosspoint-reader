@@ -164,3 +164,68 @@ grep -o "bt/host/nimble[^ ]*ble_gap.h" .pio/build/gh_release/src/notes/BleHidHos
 Reference point, `gh_release` at `7fee9a8c` (2026-08-06): builds clean,
 `firmware.bin` 4,492,096 bytes, RAM 16.5 %, Flash 68.3 %,
 `BleHidHost.cpp.o` 510,140 bytes with 46 nimble include paths in its `.d`.
+
+## The free-threaded Python that empties the ESP-IDF venv
+
+**Fixed 2026-09-07 on `soup`.** Symptom, at CMake configure, before a single
+source file is read:
+
+```
+CMake Error at .../framework-espidf/tools/cmake/build.cmake:631 (message):
+  .../penv/.espidf-5.5.2/bin/python: Error while finding module specification
+  for 'idf_component_manager.prepare_components'
+  (ModuleNotFoundError: No module named 'idf_component_manager')
+```
+
+That reads like a corrupt ESP-IDF package. It is not. `~/.platformio/penv/.espidf-5.5.2`
+existed but contained **zero packages**, and the reason is one line up the chain:
+
+```
+× Failed to build `cryptography==44.0.3`
+  ⚠️ Warning: abi3 does not yet support CPython 3.14t
+  error: "The limited API is not currently supported in the free-threaded build"
+```
+
+ESP-IDF's constraints pin `cryptography==44.0.3`, which ships no free-threaded
+wheel, so `uv` builds it from source and pyo3's abi3 layer refuses on `3.14t`.
+
+**Why it propagates.** `espidf.py:2170` creates the IDF venv with
+`uv venv --python $PYTHONEXE`, and `$PYTHONEXE` is PlatformIO's own core penv
+python. asdf's global on this machine was `3.14.4t` — the **free-threaded**
+build — so the core penv was 3.14.4t and every IDF venv inherited it. Recreating
+the IDF venv by hand on a good interpreter does not survive: the platform
+compares `pio-idf-venv.json`'s `python_version` against the core python, finds a
+mismatch, and deletes the venv (`_is_venv_outdated` / `_create_venv`).
+
+**Why it fails silently and stays failed.** `pio-idf-venv.json` was present
+beside the empty venv, so `ensure_python_venv_available()` skipped the install
+entirely on every later run. The install error only reappears if that marker is
+deleted. An empty venv plus a valid-looking marker is the steady state.
+
+**The fix — rebuild the CORE penv on a supported interpreter:**
+
+```bash
+mv ~/.platformio/penv ~/.platformio/penv.bak-py314t     # reversible
+/opt/homebrew/bin/python3.12 -m venv ~/.platformio/penv
+~/.platformio/penv/bin/python -m pip install --upgrade pip setuptools wheel
+~/.platformio/penv/bin/python -m pip install "platformio==6.1.19"
+rm -rf ~/.platformio/penv/.espidf-5.5.2                 # let it rebuild
+pio run -e default
+```
+
+`~/.local/bin/pio` has `#!/Users/…/.platformio/penv/bin/python` as its shebang,
+so it keeps working across the swap; pin the same PlatformIO version you had.
+
+Python **3.12** rather than a non-free-threaded 3.14: `cryptography 44.0.3`
+predates 3.14 and has no 3.14 wheel either, so a plain 3.14 would also build
+from source. ESP-IDF 5.5 supports 3.9-3.13.
+
+**The tell**, so this is not re-diagnosed from the CMake error: the interpreter
+in `~/.platformio/penv/pyvenv.cfg` ends in `t`, and
+`~/.platformio/penv/.espidf-*/bin/python -m pip list` prints nothing. The
+`RuntimeWarning: The global interpreter lock (GIL) has been enabled to load
+module …` lines all over the build output are the same free-threaded
+interpreter announcing itself.
+
+Verified after the fix: `pio run -e default` SUCCESS in 50 s, `firmware.bin`
+5,350,880 bytes.
