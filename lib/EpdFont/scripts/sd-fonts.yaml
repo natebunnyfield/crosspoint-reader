@@ -644,13 +644,23 @@ families:
   # Latin-only: three Greek letters as symbols, no Cyrillic; `reading` prunes
   # to the fallback chain like the other Latin-only families.
   #
-  # SIX WEIGHTS, FOUR SLOTS. Medium is the reader's bold, NOT Bold. Measured
-  # stems at 50 ppem: Regular 60/1000 em, Medium 100 (1.67x), Bold 120 (2.0x).
-  # This repo's synthetic-bold target is ~1.5x stems and its real bolds sit
-  # near there; Dante Bold at 2x is a display black that fights the page in
-  # running text. Medium and MediumItalic are the pair; Bold and BoldItalic
-  # stay staged for anyone who wants to look again -- swap the two `path:`
-  # lines and rebuild.
+  # SIX WEIGHTS, FOUR SLOTS. BOLD AND BOLD ITALIC are the reader's bold pair
+  # (owner ruling 2026-09-06: "redo dante to use bold for bold and bold italic
+  # for bold italic"). Measured stems at 50 ppem: Regular 60/1000 em, Medium
+  # 100 (1.67x), Bold 120 (2.0x).
+  #
+  # The first build of this recipe shipped MEDIUM as the bold, reasoning that
+  # 2.0x reads as a display black in running text next to a tier whose real
+  # bolds measure 1.5x-2.5x. That was a judgement the owner had not asked for
+  # and did not want -- the face ships a Bold, and the Bold is what "bold"
+  # means. Recorded rather than re-argued: if the weight ever wants revisiting,
+  # Medium and MediumItalic are still staged in local_fonts/ and it is two
+  # `path:` lines.
+  #
+  # Metrics did NOT move with the swap, which was checked rather than assumed:
+  # Bold's plain ink is TIGHTER than Medium's (minimum ink-safe span 1080
+  # against 1120, descent need 240 against 280), so 838/-282 still clears every
+  # descender in all four styles and advY stays 23/28/33/40/47/54.
   #
   # scale: 0.94 IS A SLOT FIT, measured 2026-09-06 across k=0.90..1.30 and
   # every 6-size ramp from 6 to 29 pt, optimising x-height and leading TOGETHER
@@ -685,9 +695,9 @@ families:
       3: [0x2E3A, 0x2E3B]
     styles:
       regular:    {scale: 0.94, path: "local_fonts/DanteMT-Regular.ttf"}
-      bold:       {scale: 0.94, path: "local_fonts/DanteMT-Medium.ttf"}
+      bold:       {scale: 0.94, path: "local_fonts/DanteMT-Bold.ttf"}
       italic:     {scale: 0.94, path: "local_fonts/DanteMT-Italic.ttf"}
-      bolditalic: {scale: 0.94, path: "local_fonts/DanteMT-MediumItalic.ttf"}
+      bolditalic: {scale: 0.94, path: "local_fonts/DanteMT-BoldItalic.ttf"}
 
   # Lutetia Nova, Ralph M. Unger's 2014 redrawing of van Krimpen's Lutetia
   # (2026-09-06, owner: "do the same building process for lutetia nova book

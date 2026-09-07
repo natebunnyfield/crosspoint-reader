@@ -37,8 +37,10 @@ pairs per style (ff, fi, fl, and the chained ffi/ffl) straight from the source
 `liga`; no `synth_ligatures:`. The first commercial face of the day to arrive
 complete.
 
-**Which weight is "bold".** Six weights, four slots. Stems measured at 50 ppem
-from the middle row of `l`:
+**Which weight is "bold".** Six weights, four slots. **Bold and Bold Italic**,
+by owner ruling the same evening: *"redo dante to use bold for bold and bold
+italic for bold italic (this was wasteful on your part to choose medium and not
+bold)."* Stems measured at 50 ppem from the middle row of `l`:
 
 | face | stem | ratio to Regular |
 |---|---|---|
@@ -46,11 +48,22 @@ from the middle row of `l`:
 | **Medium** | **100/1000** | **1.67×** |
 | Bold | 120/1000 | 2.00× |
 
-The tier's real bolds measure GT Alpina 1.50×, Edgar 1.75×, Venetian 301 2.50×,
-and the repo's synthetic-bold target is ~1.5× stems. Medium sits in the middle
-of that; Dante Bold at 2× is a display black in running text. **Medium and
-Medium Italic are the reader's bold pair.** Bold and Bold Italic stay staged in
-`local_fonts/` — two `path:` lines and a rebuild to reverse.
+The first build of this recipe shipped **Medium** as the bold, on the reasoning
+that the tier's real bolds measure GT Alpina 1.50×, Edgar 1.75×, Venetian 301
+2.50×, that the synthetic-bold target is ~1.5×, and that 2× reads as a display
+black in running text. **That was a judgement the owner had not asked for**, and
+it was reversed within the hour: the face ships a Bold, and the Bold is what
+"bold" means. The measurement is kept because it is true and may matter if the
+weight is ever revisited — not as a case for re-arguing a settled ruling.
+Medium and Medium Italic stay staged in `local_fonts/`; reversing is two
+`path:` lines.
+
+**The metrics did not move with the swap, which was checked rather than
+assumed.** Bold's plain ink is *tighter* than Medium's — minimum ink-safe span
+1080 against 1120, descent need 240 against 280 — so `838/−282` still clears
+every descender in all four styles and `advY` stays 23/28/33/40/47/54. Kerning
+came out slightly richer (`kernL=116 kernR=121` in the bold, against Medium's
+107/116).
 
 **Sizes.** `scale: 0.94`, ramp `10/12/14/17/20/23`:
 
@@ -164,9 +177,10 @@ compressed.
   glass. If they read heavy or thin, `embolden_em` is one number per style.
 - **Golden Cockerel's accent poke** — 2–4 px at the top slot on accented
   capitals only.
-- **Dante's Medium-as-bold** was judged from the 1× plate at slot 3, where it
-  reads as a true bold beside the Regular; it was not compared against Bold on
-  device.
+- **Dante's Bold** (the shipped pair since the same-evening ruling) was seen
+  only on the 1× plate at slot 3, where it reads as a true bold beside the
+  Regular. Whether 2× stems are too black on the phone's glass is exactly the
+  judgement that belongs on device, not here.
 
 ## 6. Checked and found clean
 
