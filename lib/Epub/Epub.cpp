@@ -167,7 +167,17 @@ bool Epub::parseTocNcxFile() const {
     return false;
   }
 
-  TocNcxParser ncxParser(contentBasePath, ncxSize, bookMetadataCache.get());
+  // Resolve against the NCX's OWN folder, not the OPF's. An NCX `src` is a
+  // relative URI, so it resolves against the document that holds it -- and a
+  // toc.ncx does not have to sit beside content.opf. Against the OPF's folder,
+  // a toc at OEBPS/nav/toc.ncx reaching `../Text/ch1.xhtml` produces
+  // `Text/ch1.xhtml`, one folder short of every spine item, so EVERY entry in
+  // the book fails createTocEntry's exact href match at once, gets spineIndex
+  // -1, and Chapter Select silently cancels the pick. Same reasoning the nav
+  // document already carries below; the two are identical whenever the NCX does
+  // sit beside the OPF, which is why this went unnoticed.
+  const std::string ncxContentBasePath = tocNcxItem.substr(0, tocNcxItem.find_last_of('/') + 1);
+  TocNcxParser ncxParser(ncxContentBasePath, ncxSize, bookMetadataCache.get());
 
   if (!ncxParser.setup()) {
     LOG_ERR("EBP", "Could not setup toc ncx parser");
