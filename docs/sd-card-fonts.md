@@ -544,16 +544,207 @@ Consequences worth knowing before reprovisioning:
 
 ## Installing Fonts
 
-There are two ways to install fonts, and both put the files there from off the
-device.
+There are three ways to install fonts.
 
-An on-device "Manage Fonts" downloader used to be a third. Its screen was
-removed on 2026-08-08 (nothing launched it, so it was unreachable), and the rest
-of it — the `fonts.json` manifest, its generator, and the "stable" release tag
-devices fetched from — on 2026-08-10, on the owner's ruling that fonts cannot be
-installed completely by downloading them on the device. Do not rebuild it
-without solving that first. SD firmware updates remain the on-device update path
-for firmware itself.
+### The 2026-08-10 removal, and what had to change before it came back
+
+An on-device "Manage Fonts" downloader was the original third way. Its screen
+was removed on 2026-08-08 (nothing launched it, so it was unreachable), and the
+rest of it — the `fonts.json` manifest, its generator, and the "stable" release
+tag devices fetched from — on 2026-08-10 (`c3d1268`, owner ruling: *"fonts
+cannot be installed fully from device downloading them. remove it fully from
+repo."*). `release-fonts.yml` still carries the reason in its header: **"it
+could never install a family completely."**
+
+The problem was never the download. It was that the old design treated a
+family's `.cpfont` files as independent, and a family is not one file — it is
+six, one per size slot. `SdCardFontRegistry` offers a family whatever subset of
+those happen to be in its directory, so a family missing its 14 pt cut is not an
+error anywhere: it is a font that silently has no 14 pt.
+
+**Update Fonts (2026-09-07) is the rebuild, and it is allowed to exist because
+the unit is now the FAMILY.** Three things make a partial install unreachable,
+and all three have to hold — `src/network/FontSyncPlan.h` is the pure decision
+layer and carries the argument in full:
+
+1. Any file of a family needing work installs the **whole** family
+   (`fontsync::familyVerdict`). There is no per-file install and no verdict that
+   could express one.
+2. Every byte lands in `<root>/.<Family>.part` first. That directory is
+   invisible to discovery — `SdCardFontRegistry::scanRoot` skips names beginning
+   with `.` (`SdCardFontRegistry.cpp:180`) — so a family being downloaded is
+   **absent** from the picker, never partially present.
+3. It moves into place only once every file has matched the manifest's byte
+   count *and* sha256 (`fontsync::commitVerdict`), by two directory renames with
+   a rollback between them. A crash between the renames leaves the family absent
+   with its previous copy in `<root>/.<Family>.old`, which the next run restores
+   before doing anything else. **Absent is self-healing; partial is not.**
+
+`test/font_sync/FontSyncPlanTest.cpp` is where that guarantee is pinned; four of
+its cases fail against the pre-2026-08-10 per-file design.
+
+The other half of the story is *where the fonts come from*.
+`.github/workflows/release-fonts.yml` publishes to the public
+`crosspoint-fonts` repo from a GitHub runner and can only ever build 7 of the 12
+families in `installed_families:` — Edgar, DanteMT, LutetiaNova, Doves and
+WarblerText are built from commercial outlines in `lib/EpdFont/local_fonts/`,
+which is gitignored and never leaves the owner's Mac. So Update Fonts reads a
+**private** release instead: `claude-tools`' `scripts/publish_fonts.py` runs
+locally, builds all twelve on the machine that holds the outlines, and uploads
+only the resulting bitmaps to the `fonts-latest` tag on
+`natebunnyfield/claude-tools`. The outlines themselves are never uploaded.
+
+That publisher refuses to publish at all unless every family in
+`installed_families:` is present with exactly the sizes its own recipe declares
+— a gate rather than a paragraph, because an incomplete release is the input
+this whole design exists to survive.
+
+SD firmware updates remain the on-device update path for firmware itself.
+
+### Option 0: Update Fonts, on the device
+
+**Settings → Update Fonts.** Needs Wi-Fi and a GitHub token — the **same** token
+Update Library uses (`/github-token.txt` on the card, or `SETTINGS.githubToken`,
+or the host's settings surface on iOS), because both releases live in the same
+private repo.
+
+It lived on the **Home** menu for a few hours on 2026-09-07 and was moved to
+Settings by owner ruling the same day. **Update Library stays on Home.** The
+asymmetry is the ruling, not an oversight: nothing already in daily use moves.
+
+#### The five rulings that shaped it (all 2026-09-07)
+
+**1 · A family installs whole or not at all.** The mechanism is above; the tests
+are `test/font_sync/FontSyncPlanTest.cpp` (the decisions) and
+`test/font_commit/FontCommitTest.cpp` (the real filesystem — staging, the two
+renames, the rollback, and recovery from a commit interrupted between them).
+
+**2 · The commit deletes the outgoing family's hi-res `<N>x` subtrees.** A
+family directory is not only its six base cuts: a host at
+`CROSSPOINT_RENDER_SCALE > 1` reads `<root>/<Family>/<N>x/…`
+(`SdCardFontManager.cpp:32-35`), and `fs_/fonts` carries 2x and 3x today. The
+publisher ships only the base tier — 2x/3x is several times 80 MB, rejected on
+payload size — so the swap takes them with it.
+
+> *the X4 renders at scale 1 and never reads 2x/3x, so deleting costs it nothing
+> and keeps each family internally consistent. Only a RENDER_SCALE=2 host (the
+> iOS build) notices, and falling back to base-tier glyphs is better than
+> reading a hi-res tier that is older than the 1x cuts beside it.*
+
+An implementation that **carried the tiers over** was written the same day, in
+response to the adversarial review that found the deletion, and then withdrawn
+by this ruling. Do not restore it thinking it was an oversight — the deletion is
+otherwise invisible (`scanDirectory` skips subdirectories,
+`SdCardFontRegistry.cpp:120-123`; `removeDir` is recursive,
+`SDCardManager.cpp:380-411`), which is exactly why it is documented here, at the
+code, and pinned by
+`FontCommit.ACommitLeavesTheFamilysManifestCutsAndNoStaleHiResSubtree`.
+**Consequence:** a scaled host must re-seed its hi-res tiers out of band
+(`install-sim-fonts.py`, `ios/seedfonts`) after a run.
+
+**3 · Back stops the run, between families only.** A 12-family sync is minutes,
+not the seconds Update Library takes. The check sits at the top of
+`FontUpdateActivity::loop()`, ahead of the SYNCING branch's early `return` — the
+edge itself is sampled by `main.cpp:1097` before `ActivityManager.cpp:82` calls
+the activity, so what made Back unreachable was only that `return`. A cancel
+cannot leave a family half-installed, because the commit is already atomic; the
+worst case is "stopped after Doves", which the next run resumes. The screen says
+**Stopped after N of M**, never plain success.
+
+**4 · The sync is a mirror: a family the manifest does not list is removed.**
+This reverses the "removal is not this feature" position inherited from Update
+Library. The trade-off was stated when the ruling was made and is accepted: **a
+family sideloaded over File Transfer that is not in `installed_families:` will
+be deleted by a sync.** There is deliberately no exemption for one.
+
+It is the first thing this feature destroys that the owner put there, so it is
+fenced:
+
+- it does nothing unless a `fetchManifest()` returned OK — a failed fetch, a
+  truncated manifest and a zero-family manifest are all *"I do not know what
+  belongs here"*, which must never be read as *"so remove it all"*;
+- it deletes only names `fontsync::isSafeFamilyName` accepts, the same validator
+  the install side uses, resolved as `<root>/<name>`. No separator survives it,
+  so nothing outside a font root is expressible;
+- it skips names beginning with `.` or `_` — this feature's own staging
+  directories, macOS forks, `.Trashes` — which are also exactly what discovery
+  skips (`SdCardFontRegistry.cpp:181`), so the rule is one rule: it can only
+  delete a directory the picker would have offered;
+- **both roots**, since a stale family in the shadowed root is still in the
+  picker;
+- it runs **after** the per-family loop, and **never after a cancel**. Removing
+  first would free card space before the downloads, and would also mean a run
+  that failed had destroyed families and installed nothing.
+
+Every family removed is named in the log and on the summary screen, counted
+apart from added/updated. **Section caches need no clearing on removal** — the
+reader falls back to the built-in face, whose `fontId` differs, so
+`Section.cpp:362` rejects the stale cache on its own. That is unlike a
+*replaced* family, where a rebuild with identical counts can keep the same id.
+
+The live case this ruling settles: `fs_/fonts` holds a directory named
+`DovesType` while the recipe is now `Doves`. One sync installs `Doves` and takes
+`DovesType` with it — pinned by
+`FontCommit.TheRenamedDovesTypeDirectoryIsReplacedByDovesInOneRun`.
+
+**5 · The GitHub credential and the release-JSON parser are shared** with Update
+Library (`src/network/GithubAuth.h`, `GithubReleaseAssets.h`), rather than
+duplicated. One token for one private repo.
+
+#### Standing rulings and rejected alternatives
+
+Written down because each is a question the next session will otherwise ask
+again, and two of them are **negative results** — things that were considered
+and refused for reasons that are not visible from the code.
+
+**Removal runs AFTER the per-family loop, not before. (Ruled 2026-09-07.)**
+Removing first is genuinely tempting: it frees card space before ~80 MB of
+downloads, and on a nearly full card that is the difference between a run that
+works and one that fails on storage. It was refused anyway. A run that removed
+first and then failed — or that the reader stopped — would have destroyed
+families and installed nothing, which is the worst trade this screen can make
+with the owner's data. Removing last costs only disk headroom, on a card that
+was holding both sets a moment earlier. If card space ever forces this, the
+answer is to remove *per family, immediately after that family's own commit
+succeeds*, not to move the whole sweep to the front.
+
+**Scoping removal to families the ledger records as sync-installed: REJECTED.
+(Assessed 2026-09-07, not implemented.)** The idea is to make the mirror delete
+only what Update Fonts itself put there, so a hand-sideloaded family survives.
+`/.crosspoint/font_sync.json` already keys its records `"<Family>/<file>"`, so
+the lookup costs nothing to build. It still does not work:
+
+- **The ledger is not a record of provenance and was never meant to be.** It is
+  discarded freely and by design — a `SYNC_RECORDS_VERSION` bump ignores the
+  whole file, so does anything over `MAX_LEDGER_BYTES` (64 KB), and so does a
+  failed or short write. Every one of those makes a previously-synced family
+  look sideloaded. The mirror would then *silently stop mirroring* and the card
+  would re-accumulate exactly the near-duplicate directories this ruling exists
+  to clear (`DovesType` beside `Doves`). A guard that fails open, invisibly, is
+  worse than no guard.
+- **It can never clean a card provisioned before this feature existed** — which
+  is every card today. The first and most valuable sweep is precisely the one it
+  would refuse to do.
+
+If protection is wanted later, the shape to build is a **Settings toggle**
+("Remove fonts not in the list", default on) — visible, explainable, and it
+fails closed rather than degrading into silence. Do not re-propose the ledger
+heuristic without answering both objections above.
+
+**No exemption for sideloaded families. (Ruled 2026-09-07.)** The trade-off is
+stated under ruling 4 above and was accepted deliberately. Adding a quiet
+exemption narrows the ruling; it is not a refinement of it.
+
+#### Known limitation: which root a new family lands in
+
+An existing family is updated where it already lives
+(`SdCardFontRegistry::findFamilyRoot`), but a **new** one goes to
+`defaultWriteRoot()`, which prefers `/.fonts` whenever that directory exists —
+even on a card whose other families are all in `/fonts`. So a new family can end
+up in a different root from its siblings. This is pre-existing `FontInstaller`
+behavior (`FontInstaller.cpp:60-63`), not something Update Fonts introduced, and
+it is harmless because discovery merges both roots. Left as-is by ruling
+2026-09-07 rather than changed here.
 
 ### Option 1: Upload via web browser
 

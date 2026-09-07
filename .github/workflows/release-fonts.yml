@@ -5,10 +5,19 @@ name: Build & Publish SD Card Fonts
 # the crosspoint-fonts repo so font releases don't clutter the firmware
 # releases page.
 #
-# No fonts.json manifest and no "stable" tag any more: both existed only for
-# the device-side font download, removed 2026-08-10 because it could never
-# install a family completely. Fonts are installed by copying .cpfont files to
-# the SD card, or over WiFi through File Transfer.
+# No fonts.json manifest and no "stable" tag here: both existed only for the
+# 2026-08-10 device-side font download, removed because it could never install a
+# family completely.
+#
+# DEVICE-SIDE DOWNLOAD EXISTS AGAIN SINCE 2026-09-07, and it does NOT read this
+# release. Update Fonts reads a PRIVATE release (`fonts-latest` on
+# natebunnyfield/claude-tools, published by that repo's scripts/publish_fonts.py)
+# because this workflow can only ever build 7 of the 12 families in
+# `installed_families:` -- Edgar, DanteMT, LutetiaNova, Doves and WarblerText are
+# built from commercial outlines in lib/EpdFont/local_fonts/, which is gitignored
+# and never reaches a runner. This workflow stays as the PUBLIC set for anyone
+# who is not the owner; do not add a manifest here expecting the device to read
+# it. See docs/sd-card-fonts.md.
 #
 # Requires a repository secret FONTS_REPO_TOKEN — a fine-grained PAT (or
 # classic PAT) with contents:write permission on the target fonts repo.

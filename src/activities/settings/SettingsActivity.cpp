@@ -14,6 +14,7 @@
 #include "CrossPointSettings.h"
 #include "EditorFontSelectionActivity.h"
 #include "FontSelectionActivity.h"
+#include "FontUpdateActivity.h"
 #include "MappedInputManager.h"
 #include "SystemFont.h"
 #include "activities/boot_sleep/SleepScreenPolicy.h"
@@ -64,6 +65,16 @@ void SettingsActivity::rebuildSettingsLists() {
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
 #endif
+  // Update Fonts. Beside SD Firmware Update because it is the same shape of
+  // row -- go and fetch something, then install it -- and unconditional,
+  // OUTSIDE that guard, because every build can write the SD font roots
+  // including the ones that cannot flash a partition.
+  //
+  // It lived on the Home menu until the owner's 2026-09-07 ruling moved it
+  // here. Update Library stays on Home and is untouched: the asymmetry is the
+  // ruling, not an oversight, and the reason is that nothing already in daily
+  // use moves.
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_UPDATE_FONTS, SettingAction::UpdateFonts));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
   // Informational, so it sits last: who wrote this firmware and what it is
@@ -332,6 +343,15 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
 #endif
+      case SettingAction::UpdateFonts:
+        // startActivityForResult, not replaceActivity: this screen was reached
+        // from Settings, so Back belongs back in Settings. That is the one
+        // behavioural difference from the Home-launched Update Library, which
+        // replaces and returns to Home. Nothing on the parent list changes, so
+        // the result handler has nothing to refresh -- the picker reads the
+        // registry, which finishRun() has already marked dirty.
+        startActivityForResult(std::make_unique<FontUpdateActivity>(renderer, mappedInput), resultHandler);
+        break;
       case SettingAction::TextSettings:
         startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                                [this](const ActivityResult&) {

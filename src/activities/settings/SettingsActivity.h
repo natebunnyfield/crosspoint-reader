@@ -25,6 +25,11 @@ enum class SettingAction {
   // (owner ruling 2026-08-24). Not persisted anywhere -- this enum names
   // device-only ACTIONS, which carry no key -- so it may be reordered freely.
   Typography,
+  // Update Fonts, moved off the Home menu by owner ruling 2026-09-07 --
+  // Update Library stays on Home, deliberately asymmetric: nothing already
+  // in daily use moves. Device-only like every other ACTION here, so it
+  // carries no key and this enum may still be reordered freely.
+  UpdateFonts,
   PairBluetoothKeyboard,
   ForgetBluetoothKeyboard,
   Colophon,

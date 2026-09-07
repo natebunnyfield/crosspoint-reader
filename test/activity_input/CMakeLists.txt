@@ -72,6 +72,8 @@ add_executable(ActivityInputTest
   ListPagingTest.cpp
   LibraryUpdateFirstFrameTest.cpp
   LibraryUpdaterDouble.cpp
+  FontUpdateFirstFrameTest.cpp
+  FontUpdaterDouble.cpp
   HostHarness.cpp
   # activity + input layer under test
   ${REPO_ROOT}/src/MappedInputManager.cpp
@@ -103,6 +105,11 @@ add_executable(ActivityInputTest
   # card are not under test) and stubs/WiFi.h. Its header pulls only
   # LibrarySyncPlan.h, which is pure, so nothing else comes with it.
   ${REPO_ROOT}/src/activities/settings/LibraryUpdateActivity.cpp
+  # Update Fonts (FontUpdateFirstFrameTest.cpp): the REAL screen, over a
+  # FontUpdater double (FontUpdaterDouble.cpp -- the network, the card and the
+  # font registry are not under test) and stubs/WiFi.h. Its header pulls only
+  # FontSyncPlan.h, which is pure, so nothing else comes with it.
+  ${REPO_ROOT}/src/activities/settings/FontUpdateActivity.cpp
   ${REPO_ROOT}/src/notes/KeyboardPanel.cpp
   ${REPO_ROOT}/src/notes/EditorFonts.cpp
   ${REPO_ROOT}/src/ReadingFontList.cpp

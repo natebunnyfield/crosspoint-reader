@@ -17,16 +17,10 @@
 #include <functional>
 
 #include "CrossPointSettings.h"
+#include "GithubAuth.h"
+#include "GithubReleaseAssets.h"
 #include "LibrarySyncPlan.h"
 #include "RecentBooksStore.h"
-#include "util/CardSecret.h"
-#ifdef SIMULATOR
-// The host's own settings surface, where a platform with no way to edit the
-// card's settings.json keeps this token instead. Simulator-only by
-// construction: the header is part of the simulator library and folds to a
-// constant everywhere but a phone. See SimHostSettings.h.
-#include <SimHostSettings.h>
-#endif
 
 namespace {
 
@@ -66,217 +60,10 @@ constexpr int SYNC_RECORDS_VERSION = 1;
 // the publisher starts stamping them.
 constexpr int MAX_MANIFEST_VERSION = 1;
 
-// Where the token lives on the card: one line, hand-placed, the same pattern
-// as /claude-key.txt. Read through util/CardSecret.h so the two files behave
-// identically (trailing newline trimmed, empty means "not configured").
-constexpr const char* GITHUB_TOKEN_PATH = "/github-token.txt";
-
-// The token, from wherever this build's owner can actually set one, in order:
-//
-//   1. the simulator's own settings surface, when it holds anything. A HOST
-//      BUILD MAY HAVE NO WAY TO EDIT A FILE ON THE CARD -- an iPhone does not.
-//   2. /github-token.txt on the card root. Wins over the settings field
-//      because a file the owner placed there is the more deliberate act, and
-//      it does not round-trip through a settings save.
-//   3. SETTINGS.githubToken, hand-edited into /.crosspoint/settings.json --
-//      the original home, kept so existing cards keep working.
-//
-// Nothing here is copied INTO SETTINGS: that field is persisted by the next
-// settings save, and on iOS the directory it saves to is served over the LAN
-// by File Transfer and WebDAV. One fewer copy of a credential, for no loss of
-// function. (The token file is served the same way; see the doc.)
-//
-// NEVER LOG THE RETURN VALUE, here or at any call site.
-std::string githubTokenValue() {
-#ifdef SIMULATOR
-  char hosted[sizeof(SETTINGS.githubToken)] = {};
-  const size_t hostedLength = sim_host_settings::githubToken(hosted, sizeof(hosted));
-  if (hostedLength != 0) {
-    // Length only. A token longer than the field is a paste error, and it will
-    // fail authentication with a 401 that says nothing about why -- so the one
-    // place that can tell says so, without the bytes.
-    if (hostedLength > sizeof(hosted) - 1) {
-      LOG_ERR("LIB", "host GitHub token is %u bytes; the field holds %u -- truncated, and it will not authenticate",
-              static_cast<unsigned>(hostedLength), static_cast<unsigned>(sizeof(hosted) - 1));
-    }
-    return std::string(hosted);
-  }
-#endif
-  std::string fromFile;
-  if (cardsecret::readOneLine("LIB", GITHUB_TOKEN_PATH, fromFile)) return fromFile;
-  return std::string(SETTINGS.githubToken);
-}
-
-std::string bearerHeaderValue() {
-  // Built in one place so no call site ever holds the raw token where a log
-  // line could pick it up. NEVER log the returned value.
-  return std::string("Bearer ") + githubTokenValue();
-}
-
-// Streaming parse of the release-by-tag JSON, collecting EVERY asset's API
-// `url` (not browser_download_url — that does not serve a private repo's
-// assets). Same StreamingJsonParser skeleton as ReleaseJsonParser; kept
-// separate because that parser keys on browser_download_url and keeps only
-// firmware.bin, and this one must keep the whole asset list.
-class LibraryReleaseParser {
- public:
-  struct Asset {
-    std::string name;
-    std::string url;
-    size_t size = 0;
-  };
-
-  LibraryReleaseParser()
-      : parser(JsonCallbacks{this, sOnKey, sOnString, sOnNumber, sOnBool, sOnNull, sOnObjectStart, sOnObjectEnd,
-                             sOnArrayStart, sOnArrayEnd}) {}
-
-  void feed(const char* data, size_t len) { parser.feed(data, len); }
-  bool hasError() const { return parser.hasError(); }
-  const std::vector<Asset>& getAssets() const { return assets; }
-
- private:
-  enum class Position : uint8_t { TOP_LEVEL, IN_ASSETS_ARRAY, IN_ASSET_OBJECT };
-  enum class LastKey : uint8_t { NONE, ASSETS, ASSET_NAME, ASSET_URL, ASSET_SIZE };
-
-  static void sOnKey(void* ctx, const char* key, size_t len) {
-    auto* self = static_cast<LibraryReleaseParser*>(ctx);
-    switch (self->position) {
-      case Position::TOP_LEVEL:
-        if (self->depth == 1 && len == 6 && memcmp(key, "assets", 6) == 0)
-          self->lastKey = LastKey::ASSETS;
-        else
-          self->lastKey = LastKey::NONE;
-        break;
-      case Position::IN_ASSET_OBJECT:
-        if (self->assetDepth == 1) {
-          if (len == 4 && memcmp(key, "name", 4) == 0)
-            self->lastKey = LastKey::ASSET_NAME;
-          else if (len == 3 && memcmp(key, "url", 3) == 0)
-            self->lastKey = LastKey::ASSET_URL;
-          else if (len == 4 && memcmp(key, "size", 4) == 0)
-            self->lastKey = LastKey::ASSET_SIZE;
-          else
-            self->lastKey = LastKey::NONE;
-        }
-        break;
-      default:
-        break;
-    }
-  }
-
-  static void sOnString(void* ctx, const char* value, size_t len) {
-    auto* self = static_cast<LibraryReleaseParser*>(ctx);
-    if (self->position == Position::IN_ASSET_OBJECT && self->assetDepth == 1) {
-      if (self->lastKey == LastKey::ASSET_NAME)
-        self->current.name.assign(value, len);
-      else if (self->lastKey == LastKey::ASSET_URL)
-        self->current.url.assign(value, len);
-    }
-    self->lastKey = LastKey::NONE;
-  }
-
-  static void sOnNumber(void* ctx, const char* value, size_t /*len*/) {
-    auto* self = static_cast<LibraryReleaseParser*>(ctx);
-    if (self->lastKey == LastKey::ASSET_SIZE && self->position == Position::IN_ASSET_OBJECT && self->assetDepth == 1) {
-      self->current.size = static_cast<size_t>(strtoul(value, nullptr, 10));
-    }
-    self->lastKey = LastKey::NONE;
-  }
-
-  static void sOnBool(void* ctx, bool) { static_cast<LibraryReleaseParser*>(ctx)->lastKey = LastKey::NONE; }
-  static void sOnNull(void* ctx) { static_cast<LibraryReleaseParser*>(ctx)->lastKey = LastKey::NONE; }
-
-  static void sOnObjectStart(void* ctx) {
-    auto* self = static_cast<LibraryReleaseParser*>(ctx);
-    switch (self->position) {
-      case Position::TOP_LEVEL:
-        self->depth++;
-        self->lastKey = LastKey::NONE;
-        break;
-      case Position::IN_ASSETS_ARRAY:
-        self->position = Position::IN_ASSET_OBJECT;
-        self->assetDepth = 1;
-        self->current = Asset{};
-        self->lastKey = LastKey::NONE;
-        break;
-      case Position::IN_ASSET_OBJECT:
-        self->assetDepth++;
-        self->lastKey = LastKey::NONE;
-        break;
-    }
-  }
-
-  static void sOnObjectEnd(void* ctx) {
-    auto* self = static_cast<LibraryReleaseParser*>(ctx);
-    switch (self->position) {
-      case Position::TOP_LEVEL:
-        if (self->depth > 0) self->depth--;
-        break;
-      case Position::IN_ASSET_OBJECT:
-        self->assetDepth--;
-        if (self->assetDepth == 0) {
-          // Capped: the release JSON comes from the network (the fixed
-          // api.github.com endpoint today, but a hostile or MITM'd response
-          // could stream assets without end and grow this vector until the
-          // ~380 KB device heap is exhausted -- crafted-input hunt 2026-09-04).
-          // A real release has a handful of assets; kMaxAssets is generous.
-          constexpr size_t kMaxAssets = 512;
-          if (!self->current.name.empty() && !self->current.url.empty() && self->assets.size() < kMaxAssets) {
-            self->assets.push_back(self->current);
-          }
-          self->position = Position::IN_ASSETS_ARRAY;
-        }
-        self->lastKey = LastKey::NONE;
-        break;
-      default:
-        break;
-    }
-  }
-
-  static void sOnArrayStart(void* ctx) {
-    auto* self = static_cast<LibraryReleaseParser*>(ctx);
-    switch (self->position) {
-      case Position::TOP_LEVEL:
-        if (self->lastKey == LastKey::ASSETS && self->depth == 1) {
-          self->position = Position::IN_ASSETS_ARRAY;
-        } else {
-          self->depth++;
-        }
-        self->lastKey = LastKey::NONE;
-        break;
-      case Position::IN_ASSET_OBJECT:
-        self->assetDepth++;
-        self->lastKey = LastKey::NONE;
-        break;
-      default:
-        break;
-    }
-  }
-
-  static void sOnArrayEnd(void* ctx) {
-    auto* self = static_cast<LibraryReleaseParser*>(ctx);
-    switch (self->position) {
-      case Position::TOP_LEVEL:
-        if (self->depth > 0) self->depth--;
-        break;
-      case Position::IN_ASSETS_ARRAY:
-        self->position = Position::TOP_LEVEL;
-        break;
-      case Position::IN_ASSET_OBJECT:
-        self->assetDepth--;
-        self->lastKey = LastKey::NONE;
-        break;
-    }
-  }
-
-  StreamingJsonParser parser;
-  Position position = Position::TOP_LEVEL;
-  LastKey lastKey = LastKey::NONE;
-  uint8_t depth = 0;
-  uint8_t assetDepth = 0;
-  Asset current;
-  std::vector<Asset> assets;
-};
+// The token and the Authorization header come from network/GithubAuth.h, which
+// is shared with FontUpdater: the fonts release is in the SAME private repo, so
+// it is the same credential, read the same three ways, and NEVER logged.
+constexpr const char* LOG_MODULE = "LIB";
 
 void hexDigest(const unsigned char digest[32], char outHex[65]) {
   static const char* hex = "0123456789abcdef";
@@ -290,7 +77,7 @@ void hexDigest(const unsigned char digest[32], char outHex[65]) {
 }  // namespace
 
 LibraryUpdater::LibraryError LibraryUpdater::fetchManifest(StepCallback onStep, void* ctx) {
-  if (githubTokenValue().empty()) {
+  if (githubauth::tokenValue(LOG_MODULE).empty()) {
     // Not an error to retry — the screen tells the owner where the token goes,
     // and on a host build that is the host's settings app rather than a file.
     return NO_TOKEN;
@@ -300,15 +87,15 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest(StepCallback onStep, 
 
   const HttpDownloader::HeaderList apiHeaders = {
       {"Accept", "application/vnd.github+json"},
-      {"Authorization", bearerHeaderValue()},
+      {"Authorization", githubauth::bearerHeaderValue(LOG_MODULE)},
   };
 
-  auto parser = makeUniqueNoThrow<LibraryReleaseParser>();
+  auto parser = makeUniqueNoThrow<GithubReleaseAssetParser>();
   if (!parser) {
     LOG_ERR("LIB", "OOM: release JSON parser");
     return OOM_ERROR;
   }
-  LibraryReleaseParser& releaseParser = *parser;
+  GithubReleaseAssetParser& releaseParser = *parser;
   if (onStep) onStep(ctx, CheckStep::CONTACTING);
   const HttpDownloader::DownloadError fetched = HttpDownloader::fetchUrlWithHeaders(
       libraryReleaseUrl, apiHeaders, [&releaseParser](const uint8_t* data, size_t len) {
@@ -356,7 +143,7 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest(StepCallback onStep, 
   const auto& assets = releaseParser.getAssets();
   LOG_DBG("LIB", "Release lists %u assets", static_cast<unsigned>(assets.size()));
 
-  const LibraryReleaseParser::Asset* manifestAsset = nullptr;
+  const GithubReleaseAssetParser::Asset* manifestAsset = nullptr;
   for (const auto& asset : assets) {
     if (asset.name == manifestAssetName) {
       manifestAsset = &asset;
@@ -373,7 +160,7 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest(StepCallback onStep, 
   // redirect handling follows.
   const HttpDownloader::HeaderList assetHeaders = {
       {"Accept", "application/octet-stream"},
-      {"Authorization", bearerHeaderValue()},
+      {"Authorization", githubauth::bearerHeaderValue(LOG_MODULE)},
   };
 
   if (onStep) onStep(ctx, CheckStep::READING);
@@ -673,7 +460,7 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
 
   const HttpDownloader::HeaderList assetHeaders = {
       {"Accept", "application/octet-stream"},
-      {"Authorization", bearerHeaderValue()},
+      {"Authorization", githubauth::bearerHeaderValue(LOG_MODULE)},
   };
 
   mbedtls_sha256_context sha;
