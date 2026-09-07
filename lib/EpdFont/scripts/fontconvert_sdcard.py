@@ -273,7 +273,25 @@ def extract_ligature_glyph_indices_fonttools(font_path):
 
 
 def _extract_pairpos_subtable(subtable, glyph_to_cp, raw_kern):
-    """Extract kerning from a PairPos subtable (Format 1 or 2)."""
+    """Extract kerning from ONE PairPos subtable (Format 1 or 2).
+
+    Writes into `raw_kern` with `=`, not `+=`: one subtable states one value
+    per pair, and the caller — never this function — decides how the subtables
+    of a lookup combine.  See `_resolve_lookup_subtables` for that rule.
+
+    A Format-1 record whose XAdvance is ZERO is recorded, because zero is a
+    MEANINGFUL value there: it is how a designer writes "this specific pair is
+    an exception, do not kern it" against a class rule that would otherwise
+    fire.  A Format-2 cell of zero is NOT recorded — a class matrix is mostly
+    zeros and a zero cell means "this subtable has nothing to say", which is
+    also how HarfBuzz reads it (PairPosFormat2::apply returns false unless a
+    nonzero value was applied, so the next subtable still gets its turn, while
+    PairPosFormat1 returns true the moment the second glyph is found).
+    Measured against hb-shape on DanteMT-Regular at upem 2048, T unkerned
+    advance 1300:  "Ta" -> 1161 (class -139, no exception),  "Tà" -> 1265
+    (exception -35 WINS over the class -139),  "Tä" -> 1300 (a zero exception,
+    NO kern at all, though the class says -139).
+    """
     if subtable.Format == 1:
         # Individual pairs
         for i, coverage_glyph in enumerate(subtable.Coverage.glyphs):
@@ -286,9 +304,10 @@ def _extract_pairpos_subtable(subtable, glyph_to_cp, raw_kern):
                 xa = 0
                 if hasattr(pvr, 'Value1') and pvr.Value1:
                     xa = getattr(pvr.Value1, 'XAdvance', 0) or 0
-                if xa != 0:
-                    key = (coverage_glyph, pvr.SecondGlyph)
-                    raw_kern[key] = raw_kern.get(key, 0) + xa
+                key = (coverage_glyph, pvr.SecondGlyph)
+                # First record wins if a subtable lists a pair twice (malformed
+                # but harmless): a shaper stops at the first match too.
+                raw_kern.setdefault(key, xa)
     elif subtable.Format == 2:
         # Class-based pairs — iterate by class, not by glyph, to avoid
         # O(glyphs²) explosion for CJK fonts with many requested glyphs.
@@ -323,8 +342,65 @@ def _extract_pairpos_subtable(subtable, glyph_to_cp, raw_kern):
                     continue
                 for lg in left_by_class[c1]:
                     for rg in right_by_class[c2]:
-                        key = (lg, rg)
-                        raw_kern[key] = raw_kern.get(key, 0) + xa
+                        raw_kern.setdefault((lg, rg), xa)
+
+
+def _resolve_lookup_subtables(lookup, glyph_to_cp):
+    """Resolve the PairPos subtables of ONE lookup, first match wins.
+
+    OpenType: the subtables of a lookup are searched IN ORDER and only the
+    first one that matches is applied ("the client searches the subtables in
+    order until it finds a subtable that describes the current glyph
+    context").  HarfBuzz implements exactly that -- OT::Lookup::dispatch stops
+    at the first subtable whose apply() returns true.
+
+    This function used to be absent, and the extractor SUMMED every subtable
+    of a lookup into one dict.  That is the shape a Monotype-style kern lookup
+    is built in -- a small Format-1 subtable of EXCEPTIONS in front of a big
+    Format-2 class matrix -- so summing applied the exception AND the rule it
+    was written to override.  Measured on the 12 installed families
+    (docs/kerning-subtable-precedence-2026-09-07.md): DanteMT 26-29 pairs per
+    style, Doves 742, InknutJunicode italic 1123, WarblerText up to 1458,
+    Edgar up to 88.  Worst observed error was DanteMT "Tà" at -174 design
+    units where the designer wrote -35, i.e. five times too tight.
+
+    Returns {(left_glyph, right_glyph): design_units}, zeros included -- a
+    zero here is a designer's explicit "do not kern this pair" and must
+    survive until the caller has finished overlaying, or the class rule it
+    cancels leaks straight back in.
+    """
+    resolved = {}
+    for st in lookup.SubTable:
+        # Unwrap Extension (lookup type 9) wrappers. After unwrapping,
+        # `lookup.LookupType` is still 9, so we must look at the *effective*
+        # type carried on the extension subtable to know whether `actual` is
+        # a PairPos table.
+        actual = st
+        if lookup.LookupType == 9 and hasattr(st, 'ExtSubTable'):
+            actual = st.ExtSubTable
+        effective_type = getattr(st, 'ExtensionLookupType', lookup.LookupType)
+        if not hasattr(actual, 'Format'):
+            continue
+        # _extract_pairpos_subtable assumes a Type-2 (PairPos) subtable. Other
+        # lookup types reachable through the kern feature (cursive attachment,
+        # mark-to-mark, contextual, etc.) have a different shape and crash
+        # inside the extractor. Skip them with a debug note rather than
+        # aborting the whole build. Modern fonts often ship kern via
+        # Extension-wrapped PairPos, so checking the effective type instead of
+        # the outer type is what makes those lookups actually reach the
+        # extractor.
+        if effective_type != 2:
+            print(f"  Debug: skipping unsupported GPOS kern lookupType="
+                  f"{effective_type} (outer={lookup.LookupType}, Format={actual.Format})",
+                  file=sys.stderr)
+            continue
+        sub_kern = {}
+        _extract_pairpos_subtable(actual, glyph_to_cp, sub_kern)
+        for key, val in sub_kern.items():
+            # setdefault, not assignment: an EARLIER subtable already spoke for
+            # this pair and a shaper would never have reached this one.
+            resolved.setdefault(key, val)
+    return resolved
 
 
 def extract_kerning_fonttools(font_path, codepoints, ppem):
@@ -366,6 +442,14 @@ def extract_kerning_fonttools(font_path, codepoints, ppem):
     # optical_kern.py depends on — it writes its synthesised pairs into a fresh
     # `kern` table and never emits a pair the designer already ruled on in GPOS
     # (optical_kern.py:390-393), so nothing it produces is shadowed here.
+    #
+    # gpos_kern may hold an explicit ZERO for a pair (a Format-1 exception that
+    # cancels a class rule, see _extract_pairpos_subtable). The overlay must
+    # keep that zero and let it erase any legacy value for the same pair: the
+    # designer's OpenType ruling is "do not kern this", and reverting to the
+    # legacy table's value would be exactly the override this file exists to
+    # avoid. `dict.update` does that; the final `if adjust != 0` then drops the
+    # pair from the shipped table, which is what "do not kern" means on device.
     raw_kern = {}   # (left_glyph_name, right_glyph_name) -> design_units
     gpos_kern = {}  # same, GPOS only — overlaid onto raw_kern below
 
@@ -385,33 +469,16 @@ def extract_kerning_fonttools(font_path, codepoints, ppem):
             for fr in gpos.FeatureList.FeatureRecord:
                 if fr.FeatureTag == 'kern':
                     kern_lookup_indices.update(fr.Feature.LookupListIndex)
-        for li in kern_lookup_indices:
+        # Subtables of ONE lookup: first match wins (_resolve_lookup_subtables).
+        # Separate lookups: SUMMED, because a shaper runs every lookup of the
+        # feature in turn and each applies its own adjustment on top of the
+        # last. Verified harmless on all 12 installed families: no pair is
+        # carried by two different kern lookups in any of them (measured
+        # 2026-09-07, cross-lookup overlap 0 everywhere).
+        for li in sorted(kern_lookup_indices):
             lookup = gpos.LookupList.Lookup[li]
-            for st in lookup.SubTable:
-                actual = st
-                # Unwrap Extension (lookup type 9) wrappers. After unwrapping,
-                # `lookup.LookupType` is still 9, so we must look at the
-                # *effective* type carried on the extension subtable to know
-                # whether `actual` is a PairPos table.
-                if lookup.LookupType == 9 and hasattr(st, 'ExtSubTable'):
-                    actual = st.ExtSubTable
-                effective_type = getattr(st, 'ExtensionLookupType', lookup.LookupType)
-                if hasattr(actual, 'Format'):
-                    # _extract_pairpos_subtable assumes a Type-2 (PairPos)
-                    # subtable. Other lookup types reachable through the kern
-                    # feature (cursive attachment, mark-to-mark, contextual,
-                    # etc.) have a different shape and crash inside the
-                    # extractor. Skip them with a debug note rather than
-                    # aborting the whole build. Modern fonts often ship kern
-                    # via Extension-wrapped PairPos, so checking the effective
-                    # type instead of the outer type is what makes those
-                    # lookups actually reach the extractor.
-                    if effective_type == 2:
-                        _extract_pairpos_subtable(actual, glyph_to_cp, gpos_kern)
-                    else:
-                        print(f"  Debug: skipping unsupported GPOS kern lookupType="
-                              f"{effective_type} (outer={lookup.LookupType}, Format={actual.Format})",
-                              file=sys.stderr)
+            for key, val in _resolve_lookup_subtables(lookup, glyph_to_cp).items():
+                gpos_kern[key] = gpos_kern.get(key, 0) + val
 
     font.close()
 
