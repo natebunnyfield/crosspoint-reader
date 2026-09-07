@@ -3,6 +3,7 @@
 #include <Epub/BookNotes.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <Logging.h>
 
 #include <cstdio>
 
@@ -66,6 +67,14 @@ void EpubReaderChapterSelectionActivity::loop() {
     }
     const auto tocItem = epub->getTocItem(selectorIndex - noteRowCount);
     if (tocItem.spineIndex == -1) {
+      // The entry reaches no spine item, so there is nowhere to go and the pick
+      // is dropped -- which on screen is the reader repainting the page it was
+      // already on, i.e. "Chapter Select does nothing". Say so: silence here
+      // cost a whole investigation, because a dropped pick and a pick that
+      // lands wrong look identical from the outside. The href is the useful
+      // half -- it is what failed to match a spine item at index time.
+      LOG_ERR("ECS", "TOC entry '%s' reaches no spine item (href '%s'); pick dropped", tocItem.title.c_str(),
+              tocItem.href.c_str());
       ActivityResult result;
       result.isCancelled = true;
       setResult(std::move(result));
