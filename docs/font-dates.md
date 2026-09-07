@@ -508,3 +508,45 @@ tree. Romulus shipped in builds 178–182 and Golden Cockerel in 180–182; both
 recipes and picker rows stay, per this file's convention for cut families, so a
 reconsideration does not pay for the sweep twice. The installed set is **eleven**.
 
+
+### Doves takes the Coelacanth italic, and WarblerText ships (2026-09-07)
+
+**Doves' borrowed italic is Coelacanth, not Junicode** (owner: *"I think Doves
+would do better with a tuned Coelacanth"* → *"yes to coelacanth"*). Both faces
+descend from Jenson, which Junicode does not.
+
+**The measurements preferred Junicode and are kept because they lost.** At
+matched x-height, Coelacanth's stroke is 79% of the roman against Junicode's
+99%; tuned, its x-height error is 5 against 3, its caps 5 against exact, and its
+leading drift 5 against 2. What it has instead is the shared ancestor and a
+lighter, more calligraphic colour — a judgement about the page, not the table,
+and the owner made it from the rendered pair.
+
+`scale: 1.030` is the knee of a sharp trade. Coelacanth has the longest
+extenders in the file, so scaling it toward the roman's x-height lifts the
+shared ink floor:
+
+| scale | x-ht err | cap err | drift | |
+|---|---|---|---|---|
+| 0.975 | 9 | 3 | 2 | italic reads small |
+| 1.000 | 8 | 2 | 4 | |
+| **1.030** | **5** | **5** | **5** | **taken — last scale before the cliff** |
+| 1.040 | 5 | 5 | 12 | floor crosses a pixel |
+| 1.060 | 2 | 7 | 12 | |
+
+Metrics moved with it, `998/−402` against the Junicode fit's `1018/−362`:
+Coelacanth's descenders are deeper (400/1000 against 360), so descent grew and
+ascent gave way. Accented capitals poke 82/1000 em — descenders win, as
+everywhere else.
+
+**WarblerText is installed.** Its kit reads *"for testing purposes only"* and
+names *"0 apps or e-books"*, but the owner holds a licence bought separately
+(*"warbler was purchased elsewhere"*), so it ships. **The files on disk are
+still the trial download**; if the purchased ones differ they should be restaged
+over them — the recipe references paths, not bytes, and nothing would notice the
+swap. Its origin is **1790 London**, William Martin's types for Bulmer's
+Shakspeare Press, deliberately not chased back to Jenson: a Modern after Martin
+descends from Baskerville's line.
+
+Installed set is **twelve**.
+

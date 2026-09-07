@@ -331,16 +331,16 @@ TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
   // ("Drop DTL Romulus and Golden Cockerel entirely") and are on no surface.
   std::vector<std::string> fams = {"Edgar",     "Coelacanth",     "TeXGyreSchola", "LibreFranklin",
                                    "LibrisADF", "InknutJunicode", "TeXGyreHeros",  "Almendra",
-                                   "DanteMT",   "LutetiaNova",    "DovesType"};
+                                   "DanteMT",   "LutetiaNova",    "DovesType",     "WarblerText"};
   std::stable_sort(fams.begin(), fams.end(), [](const std::string& a, const std::string& b) {
     return readingfonts::sortsBefore(a.c_str(), b.c_str());
   });
 
   // Dante sits SEVENTH, not second: its origin became Griffo's 1501 Venice on
   // 2026-09-07, so it sorts with the Venetians rather than with its own 1954.
-  const std::vector<std::string> want = {"TeXGyreHeros",  "LibrisADF", "LutetiaNova", "TeXGyreSchola",
-                                         "LibreFranklin", "Edgar",     "DanteMT",     "Coelacanth",
-                                         "DovesType",     "InknutJunicode", "Almendra"};
+  const std::vector<std::string> want = {"TeXGyreHeros",  "LibrisADF",   "LutetiaNova", "TeXGyreSchola",
+                                         "LibreFranklin", "WarblerText", "Edgar",       "DanteMT",
+                                         "Coelacanth",    "DovesType",   "InknutJunicode", "Almendra"};
   EXPECT_EQ(fams, want);
 
   // The two Venetians tie on origin and are separated by stage 1 alone.
