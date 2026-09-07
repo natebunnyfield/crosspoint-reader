@@ -45,6 +45,11 @@
 // `earliestYear` duplicates the first year numerically: the picker sorts
 // reverse chronologically by it, newest lineage first.
 //
+// `origin` is the EARLIEST ORIGIN — one "YEAR PLACE" naming the original type
+// the family descends from, which the reader picker draws as the first line of
+// its colophon. Usually it is `lineage`'s first stage repeated; three rows say
+// otherwise, and that is why it is stored rather than parsed. See the field.
+//
 // `constexpr` array of pointers to string literals: lives in flash, costs no DRAM
 // (Resource Protocol 3/6). Names carry UTF-8 (ø, ß) — the UI faces cover Latin-1,
 // verified by rendering the picker.
@@ -55,7 +60,56 @@ struct Entry {
   const char* name;       // typeface name, properly spaced
   const char* designer;   // credited designer
   const char* lineage;    // "YEAR PLACE; YEAR PLACE" stages — from docs/font-dates.md
-  uint16_t earliestYear;  // first year in `lineage`, for reverse-chron picker sort
+  // EARLIEST ORIGIN: one "YEAR PLACE" naming the original type this family
+  // descends from, drawn at the TOP of the reader picker's colophon (owner
+  // ruling 2026-09-06, "the year and place of its earliest origin — the
+  // original type, not the digitisation").
+  //
+  // A FIELD RATHER THAN A DERIVATION, and Coelacanth is the proof. Its lineage
+  // begins "1914 New York" — Bruce Rogers' Centaur — but the type Centaur
+  // revives is Jenson's roman, Venice, c. 1470, so reading stage 1 of `lineage`
+  // would print the revival's date as the origin. Doves Type is the same shape
+  // for the same reason (docs/font-dates.md: "the type was cut after Jenson"),
+  // and so is Venetian 301, which is the same Centaur model. Three of the 38
+  // rows disagree with their own first stage, which is three too many for a
+  // parse.
+  //
+  // EVERY row carries one, including the ~35 where it IS the first stage
+  // repeated. Spelled out rather than defaulted (the way `groupBreakAfter`
+  // below is) because this is the line the reader sees FIRST: a row that omits
+  // it would be a row whose top line nobody wrote. The cost is ~35 short
+  // literals in flash and no DRAM.
+  //
+  // WHAT ACTUALLY ENFORCES THAT, because it is not the warning. Having no
+  // default initialiser does make -Wmissing-field-initializers fire, but the
+  // firmware build never sees it: platformio.ini carries only
+  // `build_src_flags = -Werror=switch` and no -Wall/-Wextra. The real gate is a
+  // TYPE ERROR, and it is a hard one -- a row that skips `origin` puts its
+  // `earliestYear` integer into a `const char*`, which no compiler accepts. The
+  // field order is load-bearing for that: `origin` sits immediately before
+  // `earliestYear` so an omission cannot degrade to a silent nullptr. Backing it
+  // up, test/settings_display_order asserts every row's origin is non-null,
+  // carries a year, and does not post-date its own first lineage stage.
+  //
+  // A comma'd stage contributes only its FIRST year: Source Serif 4's
+  // "2014, 2021 Santa Clara, California" origins as "2014 Santa Clara,
+  // California", because 2021 is a revision of the thing, not the thing.
+  //
+  // NOT the sort key. `earliestYear` still follows `lineage`'s first stage —
+  // see the comment on it below.
+  const char* origin;
+  // First year of `lineage`'s FIRST STAGE, for the picker's reverse-chron sort.
+  //
+  // DELIBERATELY NOT `origin`'s year, decided 2026-09-06 when `origin` was
+  // added. Moving it would silently reorder the picker AND the in-book font
+  // cycle, which walks the same comparator (readingfonts::sortsBefore,
+  // src/ReadingFontList.cpp): Coelacanth, Doves Type and Venetian 301 would
+  // jump from 1914/1900/1914 to c. 1470 and land beside Inknut at the old end
+  // of the list. That is a reordering nobody asked for, and it would make the
+  // order a claim about art history rather than about the faces — nearly every
+  // revival here traces to Jenson or to Caslon if you follow it far enough.
+  // Sorting on origin is one integer per row if it is ever wanted.
+  uint16_t earliestYear;
   // Stages after which a BLANK LINE separates one typeface's attribution from
   // the next's. 0 — the value every row that omits it gets — means no break,
   // which is every family whose stages are all one typeface's story.
@@ -206,7 +260,17 @@ inline constexpr Entry kEntries[] = {
     // placement the 2026-08-24 ruling had deliberately overridden. If the old
     // position is wanted back it is this integer and nothing else; do not
     // reintroduce a fictional stage to get it.
-    {"Almendra", "Almendra", "Blackletter; Ana Sanfelippo", "c. 1450 Mainz; 2011 Buenos Aires", 1450},
+    // ORIGIN = this row's own first stage, because Almendra is an ORIGINAL
+    // design and has no earlier model to promote — the finding the whole block
+    // above records. Note for anyone reconciling the two files:
+    // docs/font-dates.md's Almendra row still reads "1522 Rome; 2011 Buenos
+    // Aires" and its Excluded-dates section still says the row "carries one
+    // stage, 2011 Buenos Aires, and sorts on 2011". Both predate the later
+    // 2026-08-27 ruling quoted above ("use c. 1450 mainz or something more
+    // accurate for blackletter type used in print") that this row implements,
+    // so the doc is BEHIND the header here, not in conflict with it. Flagged
+    // 2026-09-06; the doc row wants the same edit.
+    {"Almendra", "Almendra", "Blackletter; Ana Sanfelippo", "c. 1450 Mainz; 2011 Buenos Aires", "c. 1450 Mainz", 1450},
     // Three revisions in one stage: Carter & Cone recut Dwiggins' Caledonia in
     // Cambridge across 1988, 1994 and 2026, so those years share a place and
     // take commas; the 1938 Linotype original is a separate stage. Dwiggins drew
@@ -214,10 +278,23 @@ inline constexpr Entry kEntries[] = {
     // the face's own name already says Carter & Cone, and the stage spans three
     // hands anyway (1988 David Berlow at Adobe/Linotype, 1994 and 2026 Carter &
     // Cone), so no single individual belongs on the line.
-    {"CaledoniaCC", "Caledonia CC", "W.A. Dwiggins;", "1938 Hingham, Mass.; 1988, 1994, 2026 Cambridge, Mass.", 1938},
+    {"CaledoniaCC", "Caledonia CC", "W.A. Dwiggins;", "1938 Hingham, Mass.; 1988, 1994, 2026 Cambridge, Mass.",
+     "1938 Hingham, Mass.", 1938},
     {"Edgar", "Edgar", "William Caslon & Alexander Phemister; Tobias Frere-Jones & Nina St\xC3\xB6ssinger",
-     "1722 London; 2025 Brooklyn", 1722},
-    {"Coelacanth", "Coelacanth", "Bruce Rogers; Ben Whitmore", "1914 New York; 2014 Waiheke Island, New Zealand", 1914},
+     "1722 London; 2025 Brooklyn", "1722 London", 1722},
+    // ORIGIN c. 1470 Venice, and it is the row that made `origin` a field.
+    // Stage 1 is Rogers' Centaur, 1914 — but Centaur is a revival of Nicolas
+    // Jenson's roman, so the ORIGINAL TYPE is Jenson's and the lineage's first
+    // stage is not the origin. OWNER RULING 2026-09-06, not a citation:
+    // docs/font-dates.md carries no Jenson attribution for Centaur anywhere
+    // (its Basis cell stops at "Centaur 1914"), so do not quote this row as
+    // evidence for anything else. The "c." is doing real work — the doc dates
+    // Jenson's roman 1470 in the Rosarivo row and that row itself flags the
+    // dating as an inference, which is exactly the precision "c." claims.
+    // earliestYear stays 1914; see the field comment for why the sort did not
+    // move with it.
+    {"Coelacanth", "Coelacanth", "Bruce Rogers; Ben Whitmore", "1914 New York; 2014 Waiheke Island, New Zealand",
+     "c. 1470 Venice", 1914},
     // Built 2026-09-06 and CUT the same day (owner: "drop dtlfleischmann, keep
     // romulus"). The row stays, the way Freight Sans' and Lexica Ultralegible's
     // do: the recipe in sd-fonts.yaml is still buildable, and a build with no
@@ -240,8 +317,8 @@ inline constexpr Entry kEntries[] = {
     // this row. Leipzig is firm: the same museum page has Kaiser at Leipzig
     // University through the 1990s and designing for DTL "since 1992".
     // See docs/font-dates.md.
-    {"DTLFleischmann", "DTL Fleischmann", "Johann Michael Fleischmann; Erhard Kaiser",
-     "1743 Amsterdam; 2000 Leipzig", 1743},
+    {"DTLFleischmann", "DTL Fleischmann", "Johann Michael Fleischmann; Erhard Kaiser", "1743 Amsterdam; 2000 Leipzig",
+     "1743 Amsterdam", 1743},
     // Added 2026-09-06 alongside DTL Fleischmann and PROMOTED the same day
     // (owner: "add") -- installed_families:, so every surface. It is the ninth
     // installed family and the first commercial one: the outlines are licensed
@@ -256,8 +333,8 @@ inline constexpr Entry kEntries[] = {
     // issue is deliberately NOT a third stage: it is the same design licensed
     // out, not a redrawing. Note for anyone judging the specimen -- Romulus's
     // sloped form is an OBLIQUE, not a true italic, by van Krimpen's design.
-    {"DTLRomulus", "DTL Romulus", "Jan van Krimpen; Frank E. Blokland",
-     "1931 Haarlem; 2003 's-Hertogenbosch", 1931},
+    {"DTLRomulus", "DTL Romulus", "Jan van Krimpen; Frank E. Blokland", "1931 Haarlem; 2003 's-Hertogenbosch",
+     "1931 Haarlem", 1931},
     // Added 2026-09-06 (owner: "make the best possible version of Dante").
     // Stage 1 is the type as cut: Giovanni Mardersteig drew it and Charles
     // Malin cut the punches for the Officina Bodoni in Verona; Tipoteca and
@@ -271,8 +348,8 @@ inline constexpr Entry kEntries[] = {
     // stage: same design licensed for the machine, not a redrawing. Salfords
     // is Monotype's works near Redhill, Surrey -- the company's address, not
     // a page naming Carpenter's desk; docs/font-dates.md says so.
-    {"DanteMT", "Dante", "Giovanni Mardersteig; Ron Carpenter",
-     "1954 Verona; 1993 Salfords, Surrey", 1954},
+    {"DanteMT", "Dante", "Giovanni Mardersteig; Ron Carpenter", "1954 Verona; 1993 Salfords, Surrey", "1954 Verona",
+     1954},
     // Added 2026-09-06 with Dante. Stage 1 is van Krimpen's Lutetia, cut for
     // Joh. Enschede in Haarlem and first shown at the 1925 Paris exposition
     // (hence the name, Lutetia being Roman Paris). Stage 2 is Ralph M. Unger's
@@ -286,7 +363,7 @@ inline constexpr Entry kEntries[] = {
      // "hammer" above is two pieces.
      "1925 Haarlem; 2014 Schw\xC3\xA4"
      "bisch Gm\xC3\xBCnd",
-     1925},
+     "1925 Haarlem", 1925},
     // Added 2026-09-06 with Dante. Stage 1 is Eric Gill's type for Robert
     // Gibbings's Golden Cockerel Press at Waltham St Lawrence, Berkshire --
     // 1929 per MyFonts and ITC's own launch volume. Stage 2 is ITC's digital
@@ -294,7 +371,7 @@ inline constexpr Entry kEntries[] = {
     // HouseStyle studio was in London. The Titling and the Initials &
     // Ornaments cuts exist in the kit and have no slot in the reader.
     {"GoldenCockerel", "Golden Cockerel", "Eric Gill; Richard Dawson & Dave Farey",
-     "1929 Waltham St Lawrence; 1996 London", 1929},
+     "1929 Waltham St Lawrence; 1996 London", "1929 Waltham St Lawrence", 1929},
     // Added 2026-09-06. Stage 1 is the Doves Press type: Emery Walker and
     // T. J. Cobden-Sanderson had it cut after Jenson for their Hammersmith
     // press, first used 1900. Stage 2 is Robert Green's recovery -- he redrew
@@ -307,25 +384,31 @@ inline constexpr Entry kEntries[] = {
     // and cut no italic, so this family's italic is BORROWED (Junicode,
     // instanced to match) -- the only family in the picker whose italic is not
     // its own, which is why the designer column names Green alone.
-    {"DovesType", "Doves Type", "Emery Walker & T. J. Cobden-Sanderson; Robert Green",
-     "1900 Hammersmith; 2021 London", 1900},
+    // ORIGIN c. 1470 Venice, and this one IS sourced: docs/font-dates.md's
+    // Doves Type row says in its own Creation-place cell that "the type was cut
+    // after Jenson", and the Rosarivo row in the same table dates Jenson's roman
+    // to 1470 Venice. Two statements from the one authority, not an inference
+    // of ours. Same "c." as Coelacanth's, for the same reason.
+    {"DovesType", "Doves Type", "Emery Walker & T. J. Cobden-Sanderson; Robert Green", "1900 Hammersmith; 2021 London",
+     "c. 1470 Venice", 1900},
     {"GoudyBookletter1911", "Goudy Bookletter", "Frederic W. Goudy; Barry Schwartz", "1911 New York; 2009 St. Paul",
-     1911},
+     "1911 New York", 1911},
     // Born digital and revised where it was drawn, so one stage, comma'd years.
     {"SourceSerif4", "Source Serif 4",
      "Frank Grie\xC3\x9F"
      "hammer",
-     "2014, 2021 Santa Clara, California", 2014},
+     "2014, 2021 Santa Clara, California", "2014 Santa Clara, California", 2014},
     // The one family that repeats a name across both stages, and it is correct:
     // there is no historical model here. Moser drew the 2011 Bern one-off, then
     // spent eight years expanding it into Grilli Type's 2020 release ("GT Alpina
     // by Reto Moser" on the foundry's own specimen). The semicolon separates two
     // cities of one designer's work, not an original from a digitiser.
-    {"GTAlpinaCond", "GT Alpina", "Reto Moser; Reto Moser", "2011 Bern; 2020 Lucerne, Switzerland", 2011},
+    {"GTAlpinaCond", "GT Alpina", "Reto Moser; Reto Moser", "2011 Bern; 2020 Lucerne, Switzerland", "2011 Bern", 2011},
     // Stage 1 empty: docs/font-dates.md declines to promote de Spira, calling the
     // 1469 model the table's inference rather than S\xC3\xB8rensen's claim. Same
     // placement the InknutJunicode row below already uses.
-    {"InknutAntiqua62", "Inknut Antiqua", "; Claus Eggers S\xC3\xB8rensen", "1469 Venice; 2014 Amsterdam", 1469},
+    {"InknutAntiqua62", "Inknut Antiqua", "; Claus Eggers S\xC3\xB8rensen", "1469 Venice; 2014 Amsterdam",
+     "1469 Venice", 1469},
     // TWO TYPEFACES, credited roman-first: Inknut Antiqua sets regular and
     // bold, Junicode supplies the real cut italics Inknut's foundry repo has
     // at no weight.
@@ -344,10 +427,10 @@ inline constexpr Entry kEntries[] = {
     // on the card and the string SdCardFontRegistry matches, so moving it would
     // orphan every installed copy. Only the label changed.
     {"InknutJunicode", "Inknut + Junicode", "; Claus Eggers S\xC3\xB8rensen; ; Peter S. Baker",
-     "1469 Venice; 2014 Amsterdam; 1703 Oxford; 1998, 2023 Charlottesville, Virginia", 1469, 2},
+     "1469 Venice; 2014 Amsterdam; 1703 Oxford; 1998, 2023 Charlottesville, Virginia", "1469 Venice", 1469, 2},
     {"LibreCaslonText", "Libre Caslon Text", "William Caslon; Pablo Impallari & Rodrigo Fuenzalida",
-     "1722 London; 2012 Rosario, Argentina", 1722},
-    {"Lora", "Lora", "Olga Karpushina", "2011, 2019 Moscow", 2011},
+     "1722 London; 2012 Rosario, Argentina", "1722 London", 1722},
+    {"Lora", "Lora", "Olga Karpushina", "2011, 2019 Moscow", "2011 Moscow", 2011},
     // Stage 1 empty: docs/font-dates.md adds no original author here and flags the
     // 1757 Baskerville model itself as uncited (owner ruling 2026-08-12, ship as
     // written). Levée joins Gentile on the 2020 stage per the same ruling —
@@ -356,15 +439,15 @@ inline constexpr Entry kEntries[] = {
     {"Newsreader", "Newsreader",
      "; Hugues Gentile & Jean-Baptiste Lev\xC3\xA9"
      "e",
-     "1757 Birmingham; 2020 Paris", 1757},
+     "1757 Birmingham; 2020 Paris", "1757 Birmingham", 1757},
     // Stage 1 empty: Jenson is NOT promoted -- docs/font-dates.md flags the 1470
     // Venice model as uncited (the face is named for Raúl Rosarivo, a Gutenberg
     // scholar, which points at Mainz). Ugerman is the 2011 Buenos Aires designer.
-    {"Rosarivo", "Rosarivo", "; Pablo Ugerman", "1470 Venice; 2011 Buenos Aires", 1470},
+    {"Rosarivo", "Rosarivo", "; Pablo Ugerman", "1470 Venice; 2011 Buenos Aires", "1470 Venice", 1470},
     {"TeXGyreSchola", "TeX Gyre Schola",
      "Morris Fuller Benton; Bogus\xC5\x82"
      "aw Jackowski & Janusz M. Nowacki",
-     "1918 Jersey City; 2007 Gda\xC5\x84sk", 1918},
+     "1918 Jersey City; 2007 Gda\xC5\x84sk", "1918 Jersey City", 1918},
     // Same GUST e-foundry duo as TeX Gyre Schola above. Original: Adam
     // Półtawski's Antykwa Półtawskiego, first cast at Jan Idzkowski's
     // foundry, Warsaw, 1931. Digitized copyright years (2003, 2009) are the
@@ -379,19 +462,20 @@ inline constexpr Entry kEntries[] = {
      "Adam P\xC3\xB3\xC5\x82"
      "tawski; Bogus\xC5\x82"
      "aw Jackowski & Janusz M. Nowacki",
-     "1931 Warsaw; 2003, 2009 Gda\xC5\x84sk", 1931},
+     "1931 Warsaw; 2003, 2009 Gda\xC5\x84sk", "1931 Warsaw", 1931},
     // The directory keeps Arkandis' foundry suffix because it is frozen; the
     // display name drops it, which is what the face calls itself. Model-dated
     // at Warren Chappell's Lydian, the 1938 typeface the font's own name table
     // says it mimics — New York, where Chappell ran his own studio, not ATF's
     // Jersey City plant, since he drew it independently rather than as staff.
     // Digitisation place is bare "France": ADF publishes no city.
-    {"LibrisADF", "Libris", "Warren Chappell; Hirwen Harendal", "1938 New York; 2011 France", 1938},
+    {"LibrisADF", "Libris", "Warren Chappell; Hirwen Harendal", "1938 New York; 2011 France", "1938 New York", 1938},
     // Stage 1 empty: the model is Oxford University Press' Pica Roman, an
     // institution, and the punchcutter is unrecorded (Baker's own design history
     // names nobody; do not "fix" it with Peter de Walpergen, who cut the Fell
     // Pica that Baker explicitly rules out). Baker is the digitiser.
-    {"Junicode", "Junicode SemiCond", "; Peter S. Baker", "1703 Oxford; 1998, 2023 Charlottesville, Virginia", 1703},
+    {"Junicode", "Junicode SemiCond", "; Peter S. Baker", "1703 Oxford; 1998, 2023 Charlottesville, Virginia",
+     "1703 Oxford", 1703},
     // Model-dated like the rest of the table, not born-digital: the lineage
     // starts with the sans serif named in Vincent Figgins' 1832 London specimen
     // ("sans serif" is Figgins' own word; "grotesque" is Thorowgood's, c. 1834 —
@@ -419,7 +503,7 @@ inline constexpr Entry kEntries[] = {
     // designer with a director. 1832 stays empty: no individual is recorded for
     // the Figgins-specimen model.
     {"LexicaUltralegible", "Lexica Ultralegible", "; Elliott Scott & Craig Dobie; Jacob Perez",
-     "1832 London; 2019 New York; 2024 El Paso, Texas", 1832},
+     "1832 London; 2019 New York; 2024 El Paso, Texas", "1832 London", 1832},
     // The text grotesques. Libre Franklin is the installed one; Host Grotesk and
     // Archivo are recipe-only since 2026-08-04 but keep their labels, because a
     // card provisioned before that ruling still shows them in the picker.
@@ -437,13 +521,13 @@ inline constexpr Entry kEntries[] = {
      "t\xC4\xB1"
      "o\xC4\x9F"
      "lu",
-     "2023", 2023},  // year alone: Element Type publishes no location
+     "2023", "2023", 2023},  // year alone: Element Type publishes no location
     {"Archivo", "Archivo",
      "H\xC3\xA9"
      "ctor Gatti",
-     "2012, 2020 Buenos Aires", 2012},
+     "2012, 2020 Buenos Aires", "2012 Buenos Aires", 2012},
     {"LibreFranklin", "Libre Franklin", "Morris Fuller Benton; Pablo Impallari, Rodrigo Fuenzalida & Nhung Nguyen",
-     "1902 Jersey City; 2016 Rosario, Argentina", 1902},
+     "1902 Jersey City; 2016 Rosario, Argentina", "1902 Jersey City", 1902},
     // The neo-grotesque, installed 2026-08-23. Same GUST e-foundry duo, same
     // license and same CTAN shelf as TeX Gyre Schola above, pointed at the
     // other end of the base-35 set.
@@ -481,13 +565,13 @@ inline constexpr Entry kEntries[] = {
     {"TeXGyreHeros", "TeX Gyre Heros",
      "Max Miedinger & Eduard Hoffmann; Bogus\xC5\x82"
      "aw Jackowski & Janusz M. Nowacki",
-     "1957 M\xC3\xBCnchenstein, Switzerland; 2009 Gda\xC5\x84sk", 1957},
+     "1957 M\xC3\xBCnchenstein, Switzerland; 2009 Gda\xC5\x84sk", "1957 M\xC3\xBCnchenstein, Switzerland", 1957},
     // Cut back to a recipe on 2026-08-04 and deleted from every surface; the
     // label stays because a card provisioned before that ruling still carries
     // the family. Born digital, one stage. 2004 is the design year from the
     // font's own copyright and head.created; the June 2005 GarageFonts release
     // is a year of lag and collapses under the table's adjacent-year rule.
-    {"FreightSans", "Freight Sans", "Joshua Darden", "2004 Brooklyn", 2004},
+    {"FreightSans", "Freight Sans", "Joshua Darden", "2004 Brooklyn", "2004 Brooklyn", 2004},
     // Born digital, 2011: the name points at the Italian 1400s but neither the
     // FONTLOG nor the specimen claims a model for the SANS (it is drawn as a
     // companion to Quattrocento, the serif), and this table does not invent
@@ -496,12 +580,18 @@ inline constexpr Entry kEntries[] = {
     // which would read as two dates. Brenda Gallo joined for the 2012 bold and
     // italics and is in docs/font-dates.md, trimmed here to fit the row.
     {"QuattrocentoSans", "Quattrocento Sans", "Pablo Impallari & Igino Marini",
-     "2011 Rosario, Argentina & Osimo, Italy", 2011},
+     "2011 Rosario, Argentina & Osimo, Italy", "2011 Rosario, Argentina & Osimo, Italy", 2011},
     // Rogers is the ORIGINAL author here, not a digitiser — the reverse of most
     // two-stage rows — so he takes stage 1. Stage 2 is empty: the 1990 revival was
     // Bitstream staff work with no individual named in the font or the licence
     // key, and a company does not go in the designer slot.
-    {"Venetian301", "Venetian 301", "Bruce Rogers;", "1914 New York; 1990 Cambridge, Mass.", 1914},
+    // ORIGIN c. 1470 Venice, on Coelacanth's ruling rather than a second one:
+    // docs/font-dates.md's own Excluded-dates section says "the 1914 design is
+    // the model year for both Coelacanth and Venetian 301", so this is the SAME
+    // Centaur, and two rows carrying one model may not disagree about where it
+    // came from. Applied 2026-09-06 with Coelacanth's; flagged there rather than
+    // treated as independently sourced.
+    {"Venetian301", "Venetian 301", "Bruce Rogers;", "1914 New York; 1990 Cambridge, Mass.", "c. 1470 Venice", 1914},
     // --- The editor (writing) group ---------------------------------------
     // Colophons for the Editor Font picker, which presents and sorts its list
     // identically to Reader Font (owner ruling 2026-08-09). The keys are the
@@ -523,7 +613,7 @@ inline constexpr Entry kEntries[] = {
     // for historical models (1470 Venice, 1722 London); a contemporary
     // derivation by a different hand is its own start. docs/font-dates.md
     // carries the citations and records this as a decision.
-    {"SpaceMono", "Space Mono", "Benjamin Critton, Colophon", "2016 London", 2016},
+    {"SpaceMono", "Space Mono", "Benjamin Critton, Colophon", "2016 London", "2016 London", 2016},
     // PEOPLE, never foundries (owner ruling 2026-08-15). "Bold Monday" is a
     // company; it belongs in the manufacturer field of the font, which is
     // exactly where the shipped file puts it. IBMPlexMono-Regular.ttf name ID 9
@@ -533,7 +623,7 @@ inline constexpr Entry kEntries[] = {
     // Abbink, New York/Austin", and boldmonday.com/support/about/ puts van der
     // Laan near The Hague and van Rosmalen near Eindhoven.
     {"IBMPlexMono", "IBM Plex Mono", "Mike Abbink, Paul van der Laan & Pieter van Rosmalen",
-     "2017 New York, Austin, The Hague & Eindhoven", 2017},
+     "2017 New York, Austin, The Hague & Eindhoven", "2017 New York, Austin, The Hague & Eindhoven", 2017},
     // Dates from iA's own announcement, "A Typographic Christmas" (ia.net,
     // 14 Dec 2018): Mono is "the classic Nitti, designed by Bold Monday";
     // "last year we added iA Writer Duo ... based on IBM Plex"; "this year we
@@ -547,9 +637,9 @@ inline constexpr Entry kEntries[] = {
     // splits into the Plex stage and iA's adaptation in Zurich.
     {"iAWriterQuattro", "iA Writer Quattro",
      "Mike Abbink, Paul van der Laan & Pieter van Rosmalen; Oliver Reichenstein",
-     "2017 New York, Austin, The Hague & Eindhoven; 2018 Zurich", 2017},
+     "2017 New York, Austin, The Hague & Eindhoven; 2018 Zurich", "2017 New York, Austin, The Hague & Eindhoven", 2017},
     {"iAWriterDuo", "iA Writer Duo", "Mike Abbink, Paul van der Laan & Pieter van Rosmalen; Oliver Reichenstein",
-     "2017 New York, Austin, The Hague & Eindhoven; 2017 Zurich", 2017},
+     "2017 New York, Austin, The Hague & Eindhoven; 2017 Zurich", "2017 New York, Austin, The Hague & Eindhoven", 2017},
     // This row used to credit Nitti — "Pieter van Rosmalen, Bold Monday;
     // Oliver Reichenstein", 2009 The Hague — and that was wrong about WHICH
     // typeface this is. Nitti is what iA Writer LEFT, not what this face is
@@ -567,7 +657,7 @@ inline constexpr Entry kEntries[] = {
     // being replaced. Nitti's own credit now lives on the NittiTypewriter row
     // below, where it is finally attached to the typeface it describes.
     {"iAWriterMono", "iA Writer Mono", "Mike Abbink, Paul van der Laan & Pieter van Rosmalen; Oliver Reichenstein",
-     "2017 New York, Austin, The Hague & Eindhoven; 2018 Zurich", 2017},
+     "2017 New York, Austin, The Hague & Eindhoven; 2018 Zurich", "2017 New York, Austin, The Hague & Eindhoven", 2017},
     // The one COMMERCIAL editor face. Released 2010 by Fabrizio Schiavi Design,
     // the studio Schiavi set up in Piacenza (en.wikipedia.org/wiki/Fabrizio_Schiavi,
     // en.wikipedia.org/wiki/PragmataPro). One stage: fsd.it still sells it as a
@@ -576,7 +666,7 @@ inline constexpr Entry kEntries[] = {
     // makes the 2009 copyright start release lag rather than a second stage.
     // No row in docs/font-dates.md yet — add one there if that table is
     // regenerated.
-    {"PragmataPro", "PragmataPro", "Fabrizio Schiavi", "2010 Piacenza", 2010},
+    {"PragmataPro", "PragmataPro", "Fabrizio Schiavi", "2010 Piacenza", "2010 Piacenza", 2010},
     // Nitti Typewriter, the face iA Writer used before it moved to IBM Plex
     // ("the classic Nitti", iA, Dec 2018). 2007 is the first year in the shipped
     // font's OWN copyright string (name ID 0, "Copyright © 2007–2016 Bold
@@ -591,7 +681,7 @@ inline constexpr Entry kEntries[] = {
     // those are the foundry's today, not where a 2007 face was drawn, and
     // nothing dates the studio to the design. Bare years, per the rule
     // docs/font-dates.md applies to Host Grotesk.
-    {"NittiTypewriter", "Nitti Typewriter", "Pieter van Rosmalen", "2007", 2007},
+    {"NittiTypewriter", "Nitti Typewriter", "Pieter van Rosmalen", "2007", "2007", 2007},
 };
 
 inline const Entry* find(const char* directory) {
@@ -601,11 +691,87 @@ inline const Entry* find(const char* directory) {
   return it != std::end(kEntries) ? &*it : nullptr;
 }
 
+// THE THREE SORT KEYS, derived from the strings rather than stored beside them.
+//
+// Owner ruling 2026-09-06: *"sort by origin year, secondary sort by next year,
+// tertiary by next year."* So a family orders on its ORIGIN first (the year in
+// `origin`, which for a revival is the original type — Coelacanth's c. 1470,
+// not Rogers' 1914), then on its own first lineage stage, then on its second.
+//
+// WHY THESE ARE PARSED AND NOT THREE MORE INTEGER FIELDS. `earliestYear` is
+// already a numeric duplicate of the first lineage year and its comment says
+// why that was tolerated; adding two more would be three duplications of the
+// same fact per row across 38 rows, and the first time one of them disagreed
+// with its string the list would sort by something no one could see on screen.
+// The strings are the only copy. Scanning them costs a few dozen byte
+// comparisons inside a sort of at most 38 items, on a screen the reader opens
+// by hand — measured against nothing because it is not on any hot path.
+//
+// A year is the first run of four digits, so "c. 1470 Venice" gives 1470 and
+// "1988, 1994, 2026 Cambridge, Mass." gives 1988. A stage is a ';'-separated
+// segment of `lineage`; a missing stage answers 0 and therefore sorts last,
+// which is what an absent second stage should do.
+constexpr uint16_t yearIn(const char* s) {
+  if (s == nullptr) return 0;
+  for (const char* p = s; *p != '\0'; ++p) {
+    if (*p < '0' || *p > '9') continue;
+    uint16_t y = 0;
+    int digits = 0;
+    for (const char* q = p; *q >= '0' && *q <= '9'; ++q) {
+      y = static_cast<uint16_t>(y * 10 + (*q - '0'));
+      ++digits;
+    }
+    if (digits == 4) return y;
+    while (*p >= '0' && *p <= '9') ++p;  // skip a 2- or 3-digit run whole
+    if (*p == '\0') break;
+  }
+  return 0;
+}
+
+// The year of lineage stage `index` (0-based), 0 if there is no such stage.
+constexpr uint16_t stageYear(const char* lineage, int index) {
+  if (lineage == nullptr) return 0;
+  const char* p = lineage;
+  for (int seen = 0; seen < index; ++seen) {
+    while (*p != '\0' && *p != ';') ++p;
+    if (*p == '\0') return 0;
+    ++p;
+  }
+  // yearIn stops at the first 4-digit run, which is inside this segment
+  // because every segment begins with its year.
+  return yearIn(p);
+}
+
 // Earliest (creation) year for a family, for ordering the picker reverse
 // chronologically by lineage. 0 for a family not in the table — sorts last.
 inline uint16_t earliestYear(const char* directory) {
   const Entry* e = find(directory);
   return e != nullptr ? e->earliestYear : 0;
+}
+
+// The family's earliest origin, "YEAR PLACE" — the original type, not the
+// digitisation. Empty for a family not in the table, exactly as subtitle() is:
+// an unlisted or user-installed font gets no credit rather than a wrong one.
+//
+// Returned by value to match displayName()/subtitle(); the underlying literal
+// is in flash and nothing is built per frame beyond the string copy the two
+// neighbours already cost.
+// The origin year alone, for the primary sort key. 0 when the family is not
+// in the table -- sorts last, as earliestYear() does.
+inline uint16_t originYear(const char* directory) {
+  const Entry* e = find(directory);
+  return e != nullptr ? yearIn(e->origin) : 0;
+}
+
+// The year of lineage stage `index` for a family. 0 when absent.
+inline uint16_t lineageStageYear(const char* directory, int index) {
+  const Entry* e = find(directory);
+  return e != nullptr ? stageYear(e->lineage, index) : 0;
+}
+
+inline std::string origin(const std::string& directory) {
+  const Entry* e = find(directory.c_str());
+  return (e != nullptr && e->origin != nullptr) ? std::string(e->origin) : std::string();
 }
 
 // Typeface name only — for the preview pane and the picker row title.

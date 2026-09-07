@@ -37,10 +37,12 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "FontDisplayNames.h"
+#include "ReadingFontList.h"
 #include "activities/settings/SettingDisplayOrder.h"
 #include "notes/EditorFonts.h"
 
@@ -242,6 +244,105 @@ TEST(SettingDisplayOrder, SubsetStillRejectsDuplicatesAndRange) {
   EXPECT_EQ(settingorder::resolve({1, 1}, 12, true).size(), 12u);  // dup -> identity
   EXPECT_EQ(settingorder::resolve({12}, 12, true).size(), 12u);    // range -> identity
   EXPECT_EQ(settingorder::resolve({}, 12, true).size(), 12u);      // empty -> identity
+}
+
+// EARLIEST ORIGIN, added 2026-09-06 with FontDisplayNames::Entry::origin.
+//
+// The reader picker draws `origin` as the FIRST line of every colophon, so a
+// row that gets it wrong is wrong in the most visible place on the screen, and
+// two of the three ways it can go wrong are silent:
+//
+//   * a new family added with no origin draws a blank first line and a stray
+//     blank after it -- nothing errors, the colophon just starts two lines
+//     down;
+//   * an origin later than the face's own first lineage stage is a lineage
+//     running BACKWARDS, which no reader would parse as an error, only as a
+//     confusing date;
+//   * `earliestYear` quietly following `origin` instead of `lineage` would
+//     reorder both this picker and the in-book font cycle
+//     (readingfonts::sortsBefore), which is the consequence the field's own
+//     comment says was deliberately NOT taken.
+//
+// Comments were doing this job and comments are not a gate.
+TEST(SettingDisplayOrder, EveryFamilyCarriesAnEarliestOrigin) {
+  // First run of digits in a "YEAR PLACE" stage. "c. 1450 Mainz" -> 1450.
+  const auto firstYear = [](const char* s) {
+    for (const char* p = s; p != nullptr && *p != '\0'; ++p) {
+      if (*p >= '0' && *p <= '9') return std::atoi(p);
+    }
+    return 0;
+  };
+
+  // The rows whose origin is NOT their own first lineage stage, and every one
+  // of them is the same fact: a 20th-century revival of a 15th-century
+  // Venetian roman. Coelacanth and Venetian 301 are both Bruce Rogers' Centaur
+  // (docs/font-dates.md, Excluded dates: "the 1914 design is the model year for
+  // both"); Doves Type "was cut after Jenson" in the same table's own words.
+  // Listed EXHAUSTIVELY so a fourth divergence has to be added here on purpose
+  // -- an origin that silently disagrees with its lineage is exactly the kind
+  // of attribution this table exists to prevent.
+  const std::vector<std::string> kOriginDiffersFromFirstStage = {"Coelacanth", "DovesType", "Venetian301"};
+
+  std::vector<std::string> diverged;
+  for (const auto& e : FontDisplayNames::kEntries) {
+    ASSERT_NE(e.origin, nullptr) << e.directory << " has no earliest origin";
+    EXPECT_NE(std::string(e.origin), "") << e.directory << " has an empty earliest origin";
+
+    const int originYear = firstYear(e.origin);
+    const int lineageYear = firstYear(e.lineage);
+    EXPECT_GT(originYear, 0) << e.directory << ": origin carries no year -- \"" << e.origin << "\"";
+    EXPECT_LE(originYear, lineageYear) << e.directory << ": an origin cannot post-date the face's own first stage ("
+                                       << e.origin << " vs " << e.lineage << ")";
+
+    // `earliestYear` STILL FOLLOWS `lineage`, and that is now the SECONDARY
+    // sort key rather than the only one. The 2026-09-06 ruling that kept the
+    // order on stage 1 was superseded the same day, after the origin line
+    // shipped and the list visibly disagreed with itself -- Coelacanth showing
+    // "c. 1470 Venice" four rows above Inknut's "1469 Venice". The order is
+    // now origin, then stage 1, then stage 2 (readingfonts::sortsBefore), and
+    // this field is the middle key. It must still mirror the lineage, or the
+    // second key would sort by something no one can see.
+    EXPECT_EQ(static_cast<int>(e.earliestYear), lineageYear)
+        << e.directory << ": earliestYear must track the LINEAGE's first stage, not the origin";
+
+    if (originYear != lineageYear) diverged.push_back(e.directory);
+  }
+  EXPECT_EQ(diverged, kOriginDiffersFromFirstStage);
+}
+
+// THE THREE-KEY ORDER, owner ruling 2026-09-06: "sort by origin year,
+// secondary sort by next year, tertiary by next year."
+//
+// Pinned because the comparator is shared with the IN-BOOK font cycle, so a
+// change here silently changes what the next-family gesture does in a book --
+// a place no picker screenshot would ever show. The Coelacanth/Doves pair is
+// the case that proves the secondary key is wired: both originate c. 1470, and
+// only stage 1 (1914 against 1900) separates them.
+TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
+  std::vector<std::string> fams = {"Edgar",     "Coelacanth",   "TeXGyreSchola", "LibreFranklin",
+                                   "LibrisADF", "InknutJunicode", "TeXGyreHeros", "Almendra",
+                                   "DTLRomulus", "DanteMT",     "LutetiaNova",   "GoldenCockerel",
+                                   "DovesType"};
+  std::stable_sort(fams.begin(), fams.end(), [](const std::string& a, const std::string& b) {
+    return readingfonts::sortsBefore(a.c_str(), b.c_str());
+  });
+
+  const std::vector<std::string> want = {"TeXGyreHeros", "DanteMT",     "LibrisADF",  "DTLRomulus",
+                                         "GoldenCockerel", "LutetiaNova", "TeXGyreSchola",
+                                         "LibreFranklin", "Edgar",      "Coelacanth", "DovesType",
+                                         "InknutJunicode", "Almendra"};
+  EXPECT_EQ(fams, want);
+
+  // The two Venetians tie on origin and are separated by stage 1 alone.
+  EXPECT_TRUE(readingfonts::sortsBefore("Coelacanth", "DovesType"));
+  EXPECT_FALSE(readingfonts::sortsBefore("DovesType", "Coelacanth"));
+
+  // And the ordering the ruling was made to fix: Coelacanth now sits ABOVE
+  // Inknut, because c. 1470 is later than 1469 -- it read backwards before.
+  EXPECT_TRUE(readingfonts::sortsBefore("Coelacanth", "InknutJunicode"));
+
+  // An unlisted face has no date and sorts last, at every level.
+  EXPECT_TRUE(readingfonts::sortsBefore("Almendra", "NoSuchFamily"));
 }
 
 TEST(SettingDisplayOrder, WithdrawnValueStillDecodesToPositionZero) {

@@ -25,22 +25,45 @@
 namespace {
 constexpr const char* ELLIPSIS_UTF8 = "\xe2\x80\xa6";
 
-// Colophon lines the PREVIEW PANE reserves. Five is the worst case in the
-// table, reached two different ways: two lineage stages at a person and a
-// year-place each, plus the blank line that separates the originator from
-// whoever digitised their work; or Inknut + Junicode, which is deep
-// enough that FontDisplayNames::subtitle() collapses it to one bulleted line
-// per stage -- four of them -- plus the blank that separates the two
-// TYPEFACES (FontDisplayNames::Entry::groupBreakAfter). Nothing exceeds this,
-// and nothing has slack: a sixth line is dropped without a word.
-constexpr int kColophonLines = 5;
+// Colophon lines the PREVIEW PANE reserves. SEVEN as of 2026-09-06, and every
+// one of them is spoken for.
+//
+// Five is the worst case FontDisplayNames::subtitle() can produce, reached two
+// different ways: two lineage stages at a person and a year-place each, plus
+// the blank line that separates the originator from whoever digitised their
+// work; or Inknut + Junicode, which is deep enough that subtitle() collapses it
+// to one bulleted line per stage -- four of them -- plus the blank that
+// separates the two TYPEFACES (FontDisplayNames::Entry::groupBreakAfter).
+//
+// The other two are the EARLIEST ORIGIN line this screen now draws above that
+// (owner ruling 2026-09-06) and the blank line under it. The blank is not
+// decoration: without it Coelacanth reads "c. 1470 Venice / Bruce Rogers /
+// 1914 New York", which hands Jenson's date to Rogers -- a misattribution, in
+// the one table that exists to get attribution right. A blank line is the
+// separator this colophon already uses between one hand's work and another's,
+// so it is the same device, not a new one.
+//
+// Nothing exceeds this and nothing has slack: an eighth line is dropped without
+// a word. Adding a lineage stage means raising this AND the sibling constant in
+// EditorFontSelectionActivity.cpp.
+constexpr int kColophonLines = 7;
 
-// Families visible at once. The list rows are the family name alone now, so a
-// row is one line instead of six, and five families fit in less height than
-// three subtitled ones used to take. The credit moved to the pane, which is
-// where the face is actually being judged — the list is only the set you step
-// through.
-constexpr int kVisibleFontRows = 5;
+// Families visible at once. FOUR, owner ruling 2026-09-06 (was five).
+//
+// The list rows are the family name alone, so a row is one line instead of six
+// — the credit moved to the pane, which is where the face is actually being
+// judged, and the list is only the set you step through. Dropping the fifth row
+// buys the pane one listRowHeight (40 px in this theme), which is what pays for
+// the two colophon lines above.
+//
+// THIS IS THE ONE PLACE THE COUNT IS DECIDED, and it has to stay that way. Both
+// other quantities that must agree with it are DERIVED from `listHeight` below
+// rather than from this constant: LyraTheme::drawList computes its own page size
+// as rect.height / getListRowStep(...) (LyraTheme.cpp:192), and loop()'s
+// continuous-paging stride comes out of getNumberOfItemsPerPage() over the same
+// remaining height. Spell a second literal `4` into either and they drift, which
+// is the bug the stride comment down in loop() describes.
+constexpr int kVisibleFontRows = 4;
 
 // Air between the pane's label and the colophon beneath it.
 constexpr int kColophonGap = 6;
@@ -257,13 +280,26 @@ void FontSelectionActivity::loop() {
   }
 
   const int listSize = static_cast<int>(fonts_.size());
-  // hasSubtitle=true: the list rows carry a designer/years subtitle, so the
-  // page stride must use the taller subtitle row height or continuous paging
-  // would jump past entries the screen never showed.
+  // Page stride for a HELD Left/Right. It must equal the number of rows the
+  // screen actually draws or continuous paging jumps past entries the reader
+  // never saw — the failure this comment has existed to prevent since the
+  // subtitle came off these rows.
   //
-  // No cap: the stride is whatever the theme says fits below the preview pane,
-  // which is the same question render()'s list rect answers, so the page stride
-  // and the drawn page still agree.
+  // hasSubtitle=false, and the comment here used to say `true` while the call
+  // already passed false (stale since the subtitle moved to the pane on
+  // 2026-08-14). Corrected 2026-09-06 rather than "fixed": false is right. The
+  // rows carry a title only, so the stride's row height has to be
+  // getListRowStep(false, 1) — the same one onEnter() sized `listHeight` with
+  // and the same one drawList picks, since it passes rowSubtitle != nullptr and
+  // this screen passes nullptr.
+  //
+  // No cap, and it needs none: reserving previewHeight + verticalSpacing leaves
+  // getNumberOfItemsPerPage exactly `listHeight` to divide (usableHeight −
+  // verticalSpacing − previewHeight IS listHeight, by onEnter's own
+  // definition), so this returns listHeight / rowStep — which is
+  // kVisibleFontRows whenever the budget was not the binding clamp, and the
+  // clamped value when it was. The stride follows the drawn count either way,
+  // which is why the count changing from 5 to 4 needed no edit here.
   const int pageItems =
       UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, previewHeight + metrics_.verticalSpacing, 1);
 
@@ -598,6 +634,35 @@ std::vector<std::string> FontSelectionActivity::previewColophonLines(int width) 
   if (text.empty()) return out;
 
   out.reserve(kColophonLines);
+
+  // EARLIEST ORIGIN first — the year and place of the original type, not of the
+  // digitisation (owner ruling 2026-09-06). It is DATA out of the table, not a
+  // UI string, so it takes no tr(): the same footing the lineage and designer
+  // lines below it already stand on, and there is nothing here to translate but
+  // a place name that would be wrong to translate.
+  //
+  // Not word-wrapped, unlike the segments below, and that is MEASURED rather
+  // than assumed. Summing librefranklin_8_regular's own advanceX table over
+  // every origin in FontDisplayNames.h against this pane's 456 px (480 - 2 *
+  // previewPadding): the widest in the whole table is iA Writer Quattro's
+  // "2017 New York, Austin, The Hague & Eindhoven" at 371 px, the widest a
+  // READING family can reach is Quattrocento Sans at 296 px, and the widest of
+  // the 13 installed is TeX Gyre Heros at 253 px. So there is 19% headroom on
+  // the worst case in the table and better than 40% on anything shipping, and
+  // wrapping would spend a line of a seven-line budget on a case that does not
+  // exist. (Not every origin is a year AND a place, either -- Host Grotesk and
+  // Nitti Typewriter are bare years, because no place for them is publishable.)
+  // If one ever does overflow, raise kColophonLines and wrap it here;
+  // truncatedText would be the wrong answer for a line whose whole content is
+  // the fact.
+  //
+  // Blank line under it: see kColophonLines for why it is load-bearing.
+  const std::string origin = FontDisplayNames::origin(fonts_[previewFontIndex_].name);
+  if (!origin.empty()) {
+    out.push_back(origin);
+    out.push_back(std::string());
+  }
+
   size_t segStart = 0;
   while (segStart <= text.size() && static_cast<int>(out.size()) < kColophonLines) {
     const size_t nl = text.find('\n', segStart);
@@ -776,10 +841,16 @@ void FontSelectionActivity::render(RenderLock&&) {
       },
       // NO subtitle. The credit does not belong in the list: it is about the
       // face being judged, not about navigating to it, and one row per family
-      // is what lets the list BE a comparison set — five families on screen
-      // instead of three (owner ruling 2026-08-14). The colophon is now a
-      // permanent part of the preview pane, where it sits next to the specimen
-      // it describes.
+      // is what lets the list BE a comparison set — three subtitled families
+      // became five name-only ones (owner ruling 2026-08-14), and four since
+      // 2026-09-06, the fifth row having been spent on the pane. The colophon
+      // is a permanent part of the preview pane, where it sits next to the
+      // specimen it describes.
+      //
+      // Passing nullptr here is also what makes drawList's own page size agree
+      // with kVisibleFontRows: it derives its row height from
+      // rowSubtitle != nullptr (LyraTheme.cpp:192), the same false onEnter()
+      // sized listHeight with.
       nullptr, nullptr,
       [this](int index) -> std::string {
         // A DEACTIVATED FAMILY STAYS LISTED, and says so here. The picker is

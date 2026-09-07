@@ -38,7 +38,11 @@ class FontSelectionActivity final : public Activity {
   // the sizes they ship, so the stored value snaps per-family — the stored
   // number alone is not an accurate readout.
   uint8_t resolvedPointSize() const;
-  // Typefaces shown per page: kVisibleFontRows (three), fixed.
+  // Typefaces shown per page: kVisibleFontRows, fixed. The NUMBER is not
+  // repeated here on purpose -- this line said "(three)" from 34980524d
+  // (2026-08-05) through the 2026-08-14 move to five and the 2026-09-06 move
+  // to four, which is a comment outliving two rulings. The constant is in
+  // FontSelectionActivity.cpp and is the only place it is written down.
   //
   // The list rect and the navigation stride MUST derive from the same number.
   // drawList() computes its own pageItems from rect.height / rowHeight, so if

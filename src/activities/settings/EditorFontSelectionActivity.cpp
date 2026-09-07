@@ -17,10 +17,25 @@
 #include "notes/MarkdownRender.h"
 
 namespace {
-// Two subtitle lines, the same as the reading picker's kColophonLines, and for
-// the same reason: the rows carry a "Designer · YEAR PLACE" colophon that does
-// not fit on one. Both the page stride and drawList have to be told, or paging
-// skips rows.
+// Colophon lines the PREVIEW PANE reserves -- five, the worst case
+// FontDisplayNames::subtitle() can produce.
+//
+// It has NOTHING to do with paging, and the sentence it replaces said it did
+// ("both the page stride and drawList have to be told, or paging skips rows"),
+// which was left over from when this colophon lived in the list rows. It does
+// not: drawList is passed nullptr for rowSubtitle and 1 for subtitleLines
+// (render(), below), the stride passes hasSubtitle=false (loop(), below), and
+// this constant is read only by previewColophonLines(). Corrected 2026-09-06.
+//
+// NO LONGER "the same as the reading picker's kColophonLines" -- that picker
+// went to SEVEN on 2026-09-06 when it gained an EARLIEST ORIGIN line above the
+// colophon plus the blank under it (FontSelectionActivity.cpp). Five is still
+// the worst case FontDisplayNames::subtitle() alone can produce, which is what
+// this screen draws, so this constant is correct as it stands. It is a
+// DELIBERATE divergence, not drift: the origin line was asked for on the Reader
+// Font picker only. Bringing this screen into line with the 2026-08-09 "presents
+// identically" ruling is the same three lines the reading picker has, plus
+// raising this to 7 -- it wants an owner ruling, not a guess.
 //
 // Owner ruling 2026-08-09: this list presents and sorts identically to Reader
 // Font. The subtitle used to be the availability note alone; it is now the

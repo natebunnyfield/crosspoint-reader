@@ -309,3 +309,168 @@ sourced working notes and do NOT reach the device.
   thing this face descends from*, and 1832 is where Figgins prints the name.
   Owner ruling 2026-08-03; noted so the 16-year gap reads as a decision rather
   than an oversight.
+
+## Earliest origin — the picker's first colophon line
+
+Added 2026-09-06. `FontDisplayNames::Entry::origin` carries one `YEAR PLACE`
+naming **the original type a family descends from — the original, not the
+digitisation** — and `FontSelectionActivity` draws it as the FIRST line of the
+Reader Font preview colophon, above the designer/lineage block, with a blank
+line under it.
+
+Owner's framing, and the case that decided the shape of the field:
+
+> Coelacanth's lineage begins "1914 New York" (Bruce Rogers' Centaur), but its
+> true origin is Jenson's roman, Venice, c. 1470 — and that is what he wants on
+> this line.
+
+### Why a stored field and not stage 1 of `lineage`
+
+Because stage 1 is not always the origin, and the three rows where it is not are
+the interesting ones. A parse would have printed the revival's date as the
+origin for all three. It is stored per row, on every row, including the 35 where
+it repeats the first stage — spelled out rather than defaulted so that a new
+family cannot be added without answering the question (the struct field has no
+default initialiser, so `-Wmissing-field-initializers` catches an omission).
+
+### Where it differs from the face's own first stage
+
+| Directory | Lineage stage 1 | Origin | Sourcing |
+|---|---|---|---|
+| Coelacanth | 1914 New York | c. 1470 Venice | **OWNER RULING 2026-09-06**, not a citation. This table carries no Jenson attribution for Centaur anywhere — the Coelacanth Basis cell stops at "Centaur 1914". Do not quote this row as evidence for anything else |
+| DovesType | 1900 Hammersmith | c. 1470 Venice | **Sourced here**: the Doves Type row's own Creation-place cell says the type "was cut after Jenson", and the Rosarivo row dates Jenson's roman to 1470 Venice |
+| Venetian301 | 1914 New York | c. 1470 Venice | Coelacanth's ruling applied to the same model, not a second ruling. This table's Excluded-dates section says "the 1914 design is the model year for **both** Coelacanth and Venetian 301", so two rows carrying one model may not disagree about where it came from |
+
+The `c.` is doing real work in all three and should not be sharpened. The
+Rosarivo row already flags "1470 Venice" as an inference rather than a cited
+attribution (owner ruling 2026-08-12, ship as written, flagged), which is
+exactly the precision `c.` claims.
+
+**Nothing else was promoted.** Every other row's origin is its own first stage,
+because this table states no earlier model for any of them. That is the finding,
+not a gap: Century Schoolbook, Franklin Gothic, Lydian, Helvetica, Caslon's
+types, Baskerville's types, the Figgins sans, Romulus, Lutetia, Dante and Golden
+Cockerel are each the earliest thing this table names for their family, and
+inventing an ancestor for any of them would be the same uncited inference
+`Almendra: 1350 London` was.
+
+### The origins as shipped
+
+Installed families first (`installed_families:` in
+`lib/EpdFont/scripts/sd-fonts.yaml`), then the rest.
+
+| Directory | Origin | Source |
+|---|---|---|
+| Edgar | 1722 London | own stage 1 (Caslon's types) |
+| Coelacanth | c. 1470 Venice | **owner ruling 2026-09-06** — see above |
+| TeXGyreSchola | 1918 Jersey City | own stage 1 (Century Schoolbook) |
+| LibreFranklin | 1902 Jersey City | own stage 1 (Franklin Gothic) |
+| LibrisADF | 1938 New York | own stage 1 (Lydian) |
+| InknutJunicode | 1469 Venice | own stage 1 |
+| TeXGyreHeros | 1957 Münchenstein, Switzerland | own stage 1 (Helvetica) |
+| Almendra | c. 1450 Mainz | own stage 1 — original design, no model. **See the note below** |
+| DTLRomulus | 1931 Haarlem | own stage 1 |
+| DanteMT | 1954 Verona | own stage 1 |
+| LutetiaNova | 1925 Haarlem | own stage 1 |
+| GoldenCockerel | 1929 Waltham St Lawrence | own stage 1 |
+| DovesType | c. 1470 Venice | **sourced** — "cut after Jenson" + the Rosarivo row's dating |
+| CaledoniaCC | 1938 Hingham, Mass. | own stage 1 |
+| DTLFleischmann | 1743 Amsterdam | own stage 1 |
+| GoudyBookletter1911 | 1911 New York | own stage 1 |
+| SourceSerif4 | 2014 Santa Clara, California | own stage 1, first year of a comma'd stage |
+| GTAlpinaCond | 2011 Bern | own stage 1 |
+| InknutAntiqua62 | 1469 Venice | own stage 1 |
+| LibreCaslonText | 1722 London | own stage 1 |
+| Lora | 2011 Moscow | own stage 1, first year of a comma'd stage |
+| Newsreader | 1757 Birmingham | own stage 1 |
+| Rosarivo | 1470 Venice | own stage 1 |
+| Antpolt | 1931 Warsaw | own stage 1 |
+| Junicode | 1703 Oxford | own stage 1 |
+| LexicaUltralegible | 1832 London | own stage 1 |
+| HostGrotesk | 2023 | own stage 1 — bare year, no place is publishable |
+| Archivo | 2012 Buenos Aires | own stage 1, first year of a comma'd stage |
+| FreightSans | 2004 Brooklyn | own stage 1 |
+| QuattrocentoSans | 2011 Rosario, Argentina & Osimo, Italy | own stage 1, one stage two cities |
+| Venetian301 | c. 1470 Venice | **owner ruling 2026-09-06 by identity with Coelacanth** |
+| SpaceMono | 2016 London | own stage 1 (editor face) |
+| IBMPlexMono | 2017 New York, Austin, The Hague & Eindhoven | own stage 1 (editor face) |
+| iAWriterQuattro | 2017 New York, Austin, The Hague & Eindhoven | own stage 1 (editor face) |
+| iAWriterDuo | 2017 New York, Austin, The Hague & Eindhoven | own stage 1 (editor face) |
+| iAWriterMono | 2017 New York, Austin, The Hague & Eindhoven | own stage 1 (editor face) |
+| PragmataPro | 2010 Piacenza | own stage 1 (editor face) |
+| NittiTypewriter | 2007 | own stage 1 (editor face) — bare year, no place |
+
+A comma'd stage contributes only its FIRST year: Source Serif 4's
+`2014, 2021 Santa Clara, California` origins as `2014 Santa Clara, California`,
+because 2021 is a revision of the thing rather than the thing.
+
+### ⚠ Almendra: this table is BEHIND `FontDisplayNames.h`
+
+The Almendra row above still reads `1522 Rome; 2011 Buenos Aires`, and the
+Excluded-dates section still says the row "carries one stage, `2011 Buenos
+Aires`, and sorts on 2011". Neither is what ships. `FontDisplayNames.h` carries
+`c. 1450 Mainz; 2011 Buenos Aires` with `earliestYear` 1450, implementing a
+LATER owner ruling from the same day (2026-08-27, *"use c. 1450 mainz or
+something more accurate for blackletter type used in print"*) whose reasoning is
+recorded in full in that header's comment. So the header is ahead of this file,
+not in conflict with it. The origin field takes the shipped value. **This row
+and that section want the same edit; flagged 2026-09-06, not made.**
+
+### The sort key did NOT move with it
+
+`earliestYear` still follows `lineage`'s first stage, so Coelacanth still sorts
+at 1914, Doves Type at 1900 and Venetian 301 at 1914. Deliberate, 2026-09-06:
+
+* moving it would reorder the Reader Font picker **and** the in-book font cycle,
+  which walks the same comparator (`readingfonts::sortsBefore`,
+  `src/ReadingFontList.cpp`) — the three faces would jump to the old end of the
+  list beside Inknut, which is a reordering nobody asked for;
+* and it would make the order a claim about art history rather than about the
+  faces: nearly every revival here traces back to Jenson or to Caslon if the
+  line is followed far enough, so "earliest ancestor" is a weaker sort key than
+  "when this design was made".
+
+Sorting on origin instead is one integer per row if it is ever wanted.
+`test/settings_display_order` pins the current ruling
+(`SettingDisplayOrder.EveryFamilyCarriesAnEarliestOrigin`), which also asserts
+that every row has an origin, that no origin post-dates its own first stage, and
+that the set of divergent rows is exactly the three listed above.
+
+### The sort ruling, superseded the same day
+
+The section above was written when `earliestYear` — the LINEAGE's first stage —
+was still the only sort key, and it recorded that as deliberate. **That was
+superseded on 2026-09-06**, hours later, once the origin line actually shipped
+and the list could be looked at: Coelacanth sat four rows ABOVE Inknut while
+showing `c. 1470 Venice` against Inknut's `1469 Venice`. A list that displays
+one year and sorts on another reads as a bug, because it is one.
+
+Owner ruling: *"sort by origin year, secondary sort by next year, tertiary by
+next year."* `readingfonts::sortsBefore` now compares, newest first at each
+level:
+
+1. **origin year** — the line the picker draws at the top of the colophon;
+2. **lineage stage 1** — the family's own first stage (`earliestYear`);
+3. **lineage stage 2** — its second, 0 and therefore last if it has none.
+
+The resulting order, and the only four rows that moved:
+
+| | family | origin | stage 1 | was | now |
+|---|---|---|---|---|---|
+| | Libre Franklin | 1902 | 1902 | 9 | **8** |
+| | Edgar | 1722 | 1722 | 11 | **9** |
+| | Coelacanth | c. 1470 | 1914 | 8 | **10** |
+| | Doves Type | c. 1470 | 1900 | 10 | **11** |
+
+Coelacanth and Doves tie on origin and are separated by stage 1 alone (1914
+against 1900), which is what proves the secondary key is wired rather than
+decorative. `earliestYear` still mirrors the lineage — it is the middle key
+now, not the only one — and the test that pins that is unchanged in substance,
+only in its stated reason.
+
+**The comparator is shared with the in-book font cycle**, so the next-family
+gesture inside a book follows the same order. That is deliberate: two orders
+for one set of fonts is worse than either. `SettingDisplayOrder.
+PickerSortsByOriginThenStages` pins the whole 13-row sequence, because nothing
+about the cycle is visible in a picker screenshot.
+
