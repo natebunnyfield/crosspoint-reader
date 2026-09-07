@@ -488,11 +488,15 @@ it — an acknowledged, indirect debt rather than a model copied. Bringhurst's
 line is that Dante *"has more of Griffo's spirit than any other face now
 commercially available"*.
 
-1501 Venice is Griffo's **italic**, cut for Aldus Manutius and first used as the
-text face of the April 1501 octavo Virgil, the first book printed entirely in
-italic. Griffo's **roman** is earlier — 1495–96, the *De Aetna* type Bembo
-descends from. 1501 is the owner's pick of the two; the roman date is the
-alternative if a roman-led book face ever wants it.
+**The date is 1495, Griffo's roman** — the *De Aetna* type cut for Aldus
+Manutius, the face Bembo descends from. It stood at 1501 for a few hours the
+same day (Griffo's **italic**, for the April 1501 octavo Virgil, the first book
+printed entirely in italic) and the owner moved it to the roman once the two
+were put side by side: Dante is a roman-led book face whose italic is secondary,
+so its ancestor should be the roman Griffo cut.
+
+The picker order is unchanged by the switch — nothing else in the table sits
+between 1495 and 1501, so Dante stays seventh either way.
 
 Consequence, stated because it is visible: **Dante moves from second in the
 picker to seventh**, sorting with the Venetians rather than with its own 1954.

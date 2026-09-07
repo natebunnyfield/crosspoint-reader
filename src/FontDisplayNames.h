@@ -359,13 +359,16 @@ inline constexpr Entry kEntries[] = {
     // Bringhurst: Dante "has more of Griffo's spirit than any other face now
     // commercially available".
     //
-    // 1501 Venice is Griffo's ITALIC, cut for Aldus Manutius and first used as
-    // the text face of the April 1501 octavo Virgil, the first book printed
-    // entirely in italic. Griffo's ROMAN is earlier -- 1495-96, the De Aetna
-    // type Bembo descends from. 1501 is the owner's pick of the two; the roman
-    // date is the alternative if a roman-led book face ever wants it. Do not
-    // quote this row as evidence for a Griffo attribution anywhere else.
-    {"DanteMT", "Dante", "Giovanni Mardersteig; Ron Carpenter", "1954 Verona; 1993 Salfords, Surrey", "1501 Venice",
+    // 1495 VENICE IS GRIFFO'S ROMAN, the De Aetna type cut for Aldus Manutius
+    // and the face Bembo descends from. It was 1501 for a few hours on the same
+    // day -- Griffo's italic, for the April 1501 octavo Virgil, the first book
+    // printed entirely in italic -- and the owner moved it to the roman when
+    // the two were put to him: Dante is a roman-led book face whose italic is
+    // secondary, so its ancestor should be the roman Griffo cut, not the
+    // italic. The picker order is unchanged either way; nothing else in the
+    // table sits between 1495 and 1501. Do not quote this row as evidence for
+    // a Griffo attribution anywhere else.
+    {"DanteMT", "Dante", "Giovanni Mardersteig; Ron Carpenter", "1954 Verona; 1993 Salfords, Surrey", "1495 Venice",
      1954},
     // Added 2026-09-06 with Dante. Stage 1 is van Krimpen's Lutetia, cut for
     // Joh. Enschede in Haarlem and first shown at the 1925 Paris exposition
