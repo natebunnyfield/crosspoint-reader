@@ -258,6 +258,43 @@ inline constexpr Entry kEntries[] = {
     // sloped form is an OBLIQUE, not a true italic, by van Krimpen's design.
     {"DTLRomulus", "DTL Romulus", "Jan van Krimpen; Frank E. Blokland",
      "1931 Haarlem; 2003 's-Hertogenbosch", 1931},
+    // Added 2026-09-06 (owner: "make the best possible version of Dante").
+    // Stage 1 is the type as cut: Giovanni Mardersteig drew it and Charles
+    // Malin cut the punches for the Officina Bodoni in Verona; Tipoteca and
+    // Wikipedia both give 1954, with the first book set in it (Boccaccio's
+    // Trattatello in laude di Dante, hence the name) in 1955. Mardersteig is
+    // the designer credited, Malin the punchcutter -- one stage, one hand on
+    // the drawing, the same convention as Coelacanth's Rogers-without-Malin.
+    // Stage 2 is the digital redrawing: Monotype's Ron Carpenter, "free from
+    // any restrictions imposed by hot metal", issued 1993 in three weights.
+    // The 1957 Monotype hot-metal adaptation is deliberately NOT a third
+    // stage: same design licensed for the machine, not a redrawing. Salfords
+    // is Monotype's works near Redhill, Surrey -- the company's address, not
+    // a page naming Carpenter's desk; docs/font-dates.md says so.
+    {"DanteMT", "Dante", "Giovanni Mardersteig; Ron Carpenter",
+     "1954 Verona; 1993 Salfords, Surrey", 1954},
+    // Added 2026-09-06 with Dante. Stage 1 is van Krimpen's Lutetia, cut for
+    // Joh. Enschede in Haarlem and first shown at the 1925 Paris exposition
+    // (hence the name, Lutetia being Roman Paris). Stage 2 is Ralph M. Unger's
+    // "complete fresh design" of 2014 under his RMU Typedesign label, with
+    // Georg Schiller credited as co-designer by Fonts.com; Unger works in
+    // Schwabisch Gmund (Identifont). Two stages, one redrawing -- the same
+    // shape as Romulus's row.
+    {"LutetiaNova", "Lutetia Nova", "Jan van Krimpen; Ralph M. Unger",
+     // Split literals: "\xA4b" would read as one escape (the greedy-\x
+     // hazard docs/font-dates.md warns about), the same reason "Grie\xC3\x9F"
+     // "hammer" above is two pieces.
+     "1925 Haarlem; 2014 Schw\xC3\xA4"
+     "bisch Gm\xC3\xBCnd",
+     1925},
+    // Added 2026-09-06 with Dante. Stage 1 is Eric Gill's type for Robert
+    // Gibbings's Golden Cockerel Press at Waltham St Lawrence, Berkshire --
+    // 1929 per MyFonts and ITC's own launch volume. Stage 2 is ITC's digital
+    // cut of 1996, credited by MyFonts to Richard Dawson and Dave Farey, whose
+    // HouseStyle studio was in London. The Titling and the Initials &
+    // Ornaments cuts exist in the kit and have no slot in the reader.
+    {"GoldenCockerel", "Golden Cockerel", "Eric Gill; Richard Dawson & Dave Farey",
+     "1929 Waltham St Lawrence; 1996 London", 1929},
     {"GoudyBookletter1911", "Goudy Bookletter", "Frederic W. Goudy; Barry Schwartz", "1911 New York; 2009 St. Paul",
      1911},
     // Born digital and revised where it was drawn, so one stage, comma'd years.

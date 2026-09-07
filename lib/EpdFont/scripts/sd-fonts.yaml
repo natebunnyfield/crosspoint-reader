@@ -193,7 +193,7 @@
 # added 2026-08-03, three text grotesques the same day, two of those three cut
 # 2026-08-04, Lexica Ultralegible itself cut 2026-08-04, Quattrocento Sans
 # promoted 2026-08-04, TeX Gyre Heros added 2026-08-23, Almendra added
-# 2026-08-24; DTL Romulus added 2026-09-06): these NINE, and only these nine, are INSTALLED on every surface — both device SD cards, the
+# 2026-08-24; DTL Romulus, Dante, Lutetia Nova and Golden Cockerel added 2026-09-06): these TWELVE, and only these twelve, are INSTALLED on every surface — both device SD cards, the
 # simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
@@ -241,6 +241,9 @@ installed_families:
   - TeXGyreHeros
   - Almendra
   - DTLRomulus
+  - DanteMT
+  - LutetiaNova
+  - GoldenCockerel
 # DTL Romulus joined on 2026-09-06 (owner ruling, promoting it straight out of
 # the iOS trial it was built for the day before it could be evaluated on the
 # phone — the upload was still blocked on a signing problem when the ruling
@@ -625,6 +628,152 @@ families:
   # for it. It also keeps `scale:` meaning what its schema comment says it
   # means; a 1.20 would be the largest in the file by a wide margin and would
   # read as a styling knob.
+  # Dante, Monotype's digital cut of Mardersteig's type (2026-09-06, owner:
+  # "make the best possible version of Dante from icloud dtl folder. match
+  # other font sizes. check for ligatures etc."). Commercial webfont kit
+  # (Dante MT Std, Version 2.04) -- the six TTFs are in lib/EpdFont/local_fonts/
+  # (gitignored) and never committed. In installed_families: above, on the
+  # Romulus precedent: the owner asked for it shipped, not trialled.
+  #
+  # A PROPER OPENTYPE CUT, and the first commercial one that needs no repair:
+  # native `liga` with ff fi fl ffi ffl all cmapped at U+FB00-FB04, so the
+  # converter carries FIVE ligature pairs per style with no synth_ligatures:;
+  # GPOS kern with ~1,800 pairs per face; hhea 1366/-682/410 sane on all six.
+  # The Regular alone carries smcp (144 small-cap glyphs), which the reader
+  # cannot use -- noted so nobody goes looking for why the italics lack them.
+  # Latin-only: three Greek letters as symbols, no Cyrillic; `reading` prunes
+  # to the fallback chain like the other Latin-only families.
+  #
+  # SIX WEIGHTS, FOUR SLOTS. Medium is the reader's bold, NOT Bold. Measured
+  # stems at 50 ppem: Regular 60/1000 em, Medium 100 (1.67x), Bold 120 (2.0x).
+  # This repo's synthetic-bold target is ~1.5x stems and its real bolds sit
+  # near there; Dante Bold at 2x is a display black that fights the page in
+  # running text. Medium and MediumItalic are the pair; Bold and BoldItalic
+  # stay staged for anyone who wants to look again -- swap the two `path:`
+  # lines and rebuild.
+  #
+  # scale: 0.94 IS A SLOT FIT, measured 2026-09-06 across k=0.90..1.30 and
+  # every 6-size ramp from 6 to 29 pt, optimising x-height and leading TOGETHER
+  # (the Romulus lesson: a ramp that nails x-height and ignores the line ships
+  # the loosest page in the tier). Native, x-height lands 8/10/12/14/16/18 at
+  # no single ramp without the line drifting 6+; at k=0.94 this ramp lands all
+  # six x-heights exactly AND the line within 5 px total of the tier target --
+  # mid-tier, beside Libris ADF (6). Coelacanth's k is 0.944; same family of
+  # correction. The OS/2 sxHeight (403/2048) is nonsense metadata and was
+  # ignored; every number here is rendered.
+  - name: DanteMT
+    description: "Dante, Mardersteig's Aldine roman for the Officina Bodoni, Monotype's digital cut (Latin)"
+    intervals: reading
+    sizes: [10, 12, 14, 17, 20, 23]
+    # Uniform slots: xh 8/10/12/14/16/18 EXACT on all six (regular). advY
+    # 23/28/33/40/47/54, drift 5 from 23/28/34/40/46/51 -- one under at slot
+    # 2, one over at slot 4, three over at the top. Span 1120 is the ink floor
+    # (plain ink + 0.13 em) at the top slot; raising it to clear the accents
+    # fully (857) would cost 1-4 px of leading at every slot for 19/1000 em of
+    # accent, so DESCENDERS WIN as in Venetian 301 and Romulus: descenders
+    # clear at every size in all four styles, accented capitals poke under
+    # 1 px above the declared ascender.
+    metrics: {ascent: 838, descent: -282, linegap: 0}
+    # U+2E3B THREE-EM DASH rasterises 264 px wide at the 2x cut of the top
+    # slots, and U+2E3A TWO-EM DASH joins it at 3x -- over EpdGlyph's uint8
+    # width. Same shape as Coelacanth's pointing hands at 3x: a property of
+    # the SIZE, not the family, so they leave the hi-res tiers only and the 1x
+    # cut keeps both. A page using one renders that glyph 1x-replicated on a
+    # hi-res host; nothing else changes.
+    hires_drops:
+      2: [0x2E3B]
+      3: [0x2E3A, 0x2E3B]
+    styles:
+      regular:    {scale: 0.94, path: "local_fonts/DanteMT-Regular.ttf"}
+      bold:       {scale: 0.94, path: "local_fonts/DanteMT-Medium.ttf"}
+      italic:     {scale: 0.94, path: "local_fonts/DanteMT-Italic.ttf"}
+      bolditalic: {scale: 0.94, path: "local_fonts/DanteMT-MediumItalic.ttf"}
+
+  # Lutetia Nova, Ralph M. Unger's 2014 redrawing of van Krimpen's Lutetia
+  # (2026-09-06, owner: "do the same building process for lutetia nova book
+  # and golden cockeral"). Commercial webfont kit (Lutetia Nova W00 Book,
+  # RMU Typedesign 2014), two faces: Book and Book Italic. Files in
+  # lib/EpdFont/local_fonts/ (gitignored). installed_families:, same terms as
+  # Dante: asked for shipped, not trialled.
+  #
+  # Native `liga` -- ff fi fl cmapped at U+FB00-FB02 in the Book, ff fi fl ffi
+  # ffl in the Italic -- and GPOS kern; no synth_ligatures: needed. smcp in the
+  # Book only. Latin Ext-A is real here (85 codepoints), the widest of the
+  # three 2026-09-06 additions.
+  #
+  # NO BOLD SHIPS, so the bold and bold italic are SYNTHETIC from the two real
+  # faces -- the Caledonia CC / Coelacanth pattern. Measured stems at 50 ppem:
+  # Book 80/1000 em, Book Italic 60/1000. Target 1.6x, the middle of the
+  # tier's real bolds (GT Alpina 1.5x, Edgar 1.75x), so embolden_em = 0.6 x
+  # stem: 0.048 roman, 0.036 italic. y_ratio 0.35 as both precedents use --
+  # full vertical growth eats x-height and closes counters. UNCONFIRMED ON
+  # DEVICE: the strength was derived, not judged; docs/synthetic-font-styles.md
+  # carries the acceptance criteria if it reads wrong.
+  #
+  # scale: 0.88 IS A SLOT FIT, swept jointly for x-height and leading like
+  # Dante's. The largest downward k in the file: Lutetia is big-on-body
+  # (van Krimpen drew it for 12 pt lead), and at k=1 the ramp reaching
+  # x-height 8..18 runs 7-17 pt with the line drifting 8+. At 0.88 this ramp
+  # lands x-height 8/10/12/14/16/18 EXACT and the line within 6 of target.
+  - name: LutetiaNova
+    description: "Lutetia Nova, Unger's redrawing of van Krimpen's 1925 Lutetia (Latin)"
+    intervals: reading
+    sizes: [8, 10, 13, 15, 18, 20]
+    # Uniform slots: xh 8/10/12/14/16/18 exact (Book). advY 21/26/33/39/46/51,
+    # drift 6 -- tight at the small slots, exact at the two largest. Span 1234
+    # is the ink floor at the top slot; accents clear (declared 880 against a
+    # need of 864) and descenders clear in both real faces.
+    metrics: {ascent: 880, descent: -354, linegap: 0}
+    hires_drops:
+      2: [0x2E3B]
+      3: [0x2E3A, 0x2E3B]
+    styles:
+      regular:    {scale: 0.88, path: "local_fonts/LutetiaNova-Book.ttf"}
+      italic:     {scale: 0.88, path: "local_fonts/LutetiaNova-BookItalic.ttf"}
+      bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.036, y_ratio: 0.35}}
+
+  # Golden Cockerel, ITC's 1996 digital cut of Eric Gill's 1929 type for the
+  # Golden Cockerel Press (same 2026-09-06 ruling as Lutetia Nova). Commercial;
+  # four TTFs came in the kit and TWO are text faces -- Roman and Italic. The
+  # Titling and the Initials & Ornaments are display cuts with no slot in the
+  # reader and are NOT staged. installed_families:, same terms as Dante.
+  #
+  # NO GSUB AT ALL, like DTL Romulus: fi and fl are drawn and cmapped at
+  # U+FB01/FB02 and nothing reaches them, so synth_ligatures: supplies the
+  # rule. Nothing else is drawn (247 glyphs, Mac charset) -- no ff, ffi, ffl.
+  # GPOS kern present.
+  #
+  # NO BOLD SHIPS (ITC never cut one; Gill's press had no use for one), so
+  # bold and bold italic are synthetic. Stems 80/1000 em in both real faces,
+  # so embolden_em 0.048 on both, y_ratio 0.35. UNCONFIRMED ON DEVICE, as
+  # Lutetia's.
+  #
+  # scale: 1.02 -- barely a scale at all; the face is drawn close to the
+  # tier's proportions and this ramp lands x-height 8/10/12/14/16/18 exact
+  # with the line within 3 of target, the best fit of the three added today.
+  - name: GoldenCockerel
+    description: "Golden Cockerel, Gill's 1929 press type in ITC's 1996 cut (Latin)"
+    intervals: reading
+    sizes: [9, 11, 14, 16, 18, 20]
+    # Uniform slots: xh 8/10/12/14/16/18 exact (Roman). advY 23/28/36/41/46/51,
+    # drift 3. Span 1234 is the ink floor at the top slot. Gill's accented
+    # capitals sit HIGH: they need 960/1000 against a declared 885, so they
+    # poke up to 75/1000 em (2-4 px at the top slot) above the declared
+    # ascender. Covering them would cost 3-5 px of leading at every slot, so
+    # DESCENDERS WIN, as in Venetian 301 and Romulus; the poke is only into the
+    # line above's descender space and only on accented capitals.
+    metrics: {ascent: 885, descent: -349, linegap: 0}
+    hires_drops:
+      2: [0x2E3B]
+      3: [0x2E3A, 0x2E3B]
+    synth_ligatures: [fi, fl]
+    styles:
+      regular:    {scale: 1.02, path: "local_fonts/GoldenCockerel-Roman.ttf"}
+      italic:     {scale: 1.02, path: "local_fonts/GoldenCockerel-Italic.ttf"}
+      bold:       {from: regular, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
+      bolditalic: {from: italic, synthetic: {embolden_em: 0.048, y_ratio: 0.35}}
+
   - name: DTLRomulus
     description: "DTL Romulus, Blokland after Jan van Krimpen's 1931 Enschede roman (Latin)"
     intervals: reading
