@@ -170,3 +170,55 @@ line is 53 px against the roman's 52.** A paragraph set wholly in italic runs on
 pixel looser per line at the largest size only. Ligature count 5 and kern-left
 class count 306 are unchanged from the 1.030 build, so the scale change cost no
 coverage.
+
+## Round three — the 5x5 matrix, all six sizes
+
+Owner, 2026-09-07: "make another 5x5 matrix of scale and embolden with current
+settings in middle. this is to see if slight tweaking would help at all xxs to
+xl sizes." Scale +/- 0.030 in steps of 0.015, embolden +/- 0.010 in steps of
+0.005 — **embolden goes NEGATIVE**, which `FT_Outline_EmboldenXY` accepts and
+which thins the outline instead of swelling it. 25 families, rendered at all six
+slots (52 s wall clock for the whole sweep).
+
+Two numbers per cell, both measured at every slot rather than at one reference
+ppem: how many of the six sizes land the italic's x-height EXACTLY on the
+roman's, and the italic's ink as a percent of the roman's (measured coverage of
+a rendered `n`, same size, same rasterizer).
+
+| scale \ embolden | -0.010 | -0.005 | +0.000 | +0.005 | +0.010 |
+|---|---|---|---|---|---|
+| 1.085 | 67% · 6/6 | 72% · 6/6 | 76% · 6/6 | 81% · 0/6 | 86% · 0/6 |
+| 1.100 | 69% · 6/6 | 73% · 6/6 | 78% · 6/6 | 83% · 0/6 | 88% · 0/6 |
+| **1.115** | 71% · 6/6 | 76% · 6/6 | **81% · 6/6 (shipped)** | 85% · 0/6 | 91% · 0/6 |
+| 1.130 | 74% · 5/6 | 79% · 5/6 | 84% · 5/6 | 88% · 0/6 | 94% · 0/6 |
+| 1.145 | 76% · 5/6 | 81% · 5/6 | 86% · 5/6 | 90% · 0/6 | 96% · 0/6 |
+
+### Three findings
+
+1. **Scale barely moves the x-height in this band.** 1.085, 1.100 and 1.115 all
+   land the x-height exactly on the roman at ALL SIX sizes; 1.130 and 1.145 miss
+   at one size only. A 5.5% span of scale and the pixel grid rounds nearly all of
+   it away. Scale is not the lever left to pull — which also means the shipped
+   1.115 was not a lucky value, it is the middle of a wide flat.
+2. **Embolden costs a whole pixel of x-height, instantly, and there is no
+   "slight" setting.** Every positive-embolden cell drops to 0/6: a swelling
+   outline grows upward too, and at 16-38 ppem that is a full pixel at every
+   size. +0.005 already breaks the match that +0.000 holds. This retires the
+   idea from rounds one and two that a small embolden is a cheap way to gain
+   x-height — it is, but it gains a WHOLE pixel and cannot gain less.
+3. **The remaining gap is ink, ~19%, and it is worst at the smallest size.**
+   The shipped build carries 81% of the roman's ink on average and only 74% at
+   xxs (8 pt). That is the lightness visible on the page. The only cells that
+   close it without breaking the x-height are pure scale increases at zero
+   embolden: 1.130 reaches 84%, 1.145 reaches 86% — each costing one size's
+   x-height match and nothing else.
+
+Raw ink and stroke darkness pull opposite ways once scale moves: 1.145/+0.010
+carries 96% of the roman's ink but only 71% of its darkness per unit area,
+because the ink is spread over a bigger glyph. Both are on the artifact.
+
+Artifact: https://claude.ai/code/artifact/adef4939-b023-453d-8df2-4b8698665ad5
+
+**No change committed from this round** — it is a survey of the neighborhood
+around the shipped value, and the shipped value is still the only cell that is
+6/6 on x-height at its ink level.
