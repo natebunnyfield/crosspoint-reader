@@ -194,7 +194,8 @@
 # 2026-08-04, Lexica Ultralegible itself cut 2026-08-04, Quattrocento Sans
 # promoted 2026-08-04, TeX Gyre Heros added 2026-08-23, Almendra added
 # 2026-08-24; Dante, Lutetia Nova and Doves added 2026-09-06; DTL Romulus and
-# Golden Cockerel CUT and WarblerText added 2026-09-07): these TWELVE, and only these twelve, are INSTALLED on every surface — both device SD cards, the
+# Golden Cockerel CUT and WarblerText added 2026-09-07; DTL VandenKeere added
+# 2026-09-07): these THIRTEEN, and only these thirteen, are INSTALLED on every surface — both device SD cards, the
 # simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
@@ -245,13 +246,14 @@ installed_families:
   - LutetiaNova
   - Doves
   - WarblerText
+  - VandenKeere
 # DTL Romulus is NOT in the list above, and this note describes a promotion that
 # did not land. Corrected 2026-09-07 (owner ruling: "fix the comment; the list
 # is authoritative"), after a reader building the Update Fonts publisher took
 # the prose at face value and expected thirteen families where there are twelve.
 # The list is the enforcement mechanism this whole block exists to describe --
-# when it and the prose disagree, the LIST wins, and it holds exactly the twelve
-# names above. Everything below is kept as the record of what was measured and
+# when it and the prose disagree, the LIST wins, and it holds exactly the
+# thirteen names above. Everything below is kept as the record of what was measured and
 # what was ruled; it is not a description of the shipped set.
 #
 # DTL Romulus was ruled in on 2026-09-06 (promoting it straight out of the iOS
@@ -1121,6 +1123,167 @@ families:
       italic:     {scale: 1.03, path: "local_fonts/WarblerText-Italic.otf"}
       bold:       {scale: 1.03, path: "local_fonts/WarblerText-Bold.otf"}
       bolditalic: {scale: 1.03, path: "local_fonts/WarblerText-BoldItalic.otf"}
+
+  # DTL VandenKeere, Frank E. Blokland's revival of Hendrik van den Keere's
+  # 16th-century Flemish roman (2026-09-07, owner: add the DTL VandenKeere SD
+  # family). Commercial (Dutch Type Library); staged under clean names in
+  # lib/EpdFont/local_fonts/ (gitignored), never committed, so a clean clone
+  # cannot rebuild it -- as with Dante, Lutetia Nova, Doves and WarblerText.
+  # installed_families:, the THIRTEENTH name in that list.
+  #
+  # THE MODEL IS NOT THE DIGITISER'S OWN DRAWING, and both hands are dated.
+  # DTL's own page heads the face "DTL VandenKeere | Hendrik van den Keere |
+  # Frank E. Blokland": the roman follows the Parangon Romein van den Keere cut
+  # in 1575, which Plantin called "Reale Romaine" and first used in 1576, and
+  # the italic is after Francois Guyot's Ascendonica Cursief of c. 1557 with
+  # its capitals redrawn from the Parangon's rather than from Guyot's. The
+  # digital family was drawn at DTL Studio 1991-1995. The shipped files'
+  # own name tables date them "01-05-1995" (Regular), "2-5-95" (Bold) and
+  # "27-05-97 / 1997" (Italic), all "by Dutch Type Library". Lineage and
+  # citations: docs/font-dates.md; fit: docs/vandenkeere-2026-09-07.md.
+  #
+  # THE "SD" CUT, AND IT IS THE ONLY ONE THAT COULD SHIP. DTL sells this face
+  # as four series -- D, SD, T and ST -- and the shop lists SIX faces under SD
+  # (Regular/Medium/Bold x roman/italic) but only a single Regular under each
+  # of T and ST. What is on disk is the SD Regular, Italic and Bold, which is
+  # the only series among them that carries three real cuts. What the letters
+  # stand for is NOT SOURCED: DTL's product page, its shop page and its
+  # supplement page all use them without expanding them, so this file does not
+  # guess. Do not "correct" SD to T on the assumption that T means text --
+  # there is no T italic and no T bold to pair with it.
+  #
+  # THE FACE IS SMALL ON BODY, which is why k is the largest UPWARD scale in
+  # this file. x-height measures 401/1000 em in the roman (418 italic, 419
+  # bold) against WarblerText's 464; Doves' 398 is the nearest neighbour and it
+  # takes 1.14. Its capitals are correspondingly tall -- cap/x-height 1.67,
+  # against Doves' 1.62, Warbler's 1.57 and Dante's 1.48 -- so at a matched
+  # x-height its capitals stand 2-3 px above the tier's at the upper slots.
+  # That is the drawing, not the fit, and the anchor is x-height.
+  #
+  # NO GSUB AT ALL -- the DTL Romulus and Golden Cockerel case exactly. fi and
+  # fl are drawn and cmapped at U+FB01/FB02 and nothing reaches them, so
+  # synth_ligatures: [fi, fl] supplies the rule. Nothing else is drawn: no ff,
+  # ffi or ffl in any of the three faces. GPOS `kern` is present and the
+  # converter's own extractor returns 959/952/954 pairs over `reading` for
+  # regular/italic/bold -- modest beside Doves' 18,852, and the built files
+  # carry kernL=69 kernR=73 in every style. A LEGACY `kern` TABLE IS ALSO
+  # PRESENT (996/1000/997 pairs) and 945 of its pairs are duplicated in GPOS;
+  # the extractor takes the GPOS value and says so, rather than summing them
+  # and doubling the designer's correction. Spot-checked against `hb-shape`
+  # on nine pairs (AV AW To Va y. Pa r, LT ov) -- 9/9 exact once the fp4
+  # rounding at 25 ppem is applied.
+  #
+  # Latin-only and NARROW: 242 codepoints in the roman and bold, 221 in the
+  # italic, with 10 of Latin Extended-A in the roman and bold and 4 in the
+  # italic, no Latin Extended Additional and no Cyrillic. That is the thinnest
+  # coverage of any installed family -- Golden Cockerel's 249 was the previous
+  # floor -- so `reading` sends more of a page's accented text to the Noto
+  # fallback here than anywhere else in the tier. Stated, not fixed: the
+  # fallback chain is what it is for.
+  #
+  # NO BOLD ITALIC SHIPS, so it alone is SYNTHETIC, cut from the real italic.
+  # Stems from the middle row of `l`: at this file's usual 50 ppem the three
+  # faces read 80/60/100 per 1000 em, but 4-vs-5 whole pixels is too coarse to
+  # divide, so the ratio was taken at 400 ppem where the same three read
+  # 72/68/110 -- the family's OWN bold is 1.53x its roman on `l` (1.50 on `o`,
+  # 1.47 on `n`). That ratio, not the 1.6x synthetic-bold target, is what a
+  # synthetic bold italic in a family that SHIPS a bold has to match, so
+  # embolden_em = 0.50 x the italic's 0.068 em stem = 0.034. y_ratio 0.35 as
+  # every other synthetic style in this file uses. UNCONFIRMED ON DEVICE: the
+  # strength is derived, not judged; docs/synthetic-font-styles.md carries the
+  # acceptance criteria if it reads wrong.
+  #
+  # baseline_shift_em 0.00595 is `embolden_em * y_ratio / 2` -- exactly half
+  # the vertical growth that the embolden's own re-centering translate gives
+  # back, which otherwise walks every flat-bottomed glyph one row below the
+  # baseline (docs/doves-italic-tuning-2026-09-07.md, round five). It is
+  # arithmetic, not a fit, and it was VERIFIED off the built .cpfont rather
+  # than predicted: bolditalic glyphs sitting off the italic's baseline row
+  # fall from 11,583 of 15,876 (73%) to 421 (2.7%) across all six sizes, which
+  # is the same residual round five left on LutetiaNova (2%) and Golden
+  # Cockerel (3%). The remainder is glyphs whose rounded bottoms grow across a
+  # pixel boundary under the embolden itself; round five's ruling is not to
+  # chase it.
+  #
+  # scale: 1.19 IS A SLOT FIT, swept jointly for x-height AND leading on
+  # 2026-09-07 across k = 0.85..1.30 (0.01, then 0.0005 near the winner) x
+  # every strictly-increasing 6-size ramp from 6 to 31 pt x every span from
+  # the ink floor (1189 = worst-style plain ink 1059 + 0.13 em) to 1500.
+  # THE RESULT IS DRIFT 0 -- x-height 8/10/12/14/16/18 EXACT and advanceY
+  # 23/28/34/40/46/51 EXACT -- which only WarblerText also manages, and the
+  # point sizes land on the slot numbers as well.
+  #
+  # k=1.19 is the CENTRE of the drift-0 window, not its edge: every k from
+  # 1.1625 to 1.2215 scores 0 on this ramp and the midpoint is 1.192, so a
+  # rounding change at either end cannot walk the fit off. Not taken:
+  #   k=1.05..1.07, ramp 9/11/13/16/18/20 -- x-height exact, leading drift 1
+  #     (slot 2 lands 33), and a ramp whose point sizes stop stepping evenly.
+  #   k=1.08, ramp 9/11/13/15/18/20 -- drift 2.
+  #   k=1.23..1.27, ramp 7/9/11/13/15/17 -- drift 2, and it needs span 1475,
+  #     108 units above the one that scores 0, for no gain.
+  # The advanceY model the sweep scores on was validated against real FreeType
+  # before it was trusted (156/156 exact on advanceY, ascender and descender
+  # over six metric splits x 26 point sizes), and the winner was then
+  # re-measured off the BUILT .cpfont headers rather than off the arithmetic --
+  # the Doves lesson in docs/three-faces-2026-09-06.md.
+  - name: VandenKeere
+    description: "DTL VandenKeere, Blokland after van den Keere's 1575 Parangon roman (Latin)"
+    intervals: reading
+    sizes: [8, 10, 12, 14, 16, 18]
+    # Uniform slots: xh 8/10/12/14/16/18 EXACT and advY 23/28/34/40/46/51
+    # EXACT (regular), read back off the built .cpfont style TOCs. DRIFT 0.
+    #
+    # NO TRADEOFF WAS NEEDED, as with WarblerText and unlike every other
+    # commercial addition, so this recipe carries no "descenders win" note.
+    # Span 1367 sits 178 units above the ink floor and inside the 1365..1368
+    # window that holds the exact leading, which leaves room for both edges:
+    #   descent -321 is the deepest ink in the whole `reading` charset in any
+    #     style -- the pilcrow at -321 (roman) and -317 (bold); the deepest
+    #     LETTER is the italic's y at -305 and the roman's p at -301;
+    #   ascent 1046 clears the tallest accented capital by 83 units -- Scaron
+    #     at 963 (roman), Acircumflex at 959 (italic) and 956 (bold).
+    # Nothing pokes above the declared ascender and nothing falls below the
+    # declared descender, in any of the four styles.
+    #
+    # The italic and bold x-heights: the italic matches the roman exactly at
+    # all six slots and the bold runs 1 px over at every slot (9/11/13/15/17/19
+    # against 8/10/12/14/16/18) -- Blokland drew them at 401/418/419 per 1000
+    # em, so that is the family, not a mismatch to correct. Per-style `scale:`
+    # is for MIXED-SOURCE families; these three are one typeface. Caps run
+    # 14/17/21/24/27/31 (roman), 14/17/20/23/27/30 (italic), 13/17/20/23/26/30
+    # (bold).
+    metrics: {ascent: 1046, descent: -321, linegap: 0}
+    # NO hires_drops:, AND THAT WAS VERIFIED BY BUILDING, not omitted: the
+    # whole `reading` charset was rasterised through the real fallback chain at
+    # 1x, 2x AND 3x on 2026-09-07 and all three tiers completed first attempt
+    # with only the global `tier_drops: 3: [0x2E3B]` applied. Nothing else in
+    # this family crosses EpdGlyph's uint8 at any tier. The top slot is 18 pt,
+    # the same as WarblerText's, which is why this lands where Warbler's did
+    # and not where Dante's 23 pt top slot does. Re-verify if the ramp grows.
+    synth_ligatures: [fi, fl]
+    styles:
+      regular:    {scale: 1.19, path: "local_fonts/VandenKeere-Regular.otf"}
+      italic:     {scale: 1.19, path: "local_fonts/VandenKeere-Italic.otf"}
+      bold:       {scale: 1.19, path: "local_fonts/VandenKeere-Bold.otf"}
+      bolditalic:
+        from: italic
+        synthetic:
+          embolden_em: 0.034
+          y_ratio: 0.35
+          # 0.0075, NOT the arithmetic 0.00595 (embolden_em * y_ratio / 2), and
+          # the difference was measured rather than guessed. At 0.00595 the
+          # CAPITALS specifically sat a row low -- H, I, K, P, T at 14/16/18 pt,
+          # lowercase clean at every size, which is a systematic fault and not
+          # the rounding noise the other families' residuals are. Swept against
+          # the built .cpfont, bolditalic glyphs off the italic's baseline row:
+          #   0.00595 -> 117/1902 (67 caps, 24 lower)
+          #   0.0075  ->  22/1902 ( 5 caps,  5 lower)   <- taken
+          #   0.0090  ->  33/1902 ( 9 caps, 10 lower)
+          #   0.0105  ->  60/1902 (14 caps, 16 lower)
+          # Coelacanth's bolditalic needed the same kind of nudge above the
+          # arithmetic (0.0085 against 0.0065). The arithmetic is the right
+          # STARTING value; it is not always the landing one, so measure.
+          baseline_shift_em: 0.0075
 
   # **CUT 2026-09-07** (owner ruling: "Drop DTL Romulus and Golden Cockerel
   # entirely"). Out of installed_families:, so it is on NO surface -- not a

@@ -437,6 +437,31 @@ inline constexpr Entry kEntries[] = {
     // earliestYear comment warns against.
     {"WarblerText", "Warbler Text", "William Martin; David Jonathan Ross",
      "1790 London; 2022 Western Massachusetts", "1790 London", 1790},
+    // Added 2026-09-07. Stage 1 is Hendrik van den Keere's Parangon Romein,
+    // cut in 1575 and first used by Plantin in 1576, who called it "Reale
+    // Romaine"; Vervliet calls it "one of the truly outstanding designs
+    // originating in the Low Countries". Van den Keere (Ghent, c. 1540-1580)
+    // was Plantin's exclusive supplier of type from 1570 until his death.
+    // Stage 2 is Frank E. Blokland's digital family, drawn at DTL Studio in
+    // 's-Hertogenbosch 1991-1995; the shipped files' own name tables date the
+    // Regular 01-05-1995 and the Bold 2-5-95, and 1995 is taken as the digital
+    // year for the same reason DTL Romulus takes 2003 -- the file says so and
+    // DTL publishes no release year.
+    //
+    // 1575 GHENT IS THE ROMAN'S DATE, and the italic's model is EARLIER: DTL's
+    // supplement page credits it to Francois Guyot's Ascendonica Cursief of
+    // c. 1557, with the capitals redrawn from the Parangon's rather than from
+    // Guyot's. The roman decides, on the Dante precedent in docs/font-dates.md
+    // -- "a roman-led book face whose italic is secondary" -- and DTL's own
+    // product page heads the face with van den Keere and Blokland alone. Guyot
+    // is recorded in docs/font-dates.md rather than dropped.
+    //
+    // ORIGIN is its own first stage. No ancestor was invented: this table
+    // names nothing earlier than the Parangon for this family, and following a
+    // Flemish roman back to Jenson is exactly the claim the earliestYear
+    // comment warns against.
+    {"VandenKeere", "DTL VandenKeere", "Hendrik van den Keere; Frank E. Blokland",
+     "1575 Ghent; 1995 's-Hertogenbosch", "1575 Ghent", 1575},
     {"GoudyBookletter1911", "Goudy Bookletter", "Frederic W. Goudy; Barry Schwartz", "1911 New York; 2009 St. Paul",
      "1911 New York", 1911},
     // Born digital and revised where it was drawn, so one stage, comma'd years.

@@ -585,12 +585,13 @@ its cases fail against the pre-2026-08-10 per-file design.
 
 The other half of the story is *where the fonts come from*.
 `.github/workflows/release-fonts.yml` publishes to the public
-`crosspoint-fonts` repo from a GitHub runner and can only ever build 7 of the 12
-families in `installed_families:` — Edgar, DanteMT, LutetiaNova, Doves and
-WarblerText are built from commercial outlines in `lib/EpdFont/local_fonts/`,
+`crosspoint-fonts` repo from a GitHub runner and can only ever build 7 of the 13
+families in `installed_families:` — Edgar, DanteMT, LutetiaNova, Doves,
+WarblerText and VandenKeere (added 2026-09-07) are built from commercial
+outlines in `lib/EpdFont/local_fonts/`,
 which is gitignored and never leaves the owner's Mac. So Update Fonts reads a
 **private** release instead: `claude-tools`' `scripts/publish_fonts.py` runs
-locally, builds all twelve on the machine that holds the outlines, and uploads
+locally, builds all thirteen on the machine that holds the outlines, and uploads
 only the resulting bitmaps to the `fonts-latest` tag on
 `natebunnyfield/claude-tools`. The outlines themselves are never uploaded.
 

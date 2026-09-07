@@ -328,19 +328,24 @@ TEST(SettingDisplayOrder, EveryFamilyCarriesAnEarliestOrigin) {
 // only stage 1 (1914 against 1900) separates them.
 TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
   // The installed set, 2026-09-07: DTLRomulus and GoldenCockerel were cut
-  // ("Drop DTL Romulus and Golden Cockerel entirely") and are on no surface.
-  std::vector<std::string> fams = {"Edgar",     "Coelacanth",     "TeXGyreSchola", "LibreFranklin",
-                                   "LibrisADF", "InknutJunicode", "TeXGyreHeros",  "Almendra",
-                                   "DanteMT",   "LutetiaNova",    "Doves",     "WarblerText"};
+  // ("Drop DTL Romulus and Golden Cockerel entirely") and are on no surface;
+  // VandenKeere was added the same day and is the thirteenth.
+  std::vector<std::string> fams = {"Edgar",       "Coelacanth",     "TeXGyreSchola", "LibreFranklin",
+                                   "LibrisADF",   "InknutJunicode", "TeXGyreHeros",  "Almendra",
+                                   "DanteMT",     "LutetiaNova",    "Doves",         "WarblerText",
+                                   "VandenKeere"};
   std::stable_sort(fams.begin(), fams.end(), [](const std::string& a, const std::string& b) {
     return readingfonts::sortsBefore(a.c_str(), b.c_str());
   });
 
   // Dante sits SEVENTH, not second: its origin became Griffo's 1501 Venice on
   // 2026-09-07, so it sorts with the Venetians rather than with its own 1954.
-  const std::vector<std::string> want = {"TeXGyreHeros",  "LibrisADF",   "LutetiaNova", "TeXGyreSchola",
-                                         "LibreFranklin", "WarblerText", "Edgar",       "DanteMT",
-                                         "Coelacanth",    "Doves",   "InknutJunicode", "Almendra"};
+  // VandenKeere slots between Edgar (1722) and Dante (1501): its origin is
+  // van den Keere's 1575 Parangon roman, its own first lineage stage.
+  const std::vector<std::string> want = {"TeXGyreHeros",  "LibrisADF",   "LutetiaNova",  "TeXGyreSchola",
+                                         "LibreFranklin", "WarblerText", "Edgar",        "VandenKeere",
+                                         "DanteMT",       "Coelacanth",  "Doves",        "InknutJunicode",
+                                         "Almendra"};
   EXPECT_EQ(fams, want);
 
   // The two Venetians tie on origin and are separated by stage 1 alone.
