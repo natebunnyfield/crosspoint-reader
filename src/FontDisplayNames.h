@@ -409,7 +409,7 @@ inline constexpr Entry kEntries[] = {
     // after Jenson", and the Rosarivo row in the same table dates Jenson's roman
     // to 1470 Venice. Two statements from the one authority, not an inference
     // of ours. Same "c." as Coelacanth's, for the same reason.
-    {"DovesType", "Doves Type", "Emery Walker & T. J. Cobden-Sanderson; Robert Green", "1900 Hammersmith; 2021 London",
+    {"Doves", "Doves", "Emery Walker & T. J. Cobden-Sanderson; Robert Green", "1900 Hammersmith; 2021 London",
      "c. 1470 Venice", 1900},
     // Added 2026-09-07. Stage 1 is William Martin's types, cut around 1790 for
     // William Bulmer's Shakspeare Press and used for the Boydell Shakespeare;

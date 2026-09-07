@@ -243,7 +243,7 @@ installed_families:
   - Almendra
   - DanteMT
   - LutetiaNova
-  - DovesType
+  - Doves
   - WarblerText
 # DTL Romulus joined on 2026-09-06 (owner ruling, promoting it straight out of
 # the iOS trial it was built for the day before it could be evaluated on the
@@ -823,31 +823,49 @@ families:
   # calligraphic colour, and that is a judgement about the page rather than
   # about the numbers -- which is the owner's to make and not this file's.
   #
-  # scale: 1.030 IS THE KNEE OF A HARD TRADE, and the knee is sharp. Coelacanth
-  # has the longest extenders in the file, so scaling it up to match the
-  # roman's x-height raises the shared ink floor and loosens every line. The
-  # curve, swept 0.975-1.060:
+  # scale: 1.115 IS THE OWNER'S PICK, TAKEN BY EYE OVER THE NUMBERS
+  # (2026-09-07, "commit D1 scale but 0 for embolden"), and the numbers it
+  # overrides are left standing below so nobody re-derives the old answer and
+  # "corrects" this one.
+  #
+  # It shipped at 1.030 first, chosen as the knee of a sweep over 0.975-1.060:
   #
   #   scale   x-ht err   cap err   leading drift
   #   0.975          9         3               2     <- italic reads SMALL
   #   1.000          8         2               4
-  #   1.030          5         5               5     <- taken
-  #   1.040          5         5              12     <- floor jumps here
+  #   1.030          5         5               5     <- shipped first
+  #   1.040          5         5              12     <- ink floor jumps here
   #   1.060          2         7              12
   #
-  # Past 1.030 the ink floor crosses a pixel and the drift doubles for no gain
-  # in size. Below it the italic starts reading small, which is the exact fault
-  # the owner caught in the Junicode fit on 2026-09-06 ("x height seems too
-  # low, height of uppers is too low"). 1.030 is the last scale before the
-  # cliff.
+  # The knee is real: Coelacanth has the longest extenders in the file, so
+  # scaling it up raises the shared ink floor and loosens every line, and past
+  # 1.030 the floor crosses a pixel and the drift doubles. The owner read the
+  # rendered page anyway and ruled the italic still short at 1.030, still short
+  # at 1.055, and the second sweep (docs/doves-italic-tuning-2026-09-07.md)
+  # showed why a middle value would not have helped: the x-height ramp ROUNDS
+  # TO THE SAME SIX PIXELS at 1.055, 1.075 and 1.095, and 1.115 is the first
+  # step that moves it (9 12 14 16 18 19 against the roman's 8 10 12 14 16 18).
+  # There was nothing between here and there to take.
+  #
+  # What it costs, stated plainly: leading drift, and an italic whose caps and
+  # extenders stand above the roman's. That is the trade the owner made with
+  # the page in front of him. Do not revert it to a lower scale on the strength
+  # of the drift column alone.
+  #
+  # embolden_em is ZERO on this style by the same ruling. The second sweep
+  # offered 0.012 and 0.020 -- both matched the roman's ink more closely on
+  # measurement, and both were declined. Coelacanth's lighter, more calligraphic
+  # colour against the Doves roman is the reason this italic was chosen over
+  # Junicode's in the first place; emboldening it argues with that choice.
+  # bolditalic still emboldens, because a bold has to.
   #
   # Metrics moved with the italic: 998/-402 against the Junicode fit's
   # 1018/-362. Coelacanth's descenders are deeper (400/1000 against 360), so
   # the descent grew and the ascent gave way -- descenders win, and accented
   # capitals poke 82/1000 em, which is the same trade every long-extender
   # family here makes.
-  - name: DovesType
-    description: "Doves Type, Green's recovery of the Doves Press roman, with a Junicode italic (Latin)"
+  - name: Doves
+    description: "Doves, Green's recovery of the Doves Press roman, with a Coelacanth italic (Latin)"
     intervals: reading
     sizes: [8, 10, 12, 14, 16, 18]
     # Uniform slots: xh 8/10/12/14/16/18 EXACT, advY 23/29/34/40/46/52 --
@@ -891,7 +909,7 @@ families:
       # report was that both read LOW and generous is the direction of the
       # complaint. Leading is unaffected: the ink floor is 1380 and the drift 2
       # at every scale from 0.985 to 1.14, so this cost nothing.
-      italic:     {scale: 1.030, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthItalic.otf"}
+      italic:     {scale: 1.115, url: "https://mirrors.ctan.org/fonts/coelacanth/opentype/CoelacanthItalic.otf"}
       # No bold in either source, so both are synthetic. Doves' stem is
       # 0.182 of its x-height; 0.6 x the em-relative stem (0.072) is 0.043 for
       # a 1.6x target. The italic is lighter per em, hence its own number.

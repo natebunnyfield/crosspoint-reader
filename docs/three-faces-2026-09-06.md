@@ -203,7 +203,7 @@ compressed.
 
 ---
 
-## 7. Doves Type (`DovesType`) — and the borrowed italic
+## 7. Doves (`Doves`) — and the borrowed italic
 
 Added after the other three, on a separate instruction: *"create a Doves font
 and create/borrow an italic from Coelacanth or Junicode depending on what fits

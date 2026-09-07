@@ -1,0 +1,172 @@
+# Tuning the borrowed Coelacanth italic to the Doves roman
+
+Date: 2026-09-07. Branch: `feature/dtl-romulus-fonts`.
+Renderer: `tools/calendar_preview/render_harness` (the device rasterizer).
+Sweep tool: `tools/proofsheet/proofsheet.py`, 3x3 cartesian product.
+
+Doves (renamed from `DovesType` 2026-09-07) ships Green's recovery of the Doves Press roman with no italic of its
+own. The italic is borrowed from Coelacanth (a Jenson revival), currently at
+`scale: 1.030`. The complaint: at that scale the italic sits under the roman on
+x-height and reads lighter than it in the same line.
+
+## What was swept
+
+    tools/proofsheet/proofsheet.py --family DovesType \
+      --vary styles.italic.scale=1.030,1.042,1.055 \
+      --vary styles.italic.synthetic.embolden_em=0.0,0.012,0.020 \
+      --vary styles.italic.synthetic.y_ratio=0.35 \
+      --mode inline --slots 2,3
+
+`y_ratio` held at 0.35 per the ruling in `docs/synthetic-font-styles.md`: it
+keeps hairline growth below stem growth, which is exactly "thicker stroke, thin
+stroke as is".
+
+This required an uncommitted change to `build-sd-fonts.py` (~line 1150) so a
+style may carry `synthetic:` alongside its own `url:`/`path:` rather than only
+via `from:`. Before it, `synth_flags` was populated only for derived styles.
+
+## Measurements
+
+Taken by replicating the converter's rasterize-time embolden exactly
+(`fontconvert_sdcard.py:836-865` — `FT_Outline_EmboldenXY` then
+`FT_Outline_Translate(-x/2, -y/2)`), because the staged/scaled font file on disk
+does NOT carry it. Two earlier attempts were invalid and are recorded so they
+are not repeated: measuring `scaled_fonts/*.ttf` directly (embolden happens
+later), and ink-density crops of rendered PNGs (line positions shift with scale,
+so the crops are not comparable).
+
+x-height and cap ramps are pixel heights at the six reading slots (roman ppem
+ramp 16/21/25/29/34/38). Stem and hairline at 83 ppem (40 pt @ 150 dpi).
+
+| build | scale | embolden | x-height ramp | cap ramp | stem | hairline | asc+desc @slot5 |
+|---|---|---|---|---|---|---|---|
+| Doves roman | 1.140 | — | 8 10 12 14 16 18 | 13 16 19 22 25 29 | 7 | 7 | 43 |
+| V1 (shipped) | 1.030 | 0.000 | 7 9 11 13 15 17 | 14 17 20 22 26 29 | 5 | 6 | 43 |
+| V2 | 1.030 | 0.012 | 9 11 13 15 17 18 | 14 17 20 22 26 29 | 6 | 7 | 43 |
+| V3 | 1.030 | 0.020 | 9 11 13 15 17 18 | 14 17 20 22 26 29 | 7 | 7 | 44 |
+| V4 | 1.042 | 0.000 | 7 9 11 13 15 17 | 14 17 20 23 26 29 | 5 | 6 | 44 |
+| V5 | 1.042 | 0.012 | 9 11 13 15 17 18 | 14 17 20 23 26 29 | 6 | 7 | 44 |
+| V6 | 1.042 | 0.020 | 9 11 13 15 17 18 | 14 17 20 23 26 29 | 6 | 7 | 44 |
+| V7 | 1.055 | 0.000 | 8 10 11 13 15 17 | 14 17 20 23 26 31 | 6 | 6 | 46 |
+| V8 | 1.055 | 0.012 | 9 11 13 15 17 19 | 14 17 20 23 26 31 | 6 | 7 | 46 |
+| V9 | 1.055 | 0.020 | 9 11 13 15 17 19 | 14 17 20 23 26 31 | 6 | 8 | 46 |
+
+## Findings
+
+1. **`embolden_em` buys x-height cheaply.** A swelling outline grows upward too,
+   so 0.012 em adds ~1 px of x-height at every slot while leaving the cap ramp
+   untouched. That is the lever for "bigger x-height without taller overall" —
+   `scale` cannot do it, because scale moves caps and descenders with it.
+2. **`scale` past 1.042 overshoots.** At 1.055 the cap ramp reaches 31 px
+   against the roman's 29 and the descender 15 against 12: a taller italic, not
+   a better-matched one. This is the failure mode the request named.
+3. **`embolden_em: 0.012, y_ratio: 0.35` matches the roman's ink.** Stem goes
+   5 -> 6 px (roman 7), hairline 6 -> 7 px (roman 7). At 0.020 the stem reaches
+   the roman's 7 at scale 1.030 but the hairline starts overshooting at 1.055
+   (8 vs 7) — the thin stroke stops being thin, which the request ruled out.
+
+## Levers checked and NOT used (negative results)
+
+- `word_space_em` — real and supported (Junicode ships -0.07). The inline
+  specimen's word-space proof line (`render_harness.cpp:565`) sets the same
+  sentence roman then italic on consecutive lines; the italic's word space
+  already reads even against the roman. No change needed.
+- `tracking_em` — supported by the recipe, unused by any shipped family. Nothing
+  in the specimen asks for it.
+- `slant_deg` — for synthesizing an italic from a roman. Coelacanth Italic is a
+  real drawn italic; shearing it would be wrong.
+- `metrics:` — already unified across the family at 998/-402/0. Changing it moves
+  leading, not the italic's fit, and would desynchronize the roman.
+
+## Artifact
+
+Nine builds rendered inline with the roman, flippable in place:
+https://claude.ai/code/artifact/8f85764e-891d-4821-ad95-804e82a879ef
+The artifact is delivery; this file is the record.
+
+## Standing rulings
+
+- (pending owner's pick from the artifact)
+
+## Round two — the overshoot call was wrong
+
+The owner read the round-one sheet and ruled: V8 (`scale 1.055`, `embolden_em
+0.012`) is closest but the italic is STILL short, and the "overshoot past 1.042"
+finding above does not hold. Taken at face value. Finding 2 is retracted: the
+cap-ramp numbers in it are real, but an italic's caps standing above the roman's
+is normal and is not what the eye reads — x-height is. The real bound is overall
+height (ascender + descender), because that is what collides with the line above
+when an italic phrase falls in running text.
+
+Second sweep, same tool, `--family Doves`:
+
+    --vary styles.italic.scale=1.055,1.075,1.095,1.115
+    --vary styles.italic.synthetic.embolden_em=0.012,0.020
+    --vary styles.italic.synthetic.y_ratio=0.35
+
+| build | scale | embolden | x-height ramp | cap ramp | stem | hairline | asc+desc |
+|---|---|---|---|---|---|---|---|
+| Doves roman | 1.140 | — | 8 10 12 14 16 18 | 13 16 19 22 25 29 | 7 | 7 | 43 |
+| A1 (round one's pick) | 1.055 | 0.012 | 9 11 13 15 17 19 | 14 17 20 23 26 31 | 6 | 7 | 46 |
+| A2 | 1.055 | 0.020 | 9 11 13 15 17 19 | 14 17 20 23 26 31 | 6 | 8 | 46 |
+| B1 | 1.075 | 0.012 | 9 11 13 15 17 19 | 14 18 21 23 27 32 | 6 | 7 | 47 |
+| B2 | 1.075 | 0.020 | 9 11 13 15 17 19 | 14 18 21 23 27 32 | 7 | 8 | 47 |
+| C1 | 1.095 | 0.012 | 9 11 13 15 18 19 | 14 18 21 24 27 32 | 7 | 7 | 48 |
+| C2 | 1.095 | 0.020 | 9 11 13 15 18 19 | 14 18 21 24 27 32 | 7 | 8 | 48 |
+| D1 | 1.115 | 0.012 | 9 12 14 16 18 19 | 14 18 21 24 28 33 | 6 | 8 | 49 |
+| D2 | 1.115 | 0.020 | 9 12 14 16 18 19 | 14 18 21 24 28 33 | 7 | 8 | 49 |
+
+**The x-height ramp stalls.** 1.055, 1.075 and 1.095 all round to the same six
+pixels; 1.115 is the first step that moves it. So a build that reads short at
+1.055 reads short at 1.095 too — the next real change is at the top of the
+sweep, and a mid-value is wasted.
+
+Artifact: https://claude.ai/code/artifact/fb2f2c3e-75da-4add-9555-8aef86ab8f3c
+
+## Rename
+
+`DovesType` -> `Doves`, family id and display name both, 2026-09-07 on the
+owner's instruction. Touched: `sd-fonts.yaml` (`installed_families:` + the
+family's `name:`, and a stale description still crediting a Junicode italic),
+`src/FontDisplayNames.h`, `test/settings_display_order/SettingDisplayOrderTest.cpp`.
+The source file on disk is still `local_fonts/DovesType-Text.ttf` — that is
+Green's own filename and is not ours to rename.
+
+## Ruling and what shipped
+
+**`scale: 1.115`, no `synthetic:` on the italic** (owner, 2026-09-07: "commit D1
+scale but 0 for embolden"). Both ink options in the second sweep were declined:
+Coelacanth's lighter, more calligraphic color against the Doves roman is the
+reason this italic was chosen over Junicode's, and emboldening it argues with
+that choice. `bolditalic` still emboldens from it at 0.036 — a bold has to.
+
+That means the `build-sd-fonts.py` change this investigation needed (allowing
+`synthetic:` on a style that has its own `url:`/`path:` rather than only via
+`from:`) is NOT load-bearing for the shipped recipe. It is kept anyway, because
+without it `proofsheet.py --vary styles.italic.synthetic.*` silently builds
+nine identical variants — the flags are computed, the sweep runs, and every
+output is the same font. That is exactly the silent failure a gate exists for,
+so `_synth_flags` now covers both cases.
+
+### Verified against the BUILT files, not the sweep's prediction
+
+Read back off `output/Doves/Doves_*.cpfont` style TOC entries after the build:
+
+| slot | 8 | 10 | 12 | 14 | 16 | 18 |
+|---|---|---|---|---|---|---|
+| target leading | 23 | 28 | 34 | 40 | 46 | 51 |
+| regular advanceY | 23 | 29 | 35 | 41 | 47 | 52 |
+| italic advanceY | 23 | 29 | 35 | 41 | 47 | 53 |
+
+Leading drift 5 for the roman, 6 for the italic — **the feared jump did not
+happen.** The 1.030-era note predicted the drift would double past 1.040 because
+the shared ink floor crosses a pixel; it does not, because `metrics:` is patched
+to 998/-402 and that declared span, not the italic's ink, is what sets the line.
+The old table was measured before the metrics patch existed and its warning no
+longer describes this recipe.
+
+One real cost, recorded so it is not discovered later: **at slot 18 the italic's
+line is 53 px against the roman's 52.** A paragraph set wholly in italic runs one
+pixel looser per line at the largest size only. Ligature count 5 and kern-left
+class count 306 are unchanged from the 1.030 build, so the scale change cost no
+coverage.

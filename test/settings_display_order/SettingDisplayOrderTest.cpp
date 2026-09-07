@@ -288,7 +288,7 @@ TEST(SettingDisplayOrder, EveryFamilyCarriesAnEarliestOrigin) {
   // Griffo, and the sources call Dante "influenced by (but not directly
   // indebted to)" his types. Both the header row and docs/font-dates.md record
   // it as a ruling rather than a citation.
-  const std::vector<std::string> kOriginDiffersFromFirstStage = {"Coelacanth", "DanteMT", "DovesType",
+  const std::vector<std::string> kOriginDiffersFromFirstStage = {"Coelacanth", "DanteMT", "Doves",
                                                                  "Venetian301"};
 
   std::vector<std::string> diverged;
@@ -331,7 +331,7 @@ TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
   // ("Drop DTL Romulus and Golden Cockerel entirely") and are on no surface.
   std::vector<std::string> fams = {"Edgar",     "Coelacanth",     "TeXGyreSchola", "LibreFranklin",
                                    "LibrisADF", "InknutJunicode", "TeXGyreHeros",  "Almendra",
-                                   "DanteMT",   "LutetiaNova",    "DovesType",     "WarblerText"};
+                                   "DanteMT",   "LutetiaNova",    "Doves",     "WarblerText"};
   std::stable_sort(fams.begin(), fams.end(), [](const std::string& a, const std::string& b) {
     return readingfonts::sortsBefore(a.c_str(), b.c_str());
   });
@@ -340,12 +340,12 @@ TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
   // 2026-09-07, so it sorts with the Venetians rather than with its own 1954.
   const std::vector<std::string> want = {"TeXGyreHeros",  "LibrisADF",   "LutetiaNova", "TeXGyreSchola",
                                          "LibreFranklin", "WarblerText", "Edgar",       "DanteMT",
-                                         "Coelacanth",    "DovesType",   "InknutJunicode", "Almendra"};
+                                         "Coelacanth",    "Doves",   "InknutJunicode", "Almendra"};
   EXPECT_EQ(fams, want);
 
   // The two Venetians tie on origin and are separated by stage 1 alone.
-  EXPECT_TRUE(readingfonts::sortsBefore("Coelacanth", "DovesType"));
-  EXPECT_FALSE(readingfonts::sortsBefore("DovesType", "Coelacanth"));
+  EXPECT_TRUE(readingfonts::sortsBefore("Coelacanth", "Doves"));
+  EXPECT_FALSE(readingfonts::sortsBefore("Doves", "Coelacanth"));
 
   // And the ordering the ruling was made to fix: Coelacanth now sits ABOVE
   // Inknut, because c. 1470 is later than 1469 -- it read backwards before.
