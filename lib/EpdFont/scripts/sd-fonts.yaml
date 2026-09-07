@@ -245,15 +245,26 @@ installed_families:
   - LutetiaNova
   - Doves
   - WarblerText
-# DTL Romulus joined on 2026-09-06 (owner ruling, promoting it straight out of
-# the iOS trial it was built for the day before it could be evaluated on the
-# phone — the upload was still blocked on a signing problem when the ruling
-# came). It is the ninth installed family and the first COMMERCIAL one in the
-# list: its outlines are licensed, gitignored, and cannot be redistributed, so
-# unlike the other eight this family cannot be rebuilt from a clean clone.
-# Anyone without lib/EpdFont/local_fonts/DTLRomulus-*.otf gets a build that
-# skips it and says so; that is a real difference from every other name here
-# and the reason this line deserves its own note.
+# DTL Romulus is NOT in the list above, and this note describes a promotion that
+# did not land. Corrected 2026-09-07 (owner ruling: "fix the comment; the list
+# is authoritative"), after a reader building the Update Fonts publisher took
+# the prose at face value and expected thirteen families where there are twelve.
+# The list is the enforcement mechanism this whole block exists to describe --
+# when it and the prose disagree, the LIST wins, and it holds exactly the twelve
+# names above. Everything below is kept as the record of what was measured and
+# what was ruled; it is not a description of the shipped set.
+#
+# DTL Romulus was ruled in on 2026-09-06 (promoting it straight out of the iOS
+# trial it was built for the day before it could be evaluated on the phone --
+# the upload was still blocked on a signing problem when the ruling came), but
+# the name was never added here. Its outlines are licensed, gitignored and
+# cannot be redistributed, so anyone without
+# lib/EpdFont/local_fonts/DTLRomulus-*.otf gets a build that skips it and says
+# so -- which it shares with five names that ARE in the list (Edgar, DanteMT,
+# LutetiaNova, Doves, WarblerText), so the original note's claim that it would
+# be "the first COMMERCIAL one" was already wrong when it was written. Adding
+# `- DTLRomulus` to the list above is all that is needed if the ruling still
+# stands; that is a decision for the owner, not a tidy-up.
 #
 # It displaces nothing: it is a Dutch baroque oldstyle and the first
 # small-on-body, long-extender text face in the tier, so no head-to-head is
@@ -876,7 +887,13 @@ families:
     metrics: {ascent: 998, descent: -402, linegap: 0}
     hires_drops:
       2: [0x2E3B]
-      3: [0x2E3A, 0x2E3B]
+      # 0x261C/0x261E are the POINTING HANDS, and they arrived with the
+      # borrowed Coelacanth italic on 2026-09-07 -- Doves' own roman has no
+      # such glyph. At tier 3 they rasterise 268x127 px and blow EpdGlyph's
+      # uint8 width, which fails the whole family's 3x build. Coelacanth's own
+      # recipe has carried `3: [0x261C, 0x261E]` for exactly this reason since
+      # it was added; the italic came across and the drop entry did not.
+      3: [0x2E3A, 0x2E3B, 0x261C, 0x261E]
     # The face draws fi and cmaps it at U+FB01 and its own `liga` has no f+i
     # rule -- it covers ff, fl, ffi and ffl and simply omits the commonest
     # ligature in English. This MERGES the missing rule into the face's own
