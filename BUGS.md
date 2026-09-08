@@ -34,6 +34,34 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-054] Deleting a file appears to corrupt filenames across the filesystem — REPORTED 2026-09-07, not yet investigated
+**severity: high (data integrity on the card, and it is not confined to the file that was deleted) · scope: unknown; start at the delete path and the directory listing that follows it · reported by the owner 2026-09-07**
+
+Owner, verbatim: *"deleting a file seems to corrupt the filenames across the
+filesystem"*.
+
+Filed as stated and NOT re-interpreted. Nothing below is a theory the owner
+offered; it is only where a first pass should start.
+
+Taken at face value the report says the damage is not confined to the deleted
+entry -- other files' NAMES are wrong afterwards -- which points at the
+directory-entry layer rather than at whatever called remove(). Two shapes fit
+and they are distinguishable: a stale cached listing being redrawn (names wrong
+on screen, correct on the card) versus real on-card corruption (names wrong
+after a remount, or on a computer). **Establishing which of those it is, is the
+whole first step**, and it costs one card read on a Mac after a reproduction.
+
+Worth knowing before anyone starts: this firmware has a long-lived FAT
+long-filename buffer story (the `nameBuffer[128]` reads in `FontUpdater.cpp`
+around the removal scan ignore `getName`'s return value and reuse the previous
+entry's contents on failure -- found 2026-09-07 in the same audit that produced
+B-053's follow-ups, and noted there as cosmetic because `isSafeFamilyName`
+gates the delete). That is not this bug, but it is the same class of mistake and
+the same buffers, so it is the right neighbourhood to read first.
+
+To close: a reproduction with the file named, the card read on a computer
+afterwards, and the delete path traced from the UI action to the FAT write.
+
 ### [B-053] Update Fonts aborts on the manifest: an unbounded `std::string::append` reaches `operator new`, and `-fno-exceptions` turns `bad_alloc` into `abort()` — SYMBOLIZED EXACTLY, FIXED 2026-09-07, UNCONFIRMED on device
 **severity: critical (the headline feature of 1.5.29-BD crashes the device, reproduced twice on the owner's X4) · scope: `src/network/FontUpdater.cpp:186-191`, the same pattern at `src/network/LibraryUpdater.cpp:167-171` and `src/network/HttpDownloader.cpp` `fetchUrl(url, std::string&)` · found 2026-09-07 from two crash reports the owner supplied, hours after 1.5.29-BD shipped**
 

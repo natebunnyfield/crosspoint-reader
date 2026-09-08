@@ -60,6 +60,16 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-029] Move the font preview to the top of the preview pane
+**scope: `src/activities/settings/` font list / preview pane · opened 2026-09-07**
+
+Owner, verbatim: *"move font preview to top of preview pane"*.
+
+Nothing else was specified, and nothing here is inferred beyond that sentence.
+The pane is the one the font list paints beside the family names; find where it
+lays the specimen out and put the specimen first. Ask before changing anything
+else about the pane -- this is a placement change, not a redesign.
+
 ## Finished
 
 ### [T-008] Everything since 2026-08-06 is staged but unproven on hardware
