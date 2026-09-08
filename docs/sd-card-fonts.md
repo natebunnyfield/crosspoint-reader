@@ -5,9 +5,15 @@ with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
 ## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12; InknutJunicode added 2026-08-13; TeXGyreHeros added 2026-08-23; Almendra added 2026-08-24)
 
-The installed set on this fork is exactly eight families — **Edgar, Coelacanth,
-InknutJunicode, TeXGyreSchola, LibreFranklin, LibrisADF, TeXGyreHeros,
-Almendra** — on every surface:
+The installed set on this fork is **thirteen** families as of 2026-09-07 —
+**Edgar, Coelacanth, InknutJunicode, TeXGyreSchola, LibreFranklin, LibrisADF,
+TeXGyreHeros, Almendra**, plus the five commercial additions **DanteMT,
+LutetiaNova, Doves, WarblerText, VandenKeere** whose outlines live in
+gitignored `lib/EpdFont/local_fonts/` and are built only on the owner's
+machine. (This paragraph said "exactly eight" until 2026-09-07; the heading
+above records the promotions one at a time and stops at Almendra, so the LIST
+in `sd-fonts.yaml` is the authority, not either piece of prose.) On every
+surface:
 device SD cards, the simulator's `fs_/fonts/`, and the iOS app's bundled seed
 set (`crosspoint-simulator/ios/seedfonts/`). The authoritative list is
 `installed_families:` in `lib/EpdFont/scripts/sd-fonts.yaml` — when this prose

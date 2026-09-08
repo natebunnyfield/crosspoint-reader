@@ -250,11 +250,12 @@ installed_families:
 # DTL Romulus is NOT in the list above, and this note describes a promotion that
 # did not land. Corrected 2026-09-07 (owner ruling: "fix the comment; the list
 # is authoritative"), after a reader building the Update Fonts publisher took
-# the prose at face value and expected thirteen families where there are twelve.
+# the prose at face value and expected one more family than the list held.
 # The list is the enforcement mechanism this whole block exists to describe --
 # when it and the prose disagree, the LIST wins, and it holds exactly the
-# thirteen names above. Everything below is kept as the record of what was measured and
-# what was ruled; it is not a description of the shipped set.
+# thirteen names above (VandenKeere joined 2026-09-07, the thirteenth).
+# Everything below is kept as the record of what was measured and what was
+# ruled; it is not a description of the shipped set.
 #
 # DTL Romulus was ruled in on 2026-09-06 (promoting it straight out of the iOS
 # trial it was built for the day before it could be evaluated on the phone --
