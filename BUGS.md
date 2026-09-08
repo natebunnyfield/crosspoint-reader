@@ -34,6 +34,101 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-052] X3 abort in the grayscale/anti-aliasing path after the BW buffer save fails — a framework `ESP_ERROR_CHECK()` giving up under heap exhaustion
+**severity: high (hard crash while reading) · scope: `lib/GfxRenderer/GfxRenderer.cpp` `storeBwBuffer()`, `src/TextAntiAliasing.cpp` `overlayViaWholeFrame()`, and whatever framework call aborts after them · found 2026-09-07 in `/Volumes/BUNNYFIELDS/crash_reports/crash_0.txt`, not reported**
+
+Found while looking for a symbolizable companion to B-048's abort, in the card's
+own rotating archive. Not the same crash as B-048 (that one is an X4, and its
+abort PC is in flash) and not B-040 (that one logs thirteen `buildAdvanceTable`
+failures first). This is a third, distinct abort.
+
+```
+CrossPoint version: 1.5.0-BNY
+Reset reason: 4
+Panic reason: abort() was called at PC 0x4038c171 on core 0
+[113293] [ERR] [SCT] Deserialization failed: Parameters do not match
+[115604] [INF] [SCT] Suspended build: 32 pages persisted
+[115684] [ERR] [SCT] Deserialization failed: Parameters do not match
+[157671] [INF] [SCT] Suspended build: 37 pages persisted
+[165591] [INF] [HOME] new note: /20260806085400.md
+[176318] [INF] [NOTEEDIT] saved 0/0 bytes to /20260806085400.md
+[184760] [ERR] [GFX] !! Failed to allocate BW buffer chunk 4 (8000 bytes)
+[184761] [ERR] [READER] Failed to store BW buffer for anti-aliasing
+[279]    [INF] [HW]  Using cached device type: X3
+```
+
+**The abort is an `ESP_ERROR_CHECK()` failure, not a failed `new`.** New
+technique, and it is the reusable half of this entry: **IRAM addresses in a
+crash report CAN be symbolized against a current ELF even when the crashed
+build is gone.** Flash `.text` (`0x42xx_xxxx`) is relaid out by every app-code
+change and is worthless across builds, but IRAM (`0x4038_xxxx`) holds
+SDK-component code whose layout barely moves. Every one of the eight IRAM
+addresses in this report resolved inside a coherent ESP-IDF function against
+`.pio/build/default/firmware.elf` (built 2026-09-07); random addresses do not
+cluster like that.
+
+```
+0x4038c171  esp_error_check_failed_print   <- the abort PC
+0x40392fc2  __assert_func                     newlib/src/assert.c:41
+0x403916c0  multi_heap_aligned_alloc_offs     multi_heap_poisoning.c:223
+0x40391632  multi_heap_realloc_impl           multi_heap.c:274
+0x403917fc  multi_heap_realloc                multi_heap_poisoning.c:349
+0x40380f64  heap_caps_aligned_alloc_base      heap_caps_base.c:169
+```
+
+The PC lands 0x77 into `esp_error_check_failed_print` (0x4038c0fa..0x4038c18e).
+That function does not call `abort()`, and ESP-IDF's panic line reports the
+**caller** of `abort()`, so it cannot be the literal answer. The only
+abort-calling function in that neighborhood is `_esp_error_check_failed` at
+0x4038c18e — 0x1D above. Everything from 0x4038c0fa to 0x4038c1f6 is the one
+error/abort/panic cluster (`esp_error_check_failed_print`,
+`_esp_error_check_failed`, `esp_system_abort`, `panic_abort`); below it is
+ringbuffer code, 0xC5 away. So the finding is: **a failed `ESP_ERROR_CHECK()`**,
+resting on IRAM layout having drifted less than ~30 bytes between the crashed
+`1.5.0-BNY` build and today's. That is the honest confidence — it is
+corroboration from a different ELF, not proof from the right one.
+
+**Which `ESP_ERROR_CHECK()` is unknown, and it is not ours.** `grep -rn
+ESP_ERROR_CHECK src lib` returns **zero** hits outside
+`ESP_ERROR_CHECK_WITHOUT_ABORT`, so no app code can produce this. Of the
+vendored trees only `espressif__mdns`, `Arduino-wolfSSL`'s
+`esp_sdk_wifi_lib.c`, `esp-modbus` and `esp-dsp` contain any, none of them in
+the render path. That leaves framework-espidf / Arduino-ESP32 itself, where an
+`esp_err_t` returned under memory pressure — SPI, `esp_event`, `esp_timer`,
+NVS — aborts instead of returning.
+
+**Our own two allocation failures are innocent, and that is worth recording so
+the next pass does not re-read them.** `GfxRenderer::storeBwBuffer()`
+(`GfxRenderer.cpp:3157`) logs the chunk failure, calls `freeBwBufferChunks()`
+and returns `false`; `overlayViaWholeFrame()` (`TextAntiAliasing.cpp:69`) logs
+and returns. Neither aborts, neither leaks. This is the B-040 shape exactly: the
+heap was already exhausted, our guarded sites reported it and stepped back, and
+something else — here a framework `ESP_ERROR_CHECK`, there a bare `new` —
+aborted a moment later. Heap poisoning is on in every build
+(`CONFIG_HEAP_POISONING_LIGHT=y`, `sdkconfig.defaults:2023`), which is why
+`0xBAAD5678` (ESP-IDF's `TAIL_CANARY_PATTERN`, `multi_heap_poisoning.c:47`)
+appears in the stack dump — it is a canary, not corruption.
+
+**The heap pressure has a named upstream source in this record.** Four
+`[SCT] Deserialization failed: Parameters do not match` in 30 s
+(`Section.cpp:388`): the pagination cache is being rejected on a spec mismatch
+and `clearCache()`d, so the section repaginates from scratch each time, and each
+rebuild is the churn that leaves nothing for a 48 KB chunked BW save. Which of
+the thirteen compared fields differed is not recoverable from this record — the
+site logs the mismatch but not the field.
+
+**To close, in order:**
+1. Make `Section.cpp:388` name the field that mismatched. One `LOG_ERR` per
+   compared value, or a bitmask, either is cheap and turns the next occurrence
+   into a diagnosis instead of a second copy of this entry.
+2. Decide whether a failed BW-buffer save should abandon the grayscale overlay
+   silently, as it does now, or force a heap-recovery step before the next
+   render attempts the same 48 KB again.
+3. The framework `ESP_ERROR_CHECK` cannot be pinned without flash symbols from
+   a build in the `1.5.0-BNY` window, and no such ELF or published binary
+   exists (see B-048 item 4). It is worth re-checking only if it recurs on a
+   current build, where the flash addresses WILL symbolize.
+
 ### [B-050] "176 still going a page before chapter that i navigated to" — NOT REPRODUCED; the whole book-to-page chain is now proven innocent
 **severity: medium (every Chapter Select pick lands wrong, on the owner's phone) · scope: unknown, but NOT `Epub`/`BookMetadataCache`/`Section`/`ChapterHtmlSlimParser` · reported 2026-09-06 (iOS TestFlight build 176 = simulator `4f8ce2f`, firmware `ec5cbd28` = 1.5.26-BD)**
 
@@ -226,6 +321,51 @@ the result here. Also worth knowing which checkout stamps `1.5.0-BNY` --
 most likely a `platformio.local.ini` with a `[crosspoint] version` override,
 which would also mean every local build since August has reported the same
 string and OTA's `isNewer()` has been comparing against 1.5.0.
+
+**Update 2026-09-07, after the owner re-supplied the same record as a file.**
+It is byte-for-byte the record already quoted above — X4, `1.5.0-BNY`, PC
+`0x421bb689` — so there is no new evidence in it. What was established instead,
+all of it negative, so nobody pays for these three checks again:
+
+- **No ELF from the `-BNY` era exists on this machine.** `find ~/src
+  ~/.platformio ~/Library/Caches -name firmware.elf` returns exactly one file:
+  `.pio/build/default/firmware.elf`, built 2026-09-07. Option (b) has nothing
+  to fall back to.
+- **No `-BNY` build was ever published.** The only GitHub release predating the
+  2026-08-19 rename is `1.5.1-B2` (2026-08-18), already carrying the new
+  suffix. So the crashed image was a locally built, hand-flashed dev build.
+  That also finishes off option (b) on its own terms: rebuilding at `da6736f^`
+  would symbolize *a* commit in the `-BNY` window, but the window is weeks of
+  commits wide, the flashed one is unknown, there is no published binary to
+  byte-compare a rebuild against, and a confident wrong symbol name costs more
+  than the missing one. **Do not rebuild for this.**
+- **The trailing sentence of this entry is withdrawn.** It still suggests a
+  `platformio.local.ini` version override "which would also mean every local
+  build since August has reported the same string" — the correction two
+  paragraphs above it already refuted that (no such file on the Mac), and the
+  release list now explains the string without it. The device was simply
+  running an old hand-flashed build; `/crash_report.txt` is only overwritten by
+  the *next* panic, so a stale report survives any number of firmware updates.
+
+**What the IRAM addresses do say.** Per the technique written up in B-052,
+`0x4038_xxxx` addresses survive across builds even when flash does not. The
+nine in this report all resolve inside FreeRTOS primitives —
+`xQueueGenericSend` (queue.c:941 and :1137), `xQueueSemaphoreTake` (:1875),
+`prvIsQueueEmpty` (:2679), `vEventGroupDelete`, `vPortYieldFromISR`,
+`pxPortInitialiseStack`, `xRingbufferGetStaticBuffer`, `__assert_func` — which
+is exactly the stack residue of a task parked on queues, i.e. the Wi-Fi/lwIP
+side, and is consistent with the `lost_ip` context. It does **not** name the
+aborting call: this report's abort PC `0x421bb689` is in flash, unlike B-052's,
+so it stays unsymbolized. Nothing here changes the disposition — plan (a),
+a report stamped a current version, is still the only way this closes, and
+B-052 is now the worked example of what that yields.
+
+**The card checked on 2026-09-07 was the X3 card** (`/Volumes/BUNNYFIELDS`,
+`Using cached device type: X3`). Its archive holds B-040 (twice:
+`crash_report.txt` and `crash_1.txt`, `1.5.9-BD`) and the new B-052, but no X4
+report. Plan (a) needs the **X4 card's** `/crash_reports/` read; it has not been
+mounted here yet.
+
 
 ### [B-046] Every release image since 1.5.17-BD fails firmware validation: the descriptor stamper left the XOR checksum stale — FIXED 2026-09-04 (scripts/stamp_app_desc.py), re-upload of the 1.5.17-BD..1.5.21-BD assets owed
 **severity: high (no release since 1.5.17-BD installs by any path) · scope: build / release, `scripts/stamp_app_desc.py` · found 2026-09-04 from a device: SD Card Firmware Update said "Invalid firmware file" for the latest release's `firmware.bin`**
