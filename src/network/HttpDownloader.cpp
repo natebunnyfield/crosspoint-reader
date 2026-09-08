@@ -87,6 +87,16 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
           if (sink.total == 0 && http.hasContentLength()) sink.total = http.getContentLength();
           if (!sink.sizeAnnounced) {
             sink.sizeAnnounced = true;
+            // Which branch a whole-body reader takes turns entirely on this
+            // number, and nothing recorded it: B-053's fix assumes GitHub
+            // declares a length, and that assumption was never verified from a
+            // device. A body with no declared length costs several
+            // reallocations instead of one exact block.
+            if (sink.total == 0) {
+              LOG_INF("HTTP", "no Content-Length declared; a whole-body read will have to grow");
+            } else {
+              LOG_DBG("HTTP", "body declares %u bytes", static_cast<unsigned>(sink.total));
+            }
             if (sink.onSize && !sink.onSize(sink.total)) return false;
           }
           if (!sink.write(data, len)) return false;

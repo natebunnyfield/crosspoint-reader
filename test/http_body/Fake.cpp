@@ -27,6 +27,11 @@ HttpDownloader::DownloadError HttpDownloader::fetchUrlWithHeaders(const std::str
     if (!onSize(s.declaredLength)) return FILE_ERROR;
   }
 
+  if (s.emitOneEmptyChunk) {
+    s.dataCallbacks++;
+    if (!onData(reinterpret_cast<const uint8_t*>(""), 0)) return FILE_ERROR;
+  }
+
   size_t sent = 0;
   while (sent < s.body.size()) {
     if (s.failAfter && sent >= s.failAfter) return HTTP_ERROR;

@@ -51,10 +51,14 @@ constexpr int SYNC_RECORDS_VERSION = 1;
 constexpr int MAX_MANIFEST_VERSION = 1;
 
 // The manifest is the one response held whole in RAM, so it gets an explicit
-// ceiling. Thirteen families measured 18,108 bytes on 2026-09-07 (~1.4 KB a
-// family), so this is room for roughly forty-five before the cap is the thing
-// that stops us -- and MAX_FAMILIES is 128, which at that rate would be ~180 KB
-// on a ~380 KB part. Over the cap is an error, never an abort. B-053.
+// ceiling. It is a BACKSTOP against a hostile or corrupt response, NOT headroom:
+// the heap gives out long before the cap does. This device refused a
+// 22,049-byte contiguous block with Wi-Fi and wolfSSL resident (B-053, measured
+// off the crash stack), so the real ceiling is whatever contiguous run a spent
+// ESP32-C3 heap will hand over -- empirically somewhere under ~22 KB, which at
+// the measured ~1.4 KB a family is roughly fourteen to sixteen families, not
+// the forty-five this number would suggest. Do not read it as a family budget.
+// Over the cap is an error, never an abort.
 constexpr size_t MAX_MANIFEST_BYTES = 64 * 1024;
 
 // The cache root the layout caches live under: /.crosspoint/epub_<hash>/sections.

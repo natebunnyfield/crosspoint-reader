@@ -130,10 +130,13 @@ void LibraryUpdateActivity::runCheck() {
     // whether the release is missing or the token cannot see it, so the release
     // endpoint alone cannot separate them; asking about the repo can, and it
     // costs one request on a path that has already failed.
+    // OOM_ERROR: same reason as the fonts screen, same fix, applied here so the
+    // next report is not this ambiguity wearing a different feature's name.
     errorMessage = err == LibraryUpdater::NO_RELEASE         ? tr(STR_LIBRARY_NO_RELEASE)
                    : err == LibraryUpdater::NO_REPO_ACCESS   ? tr(STR_LIBRARY_NO_REPO_ACCESS)
                    : err == LibraryUpdater::BAD_TOKEN        ? tr(STR_LIBRARY_BAD_TOKEN)
                    : err == LibraryUpdater::MANIFEST_TOO_NEW ? tr(STR_LIBRARY_MANIFEST_TOO_NEW)
+                   : err == LibraryUpdater::OOM_ERROR        ? tr(STR_UPDATE_OUT_OF_MEMORY)
                                                              : tr(STR_UPDATE_CHECK_FAILED);
     RenderLock lock(*this);
     state = State::FAILED;

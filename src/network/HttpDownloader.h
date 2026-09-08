@@ -66,12 +66,18 @@ class HttpDownloader {
   struct Body {
     std::unique_ptr<char[]> data;
     size_t len = 0;
+    // The block actually asked of the allocator, minus the NUL. Observable so a
+    // test can assert it: the first version of this code doubled from 1024 and
+    // took 32,769 bytes to hold an 18,108-byte manifest -- a bigger contiguous
+    // block than the one whose refusal caused B-053 -- and no test could see it.
+    size_t capacity = 0;
 
     const char* c_str() const { return data ? data.get() : ""; }
     explicit operator bool() const { return data != nullptr; }
     void reset() {
       data.reset();
       len = 0;
+      capacity = 0;
     }
   };
 
@@ -122,24 +128,49 @@ class HttpDownloader {
                                         Body& out) {
     out.reset();
 
-    size_t capacity = 0;
     bool oom = false;
     bool tooLarge = false;
 
     // Grow to hold `need` bytes plus a NUL. Nothrow the whole way down: a
     // refusal stops the transfer and is reported, it never terminates.
-    auto ensure = [&](size_t need) {
-      if (need <= capacity) return true;
+    //
+    // `exact` is the difference between the two callers and it is the whole
+    // point of this function. When the server declared a Content-Length we know
+    // the final size before a byte arrives, so we take EXACTLY that block --
+    // asking for a rounded-up one is asking a fragmented ~380 KB heap for a
+    // longer contiguous run than the data needs, which is how the first version
+    // of this fix requested 32,769 bytes for an 18,108-byte manifest. Only the
+    // unknown-length path may round up, because it has nothing better to go on.
+    auto ensure = [&](size_t need, bool exact) {
+      if (need <= out.capacity) return true;
       if (need > maxBytes) {
         tooLarge = true;
         return false;
       }
-      // Double, but never past the cap -- `want <= maxBytes / 2` is what keeps
-      // `want *= 2` from wrapping when a caller passes a very large maxBytes.
-      // Found by a test that asked for an absurd body on purpose.
-      size_t want = capacity ? capacity : 1024;
-      while (want < need && want <= maxBytes / 2) want *= 2;
-      if (want < need) want = need;  // never hand back less than was asked for
+      size_t want = need;
+      if (!exact) {
+        // Linear, NOT doubling. ensure() holds the old block and the new one at
+        // once (the memcpy below), so the peak is old + new: doubling to reach
+        // 18 KB peaked at 16,385 + 32,769 = 49,154 bytes, which is WORSE than
+        // the 33,072 of the std::string this replaced. Growing by a fixed step
+        // bounds both the overshoot and the peak. The cost is more memcpys on a
+        // path that should never run against GitHub, which declares a length.
+        constexpr size_t kGrowStep = 8192;
+        // `want <= maxBytes` is the loop invariant, so `maxBytes - want` never
+        // underflows. Writing the guard the other way round -- `want > maxBytes
+        // - kGrowStep` -- underflows whenever the cap is smaller than one step,
+        // and allocated 8193 bytes against a 4096-byte cap before a test caught
+        // it.
+        want = out.capacity;
+        while (want < need) {
+          if (kGrowStep > maxBytes - want) {
+            want = maxBytes;
+            break;
+          }
+          want += kGrowStep;
+        }
+        if (want < need) want = need;  // never hand back less than was asked for
+      }
       auto grown = makeUniqueNoThrow<char[]>(want + 1);
       if (!grown) {
         oom = true;
@@ -147,30 +178,38 @@ class HttpDownloader {
       }
       if (out.len) memcpy(grown.get(), out.data.get(), out.len);
       out.data = std::move(grown);
-      capacity = want;
+      out.capacity = want;
       return true;
     };
 
     const DownloadError result = fetchUrlWithHeaders(
         url, headers,
         [&](const uint8_t* data, size_t len) {
-          if (!ensure(out.len + len)) return false;
+          // A zero-length chunk reserves nothing, so `out.data` can still be
+          // null when the NUL write below runs -- a segfault, reproduced. No
+          // shipped transport delivers one today (every caller guards `n <= 0`
+          // before emitBody), but that convention lives in freeink-sdk, not
+          // here, and neither test fake sends one.
+          if (!len) return true;
+          // A declared length has already reserved the whole body, so this is a
+          // no-op on the normal path and only grows for a chunked response.
+          if (!ensure(out.len + len, false)) return false;
           memcpy(out.data.get() + out.len, data, len);
           out.len += len;
           out.data[out.len] = '\0';
           return true;
         },
         [&](size_t total) {
-          // The normal path: one allocation of exactly the declared size, so
-          // the doubling never happens. A server that declares nothing falls
-          // through to ensure()'s growth, which is bounded and nothrow.
+          // One allocation of exactly the declared size. A server that declares
+          // nothing falls through to ensure()'s growth, which is bounded and
+          // nothrow.
           //
           // ensure() is also what refuses an over-cap declaration, and it does
           // so here, before the transport streams a byte. An explicit
           // `total > maxBytes` alongside it would be exactly the same test
           // written twice. HttpBodyTest's dataCallbacks assertion pins the
           // refuse-before-streaming behavior.
-          return total == 0 || ensure(total);
+          return total == 0 || ensure(total, true);
         });
 
     if (tooLarge) {

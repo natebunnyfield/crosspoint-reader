@@ -17,6 +17,9 @@ struct Script {
   size_t chunk = 1024;
   // Stop after this many bytes and report a transport failure (0 = never).
   size_t failAfter = 0;
+  // Hand over one zero-length chunk before the body. No real transport does
+  // this; the guard it exercises is against a convention, not against a caller.
+  bool emitOneEmptyChunk = false;
 
   // Observed, not scripted.
   size_t sizeAnnouncements = 0;  // times the declared length was offered

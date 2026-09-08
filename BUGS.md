@@ -123,7 +123,70 @@ belongs and is ~1 KB, not a large stack buffer; `HttpDownloader`'s own read
 buffer is correctly `makeUniqueNoThrow<char[]>(READ_CHUNK)` with a null check
 (`HttpDownloader.cpp:221-226`).
 
-**FIXED 2026-09-07 — option 2, the owner's choice of the three offered.**
+**FIRST FIX SHIPPED BROKEN AS 1.5.30-BD. Read this before the section below,
+because that section describes the attempt, not the outcome.** The fix landed,
+was published, the owner installed it, and Update Fonts failed again on the same
+screen — this time as "Update failed / Could not reach GitHub" immediately after
+"Reading the font list", with no crash. Two independent defects, both mine, both
+found by read-only agents on 2026-09-07 and both fixed in the follow-up:
+
+1. **The allocation was 81% larger than it needed to be, and larger than the one
+   already known to fail.** `ensure()` sized by doubling from 1024 instead of
+   using the declared length, so an 18,108-byte manifest asked for a
+   **32,769-byte** contiguous block. MEASURED, not inferred: the real header was
+   compiled against a recording `operator new[]` — `500a01e8c` gives 32,769,
+   the follow-up gives 18,109. B-053's own crash stack proves this device
+   refused **22,049** bytes at this exact moment, so the "fix" asked the same
+   heap for 10,720 bytes MORE than the request whose refusal is this bug. The
+   claim in this entry and in the commit message — "ONE allocation of exactly
+   the declared size" — was simply false of the code. Now a declared length
+   allocates exactly that length; only the unknown-length path may round up.
+2. **`OOM_ERROR` printed "Could not reach GitHub".** It had no arm in either
+   activity's ternary chain and fell through to `STR_UPDATE_CHECK_FAILED`, so
+   did `JSON_PARSE_ERROR` and `NO_MANIFEST`. The entry below says "no new
+   user-facing string was needed"; that was the wrong half of the sentence —
+   `OOM_ERROR` had no string of its own. This is the exact failure the
+   `NOT_FOUND`/`UNAUTHORIZED` split in `HttpDownloader.h` exists to prevent
+   ("Could not reach GitHub at an owner whose device had reached GitHub
+   perfectly"), repeated against a new cause. `STR_UPDATE_OUT_OF_MEMORY` added
+   to both YAMLs and both activities.
+
+Three more came out of the same pass and are fixed with them:
+
+- **The undeclared-length path was WORSE than the `std::string` it replaced.**
+  `ensure()` holds the old block and the new one across its memcpy, so doubling
+  to reach 18 KB peaked at 16,385 + 32,769 = **49,154 bytes**, against the
+  33,072 this bug blames. Growth is now linear (8 KB a step), which bounds both
+  the overshoot and the peak. Nothing has ever verified that GitHub's asset CDN
+  declares a `Content-Length` for this manifest — the whole fix rests on it — so
+  `runGetWolf` now logs which branch ran.
+- **A zero-length chunk wrote the NUL terminator through a null pointer.**
+  Reproduced as a SIGSEGV. No shipped transport delivers one (every caller
+  guards `n <= 0` before `emitBody`), but that convention lives in
+  `freeink-sdk/`, not here, and neither test fake sent one. Guarded, with a test.
+- **`MAX_MANIFEST_BYTES`'s comment claimed headroom that does not exist** —
+  "room for roughly forty-five families" against a heap that refused 22 KB.
+  Rewritten: it is a backstop against a hostile response, not a family budget,
+  and the real ceiling is ~14-16 families.
+
+**And the test suite could not see any of it.** `grep -n capacity` over the
+original `HttpBodyTest.cpp` returned nothing: ten tests, every one asserting
+only `out.len` and the byte content, so a 32,769-byte block and an 18,109-byte
+block were indistinguishable to all of them. The lesson is narrower than "the
+fake was too generous" — the fake's contract matched the wolfSSL path
+faithfully; it was the ASSERTION SET that was blind to the only quantity that
+mattered. `Body` now carries an observable `capacity` and three tests assert it;
+reverting to doubling fails two of them.
+
+Writing those tests found one more bug in the new code: the growth guard
+`want > maxBytes - kGrowStep` underflows whenever the cap is smaller than one
+step, and allocated 8,193 bytes against a 4,096-byte cap. Now written
+`kGrowStep > maxBytes - want`, with the invariant named in a comment.
+
+---
+
+**The first attempt, for the record — option 2, the owner's choice of the three
+offered.**
 `HttpDownloader::fetchUrlToBuffer` (new, `HttpDownloader.h`) reads a whole body
 into one `makeUniqueNoThrow<char[]>` block sized from `Content-Length`, capped,
 NUL-terminated. `operator new` is never on the path, so a refusal comes back as
@@ -175,13 +238,24 @@ objects, and the test binary then reports the OLD code's behavior. Two mutation
 results were believed for several minutes on that basis. Touch the suite's
 `.cpp` files after any header edit, or delete the target's object directory.
 
-**Status is SHIPPED-quality but UNCONFIRMED on device.** 718/718 host tests
-pass and `gh_release` compiles, but the thing that failed was a real allocation
-on a real spent heap, which no host test reproduces. What to watch on the next
-Update Fonts run over Wi-Fi: it reaches "Manifest lists 13 families" instead of
-rebooting. If the heap is genuinely too tight even for one 18 KB block, the
-symptom changes from a reboot to an on-screen OOM error — which is the point of
-the fix, but is not the same as success.
+**Status: the follow-up is UNCONFIRMED on device, and the first attempt is why
+that sentence is worth taking seriously.** 721/721 host tests pass and
+`gh_release` compiles. The first fix also passed 718/718 and compiled, and it
+did not work — because nothing on the host could observe the one number that
+decided it. What to watch on the next Update Fonts run over Wi-Fi: it reaches
+"Manifest lists 13 families". If the heap cannot give up even one exact 18 KB
+block, the screen now says "Not enough memory" rather than blaming the network,
+and THAT is the answer that says holding the manifest whole is the wrong design
+and it has to stream through a file (option 3 of the original three).
+
+**The cheapest thing that would settle it is a USB serial capture of one
+reproduction.** `LOG_ERR` is compiled into `gh_release` (`-DLOG_LEVEL=1`), and
+`FontUpdateActivity` already logs the raw enum — `HTTP_ERROR` is 2,
+`OOM_ERROR` is 9 — while `FontUpdater` prints two different sentences
+("Manifest does not fit in 65536 bytes of RAM" vs "Manifest fetch failed"). None
+of it reaches the card: `getLastLogs()` is dumped only inside a panic report
+(`lib/hal/HalSystem.cpp`), and this failure no longer panics. So the
+discriminator exists, is already compiled in, and is invisible without a cable.
 
 ### [B-052] X3 abort in the grayscale/anti-aliasing path after the BW buffer save fails — a framework `ESP_ERROR_CHECK()` giving up under heap exhaustion
 **severity: high (hard crash while reading) · scope: `lib/GfxRenderer/GfxRenderer.cpp` `storeBwBuffer()`, `src/TextAntiAliasing.cpp` `overlayViaWholeFrame()`, and whatever framework call aborts after them · found 2026-09-07 in `/Volumes/BUNNYFIELDS/crash_reports/crash_0.txt`, not reported**

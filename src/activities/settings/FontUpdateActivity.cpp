@@ -138,13 +138,19 @@ void FontUpdateActivity::runCheck() {
 
   if (err != FontUpdater::OK) {
     LOG_ERR("FONTUPD", "manifest check failed (%d)", static_cast<int>(err));
-    // Four distinct causes, four distinct sentences, for the reason the library
-    // screen learned to separate them: "check failed" sends the owner to debug
-    // Wi-Fi over a manifest GitHub served perfectly.
+    // Distinct causes, distinct sentences, for the reason the library screen
+    // learned to separate them: "check failed" sends the owner to debug Wi-Fi
+    // over a manifest GitHub served perfectly.
+    //
+    // OOM_ERROR is here because it fell into the default arm and printed
+    // "Could not reach GitHub" at an owner whose network was fine -- exactly
+    // the failure this chain exists to prevent, repeated against a new cause.
+    // Reported 2026-09-07 on 1.5.30-BD; see B-053.
     errorMessage = err == FontUpdater::NO_RELEASE         ? tr(STR_FONTS_NO_RELEASE)
                    : err == FontUpdater::NO_REPO_ACCESS   ? tr(STR_LIBRARY_NO_REPO_ACCESS)
                    : err == FontUpdater::BAD_TOKEN        ? tr(STR_LIBRARY_BAD_TOKEN)
                    : err == FontUpdater::MANIFEST_TOO_NEW ? tr(STR_FONTS_MANIFEST_TOO_NEW)
+                   : err == FontUpdater::OOM_ERROR        ? tr(STR_UPDATE_OUT_OF_MEMORY)
                                                           : tr(STR_UPDATE_CHECK_FAILED);
     RenderLock lock(*this);
     state = State::FAILED;

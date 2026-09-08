@@ -35,6 +35,14 @@ class HttpBody : public ::testing::Test {
 
 // The exact case that crashed: 18,108 bytes arriving in 1 KB pieces. The old
 // accumulator died on the growth step partway through; this must complete.
+//
+// The capacity assertion is the load-bearing one and it is why this test exists
+// twice over. The first version of the fix doubled from 1024 and took 32,769
+// bytes for this body -- HALF AS MUCH AGAIN as it needs, and a longer
+// contiguous run than the 22,049-byte request whose refusal is B-053 itself.
+// It shipped as 1.5.30-BD and the device failed again. Nothing here could see
+// it, because the suite only checked that the bytes came out right. Do not
+// weaken this to `out.len`.
 TEST_F(HttpBody, TheManifestThatAbortedTheDeviceNowReadsWhole) {
   auto& s = fakehttp::script();
   s.body = bodyOfSize(18108);
@@ -45,18 +53,37 @@ TEST_F(HttpBody, TheManifestThatAbortedTheDeviceNowReadsWhole) {
   ASSERT_EQ(HttpDownloader::OK, HttpDownloader::fetchUrlToBuffer("u", kNoHeaders, 64 * 1024, out));
   EXPECT_EQ(18108u, out.len);
   EXPECT_EQ(s.body, std::string(out.c_str(), out.len));
+  EXPECT_EQ(18108u, out.capacity) << "a declared length must take exactly that block, not a rounded-up one";
 }
 
-// The reserve happens once, off the announced length, before a byte is copied.
-TEST_F(HttpBody, ADeclaredLengthIsAnnouncedExactlyOnce) {
+// The reserve happens once, off the announced length, before a byte is copied,
+// and it is the ONLY allocation: arriving chunks must not regrow it.
+TEST_F(HttpBody, ADeclaredLengthIsAnnouncedExactlyOnceAndReservedExactly) {
   auto& s = fakehttp::script();
   s.body = bodyOfSize(4000);
   s.declaredLength = 4000;
+  s.chunk = 256;  // sixteen chunks, none of which may cause a reallocation
 
   HttpDownloader::Body out;
   ASSERT_EQ(HttpDownloader::OK, HttpDownloader::fetchUrlToBuffer("u", kNoHeaders, 64 * 1024, out));
   EXPECT_EQ(1u, s.sizeAnnouncements);
   EXPECT_EQ(4000u, out.len);
+  EXPECT_EQ(4000u, out.capacity);
+}
+
+// A body one byte LONGER than declared must not overrun the exact block. The
+// server is not trusted to be truthful just because it declared a length.
+TEST_F(HttpBody, ABodyLongerThanDeclaredGrowsRatherThanOverruns) {
+  auto& s = fakehttp::script();
+  s.body = bodyOfSize(4001);
+  s.declaredLength = 4000;
+  s.chunk = 4001;
+
+  HttpDownloader::Body out;
+  ASSERT_EQ(HttpDownloader::OK, HttpDownloader::fetchUrlToBuffer("u", kNoHeaders, 64 * 1024, out));
+  EXPECT_EQ(4001u, out.len);
+  EXPECT_GE(out.capacity, 4001u);
+  EXPECT_EQ(s.body, std::string(out.c_str(), out.len));
 }
 
 // The buffer is always NUL-terminated, so c_str() is safe to hand to a parser
@@ -84,6 +111,10 @@ TEST_F(HttpBody, AChunkedResponseWithNoDeclaredLengthStillReadsWhole) {
   ASSERT_EQ(HttpDownloader::OK, HttpDownloader::fetchUrlToBuffer("u", kNoHeaders, 64 * 1024, out));
   EXPECT_EQ(9000u, out.len);
   EXPECT_EQ(s.body, std::string(out.c_str(), out.len));
+  // No declared length is the ONLY case allowed to round up -- it has nothing
+  // better to go on -- but it still may not exceed the cap.
+  EXPECT_GE(out.capacity, 9000u);
+  EXPECT_LE(out.capacity, 64u * 1024u);
 }
 
 // A body that DECLARES more than the cap is refused at the announcement, before
@@ -183,6 +214,40 @@ TEST_F(HttpBody, AReusedBufferStartsClean) {
   ASSERT_EQ(HttpDownloader::OK, HttpDownloader::fetchUrlToBuffer("u", kNoHeaders, 64 * 1024, out));
   EXPECT_EQ(100u, out.len);
   EXPECT_EQ(s.body, std::string(out.c_str(), out.len));
+}
+
+// A zero-length chunk must not write the NUL through a null buffer. No shipped
+// transport sends one -- every caller guards `n <= 0` before emitBody -- but
+// that convention lives in freeink-sdk, not in this repo, and a segfault held
+// off by a neighbouring project's invariant is worth one branch here. This
+// crashed with SIGSEGV before the guard.
+TEST_F(HttpBody, AZeroLengthChunkDoesNotWriteThroughANullBuffer) {
+  auto& s = fakehttp::script();
+  s.body = "";
+  s.declaredLength = 0;
+  s.emitOneEmptyChunk = true;
+
+  HttpDownloader::Body out;
+  EXPECT_EQ(HttpDownloader::OK, HttpDownloader::fetchUrlToBuffer("u", kNoHeaders, 4096, out));
+  EXPECT_EQ(0u, out.len);
+}
+
+// The undeclared-length path grows LINEARLY, because ensure() holds the old
+// block and the new one at the same time. Doubling to reach 18 KB peaked at
+// 16,385 + 32,769 = 49,154 bytes -- worse than the std::string B-053 replaced.
+// The assertion is an upper bound on the final block, which is what bounds the
+// peak; loosening it re-opens that regression silently.
+TEST_F(HttpBody, UndeclaredGrowthOvershootsByAtMostOneStep) {
+  auto& s = fakehttp::script();
+  s.body = bodyOfSize(18108);
+  s.declaredLength = 0;
+  s.chunk = 1024;
+
+  HttpDownloader::Body out;
+  ASSERT_EQ(HttpDownloader::OK, HttpDownloader::fetchUrlToBuffer("u", kNoHeaders, 64 * 1024, out));
+  EXPECT_EQ(18108u, out.len);
+  EXPECT_EQ(s.body, std::string(out.c_str(), out.len));
+  EXPECT_LT(out.capacity, 18108u + 8192u) << "growth overshot by more than one step -- is it doubling again?";
 }
 
 }  // namespace
