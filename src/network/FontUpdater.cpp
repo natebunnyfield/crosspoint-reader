@@ -63,6 +63,33 @@ constexpr int MAX_MANIFEST_VERSION = 1;
 // Over the cap is an error, never an abort.
 constexpr size_t MAX_MANIFEST_BYTES = 64 * 1024;
 
+// TEMPORARY, owner instruction 2026-09-08: "Let's limit it to Edgar only for
+// now", after a run in which all thirteen families reported an error. Set to
+// nullptr to sync everything again -- that is the whole revert, one line.
+//
+// This is a diagnostic narrowing, not a feature. One family is six files
+// instead of seventy-eight and ~3.5 MB instead of ~84 MB, so a run finishes in
+// a fraction of the time and the failure it reports is about one family rather
+// than thirteen at once.
+//
+// IT ALSO DISABLES REMOVAL, and that is not optional. The sync is a MIRROR: a
+// family the manifest does not list is deleted from the card. With this filter
+// on, `families` holds one entry, which is not a statement about what belongs
+// on the card -- it is a statement about what we chose to look at. Acting on it
+// would delete the other twelve families, including any the owner cannot
+// re-download. The gate in removeUnlistedFamilies refuses while this is set.
+//
+// It is a BUILD FLAG rather than a literal here so the host suites, which
+// compile this file without it, keep exercising the unfiltered behavior. A
+// hardcoded name failed fifteen tests that use other families -- and a
+// diagnostic narrowing that also disables its own test coverage is worth less
+// than nothing.
+#ifdef CROSSPOINT_FONTS_ONLY_FAMILY
+constexpr const char* ONLY_FAMILY = CROSSPOINT_FONTS_ONLY_FAMILY;
+#else
+constexpr const char* ONLY_FAMILY = nullptr;
+#endif
+
 // The cache root the layout caches live under: /.crosspoint/epub_<hash>/sections.
 constexpr char cacheRoot[] = "/.crosspoint";
 constexpr char cacheDirPrefix[] = "epub_";
@@ -285,6 +312,11 @@ void FontUpdater::acceptManifestFamily(FontManifestParser::RawFamily& raw,
   if (families.size() >= MAX_FAMILIES) return;
   Family family;
   family.name = std::move(raw.name);
+  if (ONLY_FAMILY != nullptr && family.name != ONLY_FAMILY) {
+    // Skipped, not failed: the run is deliberately looking at one family. See
+    // ONLY_FAMILY, and note that it also switches removal off.
+    return;
+  }
   if (!fontsync::isSafeFamilyName(family.name.c_str())) {
     LOG_ERR(LOG_MODULE, "Skipping malformed family name in the manifest");
     return;
@@ -885,6 +917,14 @@ size_t FontUpdater::removeUnlistedFamilies(std::vector<std::string>& removed) {
   // sets it only on its OK return, so every failure path lands here false.
   if (!manifestOk_ || families.empty()) {
     LOG_DBG(LOG_MODULE, "No usable manifest; removing nothing");
+    return 0;
+  }
+  if (ONLY_FAMILY != nullptr) {
+    // The family list was filtered to ONLY_FAMILY, so it says what this run
+    // chose to look at, NOT what belongs on the card. Mirroring against it
+    // would delete every other family, including ones that cannot be
+    // re-downloaded. Removal resumes when ONLY_FAMILY goes back to nullptr.
+    LOG_INF(LOG_MODULE, "Limited to %s; removing nothing", ONLY_FAMILY);
     return 0;
   }
 

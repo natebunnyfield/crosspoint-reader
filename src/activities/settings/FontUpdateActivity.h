@@ -92,6 +92,11 @@ class FontUpdateActivity : public Activity {
   bool skipLoopDelay() override { return state == State::SYNCING; }
 
  private:
+  // Where a failed run leaves its log ring, so the cause can be read off the
+  // card instead of a USB cable. See the definition.
+  static constexpr const char* FAILURE_LOG_PATH = "/fontsync.log";
+  void writeFailureLog(unsigned updated, unsigned unchanged, unsigned removed, unsigned errors);
+
   State state = State::CHECKING;
   FontUpdater::CheckStep checkStep = FontUpdater::CheckStep::CONTACTING;
   FontUpdater updater;

@@ -34,6 +34,75 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-055] Update Fonts: every family fails with "Downloads failed" — the download path's FIRST run on hardware, cause unknown, instrumented 2026-09-08
+**severity: high (the feature cannot install anything) · scope: `FontUpdater::stageFamily` download loop, `HttpDownloader::runGetWolf` on multi-MB bodies · reported by the owner 2026-09-08 on 1.5.32-BD**
+
+Owner, verbatim: *"Update Fonts ran but had 13 errors"*, then, when asked what
+the second line said: *"Downloads failed"*.
+
+**The manifest now works.** That is the part B-053 was about, and thirteen
+families were parsed, so the streaming parse reached the sync. Everything below
+is a DIFFERENT failure, one family further in.
+
+**"Downloads failed" is `FailureKind::NETWORK`** (`FontUpdateActivity.cpp`'s
+hint line, `STR_LIBRARY_ERRORS_NETWORK`), set at `FontUpdater.cpp:755` when
+`fetchUrlWithHeaders` returns anything but `OK`. Two things follow from the
+ORDER of the checks in `stageFamily` and they narrow it usefully:
+
+- **The card is not the problem.** `if (!writeOk)` is tested BEFORE the fetch
+  result and reports STORAGE. He got NETWORK, so every byte that arrived was
+  written successfully.
+- **The bytes are not the problem either.** A size or sha mismatch reports
+  VERIFY, also a distinct string. So this is the transfer itself not
+  completing.
+
+**This is the download path's first execution on hardware, ever.** 1.5.29-BD
+aborted at the manifest, 1.5.30-BD and 1.5.31-BD failed at it. Nothing before
+1.5.32-BD reached `stageFamily`. So this is newly-exercised code, not a
+regression from the B-053 work.
+
+**Ruled out, so it is not re-proposed:** the "S3 rejects a presigned URL that
+also carries an `Authorization` header" theory. `runGetWolf` does re-send
+`sink.extraHeaders` on every redirect hop, so the header does reach the CDN --
+but the MANIFEST is fetched through the identical asset URL, the identical
+redirect and the identical headers, and it succeeds. Whatever this is, it is
+not the headers. The remaining difference between the two is SIZE and duration:
+the manifest is 18 KB, a font file is 582 KB to several MB, and a family is six
+of them.
+
+**Instrumented rather than patched, per the standing rule.** This is the third
+device failure of this feature and the second where the answer already existed
+and could not be read: `FontUpdater.cpp:753-754` already logs `"Download of %s
+failed (%d) after %u of %u bytes"` -- the `DownloadError` code and the byte
+count are exactly what identifies this -- and `LOG_ERR` is compiled into
+`gh_release`. But `getLastLogs()` is dumped only inside a PANIC report
+(`lib/hal/HalSystem.cpp`), and this failure does not panic, so it was invisible
+without a USB cable. A run that ends with errors now writes the ring to
+**`/fontsync.log`** on the card, overwritten each run. Reading that file after
+one reproduction should name the cause outright.
+
+**Narrowed to one family while this is diagnosed.** Owner instruction: *"Let's
+limit it to Edgar only for now"*. `-DCROSSPOINT_FONTS_ONLY_FAMILY='"Edgar"'` in
+`platformio.ini`'s `[base]`; deleting that one line restores everything. Six
+files and ~3.5 MB instead of seventy-eight and ~84 MB, so a run finishes quickly
+and reports about one family rather than thirteen at once.
+
+**It also disables the removal pass, and that is not incidental.** The sync is a
+MIRROR. A filtered family list says what this build chose to LOOK AT, not what
+belongs on the card, and mirroring against it would delete the other twelve
+families -- including any the owner licensed and cannot re-download. The gate is
+in `removeUnlistedFamilies` and it refuses whenever the filter is set.
+
+The flag lives in `platformio.ini` rather than as a literal in the source
+because a hardcoded name failed fifteen host tests that use other families: a
+diagnostic narrowing that also disables its own test coverage is worth less than
+nothing.
+
+**To close:** read `/fontsync.log` after one Edgar run. The `DownloadError` code
+in it distinguishes a connection that never opened (`status < 0`) from a body
+that stopped mid-stream (`!responseComplete()`) from an unexpected HTTP status,
+and those are three different bugs.
+
 ### [B-054] Deleting a file appears to corrupt filenames across the filesystem — REPORTED 2026-09-07, not yet investigated
 **severity: high (data integrity on the card, and it is not confined to the file that was deleted) · scope: unknown; start at the delete path and the directory listing that follows it · reported by the owner 2026-09-07**
 

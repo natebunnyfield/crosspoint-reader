@@ -2,12 +2,14 @@
 
 #include <Arduino.h>
 #include <GfxRenderer.h>
+#include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
 #include <WiFi.h>
 
 #include <cstdint>
 #include <cstdio>
+#include <string>
 
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
@@ -33,6 +35,43 @@ const char* needsTokenHint() {
   return I18N.get(StrId::STR_LIBRARY_NEEDS_TOKEN_HINT);
 }
 }  // namespace
+
+
+// A run that ends in errors leaves its log ring on the CARD.
+//
+// Update Fonts has now failed on the owner's device three times running, each
+// time differently, and every diagnosis has cost a round trip: the ring holds
+// the one line that names the cause -- "Download of Edgar_8.cpfont failed (2)
+// after 131072 of 582482 bytes" -- and LOG_ERR is compiled into gh_release, but
+// getLastLogs() is only ever dumped inside a PANIC report
+// (lib/hal/HalSystem.cpp). These failures do not panic, so the answer exists,
+// is already built, and is invisible without a USB cable.
+//
+// This is the project rule about a second device failure meaning
+// instrumentation rather than another plausible patch. Overwritten each run,
+// never appended: one file, always the latest failure, no growth on the card.
+void FontUpdateActivity::writeFailureLog(unsigned updated, unsigned unchanged, unsigned removed, unsigned errors) {
+  // openFileForWrite rather than raw open flags: it is the helper every other
+  // writer here uses, and it is the one the host stubs implement.
+  HalFile file;
+  if (!Storage.openFileForWrite("FONTUPD", FAILURE_LOG_PATH, file)) {
+    LOG_ERR("FONTUPD", "Could not write %s", FAILURE_LOG_PATH);
+    return;
+  }
+#ifndef CROSSPOINT_VERSION
+#define CROSSPOINT_VERSION "host"
+#endif
+  char header[160];
+  const int n = snprintf(header, sizeof(header),
+                         "CrossPoint " CROSSPOINT_VERSION "\nfont sync: %u updated, %u unchanged, %u removed, "
+                         "%u errors\n\nLast logs:\n",
+                         updated, unchanged, removed, errors);
+  if (n > 0) file.write(header, static_cast<size_t>(n));
+  const std::string logs = getLastLogs();
+  if (!logs.empty()) file.write(logs.c_str(), logs.size());
+  file.close();
+  LOG_INF("FONTUPD", "wrote %s", FAILURE_LOG_PATH);
+}
 
 void FontUpdateActivity::onEnter() {
   Activity::onEnter();
@@ -210,6 +249,7 @@ void FontUpdateActivity::syncNextFamily() {
     LOG_INF("FONTUPD", "font sync done: %u updated, %u unchanged, %u removed, %u errors", updated, unchanged, removed,
             errors);
     if (removed != 0) LOG_INF("FONTUPD", "removed: %s", removedNames.c_str());
+    if (errors != 0) writeFailureLog(updated, unchanged, removed, errors);
     RenderLock lock(*this);
     state = State::DONE;
     requestUpdate();
