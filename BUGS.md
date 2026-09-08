@@ -238,6 +238,68 @@ objects, and the test binary then reports the OLD code's behavior. Two mutation
 results were believed for several minutes on that basis. Touch the suite's
 `.cpp` files after any header edit, or delete the target's object directory.
 
+**A memory audit of the whole feature, 2026-09-07, found three more of this
+same class and they are fixed here too.** All of them are B-053's mechanism
+somewhere else, which is the point: the bug was never one line.
+
+- **`flushSyncRecords` was B-053 verbatim, on the last line of a SUCCESSFUL
+  run, in both updaters.** `serializeJson(doc, std::string&)` appends, which
+  reaches `operator new`. Measured from the real 78 files: the ledger is 11,113
+  bytes, and libstdc++'s doubling needs 15,361 new while still holding 7,680 --
+  **23,041 bytes across two blocks, within a byte of the 22,049 this device is
+  measured refusing.** No run had ever reached it, because no run had got past
+  the manifest. Now `measureJson(doc)` sizes one nothrow block and there is no
+  growth at all. `loadSyncRecords`' `body.resize(ledgerBytes)` on a size read
+  off the card was the same hazard on the read path; also nothrow now, and a
+  refusal costs one hashing pass instead of the device.
+- **Two `push_back` loops had no usable `reserve`** (Resource Protocol 7).
+  `GithubReleaseAssetParser` doubled to a capacity-128 vector for 79 assets --
+  a 6,656-byte contiguous block with the old 3,328 still live, on the heap
+  about to be asked for the manifest. `FontUpdater`'s `records` reserved
+  `ledgerFiles.size()`, which is ZERO on a first run, so 78 `push_back`s
+  doubled to 7,168 bytes. Both floored at 96.
+- **Two comments asserted the opposite of what the code does.**
+  `FontUpdateActivity.h` said "families the manifest does not mention are never
+  touched" and `FontSyncPlan.h` said removal "is none of this feature's
+  business". `removeUnlistedFamilies` deletes exactly those, over both roots,
+  on every non-cancelled run, by a standing owner ruling
+  (`docs/sd-card-fonts.md`) that is fenced by five tests. The design is right;
+  the comments were wrong, and they are the kind that gets a correct mirror
+  "fixed" away by someone who trusted them.
+
+**Checked against the real card rather than assumed:** `/Volumes/BUNNYFIELDS`
+(the X3 card) holds six families in `/.fonts` -- Coelacanth, Edgar,
+InknutJunicode, LibreFranklin, LibrisADF, TeXGyreSchola -- and **all six are in
+the manifest, so a sync would delete nothing.** The audit flagged
+`fs_/.fonts/NittiTypewriter`, a personally licensed face that cannot be
+re-downloaded, as a family the mirror would destroy; `fs_/` is the SIMULATOR's
+card root in this repo, not a device card. The exposure is real but unproven on
+hardware: the X4's card has not been mounted here, and if it carries a family
+outside those thirteen, the first successful sync removes it. That is the
+ruling, not an oversight.
+
+**Known and NOT fixed here, recorded so the next pass does not rediscover
+them:**
+- The `JsonDocument` parsed from the manifest costs ~14.6 KB across 185 blocks
+  while the 18 KB buffer is still held (`.reset()` comes after the parse), so
+  the peak is ~50 KB. ArduinoJson's allocator is `malloc`-based and returns
+  `NoMemory` rather than aborting, but `FontUpdater` maps that to
+  `JSON_PARSE_ERROR` -- so a heap failure there still reads as "Could not reach
+  GitHub" on screen. **If the fixes here are not enough, this is the next
+  mechanism, and the honest answer is then to stream the manifest through
+  `StreamingJsonParser` (already used one function earlier for the release
+  JSON) instead of holding it whole -- option 3 of the original three, dropping
+  the feature peak from ~50 KB to ~16 KB.**
+- A first successful run hashes 84.5 MB in 1 KB chunks (~86,568 reads) with the
+  progress bar showing 0% under "Font 1 of 13" for 3-7 minutes. It will look
+  like a hang and it is not.
+- Nobody has ever measured free heap and largest-free-block at the moment
+  `CheckStep::READING` fires with Wi-Fi up and TLS live. Every heap number in
+  this entry is arithmetic or inference against one on-device datum (the 22,049
+  refusal). Three `LOG_INF` lines would make them all measured, and per the
+  standing "second device failure -> instrument, don't re-patch" rule this is
+  now the second device failure of this feature.
+
 **Status: the follow-up is UNCONFIRMED on device, and the first attempt is why
 that sentence is worth taking seriously.** 721/721 host tests pass and
 `gh_release` compiles. The first fix also passed 718/718 and compiled, and it

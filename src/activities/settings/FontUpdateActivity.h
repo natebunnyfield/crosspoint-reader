@@ -28,7 +28,12 @@
  * a family that fails leaves the previously installed one exactly as it was
  * rather than a hole in the ramp.
  *
- * Families on the card that the manifest does not mention are never touched.
+ * Families on the card that the manifest does not
+// mention ARE REMOVED -- this sync is a mirror, by an owner ruling recorded in
+// docs/sd-card-fonts.md with its rejected alternatives, and there is
+// deliberately no exemption for a sideloaded family. This line used to say the
+// opposite, which is exactly the sort of comment that gets the mirror "fixed"
+// away by someone who trusted it.
  *
  * THE FIRST FRAME IS ON THE PANEL BEFORE ANY NETWORK CALL, and onEnter() waits
  * for it rather than merely requesting it. A deferred requestUpdate() there is

@@ -124,6 +124,13 @@ class GithubReleaseAssetParser {
           // A real release has a handful of assets; kMaxAssets is generous.
           constexpr size_t kMaxAssets = 512;
           if (!self->current.name.empty() && !self->current.url.empty() && self->assets.size() < kMaxAssets) {
+            // Resource Protocol 7. Unreserved, 79 assets doubles its way to a
+            // capacity-128 vector -- one 6,656-byte contiguous operator new
+            // with the old 3,328-byte block still live, on the heap that is
+            // about to be asked for the manifest. A release carries a handful
+            // of assets per family; 96 covers thirteen families with room, and
+            // the cap still bounds a hostile response.
+            if (self->assets.capacity() == 0) self->assets.reserve(96);
             self->assets.push_back(self->current);
           }
           self->position = Position::IN_ASSETS_ARRAY;

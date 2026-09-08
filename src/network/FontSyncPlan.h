@@ -35,9 +35,13 @@
 // (SdCardFontRegistry.cpp:180) — so a family that is mid-download is invisible
 // to the picker, not partially visible.
 //
-// Removal is not representable, same as the library: nothing here can say
-// "delete". A family on the card that the manifest does not mention is none of
-// this feature's business.
+// Removal is not representable IN THIS HEADER, same as the library: nothing in
+// these pure decisions can say "delete". That is a statement about this file,
+// NOT about the feature -- FontUpdater::removeUnlistedFamilies does delete a
+// family the manifest omits, over both roots, on every non-cancelled run, by an
+// owner ruling recorded in docs/sd-card-fonts.md. The sentence that used to end
+// this comment ("none of this feature's business") read as the opposite and was
+// simply wrong.
 
 #include "LibrarySyncPlan.h"  // shaMatches / CardStamp / SyncRecord / hashVerdict / FailureKind
 

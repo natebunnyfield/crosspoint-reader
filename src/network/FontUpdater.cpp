@@ -1,5 +1,7 @@
 #include "FontUpdater.h"
 
+#include <algorithm>
+
 // clang-format off
 // Same include-order constraint as OtaUpdater.cpp / LibraryUpdater.cpp:
 // HttpDownloader.h pulls Arduino/SdFat, whose macros collide with lwip's
@@ -360,13 +362,22 @@ void FontUpdater::loadSyncRecords() {
     file.close();
     return;
   }
-  std::string body;
-  body.resize(ledgerBytes);
-  if (!body.empty()) file.read(&body[0], body.size());
+  // NOT a std::string: resize() reaches operator new, which is not nothrow
+  // under -fno-exceptions, so a refusal on a spent heap aborts instead of
+  // degrading. That is B-053, and this is the same mechanism on the ledger's
+  // read path. Failing here costs one hashing pass and nothing else.
+  auto body = makeUniqueNoThrow<char[]>(ledgerBytes + 1);
+  if (!body) {
+    LOG_ERR(LOG_MODULE, "No memory for the font ledger; hashing everything once");
+    file.close();
+    return;
+  }
+  if (ledgerBytes) file.read(body.get(), ledgerBytes);
+  body[ledgerBytes] = '\0';
   file.close();
 
   JsonDocument doc;
-  if (deserializeJson(doc, body) != DeserializationError::Ok) {
+  if (deserializeJson(doc, body.get(), ledgerBytes) != DeserializationError::Ok) {
     LOG_ERR(LOG_MODULE, "Font ledger did not parse; hashing everything once");
     return;
   }
@@ -376,7 +387,12 @@ void FontUpdater::loadSyncRecords() {
     return;
   }
   const JsonArrayConst ledgerFiles = doc["files"].as<JsonArrayConst>();
-  records.reserve(ledgerFiles.size());  // Resource Protocol 7: one allocation, not log2(N) reallocs
+  // Resource Protocol 7: one allocation, not log2(N) reallocs. On a FIRST run
+  // there is no ledger, so ledgerFiles is empty and this reserved nothing --
+  // then 78 push_backs doubled to a capacity-128 vector, a 7,168-byte
+  // contiguous operator new on an already-spent heap. Floor it at the number a
+  // real card actually holds.
+  records.reserve(std::max<size_t>(ledgerFiles.size(), 96));
   for (JsonObjectConst entry : ledgerFiles) {
     StoredRecord record;
     record.key = entry["f"] | "";
@@ -473,8 +489,20 @@ void FontUpdater::flushSyncRecords() {
     entry["t"] = record.fatTime;
     entry["s"] = record.sha;
   }
-  std::string body;
-  serializeJson(doc, body);
+  // Same reason as the read path above, and this one is worse: the ledger for
+  // 78 files measures ~11 KB, and libstdc++'s doubling needed 15,361 bytes new
+  // while still holding 7,680 -- 23,041 across two blocks, within a byte of the
+  // 22,049 this device is measured refusing (B-053). measureJson gives the
+  // exact size, so one nothrow block does it with no growth at all.
+  const size_t bodyLen = measureJson(doc);
+  auto body = makeUniqueNoThrow<char[]>(bodyLen + 1);
+  if (!body) {
+    // Leave recordsDirty set: a later run must try again rather than believe a
+    // write that never happened.
+    LOG_ERR(LOG_MODULE, "No memory to serialize the font ledger; the next run will hash again");
+    return;
+  }
+  serializeJson(doc, body.get(), bodyLen + 1);
 
   HalFile file;
   if (!Storage.openFileForWrite(LOG_MODULE, syncRecordsPath, file)) {
@@ -484,11 +512,11 @@ void FontUpdater::flushSyncRecords() {
     LOG_ERR(LOG_MODULE, "Cannot write the font ledger; the next run will hash again");
     return;
   }
-  const size_t written = file.write(body.data(), body.size());
+  const size_t written = file.write(body.get(), bodyLen);
   file.close();
-  if (written != body.size()) {
+  if (written != bodyLen) {
     LOG_ERR(LOG_MODULE, "Font ledger write was short (%u of %u bytes); the next run will hash again",
-            static_cast<unsigned>(written), static_cast<unsigned>(body.size()));
+            static_cast<unsigned>(written), static_cast<unsigned>(bodyLen));
     return;  // still dirty, and a short JSON file fails its own version check
   }
   recordsDirty = false;
