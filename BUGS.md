@@ -34,6 +34,106 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-053] Update Fonts aborts on the manifest: an unbounded `std::string::append` reaches `operator new`, and `-fno-exceptions` turns `bad_alloc` into `abort()` — SYMBOLIZED EXACTLY, unfixed
+**severity: critical (the headline feature of 1.5.29-BD crashes the device, reproduced twice on the owner's X4) · scope: `src/network/FontUpdater.cpp:186-191`, the same pattern at `src/network/LibraryUpdater.cpp:167-171` and `src/network/HttpDownloader.cpp` `fetchUrl(url, std::string&)` · found 2026-09-07 from two crash reports the owner supplied, hours after 1.5.29-BD shipped**
+
+```
+CrossPoint version: 1.5.29-BD
+Panic reason: abort() was called at PC 0x421d3f8d on core 0
+[321015] [INF] [WIFI] EVT got_ip
+[321024] [INF] [WIFI] Connected to King in 4143 ms
+```
+
+The two reports (`crash_report_2.txt`, `crash_report_3.txt`) are byte-identical
+— the fixed-path copy and its archive twin — so this is one event, but the
+stack carries the fonts manifest JSON in plain text (`DanteMT_10.cpfont`,
+`"sha256"`, `"bytes"`), which named the feature before anything was decoded.
+
+**The call chain, symbolized exactly.** Not inferred, not corroborated from a
+neighboring build — *proven against the shipped image*:
+
+```
+SecureHttpClient::readFixed              SecureHttpClient.h:519
+  SecureHttpClient::emitBody             SecureHttpClient.h:469
+    runGetWolf's sink lambda             HttpDownloader.cpp:84
+      FontUpdater::fetchManifest lambda  FontUpdater.cpp:189   <- ours
+        std::string::append              basic_string.h:1470
+          _M_mutate -> _M_create -> allocator<char>::allocate
+            operator new(unsigned int)   new_op.cc:55
+              std::bad_alloc             bad_alloc.cc:28
+                __cxxabiv1::__terminate  eh_terminate.cc:45    <- the abort PC
+```
+
+**How it was proven, because this is the reusable half.** `gh_release` was
+rebuilt locally at tag `1.5.29-BD` (`b9dbce9fc`). The rebuild is NOT
+byte-identical to the published asset — 5,311,152 vs 5,310,864 bytes, because
+the runner's build paths differ from the Mac's — so matching addresses could
+not simply be assumed. Instead the 14-byte `__cxxabiv1::__terminate` prologue
+was extracted from the rebuild's ELF at VMA `0x421d3f8a` and searched for in
+both images: **exactly one hit in each, at the identical file offset
+`0x4d3f8a`, same VMA delta `0x41d00000`.** Same code, same address, both
+images. The disassembly then closes it arithmetically — `0x421d3f8e` is
+`jalr a0` (the terminate handler call) and its return address `0x421d3f90` is
+literally present in the dumped stack; ESP-IDF prints the *call* address,
+`0x421d3f90 - 3 = 0x421d3f8d`, which is the reported PC to the byte.
+
+**The mechanism, with the sizes off the stack.** `manifestBody` is a bare
+`std::string` with no `reserve()`; the download callback appends ~1 KB chunks.
+libstdc++ doubles on growth, so it climbs 2756 -> 5512 -> 11024 -> 22048. The
+stack holds `0x2B10` (11024, the size in hand) and `0x5621` (22049, the byte
+count asked of `operator new`) as live arguments. Satisfying it needs the new
+22 KB block while the old 11 KB is still held — ~33 KB across two blocks, on a
+380 KB part, with wolfSSL and the Wi-Fi stack resident after a run of failed
+joins. It was refused, and `-fno-exceptions` (`platformio.ini:127`) makes that
+refusal fatal rather than recoverable.
+
+**The manifest is 18,108 bytes** (measured: `gh api
+repos/natebunnyfield/claude-tools/releases/tags/fonts-latest`, 79 assets =
+13 families x 6 files + the manifest). It therefore *must* reach the 22048 step
+to finish.
+
+**Ruled out, so it is not re-proposed: the thirteenth family is NOT the
+trigger.** At twelve families the manifest would be ~16.7 KB, which also
+exceeds 11024 and also requires the same 22048 growth step. VandenKeere
+(`5b87f173f`) did not push this over an edge; the allocation has been fragile
+since the feature was written and fails whenever the heap is tight.
+
+**This is a violation of two of this repo's own standing rules**, both in the
+project guide's Resource Protocol: rule 7 (`reserve()` before any append loop)
+and rule 9 (`new` is not nothrow on ESP32 — never leave a fallible allocation
+on a path that aborts).
+
+**Not introduced by the Update Fonts commit.** `LibraryUpdater.cpp:167-171`
+has the identical unguarded pattern, and so does
+`HttpDownloader::fetchUrl(url, std::string& outContent)`. FontUpdater copied a
+shape that was already there; the fonts manifest is simply the first body large
+enough to reach the failing step. Update Library's manifest is smaller and has
+not crashed, which is luck, not safety.
+
+**The plumbing gap that makes the clean fix possible.** `HttpDownloader`
+already knows the body size — `sink.total` is set from `Content-Length` at
+`HttpDownloader.cpp:219` — but `DataCallback` is `(const uint8_t*, size_t len)`
+and never receives it. Nothing downstream can `reserve()` because nothing
+downstream is told how much is coming.
+
+**Not the cause, checked and clean:** the `A5A5A5A5` words below the JSON are
+FreeRTOS stack fill, not corruption; the manifest JSON on the stack at
+`0x3FCAB95C` is wolfSSL's read chunk inside `emitBody`, which is where it
+belongs and is ~1 KB, not a large stack buffer; `HttpDownloader`'s own read
+buffer is correctly `makeUniqueNoThrow<char[]>(READ_CHUNK)` with a null check
+(`HttpDownloader.cpp:221-226`).
+
+**Fix not yet chosen — the options and their costs go to the owner first.**
+1. Plumb `Content-Length` to the callback and `reserve()` exactly once.
+   Smallest diff, kills the doubling, but a 18 KB contiguous `std::string`
+   still aborts if `operator new` refuses it.
+2. Replace `std::string` with `makeUniqueNoThrow<char[]>` sized from
+   `Content-Length`. One allocation, and a refusal returns an error instead of
+   aborting. Needs a size cap for a chunked/absent `Content-Length`.
+3. Stream the manifest to a file on the card and let ArduinoJson parse from it.
+   Constant RAM, survives a manifest of any size, biggest change.
+Whichever is taken, apply it to all three call sites, not just FontUpdater's.
+
 ### [B-052] X3 abort in the grayscale/anti-aliasing path after the BW buffer save fails — a framework `ESP_ERROR_CHECK()` giving up under heap exhaustion
 **severity: high (hard crash while reading) · scope: `lib/GfxRenderer/GfxRenderer.cpp` `storeBwBuffer()`, `src/TextAntiAliasing.cpp` `overlayViaWholeFrame()`, and whatever framework call aborts after them · found 2026-09-07 in `/Volumes/BUNNYFIELDS/crash_reports/crash_0.txt`, not reported**
 
