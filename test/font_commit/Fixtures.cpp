@@ -156,7 +156,8 @@ void reset() { server() = Server{}; }
 }  // namespace fakegh
 
 HttpDownloader::DownloadError HttpDownloader::fetchUrlWithHeaders(const std::string& url, const HeaderList&,
-                                                                  const DataCallback& onData) {
+                                                                  const DataCallback& onData,
+                                                                  const SizeCallback& onSize) {
   auto& s = fakegh::server();
   s.requested.push_back(url);
 
@@ -164,6 +165,9 @@ HttpDownloader::DownloadError HttpDownloader::fetchUrlWithHeaders(const std::str
   if (it == s.bodies.end()) return NOT_FOUND;
 
   const std::string& body = it->second;
+  // Declare the length the way GitHub does, so fetchUrlToBuffer takes its
+  // one-shot reserve here rather than the growth path (B-053).
+  if (onSize && !onSize(body.size())) return FILE_ERROR;
   const auto fail = s.failures.find(url);
   const size_t stopAfter = fail == s.failures.end() ? body.size() : fail->second.afterBytes;
 

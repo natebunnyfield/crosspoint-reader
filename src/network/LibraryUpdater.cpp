@@ -60,6 +60,10 @@ constexpr int SYNC_RECORDS_VERSION = 1;
 // the publisher starts stamping them.
 constexpr int MAX_MANIFEST_VERSION = 1;
 
+// The one response held whole in RAM gets an explicit ceiling. Over it is an
+// error, never an abort -- see B-053 and FontUpdater's copy of this constant.
+constexpr size_t MAX_MANIFEST_BYTES = 64 * 1024;
+
 // The token and the Authorization header come from network/GithubAuth.h, which
 // is shared with FontUpdater: the fonts release is in the SAME private repo, so
 // it is the same credential, read the same three ways, and NEVER logged.
@@ -164,19 +168,24 @@ LibraryUpdater::LibraryError LibraryUpdater::fetchManifest(StepCallback onStep, 
   };
 
   if (onStep) onStep(ctx, CheckStep::READING);
-  std::string manifestBody;
-  const HttpDownloader::DownloadError manifestFetched = HttpDownloader::fetchUrlWithHeaders(
-      manifestAsset->url, assetHeaders, [&manifestBody](const uint8_t* data, size_t len) {
-        manifestBody.append(reinterpret_cast<const char*>(data), len);
-        return true;
-      });
+  // Same treatment as the fonts manifest, and for the same reason: this had the
+  // identical unguarded std::string accumulator. It has not crashed only
+  // because a book manifest is smaller than a font one -- luck, not safety.
+  // B-053.
+  HttpDownloader::Body manifestBody;
+  const HttpDownloader::DownloadError manifestFetched =
+      HttpDownloader::fetchUrlToBuffer(manifestAsset->url, assetHeaders, MAX_MANIFEST_BYTES, manifestBody);
+  if (manifestFetched == HttpDownloader::TOO_LARGE || manifestFetched == HttpDownloader::OUT_OF_MEMORY) {
+    LOG_ERR("LIB", "Manifest does not fit in %u bytes of RAM", static_cast<unsigned>(MAX_MANIFEST_BYTES));
+    return OOM_ERROR;
+  }
   if (manifestFetched != HttpDownloader::OK) {
     LOG_ERR("LIB", "Manifest fetch failed");
     return HTTP_ERROR;
   }
 
   JsonDocument doc;
-  if (deserializeJson(doc, manifestBody) != DeserializationError::Ok) {
+  if (deserializeJson(doc, manifestBody.c_str(), manifestBody.len) != DeserializationError::Ok) {
     LOG_ERR("LIB", "Manifest JSON did not parse");
     return JSON_PARSE_ERROR;
   }

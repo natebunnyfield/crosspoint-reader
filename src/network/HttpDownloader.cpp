@@ -35,6 +35,10 @@ constexpr int MAX_REDIRECTS = 5;
 
 struct Sink {
   std::function<bool(const uint8_t*, size_t)> write;  // returns false to abort the transfer
+  // Announced once, before the first write, with the declared Content-Length
+  // (0 when the server declared none). Returning false refuses the body.
+  HttpDownloader::SizeCallback onSize;
+  bool sizeAnnounced = false;
   HttpDownloader::ProgressCallback progress;
   bool* cancelFlag = nullptr;
   size_t total = 0;
@@ -81,6 +85,10 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
         [&http, &sink](const uint8_t* data, size_t len) {
           if (http.getStatus() != 200) return true;
           if (sink.total == 0 && http.hasContentLength()) sink.total = http.getContentLength();
+          if (!sink.sizeAnnounced) {
+            sink.sizeAnnounced = true;
+            if (sink.onSize && !sink.onSize(sink.total)) return false;
+          }
           if (!sink.write(data, len)) return false;
           sink.downloaded += len;
           if (sink.progress && sink.total > 0) sink.progress(sink.downloaded, sink.total);
@@ -217,6 +225,11 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
   // fetch_headers returns 0 for a chunked response (no Content-Length); leave
   // total at 0 so progress stays silent and the size check is skipped.
   sink.total = contentLength > 0 ? static_cast<size_t>(contentLength) : 0;
+  sink.sizeAnnounced = true;
+  if (sink.onSize && !sink.onSize(sink.total)) {
+    esp_http_client_cleanup(client);
+    return HttpDownloader::FILE_ERROR;
+  }
 
   auto buf = makeUniqueNoThrow<char[]>(READ_CHUNK);
   if (!buf) {
@@ -304,10 +317,12 @@ HttpDownloader::DownloadError HttpDownloader::fetchUrlWithStatus(const std::stri
 }
 
 HttpDownloader::DownloadError HttpDownloader::fetchUrlWithHeaders(const std::string& url, const HeaderList& headers,
-                                                                  const DataCallback& onData) {
+                                                                  const DataCallback& onData,
+                                                                  const SizeCallback& onSize) {
   LOG_DBG("HTTP", "Fetching (custom headers): %s", url.c_str());
   Sink sink;
   sink.write = onData;
+  sink.onSize = onSize;
   sink.extraHeaders = &headers;
   return runGetSecure(url, "", "", sink);
 }

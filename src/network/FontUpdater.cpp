@@ -50,6 +50,13 @@ constexpr int SYNC_RECORDS_VERSION = 1;
 // stamps "version": 1 today.
 constexpr int MAX_MANIFEST_VERSION = 1;
 
+// The manifest is the one response held whole in RAM, so it gets an explicit
+// ceiling. Thirteen families measured 18,108 bytes on 2026-09-07 (~1.4 KB a
+// family), so this is room for roughly forty-five before the cap is the thing
+// that stops us -- and MAX_FAMILIES is 128, which at that rate would be ~180 KB
+// on a ~380 KB part. Over the cap is an error, never an abort. B-053.
+constexpr size_t MAX_MANIFEST_BYTES = 64 * 1024;
+
 // The cache root the layout caches live under: /.crosspoint/epub_<hash>/sections.
 constexpr char cacheRoot[] = "/.crosspoint";
 constexpr char cacheDirPrefix[] = "epub_";
@@ -183,24 +190,28 @@ FontUpdater::FontError FontUpdater::fetchManifest(StepCallback onStep, void* ctx
   };
 
   if (onStep) onStep(ctx, CheckStep::READING);
-  std::string manifestBody;
-  const HttpDownloader::DownloadError manifestFetched = HttpDownloader::fetchUrlWithHeaders(
-      manifestAsset->url, assetHeaders, [&manifestBody](const uint8_t* data, size_t len) {
-        manifestBody.append(reinterpret_cast<const char*>(data), len);
-        return true;
-      });
+  // ONE nothrow block, sized from Content-Length. This used to accumulate into
+  // a std::string, whose doubling growth reached operator new -- not nothrow
+  // under -fno-exceptions -- and terminated the device on the step from 11024
+  // to 22048 bytes while reading an 18 KB manifest. B-053.
+  HttpDownloader::Body manifestBody;
+  const HttpDownloader::DownloadError manifestFetched =
+      HttpDownloader::fetchUrlToBuffer(manifestAsset->url, assetHeaders, MAX_MANIFEST_BYTES, manifestBody);
+  if (manifestFetched == HttpDownloader::TOO_LARGE || manifestFetched == HttpDownloader::OUT_OF_MEMORY) {
+    LOG_ERR(LOG_MODULE, "Manifest does not fit in %u bytes of RAM", static_cast<unsigned>(MAX_MANIFEST_BYTES));
+    return OOM_ERROR;
+  }
   if (manifestFetched != HttpDownloader::OK) {
     LOG_ERR(LOG_MODULE, "Manifest fetch failed");
     return HTTP_ERROR;
   }
 
   JsonDocument doc;
-  if (deserializeJson(doc, manifestBody) != DeserializationError::Ok) {
+  if (deserializeJson(doc, manifestBody.c_str(), manifestBody.len) != DeserializationError::Ok) {
     LOG_ERR(LOG_MODULE, "Manifest JSON did not parse");
     return JSON_PARSE_ERROR;
   }
-  manifestBody.clear();
-  manifestBody.shrink_to_fit();
+  manifestBody.reset();
 
   const int manifestVersion = doc["version"] | 1;
   if (manifestVersion > MAX_MANIFEST_VERSION) {

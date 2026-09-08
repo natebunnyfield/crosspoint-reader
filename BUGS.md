@@ -34,7 +34,7 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
-### [B-053] Update Fonts aborts on the manifest: an unbounded `std::string::append` reaches `operator new`, and `-fno-exceptions` turns `bad_alloc` into `abort()` — SYMBOLIZED EXACTLY, unfixed
+### [B-053] Update Fonts aborts on the manifest: an unbounded `std::string::append` reaches `operator new`, and `-fno-exceptions` turns `bad_alloc` into `abort()` — SYMBOLIZED EXACTLY, FIXED 2026-09-07, UNCONFIRMED on device
 **severity: critical (the headline feature of 1.5.29-BD crashes the device, reproduced twice on the owner's X4) · scope: `src/network/FontUpdater.cpp:186-191`, the same pattern at `src/network/LibraryUpdater.cpp:167-171` and `src/network/HttpDownloader.cpp` `fetchUrl(url, std::string&)` · found 2026-09-07 from two crash reports the owner supplied, hours after 1.5.29-BD shipped**
 
 ```
@@ -123,16 +123,65 @@ belongs and is ~1 KB, not a large stack buffer; `HttpDownloader`'s own read
 buffer is correctly `makeUniqueNoThrow<char[]>(READ_CHUNK)` with a null check
 (`HttpDownloader.cpp:221-226`).
 
-**Fix not yet chosen — the options and their costs go to the owner first.**
-1. Plumb `Content-Length` to the callback and `reserve()` exactly once.
-   Smallest diff, kills the doubling, but a 18 KB contiguous `std::string`
-   still aborts if `operator new` refuses it.
-2. Replace `std::string` with `makeUniqueNoThrow<char[]>` sized from
-   `Content-Length`. One allocation, and a refusal returns an error instead of
-   aborting. Needs a size cap for a chunked/absent `Content-Length`.
-3. Stream the manifest to a file on the card and let ArduinoJson parse from it.
-   Constant RAM, survives a manifest of any size, biggest change.
-Whichever is taken, apply it to all three call sites, not just FontUpdater's.
+**FIXED 2026-09-07 — option 2, the owner's choice of the three offered.**
+`HttpDownloader::fetchUrlToBuffer` (new, `HttpDownloader.h`) reads a whole body
+into one `makeUniqueNoThrow<char[]>` block sized from `Content-Length`, capped,
+NUL-terminated. `operator new` is never on the path, so a refusal comes back as
+`OUT_OF_MEMORY` and an over-cap body as `TOO_LARGE` — two new `DownloadError`
+values — and both updaters map them to the `OOM_ERROR` they already had, so no
+new user-facing string was needed.
+
+- The size is delivered by a new `SizeCallback`, announced once before the
+  first body byte in both transports (`HttpDownloader.cpp`, the wolfSSL
+  callback and the esp_http_client path). On the normal path that is ONE
+  allocation of exactly the declared size; the doubling that killed this bug
+  cannot happen. A chunked response that declares nothing falls back to bounded
+  nothrow growth.
+- `fetchUrlToBuffer` is defined inline in the header on purpose: it is written
+  entirely in terms of `fetchUrlWithHeaders`, so `test/font_commit`, which
+  substitutes its own `fetchUrlWithHeaders`, exercises it for free and cannot
+  reach a network through it.
+- Applied to BOTH real call sites, `FontUpdater.cpp` and `LibraryUpdater.cpp`,
+  with a 64 KB cap each (`MAX_MANIFEST_BYTES`) — room for ~45 families at the
+  measured 1.4 KB apiece. `HttpDownloader::fetchUrl(url, std::string&)` carries
+  the same shape and was left alone deliberately: it has no callers anywhere in
+  `src` or `lib` (only the `DataCallback` overload is used, by `OtaUpdater`),
+  so no shipped path can reach it.
+
+**New suite `test/http_body`, ten tests, and what mutation testing changed
+about them.** The host cannot reproduce the abort — desktop `new` succeeds
+where a 380 KB part refuses — so each guard was verified by breaking it and
+watching a test fail. Three findings, all of which improved the code or the
+tests:
+
+- A `total > maxBytes` check in the size hook was the same test written twice;
+  `ensure()` already refuses an over-cap declaration before the transport
+  streams a byte. Removed. What pins that behavior now is the `dataCallbacks`
+  assertion, added because the first version of the test asserted only the
+  return value and could not tell "refused at the announcement" from "refused
+  after the first chunk arrived".
+- The allocation-refusal branch had NO coverage at all: the mutation that made
+  a failed allocation return success passed every test. Covered now by asking
+  for `SIZE_MAX / 2`. `1 << 60` was tried first and is not enough — this host
+  reserves it lazily and hands back a pointer.
+- Writing that test found a real latent bug in the new code: `while (want <
+  need) want *= 2;` wraps to zero for a caller with a very large `maxBytes`.
+  Now `while (want < need && want <= maxBytes / 2)`, which cannot overflow.
+
+**A verification hazard worth knowing, because it invalidated three earlier
+mutation runs in this session.** `cmake --build build/test` does NOT rebuild
+these targets when only a header under `src/network` changes; it relinks stale
+objects, and the test binary then reports the OLD code's behavior. Two mutation
+results were believed for several minutes on that basis. Touch the suite's
+`.cpp` files after any header edit, or delete the target's object directory.
+
+**Status is SHIPPED-quality but UNCONFIRMED on device.** 718/718 host tests
+pass and `gh_release` compiles, but the thing that failed was a real allocation
+on a real spent heap, which no host test reproduces. What to watch on the next
+Update Fonts run over Wi-Fi: it reaches "Manifest lists 13 families" instead of
+rebooting. If the heap is genuinely too tight even for one 18 KB block, the
+symptom changes from a reboot to an on-screen OOM error — which is the point of
+the fix, but is not the same as success.
 
 ### [B-052] X3 abort in the grayscale/anti-aliasing path after the BW buffer save fails — a framework `ESP_ERROR_CHECK()` giving up under heap exhaustion
 **severity: high (hard crash while reading) · scope: `lib/GfxRenderer/GfxRenderer.cpp` `storeBwBuffer()`, `src/TextAntiAliasing.cpp` `overlayViaWholeFrame()`, and whatever framework call aborts after them · found 2026-09-07 in `/Volumes/BUNNYFIELDS/crash_reports/crash_0.txt`, not reported**
