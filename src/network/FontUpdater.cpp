@@ -196,138 +196,76 @@ FontUpdater::FontError FontUpdater::fetchManifest(StepCallback onStep, void* ctx
   };
 
   if (onStep) onStep(ctx, CheckStep::READING);
-  // ONE nothrow block, sized from Content-Length. This used to accumulate into
-  // a std::string, whose doubling growth reached operator new -- not nothrow
-  // under -fno-exceptions -- and terminated the device on the step from 11024
-  // to 22048 bytes while reading an 18 KB manifest. B-053.
-  HttpDownloader::Body manifestBody;
-  const HttpDownloader::DownloadError manifestFetched =
-      HttpDownloader::fetchUrlToBuffer(manifestAsset->url, assetHeaders, MAX_MANIFEST_BYTES, manifestBody);
-  if (manifestFetched == HttpDownloader::TOO_LARGE || manifestFetched == HttpDownloader::OUT_OF_MEMORY) {
-    LOG_ERR(LOG_MODULE, "Manifest does not fit in %u bytes of RAM", static_cast<unsigned>(MAX_MANIFEST_BYTES));
+
+  // The manifest is parsed AS IT ARRIVES and never held. It used to be
+  // buffered whole and handed to ArduinoJson: 18,108 bytes in one contiguous
+  // block plus ~14.6 KB of document across 185 blocks, both live at once
+  // because the buffer was only released after the parse -- a ~33 KB peak on a
+  // device MEASURED refusing 22,049 contiguous bytes with Wi-Fi and wolfSSL up
+  // (B-053). Two releases were spent sizing that buffer more tightly before the
+  // measurement said the buffer was the problem. Nothing bigger than one family
+  // is resident now.
+  struct Collector {
+    FontUpdater* self;
+    const std::vector<GithubReleaseAssetParser::Asset>* assets;
+  } collector{this, &assets};
+
+  families.reserve(MAX_FAMILIES < 16 ? MAX_FAMILIES : 16);
+  auto manifestParser = makeUniqueNoThrow<FontManifestParser>(
+      [](void* ctx, FontManifestParser::RawFamily& raw) -> bool {
+        auto* c = static_cast<Collector*>(ctx);
+        c->self->acceptManifestFamily(raw, *c->assets);
+        return c->self->families.size() < MAX_FAMILIES;
+      },
+      &collector, MAX_FILES_PER_FAMILY);
+  if (!manifestParser) {
+    LOG_ERR(LOG_MODULE, "OOM: manifest parser");
     return OOM_ERROR;
   }
+
+  const HttpDownloader::DownloadError manifestFetched = HttpDownloader::fetchUrlWithHeaders(
+      manifestAsset->url, assetHeaders, [&manifestParser](const uint8_t* data, size_t len) {
+        manifestParser->feed(reinterpret_cast<const char*>(data), len);
+        return true;
+      });
   if (manifestFetched != HttpDownloader::OK) {
+    // Whatever arrived before the failure is discarded. manifestOk_ already
+    // gates removal, but a half-collected list must not reach the sync either.
+    families.clear();
     LOG_ERR(LOG_MODULE, "Manifest fetch failed");
     return HTTP_ERROR;
   }
-
-  JsonDocument doc;
-  if (deserializeJson(doc, manifestBody.c_str(), manifestBody.len) != DeserializationError::Ok) {
-    LOG_ERR(LOG_MODULE, "Manifest JSON did not parse");
+  if (!manifestParser->documentComplete()) {
+    // A body that stopped mid-document. Streaming has no opinion about the
+    // families that never arrived, and the sync is a MIRROR, so accepting a
+    // short list here would delete every family the truncation cut off.
+    LOG_ERR(LOG_MODULE, "Manifest ended mid-document; ignoring it whole");
+    families.clear();
     return JSON_PARSE_ERROR;
   }
-  manifestBody.reset();
-
-  const int manifestVersion = doc["version"] | 1;
-  if (manifestVersion > MAX_MANIFEST_VERSION) {
-    LOG_ERR(LOG_MODULE, "Manifest is version %d; this firmware understands %d", manifestVersion, MAX_MANIFEST_VERSION);
+  if (manifestParser->hasError()) {
+    LOG_ERR(LOG_MODULE, "Manifest JSON did not parse");
+    families.clear();
+    return JSON_PARSE_ERROR;
+  }
+  if (!manifestParser->sawFamiliesArray()) {
+    // No families array at all is a manifest we do not understand. An EMPTY
+    // families array is a different answer and is allowed through -- the
+    // removal gate turns on exactly that difference.
+    LOG_ERR(LOG_MODULE, "Manifest has no families array");
+    families.clear();
+    return JSON_PARSE_ERROR;
+  }
+  if (manifestParser->version() > MAX_MANIFEST_VERSION) {
+    // Checked after the parse rather than before it: streaming means the
+    // version key is not guaranteed to arrive before the families, and
+    // discarding what was collected is cheaper than a second request.
+    LOG_ERR(LOG_MODULE, "Manifest is version %d; this firmware understands %d", manifestParser->version(),
+            MAX_MANIFEST_VERSION);
+    families.clear();
     return MANIFEST_TOO_NEW;
   }
-
-  JsonArrayConst manifestFamilies = doc["families"].as<JsonArrayConst>();
-  if (manifestFamilies.isNull()) {
-    LOG_ERR(LOG_MODULE, "Manifest has no families array");
-    return JSON_PARSE_ERROR;
-  }
-
-  families.reserve(manifestFamilies.size() < MAX_FAMILIES ? manifestFamilies.size() : MAX_FAMILIES);
-  for (JsonObjectConst entry : manifestFamilies) {
-    if (families.size() >= MAX_FAMILIES) break;
-    Family family;
-    family.name = entry["family"] | "";
-    if (!fontsync::isSafeFamilyName(family.name.c_str())) {
-      LOG_ERR(LOG_MODULE, "Skipping malformed family name in the manifest");
-      continue;
-    }
-
-    JsonArrayConst entryFiles = entry["files"].as<JsonArrayConst>();
-    if (entryFiles.isNull()) {
-      LOG_ERR(LOG_MODULE, "%s: manifest entry has no files array", family.name.c_str());
-      continue;
-    }
-    family.files.reserve(entryFiles.size() < MAX_FILES_PER_FAMILY ? entryFiles.size() : MAX_FILES_PER_FAMILY);
-
-    // ANY malformed or unmatched file DROPS THE WHOLE FAMILY, rather than
-    // installing the rest of it. That is the same all-or-nothing rule
-    // fontsync::commitVerdict enforces later, applied at parse time: a family
-    // built from five of the six entries the publisher wrote is precisely the
-    // broken state this feature exists to prevent, and dropping it means the
-    // run reports "unchanged" for a family it could not understand instead of
-    // shipping a hole.
-    bool familyOk = true;
-    // NO TWO ENTRIES MAY CLAIM THE SAME POINT SIZE. Two shapes reach here and
-    // neither is catchable by validating one name at a time: a literal repeat
-    // of the same `file` (openFileForWrite is O_TRUNC, so the second download
-    // rewrites the first's path and both "verify", and the commit gate counts
-    // two), and two different names whose sizes collide once discovery has
-    // parsed them -- scanDirectory then drops the second as a duplicate
-    // (SdCardFontRegistry.cpp:138-148) and the family lands one cut short with
-    // every count saying otherwise. fontFileSize already refuses leading
-    // zeros, the easiest form of the second shape; this closes the general
-    // case. Adversarial review, 2026-09-07: commitVerdict's own comment
-    // worried about "a fifth somehow counted twice", and a duplicated manifest
-    // entry is exactly how that happens.
-    //
-    // A linear rescan rather than a seen[256] table: a family holds at most
-    // MAX_FILES_PER_FAMILY entries, so this is at worst 120 short-string
-    // parses, and the table would be 256 bytes of stack against the Resource
-    // Protocol's 256-byte ceiling for one function's locals.
-    for (JsonObjectConst fileEntry : entryFiles) {
-      if (family.files.size() >= MAX_FILES_PER_FAMILY) {
-        familyOk = false;
-        break;
-      }
-      FontFile file;
-      file.file = fileEntry["file"] | "";
-      file.bytes = fileEntry["bytes"] | 0;
-      file.sha256 = fileEntry["sha256"] | "";
-      const char* assetName = fileEntry["asset"] | "";
-      // isSafeFontFileName is strict about the "<Family>_<size>.cpfont" shape
-      // because SdCardFontRegistry parses exactly that; a differently-named
-      // file would be written, verified, counted -- and then ignored by
-      // discovery. See FontSyncPlan.h.
-      const uint8_t pointSize = fontsync::fontFileSize(family.name.c_str(), file.file.c_str());
-      if (pointSize == 0 || file.sha256.size() != 64 || file.bytes == 0) {
-        LOG_ERR(LOG_MODULE, "%s: malformed manifest file entry", family.name.c_str());
-        familyOk = false;
-        break;
-      }
-      bool duplicateSize = false;
-      for (const auto& already : family.files) {
-        if (fontsync::fontFileSize(family.name.c_str(), already.file.c_str()) == pointSize) {
-          duplicateSize = true;
-          break;
-        }
-      }
-      if (duplicateSize) {
-        LOG_ERR(LOG_MODULE, "%s: two manifest entries claim %u pt", family.name.c_str(),
-                static_cast<unsigned>(pointSize));
-        familyOk = false;
-        break;
-      }
-      for (const auto& asset : assets) {
-        if (asset.name == assetName) {
-          file.url = asset.url;
-          break;
-        }
-      }
-      if (file.url.empty()) {
-        // The manifest promises a file the release does not carry: the
-        // publisher uploads them together, so this is a half-updated release.
-        LOG_ERR(LOG_MODULE, "%s: no release asset for %s", family.name.c_str(), file.file.c_str());
-        familyOk = false;
-        break;
-      }
-      family.files.push_back(std::move(file));
-    }
-
-    if (!familyOk || family.files.empty()) {
-      LOG_ERR(LOG_MODULE, "Skipping %s entirely -- a family installs whole or not at all", family.name.c_str());
-      continue;
-    }
-    families.push_back(std::move(family));
-  }
+  manifestParser.reset();
 
   // The asset list is ~13 KB of strings on a full release and every url worth
   // keeping has already been copied. Free it before the sync starts rather than
@@ -337,6 +275,105 @@ FontUpdater::FontError FontUpdater::fetchManifest(StepCallback onStep, void* ctx
   LOG_INF(LOG_MODULE, "Manifest lists %u families", static_cast<unsigned>(families.size()));
   manifestOk_ = true;
   return OK;
+}
+
+// One family, as it finished arriving off the socket. Every rule below is the
+// one that used to run over a JsonObjectConst in fetchManifest; only the input
+// changed. Nothing here allocates beyond the family it accepts.
+void FontUpdater::acceptManifestFamily(FontManifestParser::RawFamily& raw,
+                                       const std::vector<GithubReleaseAssetParser::Asset>& assets) {
+  if (families.size() >= MAX_FAMILIES) return;
+  Family family;
+  family.name = std::move(raw.name);
+  if (!fontsync::isSafeFamilyName(family.name.c_str())) {
+    LOG_ERR(LOG_MODULE, "Skipping malformed family name in the manifest");
+    return;
+  }
+  if (raw.files.empty()) {
+    LOG_ERR(LOG_MODULE, "%s: manifest entry has no files array", family.name.c_str());
+    return;
+  }
+  family.files.reserve(raw.files.size());
+
+  // ANY malformed or unmatched file DROPS THE WHOLE FAMILY, rather than
+  // installing the rest of it. That is the same all-or-nothing rule
+  // fontsync::commitVerdict enforces later, applied at parse time: a family
+  // built from five of the six entries the publisher wrote is precisely the
+  // broken state this feature exists to prevent, and dropping it means the
+  // run reports "unchanged" for a family it could not understand instead of
+  // shipping a hole.
+  bool familyOk = true;
+  // NO TWO ENTRIES MAY CLAIM THE SAME POINT SIZE. Two shapes reach here and
+  // neither is catchable by validating one name at a time: a literal repeat
+  // of the same `file` (openFileForWrite is O_TRUNC, so the second download
+  // rewrites the first's path and both "verify", and the commit gate counts
+  // two), and two different names whose sizes collide once discovery has
+  // parsed them -- scanDirectory then drops the second as a duplicate
+  // (SdCardFontRegistry.cpp:138-148) and the family lands one cut short with
+  // every count saying otherwise. fontFileSize already refuses leading
+  // zeros, the easiest form of the second shape; this closes the general
+  // case. Adversarial review, 2026-09-07: commitVerdict's own comment
+  // worried about "a fifth somehow counted twice", and a duplicated manifest
+  // entry is exactly how that happens.
+  //
+  // A linear rescan rather than a seen[256] table: a family holds at most
+  // MAX_FILES_PER_FAMILY entries, so this is at worst 120 short-string
+  // parses, and the table would be 256 bytes of stack against the Resource
+  // Protocol's 256-byte ceiling for one function's locals.
+  for (auto& fileEntry : raw.files) {
+    if (family.files.size() >= MAX_FILES_PER_FAMILY) {
+      familyOk = false;
+      break;
+    }
+    FontFile file;
+    file.file = std::move(fileEntry.file);
+    file.bytes = fileEntry.bytes;
+    file.sha256 = std::move(fileEntry.sha256);
+    const char* assetName = fileEntry.asset.c_str();
+    // isSafeFontFileName is strict about the "<Family>_<size>.cpfont" shape
+    // because SdCardFontRegistry parses exactly that; a differently-named
+    // file would be written, verified, counted -- and then ignored by
+    // discovery. See FontSyncPlan.h.
+    const uint8_t pointSize = fontsync::fontFileSize(family.name.c_str(), file.file.c_str());
+    if (pointSize == 0 || file.sha256.size() != 64 || file.bytes == 0) {
+      LOG_ERR(LOG_MODULE, "%s: malformed manifest file entry", family.name.c_str());
+      familyOk = false;
+      break;
+    }
+    bool duplicateSize = false;
+    for (const auto& already : family.files) {
+      if (fontsync::fontFileSize(family.name.c_str(), already.file.c_str()) == pointSize) {
+        duplicateSize = true;
+        break;
+      }
+    }
+    if (duplicateSize) {
+      LOG_ERR(LOG_MODULE, "%s: two manifest entries claim %u pt", family.name.c_str(),
+              static_cast<unsigned>(pointSize));
+      familyOk = false;
+      break;
+    }
+    for (const auto& asset : assets) {
+      if (asset.name == assetName) {
+        file.url = asset.url;
+        break;
+      }
+    }
+    if (file.url.empty()) {
+      // The manifest promises a file the release does not carry: the
+      // publisher uploads them together, so this is a half-updated release.
+      LOG_ERR(LOG_MODULE, "%s: no release asset for %s", family.name.c_str(), file.file.c_str());
+      familyOk = false;
+      break;
+    }
+    family.files.push_back(std::move(file));
+  }
+
+  if (!familyOk || family.files.empty()) {
+    LOG_ERR(LOG_MODULE, "Skipping %s entirely -- a family installs whole or not at all", family.name.c_str());
+    return;
+  }
+  families.push_back(std::move(family));
 }
 
 // --- the ledger -------------------------------------------------------------

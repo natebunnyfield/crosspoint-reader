@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "FontSyncPlan.h"  // fontsync::CardStamp / FailureKind, for the record store below
+#include "FontManifestParser.h"   // RawFamily, handed over one family at a time
+#include "FontSyncPlan.h"         // fontsync::CardStamp / FailureKind, for the record store below
+#include "GithubReleaseAssets.h"  // Asset, matched to each manifest file
 
 /**
  * Update Fonts: sync the SD font roots against the .cpfont set published as the
@@ -213,6 +215,13 @@ class FontUpdater {
   void finishRun();
 
  private:
+  // Called by the streaming manifest parser as each family finishes arriving.
+  // Holds every validation rule the buffered parse used to run inline; see the
+  // comment on the definition. Takes the raw family by non-const reference
+  // because it moves the strings out of it rather than copying them.
+  void acceptManifestFamily(FontManifestParser::RawFamily& raw,
+                            const std::vector<GithubReleaseAssetParser::Asset>& assets);
+
   // What a font file looked like when its digest was last verified. Persisted
   // to /.crosspoint/font_sync.json, keyed "<Family>/<file>".
   struct StoredRecord {

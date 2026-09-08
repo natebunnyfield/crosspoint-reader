@@ -306,18 +306,48 @@ hardware: the X4's card has not been mounted here, and if it carries a family
 outside those thirteen, the first successful sync removes it. That is the
 ruling, not an oversight.
 
-**Known and NOT fixed here, recorded so the next pass does not rediscover
-them:**
-- The `JsonDocument` parsed from the manifest costs ~14.6 KB across 185 blocks
-  while the 18 KB buffer is still held (`.reset()` comes after the parse), so
-  the peak is ~50 KB. ArduinoJson's allocator is `malloc`-based and returns
-  `NoMemory` rather than aborting, but `FontUpdater` maps that to
-  `JSON_PARSE_ERROR` -- so a heap failure there still reads as "Could not reach
-  GitHub" on screen. **If the fixes here are not enough, this is the next
-  mechanism, and the honest answer is then to stream the manifest through
-  `StreamingJsonParser` (already used one function earlier for the release
-  JSON) instead of holding it whole -- option 3 of the original three, dropping
-  the feature peak from ~50 KB to ~16 KB.**
+**The manifest is no longer held in RAM at all — done 2026-09-07, after the
+owner asked why it was being deferred.** It was written up here as "the next
+mechanism if the fixes are not enough", which was the wrong call: the
+measurement already said the peak was ~50 KB (an 18 KB contiguous buffer plus
+~14.6 KB of `JsonDocument` across 185 blocks, both live because the buffer is
+released only after the parse) on a heap MEASURED refusing 22,049 contiguous
+bytes. Waiting for a third failed release to confirm arithmetic already in hand
+is the re-patching this file's own rules forbid.
+
+`FontManifestParser` (`src/network/FontManifestParser.h`) consumes the JSON as
+it arrives off the socket and hands over ONE FAMILY AT A TIME; nothing larger
+than a single family is ever resident. It is modelled on
+`GithubReleaseAssetParser`, which does the same job for the release JSON one
+function earlier, and shares `StreamingJsonParser` underneath. It deliberately
+does not validate: every rule about names, point sizes, duplicate sizes, the
+all-or-nothing family rule and asset matching stayed in
+`FontUpdater::acceptManifestFamily`, which is the old inline body with its
+comments intact and only its input changed. Feature peak drops from ~50 KB to
+~16 KB, and `TOO_LARGE`/`MAX_MANIFEST_BYTES` stop being a guess against heap
+fragmentation.
+
+**Streaming trades a buffer for a state machine, and one failure mode moves
+with it.** A buffered parse gets "the document was truncated" for free —
+ArduinoJson refuses an incomplete document outright. A streaming parse does
+not: it has already handed over every family that arrived whole and has no
+opinion about the ones that did not, so a body cut mid-transfer yields a
+family list that looks perfectly valid and is SHORT. **The sync is a mirror, so
+accepting it would delete every family the truncation cut off.** The first run
+of the streaming parser returned `OK` for a truncated manifest and
+`FontCommit.ATruncatedManifestRemovesNothing` caught it immediately — which is
+precisely the test that exists for this, written before the parser did.
+`documentComplete()` (the top-level object actually closed) now gates it, and
+`test/font_manifest` truncates the document at 10/25/50/75/90/99% and at the
+final brace. A first version of that check also required the families array to
+have closed, which conflated "truncated" with "has no families array"; the
+enclosing object cannot close before the array does, so the object is the whole
+test.
+
+**Still not fixed, recorded so the next pass does not rediscover it:** a first
+successful run hashes 84.5 MB in 1 KB chunks (~86,568 reads) with the progress
+bar showing 0% under "Font 1 of 13" for 3-7 minutes. It will look like a hang
+and it is not.
 - A first successful run hashes 84.5 MB in 1 KB chunks (~86,568 reads) with the
   progress bar showing 0% under "Font 1 of 13" for 3-7 minutes. It will look
   like a hang and it is not.

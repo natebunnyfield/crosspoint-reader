@@ -160,6 +160,7 @@ target_include_directories(ActivityInputTest PRIVATE
   ${REPO_ROOT}/lib/Utf8
   ${REPO_ROOT}/lib/MiniBidi
   ${REPO_ROOT}/lib/Memory
+  ${REPO_ROOT}/lib/JsonParser  # FontUpdater.h -> FontManifestParser.h -> StreamingJsonParser.h
   ${REPO_ROOT}/lib/InflateReader
   ${REPO_ROOT}/lib/uzlib/src
   # Headers only: FontSelectionActivity reaches <Epub.h> transitively, which pulls
