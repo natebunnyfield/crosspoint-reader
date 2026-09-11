@@ -26,8 +26,15 @@ constexpr int STRIP_ROWS = 80;
 //
 // Returns false when the path is unavailable (no strip support, or the scratch
 // would not allocate), leaving the caller to fall back.
-bool overlayViaStrips(GfxRenderer& renderer, const DrawFn draw, void* ctx) {
-  if (!renderer.supportsStripGrayscale()) return false;
+// Why three outcomes rather than a bool: the caller must be able to tell "this
+// panel cannot do strips" from "the heap would not give me the scratch". They
+// used to be the same `false`, and the fallback for both was the whole-frame
+// path -- which needs SIX blocks of exactly the size that just failed. See
+// B-052.
+enum class StripResult { DONE, UNSUPPORTED, OUT_OF_MEMORY };
+
+StripResult overlayViaStrips(GfxRenderer& renderer, const DrawFn draw, void* ctx) {
+  if (!renderer.supportsStripGrayscale()) return StripResult::UNSUPPORTED;
 
   const int gh = static_cast<int>(renderer.getDisplayHeight());
   const int gwBytes = static_cast<int>(renderer.getDisplayWidthBytes());
@@ -35,7 +42,7 @@ bool overlayViaStrips(GfxRenderer& renderer, const DrawFn draw, void* ctx) {
   auto scratch = makeUniqueNoThrow<uint8_t[]>(scratchBytes);
   if (!scratch) {
     LOG_ERR("TAA", "OOM: grayscale strip scratch (%zu bytes)", scratchBytes);
-    return false;
+    return StripResult::OUT_OF_MEMORY;
   }
 
   // The strip writes need the panel idle. A no-op unless the caller started an
@@ -58,7 +65,7 @@ bool overlayViaStrips(GfxRenderer& renderer, const DrawFn draw, void* ctx) {
   renderer.setRenderMode(GfxRenderer::BW);
   renderer.displayGrayBuffer();
   renderer.cleanupGrayscaleWithFrameBuffer();
-  return true;
+  return StripResult::DONE;
 }
 
 // Whole-frame fallback: the original pipeline, for a controller without strip
@@ -90,7 +97,26 @@ void overlayViaWholeFrame(GfxRenderer& renderer, const DrawFn draw, void* ctx) {
 void overlay(GfxRenderer& renderer, const GfxRenderer::GrayscaleAaStrength strength, const DrawFn draw, void* ctx) {
   if (draw == nullptr) return;
   renderer.setGrayscaleAaStrength(strength);
-  if (overlayViaStrips(renderer, draw, ctx)) return;
+  const StripResult strips = overlayViaStrips(renderer, draw, ctx);
+  if (strips == StripResult::DONE) return;
+
+  // THE WHOLE-FRAME FALLBACK IS ONLY FOR A PANEL THAT CANNOT DO STRIPS.
+  //
+  // It costs a 48 KB chunked save of the BW frame, taken as SIX blocks of
+  // gwBytes * STRIP_ROWS -- 8,000 bytes each on an 800x480 panel, which is
+  // EXACTLY the size of the strip scratch that just failed. So escalating from
+  // a refused 8 KB allocation to six of them cannot succeed; it can only
+  // fragment what is left and take longer to give the same answer. B-052 is
+  // that sequence on an X3: "Failed to allocate BW buffer chunk 4 (8000
+  // bytes)", then an abort a moment later on some other allocation.
+  //
+  // Out of memory therefore means SKIP the anti-aliasing for this frame. The
+  // page still renders, in plain 1-bit, which is what the fallback path would
+  // have produced anyway after failing.
+  if (strips == StripResult::OUT_OF_MEMORY) {
+    LOG_ERR("TAA", "Skipping anti-aliasing: no memory for the strip scratch, and the whole-frame path needs six of it");
+    return;
+  }
   overlayViaWholeFrame(renderer, draw, ctx);
 }
 

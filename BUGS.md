@@ -492,7 +492,7 @@ of it reaches the card: `getLastLogs()` is dumped only inside a panic report
 (`lib/hal/HalSystem.cpp`), and this failure no longer panics. So the
 discriminator exists, is already compiled in, and is invisible without a cable.
 
-### [B-052] X3 abort in the grayscale/anti-aliasing path after the BW buffer save fails — a framework `ESP_ERROR_CHECK()` giving up under heap exhaustion
+### [B-052] X3 abort in the grayscale/anti-aliasing path after the BW buffer save fails — the ESCALATION that caused it is FIXED 2026-09-10; the framework abort itself stays open
 **severity: high (hard crash while reading) · scope: `lib/GfxRenderer/GfxRenderer.cpp` `storeBwBuffer()`, `src/TextAntiAliasing.cpp` `overlayViaWholeFrame()`, and whatever framework call aborts after them · found 2026-09-07 in `/Volumes/BUNNYFIELDS/crash_reports/crash_0.txt`, not reported**
 
 Found while looking for a symbolizable companion to B-048's abort, in the card's
@@ -574,6 +574,41 @@ and `clearCache()`d, so the section repaginates from scratch each time, and each
 rebuild is the churn that leaves nothing for a 48 KB chunked BW save. Which of
 the thirteen compared fields differed is not recoverable from this record — the
 site logs the mismatch but not the field.
+
+**FIXED 2026-09-10 — the code was escalating a refused allocation into six of
+the same size.**
+
+`TextAntiAliasing.cpp`'s `overlay()` tries the strip path first and falls back
+to the whole-frame path. The strip path needs one scratch block of
+`gwBytes * STRIP_ROWS` = 100 x 80 = **8,000 bytes**. The whole-frame fallback
+needs `storeBwBuffer()`, which is **six blocks of 8,000 bytes**. And
+`overlayViaStrips` returned a bare `bool`, so "this panel cannot do strips" and
+"the heap refused my 8 KB scratch" were the same answer and both fell through to
+the fallback.
+
+So on a tight heap the sequence was: fail one 8,000-byte allocation, then
+immediately attempt six. That cannot succeed — it can only fragment what is left
+and take longer to reach the same failure. **This report is that sequence**: the
+ring shows `Failed to allocate BW buffer chunk 4 (8000 bytes)`, i.e. the
+fallback got three chunks in and died on the fourth, which is exactly what
+happens when 8,000-byte blocks have already run out.
+
+`overlayViaStrips` now returns `DONE` / `UNSUPPORTED` / `OUT_OF_MEMORY`, and
+only `UNSUPPORTED` falls through to the whole-frame path. Out of memory skips
+anti-aliasing for that frame and the page renders in plain 1-bit — which is
+what the fallback would have produced anyway, after failing. `gh_release`
+compiles; 731/731 host tests pass.
+
+`EpubReaderActivity.cpp:1956` calls `storeBwBuffer()` on its own and already
+skips grayscale on failure rather than escalating. Checked, clean, no change.
+
+**What this does NOT fix, and why the entry stays open.** The abort itself was
+in a framework `ESP_ERROR_CHECK()` (symbolized to the error/abort cluster at
+`0x4038c171`), on some allocation AFTER ours had already failed and reported. We
+do not control that call. What is fixed is the thing that made reaching it far
+more likely: this path no longer demands 48 KB from a heap that has just refused
+8 KB. Whether that is enough to keep the device off the framework's abort path
+is unconfirmed, and the honest test is the absence of a recurrence.
 
 **To close, in order:**
 1. Make `Section.cpp:388` name the field that mismatched. One `LOG_ERR` per
