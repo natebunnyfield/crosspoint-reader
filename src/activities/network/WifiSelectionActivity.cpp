@@ -256,9 +256,36 @@ void WifiSelectionActivity::showSavePrompt() {
   const char* options[] = {tr(STR_YES), tr(STR_NO)};
   optionPopup.show(tr(STR_SAVE_PASSWORD), options, 2, 0 /* default to "Yes" */, [this](const int idx) {
     if (idx == 0) {
-      // User chose "Yes" - save the password
-      RenderLock lock(*this);
-      WIFI_STORE.addCredential(selectedSSID, enteredPassword);
+      // User chose "Yes" - save the password.
+      //
+      // The return was DISCARDED here, and it is false in two invisible cases:
+      // the store is full (MAX_NETWORKS = 8, no LRU eviction, and the only
+      // device-side removal is the Forget prompt below), or saveToFile() failed
+      // on a full or absent card. The owner answered "Yes", saw nothing go
+      // wrong, and had to retype the password every session, forever. The three
+      // callers in CrossPointWebServer all check this return; this one did not.
+      //
+      // Same rule the font picker already follows for its NoRoom case:
+      // "Saying nothing, though, is the one thing that must not happen."
+      bool saved = false;
+      bool full = false;
+      {
+        RenderLock lock(*this);
+        full = WIFI_STORE.isFullFor(selectedSSID);
+        saved = WIFI_STORE.addCredential(selectedSSID, enteredPassword);
+      }
+      if (!saved) {
+        LOG_ERR("WIFI", "Could not save credentials for %s (%s)", selectedSSID.c_str(),
+                full ? "store full" : "card write failed");
+        const char* okOption[] = {tr(STR_OK_BUTTON)};
+        optionPopup.show(tr(STR_WIFI_SAVE_FAILED), okOption, 1, 0, [this](int) { onComplete(true); });
+        // tr() is a macro that qualifies the enumerator, so the ternary has to
+        // pick between two completed tr() calls, not between two bare names.
+        const char* why = full ? tr(STR_WIFI_SAVE_FULL) : tr(STR_WIFI_SAVE_CARD);
+        optionPopup.setInfoLines({std::string(why)});
+        requestUpdate();
+        return;
+      }
     }
     // Complete either way - parent will start web server
     onComplete(true);

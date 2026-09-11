@@ -58,6 +58,15 @@ class WifiCredentialStore : public PersistableStore<WifiCredentialStore> {
   // Check if a network is saved
   bool hasSavedCredential(const std::string& ssid) const;
 
+  /// True when addCredential() would REFUSE this SSID for want of room: the
+  /// store is at MAX_NETWORKS and this SSID is not already in it. An SSID that
+  /// is already saved is an update and never hits the cap.
+  ///
+  /// Exists so the UI can say WHY a save failed without MAX_NETWORKS leaking
+  /// out of this class. addCredential's return was discarded at the one call
+  /// site that had no other way to tell -- see B-060.
+  bool isFullFor(const std::string& ssid) const;
+
   // Last connected network
   void setLastConnectedSsid(const std::string& ssid);
   std::string getLastConnectedSsid() const;

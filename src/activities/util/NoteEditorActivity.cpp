@@ -841,17 +841,54 @@ bool NoteEditorActivity::save() {
     LOG_INF(TAG, "not saving %s: it was never loaded", path.c_str());
     return false;
   }
-  // An emptied note still saves: openFileForWrite truncates, so writing zero
-  // bytes is the correct way to record "the owner deleted this text". Refusing
-  // left the previous contents on the card.
-  HalFile f;
-  if (!Storage.openFileForWrite(TAG, path, f)) {
-    LOG_ERR(TAG, "cannot open %s for write", path.c_str());
+  // An emptied note still saves: writing zero bytes is the correct way to record
+  // "the owner deleted this text". Refusing left the previous contents on the
+  // card.
+  //
+  // WRITE TO A TEMPORARY AND RENAME, rather than straight over the note.
+  // openFileForWrite is O_RDWR|O_CREAT|O_TRUNC (SDCardManager.cpp:342), so the
+  // existing note was destroyed the instant the file opened -- and a short
+  // write on a full card, a flaky card, or a power cut between the open and the
+  // write left it gone or half-gone, with no copy anywhere. This is the only
+  // user-AUTHORED content on the device.
+  //
+  // The pattern is ProgressFile::writeAtomic, written after issue #2275 left a
+  // torn progress.bin the firmware could neither rewrite nor clear. Every
+  // reader already uses it for SIX BYTES of page position; the note editor did
+  // not use it for the notes.
+  const std::string tmpPath = path + ".tmp";
+  size_t written = 0;
+  {
+    HalFile f;
+    if (!Storage.openFileForWrite(TAG, tmpPath, f)) {
+      LOG_ERR(TAG, "cannot open %s for write", tmpPath.c_str());
+      savedOk = false;
+      return false;
+    }
+    written = f.write(buf->data(), buf->size());
+    f.flush();
+    if (written != buf->size()) {
+      LOG_ERR(TAG, "short write saving %s: %u/%u bytes; the note on the card is untouched", tmpPath.c_str(),
+              (unsigned)written, (unsigned)buf->size());
+      savedOk = false;
+      // Close happens at scope exit, before the remove below.
+    }
+  }
+  if (written != buf->size()) {
+    Storage.remove(tmpPath.c_str());  // never leave a half-written .tmp behind
     return false;
   }
-  const size_t written = f.write(buf->data(), buf->size());
-  f.flush();
-  savedOk = written == buf->size();
-  LOG_INF(TAG, "saved %u/%u bytes to %s", (unsigned)written, (unsigned)buf->size(), path.c_str());
+
+  // SdFat's rename does not overwrite, so the old file goes first. The window
+  // where neither exists is the same one ProgressFile accepts, and it is
+  // strictly smaller than the whole write it replaces.
+  Storage.remove(path.c_str());
+  if (!Storage.rename(tmpPath.c_str(), path.c_str())) {
+    LOG_ERR(TAG, "could not move %s into place", path.c_str());
+    savedOk = false;
+    return false;
+  }
+  savedOk = true;
+  LOG_INF(TAG, "saved %u bytes to %s", (unsigned)written, path.c_str());
   return savedOk;
 }

@@ -109,6 +109,13 @@ bool WifiCredentialStore::fromJson(JsonVariantConst doc) {
   return true;
 }
 
+bool WifiCredentialStore::isFullFor(const std::string& ssid) const {
+  std::lock_guard<std::mutex> lock(credentialMutex);
+  if (credentials.size() < MAX_NETWORKS) return false;
+  return none_of(credentials.begin(), credentials.end(),
+                 [&ssid](const WifiCredential& cred) { return cred.ssid == ssid; });
+}
+
 bool WifiCredentialStore::addCredential(const std::string& ssid, const std::string& password) {
   {
     std::lock_guard<std::mutex> lock(credentialMutex);

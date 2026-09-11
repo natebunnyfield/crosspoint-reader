@@ -31,12 +31,40 @@ std::string baseName(const std::string& path) {
 
 // Reads at most `cap` bytes of the file into `out`. Returns false on open/read
 // failure or when the file is larger than the cap.
+// The heap this needs is not a rounding error: book.bin's cap is 64 KB, which
+// on a ~380 KB no-PSRAM part is asked for as ONE contiguous block, and the
+// pretty-printers then reserve another 1.5x on top. A refused std::string
+// allocation is not recoverable here -- operator new is not nothrow under
+// -fno-exceptions, so it aborts (B-053). Bail before asking, the way
+// CssParser::loadFromCache does at its own rule loop.
+//
+// This screen is reachable with no special file and no opt-in: Manage Files
+// lists hidden entries by design, so /.crosspoint -> epub_<hash> -> book.bin ->
+// View, and TextViewerActivity turns pretty mode on automatically for CpBin.
+constexpr uint32_t MIN_FREE_HEAP_FOR_PRETTY = 96 * 1024;
+
+bool haveHeapFor(const uint32_t bytes, const char* what) {
+  // The formatted output is roughly 1.5x the source (prettyJson/prettyHtml both
+  // reserve in.size() + in.size()/2), and both live at once, so require room
+  // for the pair plus working space rather than for the read alone.
+  const uint32_t need = bytes * 3;
+  const uint32_t free = static_cast<uint32_t>(ESP.getFreeHeap());
+  if (free < MIN_FREE_HEAP_FOR_PRETTY || free < need) {
+    LOG_ERR("PrettyView", "Not enough heap to format %s: %u free, ~%u needed", what, free, need);
+    return false;
+  }
+  return true;
+}
+
 bool readCapped(const std::string& path, const uint32_t cap, std::string& out) {
   HalFile f;
   if (!Storage.openFileForRead("PrettyView", path, f)) return false;
   const uint32_t size = static_cast<uint32_t>(f.fileSize());
   if (size == 0 || size > cap) return false;
+  if (!haveHeapFor(size, path.c_str())) return false;
   out.resize(size);
+  // INT, not size_t -- a -1 here would otherwise compare unequal and be
+  // reported as a short read, which is harmless, but keep the type honest.
   return f.read(&out[0], size) == static_cast<int>(size);
 }
 
@@ -345,7 +373,9 @@ std::string prettyCpBin(const std::string& path) {
     // Big book.bin: read just the header + metadata region instead.
     HalFile f;
     if (!Storage.openFileForRead("PrettyView", path, f)) return "";
-    data.resize(16 * 1024);
+    constexpr uint32_t kFallbackBytes = 16 * 1024;
+    if (!haveHeapFor(kFallbackBytes, path.c_str())) return "";
+    data.resize(kFallbackBytes);
     const int n = f.read(&data[0], data.size());
     if (n <= 0) return "";
     data.resize(n);

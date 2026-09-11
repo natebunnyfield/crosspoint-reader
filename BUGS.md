@@ -34,6 +34,86 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-060] "Save password? Yes" could silently not save, forever — FIXED 2026-09-10
+**severity: high (the owner retypes a password every session and is never told why) · scope: `src/activities/network/WifiSelectionActivity.cpp`, `src/WifiCredentialStore.{h,cpp}` · found 2026-09-10 by a read-only sweep**
+
+`addCredential`'s return was **discarded** at the one call site with no other way
+to notice. It is `false` in two invisible cases (`WifiCredentialStore.cpp`):
+
+- the store is at `MAX_NETWORKS` (8) **and** the SSID is new — it returns before
+  the `push_back`, with only a `LOG_DBG`. There is **no LRU eviction**, and the
+  only device-side removal is the Forget prompt in this same activity.
+- otherwise it returns `saveToFile()`, which fails on a full or absent card.
+
+**Trigger, with no fault injection:** accumulate 8 saved networks, join a 9th,
+answer Yes. Everything looks normal and the web server starts. Next session the
+network is not saved — and it never will be, for any new network, with nothing
+ever said.
+
+The three other callers (`CrossPointWebServer.cpp:1522, 1524, 1534`) all check
+this return. This one did not. The rule is already written down two directories
+over, at `FontSelectionActivity.cpp:409-422`: *"Saying nothing, though, is the
+one thing that must not happen."*
+
+Now checked, with the two causes told apart on screen: **"8 networks already
+saved. Forget one, then save this."** versus **"The SD card would not take it."**
+The distinction is `WifiCredentialStore::isFullFor(ssid)`, a new predicate on the
+store rather than a public `MAX_NETWORKS` — an SSID already saved is an update
+and can never hit the cap, so the UI must not reimplement that rule.
+
+*Sub-threshold, same file, not changed:* `removeCredential`'s return is also
+discarded, but the in-memory `erase` happens first and the list is re-derived, so
+only an SD write failure survives the session.
+
+### [B-061] The note editor destroyed the note before writing it — FIXED 2026-09-10
+**severity: high (silent loss of the only user-AUTHORED content on the device) · scope: `src/activities/util/NoteEditorActivity.cpp` · found 2026-09-10 by a read-only sweep**
+
+`save()` opened the note with `openFileForWrite`, which is
+`O_RDWR | O_CREAT | O_TRUNC` (`SDCardManager.cpp:342`), so **the existing note
+was zeroed the instant the file opened**. A short write on a full card, a flaky
+card, or a power cut between the open and the write then left it gone or
+half-gone, with no copy anywhere.
+
+`savedOk` was assigned and **never read** — `grep` returns only the declaration
+and that assignment. `save()` is called only from `onExit()`, so there was no
+surface to report a failure even in principle.
+
+The fix is the pattern this tree already uses one directory over:
+`ProgressFile::writeAtomic`, written after issue #2275 left a torn
+`progress.bin` the firmware could neither rewrite nor clear. Write to `.tmp`,
+close, remove the old, rename. Every reader already used it for **six bytes** of
+page position; the note editor did not use it for the notes. A short write now
+removes the `.tmp` and leaves the note on the card untouched.
+
+The pre-existing `loadRefused` guard is unrelated and stays: it covers "opened a
+.txt book in the editor, pressed Back" and is a different hole.
+
+### [B-062] `PrettyView` asked for up to 64 KB in one block with no nothrow path — FIXED 2026-09-10
+**severity: high (abort on a screen reachable with no special file and no opt-in) · scope: `src/activities/util/PrettyView.cpp` · found 2026-09-10 by a read-only sweep**
+
+`readCapped` did a bare `out.resize(size)` with `size` taken from the card and a
+cap of **64 KB** for `book.bin`, then the pretty-printers reserved another 1.5x
+on top, then the fallback path did a second bare `resize(16 * 1024)`. None of it
+went through `makeUniqueNoThrow`; a refused `std::string` allocation is
+`abort()` under `-fno-exceptions`. B-053's shape again.
+
+**Reachable with no crafted file and no user opt-in.** Manage Files lists hidden
+entries by design, so `/.crosspoint` → `epub_<hash>` → `book.bin` → View, and
+`TextViewerActivity.cpp:53-57` turns pretty mode on **automatically** for
+`Kind::CpBin`. `ActivityManager`'s own note records a measured 94 KB free with a
+73,716-byte largest block in a comparable state, so a 64 KB contiguous request
+sits right at the edge.
+
+Both sites now bail on free heap before asking, the way
+`CssParser::loadFromCache` already does at its rule loop, and require room for
+the source and its ~1.5x formatted output together rather than for the read
+alone.
+
+**Checked and found clean while fixing it:** all four binary parsers it feeds
+(`prettyBookBin`, `prettyProgressBin`, `prettySectionBin`, `readLpString`) are
+correctly length-checked — a truncated `book.bin` yields a short card, not an
+out-of-range read. The allocation was the only defect.
+
 ### [B-059] `files` and `basepath` were mutated on the loop task while the render task walked them — FIXED 2026-09-10; the leading candidate for B-054
 **severity: critical (use-after-free on the strings being drawn; the likeliest explanation for "deleting a file corrupts filenames") · scope: `src/activities/home/FileManagerActivity.cpp`, `src/activities/home/FileBrowserActivity.cpp` · found 2026-09-10 by a read-only sweep**
 
