@@ -116,6 +116,27 @@ jobs:
             if [ -n "$flash_line" ]; then echo "- ${flash_line}"; else echo "- Flash: not found"; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Stack frame budget
+        # tools/stack_budget/ was written to enforce the Resource Protocol's
+        # 256-byte local rule mechanically "instead of discovering violations
+        # from device crashes" (its README), after six oversized frames -- up to
+        # 6,240 bytes -- were found from a crash report with an EMPTY panic
+        # reason, the documented signature of a blown stack.
+        #
+        # It was then never run by CI or by release.sh, and by 2026-09-10 the
+        # tree had drifted to fourteen frames over budget with six regressions.
+        # A gate nobody runs is a paragraph. --no-build reuses the .su files the
+        # step above just produced, so this costs seconds, not another build.
+        run: |
+          set -euo pipefail
+          tools/stack_budget/stack_budget.py --no-build | tee stack_budget.log
+          {
+            echo "## Stack frame budget"
+            echo '```'
+            tail -1 stack_budget.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload firmware.bin artifact
         uses: actions/upload-artifact@v6
         with:

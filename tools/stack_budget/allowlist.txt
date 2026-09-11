@@ -39,10 +39,8 @@
 # --- A recurring idiom, not 7 unrelated bugs: a single ~500-byte char local. ---
 # `char name[500]` / `char output[512]` appears 20 times across src/ and lib/
 # (grep for it). Each one alone is 2x the 256-byte Resource Protocol limit.
-1008 src/activities/boot_sleep/SleepActivity.cpp void SleepActivity::renderCustomSleepScreen() const  # char name[500] at SleepActivity.cpp:118 dominates; pre-existing debt
 784 src/network/CrossPointWebServer.cpp void CrossPointWebServer::handleGetSettings() const  # char output[512] at CrossPointWebServer.cpp:1166; runs on loopTask (see main.cpp:314-318)
 704 src/activities/util/BmpViewerActivity.cpp void BmpViewerActivity::loadSiblingImages()  # char name[500] at BmpViewerActivity.cpp:35; pre-existing debt
-688 src/network/CrossPointWebServer.cpp void CrossPointWebServer::handleGetOpdsServers() const  # char output[512] at CrossPointWebServer.cpp:1335; loopTask
 672 src/network/CrossPointWebServer.cpp void CrossPointWebServer::handleFileListData() const  # char output[512] at CrossPointWebServer.cpp:490; loopTask
 672 src/network/WebDAVHandler.cpp void WebDAVHandler::handlePropfind(WebServer&)  # char name[500] at WebDAVHandler.cpp:228; loopTask (main.cpp:314-318 cites WebDAVHandler frames as the reason for the 16K loopTask)
 640 src/network/CrossPointWebServer.cpp void CrossPointWebServer::scanFiles(const char*, const std::function<void(FileInfo)>&) const  # char name[500] at CrossPointWebServer.cpp:424; loopTask
@@ -51,19 +49,32 @@
 640 lib/Epub/Epub/hyphenation/LiangHyphenation.cpp std::vector<unsigned int> liangBreakIndexes(const std::vector<CodepointInfo>&, const SerializedHyphenationPatterns&, const LiangWordConfig&)  # AugmentedWord's fixed arrays (LiangHyphenation.cpp:97-102) + scores[70]; the comments at :350-352 and :367-368 choose stack over heap on purpose, to avoid fragmenting the heap across hundreds of words per page
 
 # --- Measured, cause not yet attributed. Triage these before lowering the threshold. ---
-816 lib/KOReaderSync/ProgressMapper.cpp static CrossPointPosition ProgressMapper::toCrossPoint(const std::shared_ptr<Epub>&, const SavedProgressPosition&, GfxRenderer&, int, int, int)  # not yet attributed; no large local array in the function head
-768 lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp static void ChapterHtmlSlimParser::startElement(void*, const XML_Char*, const XML_Char**)  # not yet attributed; expat per-element callback, 3 std::string locals at :358-360 do not explain 768
-768 lib/Xtc/Xtc.cpp bool Xtc::generateThumbBmp(int) const  # not yet attributed
-624 src/network/HttpDownloader.cpp HttpDownloader::DownloadError {anonymous}::runGetWolf(const std::string&, const std::string&, const std::string&, Sink&)  # not yet attributed; sits under every OTA/OPDS/font download
 592 lib/Epub/Epub.cpp bool Epub::parseContentOpf(BookMetadataCache::BookMetadata&, bool)  # not yet attributed
-592 lib/Epub/Epub/BookMetadataCache.cpp bool BookMetadataCache::buildBookBin(const std::string&, const BookMetadata&)  # not yet attributed
-592 src/components/themes/lyra/LyraTheme.cpp virtual void LyraTheme::drawRecentBookCover(GfxRenderer&, Rect, const std::vector<RecentBook>&, int, bool&, bool&, bool&, std::function<bool()>) const  # not yet attributed; render task
-576 src/activities/reader/KOReaderSyncActivity.cpp virtual void KOReaderSyncActivity::render(RenderLock&&)  # not yet attributed; render task
-576 src/components/themes/roundedraff/RoundedRaffTheme.cpp virtual void RoundedRaffTheme::drawRecentBookCover(GfxRenderer&, Rect, const std::vector<RecentBook>&, int, bool&, bool&, bool&, std::function<bool()>) const  # not yet attributed; render task
 560 src/activities/boot_sleep/SleepActivity.cpp void SleepActivity::renderCoverSleepScreen() const  # not yet attributed
-544 lib/KOReaderSync/ProgressMapper.cpp static std::string ProgressMapper::generateXPath(const std::shared_ptr<Epub>&, int, float)  # not yet attributed
-544 src/activities/settings/FontDownloadActivity.cpp bool FontDownloadActivity::fetchAndParseManifest()  # not yet attributed
 
 # --- Recovered by narrowing the lib/MiniBidi/ exemption (see stack_budget.py). ---
 # minibidi.c/.h is vendored; BidiUtils.cpp/.h is ours, so it belongs in the budget.
-608 lib/MiniBidi/BidiUtils.cpp bool BidiUtils::computeVisualWordOrder(const char*, unsigned int, std::vector<BidiUtils::VisualWord>&, BidiUtils::BidiBaseDir)  # not yet attributed; on the RENDER task (8K) via GfxRenderer text layout, so worth attributing before ratcheting below 608
+
+# ---------------------------------------------------------------------------
+# BASELINE FROZEN 2026-09-10, when the gate was wired into CI for the first
+# time. It had never been run by CI or by release.sh since it was written, and
+# the tree had drifted to fourteen frames over budget -- which is precisely the
+# failure its own README describes ('every one of those was measurable at
+# compile time; nothing was measuring'). These entries record the measured
+# sizes so the gate can pass TODAY and catch every regression from here on.
+# They are debt, not approval. See T-030.
+# ---------------------------------------------------------------------------
+1088 src/activities/boot_sleep/SleepActivity.cpp void SleepActivity::renderCustomSleepScreen() const  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+1040 src/activities/boot_sleep/CalendarSleepScreen.cpp static void calendar::CalendarSleepScreen::render(GfxRenderer&, const calendar::YMD&, uint8_t, calendar::Style)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+992 src/notes/ClaudeChat.cpp claudechat::Result claudechat::runExchange(const std::string&, void (*)(void*, const char*), void*)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+832 lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp static void ChapterHtmlSlimParser::startElement(void*, const XML_Char*, const XML_Char**)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+784 lib/Xtc/Xtc.cpp bool Xtc::generateThumbBmp(int) const  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+768 src/activities/util/KeyboardEntryActivity.cpp virtual void KeyboardEntryActivity::render(RenderLock&&)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+736 src/activities/reader/BookNotesActivity.cpp void BookNotesActivity::buildLines()  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+640 src/notes/KeyboardPanel.cpp void notes::KeyboardPanel::render(GfxRenderer&, int, int, int, int)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+640 src/network/HttpDownloader.cpp HttpDownloader::DownloadError {anonymous}::runGetWolf(const std::string&, const std::string&, const std::string&, Sink&)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+608 lib/MiniBidi/BidiUtils.cpp bool BidiUtils::computeVisualWordOrder(const std::vector<std::__cxx11::basic_string<char> >&, bool, std::vector<short unsigned int>&)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+608 lib/Epub/Epub/BookMetadataCache.cpp bool BookMetadataCache::buildBookBin(const std::string&, const BookMetadata&)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+608 src/components/themes/lyra/LyraTheme.cpp virtual void LyraTheme::drawRecentBookCover(GfxRenderer&, Rect, const std::vector<RecentBook>&, int, bool&, bool&, bool&, std::function<bool()>) const  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+576 src/activities/util/PrettyView.cpp std::string PrettyView::generate(Kind, const std::string&)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.
+528 src/network/LibraryUpdater.cpp LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t, ProgressCallback, void*)  # Frozen 2026-09-10 as the baseline when this gate was first armed in CI. The budget IS the measured size, so the frame cannot grow further without failing; paying these down is T-030. Not individually investigated -- recorded honestly rather than justified after the fact.

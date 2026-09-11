@@ -60,6 +60,56 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-030] Pay down the fourteen stack frames frozen when the budget gate was armed
+**scope: `tools/stack_budget/allowlist.txt` and the fourteen functions it names · opened 2026-09-10**
+
+`tools/stack_budget/` enforces the Resource Protocol's "locals under 256 bytes"
+rule at compile time. It exists because six oversized frames — the worst 6,240
+bytes — were once found from a crash report with an **empty panic reason**, the
+documented signature of a blown stack, and its README says it was built so those
+would be caught mechanically "instead of discovering violations from device
+crashes".
+
+**It was then wired into nothing.** Not CI, not `release.sh`. By 2026-09-10 the
+tree had drifted to **fourteen frames over the 512-byte threshold, six of them
+regressions past their recorded budgets**, and seven allowlist entries had gone
+stale. Armed in CI on 2026-09-10, in the `build` job, reusing the `.su` files
+that job already produces so it costs seconds.
+
+To make it pass today the fourteen measured sizes were frozen into the
+allowlist. **That is debt, not approval.** The budget is the measured size, so
+none of them can grow further without failing the gate — drift stops now — but
+each is still above the rule.
+
+Worst first, all measured at threshold 512 B:
+
+| bytes | frame |
+|---|---|
+| 1088 | `SleepActivity::renderCustomSleepScreen` |
+| 1040 | `CalendarSleepScreen::render` |
+| 992 | `claudechat::runExchange` |
+| 832 | `ChapterHtmlSlimParser::startElement` |
+| 784 | `Xtc::generateThumbBmp` |
+| 768 | `KeyboardEntryActivity::render` |
+| 736 | `BookNotesActivity::buildLines` |
+| 640 | `KeyboardPanel::render` |
+| 640 | `runGetWolf` |
+| 608 | `BidiUtils::computeVisualWordOrder` |
+| 608 | `BookMetadataCache::buildBookBin` |
+| 608 | `LyraTheme::drawRecentBookCover` |
+| 576 | `PrettyView::generate` |
+| 528 | `LibraryUpdater::syncBook` |
+
+The fix for each is the same shape the tool suggests: move the buffer to
+`makeUniqueNoThrow<uint8_t[]>(n)`. Ratcheting is supported — re-run and lower
+the numbers the tool reports as slack.
+
+**`runGetWolf` is the one to look at first**, and not because it is the largest.
+It is on the font/book download path, it calls `readFixed`, which puts a further
+**2,048-byte** buffer on the same stack, and that whole chain is what B-055 is
+about. Nobody has measured the depth of `loop task -> activity -> syncFamily ->
+stageFamily -> runGetWolf -> readFixed` against the 8 KB task stack.
+
 ### [T-029] Move the font preview to the top of the preview pane
 **scope: `src/activities/settings/` font list / preview pane · opened 2026-09-07**
 
