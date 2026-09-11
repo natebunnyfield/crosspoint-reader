@@ -45,6 +45,14 @@ constexpr size_t TEXT_BLOCK_SOFT_FLUSH_WORDS_WITH_CSS = 320;
 // every text fragment (e.g. Kobo KePub spans). The cap prevents unbounded heap growth
 // on resource-constrained devices (~380KB heap). TOC anchors bypass this cap.
 constexpr size_t MAX_ANCHORS_PER_CHAPTER = 1024;
+// Grow the anchor vector in fixed steps rather than doubling, and reserve this
+// much up front while the heap is at its healthiest. Doubling's peak is 3x the
+// live size (old block + new block, new being twice old); a fixed step's peak
+// is 2x plus the step, and -- more importantly on this device -- the blocks it
+// asks for stay small instead of climbing to 28 KB. MEASURED: 90 books on the
+// owner's card, nothing needed more than 512 entries.
+constexpr size_t ANCHOR_INITIAL_CAPACITY = 128;
+constexpr size_t ANCHOR_GROW_STEP = 128;
 
 constexpr const char* HEADER_TAGS[] = {"h1", "h2", "h3", "h4", "h5", "h6"};
 // "dl", "dt" and "dd" joined this list on 2026-08-28. Until then the parser
@@ -317,7 +325,7 @@ void ChapterHtmlSlimParser::flushPendingAnchor() {
   }
 
   // Record deferred anchor after previous block is flushed (and any TOC page break)
-  anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
+  pushAnchor(std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount));
   pendingAnchorId.clear();
 }
 
@@ -336,7 +344,7 @@ void ChapterHtmlSlimParser::adoptPendingAnchorForBlock() {
   if (!blockAnchorId_.empty()) {
     // Two ids before any text (<a id="a"></a><a id="b"></a>text): the first
     // has nothing better than the page the block is about to open on.
-    anchorData.push_back({std::move(blockAnchorId_), static_cast<uint16_t>(completedPageCount)});
+    pushAnchor(std::move(blockAnchorId_), static_cast<uint16_t>(completedPageCount));
   }
   blockAnchorId_ = std::move(pendingAnchorId);
   pendingAnchorId.clear();
@@ -1366,7 +1374,7 @@ void ChapterHtmlSlimParser::emitHorizontalRule(const BlockStyle& blockStyle) {
   snapToLineGrid();
 
   if (!pendingAnchorId.empty()) {
-    anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
+    pushAnchor(std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount));
     pendingAnchorId.clear();
   }
 }
@@ -2975,6 +2983,14 @@ bool ChapterHtmlSlimParser::beginParse() {
   paragraphAlignmentBlockStyle.alignment = align;
   startNewTextBlock(paragraphAlignmentBlockStyle);
 
+  // Take the anchor table's first block HERE, before the parse allocates
+  // anything else. This is the healthiest the heap will be during this build,
+  // and it removes the early doubling steps entirely -- see pushAnchor.
+  {
+    const size_t bytes = ANCHOR_INITIAL_CAPACITY * sizeof(std::pair<std::string, uint16_t>);
+    if (bytes <= ESP.getMaxAllocHeap() / 2) anchorData.reserve(ANCHOR_INITIAL_CAPACITY);
+  }
+
   xmlParser_ = XML_ParserCreate(nullptr);
   if (!xmlParser_) {
     LOG_ERR("EHP", "Couldn't allocate memory for parser");
@@ -3111,7 +3127,7 @@ bool ChapterHtmlSlimParser::finishParse() {
     keepTermWithNext_ = false;
     makePages();
     if (!pendingAnchorId.empty()) {
-      anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
+      pushAnchor(std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount));
       pendingAnchorId.clear();
     }
     completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex, pageStartAnchor());
@@ -3123,6 +3139,26 @@ bool ChapterHtmlSlimParser::finishParse() {
   // LAST, not first: makePages() above lays out the trailing page, and its
   // measure walk is as much a part of this chapter as the parse was.
   reportMissingGlyphs();
+  return true;
+}
+
+bool ChapterHtmlSlimParser::pushAnchor(std::string&& id, uint16_t pageIndex) {
+  // Already room: this cannot allocate, so it cannot throw.
+  if (anchorData.size() < anchorData.capacity()) {
+    anchorData.push_back({std::move(id), pageIndex});
+    return true;
+  }
+
+  const size_t next = anchorData.capacity() + ANCHOR_GROW_STEP;
+  const size_t bytes = next * sizeof(std::pair<std::string, uint16_t>);
+  // Same gate ParsedText uses before its bulk token reserve: free heap says how
+  // much memory exists, maxAlloc says whether one request can have it.
+  if (bytes > ESP.getMaxAllocHeap() / 2) {
+    noteAllocationFailure("chapter anchor table");
+    return false;
+  }
+  anchorData.reserve(next);
+  anchorData.push_back({std::move(id), pageIndex});
   return true;
 }
 
@@ -3365,7 +3401,7 @@ void ChapterHtmlSlimParser::placeLineOnPage(std::shared_ptr<TextBlock> line, con
   currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, currentPageNextY));
   // The block this line opens carries an id: this page is where it lands.
   if (!blockAnchorId_.empty()) {
-    anchorData.push_back({std::move(blockAnchorId_), static_cast<uint16_t>(completedPageCount)});
+    pushAnchor(std::move(blockAnchorId_), static_cast<uint16_t>(completedPageCount));
     blockAnchorId_.clear();
   }
   currentPageNextY += lineHeight;
@@ -3470,7 +3506,7 @@ void ChapterHtmlSlimParser::makePages() {
   // and the fresh page is empty, so flushPendingAnchor() will not break twice.
   if (!blockAnchorId_.empty()) {
     if (!pendingAnchorId.empty()) {
-      anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
+      pushAnchor(std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount));
     }
     pendingAnchorId = std::move(blockAnchorId_);
     blockAnchorId_.clear();

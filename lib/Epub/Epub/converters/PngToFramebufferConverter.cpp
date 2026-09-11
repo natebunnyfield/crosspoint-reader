@@ -301,6 +301,19 @@ bool PngToFramebufferConverter::getDimensionsStatic(const std::string& imagePath
     LOG_ERR("PNG", "Not enough heap for PNG decoder (%u free, need %u)", freeHeap, MIN_FREE_HEAP_FOR_PNG);
     return false;
   }
+  // FREE HEAP IS THE WRONG QUESTION ON ITS OWN. The decoder is ONE contiguous
+  // block of PNG_DECODER_APPROX_SIZE bytes, and this device is measured sitting at ~100 KB free with
+  // an 11 KB largest block. EpubReaderActivity.h already records the lesson --
+  // "Free heap says how much memory exists; maxAlloc says whether any single
+  // allocation can actually have it" -- after a build tick passed a free-heap
+  // floor and aborted anyway. The image decoders never got that second gate, so
+  // a fragmented heap passed this test and then failed the new, once per image,
+  // with nothing remembering the last failure.
+  if (ESP.getMaxAllocHeap() < PNG_DECODER_APPROX_SIZE) {
+    LOG_ERR("PNG", "Largest free block is %u, too small for the %u-byte PNG decoder", (unsigned)ESP.getMaxAllocHeap(),
+            (unsigned)PNG_DECODER_APPROX_SIZE);
+    return false;
+  }
 
   std::unique_ptr<PNG> png(new (std::nothrow) PNG());
   if (!png) {
@@ -330,6 +343,19 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
   size_t freeHeap = ESP.getFreeHeap();
   if (freeHeap < MIN_FREE_HEAP_FOR_PNG) {
     LOG_ERR("PNG", "Not enough heap for PNG decoder (%u free, need %u)", freeHeap, MIN_FREE_HEAP_FOR_PNG);
+    return false;
+  }
+  // FREE HEAP IS THE WRONG QUESTION ON ITS OWN. The decoder is ONE contiguous
+  // block of PNG_DECODER_APPROX_SIZE bytes, and this device is measured sitting at ~100 KB free with
+  // an 11 KB largest block. EpubReaderActivity.h already records the lesson --
+  // "Free heap says how much memory exists; maxAlloc says whether any single
+  // allocation can actually have it" -- after a build tick passed a free-heap
+  // floor and aborted anyway. The image decoders never got that second gate, so
+  // a fragmented heap passed this test and then failed the new, once per image,
+  // with nothing remembering the last failure.
+  if (ESP.getMaxAllocHeap() < PNG_DECODER_APPROX_SIZE) {
+    LOG_ERR("PNG", "Largest free block is %u, too small for the %u-byte PNG decoder", (unsigned)ESP.getMaxAllocHeap(),
+            (unsigned)PNG_DECODER_APPROX_SIZE);
     return false;
   }
 

@@ -362,6 +362,19 @@ bool JpegToFramebufferConverter::getDimensionsStatic(const std::string& imagePat
     LOG_ERR("JPG", "Not enough heap for JPEG decoder (%u free, need %u)", freeHeap, MIN_FREE_HEAP_FOR_JPEG);
     return false;
   }
+  // FREE HEAP IS THE WRONG QUESTION ON ITS OWN. The decoder is ONE contiguous
+  // block of JPEG_DECODER_APPROX_SIZE bytes, and this device is measured sitting at ~100 KB free with
+  // an 11 KB largest block. EpubReaderActivity.h already records the lesson --
+  // "Free heap says how much memory exists; maxAlloc says whether any single
+  // allocation can actually have it" -- after a build tick passed a free-heap
+  // floor and aborted anyway. The image decoders never got that second gate, so
+  // a fragmented heap passed this test and then failed the new, once per image,
+  // with nothing remembering the last failure.
+  if (ESP.getMaxAllocHeap() < JPEG_DECODER_APPROX_SIZE) {
+    LOG_ERR("JPG", "Largest free block is %u, too small for the %u-byte JPEG decoder", (unsigned)ESP.getMaxAllocHeap(),
+            (unsigned)JPEG_DECODER_APPROX_SIZE);
+    return false;
+  }
 
   std::unique_ptr<JPEGDEC> jpeg(new (std::nothrow) JPEGDEC());
   if (!jpeg) {
@@ -390,6 +403,19 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
   size_t freeHeap = ESP.getFreeHeap();
   if (freeHeap < MIN_FREE_HEAP_FOR_JPEG) {
     LOG_ERR("JPG", "Not enough heap for JPEG decoder (%u free, need %u)", freeHeap, MIN_FREE_HEAP_FOR_JPEG);
+    return false;
+  }
+  // FREE HEAP IS THE WRONG QUESTION ON ITS OWN. The decoder is ONE contiguous
+  // block of JPEG_DECODER_APPROX_SIZE bytes, and this device is measured sitting at ~100 KB free with
+  // an 11 KB largest block. EpubReaderActivity.h already records the lesson --
+  // "Free heap says how much memory exists; maxAlloc says whether any single
+  // allocation can actually have it" -- after a build tick passed a free-heap
+  // floor and aborted anyway. The image decoders never got that second gate, so
+  // a fragmented heap passed this test and then failed the new, once per image,
+  // with nothing remembering the last failure.
+  if (ESP.getMaxAllocHeap() < JPEG_DECODER_APPROX_SIZE) {
+    LOG_ERR("JPG", "Largest free block is %u, too small for the %u-byte JPEG decoder", (unsigned)ESP.getMaxAllocHeap(),
+            (unsigned)JPEG_DECODER_APPROX_SIZE);
     return false;
   }
 

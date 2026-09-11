@@ -57,6 +57,21 @@ class ChapterHtmlSlimParser {
   // current callback keeps running to its end even after XML_StopParser.
   void noteAllocationFailure(const char* what);
 
+  /// Append one anchor, growing `anchorData` only when the heap can take it.
+  ///
+  /// Six sites push into this vector and none of them reserved, so it doubled:
+  /// MEASURED on the owner's own copy of Procrastination.epub it reached 512
+  /// entries, and at 28 bytes an entry on device the last doubling asks for
+  /// 28,672 contiguous bytes while still holding the old 14,336 -- 43,008 live
+  /// across one copy. `push_back` THROWS, and under -fno-exceptions that is
+  /// abort(). Every neighbouring allocation here is carefully nothrow
+  /// (makeUniqueNoThrow + noteAllocationFailure, TextBlock::valid()), and this
+  /// one vector defeated all of it.
+  ///
+  /// Returns false when the growth was refused; the caller keeps going and the
+  /// parse ends in a clean error rather than an abort.
+  bool pushAnchor(std::string&& id, uint16_t pageIndex);
+
   std::unique_ptr<Page> currentPage = nullptr;
   int16_t currentPageNextY = 0;
 

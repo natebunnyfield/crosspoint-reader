@@ -34,6 +34,81 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-072] A refused 1 KB font allocation was retried per text block, and each failure cost ~140 allocations and ~70 file opens — FIXED 2026-09-10
+**severity: critical (this is the amplifier that turns a small font-path OOM into an abort elsewhere; the shape of the owner's recurring daily-use crashes) · scope: `lib/EpdFont/SdCardFont.{h,cpp}`, `lib/Epub/Epub/parsers/ChapterHtmlSlimParser.{h,cpp}`, both image converters · found 2026-09-10 by two measured heap sweeps · full numbers in [docs/reading-path-heap-budget-2026-09-10.md](docs/reading-path-heap-budget-2026-09-10.md)**
+
+Taking "it crashes regularly in daily use" at face value and measuring instead
+of guessing. **There is no leak** — 4,445 page loads produced 0 bytes of drift.
+The problem is residency, block size, and what the code does when an allocation
+is refused.
+
+**1. The retry storm and its amplifier.** `buildAdvanceTable` is called once per
+text block, so a page is a dozen-plus calls. Nothing cached a failure, so a
+tight heap was asked the same question thirteen times in 355 ms — which is
+exactly what B-040's report shows immediately before its abort. The retry was
+not the expensive part: a missing advance table makes `getTextAdvanceX` fall
+through to per-glyph `onGlyphMiss`, which is a file open, two seeks, two reads
+and a bitmap allocation **per glyph**. MEASURED over 20 real paragraphs:
+
+| | allocations | bytes | SD glyph loads |
+|---|---|---|---|
+| table present | 0 | 0 | 0 |
+| table absent | **2,829** | **190,789** | **1,415** |
+
+So each refusal churned ~140 allocations and ~70 file opens out of the very heap
+that had just said no, thirteen times over. The failure is now latched per cache
+generation and cleared by `clearPersistentCache()`. Layout is no worse — the
+fallback path is identical — it just stops paying the allocator to be told no.
+
+**2. `anchorData` doubled to a 28,672-byte throwing request.** Six push sites,
+no `reserve` anywhere, `std::pair<std::string,uint16_t>` at 28 B on device.
+MEASURED on the owner's own *Procrastination.epub*: 512 entries, and the last
+doubling asks for 28,672 bytes while still holding 14,336 — **43,008 live across
+one copy**. `push_back` throws, which is `abort()`. Every neighbouring
+allocation in that parser is carefully nothrow and this one vector defeated all
+of it. Now routed through `pushAnchor()`, which reserves 128 entries up front
+while the heap is healthiest, grows in fixed 128-entry steps rather than
+doubling, gates each growth on `getMaxAllocHeap()/2` the way `ParsedText`
+already does for its bulk reserve, and on refusal calls `noteAllocationFailure`
+so the parse ends in a clean error instead of an abort.
+
+**3. Both image decoders were gated on free heap only.** `sizeof(PNG)` is
+**45,604 bytes** and `sizeof(JPEGDEC)` **17,884** — MEASURED with
+`riscv32-esp-elf-nm` against the patched libdeps the firmware actually builds;
+the source comments say "~42 KB" and "20 KB" and are both wrong. Each is ONE
+contiguous block, and this device is measured sitting at ~100 KB free with an
+11 KB largest block. `EpubReaderActivity.h` already records the lesson — *"Free
+heap says how much memory exists; maxAlloc says whether any single allocation
+can actually have it"* — after a build tick passed a free-heap floor and aborted
+anyway. **The image decoders never got that second gate**, so a fragmented heap
+passed the test and then failed the `new`, once per image, forever. Both now
+test `getMaxAllocHeap()` too.
+
+**Also corrected here:** `resetStyleMiniData`'s retention valve tested free heap
+only (`< 40 KB`), so on a fragmented heap with 100 KB free and an 11 KB largest
+block it never tripped and the font arenas stayed resident. It now tests the
+largest block as well.
+
+**Deliberately NOT fixed, with reasons, so they are not re-proposed:**
+- The **`mergeIntoAdvanceTable` capacity ladder**. A fix was written and
+  reverted the same session: reusing the block would have recorded a capacity
+  larger than the allocation (a buffer overflow on the next merge), and an
+  in-place backward merge would silently change which entries are dropped at the
+  cap — tail today, front afterwards. 22 KB of churn did not justify that in a
+  hot path. `loadMeasureKernRows` is the larger ladder (170 KB per book) and is
+  still open.
+- The **OOM-to-cache-deletion escalation** in `EpubReaderActivity::render`: a
+  failed `Page::deserialize` is treated as a corrupt cache, so the section
+  `.bin` is deleted and the chapter re-paginates from page 0 — reloading the
+  64 KB CSS map on the way. A transient OOM therefore destroys that chapter's
+  pagination and immediately demands more memory than the allocation that
+  failed. Fixing it means distinguishing "allocation failed" from "file is
+  corrupt", which is an owner decision about a cache that might be fine.
+
+737/737 host tests pass, `gh_release` compiles. **Unconfirmed on device** — every
+number here is a host measurement of sizes, counts and lifetimes; the host
+allocator is not `multi_heap`, so none of it measures fragmentation.
+
 ### [B-071] Every crash report of a daily-use crash was unreadable: a retry storm flushed the log ring and the heap was never recorded — FIXED 2026-09-10
 **severity: high (the device crashes regularly and no report has ever explained why) · scope: `lib/Logging/Logging.cpp`, `lib/hal/HalSystem.{h,cpp}`, `src/main.cpp` · found 2026-09-10 while taking the owner's "it crashes regularly in daily use" at face value**
 

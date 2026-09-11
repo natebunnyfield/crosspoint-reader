@@ -86,6 +86,12 @@ const char* asCStr(const char* s) { return s; }
 
 // resetStyleMiniData retention bounds (see the PerStyle comment in the header).
 constexpr size_t MINI_RETAIN_MIN_FREE_HEAP = 40 * 1024;
+// The companion floor on the LARGEST OBTAINABLE BLOCK. Free heap alone is the
+// wrong question on a fragmented device -- what fails is always a contiguous
+// request. Set just above the biggest thing this subsystem asks for after the
+// framebuffer chunks (the ~10.7 KB mini bitmap arena for Edgar at 18 pt), so
+// retention stops as soon as the heap can no longer serve a rebuild.
+constexpr size_t MINI_RETAIN_MIN_MAX_ALLOC = 12 * 1024;
 constexpr uint8_t MINI_UNDERUSE_RUNS_BEFORE_FREE = 3;
 
 // Keep-if-fits buffer reuse: only reallocate when the needed size exceeds the
@@ -134,7 +140,13 @@ void SdCardFont::resetStyleMiniData(PerStyle& s) {
   // when the heap is tight: the arenas are rebuildable for one page's worth of
   // allocations, and this floor keeps retained fonts out of the way of section
   // builds and the render path's own floors.
-  if (ESP.getFreeHeap() < MINI_RETAIN_MIN_FREE_HEAP) {
+  //
+  // Both metrics, not just free heap. The resource that actually fails is a
+  // CONTIGUOUS block: this device can sit at ~100 KB free with an 11 KB largest
+  // block, which is the state clearPersistentCache's own device measurement
+  // below describes, and a free-heap floor never trips there. The background
+  // build gate already tests free AND max-alloc; this one did not.
+  if (ESP.getFreeHeap() < MINI_RETAIN_MIN_FREE_HEAP || ESP.getMaxAllocHeap() < MINI_RETAIN_MIN_MAX_ALLOC) {
     freeStyleMiniData(s);
     return;
   }
@@ -1395,6 +1407,9 @@ void SdCardFont::clearCache() {
 // --- Advance table ---
 
 void SdCardFont::clearPersistentCache() {
+  // Clearing the cache is the one moment the heap is demonstrably better than
+  // it was when the advance table was refused, so give it another chance.
+  advanceTableOom_ = false;
   for (uint8_t i = 0; i < MAX_STYLES; i++) {
     delete[] advanceTable_[i];
     advanceTable_[i] = nullptr;
@@ -1641,10 +1656,32 @@ int SdCardFont::buildAdvanceTableRange(Iter begin, Iter end, bool includeSpace, 
   // documented, survivable outcome that this function has always been able to
   // return. Only the first, smallest allocation can still fail the call
   // outright, and at 1 KB it is the one most likely to succeed.
+  // ONE FAILURE PER CACHE GENERATION, NOT ONE PER TEXT BLOCK.
+  //
+  // buildAdvanceTable is called once per text block laid out, so a page is a
+  // dozen-plus calls. When the heap is too tight for this buffer it is too
+  // tight for all of them, and retrying achieved nothing except to hammer the
+  // heap at its worst moment -- the B-040 crash report is thirteen identical
+  // failures in 355 ms, immediately before an abort.
+  //
+  // The retry was not even the expensive part. A missing advance table makes
+  // getTextAdvanceX fall through to per-glyph getGlyph -> onGlyphMiss, which is
+  // a file open, two seeks, two reads and a bitmap allocation PER GLYPH.
+  // MEASURED over 20 real paragraphs: 0 allocations and 0 file opens with the
+  // table present, versus 2,829 allocations, 190,789 bytes and 1,415 file opens
+  // without it. That amplification is what turns a 1 KB refusal here into an
+  // abort somewhere else a few hundred milliseconds later.
+  //
+  // Latching does not make layout worse: the fallback path is identical either
+  // way. It just stops paying the allocator thirteen times to be told no.
+  if (advanceTableOom_) return -1;
+
   uint32_t capacity = 256;
   uint32_t* codepoints = new (std::nothrow) uint32_t[capacity + 2];
   if (!codepoints) {
-    LOG_ERR("SDCF", "buildAdvanceTable: failed to allocate codepoint buffer (%u bytes)", (capacity + 2) * 4);
+    LOG_ERR("SDCF", "buildAdvanceTable: no memory for the %u-byte codepoint buffer; measuring per glyph until the cache is cleared",
+            (capacity + 2) * 4);
+    advanceTableOom_ = true;
     return -1;
   }
   uint32_t cpCount = 0;

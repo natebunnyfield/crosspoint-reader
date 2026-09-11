@@ -80,6 +80,15 @@ class SdCardFont {
   // when font/size/family/glyph-table state changes.
   void clearPersistentCache();
 
+  // Set when buildAdvanceTableRange cannot get its codepoint buffer, and
+  // cleared by clearPersistentCache(). See the long comment at the top of
+  // buildAdvanceTableRange: without this, a page whose layout allocates
+  // thirteen text blocks retried a refused allocation thirteen times, and each
+  // failure sent that block's measurement down the per-glyph SD path --
+  // MEASURED at ~140 allocations and ~70 file opens per block, churning the
+  // very heap that had just refused 1 KB.
+  bool advanceTableOom_ = false;
+
   // Release every rebuildable cache while keeping the font loaded and usable:
   // mini glyph/kern arenas, kern/ligature class tables, the overflow ring, and
   // the persistent advance tables. Coverage intervals stay so hasCodepoint()
