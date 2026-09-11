@@ -41,6 +41,10 @@ void FileBrowserActivity::loadFiles() {
 
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(fileNameBuffer.get(), NAME_BUFFER_SIZE);
+    // Empty means getName() failed, not a file called "". Skip rather than list
+    // it -- see the note on HalFile::getName and B-054. The hidden-file check
+    // below tests [0] == '.', which an empty name passes straight through.
+    if (fileNameBuffer[0] == '\0') continue;
     // showsHiddenEntries() is a switch that always returns false today
     // (FileBrowserActivity.h), deliberately kept as a switch rather than
     // `return false` so a future Mode enumerator fails to compile under

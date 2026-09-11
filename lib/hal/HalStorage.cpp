@@ -145,7 +145,26 @@ bool HalStorage::removeDir(const char* path) { HAL_STORAGE_WRAPPED_CALL(removeDi
   return impl->file.method(__VA_ARGS__);
 
 void HalFile::flush() { HAL_FILE_WRAPPED_CALL(flush, ); }
-size_t HalFile::getName(char* name, size_t len) { HAL_FILE_WRAPPED_CALL(getName, name, len); }
+// NOT a plain pass-through, deliberately. SdFat's getName() returns 0 and may
+// leave the buffer UNTOUCHED when it cannot read the name -- a broken long-name
+// chain, a stale directory entry, a buffer too small. Sixteen of the seventeen
+// call sites in this tree ignore the return value, and every one of them is a
+// loop over directory entries reusing one buffer, so "untouched" means the
+// PREVIOUS ENTRY'S NAME is what gets used. A listing then shows a duplicate
+// where a file should be, which is indistinguishable from the filesystem itself
+// being corrupt. Reported by the owner 2026-09-08 as "deleting a file seems to
+// corrupt the filenames across the filesystem" (B-054).
+//
+// Emptying the buffer on failure turns that silent wrong answer into an obvious
+// one at every call site at once, without touching sixteen of them. Callers that
+// want to distinguish "failed" from "empty name" still have the return value.
+size_t HalFile::getName(char* name, size_t len) {
+  HalStorage::StorageLock lock;
+  assert(impl != nullptr);
+  const size_t written = impl->file.getName(name, len);
+  if (written == 0 && name != nullptr && len > 0) name[0] = '\0';
+  return written;
+}
 size_t HalFile::size() { HAL_FILE_FORWARD_CALL(size, ); }              // already thread-safe, no need to wrap
 size_t HalFile::fileSize() { HAL_FILE_FORWARD_CALL(fileSize, ); }      // already thread-safe, no need to wrap
 uint64_t HalFile::fileSize64() { HAL_FILE_FORWARD_CALL(fileSize, ); }  // already thread-safe, no need to wrap

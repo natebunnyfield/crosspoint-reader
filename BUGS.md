@@ -103,7 +103,7 @@ in it distinguishes a connection that never opened (`status < 0`) from a body
 that stopped mid-stream (`!responseComplete()`) from an unexpected HTTP status,
 and those are three different bugs.
 
-### [B-054] Deleting a file appears to corrupt filenames across the filesystem — REPORTED 2026-09-07, not yet investigated
+### [B-054] Deleting a file appears to corrupt filenames across the filesystem — MECHANISM FOUND and fixed 2026-09-10; that it is THE cause is unconfirmed
 **severity: high (data integrity on the card, and it is not confined to the file that was deleted) · scope: unknown; start at the delete path and the directory listing that follows it · reported by the owner 2026-09-07**
 
 Owner, verbatim: *"deleting a file seems to corrupt the filenames across the
@@ -128,8 +128,54 @@ B-053's follow-ups, and noted there as cosmetic because `isSafeFamilyName`
 gates the delete). That is not this bug, but it is the same class of mistake and
 the same buffers, so it is the right neighbourhood to read first.
 
-To close: a reproduction with the file named, the card read on a computer
-afterwards, and the delete path traced from the UI action to the FAT write.
+**Traced 2026-09-10 on the owner's instruction, and there is a defect on that
+path that produces exactly this symptom.**
+
+`HalFile::getName()` returns `size_t` — the length written, **0 when it cannot
+read the name**, and on failure SdFat may leave the caller's buffer UNTOUCHED.
+Seventeen call sites in this tree call it. **Sixteen ignore the return value**
+(the exception is `CrossPointWebServer.cpp:660`), and every one of those sixteen
+is a loop over directory entries reusing a single buffer:
+
+```
+for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
+  file.getName(fileNameBuffer.get(), NAME_BUFFER_SIZE);   // return discarded
+  ...
+  files.emplace_back(fileNameBuffer.get());               // previous name, if it failed
+}
+```
+
+So one failed `getName` does not produce a blank or a garbled name — it produces
+**the previous entry's name, again**, copied into the list as if it were real.
+Several in a row produce several wrong names. On screen that is
+indistinguishable from the filesystem itself having been corrupted, which is
+precisely how it was reported.
+
+`src/activities/home/FileManagerActivity.cpp:95` is the listing the owner was
+looking at when he deleted, and `:605` hands that same buffer to
+`FsOps::removeRecursiveWithCacheClear` first — so the stale contents a failed
+`getName` falls back to are whatever the DELETE walk last wrote there.
+
+**Fixed at the HAL boundary rather than at sixteen call sites.**
+`HalFile::getName` now empties the buffer when the underlying call returns 0, so
+a failure degrades to an empty string everywhere at once instead of to a
+plausible-looking wrong name. `FileManagerActivity` and `FileBrowserActivity`
+additionally skip empty names, so a failed entry shows the listing one short
+rather than as a blank row. The return value is still there for callers that
+want to tell "failed" from "a file named nothing".
+
+**What is NOT established, and the entry stays open until it is.** Nobody has
+shown that `getName` actually fails on the owner's card, nor that deleting is
+what provokes it. What is established is that IF it fails, the symptom is
+exactly the reported one, and that sixteen call sites were one step from
+displaying a wrong answer with no way to notice. The fix is worth having on its
+own terms; whether it closes this report is unconfirmed.
+
+**To close:** delete a file on the device, then read the card on a computer. If
+the names are correct there, this was a display-layer fault and the fix above is
+the whole story. If they are wrong on the card too, this is real FAT corruption,
+the fix above is unrelated, and the delete path's writes are the place to look
+-- a different bug in a different layer.
 
 ### [B-053] Update Fonts aborts on the manifest: an unbounded `std::string::append` reaches `operator new`, and `-fno-exceptions` turns `bad_alloc` into `abort()` — SYMBOLIZED EXACTLY, FIXED 2026-09-07, UNCONFIRMED on device
 **severity: critical (the headline feature of 1.5.29-BD crashes the device, reproduced twice on the owner's X4) · scope: `src/network/FontUpdater.cpp:186-191`, the same pattern at `src/network/LibraryUpdater.cpp:167-171` and `src/network/HttpDownloader.cpp` `fetchUrl(url, std::string&)` · found 2026-09-07 from two crash reports the owner supplied, hours after 1.5.29-BD shipped**

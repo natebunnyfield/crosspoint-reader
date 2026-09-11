@@ -93,6 +93,10 @@ void FileManagerActivity::loadFiles() {
   // (ruling in docs/manage-files.md).
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(fileNameBuffer.get(), NAME_BUFFER_SIZE);
+    // An empty name is getName() having failed, not a file called "". Skipping
+    // it shows one entry short rather than a duplicate of the previous one --
+    // see the note on HalFile::getName and B-054.
+    if (fileNameBuffer.get()[0] == '\0') continue;
     if (strcmp(fileNameBuffer.get(), ".") == 0 || strcmp(fileNameBuffer.get(), "..") == 0) {
       continue;
     }
