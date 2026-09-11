@@ -3,6 +3,7 @@
 #include <BoardConfig.h>
 #include <esp_rom_sys.h>
 
+#include <cstring>
 #include <string>
 
 #define MAX_ENTRY_LEN 256
@@ -19,6 +20,26 @@ RTC_NOINIT_ATTR size_t logHead = 0;
 RTC_NOINIT_ATTR uint32_t rtcLogMagic;
 static constexpr uint32_t LOG_RTC_MAGIC = 0xDEADBEEF;
 
+// How many times in a row the newest line has repeated, and the newest line as
+// it arrived. Both live in RTC memory with the ring so they survive the reset
+// that produces a crash report.
+//
+// The raw copy is not redundant: once a repeat is folded into the slot the
+// stored text carries a " (xN)" suffix, so comparing the NEXT message against
+// the slot would stop matching and only pairs would ever collapse. That is
+// exactly what the first version of this did, and test/log_ring caught it.
+RTC_NOINIT_ATTR uint32_t logRepeatCount;
+RTC_NOINIT_ATTR char logLastRaw[MAX_ENTRY_LEN];
+
+// Compare two entries ignoring the leading "[timestamp] " that logPrintf
+// prepends -- a retry storm produces identical text at different milliseconds,
+// and comparing the whole line would never match.
+static const char* afterTimestamp(const char* line) {
+  if (line[0] != '[') return line;
+  const char* close = strchr(line, ']');
+  return close && close[1] == ' ' ? close + 2 : line;
+}
+
 void addToLogRingBuffer(const char* message) {
   // Add the message to the ring buffer, overwriting old messages if necessary.
   // If the magic is wrong or logHead is out of range (RTC_NOINIT_ATTR garbage
@@ -26,8 +47,40 @@ void addToLogRingBuffer(const char* message) {
   if (rtcLogMagic != LOG_RTC_MAGIC || logHead >= MAX_LOG_LINES) {
     memset(logMessages, 0, sizeof(logMessages));
     logHead = 0;
+    logRepeatCount = 0;
+    logLastRaw[0] = '\0';
     rtcLogMagic = LOG_RTC_MAGIC;
   }
+
+  // COLLAPSE CONSECUTIVE DUPLICATES instead of spending a ring slot on each.
+  //
+  // Sixteen slots is the whole crash report. The B-040 report is THIRTEEN
+  // identical "buildAdvanceTable: failed to allocate codepoint buffer (16384
+  // bytes)" lines, which pushed every line that led up to the failure out of
+  // the ring -- so the one report of a crash that happens in daily use told us
+  // nothing about how the device got there. A retry storm is exactly when the
+  // preceding context matters most, and exactly when the old ring threw it
+  // away.
+  //
+  // The repeat is folded into the newest slot as a "(xN)" suffix, so the line
+  // is still there and the count is visible.
+  const size_t newest = (logHead + MAX_LOG_LINES - 1) % MAX_LOG_LINES;
+  const bool haveNewest = logHead != 0 || logMessages[newest][0] != '\0';
+  if (haveNewest && logLastRaw[0] != '\0' &&
+      strcmp(afterTimestamp(logLastRaw), afterTimestamp(message)) == 0) {
+    logRepeatCount++;
+    // Rewrite the slot from the RAW text plus the running count, so the suffix
+    // never accumulates and the count is always right.
+    char collapsed[MAX_ENTRY_LEN];
+    snprintf(collapsed, sizeof(collapsed), "%s (x%u)", logLastRaw, static_cast<unsigned>(logRepeatCount + 1));
+    strncpy(logMessages[newest], collapsed, MAX_ENTRY_LEN - 1);
+    logMessages[newest][MAX_ENTRY_LEN - 1] = '\0';
+    return;
+  }
+
+  logRepeatCount = 0;
+  strncpy(logLastRaw, message, MAX_ENTRY_LEN - 1);
+  logLastRaw[MAX_ENTRY_LEN - 1] = '\0';
   strncpy(logMessages[logHead], message, MAX_ENTRY_LEN - 1);
   logMessages[logHead][MAX_ENTRY_LEN - 1] = '\0';
   logHead = (logHead + 1) % MAX_LOG_LINES;
@@ -109,5 +162,7 @@ void clearLastLogs() {
     logMessages[i][0] = '\0';
   }
   logHead = 0;
+  logRepeatCount = 0;
+  logLastRaw[0] = '\0';
   rtcLogMagic = LOG_RTC_MAGIC;
 }

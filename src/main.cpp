@@ -1089,6 +1089,7 @@ void loop() {
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
   static unsigned long lastMemPrint = 0;
+  static unsigned long lastHeapSample = 0;
 
   gpio.setSharedConfirmPowerShortPressEmitsPower(SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP);
   // Through MappedInputManager, not gpio directly: beyond gpio.update() this
@@ -1097,6 +1098,18 @@ void loop() {
   mappedInputManager.update();
 
   renderer.setFadingFix(SETTINGS.fadingFix);
+
+  // Sample the heap into RTC memory unconditionally -- NOT gated on Serial.
+  //
+  // The MEM line below only exists with a cable attached, which is the one
+  // situation in which you do not need a crash report. The device's real
+  // crashes are heap exhaustion in daily use, and the report never said what
+  // the heap was doing. This costs a few RTC bytes and three queries, and it
+  // cannot be pushed out of the 16-line log ring by a retry storm.
+  if (millis() - lastHeapSample >= 5000) {
+    HalSystem::recordHeapSample();
+    lastHeapSample = millis();
+  }
 
   if (Serial && millis() - lastMemPrint >= 10000) {
     LOG_INF("MEM", "Free: %d bytes, Total: %d bytes, Min Free: %d bytes, MaxAlloc: %d bytes", ESP.getFreeHeap(),

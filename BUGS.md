@@ -34,6 +34,54 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-071] Every crash report of a daily-use crash was unreadable: a retry storm flushed the log ring and the heap was never recorded — FIXED 2026-09-10
+**severity: high (the device crashes regularly and no report has ever explained why) · scope: `lib/Logging/Logging.cpp`, `lib/hal/HalSystem.{h,cpp}`, `src/main.cpp` · found 2026-09-10 while taking the owner's "it crashes regularly in daily use" at face value**
+
+Both crash reports on the owner's card are heap exhaustion during ordinary
+reading — B-040 (`buildAdvanceTable` 16 KB) and B-052 (BW buffer 8 KB). Neither
+says how the device got there, and **that is not bad luck, it is two structural
+defects in the reporting itself.**
+
+**1. A retry storm erases the evidence.** The ring is 16 lines and
+`HalSystem::getPanicInfo` dumps it verbatim, so the ring IS the report. B-040's
+report is **thirteen identical** `buildAdvanceTable: failed to allocate
+codepoint buffer (16384 bytes)` lines out of sixteen slots — so every line that
+led up to the failure had been pushed out. A retry storm is exactly when the
+preceding context matters most and exactly when the old ring threw it away.
+
+Consecutive duplicates now collapse into one slot with a `(xN)` suffix.
+
+**2. The heap was recorded only with a USB cable attached.** `main.cpp`'s
+periodic MEM line is guarded by `if (Serial && ...)`. So the one number that
+explains every crash this device produces existed only in the situation where
+you do not need a crash report. A crash report is the channel you use when you
+have no cable.
+
+`HalSystem::recordHeapSample()` now writes free / min-free-since-boot /
+largest-block into **RTC_NOINIT memory** every 5 s, ungated, and `getPanicInfo`
+prints it. It survives the reset the same way the log ring does, costs ~20 bytes
+rather than a ring slot, and therefore **cannot be pushed out by a storm**.
+
+Every future crash report will carry a line like:
+
+```
+Heap just before the crash (sampled at 336500ms): free=11248 minFreeSinceBoot=9024 largestBlock=6144
+```
+
+which turns "it crashes regularly" from a report into a measurement.
+
+**My first implementation of the collapsing was wrong and a test caught it.**
+It compared the incoming line against the stored slot — but once a repeat is
+folded in, the slot carries a `(xN)` suffix, so the next identical message no
+longer matched and **only pairs ever collapsed**. Thirteen repeats became seven
+slots of `(x2)`. The raw text is now kept alongside in RTC memory and the slot
+is rewritten from that, so a run of any length costs one slot.
+
+New suite `test/log_ring`, six tests, including the one that matters: **context
+logged before a 50-line storm must still be in the report afterwards.**
+
+737/737 host tests pass, `gh_release` compiles.
+
 ### [B-070] The page LUT grows by doubling on the pagination path — MITIGATED 2026-09-10, not eliminated
 **severity: medium (abort near heap exhaustion while paginating a long chapter) · scope: `lib/Epub/Epub/Section.cpp` · found 2026-09-10 by a read-only sweep**
 

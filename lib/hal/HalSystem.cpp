@@ -185,6 +185,27 @@ void checkPanic() {
   }
 }
 
+namespace {
+// Survives the reset that produces a crash report, same as the log ring.
+struct HeapSample {
+  uint32_t magic;
+  uint32_t freeBytes;
+  uint32_t minFreeBytes;  // low-water mark since boot
+  uint32_t maxAllocBytes;  // largest single block still obtainable
+  uint32_t atMillis;
+};
+constexpr uint32_t HEAP_SAMPLE_MAGIC = 0x48EA9BEEu;
+RTC_NOINIT_ATTR HeapSample rtcHeapSample;
+}  // namespace
+
+void recordHeapSample() {
+  rtcHeapSample.magic = HEAP_SAMPLE_MAGIC;
+  rtcHeapSample.freeBytes = static_cast<uint32_t>(ESP.getFreeHeap());
+  rtcHeapSample.minFreeBytes = static_cast<uint32_t>(ESP.getMinFreeHeap());
+  rtcHeapSample.maxAllocBytes = static_cast<uint32_t>(ESP.getMaxAllocHeap());
+  rtcHeapSample.atMillis = static_cast<uint32_t>(millis());
+}
+
 void clearPanic() {
   panicCaptureMarker = 0;
   panicMessage[0] = '\0';
@@ -207,6 +228,17 @@ std::string getPanicInfo(bool full) {
       info += resetLine;
     }
     info += "\n\nPanic reason: " + std::string(panicMessage);
+    // The heap as it was shortly BEFORE the crash. Every crash this device has
+    // produced in daily use was heap exhaustion, and the report never carried
+    // the one number that explains it -- see recordHeapSample().
+    if (rtcHeapSample.magic == HEAP_SAMPLE_MAGIC) {
+      char heapLine[144];
+      snprintf(heapLine, sizeof(heapLine),
+               "\n\nHeap just before the crash (sampled at %ums): free=%u minFreeSinceBoot=%u largestBlock=%u",
+               static_cast<unsigned>(rtcHeapSample.atMillis), static_cast<unsigned>(rtcHeapSample.freeBytes),
+               static_cast<unsigned>(rtcHeapSample.minFreeBytes), static_cast<unsigned>(rtcHeapSample.maxAllocBytes));
+      info += heapLine;
+    }
     info += "\n\nLast logs:\n" + getLastLogs();
     info += "\n\nStack memory:\n";
 
