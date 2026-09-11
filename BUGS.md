@@ -34,6 +34,38 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-056] A nothrow-allocated object aborted anyway, from inside its own constructor — FIXED 2026-09-10
+**severity: high (a hard abort when the owner opens File Transfer on a tight heap) · scope: `src/network/CrossPointWebServer.h` · found 2026-09-10 by a P0/P1 sweep of `src/network/`, not reported**
+
+`CrossPointWebServerActivity` allocates the web server with
+`makeUniqueNoThrow<CrossPointWebServer>()` and checks the result, with a comment
+saying exactly why: *"aborting here would take the device down at the exact
+moment the owner asked for File Transfer"*. The intent was right and the guard
+was in place.
+
+**The constructor defeated it from the inside.** `UploadState` and
+`FontUploadState` each held a `std::vector<uint8_t>` and called
+`buffer.resize(4096)` in their constructors. `resize` reaches `operator new`,
+which is NOT nothrow under `-fno-exceptions` — so the object allocation was
+nothrow and checked, and then the constructor called a throwing allocator twice
+anyway. Out of memory at that moment aborts the device rather than returning the
+null the caller was carefully testing for.
+
+This is the general shape worth remembering, because `makeUniqueNoThrow` reads
+as a complete guarantee and is not one: **it makes the OBJECT's allocation
+nothrow, not everything the constructor does.** Any type whose constructor
+allocates is still an abort risk behind it.
+
+Both buffers are now fixed arrays, so they are part of the single allocation
+that is already checked. The object is ~8 KB larger and there is one checked
+allocation instead of one checked plus two unchecked. Verified both buffers are
+genuinely used first (`state.buffer` twice, `fontUpload.buffer` three times) --
+they are not dead weight.
+
+731/731 host tests pass, `gh_release` compiles. **Unconfirmed on device:** like
+every allocation bug in this file, the failure needs a heap tight enough to
+refuse 4 KB, which no host test reproduces.
+
 ### [B-055] Update Fonts: every family fails with "Downloads failed" — the download path's FIRST run on hardware, cause unknown, instrumented 2026-09-08
 **severity: high (the feature cannot install anything) · scope: `FontUpdater::stageFamily` download loop, `HttpDownloader::runGetWolf` on multi-MB bodies · reported by the owner 2026-09-08 on 1.5.32-BD**
 
@@ -862,6 +894,32 @@ mounted here yet.
 
 ### [B-046] Every release image since 1.5.17-BD fails firmware validation: the descriptor stamper left the XOR checksum stale — FIXED 2026-09-04 (scripts/stamp_app_desc.py), re-upload of the 1.5.17-BD..1.5.21-BD assets owed
 **severity: high (no release since 1.5.17-BD installs by any path) · scope: build / release, `scripts/stamp_app_desc.py` · found 2026-09-04 from a device: SD Card Firmware Update said "Invalid firmware file" for the latest release's `firmware.bin`**
+
+**Re-measured 2026-09-10, so nobody has to guess again.** Downloaded the
+published `firmware.bin` for five tags and recomputed both integrity marks (the
+XOR byte over segment data seeded 0xEF, and the SHA256 trailer):
+
+| release | XOR byte | SHA256 |
+|---|---|---|
+| 1.5.17-BD | stored 0xFD, computed 0xBE — **STALE** | OK |
+| 1.5.19-BD | stored 0xF7, computed 0xBA — **STALE** | OK |
+| 1.5.21-BD | stored 0xD9, computed 0x9F — **STALE** | OK |
+| 1.5.31-BD | stored 0xCC, computed 0xCC — OK | OK |
+| 1.5.33-BD | stored 0xE1, computed 0xE1 — OK | OK |
+
+Two conclusions. **The prevention works**: `scripts/release.sh:99` refuses to
+publish an image whose checksum byte disagrees with its segment data, and every
+release since is clean — so this cannot recur silently. **The old assets are
+still broken as published**, exactly as this entry says: a valid hash over an
+invalid image, which is the worst shape because every cheap check passes.
+
+What remains is not a code fix. Those five releases are live on GitHub and
+anyone who downloads one gets an image that will not install by any path.
+Replacing or removing published assets is a publishing decision for the owner —
+rebuild and re-upload the five, or delete the assets so nobody can fetch a brick,
+or leave them and rely on people taking the latest. **Not actioned, awaiting
+that call.**
+
 
 An ESP image carries two integrity marks over its segment data: the appended
 SHA256 trailer, and one byte before it — the XOR of every segment data byte,

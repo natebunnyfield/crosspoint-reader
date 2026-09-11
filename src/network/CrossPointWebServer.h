@@ -42,10 +42,19 @@ class CrossPointWebServer {
     // 4KB is a good balance: large enough to reduce syscall overhead, small enough
     // to keep individual write times short and avoid watchdog issues
     static constexpr size_t UPLOAD_BUFFER_SIZE = 4096;  // 4KB buffer
-    std::vector<uint8_t> buffer;
+    // A FIXED ARRAY, not a vector that resizes in the constructor.
+    //
+    // CrossPointWebServerActivity allocates this whole object with
+    // makeUniqueNoThrow and checks the result, precisely so that being out of
+    // memory does not take the device down "at the exact moment the owner asked
+    // for File Transfer" (its own words). A vector resized in the constructor
+    // defeated that from the inside: the object allocation was nothrow and
+    // checked, and then the constructor called operator new anyway, which is
+    // not nothrow under -fno-exceptions and aborts. Resource Protocol 9, and
+    // the same mechanism as B-053. As an array the buffer is part of the one
+    // allocation that is already checked.
+    uint8_t buffer[UPLOAD_BUFFER_SIZE];
     size_t bufferPos = 0;
-
-    UploadState() { buffer.resize(UPLOAD_BUFFER_SIZE); }
   } upload;
 
   CrossPointWebServer();
@@ -124,10 +133,9 @@ class CrossPointWebServer {
     bool magicChecked = false;
     size_t bytesWritten = 0;
     static constexpr size_t BUFFER_SIZE = 4096;
-    std::vector<uint8_t> buffer;
+    // Fixed array for the same reason as UploadState::buffer above.
+    uint8_t buffer[BUFFER_SIZE];
     size_t bufferPos = 0;
-
-    FontUploadState() { buffer.resize(BUFFER_SIZE); }
   } fontUpload;
 
   // Wi-Fi credential handlers
