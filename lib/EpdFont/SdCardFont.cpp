@@ -318,6 +318,38 @@ bool SdCardFont::loadStyleKernLigatureData(PerStyle& s) {
       return false;
     }
 
+    // VALIDATE EVERY CLASS ID BEFORE ANYTHING CACHES OR INDEXES WITH IT.
+    //
+    // The classId byte comes straight off the card and was never checked
+    // against the declared class counts. The sanity block later covers the
+    // interval, glyph and entry counts only. A right-class id of 255 against
+    // kernRightClassCount = 1 read 253 bytes past a 1-byte heap allocation --
+    // reproduced under ASan at two sites, measureKernRows[lo*rowBytes + rc-1]
+    // and rowBuf[newToOldRight[newR]-1]. A bad LEFT id additionally aims the
+    // row seeks at arbitrary file offsets: in-bounds, but silently wrong
+    // kerning.
+    //
+    // Ids are 1-based (0 means "no class"), so the bound is <= count. Refusing
+    // the whole font is right: a kern table that indexes outside itself is not
+    // something to render half of, and every caller already handles a failed
+    // load by falling back to a built-in face.
+    for (uint32_t i = 0; i < s.header.kernLeftEntryCount; i++) {
+      if (s.kernLeftClasses[i].classId > s.header.kernLeftClassCount) {
+        LOG_ERR("SDCF", "Kern left class id %u exceeds declared count %u", s.kernLeftClasses[i].classId,
+                s.header.kernLeftClassCount);
+        freeStyleKernLigatureData(s);
+        return false;
+      }
+    }
+    for (uint32_t i = 0; i < s.header.kernRightEntryCount; i++) {
+      if (s.kernRightClasses[i].classId > s.header.kernRightClassCount) {
+        LOG_ERR("SDCF", "Kern right class id %u exceeds declared count %u", s.kernRightClasses[i].classId,
+                s.header.kernRightClassCount);
+        freeStyleKernLigatureData(s);
+        return false;
+      }
+    }
+
     // ASCII shortcut for getMeasureKern (see SdCardFont.h). Failing to allocate
     // it is not an error: the lookups fall back to the binary search.
     s.kernClassAscii = new (std::nothrow) uint8_t[256];

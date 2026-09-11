@@ -34,6 +34,111 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-063] A `.cpfont` with no REGULAR style loaded clean and then null-dereferenced at boot — FIXED 2026-09-10
+**severity: critical (permanent boot loop, recoverable only by editing the card on a computer) · scope: `lib/EpdFont/SdCardFontManager.cpp` · found 2026-09-10 by a read-only sweep, reproduced under ASan/UBSan**
+
+`SdCardFont::load()` accepts any `styleId < MAX_STYLES` and **does not require
+style 0**. `SdCardFontManager` then passed `font->getEpdFont(0)` — `nullptr` —
+straight into `EpdFontFamily`, and `EpdFontFamily::getFont` falls through to
+`return regular;` for **every** style, so every lookup returned null.
+
+**Reproduced:** `load -> 1`, `getEpdFont(0) = 0x0`, then UBSan *member call on
+null pointer* and an ASan SEGV on address 0x0.
+
+**The first consumer is at boot.** `main.cpp` → `sdFontSystem.begin()` →
+`setupUiFallbacks` → `hasCodepoint(0x4E00)`. `SETTINGS.sdFontFamilyName` is
+persisted, and the `clearSdFontFamily()` recovery never runs **because
+`loadFamily` succeeded**. So the device boots, dereferences null, resets, and
+does it again.
+
+Not latent on hand-built fonts: the project's own converter takes a
+"single-style mode" branch for any family declaring one style
+(`build-sd-fonts.py:1171-1174`), and a one-line YAML edit or a WebDAV PUT does
+it too. All 60 shipped families declare four styles, so stock cards are safe.
+
+Every family slot now resolves through `font->resolveStyle(...)`, at both the 1x
+and hi-res sites. `resolveStyle` walks a complete fallback row and `load()`
+guarantees at least one present style, so it can never return an absent one.
+`SdCardFont::hasStyle()` existed for this and was called nowhere.
+
+### [B-064] The third `readString` overload read an uninitialised length and resized to it — FIXED 2026-09-10
+**severity: critical (abort from a cache file; B-024 verbatim in the one overload its fix missed) · scope: `lib/Serialization/BufferedFile.h` · found 2026-09-10 by a read-only sweep, executed**
+
+B-024 initialised `len` and bounded it against the bytes remaining in **two**
+`readString` overloads — and the note above them says *"Both readString
+overloads"*, which is true of the istream and `HalFile` versions. The
+`BufferedFileReader` one predates that fix and got **neither** half:
+
+```cpp
+uint32_t len;        // uninitialised
+readPod(in, len);    // returns void; a short read leaves stack garbage
+s.resize(len);       // no bound against the bytes left
+```
+
+**Executed at EOF it resized to 0x6f26a978 — 1.86 GB — from stack garbage.**
+Under `-fno-exceptions` a refused allocation crashes inside `resize`; garbage
+above `max_size` aborts in `__throw_length_error` before allocating at all.
+Either way, B-053.
+
+Its only consumer is `BookMetadataCache`'s spine and TOC readers, reachable
+through a transient SD read error, a `seek()` whose `bool` is discarded at six
+sites, or a short write that leaves `spineCount` over-counting. `len` is now
+initialised and bounded against `fileSize() - position()`, matching the other
+two; a refusal yields an empty string, which fails the cache's own validation
+and rebuilds it. `test/untrusted_input` exercises only the istream form.
+
+### [B-065] Two `reserve()` calls sized from unvalidated on-disk numbers — FIXED 2026-09-10
+**severity: high (abort on opening an ordinary-looking file) · scope: `lib/Epub/Epub/BookMetadataCache.cpp`, `lib/Xtc/Xtc/XtcParser.cpp` · found 2026-09-10 by a read-only sweep, measured**
+
+B-032's shape in two more places. `reserve` throws, and under `-fno-exceptions`
+that is `abort()`.
+
+**`BookMetadataCache::load`** read `version`, `lutOffset`, `spineCount` and
+`tocCount` into uninitialised locals via void `readPod`, validated none of them,
+and cross-checked nothing against the file size. `spineCount` is `uint16`, so
+`cumulativeSizes.reserve(spineCount)` asked for up to **262,140 contiguous
+bytes**. The header is now checked to fit its own file — the LUTs are one
+`uint32` per spine and TOC entry at `lutOffset`, which is a real bound rather
+than a guessed cap — and a corrupt header fails the cache open, which rebuilds
+it. The sibling loaders already had all three guards
+(`CssParser::loadFromCache`), and `Page::deserialize` clamps the identical shape
+deliberately.
+
+**`XtcParser`** computed `chapterCount = (maxOffset - chapterOffset) / 96`. The
+existing clamp only narrows `maxOffset` when `pageTableOffset`/`dataOffset` sit
+**after** `chapterOffset`; put the chapter table after both and `maxOffset`
+falls back to the whole file. **Measured on a crafted 4 MB `.xtc`: 43,648
+chapters, a 1,396,736-byte request**; a 40 MB comic asks ~12 MB. Reached by
+simply **opening the file**. Now capped at 4,096 chapters, reading what fits
+rather than refusing the book — a truncated chapter list still renders every
+page. Note `BUGS.md`'s B-024 entry cites this function as *"the pattern to
+copy"*: the clamp is sound, the `reserve` it fed was not.
+
+### [B-066] A crafted `.cpfont` kern class id read up to 254 bytes past two heap buffers — FIXED 2026-09-10
+**severity: high (memory safety, reachable from a font file on the card) · scope: `lib/EpdFont/SdCardFont.cpp` · found 2026-09-10 by a read-only sweep, both sites reproduced under ASan**
+
+The `classId` byte in the on-disk kern class tables was never checked against
+the declared `kernLeftClassCount`/`kernRightClassCount`; the existing sanity
+block covers interval, glyph and entry counts only.
+
+**Both reproduced** with a font declaring `kernRightClassCount = 1` and an entry
+with `classId = 255`:
+- `SdCardFont.cpp:683` — `measureKernRows[lo * rowBytes + (rc - 1)]`:
+  heap-buffer-overflow, READ of size 1, **253 bytes after a 1-byte region**.
+- `SdCardFont.cpp:545` — `rowBuf[newToOldRight[newR] - 1]`: the same.
+
+A bad LEFT id additionally aims the row seeks at arbitrary file offsets —
+in-bounds, but silently wrong kerning.
+
+Both tables are now validated immediately after the read, before
+`kernClassAscii` can cache a bad id. Ids are 1-based, so the bound is `<=
+count`. A font that indexes outside its own kern table is refused whole rather
+than rendered partly — every caller already falls back to a built-in face.
+
+**A mutation fuzzer over the whole `.cpfont` path rediscovered this
+independently within 400 iterations**, and with it patched, **~52,500 mutated
+fonts across both interval representations ran clean under ASan+UBSan**.
+
 ### [B-060] "Save password? Yes" could silently not save, forever — FIXED 2026-09-10
 **severity: high (the owner retypes a password every session and is never told why) · scope: `src/activities/network/WifiSelectionActivity.cpp`, `src/WifiCredentialStore.{h,cpp}` · found 2026-09-10 by a read-only sweep**
 

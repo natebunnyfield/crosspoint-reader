@@ -322,9 +322,25 @@ XtcError XtcParser::readChapters() {
     return XtcError::READ_ERROR;
   }
 
-  m_chapters.reserve(chapterCount);
+  // CAP THE RESERVE. The clamp above only narrows maxOffset when pageTableOffset
+  // or dataOffset happen to sit AFTER chapterOffset; put the chapter table after
+  // both and maxOffset falls back to the whole file, so chapterCount becomes
+  // fileSize/96. Measured on a crafted 4 MB .xtc: 43,648 chapters, a 1,396,736
+  // byte request -- and a 40 MB comic asks ~12 MB. reserve throws, which under
+  // -fno-exceptions is abort(), and this is reached by simply OPENING the file.
+  //
+  // A real comic has chapters in the low hundreds. The cap is deliberately
+  // generous: over it, read what fits rather than refusing the book, because a
+  // truncated chapter list still renders every page.
+  constexpr size_t kMaxChapters = 4096;
+  const size_t chapterCountCapped = chapterCount > kMaxChapters ? kMaxChapters : chapterCount;
+  if (chapterCountCapped != chapterCount) {
+    LOG_ERR("XTC", "Chapter table claims %u entries; reading the first %u", static_cast<unsigned>(chapterCount),
+            static_cast<unsigned>(kMaxChapters));
+  }
+  m_chapters.reserve(chapterCountCapped);
   std::vector<uint8_t> chapterBuf(chapterSize);
-  for (size_t i = 0; i < chapterCount; i++) {
+  for (size_t i = 0; i < chapterCountCapped; i++) {
     if (m_file.read(chapterBuf.data(), chapterSize) != chapterSize) {
       return XtcError::READ_ERROR;
     }

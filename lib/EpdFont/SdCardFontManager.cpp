@@ -88,7 +88,29 @@ int SdCardFontManager::loadFile(const SdCardFontFileInfo& file, const char* fami
 
   LOG_DBG("SDMGR", "Loaded %s size=%u id=%d styles=%u", file.path.c_str(), file.pointSize, fontId, font->styleCount());
 
-  EpdFontFamily fontFamily(font->getEpdFont(0), font->getEpdFont(1), font->getEpdFont(2), font->getEpdFont(3));
+  // EVERY SLOT GOES THROUGH resolveStyle.
+  //
+  // load() accepts any style id below MAX_STYLES and does not require style 0,
+  // so a .cpfont with no REGULAR made getEpdFont(0) return nullptr. That null
+  // went straight into EpdFontFamily, and EpdFontFamily::getFont falls through
+  // to `return regular;` for EVERY style -- so every lookup returned nullptr
+  // and the first dereference was a null member call.
+  //
+  // The first consumer is at BOOT: main.cpp's sdFontSystem.begin() ->
+  // setupUiFallbacks -> hasCodepoint(). SETTINGS.sdFontFamilyName is persisted
+  // and the clearSdFontFamily() recovery never runs, because loadFamily
+  // SUCCEEDED. That is a boot loop recoverable only by editing the card.
+  //
+  // Not hypothetical on hand-built fonts: the project's own converter emits a
+  // single-style file for any family declaring one style
+  // (build-sd-fonts.py:1171-1174), and a WebDAV PUT or a one-line YAML edit
+  // does it too. resolveStyle walks a complete fallback row and load()
+  // guarantees at least one present style, so it can never return an absent
+  // one. hasStyle() existed for this and was called nowhere.
+  EpdFontFamily fontFamily(font->getEpdFont(font->resolveStyle(EpdFontFamily::REGULAR)),
+                           font->getEpdFont(font->resolveStyle(EpdFontFamily::BOLD)),
+                           font->getEpdFont(font->resolveStyle(EpdFontFamily::ITALIC)),
+                           font->getEpdFont(font->resolveStyle(EpdFontFamily::BOLD_ITALIC)));
   renderer.insertFont(fontId, fontFamily);
 
 #if CROSSPOINT_RENDER_SCALE > 1
@@ -137,7 +159,12 @@ int SdCardFontManager::loadFile(const SdCardFontFileInfo& file, const char* fami
       hiResFonts_.push_back(hiRes);
       renderer.registerHiResFont(
           fontId, hiRes,
-          EpdFontFamily(hiRes->getEpdFont(0), hiRes->getEpdFont(1), hiRes->getEpdFont(2), hiRes->getEpdFont(3)));
+          // Same resolveStyle routing as the 1x family above -- a hi-res
+          // companion missing REGULAR would publish the same nulls.
+          EpdFontFamily(hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::REGULAR)),
+                        hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::BOLD)),
+                        hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::ITALIC)),
+                        hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::BOLD_ITALIC))));
       LOG_DBG("SDMGR", "Loaded hi-res %s for id=%d", hiResPath.c_str(), fontId);
     }
   }

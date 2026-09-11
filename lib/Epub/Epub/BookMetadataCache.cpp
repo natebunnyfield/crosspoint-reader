@@ -513,6 +513,34 @@ bool BookMetadataCache::load() {
   serialization::readPod(bookFile, spineCount);
   serialization::readPod(bookFile, tocCount);
 
+  // VALIDATE THE HEADER NUMBERS BEFORE ANYTHING IS SIZED FROM THEM.
+  //
+  // readPod returns void and these are uninitialised locals, so a short read
+  // leaves them holding stack garbage; and even a clean read is a number that
+  // came off the card. spineCount is uint16, so the reserve() below asked for
+  // up to 262,140 contiguous bytes on a 380 KB no-PSRAM part -- and reserve
+  // throws, which under -fno-exceptions is abort(). B-032's shape, and the
+  // sibling loaders already guard it: CssParser::loadFromCache bounds against
+  // MAX_RULES, free heap and remaining bytes, and Page::deserialize clamps the
+  // identical shape deliberately.
+  //
+  // The LUTs are one uint32 per spine and TOC entry and sit at lutOffset, so
+  // the file must be big enough to hold them. That is a real bound, not a
+  // guessed cap, and it makes a corrupt header fail the cache open -- which
+  // rebuilds it -- instead of aborting the device.
+  {
+    const size_t fileBytes = bookFile.size();
+    const uint64_t lutBytes =
+        (static_cast<uint64_t>(spineCount) + static_cast<uint64_t>(tocCount)) * sizeof(uint32_t);
+    if (lutOffset > fileBytes || lutBytes > fileBytes - lutOffset) {
+      LOG_ERR("BMC", "Cache header does not fit its own file (lutOffset=%u spine=%u toc=%u size=%u); rebuilding",
+              static_cast<unsigned>(lutOffset), static_cast<unsigned>(spineCount), static_cast<unsigned>(tocCount),
+              static_cast<unsigned>(fileBytes));
+      bookFile.close();
+      return false;
+    }
+  }
+
   serialization::readString(bookFile, coreMetadata.title);
   serialization::readString(bookFile, coreMetadata.author);
   serialization::readString(bookFile, coreMetadata.language);

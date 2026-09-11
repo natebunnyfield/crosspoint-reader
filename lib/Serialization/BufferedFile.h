@@ -119,6 +119,11 @@ class BufferedFileReader {
   // Logical read position.
   size_t position() const { return bufStart + off; }
 
+  // Total size of the underlying file. Exists so readString can bound an
+  // on-disk length against the bytes actually left, the way the istream and
+  // HalFile overloads already do -- see the note above readString.
+  size_t fileSize() { return file.size(); }
+
   bool seek(const size_t target) {
     // Within the buffered window: just move the cursor.
     if (cap != 0 && target >= bufStart && target < bufStart + fill) {
@@ -158,9 +163,27 @@ inline void writeString(BufferedFileWriter& out, const std::string& s) {
   out.write(s.data(), len);
 }
 
+// THE THIRD OVERLOAD, which B-024's fix missed.
+//
+// The note in Serialization.h says "Both readString overloads" and means the
+// istream and HalFile ones; this one predates the fix and got neither half of
+// it. `len` was UNINITIALISED and readPod returns void, so a short read left it
+// holding stack garbage, and nothing bounded it against the file. Executed at
+// EOF it resized to 0x6f26a978 -- 1.86 GB -- from whatever was on the stack,
+// which under -fno-exceptions is an abort, i.e. B-053 again.
+//
+// Its only consumer is BookMetadataCache's spine/TOC readers, reached through a
+// transient SD read error, a discarded seek() failure, or a short write that
+// leaves spineCount over-counting.
 inline void readString(BufferedFileReader& in, std::string& s) {
-  uint32_t len;
+  s.clear();
+  uint32_t len = 0;
   readPod(in, len);
+  if (len != 0) {
+    const size_t total = in.fileSize();
+    const size_t here = in.position();
+    if (here > total || total - here < len) return;  // empty string; the cache's own validation rebuilds
+  }
   s.resize(len);
   if (len > 0) {
     in.read(&s[0], len);
