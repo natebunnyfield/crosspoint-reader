@@ -415,6 +415,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       spacingLabels[CrossPointSettings::TIGHT] = StrId::STR_TIGHT;
       spacingLabels[CrossPointSettings::NORMAL] = StrId::STR_NORMAL;
       spacingLabels[CrossPointSettings::WIDE] = StrId::STR_WIDE;
+      spacingLabels[CrossPointSettings::WIDER] = StrId::STR_WIDER;
+      spacingLabels[CrossPointSettings::WIDEST] = StrId::STR_WIDEST;
       v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing, std::move(spacingLabels),
                                     "lineSpacing", StrId::STR_CAT_READER));
     }

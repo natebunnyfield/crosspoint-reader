@@ -384,6 +384,9 @@ float CrossPointSettings::getReaderLineCompression() const {
   // neutral", tuned against Bookerly), and the built-in fallback is Libre
   // Franklin, whose uniform-slot leading was derived under the same ramp — the
   // separate Noto Sans ramp went with that family's removal.
+  // Steps widen as they go: 0.05, 0.10, 0.15, 0.20. Even increments read as
+  // ever-smaller changes at the loose end, because what the eye judges is the
+  // RATIO between successive settings, not the difference.
   switch (lineSpacing) {
     case TIGHT:
       return 0.95f;
@@ -392,6 +395,10 @@ float CrossPointSettings::getReaderLineCompression() const {
       return 1.0f;
     case WIDE:
       return 1.1f;
+    case WIDER:
+      return 1.25f;
+    case WIDEST:
+      return 1.45f;
   }
 }
 
