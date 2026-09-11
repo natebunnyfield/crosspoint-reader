@@ -73,7 +73,31 @@ bool removeRecursiveWithCacheClear(const std::string& fullPath, char* nameBuffer
 
     dir.rewindDirectory();
     for (auto entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
-      entry.getName(nameBuffer, nameBufferSize);
+      // An entry whose name cannot be read MUST NOT become a path.
+      //
+      // getName() returns 0 and leaves the buffer empty -- SdFat clears it on
+      // entry (FsFile.h:320) -- on a broken long-name chain, a failed cacheDir,
+      // or simply a name too long for the buffer: FAT_MAX_LFN_LENGTH is 255
+      // UTF-16 units, up to ~765 UTF-8 bytes, against a 500-byte nameBuffer. So
+      // a 255-character CJK filename copied on from a computer is enough, on a
+      // perfectly healthy card.
+      //
+      // With an empty name, entryPath became "<dir>/", which SdFat resolves
+      // back to <dir> itself (parsePathName consumes trailing separators), and
+      // isDirectory() still reports true because it reads the FAT attribute
+      // byte, not the name chain. The walk then pushed the directory it was
+      // already in, forever -- and since entryPath already ended in '/', the
+      // string never grew, so no path-length ceiling stopped it. Reproduced:
+      // 200,001 iterations, +1 stack entry per pass, until operator new fails
+      // and aborts, with the watchdog starving on the way there.
+      if (nameBuffer[0] == '\0') {
+        // Fail loudly rather than skip: this walk DELETES, and an entry we
+        // cannot name is one we cannot remove. Carrying on would rmdir a
+        // parent that still has children and report success.
+        LOG_ERR("FsOps", "Unreadable directory entry under %s; refusing to continue the delete", currentPath.c_str());
+        entry.close();
+        return false;
+      }
       if (strcmp(nameBuffer, ".") == 0 || strcmp(nameBuffer, "..") == 0) {
         continue;
       }
@@ -184,6 +208,15 @@ void migrateBookRefsRecursive(const std::string& oldDirPath, const std::string& 
     dir.rewindDirectory();
     for (auto entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
       entry.getName(nameBuffer, nameBufferSize);
+      // Same non-termination as the delete walk above: an empty name makes
+      // entryPath "<dir>/", which reopens <dir>, and the string never grows.
+      // Skipped rather than fatal here -- this walk only rewrites book
+      // references after a rename, so one unreadable entry costs a stale
+      // reference, not a half-deleted tree.
+      if (nameBuffer[0] == '\0') {
+        LOG_ERR("FsOps", "Unreadable directory entry under %s; skipping it", currentPath.c_str());
+        continue;
+      }
       if (strcmp(nameBuffer, ".") == 0 || strcmp(nameBuffer, "..") == 0) {
         continue;
       }

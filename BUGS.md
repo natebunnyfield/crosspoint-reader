@@ -34,6 +34,60 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-058] Both `FsOps` tree walks spin forever on an entry whose name cannot be read — FIXED 2026-09-10, reproduced
+**severity: critical (the loop task never returns: the walk allocates until `operator new` aborts, starving the watchdog on the way) · scope: `src/util/FsOps.cpp` `removeRecursiveWithCacheClear` and `migrateBookRefsRecursive` · found 2026-09-10 by a read-only sweep, reproduced off-device**
+
+`getName()` returns 0 and leaves the buffer **empty** (SdFat clears it on entry)
+whenever a name cannot be read — a broken long-name chain, a failed `cacheDir`,
+or a name longer than the 500-byte buffer. `FAT_MAX_LFN_LENGTH` is 255 UTF-16
+units, up to ~765 UTF-8 bytes, so **a 255-character CJK filename on a healthy
+card is enough**.
+
+Both walks discarded that return and appended the empty name to a path:
+
+```cpp
+entryPath += nameBuffer;        // appends nothing -> "<dir>/"
+const bool isDir = entry.isDirectory();
+if (isDir) stack.push_back({std::move(entryPath), false});
+```
+
+`"<dir>/"` resolves back to `<dir>` — SdFat's `parsePathName` consumes trailing
+separators, so `open()` returns the same directory — and `isDirectory()` still
+reports true because it reads the FAT **attribute byte**, not the name chain. So
+the walk pushes the directory it is already in. And because `entryPath` already
+ended in `/`, **the string never grows**, so no path-length ceiling ever stops
+it.
+
+**Reproduced** against a mock card whose directory holds one entry with
+`getName -> 0` and `isDirectory -> true`: *"NON-TERMINATING: 200001 loop
+iterations, live stack 200001 entries"* — net +1 per pass, forever. On device
+the vector grows until `operator new` fails, which under `-fno-exceptions` is
+`abort()`.
+
+**This was half-fixed by my own commit `93ad4d3fc` earlier the same day**, which
+added the empty-name guard to the two *listing* sites and not to these two
+*walkers* — even though that commit's own message names
+`FileManagerActivity:605` as the line handing the same buffer to
+`removeRecursiveWithCacheClear`. The listing fix made it worse in one specific
+way: the offending entry is now **invisible in the file list** while the delete
+walk still descends into it, so the folder looks normal and deleting it hangs
+the device.
+
+Two further consequences of the same discarded return, also closed:
+- If the unreadable entry is a **file**, `Storage.remove("<dir>/")` fails and the
+  walk returns false mid-tree — a **half-deleted directory** with only a
+  `LOG_ERR` the device cannot show.
+- `migrateBookRefsRecursive` has the identical shape and runs after **every**
+  folder rename and folder move, with no failure exit at all.
+
+The delete walk now **fails loudly** on an unreadable entry rather than skipping
+it: it deletes, and an entry it cannot name is one it cannot remove — carrying
+on would `rmdir` a parent that still has children and report success. The
+migrate walk skips and logs, because it only rewrites references and one stale
+reference is cheaper than refusing a rename.
+
+731/731 host tests pass, `gh_release` compiles.
+
 ### [B-057] `HalFile::read` returns `int` and five call sites stored it in a `size_t`, turning a read error into a 4 GB length — FIXED 2026-09-10
 **severity: critical (heap over-read, a watchdog-resetting infinite loop, and ~4 GB of out-of-bounds memory written INTO a file on the user's card) · scope: `lib/ZipFile/ZipFile.cpp`, `lib/Txt/Txt.cpp`, `lib/Xtc/Xtc.cpp`, `src/FontInstaller.cpp` · found 2026-09-10 by a read-only P0/P1 sweep of `lib/`, reproduced under ASan and UBSan**
 
@@ -218,7 +272,7 @@ in it distinguishes a connection that never opened (`status < 0`) from a body
 that stopped mid-stream (`!responseComplete()`) from an unexpected HTTP status,
 and those are three different bugs.
 
-### [B-054] Deleting a file appears to corrupt filenames across the filesystem — MECHANISM FOUND and fixed 2026-09-10; that it is THE cause is unconfirmed
+### [B-054] Deleting a file appears to corrupt filenames across the filesystem — my first mechanism was WRONG and is retracted; still open, with B-059 as the leading candidate
 **severity: high (data integrity on the card, and it is not confined to the file that was deleted) · scope: unknown; start at the delete path and the directory listing that follows it · reported by the owner 2026-09-07**
 
 Owner, verbatim: *"deleting a file seems to corrupt the filenames across the
@@ -243,8 +297,58 @@ B-053's follow-ups, and noted there as cosmetic because `isSafeFamilyName`
 gates the delete). That is not this bug, but it is the same class of mistake and
 the same buffers, so it is the right neighbourhood to read first.
 
-**Traced 2026-09-10 on the owner's instruction, and there is a defect on that
-path that produces exactly this symptom.**
+**RETRACTION, 2026-09-10, same day.** The mechanism below is **false** and the
+commit that shipped against it (`93ad4d3fc`) asserts something untrue in its
+message. Keep the code — it fixes a different, real defect, see the end of this
+entry — but the reasoning is withdrawn.
+
+`HalFile::getName` forwards to SdFat's `FsFile::getName`, which is:
+
+```cpp
+// .pio/libdeps/gh_release/SdFat/src/FsLib/FsFile.h:319-324
+size_t getName(char* name, size_t len) {
+  *name = 0;                      // unconditional, before anything else
+  return m_fFile ? m_fFile->getName(name, len) : m_xFile ? ... : 0;
+}
+```
+
+**The buffer is cleared on entry, always.** Byte-identical in both build
+environments (`gh_release` and `default`), and every variant it dispatches to
+also clears on its own failure path (`FatName.cpp:94, 163, 220`;
+`ExFatName.cpp:97, 153`). So a caller can **never** observe the previous entry's
+name. The "stale duplicate name" path I described does not exist and never did.
+
+I verified this myself rather than taking the correction on trust.
+
+What IS true from the original analysis: `getName` really can fail, and not only
+on a damaged card — `FAT_MAX_LFN_LENGTH` is 255 UTF-16 units, up to ~765 UTF-8
+bytes, against a 500-byte `NAME_BUFFER_SIZE`, so a 255-character CJK filename
+copied on from a computer makes it return 0 on perfectly healthy media. Sixteen
+call sites do discard the return. The consequence is just not the one I claimed.
+
+**What the shipped fix actually does, and why it stays.** The HAL half is a
+strict no-op — SdFat already zeroed the buffer one layer down. The
+`FileManagerActivity.cpp:99` guard is load-bearing for a different reason: an
+unreadable entry previously reached `files.emplace_back(...)` as an **empty
+string**, and `displayName` (`:31`), `fullPathOf` (`:122`) and `render` (`:918`)
+all call `std::string::back()` on it, which is undefined behaviour on an empty
+string — a one-byte under-read. That is real and the guard closes it. The same
+empty name, unguarded in the two `FsOps` walkers, is [B-058], which is worse.
+
+**The reported symptom remains unexplained**, and the leading candidate is now
+[B-059] — `files` and `basepath` mutated on the loop task with no lock while the
+render task walks them. A use-after-free on a vector of filenames being drawn
+shows up as wrong names on screen with the card intact, which is what the report
+describes. Not reproduced on device.
+
+**The next step is unchanged and is now the deciding evidence:** delete a file,
+then read the card on a computer. Names correct there means a display-layer
+fault, which B-059 would be. Names wrong there means real FAT corruption and
+neither of these is it.
+
+---
+
+**The original analysis, retained for the record and WRONG in its conclusion:**
 
 `HalFile::getName()` returns `size_t` — the length written, **0 when it cannot
 read the name**, and on failure SdFat may leave the caller's buffer UNTOUCHED.
