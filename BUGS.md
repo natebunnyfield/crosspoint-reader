@@ -130,6 +130,45 @@ because a hardcoded name failed fifteen host tests that use other families: a
 diagnostic narrowing that also disables its own test coverage is worth less than
 nothing.
 
+**Three theories RULED OUT 2026-09-10, each with evidence, so nobody spends the
+next pass on them:**
+
+1. **"The Authorization header is re-sent to the CDN and S3 rejects a presigned
+   URL that also carries one."** `runGetWolf` does re-add `sink.extraHeaders` on
+   every redirect hop, so the header really does reach the CDN. But the MANIFEST
+   is fetched through the identical asset URL, the identical redirect and the
+   identical headers, and it succeeds — thirteen families parsed. Disproved by
+   the working case.
+2. **"The progress callback repaints e-ink inside the download read loop and
+   starves the socket."** `progressCb` calls `requestUpdate(true)`, and
+   `ActivityManager::requestUpdate(true)` is `xTaskNotify(renderTaskHandle, ...)`
+   — it notifies a SEPARATE render task and returns immediately. It does not
+   block the downloading task. (It does mean up to 100 repaint notifications per
+   file competing for a single core, which is a performance concern, not a
+   failure mechanism.)
+3. **"The CDN sends the large assets chunked and the client cannot decode a
+   chunked body."** `SecureHttpClient.h:277` dispatches to `readChunked` on
+   `Transfer-Encoding: chunked`, and `:543-544` decodes it, stops at the
+   zero-size chunk and drains trailers. Chunked is supported.
+
+**What that leaves, and how to read the log against it.** The surviving
+explanation is about DURATION rather than protocol: a font file is 582 KB to
+several MB where the manifest is 18 KB, and the device is writing to SD and
+hashing SHA-256 in 1 KB pieces on a single core while the render task repaints.
+If the peer gives up on a slow reader, `responseComplete()` is false and
+`runGetWolf` returns `HTTP_ERROR` — which is exactly `FailureKind::NETWORK`.
+
+So the byte count in `/fontsync.log` is the discriminating evidence, not just
+the error code:
+- **`after 0 of N bytes`** — the connection never delivered a body. Look at the
+  handshake and the redirect, not the transfer.
+- **`after <some large number> of N bytes`** — it streamed and then stopped. That
+  is the slow-reader/timeout story above, and the fix is on our side: fewer
+  repaints, a larger read chunk, or writing without hashing in the same pass.
+- **`after N of N bytes`** with a non-OK code — the body arrived and the
+  completion check disagreed; look at `responseComplete()` and the chunked
+  trailer path.
+
 **To close:** read `/fontsync.log` after one Edgar run. The `DownloadError` code
 in it distinguishes a connection that never opened (`status < 0`) from a body
 that stopped mid-stream (`!responseComplete()`) from an unexpected HTTP status,
