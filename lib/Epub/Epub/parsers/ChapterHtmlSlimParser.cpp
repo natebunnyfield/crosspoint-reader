@@ -3022,7 +3022,18 @@ ChapterHtmlSlimParser::ParseStatus ChapterHtmlSlimParser::parseStep() {
     return ParseStatus::Error;
   }
 
-  const size_t len = parseFile_.read(buf, PARSE_BUFFER_SIZE);
+  // INT, not size_t. read() returns -1 on a read error, and (size_t)-1 is not 0,
+  // so the error branch below could never fire -- the -1 then reached expat as
+  // static_cast<int>(len). expat itself is safe (xmlparse.c:2196 rejects a
+  // negative length), so this was never memory-unsafe; the damage was a
+  // MISDIAGNOSIS. A failing SD card was reported to the owner as "Parse error
+  // at line N", blaming the book.
+  const int readResult = parseFile_.read(buf, PARSE_BUFFER_SIZE);
+  if (readResult < 0) {
+    LOG_ERR("EHP", "SD read error while parsing (not a malformed document)");
+    return ParseStatus::Error;
+  }
+  const size_t len = static_cast<size_t>(readResult);
 
   if (len == 0 && parseFile_.available() > 0) {
     LOG_ERR("EHP", "File read error");

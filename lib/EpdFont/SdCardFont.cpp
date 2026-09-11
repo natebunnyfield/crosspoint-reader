@@ -1338,7 +1338,21 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   s.miniMetadataOnly = metadataOnly;
   s.miniHysteresisPending = !metadataOnly;  // one hysteresis evaluation per rebuild
   memset(&s.miniData, 0, sizeof(s.miniData));
-  s.miniData.bitmap = s.miniBitmap;
+  // A METADATA-ONLY PREWARM MUST NOT PUBLISH A BITMAP BASE.
+  //
+  // The rebase of glyph.dataOffset from a file offset into the mini arena
+  // happens only inside `if (!metadataOnly)` above, so in metadata-only mode
+  // every dataOffset is still the glyph's raw byte offset in the .cpfont --
+  // tens of KB. Publishing s.miniBitmap alongside those made
+  // GfxRenderer::getGlyphBitmap compute &bitmap[dataOffset] far out of bounds
+  // (reproduced against a 1-byte arena), and with no prior full prewarm
+  // miniBitmap is null anyway.
+  //
+  // Null here is the honest value: metadata-only means widths and metrics, not
+  // pixels. getGlyphBitmap returns null for it rather than doing arithmetic on
+  // it, and the draw path already forces a full rebuild before drawing
+  // (SdCardFont.cpp's !(miniMetadataOnly && !metadataOnly) guard).
+  s.miniData.bitmap = metadataOnly ? nullptr : s.miniBitmap;
   s.miniData.glyph = s.miniGlyphs;
   s.miniData.intervals = s.miniIntervals;
   s.miniData.intervalCount = s.miniIntervalCount;

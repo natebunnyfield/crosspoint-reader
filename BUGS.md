@@ -34,6 +34,69 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-067] `book.bin` had no commit protocol, so one interrupted index poisoned the cache permanently — FIXED 2026-09-10
+**severity: high (chapters fail to open and the progress bar reports uninitialised values, for the life of the book) · scope: `lib/Epub/Epub/BookMetadataCache.cpp` · found 2026-09-10 by a read-only sweep**
+
+`buildBookBin` wrote the **version byte first**. `Section.cpp` deliberately does
+the opposite and says why at `:236-238`: the sentinel is patched to the real
+version *"only when the build is finalized… so an incomplete file is never
+mistaken for a valid one"*. `book.bin` never got that protocol, and it is the
+one that poisons permanently: `load()` accepted whatever it found with no size
+check, `Epub::load` then took the warm path, and **nothing else ever deletes
+`book.bin`**.
+
+**The trigger does not need power loss.** The `!zip.open()` early return closed
+and returned `false` **without removing the file**, and by that line Header A,
+the metadata and both LUTs are already in the writer — so for any book whose
+LUTs exceed the 4 KB buffer (~1000 spine+TOC entries) at least one flush has
+reached the card. The removal at the end is on the success path only.
+
+Now `BOOK_CACHE_INCOMPLETE_VERSION` (0) goes into Header A and the real version
+is written last, after the final flush — the same commit point `Section` uses. A
+crash, a short write, or that early return all leave version 0, which `load()`
+rejects as a mismatch and rebuilds. The early return also removes the file
+outright, since there is nothing in it worth keeping.
+
+### [B-068] A metadata-only prewarm published glyph offsets that were still raw FILE offsets — FIXED 2026-09-10
+**severity: high (out-of-bounds read by construction) · scope: `lib/EpdFont/SdCardFont.cpp`, `lib/GfxRenderer/GfxRenderer.cpp` · found 2026-09-10 by a read-only sweep, mechanism reproduced**
+
+`prewarmStyle` rebases `glyph.dataOffset` from a file offset into the mini arena
+only inside `if (!metadataOnly)`, yet `s.miniData.bitmap = s.miniBitmap;` was
+**unconditional** and the whole `miniData` was published either way.
+`GfxRenderer::getGlyphBitmap` then computed `&bitmap[glyph->dataOffset]` with a
+dataOffset that is the glyph's raw byte offset in the `.cpfont` — tens of KB —
+and with no prior full prewarm `miniBitmap` is null anyway.
+
+**Mechanism reproduced** against a 1-byte arena: `dataOffset = 299` with
+`bitmap` unchanged, ASan heap-buffer-overflow.
+
+**Reachability was NOT exhibited and that is recorded honestly.** The only
+metadata-only call site is `getTextWidth`'s CJK-fallback redirect, and the
+matching `drawText` redirect forces a full rebuild. The gap opens only when the
+fallback font *is* the reader font — which `loadFamilyExtraSize` makes happen by
+design for a CJK family at 8, 10 or 12 pt — because `drawText(readerFontId, …)`
+has no fallback entry and never re-prewarms. So: unsafe by construction, not
+demonstrated in a shipped sequence.
+
+A metadata-only prewarm now publishes `bitmap = nullptr`, which is the honest
+value — metadata-only means widths and metrics, not pixels — and
+`getGlyphBitmap` returns null for it rather than doing arithmetic on it.
+
+### [B-069] An SD read failure was reported to the owner as "Parse error at line N" — FIXED 2026-09-10
+**severity: medium (misdiagnosis; it blames the book for a failing card) · scope: `lib/Epub/Epub/parsers/ChapterHtmlSlimParser.cpp` · found 2026-09-10 by a read-only sweep**
+
+`const size_t len = parseFile_.read(...)` again: `-1` as a `size_t` is not 0, so
+the `len == 0` error branch could never fire, and the value reached expat as
+`static_cast<int>(len)`.
+
+**Chased expecting memory unsafety and disproved:** `lib/expat/xmlparse.c:2196`
+has an explicit `if (len < 0) return XML_STATUS_ERROR`. So this was never
+unsafe. The whole damage was the message — a failing card told the owner his
+book was malformed, which is the worst possible direction to send someone.
+
+Taken as `int` now, with its own error line that says the card rather than the
+document.
+
 ### [B-063] A `.cpfont` with no REGULAR style loaded clean and then null-dereferenced at boot — FIXED 2026-09-10
 **severity: critical (permanent boot loop, recoverable only by editing the card on a computer) · scope: `lib/EpdFont/SdCardFontManager.cpp` · found 2026-09-10 by a read-only sweep, reproduced under ASan/UBSan**
 

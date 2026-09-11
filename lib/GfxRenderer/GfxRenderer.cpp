@@ -88,6 +88,10 @@ const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const Ep
       return sdFont->getOverflowBitmap(glyph);  // may be nullptr for zero-width glyphs
     }
   }
+  // A metadata-only SD prewarm publishes no bitmap base, because its
+  // dataOffsets are still raw FILE offsets rather than arena offsets. Doing
+  // pointer arithmetic on null here would be a wild address, not a crash.
+  if (!fontData->bitmap) return nullptr;
   return &fontData->bitmap[glyph->dataOffset];
 }
 

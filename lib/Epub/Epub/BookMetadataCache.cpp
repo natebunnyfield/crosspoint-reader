@@ -27,6 +27,12 @@ namespace {
 // changes. A cache is not only a layout; it is a record of conclusions, and a
 // conclusion reached by code that has since been fixed is stale.
 constexpr uint8_t BOOK_CACHE_VERSION = 11;
+// Written into Header A while the file is still being built, and overwritten
+// with BOOK_CACHE_VERSION only once every byte is down. load() rejects it as a
+// version mismatch and rebuilds, so a file interrupted at any point -- a crash,
+// a short write, or the zip.open() early return -- is never mistaken for a
+// valid cache. Same protocol and same reasoning as SECTION_FILE_INCOMPLETE_VERSION.
+constexpr uint8_t BOOK_CACHE_INCOMPLETE_VERSION = 0;
 constexpr char bookBinFile[] = "/book.bin";
 constexpr char tmpSpineBinFile[] = "/spine.bin.tmp";
 constexpr char tmpTocBinFile[] = "/toc.bin.tmp";
@@ -216,8 +222,21 @@ bool BookMetadataCache::buildBookBin(const std::string& epubPath, const BookMeta
   const uint32_t lutSize = sizeof(uint32_t) * spineCount + sizeof(uint32_t) * tocCount;
   const uint32_t lutOffset = headerASize + metadataSize;
 
-  // Header A
-  serialization::writePod(bookOut, BOOK_CACHE_VERSION);
+  // Header A.
+  //
+  // THE VERSION BYTE IS THE COMMIT POINT, so a sentinel goes in here and the
+  // real version is written last -- exactly what Section.cpp does and says why
+  // ("an incomplete file is never mistaken for a valid one"). book.bin never
+  // got that protocol, and it is the one that poisons permanently: load()
+  // accepts whatever it finds with no size check, Epub::load then takes the
+  // warm path, and NOTHING else ever deletes book.bin. Chapters fail to open
+  // and the progress bar reports uninitialised values for the life of the book.
+  //
+  // The non-power-loss trigger is the `!zip.open()` early return below: by that
+  // line Header A, the metadata and both LUTs are in the writer, so for any
+  // book whose LUTs exceed the 4 KB buffer (~1000 spine+TOC entries) at least
+  // one flush has already reached the card.
+  serialization::writePod(bookOut, BOOK_CACHE_INCOMPLETE_VERSION);
   serialization::writePod(bookOut, lutOffset);
   serialization::writePod(bookOut, spineCount);
   serialization::writePod(bookOut, tocCount);
@@ -270,6 +289,10 @@ bool BookMetadataCache::buildBookBin(const std::string& epubPath, const BookMeta
     bookFile.close();
     spineFile.close();
     tocFile.close();
+    // The sentinel version already makes this file unloadable, but remove it
+    // too: leaving a half-written book.bin on the card costs a rebuild on every
+    // open and there is nothing in it worth keeping.
+    Storage.remove((cachePath + bookBinFile).c_str());
     return false;
   }
   // NOTE: We intentionally skip calling loadAllFileStatSlims() here.
@@ -364,7 +387,16 @@ bool BookMetadataCache::buildBookBin(const std::string& epubPath, const BookMeta
     writeTocEntryTo(bookOut, tocEntry);
   }
 
-  const bool written = bookOut.flush();
+  bool written = bookOut.flush();
+
+  // ...then commit, by overwriting the sentinel with the real version. A crash,
+  // a short write, or the early return above all leave version 0, which load()
+  // rejects as a mismatch and rebuilds.
+  if (written) {
+    bookFile.seek(0);
+    serialization::writePod(bookFile, BOOK_CACHE_VERSION);
+    bookFile.flush();
+  }
 
   // Explicit close() required: member variables persist beyond function scope
   bookFile.close();
