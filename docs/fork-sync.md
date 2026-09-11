@@ -188,6 +188,31 @@ git submodule update --init --recursive
 `repo-status.sh` flags the submodule when it is uninitialised (`-`) or has
 drifted off the pinned commit (`+`).
 
+### Standing ruling 2026-09-10 — PDF stays out of scope, autocrop framing considered and rejected
+
+Filed as `T-030` on 2026-09-08 and **dropped the same week by owner ruling**:
+*"Drop it — PDF stays out."* `ROADMAP.md` and `SCOPE.md` stand exactly as
+written; nothing in either was edited.
+
+**Recorded because the argument FOR it was a good one and will otherwise be
+re-made.** The original ask was for PDF "in the most minimal way", same
+navigation as epub, with margins autocropped — *"excluding noisy edges from bad
+scans and dropping page numbers to increase zoom and readability"*. That framing
+directly answers `SCOPE.md`'s stated objection, which is specifically about
+*"constant panning and zooming"*: autocropping the margins is the mechanism that
+removes the need to pan. It also does not ask for the "first-class" rendering
+that `ROADMAP.md` excludes.
+
+The owner heard that argument, with the option to carve out the exception in
+both files, and **chose to leave the scope decision as it stands.** So this is
+settled on the merits rather than by oversight, and a future session that
+rediscovers the autocrop reasoning should recognise it as already considered.
+
+If it ever reopens, the question that decides everything downstream was never
+answered and should be asked first: whether the device rasterizes PDFs at all
+(~380 KB RAM, no PSRAM, flash at ~81%), or whether conversion happens
+off-device in `~/src/claude-tools`, where there is memory to crop well.
+
 ### Standing ruling 2026-08-15 — `pagination-right` dropped, not merged
 
 The branch made the note editor's page counter a right-aligned, regular-weight

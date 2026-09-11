@@ -60,59 +60,6 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
-### [T-030] Minimal PDF support, with autocropped margins
-**scope: a new format alongside Epub/Txt · opened 2026-09-08 · NOT started**
-
-Owner, verbatim: *"for supporting pdfs in the most minimal way. same navigation
-as epub. but we need to autocrop margins (excluding noisy edges from bad scans
-and dropping page numbers to increase zoom and readability)"*.
-
-**What that specifies**, and nothing here goes beyond it:
-- PDF as a readable format, deliberately MINIMAL.
-- The same navigation as an epub -- the existing page/chapter model and its
-  gestures, not a new one.
-- Margins cropped automatically, with two named refinements: **noisy edges from
-  bad scans must not defeat the crop**, and **page numbers should be dropped**
-  rather than treated as content.
-- The stated goal of the crop is more zoom, hence readability. The crop is not
-  cosmetic; it is the thing that makes the page legible on an 800x480 panel.
-
-**What it does NOT specify. Ask before assuming any of it:** whether text is
-extracted and reflowed or pages are rasterized as images; which PDF library, if
-any; search, selection, annotation, or the outline; what happens to a PDF that
-is genuinely text rather than scans.
-
-**This contradicts a standing scope decision, and the request answers its
-reasoning.** `ROADMAP.md:108` lists "PDF rendering as a first-class format"
-under Out of Roadmap, and `SCOPE.md:89` gives the rationale: *"PDFs are
-fixed-layout documents, so rendering them requires displaying pages as images
-rather than reflowable text, resulting in constant panning and zooming that
-makes for a poor reading experience on e-ink."*
-
-Two things about that. The objection is specifically to **panning and zooming**
--- and autocropping the margins is precisely the mechanism that removes the need
-for it, which is what the request is about. And it says "first-class", which a
-deliberately minimal reader is not. So this is not simply a reversal, but
-**both files need editing before any of it ships**, or the repo will assert two
-opposite things. That is the owner's call to make explicitly, not something to
-slide in with an implementation. This fork already diverges from upstream scope
-on two other bullets (the note editor and Claude chat, noted in both files), so
-a third divergence is consistent with how this fork is run.
-
-**The hard part, before anyone estimates this.** ESP32-C3: ~380 KB RAM, no
-PSRAM, one 48 KB framebuffer, 800x480 1-bit. A PDF rasterizer is a large
-dependency and flash is already at ~81%. The autocrop itself is the tractable
-and interesting half -- it is an ink-density projection along each axis, and the
-"noisy scan edge" and "drop the page number" requirements are exactly what
-separates a naive bounding box from a useful one, since both are ink outside the
-text block. Nearest existing infrastructure: `lib/JpegToBmpConverter`,
-`lib/PngToBmpConverter`, and the image path in the reader.
-
-Worth deciding first, because it changes everything downstream: whether the
-device rasterizes PDFs at all, or whether they are converted to a supported
-format off-device (the `~/src/claude-tools` generators already build epubs for
-this reader) and the crop happens there, where there is memory to do it well.
-
 ### [T-029] Move the font preview to the top of the preview pane
 **scope: `src/activities/settings/` font list / preview pane · opened 2026-09-07**
 
