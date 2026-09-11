@@ -554,6 +554,20 @@ bool Section::startBuild(const ReaderRenderSpec& spec, const std::function<void(
   writeSectionFileHeader(spec);
 
   auto ctx = makeUniqueNoThrow<BuildContext>();
+  if (ctx) {
+    // Resource Protocol 7. The page LUT grows one 12-byte entry per completed
+    // page via push_back, with no reserve, so it doubled its way up -- and
+    // vector growth holds the OLD block and the NEW one across the copy, which
+    // on a chapter of a few hundred pages is a multi-KB contiguous request on a
+    // heap the parser has already fragmented. push_back throws, and under
+    // -fno-exceptions that is abort().
+    //
+    // Reserving here takes the allocation EARLY, while the heap is healthiest,
+    // and covers an ordinary chapter outright. It does not eliminate the
+    // hazard: a chapter longer than this still grows, and that growth still
+    // throws. Recorded as such in B-070 rather than claimed as a fix.
+    ctx->lut.reserve(96);
+  }
   if (!ctx) {
     LOG_ERR("SCT", "OOM: BuildContext");
     file.close();

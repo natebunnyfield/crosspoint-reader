@@ -34,6 +34,32 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-070] The page LUT grows by doubling on the pagination path — MITIGATED 2026-09-10, not eliminated
+**severity: medium (abort near heap exhaustion while paginating a long chapter) · scope: `lib/Epub/Epub/Section.cpp` · found 2026-09-10 by a read-only sweep**
+
+`ctxPtr->lut.push_back(...)` runs once per completed page with no `reserve`, so
+the vector doubled its way up. Vector growth holds the **old block and the new
+one across the copy**, which on a chapter of a few hundred 12-byte entries is a
+multi-KB contiguous request on a heap the parser has already fragmented.
+`push_back` throws; under `-fno-exceptions` that is `abort()`.
+
+What makes this worth recording rather than shrugging at: the surrounding code
+is explicitly nothrow and checks for failure — `makeUniqueNoThrow` plus
+`noteAllocationFailure` two lines above in `ChapterHtmlSlimParser`,
+`TextBlock`'s `isValid = false` checked by `ParsedText` — and all of that
+careful degradation is defeated one level up by a throwing container.
+
+**Mitigated, not fixed, and the entry says so.** The LUT now reserves 96 entries
+at `BuildContext` construction, which takes the allocation early while the heap
+is healthiest and covers an ordinary chapter outright. A longer chapter still
+grows, and that growth still throws. Eliminating it needs either a nothrow
+container or a cap on pages per chapter, and a cap truncates a book — an owner
+decision, not a cleanup.
+
+The `std::make_shared` calls on the same path (`ParsedText.cpp:1720,1774`,
+`ChapterHtmlSlimParser.cpp:3354`) are ~120 B and ~40 B once per line. Same rule,
+but small enough to fail only at genuine exhaustion; left alone deliberately.
+
 ### [B-067] `book.bin` had no commit protocol, so one interrupted index poisoned the cache permanently — FIXED 2026-09-10
 **severity: high (chapters fail to open and the progress bar reports uninitialised values, for the life of the book) · scope: `lib/Epub/Epub/BookMetadataCache.cpp` · found 2026-09-10 by a read-only sweep**
 
