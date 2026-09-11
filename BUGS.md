@@ -34,6 +34,68 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-059] `files` and `basepath` were mutated on the loop task while the render task walked them — FIXED 2026-09-10; the leading candidate for B-054
+**severity: critical (use-after-free on the strings being drawn; the likeliest explanation for "deleting a file corrupts filenames") · scope: `src/activities/home/FileManagerActivity.cpp`, `src/activities/home/FileBrowserActivity.cpp` · found 2026-09-10 by a read-only sweep**
+
+`docs/activity-manager.md:273` states the contract: *"any state read by
+`render()` and written by `loop()` must be guarded"*. `ActivityManager::loop()`
+deliberately holds no lock, so it is opt-in per activity — and `grep RenderLock
+src/activities/home/*.cpp` returned **only the `render()` signatures**. None of
+the four `home/` list activities acquired the lock in `loop()`.
+
+**What render() actually touches.** Not just `files.size()`, which is read once:
+`GUI.drawList`'s row lambda copies a `std::string` out of `files` for **every
+row, inside the draw loop** (`BaseTheme.cpp:255-300`, `LyraTheme.cpp:334`),
+measures it and draws it — which on a card-resident font hits the SD card. It
+also reads `basepath.substr(...)` and `basepath.c_str()`.
+
+**Why the window is wide rather than theoretical.** Both tasks are priority 1 on
+one core with time slicing. The loop ends in a ~10 ms delay, so during ONE e-ink
+render the loop task wakes and runs a full input pass roughly **thirty times**.
+`EpubReaderActivity.cpp:252` consults `RenderLock::peek()` before its idle
+prewarm for exactly this reason; these activities consult nothing.
+
+**Trigger:** on the file list, tap into a folder — the render of the new list
+begins — then press Back before it finishes. `basepath.replace()` frees the
+buffer the render task is holding through `c_str()`; `files.clear()` destroys
+the strings the row lambda is copying; `emplace_back` reallocates the array out
+from under `files[index]`.
+
+**This is B-022's shape.** That bug was fixed in `TextViewerActivity` and
+`ClaudeChatActivity` on 2026-08-07 and its close-out said to *"audit the other
+activities for the same pattern rather than fixing only these two"*. The four
+`home/` activities were never audited. The sanctioned fix is
+`TextViewerActivity.cpp:137-145`: build into a local, publish with a swap under
+the lock, so the lock is held for an O(1) operation and never across the
+directory walk.
+
+Both `loadFiles()` implementations now do that, and both enter-directory and
+Back paths build the new `basepath` in a local and publish it under the lock —
+never holding that lock across `loadFiles()`, which takes its own (the mutex is
+not recursive).
+
+**One extra defect found while fixing it.** `selectorIndex` was published
+separately from `files`, and `render()` guards `files[selectorIndex]` with
+`files.empty()` **only** — so publishing a shorter list while the index still
+pointed into the old one was an out-of-bounds read. Both now clamp the index
+**inside the same lock as the swap**, so the invariant holds at every publish
+whatever the caller does afterwards. The navigation writes that remain
+unguarded are in-range by construction and are single aligned 32-bit stores.
+
+**Not reproduced, and deliberately so.** A deterministic host test for this would
+be testing the FreeRTOS scheduler; B-022 shipped without one for the same
+reason. The defect is verified by reading every mutation path against
+`render()`.
+
+**Relationship to [B-054].** This is now the leading explanation for the owner's
+"deleting a file seems to corrupt the filenames across the filesystem": a
+use-after-free on a vector of filenames being drawn shows as wrong names on
+screen **with the card intact**. That is a prediction, and the test that
+confirms or kills it is unchanged — delete a file, then read the card on a
+computer.
+
+731/731 host tests pass, `gh_release` compiles.
+
 ### [B-058] Both `FsOps` tree walks spin forever on an entry whose name cannot be read — FIXED 2026-09-10, reproduced
 **severity: critical (the loop task never returns: the walk allocates until `operator new` aborts, starving the watchdog on the way) · scope: `src/util/FsOps.cpp` `removeRecursiveWithCacheClear` and `migrateBookRefsRecursive` · found 2026-09-10 by a read-only sweep, reproduced off-device**
 

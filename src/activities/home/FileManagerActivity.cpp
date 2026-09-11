@@ -74,10 +74,28 @@ std::string sanitizeFileName(const std::string& in) {
 }  // namespace
 
 void FileManagerActivity::loadFiles() {
-  files.clear();
+  // BUILD INTO A LOCAL, PUBLISH WITH A SWAP UNDER THE LOCK.
+  //
+  // loadFiles() runs on the LOOP task. render() walks `files` on the RENDER
+  // task -- and not just `files.size()`, which is read once: GUI.drawList's row
+  // lambda copies a std::string out of `files` for EVERY ROW, inside the draw
+  // loop (BaseTheme.cpp:255-300, LyraTheme.cpp:334), measuring and drawing each
+  // one, which on a card-resident font hits the SD card. Both tasks are
+  // priority 1 on one core with time slicing, and the loop task is ready every
+  // ~10 ms while a render sits in drawList for tens of ms plus displayBuffer
+  // for hundreds. So clearing and refilling `files` here freed the very strings
+  // render() was reading, and emplace_back reallocated the array under
+  // files[index].
+  //
+  // This is B-022's shape exactly, whose close-out said to audit the other
+  // activities and never did. The pattern is TextViewerActivity.cpp:137-145:
+  // the lock is held for an O(1) swap and never across the directory walk.
+  std::vector<std::string> built;
 
   auto root = Storage.open(basepath.c_str());
   if (!root || !root.isDirectory()) {
+    RenderLock lock(*this);
+    files.swap(built);  // publish the empty list rather than leaving a stale one
     return;
   }
 
@@ -86,6 +104,8 @@ void FileManagerActivity::loadFiles() {
   if (!fileNameBuffer) {
     LOG_ERR("FileManager", "fileNameBuffer not allocated");
     root.close();
+    RenderLock lock(*this);
+    files.swap(built);
     return;
   }
 
@@ -94,20 +114,32 @@ void FileManagerActivity::loadFiles() {
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(fileNameBuffer.get(), NAME_BUFFER_SIZE);
     // An empty name is getName() having failed, not a file called "". Skipping
-    // it shows one entry short rather than a duplicate of the previous one --
-    // see the note on HalFile::getName and B-054.
+    // it shows one entry short rather than listing an empty string, which
+    // displayName/fullPathOf/render would then call std::string::back() on --
+    // UB on an empty string. See B-054 and B-058.
     if (fileNameBuffer.get()[0] == '\0') continue;
     if (strcmp(fileNameBuffer.get(), ".") == 0 || strcmp(fileNameBuffer.get(), "..") == 0) {
       continue;
     }
     if (file.isDirectory()) {
-      files.emplace_back(std::string(fileNameBuffer.get()) + "/");
+      built.emplace_back(std::string(fileNameBuffer.get()) + "/");
     } else {
-      files.emplace_back(fileNameBuffer.get());
+      built.emplace_back(fileNameBuffer.get());
     }
   }
   root.close();
-  FsHelpers::sortFileList(files);
+  FsHelpers::sortFileList(built);
+
+  RenderLock lock(*this);
+  files.swap(built);
+  // Clamp INSIDE the same lock. render() guards files[selectorIndex] with
+  // files.empty() only (see the confirm-label branch), so publishing a shorter
+  // list while selectorIndex still pointed into the old one was an
+  // out-of-bounds read. Doing it here means the invariant holds at every
+  // publish, whatever the caller does with selectorIndex afterwards.
+  if (selectorIndex >= files.size()) {
+    selectorIndex = files.empty() ? 0 : files.size() - 1;
+  }
 }
 
 size_t FileManagerActivity::findEntry(const std::string& name) const {
@@ -740,10 +772,23 @@ void FileManagerActivity::loop() {
       return;
     }
 
-    if (basepath.back() != '/') basepath += '/';
-    basepath += entry.substr(0, entry.length() - 1);
+    // basepath is read by render() -- basepath.substr() for the title and
+    // basepath.c_str() for the path line -- so mutating it in place freed the
+    // buffer the render task was holding. Build the new value, publish it under
+    // the lock, and never hold that lock across loadFiles(), which takes its
+    // own (the mutex is not recursive).
+    std::string next = basepath;
+    if (next.empty() || next.back() != '/') next += '/';
+    next += entry.substr(0, entry.length() - 1);
+    {
+      RenderLock lock(*this);
+      basepath.swap(next);
+    }
     loadFiles();
-    selectorIndex = 0;
+    {
+      RenderLock lock(*this);
+      selectorIndex = 0;
+    }
     requestUpdate();
   };
 
@@ -773,13 +818,23 @@ void FileManagerActivity::loop() {
     if (basepath != "/") {
       const std::string oldPath = basepath;
 
-      basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
-      if (basepath.empty()) basepath = "/";
+      // Same reason as the enter-directory path above: replace() in place freed
+      // the buffer render() was reading through c_str().
+      std::string parent = oldPath;
+      parent.replace(parent.find_last_of('/'), std::string::npos, "");
+      if (parent.empty()) parent = "/";
+      {
+        RenderLock lock(*this);
+        basepath.swap(parent);
+      }
       loadFiles();
 
       const auto pos = oldPath.find_last_of('/');
       const std::string dirName = oldPath.substr(pos + 1) + "/";
-      selectorIndex = findEntry(dirName);
+      {
+        RenderLock lock(*this);
+        selectorIndex = findEntry(dirName);
+      }
 
       requestUpdate();
     } else {

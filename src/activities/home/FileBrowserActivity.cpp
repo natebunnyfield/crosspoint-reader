@@ -24,10 +24,16 @@ constexpr size_t NAME_BUFFER_SIZE = 500;
 }  // namespace
 
 void FileBrowserActivity::loadFiles() {
-  files.clear();
+  // Build into a local, publish with a swap under the lock -- the same B-022
+  // shape as FileManagerActivity::loadFiles, and for the same reason: this runs
+  // on the loop task while render() walks `files` per row on the render task.
+  // See the long note there.
+  std::vector<std::string> built;
 
   auto root = Storage.open(basepath.c_str());
   if (!root || !root.isDirectory()) {
+    RenderLock lock(*this);
+    files.swap(built);
     return;
   }
 
@@ -36,6 +42,8 @@ void FileBrowserActivity::loadFiles() {
   if (!fileNameBuffer) {
     LOG_ERR("FileBrowser", "fileNameBuffer not allocated");
     root.close();
+    RenderLock lock(*this);
+    files.swap(built);
     return;
   }
 
@@ -56,23 +64,30 @@ void FileBrowserActivity::loadFiles() {
     }
 
     if (file.isDirectory()) {
-      files.emplace_back(std::string(fileNameBuffer.get()) + "/");
+      built.emplace_back(std::string(fileNameBuffer.get()) + "/");
     } else {
       std::string_view filename{fileNameBuffer.get()};
       if (mode == Mode::PickFirmware) {
         // Firmware picker: only show .bin files.
         if (FsHelpers::checkFileExtension(filename, ".bin")) {
-          files.emplace_back(filename);
+          built.emplace_back(filename);
         }
       } else if (FsHelpers::hasEpubExtension(filename) || FsHelpers::hasXtcExtension(filename) ||
                  FsHelpers::hasTxtExtension(filename) || FsHelpers::hasMarkdownExtension(filename) ||
                  FsHelpers::hasBmpExtension(filename)) {
-        files.emplace_back(filename);
+        built.emplace_back(filename);
       }
     }
   }
   root.close();
-  FsHelpers::sortFileList(files);
+  FsHelpers::sortFileList(built);
+
+  RenderLock lock(*this);
+  files.swap(built);
+  // Clamp in the same lock as the publish -- see FileManagerActivity.
+  if (selectorIndex >= files.size()) {
+    selectorIndex = files.empty() ? 0 : files.size() - 1;
+  }
 }
 
 void FileBrowserActivity::onEnter() {
@@ -191,17 +206,28 @@ void FileBrowserActivity::loop() {
       return;
     } else {
       // --- SHORT PRESS ACTION: OPEN/NAVIGATE ---
-      if (basepath.back() != '/') basepath += "/";
+      // Do NOT mutate basepath in place: render() reads it on the other task.
+      // The trailing slash only ever existed to build a child path, so build it
+      // in a local and publish basepath under the lock in the directory case.
+      std::string prefix = basepath;
+      if (prefix.empty() || prefix.back() != '/') prefix += "/";
 
       if (isDirectory) {
-        basepath += entry.substr(0, entry.length() - 1);
+        std::string next = prefix + entry.substr(0, entry.length() - 1);
+        {
+          RenderLock lock(*this);
+          basepath.swap(next);
+        }
         loadFiles();
-        selectorIndex = 0;
+        {
+          RenderLock lock(*this);
+          selectorIndex = 0;
+        }
         requestUpdate();
       } else {
         // Push rather than replace so FileBrowserActivity stays on the stack;
         // Back from the reader pops back here with the selection intact.
-        activityManager.pushActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, basepath + entry, false));
+        activityManager.pushActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, prefix + entry, false));
       }
     }
     return;
@@ -225,13 +251,22 @@ void FileBrowserActivity::loop() {
     if (basepath != "/") {
       const std::string oldPath = basepath;
 
-      basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
-      if (basepath.empty()) basepath = "/";
+      // As above: build the parent path in a local, publish under the lock.
+      std::string parent = oldPath;
+      parent.replace(parent.find_last_of('/'), std::string::npos, "");
+      if (parent.empty()) parent = "/";
+      {
+        RenderLock lock(*this);
+        basepath.swap(parent);
+      }
       loadFiles();
 
       const auto pos = oldPath.find_last_of('/');
       const std::string dirName = oldPath.substr(pos + 1) + "/";
-      selectorIndex = findEntry(dirName);
+      {
+        RenderLock lock(*this);
+        selectorIndex = findEntry(dirName);
+      }
 
       requestUpdate();
     } else if (mode == Mode::PickFirmware) {
