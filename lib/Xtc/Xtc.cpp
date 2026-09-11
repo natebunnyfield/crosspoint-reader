@@ -333,8 +333,20 @@ bool Xtc::generateThumbBmp(int height) const {
         if (Storage.openFileForWrite("XTC", getThumbBmpPath(height), dst)) {
           uint8_t buffer[512];
           while (src.available()) {
-            size_t bytesRead = src.read(buffer, sizeof(buffer));
-            dst.write(buffer, bytesRead);
+            // INT, not size_t -- same defect as lib/Txt/Txt.cpp's cover copy,
+            // and worse here because the source is a 512-byte STACK buffer: a
+            // -1 read as 0xFFFFFFFF copied out of bounds into the thumbnail
+            // file on the card, and available() never falls on a failed read so
+            // the loop never ended.
+            const int bytesRead = src.read(buffer, sizeof(buffer));
+            if (bytesRead <= 0) {
+              LOG_ERR("XTC", "Read error copying the cover to the thumbnail");
+              break;
+            }
+            if (dst.write(buffer, static_cast<size_t>(bytesRead)) != static_cast<size_t>(bytesRead)) {
+              LOG_ERR("XTC", "Write error copying the cover to the thumbnail");
+              break;
+            }
           }
         }
       }

@@ -60,6 +60,23 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-031] No test can reach a mid-stream SD read error
+**scope: `test/` HalStorage stubs · opened 2026-09-10**
+
+Every host `HalStorage` stub in `test/` returns -1 from `read()` only when the
+`FILE*` is null. So a read that fails **partway through a file** — the exact
+condition behind B-057, where `HalFile::read`'s -1 became a 4 GB length at five
+call sites — cannot be produced by any suite in this repo.
+
+What it needs: a stub that fails on the Nth call, so a test can open a real
+file, read two chunks successfully and have the third return -1. That is enough
+to pin all five B-057 sites, and it is the only way any of them gets a
+regression test.
+
+Worth doing because B-057's trigger is a bad sector rather than crafted input:
+it is the one class of defect that needs no attacker and no unusual file, and it
+currently has zero coverage.
+
 ### [T-030] Pay down the fourteen stack frames frozen when the budget gate was armed
 **scope: `tools/stack_budget/allowlist.txt` and the fourteen functions it names · opened 2026-09-10**
 
@@ -108,7 +125,14 @@ the numbers the tool reports as slack.
 It is on the font/book download path, it calls `readFixed`, which puts a further
 **2,048-byte** buffer on the same stack, and that whole chain is what B-055 is
 about. Nobody has measured the depth of `loop task -> activity -> syncFamily ->
-stageFamily -> runGetWolf -> readFixed` against the 8 KB task stack.
+stageFamily -> runGetWolf -> readFixed`.
+
+**The stack it runs on is 16 KB, not 8 KB** — `SET_LOOP_TASK_STACK_SIZE(16 *
+1024)` at `src/main.cpp:781`. The 8 KB figure is the RENDER task
+(`ActivityManager.cpp:35`), and conflating the two overstates the pressure on
+the download chain; corrected here 2026-09-10 after a sweep caught it. The
+frames below still break the 256-byte rule, but none of them is a demonstrated
+overflow, and this entry should not be read as claiming one.
 
 ### [T-029] Move the font preview to the top of the preview pane
 **scope: `src/activities/settings/` font list / preview pane · opened 2026-09-07**

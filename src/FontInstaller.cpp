@@ -89,11 +89,14 @@ bool FontInstaller::validateCpfontFile(const char* path) {
   }
 
   uint8_t magic[CPFONT_MAGIC_LEN];
-  size_t bytesRead = file.read(magic, CPFONT_MAGIC_LEN);
+  // INT, not size_t: a failed read is -1, and (size_t)-1 < CPFONT_MAGIC_LEN is
+  // FALSE, so the guard below passed and memcmp ran over an uninitialised
+  // magic[]. A read error would validate or reject the font at random.
+  const int bytesRead = file.read(magic, CPFONT_MAGIC_LEN);
   file.close();
 
-  if (bytesRead < CPFONT_MAGIC_LEN) {
-    LOG_ERR("FONT", "File too small: %s (%zu bytes)", path, bytesRead);
+  if (bytesRead < static_cast<int>(CPFONT_MAGIC_LEN)) {
+    LOG_ERR("FONT", "Could not read the header of %s (%d)", path, bytesRead);
     return false;
   }
 

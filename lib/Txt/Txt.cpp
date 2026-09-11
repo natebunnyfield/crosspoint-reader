@@ -132,8 +132,19 @@ bool Txt::generateCoverBmp() const {
       return false;
     }
     while (src.available()) {
-      size_t bytesRead = src.read(buffer.get(), COPY_BUFFER_SIZE);
-      dst.write(buffer.get(), bytesRead);
+      // INT, not size_t. A -1 stored as 0xFFFFFFFF wrote ~4 GB of out-of-bounds
+      // memory INTO THE COVER CACHE FILE ON THE CARD, and src.available() never
+      // decreases on a failed read (it is fileSize - curPosition, and a failed
+      // read does not advance the position), so the loop never ended either.
+      const int bytesRead = src.read(buffer.get(), COPY_BUFFER_SIZE);
+      if (bytesRead <= 0) {
+        LOG_ERR("TXT", "Read error copying the BMP cover; leaving the cache entry out");
+        return false;
+      }
+      if (dst.write(buffer.get(), static_cast<size_t>(bytesRead)) != static_cast<size_t>(bytesRead)) {
+        LOG_ERR("TXT", "Write error copying the BMP cover");
+        return false;
+      }
     }
     LOG_DBG("TXT", "Copied BMP cover to cache");
     return true;
@@ -192,6 +203,8 @@ bool Txt::readContent(uint8_t* buffer, size_t offset, size_t length) const {
     return false;
   }
 
-  size_t bytesRead = file.read(buffer, length);
+  // -1 as a size_t is > 0, so a read error used to report SUCCESS and the
+  // caller rendered `length` bytes of uninitialised buffer as book text.
+  const int bytesRead = file.read(buffer, length);
   return bytesRead > 0;
 }

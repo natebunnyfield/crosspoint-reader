@@ -45,11 +45,18 @@ size_t zipFillCallback(void* vctx, const uint8_t** data) {
   if (ctx->fileRemaining == 0) return 0;
 
   const size_t toRead = ctx->fileRemaining < ctx->readBufSize ? ctx->fileRemaining : ctx->readBufSize;
-  const size_t bytesRead = ctx->file->read(ctx->readBuf, toRead);
-  ctx->fileRemaining -= bytesRead;
+  // HalFile::read returns INT and -1 on a read error (a broken cluster chain, a
+  // bad sector, a handle not open for read). Stored in a size_t that became
+  // 0xFFFFFFFF and was handed to tinfl as an input length -- miniz then
+  // overflowed `pIn_buf_cur + inAvail`, `pIn_buf_end < pIn_buf_cur` went true,
+  // and the stream reported NEEDS_MORE_INPUT forever while InflateStream
+  // neither refilled nor errored. Reproduced: a task-watchdog reset mid-book.
+  const int bytesRead = ctx->file->read(ctx->readBuf, toRead);
+  if (bytesRead <= 0) return 0;  // 0 is tinfl's legitimate "no more input"
+  ctx->fileRemaining -= static_cast<size_t>(bytesRead);
 
   *data = ctx->readBuf;
-  return bytesRead;
+  return static_cast<size_t>(bytesRead);
 }
 }  // namespace
 
@@ -487,12 +494,17 @@ bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t ch
 
     size_t remaining = inflatedDataSize;
     while (remaining > 0) {
-      const size_t dataRead = file.read(buffer, remaining < chunkSize ? remaining : chunkSize);
-      if (dataRead == 0) {
+      // INT, not size_t: -1 stored as 0xFFFFFFFF passed the `== 0` guard and
+      // reached out.write(buffer, 0xFFFFFFFF) over a chunkSize heap block.
+      // Reproduced under ASan as a heap-buffer-overflow; `remaining -= dataRead`
+      // also made `remaining` GROW, so the loop could not end.
+      const int readResult = file.read(buffer, remaining < chunkSize ? remaining : chunkSize);
+      if (readResult <= 0) {
         LOG_ERR("ZIP", "Could not read more bytes");
         free(buffer);
         return false;
       }
+      const size_t dataRead = static_cast<size_t>(readResult);
 
       if (out.write(buffer, dataRead) != dataRead) {
         free(buffer);

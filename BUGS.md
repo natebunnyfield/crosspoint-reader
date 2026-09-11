@@ -34,6 +34,50 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-057] `HalFile::read` returns `int` and five call sites stored it in a `size_t`, turning a read error into a 4 GB length — FIXED 2026-09-10
+**severity: critical (heap over-read, a watchdog-resetting infinite loop, and ~4 GB of out-of-bounds memory written INTO a file on the user's card) · scope: `lib/ZipFile/ZipFile.cpp`, `lib/Txt/Txt.cpp`, `lib/Xtc/Xtc.cpp`, `src/FontInstaller.cpp` · found 2026-09-10 by a read-only P0/P1 sweep of `lib/`, reproduced under ASan and UBSan**
+
+`HalFile::read` is declared `int` (`lib/hal/HalStorage.h:90`) and forwards to
+SdFat's `FsFile::read`, which returns **-1** on a read error — a broken cluster
+chain, a bad sector, a handle not open for read. Assigned to a `size_t`, -1
+becomes `0xFFFFFFFF`, and every `== 0`, `> 0` and `< n` guard in front of it
+passes that through **as a length**.
+
+**The trigger is not crafted input.** It is one flaky SD read on an ordinary
+book. This tree already carries explicit retry logic for "SD card timing issues"
+(`lib/Epub/Epub/Section.cpp:498-507`), so the failure it depends on is one the
+code elsewhere expects.
+
+| site | what the -1 did |
+|---|---|
+| `ZipFile.cpp` STORED path | `out.write(buffer, 0xFFFFFFFF)` from a `chunkSize` heap block — **ASan heap-buffer-overflow reproduced**. `remaining -= dataRead` also made `remaining` GROW, so the loop could not terminate. |
+| `ZipFile.cpp` `zipFillCallback` | returned `SIZE_MAX` to tinfl as an input length — **UBSan reproduced**, `miniz.c:2451` unsigned overflow; then `pIn_buf_end < pIn_buf_cur` and `NEEDS_MORE_INPUT` forever, with `InflateStream` neither refilling nor erroring. Ran >120 s with zero progress: a **task-watchdog reset mid-book**. |
+| `Txt.cpp` cover copy | wrote ~4 GB of out-of-bounds memory **into the cover cache file on the card**, and `src.available()` never falls on a failed read, so the loop never ended. |
+| `Xtc.cpp` thumbnail copy | the same, and the source is a **512-byte stack buffer**. |
+| `FontInstaller.cpp` | `(size_t)-1 < CPFONT_MAGIC_LEN` is false, so the "file too small" guard passed and `memcmp` ran over an **uninitialised** `magic[]` — a font validated or rejected at random. |
+
+All five now take the result as `int`, reject `<= 0`, and cast only after. The
+sibling decoder already did it correctly (`PngToBmpConverter.cpp:263-267`), so
+this was a missing check rather than a missing idea.
+
+**Swept, not spot-fixed:** all 18 `size_t x = ...read(...)` sites across `lib/`
+and `src/` were checked. The rest compare `!= expectedSize`, which is safe
+against -1. Two more of this shape are dead code (`Xtc/XtcParser.cpp:519`,
+`ZipFile::loadAllFileStatSlims`) and were left alone.
+
+Also fixed with it, same root cause, P1: `Txt.cpp:195` returned `bytesRead > 0`
+where -1 is `true`, so a read error reported SUCCESS and the caller rendered
+`length` bytes of uninitialised buffer as book text.
+
+**Not covered by any test, and that is itself a finding.** Every host
+`HalStorage` stub in `test/` returns -1 only when the `FILE*` is null, so **no
+current suite can reach a mid-stream read error**. Closing that needs a stub
+that fails on the Nth call. Filed as T-031.
+
+731/731 host tests pass, `gh_release` compiles. **Unconfirmed on device:** the
+fix is verified by construction and by the sweep's ASan reproductions of the
+OLD behavior, not by a flaky card.
+
 ### [B-056] A nothrow-allocated object aborted anyway, from inside its own constructor — FIXED 2026-09-10
 **severity: high (a hard abort when the owner opens File Transfer on a tight heap) · scope: `src/network/CrossPointWebServer.h` · found 2026-09-10 by a P0/P1 sweep of `src/network/`, not reported**
 
