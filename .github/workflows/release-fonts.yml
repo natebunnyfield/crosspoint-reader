@@ -12,8 +12,8 @@ name: Build & Publish SD Card Fonts
 # DEVICE-SIDE DOWNLOAD EXISTS AGAIN SINCE 2026-09-07, and it does NOT read this
 # release. Update Fonts reads a PRIVATE release (`fonts-latest` on
 # natebunnyfield/claude-tools, published by that repo's scripts/publish_fonts.py)
-# because this workflow can only ever build 7 of the 12 families in
-# `installed_families:` -- Edgar, DanteMT, LutetiaNova, Doves and WarblerText are
+# because this workflow can only ever build 7 of the 10 families in
+# `installed_families:` -- Edgar, Doves and VandenKeere are
 # built from commercial outlines in lib/EpdFont/local_fonts/, which is gitignored
 # and never reaches a runner. This workflow stays as the PUBLIC set for anyone
 # who is not the owner; do not add a manifest here expecting the device to read
