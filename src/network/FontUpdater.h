@@ -21,11 +21,11 @@
  *
  * WHY THE PUBLISHER IS LOCAL AND NOT release-fonts.yml.
  * .github/workflows/release-fonts.yml publishes .cpfont files to the PUBLIC
- * crosspoint-fonts repo, and can only ever build 7 of the 10 families in
+ * crosspoint-fonts repo, and can only ever build 8 of the 11 families in
  * `installed_families:`. The other three -- Edgar, Doves and VandenKeere --
  * come from commercial outlines in lib/EpdFont/local_fonts/,
  * which is gitignored and never leaves the owner's Mac. claude-tools'
- * scripts/publish_fonts.py builds all ten on that Mac and uploads only the
+ * scripts/publish_fonts.py builds all eleven on that Mac and uploads only the
  * resulting bitmaps.
  *
  * THE UNIT IS A FAMILY, AND THAT IS THE WHOLE DESIGN.

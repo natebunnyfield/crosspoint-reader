@@ -328,18 +328,32 @@ TEST(SettingDisplayOrder, EveryFamilyCarriesAnEarliestOrigin) {
 TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
   // The installed set, 2026-09-12: Dante, Lutetia Nova and Warbler Text were
   // cut ("dante warbler and lutetia were all dropped"), joining DTLRomulus and
-  // GoldenCockerel on no surface. Ten remain.
-  std::vector<std::string> fams = {"Edgar",          "Coelacanth",   "TeXGyreSchola", "LibreFranklin", "LibrisADF",
-                                   "InknutJunicode", "TeXGyreHeros", "Almendra",      "Doves",         "VandenKeere"};
+  // GoldenCockerel on no surface, and AtkinsonHyperlegibleNext was promoted out
+  // of the iOS trial the same day. Eleven.
+  std::vector<std::string> fams = {"Edgar",
+                                   "Coelacanth",
+                                   "TeXGyreSchola",
+                                   "LibreFranklin",
+                                   "LibrisADF",
+                                   "InknutJunicode",
+                                   "TeXGyreHeros",
+                                   "Almendra",
+                                   "Doves",
+                                   "VandenKeere",
+                                   "AtkinsonHyperlegibleNext"};
   std::stable_sort(fams.begin(), fams.end(), [](const std::string& a, const std::string& b) {
     return readingfonts::sortsBefore(a.c_str(), b.c_str());
   });
 
   // VandenKeere sits directly after Edgar (1722) and ahead of the two
   // Venetians: its origin is van den Keere's 1575 Parangon roman, its own
-  // first lineage stage.
-  const std::vector<std::string> want = {"TeXGyreHeros", "LibrisADF",  "TeXGyreSchola", "LibreFranklin",  "Edgar",
-                                         "VandenKeere",  "Coelacanth", "Doves",         "InknutJunicode", "Almendra"};
+  // first lineage stage. AtkinsonHyperlegibleNext sits between Libre Franklin
+  // (1902) and Edgar: its origin is Figgins' 1832 London sans, on the Lexica
+  // Ultralegible precedent (owner ruling 2026-08-03, docs/font-dates.md).
+  const std::vector<std::string> want = {
+      "TeXGyreHeros", "LibrisADF",   "TeXGyreSchola", "LibreFranklin", "AtkinsonHyperlegibleNext",
+      "Edgar",        "VandenKeere", "Coelacanth",    "Doves",         "InknutJunicode",
+      "Almendra"};
   EXPECT_EQ(fams, want);
 
   // The two Venetians tie on origin and are separated by stage 1 alone.

@@ -195,8 +195,9 @@
 # promoted 2026-08-04, TeX Gyre Heros added 2026-08-23, Almendra added
 # 2026-08-24; Dante, Lutetia Nova and Doves added 2026-09-06; DTL Romulus and
 # Golden Cockerel CUT and WarblerText added 2026-09-07; DTL VandenKeere added
-# 2026-09-07; Dante, Lutetia Nova and Warbler Text CUT 2026-09-12): these TEN,
-# and only these ten, are INSTALLED on every surface — both device SD cards, the
+# 2026-09-07; Dante, Lutetia Nova and Warbler Text CUT 2026-09-12; Atkinson
+# Hyperlegible Next PROMOTED out of the iOS trial 2026-09-12): these ELEVEN,
+# and only these eleven, are INSTALLED on every surface — both device SD cards, the
 # simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
@@ -245,13 +246,31 @@ installed_families:
   - Almendra
   - Doves
   - VandenKeere
+  - AtkinsonHyperlegibleNext
+# AtkinsonHyperlegibleNext joined on 2026-09-12 (owner ruling, promoting it out
+# of the iOS trial it had been on since build 188 -- the 2026-09-11 ruling
+# "drop lexica and atkinson soft, add atkinson hyperlegible next at 365
+# weight" put it there). It is the eleventh installed family and the FOURTH
+# sans: the low-vision / hyperlegible cell, which nothing else in the list
+# fills (Lexica Ultralegible, the fork of its predecessor, came off the cards
+# 2026-08-04 and was declined again 2026-09-11), so it displaces nothing and no
+# head-to-head is owed. SIL OFL 1.1, fetched from a pinned commit of
+# googlefonts/atkinson-hyperlegible-next, so unlike Edgar, Doves and
+# VandenKeere it rebuilds from a clean clone -- the public release-fonts.yml
+# can build it, which moves that workflow's count from 7 of 10 to 8 of 11.
+# Its name has come back out of CROSSPOINT_IOS_TRIAL_FAMILIES in the simulator
+# repo's ios/CMakeLists.txt, which refuses a family named in both lists.
+# Slots, span and coverage are measured in the recipe's own comment block
+# (Accessibility section); still not run through the Almendra-anchored
+# words-per-page measurement.
 # DTL Romulus is NOT in the list above, and this note describes a promotion that
 # did not land. Corrected 2026-09-07 (owner ruling: "fix the comment; the list
 # is authoritative"), after a reader building the Update Fonts publisher took
 # the prose at face value and expected one more family than the list held.
 # The list is the enforcement mechanism this whole block exists to describe --
 # when it and the prose disagree, the LIST wins, and it holds exactly the
-# ten names above (Dante, Lutetia Nova and Warbler Text were cut 2026-09-12).
+# eleven names above (Dante, Lutetia Nova and Warbler Text were cut 2026-09-12;
+# Atkinson Hyperlegible Next was promoted the same day).
 # Everything below is kept as the record of what was measured and what was
 # ruled; it is not a description of the shipped set.
 #
@@ -2624,11 +2643,14 @@ families:
 
   # Atkinson Hyperlegible Next, Braille Institute's 2025 successor to Atkinson
   # Hyperlegible (2026-09-11, owner ruling: "drop lexica and atkinson soft, add
-  # atkinson hyperlegible next at 365 weight"). ON TRIAL: NOT in
-  # installed_families: -- it reaches no device card and no simulator default
-  # install, only the iOS seed tree, under CROSSPOINT_IOS_TRIAL_FAMILIES in the
-  # simulator's ios/CMakeLists.txt, and it must come out of there when the
-  # owner rules (simulator repo, docs/trial-fonts.md).
+  # atkinson hyperlegible next at 365 weight"). INSTALLED 2026-09-12
+  # (promoted): owner ruling, out of the iOS trial it had been on since build
+  # 188. It is in installed_families: above, so it belongs on every surface --
+  # device SD cards, the simulator's fs_/fonts/, and the iOS seed tree -- and
+  # its name has come back out of CROSSPOINT_IOS_TRIAL_FAMILIES in the
+  # simulator's ios/CMakeLists.txt (simulator repo, docs/trial-fonts.md, which
+  # records the trial's close). Picker label and dates: src/FontDisplayNames.h
+  # and docs/font-dates.md, both added with the promotion.
   #
   # REWRITTEN IN PLACE 2026-09-11. This recipe was here already, as the four
   # STATIC cuts (Regular/Bold, wght 400/700) fetched from the branch `main`,

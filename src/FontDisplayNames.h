@@ -575,6 +575,20 @@ inline constexpr Entry kEntries[] = {
     // the Figgins-specimen model.
     {"LexicaUltralegible", "Lexica Ultralegible", "; Elliott Scott & Craig Dobie; Jacob Perez",
      "1832 London; 2019 New York; 2024 El Paso, Texas", "1832 London", 1832},
+    // Added 2026-09-12, with the promotion out of the iOS trial (owner ruling;
+    // the trial began at build 188). Same skeleton as Lexica above and the
+    // same three-stage shape: the 1832 Figgins sans as the model (the owner's
+    // 2026-08-03 ruling for Lexica, applied to the face it was forked from),
+    // the 2019 Atkinson Hyperlegible, then Braille Institute's own 2025
+    // successor -- "Next" -- released 2025-02-10 under a Los Angeles dateline.
+    // Stage 3 credits the two individuals PRINT names on the Applied Design
+    // team for Next, Elliott Scott (creative director) and Megan Eisworth
+    // (designer); the studio and Letters from Sweden, which collaborated, stay
+    // out of this column per docs/font-dates.md's individuals-only rule. Stage
+    // 1 is empty for the reason Lexica's is. See docs/font-dates.md.
+    {"AtkinsonHyperlegibleNext", "Atkinson Hyperlegible Next",
+     "; Elliott Scott & Craig Dobie; Elliott Scott & Megan Eisworth", "1832 London; 2019 New York; 2025 Los Angeles",
+     "1832 London", 1832},
     // The text grotesques. Libre Franklin is the installed one; Host Grotesk and
     // Archivo are recipe-only since 2026-08-04 but keep their labels, because a
     // card provisioned before that ruling still shows them in the picker.
