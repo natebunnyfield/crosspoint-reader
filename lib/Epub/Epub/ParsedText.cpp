@@ -776,8 +776,15 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
   // oscillate between pages. See AutoJustify.h for the threshold and its
   // source, the ladder the Justified Text settings row offers, and
   // docs/auto-justification.md for the measurement method.
+  // Automatic line breaking needs this block's own characters-per-line, and the
+  // only place it is measured is inside the justification decision below. Zero
+  // means "not measured", which resolveAutomatic reads as "no claim that
+  // hyphens would help" -- the correct answer for a block that never asked to
+  // be justified, since those are exactly the blocks it leaves alone.
+  int charsPerLineEstimate = 0;
   if (blockStyle.alignment == CssTextAlign::Justify) {
     const int alphabetPx = measureLowercaseAlphabet(renderer, fontId);
+    charsPerLineEstimate = autojustify::charsPerLine(viewportWidth, alphabetPx);
     if (!autojustify::shouldJustify(viewportWidth, alphabetPx, justifyThresholdChars)) {
       blockStyle.alignment = blockStyle.isRtl ? CssTextAlign::Right : CssTextAlign::Left;
       // The reader sees a ragged edge in a book that asked to be justified and
@@ -820,8 +827,30 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
   // the mapping from the stored byte to the breaker has one definition and a
   // test that fails if anyone re-points it -- see lib/Epub/Epub/LineBreakMode.h
   // for why the two are coupled to one flag at all.
+  // Automatic resolves HERE and not at the settings row, because its whole
+  // question is about this block: its measure, its face, and whether it is
+  // still justified after auto-justification demoted what it could. A block
+  // that came out ragged, or that is wide enough to justify cleanly on its
+  // own, sets whole words. See LineBreakMode.h for the bar and its sources.
+  const bool blockIsJustified = blockStyle.alignment == CssTextAlign::Justify;
+  const linebreak::Mode breaker = linebreak::resolvedMode(hyphenationEnabled, blockIsJustified, charsPerLineEstimate);
+  if (linebreak::isAutomatic(hyphenationEnabled)) {
+    // Same one-line-per-distinct-configuration guard as the auto-justify log
+    // above, and for the same reason: a page holds dozens of blocks and the
+    // repeat says nothing.
+    static int lastAutoChars = -1;
+    static bool lastAutoJustified = false;
+    if (charsPerLineEstimate != lastAutoChars || blockIsJustified != lastAutoJustified) {
+      lastAutoChars = charsPerLineEstimate;
+      lastAutoJustified = blockIsJustified;
+      LOG_DBG("PTX", "auto-hyphen: %s, ~%d chars/line, bound %d -> %s", blockIsJustified ? "justified" : "ragged",
+              charsPerLineEstimate, linebreak::HELPFUL_MAX_CHARS,
+              linebreak::splitsWordsAtLineEnds(breaker) ? "hyphenated" : "whole words");
+    }
+  }
+
   std::vector<size_t> lineBreakIndices;
-  if (linebreak::splitsWordsAtLineEnds(linebreak::modeFor(hyphenationEnabled))) {
+  if (linebreak::splitsWordsAtLineEnds(breaker)) {
     // Use greedy layout that can split words mid-loop when a hyphenated prefix fits.
     lineBreakIndices =
         computeHyphenatedLineBreaks(renderer, fontId, pageWidth, wordWidths, wordContinues, wordNoSpaceBefore);

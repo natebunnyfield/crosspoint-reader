@@ -343,7 +343,9 @@ ReaderRenderSpec CrossPointSettings::readerRenderSpec(const uint16_t viewportWid
   spec.paragraphAlignment = paragraphAlignment;
   spec.viewportWidth = viewportWidth;
   spec.viewportHeight = viewportHeight;
-  spec.hyphenationEnabled = hyphenationEnabled != 0;
+  // Passed through WHOLE, not narrowed to a bool: Automatic is a third value
+  // and the block-level decision is made in layout, not here.
+  spec.hyphenationEnabled = hyphenationEnabled;
   spec.embeddedStyle = embeddedStyle != 0;
   spec.imageRendering = imageRendering;
   spec.focusReadingEnabled = focusReadingEnabled != 0;
@@ -384,6 +386,9 @@ float CrossPointSettings::getReaderLineCompression() const {
   // neutral", tuned against Bookerly), and the built-in fallback is Libre
   // Franklin, whose uniform-slot leading was derived under the same ramp — the
   // separate Noto Sans ramp went with that family's removal.
+  // Steps widen as they go: 0.05, 0.10, 0.15, 0.20. Even increments read as
+  // ever-smaller changes at the loose end, because what the eye judges is the
+  // RATIO between successive settings, not the difference.
   switch (lineSpacing) {
     case TIGHT:
       return 0.95f;
@@ -392,6 +397,10 @@ float CrossPointSettings::getReaderLineCompression() const {
       return 1.0f;
     case WIDE:
       return 1.1f;
+    case WIDER:
+      return 1.25f;
+    case WIDEST:
+      return 1.45f;
   }
 }
 

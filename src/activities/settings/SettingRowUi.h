@@ -68,11 +68,21 @@ inline std::string valueText(const SettingInfo& setting) {
   return {};
 }
 
+// TWO CHOICES IS A TOGGLE, NOT A QUESTION (owner ruling 2026-09-11: "whenever
+// an option is only two values, just toggle between them instead of a dialog").
+// A popup that offers exactly two answers costs a full e-ink repaint to open, a
+// move, a Confirm and a second repaint to close, to do what one press can do
+// where the row already stands -- and the row's value column already says which
+// of the two is current, so the popup shows nothing the reader cannot see.
+// Three or more still opens: at that point the choices are worth listing, and
+// cycling blind through them is the worse interaction.
+inline constexpr size_t PICKER_MIN_CHOICES = 3;
+
 // Whether Confirm on this row opens something (a picker or a sub-screen) rather
 // than changing a value where it stands. Drives the button hint's label, so it
 // must agree with activate() below or the hint says "Toggle" and a popup opens.
 inline bool opensPicker(const SettingInfo& setting) {
-  return setting.type == SettingType::ENUM && setting.enumCount() > 1;
+  return setting.type == SettingType::ENUM && setting.enumCount() >= PICKER_MIN_CHOICES;
 }
 
 // Confirm. Writes the new value for an in-place row, or shows `popup` for a
@@ -95,7 +105,7 @@ inline bool activate(const SettingInfo& setting, OptionPopup& popup, const std::
   const bool byAccessor = setting.type == SettingType::ENUM && setting.valueGetter && setting.valueSetter;
   if (byPointer || byAccessor) {
     const uint8_t current = byPointer ? SETTINGS.*(setting.valuePtr) : setting.valueGetter();
-    if (choiceCount > 1) {
+    if (choiceCount >= PICKER_MIN_CHOICES) {
       // Captured BY VALUE, all of it: onSelect calls onChanged(), which
       // rebuilds the vector `setting` refers into.
       const std::vector<uint8_t> order = setting.resolvedDisplayOrder();
@@ -120,11 +130,20 @@ inline bool activate(const SettingInfo& setting, OptionPopup& popup, const std::
       }
       return true;
     }
-    // A row with no choices at all must not reach the modulus: on RISC-V a
+    // A row with no choices at all must not reach the step below: on RISC-V a
     // divide by zero does not trap, it returns the dividend, so the stored
     // index climbs until the value column renders blank.
     if (choiceCount == 0) return false;
-    const uint8_t next = static_cast<uint8_t>((current + 1) % static_cast<uint8_t>(choiceCount));
+    // Step through DISPLAY order, not raw stored values. For the two-choice
+    // rows this gate now catches, the two are the same flip either way -- but a
+    // row built with withDisplaySubset() lists fewer values than it stores, and
+    // a raw `(current + 1) % count` would step onto a value the picker had
+    // deliberately withdrawn. Advancing by position cannot: it only ever lands
+    // on something the row offers.
+    const std::vector<uint8_t> order = setting.resolvedDisplayOrder();
+    if (order.empty()) return false;
+    const size_t pos = setting.positionOfStored(current);
+    const uint8_t next = order[(pos + 1) % order.size()];
     if (byPointer) {
       SETTINGS.*(setting.valuePtr) = next;
     } else {

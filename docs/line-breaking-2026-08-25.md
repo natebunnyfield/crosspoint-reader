@@ -1388,3 +1388,89 @@ things landed:
 `tools/linebreak_corpus.py` is unchanged and reproduced the §8a corpus exactly
 (394 paragraphs, 22,881 words), which is the second time that script has paid
 for itself.
+
+---
+
+## 10. Automatic (2026-09-11) — hyphens only where not hyphenating is worse
+
+Owner ruling: *"make a third setting that only turns on hyphenation
+automatically when it is helpful for even a dyslexic reader."* Shipped as
+`linebreak::STORED_AUTOMATIC = 2`, the value this header had already reserved
+("A three-way mode would take the value 2"), so **0 and 1 keep their meanings
+exactly** and no card re-paginates until the row is touched. The default is
+still `Hyphenated`.
+
+### 10a. Why the bar is where it is
+
+The clause is the specification, and it is a demanding one, because **both**
+costs land on the same reader:
+
+* **A split word is a real cost.** The British Dyslexia Association's Style
+  Guide asks for text that is not justified and for words not to be broken
+  across lines. A word arriving in two pieces has to be rejoined before it is
+  recognised.
+* **Erratic word spacing is also a real cost, for the same reader.** It is what
+  justification does to a short line, and the white channels it opens down a
+  paragraph pull the eye off the line it is tracking — which is *why* that same
+  guide asks for ragged right.
+
+So Automatic never asks "are hyphens good?". It asks the only question with a
+defensible answer: **is this line so short that setting it justified without
+hyphens would do more damage than the hyphens?** Usually the answer is no.
+
+### 10b. The two conditions
+
+Both are required, and the first is what makes Automatic genuinely different
+from "Allow hyphens" rather than a milder version of it.
+
+1. **The block must still be justified**, *after* auto-justification (§
+   `AutoJustify.h`) has had its say. A ragged block has no stretched gaps, so a
+   hyphen there buys nothing. Note the consequence: under "Allow hyphens" a
+   ragged block is still hyphenated as a rescue against a conspicuously short
+   line (`RAGGED_HYPHEN_GATE_PCT`, §9). **Under Automatic that rescue does not
+   run** — a short ragged line is not a defect.
+2. **The measure must be inside the grey band**, `[justification threshold,
+   HELPFUL_MAX_CHARS)` — by default `[40, 50)`.
+
+### 10c. The bound: 50, and deliberately conservative
+
+| Source | Says | Bearing |
+|---|---|---|
+| Bringhurst 2.1.2 | justified below "38 or 40" gives "white acne or pig bristles" | the band's **lower** edge is already this reader's justification threshold |
+| Butterick, *Practical Typography* | comfortable measure 45–90 | at 50 the line is inside it with room; justification composes unaided |
+| Gregory & Poulton (1970) | justification significantly worse than ragged at ~38–39 chars; **no disadvantage by ~66** | 66 would be defensible for a general reader — **not** here |
+
+Between 50 and 66 justification is merely *imperfect*, not *harmful*, and
+imperfect does not justify a split word to someone who pays for one. That is
+the whole reason the bound is 50 rather than 66.
+
+Against this device's own calibration sweep (13 face/size pairs at 512 px,
+measured range 28–53 characters — the table in `docs/auto-justification.md`),
+50 leaves both regimes reachable: the widest setting on the card sits above the
+bound and sets whole words, everything narrower that is still justified
+hyphenates.
+
+### 10d. A degenerate case that is correct
+
+Raise **Justified Text** to 50 and Automatic stops hyphenating altogether: the
+band `[50, 50)` is empty. That is right, not a bug — a reader who has asked for
+ragged setting below 50 characters has asked for the remedy that makes hyphens
+unnecessary in the first place.
+
+### 10e. Where it is decided, and what it cost
+
+In `ParsedText::layoutAndExtractLines`, at the breaker dispatch, because that is
+the only place all three inputs exist at once: the block's own measure, its
+face, and its alignment *after* demotion. `linebreak::resolveAutomatic` is pure
+and constexpr; `test/line_break_mode` pins every boundary, including the
+unmeasurable-alphabet fallback (→ whole words: a claim that cannot be checked
+has not been made).
+
+The stored field widened from `bool` to `uint8_t` along the chain
+(`CrossPointSettings` → `ReaderRenderSpec` → `ChapterHtmlSlimParser` →
+`ParsedText`). `sizeof(bool) == 1`, so **the section-file header layout is
+unchanged and `SECTION_FILE_VERSION` did not move**. One real hazard was found
+and fixed in passing: `ReaderRenderSpec::layoutHash` packed the flag as a single
+bit at position 1, where a stored `2` would have carried into `embeddedStyle`'s
+bit and hashed Automatic identically to "whole words, no embedded style". It is
+mixed on its own now, the same remedy `justifyThresholdChars` already needed.

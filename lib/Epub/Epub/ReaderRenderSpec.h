@@ -38,7 +38,9 @@ struct ReaderRenderSpec {
   uint8_t paragraphAlignment = 0;
   uint16_t viewportWidth = 0;
   uint16_t viewportHeight = 0;
-  bool hyphenationEnabled = false;
+  // A linebreak:: STORED_* byte. Three-valued since 2026-09-11 (Automatic), so
+  // NOT a bool -- and it is packed on its own in the hash below for that reason.
+  uint8_t hyphenationEnabled = 0;
   bool embeddedStyle = true;
   uint8_t imageRendering = 0;
   bool focusReadingEnabled = false;
@@ -96,10 +98,15 @@ struct ReaderRenderSpec {
     mix(static_cast<uint32_t>(fontId));
     mix(compressionBits);
     mix(static_cast<uint32_t>(viewportWidth) << 16 | viewportHeight);
-    mix(static_cast<uint32_t>(extraParagraphSpacing) | static_cast<uint32_t>(hyphenationEnabled) << 1 |
-        static_cast<uint32_t>(embeddedStyle) << 2 | static_cast<uint32_t>(focusReadingEnabled) << 3 |
-        static_cast<uint32_t>(lineGridEnabled) << 4 | static_cast<uint32_t>(paragraphAlignment) << 5 |
-        static_cast<uint32_t>(imageRendering) << 13);
+    // hyphenationEnabled is NO LONGER IN THIS WORD. It was one bit at position
+    // 1; it became a three-valued byte on 2026-09-11 (Automatic), and a 2 there
+    // would have carried into embeddedStyle's bit and hashed Automatic
+    // identically to "whole words plus no embedded style". Mixed on its own
+    // below, the same remedy justifyThresholdChars already needed.
+    mix(static_cast<uint32_t>(extraParagraphSpacing) | static_cast<uint32_t>(embeddedStyle) << 2 |
+        static_cast<uint32_t>(focusReadingEnabled) << 3 | static_cast<uint32_t>(lineGridEnabled) << 4 |
+        static_cast<uint32_t>(paragraphAlignment) << 5 | static_cast<uint32_t>(imageRendering) << 13);
+    mix(static_cast<uint32_t>(hyphenationEnabled));
     // Mixed on its own rather than packed into the word above: that word is
     // already carrying imageRendering at bit 13 and a byte would collide with
     // it. A note's layout scope has to notice this move for the same reason the

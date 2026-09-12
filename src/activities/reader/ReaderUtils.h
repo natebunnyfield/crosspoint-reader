@@ -23,15 +23,15 @@ enum ReaderTouchAction : freeink::ui::ActionId {
 
 // Where a +1 / -1 line-spacing step lands, given the slot it starts from.
 //
-// LINE_COMPRESSION has only THREE slots (TIGHT / NORMAL / WIDE — CrossPointSettings.h:118),
-// so this CLAMPS rather than wraps: wrapping across a
-// three-value range means one step at either end jumps the leading the whole way to the
-// opposite extreme, which reads as a malfunction rather than a range end. Clamping makes
-// "you are at the tightest setting" perceptible.
+// This CLAMPS rather than wraps, and the reason survives the ramp growing from three slots
+// to five (2026-09-11): wrapping means one step at either end jumps the leading the whole
+// way to the opposite extreme, which reads as a malfunction rather than a range end.
+// Clamping makes "you are at the tightest setting" perceptible. The longer the ramp, the
+// further a wrap would throw the page, so the argument only gets stronger.
 //
-// The values are persisted indices (CrossPointSettings.cpp:250 validates against
-// LINE_COMPRESSION_COUNT), so this deliberately introduces no new slot and changes no
-// existing slot's meaning; it only walks the three that already exist.
+// The values are persisted indices (CrossPointSettings.cpp validates against
+// LINE_COMPRESSION_COUNT), so this changes no existing slot's meaning; it walks whatever
+// slots the enum declares, in the order it declares them.
 //
 // Returning `current` unchanged at either end is the caller's signal that there is nothing
 // to persist and nothing to re-paginate — which is what keeps a repeated press at the end of
@@ -47,14 +47,21 @@ constexpr uint8_t steppedLineSpacing(const uint8_t current, const int delta) {
   if (next > last) next = last;
   return static_cast<uint8_t>(next);
 }
-static_assert(CrossPointSettings::LINE_COMPRESSION_COUNT == 3,
-              "steppedLineSpacing's clamp-don't-wrap rationale assumes the three TIGHT/NORMAL/WIDE slots");
+// The chord walks the enum by arithmetic, so the enum's ORDER has to stay the
+// ramp's order -- which is why LINE_COMPRESSION is append-only and only ever
+// grows at the wide end (see the block above it in CrossPointSettings.h). These
+// pin both ends and the interior, so a value inserted rather than appended
+// fails to compile here rather than silently re-leading everyone's books.
+static_assert(CrossPointSettings::LINE_COMPRESSION_COUNT == 5,
+              "steppedLineSpacing walks the ramp by value: a new slot must be APPENDED, and this count updated");
 static_assert(steppedLineSpacing(CrossPointSettings::TIGHT, -1) == CrossPointSettings::TIGHT,
-              "A step below Tight must clamp, not wrap to Wide");
-static_assert(steppedLineSpacing(CrossPointSettings::WIDE, +1) == CrossPointSettings::WIDE,
-              "A step above Wide must clamp, not wrap to Tight");
+              "A step below the tightest slot must clamp, not wrap to the widest");
+static_assert(steppedLineSpacing(CrossPointSettings::WIDEST, +1) == CrossPointSettings::WIDEST,
+              "A step above the widest slot must clamp, not wrap to the tightest");
 static_assert(steppedLineSpacing(CrossPointSettings::NORMAL, +1) == CrossPointSettings::WIDE, "Normal + 1 == Wide");
 static_assert(steppedLineSpacing(CrossPointSettings::NORMAL, -1) == CrossPointSettings::TIGHT, "Normal - 1 == Tight");
+static_assert(steppedLineSpacing(CrossPointSettings::WIDE, +1) == CrossPointSettings::WIDER, "Wide + 1 == Wider");
+static_assert(steppedLineSpacing(CrossPointSettings::WIDER, +1) == CrossPointSettings::WIDEST, "Wider + 1 == Widest");
 
 struct PageTurnResult {
   bool prev;

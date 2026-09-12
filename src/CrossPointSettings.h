@@ -100,7 +100,20 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // slot is an INDEX, so the default has to move with the insertion or a fresh
   // install reads at XS. Still 14 pt on the built-in ramp.
   static constexpr uint8_t DEFAULT_FONT_SIZE_SLOT = 3;  // M, = 14pt on the built-in ramp
-  enum LINE_COMPRESSION { TIGHT = 0, NORMAL = 1, WIDE = 2, LINE_COMPRESSION_COUNT };
+  // APPEND-ONLY, and the order IS the ramp. Every value is written into a
+  // settings.json and compared against every cached section file, so inserting
+  // a step in the middle would re-point saved preferences at a different
+  // spacing and silently re-paginate books that asked for neither. The two
+  // wider slots were added on 2026-09-11 (owner: "add some more useful levels
+  // to line spacing") at the END, where they extend the ramp without moving
+  // anything: TIGHT/NORMAL/WIDE still mean exactly what they meant.
+  //
+  // The ramp only grows UPWARD for the same reason it is worth growing at all.
+  // 1.1 was the whole of "more air", which is less leading than most printed
+  // fiction and well short of what large-print reading wants, while the tight
+  // end at 0.95 is already close to where ascenders and descenders start
+  // meeting on the SD faces.
+  enum LINE_COMPRESSION { TIGHT = 0, NORMAL = 1, WIDE = 2, WIDER = 3, WIDEST = 4, LINE_COMPRESSION_COUNT };
   enum PARAGRAPH_ALIGNMENT {
     JUSTIFIED = 0,
     LEFT_ALIGN = 1,

@@ -391,13 +391,31 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // survives parsing. The 2026-08-25 override ruling -- a typography setting
     // is a default a book's own CSS beats where the book was explicit -- has
     // nothing to bite on here, and there is no stored per-book value to honor.
+    //
+    // AUTOMATIC, the third choice (owner ruling 2026-09-11: "make a third
+    // setting that only turns on hyphenation automatically when it is helpful
+    // for even a dyslexic reader"). It is a POLICY, decided per block in
+    // layout rather than here -- hyphens only where the alternative is worse
+    // for the same reader, which is a justified line short enough that its few
+    // word gaps have to gape. Everything else, including every ragged block,
+    // sets whole words. The bar, the bound and their sources are in
+    // LineBreakMode.h; this row only stores which of the three was chosen.
+    //
+    // Listed FIRST because it is the one a reader should try before deciding
+    // they have an opinion, and because it is the only one of the three whose
+    // answer changes with the reading size they are already adjusting. The
+    // DEFAULT is still Hyphenated -- an existing install renders identically
+    // until the row is touched, and a fresh one gets what every shipped build
+    // has drawn.
     {
-      std::vector<StrId> breakLabels(2);
+      std::vector<StrId> breakLabels(3);
       breakLabels[linebreak::STORED_WHOLE_WORDS] = StrId::STR_LINE_BREAKS_WHOLE_WORDS;
       breakLabels[linebreak::STORED_HYPHENATED] = StrId::STR_LINE_BREAKS_HYPHENATED;
+      breakLabels[linebreak::STORED_AUTOMATIC] = StrId::STR_LINE_BREAKS_AUTOMATIC;
       v.push_back(SettingInfo::Enum(StrId::STR_LINE_BREAKS, &CrossPointSettings::hyphenationEnabled,
                                     std::move(breakLabels), "hyphenationEnabled", StrId::STR_CAT_READER)
-                      .withDisplayOrder({linebreak::STORED_HYPHENATED, linebreak::STORED_WHOLE_WORDS}));
+                      .withDisplayOrder(
+                          {linebreak::STORED_AUTOMATIC, linebreak::STORED_HYPHENATED, linebreak::STORED_WHOLE_WORDS}));
     }
     // Line Spacing. Its row was deleted by the 2026-08-21 reduction and is
     // REINSTATED here by the 2026-08-24 ruling above -- which supersedes that
@@ -415,6 +433,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       spacingLabels[CrossPointSettings::TIGHT] = StrId::STR_TIGHT;
       spacingLabels[CrossPointSettings::NORMAL] = StrId::STR_NORMAL;
       spacingLabels[CrossPointSettings::WIDE] = StrId::STR_WIDE;
+      spacingLabels[CrossPointSettings::WIDER] = StrId::STR_WIDER;
+      spacingLabels[CrossPointSettings::WIDEST] = StrId::STR_WIDEST;
       v.push_back(SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing, std::move(spacingLabels),
                                     "lineSpacing", StrId::STR_CAT_READER));
     }
