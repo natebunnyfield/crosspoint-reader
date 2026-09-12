@@ -53,8 +53,8 @@ std::string realisticManifest(int familyCount = 13) {
   return s;
 }
 
-Collected parseInChunks(const std::string& json, size_t chunk, bool* complete = nullptr,
-                        bool* sawFamilies = nullptr, int* version = nullptr, size_t maxFiles = 16) {
+Collected parseInChunks(const std::string& json, size_t chunk, bool* complete = nullptr, bool* sawFamilies = nullptr,
+                        int* version = nullptr, size_t maxFiles = 16) {
   Collected out;
   FontManifestParser parser(collect, &out, maxFiles);
   for (size_t i = 0; i < json.size(); i += chunk) {
@@ -193,7 +193,8 @@ TEST(FontManifest, UnknownKeysAndNestingAreIgnored) {
       "{\"version\":1,\"generated\":\"x\",\"extra\":{\"a\":[1,2,{\"b\":\"c\"}]},"
       "\"families\":[{\"family\":\"Ok\",\"note\":{\"deep\":[{\"x\":1}]},"
       "\"files\":[{\"file\":\"Ok_10.cpfont\",\"asset\":\"Ok_10.cpfont\",\"bytes\":42,"
-      "\"sha256\":\"" + sha + "\",\"meta\":{\"nested\":true}}]}]}";
+      "\"sha256\":\"" +
+      sha + "\",\"meta\":{\"nested\":true}}]}]}";
   bool complete = false;
   const Collected got = parseInChunks(json, 5, &complete);
   EXPECT_TRUE(complete);

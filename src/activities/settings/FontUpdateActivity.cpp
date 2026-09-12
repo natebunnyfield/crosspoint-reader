@@ -36,7 +36,6 @@ const char* needsTokenHint() {
 }
 }  // namespace
 
-
 // A run that ends in errors leaves its log ring on the CARD.
 //
 // Update Fonts has now failed on the owner's device three times running, each
@@ -63,14 +62,16 @@ void FontUpdateActivity::writeFailureLog(unsigned updated, unsigned unchanged, u
 #endif
   char header[160];
   const int n = snprintf(header, sizeof(header),
-                         "CrossPoint " CROSSPOINT_VERSION "\nfont sync: %u updated, %u unchanged, %u removed, "
+                         "CrossPoint " CROSSPOINT_VERSION
+                         "\nfont sync: %u updated, %u unchanged, %u removed, "
                          "%u errors\n\nLast logs:\n",
                          updated, unchanged, removed, errors);
   // snprintf returns what it WOULD have written, not what it did. Writing that
   // many bytes out of a 160-byte array reads past it whenever the header is
   // longer -- four %u at ten digits each is 40 characters of counters alone.
   // Clamp to what is actually in the buffer.
-  const size_t headerLen = n < 0 ? 0 : (static_cast<size_t>(n) < sizeof(header) ? static_cast<size_t>(n) : sizeof(header) - 1);
+  const size_t headerLen =
+      n < 0 ? 0 : (static_cast<size_t>(n) < sizeof(header) ? static_cast<size_t>(n) : sizeof(header) - 1);
 
   // Both writes are CHECKED. This file is the only diagnostic B-055 has, and a
   // card with no room left would otherwise truncate it silently while the log

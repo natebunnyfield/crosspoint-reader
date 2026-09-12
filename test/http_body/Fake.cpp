@@ -18,8 +18,8 @@ void reset() { script() = Script{}; }
 // wolfSSL path does: announce the declared length once, then deliver the body
 // in fixed-size pieces, stopping when a callback returns false.
 HttpDownloader::DownloadError HttpDownloader::fetchUrlWithHeaders(const std::string&, const HeaderList&,
-                                                                 const DataCallback& onData,
-                                                                 const SizeCallback& onSize) {
+                                                                  const DataCallback& onData,
+                                                                  const SizeCallback& onSize) {
   auto& s = fakehttp::script();
 
   if (onSize) {

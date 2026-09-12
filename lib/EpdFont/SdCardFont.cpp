@@ -1679,8 +1679,10 @@ int SdCardFont::buildAdvanceTableRange(Iter begin, Iter end, bool includeSpace, 
   uint32_t capacity = 256;
   uint32_t* codepoints = new (std::nothrow) uint32_t[capacity + 2];
   if (!codepoints) {
-    LOG_ERR("SDCF", "buildAdvanceTable: no memory for the %u-byte codepoint buffer; measuring per glyph until the cache is cleared",
-            (capacity + 2) * 4);
+    LOG_ERR(
+        "SDCF",
+        "buildAdvanceTable: no memory for the %u-byte codepoint buffer; measuring per glyph until the cache is cleared",
+        (capacity + 2) * 4);
     advanceTableOom_ = true;
     return -1;
   }
