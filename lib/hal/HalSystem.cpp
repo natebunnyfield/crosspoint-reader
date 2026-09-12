@@ -190,7 +190,7 @@ namespace {
 struct HeapSample {
   uint32_t magic;
   uint32_t freeBytes;
-  uint32_t minFreeBytes;  // low-water mark since boot
+  uint32_t minFreeBytes;   // low-water mark since boot
   uint32_t maxAllocBytes;  // largest single block still obtainable
   uint32_t atMillis;
 };

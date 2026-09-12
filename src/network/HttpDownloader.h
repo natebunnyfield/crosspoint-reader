@@ -124,8 +124,7 @@ class HttpDownloader {
    * fetchUrlWithHeaders (test/font_commit) get this for free and cannot
    * accidentally reach the network through it.
    */
-  static DownloadError fetchUrlToBuffer(const std::string& url, const HeaderList& headers, size_t maxBytes,
-                                        Body& out) {
+  static DownloadError fetchUrlToBuffer(const std::string& url, const HeaderList& headers, size_t maxBytes, Body& out) {
     out.reset();
 
     bool oom = false;
@@ -194,6 +193,19 @@ class HttpDownloader {
           // A declared length has already reserved the whole body, so this is a
           // no-op on the normal path and only grows for a chunked response.
           if (!ensure(out.len + len, false)) return false;
+          // FALSE POSITIVE, checked rather than waved away: `out.data` is a
+          // std::unique_ptr<char[]> (Body::data above), so `.get()` returns
+          // char* and this arithmetic is ordinary and well defined. cppcheck
+          // cannot resolve the array specialisation's get() through the lambda
+          // and falls back to void*, which IS undefined to offset. It is a
+          // `low:portability` report and `pio check` fails CI on low, so it has
+          // to be answered here rather than left to accumulate.
+          //
+          // The suppression sits on the line directly above the statement, as
+          // every other one in this tree does: --inline-suppr binds a comment
+          // to the NEXT line, so a paragraph between the two is a suppression
+          // that silently stops applying.
+          // cppcheck-suppress arithOperationsOnVoidPointer
           memcpy(out.data.get() + out.len, data, len);
           out.len += len;
           out.data[out.len] = '\0';

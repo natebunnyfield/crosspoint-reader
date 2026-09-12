@@ -636,8 +636,7 @@ std::string firstLineageStage(const std::string& colophonBody) {
   const size_t firstNl = colophonBody.find('\n');
   if (firstNl == std::string::npos) return std::string();
   const size_t secondNl = colophonBody.find('\n', firstNl + 1);
-  return colophonBody.substr(firstNl + 1, secondNl == std::string::npos ? std::string::npos
-                                                                        : secondNl - firstNl - 1);
+  return colophonBody.substr(firstNl + 1, secondNl == std::string::npos ? std::string::npos : secondNl - firstNl - 1);
 }
 
 }  // namespace

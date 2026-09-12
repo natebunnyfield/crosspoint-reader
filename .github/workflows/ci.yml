@@ -125,11 +125,30 @@ jobs:
         #
         # It was then never run by CI or by release.sh, and by 2026-09-10 the
         # tree had drifted to fourteen frames over budget with six regressions.
-        # A gate nobody runs is a paragraph. --no-build reuses the .su files the
-        # step above just produced, so this costs seconds, not another build.
+        # A gate nobody runs is a paragraph.
+        #
+        # IT STILL HAD NOT RUN. Armed here on 2026-09-10 with --no-build and the
+        # claim that it "reuses the .su files the step above just produced", it
+        # failed on its very first execution and on every push since:
+        #
+        #     error: build dir /tmp/pio_stack_budget/build does not exist
+        #
+        # The claim was simply untrue, in two ways at once. stack_budget.py
+        # builds into a PRIVATE PLATFORMIO_BUILD_DIR of its own (its module
+        # docstring says so), so --no-build reuses ITS previous run and not the
+        # `pio run` above; and that `pio run` compiles without -fstack-usage, so
+        # there are no .su files anywhere in .pio to reuse even if the paths had
+        # matched. Three commits went in red behind it -- which is the same
+        # failure the gate was written to prevent, one level up: a gate that
+        # cannot pass teaches everyone to ignore the red.
+        #
+        # So it builds its own instrumented tree, which is what it was always
+        # going to have to do. That is a second firmware build and it is not
+        # free -- but ~/.platformio is a cache hit by this point, and a gate
+        # that runs at all is worth more than the minutes.
         run: |
           set -euo pipefail
-          tools/stack_budget/stack_budget.py --no-build | tee stack_budget.log
+          tools/stack_budget/stack_budget.py | tee stack_budget.log
           {
             echo "## Stack frame budget"
             echo '```'

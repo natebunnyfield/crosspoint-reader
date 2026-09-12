@@ -562,8 +562,7 @@ bool BookMetadataCache::load() {
   // rebuilds it -- instead of aborting the device.
   {
     const size_t fileBytes = bookFile.size();
-    const uint64_t lutBytes =
-        (static_cast<uint64_t>(spineCount) + static_cast<uint64_t>(tocCount)) * sizeof(uint32_t);
+    const uint64_t lutBytes = (static_cast<uint64_t>(spineCount) + static_cast<uint64_t>(tocCount)) * sizeof(uint32_t);
     if (lutOffset > fileBytes || lutBytes > fileBytes - lutOffset) {
       LOG_ERR("BMC", "Cache header does not fit its own file (lutOffset=%u spine=%u toc=%u size=%u); rebuilding",
               static_cast<unsigned>(lutOffset), static_cast<unsigned>(spineCount), static_cast<unsigned>(tocCount),
