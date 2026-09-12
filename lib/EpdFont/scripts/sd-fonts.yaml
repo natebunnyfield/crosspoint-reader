@@ -2611,23 +2611,95 @@ families:
 
   - name: LexicaUltralegible
     description: "Lexica Ultralegible, Atkinson Hyperlegible extended for reading (Latin)"
-    # INSTALLED (S tier). The one sans in the installed set: Atkinson
-    # Hyperlegible's letterform-disambiguation design with the coverage gap
-    # closed — 100% of Latin-1 and Latin Extended-A where Atkinson's own static
-    # TTFs carry 98% / 73%, so accented European text stays in the face instead
-    # of falling back to Noto mid-word. `reading` rather than `latin-ext` to
-    # match Edgar, the other recently-added installed family.
+    # NOT installed. It was S tier for one day -- added 2026-08-03 off the sans
+    # bench, cut 2026-08-04 on the one-installed-sans taxonomy ruling
+    # (docs/sd-card-fonts.md) -- and this comment went on saying "INSTALLED"
+    # for five weeks after. Buildable-only since the cut.
+    #
+    # ON TRIAL 2026-09-11 (owner ask: bundle it as a second trial family beside
+    # AtkinsonHyperlegibleSoft below). Bundled in the iOS seed tree under
+    # CROSSPOINT_IOS_TRIAL_FAMILIES in the simulator's ios/CMakeLists.txt, and
+    # still NOT in installed_families:, so it reaches no device card and no
+    # simulator default install. The 2026-08-04 note that putting it back on a
+    # surface needs a fresh ruling stands: this is that ruling, for a TRIAL,
+    # and a promotion would be a second one. Sources are SIL OFL 1.1
+    # (jacobxperez/lexica-ultralegible, tag v1.0.0), fetched by URL.
+    #
+    # Atkinson Hyperlegible's letterform-disambiguation design with the
+    # coverage gap closed -- 100% of Latin-1 and Latin Extended-A where
+    # Atkinson's own static TTFs carry 98% / 73%, so accented European text
+    # stays in the face instead of falling back to Noto mid-word.
     intervals: reading
-    # Uniform slots: xh 12/14/16/18 (exact on all four), advY 33/39/45/51.
-    # Slot 0 sits 1 px under the tier's 34 and cannot be fixed: the next span
-    # that reaches 34 px there pushes the other three to 40/46/52, three misses
-    # instead of one. This is the hinting-skip case sd-fonts.yaml documents
-    # above. The ascender/advanceY ratio (0.77-0.79) matches TeX Gyre Schola's.
-    sizes: [11, 13, 15, 17]
-    metrics: {ascent: 1102, descent: -339, linegap: 0}
+    # RE-RAMPED 2026-09-11 from the 4-slot [11, 13, 15, 17] (xh 12/14/16/18,
+    # advY 33/39/45/51) to the tier's six slots, and the span re-swept for the
+    # six-slot target at the same time. Same ramp and same span as
+    # AtkinsonHyperlegibleSoft below, ON PURPOSE: the two are one skeleton
+    # (x-height 496, cap 668, n 408 per 1000 em in both), and the trial is a
+    # comparison of the faces, so the fit must not be a variable in it.
+    #
+    # Uniform slots, hinted `x` bitmap rows at 150 DPI (the sweep_grot.py
+    # reading; `top` reads the same, the x does not dip): bold and bold italic
+    # 8/10/12/14/16/18 EXACT; regular and italic 7/10/12/14/16/18 -- slot 0 one
+    # px SMALL, and it cannot be hit: 7 pt reads 7 and 8 pt reads 9 under the
+    # native hinter AND under FT_LOAD_FORCE_AUTOHINT (both checked, per the
+    # Archivo rule above). Soft, cut from the same outlines, hits it; the
+    # difference is the two files' hinting.
+    sizes: [7, 9, 11, 13, 15, 17]
+    # advY 22/28/34/40/46/52 against 23/28/34/40/46/51 -- drift 2, the ends one
+    # px each way, the middle four exact. Swept 2026-09-11 over spans
+    # 1250..1558 x ascender ratios 0.75/0.77/0.79/0.81 with the grotesque
+    # bench's advy_probe (validated first: it reproduces the old recipe's
+    # 33/39/45/51 on the old ramp); spans 1476-1478 score 2 and nothing scores
+    # lower. The old 1102/-339 on this ramp is 21/27/33/39/45/51, drift 6.
+    # Descent -339 is kept from the old span (plain ink bottoms at -192, so it
+    # clears by 147); ascent 1137 clears the accented capitals at 879 by 258.
+    metrics: {ascent: 1137, descent: -339, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-Regular.ttf"}
       bold:       {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-Bold.ttf"}
       italic:     {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-Italic.ttf"}
       bolditalic: {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-BoldItalic.ttf"}
+
+  # Atkinson Hyperlegible Soft, Namesake's rounded cut of Atkinson Hyperlegible
+  # Next (2026-09-11, owner: bundle it as a TRIAL family for the iOS build).
+  # NOT in installed_families: -- it reaches no device card and no simulator
+  # default install, only the iOS seed tree, under CROSSPOINT_IOS_TRIAL_FAMILIES
+  # in the simulator's ios/CMakeLists.txt, and it must come out of there when
+  # the owner rules (simulator repo, docs/trial-fonts.md).
+  #
+  # NOT A BRAILLE INSTITUTE RELEASE. Braille Institute ships three families --
+  # Atkinson Hyperlegible (2019), Next (2025) and Mono -- and no "Soft". This
+  # is namesakefyi/atkinson-hyperlegible-soft, tag v1.0.0: the Next outlines
+  # with every sharp corner rounded in Glyphs 3 "to better emulate the
+  # appearance of printed text", by Namesake Collaborative, whose copyright
+  # the OFL.txt carries. SIL OFL 1.1, no Reserved Font Name declared. The name
+  # table says family "Atkinson Hyperlegible Soft", version 2.001. Fourteen
+  # static cuts ship (ExtraLight..ExtraBold x upright/italic); the four RIBBI
+  # ones are taken, and the italic FILE is -RegularItalic, not -Italic.
+  #
+  # Measured off the four TTFs (fontTools, 2026-09-11): 1000 upm, x-height
+  # 496, cap 668, usWeightClass 400/700, 347 codepoints -- Latin-1 90/96 and
+  # Latin Extended-A 91/128 -- with 4 Greek and no Cyrillic, so `reading` sends
+  # the rest to the Noto fallback. GPOS kern/mark/mkmk present, no legacy kern
+  # table; GSUB carries no liga and the face draws no fi/fl at U+FB01/FB02, so
+  # there is nothing for synth_ligatures: to reach. Not run through the
+  # Almendra-anchored words-per-page measurement; a promotion pays for that.
+  - name: AtkinsonHyperlegibleSoft
+    description: "Atkinson Hyperlegible Soft, Namesake's rounded cut of Braille Institute's Atkinson Hyperlegible Next (Latin)"
+    intervals: reading
+    # Uniform slots: xh 8/10/12/14/16/18 EXACT in all four styles, hinted `x`
+    # bitmap rows at 150 DPI under the native hinter (the auto-hinter drops
+    # 7 pt to 7 px, so force_autohint is NOT set). Same ramp and span as
+    # LexicaUltralegible above, deliberately -- see its note.
+    sizes: [7, 9, 11, 13, 15, 17]
+    # advY 22/28/34/40/46/52 against 23/28/34/40/46/51, drift 2; the sweep is
+    # described under LexicaUltralegible and gives the same answer here, the
+    # source metrics being identical. Ascent 1137 clears the accented capitals
+    # at 867; descent -339 clears the plain ink at -192.
+    metrics: {ascent: 1137, descent: -339, linegap: 0}
+    styles:
+      regular:    {url: "https://raw.githubusercontent.com/namesakefyi/atkinson-hyperlegible-soft/v1.0.0/ttf/AtkinsonHyperlegibleSoft-Regular.ttf"}
+      bold:       {url: "https://raw.githubusercontent.com/namesakefyi/atkinson-hyperlegible-soft/v1.0.0/ttf/AtkinsonHyperlegibleSoft-Bold.ttf"}
+      italic:     {url: "https://raw.githubusercontent.com/namesakefyi/atkinson-hyperlegible-soft/v1.0.0/ttf/AtkinsonHyperlegibleSoft-RegularItalic.ttf"}
+      bolditalic: {url: "https://raw.githubusercontent.com/namesakefyi/atkinson-hyperlegible-soft/v1.0.0/ttf/AtkinsonHyperlegibleSoft-BoldItalic.ttf"}
 
