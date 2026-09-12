@@ -195,7 +195,8 @@
 # promoted 2026-08-04, TeX Gyre Heros added 2026-08-23, Almendra added
 # 2026-08-24; Dante, Lutetia Nova and Doves added 2026-09-06; DTL Romulus and
 # Golden Cockerel CUT and WarblerText added 2026-09-07; DTL VandenKeere added
-# 2026-09-07): these THIRTEEN, and only these thirteen, are INSTALLED on every surface — both device SD cards, the
+# 2026-09-07; Dante, Lutetia Nova and Warbler Text CUT 2026-09-12): these TEN,
+# and only these ten, are INSTALLED on every surface — both device SD cards, the
 # simulator's fs_/fonts/, and the iOS bundled seed set. Everything else below stays a buildable recipe that ships
 # nowhere.
 #
@@ -242,10 +243,7 @@ installed_families:
   - InknutJunicode
   - TeXGyreHeros
   - Almendra
-  - DanteMT
-  - LutetiaNova
   - Doves
-  - WarblerText
   - VandenKeere
 # DTL Romulus is NOT in the list above, and this note describes a promotion that
 # did not land. Corrected 2026-09-07 (owner ruling: "fix the comment; the list
@@ -253,7 +251,7 @@ installed_families:
 # the prose at face value and expected one more family than the list held.
 # The list is the enforcement mechanism this whole block exists to describe --
 # when it and the prose disagree, the LIST wins, and it holds exactly the
-# thirteen names above (VandenKeere joined 2026-09-07, the thirteenth).
+# ten names above (Dante, Lutetia Nova and Warbler Text were cut 2026-09-12).
 # Everything below is kept as the record of what was measured and what was
 # ruled; it is not a description of the shipped set.
 #
@@ -263,8 +261,8 @@ installed_families:
 # the name was never added here. Its outlines are licensed, gitignored and
 # cannot be redistributed, so anyone without
 # lib/EpdFont/local_fonts/DTLRomulus-*.otf gets a build that skips it and says
-# so -- which it shares with five names that ARE in the list (Edgar, DanteMT,
-# LutetiaNova, Doves, WarblerText), so the original note's claim that it would
+# so -- which it shares with three names that ARE in the list (Edgar, Doves
+# and VandenKeere), so the original note's claim that it would
 # be "the first COMMERCIAL one" was already wrong when it was written. Adding
 # `- DTLRomulus` to the list above is all that is needed if the ruling still
 # stands; that is a decision for the owner, not a tidy-up.
@@ -613,6 +611,14 @@ families:
       italic:     {scale: 0.97, path: "local_fonts/DTLFleischmann-Italic.ttf"}
       bolditalic: {scale: 0.97, path: "local_fonts/DTLFleischmann-BoldItalic.ttf"}
 
+  # **CUT 2026-09-12** (owner ruling: "dante warbler and lutetia were all
+  # dropped"). Out of installed_families:, so it is on NO surface -- not a
+  # device card, not the simulator's fs_/fonts/, not the iOS seed tree. The
+  # recipe and its measurements stay, per this file's convention for cut
+  # families: the sources are gitignored and the sweep cost real work, so a
+  # reconsideration should not pay for it twice. It shipped from build 180.
+  # Re-adding it to a surface needs a fresh ruling, not a rebuild.
+  #
   # PROMOTED 2026-09-06 (owner ruling: "add"), straight out of the iOS trial it
   # was built for. It is in installed_families: above, so it belongs on every
   # surface — device SD cards, the simulator's fs_/fonts/, and the iOS seed
@@ -714,6 +720,14 @@ families:
       italic:     {scale: 0.94, path: "local_fonts/DanteMT-Italic.ttf"}
       bolditalic: {scale: 0.94, path: "local_fonts/DanteMT-BoldItalic.ttf"}
 
+  # **CUT 2026-09-12** (owner ruling: "dante warbler and lutetia were all
+  # dropped"). Out of installed_families:, so it is on NO surface -- not a
+  # device card, not the simulator's fs_/fonts/, not the iOS seed tree. The
+  # recipe and its measurements stay, per this file's convention for cut
+  # families: the sources are gitignored and the sweep cost real work, so a
+  # reconsideration should not pay for it twice. It shipped from build 180.
+  # Re-adding it to a surface needs a fresh ruling, not a rebuild.
+  #
   # Lutetia Nova, Ralph M. Unger's 2014 redrawing of van Krimpen's Lutetia
   # (2026-09-06, owner: "do the same building process for lutetia nova book
   # and golden cockeral"). Commercial webfont kit (Lutetia Nova W00 Book,
@@ -996,6 +1010,15 @@ families:
           baseline_shift_em: 0.016
           "baseline_shift_em@18": 0.040
 
+  # **CUT 2026-09-12** (owner ruling: "dante warbler and lutetia were all
+  # dropped"). Out of installed_families:, so it is on NO surface -- not a
+  # device card, not the simulator's fs_/fonts/, not the iOS seed tree. The
+  # recipe and its measurements stay, per this file's convention for cut
+  # families: the sources are gitignored and the sweep cost real work, so a
+  # reconsideration should not pay for it twice. It shipped from build 183,
+  # and the trial-file question settled below is moot while it ships
+  # nowhere. Re-adding it to a surface needs a fresh ruling, not a rebuild.
+  #
   # Warbler Text, David Jonathan Ross's 2022 Modern after William Martin's 1790
   # types for William Bulmer (2026-09-07, owner: add WarblerText). Commercial
   # (DJR Type LLC) and a TESTING/TRIAL cut: the kit's files are named

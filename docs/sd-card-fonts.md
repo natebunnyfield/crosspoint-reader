@@ -5,12 +5,15 @@ with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
 ## S tier (fork ruling, 2026-08-02; reduced to four 2026-08-07; LibrisADF added 2026-08-12; InknutJunicode added 2026-08-13; TeXGyreHeros added 2026-08-23; Almendra added 2026-08-24)
 
-The installed set on this fork is **thirteen** families as of 2026-09-07 —
+The installed set on this fork is **ten** families as of 2026-09-12 —
 **Edgar, Coelacanth, InknutJunicode, TeXGyreSchola, LibreFranklin, LibrisADF,
-TeXGyreHeros, Almendra**, plus the five commercial additions **DanteMT,
-LutetiaNova, Doves, WarblerText, VandenKeere** whose outlines live in
+TeXGyreHeros, Almendra**, plus the two commercial additions **Doves,
+VandenKeere** whose outlines live in
 gitignored `lib/EpdFont/local_fonts/` and are built only on the owner's
-machine. (This paragraph said "exactly eight" until 2026-09-07; the heading
+machine. (Edgar is commercial too, and already in the eight.) Dante, Lutetia
+Nova and Warbler Text were in this set from 2026-09-06/07 and were CUT
+2026-09-12 ("dante warbler and lutetia were all dropped"); their recipes stay
+buildable in `sd-fonts.yaml`. (This paragraph said "exactly eight" until 2026-09-07; the heading
 above records the promotions one at a time and stops at Almendra, so the LIST
 in `sd-fonts.yaml` is the authority, not either piece of prose.) On every
 surface:
@@ -591,13 +594,12 @@ its cases fail against the pre-2026-08-10 per-file design.
 
 The other half of the story is *where the fonts come from*.
 `.github/workflows/release-fonts.yml` publishes to the public
-`crosspoint-fonts` repo from a GitHub runner and can only ever build 7 of the 13
-families in `installed_families:` — Edgar, DanteMT, LutetiaNova, Doves,
-WarblerText and VandenKeere (added 2026-09-07) are built from commercial
-outlines in `lib/EpdFont/local_fonts/`,
+`crosspoint-fonts` repo from a GitHub runner and can only ever build 7 of the 10
+families in `installed_families:` — Edgar, Doves and VandenKeere are built from
+commercial outlines in `lib/EpdFont/local_fonts/`,
 which is gitignored and never leaves the owner's Mac. So Update Fonts reads a
 **private** release instead: `claude-tools`' `scripts/publish_fonts.py` runs
-locally, builds all thirteen on the machine that holds the outlines, and uploads
+locally, builds all ten on the machine that holds the outlines, and uploads
 only the resulting bitmaps to the `fonts-latest` tag on
 `natebunnyfield/claude-tools`. The outlines themselves are never uploaded.
 
