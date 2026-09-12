@@ -157,14 +157,13 @@ int SdCardFontManager::loadFile(const SdCardFontFileInfo& file, const char* fami
       delete hiRes;
     } else {
       hiResFonts_.push_back(hiRes);
-      renderer.registerHiResFont(
-          fontId, hiRes,
-          // Same resolveStyle routing as the 1x family above -- a hi-res
-          // companion missing REGULAR would publish the same nulls.
-          EpdFontFamily(hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::REGULAR)),
-                        hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::BOLD)),
-                        hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::ITALIC)),
-                        hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::BOLD_ITALIC))));
+      renderer.registerHiResFont(fontId, hiRes,
+                                 // Same resolveStyle routing as the 1x family above -- a hi-res
+                                 // companion missing REGULAR would publish the same nulls.
+                                 EpdFontFamily(hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::REGULAR)),
+                                               hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::BOLD)),
+                                               hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::ITALIC)),
+                                               hiRes->getEpdFont(hiRes->resolveStyle(EpdFontFamily::BOLD_ITALIC))));
       LOG_DBG("SDMGR", "Loaded hi-res %s for id=%d", hiResPath.c_str(), fontId);
     }
   }

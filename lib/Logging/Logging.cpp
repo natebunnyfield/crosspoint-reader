@@ -66,8 +66,7 @@ void addToLogRingBuffer(const char* message) {
   // is still there and the count is visible.
   const size_t newest = (logHead + MAX_LOG_LINES - 1) % MAX_LOG_LINES;
   const bool haveNewest = logHead != 0 || logMessages[newest][0] != '\0';
-  if (haveNewest && logLastRaw[0] != '\0' &&
-      strcmp(afterTimestamp(logLastRaw), afterTimestamp(message)) == 0) {
+  if (haveNewest && logLastRaw[0] != '\0' && strcmp(afterTimestamp(logLastRaw), afterTimestamp(message)) == 0) {
     logRepeatCount++;
     // Rewrite the slot from the RAW text plus the running count, so the suffix
     // never accumulates and the count is always right.

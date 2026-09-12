@@ -288,8 +288,7 @@ TEST(SettingDisplayOrder, EveryFamilyCarriesAnEarliestOrigin) {
   // Griffo, and the sources call Dante "influenced by (but not directly
   // indebted to)" his types. Both the header row and docs/font-dates.md record
   // it as a ruling rather than a citation.
-  const std::vector<std::string> kOriginDiffersFromFirstStage = {"Coelacanth", "DanteMT", "Doves",
-                                                                 "Venetian301"};
+  const std::vector<std::string> kOriginDiffersFromFirstStage = {"Coelacanth", "DanteMT", "Doves", "Venetian301"};
 
   std::vector<std::string> diverged;
   for (const auto& e : FontDisplayNames::kEntries) {
@@ -330,10 +329,9 @@ TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
   // The installed set, 2026-09-07: DTLRomulus and GoldenCockerel were cut
   // ("Drop DTL Romulus and Golden Cockerel entirely") and are on no surface;
   // VandenKeere was added the same day and is the thirteenth.
-  std::vector<std::string> fams = {"Edgar",       "Coelacanth",     "TeXGyreSchola", "LibreFranklin",
-                                   "LibrisADF",   "InknutJunicode", "TeXGyreHeros",  "Almendra",
-                                   "DanteMT",     "LutetiaNova",    "Doves",         "WarblerText",
-                                   "VandenKeere"};
+  std::vector<std::string> fams = {"Edgar",          "Coelacanth",   "TeXGyreSchola", "LibreFranklin", "LibrisADF",
+                                   "InknutJunicode", "TeXGyreHeros", "Almendra",      "DanteMT",       "LutetiaNova",
+                                   "Doves",          "WarblerText",  "VandenKeere"};
   std::stable_sort(fams.begin(), fams.end(), [](const std::string& a, const std::string& b) {
     return readingfonts::sortsBefore(a.c_str(), b.c_str());
   });
@@ -342,10 +340,9 @@ TEST(SettingDisplayOrder, PickerSortsByOriginThenStages) {
   // 2026-09-07, so it sorts with the Venetians rather than with its own 1954.
   // VandenKeere slots between Edgar (1722) and Dante (1501): its origin is
   // van den Keere's 1575 Parangon roman, its own first lineage stage.
-  const std::vector<std::string> want = {"TeXGyreHeros",  "LibrisADF",   "LutetiaNova",  "TeXGyreSchola",
-                                         "LibreFranklin", "WarblerText", "Edgar",        "VandenKeere",
-                                         "DanteMT",       "Coelacanth",  "Doves",        "InknutJunicode",
-                                         "Almendra"};
+  const std::vector<std::string> want = {
+      "TeXGyreHeros", "LibrisADF", "LutetiaNova", "TeXGyreSchola", "LibreFranklin",  "WarblerText", "Edgar",
+      "VandenKeere",  "DanteMT",   "Coelacanth",  "Doves",         "InknutJunicode", "Almendra"};
   EXPECT_EQ(fams, want);
 
   // The two Venetians tie on origin and are separated by stage 1 alone.

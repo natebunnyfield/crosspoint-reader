@@ -435,8 +435,8 @@ inline constexpr Entry kEntries[] = {
     // does NOT get Jenson: a Modern after Martin descends from Baskerville's
     // line, and following any revival back to Venice is exactly the claim the
     // earliestYear comment warns against.
-    {"WarblerText", "Warbler Text", "William Martin; David Jonathan Ross",
-     "1790 London; 2022 Western Massachusetts", "1790 London", 1790},
+    {"WarblerText", "Warbler Text", "William Martin; David Jonathan Ross", "1790 London; 2022 Western Massachusetts",
+     "1790 London", 1790},
     // Added 2026-09-07. Stage 1 is Hendrik van den Keere's Parangon Romein,
     // cut in 1575 and first used by Plantin in 1576, who called it "Reale
     // Romaine"; Vervliet calls it "one of the truly outstanding designs
@@ -460,8 +460,8 @@ inline constexpr Entry kEntries[] = {
     // names nothing earlier than the Parangon for this family, and following a
     // Flemish roman back to Jenson is exactly the claim the earliestYear
     // comment warns against.
-    {"VandenKeere", "DTL VandenKeere", "Hendrik van den Keere; Frank E. Blokland",
-     "1575 Ghent; 1995 's-Hertogenbosch", "1575 Ghent", 1575},
+    {"VandenKeere", "DTL VandenKeere", "Hendrik van den Keere; Frank E. Blokland", "1575 Ghent; 1995 's-Hertogenbosch",
+     "1575 Ghent", 1575},
     {"GoudyBookletter1911", "Goudy Bookletter", "Frederic W. Goudy; Barry Schwartz", "1911 New York; 2009 St. Paul",
      "1911 New York", 1911},
     // Born digital and revised where it was drawn, so one stage, comma'd years.
