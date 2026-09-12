@@ -2599,15 +2599,69 @@ families:
 
   # ── Accessibility ──────────────────────────────────────────────────────
 
+  # Atkinson Hyperlegible Next, Braille Institute's 2025 successor to Atkinson
+  # Hyperlegible (2026-09-11, owner ruling: "drop lexica and atkinson soft, add
+  # atkinson hyperlegible next at 365 weight"). ON TRIAL: NOT in
+  # installed_families: -- it reaches no device card and no simulator default
+  # install, only the iOS seed tree, under CROSSPOINT_IOS_TRIAL_FAMILIES in the
+  # simulator's ios/CMakeLists.txt, and it must come out of there when the
+  # owner rules (simulator repo, docs/trial-fonts.md).
+  #
+  # REWRITTEN IN PLACE 2026-09-11. This recipe was here already, as the four
+  # STATIC cuts (Regular/Bold, wght 400/700) fetched from the branch `main`,
+  # on the untuned 4-slot [12, 14, 16, 18] ramp with no span -- never built
+  # for a surface, never benched. One recipe per name, so the trial replaces
+  # it rather than sitting beside it; the static cuts are still what
+  # sans-candidates.yaml and tools/sans-bench point at.
+  #
+  # THIS ONE IS THE BRAILLE INSTITUTE RELEASE, unlike Soft above:
+  # googlefonts/atkinson-hyperlegible-next, "Copyright 2020-2024 The Atkinson
+  # Hyperlegible Next Project Authors", SIL OFL 1.1, no Reserved Font Name
+  # declared. The repo carries no tags and no releases (checked 2026-09-11), so
+  # the URLs pin the COMMIT -- 7925f50f, 2025-02-21, the tip of main that day
+  # -- rather than the branch. Name table: family "Atkinson Hyperlegible
+  # Next", version 2.001, the same version string Soft carries, which is the
+  # same skeleton.
+  #
+  # VARIABLE, wght 200-800, one file per posture (fonts/variable/), instanced
+  # with fontTools per the note at the top of this file. The owner named ONE
+  # weight: 365 for regular and italic, between the Light (300) and Regular
+  # (400) named instances. An unnamed coordinate has no STAT value to rename
+  # from, so build-sd-fonts.py's instancer keeps the source name table for
+  # those two (nothing downstream reads it). He did NOT name a bold weight:
+  # 700 -- the Bold named instance, and the weight every other four-style
+  # recipe here uses -- is TAKEN for bold and bolditalic. A different bold is
+  # one number in each of two lines.
+  #
+  # Measured off the four instanced TTFs (fontTools + freetype, 2026-09-11):
+  # 1000 upm, x-height 496, cap 668, usWeightClass 365/700 after instancing,
+  # 362 codepoints -- Latin-1 94/96 and Latin Extended-A 93/128 -- with 4
+  # Greek and no Cyrillic, so `reading` sends the rest to the Noto fallback.
+  # GPOS kern/mark/mkmk, no legacy kern table; GSUB carries no liga and the
+  # face draws no fi/fl at U+FB01/FB02, so there is nothing for
+  # synth_ligatures: to reach. Not run through the Almendra-anchored
+  # words-per-page measurement; a promotion pays for that.
   - name: AtkinsonHyperlegibleNext
-    description: "Accessibility font for low vision (Latin)"
-    intervals: latin-ext
-    sizes: [12, 14, 16, 18]
+    description: "Atkinson Hyperlegible Next, Braille Institute's successor to Atkinson Hyperlegible, weight 365 (Latin)"
+    intervals: reading
+    # Uniform slots: xh 8/10/12/14/16/18 EXACT in all four styles at wght
+    # 365/700, hinted `x` bitmap rows at 150 DPI under the native hinter (the
+    # auto-hinter drops 7 pt to 7 px in the two 365 cuts, so force_autohint is
+    # NOT set). The ramp and span START from AtkinsonHyperlegibleSoft's above
+    # -- Soft is these outlines rounded, the same skeleton -- and were
+    # RE-PROBED at this weight rather than copied.
+    sizes: [7, 9, 11, 13, 15, 17]
+    # advY 22/28/34/40/46/52 against 23/28/34/40/46/51, drift 2, identical in
+    # all four styles: the reading Soft and Lexica gave, the source metrics
+    # being the same, so the sweep described under LexicaUltralegible stands.
+    # Ascent 1137 clears the accented capitals at 862 (wght 365) / 880 (700);
+    # descent -339 clears the plain ink at -191 / -201.
+    metrics: {ascent: 1137, descent: -339, linegap: 0}
     styles:
-      regular:    {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-Regular.ttf"}
-      bold:       {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-Bold.ttf"}
-      italic:     {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-Italic.ttf"}
-      bolditalic: {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/main/fonts/ttf/AtkinsonHyperlegibleNext-BoldItalic.ttf"}
+      regular:    {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext%5Bwght%5D.ttf", variable: {wght: 365}}
+      bold:       {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext%5Bwght%5D.ttf", variable: {wght: 700}}
+      italic:     {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext-Italic%5Bwght%5D.ttf", variable: {wght: 365}}
+      bolditalic: {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
 
   - name: LexicaUltralegible
     description: "Lexica Ultralegible, Atkinson Hyperlegible extended for reading (Latin)"
@@ -2616,13 +2670,15 @@ families:
     # (docs/sd-card-fonts.md) -- and this comment went on saying "INSTALLED"
     # for five weeks after. Buildable-only since the cut.
     #
-    # ON TRIAL 2026-09-11 (owner ask: bundle it as a second trial family beside
-    # AtkinsonHyperlegibleSoft below). Bundled in the iOS seed tree under
-    # CROSSPOINT_IOS_TRIAL_FAMILIES in the simulator's ios/CMakeLists.txt, and
-    # still NOT in installed_families:, so it reaches no device card and no
-    # simulator default install. The 2026-08-04 note that putting it back on a
-    # surface needs a fresh ruling stands: this is that ruling, for a TRIAL,
-    # and a promotion would be a second one. Sources are SIL OFL 1.1
+    # ON TRIAL 2026-09-11 and DECLINED THE SAME DAY (owner ruling: "drop lexica
+    # and atkinson soft, add atkinson hyperlegible next at 365 weight").
+    # Bundled in the iOS seed tree under CROSSPOINT_IOS_TRIAL_FAMILIES beside
+    # AtkinsonHyperlegibleSoft for one build; its name is out of that list and
+    # its .cpfont tree is deleted, recipe kept. Never in installed_families:,
+    # so it reached no device card and no simulator default install. Two
+    # rulings against it now (the 2026-08-04 cut, and this one); do not bundle
+    # it a third time without one for it. What replaced it is
+    # AtkinsonHyperlegibleNext above. Sources are SIL OFL 1.1
     # (jacobxperez/lexica-ultralegible, tag v1.0.0), fetched by URL.
     #
     # Atkinson Hyperlegible's letterform-disambiguation design with the
@@ -2661,11 +2717,14 @@ families:
       bolditalic: {url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-BoldItalic.ttf"}
 
   # Atkinson Hyperlegible Soft, Namesake's rounded cut of Atkinson Hyperlegible
-  # Next (2026-09-11, owner: bundle it as a TRIAL family for the iOS build).
-  # NOT in installed_families: -- it reaches no device card and no simulator
-  # default install, only the iOS seed tree, under CROSSPOINT_IOS_TRIAL_FAMILIES
-  # in the simulator's ios/CMakeLists.txt, and it must come out of there when
-  # the owner rules (simulator repo, docs/trial-fonts.md).
+  # Next. ON TRIAL 2026-09-11 and DECLINED THE SAME DAY (owner ruling: "drop
+  # lexica and atkinson soft, add atkinson hyperlegible next at 365 weight").
+  # Bundled in the iOS seed tree under CROSSPOINT_IOS_TRIAL_FAMILIES for one
+  # build; its name is out of that list and its .cpfont tree is deleted,
+  # recipe kept. Never in installed_families:. What replaced it is
+  # AtkinsonHyperlegibleNext above -- the same outlines without the rounding,
+  # at the owner's weight. Do not bundle this one again without a ruling for
+  # it.
   #
   # NOT A BRAILLE INSTITUTE RELEASE. Braille Institute ships three families --
   # Atkinson Hyperlegible (2019), Next (2025) and Mono -- and no "Soft". This
