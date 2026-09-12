@@ -387,8 +387,10 @@ void layoutParagraph(const std::string& text, const int fontId, const uint16_t m
                      const CssTextAlign align, const int justifyThresholdChars, Corpus& out) {
   BlockStyle style;
   style.alignment = align;
-  ParsedText block(/*extraParagraphSpacing=*/false, linebreak::splitsWordsAtLineEnds(storedMode),
-                   /*focusReadingEnabled=*/false, style);
+  // The STORED byte goes straight in: ParsedText takes a linebreak:: mode, not a
+  // "splits words" flag, since Automatic became a third value it has to resolve
+  // per block against that block's own measure.
+  ParsedText block(/*extraParagraphSpacing=*/false, storedMode, /*focusReadingEnabled=*/false, style);
   for (const auto& w : splitWords(text)) block.addWord(w, EpdFontFamily::REGULAR);
 
   std::vector<std::shared_ptr<TextBlock>> lines;
@@ -944,7 +946,7 @@ TEST(LineBreakQuality, TotalFitCostsASmallMultipleOfGreedy) {
         for (const auto& p : paragraphs()) {
           BlockStyle style;
           style.alignment = CssTextAlign::Justify;
-          ParsedText block(false, linebreak::splitsWordsAtLineEnds(mode), false, style);
+          ParsedText block(false, mode, false, style);
           for (const auto& w : splitWords(p)) block.addWord(w, EpdFontFamily::REGULAR);
 
           int seen = 0;

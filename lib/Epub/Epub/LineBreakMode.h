@@ -103,6 +103,10 @@ namespace linebreak {
 // the value 2.
 inline constexpr uint8_t STORED_WHOLE_WORDS = 0;
 inline constexpr uint8_t STORED_HYPHENATED = 1;
+// The three-way mode this header anticipated. 2 has never been written by any
+// build, so it is free, and 0 and 1 keep their meanings exactly -- a card full
+// of section files stays valid until the reader actually chooses Automatic.
+inline constexpr uint8_t STORED_AUTOMATIC = 2;
 
 // What every shipped build has rendered since the flag was frozen, and what a
 // fresh install must still get. An existing install renders identically until
@@ -112,25 +116,126 @@ inline constexpr uint8_t STORED_DEFAULT = STORED_HYPHENATED;
 enum class Mode : uint8_t {
   WholeWords = STORED_WHOLE_WORDS,
   Hyphenated = STORED_HYPHENATED,
+  // NOT a breaker. A policy that resolves to one of the two above, per block,
+  // against that block's own measure -- see resolveAutomatic below.
+  Automatic = STORED_AUTOMATIC,
 };
 
 // Anything that is not a mode falls to the shipped default rather than to 0.
 // Falling to 0 would mean a corrupt or future settings.json silently changing
 // every line break in every book to the mode nobody chose.
 constexpr Mode modeFor(const uint8_t stored) {
-  return stored == STORED_WHOLE_WORDS ? Mode::WholeWords : Mode::Hyphenated;
+  if (stored == STORED_WHOLE_WORDS) return Mode::WholeWords;
+  if (stored == STORED_AUTOMATIC) return Mode::Automatic;
+  return Mode::Hyphenated;
+}
+
+constexpr bool isAutomatic(const Mode mode) { return mode == Mode::Automatic; }
+constexpr bool isAutomatic(const uint8_t stored) { return isAutomatic(modeFor(stored)); }
+
+// ---------------------------------------------------------------------------
+// AUTOMATIC: hyphens only where NOT hyphenating is the worse harm
+// ---------------------------------------------------------------------------
+//
+// Owner ruling 2026-09-11: "make a third setting that only turns on
+// hyphenation automatically when it is helpful for even a dyslexic reader."
+// That last clause sets the BAR, and it is a high one, because the two costs
+// being weighed both land on the same reader:
+//
+//   * A split word is a real cost. The British Dyslexia Association's Style
+//     Guide asks plainly for text that is not justified and for words not to be
+//     broken across lines; a word arriving in two pieces across a line end has
+//     to be rejoined before it can be recognised.
+//   * Erratic word spacing is also a real cost, and for the same reader. It is
+//     what justification does to a short line, and the white channels it opens
+//     down a paragraph ("rivers") pull the eye off the line it is tracking --
+//     which is why the same guide asks for ragged right in the first place.
+//
+// So Automatic does not ask "are hyphens good?". It asks the only question
+// whose answer can be defended: IS THIS LINE SO SHORT THAT SETTING IT
+// JUSTIFIED WITHOUT HYPHENS WOULD DO MORE DAMAGE THAN THE HYPHENS? Almost
+// always the answer is no, and Automatic sets whole words.
+//
+// TWO CONDITIONS, BOTH REQUIRED.
+//
+// 1. THE BLOCK MUST STILL BE JUSTIFIED -- after auto-justification has had its
+//    say (AutoJustify.h), not before. A ragged block has no stretched gaps at
+//    all: its spacing is already even, so a hyphen there buys nothing and costs
+//    a stumble. This is also what makes Automatic genuinely different from
+//    "Allow hyphens", which still hyphenates a ragged block as a rescue against
+//    a conspicuously short line (RAGGED_HYPHEN_GATE_PCT below). Under
+//    Automatic that rescue does not run: a short ragged line is not a defect.
+//
+// 2. THE MEASURE MUST BE INSIDE THE GREY BAND. Above HELPFUL_MAX_CHARS the
+//    line holds enough gaps to absorb its slack invisibly and justification
+//    composes on its own, so hyphens are pure cost. Below the justification
+//    threshold the block is already ragged and condition 1 has excluded it.
+//    What is left is the narrow band between them, which is exactly the zone
+//    every source names as the place justified text goes wrong.
+//
+// Note what condition 1 implies: raise the Justified Text threshold to 50 and
+// Automatic stops hyphenating altogether, because nothing is left between the
+// two bounds. That is correct rather than a degenerate case -- a reader who has
+// asked for ragged setting below 50 characters has asked for the remedy that
+// makes hyphens unnecessary.
+
+// The upper bound of the band, in characters per line.
+//
+// 50 rather than a rounder number, and deliberately at the CONSERVATIVE end of
+// what the sources would allow, because the bar is "helpful for even a dyslexic
+// reader" -- when in doubt, do not hyphenate:
+//
+//   * Butterick, "Practical Typography", gives 45-90 characters as the
+//     comfortable band. At 50 the line is inside it with room to spare, so
+//     justification has enough gaps to hide its slack and a hyphen is buying
+//     nothing.
+//   * Bringhurst's failure zone is "less than 38 or 40" (AutoJustify.h quotes
+//     it in full), and 40 is this reader's default justification threshold. So
+//     the band Automatic hyphenates in is [40, 50): justified, and short.
+//   * Gregory & Poulton (1970) measured justification significantly worse than
+//     ragged at ~38-39 characters and found NO disadvantage by ~66. Setting the
+//     bound at 66 would have been defensible for a general reader and is not
+//     defensible here: between 50 and 66 justification is merely imperfect, not
+//     harmful, and imperfect does not justify a split word to someone who pays
+//     for one.
+//
+// On this device's own sweep (13 face/size pairs at 512 px, the calibration
+// table in docs/auto-justification.md) the measured range is 28-53 characters,
+// so 50 leaves both regimes reachable: the widest setting on the card sits
+// above the bound and sets whole words, everything narrower that is still
+// justified hyphenates.
+inline constexpr int HELPFUL_MAX_CHARS = 50;
+
+// Automatic's decision for ONE block. `charsPerLine` is autojustify's estimate
+// for this block's own measure and face; `blockIsJustified` is the alignment
+// AFTER auto-justification.
+//
+// An unmeasurable line (charsPerLine <= 0, a face whose alphabet could not be
+// measured) resolves to WholeWords. This is the opposite of autojustify's
+// fallback, and on purpose: there the fallback preserves what the BOOK asked
+// for, while here there is no request to preserve, only a claim that hyphens
+// would help -- and a claim that cannot be checked has not been made.
+constexpr Mode resolveAutomatic(const bool blockIsJustified, const int charsPerLine) {
+  if (!blockIsJustified) return Mode::WholeWords;
+  if (charsPerLine <= 0) return Mode::WholeWords;
+  return charsPerLine < HELPFUL_MAX_CHARS ? Mode::Hyphenated : Mode::WholeWords;
+}
+
+// Resolve whatever the reader stored down to a breaker. The two predicates
+// below are exhaustive and exclusive over the RESULT, which is why Automatic
+// has to come through here first.
+constexpr Mode resolvedMode(const uint8_t stored, const bool blockIsJustified, const int charsPerLine) {
+  const Mode mode = modeFor(stored);
+  return isAutomatic(mode) ? resolveAutomatic(blockIsJustified, charsPerLine) : mode;
 }
 
 // True when the breaker may split a word that would otherwise not fit the
-// current line -- i.e. when computeHyphenatedLineBreaks runs.
+// current line -- i.e. when computeHyphenatedLineBreaks runs. Automatic is not
+// a valid argument: resolve it first.
 constexpr bool splitsWordsAtLineEnds(const Mode mode) { return mode == Mode::Hyphenated; }
 
 // True when the total-fit dynamic program runs.
 constexpr bool usesTotalFit(const Mode mode) { return mode == Mode::WholeWords; }
-
-// The two are exhaustive and exclusive; both call sites below assert it.
-constexpr bool splitsWordsAtLineEnds(const uint8_t stored) { return splitsWordsAtLineEnds(modeFor(stored)); }
-constexpr bool usesTotalFit(const uint8_t stored) { return usesTotalFit(modeFor(stored)); }
 
 // ---------------------------------------------------------------------------
 // THE RAGGED HYPHENATION GATE

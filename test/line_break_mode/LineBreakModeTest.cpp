@@ -27,6 +27,7 @@
 
 #include <cstdint>
 
+#include "AutoJustify.h"
 #include "LineBreakMode.h"
 
 namespace {
@@ -61,8 +62,8 @@ TEST(LineBreakMode, DefaultIsWhatEveryShippedBuildHasDrawn) {
   // after the unfreeze.
   EXPECT_EQ(linebreak::STORED_DEFAULT, linebreak::STORED_HYPHENATED);
   EXPECT_EQ(linebreak::modeFor(linebreak::STORED_DEFAULT), linebreak::Mode::Hyphenated);
-  EXPECT_TRUE(linebreak::splitsWordsAtLineEnds(linebreak::STORED_DEFAULT));
-  EXPECT_FALSE(linebreak::usesTotalFit(linebreak::STORED_DEFAULT));
+  EXPECT_TRUE(linebreak::splitsWordsAtLineEnds(linebreak::modeFor(linebreak::STORED_DEFAULT)));
+  EXPECT_FALSE(linebreak::usesTotalFit(linebreak::modeFor(linebreak::STORED_DEFAULT)));
 }
 
 // ---------------------------------------------------------------------------
@@ -84,15 +85,103 @@ TEST(LineBreakMode, WholeWordsRunsTheTotalFitDynamicProgram) {
 }
 
 TEST(LineBreakMode, ExactlyOneBreakerRunsForEveryPossibleByte) {
-  // Exhaustive over the whole domain of the stored field, so a third mode
-  // appended later cannot leave a byte routing to neither breaker (a paragraph
-  // with no line breaks at all) or to both.
+  // Exhaustive over the whole domain of the stored field: no byte may route to
+  // neither breaker (a paragraph with no line breaks at all) or to both.
+  //
+  // Through resolvedMode, because that is now the only total function. The
+  // third mode this test was written in anticipation of arrived on 2026-09-11,
+  // and Automatic deliberately answers NEITHER predicate on its own -- it is a
+  // policy, and asking it "do you split words?" without telling it which block
+  // has no answer. Every block shape is swept here so the guarantee still holds
+  // where it matters: after resolution.
   for (int v = 0; v <= 255; ++v) {
-    const auto mode = linebreak::modeFor(static_cast<uint8_t>(v));
-    const bool greedy = linebreak::splitsWordsAtLineEnds(mode);
-    const bool totalFit = linebreak::usesTotalFit(mode);
-    EXPECT_NE(greedy, totalFit) << "byte " << v << " routes to " << (greedy ? "both" : "neither") << " breaker";
+    for (const bool justified : {false, true}) {
+      for (const int chars : {0, 20, 39, 40, 49, 50, 66, 120}) {
+        const auto mode = linebreak::resolvedMode(static_cast<uint8_t>(v), justified, chars);
+        const bool greedy = linebreak::splitsWordsAtLineEnds(mode);
+        const bool totalFit = linebreak::usesTotalFit(mode);
+        EXPECT_NE(greedy, totalFit) << "byte " << v << " at " << (justified ? "justified" : "ragged") << " " << chars
+                                    << " chars routes to " << (greedy ? "both" : "neither") << " breaker";
+      }
+    }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Automatic: hyphens only where NOT hyphenating is the worse harm
+// ---------------------------------------------------------------------------
+//
+// Owner ruling 2026-09-11, and the bar is the clause: "only turns on
+// hyphenation automatically when it is helpful for even a dyslexic reader".
+// Both costs land on that reader -- a split word has to be rejoined before it
+// is recognised, and the white channels justification opens down a short
+// paragraph pull the eye off the line -- so the only defensible question is
+// which is worse HERE. These cases pin the answer at every boundary.
+
+TEST(AutomaticLineBreaks, ARaggedBlockIsNeverHyphenated) {
+  // The whole point, and the sharpest difference from "Allow hyphens", which
+  // still hyphenates a ragged block as a rescue against a short line. Ragged
+  // spacing is already even: a hyphen buys nothing and costs a stumble.
+  for (const int chars : {10, 30, 39, 40, 45, 49, 50, 66, 200}) {
+    EXPECT_EQ(linebreak::resolveAutomatic(/*blockIsJustified=*/false, chars), linebreak::Mode::WholeWords)
+        << "ragged at " << chars << " chars/line";
+  }
+}
+
+TEST(AutomaticLineBreaks, AJustifiedLineTooShortForItsGapsIsHyphenated) {
+  // The band is [justification threshold, HELPFUL_MAX_CHARS). Its lower edge is
+  // where auto-justification stops handing blocks over at all -- below 40 the
+  // block is ragged and the case above has it.
+  EXPECT_EQ(linebreak::resolveAutomatic(true, 40), linebreak::Mode::Hyphenated);
+  EXPECT_EQ(linebreak::resolveAutomatic(true, 45), linebreak::Mode::Hyphenated);
+  EXPECT_EQ(linebreak::resolveAutomatic(true, linebreak::HELPFUL_MAX_CHARS - 1), linebreak::Mode::Hyphenated);
+}
+
+TEST(AutomaticLineBreaks, AJustifiedLineWithRoomToComposeIsNot) {
+  // At the bound the line is inside Butterick's comfortable 45-90, so the gaps
+  // absorb their slack invisibly and the hyphen is paying for nothing.
+  EXPECT_EQ(linebreak::resolveAutomatic(true, linebreak::HELPFUL_MAX_CHARS), linebreak::Mode::WholeWords);
+  EXPECT_EQ(linebreak::resolveAutomatic(true, 66), linebreak::Mode::WholeWords)
+      << "Gregory & Poulton measured no disadvantage to justification by here";
+  EXPECT_EQ(linebreak::resolveAutomatic(true, 120), linebreak::Mode::WholeWords);
+}
+
+TEST(AutomaticLineBreaks, AnUnmeasurableLineDoesNotHyphenate) {
+  // The opposite of autojustify's fallback, deliberately. There the fallback
+  // preserves what the BOOK asked for; here there is no request to preserve,
+  // only a claim that hyphens would help -- and a claim that cannot be checked
+  // has not been made.
+  EXPECT_EQ(linebreak::resolveAutomatic(true, 0), linebreak::Mode::WholeWords);
+  EXPECT_EQ(linebreak::resolveAutomatic(true, -1), linebreak::Mode::WholeWords);
+}
+
+TEST(AutomaticLineBreaks, TheBoundSitsInsideTheBandEverySourceAgreesOn) {
+  // Above Bringhurst's 38-40 failure zone (and this reader's own default
+  // justification threshold, so the band is not empty), and at or below
+  // Butterick's 45 comfortable floor plus a margin -- not out at Gregory &
+  // Poulton's 66, where justification is merely imperfect rather than harmful.
+  EXPECT_GT(linebreak::HELPFUL_MAX_CHARS, autojustify::THRESHOLD_CHARS)
+      << "at or below the justification threshold the band is empty and Automatic never hyphenates";
+  EXPECT_LE(linebreak::HELPFUL_MAX_CHARS, 55) << "imperfect is not harmful, and does not justify a split word";
+}
+
+TEST(AutomaticLineBreaks, TheFixedModesAreUntouchedByAnyBlock) {
+  // Automatic must not have leaked into the other two: whatever the block, the
+  // stored byte a reader chose is what runs.
+  for (const bool justified : {false, true}) {
+    for (const int chars : {0, 30, 45, 80}) {
+      EXPECT_EQ(linebreak::resolvedMode(linebreak::STORED_HYPHENATED, justified, chars), linebreak::Mode::Hyphenated);
+      EXPECT_EQ(linebreak::resolvedMode(linebreak::STORED_WHOLE_WORDS, justified, chars), linebreak::Mode::WholeWords);
+    }
+  }
+}
+
+TEST(AutomaticLineBreaks, TheDefaultIsStillHyphenatedSoNoInstallMoves) {
+  // A third choice is an offer, not a migration. Every existing card and every
+  // fresh install renders exactly as before until the row is touched.
+  EXPECT_EQ(linebreak::STORED_DEFAULT, linebreak::STORED_HYPHENATED);
+  EXPECT_NE(linebreak::STORED_DEFAULT, linebreak::STORED_AUTOMATIC);
+  EXPECT_EQ(linebreak::STORED_AUTOMATIC, 2) << "0 and 1 are in settings.json files in the wild and may never move";
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +192,12 @@ TEST(LineBreakMode, AnUnknownByteFallsToTheShippedDefault) {
   // A `stored != STORED_HYPHENATED` test would send every one of these to the
   // total-fit breaker, re-breaking every paragraph in the book off a byte
   // nobody chose. The failure would present as a rendering bug.
-  for (const uint8_t v : {uint8_t{2}, uint8_t{3}, uint8_t{17}, uint8_t{200}, uint8_t{255}}) {
+  //
+  // 2 IS NO LONGER IN THIS LIST. It became STORED_AUTOMATIC on 2026-09-11, and
+  // this case failing on it is exactly what it was written to do -- the domain
+  // of the field grew, so the set of bytes that mean nothing shrank. Every byte
+  // above the modes is still unknown and still falls to the default.
+  for (const uint8_t v : {uint8_t{3}, uint8_t{17}, uint8_t{200}, uint8_t{255}}) {
     EXPECT_EQ(linebreak::modeFor(v), linebreak::modeFor(linebreak::STORED_DEFAULT))
         << "byte " << static_cast<int>(v) << " did not fall to the default";
   }

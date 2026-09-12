@@ -356,7 +356,7 @@ bool Section::loadSectionFile(const ReaderRenderSpec& spec) {
     float fileLineCompression;
     bool fileExtraParagraphSpacing;
     uint8_t fileParagraphAlignment;
-    bool fileHyphenationEnabled;
+    uint8_t fileHyphenationEnabled;
     bool fileEmbeddedStyle;
     uint8_t fileImageRendering;
     bool fileFocusReadingEnabled;
