@@ -2628,9 +2628,10 @@ families:
   # weight: 365 for regular and italic, between the Light (300) and Regular
   # (400) named instances. An unnamed coordinate has no STAT value to rename
   # from, so build-sd-fonts.py's instancer keeps the source name table for
-  # those two (nothing downstream reads it). He did NOT name a bold weight:
-  # 700 -- the Bold named instance, and the weight every other four-style
-  # recipe here uses -- is TAKEN for bold and bolditalic. A different bold is
+  # those two (nothing downstream reads it). He did NOT name a bold weight at
+  # first, and 700 -- the Bold named instance -- was taken; then, the same
+  # day, "for next cut, put bold at 600 instead", so bold and bolditalic are
+  # wght 600 (SemiBold). A different bold is
   # one number in each of two lines.
   #
   # Measured off the four instanced TTFs (fontTools + freetype, 2026-09-11):
@@ -2645,7 +2646,8 @@ families:
     description: "Atkinson Hyperlegible Next, Braille Institute's successor to Atkinson Hyperlegible, weight 365 (Latin)"
     intervals: reading
     # Uniform slots: xh 8/10/12/14/16/18 EXACT in all four styles at wght
-    # 365/700, hinted `x` bitmap rows at 150 DPI under the native hinter (the
+    # 365/700 (bold since re-cut to 600, owner 2026-09-11 -- between two rungs
+    # that both probed exact, not re-probed itself), hinted `x` bitmap rows at 150 DPI under the native hinter (the
     # auto-hinter drops 7 pt to 7 px in the two 365 cuts, so force_autohint is
     # NOT set). The ramp and span START from AtkinsonHyperlegibleSoft's above
     # -- Soft is these outlines rounded, the same skeleton -- and were
@@ -2654,14 +2656,15 @@ families:
     # advY 22/28/34/40/46/52 against 23/28/34/40/46/51, drift 2, identical in
     # all four styles: the reading Soft and Lexica gave, the source metrics
     # being the same, so the sweep described under LexicaUltralegible stands.
-    # Ascent 1137 clears the accented capitals at 862 (wght 365) / 880 (700);
+    # Ascent 1137 clears the accented capitals at 862 (wght 365) / 880 (700,
+    # so also at 600);
     # descent -339 clears the plain ink at -191 / -201.
     metrics: {ascent: 1137, descent: -339, linegap: 0}
     styles:
       regular:    {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext%5Bwght%5D.ttf", variable: {wght: 365}}
-      bold:       {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext%5Bwght%5D.ttf", variable: {wght: 700}}
+      bold:       {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext%5Bwght%5D.ttf", variable: {wght: 600}}
       italic:     {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext-Italic%5Bwght%5D.ttf", variable: {wght: 365}}
-      bolditalic: {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext-Italic%5Bwght%5D.ttf", variable: {wght: 700}}
+      bolditalic: {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext-Italic%5Bwght%5D.ttf", variable: {wght: 600}}
 
   - name: LexicaUltralegible
     description: "Lexica Ultralegible, Atkinson Hyperlegible extended for reading (Latin)"
