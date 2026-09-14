@@ -2298,14 +2298,21 @@ families:
   # horizontal only, so every alignment is stock; a sub-pixel notch at each
   # line-line crotch; every digit on the cap-height row at all four judged
   # slots (stock's 5 and 7 sit a row low at 9 pt); advances exactly stock;
-  # Heros's GPOS kerning carried plus a handful of fitted pairs so that at 9 pt
-  # no upright pair touches and no italic pair touches that stock keeps apart.
+  # Heros's GPOS kerning carried EXACTLY -- 216,600 ASCII pairs x 6 slots x 4
+  # styles verified identical to TeXGyreHeros in the built .cpfonts. Fitted
+  # pairs were tried and WITHDRAWN: a kern is in design units, so one chosen to
+  # flip a pixel at 9 pt opened `ty` by 3.56 px at the 16 pt slot (round 14).
+  #
+  # COVERAGE IS NOT THE SAME as Heros: 395 codepoints per style against 1053.
+  # Latin-1, Latin Ext-A/B and General Punctuation are complete; Greek, Latin
+  # Extended Additional, combining marks, math operators and the ff-ffl
+  # ligatures are not cut and fall to the `reading` fallback chain.
   # Measured cost, whole page, four levels: 9 pt solid-black share 60.5 -> 71.8 %,
   # 14 pt 73.6 -> 78.2; 11 and 12 pt LIGHTER than stock (77 -> 71, 78 -> 73) --
   # one outline cannot land a 2.3-2.5 px stem the way it lands 2.0-2.2; the
   # owner installed it knowing that trade.
   #
-  # Same recipe as Heros in every other respect: same slots (the alignments are
+  # Same recipe as Heros in every other respect EXCEPT that coverage: same slots (the alignments are
   # stock, so the x-height match holds), same metrics, same per-style scale
   # (dropping the scale is the round-11 trap), same fallback chain. Sources are
   # the four cut TTFs in local_fonts/ (GFL permits a modified redistribution

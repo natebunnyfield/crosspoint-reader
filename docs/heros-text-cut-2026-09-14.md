@@ -1,6 +1,6 @@
 # Heros Text Cut — a punchcutter's corrections to TeX Gyre Heros, measured on the reader's own renderer
 
-**Date:** 2026-09-14. **Firmware surveyed:** `a8368eb` (main). **Status:** INSTALLED 2026-09-14 (owner: "install fonts in testflight and firmware and everywhere else") — `installed_families` ninth entry, recipe `HerosTextCut` beside `TeXGyreHeros`, sources in `lib/EpdFont/local_fonts/` and the private `crosspoint-local-fonts` mirror (commit 067f727), picker entry in `src/FontDisplayNames.h`, row in `docs/font-dates.md`, sim card `fs_/fonts/HerosTextCut` at 1x/2x/3x, iOS seed tree `build/seedfonts/HerosTextCut` at 1x+2x through `validate_seed_fonts.py`. Installed knowing the 11–12 pt trade below. Owner asked for it, judged three rounds by eye, and the last round was measured. Read this before proposing "make Heros heavier for e-ink" — the answer is size-dependent and the 12 pt slot is a measured regression.
+**Date:** 2026-09-14. **Firmware surveyed:** `a8368eb` (main). **Status:** INSTALLED 2026-09-14 (owner: "install fonts in testflight and firmware and everywhere else") — `installed_families` **twelfth** entry, recipe `HerosTextCut` beside `TeXGyreHeros`, sources in `lib/EpdFont/local_fonts/` and the private `crosspoint-local-fonts` mirror (commit 067f727), picker entry in `src/FontDisplayNames.h`, row in `docs/font-dates.md`, sim card `fs_/fonts/HerosTextCut` at 1x/2x/3x and the three packaged Mac apps' cards, iOS seed tree `build/seedfonts/HerosTextCut` at 1x+2x through `validate_seed_fonts.py`. Installed knowing the 11–12 pt trade below. Owner asked for it, judged three rounds by eye, and the last round was measured. Read this before proposing "make Heros heavier for e-ink" — the answer is size-dependent and the 12 pt slot is a measured regression.
 
 ## What was asked, in order
 
@@ -87,4 +87,57 @@ Shares are the fair comparison; absolute counts move with line breaks. The histo
 
 ## When it was installed, and what the next person should check
 
-Done as described below on 2026-09-14. Recipe carries `scale: 1.014` per style like Heros (dropping it is the round-11 trap). Still owed: a words-per-page re-sweep — the fitted kerns change a few line breaks, so the words-per-page ledger moves a little. Do not install without answering the 12 pt regression; a 12 pt reader would be handed a lighter page than today.
+Done as described below on 2026-09-14. Recipe carries `scale: 1.014` per style like Heros (dropping it is the round-11 trap). Still owed: a words-per-page re-sweep — the fitted kerns change a few line breaks, so the words-per-page ledger moves a little. Installed 2026-09-14 WITH the 11-12 pt regression unanswered, by owner decision. A reader at those two slots is handed a slightly lighter page than stock; 9 and 14 pt are darker.
+
+## Round 14 — adversarial review, and the fitted kerns withdrawn
+
+A read-only refuting pass over the install commit found one real defect and I
+could not disprove it. **A kern is in DESIGN UNITS, so a value chosen to flip
+one pixel at the 9 pt slot scales with ppem and over-applies at every larger
+one.** Measured in the shipped `.cpfont`s, cut vs stock, 1/16 px:
+
+| pair | 9 pt | 12 pt | 14 pt | 16 pt |
+|---|---|---|---|---|
+| `th` | +0.94 | +1.19 | +1.44 | +1.62 |
+| `ti` `fi` | +1.00 | +1.38 | +1.56 | +1.81 |
+| `tw` `ty` | +2.00 | +2.69 | +3.12 | **+3.56** |
+
+`th` and `ti` are among the commonest bigrams in English, so 14 and 16 pt read
+visibly looser than stock — and at 14 pt regular *nothing was touching*.
+
+**The fitted kerns are withdrawn. None ships.** Measured rather than argued: the
+stems take 10 u of ink gap (5 u a side), which is 0.19 px at 9 pt and sub-pixel
+at every slot; every kern big enough to move a pixel is 3–7x that. Fixing a
+sub-pixel encroachment with a 1 px instrument is what produced the 3.56 px.
+Verified after the rebuild: **216,600 ASCII pairs x 6 slots x 4 styles, 0 differ
+from stock.** The family carries Heros's own kerning exactly.
+
+What that costs, abutting pairs of the 186-pair corpus, cut/stock per slot:
+
+| style | 7 pt | 9 pt | 11 pt | 12 pt | 14 pt | 16 pt |
+|---|---|---|---|---|---|---|
+| regular | 12/12 | **10/10** | 8/4 | 4/2 | 2/1 | 0/1 |
+| bold | 9/8 | 14/3 | 3/2 | 3/2 | 3/0 | 1/1 |
+| italic | 22/10 | 5/2 | 3/2 | 6/0 | 4/0 | 2/2 |
+| bold italic | **43/9** | 1/1 | 4/0 | 6/0 | 4/1 | 0/0 |
+
+At 9 pt regular — the size and style every round of this was judged at — the cut
+abuts on exactly as many pairs as stock. **Stock abuts too**: it is normal for
+this face at these sizes, and the ask was that letters not touch at the size
+being read, not that abutment be eliminated at six slots. **The one place the
+cut is clearly worse is bold italic at the 7 pt slot** (43 against 9). Not the
+stem weight — swept to 1 u a side, still 32 — so it is the trap geometry or the
+cu2qu conversion at 14.8 px/em. Left as a known limitation: bold italic is
+emphasis inside emphasis at the smallest slot.
+
+Also from that review, fixed here: the status line said "ninth entry" (it is the
+twelfth) and claimed a 3x seed tier that was never built. Two comments elsewhere
+now undercount the local-source families — `.github/workflows/release-fonts.yml:15`
+and `src/network/FontUpdater.cpp:32` — not load-bearing, not touched.
+
+**Coverage, disclosed here and now in the recipe**: the cut carries 395
+codepoints per style against stock's 1053. Latin-1, Latin Ext-A/B and General
+Punctuation are complete; Greek (54), Latin Extended Additional (133), combining
+marks (21), math operators (14) and the `ff`-`ffl` ligatures (5) are NOT cut and
+fall to the `reading` fallback chain, as they do for any family that lacks them.
+The shipped `.cpfont` still carries 2676 glyphs, identical to TeXGyreHeros.
