@@ -1297,7 +1297,7 @@ families:
     # (bold).
     metrics: {ascent: 1046, descent: -321, linegap: 0}
     # NO hires_drops:, AND THAT WAS VERIFIED BY BUILDING, not omitted: the
-    # whole `reading` charset was rasterised through the real fallback chain at
+    # whole `reading` charset was rasterized through the real fallback chain at
     # 1x, 2x AND 3x on 2026-09-07 and all three tiers completed first attempt
     # with only the global `tier_drops: 3: [0x2E3B]` applied. Nothing else in
     # this family crosses EpdGlyph's uint8 at any tier. The top slot is 18 pt,
@@ -2101,6 +2101,119 @@ families:
       bold:       {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Bold.ttf"}
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-Italic.ttf"}
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spectral/Spectral-BoldItalic.ttf"}
+
+  # ── Albo (in-house) ────────────────────────────────────────────────────
+  #
+  # NOT in installed_families:, so it is on no surface. Promoting it is an
+  # owner ruling, not a tidy-up — this file's standing convention.
+  #
+  # The one family here whose outlines are OURS: drawn parametrically by
+  # crosspoint-simulator/tools/wedge_serif (99 evolutionary rounds,
+  # docs/wedge-serif-exploration.md), 470 glyphs, 1000 upem, five cuts
+  # (Regular 400, Italic 400, SemiBold 600, Bold 700, BoldItalic 700; the
+  # italics are slanted 11° with the fsSelection ITALIC bit set). It is
+  # therefore not a licensing case like Edgar, Doves or VandenKeere — but
+  # local_fonts/ is gitignored wholesale, so the .ttf files still do not
+  # travel with a clone. Rebuild: `python3 -m outlines.build <dir>` from
+  # crosspoint-simulator/tools/wedge_serif.
+  #
+  # SemiBold is deliberately unmapped. The reader has four style slots and
+  # bold is 700 everywhere else in this file; the 600 cut exists for the
+  # design's own weight ladder.
+  - name: Albo
+    description: "Albo, in-house humanist wedge serif drawn for CrossPoint longform reading (Latin, Greek, symbols)"
+    # `reading` and nothing added, because the face was drawn to it: 468 of
+    # its 469 cmapped codepoints fall inside these intervals. THE ONE THAT
+    # DOES NOT is U+2122 ™, which sits in Letterlike Symbols and is therefore
+    # DROPPED from the build entirely (a codepoint outside every interval is
+    # not built and not fallen back). Edgar is the precedent for wanting it —
+    # it carries `reading,(0x2100-0x214F)` for exactly ™ ℗ ℠ — and adding that
+    # range here would pull ~80 Noto glyphs in for the one character Albo
+    # draws. Left as `reading` until someone rules otherwise; 24 of the 25
+    # `reading` families in this file have the same gap.
+    intervals: reading
+    # SIZES: the tier's canonical ramp, which is also Edgar's exactly, and it
+    # was picked on the x-height anchor rather than copied.
+    #
+    # WHY THIS RAMP. Albo's x-height is 0.451 em; Edgar's is 0.463 em behind
+    # a 0.96 `scale:`, so 0.444 em effective. Those two are the closest pair
+    # in the file, so Edgar's ramp is the prior, and it holds: measured on
+    # the tier's own probe (hinted `x` bitmap rows, 150 DPI, native hinter —
+    # which for this face is the auto-hinter, Albo carrying no cvt/fpgm/prep,
+    # and that is what fontconvert_sdcard.py renders with too), this ramp
+    # reads 9/10/13/15/17/19 in the regular and italic and 10/11/14/15/18/20
+    # in the bold pair, against the 8/10/12/14/16/18 anchor.
+    #
+    # THAT +1 IS THE `x` GLYPH, NOT THE FACE, and it is why no other ramp was
+    # taken. Albo's x flares 22 units BELOW the baseline where Edgar's sits
+    # at -2, VandenKeere's at -3 and Romulus' at 0; the probe counts bitmap
+    # rows, so it counts the flare. The same probe on `n` reads
+    # 9/10/12/14/16/18 in the regular — EXACT at five of six slots — and the
+    # `n` is what a page of text is mostly made of. Recorded rather than
+    # corrected: `scale:` is not a styling knob, and neither sanctioned use
+    # applies (the five cuts are one typeface, so this is not the
+    # mixed-source case, and the Almendra-anchored words-per-page
+    # measurement has not been run on it).
+    #
+    # AND NO RAMP DOES BETTER ON THE x PROBE: 12 px and 18 px are UNREACHABLE
+    # in this face at any point size. 11 pt reads 11 and 12 pt reads 13; 16 pt
+    # reads 17 and 17 pt reads 19. Hinting skips both values, exactly as it
+    # skips one for Coelacanth's XXS. A 6..24 pt sweep of every strictly
+    # increasing six-tuple, scored against both anchors jointly, returns this
+    # ramp first.
+    sizes: [8, 10, 12, 14, 16, 18]
+    # LEADING: advanceY 23/28/34/40/46/51 — EXACT at all six slots and
+    # IDENTICAL IN ALL FIVE STYLES. Drift 0, which only VandenKeere also
+    # manages.
+    #
+    # The span is 1366 and the window that holds the exact ramp is 1365..1367
+    # — the same three-unit window VandenKeere landed in, the two families
+    # sharing a top slot of 18 pt. Read back off FreeType's own
+    # size.height, not computed: `advanceY = ceil(span/1000 * pt * 150/72)`
+    # is not the formula the build actually gets.
+    #
+    # Both edges have room, so neither had to win:
+    #   ascent 1023 clears the tallest ink in the whole cmap — ĥ U+0125 at
+    #     996 (Bold), 984 (SemiBold), 971 (Regular/Italic) — by 27, and the
+    #     tallest accented CAPITAL (Å at 903 Bold, 870 Regular) by 120;
+    #   descent -343 clears the deepest ink — the Bold and BoldItalic y at
+    #     -317, the Regular g at -298 — by 26.
+    # Nothing pokes above the declared ascender or below the declared
+    # descender, in any of the five styles. Ink floor: the worst-style plain
+    # text span is 1094 (Bold, 777..-317), so the +0.13 em floor is 1224 and
+    # this span sits 142 above it.
+    metrics: {ascent: 1023, descent: -343, linegap: 0}
+    # NO synth_ligatures:, and that was checked rather than assumed. Albo
+    # carries a real GSUB `liga` (round 96) reaching ff fi fl ffi ffl, all
+    # five cmapped at U+FB00-FB04, and `reading` covers U+FB00-FB06 — so the
+    # outlines are drawn, encoded AND reachable. Its kerning is its own too:
+    # a GPOS `kern` feature (round 95, hand class kerning).
+    #
+    # NO hires_drops:, VERIFIED BY BUILDING rather than omitted — the whole
+    # `reading` charset was rasterized through the real fallback chain at 1x
+    # AND 2x on 2026-09-14 and both tiers completed first attempt with no drop
+    # of any kind applied (the global `tier_drops:` names 3x only). Nothing in
+    # this family crosses EpdGlyph's uint8 at either tier — and that guard
+    # RAISES rather than dropping, so a clean build is the proof. 3x was not
+    # built; re-verify if the ramp grows or a 3x tier returns.
+    #
+    # COVERAGE, MEASURED OFF THE BUILT FILES rather than assumed (2026-09-14,
+    # all 12 files x 4 styles). Each carries 2,676 codepoints in 61 intervals:
+    # `reading` asks for 3,175, 500 are pruned because no face in the chain
+    # draws them, and U+FFFD is added by the converter. 468 of those 2,676 are
+    # Albo's own, and every one of them was compared BIT FOR BIT against a
+    # direct FreeType render of the patched source at the same ppem —
+    # width, height, advanceX, left, top and the packed 2-bit bitmap all
+    # equal, 468/468, in every style at every size and both tiers. Zero
+    # codepoints Albo draws were served by a fallback face. The remaining
+    # 2,208 come from the chain (TeX Gyre Schola, Noto Sans, Noto Sans Math,
+    # Noto Sans Symbols 2). Its own tables came through too: 5 ligature pairs
+    # and a 252-cell kern matrix per style.
+    styles:
+      regular:    {path: "local_fonts/Albo/Albo-Regular.ttf"}
+      italic:     {path: "local_fonts/Albo/Albo-Italic.ttf"}
+      bold:       {path: "local_fonts/Albo/Albo-Bold.ttf"}
+      bolditalic: {path: "local_fonts/Albo/Albo-BoldItalic.ttf"}
 
   # ── Sans-serif ─────────────────────────────────────────────────────────
 
