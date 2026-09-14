@@ -247,6 +247,7 @@ installed_families:
   - Doves
   - VandenKeere
   - AtkinsonHyperlegibleNext
+  - HerosTextCut
 # AtkinsonHyperlegibleNext joined on 2026-09-12 (owner ruling, promoting it out
 # of the iOS trial it had been on since build 188 -- the 2026-09-11 ruling
 # "drop lexica and atkinson soft, add atkinson hyperlegible next at 365
@@ -2287,6 +2288,41 @@ families:
       bold:       {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bold.otf"}
       italic:     {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-italic.otf"}
       bolditalic: {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf"}
+
+  # HerosTextCut joined on 2026-09-14 (owner: "install fonts in testflight and
+  # firmware and everywhere else"), the first DERIVED installed family: TeX
+  # Gyre Heros put through a punchcutter's corrections for the 9-13 pt slots,
+  # on the outlines, by tools/textcut/textcut_curves.py. What differs from
+  # TeXGyreHeros above, all measured on this renderer
+  # (docs/heros-text-cut-2026-09-14.md, 13 rounds): stems +5 u a side,
+  # horizontal only, so every alignment is stock; a sub-pixel notch at each
+  # line-line crotch; every digit on the cap-height row at all four judged
+  # slots (stock's 5 and 7 sit a row low at 9 pt); advances exactly stock;
+  # Heros's GPOS kerning carried plus a handful of fitted pairs so that at 9 pt
+  # no upright pair touches and no italic pair touches that stock keeps apart.
+  # Measured cost, whole page, four levels: 9 pt solid-black share 60.5 -> 71.8 %,
+  # 14 pt 73.6 -> 78.2; 11 and 12 pt LIGHTER than stock (77 -> 71, 78 -> 73) --
+  # one outline cannot land a 2.3-2.5 px stem the way it lands 2.0-2.2; the
+  # owner installed it knowing that trade.
+  #
+  # Same recipe as Heros in every other respect: same slots (the alignments are
+  # stock, so the x-height match holds), same metrics, same per-style scale
+  # (dropping the scale is the round-11 trap), same fallback chain. Sources are
+  # the four cut TTFs in local_fonts/ (GFL permits a modified redistribution
+  # under another name); they are in the private crosspoint-local-fonts mirror
+  # for CI, and regenerable from the CTAN OTFs with the cutter and
+  # tools/textcut/kern-<style>.json.
+  - name: HerosTextCut
+    description: "TeX Gyre Heros, text cut for the 9-13 pt slots (Latin)"
+    intervals: reading
+    force_autohint: true
+    sizes: [7, 9, 11, 12, 14, 16]
+    metrics: {ascent: 1040, descent: -523, linegap: 0}
+    styles:
+      regular:    {scale: 1.014, path: "local_fonts/HerosTextCut-regular.ttf"}
+      bold:       {scale: 1.014, path: "local_fonts/HerosTextCut-bold.ttf"}
+      italic:     {scale: 1.014, path: "local_fonts/HerosTextCut-italic.ttf"}
+      bolditalic: {scale: 1.014, path: "local_fonts/HerosTextCut-bolditalic.ttf"}
 
   - name: HostGrotesk
     description: "Host Grotesk, Element Type's contemporary grotesque (Latin)"
