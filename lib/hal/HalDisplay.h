@@ -140,6 +140,26 @@ class HalDisplay {
   // SSD1677 (X4) ONLY. Uc8253X3Driver accepts both parameters and has no
   // absolute bank behind them, so on an X3 this silently falls back to the
   // bilevel path -- a plumbed flag is not a capability.
+  // Refresh only a horizontal BAND of the panel, leaving the rest untouched.
+  //
+  // `x` and `w` are accepted and ignored on every panel today -- the band is
+  // full width. See Uc8253X3Driver::displayWindow for why: horizontal windowing
+  // is the one part of the partial sequence with no evidence behind it on the
+  // X3's controller, and the saving is proportional to HEIGHT anyway, because
+  // the waveform runs over the gates inside the window.
+  //
+  // Falls back to a whole-panel Fast refresh, silently and correctly, whenever
+  // the window cannot be honoured: no previous frame to diff against, a band
+  // taller than two thirds of the panel, or a driver with no override. So a
+  // caller may always ask; it may not assume it got what it asked for, and
+  // supportsWindowedRefresh() is how to find out in advance.
+  void displayWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool turnOffScreen = false);
+
+  // Does this panel have a real windowed path, or will displayWindow() fall
+  // back to the whole panel? True on SSD1677 (X4) and, since 2026-09-14, on
+  // UC8253 (X3).
+  bool supportsWindowedRefresh() const;
+
   void displayGrayBuffer(bool turnOffScreen = false, const unsigned char* lut = nullptr,
                          bool absolute = false);
 

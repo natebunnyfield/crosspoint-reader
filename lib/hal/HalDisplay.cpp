@@ -190,6 +190,21 @@ void HalDisplay::cleanupGrayscaleBuffers(const uint8_t* bwBuffer) {
   einkDisplay.cleanupGrayscaleBuffers(bwBuffer);
 }
 
+void HalDisplay::displayWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool turnOffScreen) {
+  toPanelPolarity();
+  einkDisplay.displayWindow(x, y, w, h, turnOffScreen);
+  toLogicalPolarity();
+}
+
+bool HalDisplay::supportsWindowedRefresh() const {
+  // Both shipped controllers have an override now, so this is true on the
+  // devices we build for. It stays a question rather than a constant because
+  // PanelDriver's default is still a whole-panel fallback and a future board
+  // may land without one -- a caller that assumed the capability would then
+  // quietly pay for a full refresh per keystroke.
+  return true;
+}
+
 void HalDisplay::displayGrayBuffer(bool turnOffScreen, const unsigned char* lut, bool absolute) {
   toPanelPolarity();
   einkDisplay.displayGrayBuffer(turnOffScreen, lut, absolute);
