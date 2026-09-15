@@ -652,3 +652,17 @@ GPL-2.0 project is reproduced in this document. Frame counts, group counts,
 section-level equality results and register opcodes are facts about how the
 hardware is driven; the opcodes and the LUT layout come from the controller
 datasheet in §5.*
+
+## Update 2026-09-14 — the plumbing half landed
+
+`HalDisplay::displayGrayBuffer` now forwards the SDK's `lut` and `factoryMode`
+arguments instead of dropping them (`dabda89f9`), and
+`HalDisplay::supportsAbsoluteGrayscale()` answers the question this document
+says a caller must be able to ask: **false on UC8253/X3**, where the flag is
+accepted and there is no absolute bank behind it. No call site changed, so the
+commit is behaviour-neutral; what changed is that the capability is now
+reachable and askable.
+
+Unchanged and still outstanding: **nobody has a wall-clock figure for any
+grayscale waveform on our own panel**, which is the measurement this document
+says to take before acting on §6b, and which cannot be taken off-device.

@@ -392,7 +392,56 @@ depend on.
 
 ---
 
-### D-2 — windowed (partial) refresh, which exists for X4 and not for X3
+### D-2 — DONE 2026-09-14, and this entry's own estimate was wrong
+
+**Shipped.** `Uc8253X3Driver::displayWindow` exists (submodule `9abad32`), exposed
+as `HalDisplay::displayWindow` / `supportsWindowedRefresh` (`b30d030c6`). Nothing
+calls it yet; wiring the note editor is a separate change.
+
+**The estimate below said "Large and uncertain on X3 -- it needs a UC8253
+partial-window LUT and register sequence that does not exist in the SDK." That
+was wrong, and it is worth recording why**, because the same mistake is
+available to the next survey: I priced the work from `grep -c displayWindow`
+returning 0 on the X3 driver, and concluded the *mechanism* was absent from the
+absence of that one *entry point*.
+
+Reading the driver instead of grepping it: `Uc8253X3Driver` already issues
+`PARTIAL_IN` / `PARTIAL_WINDOW` / `PARTIAL_OUT` in three places
+(`Uc8253X3Driver.cpp:253, 360, 403`). `displayFinish()`'s post-condition pass
+already runs the entire sequence -- load bank, partial in, PTL window, write
+plane, partial out, trigger refresh -- over the whole panel.
+`writeGrayscalePlaneStrip()` already emits a row band in **gate space**, and its
+comment records that emitting rows top-first was the AA/image banding bug, i.e.
+the hard part was found and fixed by someone else already. No LUT was needed:
+the Fast bank a whole-panel fast refresh uses is the right bank for a
+differential window.
+
+What was actually missing was an override that passes a sub-rectangle. About a
+hundred lines, most of them comment.
+
+**Three things that were real decisions, not transcription:** the band is full
+width (`x`/`w` accepted and ignored) because every PTL window this driver has
+ever sent spans the full width, so horizontal windowing is the one untested part
+and a wrong X window corrupts rather than fails -- and the saving is
+proportional to HEIGHT anyway, since the waveform runs over the gates inside the
+window. Both RAM planes are written, DTM2 new and DTM1 previous, because the
+Fast bank is differential and DTM2 alone drives against a stale baseline (the
+"window updates but keeps a shadow" failure). And it refuses rather than
+guesses: no previous frame, or a band over two thirds of the panel, takes the
+whole-panel path.
+
+**Still device-unconfirmed**, by construction -- no simulator has a partial
+present. On glass: a shadow of the old text inside the band means the DTM1
+baseline is wrong, a mark on the rows just outside it means the bank is too
+strong, banding means gate-space inversion.
+
+The number it is aimed at is unchanged and still the reason to do it: the
+refresh is 62% of the note editor's 920 ms typing floor
+(`docs/ble-editor-spike.md:88`).
+
+---
+
+### D-2 (as originally surveyed, kept for the record) — windowed refresh, X4 only
 
 | | |
 |---|---|
