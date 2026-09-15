@@ -671,10 +671,10 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
     return;
   }
 
-  // The row this pixel lands on is now dirty. Placed AFTER the bounds check so
-  // a clipped pixel cannot widen the band, and before the strip redirect so a
-  // strip write still counts -- the strip is composited into the same panel.
-  markDirtyRow(phyY);
+  // This pixel is now dirty. Placed AFTER the bounds check so a clipped pixel
+  // cannot widen the rect, and before the strip redirect so a strip write still
+  // counts -- the strip is composited into the same panel.
+  markDirty(phyX, phyY);
 
   // Tiled grayscale: redirect writes to the strip scratch and clip to the
   // current band. Single predictable branch on the hot per-pixel path.
@@ -1717,7 +1717,7 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, co
       const bool black = ((byte >> (7 - (col & 7))) & 1) == 0;
       for (int j = 0; j < S; ++j) {
         for (int i = 0; i < S; ++i) {
-          markDirtyRow(phyRow * S + j);  // glyph blit bypasses drawPixel
+          markDirty(phyCol * S + i, phyRow * S + j);  // glyph blit bypasses drawPixel
           const uint32_t byteIndex =
               static_cast<uint32_t>(phyRow * S + j) * panelWidthBytes + static_cast<uint32_t>(phyCol * S + i) / 8;
           const uint8_t bitPosition = 7 - ((phyCol * S + i) % 8);
@@ -2336,11 +2336,19 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   // thirds of the panel. So this is an offer, not an instruction, and a panel
   // with no windowed path (supportsWindowedRefresh() false) never sees it.
   if (refreshMode == HalDisplay::FAST_REFRESH && !_dirtyAll && !_stripActive &&
-      _dirtyBottom >= _dirtyTop && display.supportsWindowedRefresh()) {
+      _dirtyBottom >= _dirtyTop && _dirtyRight >= _dirtyLeft && display.supportsWindowedRefresh()) {
+    const int w = _dirtyRight - _dirtyLeft + 1;
     const int h = _dirtyBottom - _dirtyTop + 1;
-    display.displayWindow(0, static_cast<uint16_t>(_dirtyTop), 0, static_cast<uint16_t>(h), fadingFix);
-    resetDirty();
-    return;
+    // Area, not either edge on its own. In Portrait a line of text is narrow in
+    // physical X and full height in physical Y, so a height test alone would
+    // reject exactly the case this exists for.
+    const int panelArea = static_cast<int>(panelWidth) * static_cast<int>(panelHeight);
+    if (w * h * 3 <= panelArea * 2) {
+      display.displayWindow(static_cast<uint16_t>(_dirtyLeft), static_cast<uint16_t>(_dirtyTop),
+                            static_cast<uint16_t>(w), static_cast<uint16_t>(h), fadingFix);
+      resetDirty();
+      return;
+    }
   }
 
   display.displayBuffer(refreshMode, fadingFix);
