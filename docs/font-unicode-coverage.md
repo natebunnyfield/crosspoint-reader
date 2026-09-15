@@ -174,3 +174,42 @@ from the fallback chain. That is not a defect specific to this family: TeX Gyre
 Schola's own cmap is the same 1,087 codepoints, because GUST could not
 relicense the base-35 Cyrillic (`qhv-hist.txt`) and shipped no Cyrillic in any
 TeX Gyre face.
+
+## Corpus diff: Eighth Atlas, 2026-09-15
+
+The claude-tools epubs are the reader's real-world codepoint corpus, so each
+new one gets diffed against the installed interval tables. `atlas/epub/
+eighth-atlas-2026-09-15.epub` (62,406 words, 136 entries) uses **38 distinct
+non-ASCII codepoints**. Measured by parsing the `.cpfont` interval tables of
+all nine installed families at 16 px, the same way the 2026-08-20 pass did —
+not inferred from `sd-fonts.yaml`, which records what was *requested* and not
+what survived pruning.
+
+**Present in all nine families**, including the ones that would be plausible
+gaps: U+215C ⅜, U+00BC/BD/BE ¼ ½ ¾, U+2248 ≈, U+2032/2033 ′ ″, U+03C6 φ,
+U+00D7 ×, U+014D ō, U+016B ū, U+017A ź, U+0131 ı, U+00E6 æ, U+2192 →,
+U+00B7 ·, U+2014/2013 — –, U+2026 …, and the accented Latin set. The
+`reading` preset's 0x0020–0x024F, 0x2000–0x206F, 0x2150–0x218F, 0x2190–0x21FF
+and 0x2200–0x22FF blocks cover every one of them.
+
+**Absent from all nine**, and therefore rendering as the family's own U+FFFD
+box:
+
+| codepoint | char | entry |
+|---|---|---|
+| U+3131 · U+3141 · U+3145 | ㄱ ㅁ ㅅ | `topics/hangul.md` |
+| U+3057 · U+56DE · U+6839 | し 回 根 | `topics/nemawashi.md` |
+| U+5B88 · U+7834 · U+96E2 | 守 破 離 | `topics/shuhari.md` |
+
+Ten codepoints, twelve occurrences, three entries — every one of them a
+parenthetical gloss beside its romanization, so the sentence still reads. The
+cause is the same structural one this document already describes: `reading`
+stops at 0x303F, so Hiragana (0x3040–0x309F), Hangul Compatibility Jamo
+(0x3130–0x318F) and the CJK ideographs (0x4E00–0x9FFF) are outside every
+installed family, and `resolveTextFontId`'s CJK redirect
+(`lib/GfxRenderer/GfxRenderer.cpp:196-219`) needs a registered fallback font
+that this card does not carry.
+
+Scope note: verified against the interval tables, **not observed on glass**.
+The book itself was confirmed to parse, paginate and render in the simulator
+on 2026-09-15; the three affected pages were not paged to.
