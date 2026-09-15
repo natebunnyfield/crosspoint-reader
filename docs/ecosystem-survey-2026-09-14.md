@@ -505,6 +505,46 @@ Worth reading **alongside** B-1 rather than instead of it — two implementation
 disagreeing about connection parameters or reconnect strategy is more
 informative than either alone. Source not read by me.
 
+### W-1 — WITHDRAWN 2026-09-14, on reading our own power manager
+
+**Do not implement this as written.** The candidate below survives only as a
+description of what Espressif measured; the recommendation it carried is wrong
+for this firmware, and the reason is two lines in our own tree.
+
+`HalPowerManager::setPowerSaving()` already does manual frequency scaling
+(`lib/hal/HalPowerManager.cpp:51,59`, `setCpuFrequencyMhz` between
+`LOW_POWER_FREQ` = 10 MHz and the boot frequency) — and at
+`lib/hal/HalPowerManager.cpp:39-43` it **force-disables power saving whenever
+WiFi is in any mode but `WIFI_MODE_NULL`**:
+
+```
+auto wifiMode = WiFi.getMode();
+if (wifiMode != WIFI_MODE_NULL) {
+  // Wifi is active, force disabling power saving
+  enabled = false;
+}
+```
+
+So the window Espressif's 20.82 → 10.71 mA DFS figure describes — *while
+associated* — is precisely the window this firmware already refuses to scale in,
+deliberately. The candidate's own §4 caveat said the addressable window was only
+the seconds we are online; the truth is narrower still: it is zero.
+
+Worse, the two mechanisms are mutually exclusive. `CONFIG_PM_ENABLE=y` makes
+`setCpuFrequencyMhz()` the wrong API — under the power-management framework the
+frequency is governed by `esp_pm_configure()` and lock acquisition, not by
+direct calls — so switching it on without rewriting `HalPowerManager` would give
+us two systems fighting over the same clock.
+
+**What is actually behind this, and it is a bigger question than a Kconfig
+flag**: the *reason* WiFi forces full speed is presumably that hand-scaling the
+CPU breaks radio timing, which is the exact problem `esp_pm`'s locks exist to
+solve properly. Replacing our manual scaling with the PM framework could make
+scaling-while-associated safe for the first time. That is a rewrite of
+`HalPowerManager` on a device the owner reads on, with the failure mode "the
+radio or the panel SPI mistimes", and it wants a bench and a current meter — not
+a config line. **Filed as a real candidate, not started.**
+
 ### W-1 — DFS and auto-light-sleep, a Kconfig question with a 17x answer
 
 | | |
