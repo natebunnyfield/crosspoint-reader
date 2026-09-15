@@ -671,6 +671,11 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
     return;
   }
 
+  // The row this pixel lands on is now dirty. Placed AFTER the bounds check so
+  // a clipped pixel cannot widen the band, and before the strip redirect so a
+  // strip write still counts -- the strip is composited into the same panel.
+  markDirtyRow(phyY);
+
   // Tiled grayscale: redirect writes to the strip scratch and clip to the
   // current band. Single predictable branch on the hot per-pixel path.
   uint8_t* target = frameBuffer;
@@ -1712,6 +1717,7 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, co
       const bool black = ((byte >> (7 - (col & 7))) & 1) == 0;
       for (int j = 0; j < S; ++j) {
         for (int i = 0; i < S; ++i) {
+          markDirtyRow(phyRow * S + j);  // glyph blit bypasses drawPixel
           const uint32_t byteIndex =
               static_cast<uint32_t>(phyRow * S + j) * panelWidthBytes + static_cast<uint32_t>(phyCol * S + i) / 8;
           const uint8_t bitPosition = 7 - ((phyCol * S + i) % 8);
@@ -2251,6 +2257,7 @@ static unsigned long start_ms = 0;
 
 void GfxRenderer::clearScreen(const uint8_t color) const {
   start_ms = millis();
+  if (!_stripActive) markAllDirty();  // a strip clear touches only its scratch
   if (_stripActive) {
     // Clear only the active band's scratch, not the shared framebuffer.
     memset(_stripBuf, color, static_cast<size_t>(panelWidthBytes) * _stripRows);
@@ -2304,6 +2311,7 @@ bool GfxRenderer::glyphIntersectsStrip(int x0, int y0, int x1, int y1) const {
 
 void GfxRenderer::invertScreen() const {
   if (_textOnly) return;
+  markAllDirty();
   for (uint32_t i = 0; i < frameBufferSize; i++) {
     frameBuffer[i] = ~frameBuffer[i];
   }
@@ -2312,7 +2320,31 @@ void GfxRenderer::invertScreen() const {
 void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const {
   auto elapsed = millis() - start_ms;
   LOG_DBG("GFX", "Time = %lu ms from clearScreen to displayBuffer", elapsed);
+
+  // A small change gets a windowed refresh. The waveform runs over the gates
+  // inside the window, so the cost is proportional to the rows that actually
+  // changed -- which is where the reader's latency goes (the note editor's
+  // typing floor is 350 ms debounce + ~570 ms whole-panel refresh, and the
+  // refresh is 62% of it; docs/ble-editor-spike.md:88).
+  //
+  // FAST_REFRESH ONLY. HALF and FULL are deliberate whole-panel cleanups --
+  // that is what a caller is asking for when it picks one -- and windowing them
+  // would quietly defeat the de-ghosting they exist to do.
+  //
+  // The driver decides the rest: it falls back to a whole-panel refresh when it
+  // has no previous frame to diff against, or when the band is more than two
+  // thirds of the panel. So this is an offer, not an instruction, and a panel
+  // with no windowed path (supportsWindowedRefresh() false) never sees it.
+  if (refreshMode == HalDisplay::FAST_REFRESH && !_dirtyAll && !_stripActive &&
+      _dirtyBottom >= _dirtyTop && display.supportsWindowedRefresh()) {
+    const int h = _dirtyBottom - _dirtyTop + 1;
+    display.displayWindow(0, static_cast<uint16_t>(_dirtyTop), 0, static_cast<uint16_t>(h), fadingFix);
+    resetDirty();
+    return;
+  }
+
   display.displayBuffer(refreshMode, fadingFix);
+  resetDirty();
 }
 
 void GfxRenderer::displayBufferAsync(const HalDisplay::RefreshMode refreshMode) const {

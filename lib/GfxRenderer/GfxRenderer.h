@@ -114,6 +114,53 @@ class GfxRenderer {
   // things that still put pixels down. See TextOnlyScope for why.
   mutable bool _textOnly = false;
 
+  // ---------------------------------------------------------- dirty band
+  //
+  // The span of PHYSICAL panel rows any primitive has touched since the last
+  // present. displayBuffer() turns a small span into a windowed refresh
+  // (HalDisplay::displayWindow) instead of a whole-panel one, which is where
+  // the reader's latency actually goes -- the waveform runs over the gates in
+  // the window, so the cost is proportional to the rows that changed.
+  //
+  // TRACKED AT THE PIXEL WRITERS, NOT AT THE CALLERS, and that is the whole
+  // safety argument. There are exactly three places that write frameBuffer --
+  // drawPixel/drawPixelDevice, the hi-res glyph blit in drawText, and
+  // clearScreen/invertScreen -- so instrumenting them is complete BY
+  // CONSTRUCTION. Tracking in the ~70 displayBuffer() callers instead would
+  // mean the band is right only if every one of them was found, and the failure
+  // mode of missing one is a stale region on the panel: the window refreshes
+  // rows that changed and silently leaves the ones nobody declared. Over-
+  // reporting is safe (a full refresh); under-reporting is a bug you see as
+  // "half the screen didn't update".
+  //
+  // PHYSICAL rows, after rotation. drawPixel computes phyY for its bounds check
+  // already, so this rides along on a value that is in a register anyway. It
+  // costs two predictable compares in the hottest loop in the firmware, which
+  // is the price of completeness; the alternative was correctness by vigilance.
+  mutable int _dirtyTop = 0;
+  mutable int _dirtyBottom = 0;
+  mutable bool _dirtyAll = true;   // until something says otherwise, assume everything
+
+  inline void markDirtyRow(const int phyY) const {
+    if (_dirtyAll) return;
+    if (phyY < _dirtyTop) _dirtyTop = phyY;
+    if (phyY > _dirtyBottom) _dirtyBottom = phyY;
+  }
+  inline void markDirtyRows(const int phyY0, const int phyY1) const {
+    markDirtyRow(phyY0);
+    markDirtyRow(phyY1);
+  }
+  // A whole-panel change: clearScreen, invertScreen, anything that cannot say
+  // where it drew. Sticky until the next present.
+  inline void markAllDirty() const { _dirtyAll = true; }
+  // Called by displayBuffer() after a present. Starts the next frame EMPTY --
+  // an inverted range, so the first markDirtyRow sets both ends.
+  inline void resetDirty() const {
+    _dirtyAll = false;
+    _dirtyTop = INT32_MAX;
+    _dirtyBottom = -1;
+  }
+
   // CJK UI font fallback map: primary (built-in, Latin-only) UI font id -> a
   // size-matched SD-card font id that carries CJK glyphs. When a string drawn
   // or measured with a mapped primary font contains a CJK codepoint the primary
