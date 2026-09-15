@@ -247,6 +247,17 @@ installed_families:
   - Doves
   - VandenKeere
   - AtkinsonHyperlegibleNext
+  - Albo
+# Albo joined on 2026-09-14 (owner ruling, "install it everywhere"). The
+# twelfth installed family and the first drawn IN-HOUSE rather than sourced:
+# tools/wedge_serif in crosspoint-simulator, a hundred rounds of the owner's
+# own rulings. It displaces nothing -- it is the sixth serif, and its cell is
+# "the one cut for this device", which no sourced face can fill. Its coverage
+# was built for this reader specifically: the 38 codepoints it was missing
+# were the ones MEASURED in the owner's own 34 epubs, and all 468 of its
+# in-interval codepoints were verified to reach the .cpfont bit-for-bit
+# rather than falling back to Noto (docs/wedge-serif-exploration.md, round
+# 100b, in the simulator repo).
 # AtkinsonHyperlegibleNext joined on 2026-09-12 (owner ruling, promoting it out
 # of the iOS trial it had been on since build 188 -- the 2026-09-11 ruling
 # "drop lexica and atkinson soft, add atkinson hyperlegible next at 365

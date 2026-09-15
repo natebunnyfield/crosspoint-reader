@@ -589,6 +589,15 @@ inline constexpr Entry kEntries[] = {
     {"AtkinsonHyperlegibleNext", "Atkinson Hyperlegible Next",
      "; Elliott Scott & Craig Dobie; Elliott Scott & Megan Eisworth", "1832 London; 2019 New York; 2025 Los Angeles",
      "1832 London", 1832},
+    // ALBO, the twelfth installed family and the only one drawn in-house:
+    // ~/src/crosspoint-simulator/tools/wedge_serif, a hundred rounds over
+    // 2026-09-12..14, every shape ruled by the owner. Designer and place are
+    // HIS OWN STATEMENT (asked 2026-09-14, answered "Nate Bunnyfield .
+    // Omaha") -- not inferred, and not to be "corrected" by a later session.
+    // ONE STAGE, so `origin` repeats the lineage rather than naming an
+    // earlier type: there is no earlier type, which is what makes this row
+    // different from every other one in the table.
+    {"Albo", "Albo", "Nate Bunnyfield", "2026 Omaha", "2026 Omaha", 2026},
     // The text grotesques. Libre Franklin is the installed one; Host Grotesk and
     // Archivo are recipe-only since 2026-08-04 but keep their labels, because a
     // card provisioned before that ruling still shows them in the picker.
