@@ -190,10 +190,18 @@ void HalDisplay::cleanupGrayscaleBuffers(const uint8_t* bwBuffer) {
   einkDisplay.cleanupGrayscaleBuffers(bwBuffer);
 }
 
-void HalDisplay::displayGrayBuffer(bool turnOffScreen) {
+void HalDisplay::displayGrayBuffer(bool turnOffScreen, const unsigned char* lut, bool absolute) {
   toPanelPolarity();
-  einkDisplay.displayGrayBuffer(turnOffScreen);
+  einkDisplay.displayGrayBuffer(turnOffScreen, lut, absolute);
   toLogicalPolarity();
+}
+
+bool HalDisplay::supportsAbsoluteGrayscale() const {
+  // The absolute bank is an SSD1677 feature. Asking the display which panel is
+  // live rather than testing a board macro, because a board config selects the
+  // panel at runtime (BoardConfig::ACTIVE) and the X3/X4 split is not a
+  // compile-time constant in every build.
+  return !einkDisplay.isX3Mode();
 }
 
 void HalDisplay::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows) {
