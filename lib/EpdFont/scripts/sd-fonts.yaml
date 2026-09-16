@@ -39,6 +39,19 @@
 #                ligature lookup is a draw-time table walk, and LigatureControl
 #                keys its per-pair toggles on the INPUT pair, so each new pair
 #                gets its own switch in Typography Settings for free.
+#   fallback_head: (optional) {style: source-spec} — faces spliced in FRONT of
+#                the fallback chain, PER STYLE. For a family cut or derived
+#                from another typeface: what the derived face does not carry
+#                should come from the face it came from, not from the chain's
+#                generic head. Each entry takes the same keys as a style source
+#                (path/url/zip, variable:, scale:) and `scale:` matters — a head
+#                at a different em renders its glyphs at a different size from
+#                the text around them. Per style because the ordinary chain is
+#                not: every style of every family gets TeX Gyre Schola REGULAR,
+#                so a bold page's fallback glyphs have always come back at
+#                regular weight. It only ADDS a face at the front; everything
+#                the head lacks still falls through to Schola, Noto Sans, Noto
+#                Sans Math and Noto Sans Symbols 2 exactly as before.
 #   drop_codepoints: (optional) Codepoints to delete from the source's cmap
 #                before conversion, so the Noto fallback supplies them. For
 #                sources whose cmap points at the WRONG outline: the converter
@@ -2325,6 +2338,36 @@ families:
     force_autohint: true
     sizes: [7, 9, 11, 12, 14, 16]
     metrics: {ascent: 1040, descent: -523, linegap: 0}
+    # THE CUT IS A SUBSET OF HEROS, so Heros answers for the rest of it.
+    # `textcut_curves.py`'s charset gate stops at U+024F plus General
+    # Punctuation and the euro -- 395 glyphs per style -- while `reading` asks
+    # for 647 of the 1,053 the source face has. The other 252 (its Greek, the
+    # four arrows, fourteen math operators, the f-ligatures, 133 Latin Extended
+    # Additional) used to come from the head of the ordinary chain, which is
+    # TeX Gyre Schola: a SERIF, setting Greek and operators inside a
+    # neo-grotesque page. Measured 2026-09-15, rendered from the card at slot 3
+    # beside TeXGyreHeros; docs/font-unicode-coverage.md.
+    #
+    # Owner ruling 2026-09-16: "if heros has symbols, text cut should use those
+    # before using Schola." Same four CTAN sources and the same scale as the
+    # TeXGyreHeros recipe above, so a fallback glyph lands at the size and the
+    # design the cut was made from -- stock weight rather than cut weight,
+    # which is the honest reading of a glyph the cutter never touched. Schola,
+    # Noto Sans, Noto Sans Math and Noto Sans Symbols 2 still follow for what
+    # Heros itself lacks (U+2713 and U+2717 among them).
+    # The cutter writes no GSUB at all -- it builds the face from scratch
+    # through fontBuilder and emits one `kern` feature, which is GPOS. So the
+    # five f-ligature OUTLINES it now carries (U+FB00-FB04, added 2026-09-16)
+    # had nothing to reach them: the built .cpfont reported `ligs=0` against
+    # stock Heros's `ligs=5`, and every `fi` in every book set as f+i. This
+    # writes the rule. U+FB05/FB06 are absent from Heros itself, so `st` is not
+    # listed.
+    synth_ligatures: [ff, fi, fl, ffi, ffl]
+    fallback_head:
+      regular:    {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf"}
+      bold:       {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bold.otf"}
+      italic:     {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-italic.otf"}
+      bolditalic: {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf"}
     styles:
       regular:    {scale: 1.014, path: "local_fonts/HerosTextCut-regular.ttf"}
       bold:       {scale: 1.014, path: "local_fonts/HerosTextCut-bold.ttf"}

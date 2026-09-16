@@ -29,7 +29,7 @@ Three wrong instruments, recorded so nobody reaches for them: (a) a bounding-box
 
 **The cpfont kern matrix is 4.4 fixed-point, ±8 px, 1/16 px resolution**, and `fontconvert_sdcard.py`'s `extract_kerning_fonttools()` returns THAT (×16, clamped to int8), not design units — raw GPOS `f/a` is −10 u; it reports −128. Right for a .cpfont, wrong for a font file; the cutter reads GPOS itself.
 
-**Glyph set**: every cmap codepoint in Basic Latin, Latin-1, Latin Ext-A/B and General Punctuation plus U+20AC — 395 glyphs per style (274–289 traps). ASCII-only was the proof-of-concept set; the harness's `é` in "Café" was coming from the Noto fallback chain, not the font. Accented letters are cut but NOT pair-fitted (the corpus is ASCII); their bearings are stock plus the offset compensation.
+**Glyph set** (as of round 9; **400 per style since round 15**, which added the five f-ligature forms): every cmap codepoint in Basic Latin, Latin-1, Latin Ext-A/B and General Punctuation plus U+20AC — 395 glyphs per style (274–289 traps). ASCII-only was the proof-of-concept set; the harness's `é` in "Café" was coming from the Noto fallback chain, not the font. Accented letters are cut but NOT pair-fitted (the corpus is ASCII); their bearings are stock plus the offset compensation.
 
 **Advance (round 8)**: STOCK in units. The offset's 2d used to be added to every advance; at 9 pt that is +0.19 px and half the alphabet rounded up a pixel — the loosening the owner read as bad kerning in `harf`. Now the stems grow into the bearings by d a side (0.09 px) and every glyph's rounded advance equals stock's at every slot (measured: 0/67 differ, ×4 slots, ×4 styles). Consequence: more pairs abut in the cut than in stock, so the upright kern fit carries more pairs (regular 31, bold 29, each +53 u) — those kerns put back the pixel stock has.
 
@@ -76,12 +76,12 @@ Shares are the fair comparison; absolute counts move with line breaks. The histo
 
 ## Where things are
 
-- `tools/textcut/textcut_vector.py <style>` — the cutter. Reads `downloaded_fonts/QHERO/texgyreheros-<style>.otf`, writes `BUILD_DIR/HerosTextCut-<style>.ttf`. The three non-regular OTFs were fetched from the recipe's CTAN URLs into the same cache dir.
+- `tools/textcut/textcut_curves.py <style>` — **the cutter** (since round 9). Finds its source under whichever `lib/EpdFont/scripts/downloaded_fonts/<family>/` cached the CTAN `texgyreheros-<style>.otf`, fetches it if none did, and writes `lib/EpdFont/local_fonts/HerosTextCut-<style>.ttf`. `TEXTCUT_SRC` and `TEXTCUT_OUT` override either end. Until 2026-09-16 both ends were unrunnable placeholders — an absolute path into a `downloaded_fonts/QHERO/` directory that does not exist, and a literal `OUTDIR = "BUILD_DIR"`.
 - `tools/textcut/fit_pairs.py FONT [--fix bearings-<style>.json]` — the touch test and the minimal fix; exit 1 while any pair touches, so it loops.
-- `tools/textcut/kern-{regular,bold,italic,bolditalic}.json` — the fitted per-pair kerns; uprights under the never-touch rule, italics under `--match`, in units, `{"fa": 53, ...}`; the cutter also dumps `HerosTextCut-<style>.kern.json`, the EFFECTIVE pairs (source + fixes) the fitter reads back.
-- `tools/textcut/proof.yaml` — the two-family recipe; `path:` entries need `BUILD_DIR` replaced.
+- `tools/textcut/kern-{regular,bold,italic,bolditalic}.json` — the fitted per-pair kerns, read from THIS directory (not the output directory, which is gitignored; corrected 2026-09-16). **None of these files exists, and that is correct**: round 14 withdrew every fitted kern, measured, and the shipped cut carries Heros's own kerning exactly — 216,600 ASCII pairs x 6 slots x 4 styles, 0 differing from stock. The format stands for the next fit: uprights under the never-touch rule, italics under `--match`, in units, `{"fa": 53, ...}`. The cutter also dumps `HerosTextCut-<style>.kern.json`, the EFFECTIVE pairs the fitter reads back.
+- `tools/textcut/proof.yaml` — the two-family recipe. Runs as committed since 2026-09-16 (`build-sd-fonts.py --config tools/textcut/proof.yaml`); the `path:` entries used to be `BUILD_DIR/...` placeholders. It mirrors the shipped recipe's `intervals: reading`, `synth_ligatures:` and `fallback_head:`, because an arm built from a different recipe measures the recipe — see round 11.
 - `tools/textcut/compose_eink.py` — the figure and the histogram.
-- `tools/textcut/textcut_curves.py <style>` is the cutter as of round 9; `textcut_vector.py` is kept for the history above and is superseded.
+- `tools/textcut/textcut_vector.py` is SUPERSEDED (round 9) and kept only for the history above. Its `QHERO` / `BUILD_DIR` placeholders were deliberately left alone: it is a record, not a tool.
 - Built cpfonts left in `tools/calendar_preview/fs_/.fonts/{HerosRef,HerosTextCut}/`, the way `proofsheet.py` leaves its variants.
 - Proof pages (the owner judges by these): https://claude.ai/code/artifact/69c2a6b2-1964-4389-8e12-5353da9966f1 (e-ink, measured) and https://claude.ai/code/artifact/b7caa190-8903-4925-bf13-70be036d3980 (the print cut, three-tone overlay of the traps).
 
@@ -141,3 +141,85 @@ Punctuation are complete; Greek (54), Latin Extended Additional (133), combining
 marks (21), math operators (14) and the `ff`-`ffl` ligatures (5) are NOT cut and
 fall to the `reading` fallback chain, as they do for any family that lacks them.
 The shipped `.cpfont` still carries 2676 glyphs, identical to TeXGyreHeros.
+
+## Round 15 — the cut was a sans wearing a serif, and it had no ligatures
+
+2026-09-16. Two defects, both present in the 2026-09-14 install, both found by
+rendering the specimen's math line rather than by reading anything.
+
+**The cut carries 395 of the 647 codepoints `reading` asks for**, because
+`wanted()` stops at U+024F plus General Punctuation and the euro while the
+recipe asks for `reading`. The other 252 — Heros's Greek, its four arrows, its
+fourteen math operators, its f-ligature forms, 133 Latin Extended Additional —
+were filled from the head of the ordinary fallback chain, which is **TeX Gyre
+Schola, a serif**. Rendered from the card at slot 3 beside `TeXGyreHeros`, the
+cut set `α β Δ π` and `≠ ≤ ≥ ∞ ← →` in Century Schoolbook inside a
+neo-grotesque page. Full measurement: `docs/font-unicode-coverage.md`, "The cut
+carries 395 of the 647 it asks for".
+
+Owner ruling: *"if heros has symbols, text cut should use those before using
+Schola."* Implemented as a new family key, `fallback_head:` — a
+`{style: source-spec}` map spliced in FRONT of the chain — because the same
+shape recurs for any family cut or derived from another typeface. HerosTextCut
+names the same four CTAN Heros OTFs its parent recipe uses, at the same
+`scale: 1.014`, so a fallback glyph lands at the size the cut renders at. What
+Heros itself lacks (U+2713, U+2717 and the rest) still falls through to Schola,
+Noto Sans, Noto Sans Math and Noto Sans Symbols 2. Measured after the rebuild:
+the `≥ ∞ · α β Δ π · ←` run against `HerosRef` on the same page is **mean |Δ|
+0.07 code values, 0.07 % of pixels differing by more than 4** — the same
+drawing, not a near one.
+
+**A fix fell out of it that is not about this family.** `--fallback-<style>` was
+already per style in `fontconvert_sdcard.py`; `build-sd-fonts.py` was handing
+all four styles one string. So every style of every family has been falling
+back to TeX Gyre Schola **regular** since the chain was built, and a bold
+page's fallback glyphs have always come back at regular weight. The head is per
+style, so this is the first family whose bold fallback glyph is bold.
+
+**`ligs=0`.** The cutter builds the face from scratch through `fontBuilder` and
+emits one `kern` feature, which is GPOS — the TTFs carry no GSUB table at all,
+and the cut did not carry U+FB00–FB04 either, so the built `.cpfont` reported
+`ligs=0` against stock Heros's `ligs=5` and every `fi` in every book set as
+`f`+`i`. Both halves were needed: `wanted()` now takes 0xFB00–0xFB06 (Heros has
+FB00–FB04; FB05/FB06, the `st` pair, are absent from the source and the cmap
+scan simply finds nothing), and `synth_ligatures: [ff, fi, fl, ffi, ffl]` in
+the recipe writes the rule. Built: **`ligs=5` in all four styles.**
+
+**The re-cut changed nothing else, verified rather than assumed.** Per-glyph
+outline hashes and advances against the shipped TTFs, all four styles: 5
+codepoints added, **0 outlines changed, 0 advances changed**, GPOS pair counts
+identical (regular 4 813, bold 4 741, italic 5 296, bold italic 4 982, 0 values
+moved). `body lines` per slot identical at all six slots, so no reflow; 3.6 % of
+page pixels move at 9 pt, which is the ligature substitution and the glyphs it
+shifts along each line that carries one.
+
+**The cutter could not be run at all as committed**, which is why this is worth
+a paragraph: `SRC` was an absolute path into `downloaded_fonts/QHERO/`, a
+directory that does not exist, and `OUTDIR` was the literal string
+`"BUILD_DIR"`. Both are repo-relative and env-overridable now
+(`TEXTCUT_SRC`, `TEXTCUT_OUT`), and the default source is the same CTAN file
+the `TeXGyreHeros` recipe already caches.
+
+Shipped to every surface the 2026-09-14 install names: `fs_/fonts/HerosTextCut`
+at 1x/2x/3x, the three packaged Mac apps' cards, and the iOS seed tree at
+1x+2x through `validate_seed_fonts.py` (12 families OK). **The private
+`crosspoint-local-fonts` mirror carries the source TTFs for CI and must be
+re-pushed.** A stale mirror does not quietly give back the 395-glyph cut, which
+is what this paragraph first said: it **fails the build**, because
+`synth_ligatures:` refuses a face that does not map the ligature it is told to
+reach —
+
+    FAILED: HerosTextCut/regular: synth_ligatures 'ff' needs U+FB00, which this
+    face does not map. This stage patches, it does not draw.
+
+and `build-sd-fonts.py` exits 1. Both firmware release workflows and the
+simulator's `testflight-ios.yml` check only that the `local_fonts/` path
+EXISTS, never its content, so a stale mirror clears that gate and dies later in
+the font build. Loud, which is the right failure — but it is a failure, not a
+silent downgrade.
+
+Still not done, and not attempted: the 252 are Heros's glyphs, not cut ones.
+Widening `wanted()` to all of `reading` would put the weight, the traps and the
+digit pass over Greek, math and arrows they were never tuned on, and
+`fit_pairs.py`'s corpus is ASCII so none of them would be pair-fitted. That is a
+separate ruling.

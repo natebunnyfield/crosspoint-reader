@@ -5,7 +5,7 @@ tier_drops:
 families:
 - name: HerosRef
   description: GUST's Helvetica revival, via URW Nimbus Sans (Latin)
-  intervals: latin-ext
+  intervals: reading
   force_autohint: true
   sizes:
   - 9
@@ -31,7 +31,19 @@ families:
       url: https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf
 - name: HerosTextCut
   description: GUST's Helvetica revival, via URW Nimbus Sans (Latin)
-  intervals: latin-ext
+  intervals: reading
+  # Both of these mirror the shipped sd-fonts.yaml recipe, and they have to:
+  # an arm of an A/B built from a different recipe measures the recipe. Round
+  # 11 is the precedent -- a dropped `scale: 1.014` had stock rendered 1.4%
+  # larger for eight rounds. Without synth_ligatures the proof builds `ligs=0`
+  # against HerosRef's `ligs=5` and every fi/fl in the specimen's body text is
+  # an unmatched pair.
+  synth_ligatures: [ff, fi, fl, ffi, ffl]
+  fallback_head:
+    regular:    {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf"}
+    bold:       {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bold.otf"}
+    italic:     {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-italic.otf"}
+    bolditalic: {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf"}
   force_autohint: true
   sizes:
   - 9
@@ -45,13 +57,13 @@ families:
   styles:
     regular:
       scale: 1.014
-      path: BUILD_DIR/HerosTextCut-regular.ttf
+      path: local_fonts/HerosTextCut-regular.ttf
     bold:
       scale: 1.014
-      path: BUILD_DIR/HerosTextCut-bold.ttf
+      path: local_fonts/HerosTextCut-bold.ttf
     italic:
       scale: 1.014
-      path: BUILD_DIR/HerosTextCut-italic.ttf
+      path: local_fonts/HerosTextCut-italic.ttf
     bolditalic:
       scale: 1.014
-      path: BUILD_DIR/HerosTextCut-bolditalic.ttf
+      path: local_fonts/HerosTextCut-bolditalic.ttf

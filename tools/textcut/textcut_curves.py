@@ -46,9 +46,46 @@ from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.cu2quPen import Cu2QuPen
 
 STYLE = sys.argv[1] if len(sys.argv) > 1 else "regular"
-SRC = ("/Users/natebunnyfield/src/crosspoint-reader/lib/EpdFont/scripts/"
-       f"downloaded_fonts/QHERO/texgyreheros-{STYLE}.otf")
-OUTDIR = "BUILD_DIR"
+# Paths resolve from THIS file, and both are env-overridable. They were an
+# absolute path into a `downloaded_fonts/QHERO/` directory that does not exist
+# and a literal `OUTDIR = "BUILD_DIR"`, so the committed script could not be
+# run by anyone, including the next person who needed to re-cut (2026-09-16).
+# The source is the same CTAN file the TeXGyreHeros recipe fetches, taken from
+# the build's own cache so a re-cut needs no second download.
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
+_CACHE = os.path.join(REPO, "lib/EpdFont/scripts/downloaded_fonts")
+# The source is the CTAN TeX Gyre Heros the recipes already fetch. It is looked
+# for under whichever family cached it -- the caches are gitignored and are
+# populated as a side effect of building a family, so on a given machine it may
+# be any of these and on a fresh clone it is none of them. When none is present
+# the file is fetched, so a re-cut works from a clean checkout; TEXTCUT_SRC
+# overrides.
+_SRC_URL = f"https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-{STYLE}.otf"
+
+
+def _find_source():
+    for family in ("TeXGyreHeros", "HerosTextCut", "HerosRef"):
+        p = os.path.join(_CACHE, family, f"texgyreheros-{STYLE}.otf")
+        if os.path.exists(p):
+            return p
+    dest = os.path.join(_CACHE, "TeXGyreHeros", f"texgyreheros-{STYLE}.otf")
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    import urllib.request
+    print(f"fetching {_SRC_URL}")
+    urllib.request.urlretrieve(_SRC_URL, dest)
+    return dest
+
+
+SRC = os.environ.get("TEXTCUT_SRC")  # resolved in build(); see _find_source
+# The cut TTFs go where the recipes read them from. The FITTED KERNS are read
+# from this script's own directory and NOT from the output directory, which is
+# where `kp` used to point: the output directory is gitignored, so a fix file
+# left there is invisible to git and to every other machine. None ships today
+# -- round 14 withdrew all of them, measured -- but the lookup has to be right
+# before the next one is written.
+OUTDIR = os.environ.get("TEXTCUT_OUT") or os.path.join(REPO, "lib/EpdFont/local_fonts")
+FIXDIR = HERE
 os.makedirs(OUTDIR, exist_ok=True)
 OUT = f"{OUTDIR}/HerosTextCut-{STYLE}.ttf"
 BOLD = STYLE.startswith("bold")
@@ -62,7 +99,17 @@ DIGIT_TOP = 715.0
 DIGIT_LIFT = {c: DIGIT_TOP / 709.0 for c in "01234689"}; DIGIT_LIFT.update({"5": DIGIT_TOP / 694.0, "7": DIGIT_TOP / 694.0})
 CU2QU_ERR = 1.0
 
-def wanted(cp): return 0x20 <= cp < 0x0250 or 0x2000 <= cp <= 0x206F or cp == 0x20AC
+# Basic Latin, Latin-1, Latin Ext-A/B, General Punctuation, the euro, and the
+# f-ligature presentation forms. The ligatures joined 2026-09-16: without their
+# OUTLINES in the cut there is nothing for a `liga` rule to substitute TO, so
+# the built .cpfont reported `ligs=0` against stock Heros's `ligs=5` and an
+# `fi` set as f+i for every reader. Heros carries FB00-FB04 (ff fi fl ffi ffl)
+# and not FB05/FB06 (the st pair), so the range is written as the block and the
+# cmap scan takes what is there. The GSUB rule that REACHES them is a separate
+# thing and comes from `synth_ligatures:` in sd-fonts.yaml -- this font file
+# still has no GSUB table at all.
+def wanted(cp): return (0x20 <= cp < 0x0250 or 0x2000 <= cp <= 0x206F
+                        or cp == 0x20AC or 0xFB00 <= cp <= 0xFB06)
 
 # ------------------------------------------------------------- contours
 def contours_of(glyphset, name):
@@ -224,7 +271,11 @@ def read_gpos_kern(font, charmap):
     return out
 
 def build():
-    src = TTFont(SRC); upm = src["head"].unitsPerEm; cmap = src.getBestCmap(); gs = src.getGlyphSet(); hmtx = src["hmtx"]
+    # Resolved HERE and not at import: fit_pairs.py imports this module for
+    # read_gpos_kern, and a module-level _find_source() would download a font
+    # as a side effect of that import on any machine with a cold cache.
+    src_path = SRC or _find_source()
+    src = TTFont(src_path); upm = src["head"].unitsPerEm; cmap = src.getBestCmap(); gs = src.getGlyphSet(); hmtx = src["hmtx"]
     order = [".notdef"]; charmap = {}; glyphs = {}; metrics = {}; traps_total = 0
     pen = TTGlyphPen(None); pen.moveTo((50, 0)); pen.lineTo((50, 700)); pen.lineTo((450, 700)); pen.lineTo((450, 0)); pen.closePath()
     glyphs[".notdef"] = pen.glyph(); metrics[".notdef"] = (500, 50)
@@ -248,7 +299,7 @@ def build():
                 usWinAscent=os2.usWinAscent, usWinDescent=os2.usWinDescent, sxHeight=os2.sxHeight, sCapHeight=os2.sCapHeight)
     fb.setupPost()
     src_kern = read_gpos_kern(src, {cp: cmap[cp] for cp in charmap})
-    fixes = {}; kp = f"{OUTDIR}/kern-{STYLE}.json"
+    fixes = {}; kp = f"{FIXDIR}/kern-{STYLE}.json"
     if os.path.exists(kp): fixes = json.load(open(kp))
     eff = {}
     for (l, r), v in src_kern.items():

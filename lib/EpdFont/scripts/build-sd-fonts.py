@@ -1051,6 +1051,7 @@ def build_family(
         resolved_styles = {}
         synth_flags = {}
         space_flags = {}
+        fallback_heads = {}
         # Advance-only spacing, collected over EVERY style. Flat keys rather
         # than a nested map, and deliberately NOT folded into the `from:` pass
         # below the way `synthetic:` is: a synthetic style borrows another
@@ -1152,11 +1153,57 @@ def build_family(
             synth_flags[style_name] = ",".join(
                 f"{k}={v}" for k, v in sorted(style_spec["synthetic"].items()))
 
+        # `fallback_head:` -- faces spliced in FRONT of the chain, per style.
+        #
+        # For a family DERIVED from another typeface. Heros Text Cut is cut
+        # from TeX Gyre Heros and carries 395 of the 647 codepoints Heros has
+        # inside `reading`; the other 252 -- its Greek, its arrows, its math
+        # operators, its f-ligatures, its Vietnamese -- were filled from the
+        # ordinary chain, which begins with TeX Gyre Schola, a SERIF. A
+        # neo-grotesque page was setting `alpha beta Delta pi` in Century
+        # Schoolbook. Owner ruling 2026-09-16: "if heros has symbols, text cut
+        # should use those before using Schola."
+        #
+        # PER STYLE, because the ordinary chain is not: every style of every
+        # family gets Schola REGULAR, so a bold page's fallback glyphs have
+        # always come back at regular weight. A head named per style fixes that
+        # for the family that uses it, and each entry takes the same keys as a
+        # style source (`path`/`url`/`zip`, `variable:`, `scale:`) -- `scale:`
+        # matters, because the family's own styles may carry one and a head at
+        # a different em renders its glyphs at a different size from the text
+        # around them.
+        #
+        # It only ever ADDS a face at the front: everything the head lacks
+        # still falls through to Schola, Noto Sans, Noto Sans Math and Noto
+        # Sans Symbols 2 exactly as before, so a family without this key builds
+        # byte-for-byte as it did.
+        head_specs = family.get("fallback_head") or {}
+        for style_name, head_spec in head_specs.items():
+            if style_name not in resolved_styles:
+                return name, False, (
+                    f"{name}: fallback_head names style '{style_name}', which "
+                    f"this family does not have")
+            head = resolve_font_path(head_spec, name, f"fbhead-{style_name}")
+            if "scale" in head_spec:
+                head = apply_upem_scale(head, float(head_spec["scale"]),
+                                        name, f"fbhead-{style_name}")
+            fallback_heads[style_name] = head
+
     except (FileNotFoundError, RuntimeError) as e:
         return name, False, str(e)
 
     # Build the fontconvert_sdcard.py command
     cmd = [sys.executable, str(FONTCONVERT)]
+
+    def chain_for_style(style_name: str) -> str:
+        """The fallback chain one style is built against.
+
+        `fallback_font` is the family-wide chain; a `fallback_head:` entry for
+        this style goes in front of it. Joined with os.pathsep, which is what
+        fontconvert_sdcard.py splits on.
+        """
+        head = fallback_heads.get(style_name)
+        return os.pathsep.join([str(head), fallback_font]) if head else str(fallback_font)
 
     multi_style = len(resolved_styles) > 1 or "regular" not in resolved_styles
     has_any_multi = any(k in resolved_styles for k in ("regular", "bold", "italic", "bolditalic"))
@@ -1165,14 +1212,14 @@ def build_family(
         # Multi-style mode
         for style_name, font_path in resolved_styles.items():
             cmd.extend([f"--{style_name}", str(font_path)])
-            cmd.extend([f"--fallback-{style_name}", str(fallback_font)])
+            cmd.extend([f"--fallback-{style_name}", chain_for_style(style_name)])
     else:
         # Single-style mode
         style_name = next(iter(resolved_styles))
         font_path = resolved_styles[style_name]
         cmd.append(str(font_path))
         cmd.extend(["--style", style_name])
-        cmd.extend([f"--fallback-{style_name}", str(fallback_font)])
+        cmd.extend([f"--fallback-{style_name}", chain_for_style(style_name)])
 
     for style_name, spec in synth_flags.items():
         cmd.extend([f"--synth-{style_name}", spec])
@@ -1371,6 +1418,16 @@ def main():
     needed_fallbacks = set(chosen_fallbacks)
     for path, names in chosen_fallbacks.items():
         print(f"Fallback glyphs from {path.name}: {', '.join(sorted(names))}")
+    # `fallback_head:` faces are NOT in chosen_fallbacks -- that dict exists to
+    # decide which shared faces this run must download, and a head is resolved
+    # per family inside the worker. Print it anyway: the list above is what
+    # anyone diagnosing a wrong fallback glyph reads, and a head missing from
+    # it reads as "the head is not in play".
+    for f in families:
+        head = f.get("fallback_head") or {}
+        if head:
+            print(f"Fallback glyphs FIRST from the {f['name']} head: "
+                  f"{', '.join(sorted(head))}")
     if LATIN_FALLBACK_FONT in needed_fallbacks and not LATIN_FALLBACK_FONT.is_file():
         print(
             f"ERROR: Missing Latin fallback font: {LATIN_FALLBACK_FONT}\n"
