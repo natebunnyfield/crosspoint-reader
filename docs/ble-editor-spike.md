@@ -518,3 +518,44 @@ pio run -e default -t upload     # build + flash the USB-connected X4
 `CMD:BLEEDIT` over serial opens the editor without anyone at the buttons; the
 home-menu row does the same thing by hand. Log markers: `SPIKE-HEAP P0..P5`,
 `SPIKE-LATENCY`, and `BLESPIKE` for the GAP/GATT trace.
+
+
+## 2026-09-15 — the partial-redraw attempt, and why it was reverted
+
+Windowed refresh landed (build 202) with a partial redraw in
+`NoteEditorActivity::render`: when `topLine`, the line count and the cursor's
+line were all unchanged, only the cursor's own line was cleared and redrawn, so
+`GfxRenderer`'s dirty rect stayed small and the refresh could be windowed.
+Measured in the simulator at one percent of the panel.
+
+**It broke the editor on device, and the owner found it in one sitting**:
+*"keyboard is not updating in editor"*.
+
+The eligibility test was asking the wrong question. `render()` draws three live
+regions, not one:
+
+1. the text lines,
+2. the **on-screen keyboard panel** (`panel.render(...)`), whose selection
+   highlight moves on every arrow press, and
+3. the **status band** above it, which carries a live word count and the KBD
+   indicator.
+
+Moving the keyboard's highlight does not move the *text* cursor, so all three of
+my conditions held, the partial path ran, and the panel was never redrawn. The
+word count froze for the same reason. The test was sound for the region it
+described and silent about the two it did not.
+
+**Reverted in full.** The dirty rect in `GfxRenderer` and the UC8253 windowed
+refresh both stay — they are correct, they cost nothing while unused, and the
+rect still falls back to a whole-panel refresh for every caller that clears the
+screen, which is all of them again.
+
+**Do not simply re-add this with the keyboard state in the condition.** The
+three regions between them span most of the screen: text at the top, the panel
+occupying the strip above the button hints, the status band between them. A
+redraw that covers all three honestly is close to a whole-panel redraw, so the
+saving the exercise was for largely evaporates for *this* screen. If it is
+attempted again, the thing to measure first is the union of the three dirty
+regions during ordinary typing — if that is not comfortably under half the
+panel, the answer is that the editor is the wrong place for this and a screen
+with one live region is the right one.

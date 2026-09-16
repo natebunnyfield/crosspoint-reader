@@ -101,36 +101,6 @@ class NoteEditorActivity final : public Activity {
   bool repeatCaret(MappedInputManager::Button button, CaretDir dir);
   void moveCaret(CaretDir dir);
   void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
-
-  // ---------------------------------------------- partial redraw (2026-09-14)
-  //
-  // Typing one character redraws and refreshes the WHOLE panel, and the refresh
-  // is 62% of the measured 920 ms floor (docs/ble-editor-spike.md:88). The
-  // renderer will window a refresh to the rows that changed
-  // (GfxRenderer's dirty band) -- but only if something actually leaves the
-  // rest of the panel alone, and render() begins with clearScreen(), which
-  // marks the whole panel dirty. So the win needs a path that does not clear.
-  //
-  // These four remember what the last FULL render put on the glass. When all of
-  // them still hold, the only thing that can have changed is the content of the
-  // cursor's own line, and that line alone is redrawn.
-  //
-  // THE CONDITION IS DELIBERATELY NARROW, because the failure mode is a stale
-  // region the user can see and cannot clear. Anything that moves other lines --
-  // scrolling (topLine), a wrap or an unwrap (lines.size()), moving between
-  // lines (the caret has to be erased from the old one) -- takes the full path.
-  // Wrapping is the subtle one: typing inside a line can push a word onto the
-  // next line, which changes lines.size(), which forces a full render. That is
-  // why this is safe rather than clever.
-  bool partialValid = false;
-  size_t lastTopLine = 0;
-  size_t lastLineCount = 0;
-  size_t lastCursorLine = 0;
-
-  // Redraw only the cursor's line, over a cleared background, without touching
-  // the rest of the panel. Returns false when it declines, and the caller then
-  // takes the full path.
-  bool renderCursorLineOnly();
   bool save();
   // Shared exit for Back and keyboard Done: saves, then routes to FileManager
   // (when launched from there) or goes home.

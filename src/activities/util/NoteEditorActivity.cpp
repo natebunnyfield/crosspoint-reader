@@ -716,37 +716,7 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
   }
 }
 
-// Redraw ONLY the cursor's line, leaving every other pixel alone, so the
-// renderer's dirty band stays small and displayBuffer() can window the refresh
-// instead of repainting the panel. The eligibility test is in the header.
-bool NoteEditorActivity::renderCursorLineOnly() {
-  if (!partialValid || oomFailed || !buf) return false;
-  const size_t cl = lineOfCursor();
-  // Anything that can move a line other than the cursor's own takes the full
-  // path: scrolling, a wrap or unwrap, or the caret moving off the line it was
-  // on (which has to be erased from the old one).
-  if (topLine != lastTopLine || lines.size() != lastLineCount || cl != lastCursorLine) return false;
-  if (cl < topLine || cl >= lines.size()) return false;
-  const size_t row = cl - topLine;
-  if (row >= static_cast<size_t>(maxLines)) return false;
-
-  const int y = contentTop + static_cast<int>(row) * lineHeight;
-  // Clear the line's band first: drawLine paints glyphs, it does not erase what
-  // was under them, so without this a deleted character stays on screen. This
-  // goes through drawPixel, which is what puts these rows -- and only these
-  // rows -- into the dirty band.
-  renderer.fillRect(0, y, renderer.getScreenWidth(), lineHeight, false);
-
-  const DisplayLine& dl = lines[cl];
-  const size_t len = dl.end > dl.start ? dl.end - dl.start : 0;
-  drawLine(buf->data() + dl.start, len, y, true, buf->cursor() - dl.start);
-  renderer.displayBuffer();
-  return true;
-}
-
 void NoteEditorActivity::render(RenderLock&&) {
-  if (renderCursorLineOnly()) return;
-
   renderer.clearScreen();
   const auto pageWidth = renderer.getScreenWidth();
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -772,7 +742,6 @@ void NoteEditorActivity::render(RenderLock&&) {
     }
     const auto oomLabels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, oomLabels.btn1, oomLabels.btn2, oomLabels.btn3, oomLabels.btn4);
-    partialValid = false;  // an OOM screen is not a document; never patch a line onto it
     renderer.displayBuffer();
     return;
   }
@@ -858,14 +827,6 @@ void NoteEditorActivity::render(RenderLock&&) {
                           ? mappedInput.mapLabels(tr(STR_BACK), tr(STR_DONE), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT))
                           : mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-  // The panel now shows a FULL render. Remember what it was, so the next
-  // keystroke can tell whether anything but the cursor's own line could have
-  // moved. Set here rather than at the top of render() because only a completed
-  // full render makes the partial path safe.
-  partialValid = !oomFailed && buf != nullptr;
-  lastTopLine = topLine;
-  lastLineCount = lines.size();
-  lastCursorLine = lineOfCursor();
   renderer.displayBuffer();
 }
 
