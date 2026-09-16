@@ -422,3 +422,67 @@ replacing it with a face of comparable breadth — Cyrillic, Latin Extended-B,
 Latin Extended Additional and the combining marks in one file — which in
 practice means DejaVu Sans or another Noto. That is a swap, not a removal, and
 has not been priced.
+
+## What each family's description CLAIMS, against what its face has, 2026-09-16
+
+Every `description:` in `sd-fonts.yaml` ends in a script parenthetical, and
+sixteen of them were wrong. **Nothing on the device reads that field** — the
+device-side font download and its `fonts.json` manifest were removed 2026-08-10
+(`build-sd-fonts.py:6-10`), and no script in either repo parses `description:`
+today. An earlier draft of this section claimed the field was user-visible
+through that download UI; adversarial review caught it, and it is the exact
+invented rationale this project's rules forbid. What the field actually is: the
+one-line answer to "what is this typeface" that a developer reading the recipe
+gets, and the text `docs/type-coverage.html` renders. That is enough reason for
+it to be true, and it did not need a bigger one. Found by joining the three font-metadata sources
+(`sd-fonts.yaml`, `src/FontDisplayNames.h`, `docs/font-dates.md`) and measuring
+every regular face's own cmap.
+
+**The test, and why a block count is not one.** Counting codepoints in the Greek
+or Cyrillic block cannot separate a face that sets Greek from a face that has
+the micro sign: TeX Gyre Schola holds 54 of 144 Greek codepoints and cannot set
+a word of it. The question is asked instead as **the 14 tonos-accented Greek
+letters** (Ά Έ Ή Ί Ό Ύ Ώ ά έ ή ί ό ύ ώ) and **the 64 core Russian letters**
+(U+0410–044F). Those are what running text needs. The **tonos test is perfectly bimodal**
+across all 56 measurable faces — every face has all 14 or none, no exceptions —
+so it needed no threshold at all. The **Cyrillic test is not**, and an earlier
+draft of this section said it was: Junicode carries **4 of the 64**, the hard
+and soft signs Ъ Ь ъ ь, which a medievalist face has for Slavonic
+transcription rather than for setting Russian, and Antpolt carries 2. The
+classification is unaffected — 4 of 64 does not earn a Cyrillic claim — but a
+face at 8 or 12 would have needed exactly the judgment the prose claimed was
+never required. It is a near-bimodal test with a wide gap, not a free one.
+
+| direction | families |
+|---|---|
+| **over-claimed** a script the face lacks | TeXGyreSchola, Archivo (both dropped `Greek, Cyrillic`) · IBMPlexSerif, IBMPlexMono, LibreFranklin (dropped `Greek`) |
+| **no parenthetical at all** | Almendra → `(Latin)`, the only installed family without one |
+| **under-claimed** — the face HAS the script, the description hid it | Spectral, iAWriterMono (Cyrillic) · FiraSansBook, iAWriterDuo, iAWriterQuattro, SourceCodePro, OpenDyslexic, NittiTypewriter (Greek + Cyrillic) · LexicaUltralegible, Junicode (Greek) |
+
+The under-claims are the same defect pointed the other way and are the direction
+that costs a reader something: someone hunting a Cyrillic face would have passed
+over Spectral, and Junicode — a medievalist scholarly serif carrying a full
+tonos Greek — was described as Latin-only.
+
+**The nuance that makes this a convention rather than a fact.** A shipped
+`.cpfont` carries ~2,676 codepoints whatever its face holds, because the
+fallback chain fills the rest. So a description naming Cyrillic was never false
+of the FILE, only of the TYPEFACE. The file's own convention is to describe the
+typeface — `sd-fonts.yaml`'s TeXGyreHeros recipe already says at length that its
+description "does not claim the two scripts the face does not have", and names
+Schola's description as wrong for the same reason. That comment is what was
+generalized; reversing the convention would mean re-editing all sixteen.
+
+**Six families could not be measured**: DTLFleischmann, DanteMT, LutetiaNova,
+GoldenCockerel, WarblerText and DTLRomulus are commercial faces whose outlines
+are gitignored and live only in the private `crosspoint-local-fonts` mirror. Run
+the sweep again on a machine that has them. AtkinsonHyperlegibleSoft and
+Junicode WERE measured — their sources are public and were fetched for this.
+
+Two other metadata defects fixed in the same pass, neither about coverage:
+the reader's picker (`src/FontDisplayNames.h`) and its declared source of truth
+(`docs/font-dates.md`) disagreed on four families and the doc was missing rows
+for six picker entries — the doc had itself flagged, and not closed, that it was
+behind the header on Almendra. And the `DTLRomulus` row carried two unescaped
+`|` characters inside a quoted font name, which silently split it into ten
+columns and truncated its Basis cell wherever the table was rendered.

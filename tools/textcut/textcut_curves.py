@@ -38,12 +38,13 @@ Operations, in font units at 1000/em, all deterministic:
            fixes from kern-<style>.json (uprights only), written as one kern
            feature through feaLib.
 """
-import sys, os, json, math
+import sys, os, json, math, re, hashlib
 from fontTools.ttLib import TTFont
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.recordingPen import RecordingPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.cu2quPen import Cu2QuPen
+from fontTools.misc.fixedTools import floatToFixedToStr
 
 STYLE = sys.argv[1] if len(sys.argv) > 1 else "regular"
 # Paths resolve from THIS file, and both are env-overridable. They were an
@@ -98,6 +99,73 @@ TRAP_DEPTH, TRAP_MOUTH, TRAP_FLOOR, TRAP_MAX_DEG = 20.0, 8.0, 3.0, 75.0
 DIGIT_TOP = 715.0
 DIGIT_LIFT = {c: DIGIT_TOP / 709.0 for c in "01234689"}; DIGIT_LIFT.update({"5": DIGIT_TOP / 694.0, "7": DIGIT_TOP / 694.0})
 CU2QU_ERR = 1.0
+
+# Bump this whenever the CUT changes -- outlines, advances, kerning, traps,
+# digit lift, or anything else that changes what the font draws or measures.
+# name ID 5 (version) and head.fontRevision are both derived from this one
+# number below (via floatToFixedToStr, so the fixed-point head field and the
+# printable string can never read differently), and the uniqueFontIdentifier
+# folds in a content hash on top of it -- so a hand-typed date can no longer
+# go stale the way "curves 2026-09-14" did across the 2026-09-16 ligature
+# round. WHOEVER CHANGES THE CUT BUMPS THIS NUMBER.
+FONT_VERSION = 0.003
+
+def style_words(style):
+    """(human subfamily, PostScript-safe subfamily) for a lowercase CLI style
+    name. These are different conventions: the human form is space-separated
+    ('Bold Italic', for styleName/fullName) and the PostScript form is one
+    token with no spaces ('BoldItalic', for psName) -- a PostScript name may
+    not contain a space. Only these four styles are ever cut here."""
+    words = {"regular": "Regular", "bold": "Bold", "italic": "Italic", "bolditalic": "Bold Italic"}
+    human = words.get(style, style.capitalize())
+    return human, human.replace(" ", "")
+
+def gfl_strings(src):
+    """Pull the license name, license URL, and designer credit out of the
+    SOURCE face's own name table, quoted verbatim rather than composed here.
+    Verified against all four texgyreheros-*.otf: none carries a separate
+    nameID 9 (designer), 11 (vendorURL), 13 (license) or 14 (licenseURL) --
+    the only place any of this lives is prose inside nameID 0 (copyright).
+    Parsed rather than hand-typed so a future source update carries through
+    unattended, and so the license text is the GFL's own wording, not ours."""
+    copyright_ = src["name"].getDebugName(0)
+    m_license = re.search(r"This work is released under.*?details\.", copyright_)
+    m_url = re.search(r"https?://\S+", copyright_)
+    m_designer = re.search(r"extensions by (.+?)\s*\(on behalf", copyright_)
+    license_desc = m_license.group(0) if m_license else copyright_
+    license_url = m_url.group(0) if m_url else ""
+    designer = m_designer.group(1) if m_designer else ""
+    return copyright_, license_desc, license_url, designer
+
+def content_hash(order, charmap, glyphs, metrics, kerning):
+    """A deterministic digest of exactly what this build cut: every glyph's
+    codepoints, advance/sidebearing, and outline (contour end points, on/off
+    flags, coordinates), in the stable glyph order the build already keeps,
+    plus the EFFECTIVE kern pairs -- source GPOS plus any fitted fixes -- which
+    are shipped content as much as an outline is.
+    Re-running the cutter on the same source with the same settings must
+    reproduce this byte-for-byte (the repo verifies the cut reproduces), so
+    nothing here may depend on dict iteration order, wall time, or anything
+    else that varies run to run -- `order` supplies the iteration order and
+    every other input is read straight off the glyph/metric data itself."""
+    cps_by_name = {}
+    for cp, name in charmap.items(): cps_by_name.setdefault(name, []).append(cp)
+    h = hashlib.sha256()
+    for gname in order:
+        g = glyphs[gname]
+        h.update(gname.encode("utf-8"))
+        h.update(repr(sorted(cps_by_name.get(gname, []))).encode("utf-8"))
+        h.update(repr(metrics[gname]).encode("utf-8"))
+        if g.numberOfContours > 0:
+            h.update(bytes(g.flags))
+            h.update(repr(list(g.endPtsOfContours)).encode("utf-8"))
+            h.update(repr(list(g.coordinates)).encode("utf-8"))
+        else:
+            h.update(b"no-outline")
+    h.update(b"kern")
+    for (l, r), v in sorted(kerning.items()):
+        h.update(f"{l:04X},{r:04X}={v};".encode("ascii"))
+    return h.hexdigest()[:12]
 
 # Basic Latin, Latin-1, Latin Ext-A/B, General Punctuation, the euro, and the
 # f-ligature presentation forms. The ligatures joined 2026-09-16: without their
@@ -293,11 +361,16 @@ def build():
     fb.setupHorizontalMetrics(metrics)
     hhea = src["hhea"]; os2 = src["OS/2"]
     fb.setupHorizontalHeader(ascent=hhea.ascent, descent=hhea.descent)
-    fb.setupNameTable({"familyName": "Heros Text Cut", "styleName": STYLE.capitalize(), "fullName": f"Heros Text Cut {STYLE.capitalize()}",
-                       "psName": f"HerosTextCut-{STYLE.capitalize()}", "uniqueFontIdentifier": f"HerosTextCut-{STYLE} curves 2026-09-14", "version": "Version 0.002"})
-    fb.setupOS2(sTypoAscender=os2.sTypoAscender, sTypoDescender=os2.sTypoDescender, sTypoLineGap=os2.sTypoLineGap,
-                usWinAscent=os2.usWinAscent, usWinDescent=os2.usWinDescent, sxHeight=os2.sxHeight, sCapHeight=os2.sCapHeight)
-    fb.setupPost()
+
+    # KERNING IS RESOLVED BEFORE THE NAME TABLE, and that ordering is the
+    # point: the effective pairs feed content_hash, so a kern-only change moves
+    # the uniqueFontIdentifier. It used to be computed after the name table and
+    # was therefore absent from the digest -- a fix to kern-<style>.json would
+    # have changed the shipped GPOS and left the font's identity string saying
+    # it was the same font, which is the exact class of bug the hand-typed date
+    # already caused once. Found by adversarial review 2026-09-16; inert at the
+    # time, because round 14 withdrew every fitted pair and all four styles
+    # build with 0 fitted.
     src_kern = read_gpos_kern(src, {cp: cmap[cp] for cp in charmap})
     fixes = {}; kp = f"{FIXDIR}/kern-{STYLE}.json"
     if os.path.exists(kp): fixes = json.load(open(kp))
@@ -307,6 +380,31 @@ def build():
     for pair, v in fixes.items():
         l, r = ord(pair[0]), ord(pair[1])
         if l in charmap and r in charmap: eff[(l, r)] = eff.get((l, r), 0) + int(v)
+
+    human, ps = style_words(STYLE)
+    version_str = f"Version {floatToFixedToStr(FONT_VERSION, 16)}"
+    digest = content_hash(order, charmap, glyphs, metrics, eff)
+    uid = f"HerosTextCut-{ps};{floatToFixedToStr(FONT_VERSION, 16)};{digest}"
+    src_copyright, license_desc, license_url, designer = gfl_strings(src)
+    derivative_note = (" Heros Text Cut is a modified derivative of TeX Gyre Heros, redistributed under a"
+                        " different name as the GUST Font License permits; outline changes 2026 by the"
+                        " CrossPoint reader project.")
+    fb.setupNameTable({
+        "familyName": "Heros Text Cut", "styleName": human, "fullName": f"Heros Text Cut {human}",
+        "psName": f"HerosTextCut-{ps}", "uniqueFontIdentifier": uid, "version": version_str,
+        "copyright": src_copyright + derivative_note,
+        "designer": designer,
+        # NO vendorURL (nameID 11). The source publishes none, and pointing it
+        # at the GFL's URL -- the only URL the source does publish -- would
+        # make a font manager's "vendor" link open a license text. An absent
+        # field is honest; a field that answers a different question is not.
+        "licenseDescription": license_desc,
+        "licenseInfoURL": license_url,
+    })
+    fb.font["head"].fontRevision = FONT_VERSION
+    fb.setupOS2(sTypoAscender=os2.sTypoAscender, sTypoDescender=os2.sTypoDescender, sTypoLineGap=os2.sTypoLineGap,
+                usWinAscent=os2.usWinAscent, usWinDescent=os2.usWinDescent, sxHeight=os2.sxHeight, sCapHeight=os2.sCapHeight)
+    fb.setupPost()
     if eff:
         from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
         lines = ["languagesystem DFLT dflt;", "feature kern {"] + [f"  pos {charmap[l]} {charmap[r]} {v};" for (l, r), v in sorted(eff.items())] + ["} kern;"]
