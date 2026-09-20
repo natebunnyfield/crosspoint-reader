@@ -2119,22 +2119,29 @@ families:
   # owner ruling, not a tidy-up — this file's standing convention.
   #
   # The one family here whose outlines are OURS: drawn parametrically by
-  # crosspoint-simulator/tools/wedge_serif (99 evolutionary rounds,
-  # docs/wedge-serif-exploration.md), 470 glyphs, 1000 upem, five cuts
-  # (Regular 400, Italic 400, SemiBold 600, Bold 700, BoldItalic 700; the
-  # italics are slanted 11° with the fsSelection ITALIC bit set). It is
+  # crosspoint-simulator/tools/wedge_serif (297 evolutionary rounds,
+  # docs/wedge-serif-exploration.md), 486 glyphs, 1000 upem, FOUR cuts
+  # (Regular 400, Italic 400, Bold 700, BoldItalic 700; the italics are
+  # slanted 13° with the fsSelection ITALIC bit set). It is
   # therefore not a licensing case like Edgar, Doves or VandenKeere — but
   # local_fonts/ is gitignored wholesale, so the .ttf files still do not
   # travel with a clone. Rebuild: `python3 -m outlines.build <dir>` from
   # crosspoint-simulator/tools/wedge_serif.
   #
-  # SemiBold is deliberately unmapped. The reader has four style slots and
-  # bold is 700 everywhere else in this file; the 600 cut exists for the
-  # design's own weight ladder.
+  # SemiBold is RETIRED, not merely unmapped (2026-09-20): the 600 cut has
+  # been deleted from local_fonts/Albo/ rather than left there for a slot that
+  # does not exist. The reader has four style slots and bold is 700 everywhere
+  # else in this file, so an unbuilt fifth cut was only a thing to keep in
+  # step with the other four, and it had already fallen behind.
+  #
+  # The italic pair is an ALDINE italic, drawn rather than sheared: a separate
+  # construction in outlines/glyphs/aldine.py against Flanker Griffo and the
+  # scans, not the roman on a slant. That is why its cmap matches the roman's
+  # while almost none of its outlines do.
   - name: Albo
     description: "Albo, in-house humanist wedge serif drawn for CrossPoint longform reading (Latin, Greek, symbols)"
-    # `reading` and nothing added, because the face was drawn to it: 468 of
-    # its 469 cmapped codepoints fall inside these intervals. THE ONE THAT
+    # `reading` and nothing added, because the face was drawn to it: 484 of
+    # its 485 cmapped codepoints fall inside these intervals. THE ONE THAT
     # DOES NOT is U+2122 ™, which sits in Letterlike Symbols and is therefore
     # DROPPED from the build entirely (a codepoint outside every interval is
     # not built and not fallen back). Edgar is the precedent for wanting it —
@@ -2162,7 +2169,7 @@ families:
     # 9/10/12/14/16/18 in the regular — EXACT at five of six slots — and the
     # `n` is what a page of text is mostly made of. Recorded rather than
     # corrected: `scale:` is not a styling knob, and neither sanctioned use
-    # applies (the five cuts are one typeface, so this is not the
+    # applies (the four cuts are one typeface, so this is not the
     # mixed-source case, and the Almendra-anchored words-per-page
     # measurement has not been run on it).
     #
