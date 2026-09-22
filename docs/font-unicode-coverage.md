@@ -174,3 +174,315 @@ from the fallback chain. That is not a defect specific to this family: TeX Gyre
 Schola's own cmap is the same 1,087 codepoints, because GUST could not
 relicense the base-35 Cyrillic (`qhv-hist.txt`) and shipped no Cyrillic in any
 TeX Gyre face.
+
+## Corpus diff: Eighth Atlas, 2026-09-15
+
+The claude-tools epubs are the reader's real-world codepoint corpus, so each
+new one gets diffed against the installed interval tables. `atlas/epub/
+eighth-atlas-2026-09-15.epub` (62,406 words, 136 entries) uses **38 distinct
+non-ASCII codepoints**. Measured by parsing the `.cpfont` interval tables of
+all nine installed families at 16 px, the same way the 2026-08-20 pass did —
+not inferred from `sd-fonts.yaml`, which records what was *requested* and not
+what survived pruning.
+
+**Present in all nine families**, including the ones that would be plausible
+gaps: U+215C ⅜, U+00BC/BD/BE ¼ ½ ¾, U+2248 ≈, U+2032/2033 ′ ″, U+03C6 φ,
+U+00D7 ×, U+014D ō, U+016B ū, U+017A ź, U+0131 ı, U+00E6 æ, U+2192 →,
+U+00B7 ·, U+2014/2013 — –, U+2026 …, and the accented Latin set. The
+`reading` preset's 0x0020–0x024F, 0x2000–0x206F, 0x2150–0x218F, 0x2190–0x21FF
+and 0x2200–0x22FF blocks cover every one of them.
+
+**Absent from all nine**, and therefore rendering as the family's own U+FFFD
+box:
+
+| codepoint | char | entry |
+|---|---|---|
+| U+3131 · U+3141 · U+3145 | ㄱ ㅁ ㅅ | `topics/hangul.md` |
+| U+3057 · U+56DE · U+6839 | し 回 根 | `topics/nemawashi.md` |
+| U+5B88 · U+7834 · U+96E2 | 守 破 離 | `topics/shuhari.md` |
+
+Ten codepoints, twelve occurrences, three entries — every one of them a
+parenthetical gloss beside its romanization, so the sentence still reads. The
+cause is the same structural one this document already describes: `reading`
+stops at 0x303F, so Hiragana (0x3040–0x309F), Hangul Compatibility Jamo
+(0x3130–0x318F) and the CJK ideographs (0x4E00–0x9FFF) are outside every
+installed family, and `resolveTextFontId`'s CJK redirect
+(`lib/GfxRenderer/GfxRenderer.cpp:196-219`) needs a registered fallback font
+that this card does not carry.
+
+Scope note: verified against the interval tables, **not observed on glass**.
+The book itself was confirmed to parse, paginate and render in the simulator
+on 2026-09-15; the three affected pages were not paged to.
+
+## The cut carries 395 of the 647 it asks for, 2026-09-15
+
+Two findings, one mechanism, both from one question: a `render_harness aa
+HerosRef` proof page at slot 1 showing eleven replacement boxes on the math
+line, and the ask "use a better fallback (probably some math or tex gyre
+typeface) to address the missing characters there."
+
+**A better fallback cannot address them, and that is worth stating first.** The
+fallback chain only fills a codepoint the family's `intervals:` ASKED for --
+`build-sd-fonts.py:apply_cmap_drops` says it in its own docstring, "a codepoint
+outside every interval is dropped from the build entirely rather than fallen
+back," and `fontconvert_sdcard.py` reaches for the chain only when
+`face.get_char_index(cp) == 0` for a requested codepoint. So a face added to
+the chain changes nothing for a codepoint nobody requested.
+
+### 1. The proof recipe, not the fallback (`tools/textcut/proof.yaml`)
+
+`HerosRef` and `HerosTextCut` are built there at `intervals: latin-ext`, which
+is `0x0020-0x024F, 0x02B0-0x02FF, 0x1E00-0x1EFF, 0x2000-0x206F, 0xFB00-0xFB06`
+-- no Greek, no Arrows, no Mathematical Operators, no Dingbats. The specimen's
+math line asks for all four blocks, so eleven of its thirteen probes were
+dropped at build time: `-` U+2212, `!= <= >=` U+2260/2264/2265, `inf` U+221E,
+`alpha beta Delta pi` U+03B1/03B2/0394/03C0, `<- ->` U+2190/2192, plus the two
+dingbats U+2713/2717. `x` and `/` survived because they are Latin-1.
+
+The shipped recipes for both families in `sd-fonts.yaml` use `intervals:
+reading`. The proof was narrower than the thing it proves. Rebuilt at
+`reading`: 2,676 glyphs per style, which is exactly the shipped
+`TeXGyreHeros` figure from the 2026-08-23 addendum above, build time 6 s for
+both families, 1.1M -> 3.4M per family at the proof's four slots. Every probe
+renders.
+
+### 2. The shipped cut is a sans face with a serif for 252 of its codepoints
+
+Measured against `lib/EpdFont/local_fonts/HerosTextCut-regular.ttf` and
+`downloaded_fonts/HerosRef/texgyreheros-regular.otf`, per style, identical for
+all four styles:
+
+| | codepoints |
+|---|---|
+| TeX Gyre Heros own cmap | 1,053 |
+| ...of which inside `reading` | 647 |
+| HerosTextCut carries | 395 |
+| **Heros has, the cut does not** | **252** |
+
+The cutter's charset gate is `tools/textcut/textcut_curves.py:65`,
+`wanted(cp) = 0x20 <= cp < 0x0250 or 0x2000 <= cp <= 0x206F or cp == 0x20AC`.
+Everything Heros has outside that gate is filled on the card from
+`[TeXGyreSchola, NotoSans, NotoSansMath, NotoSansSymbols2]` -- Schola first, by
+the 2026-08-17 ruling -- and Schola is Century Schoolbook, a serif. Rendered
+from the card the device reads (`fs_/fonts/`, slot 3, `render_harness aa`),
+HerosTextCut sets `alpha beta Delta pi` and `!= <= >= inf <- ->` in serif while
+TeXGyreHeros sets them in its own sans, on the same page, under names that
+differ by two words.
+
+The 252, by block:
+
+| block | n | what it is |
+|---|---|---|
+| U+1E00-1EFF | 133 | Latin Extended Additional -- Vietnamese and the dotted/barred accents |
+| U+0300-03FF | 75 | combining diacritics and the 54 Greek Heros carries |
+| U+02B0-02FF | 10 | spacing modifiers, the circumflex/caron/breve set |
+| U+2200-22FF | 14 | `d Sum - -+ / * sqrt inf angle ~~ != <= >= star` |
+| U+2000-20CF | 6 | currency: colon, lira, naira, won, dong, peso |
+| U+FB00-FB06 | 5 | **the f-ligatures** -- the built cpfont reports `ligs=0` against Heros's `ligs=5` |
+| U+2190-21FF | 4 | the four cardinal arrows |
+| U+2500-26FF | 5 | lozenge, white bullet, eighth note, the two marriage signs |
+
+The f-ligature row is the one that reaches ordinary English prose: an epub
+using U+FB01/FB02 gets a Century Schoolbook `fi` inside a neo-grotesque
+paragraph, and `SdCardFont`'s own liga table is empty for the family.
+
+### Three options, with what each costs
+
+1. **Proof only** -- `proof.yaml` to `reading`. One line, 6 s, makes the
+   specimen match what ships. Does NOT change the card; the cut arm then
+   renders its serif fallback beside the ref arm's own glyphs, which is honest
+   and is how the two families actually differ today.
+2. **Widen the cut** -- `wanted()` to `reading`'s ranges, so the cutter carries
+   every glyph the source face has inside them, 647 instead of 395. The weight,
+   trap and digit-alignment operations then run over Greek, math and arrows
+   they were never tuned on (the trap rule is crotch-angle driven and would
+   fire on `alpha`, `Delta`, the arrowheads), and `fit_pairs.py`'s corpus is
+   ASCII so none of them would be pair-fitted -- the same accepted tradeoff the
+   accented Latin already carries. Costs a rebuild and a reinstall of an
+   INSTALLED family: card, three Mac app cards, the iOS seed tree, all tiers.
+3. **Order the chain by classification** -- put a sans (NotoSans /
+   NotoSansMath) ahead of Schola for sans families. This reverses the
+   2026-08-17 ruling ("make texgyre with primary"), which was itself made about
+   Libre Franklin, a sans; it would move glyphs in every family, not just this
+   one. Not taken without a ruling.
+
+A correction to this document, from the same review: the reason U+2E3B does not
+move at the 3x tier is NOT that the head displaced Schola for it. Measured at
+16/32/48 ppem, **U+2E3B is absent from the Heros head, from Schola, from Noto
+Sans Math and from Noto Sans Symbols 2** — it comes from **Noto Sans**, at
+132x4 px at 48 ppem. So the global `tier_drops: {3: [11835]}` is untouched
+because nothing moved, not because the head answers for it. The conclusion
+holds and the rationale did not; all three tiers built, and
+`fontconvert_sdcard.py` aborts rather than truncating on a glyph over 255 px,
+so those builds are proof rather than assumption. Largest rendered dimension
+over every `reading` codepoint the head can supply, at the largest 3x ppem:
+head 66 px, Schola 65 px — nothing near the ceiling either way.
+
+Checked and found CLEAN on the way: the arrows are present in every installed
+family (the 08-17 fix holds); `HerosRef`'s own face supplies eleven of the
+thirteen probes once they are requested, so stock Heros needs no new fallback
+face at all; the pruned residue at `reading` is 500 codepoints per style and is
+the same unfillable set the 2026-08-20 pass recorded (C1 controls, Roman
+numerals, rare Greek, box drawing), not a regression.
+
+## Resolution, 2026-09-16: a per-style head on the chain, and Noto stays
+
+### The cut now falls back to the face it was cut from
+
+Owner ruling: *"if heros has symbols, text cut should use those before using
+Schola."* Taken as written and generalized one step, because the same shape
+will recur for any family cut or derived from another typeface.
+
+`fallback_head:` is a new optional family key in `sd-fonts.yaml` — a
+`{style: source-spec}` map of faces spliced in FRONT of the chain. Each entry
+takes the same keys as a style source (`path`/`url`/`zip`, `variable:`,
+`scale:`). HerosTextCut names the same four CTAN TeX Gyre Heros OTFs its parent
+recipe uses, at the same `scale: 1.014`, so a fallback glyph lands at the size
+the cut renders at rather than 1.4 % under it.
+
+**PER STYLE, and that is a fix in its own right.** `--fallback-<style>` was
+already per style in `fontconvert_sdcard.py`; `build-sd-fonts.py` was passing
+the same string to all four. So every style of every family has been falling
+back to TeX Gyre Schola **regular** — a bold page's fallback glyphs have always
+come back at regular weight, in every family, since the chain was built. The
+head is per style, so the family that uses it is the first to get a bold
+fallback glyph that is bold. The generic chain behind it is unchanged, and a
+family with no `fallback_head:` builds byte-for-byte as before.
+
+Measured after the rebuild, `render_harness aa` slot 1, the Greek-and-arrows run
+(`>= inf . alpha beta Delta pi . <-`) of HerosTextCut against HerosRef on the
+same page: **mean |delta| 0.07 code values, 0.07 % of pixels differing by more
+than 4**. It was a serif; it is now the same drawing the reference uses. The
+252 are Heros's own again, and Schola/Noto/Math/Symbols2 still answer for what
+Heros itself lacks — U+2713 and U+2717 among them.
+
+`tools/textcut/proof.yaml` carries the same corrections — `reading`, the head
+AND `synth_ligatures:` — so the specimen and the card agree. The ligature line
+was missed on the first pass and caught by adversarial review: without it the
+proof built `ligs=0` against `HerosRef`'s `ligs=5`, which is round 11's failure
+again (an arm built from a different recipe measures the recipe). Its `path:`
+entries were also still the literal `BUILD_DIR/...` placeholders; the file runs
+as committed now.
+
+One thing this does NOT fix: `ligs=0`. The cut has the f-ligature OUTLINES back
+(U+FB01/FB02 now come from Heros), but the `liga` GSUB rule that reaches them
+from `f`+`i` lives in the PRIMARY face's table, and the cutter writes no `liga`.
+An epub that spells U+FB01 directly is now right; automatic ligature
+substitution in HerosTextCut still does nothing. `synth_ligatures:` is the
+existing lever for exactly this and is untested on a cut face.
+
+### Can Noto Sans be safely removed? No — measured
+
+The 2026-08-17 ruling was *"can the missing characters in libre franklin be
+sourced from texgyre instead? drop noto"*, and the "drop noto" half has stood
+unanswered ever since. Answering it now, against the chain as it is today
+(Schola, Noto Sans, Noto Sans Math, Noto Sans Symbols 2), by resolving each
+installed family's `intervals:` against its own cmap plus the chain with and
+without Noto Sans:
+
+| family | today | without Noto Sans | lost |
+|---|---|---|---|
+| Edgar | 2,861 | 1,837 | **1,024** |
+| TeXGyreSchola | 2,676 | 1,681 | 995 |
+| TeXGyreHeros | 2,676 | 1,681 | 995 |
+| HerosTextCut | 2,676 | 1,681 | 995 |
+| VandenKeere | 2,676 | 1,681 | 995 |
+| Doves | 2,676 | 1,683 | 993 |
+| AtkinsonHyperlegibleNext | 2,676 | 1,685 | 991 |
+| LibrisADF | 2,676 | 1,689 | 987 |
+| Almendra | 2,676 | 1,692 | 984 |
+| InknutJunicode | 2,693 | 1,731 | 962 |
+| LibreFranklin | 2,676 | 2,017 | 659 |
+| Coelacanth | 3,004 | 2,488 | 516 |
+
+All twelve installed families use `reading`, so all twelve are on the broad
+chain; none is on the Latin-only Libre Franklin path. The union of what would
+be lost is **1,163 codepoints**, and the single decisive block is **Cyrillic**:
+
+> Cyrillic U+0400–U+052F — TeX Gyre Schola **0**, Noto Sans **304**,
+> Noto Sans Math **0**, Noto Sans Symbols 2 **0**.
+
+Noto Sans is the only face in the chain with any Cyrillic at all, and only two
+installed families carry their own (Coelacanth 145, Libre Franklin 220). The
+other ten would render a Russian epub entirely as replacement boxes. The rest of
+the 1,163 is Latin Extended-B and the IPA/modifier blocks (319), Latin Extended
+Additional (123), combining diacritics (93), Supplemental Punctuation (94),
+General Punctuation's rare half (75), superscripts/subscripts/currency (54) and
+Letterlike/Number Forms (46). Only 41–68 codepoints per family would shift to
+Math/Symbols2 instead of vanishing.
+
+**And the real corpus regresses too.** The 36 canonical `~/src/claude-tools`
+epubs use 179 distinct codepoints; dropping Noto Sans loses, per family,
+between one and five of them — the superscripts `⁴ ⁿ`, the subscripts `₂ ₄`,
+and `⅜`. That last is one of the glyphs the 2026-09-15 Eighth Atlas diff had
+just verified present in every installed family.
+
+So: not safely, not as the chain stands. "Drop noto" is achievable only by
+replacing it with a face of comparable breadth — Cyrillic, Latin Extended-B,
+Latin Extended Additional and the combining marks in one file — which in
+practice means DejaVu Sans or another Noto. That is a swap, not a removal, and
+has not been priced.
+
+## What each family's description CLAIMS, against what its face has, 2026-09-16
+
+Every `description:` in `sd-fonts.yaml` ends in a script parenthetical, and
+sixteen of them were wrong. **Nothing on the device reads that field** — the
+device-side font download and its `fonts.json` manifest were removed 2026-08-10
+(`build-sd-fonts.py:6-10`), and no script in either repo parses `description:`
+today. An earlier draft of this section claimed the field was user-visible
+through that download UI; adversarial review caught it, and it is the exact
+invented rationale this project's rules forbid. What the field actually is: the
+one-line answer to "what is this typeface" that a developer reading the recipe
+gets, and the text `docs/type-coverage.html` renders. That is enough reason for
+it to be true, and it did not need a bigger one. Found by joining the three font-metadata sources
+(`sd-fonts.yaml`, `src/FontDisplayNames.h`, `docs/font-dates.md`) and measuring
+every regular face's own cmap.
+
+**The test, and why a block count is not one.** Counting codepoints in the Greek
+or Cyrillic block cannot separate a face that sets Greek from a face that has
+the micro sign: TeX Gyre Schola holds 54 of 144 Greek codepoints and cannot set
+a word of it. The question is asked instead as **the 14 tonos-accented Greek
+letters** (Ά Έ Ή Ί Ό Ύ Ώ ά έ ή ί ό ύ ώ) and **the 64 core Russian letters**
+(U+0410–044F). Those are what running text needs. The **tonos test is perfectly bimodal**
+across all 56 measurable faces — every face has all 14 or none, no exceptions —
+so it needed no threshold at all. The **Cyrillic test is not**, and an earlier
+draft of this section said it was: Junicode carries **4 of the 64**, the hard
+and soft signs Ъ Ь ъ ь, which a medievalist face has for Slavonic
+transcription rather than for setting Russian, and Antpolt carries 2. The
+classification is unaffected — 4 of 64 does not earn a Cyrillic claim — but a
+face at 8 or 12 would have needed exactly the judgment the prose claimed was
+never required. It is a near-bimodal test with a wide gap, not a free one.
+
+| direction | families |
+|---|---|
+| **over-claimed** a script the face lacks | TeXGyreSchola, Archivo (both dropped `Greek, Cyrillic`) · IBMPlexSerif, IBMPlexMono, LibreFranklin (dropped `Greek`) |
+| **no parenthetical at all** | Almendra → `(Latin)`, the only installed family without one |
+| **under-claimed** — the face HAS the script, the description hid it | Spectral, iAWriterMono (Cyrillic) · FiraSansBook, iAWriterDuo, iAWriterQuattro, SourceCodePro, OpenDyslexic, NittiTypewriter (Greek + Cyrillic) · LexicaUltralegible, Junicode (Greek) |
+
+The under-claims are the same defect pointed the other way and are the direction
+that costs a reader something: someone hunting a Cyrillic face would have passed
+over Spectral, and Junicode — a medievalist scholarly serif carrying a full
+tonos Greek — was described as Latin-only.
+
+**The nuance that makes this a convention rather than a fact.** A shipped
+`.cpfont` carries ~2,676 codepoints whatever its face holds, because the
+fallback chain fills the rest. So a description naming Cyrillic was never false
+of the FILE, only of the TYPEFACE. The file's own convention is to describe the
+typeface — `sd-fonts.yaml`'s TeXGyreHeros recipe already says at length that its
+description "does not claim the two scripts the face does not have", and names
+Schola's description as wrong for the same reason. That comment is what was
+generalized; reversing the convention would mean re-editing all sixteen.
+
+**Six families could not be measured**: DTLFleischmann, DanteMT, LutetiaNova,
+GoldenCockerel, WarblerText and DTLRomulus are commercial faces whose outlines
+are gitignored and live only in the private `crosspoint-local-fonts` mirror. Run
+the sweep again on a machine that has them. AtkinsonHyperlegibleSoft and
+Junicode WERE measured — their sources are public and were fetched for this.
+
+Two other metadata defects fixed in the same pass, neither about coverage:
+the reader's picker (`src/FontDisplayNames.h`) and its declared source of truth
+(`docs/font-dates.md`) disagreed on four families and the doc was missing rows
+for six picker entries — the doc had itself flagged, and not closed, that it was
+behind the header on Almendra. And the `DTLRomulus` row carried two unescaped
+`|` characters inside a quoted font name, which silently split it into ten
+columns and truncated its Basis cell wherever the table was rendered.

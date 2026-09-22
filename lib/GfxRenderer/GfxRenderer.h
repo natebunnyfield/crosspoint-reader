@@ -114,6 +114,59 @@ class GfxRenderer {
   // things that still put pixels down. See TextOnlyScope for why.
   mutable bool _textOnly = false;
 
+  // ---------------------------------------------------------- dirty rect
+  //
+  // The PHYSICAL panel rectangle anything has touched since the last present.
+  // displayBuffer() turns a small rect into a windowed refresh
+  // (HalDisplay::displayWindow) instead of a whole-panel one.
+  //
+  // BOTH AXES, AND THAT IS NOT OPTIONAL HERE. `orientation` is a compile-time
+  // Portrait (GfxRenderer.h:74), so rotateCoordinates maps logical (x, y) to
+  // physical (y, panelHeight-1-x): a LOGICAL TEXT LINE IS A PHYSICAL COLUMN.
+  // A row-only band therefore spans the full panel height for any line of text
+  // and can never window the one case the whole exercise is for. Tracked as a
+  // rect, the same line is a narrow band in physical X, which is exactly what
+  // the controller's PTL window addresses.
+  //
+  // TRACKED AT THE PIXEL WRITERS, NOT AT THE CALLERS, and that is the safety
+  // argument. There are exactly three places that write frameBuffer --
+  // drawPixel/drawPixelDevice, the hi-res glyph blit in drawText, and
+  // clearScreen/invertScreen -- so instrumenting them is complete BY
+  // CONSTRUCTION. Tracking in the ~70 displayBuffer() callers instead would
+  // mean the rect is right only if every one was found, and the failure mode of
+  // missing one is a stale region: the window refreshes what someone declared
+  // and silently leaves the rest. Over-reporting is safe (a full refresh);
+  // under-reporting is a bug you see as "half the screen didn't update".
+  //
+  // It costs four predictable compares in the hottest loop in the firmware, on
+  // values already in registers for the bounds check. That is the price of
+  // completeness; the alternative was correctness by vigilance.
+  mutable int _dirtyLeft = 0;
+  mutable int _dirtyRight = 0;
+  mutable int _dirtyTop = 0;
+  mutable int _dirtyBottom = 0;
+  mutable bool _dirtyAll = true;   // until something says otherwise, assume everything
+
+  inline void markDirty(const int phyX, const int phyY) const {
+    if (_dirtyAll) return;
+    if (phyX < _dirtyLeft) _dirtyLeft = phyX;
+    if (phyX > _dirtyRight) _dirtyRight = phyX;
+    if (phyY < _dirtyTop) _dirtyTop = phyY;
+    if (phyY > _dirtyBottom) _dirtyBottom = phyY;
+  }
+  // A whole-panel change: clearScreen, invertScreen, anything that cannot say
+  // where it drew. Sticky until the next present.
+  inline void markAllDirty() const { _dirtyAll = true; }
+  // Called by displayBuffer() after a present. Starts the next frame EMPTY --
+  // an inverted range, so the first markDirty sets every edge.
+  inline void resetDirty() const {
+    _dirtyAll = false;
+    _dirtyLeft = INT32_MAX;
+    _dirtyRight = -1;
+    _dirtyTop = INT32_MAX;
+    _dirtyBottom = -1;
+  }
+
   // CJK UI font fallback map: primary (built-in, Latin-only) UI font id -> a
   // size-matched SD-card font id that carries CJK glyphs. When a string drawn
   // or measured with a mapped primary font contains a CJK codepoint the primary

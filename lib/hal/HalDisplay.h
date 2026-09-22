@@ -121,7 +121,52 @@ class HalDisplay {
   void copyGrayscaleMsbBuffers(const uint8_t* msbBuffer);
   void cleanupGrayscaleBuffers(const uint8_t* bwBuffer);
 
-  void displayGrayBuffer(bool turnOffScreen = false);
+  // Grayscale present. `lut` selects a waveform bank (nullptr = the panel's
+  // configured one) and `absolute` asks for the self-contained 4-level mode.
+  //
+  // THE TWO ARGUMENTS ARE THE POINT, and they were dropped here for a year:
+  // the SDK has taken them since FreeInkDisplay.h:246 and this wrapper declared
+  // only the first, so all eight call sites got the defaults and no caller
+  // could reach the other bank (docs/grayscale-fast-refresh-spec-2026-09-14.md).
+  //
+  // WHAT `absolute` BUYS IS DARKENING, NOT SPEED. The default differential
+  // path nudges from whatever is on the panel and can only lighten toward the
+  // target; the absolute bank drives every pixel to its level from a known
+  // state, so a gray can go DARKER than the frame before it. It is the slower
+  // of the two banks (50 waveform frames against 60 at half the frame period
+  // -- our own Ssd1677Luts.h:88-90 records it), which is the opposite of how
+  // the number is usually quoted upstream.
+  //
+  // SSD1677 (X4) ONLY. Uc8253X3Driver accepts both parameters and has no
+  // absolute bank behind them, so on an X3 this silently falls back to the
+  // bilevel path -- a plumbed flag is not a capability.
+  // Refresh only a horizontal BAND of the panel, leaving the rest untouched.
+  //
+  // `x` and `w` are accepted and ignored on every panel today -- the band is
+  // full width. See Uc8253X3Driver::displayWindow for why: horizontal windowing
+  // is the one part of the partial sequence with no evidence behind it on the
+  // X3's controller, and the saving is proportional to HEIGHT anyway, because
+  // the waveform runs over the gates inside the window.
+  //
+  // Falls back to a whole-panel Fast refresh, silently and correctly, whenever
+  // the window cannot be honoured: no previous frame to diff against, a band
+  // taller than two thirds of the panel, or a driver with no override. So a
+  // caller may always ask; it may not assume it got what it asked for, and
+  // supportsWindowedRefresh() is how to find out in advance.
+  void displayWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool turnOffScreen = false);
+
+  // Does this panel have a real windowed path, or will displayWindow() fall
+  // back to the whole panel? True on SSD1677 (X4) and, since 2026-09-14, on
+  // UC8253 (X3).
+  bool supportsWindowedRefresh() const;
+
+  void displayGrayBuffer(bool turnOffScreen = false, const unsigned char* lut = nullptr,
+                         bool absolute = false);
+
+  // Does this panel actually have an absolute 4-level bank behind
+  // displayGrayBuffer(..., absolute=true)? False on UC8253/X3, where the flag
+  // is accepted and ignored. Ask before offering the mode, never assume.
+  bool supportsAbsoluteGrayscale() const;
 
   // Tiled grayscale: stream one band of a plane (lsbPlane selects LSB/MSB RAM)
   // straight to the controller; supportsStripGrayscale() gates the path. See

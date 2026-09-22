@@ -660,6 +660,14 @@ inline constexpr Entry kEntries[] = {
      "Max Miedinger & Eduard Hoffmann; Bogus\xC5\x82"
      "aw Jackowski & Janusz M. Nowacki",
      "1957 M\xC3\xBCnchenstein, Switzerland; 2009 Gda\xC5\x84sk", "1957 M\xC3\xBCnchenstein, Switzerland", 1957},
+    // The text cut of the face above: same lineage, one more stage. Cut on the
+    // outlines by tools/textcut/ for the 9-13 pt slots (docs/heros-text-cut-
+    // 2026-09-14.md); the 2026 stage is this repository's, so it is a reliable
+    // date under the table's rule.
+    {"HerosTextCut", "Heros Text Cut",
+     "Max Miedinger & Eduard Hoffmann; Bogus\xC5\x82"
+     "aw Jackowski & Janusz M. Nowacki; text cut 2026",
+     "1957 M\xC3\xBCnchenstein, Switzerland; 2009 Gda\xC5\x84sk; 2026", "1957 M\xC3\xBCnchenstein, Switzerland", 1957},
     // Cut back to a recipe on 2026-08-04 and deleted from every surface; the
     // label stays because a card provisioned before that ruling still carries
     // the family. Born digital, one stage. 2004 is the design year from the

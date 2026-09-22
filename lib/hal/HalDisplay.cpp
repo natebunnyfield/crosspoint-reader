@@ -190,10 +190,33 @@ void HalDisplay::cleanupGrayscaleBuffers(const uint8_t* bwBuffer) {
   einkDisplay.cleanupGrayscaleBuffers(bwBuffer);
 }
 
-void HalDisplay::displayGrayBuffer(bool turnOffScreen) {
+void HalDisplay::displayWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool turnOffScreen) {
   toPanelPolarity();
-  einkDisplay.displayGrayBuffer(turnOffScreen);
+  einkDisplay.displayWindow(x, y, w, h, turnOffScreen);
   toLogicalPolarity();
+}
+
+bool HalDisplay::supportsWindowedRefresh() const {
+  // Both shipped controllers have an override now, so this is true on the
+  // devices we build for. It stays a question rather than a constant because
+  // PanelDriver's default is still a whole-panel fallback and a future board
+  // may land without one -- a caller that assumed the capability would then
+  // quietly pay for a full refresh per keystroke.
+  return true;
+}
+
+void HalDisplay::displayGrayBuffer(bool turnOffScreen, const unsigned char* lut, bool absolute) {
+  toPanelPolarity();
+  einkDisplay.displayGrayBuffer(turnOffScreen, lut, absolute);
+  toLogicalPolarity();
+}
+
+bool HalDisplay::supportsAbsoluteGrayscale() const {
+  // The absolute bank is an SSD1677 feature. Asking the display which panel is
+  // live rather than testing a board macro, because a board config selects the
+  // panel at runtime (BoardConfig::ACTIVE) and the X3/X4 split is not a
+  // compile-time constant in every build.
+  return !einkDisplay.isX3Mode();
 }
 
 void HalDisplay::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows) {

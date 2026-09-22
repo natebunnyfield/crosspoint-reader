@@ -188,6 +188,45 @@ git submodule update --init --recursive
 `repo-status.sh` flags the submodule when it is uninitialised (`-`) or has
 drifted off the pinned commit (`+`).
 
+### 2026-09-14 — 17 display commits taken; CHERRY-PICK, do not rebase
+
+We were at `352098e` (2026-08-15): **10 ahead / 151 behind**, the 10 all local
+`KeyboardPanel` icon work. 44 of the 151 are display.
+
+**A full rebase is the wrong move and this is the reason.** Upstream reworked
+the same keyboard component our 10 commits live in — it solved the alt-hint
+collision by reserving vertical headroom where we inset the hint into its
+corner — so every one of our 10 conflicts, each needing a visual judgement call
+about a keyboard the owner has already signed off. That is real cost for no
+display benefit. Cherry-pick the area you actually want onto our head instead.
+
+**Mechanics that matter if you repeat this.** Filter merge commits
+(`git log --no-merges`) or the first merge in the range stops the run looking
+exactly like a conflict. Of 37 non-merge display commits, **18 applied clean**.
+
+**The 19 that did not are one coherent group, not 19 problems**: new board
+support we do not ship — EEGO A4, Xteink X4 Classic, Waveshare
+ESP32-S3-ePaper-3.97 — and the `grayscale-capabilities` series
+(`3080ca2`, `70102f0`, `4a69a29`, `a3db714`, `d02deed`, `3c6e110`, `6644bf2`,
+`5916724`, `2cca22f`, `4b8188e`, `39606d5`) which depends on those boards
+landing first and mostly conflicts in `BoardConfig.h`. Taking them means taking
+the hardware half too; that is a deliberate pass, not a cherry-pick.
+
+**One of the 18 was dropped after it built red**: `208afe8`, the EpdBus shared-SD-rail
+fix, references `BoardConfig::isOnePage` — an ESP32-C61 profile that is not our
+hardware. Added by `3e5aff1`/`40503d5` in `libs/hardware/`, which we did not take.
+
+Taken (our shas): `054f965` X3 skip POWER_ON when the UC8253 is already powered,
+`ded0676` UC8279 WW/WB exchange for the X3 AA tables, `f409fb3` ghosting via
+power-off after AA refresh, `44c6fa9` skip power-off when the screen is off,
+plus the X4 Pro deep-sleep park and bounded wait, a UC8279 grayscale plane
+inversion fix, and PaperMono window refresh.
+
+Branch `sdk-display-2026-09-14` on our SDK fork. Verified: `default`,
+`gh_release`, `sticky`, `simulator_x3` build; 751/751 firmware and 90/90
+simulator tests. The panel behaviour itself is **device-only** — no simulator
+shows ghosting or a power sequence.
+
 ### Standing ruling 2026-09-10 — PDF stays out of scope, autocrop framing considered and rejected
 
 Filed as `T-030` on 2026-09-08 and **dropped the same week by owner ruling**:

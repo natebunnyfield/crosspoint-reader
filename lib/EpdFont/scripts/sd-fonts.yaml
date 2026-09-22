@@ -39,6 +39,19 @@
 #                ligature lookup is a draw-time table walk, and LigatureControl
 #                keys its per-pair toggles on the INPUT pair, so each new pair
 #                gets its own switch in Typography Settings for free.
+#   fallback_head: (optional) {style: source-spec} — faces spliced in FRONT of
+#                the fallback chain, PER STYLE. For a family cut or derived
+#                from another typeface: what the derived face does not carry
+#                should come from the face it came from, not from the chain's
+#                generic head. Each entry takes the same keys as a style source
+#                (path/url/zip, variable:, scale:) and `scale:` matters — a head
+#                at a different em renders its glyphs at a different size from
+#                the text around them. Per style because the ordinary chain is
+#                not: every style of every family gets TeX Gyre Schola REGULAR,
+#                so a bold page's fallback glyphs have always come back at
+#                regular weight. It only ADDS a face at the front; everything
+#                the head lacks still falls through to Schola, Noto Sans, Noto
+#                Sans Math and Noto Sans Symbols 2 exactly as before.
 #   drop_codepoints: (optional) Codepoints to delete from the source's cmap
 #                before conversion, so the Noto fallback supplies them. For
 #                sources whose cmap points at the WRONG outline: the converter
@@ -258,6 +271,7 @@ installed_families:
 # in-interval codepoints were verified to reach the .cpfont bit-for-bit
 # rather than falling back to Noto (docs/wedge-serif-exploration.md, round
 # 100b, in the simulator repo).
+  - HerosTextCut
 # AtkinsonHyperlegibleNext joined on 2026-09-12 (owner ruling, promoting it out
 # of the iOS trial it had been on since build 188 -- the 2026-09-11 ruling
 # "drop lexica and atkinson soft, add atkinson hyperlegible next at 365
@@ -461,7 +475,12 @@ families:
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/gentiumbookplus/GentiumBookPlus-BoldItalic.ttf"}
 
   - name: IBMPlexSerif
-    description: "Professional serif (Latin, Greek, Cyrillic)"
+    # Measured 2026-09-16 (regular OTF cmap): Greek 1/144, none of the 14
+    # tonos-accented letters a real Greek text needs — same "not actually
+    # Greek" shape as TeXGyreHeros's own comment below describes, just at a
+    # smaller total. Cyrillic 168/256 with the full 64/64 core Russian
+    # alphabet IS real. Description narrowed to what the face carries.
+    description: "Professional serif (Latin, Cyrillic)"
     intervals: latin-ext,greek,cyrillic
     sizes: [12, 14, 16, 18]
     styles:
@@ -1493,7 +1512,13 @@ families:
       bolditalic: {path: "local_fonts/Venetian301-BoldItalic.otf"}
 
   - name: TeXGyreSchola
-    description: "GUST's Century Schoolbook revival (Latin, Greek, Cyrillic)"
+    # This is the wrong description the TeXGyreHeros recipe comment below
+    # points at ("Schola's description has always been wrong for the same
+    # reason"). Measured 2026-09-16: byte-for-byte the same GUST-built cmap
+    # shape as Heros -- Greek 54/144 with 0/14 tonos-accented letters
+    # (symbol-adjacent only, not real Greek) and Cyrillic 0/256. Narrowed to
+    # match the convention Heros already follows.
+    description: "GUST's Century Schoolbook revival (Latin)"
     intervals: reading
     sizes: [8, 10, 12, 14, 16, 18]
     # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four.
@@ -1547,7 +1572,7 @@ families:
       bolditalic: {url: "https://mirrors.ctan.org/fonts/poltawski/fonts/opentype/gust/poltawski/antpolt-bolditalic.otf"}
 
   - name: Junicode
-    description: "Medievalist scholarly serif, semi-condensed (Latin)"
+    description: "Medievalist scholarly serif, semi-condensed (Latin, Greek)"
     intervals: latin-ext
     # Uniform slots: xh 13/15/16/18 (+1 px at the two small slots — hinting
     # skips 12 and 14 px), advY 34/40/46/51 exact. The old "0.418 em x-height,
@@ -1590,7 +1615,11 @@ families:
   # The rebuild itself is cheap: about 6 s per tier, sources and fallbacks all
   # cached. It is the WEIGHT that needs the ruling, not the work.
   - name: Almendra
-    description: "Bookish oldstyle drawn from medieval calligraphy"
+    # Measured 2026-09-16 (regular cmap): 358 own glyphs, Greek 1/144 (0/14
+    # tonos-accented), Cyrillic 0/256 -- neither real. This was the only
+    # installed family with no script parenthetical at all; added one
+    # consistent with every other installed family's convention.
+    description: "Bookish oldstyle drawn from medieval calligraphy (Latin)"
     # `reading`, not `latin-ext`, since 2026-08-24 (owner: "add coverage to
     # almendra"). A latin-ext family gets no symbol/math/dingbat tail from
     # fallback_chain_for(), so this had no arrows (U+2190-2193) and no real
@@ -2128,7 +2157,16 @@ families:
       bolditalic: {url: "https://mirrors.ctan.org/fonts/accanthis/opentype/AccanthisADFStdNo3-BoldItalic.otf"}
 
   - name: Spectral
-    description: "Production Type's screen-optimized old-style, cut from the blind serif bench (Latin)"
+    # Cyrillic ADDED 2026-09-16, measured: the face carries all 64 letters of
+    # the core Russian alphabet (U+0410-044F). The same sweep that corrected
+    # the five over-claims below found nine faces UNDER-claiming -- a
+    # description naming fewer scripts than the face has is the same defect
+    # pointed the other way, and it is the direction a reader looking for a
+    # Cyrillic face would be hurt by. Test used throughout: the 14 tonos-
+    # accented Greek letters and the 64 core Cyrillic letters, which a face
+    # either has entirely or lacks entirely -- a raw block count does not
+    # separate real script coverage from the micro sign.
+    description: "Production Type's screen-optimized old-style, cut from the blind serif bench (Latin, Cyrillic)"
     intervals: latin-ext
     # Uniform slots: xh 12/14/16/18 (exact), advY 33/41/47/50 (+-1 rounding).
     # From tools/blind-bench/sweep_blind.py; see blind_slots.json, and the same
@@ -2271,7 +2309,11 @@ families:
   # hinted render, advanceY against the tier's shipped 34/39/45/51.
 
   - name: Archivo
-    description: "Archivo, Omnibus-Type's grotesque for text (Latin, Greek, Cyrillic)"
+    # Measured 2026-09-16 (regular cmap): Greek 4/144, 0/14 tonos-accented --
+    # not real Greek. Cyrillic 0/256. Description narrowed to what the face
+    # carries; `reading` still asks for both and the fallback chain fills
+    # them for anything actually built from this recipe.
+    description: "Archivo, Omnibus-Type's grotesque for text (Latin)"
     intervals: reading
     # force_autohint is LOAD-BEARING, not a tweak. Under the font's native
     # hinting no point size renders a 12 px x-height at all — it jumps 11 px
@@ -2293,7 +2335,11 @@ families:
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo-Italic%5Bwdth%2Cwght%5D.ttf", variable: {wght: 700, wdth: 100}}
 
   - name: LibreFranklin
-    description: "Libre Franklin, Impallari's Franklin Gothic revival (Latin, Greek, Cyrillic)"
+    # Measured 2026-09-16 (regular cmap): Greek 4/144, 0/14 tonos-accented --
+    # not real Greek, same shape as the other 4/144 cases in this file.
+    # Cyrillic 220/256 with the full 64/64 core Russian alphabet IS real.
+    # Description narrowed to drop the false Greek claim only.
+    description: "Libre Franklin, Impallari's Franklin Gothic revival (Latin, Cyrillic)"
     intervals: reading
     # Uniform slots: xh 12/14/16/18 exact on all four; advY 33/39/46/52,
     # slots 0/2/3 within a pixel. Best-rounded face in the grotesque bench:
@@ -2448,6 +2494,78 @@ families:
       bold:       {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bold.otf"}
       italic:     {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-italic.otf"}
       bolditalic: {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf"}
+
+  # HerosTextCut joined on 2026-09-14 (owner: "install fonts in testflight and
+  # firmware and everywhere else"), the first DERIVED installed family: TeX
+  # Gyre Heros put through a punchcutter's corrections for the 9-13 pt slots,
+  # on the outlines, by tools/textcut/textcut_curves.py. What differs from
+  # TeXGyreHeros above, all measured on this renderer
+  # (docs/heros-text-cut-2026-09-14.md, 13 rounds): stems +5 u a side,
+  # horizontal only, so every alignment is stock; a sub-pixel notch at each
+  # line-line crotch; every digit on the cap-height row at all four judged
+  # slots (stock's 5 and 7 sit a row low at 9 pt); advances exactly stock;
+  # Heros's GPOS kerning carried EXACTLY -- 216,600 ASCII pairs x 6 slots x 4
+  # styles verified identical to TeXGyreHeros in the built .cpfonts. Fitted
+  # pairs were tried and WITHDRAWN: a kern is in design units, so one chosen to
+  # flip a pixel at 9 pt opened `ty` by 3.56 px at the 16 pt slot (round 14).
+  #
+  # COVERAGE IS NOT THE SAME as Heros: 395 codepoints per style against 1053.
+  # Latin-1, Latin Ext-A/B and General Punctuation are complete; Greek, Latin
+  # Extended Additional, combining marks, math operators and the ff-ffl
+  # ligatures are not cut and fall to the `reading` fallback chain.
+  # Measured cost, whole page, four levels: 9 pt solid-black share 60.5 -> 71.8 %,
+  # 14 pt 73.6 -> 78.2; 11 and 12 pt LIGHTER than stock (77 -> 71, 78 -> 73) --
+  # one outline cannot land a 2.3-2.5 px stem the way it lands 2.0-2.2; the
+  # owner installed it knowing that trade.
+  #
+  # Same recipe as Heros in every other respect EXCEPT that coverage: same slots (the alignments are
+  # stock, so the x-height match holds), same metrics, same per-style scale
+  # (dropping the scale is the round-11 trap), same fallback chain. Sources are
+  # the four cut TTFs in local_fonts/ (GFL permits a modified redistribution
+  # under another name); they are in the private crosspoint-local-fonts mirror
+  # for CI, and regenerable from the CTAN OTFs with the cutter and
+  # tools/textcut/kern-<style>.json.
+  - name: HerosTextCut
+    description: "TeX Gyre Heros, text cut for the 9-13 pt slots (Latin)"
+    intervals: reading
+    force_autohint: true
+    sizes: [7, 9, 11, 12, 14, 16]
+    metrics: {ascent: 1040, descent: -523, linegap: 0}
+    # THE CUT IS A SUBSET OF HEROS, so Heros answers for the rest of it.
+    # `textcut_curves.py`'s charset gate stops at U+024F plus General
+    # Punctuation and the euro -- 395 glyphs per style -- while `reading` asks
+    # for 647 of the 1,053 the source face has. The other 252 (its Greek, the
+    # four arrows, fourteen math operators, the f-ligatures, 133 Latin Extended
+    # Additional) used to come from the head of the ordinary chain, which is
+    # TeX Gyre Schola: a SERIF, setting Greek and operators inside a
+    # neo-grotesque page. Measured 2026-09-15, rendered from the card at slot 3
+    # beside TeXGyreHeros; docs/font-unicode-coverage.md.
+    #
+    # Owner ruling 2026-09-16: "if heros has symbols, text cut should use those
+    # before using Schola." Same four CTAN sources and the same scale as the
+    # TeXGyreHeros recipe above, so a fallback glyph lands at the size and the
+    # design the cut was made from -- stock weight rather than cut weight,
+    # which is the honest reading of a glyph the cutter never touched. Schola,
+    # Noto Sans, Noto Sans Math and Noto Sans Symbols 2 still follow for what
+    # Heros itself lacks (U+2713 and U+2717 among them).
+    # The cutter writes no GSUB at all -- it builds the face from scratch
+    # through fontBuilder and emits one `kern` feature, which is GPOS. So the
+    # five f-ligature OUTLINES it now carries (U+FB00-FB04, added 2026-09-16)
+    # had nothing to reach them: the built .cpfont reported `ligs=0` against
+    # stock Heros's `ligs=5`, and every `fi` in every book set as f+i. This
+    # writes the rule. U+FB05/FB06 are absent from Heros itself, so `st` is not
+    # listed.
+    synth_ligatures: [ff, fi, fl, ffi, ffl]
+    fallback_head:
+      regular:    {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-regular.otf"}
+      bold:       {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bold.otf"}
+      italic:     {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-italic.otf"}
+      bolditalic: {scale: 1.014, url: "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyreheros-bolditalic.otf"}
+    styles:
+      regular:    {scale: 1.014, path: "local_fonts/HerosTextCut-regular.ttf"}
+      bold:       {scale: 1.014, path: "local_fonts/HerosTextCut-bold.ttf"}
+      italic:     {scale: 1.014, path: "local_fonts/HerosTextCut-italic.ttf"}
+      bolditalic: {scale: 1.014, path: "local_fonts/HerosTextCut-bolditalic.ttf"}
 
   - name: HostGrotesk
     description: "Host Grotesk, Element Type's contemporary grotesque (Latin)"
@@ -2652,7 +2770,7 @@ families:
   # comment does. It has no picker label, never having had a
   # src/FontDisplayNames.h row.
   - name: FiraSansBook
-    description: "Fira Sans in its Book weight, humanist sans (Latin)"
+    description: "Fira Sans in its Book weight, humanist sans (Latin, Greek, Cyrillic)"
     intervals: latin-ext
     sizes: [12, 14, 16, 18]
     styles:
@@ -2674,7 +2792,10 @@ families:
   # ── Monospace ──────────────────────────────────────────────────────────
 
   - name: IBMPlexMono
-    description: "Monospace for code and technical reading (Latin, Greek, Cyrillic)"
+    # Measured 2026-09-16 (regular cmap): Greek 1/144, 0/14 tonos-accented --
+    # not real Greek. Cyrillic 168/256 with the full 64/64 core Russian
+    # alphabet IS real. Description narrowed to drop the false Greek claim.
+    description: "Monospace for code and technical reading (Latin, Cyrillic)"
     intervals: latin-ext,greek,cyrillic
     sizes: [12, 14, 16, 18]
     styles:
@@ -2696,7 +2817,7 @@ families:
     # a RATIO so the 14/16/18 cuts scale with it. An absolute value would pin
     # every size to one leading while the glyphs kept growing.
     line_height_scale: 1.32
-    description: "EDITOR GROUP. COMMERCIAL — recipe only. Nitti Typewriter — typewriter monospace (Latin).
+    description: "EDITOR GROUP. COMMERCIAL — recipe only. Nitti Typewriter — typewriter monospace (Latin, Greek, Cyrillic).
       Three of the four styles are DRAWN cuts, not synthesis. regular = the roman.
       italic = the genuine Underline cut (a struck-through rule under the letterform, which is what a
       typewriter actually had in place of an italic); it replaces the old 11-degree shear.
@@ -2733,7 +2854,7 @@ families:
       bolditalic: {path: "local_fonts/NittiTypewriter-Underline.ttf", synthetic: {underline_connect: 1, underline_overlap_px: 2, double_strike_em: 0.0533}}
 
   - name: iAWriterMono
-    description: "EDITOR GROUP. iA Writer Mono — true monospace (Latin)"
+    description: "EDITOR GROUP. iA Writer Mono — true monospace (Latin, Cyrillic)"
     # Arrows 2026-08-17: an editor face meets them in a note as readily as a
     # reading face meets them in a book.
     intervals: latin-ext,(0x2190-0x21FF)
@@ -2745,7 +2866,7 @@ families:
       bolditalic: {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Mono/Static/iAWriterMonoS-BoldItalic.ttf"}
 
   - name: iAWriterDuo
-    description: "EDITOR GROUP. iA Writer Duo — duospace, wider i/l/j (Latin)"
+    description: "EDITOR GROUP. iA Writer Duo — duospace, wider i/l/j (Latin, Greek, Cyrillic)"
     # Arrows 2026-08-17: an editor face meets them in a note as readily as a
     # reading face meets them in a book.
     intervals: latin-ext,(0x2190-0x21FF)
@@ -2757,7 +2878,7 @@ families:
       bolditalic: {url: "https://raw.githubusercontent.com/iaolo/iA-Fonts/master/iA%20Writer%20Duo/Static/iAWriterDuoS-BoldItalic.ttf"}
 
   - name: iAWriterQuattro
-    description: "EDITOR GROUP. iA Writer Quattro — quattrospace, most proportional (Latin)"
+    description: "EDITOR GROUP. iA Writer Quattro — quattrospace, most proportional (Latin, Greek, Cyrillic)"
     # Arrows 2026-08-17: an editor face meets them in a note as readily as a
     # reading face meets them in a book.
     intervals: latin-ext,(0x2190-0x21FF)
@@ -2779,7 +2900,7 @@ families:
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/spacemono/SpaceMono-BoldItalic.ttf"}
 
   - name: SourceCodePro
-    description: "Adobe monospace with excellent hinting (Latin)"
+    description: "Adobe monospace with excellent hinting (Latin, Greek, Cyrillic)"
     intervals: latin-ext
     sizes: [12, 14, 16, 18]
     styles:
@@ -2791,7 +2912,7 @@ families:
   # ── Dyslexia ───────────────────────────────────────────────────────────────
 
   - name: OpenDyslexic
-    description: "Dyslexia-friendly font (Latin)"
+    description: "Dyslexia-friendly font (Latin, Greek, Cyrillic)"
     intervals: latin-ext
     sizes: [8, 10, 12, 14]
     styles:
@@ -2873,7 +2994,7 @@ families:
       bolditalic: {url: "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/7925f50f649b3813257faf2f4c0b381011f434f1/fonts/variable/AtkinsonHyperlegibleNext-Italic%5Bwght%5D.ttf", variable: {wght: 600}}
 
   - name: LexicaUltralegible
-    description: "Lexica Ultralegible, Atkinson Hyperlegible extended for reading (Latin)"
+    description: "Lexica Ultralegible, Atkinson Hyperlegible extended for reading (Latin, Greek)"
     # NOT installed. It was S tier for one day -- added 2026-08-03 off the sans
     # bench, cut 2026-08-04 on the one-installed-sans taxonomy ruling
     # (docs/sd-card-fonts.md) -- and this comment went on saying "INSTALLED"
