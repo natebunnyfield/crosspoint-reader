@@ -248,6 +248,25 @@
 # repo can reach it.
 #
 # build-sd-fonts.py reads `families:` and `tier_drops:`; it ignores this key.
+#
+# RULING 2026-09-22 (owner): KEEP ALL THIRTEEN. He was given the full list
+# rendered -- a specimen line per family, each one's size on the card, and the
+# three places the fat is -- and answered *"keep all for now"*. So the list
+# below is not merely what has accumulated; it is what he looked at and chose.
+#
+# The three candidates that were put to him, so they are not re-discovered and
+# re-proposed as findings:
+#   * TeXGyreHeros and HerosTextCut are ONE typeface, 45.2 MB for the pair --
+#     the cut exists because stock Heros goes thin at 9-13 pt, and it is a
+#     measured regression at 12 pt (docs/heros-text-cut-2026-09-14.md). The
+#     only true duplicate here.
+#   * FIVE sans on a reading device: LibrisADF won his blind test, Atkinson is
+#     the accessibility case, and Heros / HerosTextCut / LibreFranklin are
+#     three grotesques between them.
+#   * Coelacanth is the largest at 36.5 MB and the reason is Greek and
+#     Cyrillic coverage.
+# None of those is a fault. Do not open a "drop" pass on this list without a
+# fresh ask; 354.7 MB across 13 families at 1x+2x is the state he chose.
 installed_families:
   - Edgar
   - Coelacanth
