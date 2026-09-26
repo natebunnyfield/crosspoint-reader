@@ -37,6 +37,17 @@ struct BlockStyle {
   // NOT propagated through getCombinedBlockStyle so it can't leak into sibling blocks.
   bool fromBrElement = false;
 
+  // Set on a block whose element carries the class token `cascade-join`: a
+  // line of a CASCADE (sense-lined) paragraph that is not the paragraph's
+  // last. makePages() then adds no half-line paragraph gap after it, so the
+  // phrase lines of one paragraph sit at the ordinary line pitch. Only the
+  // generated cascade editions carry the token (claude-tools
+  // scripts/build_cascade.py; owner ruling 2026-09-26). Never serialized:
+  // it is consumed during layout. Not inherited through
+  // getCombinedBlockStyle (result starts from the child), so it names one
+  // element and nothing nested in it.
+  bool cascadeJoin = false;
+
   // Combined insets (margin + padding)
   [[nodiscard]] int16_t leftInset() const { return marginLeft + paddingLeft; }
   [[nodiscard]] int16_t rightInset() const { return marginRight + paddingRight; }

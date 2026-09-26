@@ -11,6 +11,7 @@
 #include <expat.h>
 
 #include <algorithm>
+#include <cctype>
 #include <iterator>
 #include <new>
 
@@ -181,6 +182,20 @@ const char* getAttribute(const XML_Char** atts, const char* attrName) {
     if (strcmp(atts[i], attrName) == 0) return atts[i + 1];
   }
   return nullptr;
+}
+
+// True when the whitespace-separated class attribute contains `token` exactly.
+bool hasClassToken(const std::string& classAttr, const char* token) {
+  const size_t n = strlen(token);
+  size_t i = 0;
+  while (i < classAttr.size()) {
+    while (i < classAttr.size() && isspace(static_cast<unsigned char>(classAttr[i]))) i++;
+    size_t j = i;
+    while (j < classAttr.size() && !isspace(static_cast<unsigned char>(classAttr[j]))) j++;
+    if (j - i == n && classAttr.compare(i, n, token) == 0) return true;
+    i = j;
+  }
+  return false;
 }
 
 // Returns true if the HTML element is a purely inline, non-navigable wrapper.
@@ -2256,6 +2271,28 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       const bool isDefinitionBody = strcmp(name, "dd") == 0;
       const bool isListContainer = strcmp(name, "ul") == 0 || strcmp(name, "ol") == 0;
       const bool isListItem = strcmp(name, "li") == 0;
+      // CASCADE EDITIONS (owner ruling 2026-09-26: sense-lined text, built
+      // epub side as separate editions by claude-tools
+      // scripts/build_cascade.py). Each phrase line is its own <p>. Two class
+      // tokens, and nothing else in any other book changes:
+      //  - `cascade-line`: ragged, never justified. A cascade line is a
+      //    phrase, and stretching one that wraps at a large font size would
+      //    break the shape the edition exists for. The book's text-align is
+      //    otherwise discarded here (paragraphAlignment is constexpr
+      //    JUSTIFIED), so the token is the only way to ask for it.
+      //  - `cascade-join`: no half-line paragraph gap after this line (see
+      //    BlockStyle::cascadeJoin). Measured without it: every phrase line
+      //    of a cascaded paragraph sat at 1.5x line pitch, and the gap that
+      //    separates paragraphs vanished into the gaps between lines.
+      if (!classAttr.empty()) {
+        if (hasClassToken(classAttr, "cascade-line")) {
+          elementStyle.alignment = CssTextAlign::Left;
+          elementStyle.textAlignDefined = true;
+        }
+        if (hasClassToken(classAttr, "cascade-join")) {
+          elementStyle.cascadeJoin = true;
+        }
+      }
       // A <dl> is a container in exactly the sense <ul> is -- it groups items
       // that set their own indent -- so it takes the container's text-indent
       // reset below and nothing else. It gets NO step of its own: the step
@@ -3536,7 +3573,7 @@ void ChapterHtmlSlimParser::makePages() {
     if (blockStyle.paddingBottom > 0) {
       bottomSpacing += blockStyle.paddingBottom;
     }
-    if (extraParagraphSpacing) {
+    if (extraParagraphSpacing && !blockStyle.cascadeJoin) {
       bottomSpacing += lineHeight / 2;
     }
     const int gapCap = lineHeight / 2;

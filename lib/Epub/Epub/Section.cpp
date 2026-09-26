@@ -241,7 +241,14 @@ namespace {
 // through Knuth-Plass with shrink. The threshold is in the cache key already,
 // but only as the stored setting; bumped so no cache survives the change of
 // meaning either.
-constexpr uint8_t SECTION_FILE_VERSION = 61;
+// v62: cascade editions (owner ruling 2026-09-26). A block whose element
+// carries the class token `cascade-join` gets no half-line paragraph gap after
+// it, and `cascade-line` sets it ragged (ChapterHtmlSlimParser startElement,
+// BlockStyle::cascadeJoin). Only books that carry the tokens paginate
+// differently -- the AI book's own pages were byte-identical across the change
+// -- but a cascade edition opened on the previous firmware would otherwise keep
+// its 1.5x-pitch pages.
+constexpr uint8_t SECTION_FILE_VERSION = 62;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
