@@ -40,6 +40,9 @@ add_executable(LineBreakQualityTest
 # target may define it -- on a device a mutable layout parameter is a way for two
 # pages of the same book to disagree about where the lines go.
 target_compile_definitions(LineBreakQualityTest PRIVATE CROSSPOINT_RAGGED_GATE_TUNABLE)
+# And the Knuth-Plass switch, which this suite turns OFF: it is the greedy
+# breaker's measurement (see kGreedyPinned in LineBreakQualityTest.cpp).
+target_compile_definitions(LineBreakQualityTest PRIVATE CROSSPOINT_KNUTH_PLASS_TUNABLE)
 
 target_compile_options(LineBreakQualityTest PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-include$<SEMICOLON>Arduino.h>
@@ -106,6 +109,12 @@ add_executable(LineBreakKnuthPlassTest
 target_compile_options(LineBreakKnuthPlassTest PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-include$<SEMICOLON>Arduino.h>
 )
+# The device Knuth-Plass breaker's knobs (on/off, an allocation budget, the
+# window) become settable for THIS TARGET ONLY -- KnuthPlassBreaker.h. The
+# device-port tests need them to force the greedy fallback and to compare the
+# windowed breaker with the unwindowed one; the instruments need them to keep
+# measuring the greedy breaker their arms are named after.
+target_compile_definitions(LineBreakKnuthPlassTest PRIVATE CROSSPOINT_KNUTH_PLASS_TUNABLE)
 target_include_directories(LineBreakKnuthPlassTest BEFORE PRIVATE
   ${REPO_ROOT}/test/sd_kern_measure/stubs
 )

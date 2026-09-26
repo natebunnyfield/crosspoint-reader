@@ -228,7 +228,12 @@ namespace {
 // THIS IS THE VERSION TO BUMP WHENEVER A SHIPPED FONT'S METRICS OR KERNING
 // CHANGE, and it must ship in the SAME firmware as the fonts. Replacing a
 // .cpfont alone is silent: the layout is wrong and nothing detects it.
-constexpr uint8_t SECTION_FILE_VERSION = 58;
+// v59: a justified block that hyphenates is broken by Knuth-Plass total fit
+// instead of the greedy breaker (owner ruling 2026-09-26, "go with k-p";
+// lib/Epub/Epub/KnuthPlassBreaker.h). No field changed, but nearly every
+// justified paragraph's line breaks move -- 1,132 of 1,472 in the owner's own
+// books at Albo 14 -- and the breaks are baked into the cached TextBlocks.
+constexpr uint8_t SECTION_FILE_VERSION = 59;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

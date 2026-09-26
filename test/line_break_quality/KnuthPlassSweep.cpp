@@ -51,6 +51,7 @@
 #include <tuple>
 #include <vector>
 
+#include "Epub/KnuthPlassBreaker.h"
 #include "Epub/LineBreakMode.h"
 #include "Epub/ParsedText.h"
 #include "Epub/blocks/TextBlock.h"
@@ -381,8 +382,13 @@ struct RealRun {
   double micros = 0.0;
 };
 
+// `knuthPlass` false (every instrument below) runs the GREEDY breaker the
+// arms are labeled with: since 2026-09-26 a justified hyphenating block goes
+// to the device's Knuth-Plass breaker, and "greedy+hy (shipped)" would
+// otherwise silently measure it. The device-port tests pass true.
 RealRun runReal(const std::vector<std::string>& words, const int fontId, const uint8_t storedMode,
-                const bool justified) {
+                const bool justified, const bool knuthPlass = false) {
+  kpbreak::tuning().enabled = knuthPlass;
   BlockStyle style;
   style.alignment = justified ? CssTextAlign::Justify : CssTextAlign::Left;
   ParsedText block(/*extraParagraphSpacing=*/false, storedMode, /*focusReadingEnabled=*/false, style);
@@ -397,6 +403,7 @@ RealRun runReal(const std::vector<std::string>& words, const int fontId, const u
       [&](const std::shared_ptr<TextBlock>& line) { out.blocks.push_back(line); }, /*includeLastLine=*/true,
       /*justifyThresholdChars=*/0);
   out.micros = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count();
+  kpbreak::tuning().enabled = true;
   return out;
 }
 
@@ -658,9 +665,12 @@ TEST(KnuthPlass, ModelReproducesTheShippedBreakersExactly) {
   int lines = 0, hyphenated = 0;
   for (const bool justified : {true, false}) {
     for (const uint8_t mode : {linebreak::STORED_HYPHENATED, linebreak::STORED_WHOLE_WORDS}) {
+      // Both the greedy breaker and, since 2026-09-26, the device Knuth-Plass
+      // one that replaced it on justified blocks.
+      for (const bool knuthPlass : {false, true}) {
       for (const auto& text : builtinParagraphs()) {
         const auto words = wordsOf(text);
-        const RealRun real = runReal(words, fontId, mode, justified);
+        const RealRun real = runReal(words, fontId, mode, justified, knuthPlass);
         std::vector<kp::Pos> cuts;
         ASSERT_TRUE(cutsFromBlocks(words, real.blocks, cuts));
         const Prepared P = prepare(words, fontId, true);
@@ -668,6 +678,7 @@ TEST(KnuthPlass, ModelReproducesTheShippedBreakersExactly) {
         EXPECT_EQ(mismatchedLines(model, real.blocks), 0) << text.substr(0, 40);
         lines += static_cast<int>(model.size());
         for (const auto& L : model) hyphenated += L.hyphenated;
+      }
       }
     }
   }
@@ -1184,4 +1195,421 @@ TEST(KnuthPlass, DISABLED_BlindRender) {
     std::snprintf(path, sizeof(path), "%s/%s_%d_%d_kp.pgm", outDir, fam, pt, idx);
     writeParagraphPgm(a.kpl, fontId, a.words, true, h, path);
   }
+}
+
+// ===========================================================================
+// THE DEVICE PORT (owner ruling 2026-09-26, "go with k-p").
+//
+// lib/Epub/Epub/KnuthPlassBreaker.h is what ships: integer demerits, a window,
+// ParsedText's full token stream. These tests hold it to the prototype above
+// (KnuthPlass.h, the breaker the owner judged in the blind test) cut for cut.
+// Two layers, because they fail for different reasons:
+//
+//   * PURE: the device DP fed the prototype's own positions and widths
+//     (ProtoModel). A difference here is the DP -- integer rounding, a state
+//     mapping, a tie broken the other way.
+//   * THROUGH ParsedText: the real layoutAndExtractLines on a justified,
+//     hyphenating block, cuts read back off the TextBlocks it bakes. A
+//     difference here that the pure layer does not show is the ParsedText
+//     adapter -- a width, a gap, a position, a split.
+// ===========================================================================
+
+namespace {
+
+// The device breaker's model over a prototype paragraph: the SAME positions
+// and the same measured widths, so the two DPs see identical input.
+struct ProtoModel {
+  const kp::Paragraph& p;
+  std::vector<char> breakBefore;           // (k,0) is a position
+  std::vector<std::vector<int>> hyphenAt;  // indices into p.positions, per word
+  explicit ProtoModel(const kp::Paragraph& para)
+      : p(para), breakBefore(para.words + 1, 0), hyphenAt(static_cast<size_t>(para.words) + 1) {
+    for (size_t i = 0; i < p.positions.size(); ++i) {
+      const auto& q = p.positions[i];
+      if (q.offset == 0)
+        breakBefore[q.word] = 1;
+      else
+        hyphenAt[q.word].push_back(static_cast<int>(i));
+    }
+  }
+  int tokenCount() const { return p.words; }
+  int fullWidth(const int k) const { return p.full[k]; }
+  int gapBefore(const int k) const { return p.gapAfter[k - 1]; }
+  bool gapStretches(int) const { return true; }
+  bool mayBreakBefore(const int k) const { return breakBefore[k] != 0; }
+  template <typename F>
+  void forEachHyphenPoint(const int k, bool, F&& f) const {
+    for (const int i : hyphenAt[k]) {
+      const auto& q = p.positions[i];
+      f(q.offset, q.hyphen, p.piece(k, 0, q.offset, q.hyphen), p.piece(k, q.offset, -1, false));
+    }
+  }
+  int pieceWidth(const int k, const int from, const int to, const bool hy) const { return p.piece(k, from, to, hy); }
+};
+
+kpbreak::Config deviceConfig(const Prepared& P, const int windowPositions = kpbreak::WINDOW_POSITIONS) {
+  kpbreak::Config c;
+  c.measure = kMeasure;
+  c.firstLineIndent = P.para.firstLineIndentPx;
+  c.spaceAdvance = Env::instance().renderer().getSpaceAdvance(P.fontId, 'n', 'n', EpdFontFamily::REGULAR);
+  c.windowPositions = windowPositions;
+  c.windowTokens = std::max(kpbreak::WINDOW_TOKENS, windowPositions * 2);
+  return c;
+}
+
+// Large enough that no paragraph in the corpus (719 positions at most) is
+// windowed: the pure comparison is against the prototype's global optimum.
+constexpr int kUnwindowed = 5000;
+
+std::vector<kp::Pos> deviceCuts(const Prepared& P, const int windowPositions, kpbreak::Result* res = nullptr,
+                                kpbreak::Stats* st = nullptr) {
+  const ProtoModel m(P.para);
+  std::vector<kpbreak::Cut> cuts;
+  const kpbreak::Result r = kpbreak::breakParagraph(m, deviceConfig(P, windowPositions), cuts, st);
+  if (res) *res = r;
+  std::vector<kp::Pos> out = {{0, 0, false, false}};
+  for (const auto& c : cuts) out.push_back({c.word, c.offset, c.hyphen, c.offset > 0});
+  return out;
+}
+
+std::string cutsText(const std::vector<kp::Pos>& c) {
+  std::string s;
+  for (const auto& p : c) s += std::to_string(p.word) + ":" + std::to_string(p.offset) + " ";
+  return s;
+}
+
+// Every word set once (the TextBlocks rebuild the source) and no non-final
+// line wider than the measure, read off what ParsedText actually baked.
+void expectSane(const std::vector<std::string>& words, const RealRun& real, const Prepared& P, const bool justified,
+                const std::string& label) {
+  std::vector<kp::Pos> cuts;
+  ASSERT_TRUE(cutsFromBlocks(words, real.blocks, cuts)) << label << ": the lines do not rebuild the source text";
+  const auto lines = layOut(P, cuts, justified);
+  ASSERT_EQ(mismatchedLines(lines, real.blocks), 0) << label;
+  for (size_t l = 0; l < lines.size(); ++l) {
+    EXPECT_LE(lines[l].natural, kMeasure - (l == 0 ? P.para.firstLineIndentPx : 0))
+        << label << ": line " << l << " overflows";
+  }
+}
+
+std::string repeatedParagraph(const int copies) {
+  std::string t;
+  for (int c = 0; c < copies; ++c)
+    for (const auto& p : builtinParagraphs()) t += p + " ";
+  t.pop_back();
+  return t;
+}
+
+}  // namespace
+
+TEST(KnuthPlassDevice, PureBreakerMatchesThePrototypeCutForCut) {
+  int paragraphs = 0, hyphenated = 0;
+  for (const int pt : {12, 14, 18}) {
+    const int fontId = Env::instance().fontFor("LibreFranklin", pt);
+    ASSERT_NE(fontId, 0);
+    for (const auto& text : builtinParagraphs()) {
+      const Prepared P = prepare(wordsOf(text), fontId, true);
+      const auto proto = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+      kpbreak::Result r;
+      const auto dev = deviceCuts(P, kUnwindowed, &r);
+      ASSERT_EQ(r, kpbreak::Result::Ok);
+      EXPECT_TRUE(sameCuts(proto, dev)) << "LF " << pt << "\n proto " << cutsText(proto) << "\n dev   "
+                                        << cutsText(dev);
+      for (const auto& c : dev) hyphenated += c.offset > 0;
+      paragraphs++;
+    }
+  }
+  EXPECT_EQ(paragraphs, 12);
+  EXPECT_GT(hyphenated, 0) << "no hyphenated line in the fixture: the flagged-penalty half is untested";
+}
+
+TEST(KnuthPlassDevice, ParsedTextMatchesThePrototypeOnJustifiedBlocks) {
+  int lines = 0, hyphenated = 0;
+  for (const int pt : {12, 14, 18}) {
+    const int fontId = Env::instance().fontFor("LibreFranklin", pt);
+    ASSERT_NE(fontId, 0);
+    for (const auto& text : builtinParagraphs()) {
+      const auto words = wordsOf(text);
+      const Prepared P = prepare(words, fontId, true);
+      const auto proto = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+      const int before = kpbreak::tuning().attempts;
+      const RealRun real = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, /*knuthPlass=*/true);
+      ASSERT_EQ(kpbreak::tuning().attempts, before + 1) << "the justified block never reached Knuth-Plass";
+      ASSERT_EQ(kpbreak::tuning().lastResult, kpbreak::Result::Ok);
+      std::vector<kp::Pos> got;
+      ASSERT_TRUE(cutsFromBlocks(words, real.blocks, got));
+      EXPECT_TRUE(sameCuts(proto, got)) << "LF " << pt << "\n proto " << cutsText(proto) << "\n parsed "
+                                        << cutsText(got);
+      expectSane(words, real, P, true, "LF " + std::to_string(pt));
+      lines += static_cast<int>(got.size()) - 1;
+      for (const auto& c : got) hyphenated += c.offset > 0;
+    }
+  }
+  EXPECT_GT(lines, 60);
+  EXPECT_GT(hyphenated, 0);
+}
+
+// Automatic justification decides "justified" per block; a block it demotes
+// (threshold 255 here) and a block that asked for Left both keep greedy.
+TEST(KnuthPlassDevice, RaggedBlocksAreUntouched) {
+  const int fontId = Env::instance().fontFor("LibreFranklin", 14);
+  ASSERT_NE(fontId, 0);
+  for (const auto& text : builtinParagraphs()) {
+    const auto words = wordsOf(text);
+    for (const bool demoted : {false, true}) {
+      auto run = [&](const bool kpOn) {
+        kpbreak::tuning().enabled = kpOn;
+        BlockStyle style;
+        style.alignment = demoted ? CssTextAlign::Justify : CssTextAlign::Left;
+        ParsedText block(false, linebreak::STORED_HYPHENATED, false, style);
+        for (const auto& w : words) block.addWord(w, EpdFontFamily::REGULAR);
+        std::vector<std::shared_ptr<TextBlock>> out;
+        block.layoutAndExtractLines(
+            Env::instance().renderer(), fontId, kMeasure,
+            [&](const std::shared_ptr<TextBlock>& l) { out.push_back(l); }, true, demoted ? 255 : 0);
+        kpbreak::tuning().enabled = true;
+        return out;
+      };
+      const int before = kpbreak::tuning().attempts;
+      const auto withKp = run(true);
+      EXPECT_EQ(kpbreak::tuning().attempts, before) << "a ragged block reached Knuth-Plass";
+      const auto greedy = run(false);
+      ASSERT_EQ(withKp.size(), greedy.size());
+      for (size_t l = 0; l < greedy.size(); ++l) {
+        ASSERT_EQ(withKp[l]->wordCount(), greedy[l]->wordCount());
+        for (uint16_t i = 0; i < greedy[l]->wordCount(); ++i) {
+          EXPECT_STREQ(withKp[l]->wordText(i), greedy[l]->wordText(i));
+          EXPECT_EQ(withKp[l]->wordXpos(i), greedy[l]->wordXpos(i));
+        }
+      }
+    }
+  }
+}
+
+// A heap that cannot hold the working set must fall back to greedy with the
+// block untouched: the output is then byte-for-byte the greedy breaker's.
+TEST(KnuthPlassDevice, AllocationFailureFallsBackToGreedyExactly) {
+  const int fontId = Env::instance().fontFor("LibreFranklin", 14);
+  ASSERT_NE(fontId, 0);
+  int differedFromKp = 0;
+  for (const size_t limit : {size_t{1}, size_t{200}, size_t{2000}}) {
+    for (const auto& text : builtinParagraphs()) {
+      const auto words = wordsOf(text);
+      const RealRun greedy = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, false);
+      const RealRun kpRun = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, true);
+      kpbreak::tuning().allocLimitBytes = limit;
+      const RealRun starved = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, true);
+      const kpbreak::Result r = kpbreak::tuning().lastResult;
+      kpbreak::tuning().allocLimitBytes = 0;
+      ASSERT_EQ(r, kpbreak::Result::AllocFailed) << "limit " << limit;
+      ASSERT_EQ(starved.blocks.size(), greedy.blocks.size());
+      for (size_t l = 0; l < greedy.blocks.size(); ++l) {
+        ASSERT_EQ(starved.blocks[l]->wordCount(), greedy.blocks[l]->wordCount());
+        for (uint16_t i = 0; i < greedy.blocks[l]->wordCount(); ++i) {
+          EXPECT_STREQ(starved.blocks[l]->wordText(i), greedy.blocks[l]->wordText(i));
+          EXPECT_EQ(starved.blocks[l]->wordXpos(i), greedy.blocks[l]->wordXpos(i));
+        }
+      }
+      std::vector<kp::Pos> a, b;
+      ASSERT_TRUE(cutsFromBlocks(words, greedy.blocks, a));
+      ASSERT_TRUE(cutsFromBlocks(words, kpRun.blocks, b));
+      differedFromKp += !sameCuts(a, b);
+    }
+  }
+  // Not vacuous: on these paragraphs the fallback visibly is NOT Knuth-Plass.
+  EXPECT_GT(differedFromKp, 0);
+
+  // And the pure breaker says so without touching its output vector's caller.
+  const Prepared P = prepare(wordsOf(builtinParagraphs()[0]), fontId, true);
+  const ProtoModel m(P.para);
+  kpbreak::Config c = deviceConfig(P);
+  c.allocLimitBytes = 100;
+  std::vector<kpbreak::Cut> cuts = {{1, 2, true}};
+  EXPECT_EQ(kpbreak::breakParagraph(m, c, cuts), kpbreak::Result::AllocFailed);
+  EXPECT_TRUE(cuts.empty());
+}
+
+// The window: a paragraph past WINDOW_POSITIONS is solved in windows, still
+// sets every word once without overflow, and holds no more than the stated
+// worst case. A small window on the fixture exercises the seams many times.
+TEST(KnuthPlassDevice, TheWindowBoundsMemoryAndStillSetsEveryWord) {
+  const int fontId = Env::instance().fontFor("LibreFranklin", 14);
+  ASSERT_NE(fontId, 0);
+
+  // (a) the shipped window, on a paragraph longer than it.
+  const auto words = wordsOf(repeatedParagraph(3));
+  const Prepared P = prepare(words, fontId, true);
+  ASSERT_GT(static_cast<int>(P.para.positions.size()), 2 * kpbreak::WINDOW_POSITIONS)
+      << "the long fixture no longer needs more than one window";
+  const RealRun real = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, true);
+  ASSERT_EQ(kpbreak::tuning().lastResult, kpbreak::Result::Ok);
+  const kpbreak::Stats st = kpbreak::tuning().lastStats;
+  EXPECT_GE(st.windows, 3);
+  // The header's worst case, computed from the same terms.
+  const size_t P1 = kpbreak::WINDOW_POSITIONS + 1;
+  const size_t worst = P1 * sizeof(kpbreak::detail::Pos) + P1 * kpbreak::STATES * (sizeof(int64_t) + sizeof(uint16_t)) +
+                       P1 * sizeof(uint16_t) + (kpbreak::WINDOW_TOKENS + 1) * sizeof(int32_t) +
+                       kpbreak::WINDOW_TOKENS * (sizeof(int32_t) + sizeof(uint16_t));
+  EXPECT_LE(st.peakBytes, worst);
+  printf("[window] %zu words, %zu positions: %d windows, peak %zu B (worst case %zu B)\n", words.size(),
+         P.para.positions.size(), st.windows, st.peakBytes, worst);
+  expectSane(words, real, P, true, "long paragraph");
+
+  // The windowed result against the prototype's global optimum: report, and
+  // bound the damage at the seams -- no line looser than the prototype's worst.
+  const auto proto = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+  std::vector<kp::Pos> got;
+  ASSERT_TRUE(cutsFromBlocks(words, real.blocks, got));
+  const double s = Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
+  const double protoWorst = worstOf(layOut(P, proto, true), s);
+  const double gotWorst = worstOf(layOut(P, got, true), s);
+  printf("[window] same cuts as the unwindowed prototype: %s; worst line %.2f vs %.2f spaces\n",
+         sameCuts(proto, got) ? "yes" : "no", gotWorst, protoWorst);
+
+  // (b) a tiny window through the pure breaker: many seams.
+  for (const int w : {8, 24, 40}) {
+    for (const auto& text : builtinParagraphs()) {
+      const Prepared Q = prepare(wordsOf(text), fontId, true);
+      kpbreak::Result r;
+      kpbreak::Stats qs;
+      const auto dev = deviceCuts(Q, w, &r, &qs);
+      ASSERT_EQ(r, kpbreak::Result::Ok) << "window " << w;
+      EXPECT_GT(qs.windows, 1) << "window " << w;
+      const auto lines = layOut(Q, dev, true);
+      std::string rebuilt;
+      for (size_t l = 0; l < lines.size(); ++l) {
+        EXPECT_LE(lines[l].natural, kMeasure - (l == 0 ? Q.para.firstLineIndentPx : 0)) << "window " << w;
+        const kp::Pos& b = dev[l + 1];
+        for (size_t t = 0; t < lines[l].texts.size(); ++t) {
+          const bool split = t + 1 == lines[l].texts.size() && b.offset > 0;
+          std::string piece = lines[l].texts[t];
+          if (split && b.hyphen) piece.pop_back();
+          rebuilt += piece;
+          if (!split) rebuilt += ' ';
+        }
+      }
+      std::string expect;
+      for (const auto& x : Q.words) expect += x + " ";
+      EXPECT_EQ(rebuilt, expect) << "window " << w;
+    }
+  }
+}
+
+// THE CORPUS: the owner's own books (tools/linebreak_corpus.py, doc section 2).
+// Skips without CROSSPOINT_LINEBREAK_CORPUS; the doc records the run.
+//   * pure, unwindowed: must equal the prototype on EVERY paragraph;
+//   * through ParsedText with the shipped window: must equal it on every
+//     paragraph that fits one window, and is counted on the rest;
+//   * every paragraph: every word set once, no line over the measure;
+//   * host timing: ParsedText greedy vs ParsedText Knuth-Plass, whole call.
+TEST(KnuthPlassDevice, CorpusMatchesThePrototype) {
+  const auto corpus = loadCorpus();
+  if (corpus.empty()) GTEST_SKIP() << "set CROSSPOINT_LINEBREAK_CORPUS";
+  std::string spec = std::getenv("CROSSPOINT_KP_FACES") ? std::getenv("CROSSPOINT_KP_FACES") : "LibreFranklin:14,Albo:14";
+  size_t i = 0;
+  while (i < spec.size()) {
+    size_t j = spec.find(',', i);
+    if (j == std::string::npos) j = spec.size();
+    const std::string item = spec.substr(i, j - i);
+    i = j + 1;
+    const size_t c = item.find(':');
+    const std::string fam = item.substr(0, c);
+    const int pt = std::atoi(item.c_str() + c + 1);
+    const int fontId = Env::instance().fontFor(fam, pt);
+    if (fontId == 0) {
+      printf("[corpus] %s %d not available, skipped\n", fam.c_str(), pt);
+      continue;
+    }
+    int pureDiff = 0, parsedDiff = 0, windowed = 0, windowedDiff = 0, lines = 0, hyph = 0, maxPos = 0;
+    double greedyUs = 0, kpUs = 0, protoDpUs = 0, devDpUs = 0, maxKpUs = 0, seamWorst = 0, protoWorst = 0;
+    int seamWorse = 0, seamHyph = 0, protoHyph = 0;
+    size_t peak = 0;
+    for (size_t pi = 0; pi < corpus.size(); ++pi) {
+      const auto words = wordsOf(corpus[pi]);
+      const Prepared P = prepare(words, fontId, true);
+      maxPos = std::max(maxPos, static_cast<int>(P.para.positions.size()));
+      double protoUs = 0;
+      const auto proto = kpCuts(P, candidateParams(fontId, true, false), nullptr, &protoUs);
+      protoDpUs += protoUs;
+      const auto t0 = std::chrono::steady_clock::now();
+      kpbreak::Result r;
+      const auto pure = deviceCuts(P, kUnwindowed, &r);
+      devDpUs += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count();
+      ASSERT_EQ(r, kpbreak::Result::Ok) << pi;
+      if (!sameCuts(proto, pure)) {
+        if (pureDiff < 5)
+          ADD_FAILURE() << fam << " " << pt << " paragraph " << pi << " pure\n proto " << cutsText(proto)
+                        << "\n dev   " << cutsText(pure);
+        pureDiff++;
+      }
+      const RealRun g = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, false);
+      greedyUs += g.micros;
+      const RealRun k = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, true);
+      kpUs += k.micros;
+      maxKpUs = std::max(maxKpUs, k.micros);
+      ASSERT_EQ(kpbreak::tuning().lastResult, kpbreak::Result::Ok) << pi;
+      peak = std::max(peak, kpbreak::tuning().lastStats.peakBytes);
+      expectSane(words, k, P, true, fam + " paragraph " + std::to_string(pi));
+      std::vector<kp::Pos> got;
+      ASSERT_TRUE(cutsFromBlocks(words, k.blocks, got));
+      lines += static_cast<int>(got.size()) - 1;
+      for (const auto& q : got) hyph += q.offset > 0;
+      const bool oneWindow = static_cast<int>(P.para.positions.size()) <= kpbreak::WINDOW_POSITIONS + 1;
+      if (!oneWindow) windowed++;
+      if (!sameCuts(proto, got)) {
+        if (oneWindow) {
+          if (parsedDiff < 5)
+            ADD_FAILURE() << fam << " " << pt << " paragraph " << pi << " ParsedText\n proto " << cutsText(proto)
+                          << "\n parsed " << cutsText(got);
+          parsedDiff++;
+        } else {
+          windowedDiff++;
+        }
+      }
+      if (!oneWindow) {
+        // What the seams cost: this paragraph's loosest line, windowed vs not.
+        const double sp = Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
+        const double a = worstOf(layOut(P, got, true), sp), b = worstOf(layOut(P, proto, true), sp);
+        seamWorst += a;
+        protoWorst += b;
+        seamWorse += a > b + 1e-9;
+        seamHyph += hyphensOf(layOut(P, got, true));
+        protoHyph += hyphensOf(layOut(P, proto, true));
+      }
+    }
+    const double n = static_cast<double>(corpus.size());
+    printf("[corpus] %s %d: %zu paragraphs, %d lines, %d hyphenated; pure differs %d, ParsedText differs %d "
+           "(one window); %d paragraphs past the window, %d of them differ; max positions %d; peak %zu B\n",
+           fam.c_str(), pt, corpus.size(), lines, hyph, pureDiff, parsedDiff, windowed, windowedDiff, maxPos, peak);
+    if (windowed > 0)
+      printf("[corpus] %s %d windowed paragraphs: mean worst line %.3f vs unwindowed %.3f spaces, %d of %d worse; "
+             "hyphenated lines %d vs %d\n",
+             fam.c_str(), pt, seamWorst / windowed, protoWorst / windowed, seamWorse, windowed, seamHyph, protoHyph);
+    printf("[corpus] %s %d host timing per paragraph: ParsedText greedy %.1f us, ParsedText Knuth-Plass %.1f us "
+           "(max %.0f us); DP alone: prototype (double) %.1f us, device (int64) %.1f us\n",
+           fam.c_str(), pt, greedyUs / n, kpUs / n, maxKpUs, protoDpUs / n, devDpUs / n);
+    EXPECT_EQ(pureDiff, 0);
+    EXPECT_EQ(parsedDiff, 0);
+  }
+}
+
+// Adversarial review 2026-09-26, finding 1: a word longer than three lines has
+// no path under a HARD two-hyphens-in-a-row cap (its fourth fragment can only
+// follow a third hyphenated line), so the whole paragraph silently fell to
+// greedy. The breaker now relaxes the cap for exactly the positions nothing
+// else can reach; this pins that such a paragraph is set by Knuth-Plass, whole
+// and within the measure.
+TEST(KnuthPlassDevice, AWordLongerThanThreeLinesStillGetsKnuthPlass) {
+  const int fontId = Env::instance().fontFor("LibreFranklin", 14);
+  ASSERT_NE(fontId, 0);
+  std::string giant;
+  for (int i = 0; i < 6; ++i) giant += "Donaudampfschifffahrtsgesellschaftskapitaen";
+  std::string text;
+  for (int i = 0; i < 3; ++i) text += "the river boats of the old company were named " + giant + " and more ";
+  const auto words = wordsOf(text);
+  const Prepared P = prepare(words, fontId, true);
+  ASSERT_GT(P.para.full[9], 3 * kMeasure) << "the fixture word no longer spans four lines";
+  const RealRun real = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, true);
+  EXPECT_EQ(kpbreak::tuning().lastResult, kpbreak::Result::Ok);
+  expectSane(words, real, P, true, "giant word");
 }

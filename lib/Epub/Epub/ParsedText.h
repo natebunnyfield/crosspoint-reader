@@ -65,6 +65,16 @@ class ParsedText {
                                                   std::vector<bool>& noSpaceBeforeVec);
   bool hyphenateWordAtIndex(size_t wordIndex, int availableWidth, const GfxRenderer& renderer, int fontId,
                             std::vector<uint16_t>& wordWidths, bool allowFallbackBreaks);
+  // Knuth-Plass total fit for a JUSTIFIED block (KnuthPlassBreaker.h). Returns
+  // false -- with nothing mutated -- when it declines or cannot run (ruby, an
+  // allocation failure, no path), and the caller then uses the greedy breaker.
+  bool computeKnuthPlassLineBreaks(const GfxRenderer& renderer, int fontId, int pageWidth,
+                                   std::vector<uint16_t>& wordWidths, std::vector<size_t>& lineBreakIndices);
+  // Splits words[wordIndex] at byteOffset into prefix (+ '-' when needsHyphen)
+  // and remainder, keeping every parallel array in step. Shared by the greedy
+  // breaker's hyphenateWordAtIndex and the Knuth-Plass one.
+  void splitWordAt(size_t wordIndex, size_t byteOffset, bool needsHyphen, uint16_t prefixWidth,
+                   const GfxRenderer& renderer, int fontId, std::vector<uint16_t>& wordWidths);
   void extractLine(size_t breakIndex, int pageWidth, const std::vector<uint16_t>& wordWidths,
                    const std::vector<bool>& continuesVec, const std::vector<bool>& noSpaceBeforeVec,
                    const std::vector<size_t>& lineBreakIndices,

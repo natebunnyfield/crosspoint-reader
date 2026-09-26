@@ -6,8 +6,9 @@ Written 2026-09-25. It is experiment **E3** of the layout research plan
 2×2 that no stored byte can reach, total fit WITH hyphen points, and measures it
 against the shipped default on the owner's own books.
 
-**Nothing on the device changed.** The breaker is host-only: it lives in the
-test harness and was not wired into `ParsedText` or the renderer.
+**Nothing on the device changed** when §1–§12 were written: the breaker was
+host-only. **Superseded 2026-09-26: the owner ruled "go with k-p", and §13 is
+the device port that shipped** (`lib/Epub/Epub/KnuthPlassBreaker.h`).
 
 * Surveyed at `9b78f5d5c`, plus the harness files named below.
 * Every number is **measured on the host** unless it is marked as an estimate.
@@ -749,4 +750,307 @@ CROSSPOINT_TEST_SD=<sd snapshot> CROSSPOINT_LINEBREAK_CORPUS=/tmp/corpus.txt CRO
 CROSSPOINT_KP_FACES=Albo:14,LibreFranklin:14 \
   build/line_break_quality/LineBreakKnuthPlassTest --gtest_also_run_disabled_tests --gtest_filter='*BlindStats*'
 python3 tools/knuth_plass_blind.py --stats-dir /tmp/kpb --corpus /tmp/corpus.txt --sd <sd snapshot>
+```
+
+---
+
+## 13. Shipped: the device port (2026-09-26)
+
+**Owner ruling 2026-09-26, "go with k-p": option B of §7.** Knuth-Plass
+replaces the greedy breaker on JUSTIFIED blocks only. It is stretch-only and
+uses exactly the §2 candidate parameters the blind test showed him. Ragged
+blocks are unchanged, and shrink (C) is not part of it. Built on `ed4b0b434`.
+
+### 13a. What shipped, and where
+
+| What | Where |
+|---|---|
+| The breaker: header-only, integer, windowed | `lib/Epub/Epub/KnuthPlassBreaker.h` (`kpbreak::breakParagraph`, :240; the DP is `detail::breakParagraphImpl`, :247) |
+| ParsedText's view of a block, read-only | `lib/Epub/Epub/ParsedText.cpp:446` (`KnuthPlassModel`) |
+| Run it, split only the chosen words, return break indices | `ParsedText::computeKnuthPlassLineBreaks`, `ParsedText.cpp:1258` |
+| The gate | `ParsedText.cpp:916` |
+| The split, shared with greedy's `hyphenateWordAtIndex` | `ParsedText::splitWordAt`, `ParsedText.cpp:1470` |
+| Re-pagination | `SECTION_FILE_VERSION` 58 → **59**, `Section.cpp:236` |
+| Tests | `test/line_break_quality/KnuthPlassSweep.cpp:1305` onward, seven `KnuthPlassDevice.*` tests |
+
+**The gate.** Knuth-Plass runs when two things hold. First, the resolved
+breaker is one that splits words: Hyphenated, or Automatic resolving to
+Hyphenated. Second, the block is still `Justify` AFTER automatic
+justification. A block that auto-justify demoted to ragged keeps greedy and its
+70% ragged gate. So do a Whole Words block (already total fit) and a ruby block
+(the model has no term for ruby's break-dependent overhangs). `extractLine` is
+unchanged.
+
+**Greedy is also the fallback.** It takes over whenever the breaker returns
+anything but `Ok`: an allocation failure, no path, or malformed input. The
+breaker never mutates the block, so the fallback gets it exactly as it was.
+`KnuthPlassDevice.AllocationFailureFallsBackToGreedyExactly` pins this: the
+output is byte-for-byte greedy's.
+
+### 13b. How the port differs from the prototype, deliberately
+
+1. **Integers, no floats.** Badness is carried in sixteenths:
+   `b16 = round(12800·slack³ / (gaps·space)³)`, which is `1600·r³`. Demerits are
+   int64 in 1/256ths. Fitness is decided exactly in integers: `4·slack ≤ G` is
+   `r ≤ ½`. Badness clamps at `B16_MAX`, r ≈ 68, and path sums saturate.
+   **Checked in the device ELF:** the inlined breaker calls no soft-float
+   helper, only `__divdi3` (the int64 divide in the cube) and `__clzsi2`.
+2. **Nine states per position, not twelve.** Fitness class 0 (tight) cannot
+   occur without shrink, so it is dropped. The result is identical.
+3. **A window of 320 break positions or 640 tokens.** That is about 250 words
+   at the corpus's 1.3 positions per word. Past it, the path to the window's
+   end is traced, the lines ending in the first half are committed, and the
+   next window starts from the last committed break, carrying its (fitness,
+   hyphen-run) state.
+4. **A relaxed pass for words longer than three lines.** This one came from
+   the adversarial review (13f). Under a HARD cap of two hyphenated lines in a
+   row, a word spanning four or more lines has no legal path. The prototype
+   returns no cuts there, and the port fell back to greedy for the whole
+   paragraph. Passes 2 and 3 (`KnuthPlassBreaker.h:394`, `:437`) repeat the
+   normal and forced passes with the cap relaxed, but only for a position
+   nothing else can reach. Wherever the prototype finds a path they never run,
+   so parity is untouched. Re-measured after the fix, the corpus table in 13c
+   is identical.
+5. **The full token stream.** Continuation tokens (no-break space, attached
+   punctuation, focus-reading suffix) are not broken before. No-space-before
+   tokens (CJK) are stretchable gaps with no natural width. A spaced dash is
+   never a line start. Gaps are measured exactly as `extractLine` measures
+   them.
+
+**Memory, worst case: 39,146 B** per call, transient. These are the DP's own
+arrays, from `malloc`/`realloc` and never the throwing `new`:
+
+| Item | Bytes |
+|---|---:|
+| Positions: 321 × 10 | 3,210 |
+| Best demerits: 321 × 9 × 8 | 23,112 |
+| Back-pointers: 321 × 9 × 2 | 5,778 |
+| Traced path | 642 |
+| Token sums | 6,404 |
+
+**Largest measured, on the whole corpus in all six configurations: 35,596 B.**
+A mean paragraph holds about 12 KB.
+
+**Not covered by the nothrow path.** The review corrected this claim. The
+following are ordinary throwing allocations of tens of bytes, the kind greedy
+also makes:
+
+* the output cut list;
+* `Hyphenator::breakOffsets`' vector;
+* the substring copies measured per hyphen point.
+
+Greedy makes them for one word per line. This breaker makes them for every
+word, and from the second window on it does so while holding the previous
+window's arrays. A heap that cannot give tens of bytes can still abort here,
+as it would under greedy.
+
+### 13c. Proof that it is the breaker the owner judged
+
+**Measured on the host, 2026-09-26.** Corpus: §2's 1,472 paragraphs, rebuilt
+with `tools/linebreak_corpus.py`. Albo was a snapshot copy of `fs_/fonts/Albo`
+(`Albo_14` md5 `2896f6bf…`; it has been rebuilt since §2's hashes).
+
+| Config | Pure DP ≠ prototype | Through ParsedText ≠ prototype (one window) | Past the window | …of those that differ |
+|---|---:|---:|---:|---:|
+| LF 14 | 0 | 0 of 1,420 | 52 | 9 |
+| Albo 14 | 0 | 0 of 1,420 | 52 | 19 |
+| LF 12 | 0 | 0 | 52 | 24 |
+| Albo 12 | 0 | 0 | 52 | 18 |
+| LF 18 | 0 | 0 | 52 | 8 |
+| Albo 18 | 0 | 0 | 52 | 3 |
+
+* **"Pure"** feeds the device DP the prototype's own positions and widths,
+  unwindowed, so it tests the integer DP alone.
+* **"Through ParsedText"** reads cuts back off the TextBlocks that
+  `layoutAndExtractLines` bakes, so it also tests the adapter, the widths and
+  the splitting.
+* **Every paragraph**, windowed or not, rebuilds its source text exactly, and
+  no line exceeds the measure.
+* **What the window costs**, on the 52 windowed paragraphs, as their loosest
+  line windowed against unwindowed:
+
+  | Config | Windowed | Unwindowed | Change | Paragraphs worse |
+  |---|---:|---:|---:|---:|
+  | LF 14 | 4.080 | 4.064 | +0.4% | 3 |
+  | Albo 14 | 3.310 | 3.297 | +0.4% | 4 |
+  | LF 12 | 3.569 | 3.515 | +1.5% | 7 |
+  | Albo 12 | 2.865 | 2.863 | +0.1% | 6 |
+  | LF 18 | 5.654 | 5.642 | +0.2% | 2 |
+  | Albo 18 | 4.306 | 4.299 | +0.2% | 1 |
+
+  Hyphenated lines are 3–17% higher on those paragraphs (for example LF 14,
+  380 against 361).
+
+**Fixture (runs with no corpus).** Of the seven `KnuthPlassDevice` tests, six
+run on the built-in paragraphs; the seventh is the corpus test above.
+
+| Test | What it checks |
+|---|---|
+| `PureBreakerMatchesThePrototypeCutForCut` | 12 paragraphs, LF 12/14/18 |
+| `ParsedTextMatchesThePrototypeOnJustifiedBlocks` | The same paragraphs, through ParsedText |
+| `RaggedBlocksAreUntouched` | Left-aligned and demoted blocks never reach the breaker, and their output equals greedy's |
+| `AllocationFailureFallsBackToGreedyExactly` | At budgets of 1, 200 and 2,000 B |
+| `AWordLongerThanThreeLinesStillGetsKnuthPlass` | A 6× "Donaudampfschifffahrtsgesellschaftskapitaen" word gets `Ok`, is whole, and stays within the measure. **Failing first:** it returned `NoPath` with the relaxation disabled. |
+| `TheWindowBoundsMemoryAndStillSetsEveryWord` | A 909-word, 1,027-position paragraph takes 6 windows, peak 35,586 B, under the stated worst case. Windows of 8, 24 and 40 positions still set every word once without overflow. |
+
+`ModelReproducesTheShippedBreakersExactly` now also runs the device breaker's
+lines through the geometry model. It holds: 0 mismatched lines.
+
+### 13d. Cost
+
+**Host, measured.** Apple M4, Release, one pass over the corpus, per paragraph,
+from `KnuthPlassDevice.CorpusMatchesThePrototype`. Not a quiet-machine run;
+another agent was active.
+
+| Config | ParsedText, greedy | ParsedText, Knuth-Plass | KP worst paragraph | DP alone, prototype (double) | DP alone, device (int64) |
+|---|---:|---:|---:|---:|---:|
+| LF 14 | 33.8 µs | 66.7 µs | 539 µs | 29.3 µs | 13.5 µs |
+| Albo 14 | 24.0 µs | 50.3 µs | 442 µs | 29.1 µs | 13.3 µs |
+| range, 6 configs | 22.9–33.8 | 48.7–66.7 | ≤ 551 | 22.7–33.8 | 10.3–15.4 |
+
+The whole-call figures are measure + break + extract. So the breaker costs
+about **2× greedy per paragraph on the host**, +23–33 µs.
+
+**Most of that is not the DP.** It is the setup: `Hyphenator::breakOffsets` on
+every word, plus two advance measurements per hyphen point. Greedy does these
+only for the one word that overflows each line.
+
+The two "DP alone" columns are **not a like-for-like comparison of doubles
+against integers**. The prototype also re-measures pieces through a
+`std::function` cache inside its loop; the device DP reads precomputed widths.
+
+**ESP32-C3: ESTIMATE, not measured.** There is no paired device.
+
+* The per-operation factor is §6b's 50–100×.
+* That puts the added cost at roughly **1.2–3.3 ms per justified paragraph**,
+  about **4–17 ms per paginated page** at 3–5 paragraphs a page.
+* It lands on pagination (chapter open and background), not on page turns.
+* Ragged pages, which include the default 14 pt X3 page (§2), pay nothing.
+
+**Device build (`pio run -e default`, the C3 binary that serves X3 and X4),
+measured against the same tree without the change, final code.**
+
+| | Change |
+|---|---:|
+| Flash | **+5,472 B** (5,355,507 → 5,360,979; `.flash.text` +5,416, `.flash.rodata` +56) |
+| Static RAM (`.dram0.data`, `.dram0.bss`, `.iram0.text`) | **+0** |
+
+### 13e. Negative results and things found on the way
+
+* **The window changes about a third of the 52 over-long paragraphs** (3–24 of
+  52 per config) and costs them ≤ 1.5% on the loosest line (13c). An
+  unwindowed DP on the largest corpus paragraph (719 positions) would need
+  about 72 KB, per §6b's layout with int64 demerits. That is the thing the cap
+  exists to stop.
+* **Integer badness at 1/16 resolution produced no cut difference anywhere** in
+  the 8,832 paragraph-configurations (1,472 × 6). The expected risk was a near-tie
+  flipping on rounding; it did not happen on this corpus. That is an
+  observation, not a guarantee.
+* **`LineBreakQualityTest` would have measured Knuth-Plass under greedy's
+  name.** Its "Hyphenated" cells are justified hyphenating blocks, and two
+  pinned facts failed once Knuth-Plass took them:
+  `AtEqualHyphenationTotalFitProtectsTheWorstLine` and the default's hyphen
+  density in `HyphenRunsAreCounted…`. Those are facts about greedy, which still
+  sets every ragged block and is the fallback. So that suite is now pinned to
+  greedy through a test-only switch (`CROSSPOINT_KNUTH_PLASS_TUNABLE`,
+  `kGreedyPinned` in `LineBreakQualityTest.cpp`), and it passes 14/14. The §2
+  instruments in `KnuthPlassSweep.cpp` (`runReal`) are pinned the same way, so
+  their "greedy+hy (shipped)" arm still means greedy. **It is no longer what
+  ships on justified text.**
+* **The simulator link was blocked for a while by someone else's work.** The
+  first `pio run -e simulator_x3` compiled this change's `ParsedText.o` and
+  `Section.o` clean, then failed in `crosspoint-simulator/src/SurfaceSheet.cpp`
+  against another session's uncommitted `RakingLight.h`. A retry after that
+  work settled: **SUCCESS**.
+* **Explicit hyphens cost what inserted ones do.** A break after "well-" or
+  "state-of-" takes the full 10,000 penalty and counts toward the two-in-a-row
+  cap. That matches the prototype (every `breakOffsets` point is flagged), so it
+  is what the owner judged. It was not separately ruled on; TeX charges 50
+  there.
+  * The review's probe: "a well-known state-of-the-art mother-in-law" ×20 at
+    250 px set 60 lines against greedy's 54, one of them `state-of-` alone.
+  * **Not changed.** It is recorded as a candidate.
+* **Pre-existing, not this change:** every soft-flush call (a block past 750
+  tokens, or 320 with embedded CSS) gives its first line the paragraph indent
+  again (`resolveFirstLineIndent`). Greedy does the same; it was not traced
+  further.
+* **No new translation unit**, so the simulator's generated iOS source list does
+  not go stale. The breaker is header-only for that reason.
+
+### 13f. Checked and found clean
+
+**The adversarial review, 2026-09-26.** It was read-only, it had not written
+the code, and it built its own ASan/UBSan probes. Everything below is from its
+report, each item checked against the source.
+
+**Confirmed and fixed:**
+
+| # | Finding | Fix |
+|---:|---|---|
+| 1 | **MEDIUM.** A word longer than three lines left no path, so the paragraph fell to greedy. | 13b item 4, plus a failing-first test. |
+| 2 | **LOW–MEDIUM.** The header overstated "never the throwing new". | The prose in the header and in 13b is corrected. |
+| 3 | **LOW.** `out` kept earlier windows' cuts on a later-window failure. The only caller discarded them. | `breakParagraph` now clears `out` on every non-`Ok` result. |
+| 5 | **LOW.** `LineBreakQualityTest`'s "shipped default … 15–17% hyphenated" prose was stale. | Now says greedy, with the date. |
+
+**Recorded, not changed:** item 4, the explicit-hyphen penalty (13e).
+
+**Checked and clean**, per the review:
+
+* **Split application** (`ParsedText.cpp:1258`–): descending order, a word cut
+  twice, the shift arithmetic, and soft and explicit hyphens.
+* **`splitWordAt`** (`:1470`) keeps all seven parallel arrays in step, and its
+  widths equal the ones the DP assumed.
+* **Gaps and stretch counts** match `extractLine`, including no-break spaces,
+  CJK no-space tokens and continuation tokens.
+* **Text integrity under the breaker** for plain text, soft and explicit
+  hyphens, NBSP, em dashes, focus reading, CJK, and soft flush at 20 and 60
+  tokens.
+* **The integer DP:**
+  * `badness16` ≤ 4.5e17;
+  * clamp and saturation;
+  * exact fitness boundaries, and the dropped class 0;
+  * tie order, pass 1 and `isEnd` all match `KnuthPlass.h`;
+  * maximum cell 65,519, under `NO_PREV`.
+* **Windows:**
+  * every window makes progress;
+  * the carried state and the flagged start are right;
+  * the indent applies in the first window only;
+  * the caps hold;
+  * windows of 2 and 3 positions over 3,000 words ran under ASan with no fault.
+* **Degenerate input:** P < 2, 700 continuation tokens, a single token, and
+  6,000 px tokens.
+* **The gate** (`:916`). Ruby is excluded (`:1273`). Whole Words, Automatic
+  resolving to whole words, and demoted blocks all keep greedy.
+* **The fallback** mutates nothing before `Ok`.
+* **The version bump** to 59.
+
+**Host suites on the final source.** Of the ParsedText-linking suites,
+`LineBreakKnuthPlassTest` passes 9/9 with the corpus (8 plus 1 skip without it)
+and `LineBreakQualityTest` 14/14. The ctest subset over WordAnchor,
+TocHrefResolution, TocAnchorPage, DefinitionList, ChapterJump,
+TableKeepTogether, AutoJustify, SdKernMeasure, LineBreakMode,
+HyphenationEvaluation and the two line-break suites passes 106/106.
+
+In the whole `build/` ctest, `ReaderFontSizesTest` fails
+(`BothSlotNameTablesCarryTheSixNamesInOrder`). It does not link ParsedText, so
+it is not related to this change and was not investigated. The rest are
+unbuilt `_NOT_BUILT` targets.
+
+### 13g. Not done
+
+* **No device timing.** The figures in 13d are estimates.
+* **No owner-eye check of the shipped build.** The blind test judged the
+  prototype's output. This port reproduces that output cut for cut on every
+  paragraph that fits one window, but it has not been seen on the device.
+* **No per-measure hyphen penalty.** §4 and §10 still stand: LF 18 sets more
+  hyphens than greedy.
+
+### 13h. Reproduce
+
+```
+python3 tools/linebreak_corpus.py <the six epubs, §2> /tmp/corpus.txt
+cd build && cmake . && make LineBreakKnuthPlassTest LineBreakQualityTest && cd ..
+CROSSPOINT_TEST_SD=<sd snapshot> CROSSPOINT_LINEBREAK_CORPUS=/tmp/corpus.txt \
+CROSSPOINT_KP_FACES=LibreFranklin:14,Albo:14,LibreFranklin:12,Albo:12,LibreFranklin:18,Albo:18 \
+  build/line_break_quality/LineBreakKnuthPlassTest --gtest_filter='KnuthPlassDevice.*'
 ```

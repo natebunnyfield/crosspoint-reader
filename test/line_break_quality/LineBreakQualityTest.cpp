@@ -84,6 +84,7 @@
 #include <vector>
 
 #include "Epub/AutoJustify.h"
+#include "Epub/KnuthPlassBreaker.h"
 #include "Epub/LineBreakMode.h"
 #include "Epub/ParsedText.h"
 #include "Epub/hyphenation/Hyphenator.h"
@@ -92,6 +93,20 @@
 HalDisplay display;
 
 namespace {
+
+// THIS SUITE MEASURES THE GREEDY BREAKER, and pins it to greedy on purpose.
+// Since 2026-09-26 a JUSTIFIED block that hyphenates is broken by Knuth-Plass
+// on the device (KnuthPlassBreaker.h), so every justified "Hyphenated" cell
+// below would otherwise measure that breaker under greedy's name -- and two of
+// the pinned facts here (the equal-hyphenation worst-line comparison and the
+// default's hyphen density) are facts about greedy, which still sets every
+// ragged block and is the fallback. The breaker that now ships on justified
+// text is measured, cut for cut against its prototype, in LineBreakKnuthPlassTest
+// (KnuthPlassSweep.cpp, "THE DEVICE PORT").
+const bool kGreedyPinned = [] {
+  kpbreak::tuning().enabled = false;
+  return true;
+}();
 
 class Gfx {
  public:
@@ -1138,7 +1153,9 @@ TEST(LineBreakQuality, TheRiverMetricClearsItsRaggedNull) {
 // HYPHEN QUALITY, NOT HYPHEN COUNT. "489 against 33" was published as the
 // headline difference and says nothing about whether those 489 are well
 // behaved. The typographic limit is two hyphenated lines in a row; three is a
-// LADDER. Over the corpus the shipped default runs 15-17% of lines hyphenated
+// LADDER. Over the corpus the GREEDY breaker (the shipped default on justified
+// text until 2026-09-26, when Knuth-Plass replaced it there -- see
+// kGreedyPinned above; it still sets ragged blocks) runs 15-17% of lines hyphenated
 // with 6-19 ladders and a longest run of 4-5, while both whole-word cells never
 // exceed one ladder. The embedded specimen is too small to hold a ladder at
 // all, so what is pinned here is the DENSITY -- the part that does show at this

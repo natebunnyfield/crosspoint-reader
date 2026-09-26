@@ -14,6 +14,7 @@
 
 #include "AutoJustify.h"
 #include "BookNotes.h"
+#include "KnuthPlassBreaker.h"
 #include "LineBreakMode.h"
 #include "hyphenation/Hyphenator.h"
 
@@ -428,6 +429,61 @@ bool isWordCharacter(uint32_t cp) {
 
   return true;
 }
+
+// The Knuth-Plass breaker's view of a ParsedText block (KnuthPlassBreaker.h,
+// "The model a caller supplies"). Read-only: nothing here mutates the block,
+// so a breaker that declines leaves greedy a block exactly as it found it.
+//
+// Every width is measured the way the rest of this file measures it, so the
+// breaker's lines are the lines extractLine will paint:
+//   * gaps as computeHyphenatedLineBreaks and extractLine take them -- a
+//     no-space-before token adds nothing but is a stretchable gap, a
+//     continuation token adds its cross-boundary kerning and stretches only
+//     when it is a no-break space, any other token adds the kerned space;
+//   * hyphen pieces with measureWordWidth, exactly as hyphenateWordAtIndex
+//     measures a prefix (soft hyphens stripped, '-' appended when required)
+//     and splitWordAt measures a remainder.
+struct KnuthPlassModel {
+  const GfxRenderer& renderer;
+  int fontId;
+  const std::deque<std::string>& words;
+  const std::vector<EpdFontFamily::Style>& styles;
+  const std::vector<uint16_t>& widths;
+  const std::vector<bool>& continues;
+  const std::vector<bool>& noSpaceBefore;
+
+  int tokenCount() const { return static_cast<int>(words.size()); }
+  int fullWidth(const int k) const { return widths[k]; }
+  int gapBefore(const int k) const {
+    if (noSpaceBefore[k]) return 0;
+    if (!continues[k]) {
+      return renderer.getSpaceAdvance(fontId, lastCodepoint(words[k - 1]), firstCodepoint(words[k]), styles[k - 1]);
+    }
+    return renderer.getKerning(fontId, lastCodepoint(words[k - 1]), firstCodepoint(words[k]), styles[k - 1]);
+  }
+  bool gapStretches(const int k) const { return noSpaceBefore[k] || !continues[k] || words[k] == " "; }
+  bool mayBreakBefore(const int k) const { return !continues[k] && !startsWithLineForbiddenDash(words[k]); }
+  template <typename F>
+  void forEachHyphenPoint(const int k, const bool includeFallback, F&& emit) const {
+    const std::string& word = words[k];
+    if (word.size() < 2) return;  // no interior byte to break at
+    auto infos = Hyphenator::breakOffsets(word, includeFallback);
+    if (infos.empty()) return;
+    std::sort(infos.begin(), infos.end(), [](const auto& a, const auto& b) { return a.byteOffset < b.byteOffset; });
+    size_t last = 0;
+    for (const auto& bi : infos) {
+      if (bi.byteOffset == 0 || bi.byteOffset >= word.size() || bi.byteOffset == last) continue;
+      last = bi.byteOffset;
+      const int prefix =
+          measureWordWidth(renderer, fontId, word.substr(0, bi.byteOffset), styles[k], bi.requiresInsertedHyphen);
+      const int suffix = measureWordWidth(renderer, fontId, word.substr(bi.byteOffset), styles[k]);
+      emit(static_cast<int>(bi.byteOffset), bi.requiresInsertedHyphen, prefix, suffix);
+    }
+  }
+  int pieceWidth(const int k, const int from, const int to, const bool hyphen) const {
+    return measureWordWidth(renderer, fontId, words[k].substr(from, to - from), styles[k], hyphen);
+  }
+};
 
 }  // namespace
 
@@ -851,9 +907,17 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
 
   std::vector<size_t> lineBreakIndices;
   if (linebreak::splitsWordsAtLineEnds(breaker)) {
-    // Use greedy layout that can split words mid-loop when a hyphenated prefix fits.
-    lineBreakIndices =
-        computeHyphenatedLineBreaks(renderer, fontId, pageWidth, wordWidths, wordContinues, wordNoSpaceBefore);
+    // A JUSTIFIED block that would hyphenate is set by Knuth-Plass total fit
+    // (owner ruling 2026-09-26, "go with k-p"; KnuthPlassBreaker.h and
+    // docs/knuth-plass-line-breaking-2026-09-25.md). blockIsJustified is read
+    // AFTER automatic justification, so a block the measure demoted to ragged
+    // keeps the greedy breaker and its ragged hyphen gate, unchanged. Greedy
+    // is also the fallback whenever Knuth-Plass declines or cannot allocate.
+    if (!blockIsJustified || !computeKnuthPlassLineBreaks(renderer, fontId, pageWidth, wordWidths, lineBreakIndices)) {
+      // Use greedy layout that can split words mid-loop when a hyphenated prefix fits.
+      lineBreakIndices =
+          computeHyphenatedLineBreaks(renderer, fontId, pageWidth, wordWidths, wordContinues, wordNoSpaceBefore);
+    }
   } else {
     // Total-fit: minimizes the sum of squared trailing slack over the whole
     // paragraph. Whole words only, apart from its own pre-pass on a word too
@@ -1191,6 +1255,74 @@ std::vector<size_t> ParsedText::computeLineBreaks(const GfxRenderer& renderer, c
   return lineBreakIndices;
 }
 
+bool ParsedText::computeKnuthPlassLineBreaks(const GfxRenderer& renderer, const int fontId, const int pageWidth,
+                                             std::vector<uint16_t>& wordWidths, std::vector<size_t>& lineBreakIndices) {
+  kpbreak::Config cfg;
+#ifdef CROSSPOINT_KNUTH_PLASS_TUNABLE
+  auto& tune = kpbreak::tuning();
+  if (!tune.enabled) return false;
+  cfg.allocLimitBytes = tune.allocLimitBytes;
+  cfg.windowPositions = tune.windowPositions;
+  cfg.windowTokens = tune.windowTokens;
+  tune.attempts++;
+#endif
+  if (words.empty()) return false;
+  // Ruby widens its base's first and last tokens by overlaps that depend on
+  // where the line breaks (computeLineBreaks' extraStartOffset/extraEndOffset).
+  // The model has no term for that, so a ruby block keeps the greedy breaker.
+  for (const auto& rt : rubyTexts) {
+    if (!rt.empty()) return false;
+  }
+
+  cfg.measure = pageWidth;
+  cfg.firstLineIndent = resolveFirstLineIndent(true, renderer, fontId);
+  cfg.spaceAdvance = renderer.getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
+
+  const KnuthPlassModel model{renderer, fontId, words, wordStyles, wordWidths, wordContinues, wordNoSpaceBefore};
+  std::vector<kpbreak::Cut> cuts;
+  kpbreak::Stats stats;
+  const kpbreak::Result result = kpbreak::breakParagraph(model, cfg, cuts, &stats);
+#ifdef CROSSPOINT_KNUTH_PLASS_TUNABLE
+  tune.lastResult = result;
+  tune.lastStats = stats;
+#endif
+  if (result != kpbreak::Result::Ok) {
+    // An allocation failure, or no path (an unbreakable run past the token
+    // window). Uncommon on body text, so logged every time.
+    LOG_DBG("PTX", "knuth-plass declined (%d) on %u tokens, greedy instead", static_cast<int>(result),
+            static_cast<unsigned>(words.size()));
+    return false;
+  }
+
+  // Split the chosen words, LAST cut first, so every earlier cut's token index
+  // is still the one the breaker saw. A token cut twice (a word longer than a
+  // line) is split at its later offset first; its prefix then still begins at
+  // byte 0 and the earlier offset still names the same byte.
+  for (size_t c = cuts.size(); c-- > 0;) {
+    const kpbreak::Cut& cut = cuts[c];
+    if (cut.offset == 0) continue;
+    const size_t w = cut.word;
+    const uint16_t prefixWidth =
+        measureWordWidth(renderer, fontId, words[w].substr(0, cut.offset), wordStyles[w], cut.hyphen);
+    splitWordAt(w, cut.offset, cut.hyphen, prefixWidth, renderer, fontId, wordWidths);
+  }
+
+  // Cut -> "index of the token that starts the next line", after the splits:
+  // every split before a cut shifts it right by one.
+  lineBreakIndices.clear();
+  lineBreakIndices.reserve(cuts.size());
+  size_t shift = 0;
+  for (const kpbreak::Cut& cut : cuts) {
+    if (cut.offset > 0) {
+      lineBreakIndices.push_back(cut.word + shift + 1);
+      shift++;
+    } else {
+      lineBreakIndices.push_back(cut.word + shift);
+    }
+  }
+  return true;
+}
+
 // Builds break indices while opportunistically splitting the word that would overflow the current line.
 std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& renderer, const int fontId,
                                                             const int pageWidth, std::vector<uint16_t>& wordWidths,
@@ -1330,8 +1462,17 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
     return false;
   }
 
+  splitWordAt(wordIndex, chosenOffset, chosenNeedsHyphen, static_cast<uint16_t>(chosenWidth), renderer, fontId,
+              wordWidths);
+  return true;
+}
+
+void ParsedText::splitWordAt(const size_t wordIndex, const size_t chosenOffset, const bool chosenNeedsHyphen,
+                             const uint16_t prefixWidth, const GfxRenderer& renderer, const int fontId,
+                             std::vector<uint16_t>& wordWidths) {
+  const auto style = wordStyles[wordIndex];
   // Split the word at the selected breakpoint and append a hyphen if required.
-  std::string remainder = word.substr(chosenOffset);
+  std::string remainder = words[wordIndex].substr(chosenOffset);
   words[wordIndex].resize(chosenOffset);
   if (chosenNeedsHyphen) {
     words[wordIndex].push_back('-');
@@ -1373,10 +1514,9 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
   wordNoSpaceBefore.insert(wordNoSpaceBefore.begin() + wordIndex + 1, false);
 
   // Update cached widths to reflect the new prefix/remainder pairing.
-  wordWidths[wordIndex] = static_cast<uint16_t>(chosenWidth);
+  wordWidths[wordIndex] = prefixWidth;
   const uint16_t remainderWidth = measureWordWidth(renderer, fontId, remainder, style);
   wordWidths.insert(wordWidths.begin() + wordIndex + 1, remainderWidth);
-  return true;
 }
 
 void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const std::vector<uint16_t>& wordWidths,
