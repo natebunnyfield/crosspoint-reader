@@ -65,3 +65,68 @@ target_link_libraries(LineBreakQualityTest PRIVATE
 )
 
 gtest_discover_tests(LineBreakQualityTest)
+
+# ---------------------------------------------------------------------------
+# Knuth-Plass total fit against the shipped breakers (2026-09-25).
+#
+# A SECOND executable rather than more tests in LineBreakQualityTest: it needs
+# the SD font stack (Albo is a .cpfont, not a built-in face), which means the
+# directory-capable HalStorage stub from test/sd_kern_measure ahead of
+# calendar_preview's read-only one. Putting that under the existing suite would
+# change the environment its pinned numbers were measured in. The breaker
+# itself (KnuthPlass.h) is host-only and is not compiled into the firmware.
+# docs/knuth-plass-line-breaking-2026-09-25.md.
+add_executable(LineBreakKnuthPlassTest
+  KnuthPlassSweep.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/ParsedText.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/blocks/TextBlock.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/hyphenation/Hyphenator.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/hyphenation/HyphenationCommon.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/hyphenation/LanguageRegistry.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/hyphenation/LiangHyphenation.cpp
+  ${REPO_ROOT}/lib/EpdFont/SdCardFontManager.cpp
+  ${REPO_ROOT}/lib/EpdFont/SdCardFontRegistry.cpp
+  ${REPO_ROOT}/lib/GfxRenderer/GfxRenderer.cpp
+  ${REPO_ROOT}/lib/GfxRenderer/Bitmap.cpp
+  ${REPO_ROOT}/lib/GfxRenderer/BitmapHelpers.cpp
+  ${REPO_ROOT}/lib/GfxRenderer/FontCacheManager.cpp
+  ${REPO_ROOT}/lib/EpdFont/EpdFont.cpp
+  ${REPO_ROOT}/lib/EpdFont/LigatureControl.cpp
+  ${REPO_ROOT}/lib/EpdFont/EpdFontFamily.cpp
+  ${REPO_ROOT}/lib/EpdFont/FontDecompressor.cpp
+  ${REPO_ROOT}/lib/EpdFont/SdCardFont.cpp
+  ${REPO_ROOT}/lib/Utf8/Utf8.cpp
+  ${REPO_ROOT}/lib/MiniBidi/BidiUtils.cpp
+  ${REPO_ROOT}/lib/MiniBidi/minibidi.c
+  ${REPO_ROOT}/lib/Memory/BuildScratch.cpp
+  ${REPO_ROOT}/lib/InflateReader/InflateReader.cpp
+  ${REPO_ROOT}/lib/uzlib/src/tinflate.c
+  ${CP_PREVIEW}/uzlib_checksums.c
+)
+target_compile_options(LineBreakKnuthPlassTest PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-include$<SEMICOLON>Arduino.h>
+)
+target_include_directories(LineBreakKnuthPlassTest BEFORE PRIVATE
+  ${REPO_ROOT}/test/sd_kern_measure/stubs
+)
+target_include_directories(LineBreakKnuthPlassTest PRIVATE
+  ${CP_PREVIEW}
+  ${REPO_ROOT}/src
+  ${REPO_ROOT}/lib/Epub
+  ${REPO_ROOT}/lib/GfxRenderer
+  ${REPO_ROOT}/lib/EpdFont
+  ${REPO_ROOT}/lib/Utf8
+  ${REPO_ROOT}/lib/MiniBidi
+  ${REPO_ROOT}/lib/Memory
+  ${REPO_ROOT}/lib/InflateReader
+  ${REPO_ROOT}/lib/uzlib/src
+  ${REPO_ROOT}/lib/Serialization
+)
+target_link_libraries(LineBreakKnuthPlassTest PRIVATE
+  crosspoint_test_common
+  GTest::gtest_main
+)
+gtest_discover_tests(LineBreakKnuthPlassTest
+  WORKING_DIRECTORY ${REPO_ROOT}
+  PROPERTIES ENVIRONMENT "CROSSPOINT_TEST_SD=${CROSSPOINT_TEST_SD_DIR}"
+)

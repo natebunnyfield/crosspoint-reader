@@ -42,6 +42,11 @@ class HalDisplay {
   void displayBufferAsync(RefreshMode = FAST_REFRESH) {}
   void waitRefreshComplete() {}
   bool supportsAsyncRefresh() const { return false; }
+  // Windowed refresh (lib/hal/HalDisplay.h, 2026-09-14). GfxRenderer calls both
+  // since 3eccd843b; without them every host suite that links GfxRenderer.cpp
+  // against this stub stopped compiling. No panel here, so no windowed path.
+  void displayWindow(uint16_t, uint16_t, uint16_t, uint16_t, bool = false) {}
+  bool supportsWindowedRefresh() const { return false; }
   // Output polarity. Real enough for the host harness: GfxRenderer reads it to
   // decide whether to counter-invert content images, so a test can set it and
   // exercise preserveImagePolarity without a panel.

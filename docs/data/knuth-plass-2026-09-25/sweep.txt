@@ -1,0 +1,128 @@
+corpus: 1472 paragraphs
+
+== LibreFranklin 14 pt @ 512 px: word space 6 px, ~35.9 chars/line
+
+  JUSTIFIED  (model vs firmware: 0 of 41344 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  mean   p50   p95   p99    max pWorst |  <.25   <.5    <1    <2   >=2 |  hyph   r2  lad lng | riv/kg   min shrunk 1word
+  greedy+hy (shipped)     20431  2.37  2.00  4.67  7.17  59.33   4.94 |  13.9   8.1  23.3  30.8  23.9 |  3328  408   74   6 |  41.75  1.00      0     2
+  totalfit whole words    20913  3.10  2.67  6.33 10.33  45.00   6.64 |   7.0   4.2  15.8  30.1  43.0 |     5    0    0   1 |  55.58  1.00      0     9
+  KP TeX defaults         20469  2.27  2.17  3.83  5.00  12.83   3.80 |  10.4   6.8  22.6  39.0  21.3 |  4246  577  172   6 |  40.43  1.00      0     5
+  KP candidate            20484  2.32  2.17  3.83  5.00  12.83   3.85 |   9.7   6.3  21.7  38.9  23.4 |  3259  445    0   2 |  40.95  1.00      0     5
+  KP candidate+shrink     20094  1.96  1.83  3.50  4.67  12.83   3.43 |  18.9  11.3  22.5  33.5  13.7 |  2630  321    0   2 |  29.74  0.67   2088     4
+  cost/paragraph (host, -O2): greedy layout 34.7 us, whole-words DP layout 42.3 us, KP measure-setup 39.9 us (50.7 extra advance lookups), KP candidate DP 28.1 us (max 185 us), 883 line evaluations; positions mean 104 max 719, max host table 103536 B
+  per paragraph (<=11 lines): KP worst line better in 320, worse in 42, of 857. largest gains: #498(34.50) #108(18.17) #678(13.50) #126(12.67) #1250(11.50) #956(9.83)
+  median-gain paragraph: #479(0.00)
+
+  RAGGED  (model vs firmware: 0 of 41734 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  slack     sd    p95  pWorst |  hyph   r2  lad lng
+  greedy+hy (shipped)     20821   8.25   6.01  20.00   18.75 |   384    6    1   3
+  totalfit whole words    20913   8.70   5.33  18.17   17.68 |     5    0    0   1
+  KP TeX defaults         20438   6.07   3.59  12.17   11.76 |  4047  506  137   6
+  KP candidate            20920   8.70   5.11  17.83   16.91 |    57    1    0   2
+  cost/paragraph (host, -O2): greedy layout 27.3 us, whole-words DP layout 40.9 us, KP measure-setup 39.5 us (50.7 extra advance lookups), KP candidate DP 28.9 us (max 195 us), 883 line evaluations; positions mean 104 max 719, max host table 103536 B
+
+== Albo 14 pt @ 512 px: word space 9 px, ~37.8 chars/line
+
+  JUSTIFIED  (model vs firmware: 0 of 40359 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  mean   p50   p95   p99    max pWorst |  <.25   <.5    <1    <2   >=2 |  hyph   r2  lad lng | riv/kg   min shrunk 1word
+  greedy+hy (shipped)     19973  1.86  1.67  3.33  4.78  28.11   3.42 |  23.7  15.8  26.2  26.3   8.0 |  3164  366   71   7 |  46.53  1.00      0     2
+  totalfit whole words    20386  2.29  2.00  4.33  6.56  30.78   4.43 |  12.4  10.7  22.8  34.8  19.3 |     4    0    0   1 |  60.07  1.00      0     7
+  KP TeX defaults         20017  1.80  1.78  2.78  3.56  12.78   2.77 |  18.4  15.4  31.0  31.7   3.5 |  4083  546  155   9 |  45.92  1.00      0     3
+  KP candidate            20111  1.94  1.89  3.00  3.67  12.78   2.99 |  15.5  12.3  26.9  38.5   6.8 |  1495  122    0   2 |  50.16  1.00      0     3
+  KP candidate+shrink     19600  1.64  1.56  2.78  3.33  12.78   2.67 |  29.6  16.9  24.0  26.3   3.3 |   867   50    0   2 |  34.68  0.67   2696     1
+  cost/paragraph (host, -O2): greedy layout 28.3 us, whole-words DP layout 24.3 us, KP measure-setup 29.9 us (50.7 extra advance lookups), KP candidate DP 29.5 us (max 197 us), 900 line evaluations; positions mean 104 max 719, max host table 103536 B
+  per paragraph (<=11 lines): KP worst line better in 236, worse in 186, of 880. largest gains: #498(22.44) #108(11.89) #645(10.56) #678(9.89) #126(8.33) #443(6.56)
+  median-gain paragraph: #0(0.00)
+
+  RAGGED  (model vs firmware: 0 of 40709 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  slack     sd    p95  pWorst |  hyph   r2  lad lng
+  greedy+hy (shipped)     20323   5.35   3.90  13.00   12.09 |   271    7    1   3
+  totalfit whole words    20386   5.58   3.43  11.56   11.23 |     4    0    0   1
+  KP TeX defaults         19978   3.93   2.35   8.00    7.66 |  3741  432  110   9
+  KP candidate            20401   5.64   3.40  11.56   11.04 |     8    0    0   1
+  cost/paragraph (host, -O2): greedy layout 21.3 us, whole-words DP layout 23.7 us, KP measure-setup 30.7 us (50.7 extra advance lookups), KP candidate DP 31.5 us (max 213 us), 900 line evaluations; positions mean 104 max 719, max host table 103536 B
+
+== LibreFranklin 12 pt @ 512 px: word space 5 px, ~41.6 chars/line
+
+  JUSTIFIED  (model vs firmware: 0 of 35519 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  mean   p50   p95   p99    max pWorst |  <.25   <.5    <1    <2   >=2 |  hyph   r2  lad lng | riv/kg   min shrunk 1word
+  greedy+hy (shipped)     17587  2.12  1.80  4.00  5.80  37.00   3.95 |  20.6  11.1  20.0  31.1  17.1 |  2758  301   60   5 |  28.60  1.00      0     2
+  totalfit whole words    17932  2.70  2.40  5.40  8.00  41.20   5.18 |  10.8   7.0  15.1  33.9  33.2 |     2    0    0   1 |  41.25  1.00      0     2
+  KP TeX defaults         17624  2.06  2.00  3.40  4.20  11.80   3.25 |  16.1  10.0  20.9  40.6  12.5 |  3555  453  116   5 |  27.94  1.00      0     3
+  KP candidate            17629  2.12  2.00  3.40  4.40  11.80   3.33 |  14.8   9.3  19.7  40.8  15.4 |  2273  257    0   2 |  29.55  1.00      0     3
+  KP candidate+shrink     17345  1.82  1.80  3.20  3.80  11.80   2.98 |  25.4  13.1  19.0  34.0   8.5 |  1700  160    0   2 |  20.93  0.60   1843     3
+  cost/paragraph (host, -O2): greedy layout 33.7 us, whole-words DP layout 45.3 us, KP measure-setup 40.0 us (50.7 extra advance lookups), KP candidate DP 32.3 us (max 278 us), 1006 line evaluations; positions mean 104 max 719, max host table 103536 B
+  per paragraph (<=11 lines): KP worst line better in 281, worse in 85, of 995. largest gains: #1240(32.40) #411(15.40) #1060(12.80) #1445(12.40) #1112(9.80) #1267(7.60)
+  median-gain paragraph: #327(0.00)
+
+  RAGGED  (model vs firmware: 0 of 35829 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  slack     sd    p95  pWorst |  hyph   r2  lad lng
+  greedy+hy (shipped)     17897   8.70   6.61  21.60   19.80 |   119    1    1   3
+  totalfit whole words    17932   8.91   5.60  19.00   17.73 |     2    0    0   1
+  KP TeX defaults         17602   6.24   3.82  12.60   11.82 |  3471  428   98   7
+  KP candidate            17917   8.85   5.39  18.40   17.02 |    56    1    0   2
+  cost/paragraph (host, -O2): greedy layout 26.8 us, whole-words DP layout 43.8 us, KP measure-setup 39.2 us (50.7 extra advance lookups), KP candidate DP 32.0 us (max 215 us), 1006 line evaluations; positions mean 104 max 719, max host table 103536 B
+
+== Albo 12 pt @ 512 px: word space 8 px, ~44.0 chars/line
+
+  JUSTIFIED  (model vs firmware: 0 of 34511 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  mean   p50   p95   p99    max pWorst |  <.25   <.5    <1    <2   >=2 |  hyph   r2  lad lng | riv/kg   min shrunk 1word
+  greedy+hy (shipped)     17100  1.66  1.50  2.75  3.75  22.00   2.72 |  21.1  23.0  32.1  20.5   3.3 |  2571  283   49   5 |  42.07  1.00      0     1
+  totalfit whole words    17411  1.98  1.75  3.50  5.12  19.12   3.37 |  11.6  15.4  31.1  31.5  10.4 |     3    0    0   1 |  53.33  1.00      0     2
+  KP TeX defaults         17126  1.62  1.50  2.38  2.88  11.62   2.31 |  16.4  22.4  39.4  21.0   0.8 |  3342  447  101   5 |  41.80  1.00      0     2
+  KP candidate            17276  1.80  1.75  2.75  3.12  11.62   2.63 |  13.4  16.0  33.1  34.6   2.8 |   632   26    0   2 |  48.11  1.00      0     2
+  KP candidate+shrink     16809  1.48  1.38  2.50  3.00   8.00   2.31 |  24.5  27.4  27.8  19.0   1.3 |   306   10    0   2 |  32.28  0.62   2665     2
+  cost/paragraph (host, -O2): greedy layout 28.2 us, whole-words DP layout 25.5 us, KP measure-setup 30.4 us (50.7 extra advance lookups), KP candidate DP 34.6 us (max 232 us), 1031 line evaluations; positions mean 104 max 719, max host table 103536 B
+  per paragraph (<=11 lines): KP worst line better in 241, worse in 331, of 1014. largest gains: #108(7.38) #832(5.75) #1240(5.62) #1267(4.50) #956(4.25) #177(4.00)
+  median-gain paragraph: #71(0.00)
+
+  RAGGED  (model vs firmware: 0 of 34799 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  slack     sd    p95  pWorst |  hyph   r2  lad lng
+  greedy+hy (shipped)     17388   5.26   4.00  12.88   11.95 |    97    0    0   1
+  totalfit whole words    17411   5.37   3.37  11.50   10.60 |     3    0    0   1
+  KP TeX defaults         17110   3.80   2.28   7.62    7.15 |  3110  346   73   4
+  KP candidate            17423   5.43   3.34  11.25   10.45 |     4    0    0   1
+  cost/paragraph (host, -O2): greedy layout 20.7 us, whole-words DP layout 24.3 us, KP measure-setup 30.4 us (50.7 extra advance lookups), KP candidate DP 35.3 us (max 244 us), 1031 line evaluations; positions mean 104 max 719, max host table 103536 B
+
+== LibreFranklin 18 pt @ 512 px: word space 8 px, ~28.0 chars/line
+
+  JUSTIFIED  (model vs firmware: 0 of 54008 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  mean   p50   p95   p99    max pWorst |  <.25   <.5    <1    <2   >=2 |  hyph   r2  lad lng | riv/kg   min shrunk 1word
+  greedy+hy (shipped)     26588  2.97  2.38  6.50 10.75  51.88   7.70 |   7.1   9.4  18.2  28.1  37.2 |  4276  519   97   7 |  60.94  1.00      0    16
+  totalfit whole words    27420  4.09  3.25  9.38 18.38  43.62  11.04 |   3.5   4.6  10.9  23.7  57.4 |    14    0    0   1 |  78.99  1.00      0    65
+  KP TeX defaults         26683  2.77  2.62  5.00  6.62  11.75   5.15 |   5.1   7.3  16.3  31.8  39.4 |  5714  796  218   7 |  59.13  1.00      0    29
+  KP candidate            26687  2.81  2.62  5.00  6.62  11.88   5.21 |   5.0   7.0  16.1  31.5  40.4 |  5141  863    1   3 |  59.91  1.00      0    29
+  KP candidate+shrink     26155  2.42  2.25  4.50  6.25  11.50   4.68 |  10.7  11.6  17.1  31.2  29.3 |  4849  791    0   2 |  46.26  0.62   2120    21
+  cost/paragraph (host, -O2): greedy layout 36.6 us, whole-words DP layout 38.1 us, KP measure-setup 39.2 us (50.7 extra advance lookups), KP candidate DP 22.5 us (max 151 us), 707 line evaluations; positions mean 104 max 719, max host table 103536 B
+  per paragraph (<=11 lines): KP worst line better in 270, worse in 12, of 604. largest gains: #100(30.25) #1351(28.50) #387(25.75) #1041(24.38) #836(23.50) #839(23.25)
+  median-gain paragraph: #0(0.00)
+
+  RAGGED  (model vs firmware: 0 of 54421 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  slack     sd    p95  pWorst |  hyph   r2  lad lng
+  greedy+hy (shipped)     27001   7.23   5.06  16.62   16.66 |  1516   89    5   3
+  totalfit whole words    27420   8.30   5.06  17.25   17.63 |    14    0    0   1
+  KP TeX defaults         26607   5.87   3.46  11.62   11.89 |  5388  709  193   7
+  KP candidate            27417   8.29   4.91  16.88   17.02 |    58    0    0   1
+  cost/paragraph (host, -O2): greedy layout 28.4 us, whole-words DP layout 36.7 us, KP measure-setup 39.3 us (50.7 extra advance lookups), KP candidate DP 23.8 us (max 162 us), 707 line evaluations; positions mean 104 max 719, max host table 103536 B
+
+== Albo 18 pt @ 512 px: word space 11 px, ~29.4 chars/line
+
+  JUSTIFIED  (model vs firmware: 0 of 52124 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  mean   p50   p95   p99    max pWorst |  <.25   <.5    <1    <2   >=2 |  hyph   r2  lad lng | riv/kg   min shrunk 1word
+  greedy+hy (shipped)     25697  2.32  2.00  4.55  7.36  32.73   5.39 |  12.7  14.7  21.7  30.5  20.4 |  3952  463   83   4 |  63.93  1.00      0    15
+  totalfit whole words    26427  3.05  2.55  6.45 12.27  31.27   7.52 |   6.2   7.9  16.0  31.8  38.0 |    10    0    0   1 |  81.30  1.00      0    51
+  KP TeX defaults         25765  2.20  2.09  3.64  4.82  11.73   3.83 |   9.3  12.8  22.4  39.2  16.3 |  5377  732  195   8 |  62.92  1.00      0     9
+  KP candidate            25770  2.25  2.09  3.73  4.91  11.73   3.90 |   8.9  11.6  21.3  39.6  18.6 |  3858  510    0   2 |  63.40  1.00      0     9
+  KP candidate+shrink     25098  1.90  1.82  3.27  4.27  11.73   3.42 |  18.8  17.2  21.3  32.5  10.2 |  2949  349    0   2 |  45.86  0.64   2957     8
+  cost/paragraph (host, -O2): greedy layout 30.8 us, whole-words DP layout 23.4 us, KP measure-setup 30.3 us (50.7 extra advance lookups), KP candidate DP 23.5 us (max 158 us), 727 line evaluations; positions mean 104 max 719, max host table 103536 B
+  per paragraph (<=11 lines): KP worst line better in 249, worse in 34, of 636. largest gains: #1351(19.82) #1449(18.64) #100(17.00) #1066(16.09) #387(13.64) #587(12.18)
+  median-gain paragraph: #552(0.00)
+
+  RAGGED  (model vs firmware: 0 of 52514 real lines differ, 0 paragraphs unmatched)
+  arm                     lines  slack     sd    p95  pWorst |  hyph   r2  lad lng
+  greedy+hy (shipped)     26087   5.14   3.62  12.00   11.80 |  1272   67    3   3
+  totalfit whole words    26427   5.84   3.54  12.09   12.23 |    10    0    0   1
+  KP TeX defaults         25702   4.11   2.43   8.18    8.28 |  4909  633  131   5
+  KP candidate            26449   5.89   3.51  12.00   12.06 |    13    0    0   1
+  cost/paragraph (host, -O2): greedy layout 22.4 us, whole-words DP layout 22.6 us, KP measure-setup 30.7 us (50.7 extra advance lookups), KP candidate DP 25.9 us (max 170 us), 727 line evaluations; positions mean 104 max 719, max host table 103536 B
+

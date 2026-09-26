@@ -13,6 +13,11 @@ ragged hyphenation gate that §7 and §8j both list as untouched, swept 40–100
 device draws has changed. Where a claim is inferred rather than measured, it
 says so.
 
+**§3's "missing cell" was built and measured on 2026-09-25**, host-only:
+total fit WITH hyphen points, in `test/line_break_quality/KnuthPlass.h`. The
+verdict and tables are in
+[knuth-plass-line-breaking-2026-09-25.md](knuth-plass-line-breaking-2026-09-25.md).
+
 **Read this before touching `ParsedText::computeLineBreaks` or
 `computeHyphenatedLineBreaks`.** Two of the sections below overturn something
 that was written down as settled, and §8 qualifies a third — §3's verdict
