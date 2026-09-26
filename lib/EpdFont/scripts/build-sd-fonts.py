@@ -1246,6 +1246,16 @@ def build_family(
 
     if family.get("force_autohint", False):
         cmd.append("--force-autohint")
+    # `hinting: none` -- no grid fitting for this family's own faces (fallbacks
+    # keep theirs). The only value: anything else is a typo that would
+    # otherwise build silently with the default hinter.
+    hinting = family.get("hinting")
+    if hinting is not None:
+        if hinting != "none":
+            raise ValueError(f"{name}: hinting: {hinting!r} -- the only accepted value is 'none'")
+        if family.get("force_autohint", False):
+            raise ValueError(f"{name}: hinting: none and force_autohint are mutually exclusive")
+        cmd.append("--no-hinting")
 
     # Run fontconvert_sdcard.py
     start = time.monotonic()

@@ -11,6 +11,11 @@
 #   intervals:   Comma-separated Unicode interval presets for fontconvert_sdcard.py
 #   sizes:       Point sizes to generate
 #   force_autohint: (optional) Force FreeType auto-hinter instead of native hinting
+#   hinting:     (optional) `none` renders the family's OWN faces with
+#                FT_LOAD_NO_HINTING -- no grid fitting, the outline's own
+#                weight and position; fallback faces keep default hinting.
+#                The only accepted value; exclusive with force_autohint.
+#                Albo is the one user (owner ruling 2026-09-26).
 #   metrics:     (optional) Vertical-metrics override, {ascent, descent, linegap}
 #                in font units per 1000 upem (descent negative, hhea convention;
 #                linegap defaults to 0). Rewrites hhea + OS/2 typo + OS/2 win on
@@ -2288,6 +2293,21 @@ families:
     # text span is 1094 (Bold, 777..-317), so the +0.13 em floor is 1224 and
     # this span sits 142 above it.
     metrics: {ascent: 1023, descent: -343, linegap: 0}
+    # NO HINTING (owner ruling 2026-09-26, "no hinting wins", after the proof
+    # page). Albo ships no bytecode, so the default load handed every glyph to
+    # FreeType's autohinter, which is not neutral on this face: at NORMAL target
+    # it snapped the roman's stems and drew it 4-10% heavier than its outline
+    # at 1x, and on round 395's e it sealed the mouth at 8-9.75 ppem. Unhinted,
+    # colour is 0.97-1.01 of the outline at every reader size, 1x and 2x, and
+    # Apple Vision reads the converter's own pixels at 99.7-100%. Primary faces
+    # only; the fallback chain keeps its hinting. Measured in
+    # crosspoint-simulator docs/albo-hinting-options-2026-09-26.md.
+    #
+    # NOTE the comments above about the `x`/`n` probe reading 9/10/13/... were
+    # measured on the HINTED render; unhinted x-heights are fractional, so the
+    # ramp was not re-derived and did not need to be (advanceY, ascender and
+    # descender come from face.size, which hinting does not touch).
+    hinting: none
     # NO synth_ligatures:, and that was checked rather than assumed. Albo
     # carries a real GSUB `liga` (round 96) reaching ff fi fl ffi ffl, all
     # five cmapped at U+FB00-FB04, and `reading` covers U+FB00-FB06 — so the

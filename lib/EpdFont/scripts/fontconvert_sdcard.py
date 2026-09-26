@@ -857,6 +857,7 @@ def spacing_params_for_size(spacing, ppem):
 
 
 def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=False,
+                         no_hinting=False,
                          drop_codepoints=None,
                          fallback_fontfile=None, synthetic=None, spacing=None,
                          line_height_px=None, line_height_scale=None):
@@ -868,8 +869,20 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 
     `spacing`, when set, is a dict (see spacing_params_for_size) of advance-only
     tracking and word-space deltas.
+
+    `no_hinting` loads the PRIMARY face's glyphs with FT_LOAD_NO_HINTING: the
+    outline is scaled and rendered with no grid fitting at all. Fallback faces
+    keep the default load, so a family that opts out of hinting does not also
+    change the Noto/TeX Gyre glyphs it borrows. For a face that ships no
+    bytecode the default is FreeType's autohinter, which is not neutral -- on
+    Albo it drew the roman 4-10% heavier than its outline and, on one e
+    outline, sealed the mouth at 8-9.75 ppem (crosspoint-simulator
+    docs/albo-hinting-options-2026-09-26.md). Exclusive with force_autohint.
     """
     import freetype
+
+    if no_hinting and force_autohint:
+        raise ValueError("no_hinting and force_autohint are mutually exclusive")
 
     style_names = {0: "regular", 1: "bold", 2: "italic", 3: "bolditalic"}
     style_label = style_names.get(style_id, str(style_id))
@@ -919,6 +932,10 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         load_flags = freetype.FT_LOAD_RENDER
     if force_autohint:
         load_flags |= freetype.FT_LOAD_FORCE_AUTOHINT
+    # The primary face's flags. Fallback faces always take `load_flags`.
+    primary_flags = load_flags | (freetype.FT_LOAD_NO_HINTING if no_hinting else 0)
+    if no_hinting:
+        print(f"  [{style_label}] Hinting: none (FT_LOAD_NO_HINTING, primary face only)", file=sys.stderr)
 
     def apply_synthetic_and_render(f):
         """Embolden (centered) then shear the loaded outline, then render.
@@ -964,7 +981,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         if glyph_index == 0:
             glyph_index = ligature_glyph_indices.get(code_point, 0)
         if glyph_index > 0:
-            face.load_glyph(glyph_index, load_flags)
+            face.load_glyph(glyph_index, primary_flags)
             if synthetic:
                 apply_synthetic_and_render(face)
             return face
@@ -1418,6 +1435,7 @@ def style_sections_total_size(sections):
 
 def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
                                force_autohint=False, fallback_style_fonts=None,
+                               no_hinting=False,
                                synth_specs=None, spacing_specs=None, line_height_px=None, line_height_scale=None,
                                drop_codepoints=None):
     """Generate a multi-style v4 .cpfont file.
@@ -1446,6 +1464,7 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
         raster_data[style_id] = rasterize_font_style(
             fontfile, size, intervals, style_id=style_id,
             force_autohint=force_autohint,
+            no_hinting=no_hinting,
             drop_codepoints=drop_codepoints,
             fallback_fontfile=fallback_fontfile,
             synthetic=synth_specs.get(style_id),
@@ -1546,6 +1565,9 @@ def main():
                         help="Font family name for output filenames (default: derived from font filename).")
     parser.add_argument("--force-autohint", dest="force_autohint", action="store_true",
                         help="Force FreeType auto-hinter instead of native font hinting.")
+    parser.add_argument("--no-hinting", dest="no_hinting", action="store_true",
+                        help="Load the primary face with FT_LOAD_NO_HINTING (no grid fitting; "
+                             "fallback faces unchanged). Exclusive with --force-autohint.")
     parser.add_argument("-o", "--output", dest="output",
                         help="Output file path (for single-size mode).")
     parser.add_argument("--output-dir", dest="output_dir",
@@ -1769,6 +1791,7 @@ def main():
         total_size += generate_cpfont_multistyle(
             style_fonts, sz, intervals, output_path,
             force_autohint=args.force_autohint,
+            no_hinting=args.no_hinting,
             fallback_style_fonts=fallback_style_fonts,
             synth_specs=synth_specs,
             spacing_specs=spacing_specs,
