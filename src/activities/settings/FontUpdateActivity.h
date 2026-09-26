@@ -106,6 +106,11 @@ class FontUpdateActivity : public Activity {
   unsigned updated = 0;      // ADDED + UPDATED
   unsigned unchanged = 0;
   unsigned errors = 0;
+  // Families the owner deleted from this card and the sync therefore left alone
+  // (FontUpdater::FamilyResult::SKIPPED_DELETED). Logged, with the names; the
+  // on-screen summary is unchanged.
+  unsigned skippedDeleted = 0;
+  std::string skippedNames;
   // Families deleted because the manifest no longer lists them, counted apart
   // from the three above: this is the only destructive thing the screen does,
   // and folding it into "updated" would hide it. The names are kept so the

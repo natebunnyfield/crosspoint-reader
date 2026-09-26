@@ -33,7 +33,9 @@ class FontInstaller {
 
   /// Ensure /<root>/<family>/ exists, where <root> is /.fonts (preferred) or /fonts.
   /// Re-uses the existing root if the family is already installed; otherwise
-  /// creates it under SdCardFontRegistry::defaultWriteRoot().
+  /// creates it under SdCardFontRegistry::defaultWriteRoot(). Also takes the
+  /// family off the owner-deleted list: this is the web installer's first step,
+  /// so it is a deliberate re-add.
   bool ensureFamilyDir(const char* familyName);
 
   /// Validate a .cpfont file on disk (check magic bytes).
@@ -44,7 +46,9 @@ class FontInstaller {
   /// way ensureFamilyDir does (existing install dir, else default-write root).
   static void buildFontPath(const char* family, const char* filename, char* outBuf, size_t outBufSize);
 
-  /// Delete a family directory and all .cpfont files in it.
+  /// Delete a family directory and all .cpfont files in it, and record the
+  /// family on the owner-deleted list so Update Fonts does not download it
+  /// again (network/FontDeletionList.h).
   /// If the deleted family is the active reader font, clears the setting.
   Error deleteFamily(const char* familyName);
 

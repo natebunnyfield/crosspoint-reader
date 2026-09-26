@@ -8,6 +8,7 @@
 
 #include "CrossPointSettings.h"
 #include "SdCardFontSystem.h"
+#include "network/FontDeletionList.h"
 
 FontInstaller::FontInstaller(SdCardFontRegistry& registry) : registry_(registry) {}
 
@@ -57,6 +58,13 @@ bool FontInstaller::isValidCpfontFilename(const char* name) {
 }
 
 bool FontInstaller::ensureFamilyDir(const char* familyName) {
+  // THE WEB INSTALLER'S FIRST STEP for every uploaded cut, so it is where a
+  // deliberate re-add of a family the owner once deleted is seen. Off the
+  // owner-deleted list, or Update Fonts would go on refusing to keep a family
+  // he has just installed again. Reads a few dozen bytes; writes only when the
+  // family was listed. network/FontDeletionList.h.
+  fontdeletions::clearDeleted(familyName);
+
   // Reuse the family's existing root if installed; otherwise pick the
   // default-write root (hidden if no roots exist yet).
   const char* root = SdCardFontRegistry::findFamilyRoot(familyName);
@@ -139,9 +147,15 @@ FontInstaller::Error FontInstaller::deleteFamily(const char* familyName) {
 
   if (!sawAny) {
     LOG_DBG("FONT", "Family not found in any fonts root: %s", familyName);
-    return Error::OK;  // Already gone
+    fontdeletions::recordDeleted(familyName);  // the owner asked; keep it gone
+    return Error::OK;                          // Already gone
   }
   (void)removedAny;
+
+  // DELETIONS STICK (owner bug 2026-09-26). Update Fonts mirrors its manifest,
+  // and without this it re-downloads the family on the next run.
+  // network/FontDeletionList.h.
+  fontdeletions::recordDeleted(familyName);
 
   // If this was the active font, clear the setting
   if (strcmp(SETTINGS.sdFontFamilyName, familyName) == 0) {

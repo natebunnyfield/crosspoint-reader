@@ -80,6 +80,12 @@
  * This is the first thing this feature destroys that the owner put there, so
  * removeUnlistedFamilies() is fenced accordingly; see its declaration.
  *
+ * TWO EXCEPTIONS TO THE MIRROR, 2026-09-26 (owner bug, "fonts keep getting
+ * recreated after i delete them"; docs/font-deletions-stick-2026-09-26.md):
+ * a family the owner deleted from this card is NOT downloaded again
+ * (SKIPPED_DELETED), and a family the HOST bundled (iOS seeded-fonts.txt) is
+ * not removed for being absent from a stale manifest. FontDeletionList.h.
+ *
  * THE DIGEST IS NOT RECOMPUTED WHEN NOTHING MOVED, for the reason Update
  * Library's ledger exists (owner ruling 2026-08-23) and more so: the installed
  * set is ~80 MB of .cpfont, and hashing all of it off the card to learn that
@@ -109,6 +115,9 @@ class FontUpdater {
     UPDATED,    // was on the card, differed, replaced whole
     UNCHANGED,  // every file's size and sha256 matched — untouched
     FAILED,     // staging or verification failed; the installed family is exactly as it was
+    // Absent from the card and on the owner-deleted list (/.crosspoint/deleted-fonts.txt):
+    // nothing downloaded, nothing written. See FontDeletionList.h.
+    SKIPPED_DELETED,
   };
 
   struct FontFile {
@@ -149,6 +158,9 @@ class FontUpdater {
   //     validator the install side uses -- resolved as "<root>/<name>" under
   //     one of the two SdCardFontRegistry root constants. No separator, no
   //     traversal, and nothing outside a font root is expressible;
+  //   * it spares any family the host bundled onto the card (the iOS
+  //     seed ledger, FontDeletionList.h) -- a release older than the app must
+  //     not delete what the app ships;
   //   * it skips names beginning with '.' or '_', so this feature's own
   //     staging directories, macOS forks and .Trashes are never candidates.
   //     Those are also exactly the names discovery skips
@@ -246,6 +258,13 @@ class FontUpdater {
   size_t currentFile = 0;
   size_t fileCount = 0;
 
+  // The owner-deleted list (FontDeletionList.h), read once per run on the
+  // first syncFamily() and kept current as this run adds to or clears it.
+  std::vector<std::string> deletedFamilies;
+  bool deletedLoaded = false;
+
+  bool hasRecordsFor(const std::string& family) const;
+  void dropRecordsFor(const std::string& family);
   bool computeCardSha256(const std::string& path, char outHex[65]);
   void loadSyncRecords();
   void flushSyncRecords();

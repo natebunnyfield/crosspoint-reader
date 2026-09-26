@@ -14,7 +14,10 @@
 
 #include "CrossPointSettings.h"
 #include "Fixtures.h"
+#include "FontInstaller.h"
 #include "HttpDownloader.h"
+#include "SdCardFontRegistry.h"
+#include "network/FontDeletionList.h"
 #include "network/FontUpdater.h"
 
 namespace fs = std::filesystem;
@@ -599,4 +602,212 @@ TEST_F(FontCommit, TheLedgerIsWrittenAndTheNextRunSkipsTheHash) {
     EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::UNCHANGED);
     EXPECT_EQ(fakegh::server().requested.size(), 2u);  // release + manifest, no cuts
   }
+}
+
+// --- deletions stick (owner bug 2026-09-26) --------------------------------
+//
+// "warblertext and lutetianova and other fonts keep getting recreated after i
+// delete them." Update Fonts mirrors the manifest, so before this every run
+// re-downloaded whatever the owner had deleted. docs/font-deletions-stick-2026-09-26.md.
+
+namespace {
+
+bool requestedAnyCutOf(const std::string& family) {
+  for (const auto& url : fakegh::server().requested) {
+    for (const int size : kSizes) {
+      if (url == assetUrlFor(family, size)) return true;
+    }
+  }
+  return false;
+}
+
+size_t cutsOnCard(const std::string& root, const std::string& family) {
+  size_t n = 0;
+  for (const int size : kSizes) {
+    if (fs::exists(cardPath(root + "/" + family + "/" + fileName(family, size)))) ++n;
+  }
+  return n;
+}
+
+}  // namespace
+
+TEST_F(FontCommit, AFamilyDeletedThroughTheInstallerIsNotDownloadedAgain) {
+  publish({"Doves", "WarblerText"}, "v1");
+  {
+    FontUpdater updater;
+    runSync(updater);
+  }
+  ASSERT_EQ(cutsOnCard("/.fonts", "WarblerText"), kSizes.size());
+
+  SdCardFontRegistry registry;
+  FontInstaller installer(registry);
+  ASSERT_EQ(installer.deleteFamily("WarblerText"), FontInstaller::Error::OK);
+
+  fakegh::server().requested.clear();
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  EXPECT_FALSE(fs::exists(cardPath("/.fonts/WarblerText")));
+  EXPECT_FALSE(requestedAnyCutOf("WarblerText"));
+  ASSERT_EQ(r.families.size(), 2u);
+  EXPECT_EQ(r.families[1], FontUpdater::FamilyResult::SKIPPED_DELETED);
+  EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::UNCHANGED);  // the neighbour is untouched
+}
+
+// The Files app on a phone, Manage Files, WebDAV, a card reader on a Mac: none
+// of them call FontInstaller. The sync's own ledger is what knows it saw the
+// family here before -- same inference as the iOS seed ledger.
+TEST_F(FontCommit, AFamilyDeletedOutsideTheFirmwareIsNotDownloadedAgain) {
+  publish({"Doves", "LutetiaNova"}, "v1");
+  {
+    FontUpdater updater;
+    runSync(updater);
+  }
+  fs::remove_all(cardPath("/.fonts/LutetiaNova"));
+
+  fakegh::server().requested.clear();
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  EXPECT_FALSE(fs::exists(cardPath("/.fonts/LutetiaNova")));
+  EXPECT_FALSE(requestedAnyCutOf("LutetiaNova"));
+  // ...and the inference is written down, so it survives the ledger's prune.
+  EXPECT_NE(readCardFile("/.crosspoint/deleted-fonts.txt").find("\nLutetiaNova\n"), std::string::npos);
+}
+
+TEST_F(FontCommit, ADeletionHoldsAcrossReloadsAndRepeatedRuns) {
+  publish({"Doves", "WarblerText"}, "v1");
+  {
+    FontUpdater updater;
+    runSync(updater);
+  }
+  {
+    SdCardFontRegistry registry;
+    FontInstaller installer(registry);
+    ASSERT_EQ(installer.deleteFamily("WarblerText"), FontInstaller::Error::OK);
+  }
+  for (int run = 0; run < 3; ++run) {
+    FontUpdater updater;  // a fresh object each time: nothing held in RAM
+    runSync(updater);
+    EXPECT_FALSE(fs::exists(cardPath("/.fonts/WarblerText"))) << "run " << run;
+  }
+}
+
+TEST_F(FontCommit, AFamilyReinstalledThroughTheWebInstallerSyncsAgain) {
+  publish({"WarblerText"}, "v1");
+  {
+    FontUpdater updater;
+    runSync(updater);
+  }
+  SdCardFontRegistry registry;
+  FontInstaller installer(registry);
+  ASSERT_EQ(installer.deleteFamily("WarblerText"), FontInstaller::Error::OK);
+  {
+    FontUpdater updater;
+    runSync(updater);
+  }
+  ASSERT_FALSE(fs::exists(cardPath("/.fonts/WarblerText")));
+
+  // The owner uploads it on the Fonts page: CrossPointWebServer calls
+  // ensureFamilyDir before writing the first cut. That is a deliberate re-add.
+  ASSERT_TRUE(installer.ensureFamilyDir("WarblerText"));
+  EXPECT_EQ(readCardFile("/.crosspoint/deleted-fonts.txt").find("WarblerText"), std::string::npos);
+  // Even if the upload is abandoned and the empty directory removed, the list
+  // no longer claims it, so the next sync installs it whole.
+  fs::remove_all(cardPath("/.fonts/WarblerText"));
+
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  ASSERT_EQ(r.families.size(), 1u);
+  EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::ADDED);
+  EXPECT_EQ(cutsOnCard("/.fonts", "WarblerText"), kSizes.size());
+}
+
+TEST_F(FontCommit, AFamilyCopiedBackByHandLeavesTheListAndIsKeptCurrent) {
+  publish({"WarblerText"}, "v2");
+  {
+    FontUpdater updater;
+    runSync(updater);
+  }
+  fs::remove_all(cardPath("/.fonts/WarblerText"));
+  {
+    FontUpdater updater;
+    runSync(updater);  // skipped, and now on the list
+  }
+  installOnCard("/fonts", "WarblerText", "v1", /*withHiResTiers=*/false);  // an old copy, by hand
+
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  ASSERT_EQ(r.families.size(), 1u);
+  EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::UPDATED);
+  EXPECT_EQ(readCardFile("/fonts/WarblerText/" + fileName("WarblerText", 8)), cpfontBytes("WarblerText", 8, "v2"));
+  EXPECT_EQ(readCardFile("/.crosspoint/deleted-fonts.txt").find("WarblerText"), std::string::npos);
+}
+
+// The list's own header promises this; the ledger records have to be dropped
+// on a skip or the inference would put the line straight back.
+TEST_F(FontCommit, DeletingTheLineFromTheListBringsTheFamilyBack) {
+  publish({"WarblerText"}, "v1");
+  {
+    FontUpdater updater;
+    runSync(updater);
+  }
+  fs::remove_all(cardPath("/.fonts/WarblerText"));
+  {
+    FontUpdater updater;
+    runSync(updater);
+  }
+  ASSERT_NE(readCardFile("/.crosspoint/deleted-fonts.txt").find("WarblerText"), std::string::npos);
+  writeCardFile("/.crosspoint/deleted-fonts.txt", "# edited by hand\n");
+
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  ASSERT_EQ(r.families.size(), 1u);
+  EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::ADDED);
+}
+
+TEST_F(FontCommit, AnUnreadableDeletionListIsTreatedAsEmpty) {
+  writeCardFile("/.crosspoint/deleted-fonts.txt", std::string("\x00\xff\xfe../Doves\n/fonts/Doves\n", 24));
+  publish({"Doves"}, "v1");
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  ASSERT_EQ(r.families.size(), 1u);
+  EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::ADDED);
+}
+
+// A STALE MANIFEST MUST NOT DELETE WHAT THE HOST BUNDLES. fonts-latest was
+// published 2026-09-08 and omits Albo, AtkinsonHyperlegibleNext and
+// HerosTextCut; the iOS app bundles all three and records them in
+// .crosspoint/seeded-fonts.txt. A full mirror on the phone deleted them, and the
+// seed pass then read "absent and in my ledger" as the owner's deletion.
+TEST_F(FontCommit, RemovalSparesAFamilyTheHostSeeded) {
+  installOnCard("/fonts", "Albo", "bundled", /*withHiResTiers=*/false);
+  installOnCard("/fonts", "Rosarivo", "old", /*withHiResTiers=*/false);
+  writeCardFile("/.crosspoint/seeded-fonts.txt", "# Families this app has seeded onto this card.\nAlbo\n");
+  publish({"Doves"}, "v1");
+
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  EXPECT_TRUE(fs::exists(cardPath("/fonts/Albo")));
+  EXPECT_EQ(cutsOnCard("/fonts", "Albo"), kSizes.size());
+  EXPECT_EQ(r.removed, std::vector<std::string>{"Rosarivo"});  // the mirror still works for everything else
+}
+
+// The list's parser, alone. A line it trusts is a family the sync will refuse
+// to download, so anything that is not a plain safe family name is dropped.
+TEST(FontDeletionList, ParsesNamesAndDropsCommentsGarbageAndDuplicates) {
+  const auto names = fontdeletions::parse(
+      "# header\r\nWarblerText\r\n\nLutetiaNova  \n../etc\n/fonts/Doves\n.hidden\n_fork\nWarblerText\nDanteMT");
+  EXPECT_EQ(names, (std::vector<std::string>{"WarblerText", "LutetiaNova", "DanteMT"}));
+}
+
+TEST(FontDeletionList, SerializeRoundTripsAndEmptyTextIsEmpty) {
+  const std::vector<std::string> names = {"WarblerText", "LutetiaNova"};
+  EXPECT_EQ(fontdeletions::parse(fontdeletions::serialize(names)), names);
+  EXPECT_TRUE(fontdeletions::parse("").empty());
+  EXPECT_TRUE(fontdeletions::parse(fontdeletions::serialize({})).empty());
+}
+
+TEST_F(FontCommit, AMissingOrOversizedListLoadsEmpty) {
+  EXPECT_TRUE(fontdeletions::loadDeleted().empty());
+  writeCardFile("/.crosspoint/deleted-fonts.txt", std::string(fontdeletions::kMaxListBytes + 1, 'A'));
+  EXPECT_TRUE(fontdeletions::loadDeleted().empty());
 }

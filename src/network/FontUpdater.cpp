@@ -19,6 +19,7 @@
 #include <cstring>
 
 #include "CrossPointSettings.h"
+#include "FontDeletionList.h"
 #include "FontSyncPlan.h"
 #include "GithubAuth.h"
 #include "GithubReleaseAssets.h"
@@ -475,6 +476,30 @@ void FontUpdater::loadSyncRecords() {
   LOG_DBG(LOG_MODULE, "Font ledger: %u records", static_cast<unsigned>(records.size()));
 }
 
+// Any record keyed "<family>/...": the sync has verified that family's files on
+// this card at some point, and nothing since has pruned them.
+bool FontUpdater::hasRecordsFor(const std::string& family) const {
+  for (const auto& record : records) {
+    if (record.key.size() > family.size() && record.key.compare(0, family.size(), family) == 0 &&
+        record.key[family.size()] == '/') {
+      return true;
+    }
+  }
+  return false;
+}
+
+void FontUpdater::dropRecordsFor(const std::string& family) {
+  const size_t before = records.size();
+  records.erase(std::remove_if(records.begin(), records.end(),
+                               [&](const StoredRecord& record) {
+                                 return record.key.size() > family.size() &&
+                                        record.key.compare(0, family.size(), family) == 0 &&
+                                        record.key[family.size()] == '/';
+                               }),
+                records.end());
+  if (records.size() != before) recordsDirty = true;
+}
+
 const FontUpdater::StoredRecord* FontUpdater::findRecord(const std::string& key) const {
   for (const auto& record : records) {
     if (record.key == key) return &record;
@@ -804,6 +829,41 @@ FontUpdater::FamilyResult FontUpdater::syncFamily(size_t index, ProgressCallback
 
   const char* root = SdCardFontRegistry::findFamilyRoot(family.name.c_str());
   const bool existed = root != nullptr;
+
+  // DELETIONS STICK (owner bug 2026-09-26, "fonts keep getting recreated after
+  // i delete them"). Asked AFTER recovery, so a family left absent by our own
+  // interrupted commit is back before anything reads its absence as a delete.
+  // The rules and why: FontDeletionList.h.
+  if (!deletedLoaded) {
+    deletedFamilies = fontdeletions::loadDeleted();
+    deletedLoaded = true;
+  }
+  const bool listedDeleted = fontdeletions::contains(deletedFamilies, family.name);
+  if (existed && listedDeleted) {
+    // On the card again, so someone put it back on purpose. Sync it as usual.
+    fontdeletions::clearDeleted(family.name);
+    deletedFamilies.erase(std::find(deletedFamilies.begin(), deletedFamilies.end(), family.name));
+  } else if (!existed) {
+    bool skip = listedDeleted;
+    if (!skip && hasRecordsFor(family.name)) {
+      // The sync verified this family on this card before, and the sync never
+      // deletes a family its manifest lists -- so something else did: the Files
+      // app, Manage Files, WebDAV, a card reader. Written down, so the decision
+      // outlives the records dropped below.
+      fontdeletions::recordDeleted(family.name);
+      deletedFamilies.push_back(family.name);
+      skip = true;
+    }
+    if (skip) {
+      // Drop its records. They are what the inference above reads, so leaving
+      // them would put the family straight back on the list after the owner
+      // deleted the line to have it return.
+      dropRecordsFor(family.name);
+      LOG_INF(LOG_MODULE, "Skipping %s: deleted from this card by the owner (%s)", family.name.c_str(),
+              fontdeletions::kDeletedListPath);
+      return FamilyResult::SKIPPED_DELETED;
+    }
+  }
   if (!existed) root = SdCardFontRegistry::defaultWriteRoot();
 
   const size_t matching = existed ? countMatchingFiles(family, root) : 0;
@@ -928,6 +988,18 @@ size_t FontUpdater::removeUnlistedFamilies(std::vector<std::string>& removed) {
     return 0;
   }
 
+  // A STALE MANIFEST MUST NOT DELETE WHAT THE HOST BUNDLES. The iOS app seeds
+  // families out of its own bundle and records them in seeded-fonts.txt; that
+  // bundle ships with every app build, so it is a newer statement of what
+  // belongs on this card than a release published whenever publish_fonts.py
+  // last ran. On 2026-09-26 fonts-latest (2026-09-08) omitted Albo,
+  // AtkinsonHyperlegibleNext and HerosTextCut, all three bundled -- so a phone
+  // sync deleted them, and the seed pass then read "absent and in my ledger" as
+  // the owner's deletion and never put them back. Empty on the device and the
+  // desktop, where nothing seeds, so the mirror there is exactly as ruled on
+  // 2026-09-07. FontDeletionList.h.
+  const std::vector<std::string> hostSeeded = fontdeletions::loadHostSeeded();
+
   const char* roots[] = {SdCardFontRegistry::FONTS_DIR_HIDDEN, SdCardFontRegistry::FONTS_DIR_VISIBLE};
   size_t count = 0;
   for (const char* root : roots) {
@@ -963,6 +1035,11 @@ size_t FontUpdater::removeUnlistedFamilies(std::vector<std::string>& removed) {
         }
       }
       if (listed) continue;
+      if (fontdeletions::contains(hostSeeded, name)) {
+        LOG_INF(LOG_MODULE, "Keeping %s/%s: bundled by the host (%s), though the manifest omits it", root, name.c_str(),
+                fontdeletions::kHostSeededListPath);
+        continue;
+      }
       // The SAME validator the install side uses. A name it refuses is a name
       // this run could not have created and will not delete -- which makes
       // "delete something outside a font root" unrepresentable rather than

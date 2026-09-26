@@ -264,6 +264,9 @@ void FontUpdateActivity::syncNextFamily() {
     LOG_INF("FONTUPD", "font sync done: %u updated, %u unchanged, %u removed, %u errors", updated, unchanged, removed,
             errors);
     if (removed != 0) LOG_INF("FONTUPD", "removed: %s", removedNames.c_str());
+    if (skippedDeleted != 0) {
+      LOG_INF("FONTUPD", "not downloaded, deleted by the owner: %s", skippedNames.c_str());
+    }
     if (errors != 0) writeFailureLog(updated, unchanged, removed, errors);
     RenderLock lock(*this);
     state = State::DONE;
@@ -293,6 +296,11 @@ void FontUpdateActivity::syncNextFamily() {
       break;
     case FontUpdater::FamilyResult::UNCHANGED:
       unchanged++;
+      break;
+    case FontUpdater::FamilyResult::SKIPPED_DELETED:
+      skippedDeleted++;
+      if (!skippedNames.empty()) skippedNames += ", ";
+      skippedNames += fonts[i].name;
       break;
     case FontUpdater::FamilyResult::FAILED:
       errors++;

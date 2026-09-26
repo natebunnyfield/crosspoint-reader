@@ -7,7 +7,8 @@
 # recursive delete of the outgoing family, and recovery from an interrupted
 # commit. An adversarial review named that as the largest gap on 2026-09-07.
 #
-# What is real here: src/network/FontUpdater.cpp, lib/EpdFont/SdCardFontRegistry.cpp
+# What is real here: src/network/FontUpdater.cpp, src/FontInstaller.cpp (the
+# delete and web-install paths the deletion ledger hooks), lib/EpdFont/SdCardFontRegistry.cpp
 # (root selection), lib/JsonParser/StreamingJsonParser.cpp (the release JSON),
 # and ArduinoJson.
 #
@@ -30,10 +31,20 @@ if(NOT CROSSPOINT_ARDUINOJSON_DIR)
     "Run any PlatformIO build first, e.g.:  pio run -e simulator_x3")
 endif()
 
+# FontInstaller.cpp is compiled from a COPY in the build directory. It sits in
+# src/ beside the real CrossPointSettings.h and SdCardFontSystem.h, and a quoted
+# include searches the including file's own directory before any -I path, so
+# compiled in place it would take those two instead of stubs/ -- and the real
+# settings header drags in the whole reader. From the build directory it finds
+# nothing beside it and falls through to stubs/. configure_file re-copies on
+# every change to the source.
+configure_file(${REPO_ROOT}/src/FontInstaller.cpp ${CMAKE_CURRENT_BINARY_DIR}/FontInstaller.cpp COPYONLY)
+
 add_executable(FontCommitTest
   FontCommitTest.cpp
   Fixtures.cpp
   ${REPO_ROOT}/src/network/FontUpdater.cpp
+  ${CMAKE_CURRENT_BINARY_DIR}/FontInstaller.cpp
   ${REPO_ROOT}/lib/EpdFont/SdCardFontRegistry.cpp
   ${REPO_ROOT}/lib/JsonParser/StreamingJsonParser.cpp
 )
