@@ -1025,3 +1025,163 @@ TEST(KnuthPlass, DISABLED_Render) {
            static_cast<int>(kpl.size()));
   }
 }
+
+// ---------------------------------------------------------------------------
+// The blind side-by-side (owner ruling 2026-09-25, "Blind side-by-side first")
+// ---------------------------------------------------------------------------
+//
+// Two instruments. BlindStats writes one CSV row per paragraph so the pairs can
+// be CHOSEN outside the binary (tools in docs/data/knuth-plass-2026-09-25/
+// blind-tools/). BlindRender draws the chosen paragraphs, one PGM per ARM, with
+// no label of any kind, and pads both arms of a pair to the SAME height so the
+// image size cannot say which breaker set fewer lines. The arm name is in the
+// PGM's filename only; the build script renames them A/B by a seeded shuffle.
+
+namespace {
+
+void writeParagraphPgm(const std::vector<Line>& lines, const int fontId, const std::vector<std::string>& words,
+                       const bool justified, const int heightLines, const char* path) {
+  auto& r = Env::instance().renderer();
+  if (r.isSdCardFont(fontId)) {
+    std::string all;
+    for (const auto& w : words) all += w + " ";
+    all += "-";
+    r.getSdCardFonts().at(fontId)->prewarm(all.c_str(), 0x0F, /*metadataOnly=*/false);
+  }
+  const uint32_t bufSize = static_cast<uint32_t>(r.getDisplayWidthBytes()) * r.getDisplayHeight();
+  std::vector<uint8_t> planes[3] = {std::vector<uint8_t>(bufSize), std::vector<uint8_t>(bufSize),
+                                    std::vector<uint8_t>(bufSize)};
+  r.setGrayscaleAaStrength(GfxRenderer::AA_STANDARD);
+  const int x0 = (r.getScreenWidth() - kMeasure) / 2;
+  const int lh = r.getLineHeight(fontId);
+  for (int pass = 0; pass < 3; ++pass) {
+    r.setRenderMode(pass == 0 ? GfxRenderer::BW : pass == 1 ? GfxRenderer::GRAYSCALE_LSB : GfxRenderer::GRAYSCALE_MSB);
+    r.clearScreen(pass == 0 ? 0xFF : 0x00);
+    int y = 8;
+    drawLines(lines, fontId, x0, y, justified);
+    std::memcpy(planes[pass].data(), r.getFrameBuffer(), bufSize);
+  }
+  r.setRenderMode(GfxRenderer::BW);
+  const int W = r.getScreenWidth(), H = std::min(8 + heightLines * lh + 8, r.getScreenHeight());
+  FILE* f = std::fopen(path, "wb");
+  if (!f) {
+    ADD_FAILURE() << path;
+    return;
+  }
+  std::fprintf(f, "P5\n%d %d\n255\n", W, H);
+  const int panelH = r.getDisplayHeight(), panelWB = r.getDisplayWidthBytes();
+  for (int y = 0; y < H; ++y) {
+    for (int x = 0; x < W; ++x) {
+      const bool base = pixelWhite(planes[0].data(), panelH, panelWB, x, y);
+      const bool lsb = pixelWhite(planes[1].data(), panelH, panelWB, x, y);
+      const bool msb = pixelWhite(planes[2].data(), panelH, panelWB, x, y);
+      std::fputc(base ? 255 : msb ? (lsb ? 96 : 200) : lsb ? 96 : 0, f);
+    }
+  }
+  std::fclose(f);
+}
+
+struct ArmPair {
+  std::vector<std::string> words;
+  std::vector<kp::Pos> gcuts, kcuts;
+  std::vector<Line> greedy, kpl;
+};
+
+ArmPair bothArms(const std::string& text, const int fontId) {
+  ArmPair a;
+  a.words = wordsOf(text);
+  const RealRun real = runReal(a.words, fontId, linebreak::STORED_HYPHENATED, /*justified=*/true);
+  EXPECT_TRUE(cutsFromBlocks(a.words, real.blocks, a.gcuts));
+  const Prepared P = prepare(a.words, fontId, true);
+  a.kcuts = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+  a.greedy = layOut(P, a.gcuts, true);
+  a.kpl = layOut(P, a.kcuts, true);
+  return a;
+}
+
+bool sameCuts(const std::vector<kp::Pos>& a, const std::vector<kp::Pos>& b) {
+  if (a.size() != b.size()) return false;
+  for (size_t i = 0; i < a.size(); ++i)
+    if (a[i].word != b[i].word || a[i].offset != b[i].offset) return false;
+  return true;
+}
+
+double worstOf(const std::vector<Line>& lines, const double s) {
+  double w = 0;
+  for (const auto& L : lines)
+    if (!L.isFinal && L.gapCount) w = std::max(w, L.meanGap / s);
+  return w;
+}
+
+int hyphensOf(const std::vector<Line>& lines) {
+  int n = 0;
+  for (const auto& L : lines) n += (!L.isFinal && L.hyphenated);
+  return n;
+}
+
+}  // namespace
+
+// CROSSPOINT_KP_FACES="Albo:14,LibreFranklin:14" -> <out>/stats_<face>_<pt>.csv, JUSTIFIED, candidate vs greedy.
+TEST(KnuthPlass, DISABLED_BlindStats) {
+  const auto corpus = loadCorpus();
+  if (corpus.empty()) GTEST_SKIP() << "set CROSSPOINT_LINEBREAK_CORPUS";
+  const char* outDir = std::getenv("CROSSPOINT_KP_OUT");
+  if (!outDir) outDir = ".";
+  std::string spec = std::getenv("CROSSPOINT_KP_FACES") ? std::getenv("CROSSPOINT_KP_FACES") : "Albo:14";
+  size_t i = 0;
+  while (i < spec.size()) {
+    size_t j = spec.find(',', i);
+    if (j == std::string::npos) j = spec.size();
+    const std::string item = spec.substr(i, j - i);
+    i = j + 1;
+    const size_t c = item.find(':');
+    const std::string fam = item.substr(0, c);
+    const int pt = std::atoi(item.c_str() + c + 1);
+    const int fontId = Env::instance().fontFor(fam, pt);
+    ASSERT_NE(fontId, 0) << fam;
+    const double s = Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
+    char path[512];
+    std::snprintf(path, sizeof(path), "%s/stats_%s_%d.csv", outDir, fam.c_str(), pt);
+    FILE* f = std::fopen(path, "w");
+    ASSERT_NE(f, nullptr);
+    std::fprintf(f, "idx,differ,greedy_lines,kp_lines,greedy_worst,kp_worst,greedy_hyph,kp_hyph,words\n");
+    for (size_t pi = 0; pi < corpus.size(); ++pi) {
+      const ArmPair a = bothArms(corpus[pi], fontId);
+      std::fprintf(f, "%zu,%d,%zu,%zu,%.3f,%.3f,%d,%d,%zu\n", pi, sameCuts(a.gcuts, a.kcuts) ? 0 : 1, a.greedy.size(),
+                   a.kpl.size(), worstOf(a.greedy, s), worstOf(a.kpl, s), hyphensOf(a.greedy), hyphensOf(a.kpl),
+                   a.words.size());
+    }
+    std::fclose(f);
+    printf("wrote %s\n", path);
+  }
+}
+
+// CROSSPOINT_KP_BLIND="Albo:14:443,LibreFranklin:14:678,..." ->
+// <out>/<face>_<pt>_<idx>_{greedy,kp}.pgm, justified, unlabeled, equal heights.
+TEST(KnuthPlass, DISABLED_BlindRender) {
+  const auto corpus = loadCorpus();
+  const char* spec = std::getenv("CROSSPOINT_KP_BLIND");
+  if (corpus.empty() || !spec) GTEST_SKIP() << "set CROSSPOINT_LINEBREAK_CORPUS and CROSSPOINT_KP_BLIND";
+  const char* outDir = std::getenv("CROSSPOINT_KP_OUT");
+  if (!outDir) outDir = ".";
+  std::string s = spec;
+  size_t i = 0;
+  while (i < s.size()) {
+    size_t j = s.find(',', i);
+    if (j == std::string::npos) j = s.size();
+    char fam[64] = {0};
+    int pt = 0, idx = 0;
+    std::sscanf(s.substr(i, j - i).c_str(), "%63[^:]:%d:%d", fam, &pt, &idx);
+    i = j + 1;
+    const int fontId = Env::instance().fontFor(fam, pt);
+    ASSERT_NE(fontId, 0) << fam;
+    ASSERT_LT(static_cast<size_t>(idx), corpus.size());
+    const ArmPair a = bothArms(corpus[idx], fontId);
+    const int h = static_cast<int>(std::max(a.greedy.size(), a.kpl.size()));
+    char path[512];
+    std::snprintf(path, sizeof(path), "%s/%s_%d_%d_greedy.pgm", outDir, fam, pt, idx);
+    writeParagraphPgm(a.greedy, fontId, a.words, true, h, path);
+    std::snprintf(path, sizeof(path), "%s/%s_%d_%d_kp.pgm", outDir, fam, pt, idx);
+    writeParagraphPgm(a.kpl, fontId, a.words, true, h, path);
+  }
+}

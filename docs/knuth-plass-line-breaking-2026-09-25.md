@@ -322,9 +322,12 @@ greedy's:
 | LF 18 | 270 | 12 | 604 |
 | Albo 18 | 249 | 34 | 636 |
 
-**The median paragraph is identical under both breakers in every
-configuration.** Most paragraphs have only one reasonable set of breaks. The win
-is a tail effect.
+**The median paragraph's WORST LINE is the same under both breakers in every
+configuration**, so the win is a tail effect. (Corrected 2026-09-25, same day:
+an earlier wording said the median paragraph was *identical*. It is not. At 14 pt
+justified, the two breakers put at least one break in a different place in 1,132
+of 1,472 Albo paragraphs and 1,047 of 1,472 Libre Franklin ones, per
+`DISABLED_BlindStats`. What stays the same is the loosest line.)
 
 **Against the research plan's E3 bar.** The bar was "paraWorst 5–20% better,
 holding in ≥ 5 of 6 configurations, and hyphen runs must not rise."
@@ -439,8 +442,8 @@ The paragraph index is into the corpus built above.
 | `docs/data/knuth-plass-2026-09-25/kp_LibreFranklin_14_J_678.png` | LF 14, justified. **The failure mode, included on purpose**: Knuth-Plass sets "owner-knowledge:" alone on a line, where greedy set it with a 13-space gap. Both are bad; they are bad differently. |
 
 These are the largest-gain paragraphs, chosen to make the mechanism visible.
-**They are not typical.** The median paragraph is identical under both breakers
-(§3a).
+**They are not typical.** The median paragraph's worst line is
+the same under both breakers (§3a). §12 is the unbiased sample.
 
 Regenerate them with:
 
@@ -619,4 +622,125 @@ cd build && cmake . && make LineBreakKnuthPlassTest
 cd .. && CROSSPOINT_TEST_SD=<fs_ or a snapshot of it> CROSSPOINT_LINEBREAK_CORPUS=/tmp/corpus.txt \
   build/line_break_quality/LineBreakKnuthPlassTest --gtest_also_run_disabled_tests --gtest_filter='KnuthPlass.DISABLED_Sweep'
 # the hyphen grid: CROSSPOINT_KP_FACES=Albo:14 [CROSSPOINT_KP_MODE=R] ... --gtest_filter='*HyphenPenaltySweep*'
+```
+
+---
+
+## 12. The blind side-by-side (owner ruling 2026-09-25: "Blind side-by-side first")
+
+This is §7's E4, built. **No answers exist yet.** This section records how the
+test is built, so that it can be scored and read without re-deriving anything.
+
+### 12a. Where everything is
+
+| What | Where |
+|---|---|
+| **The page** | `docs/data/knuth-plass-2026-09-25/blind/index.html`. Self-contained: inline CSS and JS, no network. |
+| **The images** | `docs/data/knuth-plass-2026-09-25/blind/pNN_A.png` and `pNN_B.png`, NN = 01–40. The page references them relatively. |
+| **The key** | `docs/data/knuth-plass-2026-09-25/blind-key.json` |
+| **The builder** | `tools/knuth_plass_blind.py` |
+| **The scorer** | `tools/knuth_plass_blind_score.py` |
+| **The instruments** | `KnuthPlass.DISABLED_BlindStats` (one CSV row per paragraph) and `KnuthPlass.DISABLED_BlindRender` (unlabeled PGMs, one per arm). |
+
+### 12b. What each pair is
+
+* **One paragraph, set two ways, in JUSTIFIED mode.** The top arm is the shipped
+  greedy breaker (`STORED_HYPHENATED`). The other is the §2 **candidate**:
+  stretch-only, hyphen penalty 10,000, at most 2 hyphens in a row. Shrink was
+  not tested here.
+* **Justified is forced.** At the default threshold, Albo 14 at 512 px would be
+  ragged (§2). The owner ruled justified mode for this test.
+* **Faces.** Albo 14 pt (34 pairs) and Libre Franklin 14 pt (6 pairs). Albo is
+  the same `.cpfont` snapshot as §2.
+* **Measure.** 512 px, the X3 portrait measure.
+* **Rendering.** Drawn by `TextBlock::render` over `GfxRenderer`, the BW base
+  plus both AA planes, composed to four levels. Portrait, 528 px wide, device
+  pixels, lossless PNG, **unlabeled**.
+* **Equal sizes.** Both arms of a pair are padded to the same height, the taller
+  arm's line count, so the image size cannot say which breaker set fewer lines.
+  The builder refuses to write a pair whose two images differ in size.
+* **Display.** The page shows every image at 1:1 and never scales it. On a
+  screen narrower than 528 CSS px, each image scrolls sideways inside its own
+  box.
+
+### 12c. How the 40 paragraphs were chosen
+
+* **Pool.** Paragraphs where the two arms' cut lists differ, and where both arms
+  set 3–12 lines (12 fits a phone screen at 1:1).
+* **Pool size.** 625 of 1,472 paragraphs for Albo; 549 for Libre Franklin.
+* **Stratified on d = greedy worst line − Knuth-Plass worst line**, in word
+  spaces, so the test is not only easy wins:
+
+| Stratum | d | Albo | LF |
+|---|---|---:|---:|
+| `kp_worse` | < −0.1 | 9 | 2 |
+| `near_tie` | −0.1 … 0.1 | 8 | 1 |
+| `kp_better` | 0.1 … 1 | 9 | 2 |
+| `kp_much_better` | > 1 | 8 | 1 |
+
+* **Deliberately not proportional to the corpus.** Here a quarter of the pairs
+  are ones Knuth-Plass loses on the worst-line metric, which the corpus does not
+  have. The per-stratum rows of the score are the honest reading; the overall
+  rate answers "over this designed mix".
+
+### 12d. Randomization
+
+One `random.Random(20260925)` draws, in this order:
+
+1. the paragraphs within each stratum;
+2. the page order of the 40 pairs;
+3. each pair's sides.
+
+Greedy landed on A in 15 of 40. Re-running the builder on the same stats CSVs
+reproduces the same pages byte for byte in content.
+
+### 12e. How the key is kept hidden
+
+* **It sits outside `blind/`.** `blind-key.json` is in the parent folder, so
+  publishing the `blind/` folder, which is everything the page needs, cannot
+  carry it.
+* **The page never names it or fetches anything.** Its only external references
+  are the 80 `pNN_A.png` / `pNN_B.png` files. It loops `p01`…`p40` in its own
+  script.
+* **The PNG filenames carry the pair and side only.** The arm name exists only in
+  the temporary PGM names, which are deleted with the temp directory.
+* **The key holds, per pair,** which arm is A and which is B, the face, the
+  corpus index, the stratum, and both arms' worst line, hyphen count and line
+  count. It lives in the repo, so it is hidden from the page and not from
+  anyone reading the repo. The owner is the only subject, so that is enough.
+
+### 12f. Answers and scoring
+
+* **Answers.** Each pair takes A, B or No difference. They are stored in
+  `localStorage` under `kp-blind-2026-09-25`. "Copy answers" writes
+  `{"test": …, "answers": {"p01": "A", …}}` to the clipboard and to the text box
+  at the foot of the page.
+* **Score them with:**
+
+  ```
+  python3 tools/knuth_plass_blind_score.py answers.json
+  ```
+
+* **What the scorer reports,** overall, per face and per stratum:
+  * the Knuth-Plass preference rate among decisive answers;
+  * an exact Clopper-Pearson 95% interval;
+  * a two-sided exact binomial p against 50%;
+  * the No difference count, kept separate.
+* **Checked on a synthetic answer file:** 30 of 38 decisive gives 78.9%, with
+  CI [62.7%, 90.4%] and p < 0.001.
+* **Power.** With 40 pairs, a preference must be about 70% or more over
+  decisive answers before the interval clears 50%. A subtler preference needs
+  a second session of fresh pairs, which the builder can make by changing
+  `SEED`.
+
+**Results: none yet.** When his answers arrive, record them here, with the date
+and the JSON committed next to the key.
+
+### 12g. Reproduce
+
+```
+CROSSPOINT_TEST_SD=<sd snapshot> CROSSPOINT_LINEBREAK_CORPUS=/tmp/corpus.txt CROSSPOINT_KP_OUT=/tmp/kpb \
+CROSSPOINT_KP_FACES=Albo:14,LibreFranklin:14 \
+  build/line_break_quality/LineBreakKnuthPlassTest --gtest_also_run_disabled_tests --gtest_filter='*BlindStats*'
+python3 tools/knuth_plass_blind.py --stats-dir /tmp/kpb --corpus /tmp/corpus.txt --sd <sd snapshot>
 ```
