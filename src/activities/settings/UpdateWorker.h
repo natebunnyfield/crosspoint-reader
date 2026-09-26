@@ -7,6 +7,7 @@
 // __has_include: the host test build (test/update_progress) defines SIMULATOR
 // without the simulator library on its include path.
 #if defined(SIMULATOR) && __has_include(<SimUpdateTrace.h>)
+#include <SimKeepAwake.h>
 #include <SimUpdateTrace.h>
 // The host's update flight recorder (crosspoint-simulator/src/SimUpdateTrace.h):
 // step boundaries, repaint requests and renders land in diagnostics/firmware.log
@@ -20,6 +21,13 @@
 #define UPD_TRACE_RENDERED() sim_update_trace::rendered()
 #define UPD_TRACE_REQUESTED() sim_update_trace::requested()
 #define UPD_TRACE_WORKING() sim_update_trace::working()
+// The host's keep-awake lease (crosspoint-simulator/src/SimKeepAwake.h): the
+// activity says whether its run is WORKING, every loop tick and on exit; the
+// host's main loop holds the phone's idle timer off while it is and restores
+// the owner's value when it is not. Owner ruling 2026-09-26 (S-042). The
+// device needs nothing: its own inactivity sleep is already held off by
+// preventAutoSleep() (main.cpp's loop resets lastActivityTime from it).
+#define UPD_KEEP_AWAKE(wanted) sim_keep_awake::request(wanted)
 #else
 #define UPD_TRACE_BEGIN(what) ((void)0)
 #define UPD_TRACE_END() ((void)0)
@@ -27,6 +35,7 @@
 #define UPD_TRACE_RENDERED() ((void)0)
 #define UPD_TRACE_REQUESTED() ((void)0)
 #define UPD_TRACE_WORKING() ((void)0)
+#define UPD_KEEP_AWAKE(wanted) ((void)(wanted))
 #endif
 
 // Runs ONE blocking updater step (the manifest check, one font family, one

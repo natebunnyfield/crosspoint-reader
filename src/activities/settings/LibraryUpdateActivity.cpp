@@ -63,6 +63,7 @@ void LibraryUpdateActivity::onEnter() {
 
   state = State::CHECKING;
   startMs = millis();
+  UPD_KEEP_AWAKE(true);
   updater.setAbortFlag(&abandon);
   // WAIT for this paint, do not merely request it. The next loop() tick
   // blocks on the network; a deferred request would still be a notification
@@ -88,6 +89,7 @@ void LibraryUpdateActivity::onExit() {
     updater.flushSyncRecords();
     recordsFlushed = true;
   }
+  UPD_KEEP_AWAKE(false);  // Back, sleep, home, destroyed: every exit releases
   UPD_TRACE_END();
   Activity::onExit();
 }
@@ -103,6 +105,9 @@ bool LibraryUpdateActivity::handleHomeGesture() {
 void LibraryUpdateActivity::loop() {
   // Read Back FIRST: the SYNCING branch returns early, and a check placed after
   // it is dead code (FontUpdateActivity.cpp learned this in 2026-09).
+  // Every tick, ahead of any return: the host holds the phone awake exactly
+  // while the run works, so done / failed / stopped release it on the next tick.
+  UPD_KEEP_AWAKE(state == State::CHECKING || state == State::SYNCING);
   const bool backPressed = mappedInput.wasPressed(MappedInputManager::Button::Back);
 
   // A step in flight (a host worker; on the device start() already finished it).

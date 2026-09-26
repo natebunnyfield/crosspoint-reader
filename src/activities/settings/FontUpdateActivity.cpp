@@ -117,6 +117,7 @@ void FontUpdateActivity::onEnter() {
 
   state = State::CHECKING;
   startMs = millis();
+  UPD_KEEP_AWAKE(true);
   updater.setAbortFlag(&abandon);
   // WAIT for this paint, do not merely request it. See the header.
   UPD_TRACE_MARK("onEnter: waiting for the CHECKING frame");
@@ -139,6 +140,7 @@ void FontUpdateActivity::onExit() {
     updater.finishRun();
     runFinished = true;
   }
+  UPD_KEEP_AWAKE(false);  // Back, sleep, home, destroyed: every exit releases
   UPD_TRACE_END();
   Activity::onExit();
 }
@@ -162,6 +164,9 @@ void FontUpdateActivity::loop() {
   // `return` in the SYNCING branch below, which used to sit ahead of the
   // input block at the bottom. Reading it up here is what makes the cancel
   // check a check rather than dead code.
+  // Every tick, ahead of any return: the host holds the phone awake exactly
+  // while the run works, so done / failed / stopped release it on the next tick.
+  UPD_KEEP_AWAKE(state == State::CHECKING || state == State::SYNCING);
   const bool backPressed = mappedInput.wasPressed(MappedInputManager::Button::Back);
 
   // A STEP IN FLIGHT (a host worker; on the device start() already finished it).

@@ -308,3 +308,105 @@ formatted); only literals stored as breadcrumbs; the device build (macros
 Re-measured after the fixes, iOS Simulator, Release, DARK page: Update Fonts
 (mock, 15 MB at 1 MB/s) 49 new frames, max gap 1,040 ms, no STALL; Update
 Library 16 new frames, max gap 1,007 ms, no STALL.
+
+## 8. Build 229: streaming downloads and keep-awake (owner ruling 2026-09-26, "Fix both")
+
+Both candidates from 7e, fixed. The recorder from section 7 stays.
+
+### 8a. Streaming host downloads
+
+**The cause, measured.** Every host transport buffered a WHOLE response before
+the firmware saw a byte: `crosspoint-simulator/src/esp_http_client.h`
+`esp_http_client_open` called `sim_http_fetch::fetch`, which fills
+`Response.body` (NSURLSession completion handler on iOS, `curl_easy_perform`
+into a string on the Mac). `HttpDownloader.cpp` `runGet` -- the path BOTH the
+desktop simulator and iOS compile, since neither defines `FREEINK_NET_WOLFSSL`
+-- then read that buffer in 1 KB pieces within microseconds, so the updaters'
+per-chunk progress (`FontUpdater.cpp` ~776, `LibraryUpdater.cpp` ~529) fired in
+one burst at the end of each file. On the iOS Simulator at 1 MB/s before the fix
+the screen read "Downloading Coelacanth_11 · 0.0 of 8.2 MB" 20 s into the family
+(section 7 screenshots).
+
+**The fix.** `crosspoint-simulator/src/SimHttpStream.h`: a `Stream` shared by
+the transport (producer) and the firmware thread in `esp_http_client_read`
+(consumer). `esp_http_client_open` now returns once the final response's headers
+are in, and each read hands over bytes as they arrive.
+- iOS: `ios/CrossPointHttp.mm` `hostOpenStream`, an NSURLSession data-task
+  delegate on its own serial queue. A body with a `Content-Encoding` declares
+  no length, because NSURLSession decodes gzip and the header counts encoded
+  bytes.
+- Mac: libcurl on a detached thread (same options as the buffered path, plus a
+  progress callback so an abort lands on a stalled link).
+- Fixtures (`CROSSPOINT_SIM_HTTP_MOCK_ROOT`, `file://`) and the Linux curl
+  SUBPROCESS stay buffered, filled into a stream in one piece.
+- **No whole-file buffering**: the producer blocks at 1 MB unread
+  (`kStreamCapBytes`; on iOS that is the only flow control a data task has).
+- **Abort**: the firmware closing early (an abandoned family, a sleep mid-file)
+  cancels the transfer at once. Before, the whole file downloaded first.
+- `.part` staging, the SHA-256 check at the end, and the two-rename commit are
+  untouched; the updaters see the same chunks, sooner.
+- `perform()` and `HTTPClient` stay buffered (small JSON bodies).
+
+### 8b. Keep awake during a run, and only then
+
+`crosspoint-simulator/src/SimKeepAwake.h`. The activity says whether its run is
+WORKING (`UPD_KEEP_AWAKE`, `UpdateWorker.h`), in `onEnter`, on EVERY `loop()`
+tick ahead of any return, and `false` in `onExit`. The host's main loop (and the
+deep-sleep loop) holds `UIApplication.idleTimerDisabled` while it is, and
+restores the value it found when it is not. So done / failed / stopped release
+on the next tick, and Back / sleep / home / destroyed release in `onExit`. A
+reboot mid-run clears the request (reboot reset); backgrounding releases, and a
+return mid-run takes it again. Every SET / REASSERT / RESTORE is a line in
+`update-trace.log`.
+
+**The device's own auto-sleep cannot fire mid-run, and never could**:
+`main.cpp:1145` resets `lastActivityTime` from `activityManager.preventAutoSleep()`
+before the timeout check at `:1151`, and both activities answer true in
+CHECKING and SYNCING (`FontUpdateActivity.h:117`, `LibraryUpdateActivity.h:83`;
+pinned by `FontUpdateFirstFrameTest` / `LibraryUpdateFirstFrameTest`). The same
+code runs on the desktop and the phone. On the device a single family runs
+inline, so no loop tick happens during it, but the reset comes first on the
+next tick. No change there.
+
+### 8c. Proof, iOS Simulator (iPhone Air, Release), mock release at 200 KB/s
+
+| Run | Result |
+|---|---|
+| Update Fonts | the byte figure moves WITHIN one file: "Downloading Doves_18 · 4.6 → 4.9 → 5.5 → 6.1 of 7.1 MB" across 9 s of the same 1.9 MB file; 89 new frames, max gap 1,055 ms; every stream `complete=1` |
+| Update Library | within the 6 MB book: 0.9 → 2.5 → 4.0 → 5.6 of 6.0 MB; max gap 1,030 ms; `keep-awake SET` at 10,602 ms, `RESTORED` at 47,539 ms after "library sync done" |
+| Real GitHub `fonts-latest` / `library-latest` on the streaming build | 5 updated + 8 unchanged / 2 updated + 56 unchanged, 0 errors; every stream complete (the library release JSON arrived with no declared length and read clean) |
+| Back mid-run | stopped after 2 of 3 families; RESTORED at the stop, before the screen was left |
+| Power held mid-file | stream closed at 720,896 of 1,263,585 bytes (aborted, not waited out); staging removed; `Entering activity: Sleep`; RESTORED 42 ms later **from the sleep loop** (see 8d, finding 0) |
+| Another app brought forward mid-run | RESTORED on `app backgrounded`, SET again on return, RESTORED at done |
+
+### 8d. Adversarial review (read-only agent) and what the runs found
+
+| # | Finding | Verdict | Action |
+|---|---|---|---|
+| 0 | (found by the power-mid-file run, before the review) the lease was applied only from the main loop, which does not run in the deep-sleep loop, so a power-off mid-run left the phone held awake while "asleep" | reproduced on the iOS Simulator | applied from `HalGPIO::startDeepSleep`'s loop too; re-run shows RESTORED 42 ms after sleep |
+| 1 | The lease and the host's charging-dependent screen-awake preference (`applyKeepScreenAwake`) both write the idle timer. Unplugging mid-run let the phone lock. Plugging in mid-run and then restoring the stale snapshot lost the owner's "awake while charging" | confirmed by reading | the lease REASSERTS while held if the timer was turned back on; every restore makes the preference re-apply itself as it stands now. Tests: "unplugged mid-run", "every restore asks the preference to re-apply" |
+| 2 | A blocked producer could outlive a consumer that never cleans up | not reachable (`runGet` cleans up on every return) | recorded |
+| 3 | One NSURLSession per request: no connection reuse | performance only | recorded |
+
+Reported CLEAN: the live path is `runGet` on both hosts (the desktop env does
+not extend `base`, and iOS has no `FREEINK_NET_WOLFSSL`); no other firmware
+caller of `esp_http_client_open/read`; gzip (measured with Foundation on the
+Mac: decoded length or -1, never the encoded length); `answered()` against the
+old accept rule; abort/cancel ordering, session invalidation, and ARC holding
+the task; redirects; fixtures over the cap; no token in any line; main-thread
+use of the idle timer from the sleep loop; exit paths (no sub-activity can hold
+the request); the request while backgrounded; WebServer's async writes cannot
+overlap a run.
+
+### 8e. Tests
+
+- `crosspoint-simulator/tests/http_stream_test.cpp`. Its socket case checks
+  that the first chunk is read while the server still holds the rest back. It
+  **fails against the old buffered shim**; the fixture-over-the-cap case is
+  there too.
+- `crosspoint-simulator/tests/keep_awake_test.cpp`: every exit path × both
+  starting values of the idle timer, background round trip, back-to-back runs,
+  unplugged mid-run. Mutants (restore to "enabled"; ignore foreground) fail it.
+- `test/update_progress/UpdateWorkerTest.cpp` `EveryExitReleasesTheKeepAwake`:
+  source gate that `loop()` states the request before any return and `onExit()`
+  releases. It fails with the Font activity's change reverted.
