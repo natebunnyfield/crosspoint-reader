@@ -51,6 +51,7 @@ void drawStatusLine(const GfxRenderer& renderer, int y, unsigned long startMs, b
 
 void LibraryUpdateActivity::onEnter() {
   Activity::onEnter();
+  UPD_TRACE_BEGIN("LibraryUpdateActivity");
 
   // Same division of labor as the firmware update screen: joining a network is
   // Settings' job, and saying so beats a generic failure after a timeout.
@@ -69,7 +70,9 @@ void LibraryUpdateActivity::onEnter() {
   // host that presents only between loop() calls, for the whole sync. The
   // frame names what is about to happen (Contacting GitHub, bar at 0 of 2)
   // and is displayed before this returns. See the header.
+  UPD_TRACE_MARK("onEnter: waiting for the CHECKING frame");
   requestUpdateAndWait();
+  UPD_TRACE_MARK("onEnter: CHECKING frame rendered");
 }
 
 void LibraryUpdateActivity::onExit() {
@@ -85,6 +88,7 @@ void LibraryUpdateActivity::onExit() {
     updater.flushSyncRecords();
     recordsFlushed = true;
   }
+  UPD_TRACE_END();
   Activity::onExit();
 }
 
@@ -102,6 +106,7 @@ void LibraryUpdateActivity::loop() {
   const bool backPressed = mappedInput.wasPressed(MappedInputManager::Button::Back);
 
   // A step in flight (a host worker; on the device start() already finished it).
+  if (worker.inFlight() || state == State::CHECKING || state == State::SYNCING) UPD_TRACE_WORKING();
   if (worker.inFlight()) {
     if (backPressed && (state == State::CHECKING || state == State::SYNCING)) requestStop();
     if (!worker.done()) {
@@ -156,6 +161,7 @@ void LibraryUpdateActivity::requestStop() {
 
 void LibraryUpdateActivity::startStep(Step next) {
   step = next;
+  UPD_TRACE_MARK(next == Step::CHECK ? "step CHECK start" : "step BOOK start");
   worker.start(&LibraryUpdateActivity::runStep, this);
   // The device ran the step inline: collect it in THIS tick, exactly as the
   // code did before the worker existed (one family / one book per tick). A
@@ -190,9 +196,11 @@ void LibraryUpdateActivity::runStep(void* ctx) {
     case Step::NONE:
       break;
   }
+  UPD_TRACE_MARK("worker: step returned");
 }
 
 void LibraryUpdateActivity::completeStep() {
+  UPD_TRACE_MARK("loop: collecting the step");
   const Step done = step;
   step = Step::NONE;
   if (done == Step::CHECK) afterCheck();
@@ -265,7 +273,9 @@ void LibraryUpdateActivity::afterCheck() {
   // Waited for, like the CHECKING frame in onEnter and for the same reason:
   // on the device the next tick blocks on the first download, and "Book 1 of N"
   // over a bar at zero must be on the panel before it does.
+  UPD_TRACE_MARK("afterCheck: waiting for the SYNCING frame");
   requestUpdateAndWait();
+  UPD_TRACE_MARK("afterCheck: SYNCING frame rendered");
   std::lock_guard<std::mutex> guard(paintMutex);
   shown = snapshot(millis());
   hasShown = true;
@@ -352,12 +362,14 @@ void LibraryUpdateActivity::maybeRepaint(bool force) {
   shown = s;
   hasShown = true;
   lastPaintMs = now;
+  UPD_TRACE_REQUESTED();
   requestUpdate(true);
 }
 
 void LibraryUpdateActivity::onProgress(void* ctx) { static_cast<LibraryUpdateActivity*>(ctx)->maybeRepaint(); }
 
 void LibraryUpdateActivity::render(RenderLock&&) {
+  UPD_TRACE_RENDERED();
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();

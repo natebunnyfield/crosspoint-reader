@@ -4,6 +4,30 @@
 #ifdef SIMULATOR
 #include <thread>
 #endif
+// __has_include: the host test build (test/update_progress) defines SIMULATOR
+// without the simulator library on its include path.
+#if defined(SIMULATOR) && __has_include(<SimUpdateTrace.h>)
+#include <SimUpdateTrace.h>
+// The host's update flight recorder (crosspoint-simulator/src/SimUpdateTrace.h):
+// step boundaries, repaint requests and renders land in diagnostics/firmware.log
+// beside every present the host makes, so a screen that stops on a phone says
+// where. Added 2026-09-26 after the fix below was reported frozen again on the
+// phone and could not be reproduced on the iOS Simulator -- see
+// docs/update-progress-2026-09-26.md section 7. Compiled out on the device.
+#define UPD_TRACE_BEGIN(what) sim_update_trace::begin(what)
+#define UPD_TRACE_END() sim_update_trace::end()
+#define UPD_TRACE_MARK(...) sim_update_trace::mark(__VA_ARGS__)
+#define UPD_TRACE_RENDERED() sim_update_trace::rendered()
+#define UPD_TRACE_REQUESTED() sim_update_trace::requested()
+#define UPD_TRACE_WORKING() sim_update_trace::working()
+#else
+#define UPD_TRACE_BEGIN(what) ((void)0)
+#define UPD_TRACE_END() ((void)0)
+#define UPD_TRACE_MARK(...) ((void)0)
+#define UPD_TRACE_RENDERED() ((void)0)
+#define UPD_TRACE_REQUESTED() ((void)0)
+#define UPD_TRACE_WORKING() ((void)0)
+#endif
 
 // Runs ONE blocking updater step (the manifest check, one font family, one
 // book, the end-of-run removals) for Update Fonts and Update Library, off the

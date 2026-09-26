@@ -174,3 +174,137 @@ specifiers, the `·` glyph (Noto Sans fallback covers U+00B7).
 - `test/activity_input/LibraryUpdateFirstFrameTest.cpp` -- Back stops between
   books and flushes the ledger (fail-first against `12f1c852d`), the Stopped
   screen dismisses. All 68 activity tests pass.
+
+## 7. REPEATED REPORT, same day: "in ios app update library and fonts both freezing screen"
+
+Reported after TestFlight builds 226/227. Build 227's archive was checked to
+contain the fix above (its binary carries `%s elapsed` and `Stopping after this
+font`), so the phone ran it. Taken as stated: on the phone, the screen stops.
+Sections 1-6 were proven on the DESKTOP only, and that is the gap this section
+closes as far as it can be closed without the phone.
+
+### 7a. The iOS path, traced line by line (at `a29b432f6` + simulator `1648143`)
+
+| Step | Where | Verified on iOS |
+|---|---|---|
+| Worker compiled in | `UpdateWorker.h` `#ifdef SIMULATOR` | `SIMULATOR` is in the generated iOS define set (`crosspoint-simulator/cmake/CrossPointSources.cmake:236`), applied to `crosspoint_core`; the step runs on a `std::thread` on iOS exactly as on the desktop |
+| Main loop | `crosspoint-simulator/src/simulator_main.cpp` `while (!display.shouldQuit())` | the SAME loop on iOS: `loop()`, `CrossPointHarness_perFrame()`, `pumpHostTextInput()`, `presentIfNeeded()`, `SDL_Delay(1)` -- no iOS-only present loop |
+| Transport | `ios/CrossPointHttp.mm` `hostFetch` | NSURLSession `sharedSession` + `dispatch_semaphore_wait`; the completion runs on the session's own background queue, never the main queue. Called on the WORKER now, so the main thread never waits on it |
+| Wi-Fi | `SimWiFiHost.h` / `ios/CrossPointWiFi.mm` | cached, mutex only, no wait on the main thread |
+| Main-queue syncs | `grep dispatch_sync\|waitUntilDone:YES` over `ios/` | none; every main-queue hop is `dispatch_async` |
+| Render path | `HalDisplay.cpp` render-task side | no wait on the main thread anywhere (`grep wait\(\|condition_variable`), so `requestUpdateAndWait()` on the main thread cannot deadlock against a present |
+| Present gates | `HalDisplay::presentIfNeeded` early returns | `g_backgrounded` (S-041), the sleep veto (dark + power-off collapse), the 30 ms / 2 s coalescing hold, no texture -- none tied to these screens |
+
+### 7b. Measured on the iOS Simulator (iPhone Air, iOS 26.5) -- the phone's code, not reproduced
+
+Every run below goes through the app's own UIKit/SDL3/Metal present path and
+NSURLSession. "Gap" is the longest interval between two presents from entering
+the screen to the run's summary.
+
+| Run | Result |
+|---|---|
+| Fonts, Debug, light, mock release at 1 MB/s (3 families, 15 MB) | 1,066 ms max gap; 48 new pictures |
+| Same, DARK (CRT page, trail) | 553 ms all presents / 1,291 ms new pictures |
+| Fonts, Debug, the REAL `fonts-latest` release (79 assets, 13 families) via NSURLSession | 1,006 ms |
+| Same, **Release** (TestFlight's configuration) | 1,053 ms |
+| Library, Release, real `library-latest` (58 books downloaded) | 1,045 ms |
+| Library, Release, second run on the synced card (58 unchanged) | 1,070 ms |
+| Fonts on a card seeded exactly as `CrossPointFsPrep` seeds a phone (13 families CPZ1-compressed, 2x companions, no ledger), real release | 1,033 ms |
+| Fonts with E-Ink Mode, Raking Light, Read Aloud, Power-Off Collapse all ON | 1,009 ms; a new screenshot every second |
+| Fonts with NO in-app instrument (no screenshot schedule, no present log, no diagnostics), glass sampled from OUTSIDE by `simctl io screenshot` every ~0.5 s | frame changes every ~1 s for the whole run; the only still span is after the summary |
+| Fonts, another app brought to the front mid-run for ~11 s, then back | presents declined as `backgrounded` while away (S-041, by design), resumed on return, run completed |
+| After the instrument below (Release): fonts / library / fonts + Back at 32 s | 1,013 / 1,016 / 1,017 ms; Back stopped after 2 of 3 families |
+
+So: **no death point was found on any path the iOS Simulator runs.** I do not
+say the phone does not freeze. The difference between those runs and the
+owner's phone is the physical device itself (its Metal, CPU, thermal state,
+network) and the owner's own card and settings, none of which this Mac can
+reach -- no iPhone is paired (`xcrun devicectl list devices`: none) and screen
+control of the Mac is not available. Why the desktop proof missed it is
+therefore unknown in its specifics, but the general reason is now measured:
+the desktop and the iOS Simulator share every line of this path, so neither
+can see a cause that lives in the device.
+
+### 7c. What ships instead: the update flight recorder (project rule: second device failure -> instrument)
+
+`crosspoint-simulator/src/SimUpdateTrace.h` (header-only), hooked into the
+firmware's two update activities (`UPD_TRACE_*` in `UpdateWorker.h`), the host
+main loop, `presentIfNeeded`, and every host fetch. While either update screen
+is up it writes, to **`diagnostics/update-trace.log`** on the card (Files app:
+On My iPhone > CrossPoint X3 > diagnostics; the previous run survives as
+`update-trace.log.1`) and interleaved into `firmware.log`:
+
+- `BEGIN`/`END`, every step boundary (`step CHECK/FAMILY/BOOK/FINISH start`,
+  `worker: step returned`, `loop: collecting the step`), both
+  `requestUpdateAndWait` waits (before and after), with firmware-clock ms;
+- every host fetch: URL (query dropped), duration, status, bytes;
+- every present with the gap since the last;
+- every owed present that `presentIfNeeded` DECLINED, and which gate did it;
+- from a watchdog THREAD (a stalled main thread cannot report itself), one
+  `STALL` line per stall: the main loop silent for 1.5 s (with the stage it is
+  parked in: `loop()`, `harness perFrame`, `pumpHostTextInput`,
+  `pumpPendingOpen`, `presentIfNeeded`, `SDL_Delay`), a drawn frame or a
+  working run not reaching the glass for 1.5 s (with the last decline), or a
+  working run whose firmware stopped asking for frames.
+
+**It needs Settings.app > CrossPoint X3 > Diagnostics Log ON.** With the next
+report, the file answers which of four things happened: the main thread is
+parked (and where), the host is declining presents (and why), the firmware
+stopped drawing (and after which step), or a fetch is hanging (and which).
+
+Device firmware is unaffected: the macros are `((void)0)` without `SIMULATOR`.
+Host tests: `crosspoint-simulator/tests/update_trace_test.cpp` (in
+`run_all.sh`), compiled with the iOS HTTP define so the phone's fetch branch is
+the one traced; its "finished run is not quiet" check fails against the first
+cut of the watchdog, which read a run that had just finished as a stall
+(measured on the iOS Simulator, 1.3 s after `font sync done`).
+
+### 7d. Checked and found CLEAN on the iOS path (so the next pass need not)
+
+`SIMULATOR` reaching the iOS core; the shared main loop; NSURLSession
+completion queue; main-queue syncs in `ios/`; render-side waits on the main
+thread; `requestUpdateAndWait` from the main thread (handle resolution in the
+FreeRTOS shim: any unregistered thread, the worker included, resolves to the
+one `main` handle -- harmless today because only the loop thread ever waits on
+it, and worth knowing); Release-only differences (asserts compiled out) on
+these screens; the phone-shaped seeded CPZ1 card; the experimental toggles;
+backgrounding mid-run.
+
+### 7e. Candidates the owner's phone could still hold (unverified, recorded so they are not re-derived)
+
+- **Auto-lock mid-run.** `allowSleepOnBattery` ships ON and the firmware's
+  `preventAutoSleep()` during a sync is not consulted by the host's idle-timer
+  logic (`applyKeepScreenAwake` reads `SETTINGS.keepScreenAwake` only), so a
+  long run with no touches can reach iOS auto-lock. The trace will show it as
+  `present declined: backgrounded`. Not changed: it is a behavior change nobody
+  asked for; it is an owner decision.
+- **Per-file byte counter frozen during a download.** The host transport still
+  buffers a whole body (section 4), so on a slow link only the small clock line
+  moves within a file. If that is what reads as frozen, the fix is the
+  streaming host transport already listed in section 4.
+
+### 7f. Adversarial review of the instrument (read-only agent, same day)
+
+| # | Finding | Verdict | Action |
+|---|---|---|---|
+| 1 | The glass watchdog keyed "frame owed" on render START vs ANY present; on a dark page the trail and beam re-present the OLD picture every display frame, so a new frame that never reached the glass would never be reported -- plausibly the very symptom | confirmed by reading | now keyed on the framebuffer GENERATION: the host reports each written `pixelBufSeq` (`frameWritten`) and the generation the presented texture holds (`uploadedSeq`); a same-frame present is counted as a repeat, not as the glass moving. Test: "a new frame hidden behind same-frame re-presents is reported" |
+| 2 | Log volume: a line per present (display rate on a dark page), and `SDL_Log` ran even with Diagnostics Log off; `update-trace.log` unbounded | confirmed | lines only while the diagnostics log is armed; one line per NEW frame; `update-trace.log` also rotates at 1 MB. Measured: 7.8 KB for a 38 s fonts run |
+| 3 | Decline dedupe never reset: after the first "coalescing hold" no later decline was ever logged, even in later runs | confirmed | a new-frame present and `begin()` end a run of declines; counted per run, not per main-loop pass. Test added |
+| 4 | Backgrounding reads as a main-loop stall with no hint why | confirmed (millis() runs while suspended) | the host marks `app backgrounded` / `app foregrounded`, which the STALL line names as the last step |
+| 5 | A reboot with an update screen up would leave the trace armed | theoretical (no update path reboots) | reset registered in `SimulatorRebootResets` |
+| 6 | `update-trace.log` deleted from Files mid-run keeps writing to the unlinked file | confirmed | reopened when the path is gone, as `firmware.log` does |
+
+Reported CLEAN: no lock-order hazard with RenderLock / the sleep transition's
+join (every lock the sink takes is a leaf; `rendered()` does not log);
+`SDL_Log` off the main thread; header-only inline atomics across the static
+`crosspoint_core` and the app (one program, C++20); the once-guard across the
+iOS longjmp; `__has_include` reaches the header in BOTH the iOS and desktop
+builds (the same TUs already include `<SimHostSettings.h>`) and falls back only
+in `test/update_progress`; no secret in any line (query dropped, headers never
+formatted); only literals stored as breadcrumbs; the device build (macros
+`((void)0)`); the two sleep-only `SDL_RenderPresent` calls in `SurfacePower.cpp`
+(sleep ENDs the trace first).
+
+Re-measured after the fixes, iOS Simulator, Release, DARK page: Update Fonts
+(mock, 15 MB at 1 MB/s) 49 new frames, max gap 1,040 ms, no STALL; Update
+Library 16 new frames, max gap 1,007 ms, no STALL.

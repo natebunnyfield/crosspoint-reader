@@ -105,6 +105,7 @@ void FontUpdateActivity::writeFailureLog(unsigned updated, unsigned unchanged, u
 
 void FontUpdateActivity::onEnter() {
   Activity::onEnter();
+  UPD_TRACE_BEGIN("FontUpdateActivity");
 
   // Joining a network is Settings' job, and saying so beats a generic failure
   // after a timeout.
@@ -118,7 +119,9 @@ void FontUpdateActivity::onEnter() {
   startMs = millis();
   updater.setAbortFlag(&abandon);
   // WAIT for this paint, do not merely request it. See the header.
+  UPD_TRACE_MARK("onEnter: waiting for the CHECKING frame");
   requestUpdateAndWait();
+  UPD_TRACE_MARK("onEnter: CHECKING frame rendered");
 }
 
 void FontUpdateActivity::onExit() {
@@ -136,6 +139,7 @@ void FontUpdateActivity::onExit() {
     updater.finishRun();
     runFinished = true;
   }
+  UPD_TRACE_END();
   Activity::onExit();
 }
 
@@ -163,6 +167,7 @@ void FontUpdateActivity::loop() {
   // A STEP IN FLIGHT (a host worker; on the device start() already finished it).
   // Take Back now -- it is acknowledged on screen at once and acts between
   // families -- keep the clock moving, and collect the result when it is ready.
+  if (worker.inFlight() || state == State::CHECKING || state == State::SYNCING) UPD_TRACE_WORKING();
   if (worker.inFlight()) {
     if (backPressed && (state == State::CHECKING || state == State::SYNCING)) requestStop();
     if (!worker.done()) {
@@ -222,6 +227,7 @@ void FontUpdateActivity::requestStop() {
 
 void FontUpdateActivity::startStep(Step next) {
   step = next;
+  UPD_TRACE_MARK(next == Step::CHECK ? "step CHECK start" : next == Step::FINISH ? "step FINISH start" : "step FAMILY start");
   worker.start(&FontUpdateActivity::runStep, this);
   // The device ran the step inline: collect it in THIS tick, exactly as the
   // code did before the worker existed (one family / one book per tick). A
@@ -268,9 +274,11 @@ void FontUpdateActivity::runStep(void* ctx) {
     case Step::NONE:
       break;
   }
+  UPD_TRACE_MARK("worker: step returned");
 }
 
 void FontUpdateActivity::completeStep() {
+  UPD_TRACE_MARK("loop: collecting the step");
   const Step done = step;
   step = Step::NONE;
   switch (done) {
@@ -364,7 +372,9 @@ void FontUpdateActivity::afterCheck() {
   // Waited for, like the CHECKING frame and for the same reason: on the device
   // the next tick blocks on the first family, and "Font 1 of N" over a bar at
   // zero must be on the panel before it does.
+  UPD_TRACE_MARK("afterCheck: waiting for the SYNCING frame");
   requestUpdateAndWait();
+  UPD_TRACE_MARK("afterCheck: SYNCING frame rendered");
   std::lock_guard<std::mutex> guard(paintMutex);
   shown = snapshot(millis());
   hasShown = true;
@@ -469,12 +479,14 @@ void FontUpdateActivity::maybeRepaint(bool force) {
   lastPaintMs = now;
   // immediate=true: on the device this runs inside a download loop that will
   // not drain a deferred flag for us.
+  UPD_TRACE_REQUESTED();
   requestUpdate(true);
 }
 
 void FontUpdateActivity::onProgress(void* ctx) { static_cast<FontUpdateActivity*>(ctx)->maybeRepaint(); }
 
 void FontUpdateActivity::render(RenderLock&&) {
+  UPD_TRACE_RENDERED();
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
