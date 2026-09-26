@@ -1054,3 +1054,5 @@ CROSSPOINT_TEST_SD=<sd snapshot> CROSSPOINT_LINEBREAK_CORPUS=/tmp/corpus.txt \
 CROSSPOINT_KP_FACES=LibreFranklin:14,Albo:14,LibreFranklin:12,Albo:12,LibreFranklin:18,Albo:18 \
   build/line_break_quality/LineBreakKnuthPlassTest --gtest_filter='KnuthPlassDevice.*'
 ```
+
+**Owner ruling, 2026-09-26 (hyphen penalty):** a break after a REAL hyphen keeps the same 10,000 penalty as an inserted one, as shipped in `6d8f38a33`. TeX's cheaper explicit-hyphen penalty (50) was offered and declined.
