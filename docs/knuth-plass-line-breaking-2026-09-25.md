@@ -1056,3 +1056,257 @@ CROSSPOINT_KP_FACES=LibreFranklin:14,Albo:14,LibreFranklin:12,Albo:12,LibreFrank
 ```
 
 **Owner ruling, 2026-09-26 (hyphen penalty):** a break after a REAL hyphen keeps the same 10,000 penalty as an inserted one, as shipped in `6d8f38a33`. TeX's cheaper explicit-hyphen penalty (50) was offered and declined.
+
+---
+
+## 14. Shipped: shrink (2026-09-26)
+
+**Owner ruling 2026-09-26: "Just ship shrink."** This is option C of §7: the
+Knuth-Plass breaker from §13 may now also **narrow** a justified line's gaps.
+**It was not blind-tested.** The blind test (§12) showed only the stretch-only
+arm, and C was never put in front of him. The ruling was made without seeing
+it. That is recorded here so nobody later reads §12's 5/5 as a verdict on
+shrink.
+
+**Also ruled the same day** (`9c04e35c3`): a real hyphen ("well-") keeps the
+same 10,000 penalty as an inserted one (§13e).
+
+Built on `9c04e35c3`.
+
+### 14a. What shipped
+
+| What | Where |
+|---|---|
+| Shrink in the DP | `KnuthPlassBreaker.h`: the tight fitness class is back (`FITS = 4`, :138, 12 states); `shrinkBadness16` :243; line capacity :469; the per-gap cap `shrinkPerGapPx` :152 |
+| The cap per gap, per style | `KnuthPlassModel::gapShrinkCap`, `ParsedText.cpp:480` |
+| The paint accepts a negative spare | `computeJustifyExtra(spare, gaps, maxShrinkPerGap)`, `ParsedText.cpp:256`. `extractLine` computes the same per-line cap (`lineShrinkCap`, :1605) and passes it on both justify paths (logical and bidi-reordered). |
+| Only for Knuth-Plass lines | `shrinkJustify_` is reset on every layout call (:930) and set only after the breaker returns `Ok` (:1332). |
+| Re-pagination | `SECTION_FILE_VERSION` 59 → **60**, `Section.cpp:239` |
+| Stretch-only still reachable | `Config::shrink` (test builds only, via `CROSSPOINT_KNUTH_PLASS_TUNABLE`) |
+
+**Every other line is painted stretch-only, exactly as before.** That covers
+greedy, Whole Words, ragged text, the fallback, and ruby. A forced overfull line
+under Knuth-Plass is also safe: the per-gap cap means its words can never be
+driven into each other, so it overflows as before.
+
+### 14b. How much a gap may shrink: TeX's third, made exact to the pixel
+
+TeX shrinks a word space by a third. On whole pixels that paints gaps UNDER
+two-thirds whenever the space is not a multiple of 3 px. Before this fix, the
+corpus measured narrowest painted gaps of 0.600, 0.625 and 0.636 of a space at
+12 and 18 pt.
+
+| Face | 12 pt | 14 pt | 18 pt |
+|---|---:|---:|---:|
+| Libre Franklin space | 5 px | **6 px** | 8 px |
+| Albo space | 8 px | **9 px** | 11 px |
+
+So a gap may lose at most **⌊S/3⌋ px**, which equals S − ⌈2S/3⌉. That is the
+most it can lose while staying at least ⅔ of a space in whole pixels. The line's
+shrink capacity is its gap count × the smallest cap on the line, so the one
+uniform `justifyExtra` the paint applies honors every gap's floor. Three things
+about the cap:
+
+* **S is the space of that gap's own style.** Albo 14's italic and bold spaces
+  are 8 px against a regular 9.
+* **A gap with no natural width may not shrink at all:** a CJK break, or a
+  no-break space.
+* **At 14 pt this is exactly TeX's third** for both faces, because 6 and 9 are
+  multiples of 3.
+
+At 12 and 18 pt it allows less than TeX would: 1 of 1.67 px at LF 12, 2 of
+2.67 at 8 px spaces, and 3 of 3.67 at Albo 18.
+
+**The prototype comparison uses the same rule.** `shippedParams`
+(`KnuthPlassSweep.cpp:512`) is the §2 candidate with `shrinkPerGapPx =
+⌊S/3⌋`, identical to the §2 "+shrink" arm at 14 pt.
+
+### 14c. Measured
+
+Corpus: §2's 1,472 paragraphs, the Albo snapshot from §13c. Run by
+`KnuthPlassDevice.CorpusMatchesThePrototype`.
+
+**Parity with the prototype's shrink arm: 0 differing paragraphs in all six
+configurations**, both pure and through ParsedText, on every paragraph that
+fits one window.
+
+* **One exact tie is accounted separately:** LF 12, paragraph 679. Traced line
+  by line, its two paths hold the same two lines, (slack −2, r −⅓) and (slack
+  4, r 0.27), in swapped order. Both total exactly 207,716,866.321084
+  demerits. The prototype's double summation picked one; the integer DP's loop
+  order picked the other. `exactTie` (`KnuthPlassSweep.cpp:1628`) relabels only
+  paths whose totals are equal, so it cannot hide a real difference. The review
+  checked that too.
+* **Stretch-only parity** is still 0 in every configuration.
+
+**Shrink against the stretch-only breaker (§13), unwindowed:**
+
+| Config | Lines | Hyphenated lines | Mean paragraph-worst line (spaces) | Paragraphs broken differently | Lines set tight | Narrowest painted gap |
+|---|---:|---:|---:|---:|---:|---:|
+| LF 14 | 20,098 vs 20,484 (−1.9%) | 2,650 vs 3,259 (−19%) | 3.431 vs 3.851 (−11%) | 1,040 | 2,252 | 0.667 |
+| Albo 14 | 19,869 vs 20,394 (−2.6%) | 956 vs 1,610 (−41%) | 2.732 vs 3.058 (−11%) | 1,154 | 2,937 | 0.667 |
+| LF 12 | 17,466 vs 17,629 | 1,940 vs 2,273 | 3.103 vs 3.326 | 731 | 1,215 | 0.800 |
+| Albo 12 | 17,026 vs 17,375 | 370 vs 657 | 2.420 vs 2.643 | 1,010 | 2,077 | 0.750 |
+| LF 18 | 26,271 vs 26,687 | 4,924 vs 5,141 | 4.797 vs 5.205 | 905 | 1,728 | 0.750 |
+| Albo 18 | 25,724 vs 26,326 | 3,448 vs 4,076 | 3.645 vs 4.060 | 1,098 | 2,575 | 0.727 |
+
+* **Fewer lines means fewer pages:** 1–2.6% fewer.
+* **Fewer hyphens and a better worst line in all six.**
+* **Painted gaps never go under ⅔ of a space.** The narrowest (0.667–0.800)
+  lands on the pixel floor of each size.
+
+**The window (paragraphs past 320 positions):** 3–30 of the 52 break
+differently from the unwindowed optimum. Their worst line averages −0.5% to +1.7%
+against the unwindowed one, per configuration.
+
+**Memory.** Worst case **49,416 B** (the header derives it), up from 39,146 B:
+
+* the tight class is back, so 12 states per position (+9.6 KB);
+* the per-gap cap adds a byte per token.
+
+**Largest measured on the corpus: 45,511 B.** That is ~10 KB more than §13's
+35,596 B. **Not measured on a device heap.**
+
+**Host timing, per paragraph** (Apple M4; not a quiet machine):
+
+| | Range over the 6 configs |
+|---|---|
+| ParsedText, greedy | 22.8–33.0 µs |
+| ParsedText, Knuth-Plass with shrink | 52.3–70.6 µs |
+| KP worst paragraph | ≤ 621 µs |
+| DP alone, device (int64) | 14.0–19.7 µs, against 12–17 µs stretch-only |
+
+§13d's ESP32-C3 **estimate** holds with that increase: the host adds
+27–41 µs per justified paragraph over greedy, so at §6b's 50–100× that is
+roughly **1.4–4.1 ms per justified paragraph**. **Not measured.**
+
+**Device build.** `pio run -e default`, the C3 binary for X3 and X4:
+
+| Against | Flash | Static RAM |
+|---|---:|---:|
+| Stretch-only (`6d8f38a33`) | **+738 B** (`.flash.text` 2,136,304 → 2,137,042) | **+0** |
+| Before Knuth-Plass | **+6,210 B** | +0 |
+
+The breaker and `extractLine` call no soft-float routines. There are two
+`__divdi3`, one per badness cube.
+
+`pio run -e simulator_x3`: SUCCESS.
+
+### 14d. Proofs
+
+Written to the session scratchpad, **not** checked in:
+`…/scratchpad/kpshrink/` (`index.html`, 12 PNGs, `shrink_manifest.txt`).
+Regenerate them with `KnuthPlass.DISABLED_ShrinkProof`
+(`KnuthPlassSweep.cpp:1792`), `CROSSPOINT_KP_OUT=<dir>`, then a lossless
+PGM → PNG step.
+
+**How they are drawn:**
+
+* The same paragraph goes through the real ParsedText twice, stretch-only
+  (before) and with shrink (after).
+* Each is drawn by `TextBlock::render` from the TextBlocks ParsedText bakes, so
+  the x positions are the firmware's own.
+* Albo 14, justified, 512 px.
+* X3 native pixels, 528 px wide, four levels.
+* Before and after are padded to one height.
+
+**Chosen by script:**
+
+| Paragraph | Picked as | Worst line (spaces) | Lines |
+|---:|---|---|---|
+| 562 | largest gain | 6.11 → 1.56 | 6 → 6 |
+| 856 | largest gain | 5.44 → 1.44 | 6 → 6 |
+| 967 | largest gain | 6.33 → 2.67 | 9 → 9 |
+| 195 | random | 2.89 → 2.56 | 8 → 7 |
+| 994 | random | 3.89 → 3.00 | 7 → 6 |
+| 1337 | random | 3.22 → 1.67 | 7 → 6 |
+
+The random three are drawn with seed 20260926 from the paragraphs shrink
+changes.
+
+### 14e. The adversarial review, and what it found
+
+It was read-only, had not written the code, and built its own probes. **It
+confirmed three defects**, all in inputs the corpus never holds: the corpus is
+regular-style Latin with ordinary spaces, which is why every corpus check had
+passed.
+
+| # | Input | What broke | Measured by the review |
+|---:|---|---|---|
+| F1 | CJK | A break with no natural width was given shrink, so glyphs overlapped | 300×"中文" in one run: 140–560 negative gaps depending on face; a CJK–Latin mix: −2 px |
+| F2 | A no-break space followed by a real one ("Mr.&nbsp; Smith") | Counted as a gap but painted without the extra (a pre-existing stretch under-fill), so a shrunk line **overflowed** the measure | 2–4 px |
+| F3 | Italic and bold at Albo 14 | The cap was taken from the regular space | A gap painted at 5 of its own 8 px (0.625) |
+
+**Fixed by the per-gap cap (14b).** `KnuthPlassDevice.ShrinkHonorsEveryGapsOwnFloor`
+(`KnuthPlassSweep.cpp:1926`) covers all three: the review's CJK run and CJK–Latin
+mix, NBSP every third word, and three styles × two faces × 12 measures.
+
+**Proven failing first:** with the old uniform regular-space cap restored, the
+CJK checks report overlapping glyphs and the NBSP check overflows by 2–4 px.
+
+**F4:** the header cited a section 14 that did not exist yet. This is it.
+
+**Found while writing that test, and fixed:**
+
+* **Symptom:** every all-italic or all-bold paragraph in an SD font went to
+  greedy.
+* **Cause:** the breaker's stretch unit is `getSpaceAdvance('n','n', REGULAR)`.
+  An SD font loads metrics only for the styles a paragraph uses, so for a
+  paragraph with no regular word that reads **0**. The breaker refused it as
+  `Invalid`, and the fallback took over silently.
+* **How long:** the stretch-only commit `6d8f38a33` had the same bug.
+* **Fix:** use the paragraph's first token's style when the regular space is
+  unknown (`ParsedText.cpp:1307`). The test now asserts `Ok` for every styled
+  case.
+
+**What the review checked and found clean:**
+
+* **No leak of shrink** to greedy, Whole Words, ragged or demoted blocks, the
+  caption probe copies, or a reused ParsedText.
+* **The state indexing** with the tight class restored, and the window's
+  carried state.
+* **The DP arithmetic:** the feasibility and tight-class tests, the
+  `shrinkPerGap = 0` fallback when S < 3, and int64 headroom.
+* **The uint16 cell bound** with 12 states.
+* **The 48,776 B arithmetic** as it stood before the per-gap byte.
+* **Layout cases with no overflow beyond hanging punctuation:** plain text,
+  narrow measures, soft flush every 25 words, negative text-indent, pure RTL
+  Hebrew, and the mixed bidi-reordered path.
+* **`LineBreakQualityTest`** still pinned to greedy, 14/14.
+
+**Not checked by it:** focus reading's shrink delta, and anything on a device.
+
+### 14f. Tests, final
+
+**`LineBreakKnuthPlassTest`:**
+
+* 9/9 without the corpus, plus the corpus test skipped.
+* 10/10 with it.
+* The tests added this round are `ShrinkHonorsEveryGapsOwnFloor` and
+  `DISABLED_SpaceWidths`, an instrument.
+* Shrink is now in `ModelReproducesTheShippedBreakersExactly` (the model
+  applies the same capped negative extra), `ParsedTextMatchesThePrototype…`,
+  the window test, and the corpus test.
+
+**The corpus test checks, on every line:**
+
+* The breaker's bound: overshoot ≤ gaps × cap.
+* Every painted gap ≥ its natural gap − cap, and ≥ ⅔ of a space where the
+  natural gap was a full one.
+* No painted right edge past the measure beyond its trailing hang.
+* Final lines never shrunk.
+
+**Other suites:**
+
+* `LineBreakQualityTest`: 14/14.
+* The ParsedText-linking ctest subset: 107/107.
+
+### 14g. Not done
+
+* **No device timing, and no device heap measurement** of the ~49 KB worst
+  case.
+* **No owner-eye check.** The proofs in 14d are the first time shrink will have
+  been seen.
+* **The pre-existing NBSP stretch under-fill (F2's root) is NOT fixed for
+  stretch.** Such a line still ends up to one extra short of the measure, as it
+  always has. Shrink is simply refused on those lines.

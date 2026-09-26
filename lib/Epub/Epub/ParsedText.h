@@ -48,6 +48,10 @@ class ParsedText {
   bool focusReadingEnabled;
   bool isNaturalAlign;
   bool hasRtlWord;
+  // Knuth-Plass set this call's lines with shrink, so extractLine may narrow a
+  // line's gaps by up to its smallest gap cap (floor(space / 3) of each gap's
+  // style; 0 for a CJK break or a no-break space). Reset on every layout call.
+  bool shrinkJustify_ = false;
   std::vector<std::string> reorderedWordsScratch;
   std::vector<EpdFontFamily::Style> reorderedStylesScratch;
   std::vector<uint16_t> reorderedWidthsScratch;

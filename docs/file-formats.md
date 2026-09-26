@@ -151,6 +151,7 @@ before relying on any of them for a field layout:
 | 56 | `d6e855e50` | the chapter break falls before a heading that holds its own anchor ([B-047]) |
 | 57 | `5b1259ba6` | a TOC that revisits a file keeps its chapter breaks ([B-049]) |
 | 59 | (this commit) | justified hyphenating blocks are broken by Knuth-Plass total fit instead of greedy; no field changed, the breaks did (`docs/knuth-plass-line-breaking-2026-09-25.md` §13) |
+| 60 | (this commit) | "Just ship shrink": the Knuth-Plass breaker may narrow a justified line's gaps to 2/3 of a space, and extractLine paints the negative spare; breaks and painted x both move (§14) |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

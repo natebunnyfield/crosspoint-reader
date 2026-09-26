@@ -299,6 +299,9 @@ struct Line {
   int gapCount = 0;
   int end = 0;
   int natural = 0;  // natural width incl. gaps, before stretch
+  int avail = 0;    // the measure less the indent
+  int trailHang = 0;
+  std::vector<int> naturalGaps, paintedGaps;  // every gap, natural and as painted
   bool hyphenated = false;
   bool isFinal = false;
 };
@@ -347,14 +350,21 @@ std::vector<Line> layOut(const Prepared& P, const std::vector<kp::Pos>& cuts, co
     int extra = (stretch && !gaps.empty() && spare > 0) ? spare / static_cast<int>(gaps.size()) : 0;
     if (allowShrink && stretch && !gaps.empty() && spare < 0) {
       const int n = static_cast<int>(gaps.size());
-      extra = -((-spare + n - 1) / n);  // round AWAY from zero so the line fits
+      // round AWAY from zero so the line fits, capped at ceil(space / 3) per
+      // gap -- ParsedText.cpp's computeJustifyExtra, since 2026-09-26.
+      const int cap = kpbreak::shrinkPerGapPx(r.getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR));
+      extra = -std::min((-spare + n - 1) / n, cap);
     }
+    L.avail = effW;
+    L.trailHang = trailHang;
     int x = indent - leadHang;
     double gapSum = 0.0;
     for (size_t i = 0; i < L.texts.size(); ++i) {
       L.xpos.push_back(static_cast<int16_t>(x));
       if (i + 1 < L.texts.size()) {
         const int g = gaps[i] + extra;
+        L.naturalGaps.push_back(gaps[i]);
+        L.paintedGaps.push_back(g);
         if (g >= 1) {
           L.gapStart.push_back(static_cast<float>(x + L.widths[i]));
           L.gapEnd.push_back(static_cast<float>(x + L.widths[i] + g));
@@ -491,6 +501,18 @@ kp::Params candidateParams(const int fontId, const bool justified, const bool sh
   prm.hyphenPenalty = 10000.0;
   prm.doubleHyphenDemerits = 1000000.0;
   prm.maxConsecutiveHyphens = 2;
+  return prm;
+}
+
+// What SHIPPED with "Just ship shrink" (2026-09-26): the candidate plus shrink
+// of floor(space / 3) px per gap -- TeX's third, made pixel-exact so no gap is
+// painted under 2/3 of a space (KnuthPlassBreaker.h). Identical to
+// candidateParams(.., true) wherever the space is a multiple of 3 px, which it
+// is for both faces at 14 pt.
+kp::Params shippedParams(const int fontId) {
+  kp::Params prm = candidateParams(fontId, true, true);
+  prm.shrinkPerGapPx =
+      kpbreak::shrinkPerGapPx(Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR));
   return prm;
 }
 
@@ -674,7 +696,7 @@ TEST(KnuthPlass, ModelReproducesTheShippedBreakersExactly) {
         std::vector<kp::Pos> cuts;
         ASSERT_TRUE(cutsFromBlocks(words, real.blocks, cuts));
         const Prepared P = prepare(words, fontId, true);
-        const auto model = layOut(P, cuts, justified);
+        const auto model = layOut(P, cuts, justified, /*allowShrink=*/knuthPlass);
         EXPECT_EQ(mismatchedLines(model, real.blocks), 0) << text.substr(0, 40);
         lines += static_cast<int>(model.size());
         for (const auto& L : model) hyphenated += L.hyphenated;
@@ -1220,6 +1242,7 @@ namespace {
 // and the same measured widths, so the two DPs see identical input.
 struct ProtoModel {
   const kp::Paragraph& p;
+  int fontId = 0;
   std::vector<char> breakBefore;           // (k,0) is a position
   std::vector<std::vector<int>> hyphenAt;  // indices into p.positions, per word
   explicit ProtoModel(const kp::Paragraph& para)
@@ -1236,6 +1259,11 @@ struct ProtoModel {
   int fullWidth(const int k) const { return p.full[k]; }
   int gapBefore(const int k) const { return p.gapAfter[k - 1]; }
   bool gapStretches(int) const { return true; }
+  // Every prototype gap is a regular word space.
+  int gapShrinkCap(int) const {
+    return kpbreak::shrinkPerGapPx(
+        Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR));
+  }
   bool mayBreakBefore(const int k) const { return breakBefore[k] != 0; }
   template <typename F>
   void forEachHyphenPoint(const int k, bool, F&& f) const {
@@ -1247,8 +1275,10 @@ struct ProtoModel {
   int pieceWidth(const int k, const int from, const int to, const bool hy) const { return p.piece(k, from, to, hy); }
 };
 
-kpbreak::Config deviceConfig(const Prepared& P, const int windowPositions = kpbreak::WINDOW_POSITIONS) {
+kpbreak::Config deviceConfig(const Prepared& P, const int windowPositions = kpbreak::WINDOW_POSITIONS,
+                             const bool shrink = true) {
   kpbreak::Config c;
+  c.shrink = shrink;
   c.measure = kMeasure;
   c.firstLineIndent = P.para.firstLineIndentPx;
   c.spaceAdvance = Env::instance().renderer().getSpaceAdvance(P.fontId, 'n', 'n', EpdFontFamily::REGULAR);
@@ -1262,10 +1292,11 @@ kpbreak::Config deviceConfig(const Prepared& P, const int windowPositions = kpbr
 constexpr int kUnwindowed = 5000;
 
 std::vector<kp::Pos> deviceCuts(const Prepared& P, const int windowPositions, kpbreak::Result* res = nullptr,
-                                kpbreak::Stats* st = nullptr) {
-  const ProtoModel m(P.para);
+                                kpbreak::Stats* st = nullptr, const bool shrink = true) {
+  ProtoModel m(P.para);
+  m.fontId = P.fontId;
   std::vector<kpbreak::Cut> cuts;
-  const kpbreak::Result r = kpbreak::breakParagraph(m, deviceConfig(P, windowPositions), cuts, st);
+  const kpbreak::Result r = kpbreak::breakParagraph(m, deviceConfig(P, windowPositions, shrink), cuts, st);
   if (res) *res = r;
   std::vector<kp::Pos> out = {{0, 0, false, false}};
   for (const auto& c : cuts) out.push_back({c.word, c.offset, c.hyphen, c.offset > 0});
@@ -1278,18 +1309,54 @@ std::string cutsText(const std::vector<kp::Pos>& c) {
   return s;
 }
 
+// What shrink promises, checked on the painted lines rather than trusted:
+//   * the BREAKER's bound: a line's natural width exceeds its measure by at
+//     most a third of a space per gap (r >= -1), exactly: 3 x over <= gaps x space;
+//   * no painted gap narrower than its natural gap less ceil(space / 3) -- the
+//     2/3-of-a-space floor, to the pixel;
+//   * no painted line past the measure, beyond its own trailing hang (the
+//     punctuation that deliberately hangs into the margin);
+//   * a final line is never shrunk, so its natural width fits outright.
+// Without shrink the first bound is natural <= measure, as before.
+struct GapStats {
+  double minPaintedOverSpace = 1e9;
+  int shrunkLines = 0;
+};
+void expectLinesHonest(const Prepared& P, const std::vector<Line>& lines, const bool justified, const bool shrink,
+                       const std::string& label, GapStats* gs = nullptr) {
+  const int space = Env::instance().renderer().getSpaceAdvance(P.fontId, 'n', 'n', EpdFontFamily::REGULAR);
+  const int cap = kpbreak::shrinkPerGapPx(space);
+  for (size_t l = 0; l < lines.size(); ++l) {
+    const Line& L = lines[l];
+    const int over = L.natural - L.avail;
+    const int gaps = static_cast<int>(L.naturalGaps.size());
+    if (L.isFinal || !justified || !shrink) {
+      EXPECT_LE(over, 0) << label << ": line " << l << " overflows";
+      continue;
+    }
+    EXPECT_LE(over, gaps * cap) << label << ": line " << l << " shrinks past 2/3 of a space";
+    if (over > 0 && gs) gs->shrunkLines++;
+    for (int g = 0; g < gaps; ++g) {
+      EXPECT_GE(L.paintedGaps[g], L.naturalGaps[g] - cap) << label << ": line " << l << " gap " << g;
+      // The ruling's own words, in whole pixels: no gap that was a full space
+      // is painted narrower than 2/3 of one.
+      if (L.naturalGaps[g] >= space) EXPECT_GE(3 * L.paintedGaps[g], 2 * space) << label << ": line " << l;
+      if (gs) gs->minPaintedOverSpace = std::min(gs->minPaintedOverSpace, static_cast<double>(L.paintedGaps[g]) / space);
+    }
+    EXPECT_LE(L.end, kMeasure + L.trailHang) << label << ": line " << l << " is painted past the measure";
+  }
+}
+
 // Every word set once (the TextBlocks rebuild the source) and no non-final
 // line wider than the measure, read off what ParsedText actually baked.
 void expectSane(const std::vector<std::string>& words, const RealRun& real, const Prepared& P, const bool justified,
-                const std::string& label) {
+                const std::string& label, GapStats* gs = nullptr) {
   std::vector<kp::Pos> cuts;
   ASSERT_TRUE(cutsFromBlocks(words, real.blocks, cuts)) << label << ": the lines do not rebuild the source text";
-  const auto lines = layOut(P, cuts, justified);
+  const bool shrink = justified && kpbreak::tuning().shrink;
+  const auto lines = layOut(P, cuts, justified, shrink);
   ASSERT_EQ(mismatchedLines(lines, real.blocks), 0) << label;
-  for (size_t l = 0; l < lines.size(); ++l) {
-    EXPECT_LE(lines[l].natural, kMeasure - (l == 0 ? P.para.firstLineIndentPx : 0))
-        << label << ": line " << l << " overflows";
-  }
+  expectLinesHonest(P, lines, justified, shrink, label, gs);
 }
 
 std::string repeatedParagraph(const int copies) {
@@ -1302,25 +1369,41 @@ std::string repeatedParagraph(const int copies) {
 
 }  // namespace
 
+TEST(KnuthPlassDevice, DISABLED_SpaceWidths) {
+  for (const auto& f : std::vector<std::pair<std::string, int>>{
+           {"LibreFranklin", 12}, {"LibreFranklin", 14}, {"LibreFranklin", 18}, {"Albo", 12}, {"Albo", 14}, {"Albo", 18}}) {
+    const int id = Env::instance().fontFor(f.first, f.second);
+    if (id) printf("[space] %s %d: %d px\n", f.first.c_str(), f.second,
+                   Env::instance().renderer().getSpaceAdvance(id, 'n', 'n', EpdFontFamily::REGULAR));
+  }
+}
+
 TEST(KnuthPlassDevice, PureBreakerMatchesThePrototypeCutForCut) {
-  int paragraphs = 0, hyphenated = 0;
+  int paragraphs = 0, hyphenated = 0, shrinkChangedSomething = 0;
   for (const int pt : {12, 14, 18}) {
     const int fontId = Env::instance().fontFor("LibreFranklin", pt);
     ASSERT_NE(fontId, 0);
     for (const auto& text : builtinParagraphs()) {
       const Prepared P = prepare(wordsOf(text), fontId, true);
-      const auto proto = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+      const auto proto = kpCuts(P, shippedParams(fontId), nullptr, nullptr);
       kpbreak::Result r;
       const auto dev = deviceCuts(P, kUnwindowed, &r);
       ASSERT_EQ(r, kpbreak::Result::Ok);
       EXPECT_TRUE(sameCuts(proto, dev)) << "LF " << pt << "\n proto " << cutsText(proto) << "\n dev   "
                                         << cutsText(dev);
+      // And the stretch-only arm the blind test showed, still reachable.
+      const auto protoStretch = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+      const auto devStretch = deviceCuts(P, kUnwindowed, &r, nullptr, /*shrink=*/false);
+      ASSERT_EQ(r, kpbreak::Result::Ok);
+      EXPECT_TRUE(sameCuts(protoStretch, devStretch)) << "stretch-only, LF " << pt;
+      shrinkChangedSomething += !sameCuts(dev, devStretch);
       for (const auto& c : dev) hyphenated += c.offset > 0;
       paragraphs++;
     }
   }
   EXPECT_EQ(paragraphs, 12);
   EXPECT_GT(hyphenated, 0) << "no hyphenated line in the fixture: the flagged-penalty half is untested";
+  EXPECT_GT(shrinkChangedSomething, 0) << "shrink moved no break in the fixture: the shrink half is untested";
 }
 
 TEST(KnuthPlassDevice, ParsedTextMatchesThePrototypeOnJustifiedBlocks) {
@@ -1331,7 +1414,7 @@ TEST(KnuthPlassDevice, ParsedTextMatchesThePrototypeOnJustifiedBlocks) {
     for (const auto& text : builtinParagraphs()) {
       const auto words = wordsOf(text);
       const Prepared P = prepare(words, fontId, true);
-      const auto proto = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+      const auto proto = kpCuts(P, shippedParams(fontId), nullptr, nullptr);
       const int before = kpbreak::tuning().attempts;
       const RealRun real = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, /*knuthPlass=*/true);
       ASSERT_EQ(kpbreak::tuning().attempts, before + 1) << "the justified block never reached Knuth-Plass";
@@ -1421,7 +1504,8 @@ TEST(KnuthPlassDevice, AllocationFailureFallsBackToGreedyExactly) {
 
   // And the pure breaker says so without touching its output vector's caller.
   const Prepared P = prepare(wordsOf(builtinParagraphs()[0]), fontId, true);
-  const ProtoModel m(P.para);
+  ProtoModel m(P.para);
+  m.fontId = P.fontId;
   kpbreak::Config c = deviceConfig(P);
   c.allocLimitBytes = 100;
   std::vector<kpbreak::Cut> cuts = {{1, 2, true}};
@@ -1457,12 +1541,12 @@ TEST(KnuthPlassDevice, TheWindowBoundsMemoryAndStillSetsEveryWord) {
 
   // The windowed result against the prototype's global optimum: report, and
   // bound the damage at the seams -- no line looser than the prototype's worst.
-  const auto proto = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+  const auto proto = kpCuts(P, shippedParams(fontId), nullptr, nullptr);
   std::vector<kp::Pos> got;
   ASSERT_TRUE(cutsFromBlocks(words, real.blocks, got));
   const double s = Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
-  const double protoWorst = worstOf(layOut(P, proto, true), s);
-  const double gotWorst = worstOf(layOut(P, got, true), s);
+  const double protoWorst = worstOf(layOut(P, proto, true, true), s);
+  const double gotWorst = worstOf(layOut(P, got, true, true), s);
   printf("[window] same cuts as the unwindowed prototype: %s; worst line %.2f vs %.2f spaces\n",
          sameCuts(proto, got) ? "yes" : "no", gotWorst, protoWorst);
 
@@ -1475,10 +1559,10 @@ TEST(KnuthPlassDevice, TheWindowBoundsMemoryAndStillSetsEveryWord) {
       const auto dev = deviceCuts(Q, w, &r, &qs);
       ASSERT_EQ(r, kpbreak::Result::Ok) << "window " << w;
       EXPECT_GT(qs.windows, 1) << "window " << w;
-      const auto lines = layOut(Q, dev, true);
+      const auto lines = layOut(Q, dev, true, true);
+      expectLinesHonest(Q, lines, true, true, "window " + std::to_string(w));
       std::string rebuilt;
       for (size_t l = 0; l < lines.size(); ++l) {
-        EXPECT_LE(lines[l].natural, kMeasure - (l == 0 ? Q.para.firstLineIndentPx : 0)) << "window " << w;
         const kp::Pos& b = dev[l + 1];
         for (size_t t = 0; t < lines[l].texts.size(); ++t) {
           const bool split = t + 1 == lines[l].texts.size() && b.offset > 0;
@@ -1493,6 +1577,57 @@ TEST(KnuthPlassDevice, TheWindowBoundsMemoryAndStillSetsEveryWord) {
       EXPECT_EQ(rebuilt, expect) << "window " << w;
     }
   }
+}
+
+// The prototype's own (double) total demerits for a cut list -- the objective
+// both DPs minimize, evaluated on the path rather than searched. Two different
+// cut lists with EQUAL totals are an exact tie: both are the optimum, and which
+// one a DP returns is down to loop order (integer) or summation rounding
+// (double). The corpus test counts those apart rather than as differences.
+double pathDemerits(const Prepared& P, const kp::Params& prm, const std::vector<kp::Pos>& cuts) {
+  std::vector<long long> fs(P.para.words + 1, 0), gs(P.para.words + 1, 0);
+  for (int k = 0; k < P.para.words; ++k) {
+    fs[k + 1] = fs[k] + P.para.full[k];
+    gs[k + 1] = gs[k] + (k + 1 < P.para.words ? P.para.gapAfter[k] : 0);
+  }
+  auto indexOf = [&](const kp::Pos& c) {
+    for (size_t i = 0; i < P.para.positions.size(); ++i)
+      if (P.para.positions[i].word == c.word && P.para.positions[i].offset == c.offset) return static_cast<int>(i);
+    return -1;
+  };
+  double total = 0;
+  int prevFit = 1;
+  for (size_t l = 1; l < cuts.size(); ++l) {
+    const int i = indexOf(cuts[l - 1]), j = indexOf(cuts[l]);
+    if (i < 0 || j < 0) return -1;
+    const kp::LineGeom g = kp::lineGeom(P.para, fs, gs, i, j);
+    const bool isEnd = l + 1 == cuts.size();
+    const int avail = P.para.measurePx - (i == 0 ? P.para.firstLineIndentPx : 0);
+    const double slack = avail - g.width;
+    double r = 0, b = 0;
+    if (!isEnd && g.gaps > 0) {
+      r = slack >= 0 ? slack / (g.gaps * prm.stretchPerGapPx) : slack / (g.gaps * prm.shrinkPerGapPx);
+      b = 100 * std::abs(r * r * r);
+    } else if (!isEnd && slack > 0) {
+      r = 10;
+      b = 1e6;
+    }
+    const int fit = isEnd ? 1 : kp::fitnessOf(r);
+    const bool endH = P.para.positions[j].flagged && !isEnd;
+    const bool startF = P.para.positions[i].flagged && i != 0;
+    double d = (prm.linePenalty + b) * (prm.linePenalty + b) + (endH ? prm.hyphenPenalty * prm.hyphenPenalty : 0);
+    if (endH && startF) d += prm.doubleHyphenDemerits;
+    if (isEnd && startF) d += prm.finalHyphenDemerits;
+    if (std::abs(prevFit - fit) > 1) d += prm.adjDemerits;
+    prevFit = fit;
+    total += d;
+  }
+  return total;
+}
+
+bool exactTie(const Prepared& P, const kp::Params& prm, const std::vector<kp::Pos>& a, const std::vector<kp::Pos>& b) {
+  const double x = pathDemerits(P, prm, a), y = pathDemerits(P, prm, b);
+  return x >= 0 && y >= 0 && std::abs(x - y) <= 1e-9 * std::max(1.0, std::abs(x));
 }
 
 // THE CORPUS: the owner's own books (tools/linebreak_corpus.py, doc section 2).
@@ -1523,24 +1658,46 @@ TEST(KnuthPlassDevice, CorpusMatchesThePrototype) {
     int pureDiff = 0, parsedDiff = 0, windowed = 0, windowedDiff = 0, lines = 0, hyph = 0, maxPos = 0;
     double greedyUs = 0, kpUs = 0, protoDpUs = 0, devDpUs = 0, maxKpUs = 0, seamWorst = 0, protoWorst = 0;
     int seamWorse = 0, seamHyph = 0, protoHyph = 0;
+    int ties = 0, parsedTies = 0;
+    int stretchDiff = 0, stretchLines = 0, stretchHyph = 0, shrinkMoved = 0;
+    double shrinkWorstSum = 0, stretchWorstSum = 0, shrinkMin = 1e9;
+    GapStats gs;
     size_t peak = 0;
     for (size_t pi = 0; pi < corpus.size(); ++pi) {
       const auto words = wordsOf(corpus[pi]);
       const Prepared P = prepare(words, fontId, true);
       maxPos = std::max(maxPos, static_cast<int>(P.para.positions.size()));
       double protoUs = 0;
-      const auto proto = kpCuts(P, candidateParams(fontId, true, false), nullptr, &protoUs);
+      const auto proto = kpCuts(P, shippedParams(fontId), nullptr, &protoUs);
       protoDpUs += protoUs;
       const auto t0 = std::chrono::steady_clock::now();
       kpbreak::Result r;
       const auto pure = deviceCuts(P, kUnwindowed, &r);
       devDpUs += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count();
       ASSERT_EQ(r, kpbreak::Result::Ok) << pi;
-      if (!sameCuts(proto, pure)) {
+      if (!sameCuts(proto, pure) && exactTie(P, shippedParams(fontId), proto, pure)) {
+        ties++;
+      } else if (!sameCuts(proto, pure)) {
         if (pureDiff < 5)
           ADD_FAILURE() << fam << " " << pt << " paragraph " << pi << " pure\n proto " << cutsText(proto)
                         << "\n dev   " << cutsText(pure);
         pureDiff++;
+      }
+      // The stretch-only arm (the blind test's): parity still holds, and it is
+      // the "before" every shrink figure is read against.
+      const auto protoStretch = kpCuts(P, candidateParams(fontId, true, false), nullptr, nullptr);
+      const auto pureStretch = deviceCuts(P, kUnwindowed, &r, nullptr, /*shrink=*/false);
+      stretchDiff += !sameCuts(protoStretch, pureStretch);
+      shrinkMoved += !sameCuts(pure, pureStretch);
+      {
+        const double sp = Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
+        const auto a = layOut(P, pure, true, true), b = layOut(P, pureStretch, true, false);
+        shrinkWorstSum += worstOf(a, sp);
+        stretchWorstSum += worstOf(b, sp);
+        stretchLines += static_cast<int>(b.size());
+        stretchHyph += hyphensOf(b);
+        for (const auto& L : a)
+          if (!L.isFinal && L.gapCount) shrinkMin = std::min(shrinkMin, L.meanGap / sp);
       }
       const RealRun g = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, false);
       greedyUs += g.micros;
@@ -1549,14 +1706,16 @@ TEST(KnuthPlassDevice, CorpusMatchesThePrototype) {
       maxKpUs = std::max(maxKpUs, k.micros);
       ASSERT_EQ(kpbreak::tuning().lastResult, kpbreak::Result::Ok) << pi;
       peak = std::max(peak, kpbreak::tuning().lastStats.peakBytes);
-      expectSane(words, k, P, true, fam + " paragraph " + std::to_string(pi));
+      expectSane(words, k, P, true, fam + " paragraph " + std::to_string(pi), &gs);
       std::vector<kp::Pos> got;
       ASSERT_TRUE(cutsFromBlocks(words, k.blocks, got));
       lines += static_cast<int>(got.size()) - 1;
       for (const auto& q : got) hyph += q.offset > 0;
       const bool oneWindow = static_cast<int>(P.para.positions.size()) <= kpbreak::WINDOW_POSITIONS + 1;
       if (!oneWindow) windowed++;
-      if (!sameCuts(proto, got)) {
+      if (!sameCuts(proto, got) && oneWindow && exactTie(P, shippedParams(fontId), proto, got)) {
+        parsedTies++;
+      } else if (!sameCuts(proto, got)) {
         if (oneWindow) {
           if (parsedDiff < 5)
             ADD_FAILURE() << fam << " " << pt << " paragraph " << pi << " ParsedText\n proto " << cutsText(proto)
@@ -1569,27 +1728,35 @@ TEST(KnuthPlassDevice, CorpusMatchesThePrototype) {
       if (!oneWindow) {
         // What the seams cost: this paragraph's loosest line, windowed vs not.
         const double sp = Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
-        const double a = worstOf(layOut(P, got, true), sp), b = worstOf(layOut(P, proto, true), sp);
+        const double a = worstOf(layOut(P, got, true, true), sp), b = worstOf(layOut(P, proto, true, true), sp);
         seamWorst += a;
         protoWorst += b;
         seamWorse += a > b + 1e-9;
-        seamHyph += hyphensOf(layOut(P, got, true));
-        protoHyph += hyphensOf(layOut(P, proto, true));
+        seamHyph += hyphensOf(layOut(P, got, true, true));
+        protoHyph += hyphensOf(layOut(P, proto, true, true));
       }
     }
     const double n = static_cast<double>(corpus.size());
     printf("[corpus] %s %d: %zu paragraphs, %d lines, %d hyphenated; pure differs %d, ParsedText differs %d "
-           "(one window); %d paragraphs past the window, %d of them differ; max positions %d; peak %zu B\n",
-           fam.c_str(), pt, corpus.size(), lines, hyph, pureDiff, parsedDiff, windowed, windowedDiff, maxPos, peak);
+           "(one window); exact ties %d / %d; %d paragraphs past the window, %d of them differ; max positions %d; "
+           "peak %zu B\n",
+           fam.c_str(), pt, corpus.size(), lines, hyph, pureDiff, parsedDiff, ties, parsedTies, windowed, windowedDiff,
+           maxPos, peak);
     if (windowed > 0)
       printf("[corpus] %s %d windowed paragraphs: mean worst line %.3f vs unwindowed %.3f spaces, %d of %d worse; "
              "hyphenated lines %d vs %d\n",
              fam.c_str(), pt, seamWorst / windowed, protoWorst / windowed, seamWorse, windowed, seamHyph, protoHyph);
+    printf("[corpus] %s %d shrink vs stretch-only: lines %d vs %d, hyphenated %d vs %d, mean paragraph-worst line "
+           "%.3f vs %.3f spaces, tightest line mean gap %.3f; %d of %zu paragraphs broke differently; lines set tight "
+           "(natural > measure) %d; narrowest painted gap %.3f space; stretch-only parity differs %d\n",
+           fam.c_str(), pt, lines, stretchLines, hyph, stretchHyph, shrinkWorstSum / n, stretchWorstSum / n, shrinkMin,
+           shrinkMoved, corpus.size(), gs.shrunkLines, gs.minPaintedOverSpace, stretchDiff);
     printf("[corpus] %s %d host timing per paragraph: ParsedText greedy %.1f us, ParsedText Knuth-Plass %.1f us "
            "(max %.0f us); DP alone: prototype (double) %.1f us, device (int64) %.1f us\n",
            fam.c_str(), pt, greedyUs / n, kpUs / n, maxKpUs, protoDpUs / n, devDpUs / n);
     EXPECT_EQ(pureDiff, 0);
     EXPECT_EQ(parsedDiff, 0);
+    EXPECT_EQ(stretchDiff, 0);
   }
 }
 
@@ -1613,3 +1780,213 @@ TEST(KnuthPlassDevice, AWordLongerThanThreeLinesStillGetsKnuthPlass) {
   EXPECT_EQ(kpbreak::tuning().lastResult, kpbreak::Result::Ok);
   expectSane(words, real, P, true, "giant word");
 }
+
+// "Just ship shrink" proofs (2026-09-26): the SAME paragraph through the real
+// ParsedText, stretch-only (before) and with shrink (after), each drawn by
+// TextBlock::render from the TextBlocks the paginator bakes -- the firmware's
+// own x positions, not a model's. Albo 14 justified at the X3's 512 px.
+// CROSSPOINT_KP_OUT=<dir>; picks the 3 paragraphs whose worst line shrink
+// improves most plus 3 drawn at random (seed 20260926) from those it changes,
+// 3-12 lines each; writes <dir>/shrink_<idx>_{before,after}.pgm padded to one
+// height, and <dir>/shrink_manifest.txt.
+TEST(KnuthPlass, DISABLED_ShrinkProof) {
+  const auto corpus = loadCorpus();
+  if (corpus.empty()) GTEST_SKIP() << "set CROSSPOINT_LINEBREAK_CORPUS";
+  const char* outDir = std::getenv("CROSSPOINT_KP_OUT");
+  if (!outDir) outDir = ".";
+  const int fontId = Env::instance().fontFor("Albo", 14);
+  ASSERT_NE(fontId, 0);
+  const double sp = Env::instance().renderer().getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
+  auto run = [&](const std::vector<std::string>& words, const bool shrink) {
+    kpbreak::tuning().shrink = shrink;
+    RealRun rr = runReal(words, fontId, linebreak::STORED_HYPHENATED, true, true);
+    kpbreak::tuning().shrink = true;
+    std::vector<Line> lines;
+    for (size_t l = 0; l < rr.blocks.size(); ++l) {
+      Line L;
+      for (uint16_t w = 0; w < rr.blocks[l]->wordCount(); ++w) {
+        L.texts.push_back(rr.blocks[l]->wordText(w));
+        L.xpos.push_back(rr.blocks[l]->wordXpos(w));
+      }
+      L.isFinal = l + 1 == rr.blocks.size();
+      lines.push_back(std::move(L));
+    }
+    return std::make_pair(rr, lines);
+  };
+  struct Cand {
+    size_t idx;
+    double gain;
+  };
+  std::vector<Cand> cands;
+  for (size_t pi = 0; pi < corpus.size(); ++pi) {
+    const auto words = wordsOf(corpus[pi]);
+    const Prepared P = prepare(words, fontId, true);
+    const auto a = deviceCuts(P, kUnwindowed, nullptr, nullptr, false);
+    const auto b = deviceCuts(P, kUnwindowed, nullptr, nullptr, true);
+    if (sameCuts(a, b) || a.size() < 4 || a.size() > 13 || b.size() > 13) continue;
+    cands.push_back({pi, worstOf(layOut(P, a, true, false), sp) - worstOf(layOut(P, b, true, true), sp)});
+  }
+  ASSERT_GE(cands.size(), 6u);
+  std::vector<Cand> byGain = cands;
+  std::sort(byGain.begin(), byGain.end(), [](const Cand& x, const Cand& y) { return x.gain > y.gain; });
+  std::vector<size_t> pick = {byGain[0].idx, byGain[1].idx, byGain[2].idx};
+  uint32_t seed = 20260926u;
+  while (pick.size() < 6) {
+    seed = seed * 1664525u + 1013904223u;
+    const size_t k = cands[(seed >> 8) % cands.size()].idx;
+    if (std::find(pick.begin(), pick.end(), k) == pick.end()) pick.push_back(k);
+  }
+  char path[512];
+  std::snprintf(path, sizeof(path), "%s/shrink_manifest.txt", outDir);
+  FILE* man = std::fopen(path, "w");
+  ASSERT_NE(man, nullptr);
+  std::fprintf(man, "idx,kind,lines_before,lines_after,worst_before,worst_after,hyph_before,hyph_after\n");
+  for (size_t n = 0; n < pick.size(); ++n) {
+    const auto words = wordsOf(corpus[pick[n]]);
+    const auto before = run(words, false).second;
+    const auto after = run(words, true).second;
+    const Prepared P = prepare(words, fontId, true);
+    std::vector<kp::Pos> ca, cb;
+    ASSERT_TRUE(cutsFromBlocks(words, run(words, false).first.blocks, ca));
+    ASSERT_TRUE(cutsFromBlocks(words, run(words, true).first.blocks, cb));
+    const auto la = layOut(P, ca, true, false), lb = layOut(P, cb, true, true);
+    const int h = static_cast<int>(std::max(before.size(), after.size()));
+    std::snprintf(path, sizeof(path), "%s/shrink_%zu_before.pgm", outDir, pick[n]);
+    writeParagraphPgm(before, fontId, words, true, h, path);
+    std::snprintf(path, sizeof(path), "%s/shrink_%zu_after.pgm", outDir, pick[n]);
+    writeParagraphPgm(after, fontId, words, true, h, path);
+    std::fprintf(man, "%zu,%s,%zu,%zu,%.2f,%.2f,%d,%d\n", pick[n], n < 3 ? "largest-gain" : "random", before.size(),
+                 after.size(), worstOf(la, sp), worstOf(lb, sp), hyphensOf(la), hyphensOf(lb));
+  }
+  std::fclose(man);
+}
+
+// Adversarial review of shrink, 2026-09-26: three inputs the corpus never
+// holds (it is regular-style Latin with ordinary spaces), each of which broke a
+// promise before the per-gap caps. Read off the TextBlocks ParsedText bakes.
+//   * italic and bold: at Albo 14 their space is 8 px against a regular 9, so a
+//     cap taken from the regular space painted a gap at 5/8 of its own space;
+//   * CJK: a break with no natural width was given shrink and painted NEGATIVE,
+//     so glyphs overlapped;
+//   * a no-break space followed by a real one: counted as a gap, painted
+//     without the extra, so a shrunk line overflowed the measure.
+namespace {
+struct Tok {
+  std::string text;
+  EpdFontFamily::Style style;
+  bool attach;
+};
+std::vector<std::shared_ptr<TextBlock>> layOutToks(const std::vector<Tok>& toks, const int fontId, const int measure) {
+  BlockStyle style;
+  style.alignment = CssTextAlign::Justify;
+  ParsedText block(false, linebreak::STORED_HYPHENATED, false, style);
+  for (const auto& t : toks) block.addWord(t.text, t.style, false, t.attach);
+  std::vector<std::shared_ptr<TextBlock>> out;
+  block.layoutAndExtractLines(
+      Env::instance().renderer(), fontId, measure, [&](const std::shared_ptr<TextBlock>& l) { out.push_back(l); }, true,
+      0);
+  return out;
+}
+struct Painted {
+  int overflowPx = 0;    // worst: right edge past the measure beyond the trailing hang
+  int negativeGaps = 0;  // painted gaps below zero
+  int underTwoThirds = 0;  // word-space gaps painted under 2/3 of their own style's space
+  int shrunkGaps = 0;    // gaps painted narrower than natural: the test is not vacuous
+};
+Painted inspect(const std::vector<std::shared_ptr<TextBlock>>& lines, const int fontId, const int measure,
+                const bool wordSpaces) {
+  auto& r = Env::instance().renderer();
+  Painted p;
+  for (size_t l = 0; l + 1 < lines.size(); ++l) {
+    const auto& b = *lines[l];
+    const int n = b.wordCount();
+    for (int i = 0; i + 1 < n; ++i) {
+      const std::string a = b.wordText(i), c = b.wordText(i + 1);
+      const int end = b.wordXpos(i) + r.getTextAdvanceX(fontId, a.c_str(), b.wordStyle(i));
+      const int gap = b.wordXpos(i + 1) - end;
+      p.negativeGaps += gap < 0;
+      if (!wordSpaces || a == " " || c == " ") continue;
+      const int natural = r.getSpaceAdvance(fontId, lastCp(a), firstCp(c), b.wordStyle(i));
+      const int space = r.getSpaceAdvance(fontId, 'n', 'n', b.wordStyle(i));
+      p.shrunkGaps += gap < natural;
+      if (natural >= space && 3 * gap < 2 * space) p.underTwoThirds++;
+    }
+    const std::string last = b.wordText(n - 1);
+    const int end = b.wordXpos(n - 1) + r.getTextAdvanceX(fontId, last.c_str(), b.wordStyle(n - 1));
+    // The trailing hang extractLine grants, in the glyph's OWN style (hangOf
+    // measures REGULAR, which undercounts an italic or bold period).
+    const std::string g = lastGlyph(last);
+    const int hang = r.getTextAdvanceX(fontId, g.c_str(), b.wordStyle(n - 1)) * hangQuarters(firstCp(g), false) / 4;
+    p.overflowPx = std::max(p.overflowPx, end - (measure + hang));
+  }
+  return p;
+}
+}  // namespace
+
+TEST(KnuthPlassDevice, ShrinkHonorsEveryGapsOwnFloor) {
+  // (1) Styled text, where the space differs from the regular one.
+  for (const auto& face : std::vector<std::pair<std::string, int>>{{"Albo", 14}, {"LibreFranklin", 14}}) {
+    const int fontId = Env::instance().fontFor(face.first, face.second);
+    if (fontId == 0) continue;  // Albo needs CROSSPOINT_TEST_SD
+    for (const auto st : {EpdFontFamily::ITALIC, EpdFontFamily::BOLD, EpdFontFamily::BOLD_ITALIC}) {
+      int shrunk = 0;
+      for (int measure = 250; measure <= 512; measure += 23) {
+        for (const auto& text : builtinParagraphs()) {
+          std::vector<Tok> toks;
+          for (const auto& w : wordsOf(text)) toks.push_back({w, st, false});
+          const auto lines = layOutToks(toks, fontId, measure);
+          const Painted p = inspect(lines, fontId, measure, true);
+          EXPECT_EQ(p.underTwoThirds, 0) << face.first << " style " << int(st) << " at " << measure;
+          EXPECT_LE(p.overflowPx, 0) << face.first << " style " << int(st) << " at " << measure;
+          EXPECT_EQ(p.negativeGaps, 0);
+          // Not the greedy fallback: an all-italic SD-font paragraph used to be
+          // refused (a regular space of 0 read as Invalid).
+          EXPECT_EQ(kpbreak::tuning().lastResult, kpbreak::Result::Ok) << face.first << " style " << int(st);
+          shrunk += p.shrunkGaps;
+        }
+      }
+      printf("[styled] %s %d style %d: %d gaps painted narrower than natural\n", face.first.c_str(), face.second,
+             int(st), shrunk);
+      EXPECT_GT(shrunk, 0) << face.first << " style " << int(st) << ": nothing shrank, the check is vacuous";
+    }
+  }
+  const int lf = Env::instance().fontFor("LibreFranklin", 14);
+  ASSERT_NE(lf, 0);
+  // (2) CJK: no break with no natural width may be painted narrower than zero.
+  {
+    // One 600-character run (addWord splits it into no-space-before breaks),
+    // and CJK glued to Latin, the review's two probes.
+    std::string run;
+    for (int i = 0; i < 300; ++i) run += "\xE4\xB8\xAD\xE6\x96\x87";
+    std::vector<Tok> mix;
+    for (int i = 0; i < 150; ++i) {
+      mix.push_back({"\xE4\xB8\xAD" "abc", EpdFontFamily::REGULAR, false});
+      mix.push_back({"def\xE6\x96\x87", EpdFontFamily::REGULAR, true});
+    }
+    const std::vector<Tok> single = {{run, EpdFontFamily::REGULAR, false}};
+    for (const std::vector<Tok>* toks : {&single, static_cast<const std::vector<Tok>*>(&mix)}) {
+      for (const int measure : {512, 400}) {
+        const auto lines = layOutToks(*toks, lf, measure);
+        ASSERT_GT(lines.size(), 3u);
+        EXPECT_EQ(inspect(lines, lf, measure, false).negativeGaps, 0) << "CJK glyphs overlap at " << measure;
+      }
+    }
+  }
+  // (3) "Mr.&nbsp; Smith": a no-break space token, then an ordinary word.
+  {
+    std::vector<Tok> toks;
+    int n = 0;
+    for (const auto& text : builtinParagraphs()) {
+      for (const auto& w : wordsOf(text)) {
+        toks.push_back({w, EpdFontFamily::REGULAR, false});
+        if (++n % 3 == 0) toks.push_back({" ", EpdFontFamily::REGULAR, true});
+      }
+    }
+    for (const int measure : {512, 400, 300}) {
+      const auto lines = layOutToks(toks, lf, measure);
+      EXPECT_LE(inspect(lines, lf, measure, false).overflowPx, 0) << "an NBSP line overflows at " << measure;
+    }
+  }
+}
+
+

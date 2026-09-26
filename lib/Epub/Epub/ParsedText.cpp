@@ -246,8 +246,20 @@ std::vector<size_t> cjkCharacterBreakByteOffsets(const std::string& text) {
   return allowedOffsets;
 }
 
-int computeJustifyExtra(const int spareSpace, const size_t gapCount) {
-  if (gapCount < MIN_JUSTIFY_GAPS || spareSpace <= 0) return 0;
+// `maxShrinkPerGap` > 0 lets a NEGATIVE spare narrow the gaps (owner ruling
+// 2026-09-26, "Just ship shrink"): only for a line the Knuth-Plass breaker
+// set, which it did knowing each gap may lose at most a third of a space. The
+// per-gap narrowing rounds AWAY from zero so the line fits, and is capped at
+// maxShrinkPerGap, so a line nobody chose to shrink (a forced overfull one)
+// can never have its words driven into each other -- it overflows, as before.
+// Every other caller passes 0 and gets exactly the old stretch-only answer.
+int computeJustifyExtra(const int spareSpace, const size_t gapCount, const int maxShrinkPerGap = 0) {
+  if (gapCount < MIN_JUSTIFY_GAPS) return 0;
+  if (spareSpace < 0 && maxShrinkPerGap > 0) {
+    const int n = static_cast<int>(gapCount);
+    return -std::min((-spareSpace + n - 1) / n, maxShrinkPerGap);
+  }
+  if (spareSpace <= 0) return 0;
   // Distribute the spare space evenly across gaps. Do NOT bail out to 0 when the
   // per-gap stretch is large: a sparse line (few words on a wide page) legitimately
   // needs big gaps to reach the margin. Returning 0 there disables justification for
@@ -462,6 +474,13 @@ struct KnuthPlassModel {
     return renderer.getKerning(fontId, lastCodepoint(words[k - 1]), firstCodepoint(words[k]), styles[k - 1]);
   }
   bool gapStretches(const int k) const { return noSpaceBefore[k] || !continues[k] || words[k] == " "; }
+  // extractLine's lineShrinkCap, gap for gap: a plain word space may lose a
+  // third of its OWN style's space; a CJK break (no natural width) and a
+  // no-break space may lose nothing.
+  int gapShrinkCap(const int k) const {
+    if (noSpaceBefore[k] || continues[k]) return 0;
+    return kpbreak::shrinkPerGapPx(renderer.getSpaceAdvance(fontId, 'n', 'n', styles[k - 1]));
+  }
   bool mayBreakBefore(const int k) const { return !continues[k] && !startsWithLineForbiddenDash(words[k]); }
   template <typename F>
   void forEachHyphenPoint(const int k, const bool includeFallback, F&& emit) const {
@@ -906,6 +925,9 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
   }
 
   std::vector<size_t> lineBreakIndices;
+  // Set by computeKnuthPlassLineBreaks only when IT chose this call's lines;
+  // every other breaker's lines are painted stretch-only, as before.
+  shrinkJustify_ = false;
   if (linebreak::splitsWordsAtLineEnds(breaker)) {
     // A JUSTIFIED block that would hyphenate is set by Knuth-Plass total fit
     // (owner ruling 2026-09-26, "go with k-p"; KnuthPlassBreaker.h and
@@ -1277,6 +1299,15 @@ bool ParsedText::computeKnuthPlassLineBreaks(const GfxRenderer& renderer, const 
   cfg.measure = pageWidth;
   cfg.firstLineIndent = resolveFirstLineIndent(true, renderer, fontId);
   cfg.spaceAdvance = renderer.getSpaceAdvance(fontId, 'n', 'n', EpdFontFamily::REGULAR);
+  // An SD font loads metrics only for the styles a paragraph USES, so a
+  // paragraph with no regular word reads a regular space of 0 -- and the
+  // breaker refused it as Invalid, silently handing every all-italic or
+  // all-bold SD-font paragraph to greedy (found 2026-09-26 while testing
+  // shrink on styled Albo). The unit is then the paragraph's own style's space.
+  if (cfg.spaceAdvance <= 0) cfg.spaceAdvance = renderer.getSpaceAdvance(fontId, 'n', 'n', wordStyles.front());
+#ifdef CROSSPOINT_KNUTH_PLASS_TUNABLE
+  cfg.shrink = tune.shrink;
+#endif
 
   const KnuthPlassModel model{renderer, fontId, words, wordStyles, wordWidths, wordContinues, wordNoSpaceBefore};
   std::vector<kpbreak::Cut> cuts;
@@ -1293,6 +1324,12 @@ bool ParsedText::computeKnuthPlassLineBreaks(const GfxRenderer& renderer, const 
             static_cast<unsigned>(words.size()));
     return false;
   }
+
+  // The breaker let a line shrink by at most (its gaps) x (its smallest gap
+  // cap), so the rounded-up share ceil(N / gaps) extractLine paints on every
+  // gap never exceeds any gap's own cap. extractLine recomputes that smallest
+  // cap per line (lineShrinkCap) the same way KnuthPlassModel::gapShrinkCap does.
+  shrinkJustify_ = cfg.shrink;
 
   // Split the chosen words, LAST cut first, so every earlier cut's token index
   // is still the one the breaker saw. A token cut twice (a word longer than a
@@ -1563,6 +1600,9 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
   int lineWordWidthSum = 0;
   size_t actualGapCount = 0;
   int totalNaturalGaps = 0;
+  // The smallest shrink cap among this line's counted gaps (KnuthPlassModel::
+  // gapShrinkCap): only read when Knuth-Plass set the line with shrink.
+  int lineShrinkCap = std::numeric_limits<int>::max();
 
   for (size_t wordIdx = 0; wordIdx < lineWordCount; wordIdx++) {
     lineWordWidthSum += wordWidths[lastBreakAt + wordIdx];
@@ -1571,8 +1611,14 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       // Unicode break opportunity with no inserted Latin-style space. It is still
       // a stretchable gap for justified CJK/Korean text.
       actualGapCount++;
+      lineShrinkCap = 0;  // no natural width to give up
     } else if (wordIdx > 0 && !continuesVec[lastBreakAt + wordIdx]) {
       actualGapCount++;
+      if (shrinkJustify_) {
+        lineShrinkCap =
+            std::min(lineShrinkCap,
+                     kpbreak::shrinkPerGapPx(renderer.getSpaceAdvance(fontId, 'n', 'n', lineWordStyles[wordIdx - 1])));
+      }
       totalNaturalGaps += renderer.getSpaceAdvance(fontId, lastCodepoint(lineWords[wordIdx - 1]),
                                                    firstCodepoint(lineWords[wordIdx]), lineWordStyles[wordIdx - 1]);
     } else if (wordIdx > 0 && continuesVec[lastBreakAt + wordIdx]) {
@@ -1580,6 +1626,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       // count them as justifiable gaps so justifyExtra is distributed to them too.
       if (lineWords[wordIdx] == " ") {
         actualGapCount++;
+        lineShrinkCap = 0;  // a no-break space is not always painted with the extra
       }
       // Cross-boundary kerning for continuation words (e.g. nonbreaking spaces, attached punctuation)
       totalNaturalGaps += renderer.getKerning(fontId, lastCodepoint(lineWords[wordIdx - 1]),
@@ -1641,7 +1688,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
   // flush: it is applied once at the paint x and paid for once here, never twice.
   const int spareSpace = effectivePageWidth - lineWordWidthSum - totalNaturalGaps + hangWidth + leadingHang;
   const int justifyExtra = (effectiveAlignment == CssTextAlign::Justify && !isLastLine)
-                               ? computeJustifyExtra(spareSpace, actualGapCount)
+                               ? computeJustifyExtra(spareSpace, actualGapCount, shrinkJustify_ ? lineShrinkCap : 0)
                                : 0;
 
   // BiDi processing: reorder words with UAX#9 in full-line context.
@@ -1721,9 +1768,10 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     }
 
     const int reorderedSpare = effectivePageWidth - reorderedWordWidthSum - reorderedNaturalGaps;
-    const int reorderedJustifyExtra = (effectiveAlignment == CssTextAlign::Justify && !isLastLine)
-                                          ? computeJustifyExtra(reorderedSpare, reorderedGapCount)
-                                          : 0;
+    const int reorderedJustifyExtra =
+        (effectiveAlignment == CssTextAlign::Justify && !isLastLine)
+            ? computeJustifyExtra(reorderedSpare, reorderedGapCount, shrinkJustify_ ? lineShrinkCap : 0)
+            : 0;
 
     const int justifyContribution = (effectiveAlignment == CssTextAlign::Justify && !isLastLine)
                                         ? reorderedJustifyExtra * static_cast<int>(reorderedGapCount)

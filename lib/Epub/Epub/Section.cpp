@@ -233,7 +233,10 @@ namespace {
 // lib/Epub/Epub/KnuthPlassBreaker.h). No field changed, but nearly every
 // justified paragraph's line breaks move -- 1,132 of 1,472 in the owner's own
 // books at Albo 14 -- and the breaks are baked into the cached TextBlocks.
-constexpr uint8_t SECTION_FILE_VERSION = 59;
+// v60: "Just ship shrink" (owner ruling 2026-09-26): the same Knuth-Plass
+// breaker may now NARROW a justified line's gaps to 2/3 of a space, and
+// extractLine paints the negative spare. Breaks and painted x both move.
+constexpr uint8_t SECTION_FILE_VERSION = 60;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

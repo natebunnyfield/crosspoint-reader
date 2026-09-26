@@ -1,14 +1,32 @@
 // Knuth-Plass total-fit line breaking for JUSTIFIED blocks -- the DEVICE port.
 //
-// Owner ruling 2026-09-26, "go with k-p": option B of
-// docs/knuth-plass-line-breaking-2026-09-25.md section 7. On a justified block
-// that would otherwise go to the greedy hyphenating breaker
+// Owner rulings 2026-09-26: "go with k-p" (option B of
+// docs/knuth-plass-line-breaking-2026-09-25.md section 7), then "Just ship
+// shrink" (option C, the same breaker allowed to NARROW gaps -- NOT
+// blind-tested; the doc's section 14). On a justified block that would
+// otherwise go to the greedy hyphenating breaker
 // (ParsedText::computeHyphenatedLineBreaks), this chooses the breaks instead,
-// with exactly the "candidate" parameters the owner saw in the blind test:
+// with the blind test's "candidate" parameters plus TeX's shrink:
 //
-//   * stretch-only: a gap stretches by half a word space at r = 1 and NEVER
-//     shrinks, because extractLine cannot paint a narrowed gap
-//     (computeJustifyExtra returns 0 on a negative spare);
+//   * a gap stretches by half a word space at r = 1 and SHRINKS by at most
+//     floor(space / 3) px at r = -1. That is TeX's third of a space made
+//     PIXEL-EXACT: floor(S/3) = S - ceil(2S/3), the most a gap can lose and
+//     still be no narrower than 2/3 of a space in whole pixels. At 14 pt both
+//     shipped faces have spaces of 6 and 9 px, so it IS a third there; at
+//     5/8/11 px spaces (12 and 18 pt) the unrounded third would paint gaps of
+//     0.60-0.64 of a space, which the ruling's "2/3 of a space" rules out.
+//     The space is the one of THAT GAP'S style (Albo 14's italic and bold
+//     spaces are 8 px against a regular 9), a gap with no natural width (a
+//     CJK break) or a no-break space may not narrow at all, and a line may
+//     shrink by at most its gap count times the SMALLEST cap on it -- which is
+//     what lets extractLine's one uniform justifyExtra honor every gap's
+//     floor. All three were found by adversarial review, 2026-09-26: without
+//     them CJK glyphs overlapped, an NBSP line overflowed the measure, and an
+//     italic gap painted at 5/8 of its space.
+//     extractLine paints a Knuth-Plass line's negative spare as a negative
+//     justifyExtra (ParsedText::shrinkJustify_), so the painted line is the
+//     one the breaker chose. Config::shrink = false is the stretch-only
+//     breaker the owner saw in the blind test, kept reachable for tests;
 //   * uncapped badness 100 |r|^3 (the doc's section 4: TeX's 10,000 cap is
 //     what made TeX-as-shipped lose to greedy on the worst line);
 //   * line penalty 10, hyphen penalty 10,000, double-hyphen demerits 10^6,
@@ -29,9 +47,10 @@
 //      Above the clamp two lines tie that the prototype would order -- both
 //      are far past anything either breaker sets on a real page (the corpus
 //      worst is r ~ 25).
-//   2. Fitness class 0 ("tight", r < -0.5) is dropped: with no shrink, r is
-//      never negative, so that class can never hold a finite value. Nine
-//      states per position rather than twelve; the result is identical.
+//   2. Shrink is integer too: with C = floor(space / 3) and K = gaps * C,
+//      r = slack / K for slack < 0, so r >= -1 is -slack <= K and the tight
+//      class (r < -0.5) is -2 slack > K, exactly. Shrink badness is at most
+//      100, so it never nears the clamp.
 //   3. A WINDOW. The DP is run over at most WINDOW_POSITIONS break positions
 //      (and WINDOW_TOKENS tokens) at a time. A paragraph that fits in one
 //      window gets the true total-fit optimum. A longer one is solved window
@@ -60,15 +79,15 @@
 // The arrays are kept (not freed) between windows, and a realloc may briefly
 // hold old and new blocks together. Per window of P positions and T tokens:
 //     positions      10 B x P
-//     best (int64)   72 B x P   (9 states)
-//     prev (uint16)  18 B x P
+//     best (int64)   96 B x P   (12 states)
+//     prev (uint16)  24 B x P
 //     traced path     2 B x P
-//     token sums     10 B x T   (+4 B)
-// At the caps (P = 321, T = 640) that is 3,210 + 23,112 + 5,778 + 642 +
-// 6,404 = 39,146 bytes, the WORST CASE (KnuthPlassDevice.TheWindowBounds...
-// computes the same sum). Measured 2026-09-26: the largest working set on the
-// owner's 1,472-paragraph corpus was 35,596 B, and a 104-position paragraph
-// (the corpus mean) holds about 12 KB. Any allocation failure returns Result::AllocFailed with
+//     token sums     11 B x T   (+4 B)   (widths, gaps, stretch count, shrink cap)
+// At the caps (P = 321, T = 640) that is 3,210 + 30,816 + 7,704 + 642 +
+// 7,044 = 49,416 bytes, the WORST CASE (KnuthPlassDevice.TheWindowBounds...
+// computes the same sum). It was 39,146 before shrink brought back the fourth
+// fitness class and the per-gap shrink cap. Largest measured on the owner's corpus: 45,511 B
+// (docs/knuth-plass-line-breaking-2026-09-25.md section 14). Any allocation failure returns Result::AllocFailed with
 // nothing mutated, and the caller falls back to greedy. So does a paragraph
 // the DP cannot find a path through (NoPath) and any malformed input.
 //
@@ -115,8 +134,8 @@ inline constexpr int64_t SATURATED = INF - 1;
 
 // Hyphen-run dimension: runs 0..MAX_CONSECUTIVE_HYPHENS, so R = 3.
 inline constexpr int RUNS = MAX_CONSECUTIVE_HYPHENS + 1;
-// Fitness classes 1..3 (decent, loose, very loose) -- see note 2 above.
-inline constexpr int FITS = 3;
+// TeX's four fitness classes: 0 tight, 1 decent, 2 loose, 3 very loose.
+inline constexpr int FITS = 4;
 inline constexpr int STATES = FITS * RUNS;
 
 // The window. 320 positions is about 250 words of English at the corpus's
@@ -125,6 +144,12 @@ inline constexpr int WINDOW_POSITIONS = 320;
 inline constexpr int WINDOW_TOKENS = 640;
 
 inline constexpr uint16_t NO_PREV = 0xFFFF;
+inline constexpr uint8_t NOT_A_GAP = 0xFF;
+
+// The most one gap may narrow: floor(space / 3) px of the space of THAT gap's
+// style -- see the header. ParsedText's model and extractLine both call this,
+// so the breaker and the paint agree gap for gap.
+constexpr int shrinkPerGapPx(const int spaceAdvance) { return spaceAdvance > 0 ? spaceAdvance / 3 : 0; }
 
 enum class Result : uint8_t { Ok, AllocFailed, NoPath, Invalid };
 
@@ -144,6 +169,9 @@ struct Config {
   int spaceAdvance = 0;  // the face's word space, getSpaceAdvance('n','n')
   int windowPositions = WINDOW_POSITIONS;
   int windowTokens = WINDOW_TOKENS;
+  // Gaps may narrow to 2/3 of a space (owner, "Just ship shrink"). false is
+  // the stretch-only breaker of the blind test.
+  bool shrink = true;
   // Test hook: 0 = no limit. Otherwise any allocation that would take the
   // working set past this many bytes fails, exactly as a full heap would.
   size_t allocLimitBytes = 0;
@@ -210,7 +238,19 @@ inline int64_t badness16(const int slack, const int64_t g) {
   return b > B16_MAX ? B16_MAX : b;
 }
 
-// TeX's classes at r = 0.5 and 1, exactly: r <= 0.5 <=> 4 slack <= G.
+// Shrink: b16 = round(1600 |r|^3) with r = slack / K, K = gaps * floor(space / 3),
+// |slack| <= K (the caller has already refused r < -1), so b16 <= 1600.
+inline int64_t shrinkBadness16(const int slack, const int64_t k) {
+  const int64_t s = -static_cast<int64_t>(slack);
+  const int64_t den = k * k * k;
+  if (den <= 0) return B16_MAX;
+  return (1600 * s * s * s + den / 2) / den;
+}
+
+// The tight class, r < -0.5 <=> -2 slack > K, exactly.
+inline int shrinkFitnessOf(const int slack, const int64_t k) { return -2 * static_cast<int64_t>(slack) > k ? 0 : 1; }
+
+// TeX's stretch classes at r = 0.5 and 1, exactly: r <= 0.5 <=> 4 slack <= G.
 inline int fitnessOf(const int slack, const int64_t g) {
   if (4 * static_cast<int64_t>(slack) <= g) return 1;
   if (2 * static_cast<int64_t>(slack) <= g) return 2;
@@ -224,6 +264,10 @@ inline int fitnessOf(const int slack, const int64_t g) {
 //   int  fullWidth(int k) const;          // advance of token k
 //   int  gapBefore(int k) const;          // k >= 1: natural px between k-1 and k on one line
 //   bool gapStretches(int k) const;       // k >= 1: does that gap take justification
+//   int  gapShrinkCap(int k) const;       // k >= 1, stretchable gaps only: the most it may
+//                                         // narrow, px; 0 = it may not (a zero-width CJK
+//                                         // break, a no-break space). A line may shrink by
+//                                         // at most (its gaps) x (the SMALLEST cap on it).
 //   bool mayBreakBefore(int k) const;     // 1 <= k < n
 //   template <class F> void forEachHyphenPoint(int k, bool includeFallback, F&& f) const;
 //        -> f(int offset, bool hyphen, int prefixWidth, int suffixWidth), ascending,
@@ -262,16 +306,17 @@ Result detail::breakParagraphImpl(const M& m, const Config& cfg, std::vector<Cut
   detail::PodBuf<Pos> pos;
   detail::PodBuf<int64_t> best;
   detail::PodBuf<uint16_t> prev;
-  detail::PodBuf<int32_t> fullSum;   // fullSum[t] = sum of full widths of window tokens [0, t)
-  detail::PodBuf<int32_t> gapSum;    // gapSum[t] = sum of natural gaps before window tokens [1, t]
-  detail::PodBuf<uint16_t> stretch;  // stretch[t] = stretchable gaps before window tokens [1, t]
+  detail::PodBuf<int32_t> fullSum;    // fullSum[t] = sum of full widths of window tokens [0, t)
+  detail::PodBuf<int32_t> gapSum;     // gapSum[t] = sum of natural gaps before window tokens [1, t]
+  detail::PodBuf<uint16_t> stretch;   // stretch[t] = stretchable gaps before window tokens [1, t]
+  detail::PodBuf<uint8_t> shrinkCap;  // shrinkCap[t] = that gap's cap, px; NOT_A_GAP when it does not stretch
 
   detail::PodBuf<uint16_t> path;  // the traced path's cells, one per line
 
   Pos start{0, 0, 0, 0, 0};
-  // State index = (fitness - 1) * RUNS + run. The paragraph starts "decent"
-  // (fitness 1) with no hyphen run, as TeX's does: index 0.
-  int startState = 0;
+  // State index = fitness * RUNS + run. The paragraph starts "decent"
+  // (fitness 1) with no hyphen run, as TeX's does.
+  int startState = 1 * RUNS;
   bool firstWindow = true;
   Stats st;
 
@@ -326,7 +371,8 @@ Result detail::breakParagraphImpl(const M& m, const Config& cfg, std::vector<Cut
     const int lastTok = lastP.offset > 0 ? lastP.word : lastP.word - 1;
     const int T = lastTok - w0 + 1;  // >= 1
     if (!fullSum.reserve(static_cast<size_t>(T) + 1, held, limit) ||
-        !gapSum.reserve(static_cast<size_t>(T), held, limit) || !stretch.reserve(static_cast<size_t>(T), held, limit)) {
+        !gapSum.reserve(static_cast<size_t>(T), held, limit) || !stretch.reserve(static_cast<size_t>(T), held, limit) ||
+        !shrinkCap.reserve(static_cast<size_t>(T), held, limit)) {
       return Result::AllocFailed;
     }
     fullSum[0] = 0;
@@ -335,9 +381,12 @@ Result detail::breakParagraphImpl(const M& m, const Config& cfg, std::vector<Cut
       if (t == 0) {
         gapSum[0] = 0;
         stretch[0] = 0;
+        shrinkCap[0] = NOT_A_GAP;
       } else {
         gapSum[t] = gapSum[t - 1] + m.gapBefore(w0 + t);
-        stretch[t] = static_cast<uint16_t>(stretch[t - 1] + (m.gapStretches(w0 + t) ? 1 : 0));
+        const bool stretches = m.gapStretches(w0 + t);
+        stretch[t] = static_cast<uint16_t>(stretch[t - 1] + (stretches ? 1 : 0));
+        shrinkCap[t] = stretches ? static_cast<uint8_t>(std::clamp(m.gapShrinkCap(w0 + t), 0, 254)) : NOT_A_GAP;
       }
     }
 
@@ -374,6 +423,7 @@ Result detail::breakParagraphImpl(const M& m, const Config& cfg, std::vector<Cut
     };
 
     const int64_t space = cfg.spaceAdvance;
+
     constexpr int64_t lp16 = LINE_PENALTY * B_SCALE;
     for (int j = 1; j < P; ++j) {
       const bool isEnd = reachedEnd && j == P - 1;
@@ -392,10 +442,18 @@ Result detail::breakParagraphImpl(const M& m, const Config& cfg, std::vector<Cut
         // finds one, these passes never run and the two agree.
         const bool forced = (pass & 1) != 0;
         const bool relaxed = pass >= 2;
+        // The line's smallest gap cap, kept incrementally: j fixes the line's
+        // last token, and each step down in i only adds tokens at its start.
+        const int la = (pos[j].offset > 0 ? pos[j].word : pos[j].word - 1) - w0;
+        int capFrom = la;  // tokens (capFrom, la] are folded into minCap
+        int minCap = NOT_A_GAP;
         for (int i = j - 1; i >= 0; --i) {
           if (forced && i < j - 1) break;
           int width = 0, gaps = 0;
           geom(i, j, width, gaps);
+          for (const int fa = pos[i].word - w0; capFrom > fa; --capFrom) {
+            if (shrinkCap[capFrom] != NOT_A_GAP) minCap = std::min<int>(minCap, shrinkCap[capFrom]);
+          }
           ++st.evaluations;
           const int avail = cfg.measure - (firstWindow && i == 0 ? cfg.firstLineIndent : 0);
           const int slack = avail - width;
@@ -406,8 +464,13 @@ Result detail::breakParagraphImpl(const M& m, const Config& cfg, std::vector<Cut
           } else if (isEnd) {
             if (slack < 0) break;  // the last line is never justified, so never shrunk
           } else {
-            if (slack < 0) break;  // stretch-only: no shrink
-            if (gaps > 0) {
+            if (slack < 0) {
+              // Shrink: only with gaps to narrow, and never past r = -1.
+              const int64_t k = cfg.shrink && minCap != NOT_A_GAP ? static_cast<int64_t>(gaps) * minCap : 0;
+              if (k <= 0 || -static_cast<int64_t>(slack) > k) break;
+              b16 = detail::shrinkBadness16(slack, k);
+              fit = detail::shrinkFitnessOf(slack, k);
+            } else if (gaps > 0) {
               const int64_t g = gaps * space;
               b16 = detail::badness16(slack, g);
               fit = detail::fitnessOf(slack, g);
@@ -424,10 +487,10 @@ Result detail::breakParagraphImpl(const M& m, const Config& cfg, std::vector<Cut
           const bool startFlagged = pos[i].offset > 0;
           if (endHyph && startFlagged) d += DOUBLE_HYPHEN_DEMERITS * D_SCALE;
           if (isEnd && startFlagged) d += FINAL_HYPHEN_DEMERITS * D_SCALE;
-          for (int c = 1; c <= FITS; ++c) {
+          for (int c = 0; c < FITS; ++c) {
             const int64_t adj = (c - fit > 1 || fit - c > 1) ? ADJ_DEMERITS * D_SCALE : 0;
             for (int run = 0; run < RUNS; ++run) {
-              const size_t from = static_cast<size_t>(i) * STATES + (c - 1) * RUNS + run;
+              const size_t from = static_cast<size_t>(i) * STATES + c * RUNS + run;
               const int64_t b0 = best[from];
               if (b0 == INF) continue;
               int nrun = 0;
@@ -439,7 +502,7 @@ Result detail::breakParagraphImpl(const M& m, const Config& cfg, std::vector<Cut
                 }
               }
               const int64_t total = detail::satAdd(detail::satAdd(b0, d), adj);
-              const size_t to = static_cast<size_t>(j) * STATES + (fit - 1) * RUNS + nrun;
+              const size_t to = static_cast<size_t>(j) * STATES + fit * RUNS + nrun;
               if (total < best[to]) {
                 best[to] = total;
                 prev[to] = static_cast<uint16_t>(from);
@@ -535,6 +598,7 @@ struct Tuning {
   size_t allocLimitBytes = 0;
   int windowPositions = WINDOW_POSITIONS;
   int windowTokens = WINDOW_TOKENS;
+  bool shrink = true;
   // Written by ParsedText after every attempt.
   Result lastResult = Result::Ok;
   Stats lastStats{};
