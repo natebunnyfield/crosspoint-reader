@@ -1348,6 +1348,12 @@ Both 14 pt faces flip.
 until the row is set to 34; only a fresh settings file gets the new default. It
 is not migrated, because a chosen 40 and a defaulted 40 look the same.
 
+**Superseded the same day. Owner ruling 2026-09-26: "One-time migrate 40→34."**
+A saved 40 with no `justifyMigrated34` flag becomes 34 once. The flag is
+written on every save, so a 40 chosen afterwards sticks. The rule, the tests,
+and a headless check from a clean card and from a card holding 40 are in
+`docs/auto-justification.md`, final section.
+
 **Verified:**
 
 * All 761 host tests green, including `LineBreakQualityTest` 14/14 and

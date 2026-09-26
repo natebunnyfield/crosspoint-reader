@@ -593,7 +593,45 @@ every save, so an install that has saved settings still holds 40. The new
 default applies only where the key is absent: a fresh card, or a settings file
 predating the row.
 
-* **Not migrated.** Nothing can tell a 40 someone chose from a 40 the old
-  default wrote.
-* **On an existing device,** choose **Justified Text → Very often (34)**.
+* **Not migrated at first.** Nothing can tell a 40 someone chose from a 40 the
+  old default wrote. Superseded the same day; see the next section.
+
+## 2026-09-26: the one-time migration, 40 → 34
+
+**Owner ruling 2026-09-26, verbatim:** "One-time migrate 40→34."
+
+**The rule**, in `src/JustifyThresholdMigration.h`, called from
+`CrossPointSettings::fromJson` and `toJson`:
+
+| On load | Becomes | Why |
+|---|---|---|
+| `justifyThreshold` 40, no `justifyMigrated34` flag | **34**, and the file is re-saved | the old default's 40 |
+| any other value, no flag | unchanged, re-saved to gain the flag | so a later 40 is never mistaken for the old default |
+| the flag present | unchanged | **a 40 chosen after the migration sticks** |
+| no settings file (factory fresh) | the default, 34; the first save writes the flag | `fromJson` never runs without a file |
+
+Every save writes the flag, so the migration runs exactly once per card.
+
+**Tests:** `test/justify_migration`, six cases.
+
+* 40 with no flag becomes 34 and requests a resave.
+* 40 with the flag stays 40.
+* 32, 36, 45 and 50 are untouched and gain the flag.
+* A file with no threshold gets 34.
+* Every rung round-trips through save and load with no re-migration.
+* Migrate, then choose 40, then reload keeps 40.
+
+**Proven failing first:** against a stub that does not migrate, 5 of the 6
+failed. The one that passed is "a 40 with the flag stays", which a no-op
+satisfies by construction.
+
+**Verified headless on `simulator_x3`** (2026-09-26), each arm from its own
+scratch card. The live threshold is read back from the section cache header,
+the byte the layout actually used (`Section.cpp`, offset 20):
+
+| Starting card | Log | `settings.json` after | Section header |
+|---|---|---|---|
+| **Clean**: no settings file | no migration line | not written (a fresh unit does not save until something changes) | **v61, threshold 34** |
+| `{"justifyThreshold":40}` | `justification threshold migrated once: 40 -> 34`, resave | `{justifyThreshold: 34, justifyMigrated34: true}` | **v61, threshold 34** |
+| `{"justifyThreshold":40,"justifyMigrated34":true}` | no migration | `{justifyThreshold: 40, justifyMigrated34: true}` | (no book opened) |
 

@@ -10,6 +10,7 @@
 #include <string>
 
 #include "I18nKeys.h"
+#include "JustifyThresholdMigration.h"
 #include "ReaderFontSizes.h"
 #include "SettingsList.h"
 #include "fontIds.h"
@@ -67,7 +68,8 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // Same again: the justification threshold is a drop-down over a character
   // ramp, so its row carries a getter/setter and no valuePtr and the loop
   // above skips it. Stored as the character COUNT, never the picker index.
-  doc["justifyThreshold"] = justifyThresholdChars;
+  // With the one-time 40 -> 34 migration's flag, always -- JustifyThresholdMigration.h.
+  justifysetting::write(doc, justifyThresholdChars);
   // lineSpacing is NOT hand-written any more. It was, for as long as it had no
   // row -- a getter-less field the generic loop above would have skipped. The
   // 2026-08-24 Typography ruling gave it a row again, with a valuePtr and the
@@ -244,8 +246,18 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   // between two of them (a hand edit, an API client, a file written when the
   // ladder differed) means a value nobody chose. clampThreshold sends those to
   // the documented default rather than snapping to a neighbour.
-  justifyThresholdChars =
-      static_cast<uint8_t>(autojustify::clampThreshold(doc["justifyThreshold"] | autojustify::THRESHOLD_CHARS));
+  // And migrated ONCE from the old default 40 to 34 (owner ruling 2026-09-26):
+  // JustifyThresholdMigration.h. A file without the flag is re-saved so the
+  // migration is persisted and never repeated.
+  {
+    const justifysetting::Loaded jt = justifysetting::read(doc);
+    const int stored = autojustify::clampThreshold(doc[justifysetting::KEY] | autojustify::THRESHOLD_CHARS);
+    if (stored != jt.threshold) {
+      LOG_INF("CPS", "justification threshold migrated once: %d -> %u", stored, static_cast<unsigned>(jt.threshold));
+    }
+    justifyThresholdChars = jt.threshold;
+    if (jt.needsResave) needsResave = true;
+  }
   // lineSpacing is loaded by the generic ENUM path above now that it has a row
   // again (see toJson). That path clamps against enumCount() -- 3, the same
   // LINE_COMPRESSION_COUNT this used -- and falls back to the field's own
