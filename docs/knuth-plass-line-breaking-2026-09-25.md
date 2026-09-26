@@ -733,8 +733,14 @@ reproduces the same pages byte for byte in content.
   a second session of fresh pairs, which the builder can make by changing
   `SEED`.
 
-**Results: none yet.** When his answers arrive, record them here, with the date
-and the JSON committed next to the key.
+**Results, 2026-09-26.** Five pairs answered (`answers/2026-09-26T0356.json`):
+Knuth-Plass preferred 5 of 5 (95% CI 47.8-100%, p = 0.062), including all 3
+from the `kp_worse` stratum, where the worst-line metric expected greedy to win.
+
+**Owner ruling, 2026-09-26: "go with k-p".** Option B of §7: Knuth-Plass
+replaces greedy on JUSTIFIED blocks, stretch-only, the same candidate the blind
+test showed. Shrink (C) was never shown to him and is not part of the ruling.
+Ragged blocks are unchanged.
 
 ### 12g. Reproduce
 
