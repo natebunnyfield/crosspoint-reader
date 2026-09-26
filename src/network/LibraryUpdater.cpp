@@ -387,7 +387,8 @@ librarysync::CardStamp stampOf(const std::string& path) {
 }
 }  // namespace
 
-bool LibraryUpdater::computeCardSha256(const std::string& path, char outHex[65]) {
+bool LibraryUpdater::computeCardSha256(const std::string& path, char outHex[65], ProgressCallback onProgress,
+                                       void* ctx) {
   HalFile file;
   if (!Storage.openFileForRead("LIB", path, file)) return false;
 
@@ -408,6 +409,13 @@ bool LibraryUpdater::computeCardSha256(const std::string& path, char outHex[65])
     }
     if (got == 0) break;
     mbedtls_sha256_update(&sha, buf.get(), static_cast<size_t>(got));
+    // Was silent; a large epub with no ledger entry hashed with nothing moving.
+    processedSize += static_cast<size_t>(got);
+    if (onProgress) onProgress(ctx);
+    if (aborted()) {
+      mbedtls_sha256_free(&sha);
+      return false;
+    }
   }
   unsigned char digest[32];
   mbedtls_sha256_finish(&sha, digest);
@@ -450,8 +458,13 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
       LOG_DBG("LIB", "Unchanged (size and mtime match the ledger, not read): %s", book.file.c_str());
       return BookResult::UNCHANGED;
     }
+    setPhase(updprogress::Phase::CHECKING);
+    totalSize = book.bytes;
+    processedSize = 0;
+    if (onProgress) onProgress(ctx);
     char cardSha[65];
-    if (computeCardSha256(destPath, cardSha) && librarysync::shaMatches(cardSha, book.sha256.c_str())) {
+    if (computeCardSha256(destPath, cardSha, onProgress, ctx) &&
+        librarysync::shaMatches(cardSha, book.sha256.c_str())) {
       // Record what was just proved, so the next run can pass this book over.
       putRecord(book.file, stamp, book.sha256);
       LOG_DBG("LIB", "Unchanged: %s", book.file.c_str());
@@ -463,6 +476,16 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
   // the bytes stream, then rename into place — the same crash-safety shape as
   // ProgressFile::writeAtomic. A power cut mid-download costs a .part file,
   // never the book that was already on the card.
+  // Abandoned (a host build torn down mid-step; setAbortFlag): stop before a
+  // download, not after it. A hash cut short lands here as a mismatch, and on a
+  // host the transport fetches a whole body before its first callback, so the
+  // per-chunk check below would only fire once the book had fully arrived.
+  if (aborted()) {
+    LOG_INF("LIB", "Abandoned before downloading %s; the card copy is untouched", book.file.c_str());
+    lastFailure_ = librarysync::FailureKind::NETWORK;
+    return BookResult::FAILED;
+  }
+
   const std::string partPath = destPath + ".part";
   if (Storage.exists(partPath.c_str())) Storage.remove(partPath.c_str());
 
@@ -499,23 +522,20 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
 
   processedSize = 0;
   totalSize = book.bytes;
-  int lastReportedPct = -1;
+  setPhase(updprogress::Phase::DOWNLOADING);
+  if (onProgress) onProgress(ctx);  // named before the first byte: TLS + redirect are seconds
   bool writeOk = true;
   const HttpDownloader::DownloadError fetched =
       HttpDownloader::fetchUrlWithHeaders(book.url, assetHeaders, [&](const uint8_t* data, size_t len) {
+        if (aborted()) return false;  // a network failure below; the .part is removed
         if (out.write(data, len) != len) {
           writeOk = false;
           return false;
         }
         mbedtls_sha256_update(&sha, data, len);
         processedSize += len;
-        if (onProgress && totalSize > 0) {
-          const int pct = static_cast<int>(static_cast<uint64_t>(processedSize) * 100 / totalSize);
-          if (pct != lastReportedPct) {
-            lastReportedPct = pct;
-            onProgress(ctx);
-          }
-        }
+        // Every chunk; the activity throttles by time (updprogress::shouldRepaint).
+        if (onProgress) onProgress(ctx);
         return true;
       });
 
@@ -552,6 +572,8 @@ LibraryUpdater::BookResult LibraryUpdater::syncBook(size_t index, ProgressCallba
     return BookResult::FAILED;
   }
 
+  setPhase(updprogress::Phase::INSTALLING);
+  if (onProgress) onProgress(ctx);
   if (existed) Storage.remove(destPath.c_str());
   if (!Storage.rename(partPath.c_str(), destPath.c_str())) {
     LOG_ERR("LIB", "Rename into place failed: %s", destPath.c_str());

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -8,6 +9,7 @@
 #include "FontManifestParser.h"   // RawFamily, handed over one family at a time
 #include "FontSyncPlan.h"         // fontsync::CardStamp / FailureKind, for the record store below
 #include "GithubReleaseAssets.h"  // Asset, matched to each manifest file
+#include "UpdateProgress.h"       // updprogress::Phase, what syncFamily() is doing now
 
 /**
  * Update Fonts: sync the SD font roots against the .cpfont set published as the
@@ -182,12 +184,27 @@ class FontUpdater {
   // getCurrentFile/getFileCount (where in the family it is) while this runs.
   FamilyResult syncFamily(size_t index, ProgressCallback onProgress = nullptr, void* ctx = nullptr);
 
+  // Bytes of the file in hand -- being HASHED while phase() is CHECKING, being
+  // downloaded while it is DOWNLOADING -- and that file's declared size.
   size_t getProcessedSize() const { return processedSize; }
   size_t getTotalSize() const { return totalSize; }
   // Files of the CURRENT family already finished, and how many it has. The
   // screen needs both to draw one honest bar over six downloads.
   size_t getCurrentFile() const { return currentFile; }
   size_t getFileCount() const { return fileCount; }
+  // What syncFamily() is doing right now. The screen names it; before
+  // 2026-09-26 it could not, and a family being hashed looked like a hang.
+  updprogress::Phase phase() const { return static_cast<updprogress::Phase>(phase_.load()); }
+  // Set while a removal pass runs, so the screen can say so.
+  void setPhase(updprogress::Phase p) { phase_.store(static_cast<uint8_t>(p)); }
+
+  // ABANDON, not cancel. Owned by the caller; checked between hash chunks and
+  // on every downloaded chunk. Only an activity being torn down mid-step sets
+  // it (a host build's sleep while a worker runs -- UpdateWorker.h). A family
+  // caught by it FAILS: its staging directory is removed and the installed copy
+  // is exactly as it was, the same guarantee as a network failure mid-family.
+  // The reader's Back never sets this; it stops the run BETWEEN families.
+  void setAbortFlag(const std::atomic<bool>* flag) { abortFlag_ = flag; }
 
   // Why the most recent syncFamily() answered FAILED (NONE after any other
   // answer), so the summary can name the thing to fix rather than a count.
@@ -203,6 +220,7 @@ class FontUpdater {
     totalSize = 0;
     currentFile = 0;
     fileCount = 0;
+    phase_.store(static_cast<uint8_t>(updprogress::Phase::PREPARING));
   }
 
   // End of run, called once. Writes the ledger if a syncFamily() changed it
@@ -253,10 +271,16 @@ class FontUpdater {
   bool removedAny = false;           // at least one family was deleted this run
   bool installedAny = false;         // at least one family was ADDED or UPDATED this run
   bool activeFamilyChanged = false;  // ...and one of them is the family the reader is set to
-  size_t processedSize = 0;
-  size_t totalSize = 0;
-  size_t currentFile = 0;
-  size_t fileCount = 0;
+  // Atomic because the render task reads them while the loop task (or, on a
+  // host, a worker thread) writes them. They were plain size_t, which was a data
+  // race the device tolerated by accident of alignment.
+  std::atomic<size_t> processedSize{0};
+  std::atomic<size_t> totalSize{0};
+  std::atomic<size_t> currentFile{0};
+  std::atomic<size_t> fileCount{0};
+  std::atomic<uint8_t> phase_{0};
+  const std::atomic<bool>* abortFlag_ = nullptr;
+  bool aborted() const { return abortFlag_ != nullptr && abortFlag_->load(); }
 
   // The owner-deleted list (FontDeletionList.h), read once per run on the
   // first syncFamily() and kept current as this run adds to or clears it.
@@ -265,13 +289,17 @@ class FontUpdater {
 
   bool hasRecordsFor(const std::string& family) const;
   void dropRecordsFor(const std::string& family);
-  bool computeCardSha256(const std::string& path, char outHex[65]);
+  // Hashes in SHA_CHUNK reads, publishing the running byte count through
+  // processedSize and calling onProgress after each chunk -- the throttle is
+  // the caller's. False on a read error, or when the abort flag is set.
+  bool computeCardSha256(const std::string& path, char outHex[65], ProgressCallback onProgress = nullptr,
+                         void* ctx = nullptr);
   void loadSyncRecords();
   void flushSyncRecords();
   const StoredRecord* findRecord(const std::string& key) const;
   void putRecord(const std::string& key, const fontsync::CardStamp& stamp, const std::string& sha);
   // How many of `family`'s files the card already holds byte-identical.
-  size_t countMatchingFiles(const Family& family, const char* root);
+  size_t countMatchingFiles(const Family& family, const char* root, ProgressCallback onProgress, void* ctx);
   // Undo a run that died between the two commit renames, and sweep any
   // abandoned staging directory, BEFORE deciding anything about this family.
   void recoverStaleStaging(const char* root, const std::string& name);

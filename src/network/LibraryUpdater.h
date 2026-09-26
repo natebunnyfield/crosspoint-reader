@@ -1,11 +1,13 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "LibrarySyncPlan.h"  // librarysync::CardStamp, for the record store below
+#include "UpdateProgress.h"   // updprogress::Phase, what syncBook() is doing now
 
 /**
  * Update Library: sync /books/ on the card against the epub set published as
@@ -95,8 +97,18 @@ class LibraryUpdater {
   // on whole-percent change only, same reasoning as OtaUpdater.
   BookResult syncBook(size_t index, ProgressCallback onProgress = nullptr, void* ctx = nullptr);
 
+  // Bytes of the book in hand -- being HASHED while phase() is CHECKING, being
+  // downloaded while it is DOWNLOADING -- and its declared size.
   size_t getProcessedSize() const { return processedSize; }
   size_t getTotalSize() const { return totalSize; }
+  // What syncBook() is doing right now, for the screen's detail line. Same
+  // reason as FontUpdater::phase(): a hash had nothing to say (2026-09-26).
+  updprogress::Phase phase() const { return static_cast<updprogress::Phase>(phase_.load()); }
+
+  // ABANDON, not cancel: FontUpdater::setAbortFlag, for books. A book caught by
+  // it FAILS, its .part is removed, and the copy already on the card is
+  // untouched. Only an activity torn down mid-step sets it.
+  void setAbortFlag(const std::atomic<bool>* flag) { abortFlag_ = flag; }
 
   // Why the most recent syncBook() answered FAILED (NONE after any other
   // answer). The activity tallies these so the summary can say what to fix
@@ -110,6 +122,7 @@ class LibraryUpdater {
   void resetBookProgress() {
     processedSize = 0;
     totalSize = 0;
+    phase_.store(static_cast<uint8_t>(updprogress::Phase::PREPARING));
   }
 
   // Write the ledger if a syncBook() changed it. Call once when the run ends.
@@ -136,10 +149,19 @@ class LibraryUpdater {
   std::vector<StoredRecord> records;
   bool recordsLoaded = false;
   bool recordsDirty = false;
-  size_t processedSize = 0;
-  size_t totalSize = 0;
+  // Atomic: the render task reads them while the loop task (or, on a host, a
+  // worker thread) writes them.
+  std::atomic<size_t> processedSize{0};
+  std::atomic<size_t> totalSize{0};
+  std::atomic<uint8_t> phase_{0};
+  const std::atomic<bool>* abortFlag_ = nullptr;
+  bool aborted() const { return abortFlag_ != nullptr && abortFlag_->load(); }
+  void setPhase(updprogress::Phase p) { phase_.store(static_cast<uint8_t>(p)); }
 
-  bool computeCardSha256(const std::string& path, char outHex[65]);
+  // Reports through processedSize and onProgress per chunk; false on a read
+  // error or when the abort flag is set.
+  bool computeCardSha256(const std::string& path, char outHex[65], ProgressCallback onProgress = nullptr,
+                         void* ctx = nullptr);
   void loadSyncRecords();
   const StoredRecord* findRecord(const std::string& file) const;
   void putRecord(const std::string& file, const librarysync::CardStamp& stamp, const std::string& sha);

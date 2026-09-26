@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -810,4 +811,134 @@ TEST_F(FontCommit, AMissingOrOversizedListLoadsEmpty) {
   EXPECT_TRUE(fontdeletions::loadDeleted().empty());
   writeCardFile("/.crosspoint/deleted-fonts.txt", std::string(fontdeletions::kMaxListBytes + 1, 'A'));
   EXPECT_TRUE(fontdeletions::loadDeleted().empty());
+}
+
+// ---------------------------------------------------------------------------
+// Progress while a family is being worked on (owner bug 2026-09-26, "not
+// appearing frozen when i select ... Update Fonts";
+// docs/update-progress-2026-09-26.md).
+
+namespace {
+struct ProgressObserver {
+  FontUpdater* updater = nullptr;
+  int calls = 0;
+  size_t maxBytes = 0;
+  std::vector<updprogress::Phase> phases;  // each phase as it was first seen, in order
+  std::atomic<bool>* abandonAt = nullptr;  // set once DOWNLOADING has moved some bytes
+  size_t abandonAfterBytes = 0;
+};
+
+void observe(void* ctx) {
+  auto* o = static_cast<ProgressObserver*>(ctx);
+  ++o->calls;
+  o->maxBytes = std::max(o->maxBytes, o->updater->getProcessedSize());
+  const updprogress::Phase p = o->updater->phase();
+  if (o->phases.empty() || o->phases.back() != p) o->phases.push_back(p);
+  if (o->abandonAt != nullptr && p == updprogress::Phase::DOWNLOADING &&
+      o->updater->getProcessedSize() >= o->abandonAfterBytes) {
+    o->abandonAt->store(true);
+  }
+}
+}  // namespace
+
+// THE HASH WAS SILENT. A card with no ledger -- every card the iOS app seeds,
+// and any card whose ledger is lost -- verifies each installed family by
+// reading it end to end, and before 2026-09-26 that read made no progress
+// callback at all: the screen sat on "Font k of N" while ~80 MB went by.
+// Fails against the pre-fix FontUpdater: zero callbacks, zero bytes.
+TEST_F(FontCommit, AnUnchangedFamilyWithNoLedgerReportsItsHashAsItGoes) {
+  installOnCard("/.fonts", "Doves", "same", /*withHiResTiers=*/false);
+  publish({"Doves"}, "same");
+
+  FontUpdater updater;
+  ASSERT_EQ(updater.fetchManifest(), FontUpdater::OK);
+  ProgressObserver obs;
+  obs.updater = &updater;
+  updater.resetFamilyProgress();
+  EXPECT_EQ(updater.syncFamily(0, &observe, &obs), FontUpdater::FamilyResult::UNCHANGED);
+  EXPECT_GT(obs.calls, 0) << "no progress callback while the family was hashed";
+  EXPECT_GT(obs.maxBytes, 0u) << "the hash never published a byte count";
+}
+
+// The screen names what the updater is doing. An outdated family walks the
+// phases in this order and no other, or the detail line would lie.
+TEST_F(FontCommit, AnOutdatedFamilyWalksPrepareCheckDownloadInstall) {
+  installOnCard("/.fonts", "Doves", "old", /*withHiResTiers=*/false);
+  publish({"Doves"}, "new");
+
+  FontUpdater updater;
+  ASSERT_EQ(updater.fetchManifest(), FontUpdater::OK);
+  ProgressObserver obs;
+  obs.updater = &updater;
+  updater.resetFamilyProgress();
+  EXPECT_EQ(updater.phase(), updprogress::Phase::PREPARING);
+  EXPECT_EQ(updater.syncFamily(0, &observe, &obs), FontUpdater::FamilyResult::UPDATED);
+  const std::vector<updprogress::Phase> expected = {updprogress::Phase::CHECKING, updprogress::Phase::DOWNLOADING,
+                                                    updprogress::Phase::INSTALLING};
+  EXPECT_EQ(obs.phases, expected);
+}
+
+// ABANDON MID-DOWNLOAD (a host build torn down while its worker is inside a
+// family -- UpdateWorker.h). The installed family must come through byte for
+// byte, with no staging directory left beside it: a cancel can never leave a
+// half-written family.
+TEST_F(FontCommit, AnAbandonedFamilyLeavesThePreviousInstallAndNoStaging) {
+  installOnCard("/.fonts", "Doves", "old", /*withHiResTiers=*/false);
+  publish({"Doves"}, "new");
+
+  FontUpdater updater;
+  std::atomic<bool> abandon{false};
+  updater.setAbortFlag(&abandon);
+  ASSERT_EQ(updater.fetchManifest(), FontUpdater::OK);
+  ProgressObserver obs;
+  obs.updater = &updater;
+  obs.abandonAt = &abandon;
+  obs.abandonAfterBytes = 64;
+  updater.resetFamilyProgress();
+  EXPECT_EQ(updater.syncFamily(0, &observe, &obs), FontUpdater::FamilyResult::FAILED);
+  updater.finishRun();
+
+  EXPECT_EQ(entryNames("/.fonts"), std::vector<std::string>{"Doves"}) << "a staging or backup dir was left behind";
+  for (const int size : kSizes) {
+    EXPECT_EQ(readCardFile("/.fonts/Doves/" + fileName("Doves", size)), cpfontBytes("Doves", size, "old"))
+        << "cut " << size << " was disturbed by an abandoned install";
+  }
+}
+
+// ...and a family that was never installed leaves nothing at all.
+TEST_F(FontCommit, AnAbandonedFirstInstallLeavesNoFamilyDirectory) {
+  publish({"Doves"}, "new");
+
+  FontUpdater updater;
+  std::atomic<bool> abandon{false};
+  updater.setAbortFlag(&abandon);
+  ASSERT_EQ(updater.fetchManifest(), FontUpdater::OK);
+  ProgressObserver obs;
+  obs.updater = &updater;
+  obs.abandonAt = &abandon;
+  obs.abandonAfterBytes = 1;
+  updater.resetFamilyProgress();
+  EXPECT_EQ(updater.syncFamily(0, &observe, &obs), FontUpdater::FamilyResult::FAILED);
+  EXPECT_FALSE(fs::exists(cardPath("/.fonts/Doves")));
+  EXPECT_TRUE(entryNames("/.fonts").empty());
+}
+
+// An abandon while HASHING an installed family (it arrives on the first chunk)
+// must not be read as "the card's copy differs" and turned into a reinstall.
+TEST_F(FontCommit, AnAbandonDuringTheHashLeavesTheInstalledFamilyAlone) {
+  installOnCard("/.fonts", "Doves", "same", /*withHiResTiers=*/false);
+  publish({"Doves"}, "same");
+
+  FontUpdater updater;
+  std::atomic<bool> abandon{true};
+  updater.setAbortFlag(&abandon);
+  ASSERT_EQ(updater.fetchManifest(), FontUpdater::OK);
+  updater.resetFamilyProgress();
+  EXPECT_EQ(updater.syncFamily(0), FontUpdater::FamilyResult::FAILED);
+  EXPECT_EQ(entryNames("/.fonts"), std::vector<std::string>{"Doves"});
+  for (const int size : kSizes) {
+    EXPECT_EQ(readCardFile("/.fonts/Doves/" + fileName("Doves", size)), cpfontBytes("Doves", size, "same"));
+  }
+  // Nothing was downloaded: the release and the manifest only.
+  EXPECT_EQ(fakegh::server().requested.size(), 2u);
 }

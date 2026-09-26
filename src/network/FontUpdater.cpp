@@ -617,7 +617,7 @@ void FontUpdater::flushSyncRecords() {
   LOG_DBG(LOG_MODULE, "Font ledger written: %u records", static_cast<unsigned>(records.size()));
 }
 
-bool FontUpdater::computeCardSha256(const std::string& path, char outHex[65]) {
+bool FontUpdater::computeCardSha256(const std::string& path, char outHex[65], ProgressCallback onProgress, void* ctx) {
   HalFile file;
   if (!Storage.openFileForRead(LOG_MODULE, path, file)) return false;
 
@@ -638,6 +638,15 @@ bool FontUpdater::computeCardSha256(const std::string& path, char outHex[65]) {
     }
     if (got == 0) break;
     mbedtls_sha256_update(&sha, buf.get(), static_cast<size_t>(got));
+    // The hash used to be silent: a card with no ledger (every seeded card, and
+    // the first run after one is lost) hashes ~80 MB here with nothing on the
+    // screen moving. Every chunk reports; the activity decides what repaints.
+    processedSize += static_cast<size_t>(got);
+    if (onProgress) onProgress(ctx);
+    if (aborted()) {
+      mbedtls_sha256_free(&sha);
+      return false;
+    }
   }
   unsigned char digest[32];
   mbedtls_sha256_finish(&sha, digest);
@@ -648,10 +657,18 @@ bool FontUpdater::computeCardSha256(const std::string& path, char outHex[65]) {
 
 // --- the sync ---------------------------------------------------------------
 
-size_t FontUpdater::countMatchingFiles(const Family& family, const char* root) {
+size_t FontUpdater::countMatchingFiles(const Family& family, const char* root, ProgressCallback onProgress, void* ctx) {
   const std::string dir = installDir(root, family.name);
   size_t matching = 0;
-  for (const auto& file : family.files) {
+  setPhase(updprogress::Phase::CHECKING);
+  for (size_t i = 0; i < family.files.size(); ++i) {
+    const FontFile& file = family.files[i];
+    // Published BEFORE the stamp and the hash, so the screen names the file it
+    // is waiting on rather than the one it just finished.
+    currentFile = i;
+    processedSize = 0;
+    totalSize = file.bytes;
+    if (onProgress) onProgress(ctx);
     const std::string path = dir + "/" + file.file;
     const bool exists = Storage.exists(path.c_str());
     const fontsync::CardStamp stamp = exists ? stampOf(path) : fontsync::CardStamp{};
@@ -672,7 +689,7 @@ size_t FontUpdater::countMatchingFiles(const Family& family, const char* root) {
       continue;
     }
     char cardSha[65];
-    if (computeCardSha256(path, cardSha) && fontsync::shaMatches(cardSha, file.sha256.c_str())) {
+    if (computeCardSha256(path, cardSha, onProgress, ctx) && fontsync::shaMatches(cardSha, file.sha256.c_str())) {
       // Record what was just proved, so the next run passes this file over.
       putRecord(key, stamp, file.sha256);
       ++matching;
@@ -718,9 +735,23 @@ size_t FontUpdater::stageFamily(const Family& family, const std::string& stageDi
   };
 
   size_t verified = 0;
+  // Zero the counters BEFORE the phase flips: the hash left them on the last
+  // file at 100%, and a render between the flip and the first file's reset
+  // below read DOWNLOADING at a whole family's worth (adversarial review).
+  currentFile = 0;
+  processedSize = 0;
+  totalSize = family.files.empty() ? 0 : family.files[0].bytes;
+  setPhase(updprogress::Phase::DOWNLOADING);
   for (size_t i = 0; i < family.files.size(); ++i) {
     const FontFile& file = family.files[i];
     const std::string path = stageDir + "/" + file.file;
+    if (aborted()) {
+      LOG_INF(LOG_MODULE, "%s: abandoned before %s -- the installed family is untouched", family.name.c_str(),
+              file.file.c_str());
+      lastFailure_ = fontsync::FailureKind::NETWORK;
+      failed = true;
+      return verified;
+    }
 
     HalFile out;
     if (!Storage.openFileForWrite(LOG_MODULE, path, out)) {
@@ -737,23 +768,23 @@ size_t FontUpdater::stageFamily(const Family& family, const std::string& stageDi
     currentFile = i;
     processedSize = 0;
     totalSize = file.bytes;
-    int lastReportedPct = -1;
+    // The new file is on the screen before its first byte: the TLS handshake
+    // and GitHub's redirect are seconds on a phone link.
+    if (onProgress) onProgress(ctx);
     bool writeOk = true;
     const HttpDownloader::DownloadError fetched =
         HttpDownloader::fetchUrlWithHeaders(file.url, assetHeaders, [&](const uint8_t* data, size_t len) {
+          if (aborted()) return false;  // counted as a network failure below; the stage is discarded
           if (out.write(data, len) != len) {
             writeOk = false;
             return false;
           }
           mbedtls_sha256_update(&sha, data, len);
           processedSize += len;
-          if (onProgress && totalSize > 0) {
-            const int pct = static_cast<int>(static_cast<uint64_t>(processedSize) * 100 / totalSize);
-            if (pct != lastReportedPct) {
-              lastReportedPct = pct;
-              onProgress(ctx);
-            }
-          }
+          // Every chunk, not every percent: the activity throttles by time
+          // (updprogress::shouldRepaint), and a percent of a 2 MB cut on a slow
+          // link was several silent seconds.
+          if (onProgress) onProgress(ctx);
           return true;
         });
 
@@ -866,7 +897,7 @@ FontUpdater::FamilyResult FontUpdater::syncFamily(size_t index, ProgressCallback
   }
   if (!existed) root = SdCardFontRegistry::defaultWriteRoot();
 
-  const size_t matching = existed ? countMatchingFiles(family, root) : 0;
+  const size_t matching = existed ? countMatchingFiles(family, root, onProgress, ctx) : 0;
   if (fontsync::familyVerdict(family.files.size(), matching) == fontsync::FamilyVerdict::UNCHANGED) {
     LOG_DBG(LOG_MODULE, "Unchanged: %s (%u files)", family.name.c_str(), static_cast<unsigned>(matching));
     return FamilyResult::UNCHANGED;
@@ -902,6 +933,9 @@ FontUpdater::FamilyResult FontUpdater::syncFamily(size_t index, ProgressCallback
     if (lastFailure_ == fontsync::FailureKind::NONE) lastFailure_ = fontsync::FailureKind::VERIFY;
     return FamilyResult::FAILED;
   }
+
+  setPhase(updprogress::Phase::INSTALLING);
+  if (onProgress) onProgress(ctx);
 
   // COMMIT: two renames, with the first undone if the second fails. Between
   // them the family is ABSENT rather than partial, and recoverStaleStaging

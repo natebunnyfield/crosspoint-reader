@@ -1,10 +1,14 @@
 #pragma once
 
+#include <atomic>
+#include <mutex>
 #include <string>
 #include <vector>
 
+#include "UpdateWorker.h"
 #include "activities/Activity.h"
 #include "network/FontUpdater.h"
+#include "network/UpdateProgress.h"
 
 /**
  * One-button font sync, from the claude-tools fonts-latest release.
@@ -67,6 +71,28 @@
  * "stopped after Doves, the rest not yet installed", which the next run
  * resumes. Checking between FILES would discard a staged family and throw away
  * its download, and would put an input read in the tight loop.
+ *
+ * THE STEP RUNS OFF THE PRESENTING THREAD ON A HOST (owner bug 2026-09-26,
+ * "not appearing frozen when i select ... Update Fonts"). "One family per tick"
+ * above gave a host ONE present per family: the render task drew every progress
+ * frame, but simulator_main presents only after loop() returns, so a 7 MB family
+ * on a 1 MB/s link was 18.7 s of glass that never changed and a button pad that
+ * read nothing. Each blocking step -- the check, one family, the removals -- now
+ * goes through UpdateWorker: a std::thread on a host, so loop() keeps ticking
+ * (presents, Back, the heartbeat), and inline on the device, where the render
+ * task already paints concurrently and a second stack is not worth its heap.
+ * The step's RESULT is still consumed here on the loop thread, in
+ * completeStep(), so every piece of state below has one writer.
+ *
+ * WHAT THE SCREEN SAYS WHILE IT WORKS, AND HOW OFTEN IT REPAINTS. Before
+ * 2026-09-26 it repainted when the whole run's percentage moved, which a hash
+ * never moves and a slow download moves every several seconds. Now a detail
+ * line names the phase, the file and the family's bytes ("Downloading Edgar_12
+ * · 1.2 of 6.8 MB"), a small line carries the elapsed time, and
+ * updprogress::shouldRepaint decides: a phase, family or file change within a
+ * quarter second, bytes and the clock at most once a second, FAST refresh
+ * always. Back is acknowledged at once ("Stopping after this font") and still
+ * acts only between families -- the ruling above is unchanged.
  */
 class FontUpdateActivity : public Activity {
  public:
@@ -90,6 +116,10 @@ class FontUpdateActivity : public Activity {
   // run sweeps it (FontUpdater::recoverStaleStaging) — but pointless.
   bool preventAutoSleep() override { return state == State::SYNCING || state == State::CHECKING; }
   bool skipLoopDelay() override { return state == State::SYNCING; }
+  // A home gesture while a step runs on a host worker would tear the activity
+  // down under it. Treat it as Back: stop after this family.
+  bool handleHomeGesture() override;
+  void onExit() override;
 
  private:
   // Where a failed run leaves its log ring, so the cause can be read off the
@@ -98,7 +128,11 @@ class FontUpdateActivity : public Activity {
   void writeFailureLog(unsigned updated, unsigned unchanged, unsigned removed, unsigned errors);
 
   State state = State::CHECKING;
-  FontUpdater::CheckStep checkStep = FontUpdater::CheckStep::CONTACTING;
+  // Atomic, and written WITHOUT the render lock: on a host the check runs on a
+  // worker thread, and a worker that waits on RenderLock deadlocks against a
+  // sleep, whose transition holds RenderLock while onExit() joins the worker
+  // (ActivityManager.cpp:153; adversarial review 2026-09-26).
+  std::atomic<FontUpdater::CheckStep> checkStep{FontUpdater::CheckStep::CONTACTING};
   FontUpdater updater;
   std::string errorMessage;
   size_t currentFamily = 0;  // index into the manifest while SYNCING (the family on screen)
@@ -122,10 +156,46 @@ class FontUpdateActivity : public Activity {
   unsigned storageErrors = 0;
   unsigned networkErrors = 0;
   unsigned verifyErrors = 0;
-  unsigned int lastRenderedPercent = 101;
   bool checkStarted = false;
+  // finishRun() has been called for this run. onExit calls it for a run torn
+  // down part-way (a sleep, a home gesture between families) so the families
+  // that DID install are discoverable and their ledger entries are written.
+  bool runFinished = false;
+  unsigned long startMs = 0;
 
-  void runCheck();        // the manifest check, on the first loop() tick
-  void syncNextFamily();  // one family per SYNCING tick, then DONE
-  void cancelSync();      // Back between families: finish the run early, honestly
+  // One blocking step at a time. See UpdateWorker.h and the header above.
+  enum class Step : uint8_t { NONE, CHECK, FAMILY, FINISH };
+  Step step = Step::NONE;
+  UpdateWorker worker;
+  FontUpdater::FontError checkResult = FontUpdater::OK;
+  FontUpdater::FamilyResult familyResult = FontUpdater::FamilyResult::FAILED;
+  size_t familyIndex = 0;
+  // Back was pressed: the run ends after the family in hand. Read by the
+  // render task and a host worker's callbacks, hence atomic.
+  std::atomic<bool> stopRequested{false};
+  // Set only by onExit while a host worker still runs; FontUpdater abandons the
+  // family in hand (staging discarded, installed copy untouched).
+  std::atomic<bool> abandon{false};
+
+  // The repaint throttle's memory. Guarded because on a host both the worker's
+  // progress callbacks and the loop's heartbeat reach maybeRepaint().
+  std::mutex paintMutex;
+  updprogress::Snapshot shown;
+  bool hasShown = false;
+  unsigned long lastPaintMs = 0;
+
+  void startStep(Step next);
+  static void runStep(void* ctx);  // the blocking half, on the worker
+  void completeStep();             // the bookkeeping half, on the loop thread
+  void afterCheck();               // the manifest check's result
+  void beginNextFamily();          // one family per step, then FINISH
+  void afterFamily();              // tally the family's result
+  void afterFinish();              // removals done: ledger, summary, DONE
+  void cancelSync();               // Back between families: finish the run early, honestly
+  void requestStop();
+  updprogress::Snapshot snapshot(unsigned long now) const;
+  // force: a new family/book is always requested at once, as the code before
+  // 2026-09-26 did -- items are seconds apart and the render task coalesces.
+  void maybeRepaint(bool force = false);
+  static void onProgress(void* ctx);
 };

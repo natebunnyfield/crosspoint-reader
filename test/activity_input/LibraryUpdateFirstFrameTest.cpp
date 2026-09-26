@@ -155,4 +155,50 @@ TEST_F(LibraryUpdateFirstFrame, NoWifiPaintsDeferredAndNeverFetches) {
   EXPECT_FALSE(host::currentActivity()->preventAutoSleep());
 }
 
+// CANCELLATION (2026-09-26, owner bug "not appearing frozen when i select
+// Update Library"): Back stops the run BETWEEN BOOKS. Before this the screen
+// had no cancel at all -- Back during a sync did nothing, so a long run offered
+// "wait or pull the power". Each book is written to <file>.part and renamed
+// into place, so stopping between books leaves no partial book.
+TEST_F(LibraryUpdateFirstFrame, BackStopsTheRunBetweenBooksAndFlushesTheLedger) {
+  libdouble::script().books = 5;
+  host::setRootActivity(makeActivity());
+  host::frame();  // the check
+  host::frame();  // book 0
+  host::frame();  // book 1
+
+  const auto& o = libdouble::observed();
+  ASSERT_EQ(o.syncedBooks.size(), 2u);
+  EXPECT_EQ(o.flushes, 0);
+
+  host::pressFrame(HalGPIO::BTN_BACK);
+
+  // Exactly the books that were reached, and no third.
+  EXPECT_EQ(o.syncedBooks.size(), 2u) << "the cancel frame must not sync another book";
+  // The ledger is still written, so the next run does not hash those two again.
+  EXPECT_EQ(o.flushes, 1);
+
+  ASSERT_NE(host::currentActivity(), nullptr);
+  EXPECT_FALSE(host::currentActivity()->preventAutoSleep());
+  EXPECT_FALSE(host::currentActivity()->skipLoopDelay());
+  host::frames(4);
+  EXPECT_EQ(o.syncedBooks.size(), 2u);
+  EXPECT_EQ(o.flushes, 1);
+}
+
+// The stopped screen is dismissed like any other terminal state.
+TEST_F(LibraryUpdateFirstFrame, TheStoppedScreenIsDismissedWithBack) {
+  libdouble::script().books = 4;
+  host::setRootActivity(makeActivity());
+  host::frame();
+  host::frame();
+  host::pressFrame(HalGPIO::BTN_BACK);
+  host::releaseFrame(HalGPIO::BTN_BACK);
+  ASSERT_NE(host::currentActivity(), nullptr);
+
+  host::tap(HalGPIO::BTN_BACK);
+  host::frames(2);
+  EXPECT_EQ(libdouble::observed().flushes, 1);
+}
+
 }  // namespace

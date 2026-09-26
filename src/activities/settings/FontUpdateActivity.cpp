@@ -34,6 +34,21 @@ const char* needsTokenHint() {
 #endif
   return I18N.get(StrId::STR_LIBRARY_NEEDS_TOKEN_HINT);
 }
+// The small line under the bar: the elapsed clock while the run works, or --
+// once Back has been pressed -- what is about to happen. Shared by the checking
+// and syncing frames so the press is acknowledged on whichever is up.
+void drawStatusLine(const GfxRenderer& renderer, int y, unsigned long startMs, bool stopping,
+                    const char* stoppingText) {
+  if (stopping) {
+    renderer.drawCenteredText(SMALL_FONT_ID, y, stoppingText, true, EpdFontFamily::BOLD);
+    return;
+  }
+  char clock[16];
+  updprogress::formatElapsed(static_cast<uint32_t>((millis() - startMs) / 1000), clock, sizeof(clock));
+  char line[48];
+  snprintf(line, sizeof(line), tr(STR_UPDATE_ELAPSED_FORMAT), clock);
+  renderer.drawCenteredText(SMALL_FONT_ID, y, line);
+}
 }  // namespace
 
 // A run that ends in errors leaves its log ring on the CARD.
@@ -100,8 +115,36 @@ void FontUpdateActivity::onEnter() {
   }
 
   state = State::CHECKING;
+  startMs = millis();
+  updater.setAbortFlag(&abandon);
   // WAIT for this paint, do not merely request it. See the header.
   requestUpdateAndWait();
+}
+
+void FontUpdateActivity::onExit() {
+  // A host worker still inside a family: abandon it and wait. The family in
+  // hand fails whole -- its staging directory is removed and whatever was
+  // installed before is untouched -- which is the same state a network failure
+  // mid-family leaves. On the device a step never outlives a loop() call, so
+  // this finds nothing in flight.
+  if (worker.inFlight()) {
+    abandon.store(true);
+    worker.join();
+  }
+  // A run left part-way still records what it installed.
+  if (checkStarted && !runFinished && updater.getFamilies().size() > 0) {
+    updater.finishRun();
+    runFinished = true;
+  }
+  Activity::onExit();
+}
+
+bool FontUpdateActivity::handleHomeGesture() {
+  if (worker.inFlight()) {
+    requestStop();
+    return true;
+  }
+  return false;
 }
 
 void FontUpdateActivity::loop() {
@@ -117,24 +160,46 @@ void FontUpdateActivity::loop() {
   // check a check rather than dead code.
   const bool backPressed = mappedInput.wasPressed(MappedInputManager::Button::Back);
 
-  // First pass after the CHECKING frame is on screen -- onEnter waited for it.
-  if (state == State::CHECKING && !checkStarted) {
-    checkStarted = true;
-    runCheck();
+  // A STEP IN FLIGHT (a host worker; on the device start() already finished it).
+  // Take Back now -- it is acknowledged on screen at once and acts between
+  // families -- keep the clock moving, and collect the result when it is ready.
+  if (worker.inFlight()) {
+    if (backPressed && (state == State::CHECKING || state == State::SYNCING)) requestStop();
+    if (!worker.done()) {
+      maybeRepaint();
+      return;
+    }
+    worker.join();
+    completeStep();
     return;
   }
 
-  // ONE FAMILY PER TICK, then back to the main loop. See the header.
+  // First pass after the CHECKING frame is on screen -- onEnter waited for it.
+  if (state == State::CHECKING && !checkStarted) {
+    checkStarted = true;
+    startStep(Step::CHECK);
+    return;
+  }
+
+  // ONE FAMILY PER STEP, then back to the main loop. See the header.
   if (state == State::SYNCING) {
-    // THE CANCEL POINT, and the only one. This tick begins after the previous
+    if (backPressed) requestStop();
+    maybeRepaint();
+    // THE CANCEL POINT, and the only one. A step begins after the previous
     // family's commit finished and before the next one starts, so a cancel
     // here can never catch a family mid-install -- the two-rename commit has
     // already either happened or been rolled back. Owner ruling 2026-09-07.
-    if (backPressed) {
-      cancelSync();
-      return;
+    switch (updprogress::nextStep(stopRequested.load(), nextFamily, updater.getFamilies().size())) {
+      case updprogress::Next::STOP:
+        cancelSync();
+        return;
+      case updprogress::Next::FINISH:
+        startStep(Step::FINISH);
+        return;
+      case updprogress::Next::RUN_ITEM:
+        beginNextFamily();
+        return;
     }
-    syncNextFamily();
     return;
   }
 
@@ -148,6 +213,81 @@ void FontUpdateActivity::loop() {
   }
 }
 
+void FontUpdateActivity::requestStop() {
+  if (stopRequested.exchange(true)) return;
+  LOG_INF("FONTUPD", "Back pressed: stopping after the family in hand");
+  // Structural: painted within a quarter second, so the press is seen to land.
+  maybeRepaint();
+}
+
+void FontUpdateActivity::startStep(Step next) {
+  step = next;
+  worker.start(&FontUpdateActivity::runStep, this);
+  // The device ran the step inline: collect it in THIS tick, exactly as the
+  // code did before the worker existed (one family / one book per tick). A
+  // host collects it from loop() on the tick it finishes.
+  if (worker.done()) {
+    worker.join();
+    completeStep();
+  }
+}
+
+// THE BLOCKING HALF. On a host this is a worker thread: it touches the updater
+// and the step's result fields and nothing else the loop thread writes.
+void FontUpdateActivity::runStep(void* ctx) {
+  auto* self = static_cast<FontUpdateActivity*>(ctx);
+  switch (self->step) {
+    case Step::CHECK: {
+      // Repaint between the check's network steps.
+      auto stepCb = +[](void* c, FontUpdater::CheckStep s) {
+        auto* me = static_cast<FontUpdateActivity*>(c);
+        // The frame onEnter waited for already names the first step; exchange()
+        // skips a repeat of it.
+        // NO RenderLock here: see checkStep's declaration.
+        if (me->checkStep.exchange(s) == s) return;
+        me->maybeRepaint();
+      };
+      self->checkResult = self->updater.fetchManifest(stepCb, self);
+      break;
+    }
+    case Step::FAMILY:
+      self->familyResult = self->updater.syncFamily(self->familyIndex, &FontUpdateActivity::onProgress, self);
+      break;
+    case Step::FINISH:
+      self->updater.setPhase(updprogress::Phase::FINISHING);
+      self->maybeRepaint();
+      // REMOVAL RUNS HERE: after every family has been offered, and only on the
+      // path that reaches the summary. Removing FIRST would free card space
+      // before ~80 MB of downloads, and would mean a run that then fails, or
+      // that the reader stops, has destroyed families and installed nothing --
+      // the worst trade this screen could make with the owner's data. A CANCEL
+      // NEVER REMOVES (owner ruling 2026-09-07): updprogress::nextStep answers
+      // STOP, not FINISH, once Back has been pressed.
+      self->removed = static_cast<unsigned>(self->updater.removeUnlistedFamilies(self->removedFamilies));
+      break;
+    case Step::NONE:
+      break;
+  }
+}
+
+void FontUpdateActivity::completeStep() {
+  const Step done = step;
+  step = Step::NONE;
+  switch (done) {
+    case Step::CHECK:
+      afterCheck();
+      break;
+    case Step::FAMILY:
+      afterFamily();
+      break;
+    case Step::FINISH:
+      afterFinish();
+      break;
+    case Step::NONE:
+      break;
+  }
+}
+
 void FontUpdateActivity::cancelSync() {
   // finishRun() STILL RUNS. Families that committed before the cancel are
   // installed, so the ledger has to record them and the registry has to be
@@ -155,6 +295,7 @@ void FontUpdateActivity::cancelSync() {
   // from the picker until reboot and make the next run hash it all again.
   // It is the same call the DONE path makes, for the same reasons.
   updater.finishRun();
+  runFinished = true;
   LOG_INF("FONTUPD", "font sync stopped by the reader after %u of %u families: %u updated, %u unchanged, %u errors",
           static_cast<unsigned>(nextFamily), static_cast<unsigned>(updater.getFamilies().size()), updated, unchanged,
           errors);
@@ -163,24 +304,8 @@ void FontUpdateActivity::cancelSync() {
   requestUpdate();
 }
 
-void FontUpdateActivity::runCheck() {
-  // Repaint between the check's network steps. immediate=true for the same
-  // reason the per-file progress callback uses it: this runs inside a blocking
-  // call that will not drain the flag for us.
-  auto stepCb = +[](void* ctx, FontUpdater::CheckStep step) {
-    auto* self = static_cast<FontUpdateActivity*>(ctx);
-    // The frame onEnter waited for already names the first step, so the
-    // CONTACTING callback has nothing to add; repainting it anyway costs a
-    // second identical refresh on top of the TLS handshake. checkStep has one
-    // writer, this task, so reading it here needs no lock.
-    if (step == self->checkStep) return;
-    {
-      RenderLock lock(*self);
-      self->checkStep = step;
-    }
-    self->requestUpdate(true);
-  };
-  const FontUpdater::FontError err = updater.fetchManifest(stepCb, this);
+void FontUpdateActivity::afterCheck() {
+  const FontUpdater::FontError err = checkResult;
 
   if (err == FontUpdater::NO_TOKEN) {
     LOG_INF("FONTUPD", "no GitHub token configured");
@@ -224,72 +349,44 @@ void FontUpdateActivity::runCheck() {
     return;
   }
 
-  {
-    RenderLock lock(*this);
-    state = State::SYNCING;
-  }
-  // Waited for, like the CHECKING frame and for the same reason: the next tick
-  // blocks on the first family, and "Font 1 of N" over a bar at zero must be on
-  // the panel before it does.
-  requestUpdateAndWait();
-}
-
-void FontUpdateActivity::syncNextFamily() {
-  const auto& fonts = updater.getFamilies();
-  if (nextFamily >= fonts.size()) {
-    // REMOVAL RUNS HERE: after every family has been offered, and only on the
-    // path that reaches the summary. Two orderings were possible and this one
-    // is deliberate.
-    //
-    // Removing FIRST would free card space before ~80 MB of downloads, which is
-    // the only argument for it. It also means a run that then fails, or that
-    // the reader stops, has destroyed families and installed nothing -- the
-    // worst trade this screen could make with the owner's data. Removing last
-    // costs nothing but disk headroom on a card that was already holding both
-    // sets a moment ago.
-    //
-    // A CANCEL NEVER REMOVES: cancelSync() is a different exit and does not
-    // call this. Owner ruling 2026-09-07, and it follows from the same
-    // reasoning -- a reader who stopped the run did not ask for a mirror.
-    removed = static_cast<unsigned>(updater.removeUnlistedFamilies(removedFamilies));
-    for (const auto& name : removedFamilies) {
-      if (!removedNames.empty()) removedNames += ", ";
-      removedNames += name;
-    }
-
-    // finishRun() writes the ledger once and, if anything installed OR was
-    // removed, re-discovers the registry and drops layout caches built with a
-    // replaced active font.
-    updater.finishRun();
-    LOG_INF("FONTUPD", "font sync done: %u updated, %u unchanged, %u removed, %u errors", updated, unchanged, removed,
-            errors);
-    if (removed != 0) LOG_INF("FONTUPD", "removed: %s", removedNames.c_str());
-    if (skippedDeleted != 0) {
-      LOG_INF("FONTUPD", "not downloaded, deleted by the owner: %s", skippedNames.c_str());
-    }
-    if (errors != 0) writeFailureLog(updated, unchanged, removed, errors);
-    RenderLock lock(*this);
-    state = State::DONE;
-    requestUpdate();
+  if (stopRequested.load()) {
+    // Back during the check. Nothing has touched the card; say so honestly as
+    // "stopped after 0 of N" rather than pretending the run completed.
+    cancelSync();
     return;
   }
 
-  auto progressCb = +[](void* ctx) {
-    auto* self = static_cast<FontUpdateActivity*>(ctx);
-    // immediate=true: this runs inside a download loop that will not drain the
-    // flag for us.
-    self->requestUpdate(true);
-  };
+  {
+    RenderLock lock(*this);
+    state = State::SYNCING;
+    updater.resetFamilyProgress();
+  }
+  // Waited for, like the CHECKING frame and for the same reason: on the device
+  // the next tick blocks on the first family, and "Font 1 of N" over a bar at
+  // zero must be on the panel before it does.
+  requestUpdateAndWait();
+  std::lock_guard<std::mutex> guard(paintMutex);
+  shown = snapshot(millis());
+  hasShown = true;
+  lastPaintMs = millis();
+}
 
+void FontUpdateActivity::beginNextFamily() {
   const size_t i = nextFamily++;
   {
     RenderLock lock(*this);
     currentFamily = i;
-    lastRenderedPercent = 101;
     updater.resetFamilyProgress();  // before the repaint below can read them
   }
-  requestUpdate(true);
-  switch (updater.syncFamily(i, progressCb, this)) {
+  familyIndex = i;
+  maybeRepaint(/*force=*/true);
+  startStep(Step::FAMILY);
+}
+
+void FontUpdateActivity::afterFamily() {
+  const auto& fonts = updater.getFamilies();
+  const size_t i = familyIndex;
+  switch (familyResult) {
     case FontUpdater::FamilyResult::ADDED:
     case FontUpdater::FamilyResult::UPDATED:
       updated++;
@@ -321,6 +418,62 @@ void FontUpdateActivity::syncNextFamily() {
   }
 }
 
+void FontUpdateActivity::afterFinish() {
+  for (const auto& name : removedFamilies) {
+    if (!removedNames.empty()) removedNames += ", ";
+    removedNames += name;
+  }
+
+  // finishRun() writes the ledger once and, if anything installed OR was
+  // removed, re-discovers the registry and drops layout caches built with a
+  // replaced active font.
+  updater.finishRun();
+  runFinished = true;
+  LOG_INF("FONTUPD", "font sync done: %u updated, %u unchanged, %u removed, %u errors", updated, unchanged, removed,
+          errors);
+  if (removed != 0) LOG_INF("FONTUPD", "removed: %s", removedNames.c_str());
+  if (skippedDeleted != 0) {
+    LOG_INF("FONTUPD", "not downloaded, deleted by the owner: %s", skippedNames.c_str());
+  }
+  if (errors != 0) writeFailureLog(updated, unchanged, removed, errors);
+  RenderLock lock(*this);
+  state = State::DONE;
+  requestUpdate();
+}
+
+// What the progress frame would show now; see updprogress::Snapshot.
+updprogress::Snapshot FontUpdateActivity::snapshot(unsigned long now) const {
+  updprogress::Snapshot s;
+  s.state = static_cast<uint8_t>(state);
+  s.phase = state == State::CHECKING ? static_cast<uint8_t>(checkStep.load()) : static_cast<uint8_t>(updater.phase());
+  s.item = static_cast<uint32_t>(currentFamily);
+  s.file = static_cast<uint32_t>(updater.getCurrentFile());
+  s.bytes = updater.getProcessedSize();
+  s.elapsedSec = static_cast<uint32_t>((now - startMs) / 1000);
+  s.stopping = stopRequested.load();
+  return s;
+}
+
+// The one place a progress frame is asked for while the run works. Reached
+// from the updater's callbacks (the loop task on the device, the worker on a
+// host) and from loop()'s own heartbeat (which is what keeps the clock moving
+// on a host while a single file's bytes are in flight).
+void FontUpdateActivity::maybeRepaint(bool force) {
+  if (state != State::CHECKING && state != State::SYNCING) return;
+  std::lock_guard<std::mutex> guard(paintMutex);
+  const unsigned long now = millis();
+  const updprogress::Snapshot s = snapshot(now);
+  if (!force && !updprogress::shouldRepaint(hasShown, shown, s, static_cast<uint32_t>(now - lastPaintMs))) return;
+  shown = s;
+  hasShown = true;
+  lastPaintMs = now;
+  // immediate=true: on the device this runs inside a download loop that will
+  // not drain a deferred flag for us.
+  requestUpdate(true);
+}
+
+void FontUpdateActivity::onProgress(void* ctx) { static_cast<FontUpdateActivity*>(ctx)->maybeRepaint(); }
+
 void FontUpdateActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
@@ -334,11 +487,12 @@ void FontUpdateActivity::render(RenderLock&&) {
 
   switch (state) {
     case State::CHECKING: {
-      // Two lines and a two-step bar, not one static line: the whole check runs
-      // inside one loop() call, so a single frozen line reads as a hang. A bar
-      // rather than a spinner because this is e-ink and an animation costs a
-      // panel refresh per frame.
-      const bool reading = checkStep == FontUpdater::CheckStep::READING;
+      // Two lines and a two-step bar, not one static line, plus the elapsed
+      // clock: on a slow link the release request alone is seconds, and a clock
+      // that moves is the difference between "working" and "hung". A bar rather
+      // than a spinner because this is e-ink and an animation costs a panel
+      // refresh per frame; the clock is throttled to one FAST refresh a second.
+      const bool reading = checkStep.load() == FontUpdater::CheckStep::READING;
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_FOR_UPDATES), true, EpdFontFamily::BOLD);
       int y = top + lineHeight + metrics.verticalSpacing;
       renderer.drawCenteredText(UI_10_FONT_ID, y,
@@ -348,6 +502,10 @@ void FontUpdateActivity::render(RenderLock&&) {
           renderer,
           Rect{metrics.contentSidePadding, y, pageWidth - metrics.contentSidePadding * 2, metrics.progressBarHeight},
           reading ? 1 : 0, 2);
+      // Below the bar's own percentage label, which BaseTheme::drawProgressBar
+      // draws at the bar's bottom + 15 in UI_10.
+      y += metrics.progressBarHeight + 15 + lineHeight + metrics.verticalSpacing;
+      drawStatusLine(renderer, y, startMs, stopRequested.load(), tr(STR_FONTS_STOPPING));
       break;
     }
 
@@ -379,22 +537,29 @@ void FontUpdateActivity::render(RenderLock&&) {
     }
 
     case State::SYNCING: {
+      const auto& family = updater.getFamilies()[currentFamily];
+      const updprogress::Phase phase = updater.phase();
+      const size_t fileCount = family.files.size();
+      size_t fileIdx = updater.getCurrentFile();
+      if (fileCount > 0 && fileIdx >= fileCount) fileIdx = fileCount - 1;
       const size_t total = updater.getTotalSize();
       const size_t processed = updater.getProcessedSize();
-      // The current FILE's own progress, then this FAMILY's share of its six
-      // cuts, then the whole run's. Three levels because a family is a
-      // multi-megabyte download and the two coarser bars alone would sit still
-      // for a minute at a time.
+      // The bar is the WHOLE RUN. A family contributes only while its files are
+      // DOWNLOADING (six files' worth, file by file) and all of itself once it
+      // is installing: the hash of the files already on the card walks the same
+      // file indices from the start, so counting it would run the bar forward
+      // and then pull it back when the download began.
       // uint64_t like FontUpdater's own percent: `processed * 100` wraps a 32-bit
-      // size_t above 42.9 MB. No shipped cut is near that, and the multiplication
-      // is still wrong if one ever is.
+      // size_t above 42.9 MB.
       const unsigned int filePct =
           total > 0 ? static_cast<unsigned int>((static_cast<uint64_t>(processed) * 100) / total) : 0;
-      const unsigned int familyPct = fontsync::familyPercent(updater.getCurrentFile(), updater.getFileCount(), filePct);
+      unsigned int familyPct = 0;
+      if (phase == updprogress::Phase::DOWNLOADING) {
+        familyPct = fontsync::familyPercent(fileIdx, fileCount, filePct);
+      } else if (phase == updprogress::Phase::INSTALLING || phase == updprogress::Phase::FINISHING) {
+        familyPct = 100;
+      }
       const unsigned int pct = fontsync::overallPercent(currentFamily, updater.getFamilies().size(), familyPct);
-      // Once per percent, same e-ink reasoning as the OTA and Library screens.
-      if (pct == lastRenderedPercent) return;
-      lastRenderedPercent = pct;
 
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_FONTS_SYNCING), true, EpdFontFamily::BOLD);
       int y = top + lineHeight + metrics.verticalSpacing;
@@ -403,13 +568,43 @@ void FontUpdateActivity::render(RenderLock&&) {
                static_cast<unsigned>(currentFamily + 1), static_cast<unsigned>(updater.getFamilies().size()));
       renderer.drawCenteredText(UI_10_FONT_ID, y, familyLine);
       y += lineHeight + metrics.verticalSpacing;
-      const std::string& name = updater.getFamilies()[currentFamily].name;
-      renderer.drawCenteredText(UI_10_FONT_ID, y, name.c_str());
+      renderer.drawCenteredText(UI_10_FONT_ID, y, family.name.c_str());
       y += lineHeight + metrics.verticalSpacing;
+
+      // WHAT IT IS DOING, NAMED. "Checking Edgar_12 · 1.2 of 6.8 MB" while it
+      // hashes what is already on the card, "Downloading ..." while bytes
+      // arrive, the family's bytes in both. See UpdateProgress.h.
+      char detail[96];
+      detail[0] = '\0';
+      if (phase == updprogress::Phase::CHECKING || phase == updprogress::Phase::DOWNLOADING) {
+        char stem[40];
+        char done[12];
+        char all[12];
+        updprogress::stemOf(fileCount > 0 ? family.files[fileIdx].file.c_str() : "", stem, sizeof(stem));
+        updprogress::formatMb(updprogress::bytesDone(family.files, fileIdx, processed), done, sizeof(done));
+        updprogress::formatMb(updprogress::bytesTotal(family.files), all, sizeof(all));
+        snprintf(detail, sizeof(detail),
+                 phase == updprogress::Phase::CHECKING ? tr(STR_UPDATE_CHECKING_FILE_FORMAT)
+                                                       : tr(STR_UPDATE_DOWNLOADING_FILE_FORMAT),
+                 stem, done, all);
+      } else if (phase == updprogress::Phase::INSTALLING) {
+        snprintf(detail, sizeof(detail), "%s", tr(STR_UPDATE_INSTALLING));
+      } else if (phase == updprogress::Phase::FINISHING) {
+        snprintf(detail, sizeof(detail), "%s", tr(STR_UPDATE_FINISHING));
+      } else {
+        snprintf(detail, sizeof(detail), "%s", tr(STR_UPDATE_PREPARING));
+      }
+      renderer.drawCenteredText(SMALL_FONT_ID, y, detail);
+      y += lineHeight + metrics.verticalSpacing;
+
       GUI.drawProgressBar(
           renderer,
           Rect{metrics.contentSidePadding, y, pageWidth - metrics.contentSidePadding * 2, metrics.progressBarHeight},
           static_cast<int>(pct), 100);
+      // Below the bar's own percentage label, which BaseTheme::drawProgressBar
+      // draws at the bar's bottom + 15 in UI_10.
+      y += metrics.progressBarHeight + 15 + lineHeight + metrics.verticalSpacing;
+      drawStatusLine(renderer, y, startMs, stopRequested.load(), tr(STR_FONTS_STOPPING));
       // A cancel is only useful if the reader knows it exists, and this is the
       // one screen in the family that runs for minutes.
       const auto labels = mappedInput.mapLabels(tr(STR_CANCEL), "", "", "");

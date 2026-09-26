@@ -1,9 +1,13 @@
 #pragma once
 
+#include <atomic>
+#include <mutex>
 #include <string>
 
+#include "UpdateWorker.h"
 #include "activities/Activity.h"
 #include "network/LibraryUpdater.h"
+#include "network/UpdateProgress.h"
 
 /**
  * One-button library sync, from the claude-tools library-latest release.
@@ -42,6 +46,20 @@
  * and shows the summary. skipLoopDelay() keeps the ticks back to back on the
  * device, where the render task was already painting concurrently and nothing
  * changes but the shape of the code.
+ *
+ * ...AND ONE PRESENT PER BOOK WAS STILL A FREEZE (owner bug 2026-09-26, "not
+ * appearing frozen when i select Update Library"). A host presents only after
+ * loop() returns, so a 6 MB book on a 1 MB/s link was 8.6 s of unchanged glass
+ * with no input read. Each blocking step now goes through UpdateWorker (a
+ * std::thread on a host, inline on the device) and loop() keeps ticking. The
+ * frame names the phase and the bytes, carries an elapsed clock, and repaints
+ * by updprogress::shouldRepaint instead of once per whole-run percent -- which
+ * a hash never moved. Same design as FontUpdateActivity; read its header.
+ *
+ * BACK STOPS THE RUN BETWEEN BOOKS (2026-09-26). The book in hand finishes --
+ * it is written to <file>.part and renamed into place, so there is no partial
+ * book to leave -- and the rest are untouched. Before this the screen had no
+ * cancel at all, because a sync was "seconds"; the report is that it is not.
  */
 class LibraryUpdateActivity : public Activity {
  public:
@@ -50,6 +68,7 @@ class LibraryUpdateActivity : public Activity {
     NO_WIFI,
     NO_TOKEN,
     SYNCING,
+    CANCELED,  // Back pressed between books: some synced, the rest untouched
     DONE,
     FAILED,
   };
@@ -63,13 +82,19 @@ class LibraryUpdateActivity : public Activity {
   // A sleep mid-sync would leave a .part file. Harmless but pointless.
   bool preventAutoSleep() override { return state == State::SYNCING || state == State::CHECKING; }
   bool skipLoopDelay() override { return state == State::SYNCING; }
+  bool handleHomeGesture() override;
+  void onExit() override;
 
  private:
   State state = State::CHECKING;
   // Which network step the manifest check is on. The whole check runs inside
   // one loop() call, so without this the screen sits on one static line and
   // takes no input until it returns -- the "hangs on kickoff" report.
-  LibraryUpdater::CheckStep checkStep = LibraryUpdater::CheckStep::CONTACTING;
+  // Atomic, and written WITHOUT the render lock: on a host the check runs on a
+  // worker thread, and a worker that waits on RenderLock deadlocks against a
+  // sleep, whose transition holds RenderLock while onExit() joins the worker
+  // (ActivityManager.cpp:153; adversarial review 2026-09-26).
+  std::atomic<LibraryUpdater::CheckStep> checkStep{LibraryUpdater::CheckStep::CONTACTING};
   LibraryUpdater updater;
   std::string errorMessage;
   size_t currentBook = 0;  // index into the manifest while SYNCING (the book on screen)
@@ -81,11 +106,37 @@ class LibraryUpdateActivity : public Activity {
   unsigned storageErrors = 0;
   unsigned networkErrors = 0;
   unsigned verifyErrors = 0;
-  unsigned int lastRenderedPercent = 101;
   // onEnter() paints and waits; the network work is loop()'s, on its first
   // pass, so that nothing blocks before the frame is displayed (see above).
   bool checkStarted = false;
+  bool recordsFlushed = false;
+  unsigned long startMs = 0;
 
-  void runCheck();      // the manifest check, on the first loop() tick
-  void syncNextBook();  // one book per SYNCING tick, then DONE
+  enum class Step : uint8_t { NONE, CHECK, BOOK };
+  Step step = Step::NONE;
+  UpdateWorker worker;
+  LibraryUpdater::LibraryError checkResult = LibraryUpdater::OK;
+  LibraryUpdater::BookResult bookResult = LibraryUpdater::BookResult::FAILED;
+  size_t bookIndex = 0;
+  std::atomic<bool> stopRequested{false};
+  std::atomic<bool> abandon{false};
+
+  std::mutex paintMutex;
+  updprogress::Snapshot shown;
+  bool hasShown = false;
+  unsigned long lastPaintMs = 0;
+
+  void startStep(Step next);
+  static void runStep(void* ctx);
+  void completeStep();
+  void afterCheck();
+  void beginNextBook();
+  void afterBook();
+  void finishSync(bool stopped);  // flush the ledger, then DONE or CANCELED
+  void requestStop();
+  updprogress::Snapshot snapshot(unsigned long now) const;
+  // force: a new family/book is always requested at once, as the code before
+  // 2026-09-26 did -- items are seconds apart and the render task coalesces.
+  void maybeRepaint(bool force = false);
+  static void onProgress(void* ctx);
 };
