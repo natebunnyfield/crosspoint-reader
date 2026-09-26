@@ -51,6 +51,7 @@
 #include <tuple>
 #include <vector>
 
+#include "Epub/AutoJustify.h"
 #include "Epub/KnuthPlassBreaker.h"
 #include "Epub/LineBreakMode.h"
 #include "Epub/ParsedText.h"
@@ -1369,12 +1370,31 @@ std::string repeatedParagraph(const int copies) {
 
 }  // namespace
 
+// Instrument: each face's word space, and what automatic justification decides
+// for it at the X3's 512 px measure (its estimated characters per line against
+// the default threshold).
 TEST(KnuthPlassDevice, DISABLED_SpaceWidths) {
-  for (const auto& f : std::vector<std::pair<std::string, int>>{
-           {"LibreFranklin", 12}, {"LibreFranklin", 14}, {"LibreFranklin", 18}, {"Albo", 12}, {"Albo", 14}, {"Albo", 18}}) {
+  for (const auto& f : std::vector<std::pair<std::string, int>>{{"LibreFranklin", 12},
+                                                                {"LibreFranklin", 14},
+                                                                {"LibreFranklin", 18},
+                                                                {"Albo", 8},
+                                                                {"Albo", 10},
+                                                                {"Albo", 12},
+                                                                {"Albo", 14},
+                                                                {"Albo", 16},
+                                                                {"Albo", 18}}) {
     const int id = Env::instance().fontFor(f.first, f.second);
-    if (id) printf("[space] %s %d: %d px\n", f.first.c_str(), f.second,
-                   Env::instance().renderer().getSpaceAdvance(id, 'n', 'n', EpdFontFamily::REGULAR));
+    if (!id) continue;
+    auto& r = Env::instance().renderer();
+    if (r.isSdCardFont(id)) {
+      std::deque<std::string> d = {autojustify::ALPHABET, "n n"};
+      r.ensureSdCardFontReady(id, d, true, 0x01);
+    }
+    const int alpha = r.getTextAdvanceX(id, autojustify::ALPHABET, EpdFontFamily::REGULAR);
+    const int cpl = autojustify::charsPerLine(kMeasure, alpha);
+    printf("[space] %s %d: space %d px, alphabet %d px, ~%d chars/line at %d px -> %s at threshold %d\n",
+           f.first.c_str(), f.second, r.getSpaceAdvance(id, 'n', 'n', EpdFontFamily::REGULAR), alpha, cpl, kMeasure,
+           autojustify::shouldJustify(kMeasure, alpha) ? "JUSTIFIED" : "ragged", autojustify::THRESHOLD_CHARS);
   }
 }
 

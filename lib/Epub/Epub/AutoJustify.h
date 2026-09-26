@@ -111,13 +111,20 @@
 // for. See docs/auto-justification.md.
 namespace autojustify {
 
+// THE DEFAULT IS 34 (owner ruling 2026-09-26), below Bringhurst's 40. The
+// reason is the breaker, not the page: with Knuth-Plass total fit and shrink
+// on justified blocks (KnuthPlassBreaker.h; docs/knuth-plass-line-breaking-
+// 2026-09-25.md sections 13-15), a justified 36-38 character line no longer
+// has the greedy breaker's catastrophic gaps that the 40 existed to avoid, and
+// 34 is what makes the X3's default page -- both 14 pt faces at 512 px, 36 and
+// 38 characters -- justify. It was 40 from 2026-08-23:
 // Bringhurst 2.1.2, p. 27: "A reasonable working minimum for justified text in
 // English is the 40-character line." This is the DEFAULT, and the value every
 // call below falls back to; the owner can move it (2026-08-24 ruling, "make
 // justified or ragged right character count an ios app setting" -> the
 // firmware's own Settings screen, since it changes line BREAKS and therefore
 // has to live in ReaderRenderSpec, which is built from CrossPointSettings).
-constexpr int THRESHOLD_CHARS = 40;
+constexpr int THRESHOLD_CHARS = 34;
 
 // THE OFFERED LADDER, and why these five rungs rather than round numbers.
 //
@@ -145,13 +152,16 @@ constexpr int THRESHOLD_CHARS = 40;
 // ("less than 38 or 40"), which is also where Gregory & Poulton (1970) measured
 // justification becoming significantly worse than ragged -- seven words per
 // line, ~38-39 characters. 45 is Butterick's comfortable floor (Practical
-// Typography gives 45-90). And 40 is Bringhurst's stated minimum, the default.
+// Typography gives 45-90). And 40 is Bringhurst's stated minimum, the default
+// until 2026-09-26. 34 was inserted that day as the new default (see
+// THRESHOLD_CHARS): it justifies both 14 pt faces at 512 px (36-38 characters)
+// while Libre Franklin 18 (32) and every 18 pt face below it stay ragged.
 //
 // Ascending, and the ORDER IS the picker's order. The stored value is the
 // character COUNT, never an index into this array -- see the getter/setter row
 // in src/SettingsList.h -- so a rung may be inserted here without migrating a
 // single settings.json.
-constexpr int THRESHOLD_CHOICES[] = {32, 36, 40, 45, 50};
+constexpr int THRESHOLD_CHOICES[] = {32, 34, 36, 40, 45, 50};
 constexpr int THRESHOLD_CHOICE_COUNT = static_cast<int>(sizeof(THRESHOLD_CHOICES) / sizeof(THRESHOLD_CHOICES[0]));
 
 // A stored byte -> a usable threshold. Anything outside the offered ladder --

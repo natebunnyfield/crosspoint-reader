@@ -486,6 +486,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
           case 32:
             justifyLabels.push_back(StrId::STR_JUSTIFY_ALMOST_ALWAYS);
             break;
+          case 34:
+            justifyLabels.push_back(StrId::STR_JUSTIFY_VERY_OFTEN);
+            break;
           case 36:
             justifyLabels.push_back(StrId::STR_JUSTIFY_MORE_OFTEN);
             break;

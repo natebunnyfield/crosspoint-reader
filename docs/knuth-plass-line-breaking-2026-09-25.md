@@ -1310,3 +1310,46 @@ CJK checks report overlapping glyphs and the NBSP check overflows by 2–4 px.
 * **The pre-existing NBSP stretch under-fill (F2's root) is NOT fixed for
   stretch.** Such a line still ends up to one extra short of the measure, as it
   always has. Shrink is simply refused on those lines.
+
+---
+
+## 15. Owner ruling: the default page justifies (2026-09-26)
+
+**Owner ruling 2026-09-26.** Lower the automatic-justification threshold from
+40 characters to 34. The default 14 pt X3 page, 36–38 characters at 512 px
+(§2), then justifies, so Knuth-Plass with shrink (§13, §14) runs by default.
+Until now §2's point held: at the default settings the page was ragged, and
+none of this work reached it.
+
+**Also confirmed:** the pixel-exact ⌊space/3⌋ shrink of §14b stays. It matches
+the ⅔-of-a-space rule.
+
+**What changed:**
+
+* `autojustify::THRESHOLD_CHARS` 40 → 34 (`lib/Epub/Epub/AutoJustify.h`).
+* 34 inserted into the Justified Text ladder as **Very often (34)**: English
+  and Spanish strings, and its label case in `src/SettingsList.h`.
+* `SECTION_FILE_VERSION` 60 → 61.
+* `AutoJustifyTest` updated.
+* The full account and the measured flip table are in
+  `docs/auto-justification.md`, final section.
+
+**Measured, 512 px, each face's estimated characters per line:**
+
+| Face | Justifies at 34 | Ragged at 34 |
+|---|---|---|
+| Libre Franklin | 12 pt (42), 14 pt (**36**, newly) | 18 pt (28) |
+| Albo | 8–12 pt (44–65), 14 pt (**37**, newly) | 16 pt (33), 18 pt (29) |
+
+Both 14 pt faces flip.
+
+**Not automatic on an existing device.** The threshold is a saved setting, and
+`settings.json` always carries it. A device that has saved settings keeps 40
+until the row is set to 34; only a fresh settings file gets the new default. It
+is not migrated, because a chosen 40 and a defaulted 40 look the same.
+
+**Verified:**
+
+* All 761 host tests green, including `LineBreakQualityTest` 14/14 and
+  `LineBreakKnuthPlassTest`.
+* `pio run -e default` and `pio run -e simulator_x3` both build (see the commit).

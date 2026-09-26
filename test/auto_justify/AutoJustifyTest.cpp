@@ -68,10 +68,13 @@ constexpr Rendered kRendered[] = {
 
 }  // namespace
 
-TEST(AutoJustify, ThresholdIsBringhurstsFortyCharacterLine) {
-  EXPECT_EQ(autojustify::THRESHOLD_CHARS, 40)
-      << "Bringhurst, The Elements of Typographic Style, 2.1.2 p. 27: 'A reasonable "
-         "working minimum for justified text in English is the 40-character line.'";
+TEST(AutoJustify, TheDefaultThresholdIs34ByOwnerRuling) {
+  // Bringhurst's 40 (2.1.2, p. 27: "A reasonable working minimum for justified
+  // text in English is the 40-character line") was the default from 2026-08-23
+  // until the owner ruled 34 on 2026-09-26, once Knuth-Plass with shrink set
+  // justified text (docs/knuth-plass-line-breaking-2026-09-25.md section 15).
+  // 40 stays on the ladder as "Balanced (40)".
+  EXPECT_EQ(autojustify::THRESHOLD_CHARS, 34);
 }
 
 TEST(AutoJustify, ForNineIsTheFirstCountThatJustifies) {
@@ -79,9 +82,14 @@ TEST(AutoJustify, ForNineIsTheFirstCountThatJustifies) {
   // Pick an alphabet where the counts land cleanly on integers.
   const int alphabet = 281;  // 1 px per 0.1 char at this constant
   EXPECT_EQ(autojustify::charsPerLine(400, alphabet), 40);
-  EXPECT_TRUE(autojustify::shouldJustify(400, alphabet));
+  EXPECT_TRUE(autojustify::shouldJustify(400, alphabet, 40));
   EXPECT_EQ(autojustify::charsPerLine(390, alphabet), 39);
-  EXPECT_FALSE(autojustify::shouldJustify(390, alphabet));
+  EXPECT_FALSE(autojustify::shouldJustify(390, alphabet, 40));
+  // And the same inclusive edge at the default, 34.
+  EXPECT_EQ(autojustify::charsPerLine(340, alphabet), 34);
+  EXPECT_TRUE(autojustify::shouldJustify(340, alphabet));
+  EXPECT_EQ(autojustify::charsPerLine(330, alphabet), 33);
+  EXPECT_FALSE(autojustify::shouldJustify(330, alphabet));
 }
 
 TEST(AutoJustify, ReproducesBringhurstsWorkedExample) {
@@ -160,8 +168,10 @@ TEST(AutoJustify, APointSizeProxyWouldGetThisWrong) {
   // proxy cannot see the difference, so it would put TeXGyre Heros and Inknut
   // Junicode -- both 14 pt, 44.6 and 34.4 rendered characters -- on the same
   // side of the line.
-  EXPECT_TRUE(autojustify::shouldJustify(512, 323));   // TeXGyreHeros 14 pt
-  EXPECT_FALSE(autojustify::shouldJustify(512, 412));  // InknutJunicode 14 pt
+  // At Bringhurst's 40, where this was measured; at the 34 default both sides
+  // of that pair justify, and the argument stands on the ladder's 40 rung.
+  EXPECT_TRUE(autojustify::shouldJustify(512, 323, 40));   // TeXGyreHeros 14 pt
+  EXPECT_FALSE(autojustify::shouldJustify(512, 412, 40));  // InknutJunicode 14 pt
 }
 
 TEST(AutoJustify, WiderMeasureNeverRagsWhenANarrowerOneJustifies) {
@@ -251,14 +261,14 @@ TEST(AutoJustify, TheArithmeticDoesNotOverflowAtAnyPlausibleMeasure) {
 // that works.
 // ---------------------------------------------------------------------------
 
-TEST(AutoJustifyThreshold, TheDefaultIsStillBringhurstsFortyCharacterLine) {
+TEST(AutoJustifyThreshold, TheDefaultIsTheDocumentedValue) {
   // The row moved; the book's number did not. A call that names no threshold
   // must land exactly where every call landed before the setting existed --
   // this is what keeps the test harnesses, and any future caller that does not
   // care, on the documented value rather than on whatever the ladder's first
   // rung happens to be.
-  EXPECT_EQ(autojustify::THRESHOLD_CHARS, 40);
-  EXPECT_EQ(autojustify::clampThreshold(autojustify::THRESHOLD_CHARS), 40);
+  EXPECT_EQ(autojustify::THRESHOLD_CHARS, 34);  // owner ruling 2026-09-26; 40 before
+  EXPECT_EQ(autojustify::clampThreshold(autojustify::THRESHOLD_CHARS), 34);
   for (int alphabet = 200; alphabet <= 600; alphabet += 7) {
     for (int measure = 200; measure <= 900; measure += 11) {
       EXPECT_EQ(autojustify::shouldJustify(measure, alphabet),
@@ -272,9 +282,9 @@ TEST(AutoJustifyThreshold, TheDefaultIsStillBringhurstsFortyCharacterLine) {
 
 TEST(AutoJustifyThreshold, TheLadderIsAscendingAndEveryRungIsDistinct) {
   // A duplicated or out-of-order rung is a settings row that lies: the picker
-  // shows five choices and two of them do the same thing, which no compiler and
+  // shows six choices and two of them do the same thing, which no compiler and
   // no render can see.
-  ASSERT_EQ(autojustify::THRESHOLD_CHOICE_COUNT, 5);
+  ASSERT_EQ(autojustify::THRESHOLD_CHOICE_COUNT, 6);
   for (int i = 1; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
     EXPECT_LT(autojustify::THRESHOLD_CHOICES[i - 1], autojustify::THRESHOLD_CHOICES[i])
         << "rung " << i << " does not ascend";
@@ -283,11 +293,12 @@ TEST(AutoJustifyThreshold, TheLadderIsAscendingAndEveryRungIsDistinct) {
   // numbers the settings labels print, and a rung that moves without its label
   // moving ships a row reading "Balanced (40)" that sets something else.
   EXPECT_EQ(autojustify::THRESHOLD_CHOICES[0], 32);
-  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[1], 36);
-  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[2], 40);
-  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[3], 45);
-  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[4], 50);
-  // Bringhurst's number is on the ladder, and it is the default.
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[1], 34);  // the default since 2026-09-26
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[2], 36);
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[3], 40);  // Bringhurst's, the default until then
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[4], 45);
+  EXPECT_EQ(autojustify::THRESHOLD_CHOICES[5], 50);
+  // The default is on the ladder.
   bool defaultIsOffered = false;
   for (int i = 0; i < autojustify::THRESHOLD_CHOICE_COUNT; i++) {
     if (autojustify::THRESHOLD_CHOICES[i] == autojustify::THRESHOLD_CHARS) defaultIsOffered = true;

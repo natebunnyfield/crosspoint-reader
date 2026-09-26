@@ -1,5 +1,11 @@
 # Automatic justification — the measure decides
 
+> **Default changed 2026-09-26: 40 → 34 characters** (owner ruling). With
+> Knuth-Plass total fit and shrink now setting justified text, the X3's default
+> 14 pt page justifies. See [the section at the foot](#2026-09-26-the-default-drops-to-34).
+> Everything below that describes 40 as the default is the record from
+> 2026-08-23/24, when the greedy breaker set justified text.
+
 **Owner ruling, 2026-08-23, verbatim:** "remove ragged right or justified ios
 app settings, instead make it automatic by letting the character length decide
 what is optimal."
@@ -355,8 +361,9 @@ the measure.
 | stored | row label | what it does |
 |---|---|---|
 | 32 | Almost always (32) | even narrow columns keep a flush edge |
+| **34** | **Very often (34)** | **default since 2026-09-26** — both 14 pt faces justify at 512 px |
 | 36 | More often (36) | |
-| **40** | **Balanced (40)** | Bringhurst's stated minimum — **default** |
+| 40 | Balanced (40) | Bringhurst's stated minimum — the default until 2026-09-26 |
 | 45 | Less often (45) | |
 | 50 | Only wide pages (50) | only a genuinely comfortable measure justifies |
 
@@ -542,3 +549,51 @@ firmware's own page capture and group the word rects by baseline:
 CROSSPOINT_SIM_READALOUD_LOG=2 CROSSPOINT_SIM_INPUT_SCRIPT='12000:QUIT' \
   SDL_VIDEODRIVER=dummy .pio/build/simulator_x3/program 2>&1 | grep READALOUD-RECT
 ```
+
+## 2026-09-26: the default drops to 34
+
+**Owner ruling 2026-09-26:** lower the automatic-justification threshold from
+40 to 34, so the default 14 pt X3 page justifies and runs Knuth-Plass with
+shrink (`docs/knuth-plass-line-breaking-2026-09-25.md` §15).
+
+**Why 40 no longer binds.** Bringhurst's 40 exists because a short justified
+line has too few gaps to absorb its slack. That failure was measured on the
+greedy breaker: 22–59-space gaps at 14 pt (the KP doc's §3a). Knuth-Plass with
+shrink caps the loosest line far lower and lets a gap narrow to ⅔ of a space.
+
+**The change:**
+
+* `autojustify::THRESHOLD_CHARS` is 34.
+* 34 is inserted into the ladder as **Very often (34)**, giving
+  32 / 34 / 36 / 40 / 45 / 50. The stored value is the character count, so no
+  settings file needs a migration.
+* `SECTION_FILE_VERSION` 60 → 61.
+
+**What flips.** Measured 2026-09-26 by `KnuthPlassDevice.DISABLED_SpaceWidths`,
+at 512 px, using this code's own estimate:
+
+| Face | pt | alphabet | est. chars/line | at 40 | at 34 |
+|---|---:|---:|---:|---|---|
+| Libre Franklin (built-in, the default face) | 12 | 346 px | 42 | justified | justified |
+| Libre Franklin | **14** (default size) | 401 px | **36** | ragged | **justified** |
+| Libre Franklin | 18 | 514 px | 28 | ragged | ragged |
+| Albo | 8 / 10 / 12 | 220 / 276 / 328 px | 65 / 52 / 44 | justified | justified |
+| Albo | **14** | 386 px | **37** | ragged | **justified** |
+| Albo | 16 | 442 px | 33 | ragged | ragged (one short) |
+| Albo | 18 | 498 px | 29 | ragged | ragged |
+
+Of these, **only the two 14 pt rows flip.** The other card families were not
+re-measured. On the 2026-08-23 sweep above, the 14 pt faces estimated at 35–39
+would also flip: Schola, Edgar, Inknut Junicode. That comes from the older
+table, which predates font rebuilds, so it is **inferred, not measured**.
+
+**A device with a saved settings file keeps its old value.**
+`CrossPointSettings.cpp` writes `justifyThreshold` into `settings.json` on
+every save, so an install that has saved settings still holds 40. The new
+default applies only where the key is absent: a fresh card, or a settings file
+predating the row.
+
+* **Not migrated.** Nothing can tell a 40 someone chose from a 40 the old
+  default wrote.
+* **On an existing device,** choose **Justified Text → Very often (34)**.
+
