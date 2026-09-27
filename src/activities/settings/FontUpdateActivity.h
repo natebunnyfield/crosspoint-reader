@@ -145,6 +145,13 @@ class FontUpdateActivity : public Activity {
   // on-screen summary is unchanged.
   unsigned skippedDeleted = 0;
   std::string skippedNames;
+  // Families the HOST bundled whose release copy differs, and which the sync
+  // therefore did not download (FontUpdater::FamilyResult::SKIPPED_BUNDLED):
+  // the iOS seed pass would put the app's copy back on the next launch. Logged
+  // with the names, same as the deleted ones; the on-screen summary is
+  // unchanged.
+  unsigned keptBundled = 0;
+  std::string keptBundledNames;
   // Families deleted because the manifest no longer lists them, counted apart
   // from the three above: this is the only destructive thing the screen does,
   // and folding it into "updated" would hide it. The names are kept so the

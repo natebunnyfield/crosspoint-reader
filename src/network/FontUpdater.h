@@ -120,6 +120,16 @@ class FontUpdater {
     // Absent from the card and on the owner-deleted list (/.crosspoint/deleted-fonts.txt):
     // nothing downloaded, nothing written. See FontDeletionList.h.
     SKIPPED_DELETED,
+    // On the card, bundled by the HOST (/.crosspoint/seeded-fonts.txt), and
+    // DIFFERENT from the manifest: nothing downloaded, nothing written. The
+    // iOS seed pass owns a bundled family and puts the app's copy back on
+    // every launch, so a download here was reverted before the next run could
+    // see it -- and the next run downloaded it again, forever (owner bug
+    // 2026-09-26, "skip font downloads if they are identical";
+    // docs/update-progress-2026-09-26.md section 9). An IDENTICAL bundled
+    // family is still UNCHANGED. Never produced on the device or the desktop,
+    // where nothing seeds.
+    SKIPPED_BUNDLED,
   };
 
   struct FontFile {
@@ -286,6 +296,9 @@ class FontUpdater {
   // first syncFamily() and kept current as this run adds to or clears it.
   std::vector<std::string> deletedFamilies;
   bool deletedLoaded = false;
+  // The host-bundled list (iOS seeded-fonts.txt), read once per run beside it.
+  // Empty on the device and the desktop. See SKIPPED_BUNDLED.
+  std::vector<std::string> hostSeededFamilies;
 
   bool hasRecordsFor(const std::string& family) const;
   void dropRecordsFor(const std::string& family);

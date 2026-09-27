@@ -867,6 +867,7 @@ FontUpdater::FamilyResult FontUpdater::syncFamily(size_t index, ProgressCallback
   // The rules and why: FontDeletionList.h.
   if (!deletedLoaded) {
     deletedFamilies = fontdeletions::loadDeleted();
+    hostSeededFamilies = fontdeletions::loadHostSeeded();
     deletedLoaded = true;
   }
   const bool listedDeleted = fontdeletions::contains(deletedFamilies, family.name);
@@ -901,6 +902,32 @@ FontUpdater::FamilyResult FontUpdater::syncFamily(size_t index, ProgressCallback
   if (fontsync::familyVerdict(family.files.size(), matching) == fontsync::FamilyVerdict::UNCHANGED) {
     LOG_DBG(LOG_MODULE, "Unchanged: %s (%u files)", family.name.c_str(), static_cast<unsigned>(matching));
     return FamilyResult::UNCHANGED;
+  }
+
+  // A FAMILY THE HOST BUNDLED IS THE HOST'S (owner bug 2026-09-26, "skip font
+  // downloads if they are identical"). The iOS seed pass
+  // (crosspoint-simulator ios/CrossPointFsPrep.cpp, seedOneFontDirectory)
+  // compares every bundled file against the app bundle on EVERY launch and
+  // copies the bundle's back over anything that differs. So a download here
+  // lasted until the next launch, and the run after it found the app's copy
+  // again and downloaded the same ~33 MB again -- measured: 30 files every run,
+  // indefinitely, while the owner saw fonts he had already downloaded come
+  // down again. Downloading cannot change what this card holds past the next
+  // launch; it can only cost the transfer, and for that one session swap the
+  // app's newer build (and its 2x tier, deleted below) for the release's.
+  //
+  // Asked AFTER the compare on purpose: an identical bundled family still
+  // reports UNCHANGED, and the log names the ones whose release copy really
+  // differs. A corrupt bundled file lands here too and is not downloaded --
+  // the seed pass repairs it from the bundle on the next launch, which it
+  // already does byte for byte. Only a family PRESENT on the card: an absent
+  // one goes through the deletion rules above, unchanged.
+  if (existed && fontdeletions::contains(hostSeededFamilies, family.name)) {
+    LOG_INF(LOG_MODULE,
+            "Keeping %s: bundled by the host (%s) and %u of %u files differ from the release; not downloading",
+            family.name.c_str(), fontdeletions::kHostSeededListPath,
+            static_cast<unsigned>(family.files.size() - matching), static_cast<unsigned>(family.files.size()));
+    return FamilyResult::SKIPPED_BUNDLED;
   }
   LOG_INF(LOG_MODULE, "%s: %u of %u files current -- installing the whole family", family.name.c_str(),
           static_cast<unsigned>(matching), static_cast<unsigned>(family.files.size()));

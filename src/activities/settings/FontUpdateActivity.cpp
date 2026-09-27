@@ -414,6 +414,11 @@ void FontUpdateActivity::afterFamily() {
       if (!skippedNames.empty()) skippedNames += ", ";
       skippedNames += fonts[i].name;
       break;
+    case FontUpdater::FamilyResult::SKIPPED_BUNDLED:
+      keptBundled++;
+      if (!keptBundledNames.empty()) keptBundledNames += ", ";
+      keptBundledNames += fonts[i].name;
+      break;
     case FontUpdater::FamilyResult::FAILED:
       errors++;
       switch (updater.lastFailure()) {
@@ -449,6 +454,9 @@ void FontUpdateActivity::afterFinish() {
   if (removed != 0) LOG_INF("FONTUPD", "removed: %s", removedNames.c_str());
   if (skippedDeleted != 0) {
     LOG_INF("FONTUPD", "not downloaded, deleted by the owner: %s", skippedNames.c_str());
+  }
+  if (keptBundled != 0) {
+    LOG_INF("FONTUPD", "not downloaded, the app's bundled copy is kept: %s", keptBundledNames.c_str());
   }
   if (errors != 0) writeFailureLog(updated, unchanged, removed, errors);
   RenderLock lock(*this);

@@ -792,6 +792,84 @@ TEST_F(FontCommit, RemovalSparesAFamilyTheHostSeeded) {
   EXPECT_EQ(r.removed, std::vector<std::string>{"Rosarivo"});  // the mirror still works for everything else
 }
 
+// --- a bundled family is the host's (owner bug 2026-09-26) ------------------
+//
+// "skip font downloads if they are identical." The iOS seed pass copies the
+// app's bundled copy of every bundled family back over the card on EVERY
+// launch (crosspoint-simulator ios/CrossPointFsPrep.cpp seedOneFontDirectory),
+// so a family whose release copy differs from the bundle was downloaded, put
+// back, and downloaded again on every run -- measured, 30 files and 33 MB a
+// run against the real fonts-latest. docs/update-progress-2026-09-26.md
+// section 9. `relaunch` is that seed pass, reduced to what it does to one
+// family: the bundle's bytes back over whatever is there.
+
+namespace {
+
+void relaunch(const std::string& family) { installOnCard("/fonts", family, "bundled", /*withHiResTiers=*/false); }
+
+}  // namespace
+
+TEST_F(FontCommit, ABundledFamilyThatDiffersIsNotDownloadedOnAnyRun) {
+  relaunch("Albo");  // the first launch seeds it
+  writeCardFile("/.crosspoint/seeded-fonts.txt", "# Families this app has seeded onto this card.\nAlbo\n");
+  publish({"Albo"}, "release");  // a different build of the same family
+
+  for (int run = 0; run < 3; ++run) {
+    fakegh::server().requested.clear();
+    FontUpdater updater;
+    const RunResult r = runSync(updater);
+    ASSERT_EQ(r.families.size(), 1u) << "run " << run;
+    EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::SKIPPED_BUNDLED) << "run " << run;
+    EXPECT_FALSE(requestedAnyCutOf("Albo")) << "run " << run << " downloaded a family the next launch reverts";
+    EXPECT_EQ(readCardFile("/fonts/Albo/" + fileName("Albo", 12)), cpfontBytes("Albo", 12, "bundled")) << "run " << run;
+    EXPECT_TRUE(r.removed.empty());
+    relaunch("Albo");
+  }
+}
+
+// The skip is asked AFTER the compare, so a bundled family that matches the
+// release still says so -- and costs no download, as before.
+TEST_F(FontCommit, ABundledFamilyIdenticalToTheReleaseIsUnchanged) {
+  installOnCard("/fonts", "Albo", "v1", /*withHiResTiers=*/false);
+  writeCardFile("/.crosspoint/seeded-fonts.txt", "Albo\n");
+  publish({"Albo"}, "v1");
+
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  ASSERT_EQ(r.families.size(), 1u);
+  EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::UNCHANGED);
+  EXPECT_FALSE(requestedAnyCutOf("Albo"));
+}
+
+// The exemption is for what the HOST bundled, nothing wider: a family the list
+// does not name, on the same card, still updates when it differs.
+TEST_F(FontCommit, AFamilyTheHostDidNotBundleStillUpdates) {
+  installOnCard("/fonts", "Albo", "bundled", /*withHiResTiers=*/false);
+  installOnCard("/fonts", "Doves", "old", /*withHiResTiers=*/false);
+  writeCardFile("/.crosspoint/seeded-fonts.txt", "Albo\n");
+  publish({"Albo", "Doves"}, "new");
+
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  ASSERT_EQ(r.families.size(), 2u);
+  EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::SKIPPED_BUNDLED);
+  EXPECT_EQ(r.families[1], FontUpdater::FamilyResult::UPDATED);
+  EXPECT_EQ(readCardFile("/fonts/Doves/" + fileName("Doves", 8)), cpfontBytes("Doves", 8, "new"));
+}
+
+// Present is the condition. A bundled family that is ABSENT takes the deletion
+// rules exactly as before this change: with no ledger and no deleted-list
+// line, it installs.
+TEST_F(FontCommit, AnAbsentBundledFamilyIsNotCoveredByTheSkip) {
+  writeCardFile("/.crosspoint/seeded-fonts.txt", "Albo\n");
+  publish({"Albo"}, "v1");
+
+  FontUpdater updater;
+  const RunResult r = runSync(updater);
+  ASSERT_EQ(r.families.size(), 1u);
+  EXPECT_EQ(r.families[0], FontUpdater::FamilyResult::ADDED);
+}
+
 // The list's parser, alone. A line it trusts is a family the sync will refuse
 // to download, so anything that is not a plain safe family name is dropped.
 TEST(FontDeletionList, ParsesNamesAndDropsCommentsGarbageAndDuplicates) {

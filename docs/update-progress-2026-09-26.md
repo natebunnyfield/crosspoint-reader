@@ -410,3 +410,154 @@ overlap a run.
 - `test/update_progress/UpdateWorkerTest.cpp` `EveryExitReleasesTheKeepAwake`:
   source gate that `loop()` states the request before any return and `onExit()`
   releases. It fails with the Font activity's change reverted.
+
+## 9. "skip font downloads if they are identical" (owner, 2026-09-26, same day)
+
+Report taken at face value: Update Fonts on the phone re-downloads fonts that are
+already on the card. Surveyed at firmware `db8a36a4b`, crosspoint-simulator
+`6e1230b`, TestFlight build 233's bundle
+(`build/CrossPointX3.xcarchive/.../SeedFonts`), and `fonts-latest` as published
+2026-09-26T13:57:11Z (79 assets, 13 families, 82,853,797 bytes).
+
+### 9a. What it is NOT (verified)
+
+**Not the CPZ1 seed-font compression.** The lead was that the app seeds every
+family as a CPZ1 container while the manifest hashes the RAW `.cpfont`, so
+every seeded file would mismatch. It does not: the simulator's `HalFile` sniffs
+the container on a read-only open and serves the LOGICAL size and bytes
+(`crosspoint-simulator/src/HalStorage.cpp` `Impl::open`, `HalFile::size()`
+`:265-269`, `read()`), and `FontUpdater`'s `stampOf` and `computeCardSha256`
+both go through it. Measured: on a card holding build 233's CPZ1 files, the
+8 families whose content matches the release report `Unchanged` with no
+download, both on a seeded card and on a plain desktop card (9c).
+
+Also checked and found not to cause a re-download: the `font_sync.json`
+ledger (the seed pass rewriting a file changes its mtime, which costs a
+re-HASH, never a download -- `hashVerdict` only ever chooses between hashing
+and not); the 2x tier (not in the manifest, not compared); file-name case (the
+manifest names and the bundle's match byte for byte for all 78 files).
+
+### 9b. The cause (verified, measured)
+
+A ping-pong between two owners of the same directory.
+
+1. The seed pass, `crosspoint-simulator/ios/CrossPointFsPrep.cpp`
+   `seedBundledFontFamilies` -> `seedOneFontDirectory`, runs on EVERY cold
+   launch (`simulator_main.cpp:338`) and, by its own rule ("the bundle owns its
+   families"), copies the bundle's file over any card file that differs.
+   `filesIdentical` compares RAW bytes, so even a logically identical raw file
+   loses to its CPZ1 twin.
+2. Build 233's bundle is NOT the release's build for 5 of the 13 families --
+   real content differences, byte-diffed after decompressing the CPZ1:
+   Edgar, Coelacanth, InknutJunicode and Albo are different builds (sizes move;
+   Albo's bundle is the newer unhinted cut, `db8a36a4b`); LibreFranklin is the
+   same size with 4 bytes different per file. The other 8 (TeXGyreSchola,
+   LibrisADF, TeXGyreHeros, Almendra, Doves, VandenKeere,
+   AtkinsonHyperlegibleNext, HerosTextCut) are identical.
+3. So Update Fonts downloads those 5 whole (30 files, 33,442,709 bytes) and
+   deletes their 2x tiers (by the 2026-09-07 ruling); the next launch's seed
+   pass puts the app's copy back (60 files: 30 base cuts + 30 2x); the next
+   Update Fonts finds the app's copy, which differs, and downloads the same 30
+   files again. Every run, indefinitely. From the owner's chair that is fonts
+   he already downloaded coming down again -- the report exactly.
+
+The death point is not one line but the pair: `FontUpdater.cpp` `syncFamily`
+installing a family the host will revert, and `CrossPointFsPrep.cpp`
+`seedOneFontDirectory` reverting it.
+
+### 9c. Measured, before and after
+
+Replayed on the Mac with the REAL seed-pass source (`CrossPointFsPrep.cpp`
+compiled into a small driver, `HOME` pointed at a scratch card, build 233's
+`SeedFonts/` beside it -- exactly what a phone's cold launch runs), then the
+real `simulator_x3` firmware driving Settings > Update Fonts against the REAL
+`fonts-latest` over the network. One "launch" = seed pass + one Update Fonts.
+
+| Run | Seed pass | Families downloaded | Bytes |
+|---|---|---|---|
+| before, launch 1 (fresh card) | 13 cloned | 5 (30 files) | 33,442,709 |
+| before, launch 2 | **60 files re-seeded** | **5 again** (30 files) | 33,442,709 |
+| after, launch 1 (fresh card) | 13 cloned | **0** | 0 |
+| after, launch 2 | 0 re-seeded | 0 | 0 |
+| after, launch 3 | 0 re-seeded | 0 | 0 |
+| desktop (CPZ1 card, no seed list), run 1 | -- | 5 (real differences, mirror as ruled) | 33,442,709 |
+| desktop, run 2 | -- | **0** (13 unchanged) | 0 |
+
+After the fix each phone-shaped run logs 8 unchanged and
+`not downloaded, the app's bundled copy is kept: Edgar, Coelacanth,
+LibreFranklin, InknutJunicode, Albo`. The release asset API was hit 31 times in
+the before-run's log and once (the manifest) in the after-run's.
+
+NOT measured on the iOS Simulator itself: its app bundles carry no `SeedFonts/`
+(`build/ios-sim` configures `CROSSPOINT_IOS_SEED_FONTS_DIR` empty), and the seed
+pass plus `FontUpdater` are the same source on both, so the replay above runs
+every line of the path except the transport (NSURLSession vs curl), which
+section 7a already traced as not deciding anything here. Device: SHIPPED --
+UNCONFIRMED; what to observe is a second Update Fonts after a relaunch
+finishing with nothing downloaded.
+
+### 9d. The fix, and the choice it makes
+
+`FontUpdater::syncFamily`, after the compare: a family that is PRESENT on the
+card and listed in the host's `/.crosspoint/seeded-fonts.txt` is not downloaded
+when it differs -- new result `FamilyResult::SKIPPED_BUNDLED`, logged with the
+names. An identical bundled family still reports `UNCHANGED`; an absent one goes
+through the deletion rules unchanged; a family the host did not bundle updates
+as before. The list is empty on the X3 and on the desktop, so neither changes.
+
+**This picks the bundle over the release for bundled families on iOS.** That is
+already the effective behavior -- the seed pass reverts any download at the next
+launch -- and it is the argument `removeUnlistedFamilies` already makes ("the
+bundle ... is a newer statement of what belongs on this card than a release").
+What is given up: a release copy NEWER than the TestFlight bundle used to be
+readable from the Update Fonts run until the next launch; now it is not
+downloaded at all, and the phone gets a bundled family's new build only through
+an app update. The alternative, not built: make the seed pass re-seed only when
+the BUNDLE's own bytes change (a per-file record of what it last seeded), so a
+download sticks until the next app build. Its cost: Update Fonts then replaces
+the bundle's newer Albo with the release's older one and deletes its 2x tier,
+and the ping-pong still happens once per app build. Owner ruling wanted if the
+first trade is the wrong one.
+
+### 9e. Adversarial review (read-only agent, same day)
+
+No correctness bug. Findings kept, not fixed:
+- **A stale seed ledger withholds updates.** `seedBundledFontFamilies` returns
+  before rewriting `seeded-fonts.txt` when the bundle has no `SeedFonts/`
+  (`CrossPointFsPrep.cpp`, the early `opendir` return), so a seedless iOS build
+  run on a card a seeded build wrote -- or a desktop `fs_` restored from a
+  phone -- keeps skipping those families with nothing reverting them.
+  TestFlight always ships seeds. The removal fence (`removeUnlistedFamilies`)
+  has had the same exposure since this morning.
+- **A bundled family in BOTH roots.** `migrateFontFamilies` leaves a hidden
+  copy when the visible one exists; `findFamilyRoot` returns the hidden one,
+  which the seed pass never reverts. No normal path was found that creates it.
+- **The differing families are still hashed every run** (~33 MB of CPZ1
+  inflate + SHA), because `putRecord` records only a match. No download, but
+  not free. Caching a mismatch would mean trusting a stored digest to decide,
+  which `hashVerdict` deliberately refuses.
+- **The on-screen summary does not count them** (same as `SKIPPED_DELETED`), so
+  updated + unchanged + errors no longer adds up to the family count.
+
+Checked and found CLEAN: the CPZ1 size path; the seed pass's
+clone-vs-copy+prune (a committed install is a real directory, so copy+prune
+reverts it); the ledger's handling of owner-deleted and departed families;
+name matching; ordering against recovery, the deletion rules and the compare;
+`flushSyncRecords` pruning and `finishRun` (the skip writes nothing);
+`-Wswitch` over `FamilyResult` (`FontUpdaterDouble` returns only FAILED or
+UNCHANGED); `ONLY_FAMILY`; the device and desktop paths.
+
+### 9f. Tests
+
+`test/font_commit/FontCommitTest.cpp`:
+- `ABundledFamilyThatDiffersIsNotDownloadedOnAnyRun` -- three runs with a
+  simulated seed pass between them. **Fails with the skip disabled** at run 0
+  ("downloaded a family the next launch reverts").
+- `AFamilyTheHostDidNotBundleStillUpdates` -- a different, unbundled family on
+  the same card still updates. Also fails with the skip disabled (its bundled
+  half).
+- `ABundledFamilyIdenticalToTheReleaseIsUnchanged`,
+  `AnAbsentBundledFamilyIsNotCoveredByTheSkip` -- guards on the compare-first
+  order and the presence condition; they pass either way by design.
+
+font_commit 41/41, font_sync 16/16, activity_input 68/68, font_manifest 10/10.
