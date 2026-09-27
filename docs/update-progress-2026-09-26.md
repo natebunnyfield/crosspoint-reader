@@ -561,3 +561,5 @@ UNCHANGED); `ONLY_FAMILY`; the device and desktop paths.
   order and the presence condition; they pass either way by design.
 
 font_commit 41/41, font_sync 16/16, activity_input 68/68, font_manifest 10/10.
+
+**Owner ruling, 2026-09-26: the app copy wins.** On iOS a family the app bundles is never downloaded by Update Fonts; fonts reach those families with each TestFlight build. (Offered: release-wins with re-copy on bundle change; declined.)
