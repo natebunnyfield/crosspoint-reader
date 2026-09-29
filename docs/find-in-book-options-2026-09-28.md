@@ -524,3 +524,34 @@ That reframes this whole document:
 - Phase 1 as scoped (search the CURRENT chapter) misses it, because a lost place is usually in another chapter.
 - The next step is to establish WHY the position gets lost: book updates, cache resets, reading on the other device, accidental jumps. The answer may be that the position should never be lost, or should follow the reader between devices, with text search as the fallback.
 - The investigation and the options that follow from it are appended below as they land. Do not start Phase 1 as written.
+
+### 8a. Why the place gets lost: investigation, 2026-09-28 (read from code; high confidence unless marked)
+
+**Nothing in the reader loses the place on its own. It is deleted on purpose whenever a book file is replaced.**
+
+- **Storage.**
+  - The position lives at `/.crosspoint/epub_<key>/progress.bin`. It holds the spine index, page and paragraph index, plus a word anchor: a byte offset into the chapter's XHTML (`EpubReaderUtils.h:12-56`).
+  - The key is `std::hash` of the card path (`lib/Epub/Epub.h:47-50`). It is implementation-defined, so the X3 and iOS name the same book differently.
+  - The anchor survives any re-layout, including font changes (`FontUpdater.cpp:1128-1171` keeps `progress.bin` deliberately). It does not survive a content change.
+- **Update Library deletes it.** For every book whose content changed, it removes the whole `epub_<hash>/` directory, `progress.bin` included (`LibraryUpdater.cpp:585-597`; its comment says so). Unchanged books keep theirs.
+  - The owner's books are rebuilt often and keep their file names (`claude-tools/scripts/publish_library.py:151-157`), so every rebuild that touched a book resets it to the start.
+- **The same deletion happens on:**
+  - web upload and WebDAV PUT (`CrossPointWebServer.cpp:864, :1773, :1704`; `WebDAVHandler.cpp:438`);
+  - web and WebDAV rename or move (`:1010, :1103`; `WebDAVHandler.cpp:609`);
+  - Settings → Clear reading cache (`ClearCacheActivity.cpp:96-139`). A known trap: Back on its confirm popup leaves it armed (`docs/p0-p1-sweep-2026-09-10.md:129-133`).
+  - Also: an iOS "Open in…" of a changed version lands at "Name (2).epub", a new path.
+- **Nothing moves the place between the phone and the X3.** KOReader sync was removed 2026-08-01 (`08d5bdee5`); stale mentions remain. Update Library is download-only. No iCloud code.
+- **There is no safety net after a jump.**
+  - The only back stack is the footnote return stack: depth 3, RAM only.
+  - Bookmarks were removed 2026-08-01 (`e0509aef9`; ROADMAP.md:50 still lists them, which is stale).
+  - Possible bug (inferred, untested): leaving the reader from inside a footnote saves the anchors from the footnote's chapter (`EpubReaderActivity.cpp:1486-1490`).
+- **In-reader inputs are unlikely causes.** Font and spacing steps re-layout but keep the anchor, and no single press jumps far. No open bug says "lost my position".
+- **Can a text anchor find the place in a rebuilt book? Almost always** (measured over three books' git history):
+  - Within a chapter, 85/86 and 19/24 paragraphs were identical across a rebuild, and 99.9% and 87% of eight-word runs survived.
+  - The spine index, the paragraph index and the byte offset all break when a chapter is inserted (Poly `3498713`: every later file shifted).
+  - A run of tens of words plus the chapter's heading or section id is the anchor that survives.
+
+**What this implies:**
+- A position record kept OUTSIDE `epub_<hash>/`, keyed stably and holding a short run of the page's own text, would survive every event above.
+- Re-found by text on the new version, it makes the lost place stop happening. Search is not needed for this case.
+- With a platform-independent key, the same record is also what could move between the devices.
