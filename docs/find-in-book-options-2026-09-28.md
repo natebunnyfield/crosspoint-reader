@@ -512,3 +512,15 @@ rendered mockup before it is asked. It is recorded here only as the list.
 3. **Input on the X3.** Typing a query on the 13-grid is slow. That is the exact
    reason upstream closed PR #2451. On iOS and Mac the host keyboard removes
    it, so the feature's value is uneven across the owner's devices.
+
+---
+
+## 8. Owner, 2026-09-28: what Find is FOR
+
+Asked whether the first build should be Phase 1 alone or Phase 1 plus TXT, the owner answered: *"this is mostly for finding within the book where I left off, do better"*.
+
+That reframes this whole document:
+- **The need is getting back to a lost reading position, not general search.**
+- Phase 1 as scoped (search the CURRENT chapter) misses it, because a lost place is usually in another chapter.
+- The next step is to establish WHY the position gets lost: book updates, cache resets, reading on the other device, accidental jumps. The answer may be that the position should never be lost, or should follow the reader between devices, with text search as the fallback.
+- The investigation and the options that follow from it are appended below as they land. Do not start Phase 1 as written.
