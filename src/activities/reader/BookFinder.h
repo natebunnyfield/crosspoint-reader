@@ -113,10 +113,6 @@ class BookFinder {
   int nextSpine = 0;
   int curSpine = -1;
   uint16_t curPage = 0;
-  // Stop scanning this chapter after this page (the wrap's return to the start
-  // chapter only needs to reach the start page, plus one for a match that
-  // starts on it and runs over the edge). -1 = no limit.
-  int lastPage = -1;
   std::unique_ptr<Section> section;
   // The open section's layout is finished: every page exists (finalized file,
   // or a build that has completed). False for no file, or a partial whose

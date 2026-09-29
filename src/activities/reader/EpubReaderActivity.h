@@ -197,6 +197,12 @@ class EpubReaderActivity final : public Activity {
   // Whole-book Find from the current page: releases the section, pushes
   // EpubReaderFindActivity, and on a hit jumps to its page.
   void startFind(const std::string& query);
+  // True from the moment startFind releases the section until the Find
+  // activity's result arrives. render() must not rebuild the section in that
+  // window: a render already queued can win the lock before the push lands,
+  // and would start a build on the same spine Find is about to lay out -- two
+  // writers on one section .part file.
+  bool findInFlight = false;
   void pageTurn(bool isForwardTurn);
 
   // Footnote navigation

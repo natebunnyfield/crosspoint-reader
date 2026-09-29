@@ -186,6 +186,21 @@ class Matcher {
     if (hasUpper) upper = *upperInclusive;
   }
 
+  // True when no match can be accepted any more, as long as everything fed from
+  // now on lies past the upper bound: a future match must start on one of the
+  // last (query length - 1) codepoints already in the window, or later. The wrap
+  // uses this to stop at the right page however many pages a match spans (an
+  // image page adds only one space to the window).
+  bool exhausted() const {
+    if (!hasUpper || !query) return false;
+    const size_t tail = query->size() > 0 ? query->size() - 1 : 0;
+    const size_t n = count < tail ? count : tail;
+    for (size_t i = 1; i <= n; i++) {
+      if (origin[(head + kMaxQueryCodepoints - i) % kMaxQueryCodepoints] <= upper) return false;
+    }
+    return true;
+  }
+
   // Feed one page's capture text. `barrierBefore`: a non-text element (image,
   // rule) opens the page, which stops a line-break hyphen join reaching across it.
   // `joinableHyphenAtEnd`: the text ends in a line-break hyphen with no non-text

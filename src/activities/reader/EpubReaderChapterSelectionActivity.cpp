@@ -58,6 +58,9 @@ void EpubReaderChapterSelectionActivity::onEnter() {
     selectorIndex = 0;
   }
   selectorIndex += headerRowCount();
+  // A book with no table of contents has no chapter row to land on; highlight
+  // Find rather than a row past the end of the list, where Confirm did nothing.
+  if (selectorIndex >= getTotalItems()) selectorIndex = FIND_ROW;
 
   // Trigger first update
   requestUpdate();

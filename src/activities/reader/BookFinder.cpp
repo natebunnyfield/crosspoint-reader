@@ -1,5 +1,6 @@
 #include "BookFinder.h"
 
+#include <Arduino.h>
 #include <Epub/Page.h>
 #include <GfxRenderer.h>
 #include <Logging.h>
@@ -8,10 +9,13 @@
 #include <utility>
 
 namespace {
-// Reserve once, sized for a dense page; a page past this simply grows the
-// vector once and keeps the capacity. Page text ~2-3 KB at reading sizes.
-constexpr size_t kReserveTokens = 512;
-constexpr size_t kReserveTextBytes = 4096;
+// Reserved once and reused for every page. Sized for an ordinary reading page
+// (the simulator's X3 pages measure 20-130 words and 130-710 bytes of text); a
+// denser page grows the vector once and keeps the capacity. Kept modest on
+// purpose: tokens are 12 B and rects 16 B each on the C3, so these three are
+// ~7 KB of heap for as long as the search runs.
+constexpr size_t kReserveTokens = 256;
+constexpr size_t kReserveTextBytes = 2048;
 }  // namespace
 
 BookFinder::BookFinder(std::shared_ptr<Epub> epub, GfxRenderer& renderer, const ReaderRenderSpec& spec,
@@ -70,21 +74,20 @@ bool BookFinder::openNextChapter() {
     }
     chaptersOpened++;
     matcher.resetStream();
-    lastPage = -1;
     curPage = 0;
     if (curSpine == startSpine && phase == Phase::Forward) {
       matcher.setBounds(&startPos, nullptr);
       curPage = startPos.page;
     } else if (curSpine == startSpine && phase == Phase::Wrap) {
       matcher.setBounds(nullptr, &startPos);
-      lastPage = startPos.page + 1;
     } else {
       matcher.setBounds(nullptr, nullptr);
     }
     const bool loaded = section->loadSectionFile(spec);
     sectionComplete = loaded && !section->isPartial();
-    LOG_DBG("FIND", "Chapter %d of %d (spine %d): %s", chapterNumber(), spineCount, curSpine,
-            sectionComplete ? "laid out" : (loaded ? "partial, will extend" : "not laid out, will build"));
+    LOG_DBG("FIND", "Chapter %d of %d (spine %d): %s; heap free=%u maxAlloc=%u", chapterNumber(), spineCount, curSpine,
+            sectionComplete ? "laid out" : (loaded ? "partial, will extend" : "not laid out, will build"),
+            static_cast<unsigned>(ESP.getFreeHeap()), static_cast<unsigned>(ESP.getMaxAllocHeap()));
     return true;
   }
 }
@@ -137,7 +140,9 @@ BookFinder::Status BookFinder::step() {
     return phase == Phase::Done ? result : Status::Running;
   }
 
-  if (lastPage >= 0 && curPage > lastPage) {
+  // The wrap's return to the start chapter ends once it is past the start page
+  // and no match beginning at or before the start position can still complete.
+  if (phase == Phase::Wrap && curSpine == startSpine && curPage > startPos.page && matcher.exhausted()) {
     closeChapter();
     return Status::Running;
   }

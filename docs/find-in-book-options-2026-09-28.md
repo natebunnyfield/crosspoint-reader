@@ -555,3 +555,149 @@ That reframes this whole document:
 - A position record kept OUTSIDE `epub_<hash>/`, keyed stably and holding a short run of the page's own text, would survive every event above.
 - Re-found by text on the new version, it makes the lost place stop happening. Search is not needed for this case.
 - With a platform-independent key, the same record is also what could move between the devices.
+
+---
+
+## 9. Implemented, 2026-09-28: whole-book "Find next" (approach A)
+
+Owner, verbatim: *"I need search for next instance of a simple string in the entire book, please do that."* Purpose (section 8): finding his place after the position was lost. Built on `main` from `9e32843aa`; commits `13afc55e8` (matcher, engine, host test) and `afcc44699` (Chapter Select row, search activity, reader jump), plus a third commit with the adversarial-review fixes (9.7). **Nothing here has run on an X3.** Everything below was measured on the host or in the desktop simulator.
+
+### 9.1 What the reader sees
+
+1. In the reader, a short press of Confirm opens Chapter Select. Its top row is now **Find…**, above the Book Notes row (when the book has notes) and the chapters. Nothing is drawn over the page; there is still no reader menu.
+2. Confirm on **Find…** opens the standard text entry (grid, QWERTY or daisywheel per `keyboardLayout`; a host keyboard on iOS and Mac), titled **Find in Book** and **prefilled with the last query**. The last query is persisted in `/.crosspoint/state.json` as `lastFindQuery`, written through the normal atomic `saveToFile()` and only when it changed. Back from the prompt returns to the chapter list.
+3. Commit. The search runs under a popup, **"Searching… chapter N of M"** (N counts chapters opened so far, clamped to M, the spine count). The popup is redrawn when N moves, at most once a second, because every redraw is a panel refresh. **Back cancels** between units of work.
+4. The reader opens **the page containing the first match** forward of the current page: the rest of this chapter, then every later chapter, then a **wrap** from the book's first chapter back to the reading position.
+5. **Find next** is the same gesture: the prompt is prefilled, so Confirm, Find…, commit. While the reader is still on the last hit's page with the same query, the search starts **after that hit**, so a second match on the same page is the next one. Only two matches in the book: the third Find wraps back to the first.
+6. **No match anywhere:** a "Not found" popup for 1.5 s (any Back/Confirm dismisses it). A miss and a cancel both leave the position exactly where it was.
+
+EPUB only; the TXT and XTC readers are untouched. Four strings added to `english.yaml` (`STR_FIND_ROW`, `STR_FIND_PROMPT`, `STR_FIND_SEARCHING_FORMAT`, `STR_FIND_NOT_FOUND`); the other languages fall back to English.
+
+### 9.2 Matching rules
+
+A simple substring, no regex, over each page's text **as rendered**: the string `readaloud::buildCapture` builds from the laid-out page (soft hyphens stripped, line-break hyphens rejoined, punctuation slices glued by measured advances). On top of that text:
+
+- **Case-insensitive** through `toLowerLatin` then `toLowerCyrillic` (ASCII, Latin-1 Supplement, Latin Extended-A, basic Cyrillic). No other script folds.
+- **Whitespace-normalized**: any run of whitespace (NBSP and the U+2000 block included) is one space, in the text and in the query; the query is trimmed.
+- **Hyphens ignored on both sides** (U+002D, U+2010, U+2011, U+00AD) and the zero-width format characters. This goes one step past the brief, deliberately: `buildCapture` drops a line-final `-` whether the layout inserted it or the book did, so "well-known" broken at its own hyphen reads back as "wellknown", and only ignoring hyphens lets the query "well-known" find it. Upstream PR #2451 made the same choice. Cost: "co-op" also matches "coop".
+- **A phrase across a page boundary** is found: the matcher streams codepoints through a 128-entry window, so the tail of one page is still in the window when the next page starts. A page edge is one space, unless the page ended in a joinable line-break hyphen (text ends in `-`, no image after the last line), in which case the word continues: `buildCapture`'s own between-lines rule carried across the page edge. A chapter edge is a hard break.
+- A hit is reported at its **first** character: (spine, page, byte offset into that page's capture text).
+- **Not folded, and worth a ruling:** typographic apostrophes and quotes. A query typed with `'` on the Mac keyboard does not match a book's `’`. iOS smart punctuation types `’`, which does match most books. Suggestion only; not built.
+
+### 9.3 Code map
+
+| Piece | Where |
+|---|---|
+| Matcher (pure, header-only, host-tested) | `src/activities/reader/FindMatcher.h`: `findtext::Query`, `findtext::Matcher`, `hasSearchableText` |
+| Page walk shared with read-aloud | `src/activities/reader/PageTextCapture.h`: `readaloud::flattenPage`. `captureReadAloudPage` (`EpubReaderActivity.cpp`) now calls it; behavior unchanged |
+| Engine (no UI, host-tested) | `src/activities/reader/BookFinder.{h,cpp}`: `begin()`, then `step()` until Found/NotFound |
+| Search activity (popup, cancel, Not found) | `src/activities/reader/EpubReaderFindActivity.{h,cpp}` |
+| Find row + prompt | `EpubReaderChapterSelectionActivity.{h,cpp}`: `FIND_ROW`, `headerRowCount()`, `openFindPrompt()` |
+| Reader: start, release, land | `EpubReaderActivity.cpp`: `startFind()`, the `FindQueryResult` branch in `openChapterSelection()`, the file-scope `lastFindHit` (RAM only) |
+| Result types | `ActivityResult.h`: `FindQueryResult`, `FindResult` |
+| Persisted query | `CrossPointState.{h,cpp}`: `lastFindQuery` |
+
+How the engine walks: exactly one `Section` open at a time. For each chapter it tries `loadSectionFile(spec)`; a finished file is scanned directly; no file, or a partial whose watermark must be extended, is laid out with the reader's own `startBuild` + `buildSomeMore(8)` and scanned as pages appear. `step()` is one bounded unit (scan one page, lay out one 8-page chunk, or open the next chapter); the activity runs units for up to 40 ms per `loop()` pass under `RenderLock` and checks Back between passes. The only unbounded unit is `startBuild` itself (the XHTML inflate), as for reading; the framebuffer is lent to it exactly as the reader lends it. The spec is `SETTINGS.readerRenderSpec(buildViewportWidth, buildViewportHeight)`, i.e. the reader's, so every section file Find leaves on the card is the one reading would have written, and its page numbers are the reader's. A found hit mid-build closes the section, whose destructor suspends the build into a partial that contains the hit page.
+
+How the reader lands: before pushing the activity it records `nextPageNumber = section->currentPage` and releases its `Section` (the destructor suspends an unfinished build), so Find's layout never holds a second build working set beside the reader's (section 2.5). A cancel or miss simply lets the next render reload that page. A hit sets `currentSpineIndex` and `pendingPageJump`, and clears `pendingAnchor`, `pendingWordAnchor`, `pendingParagraphAnchor`, `pendingPercentJump` and `cachedChapterTotalPageCount`, any of which would otherwise move the reader off the page it was sent to.
+
+### 9.4 Tests and results (exact commands)
+
+**Host gtest** `test/find_in_book` (links the real Epub/Section/parser stack like `test/chapter_jump`, reusing its `HalStorage.h` and `stubs/`, plus `BookFinder.cpp`). Fixture `test/epubs/test_find.epub`, generated by `python3 scripts/generate_find_test_epub.py`: five chapters of short-word filler plus plants that occur nowhere else. Line and page breaks are **measured from the laid-out pages**, never assumed, and each data-driven case asserts it found something to test.
+
+```bash
+cmake -S test -B build/test && cmake --build build/test --target FindInBookTest
+build/test/find_in_book/FindInBookTest
+```
+
+Result: **15 passed, 1 skipped** (the opt-in perf case). Cases: eight pure matcher cases (case and whitespace, Latin + Cyrillic folding, a phrase across a page boundary, a hyphen join across a page and its image barrier, hyphens ignored both ways, bounds selecting the next instance, the wrap's stop rule with a match spanning an image page, rejecting nothing-searchable and over-long queries), then on the real book: a hit in a later chapter; a cold book (no section files) laid out as the search goes, which leaves the same section file and page text the reader's layout gives; phrases spanning 6 real page boundaries, each landing on the earlier page at the exact byte offset; every planted long word the layout split with a hyphen, plus a soft-hyphenated source word and an explicit hyphen with and without it; wrap-around from the last chapter, and within one chapter from its last page; the next match on the same page, and the third Find wrapping to the first; a miss returning nothing after scanning every page.
+
+The test has teeth: with the page-to-page carry removed (a `resetStream()` per page), 5 cases fail, including `HitInALaterChapter`, because at a 300 px page this layout breaks "Zanz-ibar" over a page edge; with `Matcher::exhausted()` forced true, the wrap-stop case fails. Whole host suite: `ctest --test-dir build/test -j8` → **100% of 830 passed** (10 disabled/skipped as before, plus the new perf case).
+
+**Measured host scan time** (the perf case; `-O3` Release, LibreFranklin 14, 464x736 viewport, hyphenation on; a whole-book miss, so every page is scanned):
+
+```bash
+CROSSPOINT_FIND_PERF_EPUB=$PWD/fs_/books/measure.epub build/test/find_in_book/FindInBookTest --gtest_filter='*Perf*'
+```
+
+| Book | Spines | Pages scanned | Cold (lays out every chapter) | Warm (section files present) |
+|---|---|---|---|---|
+| `measure.epub` (883 KB) | 24 | 4,457 | 342.6 ms | 180.5 ms |
+| `giant.epub` (808 KB, one spine) | 1 | 4,315 | 335.1 ms | 178.5 ms |
+| `ai-engineering-from-zero.epub` (116 KB) | 13 | 357 | 30.1 ms | 12.3 ms |
+
+Warm scanning is ~40 µs per page on this Mac; roughly half of a cold search is scanning, not layout. **Device time is unmeasured.** Section 8's warning stands: the first number to take on an X3 is a whole-book miss on a real book, from the `[FIND] Search took` log line.
+
+**Simulator, end to end** (desktop `simulator` env, headless, `fs_/books/ai-engineering-from-zero.epub`, which opens at spine 0 page 0; the card's `.crosspoint/` was backed up before and restored after every run). Chapter Select opens with the current chapter highlighted two rows below Find, so `LEFT LEFT` reaches Find from spine 0, and `LEFT` x9 from spine 7.
+
+```bash
+SDL_VIDEODRIVER=dummy CROSSPOINT_SIM_READALOUD_LOG=2 \
+CROSSPOINT_SIM_INPUT_SCRIPT='5000:CONFIRM;6000:LEFT;6900:LEFT;7900:CONFIRM;9600:TYPE:whole corpus\n;14000:CONFIRM;15000:LEFT;…(x9);23500:CONFIRM;25200:TYPE:\n;31000:CONFIRM;…(LEFT x9);40500:CONFIRM;42200:TYPE:\n;47000:QUIT' \
+  timeout 70 .pio/build/simulator/program
+```
+
+| Run | Log | Displayed page (`READALOUD-TEXT`) |
+|---|---|---|
+| Find "whole corpus" from spine 0 page 0 | `Entering activity: KeyboardEntry` → `EpubReaderFind` → `Found at spine 7 page 2 offset 280 (161 pages scanned, 7 chapters laid out)`, 159 ms | contains "whole corpus" twice; bytes 280..291 are `whole corpus` |
+| Find again (prefilled, `TYPE:\n`) | `Find from spine 7 page 2 offset 280` → `Found at spine 7 page 2 offset 339 (1 pages scanned)`, 12 ms | same page; bytes 339..350 are `whole corpus` |
+| Find a third time | `Found at spine 7 page 2 offset 280 (334 pages scanned, 5 chapters laid out)`, 175 ms | wrapped round the whole book to the first |
+| Find "windows" from spine 0, then again | `spine 3 page 29 offset 182` (77 ms), then `spine 7 page 2 offset 89` (122 ms) | "Context windows" on both pages |
+| Find "zqxjv plover" from spine 0 page 1 | `Not found (335 pages scanned, 12 chapters laid out)`, 263 ms; "Not found" popup captured; then `Rendered spine 0 page 1/9` | position unchanged |
+| Same, with `QTAP:BACK` 60 ms / 120 ms after the commit | `Cancelled after 157ms (157 pages scanned)` / `194ms (226 pages)`, then `Rendered spine 0 page 1/9` | position unchanged |
+| Relaunch after a Find | `state.json` holds `"lastFindQuery":"whole corpus"`; the prompt opens prefilled with it (screenshot) | |
+
+**Device build** (`pio run -e default`, the one C3 binary that serves X4 and X3), before (`9e32843aa`) and after (the review-fix commit):
+
+| | Before | After | Delta |
+|---|---|---|---|
+| Flash (PlatformIO "used") | 5,373,417 B | 5,385,165 B | **+11,748 B** |
+| Static RAM (data+bss) | 54,932 B | 55,004 B | **+72 B** |
+| `firmware.bin` | 5,386,400 B | 5,398,144 B | +11,744 B |
+
+Flash is above the section 5 estimate of 6-10 KB (PR #2451 measured 8,174 B upstream). No new warnings in the device or simulator build.
+
+### 9.5 Memory at run time (inferred from the types, not measured on the device)
+
+While a search runs: one `Section` (the reader's own was released first), one deserialized `Page`, and the `BookFinder` inside the heap-allocated activity: the query and window (~2 KB: 128 codepoints, 128 codepoints plus origins) and per-page scratch reserved once and reused: 256 tokens (12 B each on the C3), 256 discarded rects (16 B) and 2 KB of text, about 7 KB, grown once if a page is denser. **Find has no free-heap floor**, unlike the reader's background build (`BACKGROUND_BUILD_MIN_FREE_HEAP`): it lays out chapters the way the reader's blocking render-path build does, which also ignores the floor. Each chapter's `[FIND] Chapter N of M` log line prints `heap free=` and `maxAlloc=`, so the first device run says what the margin actually is. Nothing is allocated per page beyond what `Section::loadPage` itself allocates; everything is freed when the activity exits. The popup is drawn over whatever the screen showed (the text entry, or white after a framebuffer loan), which is the "Indexing" popup's precedent.
+
+### 9.6 Checked, and found clean or broken
+
+- **Pagination agreement, clean.** The cold-book test compares the page text Find reports against the reader-spec layout of the same page; the simulator landings render the page whose text contains the query at the reported byte offset, across a partial (`page 2/9`) and the finished file (`page 2/34`).
+- **The §8a footnote-anchor bug: confirmed by reading, not fixed, not tested.** (Find itself now clears the footnote return stack when it lands, 9.7, so a Find from inside a footnote cannot hit this path.) `onExit()` mid-footnote calls `saveProgress(origin.spineIndex, origin.pageNumber, 0)` (`EpubReaderActivity.cpp`, the `footnoteDepth > 0` block in `onExit`), and `saveProgress` asks the **current** section (the footnote's chapter) for the paragraph index and word anchor of `origin.pageNumber`. So the saved record pairs the origin's spine and page with anchors from a different chapter, and the next open's word-anchor reposition applies them to the origin chapter. It does not block Find.
+- **Not built:** TXT books (section 5.5), highlighting the hit on the page (Phase 3), a list of hits, folding curly quotes (9.2), other languages' strings.
+- **Simulator repo untouched.** The two new translation units (`BookFinder.cpp`, `EpubReaderFindActivity.cpp`) reach the iOS build only when `crosspoint-simulator/cmake/CrossPointSources.cmake` is next regenerated, which the simulator's firmware-pin commits do (the list is pinned at firmware `692971fc`, from 2026-09-15).
+
+### 9.7 Adversarial review, 2026-09-28, and what changed
+
+A read-only agent that did not write the code tried to refute both commits. It found **no crash-class defect** and four P2s, each checked against the code before reporting:
+
+1. **Render race in the release-to-push gap: fixed.** `startFind` released the section and dropped the lock before the push landed. A render already queued could win the lock in that gap and start a build of the reader's chapter while Find built the same spine: two writers on one `.part` file. Now `findInFlight` is set under the lock with the release, `render()` returns early while it is set, and the Find result handler clears it under the lock (hit, miss or cancel).
+2. **A match spanning three or more pages that starts at or before the reading position was missed: fixed.** The wrap stopped one page past the start page, but an image-only page adds a single space to the window, so a phrase could end two pages later. The wrap now stops when `Matcher::exhausted()` says no codepoint that could start an accepted match is left in the window. Pinned by `FindMatcher.WrapStopsOnlyWhenNothingCanStillComplete`.
+3. **A book with no table of contents opened Chapter Select with the highlight past the end of the list: fixed.** Confirm there silently closed the screen, and that is the book where Find matters most. The highlight now falls to the Find row.
+4. **Find did not clear the footnote return stack: fixed.** Chapter Select's own jump has the same inherited behavior and was left alone. A Find landing now sets `footnoteDepth = 0`, so Back and `onExit()` cannot send the reader back to, or persist, the place Find moved them from.
+
+Checked and found CLEAN by the reviewer:
+- the query's lifetime inside `BookFinder` (a member; no copy or move);
+- token pointers into freed pages;
+- the result variant (only `get_if`);
+- starting an activity from a result handler;
+- the framebuffer loan under `RenderLock`;
+- `step()` always terminating (out-of-memory skip, 0-page chapter, a rebuild over a partial, failures, the wrap end);
+- the wrap bounds (the two passes cover every position exactly once; a one-spine book works);
+- the landing page (same spec; a partial suspended mid-hit contains the hit page; every other reposition cleared);
+- End-of-Book unreachable;
+- cancel and miss leaving the position unchanged;
+- file handles and `.part` cleanup;
+- Chapter Select row shifts, touch and progress tick;
+- the query cap (128 bytes in both entry activities);
+- offsets never starting on an ignored codepoint;
+- the format string;
+- stack (largest new local, 96 bytes);
+- the `state.json` write only on change;
+- the read-aloud refactor equivalent token for token.
+
+It also noted that `std::make_unique` for the activity breaks Resource Protocol 9 in principle, as all 41 existing activity pushes do.
+
+After the fixes: host `FindInBookTest` 15/15, full `ctest` 830/830. The simulator three-Find run gave the same three landings (offsets 280, 339, then wrapped to 280), and the not-found run returned to `spine 0 page 1`. Device build figures are in 9.4.
+
+**Follow-up for the simulator repo (not done here):** regenerate `crosspoint-simulator/cmake/CrossPointSources.cmake` when its firmware pin moves past these commits, or the iOS build will not compile `BookFinder.cpp` and `EpubReaderFindActivity.cpp`.

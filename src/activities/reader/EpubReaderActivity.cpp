@@ -984,6 +984,7 @@ void EpubReaderActivity::startFind(const std::string& query) {
       nextPageNumber = section->currentPage;
       section.reset();
     }
+    findInFlight = true;
   }
 
   const ReaderRenderSpec spec = SETTINGS.readerRenderSpec(buildViewportWidth, buildViewportHeight);
@@ -992,10 +993,11 @@ void EpubReaderActivity::startFind(const std::string& query) {
       std::make_unique<EpubReaderFindActivity>(renderer, mappedInput, epub, spec, SETTINGS.getReaderFontId(), query,
                                                startSpine, startPage, startOffset),
       [this, query](const ActivityResult& result) {
+        RenderLock lock(*this);
+        findInFlight = false;
         if (result.isCancelled) return;  // cancel or not found: position unchanged
         const auto* hit = std::get_if<FindResult>(&result.data);
         if (!hit) return;
-        RenderLock lock(*this);
         LOG_DBG("ERS", "Find landed: spine %d page %u offset %d", hit->spineIndex, hit->page,
                 static_cast<int>(hit->offset));
         lastFindHit.bookPath = epub->getPath();
@@ -1015,6 +1017,10 @@ void EpubReaderActivity::startFind(const std::string& query) {
         pendingParagraphAnchor.reset();
         pendingPercentJump = false;
         cachedChapterTotalPageCount = 0;
+        // A footnote return stack from before the jump would send Back to a
+        // place the reader has left, and onExit() would persist that place
+        // instead of this one -- losing the very position Find was for.
+        footnoteDepth = 0;
         section.reset();
       });
 }
@@ -1060,7 +1066,8 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn) {
 
 // TODO: Failure handling
 void EpubReaderActivity::render(RenderLock&& lock) {
-  if (!epub) {
+  if (!epub || findInFlight) {
+    // findInFlight: the section was released for Find; see the header.
     return;
   }
 

@@ -134,6 +134,29 @@ TEST(FindMatcher, BoundsSelectTheNextInstance) {
   EXPECT_FALSE(h.page(5, text));
 }
 
+TEST(FindMatcher, WrapStopsOnlyWhenNothingCanStillComplete) {
+  // The wrap's upper bound is (page 5, offset 0). A match starting there that
+  // runs over an image-only page (6) onto page 7 must still be found, so the
+  // window is not exhausted until every codepoint that could start one is past
+  // the bound.
+  Feed f("salt wind");
+  const findtext::TextPos upTo{5, 0};
+  f.m.setBounds(nullptr, &upTo);
+  EXPECT_FALSE(f.page(5, "salt"));
+  EXPECT_FALSE(f.m.exhausted()) << "a match starting on the bound is still open";
+  EXPECT_FALSE(f.page(6, ""));  // an image page: one space
+  EXPECT_FALSE(f.m.exhausted());
+  const auto hit = f.page(7, "wind rose");
+  ASSERT_TRUE(hit);
+  EXPECT_EQ(hit->page, 5);
+  // Once the tail is all past the bound, the wrap can stop.
+  Feed g("salt wind");
+  g.m.setBounds(nullptr, &upTo);
+  EXPECT_FALSE(g.page(5, "salt"));
+  EXPECT_FALSE(g.page(6, "the grey sea and the long tide"));
+  EXPECT_TRUE(g.m.exhausted());
+}
+
 TEST(FindMatcher, RejectsNothingSearchable) {
   findtext::Query q;
   EXPECT_FALSE(q.set(""));
