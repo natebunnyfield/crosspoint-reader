@@ -194,6 +194,9 @@ class EpubReaderActivity final : public Activity {
   // ramp does nothing at all (no settings write, no refresh).
   void stepReaderLineSpacing(int delta);
   void openChapterSelection();
+  // Whole-book Find from the current page: releases the section, pushes
+  // EpubReaderFindActivity, and on a hit jumps to its page.
+  void startFind(const std::string& query);
   void pageTurn(bool isForwardTurn);
 
   // Footnote navigation

@@ -8,7 +8,10 @@
 #include <cstdio>
 
 #include "BookNotesActivity.h"
+#include "CrossPointState.h"
+#include "FindMatcher.h"
 #include "MappedInputManager.h"
+#include "activities/util/TextEntryFactory.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -19,7 +22,24 @@ namespace {
 constexpr int kTickOverhang = 2;
 }  // namespace
 
-int EpubReaderChapterSelectionActivity::getTotalItems() const { return epub->getTocItemsCount() + noteRowCount; }
+int EpubReaderChapterSelectionActivity::getTotalItems() const { return epub->getTocItemsCount() + headerRowCount(); }
+
+void EpubReaderChapterSelectionActivity::openFindPrompt() {
+  // Prefilled with the last query, so "find the next one" is a single commit.
+  // 128 BYTES is findtext::kMaxQueryCodepoints: no query that fits the field
+  // can overflow the matcher's window.
+  startActivityForResult(makeTextEntryActivity(renderer, mappedInput, tr(STR_FIND_PROMPT), APP_STATE.lastFindQuery,
+                                               findtext::kMaxQueryCodepoints),
+                         [this](const ActivityResult& result) {
+                           if (result.isCancelled) return;  // Back from the prompt: stay on the list
+                           const auto* entry = std::get_if<KeyboardResult>(&result.data);
+                           if (!entry) return;
+                           if (!findtext::hasSearchableText(entry->text))
+                             return;  // nothing to search: stay on the list
+                           setResult(FindQueryResult{entry->text});
+                           finish();
+                         });
+}
 
 void EpubReaderChapterSelectionActivity::onEnter() {
   Activity::onEnter();
@@ -37,7 +57,7 @@ void EpubReaderChapterSelectionActivity::onEnter() {
   if (selectorIndex == -1) {
     selectorIndex = 0;
   }
-  selectorIndex += noteRowCount;
+  selectorIndex += headerRowCount();
 
   // Trigger first update
   requestUpdate();
@@ -58,14 +78,18 @@ void EpubReaderChapterSelectionActivity::loop() {
   }
 
   auto selectChapter = [this] {
-    if (noteRowCount != 0 && selectorIndex == 0) {
+    if (selectorIndex == FIND_ROW) {
+      openFindPrompt();
+      return;
+    }
+    if (noteRowCount != 0 && selectorIndex == FIND_ROW_COUNT) {
       // The notes row. Push the verbose screen rather than leaving this one:
       // Back from there comes straight back to the chapter list, with the
       // highlight where it was.
       startActivityForResult(std::make_unique<BookNotesActivity>(renderer, mappedInput), [](const ActivityResult&) {});
       return;
     }
-    const auto tocItem = epub->getTocItem(selectorIndex - noteRowCount);
+    const auto tocItem = epub->getTocItem(selectorIndex - headerRowCount());
     if (tocItem.spineIndex == -1) {
       // The entry reaches no spine item, so there is nowhere to go and the pick
       // is dropped -- which on screen is the reader repainting the page it was
@@ -187,10 +211,10 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
   // fill uses: Epub::calculateProgress(spineIndex, 0.0f). Spine granularity —
   // an anchored TOC entry shares its spine's start fraction, the best figure
   // available here without paginating every chapter.
-  // The notes row previews nothing -- it is not a place in the book -- so the
-  // tick stays where the reader is.
-  const auto selectedItem = (noteRowCount != 0 && selectorIndex == 0) ? BookMetadataCache::TocEntry{}
-                                                                      : epub->getTocItem(selectorIndex - noteRowCount);
+  // The Find and notes rows preview nothing -- neither is a place in the
+  // book -- so the tick stays where the reader is.
+  const auto selectedItem = selectorIndex < headerRowCount() ? BookMetadataCache::TocEntry{}
+                                                             : epub->getTocItem(selectorIndex - headerRowCount());
   if (selectedItem.spineIndex != -1) {
     float chapterFrac = epub->calculateProgress(selectedItem.spineIndex, 0.0f);
     chapterFrac = chapterFrac < 0.0f ? 0.0f : (chapterFrac > 1.0f ? 1.0f : chapterFrac);
@@ -212,13 +236,14 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
   const int totalItems = getTotalItems();
   GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, totalItems, selectorIndex,
                [this](int index) {
-                 if (noteRowCount != 0 && index == 0) {
+                 if (index == FIND_ROW) return std::string(tr(STR_FIND_ROW));
+                 if (noteRowCount != 0 && index == FIND_ROW_COUNT) {
                    char row[64];
                    snprintf(row, sizeof(row), "%s (%u)", tr(STR_BOOK_NOTES),
                             static_cast<unsigned>(booknotes::current().count()));
                    return std::string(row);
                  }
-                 auto item = epub->getTocItem(index - noteRowCount);
+                 auto item = epub->getTocItem(index - headerRowCount());
                  std::string indent((item.level - 1) * 2, ' ');
                  return indent + item.title;
                });

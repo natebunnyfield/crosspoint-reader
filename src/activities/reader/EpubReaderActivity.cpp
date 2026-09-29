@@ -21,10 +21,13 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "EpubReaderChapterSelectionActivity.h"
+#include "EpubReaderFindActivity.h"
 #include "EpubReaderFootnotesActivity.h"
 #include "EpubReaderUtils.h"
+#include "FindMatcher.h"
 #include "FontActivation.h"
 #include "MappedInputManager.h"
+#include "PageTextCapture.h"
 #include "PageTextMetrics.h"
 #include "ReadAloudCapture.h"
 #include "ReaderFontSizes.h"
@@ -100,6 +103,18 @@ void moveFinishedBookToReadFolder(const std::string& srcPath, const std::string&
     APP_STATE.saveToFile();
   }
 }
+
+// The last whole-book Find hit, RAM only: enough to make the next Find with the
+// same query start AFTER it when the reader is still on its page. Survives
+// leaving and reopening the book within a session, not a reboot.
+struct LastFindHit {
+  std::string bookPath;
+  std::string query;
+  int spine = -1;
+  uint16_t page = 0;
+  int32_t offset = findtext::kPageStart;
+};
+LastFindHit lastFindHit;
 
 }  // namespace
 
@@ -916,8 +931,13 @@ void EpubReaderActivity::openChapterSelection() {
   startActivityForResult(
       std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, spineIdx, bookProgress),
       [this](const ActivityResult& result) {
-        if (!result.isCancelled) {
-          const auto& chapterResult = std::get<ChapterResult>(result.data);
+        if (result.isCancelled) return;
+        if (const auto* find = std::get_if<FindQueryResult>(&result.data)) {
+          startFind(find->query);
+          return;
+        }
+        if (const auto* chapter = std::get_if<ChapterResult>(&result.data)) {
+          const auto& chapterResult = *chapter;
           RenderLock lock(*this);
 
           LOG_DBG("ERS", "Chapter pick: spine %d anchor '%s'", chapterResult.spineIndex, chapterResult.anchor.c_str());
@@ -932,6 +952,70 @@ void EpubReaderActivity::openChapterSelection() {
 
           section.reset();
         }
+      });
+}
+
+void EpubReaderActivity::startFind(const std::string& query) {
+  // Prefill for the next prompt; a write only when the query actually changed
+  // (Resource Protocol 8), atomic like every other state.json save.
+  if (APP_STATE.lastFindQuery != query) {
+    APP_STATE.lastFindQuery = query;
+    APP_STATE.saveToFile();
+  }
+
+  const int startSpine = currentSpineIndex;
+  uint16_t startPage = 0;
+  int32_t startOffset = findtext::kPageStart;
+  {
+    RenderLock lock(*this);
+    const int page = section ? section->currentPage : nextPageNumber;
+    startPage = static_cast<uint16_t>(page < 0 ? 0 : page);
+    // "Find next": still on the page of the last hit, with the same query, so
+    // start after that hit -- which may be a second match on this same page.
+    if (lastFindHit.spine == startSpine && lastFindHit.page == startPage && lastFindHit.query == query &&
+        lastFindHit.bookPath == epub->getPath()) {
+      startOffset = lastFindHit.offset;
+    }
+    // Release the reader's section so Find's layout never holds a second build
+    // working set beside it. An unfinished build is suspended into a partial
+    // file by the destructor; the next render reloads the same page from the
+    // card, which is also how a cancel or a miss leaves the position unchanged.
+    if (section) {
+      nextPageNumber = section->currentPage;
+      section.reset();
+    }
+  }
+
+  const ReaderRenderSpec spec = SETTINGS.readerRenderSpec(buildViewportWidth, buildViewportHeight);
+  LOG_DBG("ERS", "Find from spine %d page %u offset %d", startSpine, startPage, static_cast<int>(startOffset));
+  startActivityForResult(
+      std::make_unique<EpubReaderFindActivity>(renderer, mappedInput, epub, spec, SETTINGS.getReaderFontId(), query,
+                                               startSpine, startPage, startOffset),
+      [this, query](const ActivityResult& result) {
+        if (result.isCancelled) return;  // cancel or not found: position unchanged
+        const auto* hit = std::get_if<FindResult>(&result.data);
+        if (!hit) return;
+        RenderLock lock(*this);
+        LOG_DBG("ERS", "Find landed: spine %d page %u offset %d", hit->spineIndex, hit->page,
+                static_cast<int>(hit->offset));
+        lastFindHit.bookPath = epub->getPath();
+        lastFindHit.query = query;
+        lastFindHit.spine = hit->spineIndex;
+        lastFindHit.page = hit->page;
+        lastFindHit.offset = hit->offset;
+        // Open the hit's page through the ordinary page jump: the section Find
+        // laid out used this same render spec, so its page numbers are the
+        // reader's. Every other pending reposition is dropped, or it would
+        // move the reader off the page it was just sent to.
+        currentSpineIndex = hit->spineIndex;
+        pendingPageJump = hit->page;
+        nextPageNumber = 0;
+        pendingAnchor.clear();
+        pendingWordAnchor.reset();
+        pendingParagraphAnchor.reset();
+        pendingPercentJump = false;
+        cachedChapterTotalPageCount = 0;
+        section.reset();
       });
 }
 
@@ -1549,53 +1633,11 @@ void captureReadAloudPage(const Page& page, const GfxRenderer& renderer, const i
   // cppcheck-suppress knownConditionTrueFalse
   if (!gpio.readAloudCaptureWanted()) return;
 
-  // Flatten the display list into the pure grouping's inputs. Token text points
-  // straight into the block arena (valid for this call), and each token's
-  // advance is measured HERE so the grouping in ReadAloudCapture.h stays pure
-  // and host-testable — and so the value that goes to 0 for a non-resident font
-  // is passed in as data rather than re-queried where it cannot be seen.
-  std::vector<readaloud::CaptureToken> tokens;
-  struct LineSpan {
-    int x;
-    int yTop;
-    size_t begin;
-    size_t count;
-    bool barrierBefore;
-  };
-  std::vector<LineSpan> spans;
-  bool sawNonLineSinceLastLine = false;
-  for (const auto& el : page.elements) {
-    if (el->getTag() != TAG_PageLine) {
-      // A non-line element (image, rule) breaks any pending hyphen join.
-      sawNonLineSinceLastLine = true;
-      continue;
-    }
-    const auto& line = static_cast<const PageLine&>(*el);
-    const auto& block = line.getBlock();
-    if (!block || !block->valid() || block->isEmpty()) continue;
-    const size_t begin = tokens.size();
-    const uint16_t n = block->wordCount();
-    for (uint16_t i = 0; i < n; i++) {
-      const char* t = block->wordText(i);
-      const int adv = readaloud::tokenIsBlank(t) ? 0 : renderer.getTextAdvanceX(fontId, t, block->wordStyle(i));
-      tokens.push_back({t, block->wordXpos(i), adv});
-    }
-    // yPos is the line's TOP, not its baseline — it is handed to block->render()
-    // as the y origin (Page.cpp:24), and measuring the rendered panel confirms
-    // it: with yOffset=9 and lineH=36, lines at yPos 0/54/90/126 put their ink
-    // at y 15/68/104/137, i.e. yPos + yOffset plus a few px of internal leading
-    // above cap height. Subtracting the ascender lifted every rect a full line,
-    // so the highlight sat one line above the word being spoken.
-    spans.push_back({line.xPos + xOffset, line.yPos + yOffset, begin, tokens.size() - begin, sawNonLineSinceLastLine});
-    sawNonLineSinceLastLine = false;
-  }
-
-  // `tokens` is complete and will not reallocate; now point the lines at it.
-  std::vector<readaloud::CaptureLine> lines;
-  lines.reserve(spans.size());
-  std::transform(spans.begin(), spans.end(), std::back_inserter(lines), [&tokens](const LineSpan& s) {
-    return readaloud::CaptureLine{s.x, s.yTop, tokens.data() + s.begin, s.count, s.barrierBefore};
-  });
+  // Flatten the display list into the pure grouping's inputs (PageTextCapture.h,
+  // shared with whole-book Find so both read the same text).
+  readaloud::PageCaptureScratch scratch;
+  readaloud::flattenPage(page, renderer, fontId, xOffset, yOffset, scratch);
+  const auto& lines = scratch.lines;
 
   readaloud::CaptureMetrics metrics;
   metrics.lineHeight = renderer.getLineHeight(fontId);

@@ -57,8 +57,23 @@ struct FilePathResult {
   std::string path;
 };
 
-using ResultVariant = std::variant<std::monostate, WifiResult, KeyboardResult, MenuResult, ChapterResult, PercentResult,
-                                   IntervalResult, PageResult, ProgressChangeResult, FootnoteResult, FilePathResult>;
+// Chapter Select's Find row: the query the reader should search the book for.
+struct FindQueryResult {
+  std::string query;
+};
+
+// Where whole-book Find landed: the page to open, and the match's byte offset
+// in that page's rendered text (readaloud::buildCapture), which the reader keeps
+// so the next Find can start after it.
+struct FindResult {
+  int spineIndex = 0;
+  uint16_t page = 0;
+  int32_t offset = -1;
+};
+
+using ResultVariant =
+    std::variant<std::monostate, WifiResult, KeyboardResult, MenuResult, ChapterResult, PercentResult, IntervalResult,
+                 PageResult, ProgressChangeResult, FootnoteResult, FilePathResult, FindQueryResult, FindResult>;
 
 struct ActivityResult {
   bool isCancelled = false;

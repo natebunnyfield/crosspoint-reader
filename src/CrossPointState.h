@@ -20,6 +20,9 @@ class CrossPointState : public PersistableStore<CrossPointState> {
   uint8_t readerActivityLoadCount = 0;
   bool lastSleepFromReader = false;
   bool showBootScreen = true;
+  // The last whole-book Find query, prefilled into the next Find prompt. Saved
+  // only when it changes (EpubReaderActivity::startFind).
+  std::string lastFindQuery;
 
   static const char* getFilePath() { return "/.crosspoint/state.json"; }
   void toJson(JsonDocument& doc) const;
