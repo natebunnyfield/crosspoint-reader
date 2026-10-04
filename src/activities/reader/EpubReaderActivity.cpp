@@ -192,6 +192,8 @@ void EpubReaderActivity::onExit() {
   // "No page": tells a read-aloud consumer to stop speech. Inline no-op on
   // device.
   gpio.publishReadAloudPage(nullptr, 0, nullptr, 0);
+  // ...and no turned page either, so a host in landscape snaps back.
+  gpio.publishTurnedPage(false);
 
   // The extractor holds a raw pointer to this activity's epub; drop it before
   // the activity (and the shared_ptr) goes away.
@@ -1075,6 +1077,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   // "Indexing" popup on screen with no way forward. Surface an explicit error instead of hanging.
   // clearScreen first so the error popup doesn't overlay the stale "Indexing" popup.
   const auto showBuildError = [this]() {
+    gpio.publishTurnedPage(false);
     renderer.clearScreen();
     GUI.drawPopup(renderer, tr(STR_INDEX_FAILED));
   };
@@ -1090,6 +1093,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 
   // Show end of book screen
   if (currentSpineIndex == epub->getSpineItemsCount()) {
+    gpio.publishTurnedPage(false);
     renderer.clearScreen();
     // 3/8 of the screen height matches the previous fixed position on the 480x800 panel
     // and scales to other resolutions.
@@ -1749,6 +1753,21 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // page number here, only the current Section's pagination, and pageCount is a
   // watermark rather than a count.
   gpio.publishReaderPageIdentity(readerBookKey(epub->getPath()), currentSpineIndex, section ? section->currentPage : 0);
+
+  // ...and whether it is a TURNED page (a wide table set for a clockwise turn,
+  // [T-021]). Same one-shot place, same reason: an inline no-op on device; the
+  // iOS host rotates itself into landscape while one is up. Every other path
+  // off the page publishes false (onExit, the end of the book, a build error).
+  {
+    bool turned = false;
+    for (const auto& el : page->elements) {
+      if (el && el->getTag() == TAG_PageRotatedText) {
+        turned = true;
+        break;
+      }
+    }
+    gpio.publishTurnedPage(turned);
+  }
 
   // ...and how much text was on it, plus what it was set to. Beside the
   // identity for the same one-shot reason, a separate channel because it feeds

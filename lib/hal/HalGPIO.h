@@ -304,6 +304,18 @@ class HalGPIO {
   // stores the four values for its harness to read.
   void publishReaderTextInsets(int /*topPx*/, int /*rightPx*/, int /*bottomPx*/, int /*leftPx*/) {}
 
+  // WHETHER THE PAGE ON SCREEN IS TURNED: a wide-table page ([T-021]) whose
+  // content is drawn for a reader who turns the device clockwise. A no-op here,
+  // for the same host-capability reason as the insets channel above: this board
+  // cannot turn its own presentation, so nothing on it could consume the fact.
+  // A host that CAN -- the iOS app rotates itself into landscape and shows the
+  // table upright while such a page is up, and snaps back to portrait on the
+  // next upright page (crosspoint-simulator/docs/turned-page-landscape-plan-2026-10-04.md)
+  // -- needs to know which pages those are. EpubReaderActivity publishes once
+  // per displayed page, and false on every path that leaves the page: the end
+  // of the book, a build error, the reader's exit.
+  void publishTurnedPage(bool /*turned*/) {}
+
   // WHICH PAGE OF WHICH BOOK IS ON SCREEN, published once per DISPLAYED page.
   // A no-op here for the same host-capability reason as the two channels above:
   // this panel's paper is a constant, so nothing on this board could consume a
