@@ -1,4 +1,5 @@
 #include "ChapterHtmlSlimParser.h"
+#include "RotatedTablePlacement.h"
 
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
@@ -987,11 +988,12 @@ void ChapterHtmlSlimParser::emitBufferedTableFlattened() {
 // it as plain values.
 //
 // Landscape coordinates here mean: `across` runs along the reading direction and
-// `down` marches through the rows. They map onto the page as
-//   page x = down, page y = across
-// because drawTextRotated90CCW takes the band's x and the run's start y, and the
-// run descends the page. The parser owns all of this; PageRotatedText carries a
-// finished line and its landing spot, nothing more.
+// `down` marches through the rows. Where they land on the page is
+// rotatedtable::line / ::rule (RotatedTablePlacement.h): for drawTextRotated90CW,
+// the run CLIMBING the page, so the page reads after a CLOCKWISE turn (owner
+// ruling; until 2026-10-04 this was drawTextRotated90CCW and read the other way).
+// The parser owns all of this; PageRotatedText carries a finished line and its
+// landing spot, nothing more.
 bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
   if (tableBuf.size() < 2) return false;
 
@@ -1084,19 +1086,16 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
   }
 
   for (const Placed& item : placed) {
-    // Two mappings, both learned from the render rather than from the maths:
-    //
-    //  * the ROW axis is inverted. Page x grows the way the reader's view moves
-    //    UP once the device is turned, so a row `down` pixels from the top of
-    //    the table sits at viewportWidth - down. Without this the header prints
-    //    at the foot of the page and the rows read bottom-to-top.
-    //  * x is the band's RIGHT edge for this call (the CW twin takes a left
-    //    edge), so no line-height is added here; the subtraction already lands
-    //    the band where it belongs.
-    const int pageX = viewportWidth - kRotMargin - item.down;
+    // The CLOCKWISE page (RotatedTablePlacement.h): the header at the page's
+    // LEFT edge, the rows stepping right, each run climbing from the bottom --
+    // which, once the device is turned clockwise, is the header on top and the
+    // text running left to right. It is the CCW layout this file shipped until
+    // 2026-10-04 turned exactly 180 degrees inside the viewport.
+    const rotatedtable::LinePlace at =
+        rotatedtable::line(item.down, item.across, viewportHeight, kRotMargin);
     auto element = std::shared_ptr<PageRotatedText>(
         new (std::nothrow) PageRotatedText(item.text, item.bold, static_cast<int32_t>(tableFont),
-                                           static_cast<int16_t>(pageX), static_cast<int16_t>(item.across)));
+                                           static_cast<int16_t>(at.x), static_cast<int16_t>(at.y)));
     if (!element) {
       noteAllocationFailure("a rotated table line");
       return true;
@@ -1108,11 +1107,12 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
   // VERTICAL line -- drawn as a rule of zero-ish width would be invisible, so it
   // is a line element rather than a PageHorizontalRule.
   if (ruleDown >= 0) {
-    const int16_t ruleX = static_cast<int16_t>(viewportWidth - kRotMargin - ruleDown);
     const int16_t ruleLen =
         static_cast<int16_t>(plan.x[plan.columnCount - 1] + plan.w[plan.columnCount - 1] + kRotMargin);
+    const rotatedtable::RulePlace at =
+        rotatedtable::rule(ruleDown, std::max<int16_t>(1, ruleLen), viewportHeight, kRotMargin, /*thickness=*/2);
     auto rule = std::shared_ptr<PageVerticalRule>(new (std::nothrow) PageVerticalRule(
-        static_cast<uint16_t>(std::max<int16_t>(1, ruleLen)), 2, ruleX, static_cast<int16_t>(kRotMargin)));
+        static_cast<uint16_t>(at.length), 2, static_cast<int16_t>(at.x), static_cast<int16_t>(at.y)));
     if (rule) {
       currentPage->elements.push_back(std::move(rule));
     }

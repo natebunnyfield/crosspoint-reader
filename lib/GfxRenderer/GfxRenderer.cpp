@@ -325,9 +325,11 @@ static AlignedMemRect screenRectToAlignedMemRect(GfxRenderer::Orientation orient
 
 // Rotated90CW draws COUNTER-clockwise content: the run climbs toward -y and the
 // page must be turned clockwise to read it. Rotated90CCW is its 180-degree
-// mirror -- the run descends toward +y and the page is turned counter-clockwise
-// -- which is what a CLOCKWISE-rotated page (a wide table, T-021) is made of.
+// mirror -- the run descends toward +y and the page is turned counter-clockwise.
 // The names describe the glyph transform; the reader's turn is the opposite one.
+// The wide-table page (T-021) was drawn with Rotated90CCW until 2026-10-04, and
+// so read after a COUNTER-clockwise turn against the owner's clockwise ruling; it
+// is drawn with Rotated90CW now (lib/Epub/Epub/parsers/RotatedTablePlacement.h).
 enum class TextRotation { None, Rotated90CW, Rotated90CCW };
 
 // Glyph plotting target. `deviceSpace` is only ever true when a hi-res

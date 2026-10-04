@@ -1052,6 +1052,26 @@ build**, which is the part worth carrying forward:
 turns, and 2 px margins on real e-ink are all things a host render cannot
 settle. Added to [docs/device-verification-checklist.md](docs/device-verification-checklist.md).
 
+**2026-10-04: the shipped page read after a COUNTER-clockwise turn, and now
+reads after a clockwise one.** It was drawn with `drawTextRotated90CCW`, whose
+own note says what that makes: the header down the page's RIGHT edge, readable
+only once the device is turned counter-clockwise. Found by the adversarial
+review of the iOS turned-page landscape (crosspoint-simulator
+`docs/turned-page-landscape-plan-2026-10-04.md`); owner ruling the same day,
+put to him in device-turn terms: *"Clockwise: fix the page"*. Every line and the
+header rule are now placed at the old spot turned 180 degrees and drawn with
+`drawTextRotated90CW` (`lib/Epub/Epub/parsers/RotatedTablePlacement.h`), pixel
+for pixel the old page turned around (`test/rotated_text`, three cases);
+`SECTION_FILE_VERSION` 63 rebuilds every cached section. **One conflict in the
+record, for whoever reads this next:** `tools/table_preview` composed the
+2026-08-19 renders by turning a `drawTextRotated90CW` page 180 degrees, which is
+the page that needs a COUNTER-clockwise turn (its own comment says the top
+"lands once the device is turned counter-clockwise") -- so the renders that
+ruling was made against showed the direction the page has now left. The ruling's
+stated reason (right-handed; the side rockers under the hand) and the
+2026-10-04 answer are both in turn terms, which is what this follows. Device
+feel still UNCONFIRMED.
+
 **Original entry follows.**
 
 **scope: reader · ruled 2026-08-19 against nine real renders**

@@ -245,6 +245,9 @@ void EpubReaderActivity::showBuildPopup() {
   // obeys it too: that fires early in a build which may still finish inside the delay,
   // one of the ways a fast build used to flash the popup.
   if (buildStartMs == 0 || millis() - buildStartMs < BUILD_POPUP_DELAY_MS) return;
+  // The popup is upright, drawn over whatever page is up: a turned one would
+  // present it sideways in the host's landscape (review 2026-10-04, finding 2).
+  gpio.publishTurnedPage(false);
   GUI.drawPopup(renderer, tr(STR_INDEXING));
   // HALF-clear the popup when the page replaces it, else "INDEXING" ghosts.
   pagesUntilFullRefresh = 1;
@@ -1189,6 +1192,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       // without indexing the whole chapter.
       const bool needsFullBuild = pendingPercentJump;
       if (needsFullBuild) {
+        gpio.publishTurnedPage(false);  // an upright popup over the page (finding 2)
         GUI.drawPopup(renderer, tr(STR_INDEXING));
         // The popup's own refresh is a plain FAST, so force the page that replaces it onto the HALF
         // ghost-cleanup path -- otherwise the "INDEXING" text ghosts under the rendered page.
@@ -1379,6 +1383,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   // (the page that replaces it takes the HALF ghost-cleanup path). Ordinary window
   // catch-ups on a non-partial build are a page or two and stay popup-free.
   if (section->isPartial() && section->currentPage >= static_cast<int>(section->pageCount)) {
+    gpio.publishTurnedPage(false);  // an upright popup over the page (finding 2)
     GUI.drawPopup(renderer, tr(STR_INDEXING));
     pagesUntilFullRefresh = 1;
   }
@@ -1443,6 +1448,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 
   if (section->pageCount == 0) {
     LOG_DBG("ERS", "No pages to render");
+    gpio.publishTurnedPage(false);  // an upright screen replaces the page
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_EMPTY_CHAPTER), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
@@ -1450,6 +1456,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 
   if (section->currentPage < 0 || section->currentPage >= section->pageCount) {
     LOG_DBG("ERS", "Page out of bounds: %d (max %d)", section->currentPage, section->pageCount);
+    gpio.publishTurnedPage(false);  // an upright screen replaces the page
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_OUT_OF_BOUNDS), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
@@ -1472,6 +1479,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       if (giveUp) {
         LOG_ERR("ERS", "Page load retry limit reached, aborting");
         pageLoadRetryCount = 0;  // Reset so a later user-initiated navigation can try afresh
+        gpio.publishTurnedPage(false);  // an upright screen replaces the page
         renderer.clearScreen();
         renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
         renderer.displayBuffer();
@@ -1755,19 +1763,28 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   gpio.publishReaderPageIdentity(readerBookKey(epub->getPath()), currentSpineIndex, section ? section->currentPage : 0);
 
   // ...and whether it is a TURNED page (a wide table set for a clockwise turn,
-  // [T-021]). Same one-shot place, same reason: an inline no-op on device; the
-  // iOS host rotates itself into landscape while one is up. Every other path
-  // off the page publishes false (onExit, the end of the book, a build error).
-  {
-    bool turned = false;
-    for (const auto& el : page->elements) {
-      if (el && el->getTag() == TAG_PageRotatedText) {
-        turned = true;
-        break;
-      }
+  // [T-021]): an inline no-op on device; the iOS host rotates itself into
+  // landscape while one is up. Every other path off the page publishes false
+  // (onExit, the end of the book, a build error, the error screens and the
+  // Indexing popups). Decided here, PUBLISHED below, after the page's first
+  // displayBuffer: the host re-lays out within a millisecond of a change and
+  // presents whatever frame it holds, so publishing before the render showed the
+  // PREVIOUS page in the new presentation for as long as this one took to draw
+  // -- on an iPad held landscape, an upright page turned sideways and fed to the
+  // phosphor trail (crosspoint-simulator adversarial review 2026-10-04, finding 5).
+  bool turned = false;
+  for (const auto& el : page->elements) {
+    if (el && el->getTag() == TAG_PageRotatedText) {
+      turned = true;
+      break;
     }
-    gpio.publishTurnedPage(turned);
   }
+  bool turnedPublished = false;
+  const auto publishTurned = [&]() {
+    if (turnedPublished) return;
+    turnedPublished = true;
+    gpio.publishTurnedPage(turned);
+  };
 
   // ...and how much text was on it, plus what it was set to. Beside the
   // identity for the same one-shot reason, a separate channel because it feeds
@@ -1832,6 +1849,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   if (pageHasImagesNeedingDecode) {
     page->renderWithImagePlaceholders(renderer, fontId, orientedMarginLeft, paintMarginTop);
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+    publishTurned();  // this page's first frame is on the glass
     renderer.clearScreen();
   }
 
@@ -1874,6 +1892,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh, overlapRefresh);
   }
   const auto tDisplay = millis();
+  publishTurned();  // no-op when the placeholder pass above already did
 
   // Tiled grayscale: render each plane band-by-band, leaving the BW
   // framebuffer intact so no full-frame storeBwBuffer is needed; controller

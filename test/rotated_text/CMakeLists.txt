@@ -51,6 +51,7 @@ target_include_directories(RotatedTextTest PRIVATE
   ${REPO_ROOT}/lib/Memory
   ${REPO_ROOT}/lib/InflateReader
   ${REPO_ROOT}/lib/uzlib/src
+  ${REPO_ROOT}/lib/Epub/Epub/parsers
 )
 
 target_link_libraries(RotatedTextTest PRIVATE

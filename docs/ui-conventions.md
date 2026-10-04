@@ -19,6 +19,14 @@ clockwise. There is no clockwise-content call. `tools/table_preview` composes
 one by drawing with that call and turning the finished framebuffer 180 degrees
 (CCW + 180 = CW), which flips the page as a unit so row order survives.
 
+**2026-10-04: the wide-table page itself now follows the ruling in TURN terms.**
+It had shipped drawn with `drawTextRotated90CCW` -- the composition above -- so
+it read after a COUNTER-clockwise turn; asked in turn terms, the owner ruled
+*"Clockwise: fix the page"*, and it is drawn with `drawTextRotated90CW` now
+(`lib/Epub/Epub/parsers/RotatedTablePlacement.h`, TODO.md [T-021]). The
+paragraph above therefore describes how `tools/table_preview` builds its
+images, which is the opposite page to the one the reader ships.
+
 
 ## Choice surfaces — what shape of UI a decision gets
 

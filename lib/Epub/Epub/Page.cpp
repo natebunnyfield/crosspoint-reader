@@ -84,11 +84,13 @@ std::unique_ptr<PageImage> PageImage::deserialize(HalFile& file) {
 void PageRotatedText::render(GfxRenderer& renderer, const int pageFontId, const int xOffset, const int yOffset) {
   if (text.empty()) return;
   const int useFont = fontId != 0 ? fontId : pageFontId;
-  // CCW is the transform that makes a CLOCKWISE-turned page -- see the note on
-  // GfxRenderer::drawTextRotated90CCW. The parser has already wrapped this line
-  // and chosen its landing spot, so there is nothing to measure here.
-  renderer.drawTextRotated90CCW(useFont, xPos + xOffset, yPos + yOffset, text.c_str(), true,
-                                bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+  // CW: the run climbs the page and the reader turns the device CLOCKWISE to
+  // read it (owner ruling; RotatedTablePlacement.h has the account -- until
+  // 2026-10-04 this was drawTextRotated90CCW and the page read the other way).
+  // The parser has already wrapped this line and chosen its landing spot for
+  // this call, so there is nothing to measure here.
+  renderer.drawTextRotated90CW(useFont, xPos + xOffset, yPos + yOffset, text.c_str(), true,
+                               bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 }
 
 bool PageRotatedText::serialize(serialization::BufferedFileWriter& out) {

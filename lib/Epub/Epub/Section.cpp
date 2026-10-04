@@ -248,7 +248,12 @@ namespace {
 // differently -- the AI book's own pages were byte-identical across the change
 // -- but a cascade edition opened on the previous firmware would otherwise keep
 // its 1.5x-pitch pages.
-constexpr uint8_t SECTION_FILE_VERSION = 62;
+// v63: the wide-table page (T-021) reads after a CLOCKWISE turn (owner ruling
+// 2026-08-19, confirmed 2026-10-04): its lines are placed for
+// drawTextRotated90CW, the old layout turned 180 degrees (RotatedTablePlacement.h).
+// A cached v62 section holds the counter-clockwise positions, which the CW draw
+// would put off the page.
+constexpr uint8_t SECTION_FILE_VERSION = 63;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
