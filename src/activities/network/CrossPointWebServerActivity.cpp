@@ -149,6 +149,15 @@ void CrossPointWebServerActivity::onExit() {
   LOG_DBG("WEBACT", "Free heap at onExit start: %d bytes", ESP.getFreeHeap());
 
   state = WebServerActivityState::SHUTTING_DOWN;
+  // Stop the server BEFORE the silentRestart() below. Only stop() aborts an
+  // in-flight WebSocket upload (closes wsUploadFile, removes the partial), and
+  // the destructor that would call it never runs: ESP.restart() fires inside
+  // this onExit. Without this the chip reset with that file open for write --
+  // clusters already in the FAT, a directory entry still saying 0 bytes.
+  if (webServer) {
+    webServer->stop();
+    webServer.reset();
+  }
   stopDnsServer();
   MDNS.end();
 

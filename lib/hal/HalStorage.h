@@ -9,6 +9,7 @@
 #include <vector>
 
 class HalFile;
+class FsFile;
 
 class HalStorage {
  public:
@@ -63,6 +64,8 @@ class HalFile : public Print {
   class Impl;
   std::unique_ptr<Impl> impl;
   explicit HalFile(std::unique_ptr<Impl> impl);
+  // nothrow: null (a closed HalFile) on OOM instead of abort(). Callers hold StorageLock.
+  static std::unique_ptr<Impl> wrap(FsFile&& fsFile);
 
  public:
   HalFile();

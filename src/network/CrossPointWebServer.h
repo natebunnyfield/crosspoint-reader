@@ -143,3 +143,12 @@ class CrossPointWebServer {
   void handlePostWifiNetwork();
   void handleDeleteWifiNetwork();
 };
+
+// True while a WebSocket upload is writing `path`, or anything beneath it when
+// `path` is a folder. That upload's file stays open for write across many
+// handleClient() ticks, and HTTP/WebDAV requests are served in between: a
+// delete, rename, move or overwrite of the file (or of a folder holding it)
+// under that open handle orphans the upload, or -- when the freed directory
+// slot is reused before the upload closes -- syncs the upload's cluster chain
+// into another file's entry. Mutating handlers refuse while this is true.
+bool webUploadIsWriting(const char* path);

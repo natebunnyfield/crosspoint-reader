@@ -164,7 +164,8 @@ void BmpViewerActivity::doSetSleepCover() {
   // had already been set to true above it -- so it reported Done and left a
   // zero-byte sleep screen. Nothing to copy here anyway; the file already IS
   // the cover, so just record the mode.
-  if (filePath == SLEEP_COVER_PATH) {
+  // Compared as the card compares names: /SLEEP.BMP and /Sleep.bmp are the same file.
+  if (FsHelpers::isSameFatPath(filePath, SLEEP_COVER_PATH)) {
     SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
     SETTINGS.saveToFile();
     GUI.drawPopup(renderer, tr(STR_DONE));

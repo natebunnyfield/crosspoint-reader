@@ -5,6 +5,7 @@
 #include <SDCardManager.h>
 
 #include <cassert>
+#include <new>
 
 #define SDCard SDCardManager::getInstance()
 
@@ -75,6 +76,18 @@ class HalFile::Impl {
   FsFile file;
 };
 
+// Wrap an SdFat handle without the abort-on-OOM of a bare `new`. Every caller
+// holds StorageLock, so when the wrapper cannot be allocated the FsFile is
+// closed right here by its destructor (DESTRUCTOR_CLOSES_FILE), still under the
+// lock, and the caller gets a closed HalFile. An abort() at this point was a
+// reboot with every other open write handle unsynced: clusters allocated in
+// the FAT, directory entries still claiming the old sizes.
+std::unique_ptr<HalFile::Impl> HalFile::wrap(FsFile&& fsFile) {
+  std::unique_ptr<Impl> impl(new (std::nothrow) Impl(std::move(fsFile)));
+  if (!impl) LOG_ERR("HAL", "OOM wrapping a file handle");
+  return impl;
+}
+
 HalFile::HalFile() = default;
 HalFile::HalFile(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
 HalFile::~HalFile() = default;
@@ -83,7 +96,7 @@ HalFile& HalFile::operator=(HalFile&&) = default;
 
 HalFile HalStorage::open(const char* path, const oflag_t oflag) {
   StorageLock lock;  // ensure thread safety for the duration of this function
-  return HalFile(std::make_unique<HalFile::Impl>(SDCard.open(path, oflag)));
+  return HalFile(HalFile::wrap(SDCard.open(path, oflag)));
 }
 
 bool HalStorage::mkdir(const char* path, const bool pFlag) { HAL_STORAGE_WRAPPED_CALL(mkdir, path, pFlag); }
@@ -99,10 +112,17 @@ bool HalStorage::rmdir(const char* path) { HAL_STORAGE_WRAPPED_CALL(rmdir, path)
 
 bool HalStorage::openFileForRead(const char* moduleName, const char* path, HalFile& file) {
   StorageLock lock;  // ensure thread safety for the duration of this function
+  // Close whatever the out-param still holds BEFORE opening. Assigning after
+  // the open closed the old handle second: reuse a HalFile still open for
+  // write on the same path and the O_TRUNC freed the chain, then the old
+  // handle's close wrote its stale first cluster back into the live entry --
+  // an entry on free clusters, the cross-link pattern. No caller does that
+  // today; this makes it impossible rather than merely absent.
+  file = HalFile();
   FsFile fsFile;
   bool ok = SDCard.openFileForRead(moduleName, path, fsFile);
-  file = HalFile(std::make_unique<HalFile::Impl>(std::move(fsFile)));
-  return ok;
+  file = HalFile(HalFile::wrap(std::move(fsFile)));
+  return ok && file.isOpen();
 }
 
 bool HalStorage::openFileForRead(const char* moduleName, const std::string& path, HalFile& file) {
@@ -115,10 +135,17 @@ bool HalStorage::openFileForRead(const char* moduleName, const String& path, Hal
 
 bool HalStorage::openFileForWrite(const char* moduleName, const char* path, HalFile& file) {
   StorageLock lock;  // ensure thread safety for the duration of this function
+  // Close whatever the out-param still holds BEFORE opening. Assigning after
+  // the open closed the old handle second: reuse a HalFile still open for
+  // write on the same path and the O_TRUNC freed the chain, then the old
+  // handle's close wrote its stale first cluster back into the live entry --
+  // an entry on free clusters, the cross-link pattern. No caller does that
+  // today; this makes it impossible rather than merely absent.
+  file = HalFile();
   FsFile fsFile;
   bool ok = SDCard.openFileForWrite(moduleName, path, fsFile);
-  file = HalFile(std::make_unique<HalFile::Impl>(std::move(fsFile)));
-  return ok;
+  file = HalFile(HalFile::wrap(std::move(fsFile)));
+  return ok && file.isOpen();
 }
 
 bool HalStorage::openFileForWrite(const char* moduleName, const std::string& path, HalFile& file) {
@@ -191,7 +218,7 @@ bool HalFile::close() { HAL_FILE_WRAPPED_CALL(close, ); }
 HalFile HalFile::openNextFile() {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
-  return HalFile(std::make_unique<Impl>(impl->file.openNextFile()));
+  return HalFile(HalFile::wrap(impl->file.openNextFile()));
 }
 bool HalFile::isOpen() const { return impl != nullptr && impl->file.isOpen(); }  // already thread-safe, no need to wrap
 HalFile::operator bool() const { return isOpen(); }

@@ -34,6 +34,34 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-073] The firmware corrupts the FAT on SD cards: lost allocations, cross-links, duplicate entries, a directory loop — FIXED 2026-10-04 (eleven mechanisms), UNCONFIRMED on device
+**severity: critical (data loss across the whole card, self-amplifying: once one cross-link exists, deleting either file frees the other's clusters) · scope: storage HAL, WebDAV/HTTP file server, reader progress, boot GPIO, freeink-sdk SDCardManager · reported by the owner 2026-10-04: "it is firmware corrupting the cards but I don't know how"**
+
+Two cards read on a Mac the same day: BUNNYFIELDS carried a self-nested
+directory loop and clusters in use but marked free; OWEN_BNF carried two
+`/.crosspoint` entries, `/.fonts` pointing at another directory's cluster, and
+file data parsed as a directory entry. Full mechanism-by-mechanism account,
+the SdFat facts it rests on (one shared sector cache on RISC-V, so remove and
+rename have a reset window), what was deliberately NOT changed, and every area
+checked and found clean: [docs/sd-card-corruption-2026-10-04.md](docs/sd-card-corruption-2026-10-04.md).
+
+The fixes, briefly: progress rewritten in place instead of temp+remove+rename
+every page turn; a clean sleep at a sustained empty battery instead of the
+brownout reset; SD CS driven high before the boot panel probe clocks the shared
+bus; File Transfer stops its server (closing a live WebSocket upload) before it
+reboots; WebDAV MOVE refuses a folder into its own subtree; mutations refused on
+a path a WebSocket upload is writing; the folder-delete walk's missing
+`getName()` (dropped by `72b26b957`) restored; the SDK's `removeDir` no longer
+names entries into `char[128]`; Txt cover closes before removing; HAL closes an
+out-param before reopening and no longer aborts on OOM while wrapping a handle.
+
+**This also settles [B-054]'s deciding question**: the damage is real, on the
+card, after a remount. B-059 was not the whole story.
+
+**To close:** a week of normal use on a freshly formatted card, then
+`fsck_msdos -n` on a Mac. Clean is the evidence; dirty means compare against the
+doc's "not done" list (SPI CRC, the sleep/wake write burst) next.
+
 ### [B-072] A refused 1 KB font allocation was retried per text block, and each failure cost ~140 allocations and ~70 file opens — FIXED 2026-09-10
 **severity: critical (this is the amplifier that turns a small font-path OOM into an abort elsewhere; the shape of the owner's recurring daily-use crashes) · scope: `lib/EpdFont/SdCardFont.{h,cpp}`, `lib/Epub/Epub/parsers/ChapterHtmlSlimParser.{h,cpp}`, both image converters · found 2026-09-10 by two measured heap sweeps · full numbers in [docs/reading-path-heap-budget-2026-09-10.md](docs/reading-path-heap-budget-2026-09-10.md)**
 
@@ -732,6 +760,12 @@ that stopped mid-stream (`!responseComplete()`) from an unexpected HTTP status,
 and those are three different bugs.
 
 ### [B-054] Deleting a file appears to corrupt filenames across the filesystem — my first mechanism was WRONG and is retracted; still open, with B-059 as the leading candidate
+
+**2026-10-04:** real on-card FAT corruption confirmed by the owner and on two
+cards; see [B-073], which fixes the mechanisms found. Among them the
+folder-delete walk had been naming every entry with a stale buffer since
+2026-09-10 and the SDK's recursive `removeDir` mis-resolved long names to the
+parent folder -- both on the delete path this report started from.
 **severity: high (data integrity on the card, and it is not confined to the file that was deleted) · scope: unknown; start at the delete path and the directory listing that follows it · reported by the owner 2026-09-07**
 
 Owner, verbatim: *"deleting a file seems to corrupt the filenames across the

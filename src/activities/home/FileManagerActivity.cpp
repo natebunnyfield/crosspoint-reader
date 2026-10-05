@@ -600,7 +600,9 @@ void FileManagerActivity::performMoveHere() {
     requestUpdate();
     return;
   }
-  if (moveSourceIsDir && cleanBase.compare(0, moveSourcePath.length() + 1, moveSourcePath + "/") == 0) {
+  // Case-insensitive, as FAT is: SdFat would otherwise re-parent the folder
+  // under its own descendant and cut the subtree off as a directory loop.
+  if (moveSourceIsDir && FsHelpers::isSameOrInside(cleanBase, moveSourcePath)) {
     showError(tr(STR_CANT_MOVE_INTO_ITSELF));
     return;
   }

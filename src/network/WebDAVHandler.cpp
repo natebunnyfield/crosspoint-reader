@@ -12,6 +12,7 @@
 #include <memory>
 #include <new>
 
+#include "CrossPointWebServer.h"
 #include "util/BookCacheUtils.h"
 #include "util/TaskWatchdog.h"
 
@@ -56,7 +57,7 @@ void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
   (void)uri;
   if (raw.status == RAW_START) {
     _putPath = getRequestPath(server);
-    if (isProtectedPath(_putPath)) {
+    if (isProtectedPath(_putPath) || webUploadIsWriting(_putPath.c_str())) {
       _putOk = false;
       return;
     }
@@ -474,6 +475,11 @@ void WebDAVHandler::handleDelete(WebServer& s) {
     return;
   }
 
+  if (webUploadIsWriting(path.c_str())) {
+    s.send(423, "text/plain", "Locked: upload in progress");
+    return;
+  }
+
   HalFile file = Storage.open(path.c_str());
   if (!file) {
     s.send(500, "text/plain", "Failed to open");
@@ -575,6 +581,24 @@ void WebDAVHandler::handleMove(WebServer& s) {
     return;
   }
 
+  // A folder moved into its own subtree. SdFat's rename does not check: it
+  // re-parents the folder under one of its own descendants and rewrites its
+  // ".." to point there, which detaches the whole subtree from the root as a
+  // directory loop -- unreachable, never freed, and an infinite walk for any
+  // tool that follows it (2026-10-04 card: a self-nested ".../styles/..."
+  // chain). Compared case-insensitively, because FAT names are; the same path
+  // in another case is the case-only rename below, not a move inside itself.
+  if (FsHelpers::isSameOrInside(dstPath.c_str(), srcPath.c_str()) &&
+      !FsHelpers::isSameFatPath(dstPath.c_str(), srcPath.c_str())) {
+    s.send(409, "text/plain", "Cannot move a folder into itself");
+    return;
+  }
+
+  if (webUploadIsWriting(srcPath.c_str()) || webUploadIsWriting(dstPath.c_str())) {
+    s.send(423, "text/plain", "Locked: upload in progress");
+    return;
+  }
+
   if (!Storage.exists(srcPath.c_str())) {
     s.send(404, "text/plain", "Source not found");
     return;
@@ -595,7 +619,10 @@ void WebDAVHandler::handleMove(WebServer& s) {
   // because it IS the source, and the overwrite below removed it, then failed
   // to open it: 500, source gone (network hunt 2026-09-04). Renamed through
   // a temporary name instead, and never treated as an overwrite.
-  const bool caseOnly = strcasecmp(srcPath.c_str(), dstPath.c_str()) == 0;
+  // Compared as the card compares names (Unicode case folding, not just
+  // ASCII): "/Café" -> "/CAFÉ" through strcasecmp read as a different name,
+  // took the overwrite branch, and removed the source.
+  const bool caseOnly = FsHelpers::isSameFatPath(srcPath.c_str(), dstPath.c_str());
   bool dstExists = !caseOnly && Storage.exists(dstPath.c_str());
   if (dstExists && !overwrite) {
     s.send(412, "text/plain", "Destination exists and Overwrite is F");
@@ -663,6 +690,19 @@ void WebDAVHandler::handleCopy(WebServer& s) {
 
   if (srcPath == dstPath) {
     s.send(204);
+    return;
+  }
+
+  // Case-only copy (A.txt -> a.txt): on FAT the destination IS the source, so
+  // the overwrite below removed the source and then re-created it empty while
+  // srcFile still read the freed clusters the new file was being written into.
+  if (FsHelpers::isSameFatPath(srcPath.c_str(), dstPath.c_str())) {
+    s.send(403, "text/plain", "Source and destination are the same file");
+    return;
+  }
+
+  if (webUploadIsWriting(dstPath.c_str())) {
+    s.send(423, "text/plain", "Locked: upload in progress");
     return;
   }
 

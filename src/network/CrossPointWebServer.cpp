@@ -280,6 +280,14 @@ void CrossPointWebServer::begin() {
   LOG_DBG("WEB", "[MEM] Free heap after server.begin(): %d bytes", ESP.getFreeHeap());
 }
 
+bool webUploadIsWriting(const char* path) {
+  if (!wsUploadInProgress || !wsUploadFile || path == nullptr) return false;
+  String target = wsUploadPath;
+  if (!target.endsWith("/")) target += "/";
+  target += wsUploadFileName;
+  return FsHelpers::isSameOrInside(target.c_str(), path);
+}
+
 void CrossPointWebServer::abortWsUpload(const char* tag) {
   // Explicit close() required: file-scope global persists beyond function scope
   wsUploadFile.close();
@@ -979,6 +987,10 @@ void CrossPointWebServer::handleRename() const {
     server->send(404, "text/plain", "Item not found");
     return;
   }
+  if (webUploadIsWriting(itemPath.c_str())) {
+    server->send(409, "text/plain", "File is still uploading");
+    return;
+  }
 
   HalFile file = Storage.open(itemPath.c_str());
   if (!file) {
@@ -1099,6 +1111,11 @@ void CrossPointWebServer::handleMove() const {
     server->send(409, "text/plain", "Target already exists");
     return;
   }
+  if (webUploadIsWriting(itemPath.c_str())) {
+    file.close();
+    server->send(409, "text/plain", "File is still uploading");
+    return;
+  }
 
   clearBookCache(itemPath.c_str());
   const bool success = file.rename(newPath.c_str());
@@ -1196,6 +1213,11 @@ void CrossPointWebServer::handleDelete() const {
     // Check if item exists
     if (!Storage.exists(itemPath.c_str())) {
       failedItems += itemPath + " (not found); ";
+      allSuccess = false;
+      continue;
+    }
+    if (webUploadIsWriting(itemPath.c_str())) {
+      failedItems += itemPath + " (still uploading); ";
       allSuccess = false;
       continue;
     }
@@ -1663,11 +1685,11 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           wsLastProgressSent = 0;
           wsUploadStartTime = millis();
 
-          // Ensure path is valid
-          if (!wsUploadPath.startsWith("/")) wsUploadPath = "/" + wsUploadPath;
-          if (wsUploadPath.length() > 1 && wsUploadPath.endsWith("/")) {
-            wsUploadPath = wsUploadPath.substring(0, wsUploadPath.length() - 1);
-          }
+          // Normalized the way every HTTP/WebDAV handler normalizes its path, so
+          // webUploadIsWriting() compares like with like: a raw "//" or "/./"
+          // here would slip past the guard that keeps other requests off this
+          // open handle.
+          wsUploadPath = normalizeWebPath(wsUploadPath);
 
           String filePath = wsUploadPath;
           if (!filePath.endsWith("/")) filePath += "/";
@@ -1974,6 +1996,13 @@ void CrossPointWebServer::handleFontDelete() {
   }
 
   const char* familyName = doc["family"];
+  for (const char* root : {SdCardFontRegistry::FONTS_DIR_HIDDEN, SdCardFontRegistry::FONTS_DIR_VISIBLE}) {
+    const String dirPath = String(root) + "/" + familyName;
+    if (webUploadIsWriting(dirPath.c_str())) {
+      server->send(409, "application/json", "{\"error\":\"Upload in progress\"}");
+      return;
+    }
+  }
   FontInstaller installer(sdFontSystem.registry());
   auto result = installer.deleteFamily(familyName);
 

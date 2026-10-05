@@ -33,6 +33,26 @@ inline bool writeAtomic(const std::string& cachePath, const uint8_t* data, size_
   const std::string finalPath = cachePath + "/progress.bin";
   const std::string tmpPath = cachePath + "/progress.bin.tmp";
 
+  // The common case -- a page turn, same record length as last time -- is
+  // rewritten IN PLACE, with no O_TRUNC: the bytes land in the one sector the
+  // file already owns and the directory entry gets a new mtime, so the FAT is
+  // never touched. The temp + remove + rename below costs three directory ops
+  // and two FAT updates per page turn, and on this target SdFat writes a freed
+  // FAT sector to the card BEFORE the directory entry that still points at it
+  // (one shared sector cache on RISC-V): a reset in that gap -- a panic on the
+  // other task, a brownout -- leaves an entry on free clusters, which the next
+  // allocation hands out again as a cross-link. Not the #2275 truncate either:
+  // truncation frees and reallocates the chain; this never does.
+  if (len <= 512) {
+    HalFile f = Storage.open(finalPath.c_str(), O_RDWR);
+    if (f && !f.isDirectory() && f.fileSize() == len) {
+      if (f.write(data, len) == len && f.close()) {
+        return true;
+      }
+      LOG_ERR("PRG", "In-place progress rewrite failed, falling back to temp+rename: %s", finalPath.c_str());
+    }
+  }
+
   {
     HalFile f;
     if (!Storage.openFileForWrite("PRG", tmpPath, f)) {

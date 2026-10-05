@@ -159,6 +159,12 @@ bool Txt::generateCoverBmp() const {
       return false;
     }
     const bool success = JpegToBmpConverter::jpegFileToBmpStream(coverJpg, coverBmp);
+    // Close before the remove below, as Epub::generateCoverBmp does: removing a
+    // file whose write handle is still open frees nothing (the entry has never
+    // been synced past cluster 0), so every cluster the converter wrote stayed
+    // allocated with no owner.
+    coverJpg.close();
+    coverBmp.close();
 
     if (!success) {
       LOG_ERR("TXT", "Failed to generate BMP from JPG cover image");

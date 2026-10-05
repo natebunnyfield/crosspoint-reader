@@ -73,6 +73,10 @@ bool removeRecursiveWithCacheClear(const std::string& fullPath, char* nameBuffer
 
     dir.rewindDirectory();
     for (auto entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
+      // 72b26b957 dropped this call when it added the guard below, so from
+      // 2026-09-10 every entry in the walk was named by whatever the CALLER
+      // last left in nameBuffer: one stale path for the whole folder.
+      entry.getName(nameBuffer, nameBufferSize);
       // An entry whose name cannot be read MUST NOT become a path.
       //
       // getName() returns 0 and leaves the buffer empty -- SdFat clears it on

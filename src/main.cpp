@@ -35,6 +35,7 @@
 #include "fontIds.h"
 #include "images/LoadingIcon.h"
 #include "util/ButtonNavigator.h"
+#include "util/LowBatteryGuard.h"
 
 GfxRenderer renderer(display);
 MappedInputManager mappedInputManager(gpio, renderer);
@@ -544,6 +545,11 @@ enum class BootResume : uint8_t {
 // latched and silently disable silentRestart() for the rest of the session.
 static bool deepSleepInProgress = false;
 
+// File scope so setup() can reset it: the simulator's in-process wake keeps
+// statics, and a guard still armed and "empty since" before the sleep would
+// put the device straight back to sleep on the first sample.
+static LowBatteryGuard lowBatteryGuard;
+
 void silentRestart() {
   if (deepSleepInProgress) return;  // sleeping supersedes the heap-defrag reboot
   silentRebootTarget = SILENT_REBOOT_TARGET_HOME;
@@ -1046,6 +1052,7 @@ void setup() {
   // what the simulator's in-process (longjmp) wake does not.
   lastActivityTime = millis();
   deepSleepInProgress = false;
+  lowBatteryGuard = LowBatteryGuard{};
 
   // A panic's serial output is lost when USB CDC drops with the crash, so
   // replay the persisted record on the next boot instead. This is how the BLE
@@ -1152,6 +1159,13 @@ void loop() {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep(true);
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
+    return;
+  }
+
+  if (lowBatteryGuard.due(millis()) &&
+      lowBatteryGuard.sample(millis(), powerManager.getBatteryPercentage(), gpio.isUsbConnected())) {
+    LOG_INF("SLP", "Battery empty for %lu ms, sleeping before a brownout reset", LowBatteryGuard::SUSTAIN_MS);
+    enterDeepSleep(true);
     return;
   }
 

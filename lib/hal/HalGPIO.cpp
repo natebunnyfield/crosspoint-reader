@@ -115,6 +115,17 @@ HalGPIO::DeviceType detectDeviceTypeWithFingerprint() {
 
 void HalGPIO::begin() {
 #if FREEINK_MCU_C3
+  // Deselect the SD card before ANYTHING clocks the shared SCLK/MOSI. The card
+  // is still powered after a warm reset (ESP.restart, a USB-powered deep sleep)
+  // and still in SPI mode, so with its CS low it parses whatever crosses the
+  // bus as commands -- and the panel probe below bit-bangs that bus on every
+  // boot, before Storage.begin() ever drives this pin. A display byte stream
+  // that happens to form CMD24 + 0xFE writes 512 bytes of it to some sector.
+  // GPIO12 is the SD CS on both C3 boards (XTEINK_X4/X3 sd.cs).
+  static_assert(BoardConfig::XTEINK_X4.sd.cs == BoardConfig::XTEINK_X3.sd.cs, "X3/X4 SD CS diverged");
+  pinMode(BoardConfig::XTEINK_X4.sd.cs, OUTPUT);
+  digitalWrite(BoardConfig::XTEINK_X4.sd.cs, HIGH);
+
   _deviceType = detectDeviceTypeWithFingerprint();
   BoardConfig::selectDevice(deviceIsX3() ? BoardConfig::Board::XteinkX3 : BoardConfig::Board::XteinkX4);
 

@@ -88,6 +88,19 @@ inline bool hasCssExtension(const String& fileName) {
 std::string extractFolderPath(const std::string& filePath);
 
 /**
+ * True when `path` is `ancestor` itself or lies anywhere beneath it, compared
+ * the way the card compares names -- UTF-8 decoded and case-folded with
+ * SdFat's own long-name table, so "/CAFÉ/x" is inside "/Café" -- ignoring
+ * trailing slashes. The guard before renaming a folder: SdFat will happily
+ * re-parent a folder under its own descendant, which cuts the subtree off as
+ * a loop.
+ */
+bool isSameOrInside(std::string_view path, std::string_view ancestor);
+
+/** Whether two paths name the same entry on the card (same folding as above). */
+bool isSameFatPath(std::string_view a, std::string_view b);
+
+/**
  * Sanitize a filename/path component for FAT32 in a caller-provided buffer.
  * Replaces invalid path characters, spaces, and control characters with '-'.
  */
