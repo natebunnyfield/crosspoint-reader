@@ -305,7 +305,8 @@ class HalGPIO {
   void publishReaderTextInsets(int /*topPx*/, int /*rightPx*/, int /*bottomPx*/, int /*leftPx*/) {}
 
   // WHETHER THE PAGE ON SCREEN IS TURNED: a wide-table page ([T-021]) whose
-  // content is drawn for a reader who turns the device clockwise. A no-op here,
+  // table is turned clockwise, read by turning the device counter-clockwise
+  // (docs/ui-conventions.md says which direction is meant). A no-op here,
   // for the same host-capability reason as the insets channel above: this board
   // cannot turn its own presentation, so nothing on it could consume the fact.
   // A host that CAN -- the iOS app rotates itself into landscape and shows the

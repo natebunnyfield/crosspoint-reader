@@ -1762,8 +1762,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // watermark rather than a count.
   gpio.publishReaderPageIdentity(readerBookKey(epub->getPath()), currentSpineIndex, section ? section->currentPage : 0);
 
-  // ...and whether it is a TURNED page (a wide table set for a clockwise turn,
-  // [T-021]): an inline no-op on device; the iOS host rotates itself into
+  // ...and whether it is a TURNED page (a wide table turned clockwise, read by
+  // turning the device counter-clockwise, [T-021]): an inline no-op on device; the iOS host rotates itself into
   // landscape while one is up. Every other path off the page publishes false
   // (onExit, the end of the book, a build error, the error screens and the
   // Indexing popups). Decided here, PUBLISHED below, after the page's first

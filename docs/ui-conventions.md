@@ -7,25 +7,33 @@ them is a bug. File:line references are to the state at adoption.
 ## Rotation is clockwise. Always.
 
 **Owner ruling 2026-08-19: never offer a counter-clockwise rotation again.** He
-is right-handed, so a page the reader turns clockwise puts the device's side
-rockers where his hand already is; the mirrored option is not a trade-off worth
-rendering, discussing or re-proposing.
+is right-handed. **"Clockwise" names the CONTENT:** a turned page shows its
+table rotated 90 degrees clockwise -- header down the page's RIGHT edge, every
+run descending -- and **the reader turns the device COUNTER-clockwise to read
+it.** The mirrored option is not a trade-off worth rendering, discussing or
+re-proposing.
 
-The trap that produced one anyway, recorded because the name invites it:
-`GfxRenderer::drawTextRotated90CW` draws **counter-clockwise content**. Its name
-describes the turn the READER makes, not the transform applied to the glyphs —
-text drawn with it climbs bottom-to-top and reads once the device is turned
-clockwise. There is no clockwise-content call. `tools/table_preview` composes
-one by drawing with that call and turning the finished framebuffer 180 degrees
-(CCW + 180 = CW), which flips the page as a unit so row order survives.
+**Corrected 2026-10-04, and the correction is the reason this section exists in
+this form.** This paragraph used to say "a page the reader turns clockwise puts
+the device's side rockers where his hand already is". That was an agent's
+paraphrase, and it says the opposite. One TestFlight build (304) followed it and
+flipped the wide-table page; the owner, the same day: *"the iphone would need to
+be turned ccw not clockwise, you've mixed things up"*. The page is restored
+(`lib/Epub/Epub/parsers/RotatedTablePlacement.h`, `SECTION_FILE_VERSION` 64,
+TODO.md [T-021]), and the iOS app accepts only the counter-clockwise device turn
+(`UIInterfaceOrientationLandscapeRight`, the home edge on the right). When a
+direction is in question, say which: the TABLE's rotation on the page, or the
+DEVICE's turn by the reader. They are always opposite.
 
-**2026-10-04: the wide-table page itself now follows the ruling in TURN terms.**
-It had shipped drawn with `drawTextRotated90CCW` -- the composition above -- so
-it read after a COUNTER-clockwise turn; asked in turn terms, the owner ruled
-*"Clockwise: fix the page"*, and it is drawn with `drawTextRotated90CW` now
-(`lib/Epub/Epub/parsers/RotatedTablePlacement.h`, TODO.md [T-021]). The
-paragraph above therefore describes how `tools/table_preview` builds its
-images, which is the opposite page to the one the reader ships.
+The trap that produced a wrong one on 2026-08-19, recorded because the name
+invites it: `GfxRenderer::drawTextRotated90CW` draws **counter-clockwise
+content** -- the forbidden kind. Its name describes the turn the READER makes,
+not the transform applied to the glyphs: text drawn with it climbs bottom-to-top
+and reads once the device is turned clockwise. **`drawTextRotated90CCW` (added
+for T-021) is the clockwise-content call** and draws the turned page.
+`tools/table_preview` predates it and composes the same page by drawing with the
+CW call and turning the finished framebuffer 180 degrees (CCW + 180 = CW), which
+flips the page as a unit so row order survives.
 
 
 ## Choice surfaces — what shape of UI a decision gets

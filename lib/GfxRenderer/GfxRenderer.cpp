@@ -327,9 +327,9 @@ static AlignedMemRect screenRectToAlignedMemRect(GfxRenderer::Orientation orient
 // page must be turned clockwise to read it. Rotated90CCW is its 180-degree
 // mirror -- the run descends toward +y and the page is turned counter-clockwise.
 // The names describe the glyph transform; the reader's turn is the opposite one.
-// The wide-table page (T-021) was drawn with Rotated90CCW until 2026-10-04, and
-// so read after a COUNTER-clockwise turn against the owner's clockwise ruling; it
-// is drawn with Rotated90CW now (lib/Epub/Epub/parsers/RotatedTablePlacement.h).
+// The owner's "rotation is clockwise" names the CONTENT, so the wide-table page
+// (T-021) is drawn with Rotated90CCW (lib/Epub/Epub/parsers/RotatedTablePlacement.h,
+// which records the one build that read it the other way).
 enum class TextRotation { None, Rotated90CW, Rotated90CCW };
 
 // Glyph plotting target. `deviceSpace` is only ever true when a hi-res
@@ -3019,11 +3019,11 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
 // The 180-degree mirror of drawTextRotated90CW: the run DESCENDS the page and
 // the glyphs are turned the other way, so the page reads when it is turned
-// counter-clockwise. Added for T-021, whose page it drew until 2026-10-04 --
-// which is exactly why that page read after a COUNTER-clockwise turn against the
-// owner's clockwise ruling. That page is drawn with drawTextRotated90CW now
-// (lib/Epub/Epub/parsers/RotatedTablePlacement.h); nothing a reader turns should
-// be drawn with this one.
+// counter-clockwise -- the content turned CLOCKWISE, which is what the owner's
+// "rotation is clockwise" names. Added for T-021, whose page it draws
+// (lib/Epub/Epub/parsers/RotatedTablePlacement.h); the harness had been faking
+// it by turning the whole framebuffer 180 degrees, which a page renderer cannot
+// do.
 void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int y, const char* text, const bool black,
                                        const EpdFontFamily::Style style) const {
   // Cannot draw a NULL / empty string

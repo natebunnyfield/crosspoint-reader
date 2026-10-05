@@ -176,104 +176,57 @@ TEST_F(RotatedText, TheAnchorsAreMirroredToo) {
   EXPECT_LE(ccw.x1, bandX + 2) << "CCW ink should sit at or left of its anchor";
 }
 
-// --- the wide-table page reads after a CLOCKWISE turn (2026-10-04) ----------
+// --- the wide-table page: the TABLE turned clockwise, read after a ---------
+// --- COUNTER-clockwise device turn (owner, corrected 2026-10-04) ------------
 //
-// T-021 shipped its page drawn with drawTextRotated90CCW, which is a page the
-// reader turns COUNTER-clockwise, against the owner's clockwise ruling. The fix
-// places every line for drawTextRotated90CW at the old spot turned 180 degrees
-// (RotatedTablePlacement.h), and claims the result is the old page turned
-// around EXACTLY. These read the framebuffer back to hold it to that: a sign or
-// off-by-one in the placement shows up as a pixel that does not match its
-// mirror, and an asymmetric rounding in either draw call would too.
+// One TestFlight build (304) drew this page the other way round, after the
+// owner's "rotation is clockwise" was read as the READER's turn; he corrected
+// it the same day: "the iphone would need to be turned ccw not clockwise, you've
+// mixed things up". These pin the direction through the real renderer and the
+// real placement (RotatedTablePlacement.h), so a second flip fails here rather
+// than on his phone. Turned counter-clockwise, the page's RIGHT edge is the top
+// of what the reader sees and its TOP edge is their left.
 
-namespace {
-
-std::vector<bool> inkMap(const GfxRenderer& r) {
-  const int W = r.getScreenWidth(), H = r.getScreenHeight();
-  std::vector<bool> m(static_cast<size_t>(W) * H);
-  for (int y = 0; y < H; y++)
-    for (int x = 0; x < W; x++) m[static_cast<size_t>(y) * W + x] = inkAt(r, x, y);
-  return m;
-}
-
-// Every inked pixel of `before`, turned 180 degrees inside the screen, is inked
-// in `after`, and nothing else is. Returns the number of mismatches.
-int mismatchesTurned(const std::vector<bool>& before, const std::vector<bool>& after, const int W, const int H) {
-  int bad = 0;
-  for (int y = 0; y < H; y++)
-    for (int x = 0; x < W; x++)
-      if (before[static_cast<size_t>(y) * W + x] != after[static_cast<size_t>(H - 1 - y) * W + (W - 1 - x)]) bad++;
-  return bad;
-}
-
-}  // namespace
-
-TEST_F(RotatedText, TheClockwiseTablePageIsTheOldPageTurnedAround) {
+TEST_F(RotatedText, TheTablePageReadsAfterACounterClockwiseTurn) {
   GfxRenderer& r = Gfx::instance().renderer();
-  const int W = r.getScreenWidth(), H = r.getScreenHeight();
+  const int W = r.getScreenWidth();
   constexpr int kMargin = 2;  // ChapterHtmlSlimParser::emitBufferedTableRotated's kRotMargin
-  // The viewport is the whole screen here, so the turn is the screen's.
-  struct Spot {
-    int down, across;
-  };
-  // The table's first line (both margins), a line deep in the page, and one near
-  // the far corner of the reading axis.
-  const Spot spots[] = {{kMargin, kMargin}, {120, 260}, {W - 60, H - 200}};
-  for (const Spot& s : spots) {
-    r.clearScreen(0xFF);
-    r.drawTextRotated90CCW(FONT, W - kMargin - s.down, s.across, SAMPLE, true, EpdFontFamily::REGULAR);
-    const std::vector<bool> before = inkMap(r);
-    ASSERT_GT(std::count(before.begin(), before.end(), true), 0) << "the old placement drew nothing";
-
-    GfxRenderer::resetOutOfRange();
-    r.clearScreen(0xFF);
-    const rotatedtable::LinePlace at = rotatedtable::line(s.down, s.across, H, kMargin);
-    r.drawTextRotated90CW(FONT, at.x, at.y, SAMPLE, true, EpdFontFamily::REGULAR);
-    const std::vector<bool> after = inkMap(r);
-    EXPECT_EQ(mismatchesTurned(before, after, W, H), 0)
-        << "down " << s.down << ", across " << s.across << ": the clockwise line is not the old one turned 180";
-    EXPECT_EQ(GfxRenderer::outOfRangeCount(), 0u);
-  }
-}
-
-TEST_F(RotatedText, TheHeaderRuleIsTheOldRuleTurnedAround) {
-  GfxRenderer& r = Gfx::instance().renderer();
-  const int W = r.getScreenWidth(), H = r.getScreenHeight();
-  constexpr int kMargin = 2, kThick = 2;
-  const int ruleDown = 47, length = 610;
-  r.clearScreen(0xFF);
-  const int oldX = W - kMargin - ruleDown;
-  r.drawLine(oldX, kMargin, oldX, kMargin + length - 1, kThick, true);
-  const std::vector<bool> before = inkMap(r);
-  ASSERT_EQ(std::count(before.begin(), before.end(), true), kThick * length);
-
-  r.clearScreen(0xFF);
-  const rotatedtable::RulePlace at = rotatedtable::rule(ruleDown, length, H, kMargin, kThick);
-  r.drawLine(at.x, at.y, at.x, at.y + at.length - 1, kThick, true);
-  EXPECT_EQ(mismatchesTurned(before, inkMap(r), W, H), 0) << "the rule is not the old rule turned 180";
-}
-
-TEST_F(RotatedText, TheTablePageReadsAfterAClockwiseTurn) {
-  // Stated the way the reader meets it. Turned clockwise, the page's LEFT edge
-  // is the top of what the reader sees and its BOTTOM edge is their left. So the
-  // header row must be the leftmost band, and every run must start low on the
-  // page and climb.
-  GfxRenderer& r = Gfx::instance().renderer();
-  const int H = r.getScreenHeight();
-  constexpr int kMargin = 2;
   const int lh = r.getLineHeight(FONT);
+  GfxRenderer::resetOutOfRange();
   r.clearScreen(0xFF);
-  const rotatedtable::LinePlace header = rotatedtable::line(kMargin, kMargin, H, kMargin);
-  r.drawTextRotated90CW(FONT, header.x, header.y, SAMPLE, true, EpdFontFamily::BOLD);
+  const rotatedtable::LinePlace header = rotatedtable::line(kMargin, kMargin, W, kMargin);
+  r.drawTextRotated90CCW(FONT, header.x, header.y, SAMPLE, true, EpdFontFamily::BOLD);
   const Box h = inkBox(r);
   r.clearScreen(0xFF);
-  const rotatedtable::LinePlace row = rotatedtable::line(kMargin + 2 * lh, kMargin, H, kMargin);
-  r.drawTextRotated90CW(FONT, row.x, row.y, SAMPLE, true, EpdFontFamily::REGULAR);
+  const rotatedtable::LinePlace row = rotatedtable::line(kMargin + 2 * lh, kMargin, W, kMargin);
+  r.drawTextRotated90CCW(FONT, row.x, row.y, SAMPLE, true, EpdFontFamily::REGULAR);
   const Box b = inkBox(r);
   ASSERT_FALSE(h.empty());
   ASSERT_FALSE(b.empty());
-  EXPECT_LT(h.x1, b.x0) << "the header must be the band nearest the page's LEFT edge";
-  EXPECT_LT(h.x0, lh) << "the header must sit at the left margin";
-  EXPECT_GT(h.y1, H - 2 * lh) << "the first column must start at the page's BOTTOM, the reader's left";
-  EXPECT_LT(h.y0, h.y1 - lh) << "and the run must climb from there";
+  EXPECT_GT(h.x0, b.x1) << "the header must be the band nearest the page's RIGHT edge";
+  EXPECT_GT(h.x1, W - 1 - lh) << "the header must sit at the right margin";
+  EXPECT_LT(h.y0, 2 * lh) << "the first column must start at the page's TOP, the reader's left";
+  EXPECT_GT(h.y1, h.y0 + lh) << "and the run must descend from there";
+  EXPECT_EQ(GfxRenderer::outOfRangeCount(), 0u);
+}
+
+TEST_F(RotatedText, TheHeaderRuleSitsBetweenTheHeaderAndTheRows) {
+  // Under the header in the reader's view is, on the upright page, a vertical
+  // line just LEFT of the header band, starting at the top margin.
+  GfxRenderer& r = Gfx::instance().renderer();
+  const int W = r.getScreenWidth();
+  constexpr int kMargin = 2, kThick = 2;
+  const int lh = r.getLineHeight(FONT);
+  const int ruleDown = kMargin + lh + 4, length = 400;
+  const rotatedtable::RulePlace at = rotatedtable::rule(ruleDown, length, W, kMargin);
+  r.clearScreen(0xFF);
+  r.drawLine(at.x, at.y, at.x, at.y + at.length - 1, kThick, true);
+  const Box rule = inkBox(r);
+  r.clearScreen(0xFF);
+  const rotatedtable::LinePlace header = rotatedtable::line(kMargin, kMargin, W, kMargin);
+  r.drawTextRotated90CCW(FONT, header.x, header.y, SAMPLE, true, EpdFontFamily::BOLD);
+  const Box h = inkBox(r);
+  EXPECT_EQ(rule.count, kThick * length);
+  EXPECT_EQ(rule.y0, kMargin) << "the rule starts at the top margin, with the header";
+  EXPECT_LT(rule.x1, h.x0) << "the rule lies between the header and the rows";
 }

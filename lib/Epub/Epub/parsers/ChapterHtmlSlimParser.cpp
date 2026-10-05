@@ -982,18 +982,19 @@ void ChapterHtmlSlimParser::emitBufferedTableFlattened() {
 // --- T-021: the rotated page, and the key block it falls back to -----------
 //
 // Owner ruling 2026-08-19, against nine renders: a table that cannot be columns
-// upright becomes a CLOCKWISE-turned page of its own -- the columns get the
-// viewport's long axis instead of its short one -- and when even that will not
-// hold the table, the column names stack as a bold block with each row beneath
-// it as plain values.
+// upright becomes a page of its own with the TABLE turned clockwise -- the
+// columns get the viewport's long axis instead of its short one, and the reader
+// turns the device COUNTER-clockwise to read it (owner 2026-10-04, correcting a
+// one-build flip: "the iphone would need to be turned ccw not clockwise") --
+// and when even that will not hold the table, the column names stack as a bold
+// block with each row beneath it as plain values.
 //
 // Landscape coordinates here mean: `across` runs along the reading direction and
 // `down` marches through the rows. Where they land on the page is
-// rotatedtable::line / ::rule (RotatedTablePlacement.h): for drawTextRotated90CW,
-// the run CLIMBING the page, so the page reads after a CLOCKWISE turn (owner
-// ruling; until 2026-10-04 this was drawTextRotated90CCW and read the other way).
-// The parser owns all of this; PageRotatedText carries a finished line and its
-// landing spot, nothing more.
+// rotatedtable::line / ::rule (RotatedTablePlacement.h), for
+// drawTextRotated90CCW: the header down the page's right edge, each run
+// descending. The parser owns all of this; PageRotatedText carries a finished
+// line and its landing spot, nothing more.
 bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
   if (tableBuf.size() < 2) return false;
 
@@ -1086,12 +1087,11 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
   }
 
   for (const Placed& item : placed) {
-    // The CLOCKWISE page (RotatedTablePlacement.h): the header at the page's
-    // LEFT edge, the rows stepping right, each run climbing from the bottom --
-    // which, once the device is turned clockwise, is the header on top and the
-    // text running left to right. It is the CCW layout this file shipped until
-    // 2026-10-04 turned exactly 180 degrees inside the viewport.
-    const rotatedtable::LinePlace at = rotatedtable::line(item.down, item.across, viewportHeight, kRotMargin);
+    // The table turned clockwise (RotatedTablePlacement.h): the header at the
+    // page's RIGHT edge, the rows stepping left, each run descending from the
+    // top -- which, once the device is turned counter-clockwise, is the header
+    // on top and the text running left to right.
+    const rotatedtable::LinePlace at = rotatedtable::line(item.down, item.across, viewportWidth, kRotMargin);
     auto element = std::shared_ptr<PageRotatedText>(new (std::nothrow) PageRotatedText(
         item.text, item.bold, static_cast<int32_t>(tableFont), static_cast<int16_t>(at.x), static_cast<int16_t>(at.y)));
     if (!element) {
@@ -1108,7 +1108,7 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
     const int16_t ruleLen =
         static_cast<int16_t>(plan.x[plan.columnCount - 1] + plan.w[plan.columnCount - 1] + kRotMargin);
     const rotatedtable::RulePlace at =
-        rotatedtable::rule(ruleDown, std::max<int16_t>(1, ruleLen), viewportHeight, kRotMargin, /*thickness=*/2);
+        rotatedtable::rule(ruleDown, std::max<int16_t>(1, ruleLen), viewportWidth, kRotMargin);
     auto rule = std::shared_ptr<PageVerticalRule>(new (std::nothrow) PageVerticalRule(
         static_cast<uint16_t>(at.length), 2, static_cast<int16_t>(at.x), static_cast<int16_t>(at.y)));
     if (rule) {
