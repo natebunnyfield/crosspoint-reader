@@ -560,7 +560,9 @@ class GfxRenderer {
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,
                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   // Its 180-degree mirror: the run descends the page and reads when the page is
-  // turned COUNTER-clockwise, which is how a clockwise-rotated page is drawn.
+  // turned COUNTER-clockwise. Owner ruling: rotation is clockwise, so no page a
+  // reader turns may be drawn with this -- the wide-table page (T-021) was, until
+  // 2026-10-04, and read the wrong way (RotatedTablePlacement.h).
   // MIRRORED ANCHOR, and it matters: x is the band's RIGHT edge here (ink lies
   // to its left) where CW's x is the left edge, and y is where the run STARTS
   // and descends from. Passing a left edge draws the band off the page.

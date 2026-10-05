@@ -277,4 +277,3 @@ TEST_F(RotatedText, TheTablePageReadsAfterAClockwiseTurn) {
   EXPECT_GT(h.y1, H - 2 * lh) << "the first column must start at the page's BOTTOM, the reader's left";
   EXPECT_LT(h.y0, h.y1 - lh) << "and the run must climb from there";
 }
-

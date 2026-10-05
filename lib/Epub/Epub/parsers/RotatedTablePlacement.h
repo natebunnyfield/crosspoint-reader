@@ -12,14 +12,23 @@
 // and ruled the same day: "Clockwise: fix the page".
 //
 // The fix is the old layout turned 180 degrees inside the viewport, drawn with
-// drawTextRotated90CW. That is exact, not approximate: the two calls are each
-// other's 180-degree mirror cursor for cursor (GfxRenderer.cpp renderCharImpl --
-// CCW plots screenX = cx - (asc - top) - gy, screenY = cy + left + gx; CW plots
-// screenX = cx + (asc - top) + gy, screenY = cy - left - gx), so a CCW run whose
-// band's right edge is x and which starts at y is, turned around, a CW run whose
-// band's LEFT edge is vw - 1 - x and which starts at vh - 1 - y. The row and
-// reading axes the parser measures (`down`, `across`) are unchanged, so the
-// fit, the wrapping and the one-page check are exactly what they were.
+// drawTextRotated90CW. At 1x that is exact for plain text: the two calls are
+// each other's 180-degree mirror cursor for cursor (GfxRenderer.cpp
+// renderCharImpl -- CCW plots screenX = cx - (asc - top) - gy, screenY = cy +
+// left + gx; CW plots screenX = cx + (asc - top) + gy, screenY = cy - left -
+// gx), so a CCW run whose band's right edge is x and which starts at y is,
+// turned around, a CW run whose band's LEFT edge is vw - 1 - x and which starts
+// at vh - 1 - y. The row and reading axes the parser measures (`down`,
+// `across`) are unchanged, so the fit, the wrapping and the one-page check are
+// exactly what they were. Three places it is NOT the old page turned, none of
+// which clips (adversarial review 2026-10-04): a decomposed accent, which the
+// CCW path anchored with CW's arithmetic unmirrored and so set off center, and
+// which CW now sets correctly; the PANEL, as opposed to the viewport, because
+// the X3's margins are uneven (top 9, the rest 3) and the page is drawn at the
+// body font's cap-ink trim, so the first column starts some 6-12 px further
+// from the panel edge than the old one did from its own; and a supersampled
+// build, where both calls anchor at x*S, y*S and the text lands one device
+// pixel off an exact device-space mirror.
 //
 // Pure, and tested against the real renderer: test/rotated_text draws a line and
 // the rule both ways and checks the clockwise page is the old one turned around,

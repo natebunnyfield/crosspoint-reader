@@ -1478,7 +1478,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       section.reset();
       if (giveUp) {
         LOG_ERR("ERS", "Page load retry limit reached, aborting");
-        pageLoadRetryCount = 0;  // Reset so a later user-initiated navigation can try afresh
+        pageLoadRetryCount = 0;         // Reset so a later user-initiated navigation can try afresh
         gpio.publishTurnedPage(false);  // an upright screen replaces the page
         renderer.clearScreen();
         renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);

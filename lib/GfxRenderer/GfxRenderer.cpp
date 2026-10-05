@@ -3019,10 +3019,11 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
 // The 180-degree mirror of drawTextRotated90CW: the run DESCENDS the page and
 // the glyphs are turned the other way, so the page reads when it is turned
-// counter-clockwise -- i.e. this is what a clockwise-rotated PAGE is drawn with.
-// Added for T-021 (wide tables become a rotated full page); the harness had been
-// faking it by turning the whole framebuffer 180 degrees, which a page renderer
-// cannot do.
+// counter-clockwise. Added for T-021, whose page it drew until 2026-10-04 --
+// which is exactly why that page read after a COUNTER-clockwise turn against the
+// owner's clockwise ruling. That page is drawn with drawTextRotated90CW now
+// (lib/Epub/Epub/parsers/RotatedTablePlacement.h); nothing a reader turns should
+// be drawn with this one.
 void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int y, const char* text, const bool black,
                                        const EpdFontFamily::Style style) const {
   // Cannot draw a NULL / empty string

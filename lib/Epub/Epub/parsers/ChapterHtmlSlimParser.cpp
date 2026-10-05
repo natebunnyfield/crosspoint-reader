@@ -1,5 +1,4 @@
 #include "ChapterHtmlSlimParser.h"
-#include "RotatedTablePlacement.h"
 
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
@@ -24,6 +23,7 @@
 #include "Epub/converters/ImageDimsProbe.h"
 #include "Epub/converters/ImageToFramebufferDecoder.h"
 #include "Epub/htmlEntities.h"
+#include "RotatedTablePlacement.h"
 #include "XmlEncodingSupport.h"
 
 // Minimum file size (in bytes) to show indexing popup - smaller chapters don't benefit from it
@@ -1091,11 +1091,9 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
     // which, once the device is turned clockwise, is the header on top and the
     // text running left to right. It is the CCW layout this file shipped until
     // 2026-10-04 turned exactly 180 degrees inside the viewport.
-    const rotatedtable::LinePlace at =
-        rotatedtable::line(item.down, item.across, viewportHeight, kRotMargin);
-    auto element = std::shared_ptr<PageRotatedText>(
-        new (std::nothrow) PageRotatedText(item.text, item.bold, static_cast<int32_t>(tableFont),
-                                           static_cast<int16_t>(at.x), static_cast<int16_t>(at.y)));
+    const rotatedtable::LinePlace at = rotatedtable::line(item.down, item.across, viewportHeight, kRotMargin);
+    auto element = std::shared_ptr<PageRotatedText>(new (std::nothrow) PageRotatedText(
+        item.text, item.bold, static_cast<int32_t>(tableFont), static_cast<int16_t>(at.x), static_cast<int16_t>(at.y)));
     if (!element) {
       noteAllocationFailure("a rotated table line");
       return true;
