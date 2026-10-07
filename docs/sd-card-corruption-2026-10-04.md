@@ -157,7 +157,55 @@ Ranked by how directly each produces the damage above.
     `SLEEP`, `POWER`, `QUIT`): the file appears at the first sleep at
     48,004 B with a VALID trailer, a boot that quick-resumes consumes it to
     STALE and leaves it in place, and a second sleep rewrites it in place.
-14. Data loss, not FAT damage, fixed in passing: WebDAV COPY `A.txt -> a.txt`
+14. **SdFat itself frees a file's clusters before its directory entry is
+    marked deleted, and truncates the same way** — the ordering every
+    finding above was working around. With the one shared sector cache,
+    `remove()` dirties the FAT sectors first and they are evicted to the
+    card when the directory sector is loaded, so the entry is still live on
+    the card while its clusters are already free. The truncation the firmware
+    actually performs is not `FatFile::truncate()` — nothing calls it and the
+    linker drops it — but the `O_TRUNC` branch of `openCachedEntry()`, which
+    every one of the 51 `openFileForWrite` sites reaches: it frees the chain
+    at open and only marks the entry dirty, so the entry on the card keeps
+    the old size and first cluster until that handle's `close()`, which can
+    be a whole file copy later. A reset anywhere in that span is the
+    cross-link seed. (The first version of this patch reordered `truncate()`
+    and missed this; the third review caught it from the firmware's symbol
+    table.) **Fixed 2026-10-07** at that layer: `scripts/patch_sdfat.py`, a
+    pre-build hook like the JPEGDEC and wolfSSL ones, reorders all three
+    functions in the libdep tree so the directory entry reaches the card
+    first, the chain is freed after, and the frees are flushed before the
+    function returns. The same reset now leaves an entry already gone, or
+    already emptied, with clusters still marked used — lost space until an
+    fsck, harmless to every other file. The hook is idempotent and **aborts the
+    build if SdFat's text has moved**, so an SdFat upgrade cannot silently
+    ship the old order, and aborts an ESP32 env whose SdFat copy is not there
+    to patch. Verified from a clean state: with `.pio/libdeps/default/SdFat`
+    removed, `pio run -e default` reinstalled SdFat 2.3.1 through the Library
+    Manager BEFORE the pre-build hooks ran, the hook patched the fresh copy,
+    and the build passed — a fresh clone gets the reordered functions on its
+    first build. A second build applies nothing. Exact original and patched
+    text are in the script. Two consequences for the acceptance test: after
+    a reset in one of these windows `fsck_msdos -n` will now report lost
+    clusters (and, for a long-named file, orphaned long-name slots), which is
+    the benign residue by design — a dirty verdict should be read for
+    cross-links and bad chains, not for those.
+    Cost: an `O_TRUNC` open now writes the directory sector at open as well
+    as at close and flushes the frees at once — one or two extra sector
+    writes per rewrite, none of them FAT allocations. The third review
+    verified the call order in the compiled objects of both envs (sync →
+    freeChain → cacheSync) and found no defect; its hardening points — the
+    gate checks every block in the env's own copy, the libdeps path comes
+    from PlatformIO, a clean does not trip it — are in. Not covered: exFAT
+    (a separate code path with the same free-first order, reached by the
+    same `FsFile` API; the cards are FAT32, but an SDXC card arrives exFAT
+    and nothing refuses it — a patch for `ExFatFile::remove/truncate` is the
+    same shape if ever needed) and
+    `rename()`, which writes the new entry before removing the old one — a
+    reset there leaves two entries on one chain, and the other order would
+    leave the file unreachable instead; which is worse is an owner call,
+    discussed under "Not done".
+15. Data loss, not FAT damage, fixed in passing: WebDAV COPY `A.txt -> a.txt`
     removed its own source; BMP viewer "set as sleep cover" compared
     `/sleep.bmp` case-sensitively and could truncate the file it was reading.
 
@@ -239,6 +287,17 @@ Plausible items, handled or recorded:
   To enable for good, `-DUSE_SD_CRC=2` in `[base] build_flags` (one build-dir
   wipe) or beside the UTF-8 define in `inject_build_flags.py`; nothing else
   changes and the cards' existing data is unaffected.
+* **Reordering SdFat's `rename()`.** It writes the new entry (old first
+  cluster, old size) and syncs, then removes the old entry. A reset between
+  leaves two entries sharing one chain — and the `.tmp`-recovery in
+  `PersistableStore` then removes one of them, which frees the chain under the
+  other: the self-perpetuating cross-link. The other order (remove the old
+  entry, sync, then write the new one) turns that reset into an unreachable
+  chain: the file is lost (`PersistableStore`'s staged write would lose that
+  save; the previous target was already removed), the card stays consistent.
+  Both are defensible; the firmware's settings files are the ones at stake.
+  Not built — owner's call. If chosen it is a third block in
+  `scripts/patch_sdfat.py`.
 * **A post-write "card idle" wait before power-off.** Audited: the last card
   operation before deep sleep is always a single-sector directory/FAT write that
   already waited for programming (`close()` → `cacheSync`). Added then removed.

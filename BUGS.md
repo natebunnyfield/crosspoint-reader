@@ -56,7 +56,10 @@ names entries into `char[128]`; Txt cover closes before removing; HAL closes an
 out-param before reopening and no longer aborts on OOM while wrapping a handle.
 2026-10-07: a settings/state save whose bytes already match the card is
 skipped, and the 48 KB quick-resume frame is rewritten in place instead of
-created at every sleep and removed at every wake (doc items 12-13).
+created at every sleep and removed at every wake (doc items 12-13); and the
+root of the seeds, SdFat freeing clusters before the directory entry in
+`remove()`/`truncate()`, is reordered by a build-time patch that aborts the
+build if SdFat's text moves (`scripts/patch_sdfat.py`, doc item 14).
 
 **This also settles [B-054]'s deciding question**: the damage is real, on the
 card, after a remount. B-059 was not the whole story.
