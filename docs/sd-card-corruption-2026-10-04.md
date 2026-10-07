@@ -248,7 +248,13 @@ Plausible items, handled or recorded:
   frame file out instead. What remains per cycle is the saves whose content
   really changes (`showBootScreen`, `readerActivityLoadCount`, recents), each
   still a staged temp + remove + rename; an in-place rewrite of same-length
-  JSON would be the next lever, and JSON lengths rarely match.
+  JSON would be the next lever, and JSON lengths rarely match. A different
+  lever, proposed and not built because it changes a crash-safety mechanism:
+  `readerActivityLoadCount` and the blanked `openEpubPath` exist to break a
+  boot loop into a crashing book, and a crash loop is a sequence of resets,
+  not power losses — so the counter could live in `RTC_NOINIT_ATTR` memory
+  the way `silentRebootMagic` already does, costing the two staged
+  `state.json` writes per wake nothing at all. Owner's call.
 * **NimBLE host task writing settings** on first keyboard pairing
   (`BleHidHost.cpp:550-558`) — a third task, low likelihood, not changed.
 
@@ -286,7 +292,6 @@ clean result is the evidence, a dirty one should be compared against this list.
 Status 2026-10-07 00:15: OWEN_BNF (erased and restored 2026-10-04) verified
 clean, but its `state.json` still carried the restore's timestamp and no new
 cache directories existed, so the reader had not booted on it — that clean
-result is the restore, not a device test. `20261007T0517Z-crosspoint-9fe8e3d4.bin`
-(the fixes through item 11) was placed on it, hash-verified after a remount.
-The device test starts when that firmware is flashed and the card goes into
-the reader.
+result is the restore, not a device test. `20261007T0553Z-crosspoint-d1a9c53b.bin`
+(every item above) is on it, hash-verified after a remount. The device test
+starts when that firmware is flashed and the card goes into the reader.
