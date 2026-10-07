@@ -261,8 +261,13 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // announces it. NOTHING ENFORCES THIS NUMBER: it is not derivable at
     // compile time, no host test builds this list, and the loop below is the
     // cheapest thing that turns a drift into something a log will say. Whoever
-    // adds the sixteenth unconditional push_back moves it.
-    constexpr size_t FIXED_ENTRY_COUNT = 15;
+    // adds the seventeenth unconditional push_back moves it.
+    //
+    // 16 since 2026-08-29: Fonts Off (00ae42356), which also arrived without
+    // bumping this. The log line above did its job -- but only five weeks
+    // later, when a headless simulator run happened to be read for something
+    // else. Nothing between the two is a reason to trust the number more.
+    constexpr size_t FIXED_ENTRY_COUNT = 16;
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
