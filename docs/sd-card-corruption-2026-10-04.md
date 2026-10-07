@@ -225,7 +225,32 @@ Ranked by how directly each produces the damage above.
     first (unchanged) keeps the original's failure semantics: a rename to an
     existing name, or into a full directory, still fails with the old file
     untouched.
-16. Data loss, not FAT damage, fixed in passing: WebDAV COPY `A.txt -> a.txt`
+16. **Tried, refuted, reverted — the reader crash guard in RTC memory.**
+    `readerActivityLoadCount` is persisted in `state.json`: counted up (and
+    `openEpubPath` blanked) in a save before every entry into the reader, the
+    path restored in a second save by the reader's onEnter, the count reset in
+    a third at exit — and those are what keep item 12 from firing in the
+    dominant cycle. Moving the count into RTC no-init memory behind a validity
+    magic (a reference member, so every site in both repos compiled
+    unchanged) and dropping the path blanking measured **5 → 2 `state.json`
+    writes per sleep-from-the-reader / wake-into-the-reader cycle** on the
+    simulator. The refutation pass then showed the premise false on this
+    hardware: on battery, deep sleep drives GPIO13 — the battery MOSFET — low
+    (`HalPowerManager.cpp:84-91`), so every battery wake is a cold boot and
+    RTC memory is garbage; a book that panics during load would reopen and
+    panic on every wake (crash screen → Home → sleep → power-off → wake →
+    "open last book"). On iOS/macOS a process crash resets the global the
+    same way, breaking the simulator's own Files/Share-sheet contract, and a
+    hang cleared with the Reset button is a cold boot too. USB power hides
+    all of it, since the chip then really deep-sleeps and the C3 cannot power
+    down RTC fast memory. **Reverted before commit.** The refined design the
+    review proposed, not built: keep the RTC count for normal wakes and
+    persist it (blanking the path) only on the first boot after a panic with
+    the count standing — one write per crash, none per wake — with the
+    simulator keeping the persisted write, and a loop-task watchdog if the
+    hang case is to stay covered. Owner's call; the saving is three staged
+    writes per cycle.
+17. Data loss, not FAT damage, fixed in passing: WebDAV COPY `A.txt -> a.txt`
     removed its own source; BMP viewer "set as sleep cover" compared
     `/sleep.bmp` case-sensitively and could truncate the file it was reading.
 
@@ -316,13 +341,8 @@ Plausible items, handled or recorded:
   frame file out instead. What remains per cycle is the saves whose content
   really changes (`showBootScreen`, `readerActivityLoadCount`, recents), each
   still a staged temp + remove + rename; an in-place rewrite of same-length
-  JSON would be the next lever, and JSON lengths rarely match. A different
-  lever, proposed and not built because it changes a crash-safety mechanism:
-  `readerActivityLoadCount` and the blanked `openEpubPath` exist to break a
-  boot loop into a crashing book, and a crash loop is a sequence of resets,
-  not power losses — so the counter could live in `RTC_NOINIT_ATTR` memory
-  the way `silentRebootMagic` already does, costing the two staged
-  `state.json` writes per wake nothing at all. Owner's call.
+  JSON would be the next lever, and JSON lengths rarely match. The RTC
+  crash-guard lever is item 16: measured, refuted on battery, reverted.
 * **NimBLE host task writing settings** on first keyboard pairing
   (`BleHidHost.cpp:550-558`) — a third task, low likelihood, not changed.
 

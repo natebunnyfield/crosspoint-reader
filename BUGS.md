@@ -61,7 +61,9 @@ root of the seeds, SdFat freeing clusters before the directory entry in
 `remove()`/`truncate()`, is reordered by a build-time patch that aborts the
 build if SdFat's text moves (`scripts/patch_sdfat.py`, doc item 14); the
 same hook reorders `rename()` so the old entry is gone before the new one
-carries the chain (doc item 15).
+carries the chain (doc item 15). Moving the reader crash guard to RTC
+memory measured 5 → 2 `state.json` writes per cycle but was refuted on
+battery (sleep is a power-off; RTC is wiped) and reverted — doc item 16.
 
 **This also settles [B-054]'s deciding question**: the damage is real, on the
 card, after a remount. B-059 was not the whole story.
