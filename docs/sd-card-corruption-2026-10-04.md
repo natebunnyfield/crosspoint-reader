@@ -201,11 +201,31 @@ Ranked by how directly each produces the damage above.
     same `FsFile` API; the cards are FAT32, but an SDXC card arrives exFAT
     and nothing refuses it — a patch for `ExFatFile::remove/truncate` is the
     same shape if ever needed) and
-    `rename()`, which writes the new entry before removing the old one — a
-    reset there leaves two entries on one chain, and the other order would
-    leave the file unreachable instead; which is worse is an owner call,
-    discussed under "Not done".
-15. Data loss, not FAT damage, fixed in passing: WebDAV COPY `A.txt -> a.txt`
+    `rename()`, which is item 15.
+15. **SdFat's `rename()` wrote the new entry — chain and all — before it
+    removed the old one.** A reset between the two left two entries sharing
+    one chain (the duplicate `/.crosspoint` shape), and the next delete of
+    either — `PersistableStore`'s own `.tmp` recovery is one — freed the
+    chain under the other: a self-perpetuating cross-link. **Fixed
+    2026-10-07**, fourth block of `scripts/patch_sdfat.py`: the old entry is
+    removed (entry only; its chain stays) and that deletion reaches the card
+    before the new entry is given the chain; for a directory, the placeholder
+    cluster `mkdir` allocated is freed only after the new entry and its
+    dot-dot are on the card. A reset in the window now leaves the new name as
+    an empty file and the chain orphaned — that file is lost, or for a folder
+    its whole subtree (fsck recovers the chains as lost files); every other
+    file and the FAT are intact. For a staged settings save the window is
+    narrower still: `PersistableStore`'s recovery now treats an empty target
+    beside a parseable temp as the interrupted rename it is and promotes the
+    temp, so that save survives. A `remove()` that fails after marking the
+    old entry still fills the new one, as the original did, and reports the
+    failure afterwards. Chosen over leaving it:
+    the lost-file window is a few milliseconds a few times a session, while
+    the old shape poisoned the card until an fsck. Creating the new entry
+    first (unchanged) keeps the original's failure semantics: a rename to an
+    existing name, or into a full directory, still fails with the old file
+    untouched.
+16. Data loss, not FAT damage, fixed in passing: WebDAV COPY `A.txt -> a.txt`
     removed its own source; BMP viewer "set as sleep cover" compared
     `/sleep.bmp` case-sensitively and could truncate the file it was reading.
 
@@ -287,17 +307,6 @@ Plausible items, handled or recorded:
   To enable for good, `-DUSE_SD_CRC=2` in `[base] build_flags` (one build-dir
   wipe) or beside the UTF-8 define in `inject_build_flags.py`; nothing else
   changes and the cards' existing data is unaffected.
-* **Reordering SdFat's `rename()`.** It writes the new entry (old first
-  cluster, old size) and syncs, then removes the old entry. A reset between
-  leaves two entries sharing one chain — and the `.tmp`-recovery in
-  `PersistableStore` then removes one of them, which frees the chain under the
-  other: the self-perpetuating cross-link. The other order (remove the old
-  entry, sync, then write the new one) turns that reset into an unreachable
-  chain: the file is lost (`PersistableStore`'s staged write would lose that
-  save; the previous target was already removed), the card stays consistent.
-  Both are defensible; the firmware's settings files are the ones at stake.
-  Not built — owner's call. If chosen it is a third block in
-  `scripts/patch_sdfat.py`.
 * **A post-write "card idle" wait before power-off.** Audited: the last card
   operation before deep sleep is always a single-sector directory/FAT write that
   already waited for programming (`close()` → `cacheSync`). Added then removed.

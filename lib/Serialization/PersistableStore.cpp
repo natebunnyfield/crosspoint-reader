@@ -26,6 +26,11 @@ static String tempPathFor(const char* path) { return String(path) + ".tmp"; }
 // difference. No heap, and a read error ends it as "different" at once, where
 // readFile() would append -1 as 0xFF and keep issuing failing card reads up to
 // its 50 KB cap, all under the storage mutex.
+static bool fileIsEmpty(const char* path) {
+  HalFile file;
+  return Storage.openFileForRead("PERSIST", path, file) && file.fileSize() == 0;
+}
+
 static bool fileHoldsExactly(const char* path, const char* bytes, const size_t len) {
   HalFile file;
   if (!Storage.openFileForRead("PERSIST", path, file)) return false;
@@ -82,10 +87,11 @@ bool PersistableStoreBase::writeDocToFile(const char* path, const JsonDocument& 
     return false;
   }
   if (!Storage.rename(tmp.c_str(), path)) {
-    // The target is gone and the temp is still there and complete. Do NOT
-    // delete it: readDocFromFile() promotes it on the next boot, which is the
-    // whole point of writing it first.
-    LOG_ERR("PERSIST", "Failed to rename %s -> %s; the temp holds the data", tmp.c_str(), path);
+    // Whatever rename() left -- nothing at either name, the temp still whole,
+    // or an empty target beside the temp (SdFat removes the old entry before
+    // it fills the new one, scripts/patch_sdfat.py) -- readDocFromFile()
+    // sorts out on the next boot. Do NOT delete the temp here.
+    LOG_ERR("PERSIST", "Failed to rename %s -> %s", tmp.c_str(), path);
     return false;
   }
   return true;
@@ -96,15 +102,20 @@ bool PersistableStoreBase::readDocFromFile(const char* path, JsonDocument& doc) 
   // flight; which one to trust depends on whether the target survived.
   const String tmp = tempPathFor(path);
   if (Storage.exists(tmp.c_str())) {
-    if (!Storage.exists(path)) {
-      // Crashed between the remove and the rename. The temp is the only copy of
-      // the data -- but only promote it if it actually parses, because a crash
-      // during the temp write itself leaves a truncated one, and promoting that
-      // would turn a recoverable state into a corrupt file.
+    if (!Storage.exists(path) || fileIsEmpty(path)) {
+      // Crashed between the remove and the rename (no target), or inside the
+      // rename after SdFat removed the temp's entry and created the target but
+      // before it carried the data over (an EMPTY target, the shape the
+      // reordered rename leaves -- scripts/patch_sdfat.py). Either way the
+      // temp is the only copy of the data -- but only promote it if it
+      // actually parses, because a crash during the temp write itself leaves
+      // a truncated one, and promoting that would turn a recoverable state
+      // into a corrupt file.
       String candidate = Storage.readFile(tmp.c_str());
       JsonDocument probe;
       if (!candidate.isEmpty() && !deserializeJson(probe, candidate)) {
         LOG_INF("PERSIST", "Recovering %s from an interrupted write", path);
+        Storage.remove(path);  // the empty target, if that is what is there
         Storage.rename(tmp.c_str(), path);
       } else {
         LOG_ERR("PERSIST", "Discarding a truncated %s", tmp.c_str());

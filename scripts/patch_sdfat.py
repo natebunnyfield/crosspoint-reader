@@ -2,7 +2,9 @@
 PlatformIO pre-build script: reorder SdFat's remove(), truncate() and the
 O_TRUNC branch of openCachedEntry() -- the truncation every openFileForWrite
 actually performs -- so the directory entry reaches the card BEFORE the
-clusters it points at are freed, and the frees are flushed before returning.
+clusters it points at are freed, and the frees are flushed before returning;
+and rename(), so the old entry is gone from the card BEFORE the new one is
+given the chain (a reset used to leave two entries on one chain).
 
 Why. Off ARM (the C3 envs and the S3 `sticky` alike) SdFat is built with one
 shared sector cache (USE_SEPARATE_FAT_CACHE=0), and all three free the chain
@@ -239,6 +241,245 @@ PATCHES = [
       goto fail;
     }
   } else {
+""",
+    ),
+    (
+        os.path.join("src", "FatLib", "FatFile.cpp"),
+        """bool FatFile::rename(FatFile* dirFile, const char* newPath) {
+  DirFat_t entry;
+  Cluster_t dirCluster = 0;
+  FatFile file;
+  FatFile oldFile;
+  uint8_t* pc;
+  DirFat_t* dir;
+
+  // Must be an open file or subdirectory.
+  if (!(isFile() || isSubDir())) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // Can't rename LFN in 8.3 mode.
+  if (!USE_LONG_FILE_NAMES && isLFN()) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // Can't move file to new volume.
+  if (m_vol != dirFile->m_vol) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // sync() and cache directory entry
+  sync();
+  oldFile.copy(this);
+  dir = cacheDirEntry(FsCache::CACHE_FOR_READ);
+  if (!dir) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // save directory entry
+  memcpy(&entry, dir, sizeof(entry));
+  // make directory entry for new path
+  if (isFile()) {
+    if (!file.open(dirFile, newPath, O_CREAT | O_EXCL | O_WRONLY)) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+  } else {
+    // don't create missing path prefix components
+    if (!file.mkdir(dirFile, newPath, false)) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+    // save cluster containing new dot dot
+    dirCluster = file.m_firstCluster;
+  }
+  // change to new directory entry
+
+  m_dirSector = file.m_dirSector;
+  m_dirIndex = file.m_dirIndex;
+  m_lfnOrd = file.m_lfnOrd;
+  m_dirCluster = file.m_dirCluster;
+  // mark closed to avoid possible destructor close call
+  file.m_attributes = FILE_ATTR_CLOSED;
+  file.m_flags = 0;
+
+  // cache new directory entry
+  dir = cacheDirEntry(FsCache::CACHE_FOR_WRITE);
+  if (!dir) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // copy all but name and name flags to new directory entry
+  memcpy(&dir->createTimeMs, &entry.createTimeMs,
+         sizeof(entry) - sizeof(dir->name) - 2);
+  dir->attributes = entry.attributes;
+
+  // update dot dot if directory
+  if (dirCluster) {
+    // get new dot dot
+    Sector_t sector = m_vol->clusterStartSector(dirCluster);
+    pc = m_vol->dataCachePrepare(sector, FsCache::CACHE_FOR_READ);
+    dir = reinterpret_cast<DirFat_t*>(pc);
+    if (!dir) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+    memcpy(&entry, &dir[1], sizeof(entry));
+
+    // free unused cluster
+    if (!m_vol->freeChain(dirCluster)) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+    // store new dot dot
+    sector = m_vol->clusterStartSector(m_firstCluster);
+    pc = m_vol->dataCachePrepare(sector, FsCache::CACHE_FOR_WRITE);
+    dir = reinterpret_cast<DirFat_t*>(pc);
+    if (!dir) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+    memcpy(&dir[1], &entry, sizeof(entry));
+  }
+  // Remove old directory entry;
+  oldFile.m_firstCluster = 0;
+  oldFile.m_flags = FILE_FLAG_WRITE;
+  oldFile.m_attributes = FILE_ATTR_FILE;
+  if (!oldFile.remove()) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  return m_vol->cacheSync();
+""",
+        """bool FatFile::rename(FatFile* dirFile, const char* newPath) {
+  DirFat_t entry;
+  Cluster_t dirCluster = 0;
+  FatFile file;
+  FatFile oldFile;
+  uint8_t* pc;
+  DirFat_t* dir;
+  bool removed = true;
+
+  // Must be an open file or subdirectory.
+  if (!(isFile() || isSubDir())) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // Can't rename LFN in 8.3 mode.
+  if (!USE_LONG_FILE_NAMES && isLFN()) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // Can't move file to new volume.
+  if (m_vol != dirFile->m_vol) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // sync() and cache directory entry
+  sync();
+  oldFile.copy(this);
+  dir = cacheDirEntry(FsCache::CACHE_FOR_READ);
+  if (!dir) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // save directory entry
+  memcpy(&entry, dir, sizeof(entry));
+  // make directory entry for new path
+  if (isFile()) {
+    if (!file.open(dirFile, newPath, O_CREAT | O_EXCL | O_WRONLY)) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+  } else {
+    // don't create missing path prefix components
+    if (!file.mkdir(dirFile, newPath, false)) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+    // save cluster containing new dot dot
+    dirCluster = file.m_firstCluster;
+  }
+  // change to new directory entry
+
+  m_dirSector = file.m_dirSector;
+  m_dirIndex = file.m_dirIndex;
+  m_lfnOrd = file.m_lfnOrd;
+  m_dirCluster = file.m_dirCluster;
+  // mark closed to avoid possible destructor close call
+  file.m_attributes = FILE_ATTR_CLOSED;
+  file.m_flags = 0;
+
+  // CrossPoint patch (scripts/patch_sdfat.py): the OLD entry is removed --
+  // entry only, its chain stays -- and that removal reaches the card BEFORE
+  // the new entry is given the chain below. The original filled the new
+  // entry first, so a reset between the two left two entries sharing one
+  // chain, and the next delete of either freed the chain under the other.
+  // Now a reset between them leaves the new name as an empty file and the
+  // chain orphaned: the file is lost, every other file is not.
+  oldFile.m_firstCluster = 0;
+  oldFile.m_flags = FILE_FLAG_WRITE;
+  oldFile.m_attributes = FILE_ATTR_FILE;
+  removed = oldFile.remove();
+  if (!removed && oldFile.isOpen()) {
+    // Failed before touching the card (still open): nothing has changed.
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // A failure after the entry was marked leaves the data reachable only
+  // through the new entry, so it is filled regardless and the failure is
+  // reported at the end, as the original did.
+
+  // cache new directory entry
+  dir = cacheDirEntry(FsCache::CACHE_FOR_WRITE);
+  if (!dir) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  // copy all but name and name flags to new directory entry
+  memcpy(&dir->createTimeMs, &entry.createTimeMs,
+         sizeof(entry) - sizeof(dir->name) - 2);
+  dir->attributes = entry.attributes;
+
+  // update dot dot if directory
+  if (dirCluster) {
+    // get new dot dot
+    Sector_t sector = m_vol->clusterStartSector(dirCluster);
+    pc = m_vol->dataCachePrepare(sector, FsCache::CACHE_FOR_READ);
+    dir = reinterpret_cast<DirFat_t*>(pc);
+    if (!dir) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+    memcpy(&entry, &dir[1], sizeof(entry));
+
+    // store new dot dot
+    sector = m_vol->clusterStartSector(m_firstCluster);
+    pc = m_vol->dataCachePrepare(sector, FsCache::CACHE_FOR_WRITE);
+    dir = reinterpret_cast<DirFat_t*>(pc);
+    if (!dir) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+    memcpy(&dir[1], &entry, sizeof(entry));
+    // CrossPoint patch (scripts/patch_sdfat.py): the new entry points at the
+    // old chain and the dot-dot is in it on the card BEFORE the placeholder
+    // cluster mkdir allocated is freed, so a reset here costs a lost cluster
+    // rather than a live entry on a freed one.
+    if (!m_vol->cacheSync()) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+    if (!m_vol->freeChain(dirCluster)) {
+      DBG_FAIL_MACRO;
+      goto fail;
+    }
+  }
+  if (!m_vol->cacheSync()) {
+    DBG_FAIL_MACRO;
+    goto fail;
+  }
+  return removed;
 """,
     ),
 ]
