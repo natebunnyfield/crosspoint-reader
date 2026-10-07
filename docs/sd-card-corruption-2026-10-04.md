@@ -351,6 +351,7 @@ clean result is the evidence, a dirty one should be compared against this list.
 Status 2026-10-07 00:15: OWEN_BNF (erased and restored 2026-10-04) verified
 clean, but its `state.json` still carried the restore's timestamp and no new
 cache directories existed, so the reader had not booted on it — that clean
-result is the restore, not a device test. `20261007T0553Z-crosspoint-d1a9c53b.bin`
-(every item above) is on it, hash-verified after a remount. The device test
+result is the restore, not a device test. `20261007T1608Z-crosspoint-a159ab59.bin`
+(every item above, the SdFat reorder included) is on it, hash-verified after
+a remount. The device test
 starts when that firmware is flashed and the card goes into the reader.

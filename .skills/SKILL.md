@@ -143,6 +143,19 @@ dirs, not only the one being built. Do not edit it mid-task to tweak a flag —
 prefer an env var or an existing env — or finished device builds vanish and you
 pay a full rebuild.
 
+**`scripts/patch_sdfat.py` rewrites SdFat in `.pio/libdeps/<env>/SdFat` at
+every build** (a `pre:` hook in `[base] extra_scripts`, the same mould as the
+JPEGDEC and wolfSSL patches). It reorders `remove()`, `truncate()` and the
+`O_TRUNC` branch of `openCachedEntry()` so the directory entry reaches the
+card before the cluster chain is freed — the cross-link seed behind B-073,
+[docs/sd-card-corruption-2026-10-04.md](docs/sd-card-corruption-2026-10-04.md).
+If a build aborts with `ERROR: scripts/patch_sdfat.py`, SdFat's text has moved
+(an upgrade past 2.3.1, or a half-rewritten copy): read the function the
+message names, re-derive the reorder in the script, or delete that env's
+`SdFat` directory so the Library Manager reinstalls it. Do not "fix" the abort
+by removing the hook — the unpatched order is the bug. The simulator envs
+have no SdFat and do not run it.
+
 **Never add `lib_ignore = BLE` (or `bluetooth`, `bluetoothserial`, `simpleble`,
 `esp-nimble-cpp`).** It reads as "skip an Arduino library we do not use", which
 sounds free. pioarduino does not treat it as a library name:
