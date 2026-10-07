@@ -584,24 +584,81 @@ void waitForPowerRelease() {
 
 constexpr char SLEEP_FRAME_FILE[] = "/.crosspoint/sleep_frame.bin";
 
+// The frame file persists across the wake and is rewritten IN PLACE at the
+// next quick-resume sleep (O_RDWR, no truncate), so the only thing the card
+// sees per cycle is data sectors into clusters the file already owns -- no FAT
+// or directory write at all (SdFat dirties the entry only on growth, and no
+// date-time callback is registered). Creating it on every sleep and removing it
+// on every wake was two FAT-touching operations per cycle, each a window in
+// which a reset leaves an entry on freed clusters
+// (docs/sd-card-corruption-2026-10-04.md).
+//
+// A persistent file needs its own freshness marker: a reset partway through the
+// in-place write would otherwise leave a correct-size file that is half this
+// sleep's frame and half the last one's, and a save that failed before writing
+// would leave the previous frame intact -- both of which the old create-on-sleep
+// file could not do. So the frame is followed by a 4-byte trailer that is VALID
+// only between a completed save and the next load: the save marks it STALE
+// before touching the frame and VALID after the last byte; the load marks it
+// STALE once it has consumed the frame. Three single-sector data writes, still
+// no FAT. Anything other than VALID shows the splash, exactly as a missing file
+// did. state.json's showBootScreen, written just before the save, is still what
+// routes the boot here; the trailer only says whether this file may be shown.
+constexpr uint32_t SLEEP_FRAME_VALID = 0x51524653;  // 'QRFS'
+constexpr uint32_t SLEEP_FRAME_STALE = 0;
+
+static bool writeSleepFrameTrailer(HalFile& file, const size_t frameSize, const uint32_t marker) {
+  return file.seek(frameSize) && file.write(&marker, sizeof(marker)) == sizeof(marker);
+}
+
 static void saveSleepFrameBuffer() {
-  HalFile file;
-  if (!Storage.openFileForWrite("SLP", SLEEP_FRAME_FILE, file)) return;
-  file.write(renderer.getFrameBuffer(), renderer.getBufferSize());
-  file.close();
+  const size_t size = renderer.getBufferSize();
+  const size_t total = size + sizeof(uint32_t);
+  HalFile file = Storage.open(SLEEP_FRAME_FILE, O_RDWR);
+  if (!file || file.isDirectory() || file.fileSize() != total) {
+    // First sleep, a size change, or something else at that path: (re)create.
+    if (!Storage.openFileForWrite("SLP", SLEEP_FRAME_FILE, file)) {
+      Storage.remove(SLEEP_FRAME_FILE);  // whatever is there must not be shown
+      return;
+    }
+  }
+  bool ok = true;
+  if (file.fileSize() == total) {
+    // Existing file: stale first, so a reset anywhere below leaves nothing
+    // the next boot will show. (A fresh file cannot seek to the trailer yet; a
+    // reset during its write leaves a short file, which the load rejects.)
+    ok = writeSleepFrameTrailer(file, size, SLEEP_FRAME_STALE) && file.seek(0);
+  }
+  ok = ok && file.write(renderer.getFrameBuffer(), size) == size;
+  ok = ok && writeSleepFrameTrailer(file, size, SLEEP_FRAME_VALID);
+  ok = file.close() && ok;  // a failed close is a failed save
+  if (!ok) {
+    LOG_ERR("SLP", "Saving the sleep frame failed; removing it");
+    Storage.remove(SLEEP_FRAME_FILE);
+  }
 }
 
 static bool loadSleepFrameBuffer() {
+  const size_t size = display.getBufferSize();
   HalFile file;
   if (!Storage.openFileForRead("SLP", SLEEP_FRAME_FILE, file)) return false;
-  const size_t bufferSize = display.getBufferSize();
-  const size_t bytesRead = file.read(display.getFrameBuffer(), bufferSize);
+  uint32_t marker = SLEEP_FRAME_STALE;
+  const bool shaped = file.fileSize() == size + sizeof(marker) &&
+                      file.read(display.getFrameBuffer(), size) == static_cast<int>(size) &&
+                      file.read(&marker, sizeof(marker)) == static_cast<int>(sizeof(marker));
   file.close();
-  if (bytesRead != bufferSize) {
-    Storage.remove(SLEEP_FRAME_FILE);
+  if (!shaped) {
+    Storage.remove(SLEEP_FRAME_FILE);  // wrong shape: not reusable in place either
     return false;
   }
-  Storage.remove(SLEEP_FRAME_FILE);
+  if (marker != SLEEP_FRAME_VALID) return false;  // an interrupted save; the file stays for reuse
+  // Consumed. Stale now, so a reset before the next save's own marking cannot
+  // bring this frame back a second time.
+  HalFile rw = Storage.open(SLEEP_FRAME_FILE, O_RDWR);
+  if (rw) {
+    writeSleepFrameTrailer(rw, size, SLEEP_FRAME_STALE);
+    rw.close();
+  }
   return true;
 }
 

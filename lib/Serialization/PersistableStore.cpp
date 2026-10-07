@@ -21,6 +21,24 @@
 // a narrower window into an actually recoverable one.
 static String tempPathFor(const char* path) { return String(path) + ".tmp"; }
 
+// True when the file at `path` holds exactly these bytes. Size first -- one
+// directory lookup, no read -- then a chunked compare that stops at the first
+// difference. No heap, and a read error ends it as "different" at once, where
+// readFile() would append -1 as 0xFF and keep issuing failing card reads up to
+// its 50 KB cap, all under the storage mutex.
+static bool fileHoldsExactly(const char* path, const char* bytes, const size_t len) {
+  HalFile file;
+  if (!Storage.openFileForRead("PERSIST", path, file)) return false;
+  if (file.fileSize() != len) return false;
+  char chunk[128];
+  for (size_t off = 0; off < len;) {
+    const size_t want = len - off < sizeof(chunk) ? len - off : sizeof(chunk);
+    if (file.read(chunk, want) != static_cast<int>(want) || memcmp(chunk, bytes + off, want) != 0) return false;
+    off += want;
+  }
+  return true;
+}
+
 bool PersistableStoreBase::writeDocToFile(const char* path, const JsonDocument& doc) {
   Storage.mkdir("/.crosspoint");
 
@@ -35,6 +53,22 @@ bool PersistableStoreBase::writeDocToFile(const char* path, const JsonDocument& 
   serializeJson(doc, json);
   LOG_DBG("PERSIST", "save %s: json=%uB maxAlloc=%u free=%u", path, (unsigned)json.length(), ESP.getMaxAllocHeap(),
           ESP.getFreeHeap());
+
+  // Identical bytes already on the card: nothing to write. The staged write
+  // below is five directory operations and two FAT updates (temp create,
+  // remove, rename), and on this target each is a window in which a reset
+  // leaves an entry on freed clusters (docs/sd-card-corruption-2026-10-04.md).
+  // The sleep/wake cycle alone issues several saves whose content has not
+  // changed since the previous one -- the reader's onExit re-saves the state
+  // enterDeepSleep() just wrote, onEnter re-saves what the boot path wrote.
+  // The compare is a size check and at most a few KB of reads; a missing,
+  // short or unreadable file never matches, so doubt falls through to the
+  // write. exists() first keeps the "file does not exist" log line off the
+  // first boot's saves.
+  if (Storage.exists(path) && fileHoldsExactly(path, json.c_str(), json.length())) {
+    LOG_DBG("PERSIST", "save %s: unchanged, skipped", path);
+    return true;
+  }
 
   const String tmp = tempPathFor(path);
   if (!Storage.writeFile(tmp.c_str(), json)) {

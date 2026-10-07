@@ -54,6 +54,9 @@ a path a WebSocket upload is writing; the folder-delete walk's missing
 `getName()` (dropped by `72b26b957`) restored; the SDK's `removeDir` no longer
 names entries into `char[128]`; Txt cover closes before removing; HAL closes an
 out-param before reopening and no longer aborts on OOM while wrapping a handle.
+2026-10-07: a settings/state save whose bytes already match the card is
+skipped, and the 48 KB quick-resume frame is rewritten in place instead of
+created at every sleep and removed at every wake (doc items 12-13).
 
 **This also settles [B-054]'s deciding question**: the damage is real, on the
 card, after a remount. B-059 was not the whole story.

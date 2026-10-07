@@ -35,14 +35,16 @@ inline bool writeAtomic(const std::string& cachePath, const uint8_t* data, size_
 
   // The common case -- a page turn, same record length as last time -- is
   // rewritten IN PLACE, with no O_TRUNC: the bytes land in the one sector the
-  // file already owns and the directory entry gets a new mtime, so the FAT is
-  // never touched. The temp + remove + rename below costs three directory ops
-  // and two FAT updates per page turn, and on this target SdFat writes a freed
-  // FAT sector to the card BEFORE the directory entry that still points at it
-  // (one shared sector cache on RISC-V): a reset in that gap -- a panic on the
-  // other task, a brownout -- leaves an entry on free clusters, which the next
-  // allocation hands out again as a cross-link. Not the #2275 truncate either:
-  // truncation frees and reallocates the chain; this never does.
+  // file already owns and nothing else on the card changes (SdFat rewrites the
+  // directory entry only when a file grows or a date-time callback is set, and
+  // neither applies), so the FAT is never touched. The temp + remove + rename
+  // below costs three directory ops and two FAT updates per page turn, and on
+  // this target SdFat writes a freed FAT sector to the card BEFORE the
+  // directory entry that still points at it (one shared sector cache on
+  // RISC-V): a reset in that gap -- a panic on the other task, a brownout --
+  // leaves an entry on free clusters, which the next allocation hands out
+  // again as a cross-link. Not the #2275 truncate either: truncation frees and
+  // reallocates the chain; this never does.
   if (len <= 512) {
     HalFile f = Storage.open(finalPath.c_str(), O_RDWR);
     if (f && !f.isDirectory() && f.fileSize() == len) {

@@ -118,7 +118,46 @@ Ranked by how directly each produces the damage above.
     under `-fno-exceptions`, i.e. a reboot with other write handles unsynced.
     **Hardened:** `HalFile::wrap` uses `new (std::nothrow)` and hands back a
     closed file.
-12. Data loss, not FAT damage, fixed in passing: WebDAV COPY `A.txt -> a.txt`
+12. **Every settings/state save rewrote the file even when nothing had
+    changed** (`PersistableStore::writeDocToFile`: temp create, remove, rename
+    — five directory operations and two FAT updates). **Fixed 2026-10-07:**
+    the serialized JSON is compared with the bytes on the card first — size,
+    then a chunked compare with no heap and no `readFile()` (whose byte loop
+    keeps issuing failing reads to its 50 KB cap on an I/O error) — and an
+    identical save is skipped. A missing, short or unreadable file compares
+    unequal, so doubt always falls through to the write. How often it fires is
+    smaller than first thought: in the dominant sleep-from-the-reader cycle
+    the state bytes DO change between the paired saves (`readerActivityLoadCount`
+    is a crash guard that counts up and resets; `openEpubPath` is blanked at
+    wake and restored by the reader's onEnter), so those still write. It fires
+    for `RecentBooksStore::addBook` re-adding the open book, the home-branch
+    wake followed by onEnter, and any settings save that changed nothing;
+    the headless simulator showed `state.json` and `recent.json` skips on a
+    cold boot.
+13. **The quick-resume frame file was created at every sleep and removed at
+    every wake** (`/.crosspoint/sleep_frame.bin`, a fixed size: 48,000 B on
+    the X4, 52,272 B on the X3): two FAT-touching operations per cycle.
+    **Fixed 2026-10-07:** it persists and is rewritten in place (`O_RDWR`, no
+    truncate) at the next quick-resume sleep, so the card sees only data
+    sectors into clusters the file already owns — not even the directory
+    entry, since SdFat dirties it only on growth or with a date-time callback,
+    and none is registered. A persistent file needs its own freshness marker,
+    which the first version of this fix lacked (second review, below): a
+    reset partway through the in-place write left a correct-size file that
+    was half this sleep's frame and half the last one's, and a save that
+    failed before writing left the previous frame intact — both shown on the
+    next boot, where the old create-on-sleep file could only be missing or
+    short. The frame is therefore followed by a 4-byte trailer that is VALID
+    only between a completed save and the next load: the save marks it STALE
+    before touching the frame and VALID after the last byte, the load marks
+    it STALE once it has consumed the frame, and anything but VALID shows the
+    splash, exactly as a missing file did. Three single-sector data writes,
+    still no FAT. A failed open, write or close removes the file.
+    Simulator-verified headless 2026-10-07 (`sleepScreen: 6`; scripted
+    `SLEEP`, `POWER`, `QUIT`): the file appears at the first sleep at
+    48,004 B with a VALID trailer, a boot that quick-resumes consumes it to
+    STALE and leaves it in place, and a second sleep rewrites it in place.
+14. Data loss, not FAT damage, fixed in passing: WebDAV COPY `A.txt -> a.txt`
     removed its own source; BMP viewer "set as sleep cover" compared
     `/sleep.bmp` case-sensitively and could truncate the file it was reading.
 
@@ -137,6 +176,20 @@ fixed before commit:
   and decodes UTF-8; `isSameOrInside` and the new `isSameFatPath` drive the
   MOVE guard, the case-only rename and the COPY refusal. Tests include é/É,
   Cyrillic, Greek sigma and malformed UTF-8.
+
+**Second pass, 2026-10-07**, over items 12–13 and the progress-file suite.
+No correctness defect in the save skip or the suite. On the frame file it
+found the two paths above (torn in-place write accepted; failed save leaving
+the previous frame), both cosmetic but both new; fixed with the trailer. It
+also showed the `readFile()` compare was a poor fit for a save path (byte-wise
+reads, and an error loop to the cap) — replaced with the size check and
+chunked compare; that the save-skip examples in the first draft of item 12 do
+not fire in the reader cycle — corrected above; that the X3 frame is 52,272
+bytes, not 48 KB; and that a comment in `ProgressFile.h` wrongly said the
+in-place write refreshes the entry's mtime (it writes no directory sector at
+all). Noted, not changed: the last quick-resume frame now stays on the card
+between sleeps and `/.crosspoint` is readable over WebDAV — but so are the
+note and chat files the frame could show, so it exposes nothing new.
 
 Plausible items, handled or recorded:
 
@@ -159,16 +212,43 @@ Plausible items, handled or recorded:
   the panel with CRC off, so a bit error on the wire is written silently — FAT
   sectors included. No evidence of bit errors was found, and enabling CRC
   changes failure behavior (errors instead of silent writes) on hardware nobody
-  has measured. Owner decision; cost is a 512-byte table in flash
-  (`USE_SD_CRC=2`) and CRC16 per sector.
+  has measured. **Owner decision; the cost is measured** (2026-10-07, commit
+  `9fe8e3d4f`, `gh_release`, a throwaway worktree with the commercial font
+  headers copied in so the baseline matches the shipping build; the define was
+  added beside `USE_UTF8_LONG_NAMES` in the SDK's
+  `SDCardManager/inject_build_flags.py`, which appends to every library
+  builder — `[base] build_flags` in `platformio.ini` reaches libraries too,
+  but editing the ini wipes every build directory, and the hook was the
+  cheaper place to measure; `crctab` confirmed present in `SdSpiCard.cpp.o`
+  with `riscv32-esp-elf-nm`):
+
+  | | Flash used | RAM used |
+  | --- | --- | --- |
+  | baseline | 5,350,623 B (81.6 %) | 55,772 B |
+  | `USE_SD_CRC=2` (table-driven CRC-CCITT) | 5,351,345 B (81.7 %) | 55,772 B |
+  | delta | **+722 B** | 0 |
+
+  Compute cost is one CRC-16 over 512 bytes per sector, table-driven: on the
+  order of 5–10 µs at 160 MHz against ~100 µs for the sector's SPI transfer at
+  40 MHz, so under 10 % on raw sector throughput and invisible behind the FAT
+  bookkeeping around it. Not measured on a device. What it buys: SdFat sends
+  CMD59 so the card rejects a write whose data CRC does not match (a write
+  error instead of a silently wrong sector) and the host rejects a read that
+  arrives corrupted. What it changes: a marginal card or bus that used to
+  "work" with occasional silent bit errors starts reporting write failures.
+  To enable for good, `-DUSE_SD_CRC=2` in `[base] build_flags` (one build-dir
+  wipe) or beside the UTF-8 define in `inject_build_flags.py`; nothing else
+  changes and the cards' existing data is unaffected.
 * **A post-write "card idle" wait before power-off.** Audited: the last card
   operation before deep sleep is always a single-sector directory/FAT write that
   already waited for programming (`close()` → `cacheSync`). Added then removed.
-* **Fewer state writes around sleep/wake** (~20 metadata operations per cycle,
-  `PersistableStore` is write-temp + remove + rename). `EpubReaderActivity`'s
-  onExit save looked redundant with `enterDeepSleep`'s, but onExit runs on
-  non-sleep paths too, so it is not. Reducing these is the next lever on the
-  reset-window problem if corruption persists.
+* **Removing the individual sleep/wake saves.** `EpubReaderActivity`'s onExit
+  save looked redundant with `enterDeepSleep`'s, but onExit runs on non-sleep
+  paths too, so it is not — items 12 and 13 above take the duplicates and the
+  frame file out instead. What remains per cycle is the saves whose content
+  really changes (`showBootScreen`, `readerActivityLoadCount`, recents), each
+  still a staged temp + remove + rename; an in-place rewrite of same-length
+  JSON would be the next lever, and JSON lengths rarely match.
 * **NimBLE host task writing settings** on first keyboard pairing
   (`BleHidHost.cpp:550-558`) — a third task, low likelihood, not changed.
 
@@ -196,8 +276,17 @@ Plausible items, handled or recorded:
 
 `pio run -e default` and `-e simulator` green; every edited TU confirmed
 recompiled. Host suites: `PathContainmentTest` (8), `LowBatteryGuardTest` (5),
+`ProgressFileTest` (4 — an operation-counting in-memory card proving a
+same-length save issues no remove, rename or truncate),
 plus the 8 existing suites linking `FsHelpers` — 53 pass, one perf test skipped
 by design. **UNCONFIRMED on device.** To confirm: run the device a week of
-normal use on a freshly formatted card (OWEN_BNF was restored 2026-10-04), then
-`fsck_msdos -n` it on a Mac; a clean result is the evidence, a dirty one should
-be compared against this list.
+normal use on a freshly formatted card, then `fsck_msdos -n` it on a Mac; a
+clean result is the evidence, a dirty one should be compared against this list.
+
+Status 2026-10-07 00:15: OWEN_BNF (erased and restored 2026-10-04) verified
+clean, but its `state.json` still carried the restore's timestamp and no new
+cache directories existed, so the reader had not booted on it — that clean
+result is the restore, not a device test. `20261007T0517Z-crosspoint-9fe8e3d4.bin`
+(the fixes through item 11) was placed on it, hash-verified after a remount.
+The device test starts when that firmware is flashed and the card goes into
+the reader.
