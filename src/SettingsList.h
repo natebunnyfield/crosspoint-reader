@@ -192,7 +192,7 @@ inline SettingInfo buildScreenMarginSetting() {
 // Editor font SIZE, as a drop-down over editorfonts::SIZES.
 //
 // The STORED value stays the size in POINTS, never the picker's index — the
-// same rule the retired Screen Margin picker followed, and for a sharper reason
+// same rule the Screen Margin picker follows, and for a sharper reason
 // here: the editor font FAMILY was rescued from index persistence hours before
 // this row was written (see src/notes/EditorFonts.h), and putting the size on
 // an index would have reintroduced the identical failure one field over. A
