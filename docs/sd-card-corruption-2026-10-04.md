@@ -340,9 +340,22 @@ Plausible items, handled or recorded:
   paths too, so it is not — items 12 and 13 above take the duplicates and the
   frame file out instead. What remains per cycle is the saves whose content
   really changes (`showBootScreen`, `readerActivityLoadCount`, recents), each
-  still a staged temp + remove + rename; an in-place rewrite of same-length
-  JSON would be the next lever, and JSON lengths rarely match. The RTC
-  crash-guard lever is item 16: measured, refuted on battery, reverted.
+  still a staged temp + remove + rename. The RTC crash-guard lever is item
+  16: measured, refuted on battery, reverted. The accounting after that, from
+  the same headless cycle (five `state.json` writes): one at the first boot
+  (`readerActivityLoadCount` 0→1), one at sleep from `enterDeepSleep`
+  (`lastSleepFromReader`), one from the reader's onExit (count 1→0), one at
+  the wake's boot (count 0→1, path blanked), one from the reader's onEnter
+  (path restored). With the count persisted — which this hardware requires —
+  the toggle is three of the five, and dropping only the path blanking would
+  save one write per cycle for a second change to crash semantics; not done.
+  The lever that would take state writes to ZERO is structural: a fixed-size
+  binary state record rewritten in place the way `progress.bin` now is (item
+  1), which touches no FAT or directory sector at all — but `state.json` is
+  read and seeded by the simulator's shell tests and tools (`test_sleep_wake.sh`,
+  `mkcard.sh`, `capture_arm.sh`) and by the iOS harness, so it is a format
+  change across two repos. Owner's call; same for `settings.json` and
+  `recent.json`, which are the other staged writers.
 * **NimBLE host task writing settings** on first keyboard pairing
   (`BleHidHost.cpp:550-558`) — a third task, low likelihood, not changed.
 
