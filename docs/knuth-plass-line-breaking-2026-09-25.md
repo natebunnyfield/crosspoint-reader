@@ -437,9 +437,7 @@ The paragraph index is into the corpus built above.
 
 | File | What it shows |
 |---|---|
-| `docs/data/knuth-plass-2026-09-25/kp_Albo_14_J_443.png` | Albo 14, justified. Greedy's line 5 is "standardization intended as" stretched across the measure. Knuth-Plass redistributes the paragraph and has no such line. |
-| `docs/data/knuth-plass-2026-09-25/kp_Albo_14_J_645.png` | Albo 14, justified. Greedy's "stores sequences, not" becomes an even paragraph with one hyphen ("understand-ing"). |
-| `docs/data/knuth-plass-2026-09-25/kp_Albo_14_R_443.png` | Albo 14, ragged. The rag evens out; no hyphens in either arm. |
+| (three Albo renders, kp_Albo_14_J_443 / J_645 / R_443) | Moved 2026-10-12 to the private albo repo (`docs/data/knuth-plass-2026-09-25/`): Albo is not published from this fork. They showed Albo 14 justified and ragged, the same comparison as the rows below. |
 | `docs/data/knuth-plass-2026-09-25/kp_LibreFranklin_14_J_678.png` | LF 14, justified. **The failure mode, included on purpose**: Knuth-Plass sets "owner-knowledge:" alone on a line, where greedy set it with a 13-space gap. Both are bad; they are bad differently. |
 
 These are the largest-gain paragraphs, chosen to make the mechanism visible.
