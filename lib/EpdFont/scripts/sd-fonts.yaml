@@ -2308,11 +2308,13 @@ families:
     # ramp was not re-derived and did not need to be (advanceY, ascender and
     # descender come from face.size, which hinting does not touch).
     hinting: none
-    # NO synth_ligatures:, and that was checked rather than assumed. Albo
-    # carries a real GSUB `liga` (round 96) reaching ff fi fl ffi ffl, all
-    # five cmapped at U+FB00-FB04, and `reading` covers U+FB00-FB06 — so the
-    # outlines are drawn, encoded AND reachable. Its kerning is its own too:
-    # a GPOS `kern` feature (round 95, hand class kerning).
+    # NO synth_ligatures:, by the owner's ruling (2026-10-17, "I don't want
+    # ligatures"). Since Albo 1.5 no style carries a GSUB `liga`, and
+    # synthetic ligatures must not stand in for the ones removed. The ff fi fl
+    # ffi ffl glyphs stay drawn and cmapped at U+FB00-FB04 (`reading` covers
+    # U+FB00-FB06), so a text that literally contains one still sets in Albo.
+    # Its kerning is its own: a GPOS `kern` feature (round 95, hand class
+    # kerning).
     #
     # NO hires_drops:, VERIFIED BY BUILDING rather than omitted — the whole
     # `reading` charset was rasterized through the real fallback chain at 1x
