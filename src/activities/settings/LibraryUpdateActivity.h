@@ -7,6 +7,7 @@
 #include "UpdateWorker.h"
 #include "activities/Activity.h"
 #include "network/LibraryUpdater.h"
+#include "network/SavedWifiJoin.h"
 #include "network/UpdateProgress.h"
 
 /**
@@ -19,7 +20,8 @@
  * one-way step worth interrupting for.
  *
  *   CHECKING    fetch release JSON + manifest.json (LibraryUpdater)
- *   NO_WIFI     no connection — say so and point at Settings
+ *   NO_WIFI     no saved network to join, or none of them came up (CHECKING
+ *               first joins one itself, under its own frame: SavedWifiJoin.h)
  *   NO_TOKEN    SETTINGS.githubToken is empty — say where it goes, do nothing
  *   SYNCING     per-book compare/download with a progress bar
  *   DONE        summary: N updated, M unchanged, K errors
@@ -109,6 +111,11 @@ class LibraryUpdateActivity : public Activity {
   // onEnter() paints and waits; the network work is loop()'s, on its first
   // pass, so that nothing blocks before the frame is displayed (see above).
   bool checkStarted = false;
+  // The saved-network join that runs under the CHECKING frame before the
+  // check. Atomic because render() reads it on the render task to pick the
+  // frame's second line.
+  SavedWifiJoin wifiJoin;
+  std::atomic<bool> joining{false};
   bool recordsFlushed = false;
   unsigned long startMs = 0;
 

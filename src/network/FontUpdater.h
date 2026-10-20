@@ -97,6 +97,10 @@
  */
 class FontUpdater {
  public:
+  // The host every request here goes to, so the screen's network pre-flight
+  // resolves THE SAME name (OtaUpdater::releaseHost() has the reasoning).
+  static const char* apiHost() { return "api.github.com"; }
+
   using ProgressCallback = void (*)(void* ctx);
 
   enum FontError {

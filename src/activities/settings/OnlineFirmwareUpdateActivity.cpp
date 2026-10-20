@@ -10,7 +10,6 @@
 #include "WifiCredentialStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "network/OtaPreflight.h"
 
 void OnlineFirmwareUpdateActivity::onEnter() {
   Activity::onEnter();
@@ -25,31 +24,17 @@ void OnlineFirmwareUpdateActivity::onEnter() {
   // is the half that fixes "github.com not found": WL_CONNECTED means
   // ASSOCIATED, not resolvable. The pre-flight waits for the resolver before
   // any fetch starts. See network/OtaPreflight.h.
-  beginMs = millis();
-  linkMs = 0;
-  haveCredential = false;
-  joiningSsid.clear();
-
-  if (WiFi.status() != WL_CONNECTED) {
-    const std::string last = WIFI_STORE.getLastConnectedSsid();
-    if (!last.empty()) {
-      if (const auto cred = WIFI_STORE.findCredential(last)) {
-        joiningSsid = cred->ssid;
-        haveCredential = true;
-        LOG_INF("OTA", "No link; rejoining last network \"%s\"", joiningSsid.c_str());
-        WiFi.begin(cred->ssid.c_str(), cred->password.c_str());
-      }
-    }
-    if (!haveCredential) {
-      LOG_INF("OTA", "No link and no saved network to rejoin");
-      state = State::NO_WIFI;
-      requestUpdate();
-      return;
-    }
-  } else {
-    haveCredential = true;  // already associated; nothing to join
-    linkMs = millis();
+  //
+  // 2026-10-20: the join is SavedWifiJoin's now, shared with Library Update
+  // and Font Update. It loads the store first -- nothing loads wifi.json at
+  // boot, so after a fresh boot the "last network" this screen asked for did
+  // not exist yet and it said "No Wi-Fi connection" for a saved network -- and
+  // it goes on to every other saved network if the last one is not in range.
+  {
+    RenderLock lock(*this);  // the card shares the SPI bus with the panel
+    WIFI_STORE.loadFromFile();
   }
+  wifiJoin.start(OtaUpdater::releaseHost());
 
   state = State::CONNECTING;
   requestUpdate();
@@ -59,53 +44,23 @@ void OnlineFirmwareUpdateActivity::onEnter() {
 // that answers for the host the check will actually use. Returns true when the
 // screen may proceed; sets a terminal state and returns false when it may not.
 bool OnlineFirmwareUpdateActivity::preflight() {
-  const bool linkUp = WiFi.status() == WL_CONNECTED;
-  if (linkUp && linkMs == 0) {
-    linkMs = millis();
-    LOG_INF("OTA", "Associated%s%s; waiting for the resolver", joiningSsid.empty() ? "" : " with ",
-            joiningSsid.c_str());
-  }
-
-  // Only ask the resolver once the link is up, and no more often than the
-  // retry gap: hostByName() blocks, and asking with no link just burns the
-  // timeout. The host is the one the check fetches, because resolving any
-  // other proves nothing about this record.
-  if (linkUp) {
-    bool dnsOk;
-    const uint32_t now = millis();
-    if (lastDnsTryMs == 0 || now - lastDnsTryMs >= otapreflight::kDnsRetryMs) {
-      lastDnsTryMs = now;
-      IPAddress addr;
-      dnsOk = WiFi.hostByName(OtaUpdater::releaseHost(), addr) == 1;
-      if (dnsOk) LOG_INF("OTA", "Resolver answered for %s", OtaUpdater::releaseHost());
-    } else {
-      dnsOk = dnsResolved;
-    }
-    if (dnsOk) dnsResolved = true;
-  }
-
-  const uint32_t sinceBegin = millis() - beginMs;
-  const uint32_t sinceLink = linkMs == 0 ? 0 : millis() - linkMs;
-  const otapreflight::Phase phase = otapreflight::decide(haveCredential, linkUp, dnsResolved, sinceBegin, sinceLink);
-
-  switch (phase) {
-    case otapreflight::Phase::Ready:
-      return true;
-    case otapreflight::Phase::Connecting:
-    case otapreflight::Phase::Resolving:
+  switch (wifiJoin.poll()) {
+    case SavedWifiJoin::Result::Waiting:
       return false;
-    case otapreflight::Phase::NoCredential:
+    case SavedWifiJoin::Result::Ready:
+      if (!wifiJoin.lastSsidToRecord().empty()) {
+        RenderLock lock(*this);
+        WIFI_STORE.setLastConnectedSsid(wifiJoin.lastSsidToRecord());
+      }
+      return true;
+    case SavedWifiJoin::Result::NoSavedNetwork:
+    case SavedWifiJoin::Result::CouldNotJoin:
       state = State::NO_WIFI;
       break;
-    case otapreflight::Phase::ConnectFailed:
-      LOG_ERR("OTA", "Could not join \"%s\" in %u ms", joiningSsid.c_str(), (unsigned)otapreflight::kConnectTimeoutMs);
-      state = State::NO_WIFI;
-      break;
-    case otapreflight::Phase::DnsFailed:
+    case SavedWifiJoin::Result::NoDns:
       // Associated but nothing resolves. Reported as its own thing rather than
       // as "GitHub is unreachable", because the network is the part that is
       // wrong and saying so is what makes it fixable.
-      LOG_ERR("OTA", "Associated but no DNS after %u ms", (unsigned)otapreflight::kDnsTimeoutMs);
       errorMessage = tr(STR_UPDATE_CHECK_FAILED);
       state = State::FAILED;
       break;

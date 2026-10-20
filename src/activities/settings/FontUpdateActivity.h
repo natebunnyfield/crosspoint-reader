@@ -8,6 +8,7 @@
 #include "UpdateWorker.h"
 #include "activities/Activity.h"
 #include "network/FontUpdater.h"
+#include "network/SavedWifiJoin.h"
 #include "network/UpdateProgress.h"
 
 /**
@@ -19,7 +20,8 @@
  * two ordering rules repeated below; they were both real, shipped defects.
  *
  *   CHECKING    fetch release JSON + manifest.json (FontUpdater)
- *   NO_WIFI     no connection — say so and point at Settings
+ *   NO_WIFI     no saved network to join, or none of them came up (CHECKING
+ *               first joins one itself, under its own frame: SavedWifiJoin.h)
  *   NO_TOKEN    no GitHub token — say where it goes, do nothing
  *   SYNCING     per-family compare/install with a progress bar
  *   DONE        summary: N updated, M unchanged, K errors
@@ -164,6 +166,11 @@ class FontUpdateActivity : public Activity {
   unsigned networkErrors = 0;
   unsigned verifyErrors = 0;
   bool checkStarted = false;
+  // The saved-network join that runs under the CHECKING frame before the
+  // check. Atomic because render() reads it on the render task to pick the
+  // frame's second line.
+  SavedWifiJoin wifiJoin;
+  std::atomic<bool> joining{false};
   // finishRun() has been called for this run. onExit calls it for a run torn
   // down part-way (a sleep, a home gesture between families) so the families
   // that DID install are discoverable and their ledger entries are written.

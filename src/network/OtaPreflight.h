@@ -61,6 +61,11 @@ enum class Phase {
 
 // What the screen should be doing, from what it can observe.
 //
+// No screen calls this since 2026-10-20: the join moved to
+// network/SavedWifiJoin.h, which tries every saved network rather than only the
+// last one and reuses the three constants above for its resolver wait. Kept,
+// with its test, as the statement of the two-condition readiness rule.
+//
 // `hasCredential` is false only when there is no last-used network to try at
 // all. `linkUp` is WiFi.status() == WL_CONNECTED. `dnsOk` is a successful
 // hostByName() for the host the check will use -- the SAME host, because

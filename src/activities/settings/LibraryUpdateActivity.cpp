@@ -9,6 +9,7 @@
 #include <cstdio>
 
 #include "MappedInputManager.h"
+#include "WifiCredentialStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "network/LibrarySyncPlan.h"
@@ -53,13 +54,19 @@ void LibraryUpdateActivity::onEnter() {
   Activity::onEnter();
   UPD_TRACE_BEGIN("LibraryUpdateActivity");
 
-  // Same division of labor as the firmware update screen: joining a network is
-  // Settings' job, and saying so beats a generic failure after a timeout.
-  if (WiFi.status() != WL_CONNECTED) {
-    state = State::NO_WIFI;
-    requestUpdate();
-    return;
+  // THE SCREEN BRINGS THE NETWORK UP ITSELF (owner 2026-10-20: "just connect
+  // to the last wifi on its own smoothly without blocking prompts"). It used to
+  // answer "not associated" with "No Wi-Fi connection / Join a network in
+  // Settings", for a network the card already held. Now the last network that
+  // worked, then every other saved one, is joined from loop() under the
+  // CHECKING frame; NO_WIFI is left for a card with nothing to join or a
+  // search that found none of it. network/SavedWifiPlan.h.
+  {
+    RenderLock lock(*this);  // the card shares the SPI bus with the panel
+    WIFI_STORE.loadFromFile();
   }
+  wifiJoin.start(LibraryUpdater::apiHost());
+  joining.store(true);
 
   state = State::CHECKING;
   startMs = millis();
@@ -89,6 +96,7 @@ void LibraryUpdateActivity::onExit() {
     updater.flushSyncRecords();
     recordsFlushed = true;
   }
+  wifiJoin.release();     // the radio goes off again if this screen turned it on
   UPD_KEEP_AWAKE(false);  // Back, sleep, home, destroyed: every exit releases
   UPD_TRACE_END();
   Activity::onExit();
@@ -120,6 +128,46 @@ void LibraryUpdateActivity::loop() {
     }
     worker.join();
     completeStep();
+    return;
+  }
+
+  // Joining a saved network, one poll per tick so Back is read throughout.
+  if (state == State::CHECKING && joining.load()) {
+    if (backPressed) {
+      finish();
+      return;
+    }
+    switch (wifiJoin.poll()) {
+      case SavedWifiJoin::Result::Waiting:
+        maybeRepaint();  // the elapsed clock keeps moving while it joins
+        return;
+      case SavedWifiJoin::Result::Ready:
+        if (!wifiJoin.lastSsidToRecord().empty()) {
+          RenderLock lock(*this);
+          WIFI_STORE.setLastConnectedSsid(wifiJoin.lastSsidToRecord());
+        }
+        joining.store(false);
+        // The frame now names GitHub rather than the network. Waited for, as
+        // in onEnter(): the next tick blocks on the manifest check.
+        requestUpdateAndWait();
+        return;
+      case SavedWifiJoin::Result::NoDns: {
+        RenderLock lock(*this);  // a heartbeat render may be reading these
+        joining.store(false);
+        errorMessage = tr(STR_UPDATE_CHECK_FAILED);
+        state = State::FAILED;
+        requestUpdate();
+        return;
+      }
+      case SavedWifiJoin::Result::NoSavedNetwork:
+      case SavedWifiJoin::Result::CouldNotJoin: {
+        RenderLock lock(*this);
+        joining.store(false);
+        state = State::NO_WIFI;
+        requestUpdate();
+        return;
+      }
+    }
     return;
   }
 
@@ -399,7 +447,9 @@ void LibraryUpdateActivity::render(RenderLock&&) {
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_FOR_UPDATES), true, EpdFontFamily::BOLD);
       int y = top + lineHeight + metrics.verticalSpacing;
       renderer.drawCenteredText(UI_10_FONT_ID, y,
-                                reading ? tr(STR_LIBRARY_READING_MANIFEST) : tr(STR_LIBRARY_CONTACTING));
+                                joining.load() ? tr(STR_CONNECTING_SAVED_WIFI)
+                                : reading      ? tr(STR_LIBRARY_READING_MANIFEST)
+                                               : tr(STR_LIBRARY_CONTACTING));
       y += lineHeight + metrics.verticalSpacing;
       GUI.drawProgressBar(
           renderer,
