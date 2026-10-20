@@ -193,7 +193,8 @@ void FontUpdateActivity::loop() {
       finish();
       return;
     }
-    switch (wifiJoin.poll()) {
+    const SavedWifiJoin::Result result = wifiJoin.poll();
+    switch (result) {
       case SavedWifiJoin::Result::Waiting:
         maybeRepaint();  // the elapsed clock keeps moving while it joins
         return;
@@ -209,6 +210,7 @@ void FontUpdateActivity::loop() {
         return;
       case SavedWifiJoin::Result::NoDns: {
         RenderLock lock(*this);  // a heartbeat render may be reading these
+        WifiDiagnostics::writeFailureLog("Update Fonts: joined, but the resolver never answered", true);
         joining.store(false);
         errorMessage = tr(STR_UPDATE_CHECK_FAILED);
         state = State::FAILED;
@@ -218,6 +220,9 @@ void FontUpdateActivity::loop() {
       case SavedWifiJoin::Result::NoSavedNetwork:
       case SavedWifiJoin::Result::CouldNotJoin: {
         RenderLock lock(*this);
+        if (result == SavedWifiJoin::Result::CouldNotJoin) {
+          WifiDiagnostics::writeFailureLog("Update Fonts: no saved network came up", wifiJoin.joinedAtGiveUp());
+        }
         joining.store(false);
         state = State::NO_WIFI;
         requestUpdate();

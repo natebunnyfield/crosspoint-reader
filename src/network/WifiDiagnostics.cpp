@@ -1,6 +1,10 @@
 #include "WifiDiagnostics.h"
 
+#include <HalStorage.h>
 #include <Logging.h>
+
+#include <cstdio>
+#include <string>
 
 #ifdef SIMULATOR
 
@@ -11,6 +15,7 @@ void begin() {}
 uint8_t lastDisconnectReason() { return 0; }
 uint8_t authFailureCount() { return 0; }
 void resetCounters() {}
+bool isAssociated() { return false; }
 const char* reasonName(uint8_t) { return "?"; }
 }  // namespace WifiDiagnostics
 
@@ -25,6 +30,7 @@ namespace {
 // (resetCounters() races only cost one stale event, not corruption).
 volatile uint8_t lastReason = 0;
 volatile uint8_t authFailures = 0;
+volatile bool associated = false;
 bool handlerRegistered = false;
 
 bool isAuthReason(const uint8_t reason) {
@@ -49,11 +55,16 @@ void onWifiEvent(arduino_event_t* e) {
     case ARDUINO_EVENT_WIFI_STA_START:
       LOG_INF("WIFI", "EVT sta_start");
       break;
+    case ARDUINO_EVENT_WIFI_STA_STOP:
+      associated = false;
+      LOG_INF("WIFI", "EVT sta_stop");
+      break;
     case ARDUINO_EVENT_WIFI_SCAN_DONE:
       LOG_INF("WIFI", "EVT scan_done: status=%u found=%u", static_cast<unsigned>(info.wifi_scan_done.status),
               static_cast<unsigned>(info.wifi_scan_done.number));
       break;
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      associated = true;
       LOG_INF("WIFI", "EVT connected: channel=%u authmode=%u", static_cast<unsigned>(info.wifi_sta_connected.channel),
               static_cast<unsigned>(info.wifi_sta_connected.authmode));
       break;
@@ -65,7 +76,8 @@ void onWifiEvent(arduino_event_t* e) {
       break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: {
       const uint8_t reason = info.wifi_sta_disconnected.reason;
-      lastReason = reason;
+      associated = false;
+      if (reason != WIFI_REASON_ASSOC_LEAVE) lastReason = reason;  // see the header
       if (isAuthReason(reason) && authFailures < UINT8_MAX) {
         authFailures = authFailures + 1;
       }
@@ -94,9 +106,12 @@ uint8_t lastDisconnectReason() { return lastReason; }
 
 uint8_t authFailureCount() { return authFailures; }
 
+bool isAssociated() { return associated; }
+
 void resetCounters() {
   lastReason = 0;
   authFailures = 0;
+  associated = false;  // the attempt about to start cycles the radio anyway
 }
 
 const char* reasonName(const uint8_t reason) {
@@ -143,3 +158,38 @@ const char* reasonName(const uint8_t reason) {
 }  // namespace WifiDiagnostics
 
 #endif  // SIMULATOR
+
+namespace WifiDiagnostics {
+
+void writeFailureLog(const char* what, const bool associated) {
+  static constexpr const char* kPath = "/wifi.log";
+  HalFile file;
+  if (!Storage.openFileForWrite("WIFI", kPath, file)) {
+    LOG_ERR("WIFI", "Could not write %s", kPath);
+    return;
+  }
+#ifndef CROSSPOINT_VERSION
+#define CROSSPOINT_VERSION "host"
+#endif
+  // 320: a 32-byte SSID, the error text and a dev version string overran 160.
+  char header[320];
+  const int n = snprintf(header, sizeof(header),
+                         "CrossPoint " CROSSPOINT_VERSION "\nWi-Fi join failed: %s\nlast reason %u (%s), %s\n\nLast logs:\n",
+                         what ? what : "?", static_cast<unsigned>(lastDisconnectReason()),
+                         reasonName(lastDisconnectReason()), associated ? "associated" : "not associated");
+  // snprintf returns what it WOULD have written; clamp to the buffer
+  // (FontUpdateActivity::writeFailureLog has the story).
+  const size_t headerLen =
+      n < 0 ? 0 : (static_cast<size_t>(n) < sizeof(header) ? static_cast<size_t>(n) : sizeof(header) - 1);
+  bool wrote = (headerLen == 0) || file.write(header, headerLen) == headerLen;
+  const std::string logs = getLastLogs();
+  if (wrote && !logs.empty()) wrote = file.write(logs.c_str(), logs.size()) == logs.size();
+  file.close();
+  if (wrote) {
+    LOG_INF("WIFI", "wrote %s", kPath);
+  } else {
+    LOG_ERR("WIFI", "%s is incomplete -- the card would not take it", kPath);
+  }
+}
+
+}  // namespace WifiDiagnostics

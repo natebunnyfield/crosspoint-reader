@@ -12,6 +12,7 @@
 
 using savedwifi::decide;
 using savedwifi::joinOrder;
+using savedwifi::kDhcpGraceMs;
 using savedwifi::kEachAttemptMs;
 using savedwifi::kSearchBudgetMs;
 using savedwifi::kSoleAttemptMs;
@@ -71,6 +72,22 @@ TEST(SavedWifiPlan, TheWholeSearchIsBounded) {
   EXPECT_EQ(decide(Link::Pending, 0, kSearchBudgetMs, 8, 3), Step::GiveUp);
   EXPECT_EQ(decide(Link::Refused, 0, kSearchBudgetMs, 8, 3), Step::GiveUp);
   EXPECT_EQ(decide(Link::Pending, kEachAttemptMs, kSearchBudgetMs - 1, 8, 2), Step::TryNext);
+}
+
+TEST(SavedWifiPlan, AJoinWaitingForItsLeaseGetsTheGrace) {
+  // Owner report 2026-10-20: "Connection timeout [8 ASSOC_LEAVE]". WL_CONNECTED
+  // arrives only with the DHCP address, so a join that had associated was cut
+  // off at the cap as if it had failed.
+  EXPECT_EQ(decide(Link::Associated, kSoleAttemptMs, kSoleAttemptMs, 1, 0), Step::Wait);
+  EXPECT_EQ(decide(Link::Associated, kSoleAttemptMs + kDhcpGraceMs - 1, kSoleAttemptMs + kDhcpGraceMs - 1, 1, 0),
+            Step::Wait);
+  EXPECT_EQ(decide(Link::Associated, kSoleAttemptMs + kDhcpGraceMs, kSoleAttemptMs + kDhcpGraceMs, 1, 0),
+            Step::GiveUp);
+  // Past the search budget too, which a sole attempt plus grace exceeds.
+  EXPECT_EQ(decide(Link::Associated, kEachAttemptMs, kSearchBudgetMs, 3, 2), Step::Wait);
+  EXPECT_EQ(decide(Link::Associated, kEachAttemptMs, kSearchBudgetMs + kDhcpGraceMs, 3, 2), Step::GiveUp);
+  // Without the association the same clocks are over.
+  EXPECT_EQ(decide(Link::Pending, kSoleAttemptMs, kSoleAttemptMs, 1, 0), Step::GiveUp);
 }
 
 TEST(SavedWifiPlan, TheBudgetCoversAtLeastOneFullSoleAttempt) {

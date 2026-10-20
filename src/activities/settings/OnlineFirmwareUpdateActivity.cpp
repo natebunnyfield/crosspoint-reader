@@ -44,7 +44,15 @@ void OnlineFirmwareUpdateActivity::onEnter() {
 // that answers for the host the check will actually use. Returns true when the
 // screen may proceed; sets a terminal state and returns false when it may not.
 bool OnlineFirmwareUpdateActivity::preflight() {
-  switch (wifiJoin.poll()) {
+  const SavedWifiJoin::Result result = wifiJoin.poll();
+  if (result == SavedWifiJoin::Result::CouldNotJoin || result == SavedWifiJoin::Result::NoDns) {
+    RenderLock lock(*this);  // the card shares the SPI bus with the panel
+    WifiDiagnostics::writeFailureLog(result == SavedWifiJoin::Result::NoDns
+                                         ? "Update Firmware: joined, but the resolver never answered"
+                                         : "Update Firmware: no saved network came up",
+                                     result == SavedWifiJoin::Result::NoDns || wifiJoin.joinedAtGiveUp());
+  }
+  switch (result) {
     case SavedWifiJoin::Result::Waiting:
       return false;
     case SavedWifiJoin::Result::Ready:

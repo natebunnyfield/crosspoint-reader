@@ -37,6 +37,7 @@ class SavedWifiJoin {
   void start(const char* host) {
     resolveHost = host;
     broughtUp = false;
+    endedAssociated = false;
     order.clear();
     index = 0;
     linkMs = 0;
@@ -90,6 +91,7 @@ class SavedWifiJoin {
           beginAttempt();
           return Result::Waiting;
         case savedwifi::Step::GiveUp:
+          endedAssociated = WifiDiagnostics::isAssociated();  // before the leave clears it
           LOG_ERR(TAG, "Could not join any of %u saved network(s) in %lu ms", static_cast<unsigned>(order.size()),
                   millis() - searchStartMs);
           WiFi.disconnect(true);
@@ -133,6 +135,10 @@ class SavedWifiJoin {
     WiFi.mode(WIFI_OFF);
   }
 
+  // After CouldNotJoin: whether the radio had joined (and was waiting for an
+  // address) when the search gave up. For WifiDiagnostics::writeFailureLog.
+  bool joinedAtGiveUp() const { return endedAssociated; }
+
   // Non-empty once Ready when the network that came up is not the one recorded
   // as last-connected, so the next join tries it first.
   const std::string& lastSsidToRecord() const { return recordSsid; }
@@ -151,6 +157,8 @@ class SavedWifiJoin {
     // The SDK retries an auth failure in a loop with the status left at
     // WL_DISCONNECTED; three is a wrong password (WifiSelectionActivity's rule).
     if (WifiDiagnostics::authFailureCount() >= 3) return savedwifi::Link::Refused;
+    // Joined, still waiting for the DHCP lease: a working join, given more time.
+    if (WifiDiagnostics::isAssociated()) return savedwifi::Link::Associated;
     return savedwifi::Link::Pending;
   }
 
@@ -198,4 +206,5 @@ class SavedWifiJoin {
   uint32_t linkMs = 0;
   uint32_t lastDnsTryMs = 0;
   bool broughtUp = false;
+  bool endedAssociated = false;
 };

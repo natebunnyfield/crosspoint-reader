@@ -99,6 +99,11 @@ class WifiSelectionActivity final : public Activity {
   // errors fail fast via the auth-failure counter, so the long timeout only
   // applies to networks that are genuinely still negotiating.
   static constexpr unsigned long CONNECTION_TIMEOUT_MS = 15000;
+  // Extra time when the timeout lands while the radio has JOINED the network
+  // and is waiting for its DHCP lease (WifiDiagnostics::isAssociated()):
+  // WL_CONNECTED arrives only with the address, so a slow lease used to be
+  // reported as "Connection timeout" on a join that was working.
+  static constexpr unsigned long DHCP_GRACE_MS = 15000;
   unsigned long connectionStartTime = 0;
 
   void renderNetworkList(const Rect* screen, const ThemeMetrics* metrics) const;
@@ -119,6 +124,7 @@ class WifiSelectionActivity final : public Activity {
   void promptPasswordEntry();
   void attemptConnection();
   void checkConnectionStatus();
+  void logFailureToCard(bool joined);
   bool tryAutoConnectCredential(const WifiCredential& cred);
   bool tryNextSavedNetworkFromScan();
   void handleAutoConnectFailure();

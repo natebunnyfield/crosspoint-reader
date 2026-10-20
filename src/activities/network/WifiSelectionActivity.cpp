@@ -21,13 +21,23 @@ namespace {
 // Append the last WiFi disconnect reason as a technical suffix, e.g.
 // " [202 AUTH_FAIL]", so failure screens carry a code the user can report.
 // Reason names are IDF identifiers, not translatable prose.
+//
+// Call it BEFORE WiFi.disconnect(): the association state it reports is gone
+// once the station leaves. "joined" means the radio associated and was still
+// waiting for an address, which is a different fault (the network's DHCP)
+// from one it never reached.
 void appendDisconnectReason(std::string& error) {
   const uint8_t reason = WifiDiagnostics::lastDisconnectReason();
-  if (reason == 0) {
+  const bool joined = WifiDiagnostics::isAssociated();
+  char suffix[64];
+  if (reason != 0) {
+    snprintf(suffix, sizeof(suffix), " [%u %s%s]", static_cast<unsigned>(reason), WifiDiagnostics::reasonName(reason),
+             joined ? ", joined, no IP" : "");
+  } else if (joined) {
+    snprintf(suffix, sizeof(suffix), " [joined, no IP]");
+  } else {
     return;
   }
-  char suffix[48];
-  snprintf(suffix, sizeof(suffix), " [%u %s]", static_cast<unsigned>(reason), WifiDiagnostics::reasonName(reason));
   error += suffix;
 }
 }  // namespace
@@ -479,6 +489,8 @@ void WifiSelectionActivity::checkConnectionStatus() {
   }
 
   const wl_status_t status = WiFi.status();
+  // Read before any branch below disconnects: the leave clears it.
+  const bool joinedAtFailure = WifiDiagnostics::isAssociated();
 
   if (status == WL_CONNECTED) {
     // Successfully connected
@@ -540,6 +552,7 @@ void WifiSelectionActivity::checkConnectionStatus() {
             millis() - connectionStartTime, static_cast<int>(status),
             static_cast<unsigned>(WifiDiagnostics::lastDisconnectReason()),
             WifiDiagnostics::reasonName(WifiDiagnostics::lastDisconnectReason()));
+    logFailureToCard(joinedAtFailure);
     if (autoConnecting) {
       handleAutoConnectFailure();
       return;
@@ -554,13 +567,14 @@ void WifiSelectionActivity::checkConnectionStatus() {
   // so without this check a credential problem is reported as a plain timeout
   // only after the full timeout elapses.
   if (WifiDiagnostics::authFailureCount() >= 3) {
-    WiFi.disconnect();
     connectionError = tr(STR_ERROR_GENERAL_FAILURE);
     appendDisconnectReason(connectionError);
+    WiFi.disconnect();
     LOG_ERR("WIFI", "Connect to %s failed after %lu ms: repeated auth failure, last reason=%u (%s)",
             selectedSSID.c_str(), millis() - connectionStartTime,
             static_cast<unsigned>(WifiDiagnostics::lastDisconnectReason()),
             WifiDiagnostics::reasonName(WifiDiagnostics::lastDisconnectReason()));
+    logFailureToCard(joinedAtFailure);
     if (autoConnecting) {
       handleAutoConnectFailure();
       return;
@@ -575,13 +589,20 @@ void WifiSelectionActivity::checkConnectionStatus() {
   // 15s") -- the all-channel scan, WPA handshake and DHCP take the same real
   // time regardless of who initiated the attempt, and `autoConnecting` no
   // longer picks between two values.
-  if (millis() - connectionStartTime > CONNECTION_TIMEOUT_MS) {
-    WiFi.disconnect();
+  //
+  // Unless the radio has joined and is waiting for its address: then the join
+  // is working and gets DHCP_GRACE_MS more (owner report 2026-10-20, a timeout
+  // whose only recorded reason was our own disconnect).
+  const unsigned long elapsed = millis() - connectionStartTime;
+  const bool awaitingLease = WifiDiagnostics::isAssociated() && elapsed <= CONNECTION_TIMEOUT_MS + DHCP_GRACE_MS;
+  if (elapsed > CONNECTION_TIMEOUT_MS && !awaitingLease) {
     connectionError = tr(STR_ERROR_CONNECTION_TIMEOUT);
     appendDisconnectReason(connectionError);
+    WiFi.disconnect();
     LOG_ERR("WIFI", "Connect to %s timed out after %lu ms, last reason=%u (%s)", selectedSSID.c_str(),
             millis() - connectionStartTime, static_cast<unsigned>(WifiDiagnostics::lastDisconnectReason()),
             WifiDiagnostics::reasonName(WifiDiagnostics::lastDisconnectReason()));
+    logFailureToCard(joinedAtFailure);
     if (autoConnecting) {
       handleAutoConnectFailure();
       return;
@@ -590,6 +611,14 @@ void WifiSelectionActivity::checkConnectionStatus() {
     requestUpdate();
     return;
   }
+}
+
+// Every failed join leaves its event trail on the card (/wifi.log), so the next
+// report carries its cause instead of a reason the station wrote itself.
+void WifiSelectionActivity::logFailureToCard(const bool joined) {
+  std::string what = "Wi-Fi picker, \"" + selectedSSID + "\": " + connectionError;
+  RenderLock lock(*this);  // the card shares the SPI bus with the panel
+  WifiDiagnostics::writeFailureLog(what.c_str(), joined);
 }
 
 void WifiSelectionActivity::loop() {
@@ -611,6 +640,15 @@ void WifiSelectionActivity::loop() {
 
   // Check connection progress
   if (state == WifiSelectionState::CONNECTING || state == WifiSelectionState::AUTO_CONNECTING) {
+    // A join picked from the list can be abandoned too. It had no way out for
+    // its 15 s, and with DHCP_GRACE_MS a joined-but-no-address wait is up to
+    // 30 s (owner report 2026-10-20, "stuck on Connection Failed").
+    if (state == WifiSelectionState::CONNECTING && mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+      WiFi.disconnect();
+      state = WifiSelectionState::NETWORK_LIST;
+      requestUpdate();
+      return;
+    }
     if (state == WifiSelectionState::AUTO_CONNECTING) {
       if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
         WiFi.disconnect();

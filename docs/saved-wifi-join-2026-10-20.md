@@ -148,3 +148,85 @@ checked against arduino-esp32 3.3.7's `STA.cpp` before acting:
 - The multi-network fallback has not been exercised against real radios. The
   simulator joins whatever it is handed, so only the policy test covers the
   order and the caps.
+
+## Device report, same day: "Connection Failed / Error: Connection timeout [8 ASSOC_LEAVE]"
+
+The owner flashed `a050ca1e` from the card and reported the picker stuck on
+that screen. Traced from the code; there is no device log to read, which is
+the first thing fixed below.
+
+**Where the screen comes from.** `STR_CONNECTION_FAILED` is drawn only by
+`WifiSelectionActivity`, and its `CONNECTION_FAILED` state is reached only from
+a join the reader started from the list (`autoConnecting == false`). A failed
+automatic join drops back to the list without a prompt. So the saved-network
+auto-join failed first, then the hand-picked join ran out its 15 s.
+
+**The reason on the screen was our own.** IDF reason 8, `ASSOC_LEAVE`, is
+what the station sends when it leaves. Two things wrote it over the real
+cause:
+
+- **The picker itself.** Its timeout and auth-failure branches called
+  `WiFi.disconnect()` before `appendDisconnectReason()`, and the event task
+  outranks the loop, so the leave event arrives first.
+- **The core's own retry.** arduino-esp32 `STA.cpp` `_onStaArduinoEvent`:
+  `DoReconnect` disconnects before it reconnects, so every retry cycle ends on
+  a reason 8.
+
+**What a 15 s timeout CAN mean** (the same source). `NO_AP_FOUND` sets
+`WL_NO_SSID_AVAIL`, which fails at once as "Network not found". A WPA3
+`AUTH_FAIL` after the first retry sets `WL_CONNECT_FAILED`. Three auth reasons
+fail fast through the counter. That leaves:
+
+1. **Joined but no address.** The core sets `WL_CONNECTED` only on `GOT_IP`,
+   so a slow or failing DHCP lease looks exactly like this.
+2. **A wrong password failing slowly.** WPA2 4-way timeouts, fewer than three
+   inside 15 s.
+3. **A loop of non-auth reasons.**
+
+Which of these it was is NOT known. Checked and ruled out: the stored passwords
+cannot have been decoded with a wrong key, because `ObfuscationUtils` keys on
+`esp_efuse_mac_get_default`, which does not depend on the radio being up.
+
+**Changed:**
+
+- **The reason stays real.** `WifiDiagnostics` no longer records reason 8 as
+  the last reason (it still logs it), and it now tracks association
+  (`isAssociated()`). The picker builds its error text BEFORE disconnecting
+  and says "joined, no IP" when the radio had associated.
+- **More time for a slow lease.** If the radio is associated when the 15 s
+  timeout lands, the join gets 15 s more (`DHCP_GRACE_MS` in the picker,
+  `kDhcpGraceMs` in `SavedWifiPlan.h`, `Link::Associated`, tested). That is a
+  fix for cause 1 only, if cause 1 is what it was.
+- **The trail goes on the card.** Every failed join writes `/wifi.log`: a
+  header naming the screen and network, the last reason, whether it was
+  associated, then the log ring (its last 16 lines; the `EVT` lines are INF, kept in
+  `gh_release`). It is overwritten each time, the same pattern as
+  `/fontsync.log`. **This is the instrument.** If the join still fails, the
+  file names the cause.
+
+Device behavior: UNCONFIRMED.
+
+**Second adversarial review (same day), and what was done:**
+
+- **The log's "associated" field was read after the disconnect** that clears
+  it, so it said "not associated" on exactly the DHCP case under test.
+  **Fixed:** the state is captured before any disconnect (the picker's
+  `joinedAtFailure`, `SavedWifiJoin::joinedAtGiveUp()`) and passed to
+  `writeFailureLog`.
+- **The 160-byte header truncated** with a long SSID or a dev version string.
+  **Fixed:** 320.
+- **`associated` survived `resetCounters()`.** **Fixed:** it is cleared there.
+- **Manual CONNECTING had no Back.** That was pre-existing, but the grace
+  stretched the inescapable wait to 30 s. **Fixed:** Back returns to the list.
+- **Not changed:** a successful join after a failed one leaves the failed
+  join's `/wifi.log` on the card. Read its header, which names the screen and
+  network.
+
+**Checked CLEAN by the review:**
+
+- **Locks:** no double `RenderLock`. `checkConnectionStatus` and `preflight`
+  run only from an unlocked `loop()`.
+- **Sizes and timing:** the 64-byte suffix fits, the picker always gives up by
+  30 s, and `decide()` ends by 45 s.
+- **Reason 8:** nothing branches on it.
+- **Builds:** the simulator build links the stubs.

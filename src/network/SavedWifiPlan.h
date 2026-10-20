@@ -43,6 +43,12 @@ inline constexpr uint32_t kEachAttemptMs = 10000;
 // The whole search, however many networks are saved.
 inline constexpr uint32_t kSearchBudgetMs = 30000;
 
+// Extra time, on both clocks, while the radio has JOINED the network and is
+// waiting for its DHCP lease. The core reports WL_CONNECTED only with the
+// address, so without this a slow lease was cut off as a failed join (owner
+// report 2026-10-20). WifiSelectionActivity::DHCP_GRACE_MS is the same window.
+inline constexpr uint32_t kDhcpGraceMs = 15000;
+
 // The last network that worked first, then the rest in saved order, each once.
 // An empty or stale `last` (forgotten since) simply contributes nothing.
 inline std::vector<std::string> joinOrder(const std::vector<std::string>& saved, const std::string& last) {
@@ -68,8 +74,8 @@ constexpr uint32_t attemptBudgetMs(size_t candidates) { return candidates > 1 ? 
 // What the radio says about the attempt in hand. `Refused` is
 // WL_CONNECT_FAILED or repeated auth failures -- an answer, so there is no point
 // waiting out the rest of the cap. (WL_NO_SSID_AVAIL is Pending: see
-// SavedWifiJoin::linkState.)
-enum class Link { Pending, Up, Refused };
+// SavedWifiJoin::linkState.) `Associated` is joined but no address yet.
+enum class Link { Pending, Associated, Up, Refused };
 
 enum class Step {
   Wait,     // keep polling this network
@@ -81,8 +87,9 @@ enum class Step {
 // `index` is the position in joinOrder() of the network being tried.
 constexpr Step decide(Link link, uint32_t sinceAttemptMs, uint32_t sinceSearchMs, size_t candidates, size_t index) {
   if (link == Link::Up) return Step::Linked;
-  const bool attemptOver = link == Link::Refused || sinceAttemptMs >= attemptBudgetMs(candidates);
-  const bool budgetSpent = sinceSearchMs >= kSearchBudgetMs;
+  const uint32_t grace = link == Link::Associated ? kDhcpGraceMs : 0;
+  const bool attemptOver = link == Link::Refused || sinceAttemptMs >= attemptBudgetMs(candidates) + grace;
+  const bool budgetSpent = sinceSearchMs >= kSearchBudgetMs + grace;
   if (!attemptOver) return budgetSpent ? Step::GiveUp : Step::Wait;
   if (index + 1 < candidates && !budgetSpent) return Step::TryNext;
   return Step::GiveUp;
