@@ -230,3 +230,32 @@ Device behavior: UNCONFIRMED.
   30 s, and `decide()` ends by 45 s.
 - **Reason 8:** nothing branches on it.
 - **Builds:** the simulator build links the stubs.
+
+## Third pass (same day)
+
+- **The counters were reset before the radio cycle.** In both the picker and
+  `SavedWifiJoin`, `resetCounters()` ran before `disconnect(true, true)` and
+  `delay(100)`. Auth-failure and association events still queued from the
+  previous attempt arrived during the cycle and were counted against the next
+  network. **Fixed:** the reset now runs after the cycle, just before
+  `begin()`.
+- **The picker's auto-join tried the last network only once.** `onEnter()`
+  tries it directly, before any scan, and marks it attempted. If that one try
+  failed, the scan-ordered pass skipped it even when the scan showed it in
+  range. With one saved network, that meant the list, a hand-picked join, and
+  the "Connection Failed" screen the owner reported. **Fixed:** a failed
+  pre-scan attempt clears the attempted set, so the scan pass can try it once
+  more. This runs once, because after a scan `networks` is never empty.
+- **`WiFi.begin()`'s return value is now logged** in both paths. It is not acted
+  on, because right after the cycle it can still hold the previous attempt's
+  status. But `WL_CONNECT_FAILED` there is also what a radio that never
+  started returns, and that join then ends as a silent timeout. The line lands
+  in the ring, and from there in `/wifi.log`.
+
+**Checked and clean this pass:**
+
+- **The forget prompt:** after "Connection Failed" it defaults to Cancel
+  (`showForgetPrompt`), so a double Confirm cannot delete a saved password.
+- **iOS offline:** a direct attempt fails at once, the scan fails, and the list
+  appears with no wait.
+- **The update screens' release-on-exit:** it runs after the worker is joined.

@@ -419,6 +419,15 @@ void WifiSelectionActivity::handleAutoConnectFailure() {
     return;
   }
 
+  // The attempt that failed was the DIRECT one onEnter() makes on the last
+  // network, before any scan. Do not let it count: if the scan now shows that
+  // network in range, the scan-ordered pass gets to try it once more. Without
+  // this a single failed first try -- a missed all-channel scan, a slow
+  // handshake -- skipped the one network the reader actually uses, and with one
+  // saved network that meant the list and a hand-picked join (owner report
+  // 2026-10-20). Bounded: after a scan `networks` is never empty again (it
+  // always holds the hidden-network row), so this branch runs once.
+  autoAttemptedSsids.clear();
   startWifiScan(true);
 }
 
@@ -445,12 +454,15 @@ void WifiSelectionActivity::attemptConnection() {
   requestUpdate();
 
   WifiDiagnostics::begin();
-  WifiDiagnostics::resetCounters();
 
   WiFi.persistent(false);  // Credentials are managed by WifiCredentialStore; suppress SDK NVS auto-connect
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(true, true);  // Abort any in-progress SDK auto-connect and clear NVS-saved SSID
   delay(100);
+  // Reset AFTER the radio cycle, not before it: events still queued from the
+  // previous attempt (its auth failures, its association) are delivered during
+  // the cycle, and counted against THIS network when the reset came first.
+  WifiDiagnostics::resetCounters();
 
   // Scan all channels so networks with multiple APs use the strongest matching
   // BSSID instead of the first match found by the framework's default fast scan.
@@ -470,11 +482,15 @@ void WifiSelectionActivity::attemptConnection() {
   }
 
   LOG_INF("WIFI", "Connecting to %s (auto=%d)", selectedSSID.c_str(), autoConnecting ? 1 : 0);
-  if (selectedRequiresPassword && !enteredPassword.empty()) {
-    WiFi.begin(selectedSSID.c_str(), enteredPassword.c_str());
-  } else {
-    WiFi.begin(selectedSSID.c_str());
-  }
+  const wl_status_t began = (selectedRequiresPassword && !enteredPassword.empty())
+                                ? WiFi.begin(selectedSSID.c_str(), enteredPassword.c_str())
+                                : WiFi.begin(selectedSSID.c_str());
+  // Logged, not acted on: begin() returns STA.status(), which can still be the
+  // previous attempt's right after the cycle. But WL_CONNECT_FAILED here is
+  // also what a radio that never STARTED returns, and that join then produces
+  // no event at all and ends as a silent timeout -- so the line goes into the
+  // ring, and from there into /wifi.log.
+  LOG_INF("WIFI", "begin() returned %d", static_cast<int>(began));
 
   // Start the timeout clock only once begin() is issued: the mode switch,
   // disconnect and delay above are driver setup, not connection time, and

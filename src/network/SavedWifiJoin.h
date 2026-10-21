@@ -166,7 +166,6 @@ class SavedWifiJoin {
     broughtUp = true;
     const std::string& ssid = order[index];
     WifiDiagnostics::begin();
-    WifiDiagnostics::resetCounters();
     WiFi.persistent(false);  // credentials live in WifiCredentialStore, not NVS
     WiFi.mode(WIFI_STA);
     // Cycle the radio before EVERY attempt, the picker's own sequence
@@ -177,22 +176,25 @@ class SavedWifiJoin {
     // poll (adversarial review 2026-10-20).
     WiFi.disconnect(true, true);
     delay(100);
+    // After the cycle, so the previous attempt's queued events (delivered
+    // during it) are not counted against this one.
+    WifiDiagnostics::resetCounters();
     // Strongest BSSID of a multi-AP network, as the picker does.
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+    wl_status_t began;
     if (ssid.empty()) {
       LOG_INF(TAG, "Joining the host's network");
-      WiFi.begin();
+      began = WiFi.begin();
     } else {
       const auto cred = WIFI_STORE.findCredential(ssid);
       LOG_INF(TAG, "Joining saved network \"%s\" (%u of %u)", ssid.c_str(), static_cast<unsigned>(index + 1),
               static_cast<unsigned>(order.size()));
-      if (cred && !cred->password.empty()) {
-        WiFi.begin(ssid.c_str(), cred->password.c_str());
-      } else {
-        WiFi.begin(ssid.c_str());
-      }
+      began = (cred && !cred->password.empty()) ? WiFi.begin(ssid.c_str(), cred->password.c_str())
+                                                : WiFi.begin(ssid.c_str());
     }
+    // Logged, not acted on (WifiSelectionActivity::attemptConnection says why).
+    LOG_INF(TAG, "begin() returned %d", static_cast<int>(began));
     attemptStartMs = millis();
   }
 
