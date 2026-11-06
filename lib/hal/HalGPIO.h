@@ -125,6 +125,12 @@ class HalGPIO {
 
 #if FREEINK_DEVICE_PICCO
   bool keyboardTouch = false;  // see setKeyboardTouch()
+  // injectButtonTap(): this frame's synthesized press edges and their level,
+  // and the release edges they become on the next update().
+  uint8_t synthPressed = 0;
+  uint8_t synthHeld = 0;
+  uint8_t synthReleased = 0;
+  unsigned long synthPressedAt = 0;
 #endif
 
   bool lastUsbConnected = false;
@@ -226,8 +232,9 @@ class HalGPIO {
   // touch paths this fork inherited (the Home and menu swipes, tap rows,
   // swipe paging, reader tap zones, tap-to-dismiss, the touch that resets the
   // auto-sleep timer) stay inert everywhere else. wasSwipe() stays false even
-  // inside a keyboard: there, only taps and holds on keys count. The one
-  // exception is wasBackSwipeCandidate() below.
+  // inside a keyboard: there, only taps and holds on keys count. Gestures
+  // reach activities only as synthesized buttons (owner 2026-11-06), through
+  // readTouchContact() and injectButtonTap() below.
   // hasTouch() is NOT gated: it says the hardware has touch, and the theme
   // reads it for layout (UITheme.cpp:39-44), so gating it would move screens.
   // Switching either way drops a contact already on the glass, so the finger
@@ -236,13 +243,21 @@ class HalGPIO {
   void setKeyboardTouch(bool on);
   bool isKeyboardTouchOn() const { return keyboardTouch; }
 
-  // The one swipe the Picco takes, on EVERY screen, keyboards included (owner
-  // 2026-11-06: "Left-edge swipe = Back"; the Picco has no Back button). The
-  // raw swipe, not gated by setKeyboardTouch, for MappedInputManager::
-  // wasBackGesture ALONE: it delivers it as Back only when it starts at the
-  // left edge and runs right (components/EdgeSwipe.h), and drops every other
-  // swipe. Nothing else may call this; wasSwipe() above stays false.
-  bool wasBackSwipeCandidate(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const;
+  // The contact on the glass, NOT gated by setKeyboardTouch, for
+  // MappedInputManager's gesture decoder ALONE (components/PiccoInput.h).
+  // Outside keyboards every single-finger gesture is a synthesized button,
+  // and inside them the left-edge swipe is Back (owner 2026-11-06; the Picco
+  // has no Back button). True while a finger is down. `live` is false once
+  // suppressTouchContact() has ended the contact; only when it is true are
+  // nx/ny written (panel-native 0..1, like the touch queries above).
+  bool readTouchContact(float& nx, float& ny, bool& live) const;
+  // A synthesized tap on physical button `index`: pressed (edge and level)
+  // until the next update(), released (edge) on that frame, as one quick
+  // press of a real button reads. isPressed/wasPressed/wasReleased, the
+  // wasAny pair and getHeldTime fold it in, so the activity-swap swallow, the
+  // per-button hold timer and main.cpp's auto-sleep timer treat a gesture as
+  // the press it stands for (iOS's synthesized presses count as activity too).
+  void injectButtonTap(uint8_t index);
   // Drop the rest of the contact on the glass: no further tap, hold, release
   // or swipe from it. A keyboard calls this once a touch has typed a key, so
   // the same contact cannot also end as a Back swipe.

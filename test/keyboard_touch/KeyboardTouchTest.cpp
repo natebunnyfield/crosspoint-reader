@@ -654,13 +654,12 @@ TEST(KeyboardTouch, TouchHoldOnDelIsNotClearAll) {
 // The left-edge Back swipe (owner 2026-11-06: "Left-edge swipe = Back")
 // ---------------------------------------------------------------------------
 //
-// On the Picco a swipe reaches the firmware through ONE call,
-// HalGPIO::wasBackSwipeCandidate, read only by MappedInputManager::
-// wasBackGesture, which delivers it as Back exactly when
-// edgeswipe::isLeftEdgeBack says so. HalGPIO::wasSwipe, which the Home and menu
-// swipes and every SwipeDir consumer go through, returns false on the Picco
-// unconditionally. So "which swipes do anything on the Picco" is this
-// function's truth table, and nothing else.
+// On the Picco a swipe reaches activities only as a synthesized button
+// (components/PiccoInput.h, test/picco_input); inside a keyboard the only one
+// is Back, exactly when edgeswipe::isLeftEdgeBack says so. HalGPIO::wasSwipe,
+// which the Home and menu swipes and every SwipeDir consumer go through,
+// returns false on the Picco unconditionally. So "which swipes do anything in
+// a Picco keyboard" is this function's truth table, and nothing else.
 
 TEST(BackSwipe, LeftEdgeRightwardIsBack) {
   EXPECT_TRUE(edgeswipe::isLeftEdgeBack(10, 400, 200, 410, SCREEN_W));

@@ -156,6 +156,12 @@ void HalGPIO::begin() {
 
 void HalGPIO::update() {
   inputMgr.update();
+#if FREEINK_DEVICE_PICCO
+  // A synthesized press lasts one frame: it releases here (injectButtonTap).
+  synthReleased = synthHeld;
+  synthHeld = 0;
+  synthPressed = 0;
+#endif
   updateUsbState(millis());
 }
 
@@ -202,19 +208,58 @@ void HalGPIO::pollUsbState() {
 
 bool HalGPIO::wasUsbStateChanged() const { return usbStateChanged; }
 
-bool HalGPIO::isPressed(uint8_t buttonIndex) const { return inputMgr.isPressed(buttonIndex); }
+#if FREEINK_DEVICE_PICCO
+namespace {
+bool synthBit(const uint8_t mask, const uint8_t buttonIndex) { return buttonIndex < 8 && ((mask >> buttonIndex) & 1u); }
+}  // namespace
+#endif
 
-bool HalGPIO::wasPressed(uint8_t buttonIndex) const { return inputMgr.wasPressed(buttonIndex); }
+bool HalGPIO::isPressed(uint8_t buttonIndex) const {
+#if FREEINK_DEVICE_PICCO
+  if (synthBit(synthHeld, buttonIndex)) return true;
+#endif
+  return inputMgr.isPressed(buttonIndex);
+}
 
-bool HalGPIO::wasAnyPressed() const { return inputMgr.wasAnyPressed(); }
+bool HalGPIO::wasPressed(uint8_t buttonIndex) const {
+#if FREEINK_DEVICE_PICCO
+  if (synthBit(synthPressed, buttonIndex)) return true;
+#endif
+  return inputMgr.wasPressed(buttonIndex);
+}
 
-bool HalGPIO::wasReleased(uint8_t buttonIndex) const { return inputMgr.wasReleased(buttonIndex); }
+bool HalGPIO::wasAnyPressed() const {
+#if FREEINK_DEVICE_PICCO
+  if (synthPressed != 0) return true;
+#endif
+  return inputMgr.wasAnyPressed();
+}
 
-bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
+bool HalGPIO::wasReleased(uint8_t buttonIndex) const {
+#if FREEINK_DEVICE_PICCO
+  if (synthBit(synthReleased, buttonIndex)) return true;
+#endif
+  return inputMgr.wasReleased(buttonIndex);
+}
+
+bool HalGPIO::wasAnyReleased() const {
+#if FREEINK_DEVICE_PICCO
+  if (synthReleased != 0) return true;
+#endif
+  return inputMgr.wasAnyReleased();
+}
 
 bool HalGPIO::isDebouncePending() const { return inputMgr.isDebouncePending(); }
 
-unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
+unsigned long HalGPIO::getHeldTime() const {
+#if FREEINK_DEVICE_PICCO
+  // A synthesized tap is a short press, whatever the last real button's hold
+  // was: without this its release frame would report the SDK's stale global
+  // duration and could read as a long press.
+  if ((synthHeld | synthReleased) != 0) return millis() - synthPressedAt;
+#endif
+  return inputMgr.getHeldTime();
+}
 
 unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPowerButtonHeldTime(); }
 
@@ -263,8 +308,8 @@ bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEn
 #if FREEINK_DEVICE_PICCO
   // Never a swipe here on the Picco, keyboard or not. That keeps the Home and
   // menu swipes, SwipeDir and every swipe-paged list inert
-  // (MappedInputManager::decodeSwipe). The one swipe the Picco takes, the
-  // left-edge Back, is read through wasBackSwipeCandidate() below instead.
+  // (MappedInputManager::decodeSwipe). Gestures reach activities only as
+  // synthesized buttons, through readTouchContact()/injectButtonTap() below.
   (void)nxStart;
   (void)nyStart;
   (void)nxEnd;
@@ -295,10 +340,21 @@ void HalGPIO::prepareForDeepSleep() {
   if (!inputMgr.prepareForDeepSleep()) LOG_ERR("GPIO", "Failed to put touch controller to sleep");
 }
 
-bool HalGPIO::wasBackSwipeCandidate(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
-  // Deliberately NOT gated on keyboardTouch: Back is a swipe on every screen.
-  // The SDK still drops a contact suppressTouchContact() latched.
-  return inputMgr.wasSwipe(nxStart, nyStart, nxEnd, nyEnd);
+bool HalGPIO::readTouchContact(float& nx, float& ny, bool& live) const {
+  // Deliberately NOT gated on keyboardTouch: gestures are buttons on every
+  // screen. isTouchHeldAt() reads false for a contact suppressTouchContact()
+  // latched, which is what `live` reports.
+  if (!inputMgr.isTouchPressed()) return false;
+  live = inputMgr.isTouchHeldAt(nx, ny);
+  return true;
+}
+
+void HalGPIO::injectButtonTap(const uint8_t index) {
+  if (index >= 8) return;
+  const auto bit = static_cast<uint8_t>(1u << index);
+  synthPressed |= bit;
+  synthHeld |= bit;
+  synthPressedAt = millis();
 }
 
 void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }

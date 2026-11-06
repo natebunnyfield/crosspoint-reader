@@ -7,9 +7,9 @@
 // selection, the image viewer). Points are in the renderer's LOGICAL portrait
 // space, the one MappedInputManager::decodeSwipe maps both endpoints into.
 //
-// On the BOOX Picco this is the only swipe the firmware takes, on every screen
-// (owner 2026-11-06: "Left-edge swipe = Back"); HalGPIO::wasBackSwipeCandidate
-// says how that is gated.
+// On the BOOX Picco it is Back on every screen, keyboards included, and wins
+// over the swipe-right = Left gesture (owner 2026-11-06); there it is decoded
+// with the other gestures in components/PiccoInput.h.
 //
 // Header-only on purpose: a new translation unit breaks the simulator's iOS
 // source list (CLAUDE.md).

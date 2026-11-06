@@ -1304,6 +1304,8 @@ static void delayWallClock(const unsigned long ms) {
 // and the touch INT does not wake a slice (HalPowerManager::lightSleep). Polled
 // at 50 ms the swipe's start point lands late and its few samples can fall short
 // of the left-edge and 60 px tests. Not activity: the sleep timer is untouched.
+// A RECOGNIZED gesture is activity, though: it arrives as a synthesized press
+// (HalGPIO::injectButtonTap), which the wasAnyPressed() check in loop() sees.
 static bool touchContactDown() {
 #if FREEINK_DEVICE_PICCO
   return gpio.isTouchContactDown();
