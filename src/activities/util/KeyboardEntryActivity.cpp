@@ -719,9 +719,18 @@ void KeyboardEntryActivity::loop() {
       requestUpdate();
     }
 #endif
+#if FREEINK_DEVICE_PICCO
+    // The buttons stand down only while a finger is on a KEY (the press a tap
+    // or hold may still come from). A finger resting anywhere else, or a tap
+    // that landed on no key, leaves every button working.
+    if (pressedDown && routeTable.activeIndex() >= 0) {
+      return;
+    }
+#else
     if (pressedDown || tapped) {
       return;
     }
+#endif
   }
 
   if (!cursorMode && mappedInput.wasPressed(MappedInputManager::Button::Up)) {
