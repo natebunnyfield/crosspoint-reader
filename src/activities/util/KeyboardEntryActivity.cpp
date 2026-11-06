@@ -586,11 +586,18 @@ bool KeyboardEntryActivity::cursorPositionFromPoint(const int x, const int y, si
   return false;
 }
 
+#if FREEINK_DEVICE_PICCO
+fui::Rect KeyboardEntryActivity::keyboardRect() const { return keyboardRectFor(currentLayout()); }
+
+fui::Rect KeyboardEntryActivity::keyboardRectFor(const fui::KeyboardLayout& layout) const {
+#else
 fui::Rect KeyboardEntryActivity::keyboardRect() const {
+  const fui::KeyboardLayout& layout = currentLayout();
+#endif
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
-  const int rows = currentLayout().rowCount;
+  const int rows = layout.rowCount;
   const int gap = metrics.keyboardKeySpacing;
   const int height = rows * metrics.keyboardKeyHeight + (rows > 1 ? (rows - 1) * gap : 0);
   const int width = pageWidth * metrics.keyboardWidthPercent / 100;
@@ -657,13 +664,7 @@ void KeyboardEntryActivity::loop() {
     return;
   }
 
-#if FREEINK_DEVICE_PICCO
-  // No interactionsReady gate: the table this routes against is built below,
-  // on this task, so render() rebuilding its own cannot drop a tap.
-  if (!cursorMode) {
-#else
   if (!cursorMode && interactionsReady) {
-#endif
     const bool pressedDown = mappedInput.wasScreenTouchDown(tx, ty);
     int tapX = 0;
     int tapY = 0;
@@ -674,9 +675,12 @@ void KeyboardEntryActivity::loop() {
 
 #if FREEINK_DEVICE_PICCO
     // Rebuilt only when there is a point to route; the router's own drift
-    // reset (no contact left) needs no table.
-    if (pressedDown || tapped) {
-      kbtouch::buildKeyHits(touchHits, keyboardRect(), touchKeyProps(), static_cast<int16_t>(renderer.getScreenWidth()),
+    // reset (no contact left) needs no table. Against the layer on glass:
+    // interactionsReady says render() has drawn one, and published it first.
+    const fui::KeyboardLayout* drawn = drawnLayout.load();
+    if ((pressedDown || tapped) && drawn) {
+      kbtouch::buildKeyHits(touchHits, keyboardRectFor(*drawn), touchKeyProps(*drawn),
+                            static_cast<int16_t>(renderer.getScreenWidth()),
                             static_cast<int16_t>(renderer.getScreenHeight()));
     }
     auto& routeTable = touchHits;
@@ -691,8 +695,15 @@ void KeyboardEntryActivity::loop() {
       // The contact that typed is over: it cannot also end as a Back swipe
       // (a hold fires while the finger is still down, so it could otherwise).
       mappedInput.endTouchContact();
-#endif
+      // The key was found on the layer on glass. If a key press has changed
+      // the layer since (Shift, the symbols key) and the redraw is still
+      // pending, the current layer may not have it: type nothing, rather than
+      // a key the screen does not show. Shift, Del, Space and OK carry one
+      // value on every QWERTY layer that has them, so they still act.
+      if (!syncSelectionToValue(result.event.value)) return;
+#else
       syncSelectionToValue(result.event.value);
+#endif
       if (grid13) syncAnchorToSelection();  // touch jump: anchor = tapped key's center
       if (activateValue(result.event.value, result.event.longPress)) {
         requestUpdate();
@@ -1194,6 +1205,9 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   const int hintsTop = renderer.getScreenHeight() - metrics.buttonHintsHeight;
   props.bottomHitOverflow = static_cast<int16_t>(std::max(0, hintsTop - (kbRect.y + kbRect.height)));
   fui::keyboard(frame, kbRect, props);
+#if FREEINK_DEVICE_PICCO
+  drawnLayout.store(&layout);  // before the flag: loop() reads them in that order
+#endif
   interactionsReady = true;
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
@@ -1206,11 +1220,11 @@ void KeyboardEntryActivity::render(RenderLock&&) {
 // The props render() lays the keys out with, minus everything that only draws
 // (labels, fonts, the selection). A copy rather than a shared helper so the
 // other boards' render() compiles exactly as it did; keep the two in step.
-fui::KeyboardProps KeyboardEntryActivity::touchKeyProps() const {
+fui::KeyboardProps KeyboardEntryActivity::touchKeyProps(const fui::KeyboardLayout& layout) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const fui::Rect kbRect = keyboardRect();
+  const fui::Rect kbRect = keyboardRectFor(layout);
   fui::KeyboardProps props;
-  props.layout = &currentLayout();
+  props.layout = &layout;
   props.keyAction = ACTION_KEY;
   props.inputMask = static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress);
   props.gap = static_cast<int16_t>(metrics.keyboardKeySpacing);

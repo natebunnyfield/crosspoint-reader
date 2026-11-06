@@ -69,14 +69,19 @@ class KeyboardEntryActivity : public Activity {
   freeink::ui::InteractionBuffer<KEY_SLOTS> interactions;
 #if FREEINK_DEVICE_PICCO
   // Picco: loop() routes touch against THIS table, rebuilt on the loop task
-  // from the current layer (kbtouch::buildKeyHits), never against the one
-  // render() fills on the render task. That closes the window where a tap
-  // routed against a half-rebuilt table and was dropped, and it means no key
-  // is ever drawn pressed: render()'s table never sees a touch, so the screen
-  // only ever shows what the buttons show.
+  // (kbtouch::buildKeyHits) from the layer render() last DREW, never against
+  // the one render() fills on the render task. The keys are the ones on
+  // glass, not the logical layer a key press may already have changed, and no
+  // key is ever drawn pressed: render()'s table never sees a touch, so the
+  // screen only ever shows what the buttons show. Routing still waits for
+  // interactionsReady, so nothing routes before the first draw or mid-draw.
   freeink::ui::InteractionBuffer<KEY_SLOTS> touchHits;
-  // The geometry props render() lays the keys out with, for that hit pass.
-  freeink::ui::KeyboardProps touchKeyProps() const;
+  // The layer render() drew, published just before interactionsReady.
+  std::atomic<const freeink::ui::KeyboardLayout*> drawnLayout{nullptr};
+  // The geometry props render() lays `layout`'s keys out with, for that hit pass.
+  freeink::ui::KeyboardProps touchKeyProps(const freeink::ui::KeyboardLayout& layout) const;
+  // keyboardRect() for `layout` rather than the current layer.
+  freeink::ui::Rect keyboardRectFor(const freeink::ui::KeyboardLayout& layout) const;
 #endif
 
   // GPIO selection over the current layout grid (row/col in layout terms;
