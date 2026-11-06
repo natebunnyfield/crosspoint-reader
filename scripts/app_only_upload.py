@@ -20,6 +20,18 @@
 # then REFUSES the upload if anything other than the app is still on the
 # command line, or if the app offset is not the partition table's ota_0.
 #
+# Those refusals run as a pre-action of `upload`, NOT while this script is
+# read. At read time the esptool branch has not parsed the partition table:
+# ESP32_APP_OFFSET is still None (builder/main.py:864; `-t envdump` shows it),
+# and it only becomes 0xe0000 when _update_max_upload_size(), a pre-action of
+# `checkprogsize` (which `upload` depends on), runs _parse_partitions(). The
+# first version checked at read time and so refused EVERY upload ("app offset
+# '' does not match ota_0"), 2026-11-05.
+#
+# `pio run -e picco -t upload_plan` builds, runs the same checks and prints the
+# exact command `-t upload` would run, without looking for a port or running
+# it, so the write can be inspected before a device is attached.
+#
 # It also refuses the targets that cannot be made app-only: `erase` and
 # `erase_upload` erase the whole chip (vendor bootloader, NVS and the safeboot
 # recovery partition with it), and `uploadfs` / `uploadfsota` overwrite the
@@ -87,6 +99,47 @@ def ota0_offset_from_csv(csv_text):
     return None
 
 
+def address_like_flags(flags):
+    """Flags that look like a flash address (0x...). The base esptool flags carry
+    none, so after stripping any such token is an image this script did not know
+    about; the app's own offset arrives separately, as $ESP32_APP_OFFSET."""
+    out = []
+    for f in flags:
+        s = str(f).strip().strip('"')
+        if s[:2].lower() == "0x":
+            try:
+                int(s, 16)
+            except ValueError:
+                continue
+            out.append(s)
+    return out
+
+
+def app_only_problems(final_flags, extra_images, app_offset, ota0):
+    """Every reason the upload would write something other than the app at ota_0.
+
+    `final_flags` are the substituted UPLOADERFLAGS at action time, `app_offset`
+    the substituted $ESP32_APP_OFFSET then, `ota0` the partition table's ota_0.
+    Empty list = the command writes exactly one image, at ota_0.
+    """
+    problems = []
+    leftover = leftover_image_flags(final_flags, extra_images)
+    if leftover:
+        problems.append("extra images still on the command line: %s" % leftover)
+    stray = address_like_flags(final_flags)
+    if stray:
+        problems.append("flash addresses still on the command line: %s" % stray)
+    try:
+        offset = int(app_offset, 0) if app_offset else None
+    except ValueError:
+        offset = None
+    if ota0 is None or offset is None or offset != ota0:
+        problems.append(
+            "app offset %r does not match ota_0 %r" % (app_offset, hex(ota0) if ota0 is not None else None)
+        )
+    return problems
+
+
 REFUSED_TARGETS = ("erase", "erase_upload", "uploadfs", "uploadfsota")
 
 
@@ -110,32 +163,55 @@ def _scons_main(env):
     new_flags, removed = strip_extra_image_flags(flags, extra)
     env.Replace(UPLOADERFLAGS=new_flags, FLASH_EXTRA_IMAGES=[])
 
-    if "upload" not in COMMAND_LINE_TARGETS:
-        return
-
-    # Fail closed: nothing but the app may remain on the uploader command line.
-    leftover = leftover_image_flags(new_flags, extra)
-    if leftover:
-        sys.stderr.write(
-            "ERROR: scripts/app_only_upload.py: extra images still on the uploader command line "
-            "after stripping: %s. Refusing to upload.\n" % leftover
-        )
-        env.Exit(1)
-
     csv_path = env.subst("$PARTITIONS_TABLE_CSV")
     with open(csv_path) as fp:
         ota0 = ota0_offset_from_csv(fp.read())
-    app_offset = env.subst("$ESP32_APP_OFFSET")
-    if ota0 is None or not app_offset or int(app_offset, 0) != ota0:
-        sys.stderr.write(
-            "ERROR: scripts/app_only_upload.py: app offset %r does not match ota_0 %r in %s. "
-            "Refusing to upload.\n" % (app_offset, hex(ota0) if ota0 is not None else None, csv_path)
-        )
-        env.Exit(1)
 
-    print(
-        "app_only_upload: stripped %d extra image(s); uploading only the app at %s" % (removed, app_offset)
+    # Runs at ACTION time (see the header): by then `checkprogsize` has parsed
+    # the partition table and $ESP32_APP_OFFSET holds the offset UPLOADCMD uses.
+    def _check(source, env):
+        final_flags = [env.subst(str(f)) for f in env.get("UPLOADERFLAGS", [])]
+        app_offset = env.subst("$ESP32_APP_OFFSET")
+        command = env.subst("$UPLOADCMD", source=source)
+        return app_only_problems(final_flags, extra, app_offset, ota0), app_offset, command
+
+    def _verify_before_upload(target, source, env):
+        problems, app_offset, _ = _check(source, env)
+        if problems:
+            sys.stderr.write(
+                "ERROR: scripts/app_only_upload.py: refusing to upload (%s): %s.\n"
+                % (csv_path, "; ".join(problems))
+            )
+            return 1
+        print(
+            "app_only_upload: stripped %d extra image(s); uploading only %s at %s"
+            % (removed, source[0], app_offset)
+        )
+        return 0
+
+    def _print_upload_plan(target, source, env):
+        problems, app_offset, command = _check(source, env)
+        print("app_only_upload: stripped %d extra image(s) the platform appended: %s" % (removed, extra))
+        ota0_text = hex(ota0) if ota0 is not None else None
+        print("app_only_upload: ota_0 in %s = %s; $ESP32_APP_OFFSET = %s" % (csv_path, ota0_text, app_offset))
+        print("app_only_upload: `-t upload` would run (after port detection):\n  %s" % command)
+        if problems:
+            sys.stderr.write("ERROR: scripts/app_only_upload.py: upload would be REFUSED: %s.\n" % "; ".join(problems))
+            return 1
+        print("app_only_upload: OK, one image: %s at %s" % (source[0], app_offset))
+        return 0
+
+    if "upload" in COMMAND_LINE_TARGETS:
+        env.AddPreAction("upload", env.VerboseAction(_verify_before_upload, "Checking the upload writes only the app"))
+
+    plan = env.AddCustomTarget(
+        name="upload_plan",
+        dependencies="$BUILD_DIR/${PROGNAME}.bin",
+        actions=env.VerboseAction(_print_upload_plan, "Planning the app-only upload"),
+        title="Upload plan (no device)",
+        description="Build, then print the exact app-only upload command without running it",
     )
+    env.Depends(plan, "checkprogsize")
 
 
 try:
