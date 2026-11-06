@@ -592,12 +592,16 @@ fui::Rect KeyboardEntryActivity::keyboardRect() const { return keyboardRectFor(c
 fui::Rect KeyboardEntryActivity::keyboardRectFor(const fui::KeyboardLayout& layout) const {
 #else
 fui::Rect KeyboardEntryActivity::keyboardRect() const {
-  const fui::KeyboardLayout& layout = currentLayout();
 #endif
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
+  // Spelled per board so the others compile exactly what they did.
+#if FREEINK_DEVICE_PICCO
   const int rows = layout.rowCount;
+#else
+  const int rows = currentLayout().rowCount;
+#endif
   const int gap = metrics.keyboardKeySpacing;
   const int height = rows * metrics.keyboardKeyHeight + (rows > 1 ? (rows - 1) * gap : 0);
   const int width = pageWidth * metrics.keyboardWidthPercent / 100;
@@ -705,12 +709,13 @@ void KeyboardEntryActivity::loop() {
       // it deletes one character, as a tap does.
       const bool longPress =
           result.event.longPress && drawn && kbtouch::touchHoldKeepsLongPress(*drawn, result.event.value);
-#else
-      syncSelectionToValue(result.event.value);
-      const bool longPress = result.event.longPress;
-#endif
       if (grid13) syncAnchorToSelection();  // touch jump: anchor = tapped key's center
       if (activateValue(result.event.value, longPress)) {
+#else
+      syncSelectionToValue(result.event.value);
+      if (grid13) syncAnchorToSelection();  // touch jump: anchor = tapped key's center
+      if (activateValue(result.event.value, result.event.longPress)) {
+#endif
         requestUpdate();
       }
       return;

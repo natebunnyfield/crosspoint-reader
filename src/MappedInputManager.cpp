@@ -299,10 +299,14 @@ bool MappedInputManager::wasBackGesture() const {
   if (!gpio.wasBackSwipeCandidate(nxs, nys, nxe, nye)) return false;
   renderer.tapToLogical(nxs, nys, sx, sy);
   renderer.tapToLogical(nxe, nye, ex, ey);
-#else
-  if (!decodeSwipe(sx, sy, ex, ey)) return false;
-#endif
   const bool hit = edgeswipe::isLeftEdgeBack(sx, sy, ex, ey, renderer.getScreenWidth());
+#else
+  // edgeswipe::isLeftEdgeBack, spelled out so the other boards compile
+  // exactly what they did before the Picco shared it.
+  if (!decodeSwipe(sx, sy, ex, ey)) return false;
+  const bool hit = sx <= renderer.getScreenWidth() * edgeswipe::LEFT_EDGE_BACK_FRAC_X && ex > sx &&
+                   std::abs(ex - sx) > std::abs(ey - sy);
+#endif
   if (hit) rememberTouchHeldTime();
   return hit;
 }
