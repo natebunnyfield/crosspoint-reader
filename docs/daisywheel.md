@@ -75,12 +75,28 @@ Rules settled in the session:
   tap on a slot rotates the focus to that petal and picks the slot; a hold is
   the uppercase pick, so long-press still means uppercase and nothing else.
   The same holds for the full-screen 13-Grid / QWERTY keyboard and for the
-  Create Note / Claude panel (grids and the daisy strip). Swipes are never
-  input, keyboard or not, and every other screen ignores touch: the gate is
-  `HalGPIO::setKeyboardTouch` (`lib/hal/HalGPIO.h`), the key mapping
-  `src/components/KeyboardTouch.h`, tested in `test/keyboard_touch`. X4, X3
-  and Sticky builds compile none of it. No key size, layout or highlight
-  changed for touch. Device-unconfirmed when written.
+  Create Note / Claude panel (grids and the daisy strip). Every other screen
+  ignores touch: the gate is `HalGPIO::setKeyboardTouch` (`lib/hal/HalGPIO.h`),
+  the key mapping `src/components/KeyboardTouch.h`, tested in
+  `test/keyboard_touch`. X4, X3 and Sticky builds compile none of it. No key
+  size, layout or highlight changed for touch. Device-unconfirmed when written.
+  **Widened 2026-11-06, one gesture** (owner: *"Left-edge swipe = Back"*; the
+  Picco has no Back button): a swipe that starts in the left quarter of the
+  screen and runs right is Back on every Picco screen, keyboards included,
+  where it cancels exactly as the Back button does. It is the only swipe:
+  `HalGPIO::wasSwipe` stays false on the Picco, so the Home and menu swipes
+  and every swipe pager stay inert, as do tap rows, reader tap zones and the
+  touch that resets the sleep timer. The swipe reaches the firmware only
+  through `HalGPIO::wasBackSwipeCandidate`, read only by
+  `MappedInputManager::wasBackGesture`; the geometry is
+  `src/components/EdgeSwipe.h`. A swipe that lands on a key types nothing (the
+  SDK never reports a release past 59 px as a tap, and the routers drop the
+  held key), and a contact that already typed a key ends there
+  (`MappedInputManager::endTouchContact`), so it cannot also be Back. Accepted
+  risk: a sloppy rightward drag from a left-column key cancels the keyboard.
+  Same day, Picco only: a touch hold on Del deletes one character instead of
+  clearing the field (a lost TMA525C lift-off turns a tap into a hold);
+  clear-all stays on held Confirm. Device-unconfirmed when written.
 
 ## Rings
 
