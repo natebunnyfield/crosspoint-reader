@@ -68,6 +68,19 @@ Rules settled in the session:
 - ~~Touch (X4 Pro): tap petal = focus, tap char = type, hold char = uppercase.~~
   **Superseded 2026-08-05: this fork never supports touch or the X4 Pro** — the
   wheel is buttons-only.
+  **Narrowed 2026-11-05, BOOX Picco only** (owner: *"make a touch version just
+  for the keyboard on pico"*): on a Picco build, and only while an on-screen
+  keyboard is up, a tap on a key does what selecting it with the buttons and
+  confirming does, and a hold does what holding the pick does. On the wheel a
+  tap on a slot rotates the focus to that petal and picks the slot; a hold is
+  the uppercase pick, so long-press still means uppercase and nothing else.
+  The same holds for the full-screen 13-Grid / QWERTY keyboard and for the
+  Create Note / Claude panel (grids and the daisy strip). Swipes are never
+  input, keyboard or not, and every other screen ignores touch: the gate is
+  `HalGPIO::setKeyboardTouch` (`lib/hal/HalGPIO.h`), the key mapping
+  `src/components/KeyboardTouch.h`, tested in `test/keyboard_touch`. X4, X3
+  and Sticky builds compile none of it. No key size, layout or highlight
+  changed for touch. Device-unconfirmed when written.
 
 ## Rings
 
