@@ -18,6 +18,11 @@
 #include <components/keyboard/keyboard.h>
 
 #include <cstdint>
+#if FREEINK_DEVICE_PICCO
+#include <atomic>
+
+#include "components/KeyboardTouch.h"
+#endif
 
 class GfxRenderer;
 
@@ -60,6 +65,30 @@ class KeyboardPanel {
   bool shifted() const { return shift_; }
   bool symbols() const { return symbols_; }
 
+#if FREEINK_DEVICE_PICCO
+  // --- Touch: BOOX Picco only (components/KeyboardTouch.h) -----------------
+  // A tap on a key is the buttons' select-then-Confirm, a hold is a held
+  // Confirm. The host feeds routeTouch() one pass of touch per loop with the
+  // rect it hands render(); a dispatched key comes back without the selection
+  // having moved. The host then moves it with selectTouched() under its
+  // RenderLock and passes the returned pick slot to its handlePanelKey(), the
+  // very path its buttons take, so typing, refresh and debounce are theirs.
+  struct TouchKey {
+    bool fired = false;
+    int16_t id = 0;  // a grid key's value, or daisy petal * 3 + slot
+    bool longPress = false;
+  };
+  TouchKey routeTouch(const kbtouch::TouchInput& in, uint32_t nowMs, int x, int y, int width, int height, int screenW,
+                      int screenH);
+  // Selects the key routeTouch() returned, exactly where the buttons would put
+  // the selection, and returns the slot handlePanelKey() takes: 1 (Confirm)
+  // on the grids, the touched slot on daisy; -1 if `id` is no key of the
+  // current layer (type nothing). Writes what render() draws.
+  int selectTouched(int16_t id);
+  // Forget any contact in progress (the host stopped taking touch).
+  void resetTouch();
+#endif
+
  private:
   const freeink::ui::KeyboardLayout& layout() const;
   int rowCount() const;
@@ -82,6 +111,21 @@ class KeyboardPanel {
   bool daisy_ = false;
   int ringIdx_ = 0;  // 0 = abc ring, 1 = numbers/symbols
   int petal_ = 0;
+
+#if FREEINK_DEVICE_PICCO
+  freeink::ui::KeyboardProps touchKeyProps() const;
+  // Grid keys: rebuilt on the loop task from the current layer, never shared
+  // with render(), which registers nothing (so no key ever draws pressed).
+  freeink::ui::InteractionBuffer<kbtouch::KEY_SLOTS> touchHits_;
+  freeink::ui::TouchHoldRouter gridRouter_;
+  kbtouch::HoldRouter stripRouter_;
+  // The daisy strip re-centers on the selected petal, so every tap off the
+  // middle cell moves every petal on screen. A tap must land on what the
+  // owner SEES, which until the panel refreshes is the last drawn strip, not
+  // the state the previous tap just changed: render() publishes the ring and
+  // center petal it drew here (ring << 8 | petal; -1 before the first draw).
+  std::atomic<int> stripDrawn_{-1};
+#endif
 };
 
 }  // namespace notes

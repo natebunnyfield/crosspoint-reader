@@ -59,6 +59,11 @@ class ClaudeChatActivity final : public Activity {
   void handleKey(int key);
   // slot is the daisy pick (0=top,1=middle,2=bottom); ignored by the grids.
   void handlePanelKey(int slot = 1, bool longPress = false);
+#if FREEINK_DEVICE_PICCO
+  // BOOX Picco: a tap or hold on a panel key, routed into handlePanelKey()
+  // like the buttons' pick. True when a key fired this pass.
+  bool handlePanelTouch();
+#endif
   bool repeatCol(MappedInputManager::Button button, int delta);
   void relayoutPrompt();
   // The vertical bands. Re-runnable, because a host keyboard can rise or fall

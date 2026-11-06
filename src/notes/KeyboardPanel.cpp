@@ -47,6 +47,10 @@ void KeyboardPanel::begin(const bool okIsDone) {
   anchorUnit_ = 0;  // must track col_, or the first vertical move jumps
   petal_ = 0;
   ringIdx_ = 0;
+#if FREEINK_DEVICE_PICCO
+  resetTouch();
+  stripDrawn_ = -1;
+#endif
 }
 
 const fui::KeyboardLayout& KeyboardPanel::layout() const {
@@ -260,6 +264,9 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
     const int visible = n < 7 ? n : 7;
     const int cellW = width / visible;
     const int slotH = height / 3;
+#if FREEINK_DEVICE_PICCO
+    stripDrawn_ = (ringIdx_ << 8) | petal_;  // what a tap will be read against
+#endif
     for (int i = 0; i < visible; ++i) {
       const int petal = (petal_ - visible / 2 + i + n) % n;
       const int cx = x + i * cellW;
@@ -317,6 +324,8 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
   props.selectedIndex = static_cast<int16_t>(selectedLogicalIndex());
   props.labelText.font = fui::GfxRendererTarget::FONT_BODY;
   props.altText.font = fui::GfxRendererTarget::FONT_SMALL;
+  // Key GEOMETRY (layout, gap, padding): the Picco's touch hit pass copies
+  // these in touchKeyProps(), below. Change both together.
   props.gap = static_cast<int16_t>(metrics.keyboardKeySpacing);
   props.padding = fui::Insets{0, 0, 0, 0};
 
@@ -325,6 +334,104 @@ void KeyboardPanel::render(GfxRenderer& renderer, const int x, const int y, cons
                           static_cast<int16_t>(height)},
                 props);
 }
+
+#if FREEINK_DEVICE_PICCO
+// render()'s geometry props for the grids, plus the action and input mask a
+// key needs to register a hit rect (render() registers none). A copy rather
+// than a shared helper so the other boards compile render() exactly as before.
+fui::KeyboardProps KeyboardPanel::touchKeyProps() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  fui::KeyboardProps props;
+  props.layout = &layout();
+  props.keyAction = 1;  // any action: routing reports the key's value
+  props.inputMask = static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress);
+  props.gap = static_cast<int16_t>(metrics.keyboardKeySpacing);
+  props.padding = fui::Insets{0, 0, 0, 0};
+  return props;
+}
+
+KeyboardPanel::TouchKey KeyboardPanel::routeTouch(const kbtouch::TouchInput& in, const uint32_t nowMs, const int x,
+                                                  const int y, const int width, const int height, const int screenW,
+                                                  const int screenH) {
+  TouchKey out;
+  if (daisy_) {
+    const kbtouch::HoldRouter::Result r = stripRouter_.update(
+        [&](const int px, const int py) -> int {
+          const int drawn = stripDrawn_;
+          // Nothing drawn yet, or the strip on screen is the OTHER ring (a ring
+          // swap not yet repainted): the owner is not looking at these keys.
+          if (drawn < 0 || (drawn >> 8) != ringIdx_) return -1;
+          const int n = petalCount();
+          const int visible = kbtouch::stripVisibleCells(n);
+          int cell = 0;
+          int slot = 0;
+          if (!kbtouch::stripHit(x, y, width, height, visible, px, py, cell, slot)) return -1;
+          return kbtouch::stripPetal(drawn & 0xFF, visible, cell, n) * 3 + slot;
+        },
+        in, nowMs);
+    if (r) {
+      out.fired = true;
+      out.id = r.key;
+      out.longPress = r.longPress;
+    }
+    return out;
+  }
+
+  // Rebuilt only when there is a point to route; the router's drift reset
+  // (contact gone) needs no table.
+  if (in.pressedDown || in.tapped) {
+    kbtouch::buildKeyHits(touchHits_,
+                          fui::Rect{static_cast<int16_t>(x), static_cast<int16_t>(y), static_cast<int16_t>(width),
+                                    static_cast<int16_t>(height)},
+                          touchKeyProps(), static_cast<int16_t>(screenW), static_cast<int16_t>(screenH));
+  }
+  const fui::TouchHoldRouter::Result r =
+      gridRouter_.update(touchHits_, in.pressedDown, in.px, in.py, in.tapped, in.tx, in.ty, in.inContact, nowMs);
+  if (r.event) {
+    out.fired = true;
+    out.id = r.event.value;
+    out.longPress = r.event.longPress;
+  }
+  return out;
+}
+
+int KeyboardPanel::selectTouched(const int16_t id) {
+  if (daisy_) {
+    const int petal = id / 3;
+    if (id < 0 || petal >= petalCount()) return -1;
+    petal_ = petal;
+    return id % 3;
+  }
+  // Key values are unique within a layout, which the full-screen keyboard's
+  // syncSelectionToValue relies on too.
+  const fui::KeyboardLayout& l = layout();
+  for (int r = 0; r < l.rowCount; ++r) {
+    for (int c = 0; c < l.rows[r].count; ++c) {
+      if (l.rows[r].keys[c].value != id) continue;
+      row_ = r;
+      col_ = c;
+      if (grid13_) {
+        // The touched key's own center column, as KeyboardEntryActivity's
+        // syncAnchorToSelection does: the next Up/Down leaves from here.
+        int start = 0;
+        int end = 0;
+        keyUnitSpan(row_, col_, start, end);
+        anchorUnit_ = start + (end - 1 - start) / 2;
+      }
+      return 1;
+    }
+  }
+  return -1;  // not a key of this layer: nothing to type
+}
+
+void KeyboardPanel::resetTouch() {
+  gridRouter_.reset();
+  gridRouter_.holdMs = kbtouch::HOLD_MS;
+  gridRouter_.overrideHoldMs = kbtouch::DEL_HOLD_MS;
+  stripRouter_.reset();
+  stripRouter_.holdMs = kbtouch::HOLD_MS;
+}
+#endif
 
 // keyboard() indexes keys as one flat run across rows.
 int KeyboardPanel::selectedLogicalIndex() const {

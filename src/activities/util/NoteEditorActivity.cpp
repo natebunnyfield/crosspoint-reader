@@ -172,6 +172,9 @@ void NoteEditorActivity::onEnter() {
 }
 
 void NoteEditorActivity::onExit() {
+#if FREEINK_DEVICE_PICCO
+  mappedInput.setKeyboardTouch(false);
+#endif
   mappedInput.setTextEntryActive(false);
   save();
   blekbd::end();
@@ -509,6 +512,25 @@ void NoteEditorActivity::handlePanelKey(const int slot, const bool longPress) {
   ++pendingChars;
 }
 
+#if FREEINK_DEVICE_PICCO
+bool NoteEditorActivity::handlePanelTouch() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int screenW = renderer.getScreenWidth();
+  // The rect render() hands panel.render().
+  const notes::KeyboardPanel::TouchKey key =
+      panel.routeTouch(kbtouch::readTouch(mappedInput), millis(), metrics.contentSidePadding, panelTop,
+                       screenW - metrics.contentSidePadding * 2, panelHeight, screenW, renderer.getScreenHeight());
+  if (!key.fired) return false;
+  int slot = -1;
+  {
+    RenderLock lock;  // the selection is what render() draws
+    slot = panel.selectTouched(key.id);
+  }
+  if (slot >= 0) handlePanelKey(slot, key.longPress);
+  return true;
+}
+#endif
+
 void NoteEditorActivity::loop() {
   // A host keyboard can rise or fall at any moment -- the owner taps the chip,
   // or dismisses from the bar -- and the band layout depends on it. Checked
@@ -525,6 +547,17 @@ void NoteEditorActivity::loop() {
     ensureCursorVisible();
     requestUpdate();
   }
+
+#if FREEINK_DEVICE_PICCO
+  // Touch types on the panel's keys and nowhere else, and only while they take
+  // keys: not in caret mode (Confirm leaves it, as with the buttons), not with
+  // the panel hidden, not with no buffer to type into.
+  {
+    const bool keysTakeTouch = !panelHidden && !caretMode && !oomFailed && buf;
+    mappedInput.setKeyboardTouch(keysTakeTouch);
+    if (!keysTakeTouch) panel.resetTouch();
+  }
+#endif
 
   // Gated ABOVE the Back handler, like an OptionPopup: while caret mode is up
   // Back closes the mode and does not leave the editor.
@@ -621,6 +654,10 @@ void NoteEditorActivity::loop() {
   // before this -- as does Back, which is handled earlier still, so the editor
   // stays fully usable with only the phone's keyboard.
   if (panelHidden) return;
+
+#if FREEINK_DEVICE_PICCO
+  if (handlePanelTouch()) return;
+#endif
 
   // Front buttons drive the on-screen keyboard: Left/Right move along a row,
   // Confirm types the selected key. Side buttons move between rows.
