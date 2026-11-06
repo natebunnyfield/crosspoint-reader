@@ -354,6 +354,13 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::SdFirmwareUpdate:
         startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
+#else
+      case SettingAction::SdFirmwareUpdate:
+        // No row carries this action in a build without device flashing (the
+        // push above is gated the same way). The case stays so -Werror=switch
+        // still checks this switch: a device env with CROSSPOINT_NO_DEVICE_FLASH
+        // (the Picco) otherwise fails to compile here.
+        break;
 #endif
       case SettingAction::UpdateFonts:
         // startActivityForResult, not replaceActivity: this screen was reached
