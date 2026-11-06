@@ -8,6 +8,10 @@
 #include <esp_sleep.h>
 #include <soc/usb_serial_jtag_struct.h>
 
+#if FREEINK_DEVICE_PICCO
+#include <BatteryMonitor.h>
+#endif
+
 // Global HalGPIO instance
 HalGPIO gpio;
 
@@ -170,8 +174,14 @@ void HalGPIO::updateUsbState(const unsigned long now) {
   // Throttle the X3's I2C-based USB detection; see USB_POLL_X3_MS. First call
   // (usbLastPollMs == 0) always polls so boot state is correct. The combined
   // verdict below is still recomputed every call so a SOF-detected attach is
-  // not held back by the throttle window.
-  if (usbLastPollMs == 0 || !deviceIsX3() || now - usbLastPollMs >= USB_POLL_X3_MS) {
+  // not held back by the throttle window. The Picco's check is an I2C read of
+  // its SGM41562 charger, so it takes the same 1 s throttle.
+#if FREEINK_DEVICE_PICCO
+  const bool i2cUsbDetect = true;
+#else
+  const bool i2cUsbDetect = deviceIsX3();
+#endif
+  if (usbLastPollMs == 0 || !i2cUsbDetect || now - usbLastPollMs >= USB_POLL_X3_MS) {
     usbLastPollMs = now;
     usbElectricalConnected = isUsbElectricalConnected();
   }
@@ -231,6 +241,18 @@ bool HalGPIO::wasTouchActivity() const { return inputMgr.wasTouchActivity(); }
 void HalGPIO::setSharedConfirmPowerShortPressEmitsPower(const bool enabled) {
   InputManager::setSharedConfirmPowerShortPressEmitsPower(enabled);
 }
+
+#if FREEINK_DEVICE_PICCO
+bool HalGPIO::hasToggleSwitch() const { return inputMgr.hasToggleSwitch(); }
+
+bool HalGPIO::isToggleSwitchOn() const { return inputMgr.isToggleSwitchOn(); }
+
+void HalGPIO::prepareForDeepSleep() {
+  if (!inputMgr.prepareForDeepSleep()) LOG_ERR("GPIO", "Failed to put touch controller to sleep");
+}
+
+bool HalGPIO::isUsbPowerPresent() const { return isUsbElectricalConnected(); }
+#endif
 
 bool HalGPIO::isXteinkDevice() const {
   return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||
@@ -299,6 +321,18 @@ bool HalGPIO::isUsbElectricalConnected() const {
     }
     return false;
   }
+#if FREEINK_DEVICE_PICCO
+  {
+    // Picco: no USB-detect pin. The SGM41562 charger reports its input rail
+    // directly; when it cannot answer, infer from charging, where charge
+    // termination at 100% reads as "not connected" (upstream 261726f61).
+    static const BatteryMonitor battery;
+    bool known = false;
+    const bool present = battery.isExternalPowerPresent(&known);
+    if (known) return present;
+    return battery.isCharging();
+  }
+#endif
   if (BoardConfig::ACTIVE.usbDetect < 0) {
     return false;
   }

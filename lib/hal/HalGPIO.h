@@ -196,6 +196,25 @@ class HalGPIO {
   bool wasTouchActivity() const;
   void setSharedConfirmPowerShortPressEmitsPower(bool enabled);
 
+#if FREEINK_DEVICE_PICCO
+  // --- BOOX Picco (upstream 261726f61) -------------------------------------
+  // Gated to the Picco env so the X4/X3/Sticky builds compile exactly what they
+  // did; the SDK calls behind these are the Picco SDK port's.
+  //
+  // Two-position slide switch: debounced position.
+  bool hasToggleSwitch() const;
+  bool isToggleSwitchOn() const;
+  // External (USB) power as the SGM41562 charger reports it, WITHOUT the SOF
+  // host-link sample isUsbConnected() also folds in. That sample is only
+  // refreshed by update(), which nothing calls while the sleep hold below is
+  // light-sleeping, so a cable pulled from a computer would read as still
+  // attached forever. This is upstream's isUsbConnected() for the Picco.
+  bool isUsbPowerPresent() const;
+  // Puts the TMA525C touch controller to sleep before deep sleep. Call after
+  // the frontlight is off: both share the I2C bus.
+  void prepareForDeepSleep();
+#endif
+
   // --- Host keyboard text entry -------------------------------------------
   //
   // No-ops here, and they stay no-ops: this board has seven buttons and no
