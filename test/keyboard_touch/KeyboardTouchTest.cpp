@@ -571,6 +571,56 @@ TEST(KeyboardTouch, HoldRouterMatchesTheSdkRouter) {
   }
 }
 
+// KeyboardPanel::resetTouch() (the host stopped taking touch: caret mode, the
+// panel hidden, the Claude answer view) must forget the key under the finger,
+// or the next quick tap that misses every key types it.
+TEST(KeyboardTouch, ResetGridTouchForgetsTheHeldKey) {
+  const ui::KeyboardLayout& layout = grid13::SL_LAYOUT;
+  const ui::Rect rect = panelRect(layout);
+  const std::vector<KeyBox> keys = drawnKeys(layout, rect, 0);
+  const KeyBox& k = keys[keys.size() / 2];
+  // A quick tap off every key, with no press pass before it.
+  const auto quickTapOffTheKeys = [](ui::TouchHoldRouter& router, ui::InteractionBuffer<kbtouch::KEY_SLOTS>& hits) {
+    return static_cast<bool>(router.update(hits, false, 0, 0, true, 5, 5, false, 5000).event);
+  };
+
+  // The mechanism: router.reset() alone leaves the table's active key.
+  {
+    ui::InteractionBuffer<kbtouch::KEY_SLOTS> hits;
+    kbtouch::buildKeyHits(hits, rect, panelProps(layout), SCREEN_W, SCREEN_H);
+    ui::TouchHoldRouter router;
+    router.update(hits, true, static_cast<int16_t>(k.x + k.w / 2), static_cast<int16_t>(k.y + k.h / 2), false, 0, 0,
+                  true, 100);
+    ASSERT_GE(hits.activeIndex(), 0);
+    router.reset();
+    EXPECT_TRUE(quickTapOffTheKeys(router, hits)) << "expected the stale key to type without the fix";
+  }
+  // The fix.
+  {
+    ui::InteractionBuffer<kbtouch::KEY_SLOTS> hits;
+    kbtouch::buildKeyHits(hits, rect, panelProps(layout), SCREEN_W, SCREEN_H);
+    ui::TouchHoldRouter router;
+    router.update(hits, true, static_cast<int16_t>(k.x + k.w / 2), static_cast<int16_t>(k.y + k.h / 2), false, 0, 0,
+                  true, 100);
+    ASSERT_GE(hits.activeIndex(), 0);
+    kbtouch::resetGridTouch(router, hits);
+    EXPECT_EQ(hits.activeIndex(), -1);
+    EXPECT_FALSE(quickTapOffTheKeys(router, hits));
+  }
+  // (0,0) is on no key of any panel or full-screen layout.
+  int16_t value = 0;
+  for (const ui::KeyboardLayout* l :
+       {&grid13::SL_LAYOUT, &ui::builtinKeyboardLayout(ui::KeyboardLayoutId::QwertyEn, false, false, true)}) {
+    ui::InteractionBuffer<kbtouch::KEY_SLOTS> a;
+    kbtouch::buildKeyHits(a, panelRect(*l), panelProps(*l), SCREEN_W, SCREEN_H);
+    EXPECT_FALSE(keyAt(a, 0, 0, value));
+    ui::InteractionBuffer<kbtouch::KEY_SLOTS> b;
+    const ui::Rect fr = fullScreenRect(*l);
+    kbtouch::buildKeyHits(b, fr, fullScreenProps(*l, fr), SCREEN_W, SCREEN_H);
+    EXPECT_FALSE(keyAt(b, 0, 0, value));
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The left-edge Back swipe (owner 2026-11-06: "Left-edge swipe = Back")
 // ---------------------------------------------------------------------------

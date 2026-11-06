@@ -425,7 +425,7 @@ int KeyboardPanel::selectTouched(const int16_t id) {
 }
 
 void KeyboardPanel::resetTouch() {
-  gridRouter_.reset();
+  kbtouch::resetGridTouch(gridRouter_, touchHits_);
   gridRouter_.holdMs = kbtouch::HOLD_MS;
   gridRouter_.overrideHoldMs = kbtouch::DEL_HOLD_MS;
   stripRouter_.reset();

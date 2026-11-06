@@ -182,6 +182,22 @@ TouchInput readTouch(const Input& input) {
   return t;
 }
 
+// Forget a grid contact in progress: the router's own state AND the key the
+// table holds as active. TouchHoldRouter::reset() clears only the former, and
+// the router dispatches the table's active key for a tap that lands off every
+// key (keyboard.h:351-356); a tap shorter than the 90 ms touch-down delay
+// arrives with no press pass to replace it, so a stale active key would type.
+// The empty release lands at (0,0), which no keyboard here puts a key on
+// (each sits at the bottom of the screen): it clears the active key and
+// dispatches nothing.
+template <size_t N>
+void resetGridTouch(fui::TouchHoldRouter& router, fui::InteractionBuffer<N>& hits) {
+  router.reset();
+  fui::InputSnapshot cancel{};
+  cancel.touchReleased = true;
+  hits.routePublished(cancel);
+}
+
 // fui::TouchHoldRouter's contract (keyboard.h:291-424), for keys that are not
 // rects in an InteractionBuffer: the daisy wheel's polar slots and the daisy
 // strip. hit(x, y) returns a key id >= 0, or -1 off every key. One update() per
