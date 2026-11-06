@@ -220,23 +220,66 @@ unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPower
 
 bool HalGPIO::hasTouch() const { return inputMgr.hasTouch(); }
 
-bool HalGPIO::wasTouchTap(float& nx, float& ny) const { return inputMgr.wasTouchTap(nx, ny); }
+// Picco: each touch query below reads as "no touch" unless a keyboard has
+// switched touch on (setKeyboardTouch(), HalGPIO.h). The gate sits here, in the
+// one bridge from the SDK's touch API to the firmware, so no touch consumer can
+// be written that bypasses it. Every other board compiles these unchanged.
+bool HalGPIO::wasTouchTap(float& nx, float& ny) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchTap(nx, ny);
+}
 
-bool HalGPIO::wasTouchDown(float& nx, float& ny) const { return inputMgr.wasTouchPressedAt(nx, ny); }
+bool HalGPIO::wasTouchDown(float& nx, float& ny) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchPressedAt(nx, ny);
+}
 
 bool HalGPIO::isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
   return inputMgr.isTouchTapCandidate(nx, ny, heldMs);
 }
 
-bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const { return inputMgr.isTouchHeldAt(nx, ny); }
-
-unsigned long HalGPIO::lastTouchHeldMs() const { return inputMgr.lastTouchHeldMs(); }
-
-bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
-  return inputMgr.wasSwipe(nxStart, nyStart, nxEnd, nyEnd);
+bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.isTouchHeldAt(nx, ny);
 }
 
-bool HalGPIO::wasTouchActivity() const { return inputMgr.wasTouchActivity(); }
+unsigned long HalGPIO::lastTouchHeldMs() const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return 0;
+#endif
+  return inputMgr.lastTouchHeldMs();
+}
+
+bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
+#if FREEINK_DEVICE_PICCO
+  // Never a swipe on the Picco, keyboard or not: only taps and holds on keys
+  // are touch input there. That keeps the edge-swipe Back, the Home and menu
+  // swipes and every swipe-paged list inert (MappedInputManager::decodeSwipe).
+  (void)nxStart;
+  (void)nyStart;
+  (void)nxEnd;
+  (void)nyEnd;
+  return false;
+#else
+  return inputMgr.wasSwipe(nxStart, nyStart, nxEnd, nyEnd);
+#endif
+}
+
+bool HalGPIO::wasTouchActivity() const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchActivity();
+}
 
 void HalGPIO::setSharedConfirmPowerShortPressEmitsPower(const bool enabled) {
   InputManager::setSharedConfirmPowerShortPressEmitsPower(enabled);
@@ -249,6 +292,14 @@ bool HalGPIO::isToggleSwitchOn() const { return inputMgr.isToggleSwitchOn(); }
 
 void HalGPIO::prepareForDeepSleep() {
   if (!inputMgr.prepareForDeepSleep()) LOG_ERR("GPIO", "Failed to put touch controller to sleep");
+}
+
+void HalGPIO::setKeyboardTouch(const bool on) {
+  if (on == keyboardTouch) return;
+  keyboardTouch = on;
+  // A contact already down when the gate moves belongs to whatever was on
+  // screen before; the SDK clears the latch itself once that finger lifts.
+  inputMgr.suppressTouchContact();
 }
 
 bool HalGPIO::isUsbPowerPresent() const { return isUsbElectricalConnected(); }

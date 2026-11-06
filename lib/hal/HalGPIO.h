@@ -123,6 +123,10 @@ class HalGPIO {
   // switch is `SIMULATOR`.
   InputManager inputMgr;
 
+#if FREEINK_DEVICE_PICCO
+  bool keyboardTouch = false;  // see setKeyboardTouch()
+#endif
+
   bool lastUsbConnected = false;
   bool usbStateChanged = false;
   unsigned long usbLastPollMs = 0;
@@ -213,6 +217,23 @@ class HalGPIO {
   // Puts the TMA525C touch controller to sleep before deep sleep. Call after
   // the frontlight is off: both share the I2C bus.
   void prepareForDeepSleep();
+
+  // Touch is for the on-screen keyboards and nothing else on this board (owner
+  // 2026-11-05: "make a touch version just for the keyboard on pico"; the rest
+  // of the fork stays buttons-only, docs/daisywheel.md). Every touch query
+  // above (tap, touch-down, held point, held time, swipe, touch activity)
+  // reads as "no touch" until a keyboard switches this on, so the Sticky-era
+  // touch paths this fork inherited (edge-swipe Back, the Home and menu
+  // swipes, tap rows, swipe paging, reader tap zones, tap-to-dismiss, the
+  // touch that resets the auto-sleep timer) stay inert everywhere else. Swipes
+  // stay off even inside a keyboard: only taps and holds on keys count.
+  // hasTouch() is NOT gated: it says the hardware has touch, and the theme
+  // reads it for layout (UITheme.cpp:39-44), so gating it would move screens.
+  // Switching either way drops a contact already on the glass, so the finger
+  // that opened a keyboard (or long-pressed OK on the one before) cannot type
+  // a key when it lifts.
+  void setKeyboardTouch(bool on);
+  bool isKeyboardTouchOn() const { return keyboardTouch; }
 #endif
 
   // --- Host keyboard text entry -------------------------------------------

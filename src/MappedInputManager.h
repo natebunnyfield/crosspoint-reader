@@ -83,6 +83,14 @@ class MappedInputManager {
   // form rather than behind an #if.
   bool isHostKeyboardVisible() const { return gpio.isHostKeyboardVisible(); }
 
+#if FREEINK_DEVICE_PICCO
+  // BOOX Picco: touch works only while an on-screen keyboard takes it. The
+  // keyboard screens switch it on while their keys are showing and off when
+  // they go; everywhere else every touch query above reads as no touch. See
+  // HalGPIO::setKeyboardTouch for what is gated and why.
+  void setKeyboardTouch(const bool on) const { gpio.setKeyboardTouch(on); }
+#endif
+
   SwipeDir wasSwipe() const;
   bool wasHomeGesture() const;
   bool wasMenuGesture() const;
