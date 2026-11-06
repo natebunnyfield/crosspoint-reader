@@ -1298,6 +1298,20 @@ static void delayWallClock(const unsigned long ms) {
   }
 }
 
+// Picco: a finger on the glass keeps the idle loop at the 100 Hz delay-poll.
+// Touch is not user activity there outside keyboards (HalGPIO::wasTouchActivity),
+// so a left-edge Back swipe on Home or in the reader arrives in light-sleep idle,
+// and the touch INT does not wake a slice (HalPowerManager::lightSleep). Polled
+// at 50 ms the swipe's start point lands late and its few samples can fall short
+// of the left-edge and 60 px tests. Not activity: the sleep timer is untouched.
+static bool touchContactDown() {
+#if FREEINK_DEVICE_PICCO
+  return gpio.isTouchContactDown();
+#else
+  return false;
+#endif
+}
+
 void loop() {
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
@@ -1438,11 +1452,13 @@ void loop() {
       // also runs at normal clock, but that only happens when USB (externally
       // powered), WiFi, or a render Lock (full speed wanted anyway) is active.
       powerManager.setPowerSaving(false);
-      if (gpio.isDebouncePending()) {
+      if (gpio.isDebouncePending() || touchContactDown()) {
         // A raw button-state change is mid-debounce: commitment needs a second
         // matching sample, so poll again quickly instead of sleeping a slice —
         // a tap shorter than the 50 ms cadence would otherwise land in a single
         // sample and be dropped, and every press would commit a slice late.
+        // A touch contact on the Picco polls fast for the same reason
+        // (touchContactDown above).
         delayWallClock(10);
       } else if (!powerManager.lightSleep(gpio)) {
         // Light sleep declined = a render Lock, USB, or WiFi is active — the

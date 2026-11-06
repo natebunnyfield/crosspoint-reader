@@ -247,6 +247,12 @@ class HalGPIO {
   // or swipe from it. A keyboard calls this once a touch has typed a key, so
   // the same contact cannot also end as a Back swipe.
   void suppressTouchContact();
+  // True while a finger is on the glass, whatever the gate says. For the main
+  // loop's idle poll ALONE (main.cpp touchContactDown): the touch INT is not a
+  // light-sleep wake source, so a contact sampled only once per 50 ms slice
+  // would give the Back swipe a late start point and few samples. Not a touch
+  // event: it neither types nor resets the auto-sleep timer.
+  bool isTouchContactDown() const;
 #endif
 
   // --- Host keyboard text entry -------------------------------------------

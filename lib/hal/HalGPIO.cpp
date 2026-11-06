@@ -303,6 +303,8 @@ bool HalGPIO::wasBackSwipeCandidate(float& nxStart, float& nyStart, float& nxEnd
 
 void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
 
+bool HalGPIO::isTouchContactDown() const { return inputMgr.isTouchPressed(); }
+
 void HalGPIO::setKeyboardTouch(const bool on) {
   if (on == keyboardTouch) return;
   keyboardTouch = on;
