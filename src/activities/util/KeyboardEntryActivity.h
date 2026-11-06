@@ -9,6 +9,9 @@
 
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
+#if FREEINK_DEVICE_PICCO
+#include "components/KeyboardTouch.h"
+#endif
 
 enum class InputType { Text, Password, Url };
 
@@ -51,13 +54,30 @@ class KeyboardEntryActivity : public Activity {
 
   // Key hit rects registered by the keyboard component during render();
   // loop() routes touch snapshots against them. Must hold the LARGEST layout,
-  // not the QWERTY one this was sized for: 13-Grid (the default since
-  // 2026-08-04) registers 13*4 + 3 = 55 keys, so the old 48 overflowed and
-  // addInteraction() silently dropped the last seven — w x y z Del Space OK.
-  // Only touch registration was lost, since the selection highlight comes from
-  // props.selectedIndex rather than this buffer, and this fork does not use
-  // touch; the drop was invisible rather than harmless. ~18 B per slot.
-  freeink::ui::InteractionBuffer<64> interactions;
+  // not the QWERTY one this was sized for. The 48 it once was dropped the 13-
+  // Grid's last keys; 64 still does: the 13-Grid (the default since
+  // 2026-08-04) is now 5 rows of 13 = 65 keys (notes/Grid13Layout.h), so
+  // addInteraction() refuses its 'z'. Only touch registration is lost, since
+  // the selection highlight comes from props.selectedIndex rather than this
+  // buffer. 16 B per slot, two generations. The Picco takes touch, so it gets
+  // the room (kbtouch::KEY_SLOTS); the other boards keep 64, unchanged.
+#if FREEINK_DEVICE_PICCO
+  static constexpr size_t KEY_SLOTS = kbtouch::KEY_SLOTS;
+#else
+  static constexpr size_t KEY_SLOTS = 64;
+#endif
+  freeink::ui::InteractionBuffer<KEY_SLOTS> interactions;
+#if FREEINK_DEVICE_PICCO
+  // Picco: loop() routes touch against THIS table, rebuilt on the loop task
+  // from the current layer (kbtouch::buildKeyHits), never against the one
+  // render() fills on the render task. That closes the window where a tap
+  // routed against a half-rebuilt table and was dropped, and it means no key
+  // is ever drawn pressed: render()'s table never sees a touch, so the screen
+  // only ever shows what the buttons show.
+  freeink::ui::InteractionBuffer<KEY_SLOTS> touchHits;
+  // The geometry props render() lays the keys out with, for that hit pass.
+  freeink::ui::KeyboardProps touchKeyProps() const;
+#endif
 
   // GPIO selection over the current layout grid (row/col in layout terms;
   // the bottom action row is just the last row).
