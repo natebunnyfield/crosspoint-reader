@@ -45,10 +45,18 @@ void DaisyEntryActivity::onEnter() {
   // See KeyboardEntryActivity::onEnter -- the wheel is a text field too, and a
   // host that has a real keyboard should be able to type into it.
   mappedInput.setTextEntryActive(true);
+#if FREEINK_DEVICE_PICCO
+  // The wheel is an on-screen keyboard: the Picco takes touch while it is up.
+  wheelTouch.reset();
+  mappedInput.setKeyboardTouch(true);
+#endif
   requestUpdate();
 }
 
 void DaisyEntryActivity::onExit() {
+#if FREEINK_DEVICE_PICCO
+  mappedInput.setKeyboardTouch(false);
+#endif
   mappedInput.setTextEntryActive(false);
   Activity::onExit();
 }
@@ -192,6 +200,10 @@ void DaisyEntryActivity::loop() {
     }
   }
 
+#if FREEINK_DEVICE_PICCO
+  if (handleWheelTouch()) return;
+#endif
+
   buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Left}, [this] { rotate(-1); });
   buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Right}, [this] { rotate(1); });
 
@@ -230,6 +242,37 @@ void DaisyEntryActivity::loop() {
     onCancel();
   }
 }
+
+#if FREEINK_DEVICE_PICCO
+bool DaisyEntryActivity::handleWheelTouch() {
+  const kbtouch::HoldRouter::Result r = wheelTouch.update(
+      [this](const int x, const int y) -> int {
+        int petal = 0;
+        int slot = 0;
+        if (!kbtouch::wheelHit(WHEEL_CX, WHEEL_CY, RADIUS_HUB, RADIUS_OUTER, petalCount(), slotSpacing(), x, y, petal,
+                               slot)) {
+          return -1;
+        }
+        return petal * 3 + slot;
+      },
+      kbtouch::readTouch(mappedInput), millis());
+  if (!r) return false;
+  // Select, then pick: what rotating to the petal and pressing its pick
+  // button does. The focus wedge moves with it, as rotate() would move it.
+  const int petal = r.key / 3;
+  const int slot = r.key % 3;
+  if (petal != petalIdx) {
+    petalIdx = petal;
+    requestUpdate();
+  }
+  if (r.longPress) {
+    longPick(slot);
+  } else {
+    tapPick(slot);
+  }
+  return true;
+}
+#endif
 
 std::string DaisyEntryActivity::displayText() const {
   std::string shown = text;
