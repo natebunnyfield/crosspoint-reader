@@ -329,7 +329,15 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // bumping this. The log line above did its job -- but only five weeks
     // later, when a headless simulator run happened to be read for something
     // else. Nothing between the two is a reason to trust the number more.
-    constexpr size_t FIXED_ENTRY_COUNT = 16;
+    //
+    // Plus the BOOX Picco's five frontlight/slide-switch rows, compiled into
+    // that env only (see the block above the gate below).
+#if FREEINK_DEVICE_PICCO
+    constexpr size_t PICCO_ENTRY_COUNT = 5;
+#else
+    constexpr size_t PICCO_ENTRY_COUNT = 0;
+#endif
+    constexpr size_t FIXED_ENTRY_COUNT = 16 + PICCO_ENTRY_COUNT;
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
@@ -742,6 +750,32 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // so the row reads "UTC+5:45" rather than "141".
     v.push_back(SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &CrossPointSettings::clockUtcOffsetQ, {0, 104, 1},
                                    "clockUtcOffsetQ", StrId::STR_CAT_SYSTEM));
+
+#if FREEINK_DEVICE_PICCO
+    // BOOX Picco frontlight and slide switch (upstream 261726f61, 8f4d035cb).
+    // Upstream files brightness, warmth and on/off category-less because its
+    // swipe-down panel owns them, Restore Light on Wake under Display and the
+    // slide switch under Controls. This fork has no frontlight panel, and its
+    // device Settings list keeps STR_CAT_SYSTEM rows only, so all five are
+    // persisted and served by the web settings API but drawn nowhere on the
+    // device. The four light rows carry STR_CAT_DISPLAY so the web page groups
+    // them together. Whether any of them belongs on the device is the owner's
+    // call; none is invented here.
+    v.push_back(SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 100, 5},
+                                   "frontlightBrightness", StrId::STR_CAT_DISPLAY));
+    v.push_back(SettingInfo::Value(StrId::STR_WARMTH, &CrossPointSettings::frontlightWarmth, {0, 100, 5},
+                                   "frontlightWarmth", StrId::STR_CAT_DISPLAY));
+    v.push_back(SettingInfo::Toggle(StrId::STR_FRONTLIGHT, &CrossPointSettings::frontlightOn, "frontlightOn",
+                                    StrId::STR_CAT_DISPLAY));
+    v.push_back(SettingInfo::Toggle(StrId::STR_RESTORE_LIGHT_ON_WAKE, &CrossPointSettings::frontlightRestoreOnWake,
+                                    "frontlightRestoreOnWake", StrId::STR_CAT_DISPLAY));
+    // Index IS the stored value (CrossPointSettings::SLIDE_SWITCH_ACTION):
+    // append only. Upstream's third option (touch controls) is not offered,
+    // see the enum.
+    v.push_back(SettingInfo::Enum(StrId::STR_SLIDE_SWITCH, &CrossPointSettings::slideSwitchAction,
+                                  {StrId::STR_FRONTLIGHT, StrId::STR_DARK_MODE}, "slideSwitchAction",
+                                  StrId::STR_CAT_CONTROLS));
+#endif
 
     // The gate for FIXED_ENTRY_COUNT above. Runs ONCE, on the first call, and
     // says nothing when the count is right. It deliberately does not assert:

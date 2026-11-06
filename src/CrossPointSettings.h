@@ -236,6 +236,26 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // so old settings.json files still load.
   uint8_t darkMode = 0;
 
+  // Frontlight and slide switch (BOOX Picco, upstream 261726f61 / 8f4d035cb).
+  // Plain fields on every build so the struct is one shape everywhere, but only
+  // the Picco's getSettingsList() carries their rows, so only a Picco reads or
+  // writes their settings.json keys. Brightness and warmth are always restored
+  // at boot; the on/off state only when frontlightRestoreOnWake is set, unless
+  // the slide switch owns the light (then its position decides).
+  uint8_t frontlightBrightness = 60;
+  uint8_t frontlightWarmth = 50;  // 0 = cool .. 100 = warm
+  uint8_t frontlightOn = 0;
+  uint8_t frontlightRestoreOnWake = 1;
+  // What the slide switch controls. Persisted by index: append only. Upstream's
+  // third binding, SLIDE_SWITCH_TOUCH_CONTROLS = 2, is not offered here because
+  // touchReaderControls is a pinned `static constexpr` in this fork and cannot
+  // be switched; the index stays reserved so upstream's numbering still holds.
+  enum SLIDE_SWITCH_ACTION : uint8_t {
+    SLIDE_SWITCH_FRONTLIGHT = 0,
+    SLIDE_SWITCH_NIGHT_MODE = 1,  // this fork's Dark Mode (darkMode above)
+  };
+  uint8_t slideSwitchAction = SLIDE_SWITCH_FRONTLIGHT;
+
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings

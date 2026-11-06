@@ -31,6 +31,9 @@
 #include "activities/util/TextEntryFactory.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#if FREEINK_DEVICE_PICCO
+#include "util/SlideSwitch.h"
+#endif
 
 void SettingsActivity::rebuildSettingsLists() {
   deviceSettings.clear();
@@ -52,6 +55,15 @@ void SettingsActivity::rebuildSettingsLists() {
     // appended below) and Screen Margin, which now carries STR_CAT_SYSTEM and
     // so arrives through this loop.
     if (setting.category != StrId::STR_CAT_SYSTEM) continue;
+#if FREEINK_DEVICE_PICCO
+    // A slide switch bound to Dark Mode owns it, so the device must not offer a
+    // toggle the switch would overrule (upstream 8f4d035cb). UI-only, here and
+    // not in getSettingsList(), which is also what persists darkMode.
+    if (setting.valuePtr == &CrossPointSettings::darkMode &&
+        slideSwitchOwns(CrossPointSettings::SLIDE_SWITCH_NIGHT_MODE)) {
+      continue;
+    }
+#endif
     deviceSettings.push_back(setting);
   }
 

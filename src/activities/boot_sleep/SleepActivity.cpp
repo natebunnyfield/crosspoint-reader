@@ -354,6 +354,15 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
   }
 
   if (hasGreyscale) {
+#if FREEINK_DEVICE_PICCO
+    // The gray passes below leave a gray plane in the framebuffer, and on USB
+    // power the Picco keeps this frame and FAST-refreshes a charge strip over
+    // it (main.cpp holdSleepWhileUsbPowered), which would put that plane on the
+    // glass. Keep the B/W frame and put it back afterwards, as upstream's
+    // BwFrameKeeper does for overlay grayscale (fb2a8a8f1). On a failed store
+    // the gray passes still run; only the strip's background is at stake.
+    const bool bwStored = renderer.storeBwBuffer();
+#endif
     bitmap.rewindToData();
     renderer.clearScreen(0x00);
     renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
@@ -368,6 +377,9 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
 
     renderer.displayGrayBuffer();
     renderer.setRenderMode(GfxRenderer::BW);
+#if FREEINK_DEVICE_PICCO
+    if (bwStored) renderer.restoreBwBuffer();
+#endif
   }
 }
 
