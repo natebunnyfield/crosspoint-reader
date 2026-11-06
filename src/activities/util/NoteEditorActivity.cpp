@@ -524,6 +524,12 @@ bool NoteEditorActivity::handlePanelTouch() {
   // The contact that typed is over: it cannot also end as a Back swipe (a
   // hold fires while the finger is still down, so it could otherwise).
   mappedInput.endTouchContact();
+  // loop() returns on a fired touch before the pick tracker runs, so a pick
+  // button released in this same pass is never seen, and an armed pick would
+  // stay armed: the next press would read its hold from the old press time and
+  // fire the LONG action at once. The touch took this key; disarm the button.
+  pickSlot = -1;
+  pickFired = false;
   int slot = -1;
   {
     RenderLock lock;  // the selection is what render() draws

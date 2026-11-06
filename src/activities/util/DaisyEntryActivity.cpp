@@ -260,6 +260,12 @@ bool DaisyEntryActivity::handleWheelTouch() {
   // The contact that typed is over: it cannot also end as a Back swipe (a
   // hold fires while the finger is still down, so it could otherwise).
   mappedInput.endTouchContact();
+  // loop() returns on a fired touch before the pick tracker runs, so a pick
+  // button released in this same pass is never seen, and an armed pick would
+  // stay armed: the next press would fire the LONG pick at once (its hold is
+  // timed from pickPressedAt). The touch took this slot; disarm the button.
+  activePick = -1;
+  pickHandled = false;
   // Select, then pick: what rotating to the petal and pressing its pick
   // button does. The focus wedge moves with it, as rotate() would move it.
   const int petal = r.key / 3;
