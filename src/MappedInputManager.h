@@ -89,6 +89,9 @@ class MappedInputManager {
   // they go; everywhere else every touch query above reads as no touch. See
   // HalGPIO::setKeyboardTouch for what is gated and why.
   void setKeyboardTouch(const bool on) const { gpio.setKeyboardTouch(on); }
+  // Ends the current contact for every touch query, the Back swipe included.
+  // A keyboard calls it when a touch has typed a key (HalGPIO::suppressTouchContact).
+  void endTouchContact() const { gpio.suppressTouchContact(); }
 #endif
 
   SwipeDir wasSwipe() const;

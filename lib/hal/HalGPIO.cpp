@@ -261,9 +261,10 @@ unsigned long HalGPIO::lastTouchHeldMs() const {
 
 bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
 #if FREEINK_DEVICE_PICCO
-  // Never a swipe on the Picco, keyboard or not: only taps and holds on keys
-  // are touch input there. That keeps the edge-swipe Back, the Home and menu
-  // swipes and every swipe-paged list inert (MappedInputManager::decodeSwipe).
+  // Never a swipe here on the Picco, keyboard or not. That keeps the Home and
+  // menu swipes, SwipeDir and every swipe-paged list inert
+  // (MappedInputManager::decodeSwipe). The one swipe the Picco takes, the
+  // left-edge Back, is read through wasBackSwipeCandidate() below instead.
   (void)nxStart;
   (void)nyStart;
   (void)nxEnd;
@@ -293,6 +294,14 @@ bool HalGPIO::isToggleSwitchOn() const { return inputMgr.isToggleSwitchOn(); }
 void HalGPIO::prepareForDeepSleep() {
   if (!inputMgr.prepareForDeepSleep()) LOG_ERR("GPIO", "Failed to put touch controller to sleep");
 }
+
+bool HalGPIO::wasBackSwipeCandidate(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
+  // Deliberately NOT gated on keyboardTouch: Back is a swipe on every screen.
+  // The SDK still drops a contact suppressTouchContact() latched.
+  return inputMgr.wasSwipe(nxStart, nyStart, nxEnd, nyEnd);
+}
+
+void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
 
 void HalGPIO::setKeyboardTouch(const bool on) {
   if (on == keyboardTouch) return;

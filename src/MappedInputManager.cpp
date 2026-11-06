@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 #include "CrossPointSettings.h"
+#include "components/EdgeSwipe.h"
 #include "components/UITheme.h"
 
 bool MappedInputManager::isNavDirectionSwapped() const {
@@ -132,7 +133,6 @@ bool MappedInputManager::mapButton(const Button button, const std::function<bool
 }
 
 namespace {
-constexpr float LEFT_EDGE_BACK_GESTURE_FRAC_X = 0.25f;
 constexpr float BOTTOM_EDGE_BACK_GESTURE_FRAC_Y = 0.14f;
 constexpr float TOP_EDGE_MENU_GESTURE_FRAC_Y = 0.14f;
 constexpr unsigned long TOUCH_DOWN_SELECT_DELAY_MS = 90;
@@ -282,16 +282,27 @@ MappedInputManager::SwipeDir MappedInputManager::wasSwipe() const {
 }
 
 bool MappedInputManager::wasBackGesture() const {
-  // Back = left-to-right swipe starting near the left edge. Edge-anchored so that
-  // mid-screen horizontal swipes stay available to activities that consume
-  // SwipeDir::Left/Right (e.g. percent selection, image viewer).
+  // Back = left-to-right swipe starting near the left edge (components/EdgeSwipe.h).
   int sx = 0;
   int sy = 0;
   int ex = 0;
   int ey = 0;
+#if FREEINK_DEVICE_PICCO
+  // The Picco's one swipe, on every screen (owner 2026-11-06: "Left-edge swipe
+  // = Back"). Read through its own HAL call: decodeSwipe() goes through
+  // HalGPIO::wasSwipe, which stays false there, so the pagers, the Home and
+  // menu swipes and SwipeDir never see this or any other swipe.
+  float nxs = 0.0f;
+  float nys = 0.0f;
+  float nxe = 0.0f;
+  float nye = 0.0f;
+  if (!gpio.wasBackSwipeCandidate(nxs, nys, nxe, nye)) return false;
+  renderer.tapToLogical(nxs, nys, sx, sy);
+  renderer.tapToLogical(nxe, nye, ex, ey);
+#else
   if (!decodeSwipe(sx, sy, ex, ey)) return false;
-  const bool hit = sx <= renderer.getScreenWidth() * LEFT_EDGE_BACK_GESTURE_FRAC_X && ex > sx &&
-                   std::abs(ex - sx) > std::abs(ey - sy);
+#endif
+  const bool hit = edgeswipe::isLeftEdgeBack(sx, sy, ex, ey, renderer.getScreenWidth());
   if (hit) rememberTouchHeldTime();
   return hit;
 }

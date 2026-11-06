@@ -521,6 +521,9 @@ bool NoteEditorActivity::handlePanelTouch() {
       panel.routeTouch(kbtouch::readTouch(mappedInput), millis(), metrics.contentSidePadding, panelTop,
                        screenW - metrics.contentSidePadding * 2, panelHeight, screenW, renderer.getScreenHeight());
   if (!key.fired) return false;
+  // The contact that typed is over: it cannot also end as a Back swipe (a
+  // hold fires while the finger is still down, so it could otherwise).
+  mappedInput.endTouchContact();
   int slot = -1;
   {
     RenderLock lock;  // the selection is what render() draws

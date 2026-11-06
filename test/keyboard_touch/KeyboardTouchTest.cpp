@@ -17,6 +17,7 @@
 #include <set>
 #include <vector>
 
+#include "components/EdgeSwipe.h"
 #include "components/KeyboardTouch.h"
 #include "notes/DaisyRings.h"
 #include "notes/Grid13Layout.h"
@@ -568,6 +569,109 @@ TEST(KeyboardTouch, HoldRouterMatchesTheSdkRouter) {
       EXPECT_EQ(s.event.longPress, o.longPress) << "at " << f.ms;
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// The left-edge Back swipe (owner 2026-11-06: "Left-edge swipe = Back")
+// ---------------------------------------------------------------------------
+//
+// On the Picco a swipe reaches the firmware through ONE call,
+// HalGPIO::wasBackSwipeCandidate, read only by MappedInputManager::
+// wasBackGesture, which delivers it as Back exactly when
+// edgeswipe::isLeftEdgeBack says so. HalGPIO::wasSwipe, which the Home and menu
+// swipes and every SwipeDir consumer go through, returns false on the Picco
+// unconditionally. So "which swipes do anything on the Picco" is this
+// function's truth table, and nothing else.
+
+TEST(BackSwipe, LeftEdgeRightwardIsBack) {
+  EXPECT_TRUE(edgeswipe::isLeftEdgeBack(10, 400, 200, 410, SCREEN_W));
+  EXPECT_TRUE(edgeswipe::isLeftEdgeBack(0, 700, 61, 700, SCREEN_W));
+  // The left quarter is inclusive: 480 * 0.25 = 120.
+  EXPECT_TRUE(edgeswipe::isLeftEdgeBack(120, 400, 300, 400, SCREEN_W));
+}
+
+TEST(BackSwipe, EveryOtherSwipeIsNothing) {
+  struct Swipe {
+    int sx, sy, ex, ey;
+    const char* what;
+  };
+  const Swipe others[] = {
+      {121, 400, 300, 400, "rightward, starting just past the left quarter"},
+      {240, 400, 440, 400, "mid-screen rightward"},
+      {300, 400, 100, 400, "mid-screen leftward"},
+      {470, 400, 250, 400, "right edge, leftward"},
+      {400, 400, 470, 400, "right edge, rightward"},
+      {240, 790, 240, 600, "bottom-up (the Home swipe elsewhere)"},
+      {240, 10, 240, 200, "top-down (the menu swipe elsewhere)"},
+      {50, 200, 100, 500, "left edge, but more down than across"},
+      {50, 500, 100, 200, "left edge, but more up than across"},
+      {100, 400, 20, 400, "left edge, leftward"},
+  };
+  for (const Swipe& w : others) {
+    EXPECT_FALSE(edgeswipe::isLeftEdgeBack(w.sx, w.sy, w.ex, w.ey, SCREEN_W)) << w.what;
+  }
+}
+
+// The finger that swipes lands on a key first: the left column of every
+// keyboard is inside the left quarter. The router sees it as a press on that
+// key, then (once it travels past the 28 px tap slop) as contact that is no
+// longer a tap candidate, then as a lift with no tap: the SDK reports a
+// release that moved past 59 px as a swipe and never as a tap
+// (InputManager.cpp:582 and :692; TOUCH_TAP_RELEASE_SLOP_PX is
+// TOUCH_SWIPE_MIN_PX - 1). Whatever pass the activity reads Back in, the router
+// dispatches nothing, and the key it held is forgotten.
+TEST(BackSwipe, ASwipeFromAKeyTypesNothingOnTheFullScreenKeyboard) {
+  const ui::KeyboardLayout& layout = grid13::SL_LAYOUT;
+  const ui::Rect rect = fullScreenRect(layout);
+  ui::InteractionBuffer<kbtouch::KEY_SLOTS> hits;
+  kbtouch::buildKeyHits(hits, rect, fullScreenProps(layout, rect), SCREEN_W, SCREEN_H);
+  const std::vector<KeyBox> keys = drawnKeys(layout, rect, 0);
+  const KeyBox& first = keys.front();  // row 0, column 0
+  const int sx = first.x + first.w / 2;
+  const int sy = first.y + first.h / 2;
+  ASSERT_TRUE(edgeswipe::isLeftEdgeBack(sx, sy, sx + 200, sy + 10, SCREEN_W));
+
+  ui::TouchHoldRouter router;
+  router.holdMs = kbtouch::HOLD_MS;
+  router.overrideHoldMs = kbtouch::DEL_HOLD_MS;
+  struct Pass {
+    kbtouch::TouchInput in;
+    uint32_t ms;
+  };
+  const Pass swipe[] = {
+      {down(sx, sy), 90}, {down(sx, sy), 150},  // landed on the key, not yet moving
+      {dragging(), 200},  {dragging(), 260},   {dragging(), 320},
+      {dragging(), 380},  {dragging(), 440},   {dragging(), 500},  // well past a hold's 350 ms
+      {idle(), 520},                                               // the lift: Back, and no tap
+  };
+  for (const Pass& p : swipe) {
+    const ui::TouchHoldRouter::Result r =
+        router.update(hits, p.in.pressedDown, p.in.px, p.in.py, p.in.tapped, p.in.tx, p.in.ty, p.in.inContact, p.ms);
+    EXPECT_FALSE(r.event) << "typed a key at " << p.ms;
+  }
+  EXPECT_EQ(hits.activeIndex(), -1) << "the key the swipe started on is still held";
+
+  // And it is gone for good: a quick tap that misses every key afterwards
+  // (released before the 90 ms touch-down delay, so no press pass) must not
+  // type the key the swipe started on.
+  const ui::TouchHoldRouter::Result after =
+      router.update(hits, false, 0, 0, true, static_cast<int16_t>(SCREEN_W - 2), 5, false, 2000);
+  EXPECT_FALSE(after.event);
+}
+
+TEST(BackSwipe, ASwipeFromASlotTypesNothingOnTheDaisy) {
+  kbtouch::HoldRouter router;
+  int typed = 0;
+  const auto run = [&](const kbtouch::TouchInput& in, const uint32_t ms) {
+    if (router.update(oneKey, in, ms)) ++typed;
+  };
+  run(down(120, 120), 90);
+  run(down(120, 120), 150);
+  for (uint32_t ms = 200; ms <= 500; ms += 60) run(dragging(), ms);
+  run(idle(), 520);
+  EXPECT_EQ(typed, 0);
+  run(tap(10, 10), 2000);  // a press-less quick tap off every key
+  EXPECT_EQ(typed, 0);
 }
 
 }  // namespace

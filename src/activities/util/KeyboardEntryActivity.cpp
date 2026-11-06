@@ -687,6 +687,11 @@ void KeyboardEntryActivity::loop() {
         touchRouter.update(routeTable, pressedDown, static_cast<int16_t>(tx), static_cast<int16_t>(ty), tapped,
                            static_cast<int16_t>(tapX), static_cast<int16_t>(tapY), inContact, millis());
     if (result.event) {
+#if FREEINK_DEVICE_PICCO
+      // The contact that typed is over: it cannot also end as a Back swipe
+      // (a hold fires while the finger is still down, so it could otherwise).
+      mappedInput.endTouchContact();
+#endif
       syncSelectionToValue(result.event.value);
       if (grid13) syncAnchorToSelection();  // touch jump: anchor = tapped key's center
       if (activateValue(result.event.value, result.event.longPress)) {

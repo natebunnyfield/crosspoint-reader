@@ -257,6 +257,9 @@ bool DaisyEntryActivity::handleWheelTouch() {
       },
       kbtouch::readTouch(mappedInput), millis());
   if (!r) return false;
+  // The contact that typed is over: it cannot also end as a Back swipe (a
+  // hold fires while the finger is still down, so it could otherwise).
+  mappedInput.endTouchContact();
   // Select, then pick: what rotating to the petal and pressing its pick
   // button does. The focus wedge moves with it, as rotate() would move it.
   const int petal = r.key / 3;
