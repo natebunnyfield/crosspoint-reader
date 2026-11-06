@@ -97,6 +97,19 @@ Rules settled in the session:
   Same day, Picco only: a touch hold on Del deletes one character instead of
   clearing the field (a lost TMA525C lift-off turns a tap into a hold);
   clear-all stays on held Confirm. Device-unconfirmed when written.
+  Poll rate (review finding, same day): outside keyboards a touch is not
+  activity, so after 1 s without a button event the main loop light-sleeps in
+  50 ms slices (`HalPowerManager.h:58-61`) and the touch INT does not wake one
+  (`HalPowerManager::lightSleep` arms only the timer and the power pin). A Back
+  swipe on Home or in the reader was sampled at 20 Hz: late start point, few
+  samples. Fixed: while a finger is down the loop takes the 100 Hz delay-poll
+  (`touchContactDown` in `src/main.cpp`, `HalGPIO::isTouchContactDown`); the
+  sleep timer is still untouched. Limits: the first sample of a contact can
+  still land up to one 50 ms slice late, because the contact is only seen at
+  the next timer wake; making the touch INT a wake source would close that but
+  was not done. A USB bench test cannot show any of this (`lightSleep` declines
+  on USB); check on battery. Open for the owner: whether a delivered Back
+  swipe should reset the auto-sleep timer as a Back press does on other boards.
 
 ## Rings
 
