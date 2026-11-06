@@ -390,7 +390,8 @@ KeyboardPanel::TouchKey KeyboardPanel::routeTouch(const kbtouch::TouchInput& in,
   if (r.event) {
     out.fired = true;
     out.id = r.event.value;
-    out.longPress = r.event.longPress;
+    // No clear-all from a touch hold on Del (kbtouch::touchHoldKeepsLongPress).
+    out.longPress = r.event.longPress && kbtouch::touchHoldKeepsLongPress(layout(), r.event.value);
   }
   return out;
 }

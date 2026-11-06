@@ -621,6 +621,35 @@ TEST(KeyboardTouch, ResetGridTouchForgetsTheHeldKey) {
   }
 }
 
+// A touch hold on Del is a plain Del on the Picco: a lost TMA525C lift-off
+// turns a tap into a hold, and a hold on Del was clear-all. Every other key
+// keeps its hold (the alt, or uppercase).
+TEST(KeyboardTouch, TouchHoldOnDelIsNotClearAll) {
+  std::vector<const ui::KeyboardLayout*> layouts = {&grid13::SL_LAYOUT};
+  for (const auto id : {ui::KeyboardLayoutId::QwertyEn, ui::KeyboardLayoutId::SpanishEs}) {
+    for (const bool shifted : {false, true}) {
+      for (const bool symbols : {false, true}) {
+        layouts.push_back(&ui::builtinKeyboardLayout(id, shifted, symbols, true));
+      }
+    }
+  }
+  for (const ui::KeyboardLayout* l : layouts) {
+    int deletes = 0;
+    for (int r = 0; r < l->rowCount; ++r) {
+      for (int c = 0; c < l->rows[r].count; ++c) {
+        const ui::KeyboardKey& key = l->rows[r].keys[c];
+        if (key.kind == ui::KeyKind::Delete) {
+          ++deletes;
+          EXPECT_FALSE(kbtouch::touchHoldKeepsLongPress(*l, key.value));
+        } else {
+          EXPECT_TRUE(kbtouch::touchHoldKeepsLongPress(*l, key.value)) << "row " << r << " col " << c;
+        }
+      }
+    }
+    EXPECT_EQ(deletes, 1);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The left-edge Back swipe (owner 2026-11-06: "Left-edge swipe = Back")
 // ---------------------------------------------------------------------------

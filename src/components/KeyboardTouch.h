@@ -182,6 +182,24 @@ TouchInput readTouch(const Input& input) {
   return t;
 }
 
+// Whether a touch HOLD on the key `value` of `layout` keeps its long-press
+// meaning. Everywhere but Del it does (the alt, or uppercase). A hold on Del
+// would be clear-all, and on the Picco's TMA525C a lost lift-off record turns
+// a tap into a hold: the release then comes only from the stale-contact
+// timeout (InputManager.cpp pollTma525c, PICCO_TOUCH_STALE_MS), long after the
+// router's hold fired. So a touch hold on Del is a plain Del, one character,
+// which is what the tap it may really have been does; clear-all stays on the
+// buttons' held Confirm.
+inline bool touchHoldKeepsLongPress(const fui::KeyboardLayout& layout, const int16_t value) {
+  for (uint8_t r = 0; r < layout.rowCount; ++r) {
+    for (uint8_t c = 0; c < layout.rows[r].count; ++c) {
+      const fui::KeyboardKey& key = layout.rows[r].keys[c];
+      if (key.value == value) return key.kind != fui::KeyKind::Delete;
+    }
+  }
+  return true;
+}
+
 // Forget a grid contact in progress: the router's own state AND the key the
 // table holds as active. TouchHoldRouter::reset() clears only the former, and
 // the router dispatches the table's active key for a tap that lands off every

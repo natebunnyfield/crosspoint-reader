@@ -701,11 +701,16 @@ void KeyboardEntryActivity::loop() {
       // a key the screen does not show. Shift, Del, Space and OK carry one
       // value on every QWERTY layer that has them, so they still act.
       if (!syncSelectionToValue(result.event.value)) return;
+      // No clear-all from a touch hold on Del (kbtouch::touchHoldKeepsLongPress):
+      // it deletes one character, as a tap does.
+      const bool longPress =
+          result.event.longPress && drawn && kbtouch::touchHoldKeepsLongPress(*drawn, result.event.value);
 #else
       syncSelectionToValue(result.event.value);
+      const bool longPress = result.event.longPress;
 #endif
       if (grid13) syncAnchorToSelection();  // touch jump: anchor = tapped key's center
-      if (activateValue(result.event.value, result.event.longPress)) {
+      if (activateValue(result.event.value, longPress)) {
         requestUpdate();
       }
       return;
