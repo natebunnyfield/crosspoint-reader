@@ -46,6 +46,7 @@
 #include <HalFrontlight.h>
 #include <esp_heap_caps.h>
 
+#include "network/FirmwareBoardTag.h"
 #include "util/SlideSwitch.h"
 #endif
 
@@ -1275,6 +1276,15 @@ void setup() {
   // in every other state, so it costs nothing to keep.
 #if !defined(CROSSPOINT_NO_DEVICE_FLASH) || FREEINK_DEVICE_PICCO
   ota_commit::confirmBootIfPending();
+#endif
+
+#if FREEINK_DEVICE_PICCO
+  // Keep the board tag in the Picco image. With CROSSPOINT_NO_DEVICE_FLASH
+  // nothing else reads board_tag::TAG, so --gc-sections dropped it and a Sticky
+  // would accept a Picco bin from SD or WebDAV (its validator only refuses a tag
+  // naming another board). A volatile load cannot be optimized away; this
+  // toolchain ignores __attribute__((retain)).
+  static_cast<void>(*static_cast<const volatile char*>(board_tag::TAG));
 #endif
 }
 
