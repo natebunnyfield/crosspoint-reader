@@ -57,6 +57,17 @@ bool isPiccoDeviceRow(const SettingInfo& setting) {
   return isRockerStepped(setting) || setting.valuePtr == &CrossPointSettings::frontlightRestoreOnWake ||
          setting.valuePtr == &CrossPointSettings::slideSwitchAction;
 }
+
+// Restore Light on Wake is shown only while the slide switch does NOT own the
+// light, i.e. while it is bound to Dark Mode (owner ruling 2026-11-06, "Hide it
+// then"). A switch bound to the light decides the light at wake from its
+// position (main.cpp setup(), restoreLightOn), so the row would do nothing.
+// Upstream's rule, word for word: SettingsList.h isHiddenOnDevice,
+// STR_RESTORE_LIGHT_ON_WAKE: `!Frontlight.present() || slideSwitchOwnsLight()`.
+bool isHiddenLightRow(const SettingInfo& setting) {
+  if (setting.valuePtr != &CrossPointSettings::frontlightRestoreOnWake) return false;
+  return !Frontlight.present() || slideSwitchOwnsLight();
+}
 }  // namespace
 #endif
 
@@ -95,6 +106,9 @@ void SettingsActivity::rebuildSettingsLists() {
         slideSwitchOwns(CrossPointSettings::SLIDE_SWITCH_NIGHT_MODE)) {
       continue;
     }
+    // And the converse for the light (isHiddenLightRow). Flipping the Slide
+    // Switch row rebuilds this list, so the row appears and goes at once.
+    if (isHiddenLightRow(setting)) continue;
 #endif
     deviceSettings.push_back(setting);
   }
