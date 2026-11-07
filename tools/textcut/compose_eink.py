@@ -1,8 +1,9 @@
+from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 E = "eink"; SLOTS = [(0, 9), (1, 11), (2, 12), (3, 14)]
 PAPER = (0xF9, 0xF3, 0xE9); LABEL = (0x7A, 0x6E, 0x62); GAP = 24; M = 40
-ui = ImageFont.truetype("/Users/natebunnyfield/src/crosspoint-reader/lib/EpdFont/scripts/downloaded_fonts/QHERO/texgyreheros-regular.otf", 15)
+ui = ImageFont.truetype(str(Path(__file__).resolve().parents[2] / "lib/EpdFont/scripts/downloaded_fonts/TeXGyreHeros/texgyreheros-regular.otf"), 15)
 def page(fam, slot, aa=True):
     return Image.open(f"{E}/{'aa_' if aa else 'reading_'}{fam}_{slot}.png").convert("L")
 def label(im, text):
