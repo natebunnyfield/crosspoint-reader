@@ -247,4 +247,16 @@ constexpr bool pollFast(const bool contactDown, const unsigned long nowMs, const
   return contactDown || (lastReportMs != 0 && nowMs - lastReportMs < CONTACT_FAST_POLL_MS);
 }
 
+// --- Rocker-stepped value rows ----------------------------------------------
+
+// Owner ruling 2026-11-06, "Two Settings rows": Brightness and Warmth are
+// stepped with the rocker. One step up (rocker upper end) or down (lower end),
+// clamped to the row's range rather than wrapped: a brightness that wraps
+// from 100 to 0 on one press goes dark under the reader's thumb.
+constexpr uint8_t stepClamped(const uint8_t current, const bool up, const uint8_t min, const uint8_t max,
+                              const uint8_t step) {
+  const int next = static_cast<int>(current) + (up ? step : -static_cast<int>(step));
+  return static_cast<uint8_t>(next < min ? min : (next > max ? max : next));
+}
+
 }  // namespace piccoinput

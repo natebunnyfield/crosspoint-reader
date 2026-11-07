@@ -756,11 +756,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // Upstream files brightness, warmth and on/off category-less because its
     // swipe-down panel owns them, Restore Light on Wake under Display and the
     // slide switch under Controls. This fork has no frontlight panel, and its
-    // device Settings list keeps STR_CAT_SYSTEM rows only, so all five are
-    // persisted and served by the web settings API but drawn nowhere on the
-    // device. The four light rows carry STR_CAT_DISPLAY so the web page groups
-    // them together. Whether any of them belongs on the device is the owner's
-    // call; none is invented here.
+    // device Settings list keeps STR_CAT_SYSTEM rows only. All five are
+    // persisted and served by the web settings API; the four light rows carry
+    // STR_CAT_DISPLAY so the web page groups them together. On the device,
+    // Brightness and Warmth are admitted to the Picco's Settings list by
+    // member rather than category and stepped with the rocker (owner ruling
+    // 2026-11-06, "Two Settings rows"; SettingsActivity.cpp isPiccoDeviceRow).
     v.push_back(SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 100, 5},
                                    "frontlightBrightness", StrId::STR_CAT_DISPLAY));
     v.push_back(SettingInfo::Value(StrId::STR_WARMTH, &CrossPointSettings::frontlightWarmth, {0, 100, 5},

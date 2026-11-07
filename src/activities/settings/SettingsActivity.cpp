@@ -32,7 +32,26 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #if FREEINK_DEVICE_PICCO
+#include <HalFrontlight.h>
+
+#include "components/PiccoInput.h"
 #include "util/SlideSwitch.h"
+
+namespace {
+// The two frontlight rows the rocker steps (owner ruling 2026-11-06, "Two
+// Settings rows"). Their SettingInfo stays in getSettingsList() exactly as the
+// web page edits it (same keys, same 0..100 by 5); only the device list
+// admits them.
+bool isRockerStepped(const SettingInfo& setting) {
+  return setting.type == SettingType::VALUE && (setting.valuePtr == &CrossPointSettings::frontlightBrightness ||
+                                                setting.valuePtr == &CrossPointSettings::frontlightWarmth);
+}
+
+// getSettingsList() rows outside STR_CAT_SYSTEM that the Picco's device list
+// shows anyway. Matched by member, not category: the category is what groups
+// them on the web page.
+bool isPiccoDeviceRow(const SettingInfo& setting) { return isRockerStepped(setting); }
+}  // namespace
 #endif
 
 void SettingsActivity::rebuildSettingsLists() {
@@ -54,7 +73,13 @@ void SettingsActivity::rebuildSettingsLists() {
     // What the Reader tab kept: the Reader Font action (font family and size,
     // appended below) and Screen Margin, which now carries STR_CAT_SYSTEM and
     // so arrives through this loop.
+#if FREEINK_DEVICE_PICCO
+    // Plus the Picco's frontlight rows (isPiccoDeviceRow), which arrive in
+    // getSettingsList() order after Clock UTC Offset.
+    if (setting.category != StrId::STR_CAT_SYSTEM && !isPiccoDeviceRow(setting)) continue;
+#else
     if (setting.category != StrId::STR_CAT_SYSTEM) continue;
+#endif
 #if FREEINK_DEVICE_PICCO
     // A slide switch bound to Dark Mode owns it, so the device must not offer a
     // toggle the switch would overrule (upstream 8f4d035cb). UI-only, here and
@@ -166,12 +191,22 @@ void SettingsActivity::onEnter() {
 
 void SettingsActivity::onExit() {
   Activity::onExit();
+#if FREEINK_DEVICE_PICCO
+  // Leaving mid-adjust (sleep, say) keeps the value the light already shows.
+  if (adjustingLight) endLightAdjust();
+#endif
 
   UITheme::getInstance().reload();  // Re-apply theme in case it was changed
 }
 
 void SettingsActivity::loop() {
   if (optionPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+#if FREEINK_DEVICE_PICCO
+  if (adjustingLight) {
+    loopLightAdjust();
+    return;
+  }
+#endif
 
   // Handle actions with early return
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
@@ -260,6 +295,53 @@ void SettingsActivity::loop() {
   });
 }
 
+#if FREEINK_DEVICE_PICCO
+void SettingsActivity::loopLightAdjust() {
+  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm) ||
+      mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+    endLightAdjust();
+    requestUpdate();
+    return;
+  }
+  // The rocker, through the same release/hold-repeat pair the list uses: the
+  // upper end raises the value, the lower end lowers it.
+  buttonNavigator.onNextRelease([this] { stepLight(true); });
+  buttonNavigator.onPreviousRelease([this] { stepLight(false); });
+  buttonNavigator.onNextContinuous([this] { stepLight(true); });
+  buttonNavigator.onPreviousContinuous([this] { stepLight(false); });
+}
+
+void SettingsActivity::stepLight(const bool up) {
+  if (selectedSettingIndex < 0 || selectedSettingIndex >= settingsCount ||
+      !isRockerStepped(deviceSettings[selectedSettingIndex])) {
+    adjustingLight = false;
+    return;
+  }
+  const auto& setting = deviceSettings[selectedSettingIndex];
+  uint8_t& value = SETTINGS.*(setting.valuePtr);
+  const uint8_t next =
+      piccoinput::stepClamped(value, up, setting.valueRange.min, setting.valueRange.max, setting.valueRange.step);
+  if (next == value) return;
+  value = next;
+  // Live: the light changes under the reader's thumb. Brightness reaches the
+  // LEDs only while the light is on (HalFrontlight::setBrightness).
+  if (setting.valuePtr == &CrossPointSettings::frontlightBrightness) {
+    Frontlight.setBrightness(next);
+  } else {
+    Frontlight.setWarmth(next);
+  }
+  requestUpdate();
+}
+
+void SettingsActivity::endLightAdjust() {
+  adjustingLight = false;
+  if (selectedSettingIndex < 0 || selectedSettingIndex >= settingsCount) return;
+  const auto& setting = deviceSettings[selectedSettingIndex];
+  // One write per adjustment, and none if it ended where it began.
+  if (isRockerStepped(setting) && SETTINGS.*(setting.valuePtr) != adjustStartValue) SETTINGS.saveToFile();
+}
+#endif
+
 void SettingsActivity::toggleCurrentSetting() {
   if (selectedSettingIndex < 0 || selectedSettingIndex >= settingsCount) {
     return;
@@ -273,6 +355,14 @@ void SettingsActivity::toggleCurrentSetting() {
   // settings list redraws in the outgoing polarity and the row reads "on" over
   // a still-white page until something else forces a refresh.
   const bool darkModeChanged = setting.valuePtr == &CrossPointSettings::darkMode;
+
+#if FREEINK_DEVICE_PICCO
+  if (isRockerStepped(setting)) {
+    adjustingLight = true;
+    adjustStartValue = SETTINGS.*(setting.valuePtr);
+    return;
+  }
+#endif
 
   if (setting.nameId == StrId::STR_EDITOR_FONT) {
     // Confirm opens the picker with its specimen pane rather than a five-name
@@ -467,8 +557,18 @@ void SettingsActivity::render(RenderLock&&) {
       renderer, Rect{0, listTop, pageWidth, pageHeight - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing},
       settingsCount, selectedSettingIndex,
       [&settings](int index) { return std::string(I18N.get(settings[index].nameId)); }, nullptr, nullptr,
-      [&settings](int i) {
+      [&settings
+#if FREEINK_DEVICE_PICCO
+       ,
+       adjustingRow = adjustingLight ? selectedSettingIndex : -1
+#endif
+  ](int i) {
         const auto& setting = settings[i];
+#if FREEINK_DEVICE_PICCO
+        // The row being stepped says so in its value column; the row style
+        // is otherwise the list's own.
+        if (i == adjustingRow) return "< " + settingrow::valueText(setting) + " >";
+#endif
         // The stored byte here is a biased quarter-hour count; show the offset
         // it means, using the same helper the picker does. Every other row is
         // the generic shape, shared with the Typography screen.
@@ -489,13 +589,24 @@ void SettingsActivity::render(RenderLock&&) {
     // sub-activity rather than a popup.
     if (setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) return true;
     if (setting.nameId == StrId::STR_EDITOR_FONT) return true;
+#if FREEINK_DEVICE_PICCO
+    if (isRockerStepped(setting)) return true;  // Confirm starts the rocker adjustment
+#endif
     return settingrow::opensPicker(setting);
   };
   const bool onRow = selectedSettingIndex >= 0 && selectedSettingIndex < settingsCount;
   const auto confirmLabel = (onRow && opensSubScreen(settings[selectedSettingIndex])) ? tr(STR_SELECT) : tr(STR_TOGGLE);
 
   // Back exits straight to Home (see loop()); label it as what it does.
+#if FREEINK_DEVICE_PICCO
+  // While a light row is being stepped, Back and Confirm both end it, and the
+  // rocker's lower end lowers the value and its upper end raises it.
+  const auto labels = adjustingLight
+                          ? mappedInput.mapLabels(tr(STR_DONE), tr(STR_DONE), tr(STR_DIR_DOWN), tr(STR_DIR_UP))
+                          : mappedInput.mapLabels(tr(STR_HOME), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+#else
   const auto labels = mappedInput.mapLabels(tr(STR_HOME), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+#endif
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   // Always use standard refresh for settings screen

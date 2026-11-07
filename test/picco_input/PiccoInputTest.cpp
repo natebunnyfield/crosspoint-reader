@@ -412,4 +412,18 @@ TEST(PiccoIdlePoll, FastWhileDownAndForASecondAfterTheLastReport) {
   EXPECT_FALSE(piccoinput::pollFast(false, 90000, 50000));
 }
 
+// ---------------------------------------------------------------------------
+// Rocker-stepped value rows (Brightness, Warmth)
+// ---------------------------------------------------------------------------
+
+TEST(PiccoValueStep, StepsAndClampsAtBothEnds) {
+  EXPECT_EQ(piccoinput::stepClamped(60, true, 0, 100, 5), 65);
+  EXPECT_EQ(piccoinput::stepClamped(60, false, 0, 100, 5), 55);
+  EXPECT_EQ(piccoinput::stepClamped(98, true, 0, 100, 5), 100) << "clamps, never wraps to 0";
+  EXPECT_EQ(piccoinput::stepClamped(100, true, 0, 100, 5), 100);
+  EXPECT_EQ(piccoinput::stepClamped(3, false, 0, 100, 5), 0);
+  EXPECT_EQ(piccoinput::stepClamped(0, false, 0, 100, 5), 0);
+  EXPECT_EQ(piccoinput::stepClamped(63, true, 0, 100, 5), 68) << "an off-grid value from the web page";
+}
+
 }  // namespace
