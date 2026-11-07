@@ -386,4 +386,18 @@ TEST(PiccoGestureKeyboard, AKeyboardOpeningUnderTheFingerEndsTheContact) {
   EXPECT_FALSE(d.feed(Frame{{false, false, 0, 0}, 0}.s, 1710, true, SCREEN_W).fired) << "no tap";
 }
 
+// ---------------------------------------------------------------------------
+// A gesture on a button already held (review minor 2026-11-06)
+// ---------------------------------------------------------------------------
+
+TEST(PiccoSynthesizedTap, DroppedWhileThatButtonIsHeld) {
+  const auto bit = [](const uint8_t i) { return static_cast<uint8_t>(1u << i); };
+  EXPECT_TRUE(piccoinput::canSynthesizeTap(0, HalGPIO::BTN_UP));
+  EXPECT_FALSE(piccoinput::canSynthesizeTap(bit(HalGPIO::BTN_UP), HalGPIO::BTN_UP)) << "rocker upper held";
+  // Only the same button blocks it.
+  EXPECT_TRUE(piccoinput::canSynthesizeTap(bit(HalGPIO::BTN_DOWN), HalGPIO::BTN_UP));
+  EXPECT_TRUE(piccoinput::canSynthesizeTap(bit(HalGPIO::BTN_UP), HalGPIO::BTN_BACK));
+  EXPECT_FALSE(piccoinput::canSynthesizeTap(0, 8)) << "no such button";
+}
+
 }  // namespace

@@ -387,7 +387,16 @@ void MappedInputManager::synthesizeGesture() const {
     idx = i;
     return true;
   });
-  if (idx < buttonhold::kButtons) gpio.injectButtonTap(idx);
+  if (idx >= buttonhold::kButtons) return;
+  // A gesture on a button that is physically down would release it a frame
+  // early (piccoinput::canSynthesizeTap): dropped. HalGPIO::update() cleared
+  // last frame's synthesized level before this ran, so isPressed() here is the
+  // physical state alone.
+  uint8_t held = 0;
+  for (uint8_t i = 0; i <= HalGPIO::BTN_POWER; ++i) {
+    if (gpio.isPressed(i)) held |= static_cast<uint8_t>(1u << i);
+  }
+  if (piccoinput::canSynthesizeTap(held, idx)) gpio.injectButtonTap(idx);
 }
 #endif
 

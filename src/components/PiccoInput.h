@@ -216,4 +216,16 @@ class GestureDecoder {
   unsigned long lastReportMs_ = 0;
 };
 
+// --- A gesture on a button that is already held ----------------------------
+
+// A synthesized press on a physical button that is physically down would
+// release it a frame later (HalGPIO::update turns the synthesized level into a
+// release edge), ending the real press early: a gesture made while the rocker
+// end it maps to is held read as that end being let go (review minor,
+// 2026-11-06). Such a gesture is dropped. `physicallyHeld` is a bit per
+// physical button index (HalGPIO::BTN_*), as MappedInputManager reads it.
+constexpr bool canSynthesizeTap(const uint8_t physicallyHeld, const uint8_t index) {
+  return index < 8 && ((physicallyHeld >> index) & 1u) == 0;
+}
+
 }  // namespace piccoinput
