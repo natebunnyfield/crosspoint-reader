@@ -1,7 +1,9 @@
 // BOOX Picco input, pure so it is host-tested (test/picco_input): the rocker
-// remap, and the decoder that turns one touch contact into a synthesized
-// button. Compiled into Picco builds only (MappedInputManager.cpp includes it
-// under FREEINK_DEVICE_PICCO), so X4/X3/Sticky compile exactly what they did.
+// remap, the decoder that turns one touch contact into a synthesized button,
+// and three small decisions beside them (a gesture on a held button, the idle
+// touch poll, a rocker-stepped value). Compiled into Picco builds only
+// (MappedInputManager.cpp, main.cpp and SettingsActivity.cpp include it under
+// FREEINK_DEVICE_PICCO), so X4/X3/Sticky compile exactly what they did.
 //
 // Owner ruling 2026-11-06, "Picco input = the full iOS norm, keyboards type"
 // (docs/picco-port-2026-11-05.md in the primary checkout):
