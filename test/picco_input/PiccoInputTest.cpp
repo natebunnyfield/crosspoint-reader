@@ -72,6 +72,17 @@ Frame at(const int x, const int y, const unsigned long ms) { return Frame{{true,
 Frame lift(const unsigned long ms) { return Frame{{false, false, 0, 0}, ms}; }
 Frame ended(const unsigned long ms) { return Frame{{true, false, 0, 0}, ms}; }  // suppressed contact
 
+// A still finger at (x, y) from t0 for heldMs, sampled every 10 ms,
+// then (if liftAt != 0) lifted at liftAt.
+std::vector<Frame> still(const int x, const int y, const unsigned long t0, const unsigned long heldMs,
+                         const unsigned long liftAt = 0) {
+  std::vector<Frame> f;
+  for (unsigned long t = 0; t <= heldMs; t += 10) f.push_back(at(x, y, t0 + t));
+  if (f.back().ms != t0 + heldMs) f.push_back(at(x, y, t0 + heldMs));
+  if (liftAt != 0) f.push_back(lift(liftAt));
+  return f;
+}
+
 // Feeds the frames and returns every button the decoder fired, in order.
 std::vector<piccoinput::Result> run(piccoinput::GestureDecoder& d, const std::vector<Frame>& frames,
                                     const bool keyboard = false) {
@@ -159,40 +170,108 @@ TEST(PiccoGesture, HoldIsConfirmOnceAndEndsTheContact) {
   EXPECT_EQ(firedAt, 1000u + piccoinput::LONG_PRESS_MS);
 }
 
-TEST(PiccoGesture, JustShortOfTheHoldIsATap) {
-  piccoinput::GestureDecoder d;
-  EXPECT_EQ(only(run(d, {at(240, 400, 1000), at(240, 400, 1490), lift(1499)})), Button::Right);
+// --- "Match iOS exactly" (owner 2026-11-06): tap <= 400 ms and <= 28 px,
+// hold at 750 ms, nothing in between.
+
+TEST(PiccoGestureTiming, ATapLiftsWithin400Ms) {
+  {
+    piccoinput::GestureDecoder d;
+    EXPECT_EQ(only(run(d, still(240, 400, 1000, 390, 1399))), Button::Right) << "399 ms";
+  }
+  {
+    piccoinput::GestureDecoder d;
+    EXPECT_EQ(only(run(d, still(240, 400, 1000, 390, 1400))), Button::Right) << "400 ms";
+  }
+  {
+    piccoinput::GestureDecoder d;
+    EXPECT_TRUE(run(d, still(240, 400, 1000, 400, 1401)).empty()) << "401 ms";
+  }
 }
 
-TEST(PiccoGesture, HoldNeedsAStillFinger) {
-  // Within the 28 px stationary slop: still a hold.
+TEST(PiccoGestureTiming, ATapMovesAtMost28Px) {
   {
     piccoinput::GestureDecoder d;
-    const auto r = run(d, {at(240, 400, 1000), at(268, 400, 1200), at(268, 400, 1500), lift(1600)});
-    EXPECT_EQ(only(r), Button::Confirm);
+    EXPECT_EQ(only(run(d, {at(240, 400, 1000), at(268, 400, 1050), lift(1060)})), Button::Right) << "28 px across";
   }
-  // 29 px: no hold, and the lift is still a tap (under the 59 px release slop).
   {
     piccoinput::GestureDecoder d;
-    const auto r = run(d, {at(240, 400, 1000), at(269, 400, 1200), at(269, 400, 1500), lift(1600)});
-    EXPECT_EQ(only(r), Button::Right);
+    EXPECT_TRUE(run(d, {at(240, 400, 1000), at(269, 400, 1050), lift(1060)}).empty()) << "29 px across";
+  }
+  {
+    piccoinput::GestureDecoder d;
+    EXPECT_EQ(only(run(d, {at(240, 400, 1000), at(240, 372, 1050), lift(1060)})), Button::Right) << "28 px up";
+  }
+  {
+    piccoinput::GestureDecoder d;
+    EXPECT_TRUE(run(d, {at(240, 400, 1000), at(240, 371, 1050), lift(1060)}).empty()) << "29 px up";
+  }
+  // Out past the slop and back again: the excursion counts, not the end point.
+  {
+    piccoinput::GestureDecoder d;
+    EXPECT_TRUE(run(d, {at(240, 400, 1000), at(270, 400, 1030), at(240, 400, 1060), lift(1070)}).empty());
   }
 }
 
-TEST(PiccoGesture, TapAndSwipeMeetAtTheSdkThresholds) {
-  // 59 px of travel is still a tap; 60 px is a swipe (InputManager.h:327-328).
+TEST(PiccoGestureTiming, ADriftShortOfASwipeIsNothing) {
+  // 29..59 px used to be a tap under the SDK's release slop; now it is nothing.
   {
     piccoinput::GestureDecoder d;
-    EXPECT_EQ(only(run(d, {at(300, 400, 1000), at(241, 400, 1050), lift(1060)})), Button::Right) << "59 px tap";
+    EXPECT_TRUE(run(d, {at(300, 400, 1000), at(241, 400, 1050), lift(1060)}).empty()) << "59 px";
   }
+  // 60 px is a swipe, unchanged (InputManager.h:327).
   {
     piccoinput::GestureDecoder d;
     EXPECT_EQ(only(run(d, {at(300, 400, 1000), at(360, 400, 1050), lift(1060)})), Button::Left) << "60 px swipe";
   }
-  // Out past the release slop and back: neither a tap nor a swipe.
+}
+
+TEST(PiccoGestureTiming, TheHoldFiresAt750Ms) {
+  piccoinput::GestureDecoder d;
+  const std::vector<Frame> f = still(240, 400, 1000, 800);
+  unsigned long firedAt = 0;
+  int fires = 0;
+  for (const Frame& fr : f) {
+    const piccoinput::Result r = d.feed(fr.s, fr.ms, false, SCREEN_W);
+    if (r.fired) {
+      ++fires;
+      firedAt = fr.ms;
+    }
+  }
+  EXPECT_EQ(fires, 1);
+  EXPECT_EQ(firedAt, 1750u);
+  EXPECT_EQ(piccoinput::LONG_PRESS_MS, 750u);
+}
+
+TEST(PiccoGestureTiming, BetweenATapAndAHoldIsNothing) {
+  // Down 749 ms (last frame at 749), lifted at 755: too long for a tap, too
+  // short for a hold.
   {
     piccoinput::GestureDecoder d;
-    EXPECT_TRUE(run(d, {at(300, 400, 1000), at(370, 400, 1050), at(300, 400, 1100), lift(1110)}).empty());
+    EXPECT_TRUE(run(d, still(240, 400, 1000, 749, 1755)).empty()) << "749 ms";
+  }
+  // The same contact seen at 750 ms holds, and its lift adds nothing.
+  {
+    piccoinput::GestureDecoder d;
+    EXPECT_EQ(only(run(d, still(240, 400, 1000, 750, 1755))), Button::Confirm) << "750 ms";
+  }
+}
+
+TEST(PiccoGestureTiming, AHoldNeedsAStillFinger) {
+  // Within the 28 px slop: still a hold.
+  {
+    piccoinput::GestureDecoder d;
+    std::vector<Frame> f = {at(240, 400, 1000)};
+    for (const Frame& fr : still(268, 400, 1010, 790)) f.push_back(fr);
+    f.push_back(lift(1900));
+    EXPECT_EQ(only(run(d, f)), Button::Confirm);
+  }
+  // 29 px: no hold, and (too long for a tap) no tap either.
+  {
+    piccoinput::GestureDecoder d;
+    std::vector<Frame> f = {at(240, 400, 1000)};
+    for (const Frame& fr : still(269, 400, 1010, 790)) f.push_back(fr);
+    f.push_back(lift(1900));
+    EXPECT_TRUE(run(d, f).empty());
   }
 }
 

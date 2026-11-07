@@ -72,15 +72,25 @@ constexpr Route rockerRoute(const Button button) {
 
 // --- Gestures ---------------------------------------------------------------
 
-// The SDK's touch thresholds, mirrored: they are private to InputManager
-// (freeink-sdk InputManager.h:326-330), and this decoder must classify a
-// contact exactly as the SDK's own tap/swipe/long-press queries do, so a tap
-// the keyboard types and a tap this reads as Right are the same tap.
-constexpr int TAP_SLOP_PX = 28;                        // a hold must stay within this
-constexpr int SWIPE_MIN_PX = 60;                       // a swipe travels at least this on one axis
-constexpr int TAP_RELEASE_SLOP_PX = SWIPE_MIN_PX - 1;  // a tap never moved past this
-constexpr unsigned long SWIPE_MAX_MS = 700;            // a swipe is over within this
-constexpr unsigned long LONG_PRESS_MS = 500;           // a still contact this long is a hold
+// Owner ruling 2026-11-06, "Match iOS exactly" (docs/picco-port-2026-11-05.md):
+// the iOS zen thresholds, not the SDK's. A tap is one contact that never
+// travels more than 28 px from where it landed and lifts within 400 ms
+// (crosspoint-simulator ios/ZenVerbs.h:56-57 and :131-132, both inclusive); a
+// hold is a still contact at 750 ms (ios/ZenHoldRouting.h:38). Anything longer
+// than a tap, shorter than a hold and not a swipe does NOTHING, and so does a
+// contact that drifts past the tap slop without becoming a swipe.
+//
+// These apply to the gesture decoder alone. The keyboards keep the SDK's own
+// tap and hold queries and their own timings (KeyboardEntryActivity.h:167-170),
+// which the ruling leaves alone; a keyboard tap and a tap read as Right are no
+// longer the same test, and do not need to be: inside a keyboard this decoder
+// fires nothing but the left-edge Back.
+constexpr int TAP_SLOP_PX = 28;               // a tap or a hold never moves past this
+constexpr unsigned long TAP_MAX_MS = 400;     // a tap lifts within this
+constexpr unsigned long LONG_PRESS_MS = 750;  // a still contact this long is a hold
+// Swipes are the SDK's (InputManager.h:327-329), unchanged by the ruling.
+constexpr int SWIPE_MIN_PX = 60;             // a swipe travels at least this on one axis
+constexpr unsigned long SWIPE_MAX_MS = 700;  // a swipe is over within this
 
 // One frame's view of the glass, in the renderer's LOGICAL portrait pixels.
 //   contact: a finger is on the glass (InputManager::isTouchPressed).
@@ -106,11 +116,12 @@ struct Result {
 constexpr Result fire(const Button button, const bool endContact = false) { return Result{true, button, endContact}; }
 
 // A finished contact: down at (sx, sy), last seen at (ex, ey), durationMs on
-// the glass, and whether it ever travelled past the tap release slop. Same
-// rules as InputManager::wasSwipe (InputManager.cpp:681-693) and wasTouchTap
-// (:576-583): a swipe and a tap cannot both be true of one contact.
+// the glass, and whether it ever travelled past the 28 px tap slop. A swipe
+// is the SDK's rule (InputManager::wasSwipe, InputManager.cpp:681-693); a tap
+// is iOS's (above). The two cannot both be true of one contact: a swipe has
+// travelled 60 px, a tap never more than 28.
 inline Result classifyRelease(const int sx, const int sy, const int ex, const int ey, const unsigned long durationMs,
-                              const bool movedBeyondTapRelease, const bool keyboard, const int screenW) {
+                              const bool movedBeyondTapSlop, const bool keyboard, const int screenW) {
   const int dx = ex - sx;
   const int dy = ey - sy;
   const int adx = std::abs(dx);
@@ -125,7 +136,7 @@ inline Result classifyRelease(const int sx, const int sy, const int ex, const in
     return fire(dy < 0 ? Button::Back : Button::Confirm);
   }
   // Inside a keyboard the keyboard itself types the tap.
-  if (keyboard || movedBeyondTapRelease) return Result{};
+  if (keyboard || movedBeyondTapSlop || durationMs > TAP_MAX_MS) return Result{};
   return fire(Button::Right);
 }
 
@@ -139,7 +150,6 @@ class GestureDecoder {
         tracking_ = true;
         consumed_ = false;
         movedTap_ = false;
-        movedRelease_ = false;
         keyboardAtDown_ = keyboard;
         downX_ = s.x;
         downY_ = s.y;
@@ -154,7 +164,6 @@ class GestureDecoder {
       const int adx = std::abs(lastX_ - downX_);
       const int ady = std::abs(lastY_ - downY_);
       if (adx > TAP_SLOP_PX || ady > TAP_SLOP_PX) movedTap_ = true;
-      if (adx > TAP_RELEASE_SLOP_PX || ady > TAP_RELEASE_SLOP_PX) movedRelease_ = true;
       if (!keyboard && !movedTap_ && nowMs - downAt_ >= LONG_PRESS_MS) {
         consumed_ = true;
         return fire(Button::Confirm, true);
@@ -165,14 +174,13 @@ class GestureDecoder {
     tracking_ = false;
     // Ended early (s.contact still true) or already spent on a hold.
     if (consumed_ || s.contact || keyboard != keyboardAtDown_) return Result{};
-    return classifyRelease(downX_, downY_, lastX_, lastY_, nowMs - downAt_, movedRelease_, keyboard, screenW);
+    return classifyRelease(downX_, downY_, lastX_, lastY_, nowMs - downAt_, movedTap_, keyboard, screenW);
   }
 
  private:
   bool tracking_ = false;
   bool consumed_ = false;
   bool movedTap_ = false;
-  bool movedRelease_ = false;
   bool keyboardAtDown_ = false;
   int downX_ = 0;
   int downY_ = 0;
