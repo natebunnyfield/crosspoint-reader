@@ -16,6 +16,9 @@ for this build and should get a one-line pointer from it.
 | Stay awake on USB | 13869607b | `main.cpp loop`, before the idle-timeout sleep |
 | "Two Settings rows": Brightness, Warmth | c3ab67511 | `SettingsActivity.cpp` (`isRockerStepped`, `loopLightAdjust`, `stepLight`) |
 | "Add both rows": Restore Light on Wake, Slide Switch | 1ffda21f9 | `SettingsActivity.cpp isPiccoDeviceRow` |
+| Review fix: a main-loop stall no longer cancels a hold | ec7363182 | `GestureDecoder::feed` (silence judged by a poll) |
+| Review fix: a second tap on a lost lift-off is not a swipe | 5112f2424 | `GestureDecoder::feed`, `NEW_CONTACT_GAP_MS` |
+| Review fix: the touch INT wakes a light-sleep slice | f09e426e2 | `HalPowerManager::lightSleep` |
 
 All of it is under `FREEINK_DEVICE_PICCO`.
 
@@ -30,9 +33,13 @@ All of it is under `FREEINK_DEVICE_PICCO`.
   at once; Confirm or Back ends it and saves once if the value moved. The
   alternative, the fork's existing VALUE-row behavior (Confirm adds 5 and wraps
   100 -> 0, `SettingRowUi.h:156-162`), does not use the rocker at all.
-- **Hold freshness limit 200 ms** (`HOLD_REPORT_GAP_MS`): a hold needs a
-  contact report at most 200 ms old when it fires and no gap over 200 ms
-  between reports since touch-down. A guess, not a measured report rate.
+- **Hold freshness limit 200 ms** (`HOLD_REPORT_GAP_MS`): once a poll finds
+  the latest contact report more than 200 ms old, the contact cannot hold
+  (since ec7363182; before, the gap was measured between reports, so a
+  main-loop stall looked like silence). A guess, not a measured report rate.
+- **Second-finger gap 50 ms** (`NEW_CONTACT_GAP_MS`): a report that ends a
+  polled silence of at least 50 ms and lands more than 28 px from the last
+  reported point ends the contact with nothing fired. Also a guess.
 - **Fast-poll window 1 s** (`CONTACT_FAST_POLL_MS`), the same length as the
   existing post-activity 100 Hz window (`HalPowerManager::IDLE_LIGHT_SLEEP_MS`).
 - **On USB the idle timer restarts** instead of sleeping, so after unplugging
@@ -58,10 +65,47 @@ same 1 s of 100 Hz polling. Upstream's X3 figures for the two idle states,
 about 6.9 mA for up to 1 s, about 0.002 mAh per such contact. The Picco (ESP32-S3)
 has never been measured.
 
-Limit: the first tap after a long idle is still sampled at the slice rate,
-because nothing has reported yet. The touch INT (GPIO11, active low,
-`BoardConfig.h:1465-1468` in the SDK) is not a light-sleep wake source;
-arming it would fix that case at zero idle cost and was not done (not asked).
+The first tap after a long idle got nothing from that window, because
+nothing had reported yet. Since f09e426e2 the touch INT (GPIO11, active low,
+`BoardConfig.h:1468` in the SDK) is also a light-sleep wake source, so that
+tap wakes its slice at once. That costs nothing while INT idles high, and
+one early wake per touch. It is armed only when INT reads high at entry, so a
+stuck-low line falls back to the old 50 ms cadence instead of spinning.
+Unknown: whether INT pulses with no finger on the glass, which would add
+wakes. Not done: the e-ink busy slice (`onEinkBusyWaitSlice`) still samples
+touch once per slice while a refresh runs.
+
+## Review findings on this build (2026-11-06) and what was done
+
+1. **The 200 ms hold-freshness rule may stop real holds firing** (PLAUSIBLE).
+   The SDK's commit f8274f1 and its host test (`test_picco_touch.cpp:49-62`)
+   say the TMA525C may go quiet on a resting finger and model a long press
+   as one report followed by silence. If it does, report timing cannot tell a
+   resting finger from a lost lift-off, hold = Confirm never fires, and only
+   swipe-down gives Confirm. **Not resolved: it needs a measurement.**
+   Building with `TOUCH_PROBE_DEBUG` logs every report
+   (`InputManager.cpp:1232-1236`). The owner then rules which failure to
+   accept, or names another signal. The finding's second path was fixed in
+   ec7363182: a main-loop stall over 200 ms during a hold no longer cancels
+   it, because silence now counts only when a poll sees it.
+2. **A lost lift-off plus a second tap could still be Confirm** (CONFIRMED
+   on the host with the review's sequence). Fixed in 5112f2424 by the
+   second-finger rule above. Still possible: a second tap that lands within
+   50 ms, or within 28 px of the stale point, joins the first. The pair is
+   then a tap, or a swipe if the first tap had drifted. The review's other
+   suggestion, letting any 200 ms gap cancel the release too, was not taken.
+   Its only gain is that narrow drifted case, and it would drop real taps
+   longer than 200 ms if the controller does go quiet on a still finger.
+3. **Item 5 missed the first tap after idle** (CONFIRMED by reading
+   `HalPowerManager.cpp`). Fixed in f09e426e2 (the INT wake above).
+   UNCONFIRMED on device.
+
+Test-build trap found while doing this: after the header was swapped back
+and forth with `cp`, `cmake --build build/test` twice reported a stale
+PiccoInputTest (a test failed on the correct header, then passed after
+`rm` of `PiccoInputTest.cpp.o`). The mutation checks below were rerun with
+the object deleted before each build. The earlier mutation list was not
+rerun.
 
 ## Evidence
 
@@ -85,6 +129,31 @@ arming it would fix that case at zero idle cost and was not done (not asked).
   image at 0xe0000, `esp_psram_init` and the octal driver placed, "OK".
 - Not run: KeyboardTouchTest (no keyboard code touched), any device step.
 
+After the review fixes (head f09e426e2):
+- `PiccoInputTest` 31/31. New: a 400 ms poll-less stall still holds at
+  1750 ms; a lost lift-off across a stall does not hold; a poll that finds
+  the report 200 ms old holds and one that finds it 201 ms old does not; the
+  review's second-tap sequence in four directions fires nothing; the 49/50 ms
+  and 28/29 px second-finger edges; a 25 Hz swipe and a pause then a fast
+  swipe are still swipes. Mutations, each killed by at least one test:
+  `NEW_CONTACT_GAP_MS` 49 and 51, the jump test `>=` and `+1`, the consume
+  removed, the silence reset removed, the silence latch removed,
+  `HOLD_REPORT_GAP_MS` 199 and 201, `!reportGap_` dropped from the hold.
+  The review's repro program now prints `fired=0`.
+- Default (X4): RAM 55,700 -> 55,700. Flash 4,969,701 -> 4,969,709. The +8 B
+  is all `.flash.rodata`, from the two `__TIME__` strings in
+  OnlineFirmwareUpdateActivity and SdFirmwareUpdateActivity. They were
+  compiled one second apart (20:18:42, 20:18:43), so they no longer merge
+  into one string. Every other section is the same size (`riscv32-esp-elf-size
+  -A`). `nm -S --size-sort -C` names and sizes are identical. Addresses after
+  that string shift by 8.
+- Picco (sdkconfig.defaults moved aside; "Reinstall Arduino framework" at log
+  line 87; `-t upload_plan`): SUCCESS, RAM 67,840, Flash 4,776,166, no
+  compiler warnings at all in the log. `firmware.bin` 4,776,672 B, sha256
+  `9bde8d0c…e24141`. Python header parse: magic E9, chip id 9, 7 segments,
+  checksum and appended SHA-256 valid, image end = file length. Board tag
+  once. upload_plan "OK, one image ... at 0xe0000".
+
 ## Checked and found clean
 
 - No other Picco idle-sleep path: `enterDeepSleep` is called only from
@@ -102,7 +171,9 @@ arming it would fix that case at zero idle cost and was not done (not asked).
 
 Everything above. To observe: a quick tap = next, a 0.5 s press = nothing, a
 still 0.75 s press = Confirm; holds still fire on a resting finger (if not,
-the TMA525C pauses its reports and `HOLD_REPORT_GAP_MS` must grow); left
+the TMA525C pauses its reports: see review finding 1 above, which is a
+ruling question, not a bigger number); a tap after several seconds idle
+registers as reliably as one mid-run; left
 idle on USB it stays on the screen it was on and esptool reaches it; Settings
 shows the four rows after Clock UTC Offset and Brightness/Warmth move the
 light as the rocker steps them.
