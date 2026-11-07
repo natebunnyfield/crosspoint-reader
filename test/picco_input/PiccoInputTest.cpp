@@ -313,16 +313,51 @@ TEST(PiccoGestureStale, SparseButSteadyReportsStillHold) {
     for (unsigned long t = 1000; t <= 1900; t += 10) f.push_back(quiet(240, 400, t, t - (t - 1000) % 200));
     EXPECT_EQ(only(run(d, f)), Button::Confirm);
   }
-  // 201 ms between two reports: no hold.
-  {
+  // The same, but one poll lands 1 ms before the 1200 report and one 1 ms
+  // after the 200 ms mark: a poll that finds the report 200 ms old still
+  // holds, one that finds it 201 ms old does not.
+  for (const unsigned long probe : {1200ul, 1201ul}) {
     piccoinput::GestureDecoder d;
     std::vector<Frame> f;
-    for (unsigned long t = 1000; t <= 1900; t += 1) {
-      if (t % 10 != 0 && (t - 1000) % 201 != 0) continue;
-      f.push_back(quiet(240, 400, t, t - (t - 1000) % 201));
+    for (unsigned long t = 1000; t <= 1190; t += 10) f.push_back(quiet(240, 400, t, 1000));
+    f.push_back(quiet(240, 400, probe, 1000));
+    for (unsigned long t = 1210; t <= 1900; t += 10) f.push_back(at(240, 400, t));
+    if (probe == 1200) {
+      EXPECT_EQ(only(run(d, f)), Button::Confirm) << "200 ms old";
+    } else {
+      EXPECT_TRUE(run(d, f).empty()) << "201 ms old";
     }
-    EXPECT_TRUE(run(d, f).empty());
   }
+}
+
+TEST(PiccoGestureStale, AMainLoopStallDoesNotCostAHold) {
+  // A still finger reporting every 10 ms, then a 400 ms stretch with no poll
+  // at all (the main loop busy), then reports again: no poll saw the
+  // controller silent, so the hold fires on time.
+  piccoinput::GestureDecoder d;
+  std::vector<Frame> f = still(240, 400, 1000, 100);
+  for (const Frame& fr : still(240, 400, 1500, 400)) f.push_back(fr);
+  unsigned long firedAt = 0;
+  int fires = 0;
+  for (const Frame& fr : f) {
+    const piccoinput::Result r = d.feed(fr.s, fr.ms, false, SCREEN_W);
+    if (r.fired) {
+      ++fires;
+      firedAt = fr.ms;
+    }
+  }
+  EXPECT_EQ(fires, 1);
+  EXPECT_EQ(firedAt, 1750u);
+}
+
+TEST(PiccoGestureStale, ALostLiftOffAcrossAStallIsStillNotAHold) {
+  // The tap's lift-off is lost and the loop stalls past the hold: the first
+  // poll after it finds the report 700 ms old.
+  piccoinput::GestureDecoder d;
+  std::vector<Frame> f = still(240, 400, 1000, 100);
+  for (unsigned long t = 1800; t <= 4100; t += 10) f.push_back(quiet(240, 400, t, 1100));
+  f.push_back(lift(4110));
+  EXPECT_TRUE(run(d, f).empty());
 }
 
 TEST(PiccoGesture, ASlowDragIsNothing) {

@@ -97,13 +97,20 @@ constexpr unsigned long SWIPE_MAX_MS = 700;  // a swipe is over within this
 // report like any other (freeink-sdk InputManager.cpp:1231), and when one is
 // lost the SDK keeps the finger "down" for 3 s (:1116, :1275) -- long
 // enough for a tap to sit there past LONG_PRESS_MS and fire Confirm on a
-// finger that left long ago (review minor, 2026-11-06). So a gap longer than
-// this between two reports, at any point in the hold window, disqualifies the
-// contact from holding, and the last report must be this fresh when the hold
-// fires. 200 ms is twenty polls at the 100 Hz contact poll; it is a guess at
-// "the controller went quiet", not a measured report rate (UNCONFIRMED on
-// device: if the controller pauses on a resting finger for longer, real holds
-// stop firing, and this number is the one to move).
+// finger that left long ago (review minor, 2026-11-06). So once a poll finds
+// the latest report more than this old, at any point in the hold window, the
+// contact can no longer hold. Only a poll counts as seeing the silence: a
+// main loop stalled past this (SD work, layout) polls nothing, and the report
+// read at its next poll is stamped with that poll's time (InputManager.cpp:1261),
+// so a stall alone does not disqualify a hold. 200 ms is twenty polls at the
+// 100 Hz contact poll; it is a guess at "the controller went quiet", not a
+// measured report rate. UNCONFIRMED on device, and at odds with the SDK's
+// own contract: its commit f8274f1 and host test (test_picco_touch.cpp:49-62)
+// say the controller MAY stop reporting a resting finger, and model a long
+// press as one report and then silence. If it does, report timing cannot tell
+// a resting finger from a lost lift-off, real holds stop firing under this
+// rule, and the ruling needs a different signal (measure first:
+// TOUCH_PROBE_DEBUG logs every report, InputManager.cpp:1232-1236).
 constexpr unsigned long HOLD_REPORT_GAP_MS = 200;
 
 // One frame's view of the glass, in the renderer's LOGICAL portrait pixels.
@@ -180,18 +187,19 @@ class GestureDecoder {
       if (keyboard != keyboardAtDown_) consumed_ = true;
       if (consumed_) return Result{};
       if (s.reportMs != lastReportMs_) {
-        if (s.reportMs - lastReportMs_ > HOLD_REPORT_GAP_MS) reportGap_ = true;
         lastReportMs_ = s.reportMs;
+      } else if (nowMs - lastReportMs_ > HOLD_REPORT_GAP_MS) {
+        // This poll found the controller silent for too long. A lost lift-off
+        // leaves no later report, so the silence is judged here, not when the
+        // next report lands.
+        reportGap_ = true;
       }
       lastX_ = s.x;
       lastY_ = s.y;
       const int adx = std::abs(lastX_ - downX_);
       const int ady = std::abs(lastY_ - downY_);
       if (adx > TAP_SLOP_PX || ady > TAP_SLOP_PX) movedTap_ = true;
-      // The gap still open counts too: a lost lift-off leaves no later report
-      // to measure it against.
-      const bool reported = !reportGap_ && nowMs - lastReportMs_ <= HOLD_REPORT_GAP_MS;
-      if (!keyboard && !movedTap_ && reported && nowMs - downAt_ >= LONG_PRESS_MS) {
+      if (!keyboard && !movedTap_ && !reportGap_ && nowMs - downAt_ >= LONG_PRESS_MS) {
         consumed_ = true;
         return fire(Button::Confirm, true);
       }
