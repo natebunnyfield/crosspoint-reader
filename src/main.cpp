@@ -1388,6 +1388,20 @@ void loop() {
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
+#if FREEINK_DEVICE_PICCO
+  // On USB power the Picco does not sleep on the idle timer: its sleep, even
+  // with the cable in, light-sleeps the chip (holdSleepWhileUsbPowered), and
+  // a sleeping Picco answers no USB-Serial/JTAG reset, so it could not be
+  // reflashed until someone pressed Power (2026-11-06, esptool "No serial
+  // data received"). The timer restarts instead, so after unplugging it runs
+  // a full timeout at most. The screen simply stays as it was. Power still
+  // sleeps on demand; the main-loop light sleep already stands down on USB
+  // (HalPowerManager::lightSleep). Battery sleep is unchanged.
+  if (sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs && gpio.isUsbConnectedCached()) {
+    LOG_DBG("SLP", "Idle timeout on USB power: staying awake");
+    lastActivityTime = millis();
+  }
+#endif
   if (sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep(true);
