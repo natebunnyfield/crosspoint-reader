@@ -46,6 +46,7 @@
 #include <HalFrontlight.h>
 #include <esp_heap_caps.h>
 
+#include "components/PiccoInput.h"
 #include "network/FirmwareBoardTag.h"
 #include "util/SlideSwitch.h"
 #endif
@@ -1306,9 +1307,13 @@ static void delayWallClock(const unsigned long ms) {
 // of the left-edge and 60 px tests. Not activity: the sleep timer is untouched.
 // A RECOGNIZED gesture is activity, though: it arrives as a synthesized press
 // (HalGPIO::injectButtonTap), which the wasAnyPressed() check in loop() sees.
+// The fast poll also runs for CONTACT_FAST_POLL_MS after the controller's last
+// contact report, so the next tap of a run is sampled at 100 Hz from its first
+// report rather than up to a slice late (review minor, 2026-11-06). It cannot
+// help the first tap after a long idle: nothing has reported yet.
 static bool touchContactDown() {
 #if FREEINK_DEVICE_PICCO
-  return gpio.isTouchContactDown();
+  return piccoinput::pollFast(gpio.isTouchContactDown(), millis(), gpio.lastTouchReportMs());
 #else
   return false;
 #endif

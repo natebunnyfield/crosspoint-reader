@@ -400,4 +400,16 @@ TEST(PiccoSynthesizedTap, DroppedWhileThatButtonIsHeld) {
   EXPECT_FALSE(piccoinput::canSynthesizeTap(0, 8)) << "no such button";
 }
 
+// ---------------------------------------------------------------------------
+// The idle poll
+// ---------------------------------------------------------------------------
+
+TEST(PiccoIdlePoll, FastWhileDownAndForASecondAfterTheLastReport) {
+  EXPECT_TRUE(piccoinput::pollFast(true, 50000, 0)) << "a contact down";
+  EXPECT_FALSE(piccoinput::pollFast(false, 50000, 0)) << "never touched";
+  EXPECT_TRUE(piccoinput::pollFast(false, 50999, 50000));
+  EXPECT_FALSE(piccoinput::pollFast(false, 51000, 50000));
+  EXPECT_FALSE(piccoinput::pollFast(false, 90000, 50000));
+}
+
 }  // namespace

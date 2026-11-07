@@ -228,4 +228,23 @@ constexpr bool canSynthesizeTap(const uint8_t physicallyHeld, const uint8_t inde
   return index < 8 && ((physicallyHeld >> index) & 1u) == 0;
 }
 
+// --- The idle poll ----------------------------------------------------------
+
+// After 1 s idle the main loop light-sleeps in 50 ms slices and samples the
+// glass once per slice (main.cpp loop, HalPowerManager::lightSleep), so a tap
+// arriving there is seen late and a short one can be missed. It polls at
+// 10 ms instead while a contact is down, and for this long after the
+// controller's last contact report, so the next tap of a run is sampled at
+// 100 Hz from its first report. Same length as the post-activity 100 Hz window
+// (HalPowerManager::IDLE_LIGHT_SLEEP_MS), which a recognized gesture already
+// gets because its synthesized press is activity.
+constexpr unsigned long CONTACT_FAST_POLL_MS = 1000;
+
+// lastReportMs is InputManager::getTouchPoint().timestamp: 0 until the first
+// report, then the time of the latest one (a lift-off clears `valid`, not the
+// timestamp: freeink-sdk InputManager.cpp:1238-1246).
+constexpr bool pollFast(const bool contactDown, const unsigned long nowMs, const unsigned long lastReportMs) {
+  return contactDown || (lastReportMs != 0 && nowMs - lastReportMs < CONTACT_FAST_POLL_MS);
+}
+
 }  // namespace piccoinput

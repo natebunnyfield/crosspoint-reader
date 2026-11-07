@@ -365,6 +365,8 @@ void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
 
 bool HalGPIO::isTouchContactDown() const { return inputMgr.isTouchPressed(); }
 
+unsigned long HalGPIO::lastTouchReportMs() const { return inputMgr.getTouchPoint().timestamp; }
+
 void HalGPIO::setKeyboardTouch(const bool on) {
   if (on == keyboardTouch) return;
   keyboardTouch = on;

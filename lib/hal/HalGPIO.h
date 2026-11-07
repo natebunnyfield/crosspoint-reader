@@ -269,6 +269,10 @@ class HalGPIO {
   // would give the Back swipe a late start point and few samples. Not a touch
   // event: it neither types nor resets the auto-sleep timer.
   bool isTouchContactDown() const;
+  // millis() of the controller's latest contact report, 0 before the first
+  // (InputManager::getTouchPoint().timestamp). For the same idle poll: it
+  // keeps polling fast for a moment after the glass goes quiet.
+  unsigned long lastTouchReportMs() const;
 #endif
 
   // --- Host keyboard text entry -------------------------------------------
