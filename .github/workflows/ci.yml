@@ -163,6 +163,61 @@ jobs:
           path: .pio/build/default/firmware.bin
           if-no-files-found: error
 
+  # BOOX Picco (ESP32-S3, octal PSRAM). Its own job, never added to the
+  # `pio run -e default -e sticky` line above: picco and sticky share the
+  # custom-sdkconfig hash (same sdkconfig text, same MCU), so in one tree the
+  # second env compiles against one memory type's sdkconfig.h and links the
+  # other's core libs. The image builds SUCCESS and never initializes PSRAM
+  # (docs/picco-port-2026-11-05.md, "Build trap"). A fresh checkout has no
+  # sdkconfig.defaults, so pioarduino reinstalls and recompiles the core libs
+  # here even when the restored ~/.platformio holds sticky's.
+  #
+  # `-t upload_plan` builds and then runs scripts/app_only_upload.py's gates
+  # without a device: one image at ota_0, and firmware.map from THIS link
+  # places esp_psram_init and the octal driver. It fails the job otherwise.
+  # Owner ruling 2026-11-07: "Separate picco job".
+  build-picco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Install PlatformIO Core
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Build Picco and check the PSRAM link
+        run: |
+          set -euo pipefail
+          pio run -e picco -t upload_plan | tee pio-picco.log
+          grep -q "app_only_upload: OK" pio-picco.log
+          # The LAST RAM/Flash lines: on a fresh checkout the core-lib rebuild
+          # links a placeholder sketch first and prints its own (~930 KB).
+          ram_line="$(grep -E "RAM:\\s" pio-picco.log | tail -1 || true)"
+          flash_line="$(grep -E "Flash:\\s" pio-picco.log | tail -1 || true)"
+          {
+            echo "## Picco build stats"
+            echo "- ${ram_line:-RAM: not found}"
+            echo "- ${flash_line:-Flash: not found}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:
@@ -224,6 +279,7 @@ jobs:
     name: Test Status
     needs:
       - build
+      - build-picco
       - clang-format
       - cppcheck
       - unit-tests

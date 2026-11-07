@@ -506,7 +506,7 @@ Frontlight brightness/warmth has no on-device UI (web settings only); touch is
 out of scope by fork ruling but the Picco lacks Back/Left/Right; Slide Switch
 and Restore Light on Wake rows are web-only; the switch's Touch Controls
 binding is left out; `picco-gh_release` is not in `check_editor_faces.py`
-`RELEASE_ENVS`; no fork CI entry; the OTA boot confirmation is kept on the
+`RELEASE_ENVS`; no fork CI entry (since 2026-11-07: job `build-picco`, ruling below); the OTA boot confirmation is kept on the
 Picco.
 
 ## Rulings
@@ -518,3 +518,21 @@ Picco.
   re-ask.
 - Upstream release `2.0.0` was **not** flashed: the owner's next instruction was
   to build this fork for the Picco instead.
+- **2026-11-07, fork CI: "Separate picco job".** `.github/workflows/ci.yml`
+  job `build-picco` runs `pio run -e picco -t upload_plan` on its own runner
+  and fails unless `app_only_upload: OK` (one image at ota_0; `esp_psram_init`
+  and the octal driver placed by this link's map). Never fold picco into the
+  `-e default -e sticky` invocation (build trap above). A fresh checkout has no
+  `sdkconfig.defaults`, so pioarduino reinstalls and recompiles the core libs
+  (`builder/frameworks/arduino.py:621-623`, `:890-906`) even when the restored
+  `~/.platformio` cache holds sticky's. `test-status` needs it.
+  Proved before pushing from a fresh detached worktree at `main` 9240e91a7
+  (no `sdkconfig.defaults`, no editor faces, as on a runner): the log shows
+  `Reinstall Arduino framework` then `Compile Arduino IDF libs for picco`;
+  `esp_psram_init` from `esp_psram.c.o`, referenced by `esp32-hal-psram.c.o`;
+  driver `esp_psram_impl_octal.c.o`; `app_only_upload: OK`; pipe exit 0;
+  4 min 34 s. Found on that run: the FIRST `RAM:`/`Flash:` lines in a fresh
+  build belong to the core-lib rebuild's placeholder sketch (14.5% / 930,583
+  B), so the job's summary takes the LAST ones. The older `build` job's
+  "Firmware build stats" step still uses `grep -m1` (ci.yml:109-110) and so
+  likely reports the placeholder on every fresh run. Not changed; owner's call.
