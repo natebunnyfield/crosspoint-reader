@@ -8,6 +8,10 @@
 #include <esp_sleep.h>
 #include <soc/usb_serial_jtag_struct.h>
 
+#if FREEINK_DEVICE_PICCO
+#include <BatteryMonitor.h>
+#endif
+
 // Global HalGPIO instance
 HalGPIO gpio;
 
@@ -152,6 +156,12 @@ void HalGPIO::begin() {
 
 void HalGPIO::update() {
   inputMgr.update();
+#if FREEINK_DEVICE_PICCO
+  // A synthesized press lasts one frame: it releases here (injectButtonTap).
+  synthReleased = synthHeld;
+  synthHeld = 0;
+  synthPressed = 0;
+#endif
   updateUsbState(millis());
 }
 
@@ -170,8 +180,14 @@ void HalGPIO::updateUsbState(const unsigned long now) {
   // Throttle the X3's I2C-based USB detection; see USB_POLL_X3_MS. First call
   // (usbLastPollMs == 0) always polls so boot state is correct. The combined
   // verdict below is still recomputed every call so a SOF-detected attach is
-  // not held back by the throttle window.
-  if (usbLastPollMs == 0 || !deviceIsX3() || now - usbLastPollMs >= USB_POLL_X3_MS) {
+  // not held back by the throttle window. The Picco's check is an I2C read of
+  // its SGM41562 charger, so it takes the same 1 s throttle.
+#if FREEINK_DEVICE_PICCO
+  const bool i2cUsbDetect = true;
+#else
+  const bool i2cUsbDetect = deviceIsX3();
+#endif
+  if (usbLastPollMs == 0 || !i2cUsbDetect || now - usbLastPollMs >= USB_POLL_X3_MS) {
     usbLastPollMs = now;
     usbElectricalConnected = isUsbElectricalConnected();
   }
@@ -192,45 +208,175 @@ void HalGPIO::pollUsbState() {
 
 bool HalGPIO::wasUsbStateChanged() const { return usbStateChanged; }
 
-bool HalGPIO::isPressed(uint8_t buttonIndex) const { return inputMgr.isPressed(buttonIndex); }
+#if FREEINK_DEVICE_PICCO
+namespace {
+bool synthBit(const uint8_t mask, const uint8_t buttonIndex) { return buttonIndex < 8 && ((mask >> buttonIndex) & 1u); }
+}  // namespace
+#endif
 
-bool HalGPIO::wasPressed(uint8_t buttonIndex) const { return inputMgr.wasPressed(buttonIndex); }
+bool HalGPIO::isPressed(uint8_t buttonIndex) const {
+#if FREEINK_DEVICE_PICCO
+  if (synthBit(synthHeld, buttonIndex)) return true;
+#endif
+  return inputMgr.isPressed(buttonIndex);
+}
 
-bool HalGPIO::wasAnyPressed() const { return inputMgr.wasAnyPressed(); }
+bool HalGPIO::wasPressed(uint8_t buttonIndex) const {
+#if FREEINK_DEVICE_PICCO
+  if (synthBit(synthPressed, buttonIndex)) return true;
+#endif
+  return inputMgr.wasPressed(buttonIndex);
+}
 
-bool HalGPIO::wasReleased(uint8_t buttonIndex) const { return inputMgr.wasReleased(buttonIndex); }
+bool HalGPIO::wasAnyPressed() const {
+#if FREEINK_DEVICE_PICCO
+  if (synthPressed != 0) return true;
+#endif
+  return inputMgr.wasAnyPressed();
+}
 
-bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
+bool HalGPIO::wasReleased(uint8_t buttonIndex) const {
+#if FREEINK_DEVICE_PICCO
+  if (synthBit(synthReleased, buttonIndex)) return true;
+#endif
+  return inputMgr.wasReleased(buttonIndex);
+}
+
+bool HalGPIO::wasAnyReleased() const {
+#if FREEINK_DEVICE_PICCO
+  if (synthReleased != 0) return true;
+#endif
+  return inputMgr.wasAnyReleased();
+}
 
 bool HalGPIO::isDebouncePending() const { return inputMgr.isDebouncePending(); }
 
-unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
+unsigned long HalGPIO::getHeldTime() const {
+#if FREEINK_DEVICE_PICCO
+  // A synthesized tap is a short press, whatever the last real button's hold
+  // was: without this its release frame would report the SDK's stale global
+  // duration and could read as a long press.
+  if ((synthHeld | synthReleased) != 0) return millis() - synthPressedAt;
+#endif
+  return inputMgr.getHeldTime();
+}
 
 unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPowerButtonHeldTime(); }
 
 bool HalGPIO::hasTouch() const { return inputMgr.hasTouch(); }
 
-bool HalGPIO::wasTouchTap(float& nx, float& ny) const { return inputMgr.wasTouchTap(nx, ny); }
+// Picco: each touch query below reads as "no touch" unless a keyboard has
+// switched touch on (setKeyboardTouch(), HalGPIO.h). The gate sits here, in the
+// one bridge from the SDK's touch API to the firmware, so no touch consumer can
+// be written that bypasses it. Every other board compiles these unchanged.
+bool HalGPIO::wasTouchTap(float& nx, float& ny) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchTap(nx, ny);
+}
 
-bool HalGPIO::wasTouchDown(float& nx, float& ny) const { return inputMgr.wasTouchPressedAt(nx, ny); }
+bool HalGPIO::wasTouchDown(float& nx, float& ny) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchPressedAt(nx, ny);
+}
 
 bool HalGPIO::isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
   return inputMgr.isTouchTapCandidate(nx, ny, heldMs);
 }
 
-bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const { return inputMgr.isTouchHeldAt(nx, ny); }
-
-unsigned long HalGPIO::lastTouchHeldMs() const { return inputMgr.lastTouchHeldMs(); }
-
-bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
-  return inputMgr.wasSwipe(nxStart, nyStart, nxEnd, nyEnd);
+bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.isTouchHeldAt(nx, ny);
 }
 
-bool HalGPIO::wasTouchActivity() const { return inputMgr.wasTouchActivity(); }
+unsigned long HalGPIO::lastTouchHeldMs() const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return 0;
+#endif
+  return inputMgr.lastTouchHeldMs();
+}
+
+bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
+#if FREEINK_DEVICE_PICCO
+  // Never a swipe here on the Picco, keyboard or not. That keeps the Home and
+  // menu swipes, SwipeDir and every swipe-paged list inert
+  // (MappedInputManager::decodeSwipe). Gestures reach activities only as
+  // synthesized buttons, through readTouchContact()/injectButtonTap() below.
+  (void)nxStart;
+  (void)nyStart;
+  (void)nxEnd;
+  (void)nyEnd;
+  return false;
+#else
+  return inputMgr.wasSwipe(nxStart, nyStart, nxEnd, nyEnd);
+#endif
+}
+
+bool HalGPIO::wasTouchActivity() const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchActivity();
+}
 
 void HalGPIO::setSharedConfirmPowerShortPressEmitsPower(const bool enabled) {
   InputManager::setSharedConfirmPowerShortPressEmitsPower(enabled);
 }
+
+#if FREEINK_DEVICE_PICCO
+bool HalGPIO::hasToggleSwitch() const { return inputMgr.hasToggleSwitch(); }
+
+bool HalGPIO::isToggleSwitchOn() const { return inputMgr.isToggleSwitchOn(); }
+
+void HalGPIO::prepareForDeepSleep() {
+  if (!inputMgr.prepareForDeepSleep()) LOG_ERR("GPIO", "Failed to put touch controller to sleep");
+}
+
+bool HalGPIO::readTouchContact(float& nx, float& ny, bool& live, unsigned long& reportMs) const {
+  // Deliberately NOT gated on keyboardTouch: gestures are buttons on every
+  // screen. isTouchHeldAt() reads false for a contact suppressTouchContact()
+  // latched, which is what `live` reports.
+  if (!inputMgr.isTouchPressed()) return false;
+  live = inputMgr.isTouchHeldAt(nx, ny);
+  // Stamped by the SDK on every contact report it reads (InputManager.cpp:1261),
+  // and left alone when no new report arrived: the decoder tells a finger
+  // still reporting from one whose lift-off was lost by this alone.
+  reportMs = inputMgr.getTouchPoint().timestamp;
+  return true;
+}
+
+void HalGPIO::injectButtonTap(const uint8_t index) {
+  if (index >= 8) return;
+  const auto bit = static_cast<uint8_t>(1u << index);
+  synthPressed |= bit;
+  synthHeld |= bit;
+  synthPressedAt = millis();
+}
+
+void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
+
+bool HalGPIO::isTouchContactDown() const { return inputMgr.isTouchPressed(); }
+
+unsigned long HalGPIO::lastTouchReportMs() const { return inputMgr.getTouchPoint().timestamp; }
+
+void HalGPIO::setKeyboardTouch(const bool on) {
+  if (on == keyboardTouch) return;
+  keyboardTouch = on;
+  // A contact already down when the gate moves belongs to whatever was on
+  // screen before; the SDK clears the latch itself once that finger lifts.
+  inputMgr.suppressTouchContact();
+}
+
+bool HalGPIO::isUsbPowerPresent() const { return isUsbElectricalConnected(); }
+#endif
 
 bool HalGPIO::isXteinkDevice() const {
   return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||
@@ -299,6 +445,18 @@ bool HalGPIO::isUsbElectricalConnected() const {
     }
     return false;
   }
+#if FREEINK_DEVICE_PICCO
+  {
+    // Picco: no USB-detect pin. The SGM41562 charger reports its input rail
+    // directly; when it cannot answer, infer from charging, where charge
+    // termination at 100% reads as "not connected" (upstream 261726f61).
+    static const BatteryMonitor battery;
+    bool known = false;
+    const bool present = battery.isExternalPowerPresent(&known);
+    if (known) return present;
+    return battery.isCharging();
+  }
+#endif
   if (BoardConfig::ACTIVE.usbDetect < 0) {
     return false;
   }

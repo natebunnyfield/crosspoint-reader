@@ -6,7 +6,17 @@
 #include <cstdlib>
 
 #include "CrossPointSettings.h"
+#include "components/EdgeSwipe.h"
 #include "components/UITheme.h"
+
+#if FREEINK_DEVICE_PICCO
+#include "components/PiccoInput.h"
+
+namespace {
+// One decoder: there is one MappedInputManager and one touch panel.
+piccoinput::GestureDecoder gestureDecoder;
+}  // namespace
+#endif
 
 bool MappedInputManager::isNavDirectionSwapped() const {
   // Everything renders portrait, so the nav axis never flips. Kept as a named
@@ -49,6 +59,21 @@ bool MappedInputManager::mapButtonInMask(const Button button, const uint8_t mask
 }
 
 bool MappedInputManager::mapButton(const Button button, const std::function<bool(uint8_t)>& fn) const {
+#if FREEINK_DEVICE_PICCO
+  // The rocker is Right (upper end) and Left (lower end) on every screen, and
+  // sends nothing else: no Up/Down, no page buttons (owner 2026-11-06). Back,
+  // Confirm and Power take the shared mapping below.
+  switch (piccoinput::rockerRoute(button)) {
+    case piccoinput::Route::RockerUpper:
+      return fn(HalGPIO::BTN_UP);
+    case piccoinput::Route::RockerLower:
+      return fn(HalGPIO::BTN_DOWN);
+    case piccoinput::Route::None:
+      return false;
+    case piccoinput::Route::Unchanged:
+      break;
+  }
+#endif
   const auto sideLayout = SETTINGS.sideButtonLayout;
 
   switch (button) {
@@ -132,7 +157,6 @@ bool MappedInputManager::mapButton(const Button button, const std::function<bool
 }
 
 namespace {
-constexpr float LEFT_EDGE_BACK_GESTURE_FRAC_X = 0.25f;
 constexpr float BOTTOM_EDGE_BACK_GESTURE_FRAC_Y = 0.14f;
 constexpr float TOP_EDGE_MENU_GESTURE_FRAC_Y = 0.14f;
 constexpr unsigned long TOUCH_DOWN_SELECT_DELAY_MS = 90;
@@ -282,18 +306,26 @@ MappedInputManager::SwipeDir MappedInputManager::wasSwipe() const {
 }
 
 bool MappedInputManager::wasBackGesture() const {
-  // Back = left-to-right swipe starting near the left edge. Edge-anchored so that
-  // mid-screen horizontal swipes stay available to activities that consume
-  // SwipeDir::Left/Right (e.g. percent selection, image viewer).
+#if FREEINK_DEVICE_PICCO
+  // The Picco's left-edge Back (owner 2026-11-06) arrives as a synthesized
+  // Back press from synthesizeGesture(), never here: HalGPIO::wasSwipe stays
+  // false there, so the pagers, the Home and menu swipes and SwipeDir never
+  // see a swipe either.
+  return false;
+#else
+  // Back = left-to-right swipe starting near the left edge (components/EdgeSwipe.h).
   int sx = 0;
   int sy = 0;
   int ex = 0;
   int ey = 0;
+  // edgeswipe::isLeftEdgeBack, spelled out so the other boards compile
+  // exactly what they did before the Picco shared it.
   if (!decodeSwipe(sx, sy, ex, ey)) return false;
-  const bool hit = sx <= renderer.getScreenWidth() * LEFT_EDGE_BACK_GESTURE_FRAC_X && ex > sx &&
+  const bool hit = sx <= renderer.getScreenWidth() * edgeswipe::LEFT_EDGE_BACK_FRAC_X && ex > sx &&
                    std::abs(ex - sx) > std::abs(ey - sy);
   if (hit) rememberTouchHeldTime();
   return hit;
+#endif
 }
 
 bool MappedInputManager::wasMenuGesture() const {
@@ -333,8 +365,48 @@ bool MappedInputManager::isAnyPhysicalButtonHeld() const {
   return false;
 }
 
+#if FREEINK_DEVICE_PICCO
+void MappedInputManager::synthesizeGesture() const {
+  float nx = 0.0f;
+  float ny = 0.0f;
+  bool live = false;
+  piccoinput::Sample sample;
+  sample.contact = gpio.readTouchContact(nx, ny, live, sample.reportMs);
+  sample.live = sample.contact && live;
+  if (sample.live) renderer.tapToLogical(nx, ny, sample.x, sample.y);
+  const piccoinput::Result r =
+      gestureDecoder.feed(sample, millis(), gpio.isKeyboardTouchOn(), renderer.getScreenWidth());
+  if (!r.fired) return;
+  // A hold fires while the finger is down: end the contact so its lift cannot
+  // also tap (here, or as a key if the Confirm opens a keyboard).
+  if (r.endContact) gpio.suppressTouchContact();
+  // The physical button the logical one maps to, exactly as getHeldTime(Button)
+  // resolves it: Right/Left are the rocker ends, Back/Confirm the front indices.
+  uint8_t idx = buttonhold::kButtons;
+  mapButton(r.button, [&idx](const uint8_t i) {
+    idx = i;
+    return true;
+  });
+  if (idx >= buttonhold::kButtons) return;
+  // A gesture on a button that is physically down would release it a frame
+  // early (piccoinput::canSynthesizeTap): dropped. HalGPIO::update() cleared
+  // last frame's synthesized level before this ran, so isPressed() here is the
+  // physical state alone.
+  uint8_t held = 0;
+  for (uint8_t i = 0; i <= HalGPIO::BTN_POWER; ++i) {
+    if (gpio.isPressed(i)) held |= static_cast<uint8_t>(1u << i);
+  }
+  if (piccoinput::canSynthesizeTap(held, idx)) gpio.injectButtonTap(idx);
+}
+#endif
+
 void MappedInputManager::update() const {
   gpio.update();
+#if FREEINK_DEVICE_PICCO
+  // Before the hold stamps and the swallow below read this frame's edges, so
+  // a synthesized press is stamped and swallowed exactly like a real one.
+  synthesizeGesture();
+#endif
   {
     // Per-button press stamps, from the RAW edges: a press is a physical fact
     // whatever the swallow thinks of it. The swallow is applied at read time,

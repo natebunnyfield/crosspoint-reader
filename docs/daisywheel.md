@@ -68,6 +68,48 @@ Rules settled in the session:
 - ~~Touch (X4 Pro): tap petal = focus, tap char = type, hold char = uppercase.~~
   **Superseded 2026-08-05: this fork never supports touch or the X4 Pro** — the
   wheel is buttons-only.
+  **Narrowed 2026-11-05, BOOX Picco only** (owner: *"make a touch version just
+  for the keyboard on pico"*): on a Picco build, and only while an on-screen
+  keyboard is up, a tap on a key does what selecting it with the buttons and
+  confirming does, and a hold does what holding the pick does. On the wheel a
+  tap on a slot rotates the focus to that petal and picks the slot; a hold is
+  the uppercase pick, so long-press still means uppercase and nothing else.
+  The same holds for the full-screen 13-Grid / QWERTY keyboard and for the
+  Create Note / Claude panel (grids and the daisy strip). Every other screen
+  ignores touch: the gate is `HalGPIO::setKeyboardTouch` (`lib/hal/HalGPIO.h`),
+  the key mapping `src/components/KeyboardTouch.h`, tested in
+  `test/keyboard_touch`. X4, X3 and Sticky builds compile none of it. No key
+  size, layout or highlight changed for touch. Device-unconfirmed when written.
+  **Widened 2026-11-06, one gesture** (owner: *"Left-edge swipe = Back"*; the
+  Picco has no Back button): a swipe that starts in the left quarter of the
+  screen and runs right is Back on every Picco screen, keyboards included,
+  where it cancels exactly as the Back button does. It is the only swipe:
+  `HalGPIO::wasSwipe` stays false on the Picco, so the Home and menu swipes
+  and every swipe pager stay inert, as do tap rows, reader tap zones and the
+  touch that resets the sleep timer. The swipe reaches the firmware only
+  through `HalGPIO::wasBackSwipeCandidate`, read only by
+  `MappedInputManager::wasBackGesture`; the geometry is
+  `src/components/EdgeSwipe.h`. A swipe that lands on a key types nothing (the
+  SDK never reports a release past 59 px as a tap, and the routers drop the
+  held key), and a contact that already typed a key ends there
+  (`MappedInputManager::endTouchContact`), so it cannot also be Back. Accepted
+  risk: a sloppy rightward drag from a left-column key cancels the keyboard.
+  Same day, Picco only: a touch hold on Del deletes one character instead of
+  clearing the field (a lost TMA525C lift-off turns a tap into a hold);
+  clear-all stays on held Confirm. Device-unconfirmed when written.
+  Poll rate (review finding, same day): outside keyboards a touch is not
+  activity, so after 1 s without a button event the main loop light-sleeps in
+  50 ms slices (`HalPowerManager.h:58-61`) and the touch INT does not wake one
+  (`HalPowerManager::lightSleep` arms only the timer and the power pin). A Back
+  swipe on Home or in the reader was sampled at 20 Hz: late start point, few
+  samples. Fixed: while a finger is down the loop takes the 100 Hz delay-poll
+  (`touchContactDown` in `src/main.cpp`, `HalGPIO::isTouchContactDown`); the
+  sleep timer is still untouched. Limits: the first sample of a contact can
+  still land up to one 50 ms slice late, because the contact is only seen at
+  the next timer wake; making the touch INT a wake source would close that but
+  was not done. A USB bench test cannot show any of this (`lightSleep` declines
+  on USB); check on battery. Open for the owner: whether a delivered Back
+  swipe should reset the auto-sleep timer as a Back press does on other boards.
 
 ## Rings
 

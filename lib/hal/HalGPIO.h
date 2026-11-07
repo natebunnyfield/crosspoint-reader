@@ -123,6 +123,16 @@ class HalGPIO {
   // switch is `SIMULATOR`.
   InputManager inputMgr;
 
+#if FREEINK_DEVICE_PICCO
+  bool keyboardTouch = false;  // see setKeyboardTouch()
+  // injectButtonTap(): this frame's synthesized press edges and their level,
+  // and the release edges they become on the next update().
+  uint8_t synthPressed = 0;
+  uint8_t synthHeld = 0;
+  uint8_t synthReleased = 0;
+  unsigned long synthPressedAt = 0;
+#endif
+
   bool lastUsbConnected = false;
   bool usbStateChanged = false;
   unsigned long usbLastPollMs = 0;
@@ -195,6 +205,75 @@ class HalGPIO {
   bool wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const;
   bool wasTouchActivity() const;
   void setSharedConfirmPowerShortPressEmitsPower(bool enabled);
+
+#if FREEINK_DEVICE_PICCO
+  // --- BOOX Picco (upstream 261726f61) -------------------------------------
+  // Gated to the Picco env so the X4/X3/Sticky builds compile exactly what they
+  // did; the SDK calls behind these are the Picco SDK port's.
+  //
+  // Two-position slide switch: debounced position.
+  bool hasToggleSwitch() const;
+  bool isToggleSwitchOn() const;
+  // External (USB) power as the SGM41562 charger reports it, WITHOUT the SOF
+  // host-link sample isUsbConnected() also folds in. That sample is only
+  // refreshed by update(), which nothing calls while the sleep hold below is
+  // light-sleeping, so a cable pulled from a computer would read as still
+  // attached forever. This is upstream's isUsbConnected() for the Picco.
+  bool isUsbPowerPresent() const;
+  // Puts the TMA525C touch controller to sleep before deep sleep. Call after
+  // the frontlight is off: both share the I2C bus.
+  void prepareForDeepSleep();
+
+  // Touch is for the on-screen keyboards and nothing else on this board (owner
+  // 2026-11-05: "make a touch version just for the keyboard on pico"; the rest
+  // of the fork stays buttons-only, docs/daisywheel.md). Every touch query
+  // above (tap, touch-down, held point, held time, swipe, touch activity)
+  // reads as "no touch" until a keyboard switches this on, so the Sticky-era
+  // touch paths this fork inherited (the Home and menu swipes, tap rows,
+  // swipe paging, reader tap zones, tap-to-dismiss, the touch that resets the
+  // auto-sleep timer) stay inert everywhere else. wasSwipe() stays false even
+  // inside a keyboard: there, only taps and holds on keys count. Gestures
+  // reach activities only as synthesized buttons (owner 2026-11-06), through
+  // readTouchContact() and injectButtonTap() below.
+  // hasTouch() is NOT gated: it says the hardware has touch, and the theme
+  // reads it for layout (UITheme.cpp:39-44), so gating it would move screens.
+  // Switching either way drops a contact already on the glass, so the finger
+  // that opened a keyboard (or long-pressed OK on the one before) cannot type
+  // a key when it lifts.
+  void setKeyboardTouch(bool on);
+  bool isKeyboardTouchOn() const { return keyboardTouch; }
+
+  // The contact on the glass, NOT gated by setKeyboardTouch, for
+  // MappedInputManager's gesture decoder ALONE (components/PiccoInput.h).
+  // Outside keyboards every single-finger gesture is a synthesized button,
+  // and inside them the left-edge swipe is Back (owner 2026-11-06; the Picco
+  // has no Back button). True while a finger is down. `live` is false once
+  // suppressTouchContact() has ended the contact; only when it is true are
+  // nx/ny written (panel-native 0..1, like the touch queries above).
+  // reportMs is the millis() of the controller's latest contact report.
+  bool readTouchContact(float& nx, float& ny, bool& live, unsigned long& reportMs) const;
+  // A synthesized tap on physical button `index`: pressed (edge and level)
+  // until the next update(), released (edge) on that frame, as one quick
+  // press of a real button reads. isPressed/wasPressed/wasReleased, the
+  // wasAny pair and getHeldTime fold it in, so the activity-swap swallow, the
+  // per-button hold timer and main.cpp's auto-sleep timer treat a gesture as
+  // the press it stands for (iOS's synthesized presses count as activity too).
+  void injectButtonTap(uint8_t index);
+  // Drop the rest of the contact on the glass: no further tap, hold, release
+  // or swipe from it. A keyboard calls this once a touch has typed a key, so
+  // the same contact cannot also end as a Back swipe.
+  void suppressTouchContact();
+  // True while a finger is on the glass, whatever the gate says. For the main
+  // loop's idle poll ALONE (main.cpp touchContactDown): the touch INT wakes
+  // only the slice a contact starts in, so a contact sampled once per 50 ms
+  // slice after that would give the Back swipe few samples. Not a touch
+  // event: it neither types nor resets the auto-sleep timer.
+  bool isTouchContactDown() const;
+  // millis() of the controller's latest contact report, 0 before the first
+  // (InputManager::getTouchPoint().timestamp). For the same idle poll: it
+  // keeps polling fast for a moment after the glass goes quiet.
+  unsigned long lastTouchReportMs() const;
+#endif
 
   // --- Host keyboard text entry -------------------------------------------
   //

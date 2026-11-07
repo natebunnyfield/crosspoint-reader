@@ -83,6 +83,17 @@ class MappedInputManager {
   // form rather than behind an #if.
   bool isHostKeyboardVisible() const { return gpio.isHostKeyboardVisible(); }
 
+#if FREEINK_DEVICE_PICCO
+  // BOOX Picco: touch works only while an on-screen keyboard takes it. The
+  // keyboard screens switch it on while their keys are showing and off when
+  // they go; everywhere else every touch query above reads as no touch. See
+  // HalGPIO::setKeyboardTouch for what is gated and why.
+  void setKeyboardTouch(const bool on) const { gpio.setKeyboardTouch(on); }
+  // Ends the current contact for every touch query, the Back swipe included.
+  // A keyboard calls it when a touch has typed a key (HalGPIO::suppressTouchContact).
+  void endTouchContact() const { gpio.suppressTouchContact(); }
+#endif
+
   SwipeDir wasSwipe() const;
   bool wasHomeGesture() const;
   bool wasMenuGesture() const;
@@ -158,6 +169,13 @@ class MappedInputManager {
   bool mapButton(Button button, bool (HalGPIO::*fn)(uint8_t) const) const;
   bool mapButtonInMask(Button button, uint8_t mask) const;
   bool wasBackGesture() const;
+#if FREEINK_DEVICE_PICCO
+  // Runs once per update(): one frame of the contact on the glass into the
+  // gesture decoder (components/PiccoInput.h), and a recognized gesture out as
+  // a synthesized tap on the physical button its logical one maps to
+  // (HalGPIO::injectButtonTap).
+  void synthesizeGesture() const;
+#endif
   // Fetch the pending swipe (if any) and map both endpoints to logical screen coords
   bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;
   bool listItemFromPoint(int x, int y, int& index, int itemCount, int selectedIndex, int listTop, int listHeight,

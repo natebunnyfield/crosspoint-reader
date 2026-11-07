@@ -30,8 +30,9 @@ SIZES = ("12", "14")
 STYLES = ("regular", "bold", "italic", "bolditalic")
 
 # Environments whose output is published. A missing face here is a shipped
-# defect, not a local inconvenience.
-RELEASE_ENVS = ("gh_release", "gh_release_rc")
+# defect, not a local inconvenience. picco-gh_release joined by owner ruling
+# 2026-11-06 ("Add all three"); it is the Picco's published build.
+RELEASE_ENVS = ("gh_release", "gh_release_rc", "picco-gh_release")
 
 FIX = "  lib/EpdFont/scripts/convert-builtin-fonts.sh   (needs lib/EpdFont/local_fonts/)"
 

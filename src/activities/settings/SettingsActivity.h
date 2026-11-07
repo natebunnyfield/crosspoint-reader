@@ -259,6 +259,18 @@ class SettingsActivity final : public Activity {
   void toggleCurrentSetting();
   void rebuildSettingsLists();
 
+#if FREEINK_DEVICE_PICCO
+  // Brightness or Warmth being stepped with the rocker (owner ruling
+  // 2026-11-06, "Two Settings rows"). Confirm on the row starts it, Confirm or
+  // Back ends it; between the two the rocker steps the value and applies it
+  // to the light at once, instead of moving the selection.
+  bool adjustingLight = false;
+  uint8_t adjustStartValue = 0;
+  void loopLightAdjust();
+  void stepLight(bool up);
+  void endLightAdjust();
+#endif
+
  public:
   explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : Activity("Settings", renderer, mappedInput) {}

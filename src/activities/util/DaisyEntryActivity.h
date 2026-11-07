@@ -7,6 +7,9 @@
 #include "KeyboardEntryActivity.h"  // InputType
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
+#if FREEINK_DEVICE_PICCO
+#include "components/KeyboardTouch.h"
+#endif
 
 // Daisywheel text entry per docs/daisywheel.md (ruled 2026-08-04): two rings
 // of 3-char petals around an empty hub; the underlined text field above the
@@ -18,7 +21,10 @@
 // Back cancels the entry. Returns the same KeyboardResult contract as
 // KeyboardEntryActivity so call sites can swap freely via the factory.
 // Buttons only -- no touch handling (ruling 2026-08-05: this fork never
-// supports touch or the X4 Pro).
+// supports touch or the X4 Pro) -- except on the BOOX Picco, where a tap on a
+// slot is rotate-to-that-petal plus its pick and a hold is the held pick
+// (owner 2026-11-05: "make a touch version just for the keyboard on pico";
+// components/KeyboardTouch.h).
 class DaisyEntryActivity : public Activity {
  public:
   explicit DaisyEntryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title = "Enter Text",
@@ -75,6 +81,13 @@ class DaisyEntryActivity : public Activity {
   int labelFontId() const;
   bool columnFits(int lineH) const;
   void slotCenter(int petal, int slot, int& outX, int& outY) const;
+
+#if FREEINK_DEVICE_PICCO
+  kbtouch::HoldRouter wheelTouch;
+  // A tap or hold on a slot, routed into tapPick()/longPick() like a pick
+  // button. True when a slot fired this pass.
+  bool handleWheelTouch();
+#endif
 
   void onComplete(std::string text);
   void onCancel();

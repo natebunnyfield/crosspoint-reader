@@ -12,6 +12,10 @@
 
 #include "HalGPIO.h"
 
+#if FREEINK_DEVICE_PICCO
+#include <HalFrontlight.h>
+#endif
+
 HalPowerManager powerManager;  // Singleton instance
 
 // GPIO13 must stay high during light sleep on the C3 Xteink boards: it controls
@@ -23,6 +27,11 @@ void HalPowerManager::begin() {
   if (BoardConfig::ACTIVE.batteryAdc >= 0) {
     pinMode(BoardConfig::ACTIVE.batteryAdc, INPUT);
   }
+#if FREEINK_DEVICE_PICCO
+  // SGM41562 charger setup: the stock charge voltage and limits for the
+  // Picco's high-voltage cell (upstream 261726f61).
+  if (BatteryMonitor::configureCharger()) LOG_INF("PWR", "Charger configured");
+#endif
   mainLoopTask = xTaskGetCurrentTaskHandle();  // Arduino runs setup() on the loop task
   normalFreq = getCpuFrequencyMhz();
   modeMutex = xSemaphoreCreateMutex();
@@ -66,7 +75,15 @@ void HalPowerManager::setPowerSaving(bool enabled) {
   // Otherwise, no change needed
 }
 
-void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
+void HalPowerManager::startDeepSleep(HalGPIO& gpio, const bool wakeOnHeldButton) const {
+#if FREEINK_DEVICE_PICCO
+  // The frontlight driver and touch share I2C; turn the light off before touch
+  // releases the bus. This also puts the TMA525C to sleep (upstream 261726f61).
+  Frontlight.setOn(false);
+  gpio.prepareForDeepSleep();
+#else
+  (void)wakeOnHeldButton;
+#endif
 #ifdef ENABLE_SERIAL_LOG
   // Tear down HWCDC so the host sees a clean disconnect and the peripheral
   // doesn't hold power domains that interfere with USB-powered GPIO wake.
@@ -92,6 +109,22 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
   }
 #endif
 
+#if FREEINK_DEVICE_PICCO
+  // Hold the Picco's power latch (power.latch0 = GPIO4) HIGH through deep
+  // sleep, as stock does: deepSleep() isolates every pad, and a latch with no
+  // armed hold loses its driver and floats. Upstream runs this loop for every
+  // board; here it is the Picco's alone, so the Sticky's sleep path is the one
+  // it always was. A held pad ignores a new drive, so release it first.
+  for (const int8_t pin : {BoardConfig::ACTIVE.power.latch0, BoardConfig::ACTIVE.power.latch1}) {
+    if (pin < 0) continue;
+    const auto g = static_cast<gpio_num_t>(pin);
+    gpio_hold_dis(g);
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, HIGH);
+    gpio_hold_en(g);
+  }
+#endif
+
   // Cut the gated peripheral rails (touch/SD/EPD on boards like the Sticky) and
   // hold the enables off through deep sleep — otherwise the GT911 and SD card
   // stay powered all through "off" and drain the battery. No-op on boards with
@@ -101,10 +134,58 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
   // guarantees that ordering).
   freeink::PowerManager::powerDownRailsForSleep();
 
+#if FREEINK_DEVICE_PICCO
+  if (wakeOnHeldButton) {
+    freeink::PowerManager::armPowerButtonWakeup();
+    freeink::PowerManager::deepSleep();
+  }
+#endif
   // Waits for the power button to be physically released (so holding it doesn't
   // immediately wake the device again), then arms the wake source and sleeps.
   freeink::PowerManager::deepSleepUntilPowerButton();
 }
+
+#if FREEINK_DEVICE_PICCO
+// ponytail: 30 s poll; the SGM41562 status is I2C-only, so USB unplug and
+// charge progress are only seen when the timer fires.
+static constexpr uint64_t USB_HOLD_POLL_US = 30ULL * 1000 * 1000;
+
+bool HalPowerManager::holdWhileUsbPowered(HalGPIO& gpio, void (*onStatus)(bool charging, uint16_t percent)) const {
+  // Electrical power only, not isUsbConnected(): see isUsbPowerPresent().
+  if (!gpio.isUsbPowerPresent()) return false;
+  LOG_DBG("PWR", "USB power present, holding in light sleep");
+  const auto powerPin = static_cast<gpio_num_t>(BoardConfig::ACTIVE.input.power);
+  // The press that requested sleep may still be down; it must not end the hold.
+  while (digitalRead(powerPin) == LOW) delay(10);  // Picco power button is active-low
+  const BatteryMonitor battery;
+  int lastCharging = -1;
+  int lastPercent = -1;
+  while (gpio.isUsbPowerPresent()) {
+    const bool charging = battery.isCharging();
+    const uint16_t percent = getBatteryPercentage();
+    if (static_cast<int>(charging) != lastCharging || percent != lastPercent) {
+      lastCharging = charging;
+      lastPercent = percent;
+      onStatus(charging, percent);
+    }
+    // No sleepMutex here, as upstream: this runs on the loop task inside
+    // enterDeepSleep(), so lightSleep() cannot run concurrently, and the only
+    // other sleeper, onEinkBusyWaitSlice(), runs (if at all) inside onStatus()'s
+    // refresh on this same task and disarms before it returns.
+    esp_sleep_enable_timer_wakeup(USB_HOLD_POLL_US);
+    gpio_wakeup_enable(powerPin, GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+    esp_light_sleep_start();
+    gpio_wakeup_disable(powerPin);
+    // gpio_wakeup_disable() keeps the LOW_LEVEL type, and a later pinMode() would
+    // enable it as an interrupt that storms while the button is held.
+    gpio_set_intr_type(powerPin, GPIO_INTR_DISABLE);
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+    if (digitalRead(powerPin) == LOW) return true;
+  }
+  return false;
+}
+#endif
 
 bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
   // A performance Lock means a render (or similar) task is mid-flight; light sleep
@@ -145,6 +226,25 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
                        BoardConfig::ACTIVE.input.powerActiveHigh ? GPIO_INTR_HIGH_LEVEL : GPIO_INTR_LOW_LEVEL);
     esp_sleep_enable_gpio_wakeup();
   }
+#if FREEINK_DEVICE_PICCO
+  // The TMA525C's INT is armed the same way, so a touch-down wakes the slice
+  // at once instead of waiting up to 50 ms to be polled (owner ruling
+  // 2026-11-06, "so short taps after idle are not missed"). INT is active
+  // low, and low means a report is pending (freeink-sdk InputManager.cpp:1212,
+  // BoardConfig.h:1468). Armed only when INT is high at entry: a pending
+  // report (or a line stuck low) would otherwise wake every slice at once and
+  // spin; that slice keeps the timer-only cadence instead, which is the
+  // behavior before this change. Like the Power wake, it is only
+  // an early poll: the gesture decoder still decides what the contact was.
+  // Idle cost is zero while INT stays high. UNCONFIRMED on device: whether
+  // INT also pulses with no finger on the glass.
+  const int8_t touchIrq = BoardConfig::ACTIVE.touch.irq;
+  const bool touchWake = touchIrq >= 0 && gpio_get_level(static_cast<gpio_num_t>(touchIrq)) != 0;
+  if (touchWake) {
+    gpio_wakeup_enable(static_cast<gpio_num_t>(touchIrq), GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+  }
+#endif
 
   // The C3 flash-leakage workaround pulls its DIO-unused SPIWP pad low during
   // light sleep. Hold GPIO13 high only on the X3/X4 boards that use that pad as
@@ -169,6 +269,12 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
     gpio_wakeup_disable(static_cast<gpio_num_t>(powerPin));
     gpio_set_intr_type(static_cast<gpio_num_t>(powerPin), GPIO_INTR_DISABLE);
   }
+#if FREEINK_DEVICE_PICCO
+  if (touchWake) {
+    gpio_wakeup_disable(static_cast<gpio_num_t>(touchIrq));
+    gpio_set_intr_type(static_cast<gpio_num_t>(touchIrq), GPIO_INTR_DISABLE);
+  }
+#endif
 
   xSemaphoreGive(sleepMutex);
 

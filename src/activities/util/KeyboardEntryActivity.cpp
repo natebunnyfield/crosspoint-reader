@@ -177,10 +177,17 @@ void KeyboardEntryActivity::onEnter() {
   // it raises that host's keyboard (a phone's on-screen one) and takes the
   // keyboard off the button map for as long as we are here.
   mappedInput.setTextEntryActive(true);
+#if FREEINK_DEVICE_PICCO
+  // The one place the Picco takes touch: this keyboard, while it is up.
+  mappedInput.setKeyboardTouch(true);
+#endif
   requestUpdate();
 }
 
 void KeyboardEntryActivity::onExit() {
+#if FREEINK_DEVICE_PICCO
+  mappedInput.setKeyboardTouch(false);
+#endif
   mappedInput.setTextEntryActive(false);
   Activity::onExit();
 }
@@ -579,11 +586,22 @@ bool KeyboardEntryActivity::cursorPositionFromPoint(const int x, const int y, si
   return false;
 }
 
+#if FREEINK_DEVICE_PICCO
+fui::Rect KeyboardEntryActivity::keyboardRect() const { return keyboardRectFor(currentLayout()); }
+
+fui::Rect KeyboardEntryActivity::keyboardRectFor(const fui::KeyboardLayout& layout) const {
+#else
 fui::Rect KeyboardEntryActivity::keyboardRect() const {
+#endif
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
+  // Spelled per board so the others compile exactly what they did.
+#if FREEINK_DEVICE_PICCO
+  const int rows = layout.rowCount;
+#else
   const int rows = currentLayout().rowCount;
+#endif
   const int gap = metrics.keyboardKeySpacing;
   const int height = rows * metrics.keyboardKeyHeight + (rows > 1 ? (rows - 1) * gap : 0);
   const int width = pageWidth * metrics.keyboardWidthPercent / 100;
@@ -659,23 +677,70 @@ void KeyboardEntryActivity::loop() {
     int hy = 0;
     const bool inContact = mappedInput.isScreenTouchHeld(hx, hy);
 
+#if FREEINK_DEVICE_PICCO
+    // Rebuilt only when there is a point to route; the router's own drift
+    // reset (no contact left) needs no table. Against the layer on glass:
+    // interactionsReady says render() has drawn one, and published it first.
+    const fui::KeyboardLayout* drawn = drawnLayout.load();
+    if ((pressedDown || tapped) && drawn) {
+      kbtouch::buildKeyHits(touchHits, keyboardRectFor(*drawn), touchKeyProps(*drawn),
+                            static_cast<int16_t>(renderer.getScreenWidth()),
+                            static_cast<int16_t>(renderer.getScreenHeight()));
+    }
+    auto& routeTable = touchHits;
+#else
+    auto& routeTable = interactions;
+#endif
     const fui::TouchHoldRouter::Result result =
-        touchRouter.update(interactions, pressedDown, static_cast<int16_t>(tx), static_cast<int16_t>(ty), tapped,
+        touchRouter.update(routeTable, pressedDown, static_cast<int16_t>(tx), static_cast<int16_t>(ty), tapped,
                            static_cast<int16_t>(tapX), static_cast<int16_t>(tapY), inContact, millis());
     if (result.event) {
+#if FREEINK_DEVICE_PICCO
+      // The contact that typed is over: it cannot also end as a Back swipe
+      // (a hold fires while the finger is still down, so it could otherwise).
+      mappedInput.endTouchContact();
+      // The key was found on the layer on glass. If a key press has changed
+      // the layer since (Shift, the symbols key) and the redraw is still
+      // pending, the current layer may not have it: type nothing, rather than
+      // a key the screen does not show. Shift, Del, Space and OK carry one
+      // value on every QWERTY layer that has them, so they still act.
+      if (!syncSelectionToValue(result.event.value)) return;
+      // No clear-all from a touch hold on Del (kbtouch::touchHoldKeepsLongPress):
+      // it deletes one character, as a tap does.
+      const bool longPress =
+          result.event.longPress && drawn && kbtouch::touchHoldKeepsLongPress(*drawn, result.event.value);
+      if (grid13) syncAnchorToSelection();  // touch jump: anchor = tapped key's center
+      if (activateValue(result.event.value, longPress)) {
+#else
       syncSelectionToValue(result.event.value);
       if (grid13) syncAnchorToSelection();  // touch jump: anchor = tapped key's center
       if (activateValue(result.event.value, result.event.longPress)) {
+#endif
         requestUpdate();
       }
       return;
     }
+#if !FREEINK_DEVICE_PICCO
+    // Touch-down feedback: repaint so the key under the finger draws pressed.
+    // Not on the Picco, where render()'s table never routes a touch, so that
+    // repaint would draw the same screen again: a tap costs the one refresh a
+    // Confirm press costs, and no key is ever shown pressed.
     if (result.activeChanged) {
       requestUpdate();
     }
+#endif
+#if FREEINK_DEVICE_PICCO
+    // The buttons stand down only while a finger is on a KEY (the press a tap
+    // or hold may still come from). A finger resting anywhere else, or a tap
+    // that landed on no key, leaves every button working.
+    if (pressedDown && routeTable.activeIndex() >= 0) {
+      return;
+    }
+#else
     if (pressedDown || tapped) {
       return;
     }
+#endif
   }
 
   if (!cursorMode && mappedInput.wasPressed(MappedInputManager::Button::Up)) {
@@ -1133,7 +1198,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
   const fui::DeviceContext device = target.deviceContext();
   const fui::InputSnapshot noInput{};
-  fui::Frame<64> frame(target, device, noInput, interactions);
+  fui::Frame<KEY_SLOTS> frame(target, device, noInput, interactions);
 
   fui::KeyboardProps props;
   const fui::KeyboardLayout& layout = currentLayout();
@@ -1149,6 +1214,9 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   props.selectedIndex = cursorMode ? -1 : static_cast<int16_t>(selectedLogicalIndex());
   props.labelText.font = fui::GfxRendererTarget::FONT_BODY;
   props.altText.font = fui::GfxRendererTarget::FONT_SMALL;
+  // Key GEOMETRY (layout, keyAction, inputMask, gap, padding,
+  // bottomHitOverflow): the Picco's touch hit pass copies these in
+  // touchKeyProps(), below. Change both together.
   props.gap = static_cast<int16_t>(metrics.keyboardKeySpacing);
   props.padding = fui::Insets{0, 0, 0, 0};
   // Fingers land low on the bottom row (occlusion) and there is no key below
@@ -1156,6 +1224,9 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   const int hintsTop = renderer.getScreenHeight() - metrics.buttonHintsHeight;
   props.bottomHitOverflow = static_cast<int16_t>(std::max(0, hintsTop - (kbRect.y + kbRect.height)));
   fui::keyboard(frame, kbRect, props);
+#if FREEINK_DEVICE_PICCO
+  drawnLayout.store(&layout);  // before the flag: loop() reads them in that order
+#endif
   interactionsReady = true;
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
@@ -1163,6 +1234,25 @@ void KeyboardEntryActivity::render(RenderLock&&) {
 
   renderer.displayBuffer();
 }
+
+#if FREEINK_DEVICE_PICCO
+// The props render() lays the keys out with, minus everything that only draws
+// (labels, fonts, the selection). A copy rather than a shared helper so the
+// other boards' render() compiles exactly as it did; keep the two in step.
+fui::KeyboardProps KeyboardEntryActivity::touchKeyProps(const fui::KeyboardLayout& layout) const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const fui::Rect kbRect = keyboardRectFor(layout);
+  fui::KeyboardProps props;
+  props.layout = &layout;
+  props.keyAction = ACTION_KEY;
+  props.inputMask = static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress);
+  props.gap = static_cast<int16_t>(metrics.keyboardKeySpacing);
+  props.padding = fui::Insets{0, 0, 0, 0};
+  const int hintsTop = renderer.getScreenHeight() - metrics.buttonHintsHeight;
+  props.bottomHitOverflow = static_cast<int16_t>(std::max(0, hintsTop - (kbRect.y + kbRect.height)));
+  return props;
+}
+#endif
 
 void KeyboardEntryActivity::onComplete(std::string text) {
   setResult(KeyboardResult{std::move(text)});

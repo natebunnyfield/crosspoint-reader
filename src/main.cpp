@@ -29,6 +29,11 @@
 #include "activities/boot_sleep/SleepScreenPolicy.h"
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "activities/settings/SdFirmwareUpdateActivity.h"
+#endif
+// The Picco builds with CROSSPOINT_NO_DEVICE_FLASH (one app slot, nothing to
+// flash into) but still confirms a pending boot: see the call at the end of
+// setup().
+#if !defined(CROSSPOINT_NO_DEVICE_FLASH) || FREEINK_DEVICE_PICCO
 #include "network/OtaCommit.h"
 #endif
 #include "components/UITheme.h"
@@ -36,6 +41,15 @@
 #include "images/LoadingIcon.h"
 #include "util/ButtonNavigator.h"
 #include "util/LowBatteryGuard.h"
+
+#if FREEINK_DEVICE_PICCO
+#include <HalFrontlight.h>
+#include <esp_heap_caps.h>
+
+#include "components/PiccoInput.h"
+#include "network/FirmwareBoardTag.h"
+#include "util/SlideSwitch.h"
+#endif
 
 GfxRenderer renderer(display);
 MappedInputManager mappedInputManager(gpio, renderer);
@@ -662,6 +676,76 @@ static bool loadSleepFrameBuffer() {
   return true;
 }
 
+#if FREEINK_DEVICE_PICCO
+// BOOX Picco (upstream 261726f61, 8f4d035cb). Applies the slide switch's
+// position to the bound function at boot, on each change, and when its binding
+// changes; the physical position stays the source of truth, as on stock.
+static void handleSlideSwitch() {
+  static int appliedAction = -1;
+  static int appliedOn = -1;
+  if (!gpio.hasToggleSwitch()) return;
+  // Compare the position, not the change edge: transfer loops poll input and
+  // clear the edge before this runs.
+  const bool on = gpio.isToggleSwitchOn();
+  if (appliedAction == SETTINGS.slideSwitchAction && appliedOn == static_cast<int>(on)) return;
+  appliedAction = SETTINGS.slideSwitchAction;
+  appliedOn = on;
+  switch (SETTINGS.slideSwitchAction) {
+    case CrossPointSettings::SLIDE_SWITCH_NIGHT_MODE:
+      // This fork's night mode is Dark Mode, and it reaches the panel only
+      // through setInverted(), exactly as the Settings row pushes it.
+      if ((SETTINGS.darkMode != 0) == on) return;
+      SETTINGS.darkMode = on ? 1 : 0;
+      display.setInverted(on);
+      break;
+    default:
+      // Also compare the saved state: setup() lit the light from the switch
+      // without updating it.
+      if (!Frontlight.present() || (Frontlight.isOn() == on && (SETTINGS.frontlightOn != 0) == on)) return;
+      Frontlight.setOn(on);
+      SETTINGS.frontlightOn = on ? 1 : 0;
+      break;
+  }
+  SETTINGS.saveToFile();
+  activityManager.requestUpdate();
+  LOG_INF("SWITCH", "Slide switch %s", on ? "on" : "off");
+}
+
+// Charge strip along the bottom of the retained sleep screen.
+static void drawSleepChargeStrip(const bool charging, const uint16_t percent) {
+  RenderLock lock;
+  const int h = renderer.getLineHeight(SMALL_FONT_ID) + 12;
+  const int y = renderer.getScreenHeight() - h;
+  renderer.fillRect(0, y, renderer.getScreenWidth(), h, false);
+  char text[48];
+  snprintf(text, sizeof(text), "%s  %u%%", charging ? tr(STR_CHARGING) : tr(STR_CHARGED), percent);
+  renderer.drawCenteredText(SMALL_FONT_ID, y + 6, text);
+  renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+}
+
+// Shows the charge strip while the power HAL holds sleep on USB power, and
+// removes it again if USB goes away. Returns true when the power button ended
+// the hold.
+static bool holdSleepWhileUsbPowered() {
+  if (!gpio.isUsbPowerPresent()) return false;
+  // Keep the sleep frame so unplugging can remove the strip. 48 KB of PSRAM,
+  // freed when the hold ends.
+  const size_t frameSize = renderer.getBufferSize();
+  auto* const sleepFrame = static_cast<uint8_t*>(heap_caps_malloc(frameSize, MALLOC_CAP_SPIRAM));
+  if (sleepFrame) memcpy(sleepFrame, renderer.getFrameBuffer(), frameSize);
+  const bool buttonPressed = powerManager.holdWhileUsbPowered(gpio, drawSleepChargeStrip);
+  if (sleepFrame) {
+    if (!buttonPressed) {
+      RenderLock lock;
+      memcpy(renderer.getFrameBuffer(), sleepFrame, frameSize);
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+    }
+    heap_caps_free(sleepFrame);
+  }
+  return buttonPressed;
+}
+#endif
+
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout = false) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
@@ -693,10 +777,27 @@ void enterDeepSleep(bool fromTimeout = false) {
     WiFi.mode(WIFI_OFF);
   }
 
+#if FREEINK_DEVICE_PICCO
+  // The I2C LED driver keeps its state through deep sleep; switch it off here
+  // (SETTINGS.frontlightOn keeps the preference for restore-on-wake). Then, on
+  // USB power, hold in light sleep with the charge strip until the cable goes
+  // or the power button is pressed. Both need the panel awake, so they run
+  // before display.deepSleep().
+  Frontlight.setOn(false);
+  const bool wakeOnHeldButton = holdSleepWhileUsbPowered();
+#endif
+
   display.deepSleep();
+#if FREEINK_DEVICE_PICCO
+  Storage.prepareForDeepSleep();
+#endif
   LOG_DBG("MAIN", "Entering deep sleep");
 
+#if FREEINK_DEVICE_PICCO
+  powerManager.startDeepSleep(gpio, wakeOnHeldButton);
+#else
   powerManager.startDeepSleep(gpio);
+#endif
 }
 
 void setupDisplayAndFonts(bool seamless = false) {
@@ -914,19 +1015,44 @@ void setup() {
   ButtonNavigator::setMappedInputManager(mappedInputManager);
 
   const auto wakeupReason = gpio.getWakeupReason();
+
+#if FREEINK_DEVICE_PICCO
+  // Brightness and warmth are always restored. A normal wake starts with the
+  // light off unless Restore Light on Wake is enabled; a slide switch bound to
+  // the light decides it from its position instead (upstream 261726f61,
+  // 8f4d035cb). Upstream also replays the live state across a silent
+  // heap-defrag reboot; this fork's silent restart carries no payload for it,
+  // so such a reboot takes the wake rule above.
+  const bool restoreLightOn = slideSwitchOwnsLight()
+                                  ? gpio.isToggleSwitchOn()
+                                  : (SETTINGS.frontlightOn != 0 && SETTINGS.frontlightRestoreOnWake != 0);
+  Frontlight.begin(SETTINGS.frontlightBrightness, SETTINGS.frontlightWarmth, restoreLightOn);
+#endif
+
   switch (wakeupReason) {
     case HalGPIO::WakeupReason::PowerButton:
       LOG_DBG("MAIN", "Verifying power button press duration");
       if (!gpio.verifyPowerButtonWakeup(SETTINGS.getPowerButtonDuration(),
                                         SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP)) {
+#if FREEINK_DEVICE_PICCO
+        // Plugging in USB pulses the Picco's wake line; power on, as stock does.
+        if (gpio.isUsbPowerPresent()) break;
+        Storage.prepareForDeepSleep();
+#endif
         powerManager.startDeepSleep(gpio);
       }
       break;
     case HalGPIO::WakeupReason::AfterUSBPower:
-      // If USB power caused a cold boot, go back to sleep
       LOG_DBG("MAIN", "Wakeup reason: After USB Power");
+#if FREEINK_DEVICE_PICCO
+      // The Picco stays up after a USB-powered cold boot so native USB stays
+      // available, as upstream keeps it (and the X4 Pro and others) awake.
+      break;
+#else
+      // If USB power caused a cold boot, go back to sleep
       powerManager.startDeepSleep(gpio);
       break;
+#endif
     case HalGPIO::WakeupReason::AfterFlash:
       // After flashing, just proceed to boot
     case HalGPIO::WakeupReason::Other:
@@ -982,6 +1108,13 @@ void setup() {
   // refresh from FAST to HALF (~1.7s, FreeInkDisplay.cpp:573-575). Only on the
   // boot that turns it on — a light-mode device sets false over false, which the
   // SDK drops as a no-op.
+#if FREEINK_DEVICE_PICCO
+  // Apply a switch moved during sleep before the first paint, so the wake
+  // screen does not draw in the old dark mode and then repaint. After
+  // setupDisplayAndFonts(), unlike upstream, because the dark-mode binding
+  // pushes polarity into the display driver, which must be up for that.
+  handleSlideSwitch();
+#endif
   display.setInverted(SETTINGS.darkMode != 0);
 
   switch (resume) {
@@ -1134,8 +1267,25 @@ void setup() {
   //
   // Gated with the include above: a build that cannot flash a partition has no
   // OTA image to confirm, and on iOS the whole update screen is excluded.
-#ifndef CROSSPOINT_NO_DEVICE_FLASH
+  //
+  // The Picco is the exception to that gate. It builds without device flashing
+  // (one app slot), but its image is installed into the stock ota_0 slot by an
+  // outside tool -- `pio run -e picco -t upload`, or the stock web flasher's
+  // "OTA update" mode -- and if that tool leaves the slot PENDING_VERIFY under
+  // a stock bootloader with rollback enabled, an unconfirmed boot would fall
+  // back to the `safeboot` partition on the next reset. Confirming is a no-op
+  // in every other state, so it costs nothing to keep.
+#if !defined(CROSSPOINT_NO_DEVICE_FLASH) || FREEINK_DEVICE_PICCO
   ota_commit::confirmBootIfPending();
+#endif
+
+#if FREEINK_DEVICE_PICCO
+  // Keep the board tag in the Picco image. With CROSSPOINT_NO_DEVICE_FLASH
+  // nothing else reads board_tag::TAG, so --gc-sections dropped it and a Sticky
+  // would accept a Picco bin from SD or WebDAV (its validator only refuses a tag
+  // naming another board). A volatile load cannot be optimized away; this
+  // toolchain ignores __attribute__((retain)).
+  static_cast<void>(*static_cast<const volatile char*>(board_tag::TAG));
 #endif
 }
 
@@ -1149,6 +1299,26 @@ static void delayWallClock(const unsigned long ms) {
   }
 }
 
+// Picco: a finger on the glass keeps the idle loop at the 100 Hz delay-poll.
+// Touch is not user activity there outside keyboards (HalGPIO::wasTouchActivity),
+// so a left-edge Back swipe on Home or in the reader arrives in light-sleep idle.
+// The touch INT wakes the slice the contact starts in (HalPowerManager::lightSleep),
+// but polled at 50 ms after that the swipe's few samples can fall short of the
+// left-edge and 60 px tests. Not activity: the sleep timer is untouched.
+// A RECOGNIZED gesture is activity, though: it arrives as a synthesized press
+// (HalGPIO::injectButtonTap), which the wasAnyPressed() check in loop() sees.
+// The fast poll also runs for CONTACT_FAST_POLL_MS after the controller's last
+// contact report, so the next tap of a run is sampled at 100 Hz from its first
+// report rather than up to a slice late (review minor, 2026-11-06). The first
+// tap after a long idle is the INT wake's: nothing has reported yet.
+static bool touchContactDown() {
+#if FREEINK_DEVICE_PICCO
+  return piccoinput::pollFast(gpio.isTouchContactDown(), millis(), gpio.lastTouchReportMs());
+#else
+  return false;
+#endif
+}
+
 void loop() {
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
@@ -1160,6 +1330,12 @@ void loop() {
   // settles the post-swap swallow's per-frame state at the frame boundary
   // (input-edge audit 2026-08-21, finding 6).
   mappedInputManager.update();
+
+#if FREEINK_DEVICE_PICCO
+  // Saves settings to the SD card when the switch moves; cheap otherwise (two
+  // compares against the debounced position).
+  handleSlideSwitch();
+#endif
 
   renderer.setFadingFix(SETTINGS.fadingFix);
 
@@ -1212,6 +1388,20 @@ void loop() {
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
+#if FREEINK_DEVICE_PICCO
+  // On USB power the Picco does not sleep on the idle timer: its sleep, even
+  // with the cable in, light-sleeps the chip (holdSleepWhileUsbPowered), and
+  // a sleeping Picco answers no USB-Serial/JTAG reset, so it could not be
+  // reflashed until someone pressed Power (2026-11-06, esptool "No serial
+  // data received"). The timer restarts instead, so after unplugging it runs
+  // a full timeout at most. The screen simply stays as it was. Power still
+  // sleeps on demand; the main-loop light sleep already stands down on USB
+  // (HalPowerManager::lightSleep). Battery sleep is unchanged.
+  if (sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs && gpio.isUsbConnectedCached()) {
+    LOG_DBG("SLP", "Idle timeout on USB power: staying awake");
+    lastActivityTime = millis();
+  }
+#endif
   if (sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep(true);
@@ -1283,11 +1473,13 @@ void loop() {
       // also runs at normal clock, but that only happens when USB (externally
       // powered), WiFi, or a render Lock (full speed wanted anyway) is active.
       powerManager.setPowerSaving(false);
-      if (gpio.isDebouncePending()) {
+      if (gpio.isDebouncePending() || touchContactDown()) {
         // A raw button-state change is mid-debounce: commitment needs a second
         // matching sample, so poll again quickly instead of sleeping a slice —
         // a tap shorter than the 50 ms cadence would otherwise land in a single
         // sample and be dropped, and every press would commit a slice late.
+        // A touch contact on the Picco polls fast for the same reason
+        // (touchContactDown above).
         delayWallClock(10);
       } else if (!powerManager.lightSleep(gpio)) {
         // Light sleep declined = a render Lock, USB, or WiFi is active — the

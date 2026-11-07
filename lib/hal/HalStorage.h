@@ -16,6 +16,12 @@ class HalStorage {
   HalStorage();
   bool begin();
   bool ready() const;
+#if FREEINK_DEVICE_PICCO
+  // Flush SdFat's cached FAT/directory sectors, end the SDMMC host and float the
+  // bus pads before deep sleep (upstream 4a679d5d4, which the Picco's sleep
+  // path calls). Picco-only here: the fork's other boards sleep as before.
+  void prepareForDeepSleep();
+#endif
   std::vector<String> listFiles(const char* path = "/", int maxFiles = 200);
   // Read the entire file at `path` into a String. Returns empty string on failure.
   String readFile(const char* path);

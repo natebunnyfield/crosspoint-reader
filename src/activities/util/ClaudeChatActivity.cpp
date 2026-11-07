@@ -133,6 +133,9 @@ void ClaudeChatActivity::applyLayout() {
 }
 
 void ClaudeChatActivity::onExit() {
+#if FREEINK_DEVICE_PICCO
+  mappedInput.setKeyboardTouch(false);
+#endif
   mappedInput.setTextEntryActive(false);
   blekbd::end();
   buf.reset();
@@ -340,6 +343,34 @@ void ClaudeChatActivity::handlePanelKey(const int slot, const bool longPress) {
   requestUpdate();
 }
 
+#if FREEINK_DEVICE_PICCO
+bool ClaudeChatActivity::handlePanelTouch() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int screenW = renderer.getScreenWidth();
+  // The rect render() hands panel.render().
+  const notes::KeyboardPanel::TouchKey key =
+      panel.routeTouch(kbtouch::readTouch(mappedInput), millis(), metrics.contentSidePadding, panelTop,
+                       screenW - metrics.contentSidePadding * 2, panelHeight, screenW, renderer.getScreenHeight());
+  if (!key.fired) return false;
+  // The contact that typed is over: it cannot also end as a Back swipe (a
+  // hold fires while the finger is still down, so it could otherwise).
+  mappedInput.endTouchContact();
+  // loop() returns on a fired touch before the pick tracker runs, so a pick
+  // button released in this same pass is never seen, and an armed pick would
+  // stay armed: the next press would read its hold from the old press time and
+  // fire the LONG action at once. The touch took this key; disarm the button.
+  pickSlot = -1;
+  pickFired = false;
+  int slot = -1;
+  {
+    RenderLock lock;  // the selection is what render() draws
+    slot = panel.selectTouched(key.id);
+  }
+  if (slot >= 0) handlePanelKey(slot, key.longPress);
+  return true;
+}
+#endif
+
 void ClaudeChatActivity::loop() {
   // A host keyboard can rise or fall at any moment -- the owner taps the chip,
   // or dismisses from the keyboard's own bar -- and the panel band depends on
@@ -362,6 +393,16 @@ void ClaudeChatActivity::loop() {
     }
     requestUpdate();
   }
+
+#if FREEINK_DEVICE_PICCO
+  // Touch types on the panel's keys and nowhere else: only in the prompt view,
+  // the one that draws the panel, and only with a buffer to type into.
+  {
+    const bool keysTakeTouch = view == View::Prompt && !panelHidden && !oomFailed && buf;
+    mappedInput.setKeyboardTouch(keysTakeTouch);
+    if (!keysTakeTouch) panel.resetTouch();
+  }
+#endif
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     if (view == View::Answer) {  // Back from an answer returns to the prompt
@@ -417,6 +458,9 @@ void ClaudeChatActivity::loop() {
   if (oomFailed || !buf) return;  // Back above is the only thing that works
 
   if (view == View::Prompt) {
+#if FREEINK_DEVICE_PICCO
+    if (handlePanelTouch()) return;
+#endif
     // Confirm types the selected key; the panel's OK key is what asks Claude.
     // Confirm was "Ask" before the on-screen keyboard existed — with a keyboard
     // on screen it has to be the type key, or there is no way to type at all.
