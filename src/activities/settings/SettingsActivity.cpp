@@ -85,6 +85,19 @@ bool isFrontlightToggle(const SettingInfo& setting) {
 #endif
 
 void SettingsActivity::rebuildSettingsLists() {
+#if FREEINK_DEVICE_PICCO
+  // The selected row, so the selection can follow it when this rebuild adds
+  // or drops rows above it. Flipping the Slide Switch row does both (Dark Mode
+  // goes, Frontlight and Restore Light on Wake come, or the reverse), and the
+  // bare index then pointed at another row: going to Dark Mode left it on
+  // Wi-Fi Networks, so a second Confirm opened Wi-Fi. A row is the pair
+  // (valuePtr, nameId): actions carry no valuePtr, and nameId alone would do
+  // for every row this list holds today, but the pair costs nothing more.
+  const bool hadSelection =
+      selectedSettingIndex >= 0 && selectedSettingIndex < static_cast<int>(deviceSettings.size());
+  const StrId selectedName = hadSelection ? deviceSettings[selectedSettingIndex].nameId : StrId::STR_NONE_OPT;
+  uint8_t CrossPointSettings::* selectedValue = hadSelection ? deviceSettings[selectedSettingIndex].valuePtr : nullptr;
+#endif
   deviceSettings.clear();
 
   // Pick up any fonts uploaded/deleted over the web server since the last
@@ -209,6 +222,15 @@ void SettingsActivity::rebuildSettingsLists() {
   // selectable from Reader Font.
 
   settingsCount = static_cast<int>(deviceSettings.size());
+#if FREEINK_DEVICE_PICCO
+  // Back onto the same row if it is still listed; otherwise the clamp below.
+  for (int i = 0; hadSelection && i < settingsCount; i++) {
+    if (deviceSettings[i].nameId == selectedName && deviceSettings[i].valuePtr == selectedValue) {
+      selectedSettingIndex = i;
+      break;
+    }
+  }
+#endif
   if (selectedSettingIndex >= settingsCount) {
     selectedSettingIndex = settingsCount > 0 ? settingsCount - 1 : 0;
   }
