@@ -52,9 +52,12 @@ bool isRockerStepped(const SettingInfo& setting) {
 // them on the web page. Beside the two light rows, Restore Light on Wake and
 // Slide Switch (owner ruling 2026-11-06, "Add both rows"); both take the
 // generic row path, a toggle and a two-choice enum that flips in place, and
-// main.cpp handleSlideSwitch() applies a new binding on the next loop.
+// main.cpp handleSlideSwitch() applies a new binding on the next loop. And
+// Frontlight on/off ("Add the row then"), which toggleCurrentSetting() handles
+// itself because it drives the light, not just the stored byte.
 bool isPiccoDeviceRow(const SettingInfo& setting) {
-  return isRockerStepped(setting) || setting.valuePtr == &CrossPointSettings::frontlightRestoreOnWake ||
+  return isRockerStepped(setting) || setting.valuePtr == &CrossPointSettings::frontlightOn ||
+         setting.valuePtr == &CrossPointSettings::frontlightRestoreOnWake ||
          setting.valuePtr == &CrossPointSettings::slideSwitchAction;
 }
 
@@ -64,9 +67,19 @@ bool isPiccoDeviceRow(const SettingInfo& setting) {
 // position (main.cpp setup(), restoreLightOn), so the row would do nothing.
 // Upstream's rule, word for word: SettingsList.h isHiddenOnDevice,
 // STR_RESTORE_LIGHT_ON_WAKE: `!Frontlight.present() || slideSwitchOwnsLight()`.
+// Frontlight on/off follows the same rule ("Add the row then": hidden while the
+// switch owns the light), as upstream's reader-menu light toggle does
+// (EpubReaderMenuActivity.cpp:83, `Frontlight.present() && !slideSwitchOwnsLight()`).
 bool isHiddenLightRow(const SettingInfo& setting) {
-  if (setting.valuePtr != &CrossPointSettings::frontlightRestoreOnWake) return false;
+  if (setting.valuePtr != &CrossPointSettings::frontlightRestoreOnWake &&
+      setting.valuePtr != &CrossPointSettings::frontlightOn) {
+    return false;
+  }
   return !Frontlight.present() || slideSwitchOwnsLight();
+}
+
+bool isFrontlightToggle(const SettingInfo& setting) {
+  return setting.type == SettingType::TOGGLE && setting.valuePtr == &CrossPointSettings::frontlightOn;
 }
 }  // namespace
 #endif
@@ -93,7 +106,9 @@ void SettingsActivity::rebuildSettingsLists() {
 #if FREEINK_DEVICE_PICCO
     // Plus the Picco's frontlight and slide-switch rows (isPiccoDeviceRow),
     // which arrive in getSettingsList() order after Clock UTC Offset:
-    // Brightness, Warmth, Restore Light on Wake, Slide Switch.
+    // Brightness, Warmth, Frontlight, Restore Light on Wake, Slide Switch
+    // (Frontlight and Restore Light on Wake only while the switch is bound to
+    // Dark Mode, isHiddenLightRow).
     if (setting.category != StrId::STR_CAT_SYSTEM && !isPiccoDeviceRow(setting)) continue;
 #else
     if (setting.category != StrId::STR_CAT_SYSTEM) continue;
@@ -383,6 +398,18 @@ void SettingsActivity::toggleCurrentSetting() {
     adjustStartValue = SETTINGS.*(setting.valuePtr);
     return;
   }
+  if (isFrontlightToggle(setting)) {
+    // Upstream's toggleFrontlight() (main.cpp) and reader-menu toggle: flip the
+    // light as it actually is and save that as the preference. Not the generic
+    // byte flip: after a wake with Restore Light on Wake off, frontlightOn can
+    // read 1 while the light is off, and flipping the byte would take two
+    // presses to light it. The row's value column reads the light too (render).
+    const bool lightOn = !Frontlight.isOn();
+    Frontlight.setOn(lightOn);
+    SETTINGS.frontlightOn = lightOn ? 1 : 0;
+    SETTINGS.saveToFile();
+    return;
+  }
 #endif
 
   if (setting.nameId == StrId::STR_EDITOR_FONT) {
@@ -589,6 +616,10 @@ void SettingsActivity::render(RenderLock&&) {
         // The row being stepped says so in its value column; the row style
         // is otherwise the list's own.
         if (i == adjustingRow) return "< " + settingrow::valueText(setting) + " >";
+        // The light as it is, which is what Confirm flips (toggleCurrentSetting).
+        if (isFrontlightToggle(setting)) {
+          return std::string(I18N.get(Frontlight.isOn() ? StrId::STR_STATE_ON : StrId::STR_STATE_OFF));
+        }
 #endif
         // The stored byte here is a biased quarter-hour count; show the offset
         // it means, using the same helper the picker does. Every other row is
