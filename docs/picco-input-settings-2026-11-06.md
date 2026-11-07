@@ -3,7 +3,9 @@
 Branch `picco-a`, from 1d623d68c; SDK `picco-a-sdk` 5f34795 (unchanged).
 The port's running record is `docs/picco-port-2026-11-05.md` in the PRIMARY
 checkout (untracked there, absent from this branch); this file is the record
-for this build and should get a one-line pointer from it.
+for this build and should get a one-line pointer from it. The next build
+(light rows follow the slide switch, selection fix, three build gates) is
+`docs/picco-light-rows-gates-2026-11-06.md`.
 
 ## What changed, by ruling
 
