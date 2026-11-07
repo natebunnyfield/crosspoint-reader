@@ -226,6 +226,25 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
                        BoardConfig::ACTIVE.input.powerActiveHigh ? GPIO_INTR_HIGH_LEVEL : GPIO_INTR_LOW_LEVEL);
     esp_sleep_enable_gpio_wakeup();
   }
+#if FREEINK_DEVICE_PICCO
+  // The TMA525C's INT is armed the same way, so a touch-down wakes the slice
+  // at once instead of waiting up to 50 ms to be polled (owner ruling
+  // 2026-11-06, "so short taps after idle are not missed"). INT is active
+  // low, and low means a report is pending (freeink-sdk InputManager.cpp:1212,
+  // BoardConfig.h:1468). Armed only when INT is high at entry: a pending
+  // report (or a line stuck low) would otherwise wake every slice at once and
+  // spin; that slice keeps the timer-only cadence instead, which is the
+  // behavior before this change. Like the Power wake, it is only
+  // an early poll: the gesture decoder still decides what the contact was.
+  // Idle cost is zero while INT stays high. UNCONFIRMED on device: whether
+  // INT also pulses with no finger on the glass.
+  const int8_t touchIrq = BoardConfig::ACTIVE.touch.irq;
+  const bool touchWake = touchIrq >= 0 && gpio_get_level(static_cast<gpio_num_t>(touchIrq)) != 0;
+  if (touchWake) {
+    gpio_wakeup_enable(static_cast<gpio_num_t>(touchIrq), GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+  }
+#endif
 
   // The C3 flash-leakage workaround pulls its DIO-unused SPIWP pad low during
   // light sleep. Hold GPIO13 high only on the X3/X4 boards that use that pad as
@@ -250,6 +269,12 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
     gpio_wakeup_disable(static_cast<gpio_num_t>(powerPin));
     gpio_set_intr_type(static_cast<gpio_num_t>(powerPin), GPIO_INTR_DISABLE);
   }
+#if FREEINK_DEVICE_PICCO
+  if (touchWake) {
+    gpio_wakeup_disable(static_cast<gpio_num_t>(touchIrq));
+    gpio_set_intr_type(static_cast<gpio_num_t>(touchIrq), GPIO_INTR_DISABLE);
+  }
+#endif
 
   xSemaphoreGive(sleepMutex);
 

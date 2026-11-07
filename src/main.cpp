@@ -1301,16 +1301,16 @@ static void delayWallClock(const unsigned long ms) {
 
 // Picco: a finger on the glass keeps the idle loop at the 100 Hz delay-poll.
 // Touch is not user activity there outside keyboards (HalGPIO::wasTouchActivity),
-// so a left-edge Back swipe on Home or in the reader arrives in light-sleep idle,
-// and the touch INT does not wake a slice (HalPowerManager::lightSleep). Polled
-// at 50 ms the swipe's start point lands late and its few samples can fall short
-// of the left-edge and 60 px tests. Not activity: the sleep timer is untouched.
+// so a left-edge Back swipe on Home or in the reader arrives in light-sleep idle.
+// The touch INT wakes the slice the contact starts in (HalPowerManager::lightSleep),
+// but polled at 50 ms after that the swipe's few samples can fall short of the
+// left-edge and 60 px tests. Not activity: the sleep timer is untouched.
 // A RECOGNIZED gesture is activity, though: it arrives as a synthesized press
 // (HalGPIO::injectButtonTap), which the wasAnyPressed() check in loop() sees.
 // The fast poll also runs for CONTACT_FAST_POLL_MS after the controller's last
 // contact report, so the next tap of a run is sampled at 100 Hz from its first
-// report rather than up to a slice late (review minor, 2026-11-06). It cannot
-// help the first tap after a long idle: nothing has reported yet.
+// report rather than up to a slice late (review minor, 2026-11-06). The first
+// tap after a long idle is the INT wake's: nothing has reported yet.
 static bool touchContactDown() {
 #if FREEINK_DEVICE_PICCO
   return piccoinput::pollFast(gpio.isTouchContactDown(), millis(), gpio.lastTouchReportMs());
