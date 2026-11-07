@@ -49,8 +49,14 @@ bool isRockerStepped(const SettingInfo& setting) {
 
 // getSettingsList() rows outside STR_CAT_SYSTEM that the Picco's device list
 // shows anyway. Matched by member, not category: the category is what groups
-// them on the web page.
-bool isPiccoDeviceRow(const SettingInfo& setting) { return isRockerStepped(setting); }
+// them on the web page. Beside the two light rows, Restore Light on Wake and
+// Slide Switch (owner ruling 2026-11-06, "Add both rows"); both take the
+// generic row path, a toggle and a two-choice enum that flips in place, and
+// main.cpp handleSlideSwitch() applies a new binding on the next loop.
+bool isPiccoDeviceRow(const SettingInfo& setting) {
+  return isRockerStepped(setting) || setting.valuePtr == &CrossPointSettings::frontlightRestoreOnWake ||
+         setting.valuePtr == &CrossPointSettings::slideSwitchAction;
+}
 }  // namespace
 #endif
 
@@ -74,8 +80,9 @@ void SettingsActivity::rebuildSettingsLists() {
     // appended below) and Screen Margin, which now carries STR_CAT_SYSTEM and
     // so arrives through this loop.
 #if FREEINK_DEVICE_PICCO
-    // Plus the Picco's frontlight rows (isPiccoDeviceRow), which arrive in
-    // getSettingsList() order after Clock UTC Offset.
+    // Plus the Picco's frontlight and slide-switch rows (isPiccoDeviceRow),
+    // which arrive in getSettingsList() order after Clock UTC Offset:
+    // Brightness, Warmth, Restore Light on Wake, Slide Switch.
     if (setting.category != StrId::STR_CAT_SYSTEM && !isPiccoDeviceRow(setting)) continue;
 #else
     if (setting.category != StrId::STR_CAT_SYSTEM) continue;

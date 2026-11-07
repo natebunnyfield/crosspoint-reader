@@ -761,7 +761,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // STR_CAT_DISPLAY so the web page groups them together. On the device,
     // Brightness and Warmth are admitted to the Picco's Settings list by
     // member rather than category and stepped with the rocker (owner ruling
-    // 2026-11-06, "Two Settings rows"; SettingsActivity.cpp isPiccoDeviceRow).
+    // 2026-11-06, "Two Settings rows"), and Restore Light on Wake and Slide
+    // Switch beside them ("Add both rows"); SettingsActivity.cpp
+    // isPiccoDeviceRow. The Frontlight on/off row stays web-only.
     v.push_back(SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 100, 5},
                                    "frontlightBrightness", StrId::STR_CAT_DISPLAY));
     v.push_back(SettingInfo::Value(StrId::STR_WARMTH, &CrossPointSettings::frontlightWarmth, {0, 100, 5},
