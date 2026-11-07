@@ -479,6 +479,23 @@ real holds on this unit), the light and slide-switch rows, touch typing in
 keyboards, and staying awake on USB are confirmed on the device. The
 TOUCH_PROBE_DEBUG measurement is no longer needed.
 
+**Main build, flashed 2026-11-07** (owner: "go"). `main` 6a01d23a2 (the
+merge; its tree is `picco-a` plus d0a905214) built in the PRIMARY checkout
+from clean PlatformIO caches, the Sep-7 generated `sdkconfig.defaults` set
+aside first (build trap above). Bin 5,207,936 B, sha256 `7cbdf2cb…`; map has
+`esp_psram_init` from `esp32-hal-psram.c.o`; board tag once; `upload_plan` OK
+(one image at 0xe0000). Flash 4,776,618 → 5,207,426 B (+430,808) against the
+picco-a image: all of it DROM (segment 0x293cf4 → 0x2fce44), IROM flat. Cause:
+the licensed editor faces (`lib/EpdFont/builtinFonts/pragmatapro_*` and
+`nitti*`, 24 headers each, gitignored, `.gitignore:46`) exist only in the
+primary checkout, so every worktree-built Picco image so far lacked them;
+`scripts/check_editor_faces.py` requires them in release images. Build Picco
+release images from the primary (or copy those headers into the worktree).
+Boot after flashing (app-only at 0xE0000, then reset): Home, `OTA state=2;
+already committed`, heap 243,656 free (was 247,068, −3,412 B), and **no
+`FIXED_ENTRY_COUNT` error** (the check runs on the first settings load, which
+happens at boot; the 2026-11-06 boot log showed it).
+
 **Ruling 2026-11-06, slide switch: "Add both rows".** "Slide switch"
 (Frontlight / Dark Mode) and "Restore light on wake" join the Picco's device
 Settings list next to the frontlight rows. Picco only.
