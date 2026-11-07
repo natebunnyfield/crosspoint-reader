@@ -536,3 +536,11 @@ Picco.
   B), so the job's summary takes the LAST ones. The older `build` job's
   "Firmware build stats" step still uses `grep -m1` (ci.yml:109-110) and so
   likely reports the placeholder on every fresh run. Not changed; owner's call.
+  **First GitHub run, 2026-11-07 (run 42380796248, f05f4e6f2): `build-picco`
+  success.** The same run failed `clang-format`, `cppcheck` and `unit-tests`,
+  as did every `main` run back to at least fbe9c6b69 (2026-10-13), including
+  d1f0f33cc before the Picco merge, so none is from the port. `unit-tests` dies
+  compiling `test/activity_input/LibraryUpdateFirstFrameTest.cpp`:
+  `src/network/SavedWifiJoin.h:89+` calls `HostWiFi::disconnect/mode/
+  hostByName/persistent` and `WIFI_OFF`/`WIFI_STA`/`WL_CONNECT_FAILED`, none of
+  which the host WiFi stub has. Not fixed here.
