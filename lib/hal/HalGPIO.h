@@ -250,7 +250,8 @@ class HalGPIO {
   // has no Back button). True while a finger is down. `live` is false once
   // suppressTouchContact() has ended the contact; only when it is true are
   // nx/ny written (panel-native 0..1, like the touch queries above).
-  bool readTouchContact(float& nx, float& ny, bool& live) const;
+  // reportMs is the millis() of the controller's latest contact report.
+  bool readTouchContact(float& nx, float& ny, bool& live, unsigned long& reportMs) const;
   // A synthesized tap on physical button `index`: pressed (edge and level)
   // until the next update(), released (edge) on that frame, as one quick
   // press of a real button reads. isPressed/wasPressed/wasReleased, the

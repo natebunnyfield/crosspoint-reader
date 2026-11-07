@@ -68,11 +68,17 @@ struct Frame {
   unsigned long ms;
 };
 
-Frame at(const int x, const int y, const unsigned long ms) { return Frame{{true, true, x, y}, ms}; }
-Frame lift(const unsigned long ms) { return Frame{{false, false, 0, 0}, ms}; }
-Frame ended(const unsigned long ms) { return Frame{{true, false, 0, 0}, ms}; }  // suppressed contact
+// A contact frame whose report is fresh: the controller reported it this frame.
+Frame at(const int x, const int y, const unsigned long ms) { return Frame{{true, true, x, y, ms}, ms}; }
+// A contact frame whose latest report is older: the SDK still has the finger
+// down but the controller has said nothing since reportMs.
+Frame quiet(const int x, const int y, const unsigned long ms, const unsigned long reportMs) {
+  return Frame{{true, true, x, y, reportMs}, ms};
+}
+Frame lift(const unsigned long ms) { return Frame{{false, false, 0, 0, ms}, ms}; }
+Frame ended(const unsigned long ms) { return Frame{{true, false, 0, 0, ms}, ms}; }  // suppressed contact
 
-// A still finger at (x, y) from t0 for heldMs, sampled every 10 ms,
+// A still finger at (x, y) from t0 for heldMs, a fresh report every 10 ms,
 // then (if liftAt != 0) lifted at liftAt.
 std::vector<Frame> still(const int x, const int y, const unsigned long t0, const unsigned long heldMs,
                          const unsigned long liftAt = 0) {
@@ -271,6 +277,50 @@ TEST(PiccoGestureTiming, AHoldNeedsAStillFinger) {
     std::vector<Frame> f = {at(240, 400, 1000)};
     for (const Frame& fr : still(269, 400, 1010, 790)) f.push_back(fr);
     f.push_back(lift(1900));
+    EXPECT_TRUE(run(d, f).empty());
+  }
+}
+
+// --- No stale-contact hold (review minor 2026-11-06) ------------------------
+
+TEST(PiccoGestureStale, ALostLiftOffIsNotAHold) {
+  // A 100 ms tap whose lift-off report was lost: the SDK keeps the finger down
+  // with no new report until its 3 s safety net releases it. No Confirm at
+  // 750 ms, and the 3 s release is not a tap either.
+  piccoinput::GestureDecoder d;
+  std::vector<Frame> f = still(240, 400, 1000, 100);
+  for (unsigned long t = 1110; t <= 4100; t += 10) f.push_back(quiet(240, 400, t, 1100));
+  f.push_back(lift(4110));
+  EXPECT_TRUE(run(d, f).empty());
+}
+
+TEST(PiccoGestureStale, ReportsResumingAfterAGapDoNotHold) {
+  // Quiet for 300 ms, then reporting again (a second touch the SDK took for
+  // the same contact): the gap disqualifies the whole contact.
+  piccoinput::GestureDecoder d;
+  std::vector<Frame> f = still(240, 400, 1000, 100);
+  for (unsigned long t = 1110; t < 1400; t += 10) f.push_back(quiet(240, 400, t, 1100));
+  for (const Frame& fr : still(240, 400, 1400, 1000)) f.push_back(fr);
+  f.push_back(lift(2410));
+  EXPECT_TRUE(run(d, f).empty());
+}
+
+TEST(PiccoGestureStale, SparseButSteadyReportsStillHold) {
+  // Reports every 200 ms (the limit, inclusive), polled every 10 ms.
+  {
+    piccoinput::GestureDecoder d;
+    std::vector<Frame> f;
+    for (unsigned long t = 1000; t <= 1900; t += 10) f.push_back(quiet(240, 400, t, t - (t - 1000) % 200));
+    EXPECT_EQ(only(run(d, f)), Button::Confirm);
+  }
+  // 201 ms between two reports: no hold.
+  {
+    piccoinput::GestureDecoder d;
+    std::vector<Frame> f;
+    for (unsigned long t = 1000; t <= 1900; t += 1) {
+      if (t % 10 != 0 && (t - 1000) % 201 != 0) continue;
+      f.push_back(quiet(240, 400, t, t - (t - 1000) % 201));
+    }
     EXPECT_TRUE(run(d, f).empty());
   }
 }

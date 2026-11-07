@@ -91,18 +91,34 @@ constexpr unsigned long LONG_PRESS_MS = 750;  // a still contact this long is a 
 // Swipes are the SDK's (InputManager.h:327-329), unchanged by the ruling.
 constexpr int SWIPE_MIN_PX = 60;             // a swipe travels at least this on one axis
 constexpr unsigned long SWIPE_MAX_MS = 700;  // a swipe is over within this
+// A hold needs the TMA525C to keep reporting the contact. Its lift-off is a
+// report like any other (freeink-sdk InputManager.cpp:1231), and when one is
+// lost the SDK keeps the finger "down" for 3 s (:1116, :1275) -- long
+// enough for a tap to sit there past LONG_PRESS_MS and fire Confirm on a
+// finger that left long ago (review minor, 2026-11-06). So a gap longer than
+// this between two reports, at any point in the hold window, disqualifies the
+// contact from holding, and the last report must be this fresh when the hold
+// fires. 200 ms is twenty polls at the 100 Hz contact poll; it is a guess at
+// "the controller went quiet", not a measured report rate (UNCONFIRMED on
+// device: if the controller pauses on a resting finger for longer, real holds
+// stop firing, and this number is the one to move).
+constexpr unsigned long HOLD_REPORT_GAP_MS = 200;
 
 // One frame's view of the glass, in the renderer's LOGICAL portrait pixels.
-//   contact: a finger is on the glass (InputManager::isTouchPressed).
-//   live:    the contact is still being delivered. False while contact is true
-//            means it was ended (InputManager::suppressTouchContact: a keyboard
-//            typed with it, or the touch gate moved), and it must not end as a
-//            gesture.
+//   contact:  a finger is on the glass (InputManager::isTouchPressed).
+//   live:     the contact is still being delivered. False while contact is true
+//             means it was ended (InputManager::suppressTouchContact: a keyboard
+//             typed with it, or the touch gate moved), and it must not end as a
+//             gesture.
+//   reportMs: millis() of the controller's latest contact report
+//             (InputManager::getTouchPoint().timestamp). Unchanged from one
+//             frame to the next means no new report arrived in between.
 struct Sample {
   bool contact = false;
   bool live = false;
   int x = 0;
   int y = 0;
+  unsigned long reportMs = 0;
 };
 
 struct Result {
@@ -150,21 +166,30 @@ class GestureDecoder {
         tracking_ = true;
         consumed_ = false;
         movedTap_ = false;
+        reportGap_ = false;
         keyboardAtDown_ = keyboard;
         downX_ = s.x;
         downY_ = s.y;
         downAt_ = nowMs;
+        lastReportMs_ = s.reportMs;
       }
       // A keyboard opening or closing under the finger ends the contact (the
       // HAL suppresses it too, HalGPIO::setKeyboardTouch).
       if (keyboard != keyboardAtDown_) consumed_ = true;
       if (consumed_) return Result{};
+      if (s.reportMs != lastReportMs_) {
+        if (s.reportMs - lastReportMs_ > HOLD_REPORT_GAP_MS) reportGap_ = true;
+        lastReportMs_ = s.reportMs;
+      }
       lastX_ = s.x;
       lastY_ = s.y;
       const int adx = std::abs(lastX_ - downX_);
       const int ady = std::abs(lastY_ - downY_);
       if (adx > TAP_SLOP_PX || ady > TAP_SLOP_PX) movedTap_ = true;
-      if (!keyboard && !movedTap_ && nowMs - downAt_ >= LONG_PRESS_MS) {
+      // The gap still open counts too: a lost lift-off leaves no later report
+      // to measure it against.
+      const bool reported = !reportGap_ && nowMs - lastReportMs_ <= HOLD_REPORT_GAP_MS;
+      if (!keyboard && !movedTap_ && reported && nowMs - downAt_ >= LONG_PRESS_MS) {
         consumed_ = true;
         return fire(Button::Confirm, true);
       }
@@ -181,12 +206,14 @@ class GestureDecoder {
   bool tracking_ = false;
   bool consumed_ = false;
   bool movedTap_ = false;
+  bool reportGap_ = false;
   bool keyboardAtDown_ = false;
   int downX_ = 0;
   int downY_ = 0;
   int lastX_ = 0;
   int lastY_ = 0;
   unsigned long downAt_ = 0;
+  unsigned long lastReportMs_ = 0;
 };
 
 }  // namespace piccoinput

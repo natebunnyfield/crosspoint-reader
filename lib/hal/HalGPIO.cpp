@@ -340,12 +340,16 @@ void HalGPIO::prepareForDeepSleep() {
   if (!inputMgr.prepareForDeepSleep()) LOG_ERR("GPIO", "Failed to put touch controller to sleep");
 }
 
-bool HalGPIO::readTouchContact(float& nx, float& ny, bool& live) const {
+bool HalGPIO::readTouchContact(float& nx, float& ny, bool& live, unsigned long& reportMs) const {
   // Deliberately NOT gated on keyboardTouch: gestures are buttons on every
   // screen. isTouchHeldAt() reads false for a contact suppressTouchContact()
   // latched, which is what `live` reports.
   if (!inputMgr.isTouchPressed()) return false;
   live = inputMgr.isTouchHeldAt(nx, ny);
+  // Stamped by the SDK on every contact report it reads (InputManager.cpp:1261),
+  // and left alone when no new report arrived: the decoder tells a finger
+  // still reporting from one whose lift-off was lost by this alone.
+  reportMs = inputMgr.getTouchPoint().timestamp;
   return true;
 }
 

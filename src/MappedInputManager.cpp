@@ -371,7 +371,7 @@ void MappedInputManager::synthesizeGesture() const {
   float ny = 0.0f;
   bool live = false;
   piccoinput::Sample sample;
-  sample.contact = gpio.readTouchContact(nx, ny, live);
+  sample.contact = gpio.readTouchContact(nx, ny, live, sample.reportMs);
   sample.live = sample.contact && live;
   if (sample.live) renderer.tapToLogical(nx, ny, sample.x, sample.y);
   const piccoinput::Result r =
