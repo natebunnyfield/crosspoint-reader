@@ -112,6 +112,21 @@ constexpr unsigned long SWIPE_MAX_MS = 700;  // a swipe is over within this
 // rule, and the ruling needs a different signal (measure first:
 // TOUCH_PROBE_DEBUG logs every report, InputManager.cpp:1232-1236).
 constexpr unsigned long HOLD_REPORT_GAP_MS = 200;
+// A lost lift-off also lets the NEXT finger join the stale contact: the SDK
+// sets no new touch-down while it still has the old one down (:1262-1275),
+// so a second tap only moves the point, and a second tap 60 px lower within
+// 700 ms of the first read as swipe down = Confirm (review, 2026-11-06,
+// reproduced on the host). A moving finger keeps reporting, so a report that
+// ends a polled silence of at least this long AND lands more than TAP_SLOP_PX
+// from the last reported point is taken for a second finger: the contact is
+// spent and fires nothing. 50 ms is a guess, not a measurement: a moving
+// finger reporting faster than 20 Hz never leaves a 50 ms gap, and a lifted
+// finger is probably off the glass for longer than that. What still gets
+// through: a second tap that lands within 50 ms, or within TAP_SLOP_PX of the
+// stale point, joins the first; the pair is then a tap, or a swipe if the
+// first tap had drifted and the second carries on past 60 px from where the
+// first landed (UNCONFIRMED on device).
+constexpr unsigned long NEW_CONTACT_GAP_MS = 50;
 
 // One frame's view of the glass, in the renderer's LOGICAL portrait pixels.
 //   contact:  a finger is on the glass (InputManager::isTouchPressed).
@@ -176,9 +191,12 @@ class GestureDecoder {
         consumed_ = false;
         movedTap_ = false;
         reportGap_ = false;
+        silentMs_ = 0;
         keyboardAtDown_ = keyboard;
         downX_ = s.x;
         downY_ = s.y;
+        lastX_ = s.x;
+        lastY_ = s.y;
         downAt_ = nowMs;
         lastReportMs_ = s.reportMs;
       }
@@ -187,12 +205,20 @@ class GestureDecoder {
       if (keyboard != keyboardAtDown_) consumed_ = true;
       if (consumed_) return Result{};
       if (s.reportMs != lastReportMs_) {
+        if (silentMs_ >= NEW_CONTACT_GAP_MS &&
+            (std::abs(s.x - lastX_) > TAP_SLOP_PX || std::abs(s.y - lastY_) > TAP_SLOP_PX)) {
+          consumed_ = true;  // a second finger on a lost lift-off
+          return Result{};
+        }
         lastReportMs_ = s.reportMs;
-      } else if (nowMs - lastReportMs_ > HOLD_REPORT_GAP_MS) {
+        silentMs_ = 0;
+      } else {
+        // The longest silence a poll has seen since the last report.
+        silentMs_ = nowMs - lastReportMs_;
         // This poll found the controller silent for too long. A lost lift-off
         // leaves no later report, so the silence is judged here, not when the
         // next report lands.
-        reportGap_ = true;
+        if (silentMs_ > HOLD_REPORT_GAP_MS) reportGap_ = true;
       }
       lastX_ = s.x;
       lastY_ = s.y;
@@ -224,6 +250,7 @@ class GestureDecoder {
   int lastY_ = 0;
   unsigned long downAt_ = 0;
   unsigned long lastReportMs_ = 0;
+  unsigned long silentMs_ = 0;
 };
 
 // --- A gesture on a button that is already held ----------------------------

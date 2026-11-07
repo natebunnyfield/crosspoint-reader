@@ -360,6 +360,82 @@ TEST(PiccoGestureStale, ALostLiftOffAcrossAStallIsStillNotAHold) {
   EXPECT_TRUE(run(d, f).empty());
 }
 
+// A second tap on a lost lift-off: the SDK keeps the stale contact and moves
+// its point to the new finger (review, 2026-11-06). Tap 1 at y=400 reports
+// 1000-1100 and its lift-off is lost; quiet polls until tap 2 lands at 1300
+// at (x, y), reports to 1390, and lifts for real at 1400.
+std::vector<Frame> secondTapOnALostLiftOff(const int x, const int y, const unsigned long secondAt = 1300) {
+  std::vector<Frame> f = still(240, 400, 1000, 100);
+  for (unsigned long t = 1110; t < secondAt; t += 10) f.push_back(quiet(240, 400, t, 1100));
+  for (unsigned long t = secondAt; t <= secondAt + 90; t += 10) f.push_back(at(x, y, t));
+  f.push_back(lift(secondAt + 100));
+  return f;
+}
+
+TEST(PiccoGestureStale, ASecondTapElsewhereIsNotASwipe) {
+  // 80 px lower was swipe down = Confirm; higher Back; sideways Left/Right.
+  const int where[4][2] = {{240, 480}, {240, 320}, {320, 400}, {160, 400}};
+  for (const auto& p : where) {
+    piccoinput::GestureDecoder d;
+    EXPECT_TRUE(run(d, secondTapOnALostLiftOff(p[0], p[1])).empty()) << p[0] << "," << p[1];
+  }
+}
+
+TEST(PiccoGestureStale, ASecondFingerNeedsAPolledSilenceAndAJump) {
+  // After a 50 ms polled silence, a finger landing 29 px from the stale point
+  // is a second finger: its own 60 px stroke down fires nothing. Landing 28 px
+  // away it is taken for the same finger, and the stroke is a swipe down.
+  for (const int jump : {28, 29}) {
+    piccoinput::GestureDecoder d;
+    std::vector<Frame> f = {at(240, 400, 1000), quiet(240, 400, 1050, 1000)};
+    for (int i = 0; i <= 6; ++i) f.push_back(at(240, 400 + jump + i * 10, 1060 + static_cast<unsigned long>(i) * 10));
+    f.push_back(lift(1130));
+    if (jump == 28) {
+      EXPECT_EQ(only(run(d, f)), Button::Confirm) << "28 px";
+    } else {
+      EXPECT_TRUE(run(d, f).empty()) << "29 px";
+    }
+  }
+  // A 49 ms silence: still one moving finger, here a swipe down (Confirm).
+  {
+    piccoinput::GestureDecoder d;
+    std::vector<Frame> f = {at(240, 400, 1000), quiet(240, 400, 1049, 1000), at(240, 470, 1050), lift(1060)};
+    EXPECT_EQ(only(run(d, f)), Button::Confirm) << "49 ms";
+  }
+  // A 50 ms silence and a 70 px jump: a second finger.
+  {
+    piccoinput::GestureDecoder d;
+    std::vector<Frame> f = {at(240, 400, 1000), quiet(240, 400, 1050, 1000), at(240, 470, 1051), lift(1060)};
+    EXPECT_TRUE(run(d, f).empty()) << "50 ms";
+  }
+}
+
+TEST(PiccoGestureStale, AFastSwipeWithSparseReportsIsStillASwipe) {
+  // A report every 40 ms (25 Hz), 40 px apart, polled every 10 ms: the
+  // longest polled silence is 30 ms, so the jumps are one moving finger.
+  piccoinput::GestureDecoder d;
+  std::vector<Frame> f;
+  for (unsigned long t = 1000; t <= 1160; t += 10) {
+    const unsigned long rep = t - (t - 1000) % 40;
+    f.push_back(quiet(240, 400 + static_cast<int>(rep - 1000), t, rep));
+  }
+  f.push_back(lift(1170));
+  EXPECT_EQ(only(run(d, f)), Button::Confirm);
+}
+
+TEST(PiccoGestureStale, APauseThenAFastSwipeIsStillASwipe) {
+  // A finger rests while the controller goes quiet for 60 ms, reports again
+  // where it was, then swipes 30 px per 10 ms report. Only the report that
+  // ends a silence is tested for a jump.
+  piccoinput::GestureDecoder d;
+  std::vector<Frame> f = {at(240, 400, 1000)};
+  for (unsigned long t = 1010; t <= 1060; t += 10) f.push_back(quiet(240, 400, t, 1000));
+  f.push_back(at(240, 400, 1070));
+  for (int i = 1; i <= 3; ++i) f.push_back(at(240, 400 + i * 30, 1070 + static_cast<unsigned long>(i) * 10));
+  f.push_back(lift(1110));
+  EXPECT_EQ(only(run(d, f)), Button::Confirm);
+}
+
 TEST(PiccoGesture, ASlowDragIsNothing) {
   // 700 ms is the SDK's swipe window (InputManager.h:329).
   {
