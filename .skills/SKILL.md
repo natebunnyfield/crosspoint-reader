@@ -47,8 +47,19 @@ edited**: the tree is not clang-format-clean and has not been for a long time.
 A blanket sweep is therefore a large whitespace diff that buries the real change,
 and it collides with every other session holding uncommitted work in another
 worktree. Owner ruling 2026-08-18: leave the tree as it is and format per-file.
-CI is not failing on those 16, so nothing is broken — the command is simply
-wider than it looks.
+
+**CI's `clang-format` job DOES check the whole tree**, with clang-format **21**
+(`bin/clang-format-fix`, then `git diff --exit-code`). The line that used to
+stand here ("CI is not failing on those 16") was wrong by 2026-09-15. From then
+until 2026-11-08 main's CI failed on every push: this job, cppcheck at the
+`low` threshold, and an empty `-e ${{ matrix.env }}` in `build-default`. Nobody
+noticed, because the failures were never read. Fixed by formatting the 17 files
+21.1.8 rejected (`02288b0a5`) and `f4f8494de`. Local clang-format is newer
+(23 here) and formats differently, so get 21 for the check:
+`python3 -m venv /tmp/cf21 && /tmp/cf21/bin/pip install "clang-format>=21,<22"`,
+symlink it as `clang-format-21` on PATH, run `bin/clang-format-fix -g` on your
+change, and run `pio check --fail-on-defect low --fail-on-defect medium
+--fail-on-defect high` before pushing to main.
 
 ---
 
