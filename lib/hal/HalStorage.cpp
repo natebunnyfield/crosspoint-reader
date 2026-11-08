@@ -37,8 +37,37 @@ class HalStorage::StorageLock {
 };
 
 #if FREEINK_DEVICE_PICCO
+namespace {
+// Write SdFat's cached FAT and directory sectors to the card. Needed before
+// anything that ends the volume: FsVolume::end() (SdFat 2.3.1,
+// FsLib/FsVolume.h:120-125) only nulls the volume pointers, and the
+// partition-level end() is a cacheClear() (FatLib/FatPartition.h:92-95,
+// ExFatLib/ExFatPartition.h:85-88), so a dirty cached sector is dropped rather
+// than written: a FAT behind its directory entries, the lost-allocation shape
+// of B-073 (docs/sd-card-corruption-2026-10-04.md). The SDK's
+// SDCardManager::shutdown() says "FsVolume::end() flushes"; it does not.
+// FatFile::sync() and ExFatFile::sync() end in the volume's cacheSync()
+// (FatLib/FatFile.cpp:1301, ExFatLib/ExFatFileWrite.cpp:376), which writes the
+// data and FAT caches and syncs the device, and is a no-op when nothing is
+// dirty (common/FsCache.cpp:56-71). The root directory is always there to sync
+// through. Caller holds StorageLock.
+bool syncSdFatCaches() {
+  if (!SDCard.ready()) return true;  // nothing mounted, so nothing cached
+  FsFile root = SDCard.open("/", O_RDONLY);
+  if (!root) return false;
+  const bool ok = root.sync();
+  root.close();
+  return ok;
+}
+}  // namespace
+#endif
+
+#if FREEINK_DEVICE_PICCO
 void HalStorage::prepareForDeepSleep() {
   StorageLock lock;
+  // Logged, never blocking: the card loses power either way, and refusing to
+  // sleep would only drain the battery.
+  if (!syncSdFatCaches()) LOG_ERR("SD", "Sleep: could not flush SdFat's cached sectors before power-down");
   SDCard.shutdown();
 }
 #endif
