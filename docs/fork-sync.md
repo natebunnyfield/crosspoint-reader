@@ -217,8 +217,8 @@ commits built on it are then taken normally.
 **Driver, from 2026-11-08 10:30:** the session "Planck play button mouse
 clicks" (worktree `.claude/worktrees/campaign-b3`, branch `campaign-b3`) is
 taking, in this order: the `a757b9d10` reader-base port (ruled "Adopt, keep
-fork behavior") with `63fcbab02`, then batch 3 onward from `62e84a16f`. Reader port and batch 3 are pushed;
-batch 4 (`84fcff848`..`e33e3cf39`, 50 commits) is next, same driver. The
+fork behavior") with `63fcbab02`, then batch 3 onward from `62e84a16f`. Reader port, batch 3 and batch 4 are pushed;
+batch 5 (after `e33e3cf39`) is next, same driver. The
 `81e192709` light-sleep revert is left to whoever gets the owner's answer. A
 second session starting a batch or the reader port should fetch `main`, read
 this line, and take something else (or nothing) to avoid porting the same
@@ -232,6 +232,7 @@ commits twice.
 | reader base | `a757b9d10` (1, owner ruling "Adopt, keep fork behavior") + `63fcbab02` | `a757b9d10` by hand as `69f7430aa` | | SKIP `63fcbab02` (TXT `skipPages()` end sentinel: the fork has no skipPages, chapter skip retired 2026-09-01) | `71dc70df5` |
 | 2 | `e970abae8`..`57c692fe8` (40) | 10 (`e970abae8` `25cf99b21` `99724aa79` `618608e84` `6a501bba5` `c6fe67d48` `27f964b3e` `eef205044` `a4a03c6b4` `7e42d0707`) | 9 (`268c27f7d` Transparent sleep screen, appended as value 14; `48e39eb0e` reposition clearing on the fork's three-stage anchors; `4970ef1f6` PNG overlays + PNG viewer; `33f07db71` post-delete nav lock only; `bbca4886c` X3-UC8279 edge-button fix only; `d3b3b5669` dimension guard/8 MP/decode yield, not the image-margin clamp or single-base image refresh; `8eea7f865` Wi-Fi only; `a0daab994` font layer only; `93d572fcb` arabic preset only) | ALREADY 4 (`70faa29da` = `816011c42`; `e715532f9`; `080b1d719` = `ca1850a91`; `28377310d` fork has Wider/Widest); SKIP 15 (deleted subsystems: dictionary x2, status bar, Ubuntu UI face x2, font download; `b1d53ba81` ruling; `4d764de9c` press/release ruling; `413a1bd9d`+`151414d8c` revert pair; `81fd32237` would drop `.claude/skills`; `63fcbab02` needs `a757b9d10`; `b3d1e79d0` fixed-height Lyra rows; `75c079fe7` SDK-only; `da3d50c24` fork's own table columns); FLAG 2 (`a757b9d10` reader consolidation, `81e192709` light-sleep revert). Caches: section 67 -> 70 (renumbered when rebased over page-space v67, `docs/page-space-2026-11-08.md`), book.bin 11 -> 12 | (this push) |
 | 3 | `62e84a16f`..`25bbfae76` (40) | 5 (`5182d27e2` `b6746c1df` `c484dc72b` `8141d7b9c`+`820d0b96a`) | 5 (`cdbe2a779` en/es only; `8bc1603e8` no SDK bump; `86976ab23` log only, fix ALREADY; `790a0817e` guard restores the prior mode; `52444a0c9` block-close insets, `!important` ALREADY) | ALREADY 6 (empty picks); REJECTED 1 (`e31dcbb08`); SKIP 16 (deleted subsystems, other boards, Swedish, fork Settings/list chrome; see "Batch 3" below); HELD 4 (frontlight panel x4, X4 Classic... see below) + RULED: wake rule x2 SKIP ("go with rec"), USB MSC BUILD for the Picco ("build"). Caches: section 70 -> 71, CSS stays 11 | (this push) |
+| 4 | `84fcff848`..`e33e3cf39` (50) | 11 (`309923156` `ce6c6cbce` `5fcd26330` `93b6fe111` `b5fb406f5` `03c484778` `6eda8f0b7` `3e60e1302` `c33a8b0e8` `c80c537f2` `0475e6938`) | 7 (`badfa95ff` `365618e47` `9d2f234e1` `54337e6d7` `b7bceb56c` `f437bb506` `2b2ba72f0`; see "Batch 4" below) | ALREADY 7; SKIP 18 (deleted subsystems, other languages, fork-curated font ids); HELD 7 (keyboard layouts, link tapping, language fonts, pioarduino bump, grayscale SDK series x2, X4 Classic CI). Plus a fork fix from `da3d50c24` (skipped-subtree close guard). Caches: section 71 -> 77, book.bin 12 -> 13, CSS 11 -> 12 | (this push) |
 
 
 ### FUI port (`9e3cea2e5`), 2026-11-08
@@ -437,6 +438,104 @@ message carries its own detail; the decisions:
     pin lacks; held with the other board targets.
 
 Gates on the rebased tree: `pio run -e default` (X4) SUCCESS, Flash 4,853,635 B. That is 545,166 B (532 KiB) less than the reader-port gate on `69f7430aa` (5,398,801 B). Batch 3's only font or data change is `c484dc72b`, so most of that is likely its sparse kerning and Zopfli (inferred, not split per commit; upstream's figure was 323 KB, and the fork ships more built-in faces). `pio run -e picco` SUCCESS; `pio run -e simulator` SUCCESS; `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). Host tests: the first run had four suites NOT BUILT. The CSS cache port calls `Storage.rename()`, which their suite-local `HalStorage` stubs lacked, and two of them tested `loadFromStream()` as a bool. Fixed in `test: four layout suites follow the CSS cache retry port`; after that, 884 of 884 pass. `ActivityInputTest` builds again (fixed in `fca3ea5e8`).
+
+
+### Batch 4 (2026-11-08): `84fcff848`..`e33e3cf39`, 50 commits
+
+A read-only agent triaged all 50 against `103df0a79`, and each TAKE/PARTIAL was
+checked again before porting. Everything was ported in upstream order on
+`b4-work`, except that `3e60e1302` moved up to sit right after `b7bceb56c`,
+which its parsing depends on. Each commit message carries its own detail; the
+decisions:
+
+- **TAKEN (11):**
+  - `309923156` Arabic Lam-Alef guard, with the guard moved into
+    `applyLigatures()`, so `getLigature()` keeps reporting the face's table
+    (the per-ligature switch reads it).
+  - `ce6c6cbce` paragraph base direction.
+  - `5fcd26330` README link.
+  - `93b6fe111` glyph-arena retry.
+  - `b5fb406f5` ETag / Cache-Control.
+  - `03c484778` web path normalization, safe names and the files-page XSS fix
+    (security).
+  - `6eda8f0b7` the `hidden` attribute.
+  - `3e60e1302` monitor PSRAM subplot.
+  - `c33a8b0e8` unique ownership of page elements (ported by hand in its own
+    worktree).
+  - `c80c537f2` font-cache fragmentation. Upstream measured the back-turn on an
+    X3 with idle prewarm running: 1,908 -> 1,720 ms median. The fork keeps its
+    12 KB largest-block retention floor, and the hi-res companion takes the
+    same accumulate flag.
+  - `0475e6938` ROADMAP.
+- **PARTIAL (7):**
+  - `badfa95ff` vertical-align on internal links. Its test suite needs the held
+    `7bcc3a692`.
+  - `365618e47` Spanish only: the six keys whose fork value was the older
+    upstream text. `STR_RESTORE_LIGHT_ON_WAKE`, from the fork's Picco port, is
+    kept.
+  - `9d2f234e1` Xtensa panic stack capture and `-DHAVE_MAX_FRAGMENT`.
+  - `54337e6d7` the X4/X3-only warning in `fix-bricked-xteink.md`.
+  - `b7bceb56c` per-render image failure memo, inflate OOM logs and the PSRAM
+    MEM line. No `HalMemory` unit: `ESP.*` already reads `MALLOC_CAP_INTERNAL`.
+  - `f437bb506` NFD Hangul composition, with display copies in Browse Files
+    and Manage Files; book.bin v13.
+  - `2b2ba72f0` `list-style-type: none`, plus the fork's `list-style: none`
+    shorthand; CSS cache v12. Numbering was ALREADY here.
+- **ALREADY (7):**
+  - `4a679d5d4`: the SD part is Picco-only by fork choice (`HalStorage.h:19-23`).
+  - `9ba160863`: the idle branch light-sleeps and polls at 10 ms while a
+    debounce is pending (`main.cpp:1516-1541`).
+  - `483c5cf68`: the `RenderLock` it removes never reached the fork.
+  - `77b53171e` `fe6535985` `c4d8c395d` `e33e3cf39`: empty picks.
+- **SKIP (18):**
+  - Deleted subsystems: `84fcff848` (dictionary), `c3534ed89` (reader-menu
+    gesture; the gate it removes is a pinned constant), `a7df86fe2` (font
+    download), `da7feed5c` (EndOfBookOptions), `2bad1d09f` (reader menu),
+    `8a1a8769d` and `472b5e485` (KOReader sync).
+  - Already different here: `8cb0a3908` (four UX fixes, each a deleted path or
+    dead code here), `fb0523d36` (a revert of things never taken), `b95965f47`
+    and `32a0cadbc` (Ubuntu and upstream font ids; the fork's `fontIds.h` is
+    hand-curated), `20d67cb3e` (flat Settings, OPDS deleted), `46d912535`
+    (upstream's release asset naming).
+  - Version bump and other languages: `3b2032641` (version bump),
+    `e6139861a` `233f93ffb` `304ad7897` `320a97a94` (other languages).
+- **HELD (7), for the owner:**
+  - `d5d2d67a5`: keyboard layout set with a globe key. A new Settings screen,
+    and it needs SDK `02d32e6`.
+  - `7bcc3a692`: tap a link to follow it. The fork made links non-interactive
+    on purpose (`ChapterHtmlSlimParser.cpp:2189`), and it changes the page
+    format.
+  - `1f9523eb4`: 12 Hebrew/Arabic/Korean families for the ruled
+    `sd-fonts.yaml` list.
+  - `7db14a015`: pioarduino 55.03.311. It edits the REJECTED
+    `patch_pioarduino_cache.py` and adds a C3 ROM-libc linker patch.
+  - `1f3d7458a` and `e5dcc64fd`: the grayscale-capabilities SDK series,
+    deferred with the boards on 2026-09-14. They need SDK `4b8188e`,
+    `3080ca2`, ... and an X3 device check.
+  - `71342eacb`: CI for the held X4 Classic (`f021d1e5f`).
+
+**Found while porting, fixed:** a skipped (display:none / `hidden`) element's
+close ran the full close path. `blockStyleStack.pop_back()` removed the
+enclosing element's style, so the paragraphs after a hidden block lost the
+container's margins (x 29 -> 0 in the test), and a hidden nested list ended its
+parent list. The guard exists upstream inside `da3d50c24`, which batch 2
+skipped whole for its table columns; this live part went with it, so
+`da3d50c24` is now PARTIAL (the guard). It is committed separately, before
+`2b2ba72f0`, as section v76, with `SkippedBlock.*` tests that fail without it.
+
+**Found while porting, NOT changed (a limitation):** an undirected paragraph is
+set RTL when any of its first three words starts RTL (`ParsedText.cpp`,
+`RTL_PARAGRAPH_PROBE_WORDS`, upstream `f5bc554ae`). So `<p>Alpha <span
+dir="rtl">HEBREW</span> omega</p>` comes out RTL with its words reversed. The
+heuristic exists so an unmarked Hebrew paragraph that opens with an English
+term reads right. A refinement would ignore RTL words inside an explicitly
+`dir`-marked inline element.
+
+**Caches:** section 71 -> 77 (one bump per layout change: v72 direction, v73
+footnote sup, v74 Hangul, v75 hidden, v76 skipped close, v77 list-style none);
+book.bin 12 -> 13; CSS cache 11 -> 12.
+
+Gates: `pio run -e default` (X4) SUCCESS, RAM 58,724 B, Flash 4,854,239 B (batch 3: 4,853,635 B, so +604 B). `pio run -e picco` SUCCESS, RAM 70,872 B, Flash 4,660,042 B (batch 3: 4,659,342 B, so +700 B). `pio run -e simulator` SUCCESS. `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). Host tests: 923 of 923 pass (884 at batch 3; the new suites are ligature_guard, inflate_stream, fs_helpers and sd_card_font, plus the new cascade_lines cases). The unique-ownership port (`c33a8b0e8`) was built and tested on its own branch first: 909 of 909, X4, simulator and the latency gate. Device behavior (font-cache timing, the Xtensa panic capture, TLS max fragment length) is UNCONFIRMED on device.
 
 
 ## One working copy per project
