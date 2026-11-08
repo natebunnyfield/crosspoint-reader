@@ -32,6 +32,45 @@ bool startsWithImageMediaType(const std::string& mediaType) {
 
   return true;
 }
+
+bool isXmlWhitespace(const char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; }
+
+// Metadata text comes straight from the (untrusted) OPF; unbounded growth on
+// a multi-megabyte title would exhaust the heap. Downstream consumers truncate
+// far below this anyway, so overflow is clamped, not fatal (upstream 652ae0d83).
+constexpr size_t MAX_METADATA_TEXT = 512;
+
+// Collapses whitespace runs to one space and trims both ends. The separator
+// between two authors is written only when the next <dc:creator> starts
+// (authorSeparatorPending), never between two character-data callbacks of ONE
+// creator: Expat splits a text node at a character reference (&#235;) or at a
+// feed boundary, and the old per-callback ", " turned "Bront&#235;" into
+// "Bront, ë".
+void appendMetadataText(std::string& out, const XML_Char* text, const int len, bool& spacePending,
+                        bool* separatorPending = nullptr) {
+  if (out.size() >= MAX_METADATA_TEXT) return;  // already clamped and logged
+  for (int i = 0; i < len; i++) {
+    const char c = text[i];
+    if (isXmlWhitespace(c)) {
+      spacePending = true;
+      continue;
+    }
+
+    if (out.size() >= MAX_METADATA_TEXT) {
+      LOG_DBG("COF", "Metadata text exceeds %u bytes; truncating", static_cast<unsigned>(MAX_METADATA_TEXT));
+      return;
+    }
+    if (separatorPending != nullptr && *separatorPending) {
+      out.append(", ");
+      *separatorPending = false;
+      spacePending = false;
+    } else if (spacePending && !out.empty()) {
+      out.push_back(' ');
+    }
+    spacePending = false;
+    out.push_back(c);
+  }
+}
 }  // namespace
 
 bool ContentOpfParser::setup() {
@@ -115,17 +154,21 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     // Only capture the first title element; subsequent ones are subtitles
     if (self->title.empty()) {
       self->state = IN_BOOK_TITLE;
+      self->metadataSpacePending = false;
     }
     return;
   }
 
   if (self->state == IN_METADATA && xmlLocalNameEquals(name, "creator")) {
     self->state = IN_BOOK_AUTHOR;
+    self->metadataSpacePending = false;
+    self->authorSeparatorPending = !self->author.empty();
     return;
   }
 
   if (self->state == IN_METADATA && xmlLocalNameEquals(name, "language")) {
     self->state = IN_BOOK_LANGUAGE;
+    self->metadataSpacePending = false;
     return;
   }
 
@@ -357,20 +400,17 @@ void XMLCALL ContentOpfParser::characterData(void* userData, const XML_Char* s, 
   auto* self = static_cast<ContentOpfParser*>(userData);
 
   if (self->state == IN_BOOK_TITLE) {
-    self->title.append(s, len);
+    appendMetadataText(self->title, s, len, self->metadataSpacePending);
     return;
   }
 
   if (self->state == IN_BOOK_AUTHOR) {
-    if (!self->author.empty()) {
-      self->author.append(", ");  // Add separator for multiple authors
-    }
-    self->author.append(s, len);
+    appendMetadataText(self->author, s, len, self->metadataSpacePending, &self->authorSeparatorPending);
     return;
   }
 
   if (self->state == IN_BOOK_LANGUAGE) {
-    self->language.append(s, len);
+    appendMetadataText(self->language, s, len, self->metadataSpacePending);
     return;
   }
 }

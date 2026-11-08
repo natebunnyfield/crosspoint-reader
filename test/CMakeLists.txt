@@ -217,3 +217,4 @@ add_subdirectory(json_save_guard)
 
 
 add_subdirectory(sd_card_font)
+add_subdirectory(content_opf_parser)

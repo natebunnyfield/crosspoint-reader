@@ -35,7 +35,11 @@ namespace {
 // v13: upstream f437bb506. utf8ComposeNfc() now composes conjoining Hangul
 // jamo, and titles and TOC labels are cached through it (Epub.cpp,
 // BookMetadataCache.cpp), so a cached NFD Korean title is stale.
-constexpr uint8_t BOOK_CACHE_VERSION = 13;
+// v14: upstream 652ae0d83 (its OPF metadata-text fix only). Title, author and
+// language collapse whitespace, clamp at 512 bytes, and an author split across
+// two character-data callbacks (a character reference) is no longer cut by
+// ", "; the author is NFC too. A cached v13 author can read "Bront, ë".
+constexpr uint8_t BOOK_CACHE_VERSION = 14;
 // Written into Header A while the file is still being built, and overwritten
 // with BOOK_CACHE_VERSION only once every byte is down. load() rejects it as a
 // version mismatch and rebuilds, so a file interrupted at any point -- a crash,

@@ -14,7 +14,7 @@ package that does not spell its metadata `dc:title`/`dc:creator`/`dc:language`
 (or its structure `opf:spine` etc.) no longer caches an empty title, author or
 language. Same rule as v11: a conclusion reached by the old matcher is stale.
 
-**Current version is 13** (the paragraphs below were written at 11; v12 is upstream `99724aa79`, v13 upstream `f437bb506` -- NFD Hangul titles and TOC labels compose) — `BOOK_CACHE_VERSION` at
+**Current version is 14** (the paragraphs below were written at 11; v12 is upstream `99724aa79`, v13 upstream `f437bb506` -- NFD Hangul titles and TOC labels compose, v14 upstream `652ae0d83`'s metadata-text fix -- an author split at a character reference no longer reads "Bront, ë") — `BOOK_CACHE_VERSION` at
 `lib/Epub/Epub/BookMetadataCache.cpp:35`. Check the live value with
 `grep -n 'BOOK_CACHE_VERSION = ' lib/Epub/Epub/BookMetadataCache.cpp` rather
 than trusting a number here; it will drift again. The ImHex pattern below still

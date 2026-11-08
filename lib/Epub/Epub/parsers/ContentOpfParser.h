@@ -56,6 +56,11 @@ class ContentOpfParser final : public Print {
   static void characterData(void* userData, const XML_Char* s, int len);
   static void endElement(void* userData, const XML_Char* name);
 
+  // appendMetadataText() state: a whitespace run seen but not yet written, and
+  // a ", " owed before the next author's first character.
+  bool metadataSpacePending = false;
+  bool authorSeparatorPending = false;
+
  public:
   std::string title;
   std::string author;
