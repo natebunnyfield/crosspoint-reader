@@ -85,13 +85,16 @@ void UiListActivity::loop() {
   if (handleButtons()) return;
   if (routeListTouch()) return;
 
-  // Swipes scroll the viewport; the selection stays put (it may scroll
-  // off-screen) and button navigation pulls the view back to it.
+  // Swipes page the list. The view is derived from the selection (drawRows),
+  // so a swipe moves the selection a page, as the pre-port lists did; the
+  // Picco never reports a swipe (HalGPIO::wasSwipe).
   const auto swipe = mappedInput.wasSwipe();
   if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
     auto& n = activeNav();
-    const int delta = swipe == MappedInputManager::SwipeDir::Up ? n.visibleRows : -n.visibleRows;
-    if (n.scrollBy(delta, listCount())) requestUpdate();
+    const int count = listCount();
+    moveSelectionTo(swipe == MappedInputManager::SwipeDir::Up
+                        ? ButtonNavigator::nextPageIndex(n.selected, count, n.visibleRows)
+                        : ButtonNavigator::previousPageIndex(n.selected, count, n.visibleRows));
     return;
   }
 
@@ -147,42 +150,58 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
 void UiListActivity::drawRows(UiScreen& screen, const ListLook& look) {
   const int count = listCount();
   if (count <= 0) return;
-  fui::ListProps props;
-  props.action = ACTION_ROW;
-  props.inputMask = wantsTouchLongPress ? static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress)
-                                        : static_cast<uint16_t>(fui::InputTouch);  // physical buttons stay in loop()
-  syncListViewport(screen, props, look.subtitles);
   auto& n = activeNav();
+  if (n.selected >= count) n.selected = count - 1;
+  if (n.selected < 0) n.selected = 0;
 
-  // Only the rows on screen are described; the list draws that window with a
-  // zero top index and the hit values carry the absolute index.
-  const int top = n.top;
-  const int end = top + n.visibleRows < count ? top + n.visibleRows : count;
-  std::vector<ListRow> rows(static_cast<size_t>(end - top));
-  std::vector<fui::ListItem> items(rows.size());
-  for (int i = top; i < end; i++) {
-    ListRow& row = rows[static_cast<size_t>(i - top)];
-    describeRow(i, row);
-    fui::ListItem& item = items[static_cast<size_t>(i - top)];
-    item.label = row.title.c_str();
-    if (look.subtitles && !row.subtitle.empty()) item.subtitle = row.subtitle.c_str();
-    if (!row.value.empty()) item.value = row.value.c_str();
-    if (look.icons) item.icon = listIconFor(row.icon, look.subtitles ? 32 : 24);
-    item.actionValue = static_cast<int16_t>(i);
-  }
-  props.items = items.data();
-  props.count = static_cast<uint16_t>(items.size());
-  props.topIndex = 0;
-  props.selectedIndex = static_cast<int16_t>(n.selected - top);
-  props.scrollIndicator = false;  // the window always fits; the indicator is drawn for the whole list below
+  // Lyra Six paints the rows (GUI.drawList), so a converted screen looks as
+  // it did before the FUI port: the theme's row heights, UI_10 titles, the
+  // rounded light band, the value badges, its scroll bar and its PAGED
+  // layout. Paging matters beyond looks: a cursor move inside a page changes
+  // only the two rows involved, which GfxRenderer's tile diff presents as a
+  // small window, where a list that scrolls by one row at its edge repaints
+  // every row on every step there. The viewport is therefore derived from the
+  // selection exactly as drawList derives it.
   const fui::Rect band = screen.body();
-  screen.list(props);
-  if (count > n.visibleRows) {
-    const auto& theme = screen.theme();
-    fui::drawListScrollIndicator(screen.target(), band, static_cast<uint32_t>(count),
-                                 static_cast<uint32_t>(n.visibleRows), static_cast<uint32_t>(top),
-                                 theme.listScrollWidth, theme.listScrollSide, theme.listScrollInset);
+  const Rect rect{band.x, band.y, band.width, band.height};
+  const int rowStep = GUI.getListRowStep(look.subtitles);
+  const int pageItems = GUI.getListPageItems(rect.height, look.subtitles);
+  n.visibleRows = pageItems;
+  n.followOnBuild = false;
+  const int pageStart = n.selected / pageItems * pageItems;
+  n.top = pageStart;
+
+  // Only the rows on this page are described (drawList asks for no others).
+  const int pageCount = pageStart + pageItems < count ? pageItems : count - pageStart;
+  pageRows.resize(static_cast<size_t>(pageCount));
+  for (int i = 0; i < pageCount; i++) {
+    pageRows[static_cast<size_t>(i)] = ListRow{};
+    describeRow(pageStart + i, pageRows[static_cast<size_t>(i)]);
   }
+  const auto rowAt = [this, pageStart](const int index) -> const ListRow& {
+    return pageRows[static_cast<size_t>(index - pageStart)];
+  };
+  GUI.drawList(
+      renderer, rect, count, n.selected, [&rowAt](int index) { return rowAt(index).title; },
+      look.subtitles ? std::function<std::string(int)>([&rowAt](int index) { return rowAt(index).subtitle; }) : nullptr,
+      look.icons ? std::function<UIIcon(int)>([&rowAt](int index) { return rowAt(index).icon; }) : nullptr,
+      [&rowAt](int index) { return rowAt(index).value; }, look.highlightValue,
+      [&rowAt](int index) { return rowAt(index).dimmed; });
+
+  // FreeInkUI still owns touch: one hit rect per drawn row, routed by the
+  // app (routeListTouch) to ACTION_ROW with the absolute index.
+  const uint16_t mask = wantsTouchLongPress ? static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress)
+                                            : static_cast<uint16_t>(fui::InputTouch);
+  for (int i = 0; i < pageCount; i++) {
+    const fui::Rect hit{band.x, static_cast<int16_t>(band.y + i * rowStep), band.width, static_cast<int16_t>(rowStep)};
+    screen.frame().hit(hit, ACTION_ROW, static_cast<int16_t>(pageStart + i), mask);
+  }
+}
+
+void UiListActivity::drawEmptyMessage(UiScreen& screen, const char* message) {
+  // The theme's empty-list line, as the pre-port screens drew it.
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  renderer.drawText(UI_10_FONT_ID, screen.body().x + metrics.contentSidePadding, screen.body().y + 20, message);
 }
 
 void UiListActivity::drawChrome() {

@@ -85,17 +85,21 @@ void XtcReaderChapterSelectionActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   // Content: the safe area minus the header band drawChrome paints the title in.
-  screen.setContentMargin(fui::Insets{static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
-                                      static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
-                                      static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)),
-                                      static_cast<int16_t>(safe.x)});
+  screen.setContentMargin(
+      fui::Insets{static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
+                  static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
+                  static_cast<int16_t>(renderer.getScreenHeight() - safe.height + metrics.verticalSpacing),
+                  static_cast<int16_t>(safe.x)});
+  // The list band ends where the pre-port screen's did: verticalSpacing above
+  // the safe area's height (its contentHeight was safe.height - contentTop -
+  // verticalSpacing).
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
   if (!xtc) {
     return;
   }
   if (listCount() == 0) {
-    screen.centeredText(tr(STR_NO_CHAPTERS), screen.theme().bodyText);
+    drawEmptyMessage(screen, tr(STR_NO_CHAPTERS));
     return;
   }
   drawRows(screen, ListLook{});

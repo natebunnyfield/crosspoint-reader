@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "activities/Activity.h"
 #include "components/OptionPopup.h"
@@ -25,6 +26,11 @@
 // strings for every entry. A 500-file folder or a long TOC costs one screenful
 // of strings per render, and the TOC is not read from the card in full before
 // the first frame.
+//
+// The rows are PAINTED by the theme (GUI.drawList, Lyra Six) rather than by
+// fui::list, so converted screens keep the fork's look and paging; FreeInkUI
+// hosts the screen and routes touch through one hit rect per drawn row. See
+// drawRows().
 class UiListActivity : public Activity, protected UiAppHost {
  public:
   void onEnter() override;
@@ -116,6 +122,9 @@ class UiListActivity : public Activity, protected UiAppHost {
   // Lay out the rows on screen in the remaining body of `screen` and register
   // their hit rects. Call from buildScreen() once the margins are set.
   void drawRows(UiScreen& screen, const ListLook& look);
+  // The empty-list line (left-aligned UI_10 at the top of the body), as the
+  // pre-port screens drew it.
+  void drawEmptyMessage(UiScreen& screen, const char* message);
   // Move the selection to index and pull the viewport to it.
   void moveSelectionTo(int index);
 
@@ -133,4 +142,6 @@ class UiListActivity : public Activity, protected UiAppHost {
   bool routeListTouch();
 
   const bool wantsTouchLongPress;
+  // The page drawRows() last described. Render task only.
+  std::vector<ListRow> pageRows;
 };

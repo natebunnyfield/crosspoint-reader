@@ -129,7 +129,7 @@ void RecentBooksActivity::buildScreen(UiScreen& screen) {
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
   if (recentBooks.empty()) {
-    screen.centeredText(tr(STR_NO_RECENT_BOOKS), screen.theme().bodyText);
+    drawEmptyMessage(screen, tr(STR_NO_RECENT_BOOKS));
     return;
   }
 

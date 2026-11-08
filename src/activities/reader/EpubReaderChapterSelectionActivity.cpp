@@ -157,7 +157,11 @@ void EpubReaderChapterSelectionActivity::buildScreen(UiScreen& screen) {
   // drawChrome paints.
   screen.setContentMargin(fui::Insets{
       static_cast<int16_t>(listTop()), static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
-      static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)), static_cast<int16_t>(safe.x)});
+      static_cast<int16_t>(renderer.getScreenHeight() - safe.height + metrics.verticalSpacing),
+      static_cast<int16_t>(safe.x)});
+  // The list band ends where the pre-port screen's did: verticalSpacing above
+  // the safe area's height (its contentHeight was safe.height - contentTop -
+  // verticalSpacing).
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
   if (!epub) {
