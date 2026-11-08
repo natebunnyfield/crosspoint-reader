@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+
 #include "activities/Activity.h"
 #include "activities/boot_sleep/CalendarSleepScreen.h"
 
@@ -22,6 +24,8 @@ class SleepActivity final : public Activity {
   // retained screen showing (the Transparent sleep screen's plain-BMP path).
   void renderBitmapSleepScreen(const Bitmap& bitmap, bool preserveBackground = false) const;
   bool renderSleepOverlayFile(HalFile& file, const char* pathForLog) const;
+  bool renderTransparentOverlayPng(const std::string& path) const;
+  bool renderSleepOverlayPath(const std::string& path) const;
   void renderTransparentCustomSleepScreen() const;
   void renderLastScreenSleepScreen() const;
   void renderBlankSleepScreen() const;

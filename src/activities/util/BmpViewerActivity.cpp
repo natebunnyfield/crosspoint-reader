@@ -1,6 +1,7 @@
 #include "BmpViewerActivity.h"
 
 #include <Bitmap.h>
+#include <Epub/converters/PngToFramebufferConverter.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -39,7 +40,7 @@ void BmpViewerActivity::loadSiblingImages() {
       file.getName(name, sizeof(name));
       if (name[0] != '.') {
         std::string fname(name);
-        if (FsHelpers::hasBmpExtension(fname)) {
+        if (FsHelpers::hasBmpExtension(fname) || FsHelpers::hasPngExtension(fname)) {
           siblingImages.push_back(fname);
         }
       }
@@ -58,6 +59,28 @@ void BmpViewerActivity::loadSiblingImages() {
   }
 }
 
+bool BmpViewerActivity::canSetSleepCover() const {
+  return FsHelpers::hasBmpExtension(filePath) ||
+         (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM &&
+          FsHelpers::hasPngExtension(filePath));
+}
+
+bool BmpViewerActivity::renderPng() {
+  ImageDimensions dimensions;
+  if (!PngToFramebufferConverter::getDimensionsStatic(filePath, dimensions)) return false;
+  if (dimensions.width <= 0 || dimensions.height <= 0) return false;
+
+  const float scale = std::min(static_cast<float>(renderer.getScreenWidth()) / dimensions.width,
+                               static_cast<float>(renderer.getScreenHeight()) / dimensions.height);
+  const int width = std::min(renderer.getScreenWidth(), static_cast<int>(dimensions.width * std::min(scale, 1.0f)));
+  const int height = std::min(renderer.getScreenHeight(), static_cast<int>(dimensions.height * std::min(scale, 1.0f)));
+  RenderConfig config{(renderer.getScreenWidth() - width) / 2, (renderer.getScreenHeight() - height) / 2, width,
+                      height};
+
+  PngToFramebufferConverter converter;
+  return converter.decodeToFramebuffer(filePath, renderer, config);
+}
+
 void BmpViewerActivity::onEnter() {
   Activity::onEnter();
   // Per file: openSibling() re-enters with a new path, and a bad sibling
@@ -68,13 +91,32 @@ void BmpViewerActivity::onEnter() {
     loadSiblingImages();
   }
 
-  HalFile file;
-
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
   Rect popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
   GUI.fillPopupProgress(renderer, popupRect, 20);  // Initial 20% progress
-  // 1. Open the file
+  if (FsHelpers::hasPngExtension(filePath)) {
+    renderer.clearScreen();
+    const bool hasPrevious = siblingImages.size() > 1 && currentImageIndex > 0;
+    const bool hasNext = siblingImages.size() > 1 && currentImageIndex != -1 &&
+                         currentImageIndex < static_cast<int>(siblingImages.size()) - 1;
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), canSetSleepCover() ? tr(STR_SET_SLEEP_COVER) : "",
+                                              hasPrevious ? "<" : "", hasNext ? ">" : "");
+    if (renderPng()) {
+      GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+      imageValid = true;
+    } else {
+      renderer.clearScreen();
+      renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2, tr(STR_FILE_OPEN_FAILED));
+      GUI.drawButtonHints(renderer, labels.btn1, "", "", "");
+      renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    }
+    return;
+  }
+
+  HalFile file;
+  // 1. Open the BMP file
   if (Storage.openFileForRead("BMP", filePath, file)) {
     Bitmap bitmap(file, true);
 
@@ -106,8 +148,8 @@ void BmpViewerActivity::onEnter() {
       bool hasNext = (siblingImages.size() > 1 && currentImageIndex != -1 &&
                       currentImageIndex < static_cast<int>(siblingImages.size()) - 1);
 
-      const auto labels =
-          mappedInput.mapLabels(tr(STR_BACK), tr(STR_SET_SLEEP_COVER), (hasPrevious ? "<" : ""), (hasNext ? ">" : ""));
+      const auto labels = mappedInput.mapLabels(tr(STR_BACK), canSetSleepCover() ? tr(STR_SET_SLEEP_COVER) : "",
+                                                (hasPrevious ? "<" : ""), (hasNext ? ">" : ""));
 
       GUI.fillPopupProgress(renderer, popupRect, 50);
 
@@ -156,13 +198,17 @@ constexpr const char* SLEEP_COVER_PATH = "/sleep.bmp";
 // Transparent mode reads its own root file (SleepActivity.cpp), so "set as
 // sleep screen" writes there instead and leaves the mode alone (upstream #2937).
 constexpr const char* SLEEP_OVERLAY_PATH = "/sleep-overlay.bmp";
+constexpr const char* SLEEP_OVERLAY_PNG_PATH = "/sleep-overlay.png";
 }  // namespace
 
 void BmpViewerActivity::doSetSleepCover() {
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
 
   const bool transparentMode = SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM;
-  const char* destination = transparentMode ? SLEEP_OVERLAY_PATH : SLEEP_COVER_PATH;
+  if (!canSetSleepCover()) return;
+  const char* destination =
+      transparentMode ? (FsHelpers::hasPngExtension(filePath) ? SLEEP_OVERLAY_PNG_PATH : SLEEP_OVERLAY_PATH)
+                      : SLEEP_COVER_PATH;
 
   // Setting the sleep cover FROM the sleep cover destroys it. openFileForWrite
   // is O_TRUNC, so opening /sleep.bmp for output truncated the very file inFile
@@ -264,7 +310,7 @@ void BmpViewerActivity::loop() {
     // Only a file that decoded: the error screens draw a Back hint alone,
     // and copying an unreadable file over /sleep.bmp lost a working cover
     // (second-pass audit, 2026-09-04).
-    if (imageValid) doSetSleepCover();
+    if (imageValid && canSetSleepCover()) doSetSleepCover();
     return;
   }
 
