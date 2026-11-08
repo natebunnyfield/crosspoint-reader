@@ -31,6 +31,9 @@ class HomeActivity final : public Activity {
   const HomeMenuItem initialMenuItem;
   // The cover to land on when initialMenuItem is NONE; empty = the top one.
   const std::string initialBookPath;
+  // First paint as HALF: the panel still shows the sleep image (see
+  // ActivityManager::goHome).
+  const bool cleanInitialRefresh;
 
   // Menu order, owner ruling 2026-08-06. FIVE things encode this list: these two
   // maps, the menuItems/menuIcons vectors in HomeActivity.cpp, and
@@ -103,10 +106,12 @@ class HomeActivity final : public Activity {
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                        HomeMenuItem initialMenuItemValue = HomeMenuItem::NONE, std::string initialBookPathValue = {})
+                        HomeMenuItem initialMenuItemValue = HomeMenuItem::NONE, std::string initialBookPathValue = {},
+                        bool cleanInitialRefreshValue = false)
       : Activity("Home", renderer, mappedInput),
         initialMenuItem(initialMenuItemValue),
-        initialBookPath(std::move(initialBookPathValue)) {}
+        initialBookPath(std::move(initialBookPathValue)),
+        cleanInitialRefresh(cleanInitialRefreshValue) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

@@ -271,7 +271,7 @@ void ActivityManager::goToFullScreenMessage(std::string message, EpdFontFamily::
   replaceActivity(std::make_unique<FullScreenMessageActivity>(renderer, mappedInput, std::move(message), style));
 }
 
-void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
+void ActivityManager::goHome(HomeMenuItem initialMenuItem, const bool cleanInitialRefresh) {
   // Land the selector back on the row the user left from.
   //
   // This used to match currentActivity->name against a hardcoded list of
@@ -283,7 +283,8 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
   if (initialMenuItem == HomeMenuItem::NONE) initialMenuItem = lastHomeMenuItem;
   // The cover path only matters when no menu row is in charge; HomeActivity
   // applies that precedence, so it is handed over unconditionally.
-  replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem, lastHomeBookPath));
+  replaceActivity(
+      std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem, lastHomeBookPath, cleanInitialRefresh));
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 

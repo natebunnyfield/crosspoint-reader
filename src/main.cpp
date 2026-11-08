@@ -1119,6 +1119,9 @@ void setup() {
                             : isSleepWake && !APP_STATE.showBootScreen ? BootResume::SplashlessWake
                                                                        : BootResume::Splash;
   bool allowFastInitialReaderRefresh = false;
+  // Splashless wake with no retained frame: the panel still physically shows
+  // the sleep image, so a Home landing must paint it away with a clean refresh.
+  bool needsWakeRefresh = false;
 
   // Second USB sample (first one right after powerManager.begin()): settles the
   // SOF host-link verdict before the first refresh can slice-sleep.
@@ -1180,6 +1183,8 @@ void setup() {
           renderer.displayBuffer(HalDisplay::FAST_REFRESH);
         }
         allowFastInitialReaderRefresh = true;
+      } else {
+        needsWakeRefresh = true;
       }
       break;
     case BootResume::Splash:
@@ -1238,10 +1243,10 @@ void setup() {
         APP_STATE.saveToFile();
         activityManager.goToReader(zenPath, allowFastInitialReaderRefresh);
       } else {
-        activityManager.goHome();
+        activityManager.goHome(HomeMenuItem::NONE, needsWakeRefresh);
       }
     } else {
-      activityManager.goHome();
+      activityManager.goHome(HomeMenuItem::NONE, needsWakeRefresh);
     }
   } else {
     // Clear app state to avoid getting into a boot loop if the epub doesn't load
