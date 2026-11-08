@@ -274,7 +274,12 @@ namespace {
 // word, and a visible hyphen or dash inside a focus-read word becomes a break
 // opportunity. Both move line breaks (Focus Reading on only). Stale v67
 // caches would keep the old breaks.
-constexpr uint8_t SECTION_FILE_VERSION = 68;
+// v69: upstream 99724aa79 (#3001). The OPF language now parses when the package
+// does not spell it dc:language, and the language picks the hyphenation
+// patterns (Section.cpp, Hyphenator::setPreferredLanguage), which this file's
+// key does not carry. A section built under the default language would keep
+// the wrong breaks for such a book.
+constexpr uint8_t SECTION_FILE_VERSION = 69;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

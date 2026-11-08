@@ -8,8 +8,14 @@ All POD fields are written in the ESP32 little-endian representation used by
 
 ### Version 10, superseded by Version 11 (2026-08-23) — struct unchanged, meaning changed
 
-**Current version is 11**, not 10 — `BOOK_CACHE_VERSION` at
-`lib/Epub/Epub/BookMetadataCache.cpp:29`. Check the live value with
+**Version 12 (2026-11-08, upstream `99724aa79`): struct unchanged, meaning
+changed again.** The OPF parser now matches elements by local name, so a
+package that does not spell its metadata `dc:title`/`dc:creator`/`dc:language`
+(or its structure `opf:spine` etc.) no longer caches an empty title, author or
+language. Same rule as v11: a conclusion reached by the old matcher is stale.
+
+**Current version is 12** (the paragraphs below were written at 11) — `BOOK_CACHE_VERSION` at
+`lib/Epub/Epub/BookMetadataCache.cpp:35`. Check the live value with
 `grep -n 'BOOK_CACHE_VERSION = ' lib/Epub/Epub/BookMetadataCache.cpp` rather
 than trusting a number here; it will drift again. The ImHex pattern below still
 describes the v10 byte layout, which v11 does not change — no field was added
@@ -157,6 +163,7 @@ before relying on any of them for a field layout:
 | 66 | upstream `1582e70ef` + `596f0d3f7` (campaign 2026-11-08) | **structural**: the fixed-size footnote href field grows 96 → 256 bytes (`FOOTNOTE_HREF_LEN`, `lib/Epub/Epub/FootnoteEntry.h`), so each serialized footnote record goes 128 → 288 bytes; a v65 file would mis-parse every page after its first footnote |
 | 67 | `ebf31274f` | chapter sinkage removed: a section's first page starts at y=0 like every other (owner 2026-11-08, `docs/page-space-2026-11-08.md`); no field changed, the first page's layout did |
 | 68 | upstream `25cf99b21` (#2892, campaign 2026-11-08) | **layout**, Focus Reading only: a focus-read word stays one token with its bold prefix as a byte boundary (`ParsedText::wordFocusBoundary`), so the hyphenator sees the whole word, and a visible hyphen or dash inside it is a break opportunity (`TokenBoundary.h`); line breaks move for books read with Focus Reading on |
+| 69 | upstream `99724aa79` (#3001, campaign 2026-11-08) | **decision**: the OPF language now parses when it is not spelled `dc:language`, and it selects the hyphenation patterns, which the section key does not carry; paired with `book.bin` v12 |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

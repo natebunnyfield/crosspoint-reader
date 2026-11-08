@@ -26,7 +26,13 @@ namespace {
 // changes, when pagination changes, OR when anything the cached pass DECIDED
 // changes. A cache is not only a layout; it is a record of conclusions, and a
 // conclusion reached by code that has since been fixed is stale.
-constexpr uint8_t BOOK_CACHE_VERSION = 11;
+// v12, 2026-11-08: NOT a format change either; upstream 99724aa79 (#3001).
+// The OPF parser matched elements by literal qualified name ("dc:title",
+// "opf:spine"), so a package that binds Dublin Core or OPF to another prefix,
+// or uses none, cached an empty title, author or language. It matches on the
+// local name now, and by the v11 rule a cached conclusion reached by the old
+// matcher is stale.
+constexpr uint8_t BOOK_CACHE_VERSION = 12;
 // Written into Header A while the file is still being built, and overwritten
 // with BOOK_CACHE_VERSION only once every byte is down. load() rejects it as a
 // version mismatch and rebuilds, so a file interrupted at any point -- a crash,
