@@ -34,6 +34,7 @@
 
 #include "Epub.h"
 #include "Epub/converters/ImageDecoderFactory.h"
+#include "Epub/parsers/ContentOpfParser.h"
 #include "FsHelpers.h"
 
 HalDisplay display;
@@ -161,4 +162,29 @@ TEST(LargeSpine, EveryChapterKeepsItsSizeAcrossLookupChunks) {
     prev = cum;
   }
   remove(epubPath.c_str());
+}
+
+// An OPF that lists far more stylesheets than any book has. The list used to
+// grow without bound (every entry a heap string) and was then copied and used
+// to size a scratch table, so a hostile or broken manifest could abort the
+// device on vector growth (fork survey #17). The manifest's list stops at
+// ContentOpfParser::MAX_CSS_FILES, keeping the FIRST entries in order.
+TEST(CssManifestCap, AManifestOfThousandsOfStylesheetsStopsAtTheCap) {
+  std::string opf =
+      "<?xml version=\"1.0\"?><package xmlns=\"http://www.idpf.org/2007/opf\" version=\"2.0\">"
+      "<metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\"><dc:title>T</dc:title></metadata><manifest>";
+  constexpr int kSheets = 5000;
+  for (int i = 0; i < kSheets; i++) {
+    opf += "<item id=\"s" + std::to_string(i) + "\" href=\"s" + std::to_string(i) + ".css\" media-type=\"text/css\"/>";
+  }
+  opf += "</manifest><spine/></package>";
+
+  Cache cache("css_cap");
+  ContentOpfParser parser(cache.path(), "OEBPS/", opf.size(), nullptr);
+  ASSERT_TRUE(parser.setup());
+  parser.write(reinterpret_cast<const uint8_t*>(opf.data()), opf.size());
+
+  ASSERT_EQ(parser.cssFiles.size(), ContentOpfParser::MAX_CSS_FILES);
+  EXPECT_EQ(parser.cssFiles.front(), "s0.css");
+  EXPECT_EQ(parser.cssFiles.back(), "s" + std::to_string(ContentOpfParser::MAX_CSS_FILES - 1) + ".css");
 }

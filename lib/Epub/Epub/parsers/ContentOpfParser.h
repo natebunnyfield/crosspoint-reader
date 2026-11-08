@@ -65,7 +65,14 @@ class ContentOpfParser final : public Print {
   std::string coverItemHref;
   std::string guideCoverPageHref;  // Guide reference with type="cover" or "cover-page" (points to XHTML wrapper)
   std::string textReferenceHref;
+  // CSS stylesheet paths. Capped: the list comes straight from the OPF, every
+  // entry is a heap string, and the parse copies it and sizes a scratch table
+  // from it, so an OPF listing tens of thousands of stylesheets used to abort
+  // on vector growth (fork survey #17, wildfire 8c98d7808b). A real book has a
+  // handful; past the cap the rest are ignored with a log line.
+  static constexpr size_t MAX_CSS_FILES = 256;
   std::vector<std::string> cssFiles;  // CSS stylesheet paths
+  bool cssFilesCapped = false;
 
   explicit ContentOpfParser(const std::string& cachePath, const std::string& baseContentPath, const size_t xmlSize,
                             BookMetadataCache* cache)

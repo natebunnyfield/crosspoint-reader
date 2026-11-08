@@ -236,7 +236,12 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
 
     // Collect CSS files
     if (mediaType == MEDIA_TYPE_CSS) {
-      self->cssFiles.push_back(href);
+      if (self->cssFiles.size() < MAX_CSS_FILES) {
+        self->cssFiles.push_back(href);
+      } else if (!self->cssFilesCapped) {
+        self->cssFilesCapped = true;
+        LOG_ERR("COF", "More than %u stylesheets in the manifest; ignoring the rest", (unsigned)MAX_CSS_FILES);
+      }
     }
 
     // EPUB 3: Check for nav document (properties contains "nav")

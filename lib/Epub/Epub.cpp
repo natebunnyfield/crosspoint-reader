@@ -145,7 +145,7 @@ bool Epub::parseContentOpf(BookMetadataCache::BookMetadata& bookMetadata, const 
   }
 
   if (!opfParser.cssFiles.empty()) {
-    cssFiles = opfParser.cssFiles;
+    cssFiles = std::move(opfParser.cssFiles);
   }
 
   LOG_DBG("EBP", "Successfully parsed content.opf");
@@ -275,6 +275,11 @@ void Epub::discoverCssFilesFromZip() {
         }
 
         if (std::find(cssFiles.begin(), cssFiles.end(), filePath) != cssFiles.end()) {
+          return;
+        }
+        // Same cap as the manifest's list (ContentOpfParser::MAX_CSS_FILES): a
+        // zip can hold any number of .css entries.
+        if (cssFiles.size() >= ContentOpfParser::MAX_CSS_FILES) {
           return;
         }
 
