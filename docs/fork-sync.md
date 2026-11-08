@@ -231,8 +231,11 @@ commits built on it are then taken normally.
 **Driver, from 2026-11-08 10:30:** the session "Planck play button mouse
 clicks" (worktree `.claude/worktrees/campaign-b3`, branch `campaign-b3`) is
 taking, in this order: the `a757b9d10` reader-base port (ruled "Adopt, keep
-fork behavior") with `63fcbab02`, then batch 3 onward from `62e84a16f`. Reader port, batch 3 and batch 4 are pushed;
-batch 5 (after `e33e3cf39`) is next, same driver. The
+fork behavior") with `63fcbab02`, then batch 3 onward from `62e84a16f`. Batches 3-5 are pushed; batch 6 (after `fca8f55f5`) is next, same driver.
+**Owner questions (owner, 2026-11-08: "just coordinate everything with the other
+chat directly"):** the session "Picco serial watcher and hello world boot" asks
+the owner every held decision and records the ruling here; the driver does not
+ask, and re-reads this file for rulings before each batch. The
 `81e192709` light-sleep revert is left to whoever gets the owner's answer. A
 second session starting a batch or the reader port should fetch `main`, read
 this line, and take something else (or nothing) to avoid porting the same
@@ -269,6 +272,7 @@ reaches them, not port them again:
 | 2 | `e970abae8`..`57c692fe8` (40) | 10 (`e970abae8` `25cf99b21` `99724aa79` `618608e84` `6a501bba5` `c6fe67d48` `27f964b3e` `eef205044` `a4a03c6b4` `7e42d0707`) | 9 (`268c27f7d` Transparent sleep screen, appended as value 14; `48e39eb0e` reposition clearing on the fork's three-stage anchors; `4970ef1f6` PNG overlays + PNG viewer; `33f07db71` post-delete nav lock only; `bbca4886c` X3-UC8279 edge-button fix only; `d3b3b5669` dimension guard/8 MP/decode yield, not the image-margin clamp or single-base image refresh; `8eea7f865` Wi-Fi only; `a0daab994` font layer only; `93d572fcb` arabic preset only) | ALREADY 4 (`70faa29da` = `816011c42`; `e715532f9`; `080b1d719` = `ca1850a91`; `28377310d` fork has Wider/Widest); SKIP 15 (deleted subsystems: dictionary x2, status bar, Ubuntu UI face x2, font download; `b1d53ba81` ruling; `4d764de9c` press/release ruling; `413a1bd9d`+`151414d8c` revert pair; `81fd32237` would drop `.claude/skills`; `63fcbab02` needs `a757b9d10`; `b3d1e79d0` fixed-height Lyra rows; `75c079fe7` SDK-only; `da3d50c24` fork's own table columns); FLAG 2 (`a757b9d10` reader consolidation, `81e192709` light-sleep revert). Caches: section 67 -> 70 (renumbered when rebased over page-space v67, `docs/page-space-2026-11-08.md`), book.bin 11 -> 12 | (this push) |
 | 3 | `62e84a16f`..`25bbfae76` (40) | 5 (`5182d27e2` `b6746c1df` `c484dc72b` `8141d7b9c`+`820d0b96a`) | 5 (`cdbe2a779` en/es only; `8bc1603e8` no SDK bump; `86976ab23` log only, fix ALREADY; `790a0817e` guard restores the prior mode; `52444a0c9` block-close insets, `!important` ALREADY) | ALREADY 6 (empty picks); REJECTED 1 (`e31dcbb08`); SKIP 16 (deleted subsystems, other boards, Swedish, fork Settings/list chrome; see "Batch 3" below); HELD 4 (frontlight panel x4, X4 Classic... see below) + RULED: wake rule x2 SKIP ("go with rec"), USB MSC BUILD for the Picco ("build"). Caches: section 70 -> 71, CSS stays 11 | (this push) |
 | 4 | `84fcff848`..`e33e3cf39` (50) | 11 (`309923156` `ce6c6cbce` `5fcd26330` `93b6fe111` `b5fb406f5` `03c484778` `6eda8f0b7` `3e60e1302` `c33a8b0e8` `c80c537f2` `0475e6938`) | 7 (`badfa95ff` `365618e47` `9d2f234e1` `54337e6d7` `b7bceb56c` `f437bb506` `2b2ba72f0`; see "Batch 4" below) | ALREADY 7; SKIP 18 (deleted subsystems, other languages, fork-curated font ids); HELD 7 (keyboard layouts, link tapping, language fonts, pioarduino bump, grayscale SDK series x2, X4 Classic CI). Plus a fork fix from `da3d50c24` (skipped-subtree close guard). Caches: section 71 -> 77, book.bin 12 -> 13, CSS 11 -> 12 | (this push) |
+| 5 | `123f3760e`..`fca8f55f5` (50) | 6 (`f64ba736a` `3555ff556` `3f874f847` `f4b4ff06c` `8e10f51df` `04ca1d53c`) | 3 (`652ae0d83` OPF metadata fix only; `92ef5707a` grey bins only; `3f70f5dfc` MEM gate only) | ALREADY 8; SKIP 18; RULED SKIP 1 (`aaf683798`); HELD 14 (9 owner questions). Plus six fixes from the adversarial review. Caches: section 77 -> 78, book.bin 13 -> 14 | (this push) |
 
 
 ### FUI port (`9e3cea2e5`), 2026-11-08
@@ -574,6 +578,105 @@ footnote sup, v74 Hangul, v75 hidden, v76 skipped close, v77 list-style none);
 book.bin 12 -> 13; CSS cache 11 -> 12.
 
 Gates: `pio run -e default` (X4) SUCCESS, RAM 58,724 B, Flash 4,854,239 B (batch 3: 4,853,635 B, so +604 B). `pio run -e picco` SUCCESS, RAM 70,872 B, Flash 4,660,042 B (batch 3: 4,659,342 B, so +700 B). `pio run -e simulator` SUCCESS. `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). Host tests: 923 of 923 pass (884 at batch 3; the new suites are ligature_guard, inflate_stream, fs_helpers and sd_card_font, plus the new cascade_lines cases). The unique-ownership port (`c33a8b0e8`) was built and tested on its own branch first: 909 of 909, X4, simulator and the latency gate. Device behavior (font-cache timing, the Xtensa panic capture, TLS max fragment length) is UNCONFIRMED on device.
+
+
+### Batch 5 (2026-11-08): `123f3760e`..`fca8f55f5`, 50 commits
+
+A read-only agent triaged the batch against `2c1f42845`; each TAKE/PARTIAL was
+checked again before porting. This batch is mostly new features, so most of its
+weight is in HELD, grouped below so the owner is asked once per feature.
+
+- **TAKEN (6):**
+  - `f64ba736a` `upload-artifact@v6`, plus the fork-only `cut-release.yml`.
+  - `3555ff556` image heap fragmentation and the XTH plane size, all six
+    sites together.
+  - `3f874f847` the live frontlight state rides a silent restart. The Picco
+    slide switch still decides first.
+  - `f4b4ff06c` the space advance falls back to the glyph on a partial cache
+    miss (section v78).
+  - `8e10f51df` the RC workflow's penv pin, naming `gh_release_rc`: upstream's
+    `${{ matrix.pio_env }}` would expand to nothing in this matrix-less job.
+  - `04ca1d53c` per-glyph rasterizer, ported by hand in its own worktree. The fork's AA masks are passed in, each glyph cell is marked dirty once, and it falls back to the per-pixel path off-panel, at logical render scale > 1, for the notdef box and for sup/sub. Proven pixel-identical: 52 simulator screenshots byte-identical across light/dark and built-in/SD fonts, and 46,872 host differential cases (`docs/glyph-fastpath-pixel-identity-2026-11-08.md`). A full page draws 1.41-1.68x faster on the host; device speed UNCONFIRMED.
+- **PARTIAL (3):**
+  - `652ae0d83` only the OPF metadata-text fix: an author split at a character
+    reference read "Bront, ë"; titles are whitespace-collapsed and clamped at
+    512 bytes; the author is NFC (book.bin v14). The Library view itself is
+    HELD.
+  - `92ef5707a` the PNG overlay's four equal grey bins (`gray >> 6`); the
+    grayscale-capability parts are HELD with that series.
+  - `3f70f5dfc` the MEM log line also prints over the ROM printf transport
+    (the Sticky).
+- **ALREADY (8):**
+  - `6230eba2d` (fork `93fa2ddeb`), `045881a58` (fork `3496bfbb6`) and
+    `038d615f2` (fork `e66035d22`): empty picks.
+  - `06b5d5b3a`: `SdCardFont.cpp:174-181`.
+  - `e1c267b46`: fork `bec481625`, `8fbac2827`.
+  - `e0fb688bf`: Manage Files already renames, with book-reference migration.
+  - `dc9c3eabc`: the FUI port describes one page of rows per render.
+  - `8c84ef326`: its regression never happened here (batch 4 composes the row
+    title).
+- **SKIP (18):**
+  - Deleted subsystems: `ecec7e8d5` (OPDS), `2ffaae592` (bookmarks),
+    `43a335820` and `12cc816fb` (the toolbar reader menu and its deadlock fix).
+  - Other boards: `38857c008` `049c2b56c` `4598fa293` (SDK pointer bumps for
+    the held boards), `32f2b2aa2` `6f94d1ad5` (the X4 Pro Home key),
+    `19a63e0da` (Sticky IMU; the fork does not use the IMU).
+  - Release, CI and languages: `a1ceb6333` (upstream's release matrix and
+    version), `ce2b4fcd3` (German), `af820353a` (the fork ships two languages
+    already).
+  - Fixes to code the fork never took: `d707f14bd`, `004c48926`, `6f7b3e4fe`,
+    `fca8f55f5`, `0914aa1ab`.
+- **RULED SKIP (1):** `aaf683798` TrueType fonts on PSRAM boards, on the owner's 2026-11-08 ruling with `99c2f09d1` ("skip renderer and upload", recorded above by the other session).
+- **HELD (14), one question per feature, asked by the other session (see the driver note):**
+  1. **Library view.** `652ae0d83` (remainder), `bac8f73c2`, `6c83eddbf`,
+     `10d0aa1ec`: replace Recent Books with an indexed Library screen. It needs
+     SDK list APIs absent at `1dc07f6` (`syncListViewport`, `requestSelection`,
+     `inputPageRows`). Visual-gated.
+  2. **Cover Grid home theme** for PSRAM boards (the Picco): `362c88112`,
+     `581f59f93`, `d8da03ef4`. A new theme. Visual-gated.
+  3. **Word and character spacing settings:** `c81b58d33`. The fork scopes
+     letter spacing separately (`SettingsList.h:426-431`), and this changes
+     the page format.
+  4. **Time zones with DST:** `581c63745`, replacing the fork's own
+     fixed-offset list.
+  5. **Per-direction tap/swipe page turns and Next/Next side buttons:**
+     `b6cbb5e12`. Both settings are pinned by the Picco gesture rulings.
+  6. **An About screen** in Settings: `79a28ab3d`.
+  7. **UI text wrapping:** the `wrappedText` hunk of `652ae0d83`, which splits
+     an over-long word across lines instead of ellipsis-and-stop.
+     Visual-gated.
+  8. **Wi-Fi teardown by restart:** `4b17a7bb9`. Leaving Settings › Wi-Fi
+     Networks after a scan leaves the radio on today (the child hands Wi-Fi to
+     its parent, and Settings only saves). Upstream reboots silently into
+     Settings, a visible ~2-3 s "Loading". The owner decides: that, or turn the
+     radio off without a restart.
+  - Not new questions: `123f3760e` belongs to the USB Drive work (PR #35; it
+    needs SDK `4837c11` and `77bef3e`); `b0b844fcc` rides on batch 4's held
+    keyboard layouts (`d5d2d67a5`); `bde0809a4` has been held since 2026-11-07.
+
+**Found while porting, fixed (main's CI, red since 2026-09-15):**
+`build-default` and `release.yml` called `pio pkg install -e ${{ matrix.* }}`
+in jobs with no matrix. cppcheck at the `low` threshold flagged three lines.
+clang-format 21 rejected 17 files. Fixed in `02288b0a5` and `f4f8494de`, and
+`.skills/SKILL.md` now says CI checks the whole tree with clang-format 21. Also
+landed: `48ad17f2c`, the Picco's sleep path flushes SdFat's cache before the SD
+powers down (`FsVolume::end()` drops dirty sectors), found by the USB Drive
+work.
+
+**Adversarial review before shipping** (`docs/adversarial-review-2026-11-08-batches-3-5.md`,
+covering all of batches 3-5 and the other session's commits in the window). It
+found six bugs, all fixed before this push: F1, a hidden `<rt>` swallowed the
+text after it and corrupted the block-style stack (worsened by this campaign's
+skipped-subtree guard); F2, ligatures lost after a heap-pressure cache release;
+F3, the metadata clamp could end inside a character; P1, older, the HTTP server
+served files below a dot folder, saved Wi-Fi passwords included; P2, older,
+unescaped EPUB image names on the files page; P3, older, image OOM exits left
+depth unbalanced and `currentPage` null. WebDAV still mirrors dot paths on
+purpose, and whether secrets leave that mirror went to the owner.
+
+**Caches:** section 77 -> 78; book.bin 13 -> 14; CSS stays 12.
+
+Gates: `pio run -e default` (X4) SUCCESS, RAM 58,724 B, Flash 4,857,183 B. `pio run -e picco` SUCCESS, RAM 70,872 B, Flash 4,663,482 B. `pio run -e simulator` SUCCESS. `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). Host tests 940 of 940. `pio check` at the low threshold: no defects. clang-format 21: clean.
 
 
 ## One working copy per project
