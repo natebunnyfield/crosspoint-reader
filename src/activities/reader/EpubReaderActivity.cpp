@@ -1003,6 +1003,7 @@ void EpubReaderActivity::openChapterSelection() {
 
           LOG_DBG("ERS", "Chapter pick: spine %d anchor '%s'", chapterResult.spineIndex, chapterResult.anchor.c_str());
 
+          clearDeferredReposition();
           currentSpineIndex = chapterResult.spineIndex;
 
           // If anchor is not empty, it will be used later to calculate the page number.
@@ -1087,6 +1088,15 @@ void EpubReaderActivity::startFind(const std::string& query) {
 }
 
 void EpubReaderActivity::pageTurn(bool isForwardTurn) {
+  // A page turn is authoritative: do not let a resume/reflow position captured
+  // at session start snap the reader back after the incremental build completes.
+  // Peeked unlocked first so an ordinary turn never waits on the render task
+  // for the lock (the press-fired turn overlaps a render in flight); the render
+  // task only ever clears these, so a stale read costs nothing.
+  if (cachedChapterTotalPageCount != 0 || pendingWordAnchor || pendingParagraphAnchor) {
+    RenderLock lock(*this);
+    clearDeferredReposition();
+  }
   if (isForwardTurn) {
     // Advance within the section while there are (or may still be) more pages: either a built
     // page ahead, or the section is still building (windowed), in which case more pages exist
@@ -1642,6 +1652,12 @@ bool EpubReaderActivity::applyDeferredReposition() {
   }
   cachedChapterTotalPageCount = 0;  // consumed; don't read cached progress again
   return changed;
+}
+
+void EpubReaderActivity::clearDeferredReposition() {
+  cachedChapterTotalPageCount = 0;
+  pendingWordAnchor.reset();
+  pendingParagraphAnchor.reset();
 }
 
 bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageCount) {
@@ -2364,6 +2380,7 @@ void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool s
 
   {
     RenderLock lock(*this);
+    clearDeferredReposition();
     pendingAnchor = std::move(anchor);
     currentSpineIndex = targetSpineIndex;
     nextPageNumber = 0;
@@ -2381,6 +2398,7 @@ void EpubReaderActivity::restoreSavedPosition() {
 
   {
     RenderLock lock(*this);
+    clearDeferredReposition();
     currentSpineIndex = pos.spineIndex;
     nextPageNumber = pos.pageNumber;
     section.reset();

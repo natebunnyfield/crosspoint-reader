@@ -213,6 +213,13 @@ class EpubReaderActivity final : public Activity {
   // (used after a settings change re-paginates a chapter). Returns true if currentPage moved.
   // No-op while the section is still building or when the pagination is unchanged (plain resume).
   bool applyDeferredReposition();
+  // The saved resume/reflow anchor is only valid until it has established the
+  // initial landing page. Later user navigation (a page turn, a chapter pick,
+  // a footnote jump or return) must never be overwritten when a background
+  // build completes, so each of those disarms it here. Caller holds the
+  // RenderLock. Clears the word and paragraph anchors with the page count:
+  // this fork's reposition is three-stage, not upstream's one offset.
+  void clearDeferredReposition();
   bool saveProgress(int spineIndex, int currentPage, int pageCount);
   // Jump to a percentage of the book (0-100), mapping it to spine and page.
   // Opens the reader menu for the current position (short-press Confirm)
