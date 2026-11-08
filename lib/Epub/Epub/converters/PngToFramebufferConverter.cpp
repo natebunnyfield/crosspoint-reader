@@ -292,8 +292,9 @@ int pngDrawCallback(PNGDRAW* pDraw) {
           if (useDithering) {
             ditheredGray = applyBayerDither4Level(gray, outX, outY);
           } else {
-            ditheredGray = gray / 85;
-            if (ditheredGray > 3) ditheredGray = 3;
+            // Four equal bins (upstream 92ef5707a). gray / 85 made bins 85/85/85/1
+            // wide, so only a pure 255 read as white.
+            ditheredGray = gray >> 6;
           }
           pw.writePixel(outX, ditheredGray, ctx->alphaLineBuffer != nullptr);
           if (caching) cw.writePixel(outX, ditheredGray);
