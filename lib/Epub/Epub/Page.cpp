@@ -2,14 +2,13 @@
 
 #include <GfxRenderer.h>
 #include <Logging.h>
+#include <Memory.h>
 #include <Serialization.h>
-
-#include <new>
 
 namespace {
 
 template <typename Predicate>
-void renderFilteredPageElements(const std::vector<std::shared_ptr<PageElement>>& elements, GfxRenderer& renderer,
+void renderFilteredPageElements(const std::vector<std::unique_ptr<PageElement>>& elements, GfxRenderer& renderer,
                                 const int fontId, const int xOffset, const int yOffset, Predicate&& predicate) {
   for (const auto& element : elements) {
     if (predicate(*element)) {
@@ -44,12 +43,12 @@ std::unique_ptr<PageLine> PageLine::deserialize(serialization::BufferedFileReade
     return nullptr;
   }
 
-  auto* line = new (std::nothrow) PageLine(std::move(tb), xPos, yPos);
+  auto line = makeUniqueNoThrow<PageLine>(std::move(tb), xPos, yPos);
   if (!line) {
     LOG_ERR("PGE", "Deserialization failed: could not allocate PageLine");
     return nullptr;
   }
-  return std::unique_ptr<PageLine>(line);
+  return line;
 }
 
 void PageImage::render(GfxRenderer& renderer, const int fontId, const int xOffset, const int yOffset) {
@@ -75,10 +74,20 @@ std::unique_ptr<PageImage> PageImage::deserialize(serialization::BufferedFileRea
   serialization::readPod(file, xPos);
   serialization::readPod(file, yPos);
 
-  auto ib = ImageBlock::deserialize(file);
   // nothrow: this runs while deserializing a cached section, so OOM is a real
-  // outcome. Every caller of deserialize() already handles nullptr.
-  return std::unique_ptr<PageImage>(new (std::nothrow) PageImage(std::move(ib), xPos, yPos));
+  // outcome. Every caller of deserialize() already handles nullptr -- and a
+  // PageImage holding a null block would crash on its first render.
+  auto ib = ImageBlock::deserialize(file);
+  if (!ib) {
+    LOG_ERR("PGE", "Deserialization failed: null ImageBlock");
+    return nullptr;
+  }
+  auto image = makeUniqueNoThrow<PageImage>(std::move(ib), xPos, yPos);
+  if (!image) {
+    LOG_ERR("PGE", "Deserialization failed: could not allocate PageImage");
+    return nullptr;
+  }
+  return image;
 }
 
 void PageRotatedText::render(GfxRenderer& renderer, const int pageFontId, const int xOffset, const int yOffset) {
@@ -118,12 +127,12 @@ std::unique_ptr<PageRotatedText> PageRotatedText::deserialize(serialization::Buf
     LOG_ERR("PGE", "Deserialization failed: empty rotated text");
     return nullptr;
   }
-  auto* line = new (std::nothrow) PageRotatedText(std::move(text), boldByte != 0, fontId, xPos, yPos);
+  auto line = makeUniqueNoThrow<PageRotatedText>(std::move(text), boldByte != 0, fontId, xPos, yPos);
   if (!line) {
     LOG_ERR("PGE", "Deserialization failed: could not allocate PageRotatedText");
     return nullptr;
   }
-  return std::unique_ptr<PageRotatedText>(line);
+  return line;
 }
 
 void PageVerticalRule::render(GfxRenderer& renderer, const int fontId, const int xOffset, const int yOffset) {
@@ -153,12 +162,12 @@ std::unique_ptr<PageVerticalRule> PageVerticalRule::deserialize(serialization::B
     LOG_ERR("PGE", "Deserialization failed: invalid vertical rule (len=%u thick=%u)", length, thickness);
     return nullptr;
   }
-  auto* rule = new (std::nothrow) PageVerticalRule(length, thickness, xPos, yPos);
+  auto rule = makeUniqueNoThrow<PageVerticalRule>(length, thickness, xPos, yPos);
   if (!rule) {
     LOG_ERR("PGE", "Deserialization failed: could not allocate PageVerticalRule");
     return nullptr;
   }
-  return std::unique_ptr<PageVerticalRule>(rule);
+  return rule;
 }
 
 void PageHorizontalRule::render(GfxRenderer& renderer, const int fontId, const int xOffset, const int yOffset) {
@@ -194,12 +203,12 @@ std::unique_ptr<PageHorizontalRule> PageHorizontalRule::deserialize(serializatio
     return nullptr;
   }
 
-  auto* rule = new (std::nothrow) PageHorizontalRule(width, thickness, xPos, yPos);
+  auto rule = makeUniqueNoThrow<PageHorizontalRule>(width, thickness, xPos, yPos);
   if (!rule) {
     LOG_ERR("PGE", "Deserialization failed: could not allocate PageHorizontalRule");
     return nullptr;
   }
-  return std::unique_ptr<PageHorizontalRule>(rule);
+  return rule;
 }
 
 void Page::render(GfxRenderer& renderer, const int fontId, const int xOffset, const int yOffset) const {
@@ -250,7 +259,7 @@ bool Page::serialize(serialization::BufferedFileWriter& out) const {
 }
 
 std::unique_ptr<Page> Page::deserialize(serialization::BufferedFileReader& file) {
-  auto page = std::unique_ptr<Page>(new (std::nothrow) Page());
+  auto page = makeUniqueNoThrow<Page>();
   if (!page) {
     LOG_ERR("PGE", "OOM: Page while deserializing a cached section");
     return nullptr;
@@ -262,7 +271,7 @@ std::unique_ptr<Page> Page::deserialize(serialization::BufferedFileReader& file)
   // Reserve up front so a page load costs one allocation for the element vector
   // instead of a grow-copy-free cycle every doubling. `count` is untrusted (it
   // comes straight off the SD cache), so clamp it: a real page holds a few dozen
-  // elements, while a corrupt header could ask for 65535 * sizeof(shared_ptr) and
+  // elements, while a corrupt header could ask for 65535 * sizeof(unique_ptr) and
   // abort() on the failed allocation (vector's operator new is throwing, and this
   // firmware builds with -fno-exceptions). Under-reserving is harmless -- the
   // push_back path below still grows normally.

@@ -107,12 +107,12 @@ class ChapterHtmlSlimParser {
   // time, because lastExtractedLineSourceStart() has moved on by placement
   // time.
   struct PendingLine {
-    std::shared_ptr<TextBlock> line;
+    std::unique_ptr<TextBlock> line;
     uint32_t anchor;  // chapter-global source anchor of this line's first word
   };
   std::deque<PendingLine> pendingLines_;
   int paraLinesPlaced_ = 0;  // lines of the current paragraph already placed
-  void placeLineOnPage(std::shared_ptr<TextBlock> line, uint32_t anchor);
+  void placeLineOnPage(std::unique_ptr<TextBlock> line, uint32_t anchor);
   void flushPendingLines();
   // Completes the current page (if it holds anything) so the next placement
   // starts a fresh one. `anchor` is the source position the new page starts at.
@@ -428,7 +428,7 @@ class ChapterHtmlSlimParser {
   // Disarm the missing-glyph ledger and raise the note. See the .cpp.
   void reportMissingGlyphs();  // tear down without flushing (error / abandon)
 
-  void addLineToPage(std::shared_ptr<TextBlock> line);
+  void addLineToPage(std::unique_ptr<TextBlock> line);
   const std::vector<std::pair<std::string, uint16_t>>& getAnchors() const { return anchorData; }
 
   // Byte progress of the in-flight parse, used to estimate a still-building section's total page

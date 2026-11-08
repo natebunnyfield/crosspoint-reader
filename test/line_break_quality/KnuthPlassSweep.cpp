@@ -389,7 +389,7 @@ std::vector<Line> layOut(const Prepared& P, const std::vector<kp::Pos>& cuts, co
 // ---------------------------------------------------------------------------
 
 struct RealRun {
-  std::vector<std::shared_ptr<TextBlock>> blocks;
+  std::vector<std::unique_ptr<TextBlock>> blocks;
   double micros = 0.0;
 };
 
@@ -411,7 +411,7 @@ RealRun runReal(const std::vector<std::string>& words, const int fontId, const u
   // face is printed beside the table instead.
   block.layoutAndExtractLines(
       Env::instance().renderer(), fontId, kMeasure,
-      [&](const std::shared_ptr<TextBlock>& line) { out.blocks.push_back(line); }, /*includeLastLine=*/true,
+      [&](std::unique_ptr<TextBlock> line) { out.blocks.push_back(std::move(line)); }, /*includeLastLine=*/true,
       /*justifyThresholdChars=*/0);
   out.micros = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count();
   kpbreak::tuning().enabled = true;
@@ -420,7 +420,7 @@ RealRun runReal(const std::vector<std::string>& words, const int fontId, const u
 
 // Read the cut positions back off the real breaker's lines. Returns false if a
 // line's text cannot be matched to the source words (never seen; counted).
-bool cutsFromBlocks(const std::vector<std::string>& words, const std::vector<std::shared_ptr<TextBlock>>& blocks,
+bool cutsFromBlocks(const std::vector<std::string>& words, const std::vector<std::unique_ptr<TextBlock>>& blocks,
                     std::vector<kp::Pos>& cuts) {
   cuts.clear();
   cuts.push_back({0, 0, false, false});
@@ -454,7 +454,7 @@ bool cutsFromBlocks(const std::vector<std::string>& words, const std::vector<std
 }
 
 // Lines whose model x positions differ from the real TextBlock's by any pixel.
-int mismatchedLines(const std::vector<Line>& model, const std::vector<std::shared_ptr<TextBlock>>& blocks) {
+int mismatchedLines(const std::vector<Line>& model, const std::vector<std::unique_ptr<TextBlock>>& blocks) {
   int bad = 0;
   for (size_t l = 0; l < std::max(model.size(), blocks.size()); ++l) {
     if (l >= model.size() || l >= blocks.size() || model[l].texts.size() != blocks[l]->wordCount()) {
@@ -1466,10 +1466,10 @@ TEST(KnuthPlassDevice, RaggedBlocksAreUntouched) {
         style.alignment = demoted ? CssTextAlign::Justify : CssTextAlign::Left;
         ParsedText block(false, linebreak::STORED_HYPHENATED, false, style);
         for (const auto& w : words) block.addWord(w, EpdFontFamily::REGULAR);
-        std::vector<std::shared_ptr<TextBlock>> out;
+        std::vector<std::unique_ptr<TextBlock>> out;
         block.layoutAndExtractLines(
             Env::instance().renderer(), fontId, kMeasure,
-            [&](const std::shared_ptr<TextBlock>& l) { out.push_back(l); }, true, demoted ? 255 : 0);
+            [&](std::unique_ptr<TextBlock> l) { out.push_back(std::move(l)); }, true, demoted ? 255 : 0);
         kpbreak::tuning().enabled = true;
         return out;
       };
@@ -1831,7 +1831,7 @@ TEST(KnuthPlass, DISABLED_ShrinkProof) {
       L.isFinal = l + 1 == rr.blocks.size();
       lines.push_back(std::move(L));
     }
-    return std::make_pair(rr, lines);
+    return std::make_pair(std::move(rr), std::move(lines));
   };
   struct Cand {
     size_t idx;
@@ -1896,15 +1896,15 @@ struct Tok {
   EpdFontFamily::Style style;
   bool attach;
 };
-std::vector<std::shared_ptr<TextBlock>> layOutToks(const std::vector<Tok>& toks, const int fontId, const int measure) {
+std::vector<std::unique_ptr<TextBlock>> layOutToks(const std::vector<Tok>& toks, const int fontId, const int measure) {
   BlockStyle style;
   style.alignment = CssTextAlign::Justify;
   ParsedText block(false, linebreak::STORED_HYPHENATED, false, style);
   for (const auto& t : toks) block.addWord(t.text, t.style, false, t.attach);
-  std::vector<std::shared_ptr<TextBlock>> out;
+  std::vector<std::unique_ptr<TextBlock>> out;
   block.layoutAndExtractLines(
-      Env::instance().renderer(), fontId, measure, [&](const std::shared_ptr<TextBlock>& l) { out.push_back(l); }, true,
-      0);
+      Env::instance().renderer(), fontId, measure, [&](std::unique_ptr<TextBlock> l) { out.push_back(std::move(l)); },
+      true, 0);
   return out;
 }
 struct Painted {
@@ -1913,7 +1913,7 @@ struct Painted {
   int underTwoThirds = 0;  // word-space gaps painted under 2/3 of their own style's space
   int shrunkGaps = 0;    // gaps painted narrower than natural: the test is not vacuous
 };
-Painted inspect(const std::vector<std::shared_ptr<TextBlock>>& lines, const int fontId, const int measure,
+Painted inspect(const std::vector<std::unique_ptr<TextBlock>>& lines, const int fontId, const int measure,
                 const bool wordSpaces) {
   auto& r = Env::instance().renderer();
   Painted p;

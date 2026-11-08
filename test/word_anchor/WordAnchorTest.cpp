@@ -176,7 +176,7 @@ std::vector<LineRecord> layout(const int fontId, const uint16_t width, const boo
     block.addWord(w, EpdFontFamily::REGULAR);
   }
   std::vector<LineRecord> lines;
-  block.layoutAndExtractLines(Gfx::instance().renderer(), fontId, width, [&](const std::shared_ptr<TextBlock>& line) {
+  block.layoutAndExtractLines(Gfx::instance().renderer(), fontId, width, [&](std::unique_ptr<TextBlock> line) {
     LineRecord r;
     r.anchor = block.lastExtractedLineSourceStart();
     r.firstFragment = line->wordCount() > 0 ? std::string(line->wordText(0)) : std::string();

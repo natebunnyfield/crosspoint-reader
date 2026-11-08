@@ -151,7 +151,7 @@ std::vector<PageLines> layout(const std::string& bodyHtml, const bool lineGrid =
       [&pages](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
         PageLines lines;
         for (const auto& element : page->elements) {
-          const auto line = std::dynamic_pointer_cast<PageLine>(element);
+          const auto line = dynamic_cast<const PageLine*>(element.get());
           if (!line || !line->getBlock()) continue;
           const TextBlock& block = *line->getBlock();
           std::string text;
@@ -229,7 +229,7 @@ std::vector<std::vector<RuleGeom>> layoutRules(const std::string& bodyHtml) {
       [&pages](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
         std::vector<RuleGeom> rules;
         for (const auto& element : page->elements) {
-          const auto rule = std::dynamic_pointer_cast<PageHorizontalRule>(element);
+          const auto rule = dynamic_cast<const PageHorizontalRule*>(element.get());
           if (!rule) continue;
           rules.push_back({rule->getWidth(), rule->getThickness()});
         }
@@ -281,11 +281,11 @@ std::vector<ElementAt> firstPageGeometry(const std::string& bodyHtml) {
         if (!first) return;
         first = false;
         for (const auto& element : page->elements) {
-          if (std::dynamic_pointer_cast<PageHorizontalRule>(element)) {
+          if (dynamic_cast<const PageHorizontalRule*>(element.get())) {
             out.push_back({element->yPos, ""});
             continue;
           }
-          const auto line = std::dynamic_pointer_cast<PageLine>(element);
+          const auto line = dynamic_cast<const PageLine*>(element.get());
           if (!line || !line->getBlock()) continue;
           const TextBlock& block = *line->getBlock();
           std::string text;

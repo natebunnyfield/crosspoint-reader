@@ -149,7 +149,7 @@ std::vector<PageLines> layout(const std::string& bodyHtml, const CssParser* css 
       [&pages](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
         PageLines lines;
         for (const auto& element : page->elements) {
-          const auto line = std::dynamic_pointer_cast<PageLine>(element);
+          const auto line = dynamic_cast<const PageLine*>(element.get());
           if (!line || !line->getBlock()) continue;
           const TextBlock& block = *line->getBlock();
           std::string text;

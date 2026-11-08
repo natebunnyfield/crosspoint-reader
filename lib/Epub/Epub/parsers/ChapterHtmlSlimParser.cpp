@@ -670,7 +670,7 @@ int ChapterHtmlSlimParser::measureUnlaidLeadHeight() const {
   int linesHeight = 0;
   probe.layoutAndExtractLines(
       renderer, fontId, effectiveWidth,
-      [&](const std::shared_ptr<TextBlock>& line) {
+      [&](const std::unique_ptr<TextBlock> line) {
         lineCount++;
         // placeLineOnPage snaps after EVERY line, not once at the end: a ruby
         // line advances by more than one line-height and the grid rounds that
@@ -792,7 +792,7 @@ bool ChapterHtmlSlimParser::breakBeforeStrandedTerm() {
   int lastFitExtent = 0;
   probe.layoutAndExtractLines(
       renderer, fontId, effectiveWidth,
-      [&](const std::shared_ptr<TextBlock>& line) {
+      [&](const std::unique_ptr<TextBlock> line) {
         lineCount++;
         if (!line) return;
         heightBeforeLast = linesHeight;
@@ -1109,8 +1109,8 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
     // top -- which, once the device is turned counter-clockwise, is the header
     // on top and the text running left to right.
     const rotatedtable::LinePlace at = rotatedtable::line(item.down, item.across, viewportWidth, kRotMargin);
-    auto element = std::shared_ptr<PageRotatedText>(new (std::nothrow) PageRotatedText(
-        item.text, item.bold, static_cast<int32_t>(tableFont), static_cast<int16_t>(at.x), static_cast<int16_t>(at.y)));
+    auto element = makeUniqueNoThrow<PageRotatedText>(item.text, item.bold, static_cast<int32_t>(tableFont),
+                                                      static_cast<int16_t>(at.x), static_cast<int16_t>(at.y));
     if (!element) {
       noteAllocationFailure("a rotated table line");
       return true;
@@ -1126,8 +1126,8 @@ bool ChapterHtmlSlimParser::emitBufferedTableRotated() {
         static_cast<int16_t>(plan.x[plan.columnCount - 1] + plan.w[plan.columnCount - 1] + kRotMargin);
     const rotatedtable::RulePlace at =
         rotatedtable::rule(ruleDown, std::max<int16_t>(1, ruleLen), viewportWidth, kRotMargin);
-    auto rule = std::shared_ptr<PageVerticalRule>(new (std::nothrow) PageVerticalRule(
-        static_cast<uint16_t>(at.length), 2, static_cast<int16_t>(at.x), static_cast<int16_t>(at.y)));
+    auto rule = makeUniqueNoThrow<PageVerticalRule>(static_cast<uint16_t>(at.length), 2, static_cast<int16_t>(at.x),
+                                                    static_cast<int16_t>(at.y));
     if (rule) {
       currentPage->elements.push_back(std::move(rule));
     }
@@ -1330,13 +1330,13 @@ void ChapterHtmlSlimParser::emitBufferedTableAsColumns(const tablecolumns::Plan&
     // The one rule the ruling asks for: under the header, spanning the columns.
     if (headerRow && currentPage) {
       const int16_t ruleWidth = static_cast<int16_t>(plan.x[plan.columnCount - 1] + plan.w[plan.columnCount - 1]);
-      auto rule = std::shared_ptr<PageHorizontalRule>(
-          new (std::nothrow) PageHorizontalRule(static_cast<uint16_t>(ruleWidth), kRuleThickness, 0, currentPageNextY));
+      auto rule =
+          makeUniqueNoThrow<PageHorizontalRule>(static_cast<uint16_t>(ruleWidth), kRuleThickness, 0, currentPageNextY);
       if (!rule) {
         noteAllocationFailure("the table's header rule");
         return;
       }
-      currentPage->elements.push_back(rule);
+      currentPage->elements.push_back(std::move(rule));
       currentPageNextY = static_cast<int16_t>(currentPageNextY + kRuleThickness + rowGap);
       snapToLineGrid();  // Line Grid: closing rule spacing rounds up too
     }
@@ -1392,13 +1392,12 @@ void ChapterHtmlSlimParser::emitHorizontalRule(const BlockStyle& blockStyle) {
 
   currentPageNextY += topSpacing;
 
-  auto pageRule = std::shared_ptr<PageHorizontalRule>(
-      new (std::nothrow) PageHorizontalRule(width, ruleThickness, xPos, currentPageNextY));
+  auto pageRule = makeUniqueNoThrow<PageHorizontalRule>(width, ruleThickness, xPos, currentPageNextY);
   if (!pageRule) {
     LOG_ERR("EHP", "Failed to create PageHorizontalRule");
     return;
   }
-  currentPage->elements.push_back(pageRule);
+  currentPage->elements.push_back(std::move(pageRule));
   currentPageNextY = static_cast<int16_t>(currentPageNextY + ruleThickness + bottomSpacing);
   // Line Grid: hr/br spacing rounds up to the next line-height multiple.
   snapToLineGrid();
@@ -1489,13 +1488,12 @@ void ChapterHtmlSlimParser::emitTableRowSeparator() {
   }
 
   currentPageNextY = static_cast<int16_t>(currentPageNextY + air);
-  auto rule = std::shared_ptr<PageHorizontalRule>(
-      new (std::nothrow) PageHorizontalRule(static_cast<uint16_t>(width), kThickness, 0, currentPageNextY));
+  auto rule = makeUniqueNoThrow<PageHorizontalRule>(static_cast<uint16_t>(width), kThickness, 0, currentPageNextY);
   if (!rule) {
     LOG_ERR("EHP", "Failed to create table row separator");
     return;
   }
-  currentPage->elements.push_back(rule);
+  currentPage->elements.push_back(std::move(rule));
   currentPageNextY = static_cast<int16_t>(currentPageNextY + kThickness + air);
   snapToLineGrid();
 }
@@ -2067,23 +2065,21 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                 }
 
                 // Create ImageBlock and add to page
-                // nothrow: make_shared uses bare new, which aborts on OOM under
-                // -fno-exceptions; images arrive mid-parse when the heap is at its
-                // most loaded, so this must fail soft into the null-check below.
-                auto imageBlock = std::shared_ptr<ImageBlock>(
-                    new (std::nothrow) ImageBlock(cachedImagePath, resolvedPath, displayWidth, displayHeight));
+                // nothrow: images arrive mid-parse when the heap is at its most
+                // loaded, so this must fail soft into the null-check below.
+                auto imageBlock =
+                    makeUniqueNoThrow<ImageBlock>(cachedImagePath, resolvedPath, displayWidth, displayHeight);
                 if (!imageBlock) {
                   LOG_ERR("EHP", "Failed to create ImageBlock");
                   return;
                 }
                 int xPos = (self->viewportWidth - displayWidth) / 2;
-                auto pageImage =
-                    std::shared_ptr<PageImage>(new (std::nothrow) PageImage(imageBlock, xPos, self->currentPageNextY));
+                auto pageImage = makeUniqueNoThrow<PageImage>(std::move(imageBlock), xPos, self->currentPageNextY);
                 if (!pageImage) {
                   LOG_ERR("EHP", "Failed to create PageImage");
                   return;
                 }
-                self->currentPage->elements.push_back(pageImage);
+                self->currentPage->elements.push_back(std::move(pageImage));
                 self->currentPageNextY += displayHeight + imageMarginBottom;
                 // An image between two paragraphs breaks their margin
                 // adjacency (2026-08-22): the next block's marginTop must not
@@ -2773,7 +2769,7 @@ void XMLCALL ChapterHtmlSlimParser::characterData(void* userData, const XML_Char
                                         : self->viewportWidth;
     self->currentTextBlock->layoutAndExtractLines(
         self->renderer, self->fontId, effectiveWidth,
-        [self](const std::shared_ptr<TextBlock>& textBlock) { self->addLineToPage(textBlock); }, false,
+        [self](std::unique_ptr<TextBlock> textBlock) { self->addLineToPage(std::move(textBlock)); }, false,
         self->justifyThresholdChars);
   }
 }
@@ -3371,7 +3367,7 @@ void ChapterHtmlSlimParser::breakPageBefore(const uint32_t anchor) {
 // side), and a paragraph whose lines are all still pending at flush time is
 // short enough to decide with full knowledge. Pagination change — covered by
 // the SECTION_FILE_VERSION bump to v39 (Section.cpp).
-void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
+void ChapterHtmlSlimParser::addLineToPage(std::unique_ptr<TextBlock> line) {
   // This line's source anchor, captured NOW: by placement time
   // lastExtractedLineSourceStart() has moved on to a later line.
   const uint32_t anchor =
@@ -3463,7 +3459,7 @@ void ChapterHtmlSlimParser::flushPendingLines() {
   paraLinesPlaced_ = 0;
 }
 
-void ChapterHtmlSlimParser::placeLineOnPage(std::shared_ptr<TextBlock> line, const uint32_t anchor) {
+void ChapterHtmlSlimParser::placeLineOnPage(std::unique_ptr<TextBlock> line, const uint32_t anchor) {
   const int lineHeight = lineAdvanceOf(*line);
 
   if (!currentPage) {
@@ -3501,7 +3497,12 @@ void ChapterHtmlSlimParser::placeLineOnPage(std::shared_ptr<TextBlock> line, con
 
   // Apply horizontal left inset (margin + padding) as x position offset
   const int16_t xOffset = line->getBlockStyle().leftInset();
-  currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, currentPageNextY));
+  auto pageLine = makeUniqueNoThrow<PageLine>(std::move(line), xOffset, currentPageNextY);
+  if (!pageLine) {
+    noteAllocationFailure("a PageLine");
+    return;
+  }
+  currentPage->elements.push_back(std::move(pageLine));
   // The block this line opens carries an id: this page is where it lands.
   if (!blockAnchorId_.empty()) {
     pushAnchor(std::move(blockAnchorId_), static_cast<uint16_t>(completedPageCount));
@@ -3593,7 +3594,7 @@ void ChapterHtmlSlimParser::makePages() {
 
   currentTextBlock->layoutAndExtractLines(
       renderer, fontId, effectiveWidth,
-      [this](const std::shared_ptr<TextBlock>& textBlock) { addLineToPage(textBlock); }, /*includeLastLine=*/true,
+      [this](std::unique_ptr<TextBlock> textBlock) { addLineToPage(std::move(textBlock)); }, /*includeLastLine=*/true,
       justifyThresholdChars);
 
   // Paragraph boundary: place the held-back tail with widow/orphan control.

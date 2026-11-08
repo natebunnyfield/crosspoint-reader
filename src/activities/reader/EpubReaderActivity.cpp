@@ -1799,8 +1799,8 @@ void publishReadingSample(const Page& page, const Epub& book, const int spineInd
   for (const auto& el : page.elements) {
     if (el->getTag() != TAG_PageLine) continue;
     const auto& line = static_cast<const PageLine&>(*el);
-    const auto& block = line.getBlock();
-    if (!block || !block->valid() || block->isEmpty()) continue;
+    const auto* block = line.getBlock();
+    if (!block || !block->valid() || block->wordCount() == 0) continue;
     counter.beginLine();
     const uint16_t n = block->wordCount();
     for (uint16_t i = 0; i < n; i++) counter.addToken(block->wordText(i));

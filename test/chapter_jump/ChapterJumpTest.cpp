@@ -99,7 +99,7 @@ std::string firstLineOf(Section& section, const int page) {
   const auto p = section.loadPage(page);
   if (!p) return "<page load failed>";
   for (const auto& element : p->elements) {
-    const auto line = std::dynamic_pointer_cast<PageLine>(element);
+    const auto line = dynamic_cast<const PageLine*>(element.get());
     if (!line || !line->getBlock()) continue;
     const TextBlock& block = *line->getBlock();
     std::string text;

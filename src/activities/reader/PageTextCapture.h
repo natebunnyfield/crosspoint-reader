@@ -56,8 +56,8 @@ inline void flattenPage(const Page& page, const GfxRenderer& renderer, const int
       continue;
     }
     const auto& line = static_cast<const PageLine&>(*el);
-    const auto& block = line.getBlock();
-    if (!block || !block->valid() || block->isEmpty()) continue;
+    const auto* block = line.getBlock();
+    if (!block || !block->valid() || block->wordCount() == 0) continue;
     const size_t begin = s.tokens.size();
     const uint16_t n = block->wordCount();
     for (uint16_t i = 0; i < n; i++) {

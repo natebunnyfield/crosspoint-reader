@@ -408,10 +408,10 @@ void layoutParagraph(const std::string& text, const int fontId, const uint16_t m
   ParsedText block(/*extraParagraphSpacing=*/false, storedMode, /*focusReadingEnabled=*/false, style);
   for (const auto& w : splitWords(text)) block.addWord(w, EpdFontFamily::REGULAR);
 
-  std::vector<std::shared_ptr<TextBlock>> lines;
+  std::vector<std::unique_ptr<TextBlock>> lines;
   block.layoutAndExtractLines(
       Gfx::instance().renderer(), fontId, measure,
-      [&](const std::shared_ptr<TextBlock>& line) { lines.push_back(line); },
+      [&](std::unique_ptr<TextBlock> line) { lines.push_back(std::move(line)); },
       /*includeLastLine=*/true, justifyThresholdChars);
 
   auto& r = Gfx::instance().renderer();
@@ -967,7 +967,7 @@ TEST(LineBreakQuality, TotalFitCostsASmallMultipleOfGreedy) {
           int seen = 0;
           const auto t0 = std::chrono::steady_clock::now();
           block.layoutAndExtractLines(
-              Gfx::instance().renderer(), kRaggedFont, kMeasure, [&seen](const std::shared_ptr<TextBlock>&) { seen++; },
+              Gfx::instance().renderer(), kRaggedFont, kMeasure, [&seen](std::unique_ptr<TextBlock>) { seen++; },
               /*includeLastLine=*/true, autojustify::THRESHOLD_CHARS);
           total += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
           lines += seen;
@@ -1913,16 +1913,16 @@ TEST(LineBreakQuality, DISABLED_RaggedGateSweep) {
 // ---------------------------------------------------------------------------
 
 namespace {
-std::vector<std::shared_ptr<TextBlock>> layoutFocus(const std::string& text, const int fontId, const uint16_t measure,
+std::vector<std::unique_ptr<TextBlock>> layoutFocus(const std::string& text, const int fontId, const uint16_t measure,
                                                     const uint8_t storedMode) {
   BlockStyle style;
   style.alignment = CssTextAlign::Left;
   ParsedText block(/*extraParagraphSpacing=*/false, storedMode, /*focusReadingEnabled=*/true, style);
   for (const auto& w : splitWords(text)) block.addWord(w, EpdFontFamily::REGULAR);
-  std::vector<std::shared_ptr<TextBlock>> lines;
+  std::vector<std::unique_ptr<TextBlock>> lines;
   block.layoutAndExtractLines(
       Gfx::instance().renderer(), fontId, measure,
-      [&](const std::shared_ptr<TextBlock>& line) { lines.push_back(line); },
+      [&](std::unique_ptr<TextBlock> line) { lines.push_back(std::move(line)); },
       /*includeLastLine=*/true, kJustifiedThreshold);
   return lines;
 }
