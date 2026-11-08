@@ -51,6 +51,10 @@ void addToLogRingBuffer(const char* message) {
     logLastRaw[0] = '\0';
     rtcLogMagic = LOG_RTC_MAGIC;
   }
+  // RTC no-init memory survives an OTA from firmware that laid it out
+  // differently with the magic intact: never trust it to be terminated before
+  // the strcmp/snprintf below read it (P0/P1 sweep 2026-11-07, sub-threshold).
+  logLastRaw[sizeof(logLastRaw) - 1] = '\0';
 
   // COLLAPSE CONSECUTIVE DUPLICATES instead of spending a ring slot on each.
   //

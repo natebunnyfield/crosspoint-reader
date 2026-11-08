@@ -129,10 +129,15 @@ class GfxRenderer {
   // the controller's PTL window addresses.
   //
   // TRACKED AT THE PIXEL WRITERS, NOT AT THE CALLERS, and that is the safety
-  // argument. There are exactly three places that write frameBuffer --
-  // drawPixel/drawPixelDevice, the hi-res glyph blit in drawText, and
-  // clearScreen/invertScreen -- so instrumenting them is complete BY
-  // CONSTRUCTION. Tracking in the ~70 displayBuffer() callers instead would
+  // argument. The writers are drawPixel/drawPixelDevice, the hi-res glyph blit
+  // in drawText, clearScreen/invertScreen -- and, missed until 2026-11-07, the
+  // rectangle writers: fillRectImpl, preserveImagePolarity,
+  // writeFramebufferRegion, copyBufferToRegion, the scale-1 drawImage and
+  // restoreBwBuffer (markDirtyRect / markAllDirty below). A NEW writer of
+  // frameBuffer must mark what it writes. Since the same date the tile hashes
+  // (below) also widen every window to the tiles that actually changed, so a
+  // writer that forgets can no longer leave stale pixels while the baseline is
+  // trusted. Tracking in the ~70 displayBuffer() callers instead would
   // mean the rect is right only if every one was found, and the failure mode of
   // missing one is a stale region: the window refreshes what someone declared
   // and silently leaves the rest. Over-reporting is safe (a full refresh);
@@ -153,6 +158,18 @@ class GfxRenderer {
     if (phyX > _dirtyRight) _dirtyRight = phyX;
     if (phyY < _dirtyTop) _dirtyTop = phyY;
     if (phyY > _dirtyBottom) _dirtyBottom = phyY;
+  }
+  // A rectangle written in one go (fills, image blits, region copies), physical
+  // and inclusive. These writers bypass drawPixel, and before 2026-11-07 they
+  // marked nothing: a popup box drawn over a showing screen was windowed to its
+  // TEXT and its frame left unrefreshed (P0/P1 sweep 2026-11-07, reproduced
+  // under ASan on the X3 panel). Over-reporting is safe; missing one is not.
+  inline void markDirtyRect(const int x0, const int y0, const int x1, const int y1) const {
+    if (_dirtyAll) return;
+    if (x0 < _dirtyLeft) _dirtyLeft = x0;
+    if (x1 > _dirtyRight) _dirtyRight = x1;
+    if (y0 < _dirtyTop) _dirtyTop = y0;
+    if (y1 > _dirtyBottom) _dirtyBottom = y1;
   }
   // A whole-panel change: clearScreen, invertScreen, anything that cannot say
   // where it drew. Sticky until the next present.

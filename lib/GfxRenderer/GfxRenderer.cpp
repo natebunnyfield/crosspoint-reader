@@ -1269,6 +1269,7 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
   const int phyX1 = std::max(paX, pbX);  // inclusive
   int phyY0 = std::min(paY, pbY);
   int phyY1 = std::max(paY, pbY);
+  if (!_stripActive) markDirtyRect(phyX0, phyY0, phyX1, phyY1);
 
   // Strip mode: clip Y range to the active band and redirect writes.
   uint8_t* target = getWriteTarget();
@@ -1753,6 +1754,10 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, co
       break;
   }
   // TODO: Rotate bits
+  // HalDisplay writes the framebuffer directly; mark the whole panel rather than
+  // re-derive its rotated rectangle here (an icon blit is rare and small, and
+  // over-reporting only costs the window).
+  markAllDirty();
   display.drawImage(bitmap, rotatedX, rotatedY, width, height);
 #endif
 }
@@ -1999,6 +2004,7 @@ void GfxRenderer::preserveImagePolarity(const int x, const int y, const int widt
   const int top = std::max(0, std::min(ay, by));
   const int bottom = std::min(static_cast<int>(panelHeight) - 1, std::max(ay, by));
   if (left > right || top > bottom) return;
+  markDirtyRect(left, top, right, bottom);
 
   // MSB-first within a byte, so column c is bit (7 - (c & 7)). Head and tail
   // masks cover only the in-rect bits of the first and last byte; everything
@@ -2340,6 +2346,21 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   const int panelArea = static_cast<int>(panelWidth) * static_cast<int>(panelHeight);
   if (refreshMode == HalDisplay::FAST_REFRESH && !_dirtyAll && !_stripActive &&
       _dirtyBottom >= _dirtyTop && _dirtyRight >= _dirtyLeft && display.supportsWindowedRefresh()) {
+    // Widen the window to every tile whose content actually changed: the
+    // hashes see writes the dirty rect may not (a writer that forgot to mark),
+    // so the window can only grow toward the truth. Untrusted baseline (a gray
+    // pass, a polarity change): no widening, the dirty rect stands alone.
+    const bool baselineTrusted =
+        _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
+    int minTx, minTy, maxTx, maxTy;
+    const int changedTiles = rehashTiles(minTx, minTy, maxTx, maxTy);
+    if (baselineTrusted && changedTiles > 0) {
+      _dirtyLeft = std::min(_dirtyLeft, minTx * TILE_W_BYTES * 8);
+      _dirtyTop = std::min(_dirtyTop, minTy * TILE_H);
+      _dirtyRight =
+          std::max(_dirtyRight, std::min(static_cast<int>(panelWidth), (maxTx + 1) * TILE_W_BYTES * 8) - 1);
+      _dirtyBottom = std::max(_dirtyBottom, std::min(static_cast<int>(panelHeight), (maxTy + 1) * TILE_H) - 1);
+    }
     const int w = _dirtyRight - _dirtyLeft + 1;
     const int h = _dirtyBottom - _dirtyTop + 1;
     // Area, not either edge on its own. In Portrait a line of text is narrow in
@@ -2348,13 +2369,11 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
     if (w * h * 3 <= panelArea * 2) {
       display.displayWindow(static_cast<uint16_t>(_dirtyLeft), static_cast<uint16_t>(_dirtyTop),
                             static_cast<uint16_t>(w), static_cast<uint16_t>(h), fadingFix);
-      // The tiles must follow what this window put on the glass (a popup, a
-      // typed line), or the next whole-screen redraw diffs against the frame
-      // from BEFORE it and leaves the popup standing (adversarial review
+      // The tiles were rehashed above, so they follow what this window put on
+      // the glass (a popup, a typed line) -- or the next whole-screen redraw
+      // would diff against the frame from BEFORE it (adversarial review
       // 2026-11-07, finding 1). Partial: gray outside the window is still
       // there, so the gray flag is left as it was.
-      int a, b, c, d;
-      rehashTiles(a, b, c, d);
       noteFramePresented(/*wholeFrame=*/false);
       resetDirty();
       return;
@@ -2458,9 +2477,13 @@ void GfxRenderer::displayBufferAsync(const HalDisplay::RefreshMode refreshMode) 
     noteFramePresented();
     return;
   }
-  display.displayBufferAsync(refreshMode);
+  // Hashed BEFORE the call: the async present leaves the framebuffer flipped
+  // to panel polarity until waitRefreshComplete() in dark mode
+  // (HalDisplay::displayBufferAsync), and hashing it then recorded the flipped
+  // frame (P0/P1 sweep 2026-11-07, sub-threshold).
   int a, b, c, d;
   rehashTiles(a, b, c, d);
+  display.displayBufferAsync(refreshMode);
   noteFramePresented();
 }
 
@@ -2496,6 +2519,7 @@ void GfxRenderer::writeFramebufferRegion(int x, int y, int w, int h, const uint8
   if (!mem.valid) return;
 
   const size_t rowBytes = mem.w / 8;  // exact: mem.w is a multiple of 8
+  markDirtyRect(mem.x, mem.y, mem.x + mem.w - 1, mem.y + mem.h - 1);
 
   for (uint16_t row = 0; row < mem.h; ++row) {
     const uint8_t* srcRow = src + (static_cast<size_t>(row) * rowBytes);
@@ -2736,6 +2760,7 @@ bool GfxRenderer::copyBufferToRegion(int lx, int ly, int lw, int lh, const uint8
   const int rowCount = y1 - y0 + 1;
   const size_t needed = static_cast<size_t>(bytesPerRow) * static_cast<size_t>(rowCount);
   if (bufSize < needed || !frameBuffer || !buf) return false;
+  markDirtyRect(byteX0 * 8, y0, byteX1 * 8 + 7, y1);
   for (int row = 0; row < rowCount; row++) {
     uint8_t* dst = frameBuffer + (y0 + row) * panelWidthBytes + byteX0;
     memcpy(dst, buf + row * bytesPerRow, bytesPerRow);
@@ -3337,6 +3362,7 @@ void GfxRenderer::restoreBwBuffer() {
     return;
   }
 
+  markAllDirty();
   for (size_t i = 0; i < bwBufferChunks.size(); i++) {
     const size_t offset = i * BW_BUFFER_CHUNK_SIZE;
     const size_t chunkSize = std::min(BW_BUFFER_CHUNK_SIZE, static_cast<size_t>(frameBufferSize - offset));
