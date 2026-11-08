@@ -125,6 +125,27 @@ bool isProtectedItemName(const String& name) {
   return false;
 }
 
+// Every component, not only the last. The listing hides dot entries and
+// HIDDEN_ITEMS, but each handler refused them by the final name alone, so
+// /download?path=/.crosspoint/wifi.json served the saved Wi-Fi passwords
+// (adversarial review 2026-11-08). This HTTP API never shows dot-paths, so
+// refusing them here removes nothing from the page. WebDAV mirrors them on
+// purpose (WebDAVHandler::isProtectedPath); that is a separate decision.
+bool isProtectedPath(const String& path) {
+  int start = 0;
+  while (start < static_cast<int>(path.length())) {
+    if (path.charAt(start) == '/') {
+      start++;
+      continue;
+    }
+    int end = path.indexOf('/', start);
+    if (end == -1) end = path.length();
+    if (isProtectedItemName(path.substring(start, end))) return true;
+    start = end + 1;
+  }
+  return false;
+}
+
 }  // namespace
 
 // File listing page template - now using generated headers:
@@ -587,6 +608,10 @@ void CrossPointWebServer::handleFileListData() const {
   if (server->hasArg("path")) {
     currentPath = normalizeWebPath(server->arg("path"));
   }
+  if (isProtectedPath(currentPath)) {
+    server->send(403, "text/plain", "Cannot access protected items");
+    return;
+  }
 
   server->setContentLength(CONTENT_LENGTH_UNKNOWN);
   server->send(200, "application/json", "");
@@ -635,16 +660,9 @@ void CrossPointWebServer::handleDownload() const {
     return;
   }
 
-  const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (itemName.startsWith(".")) {
+  if (isProtectedPath(itemPath)) {
     server->send(403, "text/plain", "Cannot access system files");
     return;
-  }
-  for (const auto* item : HIDDEN_ITEMS) {
-    if (itemName.equals(item)) {
-      server->send(403, "text/plain", "Cannot access protected items");
-      return;
-    }
   }
 
   if (!Storage.exists(itemPath.c_str())) {
@@ -786,6 +804,11 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
       state.path = normalizeWebPath(server->arg("path"));
     } else {
       state.path = "/";
+    }
+    if (isProtectedPath(state.path)) {
+      state.error = "Cannot upload into a protected folder";
+      LOG_DBG("WEB", "[UPLOAD] Rejected protected path: %s", state.path.c_str());
+      return;
     }
 
     LOG_DBG("WEB", "[UPLOAD] START: %s to path: %s", state.fileName.c_str(), state.path.c_str());
@@ -929,6 +952,10 @@ void CrossPointWebServer::handleCreateFolder() const {
   if (server->hasArg("path")) {
     parentPath = normalizeWebPath(server->arg("path"));
   }
+  if (isProtectedPath(parentPath)) {
+    server->send(403, "text/plain", "Cannot create inside a protected folder");
+    return;
+  }
 
   // Build full folder path
   String folderPath = parentPath;
@@ -981,7 +1008,7 @@ void CrossPointWebServer::handleRename() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (isProtectedItemName(itemName)) {
+  if (isProtectedPath(itemPath)) {
     server->send(403, "text/plain", "Cannot rename protected item");
     return;
   }
@@ -1058,13 +1085,12 @@ void CrossPointWebServer::handleMove() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (isProtectedItemName(itemName)) {
+  if (isProtectedPath(itemPath)) {
     server->send(403, "text/plain", "Cannot move protected item");
     return;
   }
   if (destPath != "/") {
-    const String destName = destPath.substring(destPath.lastIndexOf('/') + 1);
-    if (isProtectedItemName(destName)) {
+    if (isProtectedPath(destPath)) {
       server->send(403, "text/plain", "Cannot move into protected folder");
       return;
     }
@@ -1203,8 +1229,8 @@ void CrossPointWebServer::handleDelete() const {
     // Security check: prevent deletion of protected items
     const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
 
-    // Hidden/system files are protected
-    if (itemName.startsWith(".")) {
+    // Hidden/system files are protected, in any component of the path.
+    if (isProtectedPath(itemPath)) {
       failedItems += itemPath + " (hidden/system file); ";
       allSuccess = false;
       continue;
@@ -1713,6 +1739,11 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           // here would slip past the guard that keeps other requests off this
           // open handle.
           wsUploadPath = normalizeWebPath(wsUploadPath);
+          if (isProtectedPath(wsUploadPath)) {
+            LOG_DBG("WS", "START rejected: protected path");
+            wsServer->sendTXT(num, "ERROR:Cannot upload into a protected folder");
+            return;
+          }
 
           String filePath = wsUploadPath;
           if (!filePath.endsWith("/")) filePath += "/";
