@@ -411,8 +411,9 @@ TEST(ListStyleNone, AnOrdinaryListKeepsItsMarkers) {
 // review 2026-11-08, F1).
 TEST(SkippedBlock, AHiddenRubyTextDoesNotSwallowWhatFollows) {
   for (const char* rt : {"<rt hidden=\"\">kan</rt>", "<rt style=\"display:none\">kan</rt>"}) {
-    const std::string html = std::string("<p>alpha<ruby>X") + rt +
-                             "</ruby>beta</p><div class=\"cascade-d1\"><div><p>lostpara</p></div></div><p>afterpara</p>";
+    const std::string html =
+        std::string("<p>alpha<ruby>X") + rt +
+        "</ruby>beta</p><div class=\"cascade-d1\"><div><p>lostpara</p></div></div><p>afterpara</p>";
     const auto lines = layout(html);
     EXPECT_GE(xOf(lines, "lostpara"), 0) << rt;
     EXPECT_EQ(0, xOf(lines, "afterpara")) << rt;
