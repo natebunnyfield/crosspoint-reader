@@ -7,6 +7,9 @@
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
+#if FREEINK_DEVICE_PICCO
+#include "components/PiccoInput.h"
+#endif
 #ifndef SIMULATOR
 #include <esp_heap_caps.h>  // PSRAM for the next-page prerender
 #endif
@@ -258,6 +261,22 @@ void EpubReaderActivity::showBuildPopup() {
   buildPopupPending = false;
 }
 
+// The idle work below (glyph prewarm, next-page prerender) runs on the loop
+// task, and while it runs nothing polls input. On the Picco that includes the
+// touch panel: a tap landing inside it is seen as its first point and then a
+// lift, and the gesture benchmark puts every loss left after its pass 2 on
+// such stalls (docs/picco-gestures-2026-11-07.md, pass 4). So that work waits
+// while a finger is on the glass and for CONTACT_FAST_POLL_MS after the last
+// report. The section build is NOT held back: deferring it could run the
+// reader into the end of the laid-out pages, a far bigger stall.
+static bool touchActiveNow() {
+#if FREEINK_DEVICE_PICCO
+  return piccoinput::pollFast(gpio.isTouchContactDown(), millis(), gpio.lastTouchReportMs());
+#else
+  return false;
+#endif
+}
+
 void EpubReaderActivity::loop() {
   if (!epub) {
     // Should never happen
@@ -283,7 +302,7 @@ void EpubReaderActivity::loop() {
   // the attempt is only latched once the page exists, so a page the build has
   // not reached yet is retried on a later tick.
   constexpr unsigned long IDLE_PREWARM_DEBOUNCE_MS = 400;
-  if (section && !RenderLock::peek() && renderer.hasFrameBuffer() &&
+  if (section && !RenderLock::peek() && renderer.hasFrameBuffer() && !touchActiveNow() &&
       lastRenderCompleteMs != 0 && millis() - lastRenderCompleteMs > IDLE_PREWARM_DEBOUNCE_MS &&
       ESP.getFreeHeap() > RENDER_MIN_FREE_HEAP && ESP.getMaxAllocHeap() > BACKGROUND_BUILD_MIN_MAX_ALLOC &&
       (section->currentPage + 1 < static_cast<int>(section->pageCount) || !section->isBuilding()) &&
@@ -2230,6 +2249,7 @@ bool EpubReaderActivity::runDeferredGrayPass() {
 void EpubReaderActivity::maybePrerenderNextPage() {
   constexpr unsigned long PRERENDER_IDLE_MS = 450;  // after IDLE_PREWARM_DEBOUNCE_MS
   if (!section || !lastPaintValid || grayPassRequested || RenderLock::peek() || !renderer.hasFrameBuffer() ||
+      touchActiveNow() ||
       renderer.isDisplayInverted() || lastRenderCompleteMs == 0 ||
       millis() - lastRenderCompleteMs <= PRERENDER_IDLE_MS) {
     return;

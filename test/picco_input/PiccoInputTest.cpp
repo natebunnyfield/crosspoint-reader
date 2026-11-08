@@ -294,6 +294,35 @@ TEST(PiccoGestureStale, ALostLiftOffIsNotAHold) {
   EXPECT_TRUE(run(d, f).empty());
 }
 
+TEST(PiccoGestureStale, ALostLiftOffJustBeforeTheHoldIsNotAHold) {
+  // A 600 ms press whose lift-off report was lost: at 750 ms the controller
+  // has been quiet only 150 ms, under the 200 ms gap rule, and the finger
+  // looked still -- this fired Confirm until pass 5. A hold now needs a report
+  // under 50 ms old at the poll it fires on (HOLD_FRESH_REPORT_MS); this one
+  // never gets one, and goes stale at 810 ms.
+  piccoinput::GestureDecoder d;
+  std::vector<Frame> f = still(240, 400, 1000, 600);
+  for (unsigned long t = 1610; t <= 4600; t += 10) f.push_back(quiet(240, 400, t, 1600));
+  f.push_back(lift(4610));
+  EXPECT_TRUE(run(d, f).empty());
+}
+
+TEST(PiccoGestureStale, AHoldWaitsForAFreshReport) {
+  // Reports every 30 ms: at the 750 ms poll the last report is 30 ms old,
+  // fresh enough, and the hold fires on time. Reports every 70 ms: the 750 ms
+  // poll finds one 50 ms old, so the hold fires at the next report (770 ms).
+  for (const unsigned long every : {30ul, 70ul}) {
+    piccoinput::GestureDecoder d;
+    unsigned long firedAt = 0;
+    for (unsigned long t = 1000; t <= 2000; t += 10) {
+      const unsigned long rep = t - (t - 1000) % every;
+      const piccoinput::Result r = d.feed(quiet(240, 400, t, rep).s, t, false, SCREEN_W);
+      if (r.fired && firedAt == 0) firedAt = t;
+    }
+    EXPECT_EQ(firedAt, every == 30 ? 1750u : 1770u) << every << " ms reports";
+  }
+}
+
 TEST(PiccoGestureStale, ReportsResumingAfterAGapDoNotHold) {
   // Quiet for 300 ms, then reporting again (a second touch the SDK took for
   // the same contact): the gap disqualifies the whole contact.

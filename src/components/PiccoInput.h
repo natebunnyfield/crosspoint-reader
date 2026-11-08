@@ -127,6 +127,14 @@ constexpr unsigned long HOLD_REPORT_GAP_MS = 200;
 // first tap had drifted and the second carries on past 60 px from where the
 // first landed (UNCONFIRMED on device).
 constexpr unsigned long NEW_CONTACT_GAP_MS = 50;
+// A hold fires only on a poll whose latest report is this fresh. Without it a
+// 550-749 ms press whose lift-off report was lost reached LONG_PRESS_MS with
+// the silence still under HOLD_REPORT_GAP_MS and fired Confirm on a finger
+// that had left (benchmark, 2026-11-07: 42 in 2,000 such presses at a 5%
+// lost-lift-off rate, 134 at 15%; docs/picco-gestures-2026-11-07.md, pass 5).
+// A resting finger reports every 10-20 ms, so a real hold fires within one
+// report of 750 ms; a sparser controller fires at its next report.
+constexpr unsigned long HOLD_FRESH_REPORT_MS = 50;
 
 // One frame's view of the glass, in the renderer's LOGICAL portrait pixels.
 //   contact:  a finger is on the glass (InputManager::isTouchPressed).
@@ -225,7 +233,8 @@ class GestureDecoder {
       const int adx = std::abs(lastX_ - downX_);
       const int ady = std::abs(lastY_ - downY_);
       if (adx > TAP_SLOP_PX || ady > TAP_SLOP_PX) movedTap_ = true;
-      if (!keyboard && !movedTap_ && !reportGap_ && nowMs - downAt_ >= LONG_PRESS_MS) {
+      if (!keyboard && !movedTap_ && !reportGap_ && nowMs - downAt_ >= LONG_PRESS_MS &&
+          nowMs - lastReportMs_ < HOLD_FRESH_REPORT_MS) {
         consumed_ = true;
         return fire(Button::Confirm, true);
       }

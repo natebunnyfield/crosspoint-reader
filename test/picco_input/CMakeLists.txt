@@ -11,3 +11,15 @@ target_compile_definitions(PiccoInputTest PRIVATE FREEINK_DEVICE_PICCO=1)
 target_compile_options(PiccoInputTest PRIVATE -Wall -Wextra -pedantic)
 target_link_libraries(PiccoInputTest PRIVATE GTest::gtest_main)
 add_test(NAME PiccoInputTest COMMAND PiccoInputTest)
+
+# Monte-Carlo scorecard for the gesture decoder: modelled controller, real
+# decoder (PiccoGestureBench.cpp header comment; docs/picco-gestures-2026-11-07.md).
+add_executable(PiccoGestureBench PiccoGestureBench.cpp)
+target_include_directories(PiccoGestureBench BEFORE PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+  ${REPO_ROOT}/src
+)
+target_compile_definitions(PiccoGestureBench PRIVATE FREEINK_DEVICE_PICCO=1)
+target_compile_options(PiccoGestureBench PRIVATE -Wall -Wextra -pedantic)
+target_link_libraries(PiccoGestureBench PRIVATE GTest::gtest_main)
+add_test(NAME PiccoGestureBench COMMAND PiccoGestureBench)
