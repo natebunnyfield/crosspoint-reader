@@ -144,6 +144,64 @@ Both land in the Epub layout engine, which this fork has already changed (the
 per-page word-anchor LUT, `section.bin` v35). Treat them as real work, not
 housekeeping.
 
+## Sync of 2026-11-07/08 — what was taken, what was not, and the backlog
+
+Owner: *"commit, push, pull in all upstream work"*. Measured before starting:
+**949 ahead / 466 behind** `upstream/develop`; the merge base is `1a7f5a9e3`
+(2026-07-31), so everything since has come over by cherry-pick only. `git
+cherry` put **459** commits genuinely absent (7 already present by patch id).
+
+**Triage (scratch script, reproducible from the commands below).** 4 touch only
+the removed prefixes (`repo-status.sh`'s list); 63 name an out-of-scope subject
+(themes, KOReader, PDF, CI/docs churn — reviewed by subject, not taken); 392 were
+candidates. A sequential `cherry-pick --no-commit` probe of all 392, in upstream
+order, on a throwaway worktree off `origin/main`, with `freeink-sdk` pointer
+moves dropped (the SDK is a fork branch here): **42 apply clean, 350 conflict**.
+
+**Taken: 36 of the 42** (39 picked, 3 reverted below), each with `-x`, on branch `upstream-sync-2026-11-07`
+(fixes, perf, build pins, bidi/keyboard UTF-8, XTC cover grayscale, progressive
+JPEG patch, font interval dedupe, `USE_SPI_ARRAY_TRANSFER=1` for ~3x SD reads,
+web upload niceties, docs/templates/license).
+
+**Held for the owner (applies clean, but a user-visible choice):**
+- `99c2f09d1` vector font (.ttf/.otf) upload in the web server — a new font path
+  beside this fork's curated `.cpfont` pipeline.
+- `965722cf8` Libron in Manage Fonts downloads — the font list is ruled.
+- `bde0809a4` build release candidates from `develop` — a branch this fork does
+  not use.
+
+**Applied clean but reverted on this branch — they need code from conflicting
+upstream commits:**
+- `2a8c1ec55` cache-clear warning inside the dialog: calls
+  `OptionPopup::showMessage`, which arrives in a conflicting commit.
+- `0a9077722` X3 BQ27220 design capacity: needs `RenderLock::Mode::Try` and
+  `BatteryMonitor::loadDesignCapacity`, likewise.
+- `e31dcbb08` "don't recompile Arduino IDF libs": **REJECTED, do not retake
+  without a ruling.** Its `scripts/patch_pioarduino_cache.py` REWRITES the
+  shared pioarduino builder (`~/.platformio/platforms/espressif32/builder/
+  frameworks/arduino.py`) for every checkout on the machine, and writes the
+  `sdkconfig.defaults` reuse marker per chip family — the exact Picco/Sticky
+  build trap in `docs/picco-port-2026-11-05.md` (both are esp32s3). It also
+  broke the clean X4 build (`.dummy/sketch.cpp: Arduino.h`). The builder text
+  was restored by hand and its `sdkconfig.crosspoint` removed the same night.
+
+**The backlog that remains (as of `818a15400`, 2026-11-07):** the 350
+conflicting firmware commits, the three held above; **simulator** upstream: 39
+absent by patch id, 10 clean (mostly stubs for upstream firmware features this
+fork does not have — SD plugins, clippings, `HalMemory`), 29 conflicting;
+**freeink-sdk** upstream (`Free-Ink/freeink-sdk`, the fork's parent): 335 absent
+by patch id against the pinned `1dc07f6`, many for boards this fork does not
+build. Taking the conflicting set is a per-commit, by-hand campaign under the
+rules above — owner's call on scope and order.
+
+Commands:
+```bash
+git fetch upstream && git cherry origin/main upstream/develop      # '+' = absent
+git rev-list --reverse --no-merges origin/main..upstream/develop   # probe order
+# per commit, on a throwaway worktree: cherry-pick -x --no-commit; drop the
+# freeink-sdk path; CONFLICT -> abort; empty -> present; else commit
+```
+
 ## One working copy per project
 
 Multiple clones is what actually costs time here. The live pair is:
