@@ -112,7 +112,15 @@ void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen
   toLogicalPolarity();
 }
 
-void HalDisplay::setInverted(const bool inverted) { polarity.setDarkMode(inverted); }
+void HalDisplay::setInverted(const bool inverted) {
+  polarity.setDarkMode(inverted);
+  // The panel drivers' dark-background re-drive (every pixel driven toward its
+  // target on a fast refresh, so white->black residue does not park in the
+  // black ground). Reachable before only through the SDK's own setInverted(),
+  // which this HAL does not use (PanelPolarity.h says why); the SDK's
+  // setBackgroundHint() carries the hint alone.
+  einkDisplay.setBackgroundHint(inverted);
+}
 
 bool HalDisplay::isInverted() const { return polarity.darkMode(); }
 

@@ -18,12 +18,15 @@
 // the SDK in its normal, fully featured state, so the grayscale planes, the
 // overlapped page turn and the window diff all keep working in dark mode.
 //
-// What is lost: the panel drivers' dark-background hint, which re-drives every
-// pixel on a differential refresh so the light residue of a white->black
-// transition does not park in the black background (Ssd1677Driver.cpp:427-439,
-// Uc8253X3Driver.cpp:195-210). setBackgroundHint() is reachable only through
-// FreeInkDisplay::setInverted(), so this trade is forced by the SDK's API
-// surface, not chosen. See docs/dark-mode.md.
+// The panel drivers' dark-background hint -- re-drive every pixel on a
+// differential refresh so the light residue of a white->black transition does
+// not park in the black background -- used to be lost with it, because
+// setBackgroundHint() was reachable only through FreeInkDisplay::setInverted().
+// Since 2026-11-08 the SDK takes the hint alone (FreeInkDisplay::
+// setBackgroundHint) and HalDisplay::setInverted() passes it; the SDK had also
+// dropped the drivers' dark paths in 69349ec, restored the same day (fork
+// survey ruling, docs/fork-survey-2026-11-07.md section 0). See
+// docs/dark-mode.md.
 //
 // Invariant this class exists to hold: the framebuffer is LOGICAL (1 = white)
 // whenever a caller may draw into it, and carries PANEL polarity only for the
