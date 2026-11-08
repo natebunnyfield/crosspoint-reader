@@ -106,3 +106,59 @@ TEST(NormalisePath, StillCollapsesParentSegments) {
 }
 
 }  // namespace
+
+// A book with thousands of chapters: past LARGE_SPINE_THRESHOLD the index build
+// looks zip sizes up in chunks of SIZE_LOOKUP_CHUNK (upstream #3733 -- one
+// 16 B target per spine item for the whole spine used to abort on device when
+// the deque could not grow). The abort itself needs the device's heap; this pins
+// that chunking still gives every spine item its own size, across the chunk
+// boundary, in order. The fixture is generated here because 2,500 chapters is
+// cheap to write and needless to commit.
+TEST(LargeSpine, EveryChapterKeepsItsSizeAcrossLookupChunks) {
+  constexpr int kChapters = 2500;  // > SIZE_LOOKUP_CHUNK (2,048): two chunks
+  const std::string epubPath = "/tmp/cp_large_spine.epub";
+  const std::string script =
+      "import zipfile,sys\n"
+      "n=int(sys.argv[2])\n"
+      "z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED)\n"
+      "z.writestr(zipfile.ZipInfo('mimetype'),'application/epub+zip')\n"
+      "z.writestr('META-INF/container.xml','<?xml version=\"1.0\"?><container version=\"1.0\" "
+      "xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\"><rootfiles><rootfile full-path=\"OEBPS/content.opf\" "
+      "media-type=\"application/oebps-package+xml\"/></rootfiles></container>')\n"
+      "man=''.join('<item id=\"c%d\" href=\"c%d.xhtml\" media-type=\"application/xhtml+xml\"/>'%(i,i) for i in "
+      "range(n))\n"
+      "spine=''.join('<itemref idref=\"c%d\"/>'%i for i in range(n))\n"
+      "z.writestr('OEBPS/content.opf','<?xml version=\"1.0\"?><package xmlns=\"http://www.idpf.org/2007/opf\" "
+      "version=\"2.0\" unique-identifier=\"id\"><metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">"
+      "<dc:title>Large</dc:title><dc:identifier id=\"id\">x</dc:identifier><dc:language>en</dc:language></metadata>"
+      "<manifest><item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\"/>'+man+'</manifest>"
+      "<spine toc=\"ncx\">'+spine+'</spine></package>')\n"
+      "z.writestr('OEBPS/toc.ncx','<?xml version=\"1.0\"?><ncx xmlns=\"http://www.daisy.org/z3986/2005/ncx/\" "
+      "version=\"2005-1\"><navMap><navPoint id=\"n0\"><navLabel><text>One</text></navLabel><content src=\"c0.xhtml\"/>"
+      "</navPoint></navMap></ncx>')\n"
+      "for i in range(n):\n"
+      "  z.writestr('OEBPS/c%d.xhtml'%i,'<html "
+      "xmlns=\"http://www.w3.org/1999/xhtml\"><body><p>'+'x'*(i%97+1)+'</p></body></html>')\n"
+      "z.close()\n";
+  FILE* f = fopen("/tmp/cp_large_spine.py", "w");
+  ASSERT_NE(f, nullptr);
+  fputs(script.c_str(), f);
+  fclose(f);
+  ASSERT_EQ(system(("python3 /tmp/cp_large_spine.py " + epubPath + " " + std::to_string(kChapters)).c_str()), 0);
+
+  Cache cache("large_spine");
+  auto epub = std::make_shared<Epub>(epubPath, cache.path());
+  ASSERT_TRUE(epub->load()) << "the index build failed";
+  ASSERT_EQ(epub->getSpineItemsCount(), kChapters);
+
+  // Each chapter's inflated size is a fixed shell plus (i % 97 + 1) letters, so
+  // consecutive differences pin every item's own size, not just the total.
+  const size_t shell = epub->getCumulativeSpineItemSize(0) - 1;
+  size_t prev = 0;
+  for (int i = 0; i < kChapters; i++) {
+    const size_t cum = epub->getCumulativeSpineItemSize(i);
+    ASSERT_EQ(cum - prev, shell + static_cast<size_t>(i % 97 + 1)) << "spine item " << i << " got the wrong size";
+    prev = cum;
+  }
+  remove(epubPath.c_str());
+}
