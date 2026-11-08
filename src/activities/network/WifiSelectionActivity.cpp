@@ -331,7 +331,9 @@ void WifiSelectionActivity::promptPasswordEntry() {
   startActivityForResult(makeTextEntryActivity(renderer, mappedInput, tr(STR_ENTER_WIFI_PASSWORD),
                                                "",  // No initial text
                                                64,  // Max password length
-                                               InputType::Password),
+                                               // Shown while typed, to cut typos (upstream #3080);
+                                               // still stored obfuscated.
+                                               InputType::Text),
                          [this](const ActivityResult& result) {
                            if (result.isCancelled) {
                              state = WifiSelectionState::NETWORK_LIST;
