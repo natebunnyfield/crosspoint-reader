@@ -373,3 +373,28 @@ TEST(SkippedBlock, AHiddenNestedListDoesNotEndItsParentList) {
     }
   EXPECT_TRUE(sawThree);
 }
+
+// --- list-style-type: none (upstream 2b2ba72f0, section v77) ---------------
+
+std::string lineWith(const std::vector<Line>& lines, const char* word) {
+  for (const Line& l : lines)
+    if (l.text.find(word) != std::string::npos) return l.text;
+  return {};
+}
+
+TEST(ListStyleNone, TheLonghandDropsTheMarker) {
+  const auto lines = layout("<ul style=\"list-style-type: none\"><li>alpha item</li></ul>");
+  EXPECT_EQ("alpha item", lineWith(lines, "alpha"));
+}
+
+TEST(ListStyleNone, TheShorthandDropsTheMarker) {
+  const auto lines = layout("<ol style=\"list-style: none\"><li>beta item</li><li>gamma item</li></ol>");
+  EXPECT_EQ("beta item", lineWith(lines, "beta"));
+  EXPECT_EQ("gamma item", lineWith(lines, "gamma"));
+}
+
+TEST(ListStyleNone, AnOrdinaryListKeepsItsMarkers) {
+  const auto lines = layout("<ol><li>delta item</li></ol><ul style=\"list-style: square inside\"><li>eps item</li></ul>");
+  EXPECT_EQ(0u, lineWith(lines, "delta").find("1."));
+  EXPECT_EQ(0u, lineWith(lines, "eps").find("\xe2\x80\xa2"));
+}

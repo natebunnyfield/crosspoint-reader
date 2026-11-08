@@ -305,7 +305,10 @@ namespace {
 // enclosing block style, table or list state (the guard upstream carries in
 // da3d50c24). Paragraphs after a hidden block keep their container's margins,
 // and a hidden nested list no longer ends its parent list.
-constexpr uint8_t SECTION_FILE_VERSION = 76;
+// v77: upstream 2b2ba72f0 (#3500). `list-style-type: none` (and the fork's
+// `list-style: none`) on a <ul>/<ol> drops its items' markers and hanging
+// gutter. Paired with CSS cache v12.
+constexpr uint8_t SECTION_FILE_VERSION = 77;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

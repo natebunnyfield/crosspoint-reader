@@ -2388,6 +2388,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         }
         ListContext ctx;
         ctx.ordered = (name[0] == 'o');
+        ctx.styleNone = cssStyle.hasListStyleType() && cssStyle.listStyleType == CssListStyleType::None;
         if (ctx.ordered) {
           // HTML "start" attribute: first item's number. Lowercase per XHTML.
           const char* startAttr = getAttribute(atts, "start");
@@ -2408,10 +2409,15 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         // stretchable inter-word gap. Hanging indent: the block's first line
         // starts at -gutter (negative text-indent), placing the marker in the
         // gutter and the text at the block's content edge, where every wrapped
-        // line returns. Plain decimal only — the CSS parser has no
-        // list-style-type, so roman/alpha counters are not available.
+        // line returns. Plain decimal only: the CSS parser reads list-style-type
+        // for `none` alone (upstream 2b2ba72f0), so roman/alpha counters are not
+        // available. A `none` list gets no marker and no hanging gutter: its
+        // items lay out as plain paragraphs at the list's indent.
+        const bool markerless = !self->listStack_.empty() && self->listStack_.back().styleNone;
         const bool ordered = !self->listStack_.empty() && self->listStack_.back().ordered;
-        if (ordered) {
+        if (markerless) {
+          // listMarker stays empty.
+        } else if (ordered) {
           ListContext& ctx = self->listStack_.back();
           // HTML "value" attribute on <li> resets the counter.
           const char* valueAttr = getAttribute(atts, "value");
@@ -2429,9 +2435,11 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         } else {
           listMarker = "\xe2\x80\xa2 ";  // U+2022 bullet, same gutter scheme
         }
-        const int gutter = self->renderer.getTextAdvanceX(self->fontId, listMarker.c_str(), EpdFontFamily::REGULAR);
-        elementStyle.textIndent = static_cast<int16_t>(-gutter);
-        elementStyle.textIndentDefined = true;
+        if (!listMarker.empty()) {
+          const int gutter = self->renderer.getTextAdvanceX(self->fontId, listMarker.c_str(), EpdFontFamily::REGULAR);
+          elementStyle.textIndent = static_cast<int16_t>(-gutter);
+          elementStyle.textIndentDefined = true;
+        }
       }
       auto accumulated = clampAccumulatedHorizontalInsets(
           self->blockStyleStack.back().getCombinedBlockStyle(elementStyle, BlockStyle::CombineAxis::Horizontal),
@@ -2457,7 +2465,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       self->startNewTextBlock(accumulated.withoutBottom());
       self->updateEffectiveInlineStyle();
 
-      if (isListItem) {
+      if (isListItem && !listMarker.empty()) {
         self->currentTextBlock->addWord(listMarker, EpdFontFamily::REGULAR);
         self->listItemBulletOnly = true;
         self->listMarkerGluePending_ = true;

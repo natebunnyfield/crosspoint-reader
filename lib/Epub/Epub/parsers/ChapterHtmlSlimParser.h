@@ -289,7 +289,8 @@ class ChapterHtmlSlimParser {
   // wrapped lines return to the item's text edge, not the marker's.
   struct ListContext {
     bool ordered = false;
-    int nextValue = 1;  // number the next <li> takes (ordered lists only)
+    bool styleNone = false;  // list-style-type: none on the <ul>/<ol>: items get no marker
+    int nextValue = 1;       // number the next <li> takes (ordered lists only)
   };
   std::vector<ListContext> listStack_;
   // Set right after the marker word is added; consumed by the next

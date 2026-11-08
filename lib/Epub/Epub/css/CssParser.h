@@ -64,7 +64,9 @@ class CssParser {
   // v11 (2026-11-08): upstream b6746c1df's cache layout -- bounded flat rule
   // storage, a complete/partial status and validated headers -- on top of v10.
   // Upstream numbered that layout 10, which this fork had already spent.
-  static constexpr uint8_t CSS_CACHE_VERSION = 11;
+  // v12 (2026-11-08): upstream 2b2ba72f0. `list-style-type` is parsed (one more
+  // wire byte and defined bit 18), so a v11 rule set lacks it.
+  static constexpr uint8_t CSS_CACHE_VERSION = 12;
 
   explicit CssParser(std::string cachePath) : cachePath(std::move(cachePath)) {}
   ~CssParser() = default;
