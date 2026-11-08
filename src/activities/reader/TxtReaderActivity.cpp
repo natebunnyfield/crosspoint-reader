@@ -6,6 +6,7 @@
 #include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Memory.h>
 #include <Serialization.h>
 #include <Utf8.h>
 
@@ -56,63 +57,41 @@ constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
 constexpr uint8_t CACHE_VERSION = 6;  // 6: bottom margin is 2x the screen margin
 }  // namespace
 
-void TxtReaderActivity::onEnter() {
-  Activity::onEnter();
-
+bool TxtReaderActivity::loadBook() {
+  txt = makeUniqueNoThrow<Txt>(bookPath, "/.crosspoint");
   if (!txt) {
-    return;
+    LOG_ERR("READER", "Failed to allocate TXT object");
+    return false;
   }
-
+  if (!txt->load()) {
+    LOG_ERR("READER", "Failed to load TXT");
+    txt.reset();
+    return false;
+  }
   txt->setupCacheDir();
-
-  // Save current txt as last opened file and add to recent books
-  auto filePath = txt->getPath();
-  auto fileName = filePath.substr(filePath.rfind('/') + 1);
-  APP_STATE.openEpubPath = filePath;
-  APP_STATE.saveToFile();
-  RECENT_BOOKS.addBook(filePath, fileName, "", "");
-
-  // Trigger first update
-  requestUpdate();
+  return true;
 }
 
 void TxtReaderActivity::onExit() {
-  Activity::onExit();
-
-  // Reset orientation back to portrait for the rest of the UI
+  ReaderActivity::onExit();
 
   pageOffsets.clear();
   currentPageLines.clear();
-  APP_STATE.readerActivityLoadCount = 0;
-  APP_STATE.saveToFile();
   txt.reset();
 }
 
-void TxtReaderActivity::loop() {
-  if (ReaderUtils::handleBackNavigation(mappedInput, activityManager, txt ? txt->getPath().c_str() : "",
-                                        {this, [](void* ctx) { static_cast<TxtReaderActivity*>(ctx)->onGoHome(); }})) {
-    return;
-  }
-
-  const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
-  auto [prevTriggered, nextTriggered] = ReaderUtils::detectPageTurn(mappedInput);
-  prevTriggered = prevTriggered || touch.prev;
-  nextTriggered = nextTriggered || touch.next;
-  if (!prevTriggered && !nextTriggered) {
-    return;
-  }
-
-  if (prevTriggered && currentPage > 0) {
+bool TxtReaderActivity::pageTurn(const bool isForward) {
+  if (!isForward) {
+    if (currentPage <= 0) return false;
     currentPage--;
-    requestUpdate();
-  } else if (nextTriggered) {
-    if (currentPage < totalPages - 1) {
-      currentPage++;
-      requestUpdate();
-    } else {
-      onGoHome();
-    }
+    return true;
   }
+  if (currentPage < totalPages - 1) {
+    currentPage++;
+    return true;
+  }
+  onGoHome();
+  return false;
 }
 
 void TxtReaderActivity::initializeReader() {
@@ -375,7 +354,7 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
   return !outLines.empty();
 }
 
-void TxtReaderActivity::render(RenderLock&&) {
+void TxtReaderActivity::renderBook(RenderLock&&) {
   if (!txt) {
     return;
   }

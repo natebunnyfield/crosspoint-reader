@@ -125,12 +125,37 @@ LastFindHit lastFindHit;
 
 }  // namespace
 
-void EpubReaderActivity::onEnter() {
-  Activity::onEnter();
-
-  if (!epub) {
-    return;
+bool EpubReaderActivity::loadBook() {
+  // The open that ReaderActivity's launcher used to do before handing over an
+  // Epub (a757b9d10 moved it here).
+  auto loaded = makeUniqueNoThrow<Epub>(bookPath, "/.crosspoint");
+  if (!loaded) {
+    LOG_ERR("READER", "Failed to allocate EPUB object");
+    return false;
   }
+  // First open: building the spine/TOC index (book.bin) takes a couple of seconds. Show the
+  // indexing popup so it isn't a silent wait on the home screen. The cachePath/hash is known at
+  // construction, so this check is valid before load(); a cached open loads in a blink -> no popup.
+  const bool uncached = !Storage.exists((loaded->getCachePath() + "/book.bin").c_str());
+  if (uncached) {
+    // The popup replaces the restored Quick Resume frame, so the reader must clean it.
+    disableFastInitialRefresh();
+    GUI.drawPopup(renderer, tr(STR_INDEXING));
+  }
+  bool ok;
+  {
+    // Lend the framebuffer's 48 KB to the container parse (expat + spine/TOC
+    // build). The popup just displayed stays on the panel; the first render
+    // redraws the full screen anyway.
+    std::optional<GfxRenderer::FrameBufferLoan> loan;
+    if (uncached) loan.emplace(renderer);
+    ok = loaded->load(true, SETTINGS.embeddedStyle == 0);
+  }
+  if (!ok) {
+    LOG_ERR("READER", "Failed to load epub");
+    return false;
+  }
+  epub = std::move(loaded);
 
   ImageBlock::clearSessionRenderFailures();
   // Lazy image extraction: section builds only header-probe images, so the first
@@ -184,17 +209,13 @@ void EpubReaderActivity::onEnter() {
     }
   }
 
-  // Save current epub as last opened epub and add to recent books
-  APP_STATE.openEpubPath = epub->getPath();
-  APP_STATE.saveToFile();
-  RECENT_BOOKS.addBook(epub->getPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
-
-  // Trigger first update
-  requestUpdate();
+  // ReaderActivity::onEnter() records the book as last opened and in Recent
+  // Books, then requests the first update.
+  return true;
 }
 
 void EpubReaderActivity::onExit() {
-  Activity::onExit();
+  ReaderActivity::onExit();
   freePrerender();
 
   // "No page": tells a read-aloud consumer to stop speech. Inline no-op on
@@ -206,11 +227,6 @@ void EpubReaderActivity::onExit() {
   // The extractor holds a raw pointer to this activity's epub; drop it before
   // the activity (and the shared_ptr) goes away.
   ImageBlock::setExtractor(nullptr, nullptr);
-
-  // Reset orientation back to portrait for the rest of the UI
-
-  APP_STATE.readerActivityLoadCount = 0;
-  APP_STATE.saveToFile();
 
   // Leaving mid-footnote loses the in-RAM return stack on deep sleep; persist the
   // pre-footnote position so the book reopens at the link origin, not the footnote.
@@ -1087,7 +1103,7 @@ void EpubReaderActivity::startFind(const std::string& query) {
       });
 }
 
-void EpubReaderActivity::pageTurn(bool isForwardTurn) {
+bool EpubReaderActivity::pageTurn(bool isForwardTurn) {
   // A page turn is authoritative: do not let a resume/reflow position captured
   // at session start snap the reader back after the incremental build completes.
   // Peeked unlocked first so an ordinary turn never waits on the render task
@@ -1133,10 +1149,17 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn) {
   LOG_DBG("ERS", "Page turn %s -> spine %d page %d", isForwardTurn ? "fwd" : "back", currentSpineIndex,
           section ? section->currentPage : -1);
   requestUpdate();
+  // Already requested: the EPUB reader's own loop() calls this, not the base's.
+  return false;
 }
 
 // TODO: Failure handling
-void EpubReaderActivity::render(RenderLock&& lock) {
+// Not ReaderActivity::render(): Find and the deferred gray pass must run before
+// the end-of-book check, which renderBook() makes itself (same screen, via
+// renderEndOfBook()).
+void EpubReaderActivity::render(RenderLock&& lock) { renderBook(std::move(lock)); }
+
+void EpubReaderActivity::renderBook(RenderLock&& lock) {
   if (!epub || findInFlight) {
     // findInFlight: the section was released for Find; see the header.
     return;
@@ -1170,12 +1193,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   // Show end of book screen
   if (currentSpineIndex == epub->getSpineItemsCount()) {
     gpio.publishTurnedPage(false);
-    renderer.clearScreen();
-    // 3/8 of the screen height matches the previous fixed position on the 480x800 panel
-    // and scales to other resolutions.
-    renderer.drawCenteredText(UI_12_FONT_ID, renderer.getScreenHeight() * 3 / 8, tr(STR_END_OF_BOOK), true,
-                              EpdFontFamily::BOLD);
-    renderer.displayBuffer();
+    renderEndOfBook();
     return;
   }
 

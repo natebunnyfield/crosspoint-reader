@@ -232,7 +232,11 @@ void FileBrowserActivity::activateSelected(const bool forceDelete, const bool fr
     } else {
       // Push rather than replace so FileBrowserActivity stays on the stack;
       // Back from the reader pops back here with the selection intact.
-      activityManager.pushActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, prefix + entry, false));
+      // ReaderActivity::open picks the reader (or the image viewer) directly; the
+      // launcher that used to swap itself out in place is gone (a757b9d10).
+      if (auto reader = ReaderActivity::open(renderer, mappedInput, prefix + entry, false)) {
+        activityManager.pushActivity(std::move(reader));
+      }
     }
   }
   return;

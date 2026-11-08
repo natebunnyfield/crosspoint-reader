@@ -7,6 +7,7 @@
 
 #include "XtcReaderActivity.h"
 
+#include <Memory.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
@@ -25,32 +26,26 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
-void XtcReaderActivity::onEnter() {
-  Activity::onEnter();
-
-  if (!xtc) {
-    return;
+bool XtcReaderActivity::loadBook() {
+  auto loaded = makeUniqueNoThrow<Xtc>(bookPath, "/.crosspoint");
+  if (!loaded) {
+    LOG_ERR("READER", "Failed to allocate XTC object");
+    return false;
   }
-
+  if (!loaded->load()) {
+    LOG_ERR("READER", "Failed to load XTC");
+    return false;
+  }
+  xtc = std::move(loaded);
   xtc->setupCacheDir();
 
   // Load saved progress
   loadProgress();
-
-  // Save current XTC as last opened book and add to recent books
-  APP_STATE.openEpubPath = xtc->getPath();
-  APP_STATE.saveToFile();
-  RECENT_BOOKS.addBook(xtc->getPath(), xtc->getTitle(), xtc->getAuthor(), xtc->getThumbBmpPath());
-
-  // Trigger first update
-  requestUpdate();
+  return true;
 }
 
 void XtcReaderActivity::onExit() {
-  Activity::onExit();
-
-  APP_STATE.readerActivityLoadCount = 0;
-  APP_STATE.saveToFile();
+  ReaderActivity::onExit();
   xtc.reset();
 }
 
@@ -65,88 +60,33 @@ void XtcReaderActivity::openChapterSelection() {
   }
 }
 
-void XtcReaderActivity::loop() {
-  if (!xtc) {
-    return;
-  }
-
-  const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
-
-  const bool atEndOfBook = currentPage >= xtc->getPageCount();
-
-  // On the end-of-book screen Confirm goes home.
-  if (atEndOfBook &&
-      (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput))) {
-    onGoHome();
-    return;
-  }
-
-  // On the end-of-book screen Back goes home.
-  if (atEndOfBook && mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    onGoHome();
-    return;
-  }
-
-  // Enter chapter selection activity
+bool XtcReaderActivity::handleFormatInput() {
+  // Enter chapter selection activity. Not consumed: Back and the page turn are
+  // still read on this tick, as they always were.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput)) {
     openChapterSelection();
   }
-
-  if (ReaderUtils::handleBackNavigation(mappedInput, activityManager, xtc ? xtc->getPath().c_str() : "",
-                                        {this, [](void* ctx) { static_cast<XtcReaderActivity*>(ctx)->onGoHome(); }})) {
-    return;
-  }
-
-  auto [prevTriggered, nextTriggered] = ReaderUtils::detectPageTurn(mappedInput);
-  prevTriggered = prevTriggered || touch.prev;
-  nextTriggered = nextTriggered || touch.next;
-  if (!prevTriggered && !nextTriggered) {
-    return;
-  }
-
-  // At end of the book: forward goes home, back returns to last page
-  if (currentPage >= xtc->getPageCount()) {
-    if (nextTriggered) {
-      onGoHome();
-    } else {
-      currentPage = xtc->getPageCount() - 1;
-      requestUpdate();
-    }
-    return;
-  }
-
-  // Chapter-skip long-press-to-skip-10 was retired 2026-09-01 (owner ruling,
-  // docs/hold-gestures.md); every page turn now moves one page.
-  if (prevTriggered) {
-    if (currentPage >= 1) {
-      currentPage -= 1;
-    } else {
-      currentPage = 0;
-    }
-    requestUpdate();
-  } else if (nextTriggered) {
-    currentPage += 1;
-    if (currentPage >= xtc->getPageCount()) {
-      currentPage = xtc->getPageCount();  // Allow showing "End of book"
-    }
-    requestUpdate();
-  }
+  return false;
 }
 
-void XtcReaderActivity::render(RenderLock&&) {
+bool XtcReaderActivity::pageTurn(const bool isForward) {
+  // Chapter-skip long-press-to-skip-10 was retired 2026-09-01 (owner ruling,
+  // docs/hold-gestures.md); every page turn moves one page.
+  if (!isForward) {
+    currentPage = currentPage >= 1 ? currentPage - 1 : 0;
+    return true;
+  }
+  currentPage += 1;
+  if (currentPage >= xtc->getPageCount()) {
+    currentPage = xtc->getPageCount();  // Allow showing "End of book"
+  }
+  return true;
+}
+
+void XtcReaderActivity::renderBook(RenderLock&&) {
   if (!xtc) {
     return;
   }
-
-  // Bounds check
-  if (currentPage >= xtc->getPageCount()) {
-    renderer.clearScreen();
-    renderer.drawCenteredText(UI_12_FONT_ID, renderer.getScreenHeight() * 3 / 8, tr(STR_END_OF_BOOK), true,
-                              EpdFontFamily::BOLD);
-    renderer.displayBuffer();
-    return;
-  }
-
   renderPage();
   saveProgress();
 }

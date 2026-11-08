@@ -4,10 +4,11 @@
 #include <Epub/Section.h>
 
 #include <optional>
+#include <string>
 
-#include "activities/Activity.h"
+#include "ReaderActivity.h"
 
-class EpubReaderActivity final : public Activity {
+class EpubReaderActivity final : public ReaderActivity {
   std::shared_ptr<Epub> epub;
   std::unique_ptr<Section> section = nullptr;
   int currentSpineIndex = 0;
@@ -26,10 +27,9 @@ class EpubReaderActivity final : public Activity {
   // meaningful in chapters with no <p> elements, where the paragraph anchor
   // resolves every page to 0 and a reflow rewound to the chapter start.
   std::optional<uint32_t> pendingWordAnchor;
-  int pagesUntilFullRefresh = 0;
-  // Image pages use a dedicated double-FAST refresh path, so retain a manual
-  // refresh request until renderContents can issue its clean base pass.
-  bool forcedRefreshPending = false;
+  // pagesUntilFullRefresh and forcedRefreshPending live in ReaderActivity. Image
+  // pages use a dedicated double-FAST refresh path, so a manual refresh request
+  // is retained there until renderContents can issue its clean base pass.
   int cachedSpineIndex = 0;
   int cachedChapterTotalPageCount = 0;
   // Signals that the next render should reposition within the newly loaded section
@@ -247,19 +247,16 @@ class EpubReaderActivity final : public Activity {
   // and would start a build on the same spine Find is about to lay out -- two
   // writers on one section .part file.
   bool findInFlight = false;
-  void pageTurn(bool isForwardTurn);
+  bool pageTurn(bool isForwardTurn) override;
 
   // Footnote navigation
   void navigateToHref(const std::string& href, bool savePosition = false);
   void restoreSavedPosition();
 
  public:
-  explicit EpubReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Epub> epub,
-                              int initialRefreshCountdown)
-      : Activity("EpubReader", renderer, mappedInput),
-        epub(std::move(epub)),
-        pagesUntilFullRefresh(initialRefreshCountdown) {}
-  void onEnter() override;
+  explicit EpubReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string bookPath,
+                              bool allowFastInitialRefresh)
+      : ReaderActivity("EpubReader", renderer, mappedInput, std::move(bookPath), allowFastInitialRefresh) {}
   void onExit() override;
   void loop() override;
   void render(RenderLock&& lock) override;
@@ -280,14 +277,16 @@ class EpubReaderActivity final : public Activity {
     return section && section->isBuilding() && !buildHeapPaused &&
            (section->isPartial() || static_cast<int>(section->pageCount) < section->currentPage + BUILD_WINDOW_AHEAD);
   }
-  bool isReaderActivity() const override { return true; }
-  bool handleForcedRefresh() override {
-    {
-      RenderLock lock(*this);
-      pagesUntilFullRefresh = 1;
-      forcedRefreshPending = true;
-    }
-    requestUpdate();
-    return true;
+
+ protected:
+  // Opens the EPUB (the indexing popup and the framebuffer loan on a first open)
+  // and restores the reading position. See the definition.
+  bool loadBook() override;
+  std::string getBookTitle() const override { return epub ? epub->getTitle() : ""; }
+  std::string getBookAuthor() const override { return epub ? epub->getAuthor() : ""; }
+  std::string getBookThumbBmpPath() const override { return epub ? epub->getThumbBmpPath() : ""; }
+  bool isAtEndOfBook() const override {
+    return epub && currentSpineIndex > 0 && currentSpineIndex >= epub->getSpineItemsCount();
   }
+  void renderBook(RenderLock&& lock) override;
 };

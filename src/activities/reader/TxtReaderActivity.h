@@ -2,17 +2,18 @@
 
 #include <Txt.h>
 
+#include <memory>
+#include <string>
 #include <vector>
 
 #include "CrossPointSettings.h"
-#include "activities/Activity.h"
+#include "ReaderActivity.h"
 
-class TxtReaderActivity final : public Activity {
+class TxtReaderActivity final : public ReaderActivity {
   std::unique_ptr<Txt> txt;
 
   int currentPage = 0;
   int totalPages = 1;
-  int pagesUntilFullRefresh = 0;
 
   // Streaming text reader - stores file offsets for each page
   std::vector<size_t> pageOffsets;  // File offset for start of each page
@@ -41,22 +42,18 @@ class TxtReaderActivity final : public Activity {
   void loadProgress();
 
  public:
-  explicit TxtReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Txt> txt,
-                             int initialRefreshCountdown)
-      : Activity("TxtReader", renderer, mappedInput),
-        txt(std::move(txt)),
-        pagesUntilFullRefresh(initialRefreshCountdown) {}
-  void onEnter() override;
+  explicit TxtReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string bookPath,
+                             bool allowFastInitialRefresh)
+      : ReaderActivity("TxtReader", renderer, mappedInput, std::move(bookPath), allowFastInitialRefresh) {}
   void onExit() override;
-  void loop() override;
-  void render(RenderLock&&) override;
-  bool isReaderActivity() const override { return true; }
-  bool handleForcedRefresh() override {
-    {
-      RenderLock lock(*this);
-      pagesUntilFullRefresh = 1;
-    }
-    requestUpdate();
-    return true;
-  }
+
+ protected:
+  bool loadBook() override;
+  // The file name, as Recent Books has always shown a text file.
+  std::string getBookTitle() const override { return bookPath.substr(bookPath.rfind('/') + 1); }
+  // No end-of-book screen for text: forward on the last page goes Home, back on
+  // the first page does nothing.
+  bool pageTurn(bool isForward) override;
+  bool isAtEndOfBook() const override { return false; }
+  void renderBook(RenderLock&& lock) override;
 };

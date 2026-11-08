@@ -247,7 +247,13 @@ void ActivityManager::goToRecentBooks() {
 }
 
 void ActivityManager::goToReader(std::string path, const bool allowFastInitialRefresh) {
-  replaceActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, std::move(path), allowFastInitialRefresh));
+  if (path.empty()) {
+    goToFileBrowser("/");  // entering via Browse: start from the root
+    return;
+  }
+  if (auto reader = ReaderActivity::open(renderer, mappedInput, std::move(path), allowFastInitialRefresh)) {
+    replaceActivity(std::move(reader));
+  }
 }
 
 void ActivityManager::goToSleep(bool fromTimeout) {

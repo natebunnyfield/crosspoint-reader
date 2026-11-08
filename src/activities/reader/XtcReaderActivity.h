@@ -12,13 +12,12 @@
 #include <string>
 #include <utility>
 
-#include "activities/Activity.h"
+#include "ReaderActivity.h"
 
-class XtcReaderActivity final : public Activity {
+class XtcReaderActivity final : public ReaderActivity {
   std::shared_ptr<Xtc> xtc;
 
   uint32_t currentPage = 0;
-  int pagesUntilFullRefresh = 0;
 
   void renderPage();
   // Opens chapter selection when the book has chapters (short-press Confirm); no-op otherwise
@@ -27,22 +26,20 @@ class XtcReaderActivity final : public Activity {
   void loadProgress();
 
  public:
-  explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Xtc> xtc,
-                             int initialRefreshCountdown)
-      : Activity("XtcReader", renderer, mappedInput),
-        xtc(std::move(xtc)),
-        pagesUntilFullRefresh(initialRefreshCountdown) {}
-  void onEnter() override;
+  explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string bookPath,
+                             bool allowFastInitialRefresh)
+      : ReaderActivity("XtcReader", renderer, mappedInput, std::move(bookPath), allowFastInitialRefresh) {}
   void onExit() override;
-  void loop() override;
-  void render(RenderLock&&) override;
-  bool isReaderActivity() const override { return true; }
-  bool handleForcedRefresh() override {
-    {
-      RenderLock lock(*this);
-      pagesUntilFullRefresh = 1;
-    }
-    requestUpdate();
-    return true;
-  }
+
+ protected:
+  bool loadBook() override;
+  std::string getBookTitle() const override { return xtc ? xtc->getTitle() : ""; }
+  std::string getBookAuthor() const override { return xtc ? xtc->getAuthor() : ""; }
+  std::string getBookThumbBmpPath() const override { return xtc ? xtc->getThumbBmpPath() : ""; }
+  // Short-press Confirm (or the touch menu gesture) opens chapter selection.
+  bool handleFormatInput() override;
+  bool pageTurn(bool isForward) override;
+  bool isAtEndOfBook() const override { return xtc && currentPage >= xtc->getPageCount(); }
+  void onReturnFromEndOfBook() override { currentPage = xtc->getPageCount() - 1; }
+  void renderBook(RenderLock&& lock) override;
 };
