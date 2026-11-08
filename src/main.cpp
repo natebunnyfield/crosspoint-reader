@@ -1392,6 +1392,13 @@ void loop() {
   if (Serial && millis() - lastMemPrint >= 10000) {
     LOG_INF("MEM", "Free: %d bytes, Total: %d bytes, Min Free: %d bytes, MaxAlloc: %d bytes", ESP.getFreeHeap(),
             ESP.getHeapSize(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+#ifdef BOARD_HAS_PSRAM
+    // Upstream b7bceb56c. ESP.getFreeHeap() and friends read MALLOC_CAP_INTERNAL,
+    // so the line above is the internal heap; the Picco's 8 MB PSRAM gets its own.
+    LOG_INF("MEM", "PSRAM: Free: %u bytes, Total: %u bytes, Min Free: %u bytes, MaxAlloc: %u bytes",
+            static_cast<unsigned>(ESP.getFreePsram()), static_cast<unsigned>(ESP.getPsramSize()),
+            static_cast<unsigned>(ESP.getMinFreePsram()), static_cast<unsigned>(ESP.getMaxAllocPsram()));
+#endif
     lastMemPrint = millis();
   }
 

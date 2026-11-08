@@ -1,6 +1,10 @@
 #include "InflateStream.h"
 
 #include <BuildScratch.h>
+#include <Logging.h>
+#if defined(ESP_PLATFORM)
+#include <esp_heap_caps.h>
+#endif
 
 #include <cstdlib>
 #include <cstring>
@@ -12,6 +16,19 @@ namespace {
 constexpr size_t WINDOW_SIZE = TINFL_LZ_DICT_SIZE;
 // tinfl_decompressor holds mz_uint32 arrays; 8 keeps the window aligned too.
 constexpr size_t STATE_ALIGNED = (sizeof(tinfl_decompressor) + 7) & ~size_t{7};
+
+// Upstream b7bceb56c reads these through a HalMemory unit; heap_caps directly
+// gives the same numbers on device without a new translation unit (and its
+// simulator twin). Host builds have no heap to report.
+void logAllocationFailure(const char* allocation, size_t bytes) {
+#if defined(ESP_PLATFORM)
+  LOG_ERR("ZIP", "Inflate %s OOM (%zu bytes): heap %zu free/%zu max, PSRAM %zu free/%zu total", allocation, bytes,
+          heap_caps_get_free_size(MALLOC_CAP_DEFAULT), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT),
+          heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
+#else
+  LOG_ERR("ZIP", "Inflate %s OOM (%zu bytes)", allocation, bytes);
+#endif
+}
 }  // namespace
 
 InflateStream::~InflateStream() { deinit(); }
@@ -34,10 +51,17 @@ bool InflateStream::init(const bool streaming) {
     // an incomplete type so consumers never include miniz; both blocks are
     // freed in deinit()/the destructor.
     state = static_cast<tinfl_decompressor*>(malloc(sizeof(tinfl_decompressor)));
-    if (!state) return false;
+    if (!state) {
+      logAllocationFailure("state", sizeof(tinfl_decompressor));
+      return false;
+    }
     if (streaming) {
       window = static_cast<uint8_t*>(malloc(WINDOW_SIZE));
-      if (!window) return false;  // state kept; deinit()/next init reclaims it
+      if (!window) {
+        logAllocationFailure("window", WINDOW_SIZE);
+        deinit();  // a failed init leaves nothing allocated
+        return false;
+      }
     }
   }
 

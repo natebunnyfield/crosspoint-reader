@@ -157,7 +157,7 @@ bool EpubReaderActivity::loadBook() {
   }
   epub = std::move(loaded);
 
-  ImageBlock::clearSessionRenderFailures();
+  ImageBlock::clearRenderFailures();
   // Lazy image extraction: section builds only header-probe images, so the first
   // render of an image page pulls the file out of the EPUB through this hook.
   ImageBlock::setExtractor(epub.get(), [](void* ctx, const char* src, const char* dest) {
@@ -1836,6 +1836,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
                                         const int orientedMarginLeft) {
   const auto t0 = millis();
   const int fontId = SETTINGS.getReaderFontId();
+  ImageBlock::clearRenderFailures();
 
   // Cap-ink trim, applied at PAINT time only: shift the whole page body up by
   // the line box's air above cap height, so the first line's cap ink lands

@@ -49,8 +49,7 @@ class InflateStream {
   InflateStream& operator=(const InflateStream&) = delete;
 
   // Allocate decompressor state (and the 32KB window when streaming) and reset
-  // stream state. Reuses existing allocations on repeated calls. Returns false
-  // on OOM.
+  // stream state. Releases prior storage first; leaves no allocation on OOM.
   bool init(bool streaming);
 
   // Free the decompressor state and window.
