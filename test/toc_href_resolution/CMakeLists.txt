@@ -38,6 +38,7 @@ add_executable(TocHrefResolutionTest
   ${REPO_ROOT}/lib/Epub/Epub/parsers/XmlEncodingSupport.cpp
   ${REPO_ROOT}/lib/Epub/Epub/parsers/XmlEncodingTables.cpp
   ${REPO_ROOT}/lib/Epub/Epub/converters/ImageDimsProbe.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/converters/ImageToFramebufferDecoder.cpp
   ${REPO_ROOT}/lib/ZipFile/ZipFile.cpp
   ${REPO_ROOT}/lib/miniz/src/InflateStream.cpp
   ${REPO_ROOT}/lib/miniz/src/miniz_impl.c
