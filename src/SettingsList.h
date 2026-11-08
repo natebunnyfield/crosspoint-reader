@@ -672,6 +672,18 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // display driver as soon as it flips.
     v.push_back(
         SettingInfo::Toggle(StrId::STR_DARK_MODE, &CrossPointSettings::darkMode, "darkMode", StrId::STR_CAT_SYSTEM));
+    // Grayscale text and the ghost-cleaning cadence, restored 2026-11-07 (owner:
+    // "make grayscale an optional setting (default on) and less or more frequent
+    // refresh another setting (default more)"). Both are reading-feel trades the
+    // lag work made visible (docs/lag-reduction-plan-2026-11-07.md): the gray
+    // pass is a second waveform per page, the HALF every N pages ~1.16 s.
+    v.push_back(SettingInfo::Toggle(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing, "textAntiAliasing",
+                                    StrId::STR_CAT_SYSTEM));
+    // Order must match CrossPointSettings::REFRESH_CADENCE -- the index IS the
+    // persisted value.
+    v.push_back(SettingInfo::Enum(StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshCadence,
+                                  {StrId::STR_REFRESH_MORE, StrId::STR_REFRESH_LESS}, "refreshCadence",
+                                  StrId::STR_CAT_SYSTEM));
     // The typeface the chrome itself is drawn in. Filed under System rather than
     // Reader because it is not about books: it changes headers, list rows,
     // button hints, popups and the battery readout, and leaves the reader's body

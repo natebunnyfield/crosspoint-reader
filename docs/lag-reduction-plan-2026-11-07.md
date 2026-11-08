@@ -364,6 +364,24 @@ it.
   the one-open anchor lookup, all 12 press-fired lists, the Picco GPIO wakes,
   the wake timing, the font picker deferral, Home thumbnails, the X4-only flags.
 
+### Two settings restored (owner, 2026-11-07)
+
+*"make grayscale an optional setting (default on) and less or more frequent
+refresh another setting (default more)"*. Both on the device's Settings list
+under Dark Mode, both in the web settings API through `getSettingsList()`:
+
+- **Text Anti-Aliasing**, a toggle, default ON (`textAntiAliasing`, live again
+  after being `static constexpr`). Off: text pages are one waveform, no gray
+  pass; image pages keep their grayscale. A saved Crisp/Dark (2/3) from the
+  four-strength era folds to ON in `normalizeRetiredSettings()`.
+- **Refresh Frequency**, More often (default) / Less often (`refreshCadence`,
+  a new key, index persisted): the reader's HALF ghost-cleaning refresh every
+  15 pages (the old hardcoded value) or every 30. The enum `REFRESH_FREQUENCY`
+  stays for its frozen values; nothing reads it now.
+
+Verified in the simulator: with AA off and Less often, 36 turns ran no text
+gray pass and the HALF came 30 turns after the previous one (turn 2 → 32).
+
 ### Not done, and why
 
 - **Phase 0** (device measurement): ruled out for now. The gray-waveform time,

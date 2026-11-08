@@ -354,7 +354,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   static constexpr uint8_t extraParagraphSpacing = 1;
   // TEXT_ANTIALIASING value (0=Off, 1=Standard, 2=Crisp, 3=Dark). Non-zero
   // still reads as "AA enabled" everywhere the old toggle was tested as a bool.
-  static constexpr uint8_t textAntiAliasing = TEXT_AA_STANDARD;
+  // A live setting again since 2026-11-07, owner: "make grayscale an optional
+  // setting (default on)" -- a System toggle, Off/Standard. Crisp and Dark have
+  // no row; normalizeRetiredSettings() folds a saved 2/3 back to Standard.
+  uint8_t textAntiAliasing = TEXT_AA_STANDARD;
   // Short power button click behavior.
   //
   // SLEEP, not IGNORE, and it must stay in step with the pin in
@@ -473,8 +476,12 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   char ligaturesOff[ligatures::SPEC_BUF_SIZE] = "";
   // Auto-sleep timeout setting (default 10 minutes). Legacy sleepTimeout enum values are migration-only.
   static constexpr uint8_t sleepTimeoutMinutes = 10;
-  // E-ink refresh frequency (default 15 pages)
-  static constexpr uint8_t refreshFrequency = REFRESH_15;
+  // How often the reader runs its HALF ghost-cleaning refresh. Owner
+  // 2026-11-07: "less or more frequent refresh another setting (default
+  // more)". Two choices, index persisted: MORE = every 15 pages (the value this
+  // was hardcoded at), LESS = every 30. See getRefreshFrequency().
+  enum REFRESH_CADENCE : uint8_t { REFRESH_MORE = 0, REFRESH_LESS = 1, REFRESH_CADENCE_COUNT };
+  uint8_t refreshCadence = REFRESH_MORE;
   // WHICH LINE BREAKER RUNS. Not a hyphen switch, whatever the field is called:
   // 1 is the first-fit greedy breaker that splits words, 0 is the total-fit
   // dynamic program that does not. The values, the default and the whole

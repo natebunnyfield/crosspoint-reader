@@ -123,6 +123,12 @@ void CrossPointSettings::normalizeRetiredSettings() {
   // a save written while its picker existed cannot hold it on forever.
   focusReadingEnabled = 0;
 
+  // The two rows restored on 2026-11-07 (docs/lag-reduction-plan-2026-11-07.md).
+  // Text AA offers Off/Standard only; a save from the four-strength era keeps
+  // its "on" without a strength the device no longer shows.
+  if (textAntiAliasing > TEXT_AA_STANDARD) textAntiAliasing = TEXT_AA_STANDARD;
+  if (refreshCadence >= REFRESH_CADENCE_COUNT) refreshCadence = REFRESH_MORE;
+
   // The three withdrawn calendar rows (owner ruling 2026-08-21: "keep calendar
   // and westside calendar"). Their enum values are frozen by persistence, so a
   // stale save is remapped to the classic calendar rather than left holding a
@@ -424,19 +430,7 @@ unsigned long CrossPointSettings::getSleepTimeoutMs() const {
 }
 
 int CrossPointSettings::getRefreshFrequency() const {
-  switch (refreshFrequency) {
-    case REFRESH_1:
-      return 1;
-    case REFRESH_5:
-      return 5;
-    case REFRESH_10:
-      return 10;
-    case REFRESH_15:
-    default:
-      return 15;
-    case REFRESH_30:
-      return 30;
-  }
+  return refreshCadence == REFRESH_LESS ? 30 : 15;
 }
 
 void CrossPointSettings::clearSdFontFamily() {
