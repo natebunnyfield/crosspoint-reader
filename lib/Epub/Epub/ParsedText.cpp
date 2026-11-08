@@ -556,9 +556,9 @@ struct KnuthPlassModel {
     for (const auto& bi : infos) {
       if (bi.byteOffset == 0 || bi.byteOffset >= word.size() || bi.byteOffset == last) continue;
       last = bi.byteOffset;
-      const int prefix = measureFocusWordWidth(renderer, fontId, word.substr(0, bi.byteOffset), styles[k],
-                                               focusBoundaryBefore(focusBoundaries[k], bi.byteOffset),
-                                               bi.requiresInsertedHyphen);
+      const int prefix =
+          measureFocusWordWidth(renderer, fontId, word.substr(0, bi.byteOffset), styles[k],
+                                focusBoundaryBefore(focusBoundaries[k], bi.byteOffset), bi.requiresInsertedHyphen);
       const int suffix = measureFocusWordWidth(renderer, fontId, word.substr(bi.byteOffset), styles[k],
                                                focusBoundaryAfter(focusBoundaries[k], bi.byteOffset));
       emit(static_cast<int>(bi.byteOffset), bi.requiresInsertedHyphen, prefix, suffix);
@@ -1387,7 +1387,7 @@ bool ParsedText::computeKnuthPlassLineBreaks(const GfxRenderer& renderer, const 
   cfg.shrink = tune.shrink;
 #endif
 
-  const KnuthPlassModel model{renderer,       fontId,           words, wordStyles, wordWidths, wordContinues,
+  const KnuthPlassModel model{renderer,          fontId,           words, wordStyles, wordWidths, wordContinues,
                               wordNoSpaceBefore, wordFocusBoundary};
   std::vector<kpbreak::Cut> cuts;
   kpbreak::Stats stats;
@@ -1712,9 +1712,8 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       actualGapCount++;
       if (!continues && !noSpace) {
         if (shrinkJustify_) {
-          lineShrinkCap = std::min(
-              lineShrinkCap,
-              kpbreak::shrinkPerGapPx(renderer.getSpaceAdvance(fontId, 'n', 'n', lineWordStyles[wordIdx - 1])));
+          lineShrinkCap = std::min(lineShrinkCap, kpbreak::shrinkPerGapPx(renderer.getSpaceAdvance(
+                                                      fontId, 'n', 'n', lineWordStyles[wordIdx - 1])));
         }
       } else {
         // A CJK break has no natural width to give up, and a no-break space is

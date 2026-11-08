@@ -7,12 +7,12 @@
 
 #include "XtcReaderActivity.h"
 
-#include <Memory.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Memory.h>
 
 #include <algorithm>
 

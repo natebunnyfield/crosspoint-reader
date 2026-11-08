@@ -81,8 +81,7 @@ TEST(SavedWifiPlan, AJoinWaitingForItsLeaseGetsTheGrace) {
   EXPECT_EQ(decide(Link::Associated, kSoleAttemptMs, kSoleAttemptMs, 1, 0), Step::Wait);
   EXPECT_EQ(decide(Link::Associated, kSoleAttemptMs + kDhcpGraceMs - 1, kSoleAttemptMs + kDhcpGraceMs - 1, 1, 0),
             Step::Wait);
-  EXPECT_EQ(decide(Link::Associated, kSoleAttemptMs + kDhcpGraceMs, kSoleAttemptMs + kDhcpGraceMs, 1, 0),
-            Step::GiveUp);
+  EXPECT_EQ(decide(Link::Associated, kSoleAttemptMs + kDhcpGraceMs, kSoleAttemptMs + kDhcpGraceMs, 1, 0), Step::GiveUp);
   // Past the search budget too, which a sole attempt plus grace exceeds.
   EXPECT_EQ(decide(Link::Associated, kEachAttemptMs, kSearchBudgetMs, 3, 2), Step::Wait);
   EXPECT_EQ(decide(Link::Associated, kEachAttemptMs, kSearchBudgetMs + kDhcpGraceMs, 3, 2), Step::GiveUp);

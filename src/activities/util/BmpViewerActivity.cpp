@@ -206,9 +206,9 @@ void BmpViewerActivity::doSetSleepCover() {
 
   const bool transparentMode = SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM;
   if (!canSetSleepCover()) return;
-  const char* destination =
-      transparentMode ? (FsHelpers::hasPngExtension(filePath) ? SLEEP_OVERLAY_PNG_PATH : SLEEP_OVERLAY_PATH)
-                      : SLEEP_COVER_PATH;
+  const char* destination = transparentMode
+                                ? (FsHelpers::hasPngExtension(filePath) ? SLEEP_OVERLAY_PNG_PATH : SLEEP_OVERLAY_PATH)
+                                : SLEEP_COVER_PATH;
 
   // Setting the sleep cover FROM the sleep cover destroys it. openFileForWrite
   // is O_TRUNC, so opening /sleep.bmp for output truncated the very file inFile

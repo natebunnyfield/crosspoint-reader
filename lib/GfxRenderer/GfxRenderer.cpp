@@ -2406,21 +2406,19 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   // thirds of the panel. So this is an offer, not an instruction, and a panel
   // with no windowed path (supportsWindowedRefresh() false) never sees it.
   const int panelArea = static_cast<int>(panelWidth) * static_cast<int>(panelHeight);
-  if (refreshMode == HalDisplay::FAST_REFRESH && !_dirtyAll && !_stripActive &&
-      _dirtyBottom >= _dirtyTop && _dirtyRight >= _dirtyLeft && display.supportsWindowedRefresh()) {
+  if (refreshMode == HalDisplay::FAST_REFRESH && !_dirtyAll && !_stripActive && _dirtyBottom >= _dirtyTop &&
+      _dirtyRight >= _dirtyLeft && display.supportsWindowedRefresh()) {
     // Widen the window to every tile whose content actually changed: the
     // hashes see writes the dirty rect may not (a writer that forgot to mark),
     // so the window can only grow toward the truth. Untrusted baseline (a gray
     // pass, a polarity change): no widening, the dirty rect stands alone.
-    const bool baselineTrusted =
-        _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
+    const bool baselineTrusted = _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
     int minTx, minTy, maxTx, maxTy;
     const int changedTiles = rehashTiles(minTx, minTy, maxTx, maxTy);
     if (baselineTrusted && changedTiles > 0) {
       _dirtyLeft = std::min(_dirtyLeft, minTx * TILE_W_BYTES * 8);
       _dirtyTop = std::min(_dirtyTop, minTy * TILE_H);
-      _dirtyRight =
-          std::max(_dirtyRight, std::min(static_cast<int>(panelWidth), (maxTx + 1) * TILE_W_BYTES * 8) - 1);
+      _dirtyRight = std::max(_dirtyRight, std::min(static_cast<int>(panelWidth), (maxTx + 1) * TILE_W_BYTES * 8) - 1);
       _dirtyBottom = std::max(_dirtyBottom, std::min(static_cast<int>(panelHeight), (maxTy + 1) * TILE_H) - 1);
     }
     const int w = _dirtyRight - _dirtyLeft + 1;
@@ -2446,8 +2444,7 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   // against what the glass shows. See _tileHash in GfxRenderer.h.
   if (refreshMode == HalDisplay::FAST_REFRESH && _dirtyAll && !_stripActive && frameBuffer &&
       display.supportsWindowedRefresh()) {
-    const bool baselineTrusted =
-        _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
+    const bool baselineTrusted = _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
     int minTx, minTy, maxTx, maxTy;
     const int changed = rehashTiles(minTx, minTy, maxTx, maxTy);
     if (baselineTrusted && changed == 0) {

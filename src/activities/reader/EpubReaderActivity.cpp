@@ -1904,8 +1904,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // when it is THIS page with this geometry, the BW frame is a copy and both
   // the scan and the BW render are skipped. Consumed either way -- a stale one
   // must never survive into a later page.
-  const bool usePrerender = prerenderValid && prerenderBuf && prerenderGeneration == sectionGeneration &&
-                            section && prerenderSpine == currentSpineIndex && prerenderPage == section->currentPage &&
+  const bool usePrerender = prerenderValid && prerenderBuf && prerenderGeneration == sectionGeneration && section &&
+                            prerenderSpine == currentSpineIndex && prerenderPage == section->currentPage &&
                             prerenderFontId == fontId && prerenderMarginLeft == orientedMarginLeft &&
                             prerenderPaintTop == paintMarginTop && !renderer.isDisplayInverted();
   prerenderValid = false;
@@ -1967,11 +1967,9 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // it are tuned around the gray pass following at once (#2190). Dark mode
   // keeps it too: its BW base pass already paints the AA levels for an overlay
   // that must then come (DarkAaScope above).
-  const bool deferGray =
-      tiledGrayscale && needsTextGrayscale && !pageHasImages && !renderer.isDisplayInverted();
+  const bool deferGray = tiledGrayscale && needsTextGrayscale && !pageHasImages && !renderer.isDisplayInverted();
   grayDeferred = false;  // whatever was pending belonged to the frame being replaced
-  const bool overlapRefresh =
-      tiledGrayscale && renderer.supportsAsyncRefresh() && !pageHasImages && !deferGray;
+  const bool overlapRefresh = tiledGrayscale && renderer.supportsAsyncRefresh() && !pageHasImages && !deferGray;
 
   if (pageHasImagesNeedingDecode) {
     page->renderWithImagePlaceholders(renderer, fontId, orientedMarginLeft, paintMarginTop);
@@ -2288,8 +2286,7 @@ bool EpubReaderActivity::runDeferredGrayPass() {
   scope.endScanAndPrewarm();
   renderer.setGrayscaleAaStrength(ReaderUtils::textAaStrength());
   renderGrayOverlay(*page, fontId, grayDeferredMarginLeft, grayDeferredPaintTop, /*needsTextGrayscale=*/true,
-                    /*needsAnyGrayscale=*/true, /*tiledGrayscale=*/true, /*overlapRefresh=*/false,
-                    {t0, t0, t0, t0});
+                    /*needsAnyGrayscale=*/true, /*tiledGrayscale=*/true, /*overlapRefresh=*/false, {t0, t0, t0, t0});
   LOG_DBG("ERS", "Deferred gray pass: spine %d page %d in %lums", currentSpineIndex, section->currentPage,
           millis() - t0);
   return true;
@@ -2304,9 +2301,7 @@ bool EpubReaderActivity::runDeferredGrayPass() {
 void EpubReaderActivity::maybePrerenderNextPage() {
   constexpr unsigned long PRERENDER_IDLE_MS = 450;  // after IDLE_PREWARM_DEBOUNCE_MS
   if (!section || !lastPaintValid || grayDeferred || grayPassRequested || RenderLock::peek() ||
-      !renderer.hasFrameBuffer() ||
-      touchActiveNow() ||
-      renderer.isDisplayInverted() || lastRenderCompleteMs == 0 ||
+      !renderer.hasFrameBuffer() || touchActiveNow() || renderer.isDisplayInverted() || lastRenderCompleteMs == 0 ||
       millis() - lastRenderCompleteMs <= PRERENDER_IDLE_MS) {
     return;
   }

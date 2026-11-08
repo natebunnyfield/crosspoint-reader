@@ -80,8 +80,8 @@ class SavedWifiJoin {
     if (!linked) {
       if (order.empty()) return Result::NoSavedNetwork;
       const uint32_t now = millis();
-      const savedwifi::Step step = savedwifi::decide(linkState(), now - attemptStartMs, now - searchStartMs,
-                                                     order.size(), index);
+      const savedwifi::Step step =
+          savedwifi::decide(linkState(), now - attemptStartMs, now - searchStartMs, order.size(), index);
       switch (step) {
         case savedwifi::Step::Wait:
           return Result::Waiting;

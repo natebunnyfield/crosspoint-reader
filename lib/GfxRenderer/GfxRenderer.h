@@ -150,7 +150,7 @@ class GfxRenderer {
   mutable int _dirtyRight = 0;
   mutable int _dirtyTop = 0;
   mutable int _dirtyBottom = 0;
-  mutable bool _dirtyAll = true;   // until something says otherwise, assume everything
+  mutable bool _dirtyAll = true;  // until something says otherwise, assume everything
 
   inline void markDirty(const int phyX, const int phyY) const {
     if (_dirtyAll) return;

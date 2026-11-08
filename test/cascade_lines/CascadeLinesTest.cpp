@@ -183,9 +183,8 @@ std::vector<Line> layout(const std::string& bodyHtml) {
             text += block.wordText(i);
             if (block.wordStyle(i) & EpdFontFamily::SUP) anySup = true;
           }
-          lines.push_back(
-              {std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment, block.getBlockStyle().isRtl,
-               anySup});
+          lines.push_back({std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment,
+                           block.getBlockStyle().isRtl, anySup});
         }
       },
       /*embeddedStyle=*/true, /*contentBase=*/"", /*imageBasePath=*/"",
@@ -206,10 +205,15 @@ int lineHeight() {
 // Single-token markers so each line is findable by one word.
 std::string cascade(const bool withJoin) {
   const std::string join = withJoin ? " cascade-join" : "";
-  return "<p class=\"cascade-line" + join + "\">Alpha begins here</p>"
-         "<p class=\"cascade-line cascade-d1 cascade-cont" + join + "\">bravo steps in</p>"
+  return "<p class=\"cascade-line" + join +
+         "\">Alpha begins here</p>"
+         "<p class=\"cascade-line cascade-d1 cascade-cont" +
+         join +
+         "\">bravo steps in</p>"
          "<p class=\"cascade-line cascade-d2 cascade-cont\">charlie ends it.</p>"
-         "<p class=\"cascade-line" + join + "\">Delta opens another</p>"
+         "<p class=\"cascade-line" +
+         join +
+         "\">Delta opens another</p>"
          "<p class=\"cascade-line cascade-d1 cascade-cont\">echo closes.</p>";
 }
 
@@ -312,8 +316,7 @@ TEST(ParagraphDirection, BodyDirStillSetsTheParagraphDirection) {
 // `vertical-align: super`, and footnote markers rendered at body size.
 
 TEST(FootnoteLinkStyle, AnInternalLinksSuperscriptIsKept) {
-  const auto lines = layout(
-      "<p>Body text<a href=\"#fn1\" style=\"vertical-align: super\">1</a> continues.</p>");
+  const auto lines = layout("<p>Body text<a href=\"#fn1\" style=\"vertical-align: super\">1</a> continues.</p>");
   ASSERT_FALSE(lines.empty());
   bool sawSup = false;
   for (const Line& l : lines) sawSup = sawSup || l.anySup;
@@ -329,7 +332,8 @@ TEST(FootnoteLinkStyle, APlainInternalLinkIsNotSuperscript) {
 // --- The HTML hidden attribute (upstream 6eda8f0b7, section v75) ------------
 
 TEST(HiddenAttribute, AHiddenElementLaysOutNothing) {
-  const auto lines = layout("<p>Shown words</p><p hidden=\"hidden\">Secret words</p><div hidden=\"\">More secret</div>");
+  const auto lines =
+      layout("<p>Shown words</p><p hidden=\"hidden\">Secret words</p><div hidden=\"\">More secret</div>");
   ASSERT_FALSE(lines.empty());
   for (const Line& l : lines) {
     EXPECT_EQ(l.text.find("Secret"), std::string::npos) << l.text;
@@ -364,7 +368,8 @@ TEST(SkippedBlock, AHiddenSubtreeWithBlocksKeepsItsContainersIndent) {
 }
 
 TEST(SkippedBlock, AHiddenNestedListDoesNotEndItsParentList) {
-  const auto lines = layout("<ol><li>one</li><li>two<ol style=\"display:none\"><li>x</li></ol></li><li>three</li></ol>");
+  const auto lines =
+      layout("<ol><li>one</li><li>two<ol style=\"display:none\"><li>x</li></ol></li><li>three</li></ol>");
   bool sawThree = false;
   for (const Line& l : lines)
     if (l.text.find("three") != std::string::npos) {
@@ -394,7 +399,8 @@ TEST(ListStyleNone, TheShorthandDropsTheMarker) {
 }
 
 TEST(ListStyleNone, AnOrdinaryListKeepsItsMarkers) {
-  const auto lines = layout("<ol><li>delta item</li></ol><ul style=\"list-style: square inside\"><li>eps item</li></ul>");
+  const auto lines =
+      layout("<ol><li>delta item</li></ol><ul style=\"list-style: square inside\"><li>eps item</li></ul>");
   EXPECT_EQ(0u, lineWith(lines, "delta").find("1."));
   EXPECT_EQ(0u, lineWith(lines, "eps").find("\xe2\x80\xa2"));
 }

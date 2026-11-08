@@ -80,10 +80,10 @@ struct Params {
 };
 
 struct Pos {
-  int word = 0;    // the word this line starts in
-  int offset = 0;  // byte offset inside it; 0 = at the word's start
-  bool hyphen = false;  // a line ENDING here ends with an inserted '-'
-  bool flagged = false; // a line ending here ends inside a word (TeX's flagged penalty)
+  int word = 0;          // the word this line starts in
+  int offset = 0;        // byte offset inside it; 0 = at the word's start
+  bool hyphen = false;   // a line ENDING here ends with an inserted '-'
+  bool flagged = false;  // a line ending here ends inside a word (TeX's flagged penalty)
 };
 
 // What the breaker needs to know about a paragraph. Every width is an integer

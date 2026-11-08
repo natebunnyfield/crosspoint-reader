@@ -754,9 +754,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             .withDisplaySubset({CrossPointSettings::BLANK, CrossPointSettings::DARK, CrossPointSettings::LIGHT,
                                 CrossPointSettings::CUSTOM, CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
                                 CrossPointSettings::QUICK_RESUME, CrossPointSettings::TRANSPARENT_CUSTOM,
-                                CrossPointSettings::CALENDAR,
-                                CrossPointSettings::CALENDAR_DARK, CrossPointSettings::CALENDAR_WESTSIDE,
-                                CrossPointSettings::CALENDAR_WESTSIDE_DARK}));
+                                CrossPointSettings::CALENDAR, CrossPointSettings::CALENDAR_DARK,
+                                CrossPointSettings::CALENDAR_WESTSIDE, CrossPointSettings::CALENDAR_WESTSIDE_DARK}));
 
     // Clock entries. Kept after the status bar was removed because the calendar
     // sleep screen shifts the RTC's UTC date by clockUtcOffsetQ
