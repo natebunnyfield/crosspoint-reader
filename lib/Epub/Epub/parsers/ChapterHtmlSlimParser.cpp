@@ -2843,9 +2843,18 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
 
   const bool styleWillChange = willPopStyleStack || willClearBold || willClearItalic;
   const bool headerOrBlockTag = isHeaderOrBlock(name);
+  // The closing element is the skipped (display:none / hidden) one or sits
+  // inside it. Its open pushed nothing -- startElement returns before any block,
+  // table or list bookkeeping -- so its close must not pop the enclosing
+  // element's state either. Without this a hidden paragraph popped its
+  // container's block style, so the paragraphs after it lost the container's
+  // margins, and a hidden nested list ended its parent list. Upstream carries
+  // the same guard, as part of da3d50c24 (its table columns, not taken here).
+  // Checked before depth is decremented, as there.
+  const bool insideSkippedSubtree = self->depth - 1 >= self->skipUntilDepth;
   const bool tableStructuralTag = isTableStructuralTag(name);
 
-  if (self->tableDepth > 1 && strcmp(name, "table") == 0) {
+  if (!insideSkippedSubtree && self->tableDepth > 1 && strcmp(name, "table") == 0) {
     // get rid of all text inside the nested table
     self->partWordBufferIndex = 0;
     self->tableDepth -= 1;
@@ -2895,7 +2904,7 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
     self->skipUntilDepth = INT_MAX;
   }
 
-  if (self->tableDepth == 1 && (strcmp(name, "td") == 0 || strcmp(name, "th") == 0)) {
+  if (!insideSkippedSubtree && self->tableDepth == 1 && (strcmp(name, "td") == 0 || strcmp(name, "th") == 0)) {
     if (self->tableBuffering) {
       self->tableCellOpen = false;
       return;
@@ -2915,15 +2924,15 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
     self->nextWordContinues = false;
   }
 
-  if (self->tableDepth == 1 && strcmp(name, "thead") == 0) {
+  if (!insideSkippedSubtree && self->tableDepth == 1 && strcmp(name, "thead") == 0) {
     self->tableInHead = false;
   }
 
-  if (self->tableDepth == 1 && (strcmp(name, "tr") == 0)) {
+  if (!insideSkippedSubtree && self->tableDepth == 1 && (strcmp(name, "tr") == 0)) {
     self->nextWordContinues = false;
   }
 
-  if (self->tableDepth == 1 && strcmp(name, "table") == 0) {
+  if (!insideSkippedSubtree && self->tableDepth == 1 && strcmp(name, "table") == 0) {
     // The buffered table is decided here, where every cell has been seen. If the
     // plan is usable it is emitted as columns; if not -- ragged, too wide, too
     // narrow, too many columns -- it falls through to exactly the flattened
@@ -3020,7 +3029,7 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   }
 
   // Clear block style when leaving header or block elements
-  if (headerOrBlockTag) {
+  if (headerOrBlockTag && !insideSkippedSubtree) {
     self->currentCssStyle.reset();
     self->updateEffectiveInlineStyle();
 

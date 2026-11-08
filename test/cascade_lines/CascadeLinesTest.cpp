@@ -336,3 +336,40 @@ TEST(HiddenAttribute, AHiddenElementLaysOutNothing) {
     EXPECT_EQ(l.text.find("secret"), std::string::npos) << l.text;
   }
 }
+
+// --- A skipped (display:none) block must not pop its parent's style ---------
+// A display:none element pushes nothing when it opens, so its close must not
+// pop the block style, list or inline state of the element around it.
+
+int xOf(const std::vector<Line>& lines, const char* word) {
+  for (const Line& l : lines)
+    if (l.text.find(word) != std::string::npos) return l.x;
+  return -1;
+}
+
+TEST(SkippedBlock, AHiddenParagraphKeepsItsContainersIndent) {
+  const int control = xOf(layout("<div class=\"cascade-d1\"><p>after</p></div>"), "after");
+  ASSERT_GE(control, 0);
+  EXPECT_EQ(control, xOf(layout("<div class=\"cascade-d1\"><p hidden=\"\">x</p><p>after</p></div>"), "after"));
+  EXPECT_EQ(control,
+            xOf(layout("<div class=\"cascade-d1\"><p style=\"display:none\">x</p><p>after</p></div>"), "after"));
+}
+
+TEST(SkippedBlock, AHiddenSubtreeWithBlocksKeepsItsContainersIndent) {
+  const int control = xOf(layout("<div class=\"cascade-d1\"><p>after</p></div>"), "after");
+  ASSERT_GE(control, 0);
+  EXPECT_EQ(control, xOf(layout("<div class=\"cascade-d1\"><div hidden=\"\"><p>a</p><p>b</p></div>"
+                                "<p>after</p></div>"),
+                         "after"));
+}
+
+TEST(SkippedBlock, AHiddenNestedListDoesNotEndItsParentList) {
+  const auto lines = layout("<ol><li>one</li><li>two<ol style=\"display:none\"><li>x</li></ol></li><li>three</li></ol>");
+  bool sawThree = false;
+  for (const Line& l : lines)
+    if (l.text.find("three") != std::string::npos) {
+      sawThree = true;
+      EXPECT_EQ(0u, l.text.find("3.")) << l.text;
+    }
+  EXPECT_TRUE(sawThree);
+}

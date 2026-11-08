@@ -170,6 +170,7 @@ before relying on any of them for a field layout:
 | 73 | upstream `badfa95ff` (#3355, campaign 2026-11-08) | **layout**: an internal link's CSS `vertical-align: super/sub` is applied (footnote markers) |
 | 74 | upstream `f437bb506` (#3036, campaign 2026-11-08) | **layout**, NFD Korean books: conjoining Hangul jamo compose into syllables on every word; paired with `book.bin` v13 (titles and TOC go through the same composer) |
 | 75 | upstream `6eda8f0b7` (#3390, campaign 2026-11-08) | **layout**: elements with the HTML `hidden` attribute are dropped (display:none) |
+| 76 | fork, guard from upstream `da3d50c24` (campaign 2026-11-08) | **layout**: a skipped (display:none / `hidden`) element's close no longer pops its container's block style, table or list state |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

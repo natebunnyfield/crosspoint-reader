@@ -301,7 +301,11 @@ namespace {
 // Korean re-lays out with the precomposed syllables the fonts carry.
 // v75: upstream 6eda8f0b7 (#3390). Elements with the HTML `hidden` attribute
 // are display:none, so their text no longer lays out.
-constexpr uint8_t SECTION_FILE_VERSION = 75;
+// v76: a skipped (display:none / hidden) element's close no longer pops the
+// enclosing block style, table or list state (the guard upstream carries in
+// da3d50c24). Paragraphs after a hidden block keep their container's margins,
+// and a hidden nested list no longer ends its parent list.
+constexpr uint8_t SECTION_FILE_VERSION = 76;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
