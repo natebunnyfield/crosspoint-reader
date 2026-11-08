@@ -269,7 +269,12 @@ namespace {
 // starts at y=0 like every other. A LAYOUT change with an unchanged struct: a
 // v66 cache would keep every chapter opening dropped a fifth of the page.
 // docs/page-space-2026-11-08.md.
-constexpr uint8_t SECTION_FILE_VERSION = 67;
+// v68: upstream 25cf99b21 (#2892). Focus Reading keeps each word whole and
+// carries its bold prefix as a byte boundary, so the hyphenator sees the whole
+// word, and a visible hyphen or dash inside a focus-read word becomes a break
+// opportunity. Both move line breaks (Focus Reading on only). Stale v67
+// caches would keep the old breaks.
+constexpr uint8_t SECTION_FILE_VERSION = 68;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

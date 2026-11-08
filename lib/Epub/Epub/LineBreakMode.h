@@ -52,7 +52,7 @@
 // performance budget. `ParsedText::hyphenateWordAtIndex` implements hyphenation
 // DESTRUCTIVELY: it splits words[i] in place and inserts the remainder into
 // `words`, `wordStyles`, `wordWidths`, `wordContinues`, `wordNoSpaceBefore`,
-// `wordSourceStart`, `wordIsFocusSuffix` and `rubyTexts`, shifting every index
+// `wordSourceStart`, `wordFocusBoundary` and `rubyTexts`, shifting every index
 // above it. The DP's `dp[]` and `ans[]` are sized from a word count captured
 // before its loop and indexed by that same word index, and its output contract
 // -- a vector of word indices that `extractLine` slices `words` by -- cannot

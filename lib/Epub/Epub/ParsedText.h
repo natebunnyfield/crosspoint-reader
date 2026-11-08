@@ -27,9 +27,17 @@ class ParsedText {
   // each, they never approach the contiguous-block ceiling.
   std::deque<std::string> words;
   std::vector<EpdFontFamily::Style> wordStyles;
-  std::vector<bool> wordContinues;      // true = word attaches to previous with no break
-  std::vector<bool> wordNoSpaceBefore;  // true = may break before token, but no synthetic space when joined
-  std::vector<bool> wordIsFocusSuffix;  // true = token is the regular tail of a focus bold-prefix split
+  // Boundary flags use all four combinations (TokenBoundary.h):
+  //   continues=false, noSpace=false: ordinary breakable word gap
+  //   continues=false, noSpace=true:  breakable zero-width, stretchable CJK/Korean gap
+  //   continues=true,  noSpace=false: unbreakable attachment
+  //   continues=true,  noSpace=true:  breakable zero-width, non-stretching attachment
+  std::vector<bool> wordContinues;
+  std::vector<bool> wordNoSpaceBefore;
+  // Focus Reading emphasis: bytes [0, wordFocusBoundary) render bold, the rest at wordStyles.
+  // 0 = none. An annotation rather than a token split, so the hyphenator and line breaker still
+  // see whole words; TextBlock stores emphasis the same way, so extractLine passes it through.
+  std::vector<uint8_t> wordFocusBoundary;
   // Block-relative source byte offset of each fragment's SOURCE WORD (all
   // fragments of one addWord() call share one value; hyphenation remainders
   // inherit the prefix's). Layout-invariant: depends only on the addWord()
@@ -57,7 +65,7 @@ class ParsedText {
   std::vector<uint16_t> reorderedWidthsScratch;
   std::vector<bool> reorderedContinuesScratch;
   std::vector<bool> reorderedNoSpaceBeforeScratch;
-  std::vector<bool> reorderedFocusSuffixScratch;
+  std::vector<uint8_t> reorderedFocusBoundaryScratch;
   std::vector<uint16_t> visualOrderScratch;
 
   int calculateRubyExtraStartOffset(size_t wordIdx, size_t maxWordIdx, const GfxRenderer& renderer, int fontId) const;
