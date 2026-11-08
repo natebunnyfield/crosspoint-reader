@@ -217,6 +217,43 @@ commits built on it are then taken normally.
 | batch | upstream range | taken | partial | skipped (why) | pushed as |
 |---|---|---|---|---|---|
 | 1 | `0f747b82a`..`9e3cea2e5` (25) | 6 (`046827fc3` `1582e70ef` `596f0d3f7` `e4aae7bae` `2cac59714` `86eb1cbde`) | 3 (`5eec70de3` IPA except the two `reading`-set recipes; `d4733bfc6` CI split only, release.yml and sticky envs dropped per B-004; `7f8b005ae` AGENTS.md symlink only) | ALREADY 10 (incl. `d720891b2` dark mode = fork's whole-UI `c2d26ae29`; `4e6190357` X3 display/battery/crypto); SKIP 5 (`0f747b82a` superseded by word anchors, `9c48609f8` + `0423276d2` bookmarks/KOSync deleted, `fecb9eb3a` + `e9c3a166f` dictionary deleted in `1d37cb851`); FLAG 1 `9e3cea2e5` FUI -> ruled "Adopt FUI", ported separately | (this push) |
+| FUI | `9e3cea2e5` (1, owner ruling "Adopt FUI") | | 1, by hand + 5 fork-rule commits (see "FUI port" below) | | (this push) |
+
+
+### FUI port (`9e3cea2e5`), 2026-11-08
+
+Upstream's "convert all lists and tabs to FUI" taken by hand, then the fork's
+rules re-applied as separate commits (press-fired list moves, the Confirm
+press/release inventory, Lyra Six painting the rows, a lag-gate check, the
+Picco's input rules). Each commit message carries the detail; the shape:
+
+- **On the base (`UiListActivity`):** Settings (flat, so not
+  `UiTabListActivity`), Typography, the time zone list, Browse Files, Recent
+  Books, both chapter lists, footnotes.
+- **Fork adaptation of the base:** rows are described one at a time
+  (`describeRow`) and only one page is described per render (`drawRows`),
+  instead of upstream's prebuilt `ListItem` vectors; the rows are painted by
+  `GUI.drawList` (Lyra Six) with one FUI hit rect per row, so the look and the
+  paged layout are unchanged; `activePopup()` hosts `OptionPopup`.
+- **Not converted (each on its own loop, with the reason in the port
+  commit):** Wi-Fi selection, Manage Files, the interval slider, the font
+  pickers, the colophon. `Activity::handleListTouch` and the list hit-test
+  helpers stay for the first two.
+- **Dropped from the commit:** OptionPopup's FUI rewrite and the FUI
+  `drawHeader` (both change the Lyra Six look), BoardConfig viewable insets
+  (same values; would pull BoardConfig into host tests), the edge-swipe
+  refactor, every hunk for deleted subsystems, the reader's latched page turn
+  (not list work; unevaluated against the fork's own turn path).
+- **Evidence:** simulator screenshots of Home (both pages), Recent Books,
+  Browse Files, Settings, the Reader Font picker and a chapter list are
+  ink-identical to `origin/main`; a scripted session gives the same refresh
+  count, frame hashes and present windows. `tools/latency/gate.sh` now also
+  fails a Settings row move that is not a windowed present.
+- **Open:** three new translation units (`UiListActivity.cpp`,
+  `UiTabListActivity.cpp`, `UiAppHost.cpp`) make the simulator's iOS source
+  list stale: regenerate `crosspoint-simulator/cmake/CrossPointSources.cmake`
+  (CLAUDE.md, "Adding or deleting a translation unit"). Device builds (X4,
+  Picco) were not run for this item.
 
 
 Commands:

@@ -131,6 +131,18 @@ Render through the theme: `drawHeader`, `drawList` (+ theme paging helpers),
 Hand-rolling one of these in an activity is a defect — the audit converted the
 XTC chapter list, the footnotes list, and two hand-rolled prompt screens.
 
+**A list screen derives `UiListActivity`** (since the 2026-11-08 port of
+upstream `9e3cea2e5`): `listCount()`, `describeRow()` (title, subtitle, value,
+icon), `buildScreen()` setting the margins and calling `drawRows()`,
+`activateIndex()`, and `handleButtons()` when the screen's Back/Confirm edges
+differ from the base's press default. `drawRows()` hands one page to
+`GUI.drawList`, so the theme paints the rows and pages them, and registers
+the FUI hit rects; the base wires press-step, hold-page and the side pair.
+Do not call `screen.list()` (fui::list) on a fork screen: it draws in its
+own font and row cadence (a different look), and it scrolls one row per step
+at the edge of the view, which repaints every row there instead of the two a
+paged move changes (the lag gate checks Settings row moves are windowed).
+
 Button-hint Back label names the **destination**: `STR_HOME` when it exits to
 Home, `STR_BACK` when it returns to a parent screen or up a directory,
 `STR_CANCEL` when it abandons a pending operation. Every screen that takes
