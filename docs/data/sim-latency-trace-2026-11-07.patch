@@ -1,0 +1,244 @@
+diff --git a/src/HalDisplay.cpp b/src/HalDisplay.cpp
+index ea69910f..d1f96da6 100644
+--- a/src/HalDisplay.cpp
++++ b/src/HalDisplay.cpp
+@@ -1,4 +1,5 @@
+ #include "HalDisplay.h"
++#include "SimLatencyTrace.h"
+ #include "SimulatorRebootResets.h"
+ 
+ #include <GfxRenderer.h>
+@@ -2516,6 +2517,11 @@ void HalDisplay::refreshDisplay(RefreshMode mode, bool /*turnOffScreen*/) {
+   // Lent out: there is nothing coherent to convert, and presenting a half-owned
+   // buffer would show a torn frame. The lender's own refresh follows.
+   if (!fb) return;
++  if (simlat::enabled()) {
++    char tag[32];
++    std::snprintf(tag, sizeof tag, "refresh fb=%08x", simlat::frameHash(fb, getBufferSize()));
++    simlat::note(tag, static_cast<int>(mode));
++  }
+   snapshotBwBase(fb);
+   // The mode is only READ by e-ink mode (src/EinkPanel.h); with it off the
+   // argument is ignored exactly as it always was.
+@@ -5211,6 +5217,7 @@ void HalDisplay::preconditionGrayscale() {}
+ void HalDisplay::preconditionGrayscale(uint16_t, uint16_t, uint16_t, uint16_t) {
+ }
+ void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t *lsbBuffer) {
++  simlat::note("gray-lsb-whole");
+   // The whole-frame AA fallback (no strip support / OOM) reaches the planes
+   // through here instead, and needs the same extension or it flashes on every
+   // page while the strip path does not.
+@@ -5233,11 +5240,13 @@ void HalDisplay::cleanupGrayscaleBuffers(const uint8_t *bwBuffer) {
+   }
+ }
+ void HalDisplay::displayGrayBuffer(bool, const unsigned char *, bool) {
++  simlat::note("gray-display");
+   composeGrayscalePreview();
+ }
+ 
+ void HalDisplay::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t *rows,
+                                           uint16_t yStart, uint16_t numRows) {
++  simlat::note(lsbPlane ? "gray-strip-lsb" : "gray-strip-msb", yStart);
+   if (!rows || numRows == 0 || yStart >= activeHeight()) {
+     return;
+   }
+diff --git a/src/HalGPIO.cpp b/src/HalGPIO.cpp
+index 5332e92c..d766c81b 100644
+--- a/src/HalGPIO.cpp
++++ b/src/HalGPIO.cpp
+@@ -1,4 +1,5 @@
+ #include "HalGPIO.h"
++#include "SimLatencyTrace.h"
+ 
+ #include "SimHostBattery.h"
+ #include "SimKeepAwake.h"
+@@ -478,6 +479,7 @@ void updateTouchMovement(float panelNx, float panelNy) {
+ }
+ 
+ void beginTouch(float logicalNx, float logicalNy) {
++  simlat::note("touch-down");
+   if (!BoardConfig::hasTouch())
+     return;
+   float panelNx = 0.0f;
+@@ -507,6 +509,7 @@ void moveTouch(float logicalNx, float logicalNy) {
+ }
+ 
+ void endTouch(float logicalNx, float logicalNy) {
++  simlat::note("touch-up");
+   if (!touchState.down)
+     return;
+   moveTouch(logicalNx, logicalNy);
+@@ -1303,6 +1306,7 @@ bool HalGPIO::wasAnyReleased() const {
+ void HalGPIO::injectButtonDown(uint8_t buttonIndex) {
+   if (buttonIndex >= NUM_BUTTONS)
+     return;
++  simlat::note("btn-down", buttonIndex);
+   SimulatorOverlay::notePageInteraction();
+   // Synthetic input enters below SDL, so the event-pump skip above never sees
+   // it -- and a headless run has no other way to prove the warm-up IS
+@@ -1321,6 +1325,7 @@ void HalGPIO::injectButtonDown(uint8_t buttonIndex) {
+ }
+ 
+ void HalGPIO::injectButtonUp(uint8_t buttonIndex) {
++  simlat::note("btn-up", buttonIndex);
+   if (buttonIndex >= NUM_BUTTONS)
+     return;
+   releasedThisFrame[buttonIndex] = true;
+diff --git a/src/HalStorage.cpp b/src/HalStorage.cpp
+index c7e09b63..1d3307e0 100644
+--- a/src/HalStorage.cpp
++++ b/src/HalStorage.cpp
+@@ -1,4 +1,5 @@
+ #include "HalStorage.h"
++#include "SimLatencyTrace.h"
+ 
+ #include "SimCompressedFile.h"
+ 
+@@ -314,6 +315,7 @@ bool HalFile::getModifyDateTime(uint16_t *pdate, uint16_t *ptime) {
+ }
+ 
+ bool HalFile::seek(size_t pos) {
++  simlat::countSeek();
+   if (!impl || impl->fd < 0)
+     return false;
+   if (impl->cpz) {
+@@ -323,6 +325,7 @@ bool HalFile::seek(size_t pos) {
+   return lseek(impl->fd, (off_t)pos, SEEK_SET) >= 0;
+ }
+ bool HalFile::seek64(uint64_t pos) {
++  simlat::countSeek();
+   if (!impl || impl->fd < 0)
+     return false;
+   if (pos > static_cast<uint64_t>(std::numeric_limits<off_t>::max()))
+@@ -334,6 +337,7 @@ bool HalFile::seek64(uint64_t pos) {
+   return lseek(impl->fd, static_cast<off_t>(pos), SEEK_SET) >= 0;
+ }
+ bool HalFile::seekCur(int64_t offset) {
++  simlat::countSeek();
+   if (!impl || impl->fd < 0)
+     return false;
+   if (impl->cpz) {
+@@ -345,6 +349,7 @@ bool HalFile::seekCur(int64_t offset) {
+   return lseek(impl->fd, (off_t)offset, SEEK_CUR) >= 0;
+ }
+ bool HalFile::seekSet(size_t offset) {
++  simlat::countSeek();
+   if (!impl || impl->fd < 0)
+     return false;
+   if (impl->cpz) {
+@@ -383,6 +388,7 @@ int HalFile::read(void *buf, size_t count) {
+     return n;
+   }
+   ssize_t n = ::read(impl->fd, buf, count);
++  simlat::countRead(n);
+   return (int)n;
+ }
+ int HalFile::read() {
+@@ -391,9 +397,12 @@ int HalFile::read() {
+   uint8_t c;
+   if (impl->cpz)
+     return read(&c, 1) == 1 ? c : -1;
+-  return (::read(impl->fd, &c, 1) == 1) ? c : -1;
++  const bool ok1 = ::read(impl->fd, &c, 1) == 1;
++  simlat::countRead(ok1 ? 1 : 0);
++  return ok1 ? c : -1;
+ }
+ size_t HalFile::write(const void *buf, size_t count) {
++  simlat::countWrite();
+   if (!impl || impl->fd < 0)
+     return 0;
+   // Unreachable by construction -- the decoder is only attached to O_RDONLY
+@@ -409,6 +418,7 @@ size_t HalFile::write(const uint8_t *buf, size_t count) {
+   return write(static_cast<const void *>(buf), count);
+ }
+ size_t HalFile::write(uint8_t b) {
++  simlat::countWrite();
+   if (!impl || impl->fd < 0)
+     return 0;
+   return (::write(impl->fd, &b, 1) == 1) ? 1 : 0;
+@@ -485,6 +495,7 @@ bool HalFile::isOpen() const {
+ HalFile::operator bool() const { return isOpen(); }
+ 
+ HalFile HalStorage::open(const char *path, const oflag_t oflag) {
++  simlat::countOpen();
+   std::string full = resolveStoragePath(path);
+   HalFile f;
+   if (full.empty()) {
+diff --git a/src/SimLatencyTrace.h b/src/SimLatencyTrace.h
+new file mode 100644
+index 00000000..87320d99
+--- /dev/null
++++ b/src/SimLatencyTrace.h
+@@ -0,0 +1,72 @@
++#pragma once
++
++// CROSSPOINT_SIM_LOG_LATENCY=1: one `[lat]` line per input edge and per panel
++// call, stamped in microseconds on the firmware's own clock (micros()), with
++// the storage traffic since the previous line. Off by default and LATCHED, so
++// an unarmed run pays one branch per hook.
++//
++// What it is for: the time from a press to the first panel call is the part of
++// a page turn or a menu move the FIRMWARE owns; the panel's waveform after that
++// (~500 ms FAST, ~1650 ms HALF/FULL, measured on the X4) is the part it does
++// not. The host cannot price SD I/O, so the counts travel with each line --
++// call counts are what transfer to the device, wall time on the host does not.
++
++#include <atomic>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++
++#include "Arduino.h"
++
++namespace simlat {
++
++inline bool enabled() {
++  static const bool on = [] {
++    const char *e = std::getenv("CROSSPOINT_SIM_LOG_LATENCY");
++    return e && *e && *e != '0';
++  }();
++  return on;
++}
++
++struct Counters {
++  std::atomic<uint32_t> opens{0}, reads{0}, seeks{0}, writes{0};
++  std::atomic<uint64_t> readBytes{0};
++};
++inline Counters &counters() {
++  static Counters c;
++  return c;
++}
++
++inline void countOpen() { if (enabled()) counters().opens++; }
++inline void countRead(long n) {
++  if (!enabled()) return;
++  counters().reads++;
++  if (n > 0) counters().readBytes += static_cast<uint64_t>(n);
++}
++inline void countSeek() { if (enabled()) counters().seeks++; }
++inline void countWrite() { if (enabled()) counters().writes++; }
++
++// Prints and resets the storage counters, so each line carries the traffic
++// that happened between it and the line before.
++inline void note(const char *what, int arg = -1) {
++  if (!enabled()) return;
++  Counters &c = counters();
++  std::fprintf(stdout,
++               "[lat] %llu %s %d opens=%u reads=%u rbytes=%llu seeks=%u "
++               "writes=%u\n",
++               static_cast<unsigned long long>(micros()), what, arg,
++               c.opens.exchange(0), c.reads.exchange(0),
++               static_cast<unsigned long long>(c.readBytes.exchange(0)),
++               c.seeks.exchange(0), c.writes.exchange(0));
++  std::fflush(stdout);
++}
++
++// FNV-1a over the frame about to be shown, so two refreshes of an identical
++// frame -- a whole waveform that changes nothing on the glass -- are visible.
++inline uint32_t frameHash(const uint8_t *fb, size_t n) {
++  uint32_t h = 2166136261u;
++  for (size_t i = 0; i < n; ++i) h = (h ^ fb[i]) * 16777619u;
++  return h;
++}
++
++}  // namespace simlat
