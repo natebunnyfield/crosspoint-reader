@@ -15,6 +15,10 @@ activity = None
 prev_fb = None
 failures = []
 for line in open(sys.argv[1], errors='replace'):
+    # Not a lag finding, but this run is the one place every boot is read:
+    # the settings list's reserve count has drifted five times unnoticed.
+    if 'FIXED_ENTRY_COUNT is' in line:
+        failures.append('settings: ' + line.strip().split('] ', 3)[-1])
     if 'Entering activity: ' in line:
         activity = line.split('Entering activity: ')[1].strip()
         if presses:

@@ -34,6 +34,27 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-077] The deferred anti-aliasing pass kerned page N with page N+1's kern table — FIXED 2026-11-07, UNCONFIRMED on device
+**severity: high (gray fringes beside glyphs on every rested page with an SD font and AA on, all boards; worse under heap pressure) · scope: `src/activities/reader/EpubReaderActivity.cpp` · introduced 2026-11-07 by the lag work (1e2549a40), found the same day by the P0/P1 sweep, kern loss reproduced on the host**
+
+The deferred gray pass (plan 2.2, `docs/lag-reduction-plan-2026-11-07.md`) ran ~600 ms after a page was shown, but the idle prewarm of page N+1 ran at ~400 ms and rebuilt the SD fonts' per-page "mini" kern tables for N+1's characters. The gray planes of page N were then drawn with pairs N lacks kerned to 0, so every glyph after such a pair sat a few px right of its BW twin (`kern(T,o)` −57 → 0, 4.4 fixed point, LibreFranklin 16 — harness linked against the real `SdCardFont`/`GfxRenderer`). Second half: the same commit ended the prewarm scope before the BW render, and its destructor frees the kern tables under heap pressure (`SdCardFont.cpp:149-151`), so the BW page could draw unkerned against a kerned layout.
+
+**Fix:** the idle prewarm and the next-page prerender wait while a gray pass is deferred (`!grayDeferred`); the prewarm scope lives to the end of `renderContents` again (`std::optional<PrewarmScope>`); and `runDeferredGrayPass` prewarms its own page before drawing, so it kerns as the BW frame did whatever ran in between. Verified ordering in a simulator trace (each "Deferred gray pass" now precedes the next "Idle prewarm"). The misregistration itself was never seen on glass — UNCONFIRMED.
+
+### [B-076] A popup drawn over a showing screen was windowed to its text; the tile hashes then made the stale box stick — FIXED 2026-11-07
+**severity: high (a popup's frame and margins left unrefreshed, then never repainted while the content stayed the same) · scope: `lib/GfxRenderer/GfxRenderer.cpp/.h` · the windowing gap predates 2026-11-07; the stickiness was introduced that day by the tile-hash present (1e2549a40); found by the P0/P1 sweep, reproduced under ASan/UBSan on the X3 panel**
+
+Dirty tracking claimed to be complete "by construction" but only `drawPixel` and the hi-res glyph blit marked it. `fillRectImpl` (so `fillRect`, `fillRoundedRect`, `fillArc`, dither fills), `preserveImagePolarity`, `writeFramebufferRegion`, `copyBufferToRegion`, the scale-1 `drawImage` and `restoreBwBuffer` wrote the framebuffer unmarked. `BaseTheme::drawPopup` over a showing screen therefore got a window around its centred text only (harness: box x 296..363, window x=330 w=1), and since the small-window path then rehashed the whole framebuffer, the next identical whole-screen redraw was skipped as "identical to the glass". Callers: Indexing over a page, Find "not found", the Bluetooth pair/forget popups, Entering sleep, `OptionPopup`.
+
+**Fix:** a `markDirtyRect` in every rectangle writer (`markAllDirty` for `restoreBwBuffer` and the scale-1 `drawImage`), and the small-change window now also widens to every tile whose hash changed while the baseline is trusted, so a writer that forgets cannot leave stale pixels. The same harness now reports a window x 240..399 × y 96..431 that contains the box. Also: the async present hashes before the call (dark mode left the framebuffer flipped), and `logLastRaw` is terminated before use.
+
+### [B-075] HTTP `/delete` could remove a file a WebSocket upload was still writing — FIXED 2026-11-07
+**severity: high, needs a hand-built request (the B-073 cross-link the upload guard exists to prevent) · scope: `src/network/CrossPointWebServer.cpp` · found by the P0/P1 sweep 2026-11-07, guard half reproduced on the host**
+
+`/delete` was the one mutating handler that did not normalize its path. `webUploadIsWriting()` compares text, SdFat collapses `//` and resolves `.`, so `paths=["/books//a.epub"]` passed the guard and deleted the open file mid-upload. The stock UI never builds such a path. Separately, the WebSocket `START:` file name was never checked for separators or `.`/`..`.
+
+**Fix:** `normalizeWebPath` in `/delete` (root re-checked after it); `START:` refuses a name that is empty, carries `/` or `\`, or is `.`/`..`, as `handleRename` does. The web UI sends `file.name` only, so nothing it does changes.
+
 ### [B-073] The firmware corrupts the FAT on SD cards: lost allocations, cross-links, duplicate entries, a directory loop — FIXED 2026-10-04 (eleven mechanisms), UNCONFIRMED on device
 **severity: critical (data loss across the whole card, self-amplifying: once one cross-link exists, deleting either file frees the other's clusters) · scope: storage HAL, WebDAV/HTTP file server, reader progress, boot GPIO, freeink-sdk SDCardManager · reported by the owner 2026-10-04: "it is firmware corrupting the cards but I don't know how"**
 

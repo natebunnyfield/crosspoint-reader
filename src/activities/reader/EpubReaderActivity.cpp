@@ -23,6 +23,7 @@
 #include <functional>
 #include <iterator>
 #include <limits>
+#include <optional>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -302,7 +303,11 @@ void EpubReaderActivity::loop() {
   // the attempt is only latched once the page exists, so a page the build has
   // not reached yet is retried on a later tick.
   constexpr unsigned long IDLE_PREWARM_DEBOUNCE_MS = 400;
-  if (section && !RenderLock::peek() && renderer.hasFrameBuffer() && !touchActiveNow() &&
+  // !grayDeferred: prewarming page N+1 rebuilds the SD fonts' per-page kern
+  // tables for N+1's characters, and a deferred gray pass of page N drawn after
+  // that kerned with the wrong table -- gray glyphs a few px off the BW ones
+  // (P0/P1 sweep 2026-11-07, kern(T,o) -57 -> 0 reproduced on the host).
+  if (section && !grayDeferred && !RenderLock::peek() && renderer.hasFrameBuffer() && !touchActiveNow() &&
       lastRenderCompleteMs != 0 && millis() - lastRenderCompleteMs > IDLE_PREWARM_DEBOUNCE_MS &&
       ESP.getFreeHeap() > RENDER_MIN_FREE_HEAP && ESP.getMaxAllocHeap() > BACKGROUND_BUILD_MIN_MAX_ALLOC &&
       (section->currentPage + 1 < static_cast<int>(section->pageCount) || !section->isBuilding()) &&
@@ -319,7 +324,7 @@ void EpubReaderActivity::loop() {
     const int nextPage = section ? section->currentPage + 1 : 0;
     const bool nextLaidOut = section && nextPage < static_cast<int>(section->pageCount);
     const bool lastPage = section && !section->isBuilding() && !nextLaidOut;
-    if (section && (nextLaidOut || lastPage) &&
+    if (section && !grayDeferred && (nextLaidOut || lastPage) &&
         (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage)) {
       idlePrewarmSpine = currentSpineIndex;
       idlePrewarmPage = section->currentPage;
@@ -1870,11 +1875,16 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   lastPaintValid = true;
 
   // Font prewarm: scan pass accumulates text, then prewarm, then real render
+  //
+  // The scope lives to the END of this function, as it did before the
+  // prerender: its destructor can free the SD fonts' per-page kern tables under
+  // heap pressure (SdCardFont::resetStyleMiniData), and the BW and gray passes
+  // below must draw with the kerning layout measured (P0/P1 sweep 2026-11-07).
+  std::optional<FontCacheManager::PrewarmScope> scope;
   if (!usePrerender) {
-    auto* fcm = renderer.getFontCacheManager();
-    auto scope = fcm->createPrewarmScope();
+    scope.emplace(renderer.getFontCacheManager()->createPrewarmScope());
     page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);  // scan pass
-    scope.endScanAndPrewarm();
+    scope->endScanAndPrewarm();
   }
   const auto tPrewarm = millis();
 
@@ -2231,6 +2241,12 @@ bool EpubReaderActivity::runDeferredGrayPass() {
   if (!page) return false;
   const auto t0 = millis();
   const int fontId = SETTINGS.getReaderFontId();
+  // Prewarm THIS page again: whatever ran since the BW frame (a cache reset
+  // under heap pressure, any other page's scan) may have changed the glyph and
+  // kern caches, and the gray planes must kern exactly as the BW frame did.
+  auto scope = renderer.getFontCacheManager()->createPrewarmScope();
+  page->render(renderer, fontId, grayDeferredMarginLeft, grayDeferredPaintTop);  // scan pass
+  scope.endScanAndPrewarm();
   renderer.setGrayscaleAaStrength(ReaderUtils::textAaStrength());
   renderGrayOverlay(*page, fontId, grayDeferredMarginLeft, grayDeferredPaintTop, /*needsTextGrayscale=*/true,
                     /*needsAnyGrayscale=*/true, /*tiledGrayscale=*/true, /*overlapRefresh=*/false,
@@ -2248,7 +2264,8 @@ bool EpubReaderActivity::runDeferredGrayPass() {
 // RenderLock, after the idle prewarm has loaded the page's glyphs.
 void EpubReaderActivity::maybePrerenderNextPage() {
   constexpr unsigned long PRERENDER_IDLE_MS = 450;  // after IDLE_PREWARM_DEBOUNCE_MS
-  if (!section || !lastPaintValid || grayPassRequested || RenderLock::peek() || !renderer.hasFrameBuffer() ||
+  if (!section || !lastPaintValid || grayDeferred || grayPassRequested || RenderLock::peek() ||
+      !renderer.hasFrameBuffer() ||
       touchActiveNow() ||
       renderer.isDisplayInverted() || lastRenderCompleteMs == 0 ||
       millis() - lastRenderCompleteMs <= PRERENDER_IDLE_MS) {
