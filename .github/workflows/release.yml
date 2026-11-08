@@ -116,7 +116,7 @@ jobs:
         run: pio run -e gh_release
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: CrossPoint-${{ github.ref_name }}
           path: |
