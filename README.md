@@ -36,7 +36,7 @@ CrossPoint is open-source e-reader firmware - community-built, fully hackable, f
   - AP mode (hotspot) and STA mode (join existing Wi-Fi), both with QR helpers
   - NTP clock sync on connect
 
-- **Customization**: sleep screen modes, side button swap (Prev/Next), power-button behavior, refresh cadence, reading typeface and size, and more. The interface itself is a single theme (Lyra Six) — the other four were removed on 2026-08-04. Firmware updates are installed via SD card (Settings > Device > SD Firmware Update); the wireless OTA-check screen was removed on 2026-08-08 as unreachable (no menu entry launched it).
+- **Customization**: sleep screen modes including transparent overlays, side button swap (Prev/Next), power-button behavior, refresh cadence, reading typeface and size, and more. The interface itself is a single theme (Lyra Six) — the other four were removed on 2026-08-04. Firmware updates are installed via SD card (Settings > Device > SD Firmware Update); the wireless OTA-check screen was removed on 2026-08-08 as unreachable (no menu entry launched it).
 
 - **Localization**: English and Spanish.
 

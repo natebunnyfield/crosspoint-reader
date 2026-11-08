@@ -284,6 +284,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     sleepScreenValues[CrossPointSettings::CALENDAR_WESTSIDE] = StrId::STR_SLEEP_WESTSIDE;
     sleepScreenValues[CrossPointSettings::CALENDAR_DARK] = StrId::STR_SLEEP_CALENDAR_DARK;
     sleepScreenValues[CrossPointSettings::CALENDAR_WESTSIDE_DARK] = StrId::STR_SLEEP_WESTSIDE_DARK;
+    sleepScreenValues[CrossPointSettings::TRANSPARENT_CUSTOM] = StrId::STR_TRANSPARENT;
 
     // Built one entry at a time instead of from a single braced initializer_list:
     // the whole list was materialised as one stack temporary (~50 x
@@ -752,7 +753,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             // stay one contiguous block at the end.
             .withDisplaySubset({CrossPointSettings::BLANK, CrossPointSettings::DARK, CrossPointSettings::LIGHT,
                                 CrossPointSettings::CUSTOM, CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
-                                CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
+                                CrossPointSettings::QUICK_RESUME, CrossPointSettings::TRANSPARENT_CUSTOM,
+                                CrossPointSettings::CALENDAR,
                                 CrossPointSettings::CALENDAR_DARK, CrossPointSettings::CALENDAR_WESTSIDE,
                                 CrossPointSettings::CALENDAR_WESTSIDE_DARK}));
 

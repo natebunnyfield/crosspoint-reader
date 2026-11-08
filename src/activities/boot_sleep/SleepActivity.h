@@ -3,6 +3,7 @@
 #include "activities/boot_sleep/CalendarSleepScreen.h"
 
 class Bitmap;
+class HalFile;
 
 class SleepActivity final : public Activity {
  public:
@@ -17,7 +18,11 @@ class SleepActivity final : public Activity {
   // Full-screen generated cover (title/author + seeded band) for COVER mode
   // when the open book has no cover image to extract.
   void renderGeneratedCoverSleepScreen(const char* title, const char* author) const;
-  void renderBitmapSleepScreen(const Bitmap& bitmap) const;
+  // preserveBackground skips the clear, so the bitmap's white pixels leave the
+  // retained screen showing (the Transparent sleep screen's plain-BMP path).
+  void renderBitmapSleepScreen(const Bitmap& bitmap, bool preserveBackground = false) const;
+  bool renderSleepOverlayFile(HalFile& file, const char* pathForLog) const;
+  void renderTransparentCustomSleepScreen() const;
   void renderLastScreenSleepScreen() const;
   void renderBlankSleepScreen() const;
   // CALENDAR: draw the holiday calendar straight into the framebuffer

@@ -39,7 +39,7 @@ void BmpViewerActivity::loadSiblingImages() {
       file.getName(name, sizeof(name));
       if (name[0] != '.') {
         std::string fname(name);
-        if (fname.length() >= 4 && fname.substr(fname.length() - 4) == ".bmp") {
+        if (FsHelpers::hasBmpExtension(fname)) {
           siblingImages.push_back(fname);
         }
       }
@@ -153,10 +153,16 @@ namespace {
 // One name for the destination, so the guard above and the open below
 // cannot drift apart.
 constexpr const char* SLEEP_COVER_PATH = "/sleep.bmp";
+// Transparent mode reads its own root file (SleepActivity.cpp), so "set as
+// sleep screen" writes there instead and leaves the mode alone (upstream #2937).
+constexpr const char* SLEEP_OVERLAY_PATH = "/sleep-overlay.bmp";
 }  // namespace
 
 void BmpViewerActivity::doSetSleepCover() {
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
+
+  const bool transparentMode = SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM;
+  const char* destination = transparentMode ? SLEEP_OVERLAY_PATH : SLEEP_COVER_PATH;
 
   // Setting the sleep cover FROM the sleep cover destroys it. openFileForWrite
   // is O_TRUNC, so opening /sleep.bmp for output truncated the very file inFile
@@ -165,8 +171,8 @@ void BmpViewerActivity::doSetSleepCover() {
   // zero-byte sleep screen. Nothing to copy here anyway; the file already IS
   // the cover, so just record the mode.
   // Compared as the card compares names: /SLEEP.BMP and /Sleep.bmp are the same file.
-  if (FsHelpers::isSameFatPath(filePath, SLEEP_COVER_PATH)) {
-    SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
+  if (FsHelpers::isSameFatPath(filePath, destination)) {
+    if (!transparentMode) SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
     SETTINGS.saveToFile();
     GUI.drawPopup(renderer, tr(STR_DONE));
     delay(1000);
@@ -186,7 +192,7 @@ void BmpViewerActivity::doSetSleepCover() {
     const auto buffer = makeUniqueNoThrow<char[]>(COPY_BUFFER_SIZE);
     if (!buffer) {
       LOG_ERR("BMP", "OOM: %u byte sleep cover copy buffer", static_cast<unsigned>(COPY_BUFFER_SIZE));
-    } else if (Storage.openFileForWrite("BMP", SLEEP_COVER_PATH, outFile)) {
+    } else if (Storage.openFileForWrite("BMP", destination, outFile)) {
       // Count bytes rather than assuming. success used to be set before the
       // loop, so a copy that moved NOTHING still reported Done -- which is how
       // a zero-byte sleep screen looked like it had worked.
@@ -208,7 +214,7 @@ void BmpViewerActivity::doSetSleepCover() {
   }
 
   if (success) {
-    SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
+    if (!transparentMode) SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
     SETTINGS.saveToFile();
     GUI.drawPopup(renderer, tr(STR_DONE));
   } else {

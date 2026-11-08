@@ -52,6 +52,7 @@ constexpr uint8_t kChosenModes[] = {
     CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE,
     CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_DARK,
     CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK,
+    CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM,
 };
 
 const char* modeName(const uint8_t m) {
@@ -82,6 +83,8 @@ const char* modeName(const uint8_t m) {
       return "Calendar (dark)";
     case CrossPointSettings::SLEEP_SCREEN_MODE::CALENDAR_WESTSIDE_DARK:
       return "Calendar Westside (dark)";
+    case CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM:
+      return "Transparent";
     default:
       return "?";
   }
