@@ -255,9 +255,10 @@ reaches them, not port them again:
   earlier) is REVERTED in the fork's SDK (`c7fc361`) and the hint is public;
   an upstream SDK move that deletes it again must not be taken blind.
 - Not upstream commits, recorded here because the SDK pointer moved:
-  `freeink-sdk` now points at `c7fc361` (Picco frontlight table, Picco battery,
-  TMA525C track-id guard, UC8279 0x03/0x67, the dark re-drive), on top of the
-  `picco-a-sdk` pin `1dc07f6`. A later SDK bump must carry these five.
+  `freeink-sdk` now points at `e05bb17` (Picco frontlight table, Picco battery,
+  TMA525C track-id guard and its two-finger latch, UC8279 0x03/0x67, the dark
+  re-drive), on top of the `picco-a-sdk` pin `1dc07f6`. A later SDK bump must
+  carry these six.
 
 
 | batch | upstream range | taken | partial | skipped (why) | pushed as |

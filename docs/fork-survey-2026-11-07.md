@@ -66,7 +66,7 @@ first" means the new host test was run against the old code and failed.
 | 17 | **DONE** | "fix(epub): cap the stylesheet list an OPF or zip can grow" | host `CssManifestCap.*`, failing first (5000 vs 256) |
 | 18 | NOT taken | — | a visual tuning plus a new image waveform, device-only, not a bug fix |
 | 19 | **DONE** (no filter) | SDK `55aeccb` "fix(picco): battery ADC median of three…" | SDK host test, 5 checks failing first |
-| 20 | **DONE** | SDK `2e943b7` "fix(picco): a new TMA525C track id ends the old contact…" | SDK host test, failing first; device feel UNCONFIRMED |
+| 20 | **DONE** | SDK `2e943b7` "fix(picco): a new TMA525C track id ends the old contact…" + `e05bb17` "a two-finger touch is spent until every finger lifts" (review finding: `2e943b7` alone released the first finger when a second was listed first, and the firmware decoder then fired a tap) | SDK host test: the lost-lift case fails on the old SDK, the two-finger case fails on `2e943b7`; device feel UNCONFIRMED |
 | 22 | already on `main` | `f9be57963` (upstream #3847) holds `modeMutex` across check and switch | read `HalPowerManager.cpp:43-80` |
 | 23 | **DONE** | same commit as #11: page turns queue to the render task, idle work reads `section` only under the lock | lag gate (14 turns, pages 1..14 in order) and a 4-chapter run crossing spines both ways |
 | 28 | **DONE** | SDK `9148674` "fix(x4): UC8279 LUT_VER 0x03/0x67…" | detect host test failing first; the 0x67 AA skip is device-only, no such panel on hand |
