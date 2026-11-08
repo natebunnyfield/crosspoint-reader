@@ -257,6 +257,21 @@ Picco's input rules). Each commit message carries the detail; the shape:
   Picco) were not run for this item.
 
 
+### Batch 2 gates (2026-11-08, after rebasing onto `3487265ff`)
+
+Run by a second session once the campaign session had stopped with batch 2
+committed but unbuilt and unpushed. On the rebased tree: `pio run -e default`
+(X4) SUCCESS, `pio run -e picco` SUCCESS, `pio run -e simulator` SUCCESS,
+`tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves), host
+tests 786 of 787 pass. The one failure is `ActivityInputTest` NOT BUILT, and it
+is not batch 2's: `src/network/SavedWifiJoin.h` gained `WiFi.mode/begin/
+disconnect/setScanMethod/setSortMethod` calls in `d1f0f33cc` (2026-10-20) that
+`test/activity_input/stubs/WiFi.h` (last changed `024f1a30f`, 2026-09-06) never
+stubbed, so that suite has not compiled since 2026-10-20. Open, not fixed here.
+The first X4 attempt died on `sdkconfig.h: No such file or directory`, the
+fresh-worktree scaffold fault in `docs/contributing/device-build-from-a-clean-tree.md`
+(fault 1); clearing it as that doc says fixed it.
+
 ### Batch 2 (2026-11-08): held for the owner, and what the SDK still lacks
 
 Report: the campaign scratchpad `batch-02-report.md`; each commit message
