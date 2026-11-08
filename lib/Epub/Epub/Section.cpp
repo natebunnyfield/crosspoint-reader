@@ -289,7 +289,11 @@ namespace {
 // padding, so bare text (or the next sibling, through the empty-block merge)
 // no longer gets the parent's top margin a second time. Moves block spacing
 // in books with margined containers.
-constexpr uint8_t SECTION_FILE_VERSION = 71;
+// v72: upstream ce6c6cbce (#3198). A paragraph's base direction comes from
+// its block (and <html>/<body> dir) only; an inline element's direction no
+// longer replaces it, so a Hebrew paragraph that opens with an English term
+// stays RTL. Moves line order and alignment in mixed-direction books.
+constexpr uint8_t SECTION_FILE_VERSION = 72;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

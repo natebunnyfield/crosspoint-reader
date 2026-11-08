@@ -101,6 +101,7 @@ struct Line {
   int x;
   int y;
   CssTextAlign alignment;
+  bool rtl = false;
 };
 
 std::string writeTemp(const char* pattern, const std::string& contents) {
@@ -179,7 +180,8 @@ std::vector<Line> layout(const std::string& bodyHtml) {
             if (!text.empty()) text += ' ';
             text += block.wordText(i);
           }
-          lines.push_back({std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment});
+          lines.push_back(
+              {std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment, block.getBlockStyle().isRtl});
         }
       },
       /*embeddedStyle=*/true, /*contentBase=*/"", /*imageBasePath=*/"",
@@ -272,3 +274,31 @@ TEST(CascadeLines, DepthClassesIndentByTheStylesheetsEmSteps) {
 }
 
 }  // namespace
+
+// --- Paragraph base direction (upstream ce6c6cbce, section v72) -------------
+// An inline element's direction must not replace its paragraph's: a Hebrew
+// paragraph that OPENS with an English term (a common shape in technical
+// books) stays RTL. Before the port, the empty block took the span's ltr as
+// the paragraph direction, so the whole paragraph was set left-to-right.
+
+TEST(ParagraphDirection, AnOpeningLtrSpanDoesNotFlipAnRtlParagraph) {
+  const auto lines = layout(
+      "<p dir=\"rtl\"><span dir=\"ltr\">CSS</span> \xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D "
+      "\xD7\xA2\xD7\x95\xD7\x9C\xD7\x9D</p>");
+  ASSERT_FALSE(lines.empty());
+  for (const Line& l : lines) EXPECT_TRUE(l.rtl) << l.text;
+}
+
+TEST(ParagraphDirection, BodyDirStillSetsTheParagraphDirection) {
+  const auto lines = layout("<div dir=\"rtl\"><span>plain</span> words</div>");
+  ASSERT_FALSE(lines.empty());
+  for (const Line& l : lines) EXPECT_TRUE(l.rtl) << l.text;
+}
+
+// Deliberately NOT asserted: "<p>Alpha <span dir=rtl>HEBREW</span> omega</p>"
+// comes out RTL. That is ParsedText's paragraph auto-detection
+// (ParsedText.cpp, RTL_PARAGRAPH_PROBE_WORDS = 3, from upstream f5bc554ae): an
+// undirected paragraph whose first three words include one starting RTL is
+// set RTL, so an unmarked Hebrew paragraph that opens with an English term
+// reads correctly. Its price is an English paragraph with a Hebrew word among
+// its first three. Recorded in docs/fork-sync.md (batch 4), not changed here.
