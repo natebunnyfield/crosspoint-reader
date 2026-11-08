@@ -87,7 +87,7 @@ for size in ${LIBREFRANKLIN_READER_SIZES[@]}; do
     font_name="librefranklin_reader_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
     font_path="../builtinFonts/source/LibreFranklin/LibreFranklin-${style}.ttf"
     output_path="../builtinFonts/${font_name}.h"
-    python fontconvert.py $font_name $size $font_path --2bit --compress --pnum > $output_path
+    python fontconvert.py $font_name $size $font_path --2bit --compress --zopfli --pnum --zopfli > $output_path
     echo "Generated $output_path"
   done
 done
@@ -108,7 +108,7 @@ for size in ${LIBREFRANKLIN_READER_SIZES[@]}; do
       font_name="librefranklin_reader_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')_${scale}x"
       font_path="../builtinFonts/source/LibreFranklin/LibreFranklin-${style}.ttf"
       output_path="../builtinFonts/${font_name}.h"
-      python fontconvert.py $font_name $((size * scale)) $font_path --2bit --compress --pnum > $output_path
+      python fontconvert.py $font_name $((size * scale)) $font_path --2bit --compress --zopfli --pnum > $output_path
       assert_header_clean "$output_path"
       echo "Generated $output_path"
     done
@@ -185,7 +185,7 @@ for entry in ${EDITOR_FAMILIES[@]}; do
       lc=$(echo $style | tr '[:upper:]' '[:lower:]')
       font_name="${prefix}_${size}_${lc}"
       output_path="../builtinFonts/${font_name}.h"
-      python fontconvert.py $font_name $size "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum $(narrow_punct_flags_for $prefix) > $output_path
+      python fontconvert.py $font_name $size "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --zopfli --pnum $(narrow_punct_flags_for $prefix) > $output_path
       echo "Generated $output_path"
     done
   done
@@ -198,7 +198,7 @@ for entry in ${EDITOR_FAMILIES_RETIRED[@]}; do
     lc=$(echo $style | tr '[:upper:]' '[:lower:]')
     font_name="${prefix}_12_${lc}"
     output_path="../builtinFonts/${font_name}.h"
-    python fontconvert.py $font_name 12 "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum > $output_path
+    python fontconvert.py $font_name 12 "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --zopfli --pnum > $output_path
     echo "Generated $output_path"
   done
 done
@@ -224,7 +224,7 @@ for entry in ${EDITOR_FAMILIES[@]}; do
         lc=$(echo $style | tr '[:upper:]' '[:lower:]')
         font_name="${prefix}_${size}_${lc}_${scale}x"
         output_path="../builtinFonts/${font_name}.h"
-        python fontconvert.py $font_name $((size * scale)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --pnum $(narrow_punct_flags_for $prefix) > $output_path
+        python fontconvert.py $font_name $((size * scale)) "../builtinFonts/source/${stem}-${style}.ttf" --2bit --compress --zopfli --pnum $(narrow_punct_flags_for $prefix) > $output_path
         echo "Generated $output_path"
       done
     done
@@ -268,10 +268,10 @@ for entry in ${LOCAL_EDITOR_FAMILIES[@]}; do
       lc=$(echo $style | tr '[:upper:]' '[:lower:]')
       # 1x cut, then one hi-res companion per HIRES_SCALES tier, same flags as
       # the OFL editor families above.
-      python fontconvert.py "${prefix}_${size}_${lc}" $size "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_${size}_${lc}.h"
+      python fontconvert.py "${prefix}_${size}_${lc}" $size "../local_fonts/${stem}-${style}.ttf" --2bit --compress --zopfli --pnum > "../builtinFonts/${prefix}_${size}_${lc}.h"
       echo "Generated ../builtinFonts/${prefix}_${size}_${lc}.h"
       for scale in ${HIRES_SCALES[@]}; do
-        python fontconvert.py "${prefix}_${size}_${lc}_${scale}x" $((size * scale)) "../local_fonts/${stem}-${style}.ttf" --2bit --compress --pnum > "../builtinFonts/${prefix}_${size}_${lc}_${scale}x.h"
+        python fontconvert.py "${prefix}_${size}_${lc}_${scale}x" $((size * scale)) "../local_fonts/${stem}-${style}.ttf" --2bit --compress --zopfli --pnum > "../builtinFonts/${prefix}_${size}_${lc}_${scale}x.h"
         echo "Generated ../builtinFonts/${prefix}_${size}_${lc}_${scale}x.h"
       done
     done
@@ -350,13 +350,13 @@ else
     for scale in 1 ${HIRES_SCALES[@]}; do
       if [ "$scale" = "1" ]; then suffix=""; else suffix="_${scale}x"; fi
       px=$((size * scale))
-      python fontconvert.py "nittitypewriter_${size}_regular${suffix}"    $px "$NITTI_REGULAR"   --2bit --compress --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_regular${suffix}.h"
+      python fontconvert.py "nittitypewriter_${size}_regular${suffix}"    $px "$NITTI_REGULAR"   --2bit --compress --zopfli --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_regular${suffix}.h"
       echo "Generated ../builtinFonts/nittitypewriter_${size}_regular${suffix}.h"
-      python fontconvert.py "nittitypewriter_${size}_bold${suffix}"       $px "$NITTI_INVERSE"   --2bit --compress --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_bold${suffix}.h"
+      python fontconvert.py "nittitypewriter_${size}_bold${suffix}"       $px "$NITTI_INVERSE"   --2bit --compress --zopfli --pnum $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_bold${suffix}.h"
       echo "Generated ../builtinFonts/nittitypewriter_${size}_bold${suffix}.h"
-      python fontconvert.py "nittitypewriter_${size}_italic${suffix}"     $px "$NITTI_UNDERLINE" --2bit --compress --pnum $NITTI_JOIN $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_italic${suffix}.h"
+      python fontconvert.py "nittitypewriter_${size}_italic${suffix}"     $px "$NITTI_UNDERLINE" --2bit --compress --zopfli --pnum $NITTI_JOIN $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_italic${suffix}.h"
       echo "Generated ../builtinFonts/nittitypewriter_${size}_italic${suffix}.h"
-      python fontconvert.py "nittitypewriter_${size}_bolditalic${suffix}" $px "$NITTI_UNDERLINE" --2bit --compress --pnum $NITTI_JOIN --synth-double-strike-em 0.0533 $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_bolditalic${suffix}.h"
+      python fontconvert.py "nittitypewriter_${size}_bolditalic${suffix}" $px "$NITTI_UNDERLINE" --2bit --compress --zopfli --pnum $NITTI_JOIN --synth-double-strike-em 0.0533 $NITTI_LH > "../builtinFonts/nittitypewriter_${size}_bolditalic${suffix}.h"
       echo "Generated ../builtinFonts/nittitypewriter_${size}_bolditalic${suffix}.h"
     done
   done
