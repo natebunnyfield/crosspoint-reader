@@ -3993,6 +3993,24 @@ the in-book path. Seven tests in `test/untrusted_input/`, including three that
 pin the plane arithmetic so the guard is not later removed as redundant by
 someone who checks only the height-divisible-by-8 case.
 
+**Root cause fixed 2026-11-08 (upstream `3555ff556`, ported on `b5-render`).**
+The plane size itself was wrong: an XTH column is padded to a whole byte, so a
+plane is `width * ((height + 7) / 8)` bytes, not `(width * height + 7) / 8`. All
+six sites now use the column-padded size (`Xtc.cpp` cover and thumbnail,
+`XtcParser.cpp` `loadPage` and `loadPageStreaming`, `XtcReaderActivity.cpp`
+buffer and plane offset), so plane2 starts where plane1 ends and no addressed
+byte is outside the buffer. That also fixes the third reader this entry missed:
+`XtcReaderActivity::renderPage`'s `getPixelValue` had no guard and read past
+plane2 on any page whose height is not a multiple of 8 (all three panels'
+native heights are, so only odd-sized pages hit it). The two guards stay as
+belt-and-braces; they can no longer fire. `XtcParser` now also refuses a page
+whose declared `dataSize` is not exactly that size (`CORRUPTED_HEADER`), so an
+odd-height XTH written with the old packed formula shows the page-load error
+instead of garbage. No tool or script in this repo writes XTC files (`git grep
+-iw "xtc\|xth\|xtg" -- tools scripts`: no writer), so nothing of the fork's own
+is refused. `test/untrusted_input` now pins the corrected geometry at every
+height 1..1024 and the old formula's overrun.
+
 ### [B-022] Paging mutates `lines` outside the render lock while the render task walks it
 **severity: medium · scope: threading · found 2026-08-06 · verified 2026-08-07** · FIXED 2026-08-07
 

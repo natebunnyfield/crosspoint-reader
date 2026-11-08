@@ -102,36 +102,47 @@ TEST(PngBitDepth, RejectsSubByteDepthsOnColourTypesTheSpecForbids) {
 
 // ── B-023: the XTC plane geometry that motivated the bounds guard ────────────
 //
-// Xtc.cpp sizes each 2-bit plane (width * height + 7) / 8 but addresses it
-// column-major with (height + 7) / 8 bytes per column. These pin the arithmetic
-// so the guard is not "removed as redundant" by someone who checks only the
-// common case.
+// An XTH plane is column-major with (height + 7) / 8 bytes per column, so it
+// is width * colBytes bytes. Until 3555ff556 every site (Xtc.cpp cover and
+// thumbnail, XtcParser.cpp loadPage and loadPageStreaming, XtcReaderActivity)
+// sized it (width * height + 7) / 8 instead -- short whenever height % 8 != 0,
+// so the last columns read past plane1 into plane2 and past plane2 off the end
+// of the allocation. Xtc.cpp's two guards (`byteOffset >= planeSize`) covered
+// the cover and thumbnail; the reader's getPixelValue had none. These pin both
+// formulas so neither the fix nor the guards are "simplified" away by someone
+// who checks only the height-divisible-by-8 case.
 
 namespace {
-size_t planeSizeAsAllocated(uint32_t w, uint32_t h) { return (static_cast<size_t>(w) * h + 7) / 8; }
 size_t colBytes(uint32_t h) { return (h + 7) / 8; }
+size_t planeSizeAsAllocated(uint32_t w, uint32_t h) { return static_cast<size_t>(w) * colBytes(h); }
+size_t planeSizeBefore3555ff556(uint32_t w, uint32_t h) { return (static_cast<size_t>(w) * h + 7) / 8; }
 size_t highestOffsetAddressed(uint32_t w, uint32_t h) {
   // colIndex maxes at w-1, byteInCol at (h-1)/8.
   return (w - 1) * colBytes(h) + (h - 1) / 8;
 }
 }  // namespace
 
-TEST(XtcPlaneGeometry, AgreesWhenHeightIsAMultipleOfEight) {
-  for (uint32_t h : {8u, 16u, 240u, 528u}) {
-    EXPECT_LT(highestOffsetAddressed(400, h), planeSizeAsAllocated(400, h))
-        << "height " << h << " should stay in bounds";
+TEST(XtcPlaneGeometry, EveryAddressedByteIsInsideThePlaneAtEveryHeight) {
+  for (uint32_t w : {1u, 7u, 100u, 400u, 480u, 528u, 800u}) {
+    for (uint32_t h = 1; h <= 1024; h++) {
+      ASSERT_LT(highestOffsetAddressed(w, h), planeSizeAsAllocated(w, h)) << w << "x" << h;
+      // Tight: the last addressed byte is the plane's last byte, so plane2
+      // (at pageBuffer + planeSize) starts exactly where plane1 ends.
+      ASSERT_EQ(highestOffsetAddressed(w, h) + 1, planeSizeAsAllocated(w, h)) << w << "x" << h;
+    }
   }
 }
 
-TEST(XtcPlaneGeometry, OverrunsWhenHeightIsNotAMultipleOfEight) {
-  // This is the bug: the last columns index past the plane. plane2 sits at
-  // pageBuffer + planeSize, so plane1 runs into plane2 and plane2 runs off the
-  // end of the allocation.
-  EXPECT_GT(highestOffsetAddressed(100, 100), planeSizeAsAllocated(100, 100));
-  EXPECT_GT(highestOffsetAddressed(400, 527), planeSizeAsAllocated(400, 527));
+TEST(XtcPlaneGeometry, TheOldFormulaAgreedOnlyWhenHeightIsAMultipleOfEight) {
+  for (uint32_t h : {8u, 16u, 240u, 528u, 800u}) {
+    EXPECT_EQ(planeSizeBefore3555ff556(400, h), planeSizeAsAllocated(400, h)) << "height " << h;
+  }
+  // This was the bug: the old size is short, so the last columns overran.
+  EXPECT_GT(highestOffsetAddressed(100, 100), planeSizeBefore3555ff556(100, 100));
+  EXPECT_GT(highestOffsetAddressed(400, 527), planeSizeBefore3555ff556(400, 527));
 }
 
-TEST(XtcPlaneGeometry, TheGuardRejectsExactlyTheOutOfRangeSamples) {
+TEST(XtcPlaneGeometry, TheGuardSkipsNothingUnderTheCorrectedSize) {
   constexpr uint32_t w = 100, h = 100;
   const size_t plane = planeSizeAsAllocated(w, h);
   size_t skipped = 0, kept = 0;
@@ -141,8 +152,8 @@ TEST(XtcPlaneGeometry, TheGuardRejectsExactlyTheOutOfRangeSamples) {
       (off >= plane ? skipped : kept)++;
     }
   }
-  EXPECT_GT(skipped, 0u) << "if nothing is skipped the guard is untested here";
-  EXPECT_GT(kept, skipped) << "the guard must not throw away most of the image";
+  EXPECT_EQ(skipped, 0u) << "the corrected plane size must cover every sample of an odd-height page";
+  EXPECT_EQ(kept, static_cast<size_t>(w) * h);
 }
 
 // ── The /firmware/ upload trigger ────────────────────────────────────────────
