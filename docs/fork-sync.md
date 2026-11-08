@@ -238,6 +238,27 @@ second session starting a batch or the reader port should fetch `main`, read
 this line, and take something else (or nothing) to avoid porting the same
 commits twice.
 
+**Taken EARLY, outside the batches (2026-11-08, owner: "yes to any bug fixes",
+fork survey §0).** The campaign driver should mark these ALREADY when its batch
+reaches them, not port them again:
+
+- `149dd53299` chunked zip size lookup for huge spines -> "fix(epub): chunk the
+  zip size lookup so huge spines do not abort".
+- `10cb2c3b29` try-lock for the reader's idle work -> its `RenderLock::Mode::Try`
+  half only, in "fix(reader): loop() reads section only under a tried render
+  lock…". The `main.cpp` hunk (loop skips a frame while the lock is busy) was
+  NOT taken.
+- `f8936ba67c` -> the early-stop half only ("fix(reader): a press stops the
+  background chapter build…"); the deque and finish-in-idle halves were NOT
+  taken.
+- SDK `69349ec` ("Remove dark background hint feature", taken from upstream
+  earlier) is REVERTED in the fork's SDK (`c7fc361`) and the hint is public;
+  an upstream SDK move that deletes it again must not be taken blind.
+- Not upstream commits, recorded here because the SDK pointer moved:
+  `freeink-sdk` now points at `c7fc361` (Picco frontlight table, Picco battery,
+  TMA525C track-id guard, UC8279 0x03/0x67, the dark re-drive), on top of the
+  `picco-a-sdk` pin `1dc07f6`. A later SDK bump must carry these five.
+
 
 | batch | upstream range | taken | partial | skipped (why) | pushed as |
 |---|---|---|---|---|---|

@@ -45,6 +45,36 @@ icon, yes to faster, albo issue is what?, yes to any bug fixes"*.
 | 10 | **TAKE the faster factory 4-level waveform** ("yes to faster"). Device-only to judge; ships UNCONFIRMED on glass. |
 | all bug-fix TAKEs | **TAKE** ("yes to any bug fixes"), plus restoring the dark-background re-drive the SDK lost in `69349ec` (p0-p1 sweep, "Known and NOT fixed"). Each one's status goes in the table below as it lands. |
 
+### Status of every bug-fix row, 2026-11-08
+
+Firmware commits are named by subject (a rebase before the push changes their
+shas); SDK commits are on `natebunnyfield/freeink-sdk` `main`, stable. "Failing
+first" means the new host test was run against the old code and failed.
+
+| # | Status | Where | How verified |
+|---|---|---|---|
+| 1 | already fixed (B-078) | `patch_sdfat.py` | p0-p1 sweep |
+| 2 | already fixed (B-079) | — | p0-p1 sweep |
+| 3 | already on `main` | campaign batch 3 hand-port of upstream `b6746c1df` | `CSS_CACHE_VERSION` in `CssParser.cpp` |
+| 4 | **DONE** | SDK `a5ca7c5` "fix(picco): realign the frontlight table…" | upstream's smooth-ramp host test, failing first; device UNCONFIRMED |
+| 5 | **DONE** (taken early, upstream `149dd53299`) | "fix(epub): chunk the zip size lookup so huge spines do not abort" | host `LargeSpine.*` (2,500 chapters, matched 2500/2500); the abort itself needs device heap |
+| 7 | already on `main` | campaign batch 4 `3767b412a` (upstream `93b6fe111`) | — |
+| 11 | **DONE** (taken early, upstream `10cb2c3b29`) | "fix(reader): loop() reads section only under a tried render lock; turns queue to the render task" | lag gate OK; simulator `semphr_reboot` gains the try case (the old shim hangs on it) |
+| 12 | **DONE**, early-stop half only (upstream `f8936ba67c`) | "fix(reader): a press stops the background chapter build at its next parse step" | X4 build; lag gate OK; device feel UNCONFIRMED (the Picco and the simulator answer false and wait for `update()`) |
+| 15 | already on `main` | campaign batch 4 `5c7b00246` (upstream `c4d8c395d`) | — |
+| 16 | **DONE** | "fix(store): refuse a save whose JSON lost members or was cut short" | host `JsonSaveGuard.*`, overflow case failing first |
+| 17 | **DONE** | "fix(epub): cap the stylesheet list an OPF or zip can grow" | host `CssManifestCap.*`, failing first (5000 vs 256) |
+| 18 | NOT taken | — | a visual tuning plus a new image waveform, device-only, not a bug fix |
+| 19 | **DONE** (no filter) | SDK `55aeccb` "fix(picco): battery ADC median of three…" | SDK host test, 5 checks failing first |
+| 20 | **DONE** | SDK `2e943b7` "fix(picco): a new TMA525C track id ends the old contact…" | SDK host test, failing first; device feel UNCONFIRMED |
+| 22 | already on `main` | `f9be57963` (upstream #3847) holds `modeMutex` across check and switch | read `HalPowerManager.cpp:43-80` |
+| 23 | **DONE** | same commit as #11: page turns queue to the render task, idle work reads `section` only under the lock | lag gate (14 turns, pages 1..14 in order) and a 4-chapter run crossing spines both ways |
+| 28 | **DONE** | SDK `9148674` "fix(x4): UC8279 LUT_VER 0x03/0x67…" | detect host test failing first; the 0x67 AA skip is device-only, no such panel on hand |
+| dark re-drive | **DONE** | SDK `c7fc361` (reverts `69349ec`, public `setBackgroundHint`) + "fix(sdk): bump freeink-sdk…" (HalDisplay passes the hint) | `run_uc8253_power.py` asserts the re-drive; device effect UNCONFIRMED |
+
+Rows 6, 8, 13, 14, 21, 24, 25 are performance, not bug fixes, and were not
+part of this ruling (8 is already on `main` from the campaign).
+
 ## 1. What is new since 2026-08-15
 
 | | Count | Note |
@@ -168,6 +198,47 @@ puts X3 latency back. Watch upstream for what its "persistent residue"
 investigation concludes.
 
 ---
+
+### #10, the factory 4-level waveform: design options (2026-11-08, not built)
+
+Owner ruled "yes to faster"; how it is built is an architecture choice, so the
+options come first. Sources read: homunet SDK `79b5439e` (frame-rate byte),
+firmware `cdbda5558f` (dual-plane window render target) and `36dc1f67d6` (the
+reader's banded absolute path); ours: `Ssd1677Driver::displayGray`
+(`factoryMode` already exists and selects `lut_factory_quality`, but nothing in
+the firmware asks for it: `GfxRenderer::displayGrayBuffer()` never passes
+`absolute`), and the deferred AA path in `EpubReaderActivity` (plan 2.2).
+
+What it is: on the X4's SSD1677, render the text page straight into ABSOLUTE
+4-level planes and refresh ONCE with the factory waveform, with its frame-rate
+byte raised 0x22 -> 0x88. homunet measured on an X4, room temperature: factory
+waveform 1,084 -> 336 ms; a whole text page ~0.65 s, against ~1.0 s for BW base
++ gray overlay. Ours today: BW FAST ~497 ms (measured), then the gray overlay
+only after a 600 ms rest (`GRAY_DEFER_MS`); the overlay waveform itself has
+never been timed on glass.
+
+**X4 only in every option.** The X3's UC8253 has no absolute bank
+(`HalDisplay::supportsAbsoluteGrayscale()` is false there) and the Picco's
+SSD2677 is a different driver. Image pages keep today's path in all options
+(homunet's does too).
+
+| | Option | Page turn on the X4 | AA arrives | RAM per text page | Cost to build |
+|---|---|---|---|---|---|
+| A | Keep deferred AA (no change) | ~0.5 s to a readable BW page | ~1.1 s later, only if the reader rests | strip scratch, as today | none |
+| B | Replace deferred AA with the one-refresh factory page | ~0.65 s (est.; +~150 ms per turn, also when flipping fast) | with the page, no second flash | 2 x ~9.6 KB contiguous (5 bands; more, smaller bands when the heap is fragmented, else a BW page) | high: port the window target (~150 lines of `GfxRenderer`), the band loop (~130 lines, against a reader since reworked by the lag work: prerender, tile hashes, queued turns), the SDK window write + frame-rate byte; the lag gate's 2.2 checks need an X4-mode variant |
+| C | B behind a setting ("Anti-aliasing: Deferred / One refresh"), X4 only, default **Deferred** | as A or B | as A or B | as B when on | B + one setting row (two languages) |
+| D | C with default **One refresh** | as B | as B | as B | as C |
+
+Shared unknowns, whichever is picked: 0x88 shortens every drive pulse, so
+contrast and ghosting in the COLD are untested (homunet: "check before using
+it in cold environments"); a guard that drops to 0x22 below a panel
+temperature is possible but unmeasured. Dark mode with absolute planes, and the
+tile-hash windowed present after an absolute page, both need checking. The
+simulator cannot judge any of it: its e-ink mode models the X3's waveforms,
+not the SSD1677's factory bank.
+
+Recommendation: **C** (a setting, default Deferred), so the owner can judge
+both on his X4 before either becomes the default.
 
 ## 3. Checked — already present here, or N/A (do not re-propose)
 
