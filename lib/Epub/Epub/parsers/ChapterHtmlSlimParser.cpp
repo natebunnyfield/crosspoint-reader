@@ -2043,14 +2043,20 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                   self->completedPageCount++;
                   self->currentPage.reset(new (std::nothrow) Page());
                   if (!self->currentPage) {
-                    LOG_ERR("EHP", "Failed to create new page");
+                    // currentPage is now null and every later callback
+                    // dereferences it: abandon the chapter (stops expat), as
+                    // the other page allocations do. depth stays balanced for
+                    // the </img> that will still arrive.
+                    self->noteAllocationFailure("Page before an image");
+                    self->depth += 1;
                     return;
                   }
                   self->currentPageNextY = 0;
                 } else if (!self->currentPage) {
                   self->currentPage.reset(new (std::nothrow) Page());
                   if (!self->currentPage) {
-                    LOG_ERR("EHP", "Failed to create initial page");
+                    self->noteAllocationFailure("first Page, for an image");
+                    self->depth += 1;
                     return;
                   }
                   self->currentPageNextY = 0;
@@ -2070,13 +2076,18 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                 auto imageBlock =
                     makeUniqueNoThrow<ImageBlock>(cachedImagePath, resolvedPath, displayWidth, displayHeight);
                 if (!imageBlock) {
+                  // The image is dropped and the chapter goes on; the depth
+                  // step every other exit of this branch takes keeps the
+                  // matching </img> from closing the parent's depth.
                   LOG_ERR("EHP", "Failed to create ImageBlock");
+                  self->depth += 1;
                   return;
                 }
                 int xPos = (self->viewportWidth - displayWidth) / 2;
                 auto pageImage = makeUniqueNoThrow<PageImage>(std::move(imageBlock), xPos, self->currentPageNextY);
                 if (!pageImage) {
                   LOG_ERR("EHP", "Failed to create PageImage");
+                  self->depth += 1;
                   return;
                 }
                 self->currentPage->elements.push_back(std::move(pageImage));
