@@ -1,8 +1,10 @@
 #pragma once
+
 #include <Epub.h>
 #include <Epub/FootnoteEntry.h>
 #include <Epub/Section.h>
 
+#include <atomic>
 #include <optional>
 #include <string>
 
@@ -247,7 +249,17 @@ class EpubReaderActivity final : public ReaderActivity {
   // and would start a build on the same spine Find is about to lay out -- two
   // writers on one section .part file.
   bool findInFlight = false;
+  // A page turn from input is QUEUED, not applied: loop() runs on the main
+  // task, and the render task resets `section` on its failure paths (a build
+  // that fails, a page that will not load), so dereferencing it from loop()
+  // raced a reset into a null dereference (fork survey #23, ForkDrift
+  // 3a9c9c5667). Taking the render lock instead would block input for a whole
+  // render. pageTurn() adds to queuedTurns and asks for a render; renderBook()
+  // applies them, under the lock it already holds, via stepPageLocked().
   bool pageTurn(bool isForwardTurn) override;
+  std::atomic<int> queuedTurns{0};
+  void applyQueuedTurnsLocked();
+  void stepPageLocked(bool isForwardTurn);
 
   // Footnote navigation
   void navigateToHref(const std::string& href, bool savePosition = false);
