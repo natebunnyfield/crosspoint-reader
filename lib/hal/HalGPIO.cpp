@@ -283,6 +283,13 @@ bool HalGPIO::wasTouchDown(float& nx, float& ny) const {
   return inputMgr.wasTouchPressedAt(nx, ny);
 }
 
+bool HalGPIO::wasTouchReleased() const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchReleased();
+}
+
 bool HalGPIO::isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const {
 #if FREEINK_DEVICE_PICCO
   if (!keyboardTouch) return false;
@@ -296,6 +303,15 @@ bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const {
 #endif
   return inputMgr.isTouchHeldAt(nx, ny);
 }
+
+bool HalGPIO::wasTouchLongPress(float& nx, float& ny) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchLongPress(nx, ny);
+}
+
+void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
 
 unsigned long HalGPIO::lastTouchHeldMs() const {
 #if FREEINK_DEVICE_PICCO
@@ -361,8 +377,6 @@ void HalGPIO::injectButtonTap(const uint8_t index) {
   synthPressedAt = millis();
 }
 
-void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
-
 bool HalGPIO::isTouchContactDown() const { return inputMgr.isTouchPressed(); }
 
 unsigned long HalGPIO::lastTouchReportMs() const { return inputMgr.getTouchPoint().timestamp; }
@@ -377,6 +391,11 @@ void HalGPIO::setKeyboardTouch(const bool on) {
 
 bool HalGPIO::isUsbPowerPresent() const { return isUsbElectricalConnected(); }
 #endif
+
+bool HalGPIO::hasEdgeSideButtons() const {
+  return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||
+         BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4Pro;
+}
 
 bool HalGPIO::isXteinkDevice() const {
   return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||

@@ -12,15 +12,20 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+namespace fui = freeink::ui;
+
 namespace {
 // Hold threshold for the long-press "remove from list" action (firmware convention).
 constexpr unsigned long LONG_PRESS_MS = 1000;
 }  // namespace
 
+RecentBooksActivity::RecentBooksActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
+    : UiListActivity("RecentBooks", renderer, mappedInput, /*wantsTouchLongPress=*/true) {}
+
 void RecentBooksActivity::loadRecentBooks() { recentBooks = RECENT_BOOKS.getBooks(); }
 
 void RecentBooksActivity::onEnter() {
-  Activity::onEnter();
+  UiListActivity::onEnter();
 
   // Prune entries whose backing files are gone; this is one of two interaction
   // points where the persistent store gets cleaned (the other is addBook).
@@ -28,11 +33,7 @@ void RecentBooksActivity::onEnter() {
     RECENT_BOOKS.saveToFile();
   }
 
-  // Load data
   loadRecentBooks();
-
-  selectorIndex = 0;
-  requestUpdate();
 }
 
 void RecentBooksActivity::onExit() {
@@ -40,114 +41,61 @@ void RecentBooksActivity::onExit() {
   recentBooks.clear();
 }
 
-void RecentBooksActivity::loop() {
-  // handleInput() as the gate, not isActive(): it keeps returning true while
-  // draining the release of the press that closed the popup, so dismissing
-  // "Remove from recents?" with Back cannot fall through to the
-  // wasReleased(Back) → Home handler below (input-edge audit 2026-08-21,
-  // finding 2).
-  if (removePopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+void RecentBooksActivity::describeRow(const int index, ListRow& row) const {
+  const auto& book = recentBooks[index];
+  row.title = book.title;
+  row.subtitle = book.author;
+  row.icon = UITheme::getFileIcon(book.path);
+}
 
-  const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, true);
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight =
-      renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
+void RecentBooksActivity::activateIndex(const int index) {
+  // Opening the book leaves this screen; a lingering flash would gray an
+  // unrelated row when the list next appears.
+  app.clearTapFlash();
+  LOG_DBG("RBA", "Selected recent book: %s", recentBooks[index].path.c_str());
+  onSelectBook(recentBooks[index].path);
+}
 
+void RecentBooksActivity::onRowLongPress(const int index) {
+  // Long-press prompts removal from the list (mirrors the Confirm-button hold).
+  app.clearTapFlash();
+  promptRemoveBook(recentBooks[index].path, recentBooks[index].title);
+}
+
+bool RecentBooksActivity::handleButtons() {
   // After a long-press has fired, swallow input until Confirm is physically released
   // (so the release doesn't also open the book; re-arm only once the button is up).
   if (longPressFired) {
     if (!mappedInput.isPressed(MappedInputManager::Button::Confirm)) {
       longPressFired = false;
     }
-    return;
+    return true;
   }
 
   // Long-press Confirm on the selected book: prompt to remove it from the list.
   // Fires when the hold times out while still held (firmware hold-to-act pattern,
   // cf. FileBrowserActivity BACK long-press).
-  if (!recentBooks.empty() && selectorIndex < recentBooks.size() &&
+  if (!recentBooks.empty() && nav.selected < listCount() &&
       mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
       mappedInput.getHeldTime(MappedInputManager::Button::Confirm) >= LONG_PRESS_MS) {
     longPressFired = true;
-    promptRemoveBook(recentBooks[selectorIndex].path, recentBooks[selectorIndex].title);
-    return;
+    promptRemoveBook(recentBooks[nav.selected].path, recentBooks[nav.selected].title);
+    return true;
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    if (!recentBooks.empty() && selectorIndex < static_cast<int>(recentBooks.size())) {
-      LOG_DBG("RBA", "Selected recent book: %s", recentBooks[selectorIndex].path.c_str());
-      onSelectBook(recentBooks[selectorIndex].path);
-      return;
+    if (!recentBooks.empty() && nav.selected < listCount()) {
+      activateIndex(nav.selected);
+      return true;
     }
-  }
-
-  int touchSel = static_cast<int>(selectorIndex);
-  const auto listTouch =
-      handleListTouch(touchSel, static_cast<int>(recentBooks.size()), contentTop, contentHeight, true);
-  if (listTouch != ListTouchResult::None) {
-    selectorIndex = static_cast<size_t>(touchSel);
-    if (listTouch == ListTouchResult::Activated) {
-      LOG_DBG("RBA", "Tapped recent book: %s", recentBooks[selectorIndex].path.c_str());
-      onSelectBook(recentBooks[selectorIndex].path);
-    }
-    return;
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     onGoHome();
+    return true;
   }
 
-  int listSize = static_cast<int>(recentBooks.size());
-  const auto swipe = mappedInput.wasSwipe();
-  if (swipe == MappedInputManager::SwipeDir::Up) {
-    selectorIndex = ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex), listSize, pageItems);
-    requestUpdate();
-    return;
-  }
-  if (swipe == MappedInputManager::SwipeDir::Down) {
-    selectorIndex = ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex), listSize, pageItems);
-    requestUpdate();
-    return;
-  }
-
-  buttonNavigator.onNextPress([this, listSize] {
-    selectorIndex = ButtonNavigator::nextIndex(static_cast<int>(selectorIndex), listSize);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPreviousPress([this, listSize] {
-    selectorIndex = ButtonNavigator::previousIndex(static_cast<int>(selectorIndex), listSize);
-    requestUpdate();
-  });
-
-  buttonNavigator.onNextContinuous([this, listSize, pageItems] {
-    selectorIndex = ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex), listSize, pageItems);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPreviousContinuous([this, listSize, pageItems] {
-    selectorIndex = ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex), listSize, pageItems);
-    requestUpdate();
-  });
-
-  // The SIDE pair pages by a whole screenful; the FRONT pair above steps one
-  // row. They used to be the same action (docs/ui-conventions.md, "Side buttons
-  // should page, not repeat the front buttons"). pageDown/pageUp clamp at the
-  // ends and return false when nothing moved, so a short list costs no redraw.
-  buttonNavigator.onPageNext([this, listSize, pageItems] {
-    int index = static_cast<int>(selectorIndex);
-    if (!ButtonNavigator::pageDown(index, listSize, pageItems)) return;
-    selectorIndex = static_cast<size_t>(index);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPagePrevious([this, listSize, pageItems] {
-    int index = static_cast<int>(selectorIndex);
-    if (!ButtonNavigator::pageUp(index, listSize, pageItems)) return;
-    selectorIndex = static_cast<size_t>(index);
-    requestUpdate();
-  });
+  return false;
 }
 
 void RecentBooksActivity::promptRemoveBook(const std::string& path, const std::string& title) {
@@ -161,10 +109,11 @@ void RecentBooksActivity::promptRemoveBook(const std::string& path, const std::s
       LOG_DBG("RBA", "Removed from recents: %s", path.c_str());
       loadRecentBooks();
       if (recentBooks.empty()) {
-        selectorIndex = 0;
-      } else if (selectorIndex >= recentBooks.size()) {
-        selectorIndex = recentBooks.size() - 1;
+        nav.selected = 0;
+      } else if (nav.selected >= listCount()) {
+        nav.selected = listCount() - 1;
       }
+      nav.follow(listCount());
       requestUpdate(true);
     }
   });
@@ -172,33 +121,25 @@ void RecentBooksActivity::promptRemoveBook(const std::string& path, const std::s
   requestUpdate();
 }
 
-void RecentBooksActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
+void RecentBooksActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
+  // Content below the GUI.drawHeader band, above the button hints.
+  screen.setContentMargin(fui::Insets{static_cast<int16_t>(metrics.topPadding + metrics.headerHeight), 0,
+                                      static_cast<int16_t>(metrics.buttonHintsHeight + metrics.verticalSpacing), 0});
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_MENU_RECENT_BOOKS));
-
-  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
-
-  // Recent tab
   if (recentBooks.empty()) {
-    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + 20, tr(STR_NO_RECENT_BOOKS));
-  } else {
-    GUI.drawList(
-        renderer, Rect{0, contentTop, pageWidth, contentHeight}, recentBooks.size(), selectorIndex,
-        [this](int index) { return recentBooks[index].title; }, [this](int index) { return recentBooks[index].author; },
-        [this](int index) { return UITheme::getFileIcon(recentBooks[index].path); });
+    screen.centeredText(tr(STR_NO_RECENT_BOOKS), screen.theme().bodyText);
+    return;
   }
 
-  if (removePopup.processRender(renderer, mappedInput)) return;
+  ListLook look;
+  look.subtitles = true;
+  look.icons = true;
+  drawRows(screen, look);
+}
 
-  // Help text
+void RecentBooksActivity::drawFooter() {
   const auto labels = mappedInput.mapLabels(tr(STR_HOME), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
-  renderer.displayBuffer();
 }

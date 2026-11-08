@@ -7,10 +7,9 @@
 #include <string>
 #include <vector>
 
-#include "activities/Activity.h"
+#include "activities/UiListActivity.h"
 #include "activities/settings/SettingsActivity.h"
 #include "components/OptionPopup.h"
-#include "util/ButtonNavigator.h"
 
 // Typography Settings — the granular typographic controls, on their own screen.
 //
@@ -29,15 +28,13 @@
 // on which .cpfont is resident, and pouring fourteen ligature rows into the
 // device's one flat Settings list would bury the eleven settings already
 // there. Its own screen is also what the ruling asked for.
-class TypographySettingsActivity final : public Activity {
+class TypographySettingsActivity final : public UiListActivity {
  public:
   explicit TypographySettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : Activity("Typography", renderer, mappedInput) {}
+      : UiListActivity("Typography", renderer, mappedInput) {}
 
   void onEnter() override;
   void onExit() override;
-  void loop() override;
-  void render(RenderLock&&) override;
 
  private:
   // One row, of two kinds.
@@ -87,8 +84,16 @@ class TypographySettingsActivity final : public Activity {
   // SettingInfo's translated name; a ligature row's is the letters it spells.
   std::string rowTitle(const Row& row) const;
 
-  ButtonNavigator buttonNavigator_;
+  int listCount() const override { return static_cast<int>(rows_.size()); }
+  void describeRow(int index, ListRow& row) const override;
+  void buildScreen(UiScreen& screen) override;
+  void activateIndex(int index) override;
+  // Confirm toggles on PRESS (no hold meaning here); Back on press returns.
+  bool handleButtons() override;
+  const char* headerTitle() const override { return tr(STR_TYPOGRAPHY_SETTINGS); }
+  void drawFooter() override;
+  OptionPopup* activePopup() override { return &optionPopup_; }
+
   std::vector<Row> rows_;
   OptionPopup optionPopup_;
-  int selectedIndex_ = 0;
 };

@@ -12,6 +12,8 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+namespace fui = freeink::ui;
+
 namespace {
 // The stored byte is quarter-hour steps biased by 48 (48 = UTC+0).
 constexpr uint8_t BIAS_QUARTER_HOURS = 48;
@@ -77,7 +79,7 @@ std::string formatUtcOffset(uint8_t biasedQ) {
 }
 
 void ClockOffsetActivity::onEnter() {
-  Activity::onEnter();
+  UiListActivity::onEnter();
 
   const uint8_t stored = SETTINGS.clockUtcOffsetQ;
   const int match = indexForOffset(stored);
@@ -87,138 +89,67 @@ void ClockOffsetActivity::onEnter() {
   hasCustomRow = (match < 0);
   customOffsetQ = stored;
   itemCount = TZ_COUNT + (hasCustomRow ? 1 : 0);
-  selectedIndex = (match >= 0) ? match : TZ_COUNT;
-
-  requestUpdate();
+  nav.selected = (match >= 0) ? match : TZ_COUNT;
 }
 
-void ClockOffsetActivity::handleSelection() {
-  if (selectedIndex < TZ_COUNT) {
-    const uint8_t offsetQ = TIMEZONES[selectedIndex].offsetQ;
+void ClockOffsetActivity::activateIndex(const int index) {
+  if (index < TZ_COUNT) {
+    const uint8_t offsetQ = TIMEZONES[index].offsetQ;
     if (offsetQ != SETTINGS.clockUtcOffsetQ) {
       SETTINGS.clockUtcOffsetQ = offsetQ;
       SETTINGS.saveToFile();
     }
   }
   // The custom row re-selects the already-stored offset: nothing to write.
+  app.clearTapFlash();
   finish();
 }
 
-void ClockOffsetActivity::loop() {
-  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-    finish();
+void ClockOffsetActivity::describeRow(const int index, ListRow& row) const {
+  const uint8_t stored = SETTINGS.clockUtcOffsetQ;
+  if (index < TZ_COUNT) {
+    row.title = I18N.get(TIMEZONES[index].nameId);
+    row.value =
+        TIMEZONES[index].offsetQ == stored ? std::string(tr(STR_SELECTED)) : formatUtcOffset(TIMEZONES[index].offsetQ);
     return;
   }
-
-  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    handleSelection();
-    return;
-  }
-
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight =
-      renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
-  switch (handleListTouch(selectedIndex, itemCount, contentTop, contentHeight, false)) {
-    case ListTouchResult::Activated:
-      handleSelection();
-      return;
-    case ListTouchResult::Consumed:
-      return;
-    case ListTouchResult::None:
-      break;
-  }
-
-  // One row fewer when render() reserves the preview line under the list;
-  // paging against the full height made the side pair dead on a real
-  // two-page list (second-pass audit, 2026-09-04).
-  const int pageItems = std::max(
-      1, UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false) - (halClock.isAvailable() ? 1 : 0));
-  const auto swipe = mappedInput.wasSwipe();
-  if (swipe == MappedInputManager::SwipeDir::Up) {
-    selectedIndex = ButtonNavigator::nextPageIndex(selectedIndex, itemCount, pageItems);
-    requestUpdate();
-    return;
-  }
-  if (swipe == MappedInputManager::SwipeDir::Down) {
-    selectedIndex = ButtonNavigator::previousPageIndex(selectedIndex, itemCount, pageItems);
-    requestUpdate();
-    return;
-  }
-
-  buttonNavigator.onNextPress([this] {
-    selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount);
-    requestUpdate();
-  });
-  buttonNavigator.onPreviousPress([this] {
-    selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount);
-    requestUpdate();
-  });
-  buttonNavigator.onNextContinuous([this, pageItems] {
-    selectedIndex = ButtonNavigator::nextPageIndex(selectedIndex, itemCount, pageItems);
-    requestUpdate();
-  });
-  buttonNavigator.onPreviousContinuous([this, pageItems] {
-    selectedIndex = ButtonNavigator::previousPageIndex(selectedIndex, itemCount, pageItems);
-    requestUpdate();
-  });
-
-  // The SIDE pair pages by a whole screenful; the FRONT pair above steps one
-  // row. They used to be the same action (docs/ui-conventions.md, "Side buttons
-  // should page, not repeat the front buttons"). pageDown/pageUp clamp at the
-  // ends and return false when nothing moved, so a short list costs no redraw.
-  buttonNavigator.onPageNext([this, pageItems] {
-    if (!ButtonNavigator::pageDown(selectedIndex, itemCount, pageItems)) return;
-    requestUpdate();
-  });
-
-  buttonNavigator.onPagePrevious([this, pageItems] {
-    if (!ButtonNavigator::pageUp(selectedIndex, itemCount, pageItems)) return;
-    requestUpdate();
-  });
+  // Custom row: show the raw offset in the title, because it appears in
+  // no named row and is the one thing this row must communicate.
+  char buf[48];
+  snprintf(buf, sizeof(buf), "%s (%s)", tr(STR_TZ_CUSTOM), formatUtcOffset(customOffsetQ).c_str());
+  row.title = buf;
+  row.value = tr(STR_SELECTED);  // Custom row only exists when it is current.
 }
 
-void ClockOffsetActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
-  const auto& metrics = UITheme::getInstance().getMetrics();
-
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_CLOCK_UTC_OFFSET));
-
-  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+int ClockOffsetActivity::previewHeight() const {
   // Live preview of the wall-clock time the highlighted row would produce, so
   // the offset can be checked against a watch instead of worked out. Upstream
   // has this on its own offset screen; this fork's rewrite as a timezone list
   // dropped it, which also left SETTINGS.clockFormat with no reader at all --
   // a 24H/12H row that changed nothing (B-019). Reserve a line for it only when
   // there is a clock to read.
-  const bool showPreview = halClock.isAvailable();
-  const int previewHeight = showPreview ? metrics.listRowHeight + metrics.verticalSpacing : 0;
-  const int contentHeight =
-      pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing - previewHeight;
-  const uint8_t stored = SETTINGS.clockUtcOffsetQ;
-  GUI.drawList(
-      renderer, Rect{0, contentTop, pageWidth, contentHeight}, itemCount, selectedIndex,
-      [this](const int index) -> std::string {
-        if (index < TZ_COUNT) return I18N.get(TIMEZONES[index].nameId);
-        // Custom row: show the raw offset in the title, because it appears in
-        // no named row and is the one thing this row must communicate.
-        char buf[48];
-        snprintf(buf, sizeof(buf), "%s (%s)", tr(STR_TZ_CUSTOM), formatUtcOffset(customOffsetQ).c_str());
-        return buf;
-      },
-      nullptr, nullptr,
-      [this, stored](const int index) -> std::string {
-        if (index >= TZ_COUNT) return tr(STR_SELECTED);  // Custom row only exists when it is current.
-        if (TIMEZONES[index].offsetQ == stored) return tr(STR_SELECTED);
-        return formatUtcOffset(TIMEZONES[index].offsetQ);
-      },
-      true);
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  return halClock.isAvailable() ? metrics.listRowHeight + metrics.verticalSpacing : 0;
+}
 
-  if (showPreview) {
-    const uint8_t previewQ = selectedIndex < TZ_COUNT ? TIMEZONES[selectedIndex].offsetQ : customOffsetQ;
+void ClockOffsetActivity::buildScreen(UiScreen& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  screen.setContentMargin(
+      fui::Insets{static_cast<int16_t>(metrics.topPadding + metrics.headerHeight), 0,
+                  static_cast<int16_t>(metrics.buttonHintsHeight + metrics.verticalSpacing + previewHeight()), 0});
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+  ListLook look;
+  look.highlightValue = true;
+  drawRows(screen, look);
+}
+
+void ClockOffsetActivity::drawFooter() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  if (halClock.isAvailable()) {
+    const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+    const int contentHeight =
+        renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing - previewHeight();
+    const uint8_t previewQ = nav.selected < TZ_COUNT ? TIMEZONES[nav.selected].offsetQ : customOffsetQ;
     char timeBuf[16];
     if (halClock.formatTime(timeBuf, sizeof(timeBuf), previewQ, SETTINGS.clockFormat == 1)) {
       char preview[64];
@@ -229,6 +160,4 @@ void ClockOffsetActivity::render(RenderLock&&) {
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
-  renderer.displayBuffer();
 }

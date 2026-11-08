@@ -31,6 +31,8 @@
 #include "activities/util/TextEntryFactory.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+
+namespace fui = freeink::ui;
 #if FREEINK_DEVICE_PICCO
 #include <HalFrontlight.h>
 
@@ -93,10 +95,9 @@ void SettingsActivity::rebuildSettingsLists() {
   // Wi-Fi Networks, so a second Confirm opened Wi-Fi. A row is the pair
   // (valuePtr, nameId): actions carry no valuePtr, and nameId alone would do
   // for every row this list holds today, but the pair costs nothing more.
-  const bool hadSelection =
-      selectedSettingIndex >= 0 && selectedSettingIndex < static_cast<int>(deviceSettings.size());
-  const StrId selectedName = hadSelection ? deviceSettings[selectedSettingIndex].nameId : StrId::STR_NONE_OPT;
-  uint8_t CrossPointSettings::* selectedValue = hadSelection ? deviceSettings[selectedSettingIndex].valuePtr : nullptr;
+  const bool hadSelection = nav.selected >= 0 && nav.selected < static_cast<int>(deviceSettings.size());
+  const StrId selectedName = hadSelection ? deviceSettings[nav.selected].nameId : StrId::STR_NONE_OPT;
+  uint8_t CrossPointSettings::* selectedValue = hadSelection ? deviceSettings[nav.selected].valuePtr : nullptr;
 #endif
   deviceSettings.clear();
 
@@ -226,25 +227,21 @@ void SettingsActivity::rebuildSettingsLists() {
   // Back onto the same row if it is still listed; otherwise the clamp below.
   for (int i = 0; hadSelection && i < settingsCount; i++) {
     if (deviceSettings[i].nameId == selectedName && deviceSettings[i].valuePtr == selectedValue) {
-      selectedSettingIndex = i;
+      nav.selected = i;
       break;
     }
   }
 #endif
-  if (selectedSettingIndex >= settingsCount) {
-    selectedSettingIndex = settingsCount > 0 ? settingsCount - 1 : 0;
+  if (nav.selected >= settingsCount) {
+    nav.selected = settingsCount > 0 ? settingsCount - 1 : 0;
   }
 }
 
 void SettingsActivity::onEnter() {
-  Activity::onEnter();
-
-  // Reset selection to the first row
-  selectedSettingIndex = 0;
+  // The base resets the selection to the first row and requests the first
+  // update.
+  UiListActivity::onEnter();
   rebuildSettingsLists();
-
-  // Trigger first update
-  requestUpdate();
 }
 
 void SettingsActivity::onExit() {
@@ -257,20 +254,23 @@ void SettingsActivity::onExit() {
   UITheme::getInstance().reload();  // Re-apply theme in case it was changed
 }
 
-void SettingsActivity::loop() {
-  if (optionPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+bool SettingsActivity::handleCustomInput() {
 #if FREEINK_DEVICE_PICCO
   if (adjustingLight) {
     loopLightAdjust();
-    return;
+    return true;
   }
 #endif
+  return false;
+}
 
-  // Handle actions with early return
+bool SettingsActivity::handleButtons() {
+  // Confirm on PRESS: no Confirm hold means anything here
+  // (docs/ui-conventions.md, the press-vs-release inventory).
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     toggleCurrentSetting();
     requestUpdate();
-    return;
+    return true;
   }
 
   // Back leaves outright. It used to send the selection back to the tab bar
@@ -280,77 +280,15 @@ void SettingsActivity::loop() {
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     SETTINGS.saveToFile();
     onGoHome();
-    return;
+    return true;
   }
+  return false;
+}
 
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int listHeight = renderer.getScreenHeight() - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
-
-  // The bespoke hit-test this replaced existed only to undo the tab bar's +1
-  // row offset. Without it the shared helper is exact.
-  switch (handleListTouch(selectedSettingIndex, settingsCount, listTop, listHeight, false)) {
-    case ListTouchResult::Activated:
-      toggleCurrentSetting();
-      requestUpdate();
-      return;
-    case ListTouchResult::Consumed:
-      return;
-    case ListTouchResult::None:
-      break;
-  }
-
-  // Handle navigation
-  const int settingsPageItems = GUI.getListPageItems(listHeight, false);
-  const auto swipe = mappedInput.wasSwipe();
-  if (swipe == MappedInputManager::SwipeDir::Up) {
-    selectedSettingIndex = ButtonNavigator::nextPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
-    requestUpdate();
-    return;
-  }
-  if (swipe == MappedInputManager::SwipeDir::Down) {
-    selectedSettingIndex = ButtonNavigator::previousPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
-    requestUpdate();
-    return;
-  }
-
-  buttonNavigator.onNextPress([this] {
-    selectedSettingIndex = ButtonNavigator::nextIndex(selectedSettingIndex, settingsCount);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPreviousPress([this] {
-    selectedSettingIndex = ButtonNavigator::previousIndex(selectedSettingIndex, settingsCount);
-    requestUpdate();
-  });
-
-  // A held Up/Down used to switch category. There are no categories left, so it
-  // pages the list instead — the same thing a hold does on every other list
-  // screen — rather than becoming a dead gesture on what is now the longest
-  // list in the firmware.
-  buttonNavigator.onNextContinuous([this, settingsPageItems] {
-    selectedSettingIndex = ButtonNavigator::nextPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPreviousContinuous([this, settingsPageItems] {
-    selectedSettingIndex = ButtonNavigator::previousPageIndex(selectedSettingIndex, settingsCount, settingsPageItems);
-    requestUpdate();
-  });
-
-  // The SIDE pair pages by a whole screenful; the FRONT pair above steps one
-  // row. They used to be the same action (docs/ui-conventions.md, "Side buttons
-  // should page, not repeat the front buttons"). pageDown/pageUp clamp at the
-  // ends and return false when nothing moved, so a short list costs no redraw.
-  buttonNavigator.onPageNext([this, settingsPageItems] {
-    if (!ButtonNavigator::pageDown(selectedSettingIndex, settingsCount, settingsPageItems)) return;
-    requestUpdate();
-  });
-
-  buttonNavigator.onPagePrevious([this, settingsPageItems] {
-    if (!ButtonNavigator::pageUp(selectedSettingIndex, settingsCount, settingsPageItems)) return;
-    requestUpdate();
-  });
+void SettingsActivity::activateIndex(const int index) {
+  nav.selected = index;
+  toggleCurrentSetting();
+  requestUpdate();
 }
 
 #if FREEINK_DEVICE_PICCO
@@ -370,12 +308,11 @@ void SettingsActivity::loopLightAdjust() {
 }
 
 void SettingsActivity::stepLight(const bool up) {
-  if (selectedSettingIndex < 0 || selectedSettingIndex >= settingsCount ||
-      !isRockerStepped(deviceSettings[selectedSettingIndex])) {
+  if (nav.selected < 0 || nav.selected >= settingsCount || !isRockerStepped(deviceSettings[nav.selected])) {
     adjustingLight = false;
     return;
   }
-  const auto& setting = deviceSettings[selectedSettingIndex];
+  const auto& setting = deviceSettings[nav.selected];
   uint8_t& value = SETTINGS.*(setting.valuePtr);
   const uint8_t next =
       piccoinput::stepClamped(value, up, setting.valueRange.min, setting.valueRange.max, setting.valueRange.step);
@@ -393,19 +330,19 @@ void SettingsActivity::stepLight(const bool up) {
 
 void SettingsActivity::endLightAdjust() {
   adjustingLight = false;
-  if (selectedSettingIndex < 0 || selectedSettingIndex >= settingsCount) return;
-  const auto& setting = deviceSettings[selectedSettingIndex];
+  if (nav.selected < 0 || nav.selected >= settingsCount) return;
+  const auto& setting = deviceSettings[nav.selected];
   // One write per adjustment, and none if it ended where it began.
   if (isRockerStepped(setting) && SETTINGS.*(setting.valuePtr) != adjustStartValue) SETTINGS.saveToFile();
 }
 #endif
 
 void SettingsActivity::toggleCurrentSetting() {
-  if (selectedSettingIndex < 0 || selectedSettingIndex >= settingsCount) {
+  if (nav.selected < 0 || nav.selected >= settingsCount) {
     return;
   }
 
-  const auto& setting = deviceSettings[selectedSettingIndex];
+  const auto& setting = deviceSettings[nav.selected];
   // quickResumeSleepScreen is hardcoded OFF since 2026-08-21, so the sleep
   // screen row no longer has a timeout row to reconcile with -- the whole
   // sleepscreen::reconcile seam left with it.
@@ -478,7 +415,7 @@ void SettingsActivity::toggleCurrentSetting() {
       // forces a refresh.
       if (darkModeChanged) display.setInverted(SETTINGS.darkMode != 0);
       SETTINGS.saveToFile();
-      // rebuildSettingsLists() clamps selectedSettingIndex to the new count.
+      // rebuildSettingsLists() clamps nav.selected to the new count.
       rebuildSettingsLists();
     });
     if (opened) requestUpdate();
@@ -603,60 +540,55 @@ void SettingsActivity::toggleCurrentSetting() {
   // returned earlier, through settingrow::activate's onChanged.
 }
 
-void SettingsActivity::render(RenderLock&&) {
-  if (optionPopup.processRender(renderer, mappedInput)) return;
+// The firmware version, beside the title, as the pre-port screen drew it.
+const char* SettingsActivity::headerSubtitle() const { return CROSSPOINT_VERSION; }
 
-  renderer.clearScreen();
+void SettingsActivity::describeRow(const int index, ListRow& row) const {
+  const auto& setting = deviceSettings[index];
+  row.title = I18N.get(setting.nameId);
+#if FREEINK_DEVICE_PICCO
+  // The row being stepped says so in its value column; the row style
+  // is otherwise the list's own.
+  if (adjustingLight && index == nav.selected) {
+    row.value = "< " + settingrow::valueText(setting) + " >";
+    return;
+  }
+  // The light as it is, which is what Confirm flips (toggleCurrentSetting).
+  if (isFrontlightToggle(setting)) {
+    row.value = I18N.get(Frontlight.isOn() ? StrId::STR_STATE_ON : StrId::STR_STATE_OFF);
+    return;
+  }
+#endif
+  // The stored byte here is a biased quarter-hour count; show the offset
+  // it means, using the same helper the picker does. Every other row is
+  // the generic shape, shared with the Typography screen.
+  if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr &&
+      setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) {
+    row.value = formatUtcOffset(SETTINGS.*(setting.valuePtr));
+    return;
+  }
+  row.value = settingrow::valueText(setting);
+}
 
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
-
+void SettingsActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
-
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_SETTINGS_TITLE),
-                 CROSSPOINT_VERSION);
-
   // No tab bar. With Reader withdrawn there is one category left, and a tab bar
   // that cannot switch to anything is not a control — it would only occupy a
   // band of the panel and a focus stop whose Confirm does nothing. The rows it
   // used to cost are given back to the list, which now holds every setting the
   // device exposes.
-  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const auto& settings = deviceSettings;
-  GUI.drawList(
-      renderer, Rect{0, listTop, pageWidth, pageHeight - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing},
-      settingsCount, selectedSettingIndex,
-      [&settings](int index) { return std::string(I18N.get(settings[index].nameId)); }, nullptr, nullptr,
-      [&settings
-#if FREEINK_DEVICE_PICCO
-       ,
-       adjustingRow = adjustingLight ? selectedSettingIndex : -1
-#endif
-  ](int i) {
-        const auto& setting = settings[i];
-#if FREEINK_DEVICE_PICCO
-        // The row being stepped says so in its value column; the row style
-        // is otherwise the list's own.
-        if (i == adjustingRow) return "< " + settingrow::valueText(setting) + " >";
-        // The light as it is, which is what Confirm flips (toggleCurrentSetting).
-        if (isFrontlightToggle(setting)) {
-          return std::string(I18N.get(Frontlight.isOn() ? StrId::STR_STATE_ON : StrId::STR_STATE_OFF));
-        }
-#endif
-        // The stored byte here is a biased quarter-hour count; show the offset
-        // it means, using the same helper the picker does. Every other row is
-        // the generic shape, shared with the Typography screen.
-        if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr &&
-            setting.nameId == StrId::STR_CLOCK_UTC_OFFSET) {
-          return formatUtcOffset(SETTINGS.*(setting.valuePtr));
-        }
-        return settingrow::valueText(setting);
-      },
-      true);
+  screen.setContentMargin(fui::Insets{static_cast<int16_t>(metrics.topPadding + metrics.headerHeight), 0,
+                                      static_cast<int16_t>(metrics.buttonHintsHeight + metrics.verticalSpacing), 0});
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+  ListLook look;
+  look.highlightValue = true;
+  drawRows(screen, look);
+}
 
-  // Draw help text. Rows that open a popup or a sub-screen say "Select";
-  // rows that toggle a value in place say "Toggle". There is no category name
-  // in this hint — there is no second tab to switch to.
+void SettingsActivity::drawFooter() {
+  // Rows that open a popup or a sub-screen say "Select"; rows that toggle a
+  // value in place say "Toggle". There is no category name in this hint —
+  // there is no second tab to switch to.
   auto opensSubScreen = [](const SettingInfo& setting) {
     if (setting.type == SettingType::ACTION) return true;
     // Two rows Settings intercepts before the generic path, both opening a
@@ -668,10 +600,10 @@ void SettingsActivity::render(RenderLock&&) {
 #endif
     return settingrow::opensPicker(setting);
   };
-  const bool onRow = selectedSettingIndex >= 0 && selectedSettingIndex < settingsCount;
-  const auto confirmLabel = (onRow && opensSubScreen(settings[selectedSettingIndex])) ? tr(STR_SELECT) : tr(STR_TOGGLE);
+  const bool onRow = nav.selected >= 0 && nav.selected < settingsCount;
+  const auto confirmLabel = (onRow && opensSubScreen(deviceSettings[nav.selected])) ? tr(STR_SELECT) : tr(STR_TOGGLE);
 
-  // Back exits straight to Home (see loop()); label it as what it does.
+  // Back exits straight to Home (see handleButtons()); label it as what it does.
 #if FREEINK_DEVICE_PICCO
   // While a light row is being stepped, Back and Confirm both end it, and the
   // rocker's lower end lowers the value and its upper end raises it.
@@ -682,7 +614,4 @@ void SettingsActivity::render(RenderLock&&) {
   const auto labels = mappedInput.mapLabels(tr(STR_HOME), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
 #endif
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
-  // Always use standard refresh for settings screen
-  renderer.displayBuffer();
 }

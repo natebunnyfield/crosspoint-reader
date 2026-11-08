@@ -15,6 +15,8 @@
 #include "activities/RenderLock.h"
 #include "components/UITheme.h"
 
+namespace fui = freeink::ui;
+
 namespace {
 
 // The four style slots a family can carry. EpdFontFamily::getFont() falls back
@@ -27,8 +29,7 @@ constexpr EpdFontFamily::Style ALL_STYLES[] = {EpdFontFamily::REGULAR, EpdFontFa
 }  // namespace
 
 void TypographySettingsActivity::onEnter() {
-  Activity::onEnter();
-  selectedIndex_ = 0;
+  UiListActivity::onEnter();
   rebuildRows();
   requestUpdate();
 }
@@ -135,14 +136,14 @@ void TypographySettingsActivity::rebuildRows() {
     }
   }
 
-  if (selectedIndex_ >= static_cast<int>(rows_.size())) {
-    selectedIndex_ = rows_.empty() ? 0 : static_cast<int>(rows_.size()) - 1;
+  if (nav.selected >= static_cast<int>(rows_.size())) {
+    nav.selected = rows_.empty() ? 0 : static_cast<int>(rows_.size()) - 1;
   }
 }
 
 void TypographySettingsActivity::toggleCurrentRow() {
-  if (selectedIndex_ < 0 || selectedIndex_ >= static_cast<int>(rows_.size())) return;
-  const Row row = rows_[selectedIndex_];  // by value: rebuildRows() replaces the vector below
+  if (nav.selected < 0 || nav.selected >= static_cast<int>(rows_.size())) return;
+  const Row row = rows_[nav.selected];  // by value: rebuildRows() replaces the vector below
 
   if (!row.isLigature) {
     // Exactly what the Settings list does with the same SettingInfo --
@@ -177,115 +178,60 @@ void TypographySettingsActivity::applyAndRebuild() {
   rebuildRows();
 }
 
-void TypographySettingsActivity::loop() {
-  if (optionPopup_.handleInput(mappedInput, [this] { requestUpdate(); })) return;
-
+bool TypographySettingsActivity::handleButtons() {
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     toggleCurrentRow();
     requestUpdate();
-    return;
+    return true;
   }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
-    return;
+    return true;
   }
-
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int listHeight = renderer.getScreenHeight() - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
-  const int rowCount = static_cast<int>(rows_.size());
-
-  const bool hasSubtitle = isEmptyState();
-  switch (handleListTouch(selectedIndex_, rowCount, listTop, listHeight, hasSubtitle)) {
-    case ListTouchResult::Activated:
-      toggleCurrentRow();
-      requestUpdate();
-      return;
-    case ListTouchResult::Consumed:
-      return;
-    case ListTouchResult::None:
-      break;
-  }
-
-  const int pageItems = GUI.getListPageItems(listHeight, hasSubtitle);
-
-  buttonNavigator_.onNextPress([this, rowCount] {
-    selectedIndex_ = ButtonNavigator::nextIndex(selectedIndex_, rowCount);
-    requestUpdate();
-  });
-  buttonNavigator_.onPreviousPress([this, rowCount] {
-    selectedIndex_ = ButtonNavigator::previousIndex(selectedIndex_, rowCount);
-    requestUpdate();
-  });
-  // A hold pages, and the SIDE pair pages by a screenful — the same division
-  // the Settings list uses, so the gesture means the same thing one screen in.
-  buttonNavigator_.onNextContinuous([this, rowCount, pageItems] {
-    selectedIndex_ = ButtonNavigator::nextPageIndex(selectedIndex_, rowCount, pageItems);
-    requestUpdate();
-  });
-  buttonNavigator_.onPreviousContinuous([this, rowCount, pageItems] {
-    selectedIndex_ = ButtonNavigator::previousPageIndex(selectedIndex_, rowCount, pageItems);
-    requestUpdate();
-  });
-  buttonNavigator_.onPageNext([this, rowCount, pageItems] {
-    if (!ButtonNavigator::pageDown(selectedIndex_, rowCount, pageItems)) return;
-    requestUpdate();
-  });
-  buttonNavigator_.onPagePrevious([this, rowCount, pageItems] {
-    if (!ButtonNavigator::pageUp(selectedIndex_, rowCount, pageItems)) return;
-    requestUpdate();
-  });
+  return false;
 }
 
-void TypographySettingsActivity::render(RenderLock&&) {
-  // The picker draws over everything and owns the frame while it is up, exactly
-  // as on the Settings list.
-  if (optionPopup_.processRender(renderer, mappedInput)) return;
+void TypographySettingsActivity::activateIndex(const int index) {
+  nav.selected = index;
+  toggleCurrentRow();
+  requestUpdate();
+}
 
-  renderer.clearScreen();
-
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
-  const auto& metrics = UITheme::getInstance().getMetrics();
-
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_TYPOGRAPHY_SETTINGS));
-
-  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const Rect listRect{0, listTop, pageWidth,
-                      pageHeight - listTop - metrics.buttonHintsHeight - metrics.verticalSpacing};
-
+void TypographySettingsActivity::describeRow(const int index, ListRow& out) const {
+  const Row& row = rows_[index];
+  out.title = rowTitle(row);
   // In the empty state the ligature master carries a SUBTITLE saying why there
-  // are no pair rows under it. Only that row does, and only then -- which is
-  // why isEmptyState() is also what loop() passes as `hasSubtitle`.
-  const bool emptyState = isEmptyState();
-  const auto& rows = rows_;
-  GUI.drawList(
-      renderer, listRect, static_cast<int>(rows.size()), selectedIndex_,
-      [this, &rows](int i) { return rowTitle(rows[i]); },
-      emptyState ? std::function<std::string(int)>([&rows](int i) {
-        return rows[i].setting.nameId == StrId::STR_LIGATURES ? std::string(tr(STR_NO_LIGATURES)) : std::string();
-      })
-                 : nullptr,
-      nullptr,
-      [&rows](int i) {
-        const Row& row = rows[i];
-        if (!row.isLigature) return settingrow::valueText(row.setting);
-        // A ligature row's value is not a stored byte but a membership test
-        // against the suppression set, so it cannot go through valueText.
-        const bool on = !ligatures::specSuppresses(SETTINGS.ligaturesOff, row.leftCp, row.rightCp);
-        return std::string(I18N.get(on ? StrId::STR_STATE_ON : StrId::STR_STATE_OFF));
-      },
-      true);
+  // are no pair rows under it. Only that row does, and only then.
+  if (isEmptyState() && row.setting.nameId == StrId::STR_LIGATURES) out.subtitle = tr(STR_NO_LIGATURES);
+  if (!row.isLigature) {
+    out.value = settingrow::valueText(row.setting);
+    return;
+  }
+  // A ligature row's value is not a stored byte but a membership test
+  // against the suppression set, so it cannot go through valueText.
+  const bool on = !ligatures::specSuppresses(SETTINGS.ligaturesOff, row.leftCp, row.rightCp);
+  out.value = I18N.get(on ? StrId::STR_STATE_ON : StrId::STR_STATE_OFF);
+}
 
+void TypographySettingsActivity::buildScreen(UiScreen& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  screen.setContentMargin(fui::Insets{static_cast<int16_t>(metrics.topPadding + metrics.headerHeight), 0,
+                                      static_cast<int16_t>(metrics.buttonHintsHeight + metrics.verticalSpacing), 0});
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+  ListLook look;
+  // Only the empty state carries a subtitle row (isEmptyState()).
+  look.subtitles = isEmptyState();
+  look.highlightValue = true;
+  drawRows(screen, look);
+}
+
+void TypographySettingsActivity::drawFooter() {
   // "Select" for the two rows that open a picker, "Toggle" for the rest -- the
   // same rule the Settings list states, through the same predicate.
-  const bool onRow = selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(rows_.size());
-  const bool picks =
-      onRow && !rows_[selectedIndex_].isLigature && settingrow::opensPicker(rows_[selectedIndex_].setting);
+  const bool onRow = nav.selected >= 0 && nav.selected < static_cast<int>(rows_.size());
+  const bool picks = onRow && !rows_[nav.selected].isLigature && settingrow::opensPicker(rows_[nav.selected].setting);
   const auto labels =
       mappedInput.mapLabels(tr(STR_BACK), picks ? tr(STR_SELECT) : tr(STR_TOGGLE), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
-  renderer.displayBuffer();
 }

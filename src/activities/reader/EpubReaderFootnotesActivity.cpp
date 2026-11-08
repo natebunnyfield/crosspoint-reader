@@ -3,129 +3,76 @@
 #include <GfxRenderer.h>
 #include <I18n.h>
 
-#include <algorithm>
-
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
-#include "fontIds.h"
 
-void EpubReaderFootnotesActivity::onEnter() {
-  Activity::onEnter();
-  selectedIndex = 0;
-  requestUpdate();
+namespace fui = freeink::ui;
+
+EpubReaderFootnotesActivity::EpubReaderFootnotesActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                                         const std::vector<FootnoteEntry>& footnotes)
+    : UiListActivity("EpubReaderFootnotes", renderer, mappedInput), footnotes(footnotes) {}
+
+void EpubReaderFootnotesActivity::describeRow(const int index, ListRow& row) const {
+  const auto& footnote = footnotes[index];
+  row.title = footnote.number[0] ? footnote.number : tr(STR_LINK);
 }
 
-void EpubReaderFootnotesActivity::onExit() { Activity::onExit(); }
+void EpubReaderFootnotesActivity::activateIndex(const int index) {
+  if (index < 0 || index >= listCount()) return;
+  // The activated row leaves this screen; a lingering flash would gray an
+  // unrelated element on the next render.
+  app.clearTapFlash();
+  setResult(FootnoteResult{footnotes[index].href});
+  finish();
+}
 
-void EpubReaderFootnotesActivity::loop() {
-  auto selectFootnote = [this] {
-    if (selectedIndex >= 0 && selectedIndex < static_cast<int>(footnotes.size())) {
-      setResult(FootnoteResult{footnotes[selectedIndex].href});
-      finish();
-    }
-  };
-
+bool EpubReaderFootnotesActivity::handleButtons() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     ActivityResult result;
     result.isCancelled = true;
     setResult(std::move(result));
     finish();
-    return;
+    return true;
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
       mappedInput.wasReleased(MappedInputManager::Button::Power)) {
-    selectFootnote();
-    return;
+    activateIndex(nav.selected);
+    return true;
   }
 
-  if (!footnotes.empty()) {
-    auto metrics = UITheme::getInstance().getMetrics();
-    Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-    const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
-    const int totalItems = static_cast<int>(footnotes.size());
-    switch (handleListTouch(selectedIndex, totalItems, contentTop, contentHeight, false)) {
-      case ListTouchResult::Activated:
-        selectFootnote();
-        return;
-      case ListTouchResult::Consumed:
-        return;
-      case ListTouchResult::None:
-        break;
-    }
-
-    const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, false);
-    const auto swipe = mappedInput.wasSwipe();
-    if (swipe == MappedInputManager::SwipeDir::Up) {
-      selectedIndex = std::min(totalItems - 1, selectedIndex + pageItems);
-      requestUpdate();
-      return;
-    }
-    if (swipe == MappedInputManager::SwipeDir::Down) {
-      selectedIndex = std::max(0, selectedIndex - pageItems);
-      requestUpdate();
-      return;
-    }
-
-    // The SIDE pair pages by a whole screenful; the FRONT pair below steps one
-    // row. They used to be the same action (docs/ui-conventions.md, "Side
-    // buttons should page, not repeat the front buttons"). This is the same
-    // clamped arithmetic the swipes above already used, now shared.
-    buttonNavigator.onPageNext([this, totalItems, pageItems] {
-      if (!ButtonNavigator::pageDown(selectedIndex, totalItems, pageItems)) return;
-      requestUpdate();
-    });
-
-    buttonNavigator.onPagePrevious([this, totalItems, pageItems] {
-      if (!ButtonNavigator::pageUp(selectedIndex, totalItems, pageItems)) return;
-      requestUpdate();
-    });
-  }
-
-  buttonNavigator.onNext([this] {
-    if (!footnotes.empty()) {
-      selectedIndex = (selectedIndex + 1) % footnotes.size();
-      requestUpdate();
-    }
-  });
-
-  buttonNavigator.onPrevious([this] {
-    if (!footnotes.empty()) {
-      selectedIndex = (selectedIndex - 1 + footnotes.size()) % footnotes.size();
-      requestUpdate();
-    }
-  });
+  return false;
 }
 
-void EpubReaderFootnotesActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
-  auto metrics = UITheme::getInstance().getMetrics();
-  Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-
-  GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
-                 tr(STR_FOOTNOTES));
-
-  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
+void EpubReaderFootnotesActivity::buildScreen(UiScreen& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  // Content: the safe area minus the header band GUI.drawHeader paints.
+  screen.setContentMargin(fui::Insets{static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
+                                      static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
+                                      static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)),
+                                      static_cast<int16_t>(safe.x)});
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
   if (footnotes.empty()) {
-    renderer.drawCenteredText(UI_10_FONT_ID, contentTop + 30, tr(STR_NO_FOOTNOTES));
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
-    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-    renderer.displayBuffer();
+    screen.centeredText(tr(STR_NO_FOOTNOTES), screen.theme().bodyText);
     return;
   }
 
-  GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, static_cast<int>(footnotes.size()),
-               selectedIndex, [this](int index) {
-                 std::string label = footnotes[index].number;
-                 return label.empty() ? std::string(tr(STR_LINK)) : label;
-               });
+  drawRows(screen, ListLook{});
+}
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+void EpubReaderFootnotesActivity::drawChrome() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  // Header via GUI.drawHeader (already FreeInkUI-themed); the rest of the
+  // screen renders through the app.
+  GUI.drawHeader(renderer, Rect{safe.x, safe.y + metrics.topPadding, safe.width, metrics.headerHeight},
+                 tr(STR_FOOTNOTES));
+}
+
+void EpubReaderFootnotesActivity::drawFooter() {
+  const auto labels = footnotes.empty() ? mappedInput.mapLabels(tr(STR_BACK), "", "", "")
+                                        : mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
-  renderer.displayBuffer();
 }

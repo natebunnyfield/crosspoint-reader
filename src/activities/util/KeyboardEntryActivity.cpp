@@ -1202,7 +1202,12 @@ void KeyboardEntryActivity::render(RenderLock&&) {
 
   // The FreeInkUI keyboard draws the keys and registers their hit rects into
   // `interactions`; loop() routes touch snapshots against that table.
+  // beginPublishCycle() makes this render build into the generation loop() is
+  // NOT reading (routePublished()/publishedData()), published below once every
+  // key is registered. The ready flag still closes for the draw: the Picco's
+  // loop-task hit pass keys off the layer this render publishes with it.
   interactionsReady = false;
+  interactions.beginPublishCycle();
   // Substitutes native-resolution backspace art for the SDK's 16px mask, which
   // keyboard() would otherwise upscale 2x into its 32px icon box. Identical to
   // the stock target in every other respect, and now used on DEVICE as well —
@@ -1239,6 +1244,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   const int hintsTop = renderer.getScreenHeight() - metrics.buttonHintsHeight;
   props.bottomHitOverflow = static_cast<int16_t>(std::max(0, hintsTop - (kbRect.y + kbRect.height)));
   fui::keyboard(frame, kbRect, props);
+  interactions.publish();
 #if FREEINK_DEVICE_PICCO
   drawnLayout.store(&layout);  // before the flag: loop() reads them in that order
 #endif

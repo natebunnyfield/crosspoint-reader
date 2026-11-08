@@ -15,14 +15,14 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+namespace fui = freeink::ui;
+
 namespace {
 // How far the chapter-preview tick extends past the progress bar's outline,
 // above and below. Shared by loop() and render() so the touch-target math and
 // the drawn layout cannot drift apart.
 constexpr int kTickOverhang = 2;
 }  // namespace
-
-int EpubReaderChapterSelectionActivity::getTotalItems() const { return epub->getTocItemsCount() + headerRowCount(); }
 
 void EpubReaderChapterSelectionActivity::openFindPrompt() {
   // Prefilled with the last query, so "find the next one" is a single commit.
@@ -42,7 +42,7 @@ void EpubReaderChapterSelectionActivity::openFindPrompt() {
 }
 
 void EpubReaderChapterSelectionActivity::onEnter() {
-  Activity::onEnter();
+  UiListActivity::onEnter();
 
   if (!epub) {
     return;
@@ -53,142 +53,125 @@ void EpubReaderChapterSelectionActivity::onEnter() {
   // which is the whole point of collecting these at parse time.
   noteRowCount = booknotes::current().any() ? 1 : 0;
 
-  selectorIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
-  if (selectorIndex == -1) {
-    selectorIndex = 0;
+  // Open on the current chapter, which may sit past the first page; the first
+  // screen build pulls the viewport to it (ListNav follow-on-build).
+  int selected = epub->getTocIndexForSpineIndex(currentSpineIndex);
+  if (selected == -1) {
+    selected = 0;
   }
-  selectorIndex += headerRowCount();
+  selected += headerRowCount();
   // A book with no table of contents has no chapter row to land on; highlight
   // Find rather than a row past the end of the list, where Confirm did nothing.
-  if (selectorIndex >= getTotalItems()) selectorIndex = FIND_ROW;
-
-  // Trigger first update
-  requestUpdate();
+  if (selected >= listCount()) selected = FIND_ROW;
+  nav.selected = selected;
 }
 
-void EpubReaderChapterSelectionActivity::onExit() { Activity::onExit(); }
+void EpubReaderChapterSelectionActivity::describeRow(const int index, ListRow& row) const {
+  if (index == FIND_ROW) {
+    row.title = tr(STR_FIND_ROW);
+    return;
+  }
+  if (noteRowCount != 0 && index == FIND_ROW_COUNT) {
+    char label[64];
+    snprintf(label, sizeof(label), "%s (%u)", tr(STR_BOOK_NOTES), static_cast<unsigned>(booknotes::current().count()));
+    row.title = label;
+    return;
+  }
+  const auto item = epub->getTocItem(index - headerRowCount());
+  row.title = std::string(item.level > 0 ? (item.level - 1) * 2 : 0, ' ') + item.title;
+}
 
-void EpubReaderChapterSelectionActivity::loop() {
-  const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, false);
-  const int totalItems = getTotalItems();
+void EpubReaderChapterSelectionActivity::activateIndex(const int index) {
+  if (index < 0 || index >= listCount()) {
+    return;
+  }
+  nav.selected = index;
+  if (index == FIND_ROW) {
+    openFindPrompt();
+    return;
+  }
+  if (noteRowCount != 0 && index == FIND_ROW_COUNT) {
+    // The notes row. Push the verbose screen rather than leaving this one:
+    // Back from there comes straight back to the chapter list, with the
+    // highlight where it was.
+    startActivityForResult(std::make_unique<BookNotesActivity>(renderer, mappedInput), [](const ActivityResult&) {});
+    return;
+  }
+  // The activated row leaves this screen (finish); a lingering flash would gray
+  // an unrelated element on the next render.
+  app.clearTapFlash();
+  const auto tocItem = epub->getTocItem(index - headerRowCount());
+  if (tocItem.spineIndex == -1) {
+    // The entry reaches no spine item, so there is nowhere to go and the pick
+    // is dropped -- which on screen is the reader repainting the page it was
+    // already on, i.e. "Chapter Select does nothing". Say so: silence here
+    // cost a whole investigation, because a dropped pick and a pick that
+    // lands wrong look identical from the outside. The href is the useful
+    // half -- it is what failed to match a spine item at index time.
+    LOG_ERR("ECS", "TOC entry '%s' reaches no spine item (href '%s'); pick dropped", tocItem.title.c_str(),
+            tocItem.href.c_str());
+    ActivityResult result;
+    result.isCancelled = true;
+    setResult(std::move(result));
+    finish();
+  } else {
+    setResult(ChapterResult{tocItem.spineIndex, tocItem.anchor});
+    finish();
+  }
+}
 
+bool EpubReaderChapterSelectionActivity::handleButtons() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     ActivityResult result;
     result.isCancelled = true;
     setResult(std::move(result));
     finish();
-    return;
+    return true;
   }
 
-  auto selectChapter = [this] {
-    if (selectorIndex == FIND_ROW) {
-      openFindPrompt();
-      return;
-    }
-    if (noteRowCount != 0 && selectorIndex == FIND_ROW_COUNT) {
-      // The notes row. Push the verbose screen rather than leaving this one:
-      // Back from there comes straight back to the chapter list, with the
-      // highlight where it was.
-      startActivityForResult(std::make_unique<BookNotesActivity>(renderer, mappedInput), [](const ActivityResult&) {});
-      return;
-    }
-    const auto tocItem = epub->getTocItem(selectorIndex - headerRowCount());
-    if (tocItem.spineIndex == -1) {
-      // The entry reaches no spine item, so there is nowhere to go and the pick
-      // is dropped -- which on screen is the reader repainting the page it was
-      // already on, i.e. "Chapter Select does nothing". Say so: silence here
-      // cost a whole investigation, because a dropped pick and a pick that
-      // lands wrong look identical from the outside. The href is the useful
-      // half -- it is what failed to match a spine item at index time.
-      LOG_ERR("ECS", "TOC entry '%s' reaches no spine item (href '%s'); pick dropped", tocItem.title.c_str(),
-              tocItem.href.c_str());
-      ActivityResult result;
-      result.isCancelled = true;
-      setResult(std::move(result));
-      finish();
-    } else {
-      setResult(ChapterResult{tocItem.spineIndex, tocItem.anchor});
-      finish();
-    }
-  };
-
-  auto metrics = UITheme::getInstance().getMetrics();
-  Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  // Keep in step with render(): the book-progress bar band (bar plus the tick
-  // overhang above and below) sits between the header and the list, so the
-  // list starts one band lower.
-  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing +
-                         metrics.popupProgressBarHeight * 2 + kTickOverhang * 2 + metrics.verticalSpacing;
-  const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
-  switch (handleListTouch(selectorIndex, totalItems, contentTop, contentHeight, false)) {
-    case ListTouchResult::Activated:
-      selectChapter();
-      return;
-    case ListTouchResult::Consumed:
-      return;
-    case ListTouchResult::None:
-      break;
-  }
-
-  const auto swipe = mappedInput.wasSwipe();
-  if (swipe == MappedInputManager::SwipeDir::Up) {
-    selectorIndex = ButtonNavigator::nextPageIndex(selectorIndex, totalItems, pageItems);
-    requestUpdate();
-    return;
-  }
-  if (swipe == MappedInputManager::SwipeDir::Down) {
-    selectorIndex = ButtonNavigator::previousPageIndex(selectorIndex, totalItems, pageItems);
-    requestUpdate();
-    return;
+  if (!epub) {
+    return true;
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    selectChapter();
+    activateIndex(nav.selected);
+    return true;
   }
 
-  buttonNavigator.onNextPress([this, totalItems] {
-    selectorIndex = ButtonNavigator::nextIndex(selectorIndex, totalItems);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPreviousPress([this, totalItems] {
-    selectorIndex = ButtonNavigator::previousIndex(selectorIndex, totalItems);
-    requestUpdate();
-  });
-
-  buttonNavigator.onNextContinuous([this, totalItems, pageItems] {
-    selectorIndex = ButtonNavigator::nextPageIndex(selectorIndex, totalItems, pageItems);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPreviousContinuous([this, totalItems, pageItems] {
-    selectorIndex = ButtonNavigator::previousPageIndex(selectorIndex, totalItems, pageItems);
-    requestUpdate();
-  });
-
-  // The SIDE pair pages by a whole screenful; the FRONT pair above steps one
-  // row. They used to be the same action (docs/ui-conventions.md, "Side buttons
-  // should page, not repeat the front buttons"). pageDown/pageUp clamp at the
-  // ends and return false when nothing moved, so a short list costs no redraw.
-  buttonNavigator.onPageNext([this, totalItems, pageItems] {
-    if (!ButtonNavigator::pageDown(selectorIndex, totalItems, pageItems)) return;
-    requestUpdate();
-  });
-
-  buttonNavigator.onPagePrevious([this, totalItems, pageItems] {
-    if (!ButtonNavigator::pageUp(selectorIndex, totalItems, pageItems)) return;
-    requestUpdate();
-  });
+  return false;
 }
 
-void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
-  renderer.clearScreen();
+int EpubReaderChapterSelectionActivity::listTop() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  // The book-progress bar band (bar plus the tick overhang above and below)
+  // sits between the header and the list, so the list starts one band lower.
+  return safe.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing +
+         metrics.popupProgressBarHeight * 2 + kTickOverhang * 2;
+}
 
-  auto metrics = UITheme::getInstance().getMetrics();
-  Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+void EpubReaderChapterSelectionActivity::buildScreen(UiScreen& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  // Content: the safe area minus the header band and the progress bar
+  // drawChrome paints.
+  screen.setContentMargin(fui::Insets{
+      static_cast<int16_t>(listTop()), static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
+      static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)), static_cast<int16_t>(safe.x)});
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
+  if (!epub) {
+    return;
+  }
+  drawRows(screen, ListLook{});
+}
+
+void EpubReaderChapterSelectionActivity::drawChrome() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
                  tr(STR_SELECT_CHAPTER));
+  if (!epub) return;
 
   // Book-position bar (2026-08-22 redesign): twice the popup bar's height,
   // a 1 px ink outline with an EMPTY (paper) interior — no gray fill. The
@@ -216,8 +199,8 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
   // available here without paginating every chapter.
   // The Find and notes rows preview nothing -- neither is a place in the
   // book -- so the tick stays where the reader is.
-  const auto selectedItem = selectorIndex < headerRowCount() ? BookMetadataCache::TocEntry{}
-                                                             : epub->getTocItem(selectorIndex - headerRowCount());
+  const auto selectedItem = nav.selected < headerRowCount() ? BookMetadataCache::TocEntry{}
+                                                            : epub->getTocItem(nav.selected - headerRowCount());
   if (selectedItem.spineIndex != -1) {
     float chapterFrac = epub->calculateProgress(selectedItem.spineIndex, 0.0f);
     chapterFrac = chapterFrac < 0.0f ? 0.0f : (chapterFrac > 1.0f ? 1.0f : chapterFrac);
@@ -232,27 +215,4 @@ void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
       renderer.fillRect(tickX, barTop + 1, carveWidth, barHeight - 2, false);
     }
   }
-
-  const int contentTop = barTop + barHeight + kTickOverhang + metrics.verticalSpacing;
-  const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
-
-  const int totalItems = getTotalItems();
-  GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, totalItems, selectorIndex,
-               [this](int index) {
-                 if (index == FIND_ROW) return std::string(tr(STR_FIND_ROW));
-                 if (noteRowCount != 0 && index == FIND_ROW_COUNT) {
-                   char row[64];
-                   snprintf(row, sizeof(row), "%s (%u)", tr(STR_BOOK_NOTES),
-                            static_cast<unsigned>(booknotes::current().count()));
-                   return std::string(row);
-                 }
-                 auto item = epub->getTocItem(index - headerRowCount());
-                 std::string indent((item.level - 1) * 2, ' ');
-                 return indent + item.title;
-               });
-
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
-  renderer.displayBuffer();
 }

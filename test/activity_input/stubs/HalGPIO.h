@@ -162,9 +162,16 @@ class HalGPIO {
   // touch API and this stub did not, which is one of the reasons this target
   // stopped compiling.
   bool hasTouch() const { return false; }
+  // X4: page buttons on an off-screen rocker, not the screen edges.
+  bool hasEdgeSideButtons() const { return false; }
   bool wasTouchTap(float&, float&) const { return false; }
   bool isTouchTapCandidate(float&, float&, unsigned long&) const { return false; }
   bool isTouchHeldAt(float&, float&) const { return false; }
+  // The FreeInkUI list hosts (9e3cea2e5) read these three through
+  // MappedInputManager; same hard-false double as the rest.
+  bool wasTouchReleased() const { return false; }
+  bool wasTouchLongPress(float&, float&) const { return false; }
+  void suppressTouchContact() {}
   unsigned long lastTouchHeldMs() const { return 0; }
   bool wasSwipe(float&, float&, float&, float&) const { return false; }
 
