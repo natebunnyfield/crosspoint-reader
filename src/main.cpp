@@ -1408,7 +1408,9 @@ void loop() {
     lastHeapSample = millis();
   }
 
-  if (Serial && millis() - lastMemPrint >= 10000) {
+  // The ROM console does not depend on Arduino USB CDC's connection state, so a
+  // Sticky (ROM printf transport) printed no MEM line at all (upstream 3f70f5dfc).
+  if ((Serial || FREEINK_LOG_TRANSPORT == FREEINK_LOG_TRANSPORT_ROM_PRINTF) && millis() - lastMemPrint >= 10000) {
     LOG_INF("MEM", "Free: %d bytes, Total: %d bytes, Min Free: %d bytes, MaxAlloc: %d bytes", ESP.getFreeHeap(),
             ESP.getHeapSize(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
 #ifdef BOARD_HAS_PSRAM
