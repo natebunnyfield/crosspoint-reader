@@ -185,14 +185,18 @@ void FileBrowserActivity::activateSelected(const bool forceDelete, const bool fr
         LOG_DBG("FileBrowser", "Attempting to delete: %s", fullPath.c_str());
         if (FsOps::removeRecursiveWithCacheClear(fullPath, fileNameBuffer.get(), NAME_BUFFER_SIZE)) {
           LOG_DBG("FileBrowser", "Deleted successfully");
-          loadFiles();
-          if (files.empty()) {
-            nav.selected = 0;
-          } else if (nav.selected >= listCount()) {
-            // Move selection to the new "last" item
-            nav.selected = listCount() - 1;
+          loadFiles();  // publishes `files` under its own RenderLock
+          {
+            // The render task reads nav as it paints the rows; see loadFiles().
+            RenderLock lock(*this);
+            if (files.empty()) {
+              nav.selected = 0;
+            } else if (nav.selected >= listCount()) {
+              // Move selection to the new "last" item
+              nav.selected = listCount() - 1;
+            }
+            nav.follow(listCount());
           }
-          nav.follow(listCount());
 
           requestUpdate(true);
         } else {
