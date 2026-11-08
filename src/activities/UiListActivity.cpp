@@ -101,13 +101,32 @@ void UiListActivity::loop() {
 void UiListActivity::navigateButtons() {
   const int count = listCount();
   auto& n = activeNav();
-  buttonNavigator.onNextRelease([this, count, &n] { moveSelectionTo(ButtonNavigator::nextIndex(n.selected, count)); });
-  buttonNavigator.onPreviousRelease(
+  // The front pair steps one row on the PRESS edge; a hold past 500 ms then
+  // continues as page jumps. Owner ruling 2026-11-07 (docs/ui-conventions.md,
+  // "List cursor moves fire on PRESS; a hold then pages"). Upstream's base
+  // steps on release so a hold can page instead, which puts the whole click
+  // in front of every move.
+  buttonNavigator.onNextPress([this, count, &n] { moveSelectionTo(ButtonNavigator::nextIndex(n.selected, count)); });
+  buttonNavigator.onPreviousPress(
       [this, count, &n] { moveSelectionTo(ButtonNavigator::previousIndex(n.selected, count)); });
   buttonNavigator.onNextContinuous(
       [this, count, &n] { moveSelectionTo(ButtonNavigator::nextPageIndex(n.selected, count, n.visibleRows)); });
   buttonNavigator.onPreviousContinuous(
       [this, count, &n] { moveSelectionTo(ButtonNavigator::previousPageIndex(n.selected, count, n.visibleRows)); });
+  // The SIDE pair pages by a whole screenful (docs/ui-conventions.md, "Side
+  // buttons should page, not repeat the front buttons"). pageDown/pageUp clamp
+  // at the ends and return false when nothing moved, so a short list costs no
+  // redraw.
+  buttonNavigator.onPageNext([this, count, &n] {
+    int index = n.selected;
+    if (!ButtonNavigator::pageDown(index, count, n.visibleRows)) return;
+    moveSelectionTo(index);
+  });
+  buttonNavigator.onPagePrevious([this, count, &n] {
+    int index = n.selected;
+    if (!ButtonNavigator::pageUp(index, count, n.visibleRows)) return;
+    moveSelectionTo(index);
+  });
 }
 
 void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, const bool hasSubtitle) {

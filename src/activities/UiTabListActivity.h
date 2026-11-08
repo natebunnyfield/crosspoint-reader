@@ -10,7 +10,7 @@
 // Each tab owns its own ListNav (selection + viewport memory); activeNav()
 // redirects the whole UiListActivity protocol (touch routing, swipe scroll,
 // screen sync) to the active tab's state. Button navigation walks the ring on
-// release and steps the TAB on continuous hold. The tab-bar chrome (pill
+// press and steps the TAB on continuous hold. The tab-bar chrome (pill
 // styles, focused band wash) is shared verbatim via buildTabBar().
 //
 // Subclasses own the button semantics wholesale (handleButtons is pure here:
@@ -47,7 +47,7 @@ class UiTabListActivity : public UiListActivity {
   int ringPos() const;
   // ACTION_ROW lands as ring = row + 1, then activateIndex(row).
   void onRowAction(const freeink::ui::ActionEvent& event) override;
-  // Release walks the ring; continuous hold steps the tab.
+  // Press walks the ring; continuous hold steps the tab.
   void navigateButtons() override;
   // Move to a ring position: tab bar rewinds the viewport, a row pulls the
   // viewport to itself.

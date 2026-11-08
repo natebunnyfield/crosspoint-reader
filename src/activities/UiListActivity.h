@@ -80,8 +80,9 @@ class UiListActivity : public Activity, protected UiAppHost {
   // Bounds-checked ACTION_ROW dispatch. Default: selection follows the tapped
   // row, then long-press/activate. UiTabListActivity remaps row -> ring.
   virtual void onRowAction(const freeink::ui::ActionEvent& event);
-  // The button-navigation tail of loop(): release steps the selection, hold
-  // jumps by page. UiTabListActivity replaces it with the ring walk.
+  // The button-navigation tail of loop(): the front pair steps the selection
+  // on PRESS and a hold jumps by page; the side pair pages. UiTabListActivity
+  // replaces it with the ring walk.
   virtual void navigateButtons();
   // First hook in loop(); return true when the pass is consumed (extra
   // buttons, gestures, modes). Runs after the popup gate and before the base

@@ -63,8 +63,9 @@ void UiTabListActivity::moveRingTo(const int ringIndex) {
 void UiTabListActivity::navigateButtons() {
   // Buttons walk the tab band (index 0) plus the rows (1..listCount).
   const int ringSize = listCount() + 1;
-  buttonNavigator.onNextRelease([this, ringSize] { moveRingTo(ButtonNavigator::nextIndex(ringPos(), ringSize)); });
-  buttonNavigator.onPreviousRelease(
+  // On PRESS, like every list here (docs/ui-conventions.md, 2026-11-07).
+  buttonNavigator.onNextPress([this, ringSize] { moveRingTo(ButtonNavigator::nextIndex(ringPos(), ringSize)); });
+  buttonNavigator.onPreviousPress(
       [this, ringSize] { moveRingTo(ButtonNavigator::previousIndex(ringPos(), ringSize)); });
   buttonNavigator.onNextContinuous([this] { stepTab(1); });
   buttonNavigator.onPreviousContinuous([this] { stepTab(-1); });
