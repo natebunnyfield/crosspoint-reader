@@ -33,6 +33,18 @@ panel effect is UNCONFIRMED on glass.
 
 ---
 
+## 0. Owner rulings, 2026-11-08
+
+Owner, answering the open items in one line: *"no quick panel, yes to loading
+icon, yes to faster, albo issue is what?, yes to any bug fixes"*.
+
+| # | Ruling |
+|---|---|
+| 3 | Already landed: the other session hand-ported upstream `b6746c1df` (CSS cache retry, `CSS_CACHE_VERSION`), `fork-sync.md` batch 3. |
+| 9 | **KEEP the loading icon on wake** ("yes to loading icon", read as yes to the icon). No change. |
+| 10 | **TAKE the faster factory 4-level waveform** ("yes to faster"). Device-only to judge; ships UNCONFIRMED on glass. |
+| all bug-fix TAKEs | **TAKE** ("yes to any bug fixes"), plus restoring the dark-background re-drive the SDK lost in `69349ec` (p0-p1 sweep, "Known and NOT fixed"). Each one's status goes in the table below as it lands. |
+
 ## 1. What is new since 2026-08-15
 
 | | Count | Note |

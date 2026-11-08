@@ -423,6 +423,8 @@ message carries its own detail; the decisions:
   - The frontlight quick panel (the held remainder of `bbca4886c`), with
     `8575b1427`, `4f0b4b70f` and `25bbfae76` built on it. Decision: does the
     Picco (it has a frontlight) get the panel and its top-edge swipe?
+    **RULED 2026-11-08: NO.** Owner: *"no quick panel"*. Skip the panel,
+    its swipe, and `8575b1427`, `4f0b4b70f`, `25bbfae76` with it.
   - **RULED 2026-11-08: the wake rule, `cdd89b1d7` with `e37164ca9`. Keep the
     fork's wake.** Owner: *"go with rec, but make an option setting if it is
     needed"*. No setting is needed. `shortPwrBtn` is pinned to `SLEEP`
