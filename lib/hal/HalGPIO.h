@@ -203,6 +203,12 @@ class HalGPIO {
 
   // Button input methods
   void update();
+  // A button contact is closed RIGHT NOW: a raw read, no debounce, no edge
+  // state touched, so it can be asked from inside long work on the loop task
+  // (the reader's background chapter build stops on it). X4/X3 only -- the ADC
+  // ladder and the power pin; on the Picco a raw read would run the touch state
+  // machine, so it answers false and a press is seen at the next update().
+  bool isButtonContactClosed();
   bool isPressed(uint8_t buttonIndex) const;
   bool wasPressed(uint8_t buttonIndex) const;
   bool wasAnyPressed() const;

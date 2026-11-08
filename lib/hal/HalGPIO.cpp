@@ -151,6 +151,16 @@ void HalGPIO::begin() {
   inputMgr.begin();
 }
 
+bool HalGPIO::isButtonContactClosed() {
+#if FREEINK_DEVICE_PICCO
+  return false;
+#else
+  // No touch on the C3 boards (FREEINK_CAP_TOUCH is 0), so getState() is two
+  // ADC reads and a pin read with no side effects.
+  return inputMgr.getState() != 0;
+#endif
+}
+
 void HalGPIO::update() {
   inputMgr.update();
 #if FREEINK_DEVICE_PICCO

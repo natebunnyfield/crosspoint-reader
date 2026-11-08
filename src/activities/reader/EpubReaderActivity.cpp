@@ -413,11 +413,14 @@ void EpubReaderActivity::loop() {
     // Checked entirely under the lock: render() may finalize the build at any
     // moment, and buildSomeMore() on a finished build would fail and wrongly reset
     // the section; the heap gate is read under it for the same reason.
+    // A button down or a turn queued: the next frames act on it first, and a tick
+    // already running stops at its next parse step (survey #12).
     RenderLock lock(RenderLock::Mode::Try);
-    if (lock.ownsLock() && section && section->isBuilding() &&
+    if (lock.ownsLock() && section && section->isBuilding() && queuedTurns.load() == 0 &&
+        !gpio.isButtonContactClosed() &&
         (section->isPartial() || static_cast<int>(section->pageCount) < section->currentPage + BUILD_WINDOW_AHEAD) &&
         buildTickHeapGate()) {
-      if (!section->buildSomeMore(BACKGROUND_BUILD_PAGES_PER_TICK)) {
+      if (!section->buildSomeMore(BACKGROUND_BUILD_PAGES_PER_TICK, [] { return gpio.isButtonContactClosed(); })) {
         LOG_ERR("ERS", "Background section build failed");
         section.reset();
         requestUpdate();
