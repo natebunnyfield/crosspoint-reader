@@ -85,6 +85,20 @@ never silently cycle; the popup is what shows the user the alternative.
   fire on press, and should keep doing so (a release-fired tap feels a frame
   late on e-ink). Do not "fix" the inventory screen by screen; a screen moves
   from press to release only when it grows a hold.
+
+  **On the FUI list base (since the 2026-11-08 port of upstream `9e3cea2e5`)**
+  the edge lives in one place per screen: `UiListActivity::handleButtons()`.
+  The base default is Back and Confirm on PRESS (upstream's), which is right
+  for a screen with no Confirm hold — the time zone list
+  (`ClockOffsetActivity`) uses it as is. Every other converted screen
+  overrides it, and the overrides carry the inventory unchanged: PRESS in
+  `SettingsActivity` and `TypographySettingsActivity`; RELEASE in
+  `FileBrowserActivity` (hold = delete), `RecentBooksActivity` (hold = remove
+  from list), `EpubReaderChapterSelectionActivity`,
+  `XtcReaderChapterSelectionActivity` and `EpubReaderFootnotesActivity`.
+  A touch tap activates through `activateIndex()` on the tap's release
+  whatever the button edge is. Wi-Fi selection, Manage Files, the colophon
+  and the font pickers are not on the base and keep their own loops.
 - **List cursor moves fire on PRESS; a hold then pages.** Owner ruling
   2026-11-07 ("yes to everything else" on
   `docs/lag-reduction-plan-2026-11-07.md`, plan 3.3). The front Left/Right
