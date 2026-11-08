@@ -214,6 +214,16 @@ commits built on it are then taken normally.
 
 ### Campaign log
 
+**Driver, from 2026-11-08 10:30:** the session "Planck play button mouse
+clicks" (worktree `.claude/worktrees/campaign-b3`, branch `campaign-b3`) is
+taking, in this order: the `a757b9d10` reader-base port (ruled "Adopt, keep
+fork behavior") with `63fcbab02`, then batch 3 onward from `62e84a16f`. The
+`81e192709` light-sleep revert is left to whoever gets the owner's answer. A
+second session starting a batch or the reader port should fetch `main`, read
+this line, and take something else (or nothing) to avoid porting the same
+commits twice.
+
+
 | batch | upstream range | taken | partial | skipped (why) | pushed as |
 |---|---|---|---|---|---|
 | 1 | `0f747b82a`..`9e3cea2e5` (25) | 6 (`046827fc3` `1582e70ef` `596f0d3f7` `e4aae7bae` `2cac59714` `86eb1cbde`) | 3 (`5eec70de3` IPA except the two `reading`-set recipes; `d4733bfc6` CI split only, release.yml and sticky envs dropped per B-004; `7f8b005ae` AGENTS.md symlink only) | ALREADY 10 (incl. `d720891b2` dark mode = fork's whole-UI `c2d26ae29`; `4e6190357` X3 display/battery/crypto); SKIP 5 (`0f747b82a` superseded by word anchors, `9c48609f8` + `0423276d2` bookmarks/KOSync deleted, `fecb9eb3a` + `e9c3a166f` dictionary deleted in `1d37cb851`); FLAG 1 `9e3cea2e5` FUI -> ruled "Adopt FUI", ported separately | (this push) |
