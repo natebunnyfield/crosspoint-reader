@@ -1181,9 +1181,16 @@ void CrossPointWebServer::handleDelete() const {
       continue;
     }
 
-    // Ensure path starts with /
-    if (!itemPath.startsWith("/")) {
-      itemPath = "/" + itemPath;
+    // Normalized like every other mutating handler (rename, move, WebDAV):
+    // webUploadIsWriting() below compares text, and SdFat collapses "//" and
+    // resolves "." -- so "/books//a.epub" used to pass the guard and delete a
+    // file a WebSocket upload was still writing into, the B-073 cross-link the
+    // guard exists to prevent (P0/P1 sweep 2026-11-07).
+    itemPath = normalizeWebPath(itemPath);
+    if (itemPath == "/") {
+      failedItems += itemPath + " (cannot delete root); ";
+      allSuccess = false;
+      continue;
     }
 
     // Security check: prevent deletion of protected items
@@ -1677,6 +1684,16 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           if (parsedSize > kMaxWsUploadBytes) {
             LOG_DBG("WS", "START rejected: size %ld exceeds %ld", parsedSize, kMaxWsUploadBytes);
             wsServer->sendTXT(num, "ERROR:Invalid START format");
+            return;
+          }
+          // The file name is joined onto the folder below and becomes the
+          // guard's target: a name carrying a separator, or "." / "..", would
+          // write outside the folder and give the guard a path no other
+          // handler spells the same way. Refused as handleRename refuses it.
+          if (wsUploadFileName.isEmpty() || wsUploadFileName.indexOf('/') >= 0 ||
+              wsUploadFileName.indexOf('\\') >= 0 || wsUploadFileName == "." || wsUploadFileName == "..") {
+            LOG_DBG("WS", "START rejected: invalid file name");
+            wsServer->sendTXT(num, "ERROR:Invalid file name");
             return;
           }
           wsUploadSize = static_cast<size_t>(parsedSize);
