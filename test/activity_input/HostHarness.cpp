@@ -402,9 +402,11 @@ void ActivityManager::requestUpdateAndWait() {
 // shim, so peek() reports the real held/not-held state.
 // ============================================================================
 
-RenderLock::RenderLock() {
-  xSemaphoreTake(activityManager.renderingMutex, portMAX_DELAY);
-  isLocked = true;
+RenderLock::RenderLock(const Mode mode) {
+  // The host shim's take always succeeds (a depth counter), so a Try never
+  // fails here; the device's try-take is pinned by the simulator's
+  // semphr_reboot test instead.
+  isLocked = xSemaphoreTake(activityManager.renderingMutex, mode == Mode::Try ? 0 : portMAX_DELAY);
 }
 
 RenderLock::RenderLock(Activity&) {
