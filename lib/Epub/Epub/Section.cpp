@@ -299,7 +299,9 @@ namespace {
 // v74: upstream f437bb506 (#3036). utf8ComposeNfc() composes conjoining Hangul
 // jamo (L+V[+T]) into syllables. It runs on every word, so a book stored in NFD
 // Korean re-lays out with the precomposed syllables the fonts carry.
-constexpr uint8_t SECTION_FILE_VERSION = 74;
+// v75: upstream 6eda8f0b7 (#3390). Elements with the HTML `hidden` attribute
+// are display:none, so their text no longer lays out.
+constexpr uint8_t SECTION_FILE_VERSION = 75;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

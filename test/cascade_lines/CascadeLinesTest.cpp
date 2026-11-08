@@ -325,3 +325,14 @@ TEST(FootnoteLinkStyle, APlainInternalLinkIsNotSuperscript) {
   ASSERT_FALSE(lines.empty());
   for (const Line& l : lines) EXPECT_FALSE(l.anySup) << l.text;
 }
+
+// --- The HTML hidden attribute (upstream 6eda8f0b7, section v75) ------------
+
+TEST(HiddenAttribute, AHiddenElementLaysOutNothing) {
+  const auto lines = layout("<p>Shown words</p><p hidden=\"hidden\">Secret words</p><div hidden=\"\">More secret</div>");
+  ASSERT_FALSE(lines.empty());
+  for (const Line& l : lines) {
+    EXPECT_EQ(l.text.find("Secret"), std::string::npos) << l.text;
+    EXPECT_EQ(l.text.find("secret"), std::string::npos) << l.text;
+  }
+}
