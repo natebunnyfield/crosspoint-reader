@@ -264,9 +264,8 @@ record). The branch `upstream-campaign` (worktree `.claude/worktrees/upstream-sy
 still points at the PRE-rebase copies, head `ec1fd5f00`, whose section bumps
 read 67-69. Do not push it or rebase it: point it at `origin/main` first. Batch
 3 starts at upstream `62e84a16f` (392 non-merge commits after `57c692fe8`
-remained on 2026-11-08). Two owner decisions are still open: `a757b9d10` (reader
-consolidation, with `63fcbab02` waiting on it) and `81e192709` (light-sleep
-revert).
+remained on 2026-11-08). One owner decision is still open: `81e192709` (light-sleep revert);
+`a757b9d10` was ruled 2026-11-08 ("Adopt, keep fork behavior", below).
 
 Run by a second session once the campaign session had stopped with batch 2
 committed but unbuilt and unpushed. On the rebased tree: `pio run -e default`
@@ -287,6 +286,13 @@ Report: the campaign scratchpad `batch-02-report.md`; each commit message
 carries its own detail. Recorded here because each is a decision, not a
 port:
 
+- **RULED 2026-11-08 — `a757b9d10` reader consolidation: "Adopt, keep fork
+  behavior".** Taken, ported by hand like FUI, and the fork's reader behavior
+  re-applied on top and proved unchanged: press-fired page turns, the
+  side-button chords, Find, the fork's end-of-book screen, no reader menu or
+  status bar, deferred anti-aliasing, the next-page prerender, the idle
+  prewarm and its touch gating. `63fcbab02` then follows. (Original flag
+  below.)
 - **FLAG `a757b9d10` "consolidate reader activities"**: turns
   `ReaderActivity` into an abstract base the Epub/Xtc/Txt readers derive from
   (shared loop, refresh cadence, end-of-book options, back navigation). The
