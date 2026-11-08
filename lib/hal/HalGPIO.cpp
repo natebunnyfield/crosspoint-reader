@@ -394,6 +394,7 @@ bool HalGPIO::isUsbPowerPresent() const { return isUsbElectricalConnected(); }
 
 bool HalGPIO::hasEdgeSideButtons() const {
   return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||
+         BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3Uc8279 ||
          BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4Pro;
 }
 
