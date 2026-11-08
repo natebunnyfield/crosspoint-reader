@@ -202,10 +202,21 @@ are dropped, scope rulings above stand (the three held commits stay held until
 asked), and every skip is recorded below with its reason. Progress is logged
 per batch under "Campaign log".
 
+**Owner ruling 2026-11-08, FUI lists: "Adopt FUI".** Upstream `9e3cea2e5`
+("convert all lists and tabs to FUI", 89 files) is taken: every list and tab
+screen moves onto FreeInkUI's `UiListActivity` / `UiTabListActivity` /
+`UiAppHost`. It is ported by hand as its own work item, and the fork's rules are
+then re-applied on top of it, not dropped: cursor moves fire on PRESS with hold
+paging (`docs/ui-conventions.md`, 2026-11-07), the press-vs-release Confirm
+inventory, `OptionPopup` as the one modal, the Lyra Six list metrics, and the
+lag work (windowed presents, no duplicate renders). The 27 later upstream
+commits built on it are then taken normally.
+
 ### Campaign log
 
 | batch | upstream range | taken | partial | skipped (why) | pushed as |
 |---|---|---|---|---|---|
+| 1 | `0f747b82a`..`9e3cea2e5` (25) | 6 (`046827fc3` `1582e70ef` `596f0d3f7` `e4aae7bae` `2cac59714` `86eb1cbde`) | 3 (`5eec70de3` IPA except the two `reading`-set recipes; `d4733bfc6` CI split only, release.yml and sticky envs dropped per B-004; `7f8b005ae` AGENTS.md symlink only) | ALREADY 10 (incl. `d720891b2` dark mode = fork's whole-UI `c2d26ae29`; `4e6190357` X3 display/battery/crypto); SKIP 5 (`0f747b82a` superseded by word anchors, `9c48609f8` + `0423276d2` bookmarks/KOSync deleted, `fecb9eb3a` + `e9c3a166f` dictionary deleted in `1d37cb851`); FLAG 1 `9e3cea2e5` FUI -> ruled "Adopt FUI", ported separately | (this push) |
 
 
 Commands:
