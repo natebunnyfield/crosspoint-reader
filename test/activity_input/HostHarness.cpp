@@ -364,7 +364,7 @@ void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
 
 void ActivityManager::popActivity() { am().pendingAction = HostPending::Pop; }
 
-void ActivityManager::goHome(HomeMenuItem) {
+void ActivityManager::goHome(HomeMenuItem, bool) {
   am().counters.goHome++;
   replaceActivity(std::make_unique<HostPlaceholderActivity>("TestHome", renderer, mappedInput));
 }

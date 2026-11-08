@@ -37,6 +37,16 @@ std::unique_ptr<FontUpdateActivity> makeActivity() {
   return std::make_unique<FontUpdateActivity>(host::renderer(), host::input());
 }
 
+// Open the screen and run the tick the saved-network join spends answering
+// Ready (src/network/SavedWifiJoin.h, since 2026-10-20): the radio here is
+// already associated and the resolver answers, so the join takes exactly one
+// tick, and its waited-for repaint names GitHub. The check comes on the tick
+// after, which is where these tests used to start counting.
+void openPastTheJoin() {
+  host::setRootActivity(makeActivity());
+  host::frame();
+}
+
 class FontUpdateFirstFrame : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -59,7 +69,7 @@ TEST_F(FontUpdateFirstFrame, OnEnterWaitsForThePaintAndFetchesNothing) {
 // The check runs on the first loop() tick, and by then the paint has been
 // waited for. This is the ordering the screen exists to keep.
 TEST_F(FontUpdateFirstFrame, TheFirstNetworkCallComesAfterTheWaitedPaint) {
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();
 
   ASSERT_EQ(fontdouble::observed().fetchCalls, 1);
@@ -70,7 +80,7 @@ TEST_F(FontUpdateFirstFrame, TheFirstNetworkCallComesAfterTheWaitedPaint) {
 // must not repaint; the READING step must. Repainting CONTACTING put a second,
 // identical refresh on top of the TLS handshake.
 TEST_F(FontUpdateFirstFrame, OnlyTheReadingStepRepaints) {
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();
 
   const auto& o = fontdouble::observed();
@@ -86,7 +96,7 @@ TEST_F(FontUpdateFirstFrame, OnlyTheReadingStepRepaints) {
 // activity header.)
 TEST_F(FontUpdateFirstFrame, EachFamilySyncsOnItsOwnTick) {
   fontdouble::script().families = 3;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
 
   // The check's tick: the manifest, the waited-for "Font 1 of 3" frame, and no
   // download yet.
@@ -94,7 +104,7 @@ TEST_F(FontUpdateFirstFrame, EachFamilySyncsOnItsOwnTick) {
   const auto& o = fontdouble::observed();
   ASSERT_EQ(o.fetchCalls, 1);
   EXPECT_TRUE(o.syncedFamilies.empty());
-  EXPECT_EQ(host::counters().updateAndWaits, 2);  // CHECKING, then SYNCING
+  EXPECT_EQ(host::counters().updateAndWaits, 3);  // CHECKING, the join's GitHub frame, then SYNCING
   ASSERT_NE(host::currentActivity(), nullptr);
   EXPECT_TRUE(host::currentActivity()->preventAutoSleep());
 
@@ -130,7 +140,7 @@ TEST_F(FontUpdateFirstFrame, EveryFamilyFailingStillReachesTheSummaryAndFinishes
   fontdouble::script().families = 3;
   fontdouble::script().failedFamilies = 3;
   fontdouble::script().failureKind = fontsync::FailureKind::STORAGE;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
 
   host::frame();    // the check
   host::frames(3);  // three families, each FAILED
@@ -156,7 +166,7 @@ TEST_F(FontUpdateFirstFrame, EveryFamilyFailingStillReachesTheSummaryAndFinishes
 // panic on device.
 TEST_F(FontUpdateFirstFrame, AManifestWithNoUsableFamilyGoesStraightToTheSummary) {
   fontdouble::script().families = 0;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
 
   host::frame();
   const auto& o = fontdouble::observed();
@@ -175,8 +185,14 @@ TEST_F(FontUpdateFirstFrame, NoWifiPaintsDeferredAndNeverFetches) {
   WiFi.simSetConnected(false);
   host::setRootActivity(makeActivity());
 
-  EXPECT_EQ(host::counters().updateAndWaits, 0);
-  EXPECT_EQ(host::counters().updates, 1);
+  // onEnter always waits for the CHECKING frame now: the join runs under it
+  // (2026-10-20). With no link and nothing saved, the first tick answers
+  // NoSavedNetwork and the NO_WIFI frame is a deferred paint.
+  EXPECT_EQ(host::counters().updateAndWaits, 1);
+  const int updatesBefore = host::counters().updates;
+  host::frame();
+  EXPECT_EQ(host::counters().updateAndWaits, 1);
+  EXPECT_EQ(host::counters().updates, updatesBefore + 1);
 
   host::frames(3);
   EXPECT_EQ(fontdouble::observed().fetchCalls, 0);
@@ -190,7 +206,7 @@ TEST_F(FontUpdateFirstFrame, NoWifiPaintsDeferredAndNeverFetches) {
 TEST_F(FontUpdateFirstFrame, NoTokenStopsBeforeAnySync) {
   fontdouble::script().checkResult = FontUpdater::NO_TOKEN;
   fontdouble::script().families = 3;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
 
   host::frames(4);
   const auto& o = fontdouble::observed();
@@ -218,7 +234,7 @@ TEST_F(FontUpdateFirstFrame, NoTokenStopsBeforeAnySync) {
 // through it, which is exactly what this asserts it does NOT do.
 TEST_F(FontUpdateFirstFrame, TheBackCheckIsActuallyReachedDuringASync) {
   fontdouble::script().families = 6;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();  // the check
 
   const auto& o = fontdouble::observed();
@@ -242,7 +258,7 @@ TEST_F(FontUpdateFirstFrame, TheBackCheckIsActuallyReachedDuringASync) {
 // atomicity on a real filesystem; this proves where the cancel lands).
 TEST_F(FontUpdateFirstFrame, ACancelBetweenFamiliesStopsCleanlyAndFinishesTheRun) {
   fontdouble::script().families = 5;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();  // the check
   host::frame();  // family 0
   host::frame();  // family 1
@@ -281,7 +297,7 @@ TEST_F(FontUpdateFirstFrame, ACancelBetweenFamiliesStopsCleanlyAndFinishesTheRun
 // The stopped screen is dismissed like any other terminal state.
 TEST_F(FontUpdateFirstFrame, TheStoppedScreenIsDismissedWithBack) {
   fontdouble::script().families = 4;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();
   host::frame();
   host::pressFrame(HalGPIO::BTN_BACK);
