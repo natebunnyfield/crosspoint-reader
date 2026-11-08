@@ -217,7 +217,8 @@ commits built on it are then taken normally.
 **Driver, from 2026-11-08 10:30:** the session "Planck play button mouse
 clicks" (worktree `.claude/worktrees/campaign-b3`, branch `campaign-b3`) is
 taking, in this order: the `a757b9d10` reader-base port (ruled "Adopt, keep
-fork behavior") with `63fcbab02`, then batch 3 onward from `62e84a16f`. The
+fork behavior") with `63fcbab02`, then batch 3 onward from `62e84a16f`. Reader port and batch 3 are pushed;
+batch 4 (`84fcff848`..`e33e3cf39`, 50 commits) is next, same driver. The
 `81e192709` light-sleep revert is left to whoever gets the owner's answer. A
 second session starting a batch or the reader port should fetch `main`, read
 this line, and take something else (or nothing) to avoid porting the same
@@ -230,6 +231,7 @@ commits twice.
 | FUI | `9e3cea2e5` (1, owner ruling "Adopt FUI") | | 1, by hand + 5 fork-rule commits (see "FUI port" below) | | (this push) |
 | reader base | `a757b9d10` (1, owner ruling "Adopt, keep fork behavior") + `63fcbab02` | `a757b9d10` by hand as `69f7430aa` | | SKIP `63fcbab02` (TXT `skipPages()` end sentinel: the fork has no skipPages, chapter skip retired 2026-09-01) | `71dc70df5` |
 | 2 | `e970abae8`..`57c692fe8` (40) | 10 (`e970abae8` `25cf99b21` `99724aa79` `618608e84` `6a501bba5` `c6fe67d48` `27f964b3e` `eef205044` `a4a03c6b4` `7e42d0707`) | 9 (`268c27f7d` Transparent sleep screen, appended as value 14; `48e39eb0e` reposition clearing on the fork's three-stage anchors; `4970ef1f6` PNG overlays + PNG viewer; `33f07db71` post-delete nav lock only; `bbca4886c` X3-UC8279 edge-button fix only; `d3b3b5669` dimension guard/8 MP/decode yield, not the image-margin clamp or single-base image refresh; `8eea7f865` Wi-Fi only; `a0daab994` font layer only; `93d572fcb` arabic preset only) | ALREADY 4 (`70faa29da` = `816011c42`; `e715532f9`; `080b1d719` = `ca1850a91`; `28377310d` fork has Wider/Widest); SKIP 15 (deleted subsystems: dictionary x2, status bar, Ubuntu UI face x2, font download; `b1d53ba81` ruling; `4d764de9c` press/release ruling; `413a1bd9d`+`151414d8c` revert pair; `81fd32237` would drop `.claude/skills`; `63fcbab02` needs `a757b9d10`; `b3d1e79d0` fixed-height Lyra rows; `75c079fe7` SDK-only; `da3d50c24` fork's own table columns); FLAG 2 (`a757b9d10` reader consolidation, `81e192709` light-sleep revert). Caches: section 67 -> 70 (renumbered when rebased over page-space v67, `docs/page-space-2026-11-08.md`), book.bin 11 -> 12 | (this push) |
+| 3 | `62e84a16f`..`25bbfae76` (40) | 5 (`5182d27e2` `b6746c1df` `c484dc72b` `8141d7b9c`+`820d0b96a`) | 5 (`cdbe2a779` en/es only; `8bc1603e8` no SDK bump; `86976ab23` log only, fix ALREADY; `790a0817e` guard restores the prior mode; `52444a0c9` block-close insets, `!important` ALREADY) | ALREADY 6 (empty picks); REJECTED 1 (`e31dcbb08`); SKIP 16 (deleted subsystems, other boards, Swedish, fork Settings/list chrome; see "Batch 3" below); HELD 7 (frontlight panel x4, wake rule x2, USB MSC, X4 Classic). Caches: section 70 -> 71, CSS stays 11 | (this push) |
 
 
 ### FUI port (`9e3cea2e5`), 2026-11-08
@@ -351,6 +353,76 @@ git rev-list --reverse --no-merges origin/main..upstream/develop   # probe order
 # per commit, on a throwaway worktree: cherry-pick -x --no-commit; drop the
 # freeink-sdk path; CONFLICT -> abort; empty -> present; else commit
 ```
+
+### Batch 3 (2026-11-08): `62e84a16f`..`25bbfae76`, 40 commits
+
+Probed one at a time against `69f7430aa` on a throwaway worktree, ported in
+upstream order on `b3-work`, then rebased onto `a5e076efd`. Each commit
+message carries its own detail; the decisions:
+
+- **TAKEN (5):** `5182d27e2` htmlToPlainText heading breaks (with its
+  `HtmlToPlainTextTest`; the dictionary caller is gone but the converter is
+  still built); `b6746c1df` CSS cache retry, merged by hand. The fork's heap
+  scratch, the heap floor (it now also stops rule growth), book notes and the
+  stale-cache delete are kept; `CSS_CACHE_VERSION` 11. `c484dc72b` sparse
+  kerning and Zopfli: the fork's larger `convert-builtin-fonts.sh` matrix kept,
+  `--zopfli` on every `--compress` call, and all 169 tracked headers
+  regenerated, because `EpdFontData` gains fields mid-struct and the headers
+  initialize it by position. That includes the 32 retired-family 2x/3x headers
+  the script no longer makes. `8141d7b9c` style-aware prewarm, with
+  `820d0b96a` folded in; the new suite gets a one-macro `HalDisplay.h` stub.
+- **PARTIAL (5):** `cdbe2a779` language ordering. Taken: `gen_i18n.py`, the
+  `_bcp47` codes for en/es and `docs/i18n.md`; the other 31 yaml do not ship.
+  `8bc1603e8` USB detection by charging state: the HalGPIO fallback is taken,
+  the SDK pointer is not (`isCharging()` exists at `1dc07f6`). `86976ab23`
+  ZipFile underflow: the fix was ALREADY here, and only the `LOG_ERR` is new.
+  `790a0817e` Wi-Fi power-save off during downloads, with one fork change: the
+  guard restores the mode it found, because `CrossPointWebServer.cpp:171`
+  turns sleep off for its session and a fixed `WIFI_PS_MIN_MODEM` restore
+  would undo that. It needs `esp_wifi_get_ps` in the simulator's stub (pushed
+  there). `52444a0c9` paragraph spacing: the block-close restart drops the
+  parent's top and bottom insets (section **v71**). Its `!important` half is
+  ALREADY: every property path here strips it already.
+- **ALREADY (6, empty cherry-picks):** `f58f9b89f` `6c5bc307d` `8665dd7b9`
+  `ecc0c4f29` `88ddc9ad0` `a56a7f07a`.
+- **REJECTED (1):** `e31dcbb08`, standing ruling 2026-11-07.
+- **SKIP (16):**
+  - Deleted subsystems: `5a6f3f57f` (the restored long-press shortcuts are
+    all deleted subsystems), `b4cd1af6b` and `e7a3bb488` (reader menu),
+    `14cdb288b` and `b42927b4f` (KOReader sync), `68be3aec7` (Calibre),
+    `7a4c96dd3` (five deleted screens), `dc65ccd9d` (the Manage Fonts
+    downloader doc).
+  - Fork already differs: `62e84a16f`. Refresh "Never" targets
+    `refreshFrequency`, which the fork replaced with `refreshCadence`; night
+    mode is the fork's whole-UI dark mode; the touch default is kept by the
+    Picco gesture rulings.
+  - Settings, UI faces and list chrome: `139de1e76` (Settings is one flat FUI
+    list here, with no tab band to hand focus from); `dc7bb07bd` (the Ubuntu
+    faces are gone, `main.cpp:86`); `3b73e7fce` (reader-menu style; its list
+    margins need SDK `setContentMarginFromScreen`, absent at the pin);
+    `f24ef2095` (deletes the theme list drawing that the FUI port still
+    paints rows with).
+  - Other boards and languages: `f0c655062` and `4638119b2` (X4 Pro),
+    `e82b51740` (Swedish).
+- **HELD (7), for the owner:**
+  - The frontlight quick panel (the held remainder of `bbca4886c`), with
+    `8575b1427`, `4f0b4b70f` and `25bbfae76` built on it. Decision: does the
+    Picco (it has a frontlight) get the panel and its top-edge swipe?
+  - The wake rule, `cdd89b1d7` with `e37164ca9`. Upstream wakes on any
+    debounced power press, in place of the hold-duration check the fork keeps
+    (`SETTINGS.getPowerButtonDuration`), and limits "cold boot = held power
+    button" to Xteink, PaperMono and Sticky, so a Picco cold boot would stop
+    being wake-verified. It also needs SDK `isPowerButtonPhysicallyPressed`,
+    absent at `1dc07f6`. Its USB-serial part is ALREADY (fork F8,
+    `main.cpp:958`).
+  - USB mass storage, `218dc6aaf`. A new mode, written for the X4 Pro and
+    entered from the deleted NetworkModeSelection screen. Decision: does the
+    Picco (also esp32s3) get it?
+  - The X4 Classic board target, `f021d1e5f`. It needs SDK board support the
+    pin lacks; held with the other board targets.
+
+Gates on the rebased tree: `pio run -e default` (X4) SUCCESS, Flash 4,853,635 B. That is 545,166 B (532 KiB) less than the reader-port gate on `69f7430aa` (5,398,801 B). Batch 3's only font or data change is `c484dc72b`, so most of that is likely its sparse kerning and Zopfli (inferred, not split per commit; upstream's figure was 323 KB, and the fork ships more built-in faces). `pio run -e picco` SUCCESS; `pio run -e simulator` SUCCESS; `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). Host tests: the first run had four suites NOT BUILT. The CSS cache port calls `Storage.rename()`, which their suite-local `HalStorage` stubs lacked, and two of them tested `loadFromStream()` as a bool. Fixed in `test: four layout suites follow the CSS cache retry port`; after that, 884 of 884 pass. `ActivityInputTest` builds again (fixed in `fca3ea5e8`).
+
 
 ## One working copy per project
 
