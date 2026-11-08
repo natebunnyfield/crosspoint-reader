@@ -22,6 +22,11 @@
 #include "util/ClaudeChatActivity.h"
 #include "util/FullScreenMessageActivity.h"
 #include "util/NoteEditorActivity.h"
+#if FREEINK_CAP_USB_MSC
+#include <Memory.h>
+
+#include "network/UsbDriveActivity.h"
+#endif
 
 static portMUX_TYPE activityManagerSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -69,6 +74,19 @@ void ActivityManager::renderTaskLoop() {
 }
 
 void ActivityManager::loop() {
+#if FREEINK_CAP_USB_MSC
+  if (currentActivity && currentActivity->requiresExclusiveStorageLoop()) {
+    currentActivity->loop();
+    // An exclusive-storage activity must restart rather than navigate away:
+    // processing a pending action here could re-enable filesystem users while
+    // the USB host still owns the raw SD card. No Home gesture either.
+    if (requestedUpdate.exchange(false) && renderTaskHandle) {
+      xTaskNotify(renderTaskHandle, 1, eIncrement);
+    }
+    return;
+  }
+#endif
+
   if (currentActivity) {
     if (!currentActivity->isHomeActivity() && mappedInput.wasHomeGesture()) {
       if (currentActivity->handleHomeGesture()) {
@@ -347,6 +365,30 @@ void ActivityManager::popActivity() {
 }
 
 bool ActivityManager::preventAutoSleep() const { return currentActivity && currentActivity->preventAutoSleep(); }
+
+#if FREEINK_CAP_USB_MSC
+bool ActivityManager::requiresExclusiveStorageLoop() const {
+  return currentActivity && currentActivity->requiresExclusiveStorageLoop();
+}
+
+// Nothing calls this yet, so --gc-sections drops it and the whole USB Drive
+// path with it. To link and measure that path before the entry point exists,
+// make it a linker GC root for one build:
+//   PLATFORMIO_BUILD_FLAGS='-Wl,-u,_ZN15ActivityManager12goToUsbDriveEv' pio run -e picco
+// (__attribute__((retain)) would say the same in source, but the Xtensa
+// toolchain ignores it: "'retain' attribute ignored", measured 2026-11-08.)
+void ActivityManager::goToUsbDrive() {
+  // replaceActivity, not push: every activity on screen and on the stack exits
+  // (closing its files) before the USB Drive activity's onEnter() hands the
+  // card over.
+  auto activity = makeUniqueNoThrow<UsbDriveActivity>(renderer, mappedInput);
+  if (!activity) {
+    LOG_ERR("ACT", "OOM: USB Drive activity");
+    return;
+  }
+  replaceActivity(std::move(activity));
+}
+#endif
 
 bool ActivityManager::isReaderActivity() const {
   return std::any_of(stackActivities.begin(), stackActivities.end(),

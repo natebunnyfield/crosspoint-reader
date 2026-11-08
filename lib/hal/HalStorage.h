@@ -7,15 +7,46 @@
 #include <memory>
 #include <string>
 #include <vector>
+#if FREEINK_CAP_USB_MSC
+#include <atomic>
+#endif
 
 class HalFile;
 class FsFile;
+
+#if FREEINK_CAP_USB_MSC
+// USB Drive (upstream 218dc6aaf; docs/usb-drive-picco.md). Picco only in this
+// fork: it is the one board with native SDMMC and a USB-OTG PHY.
+enum class UsbDriveState : uint8_t {
+  Unsupported,
+  WaitingForHost,
+  Connected,
+  Ejected,
+  Disconnected,
+  IoError,
+};
+#endif
 
 class HalStorage {
  public:
   HalStorage();
   bool begin();
   bool ready() const;
+#if FREEINK_CAP_USB_MSC
+  // USB Drive exclusively owns the SD card while active. Callers must stop all
+  // filesystem work before beginUsbDrive(), then reboot after endUsbDrive()
+  // (restartToHomeAfterStorageHandoff): the card is never remounted in place
+  // once a host has had it. From a successful beginUsbDrive() until that
+  // reboot, every HalStorage and HalFile call is refused without reaching
+  // SdFat (usbDriveOwnsCard()).
+  bool beginUsbDrive();
+  bool disconnectUsbDriveHost();
+  void endUsbDrive();
+  UsbDriveState usbDriveState() const;
+  bool usbDriveOwnsCard() const { return usbDriveOwnsCardFlag.load(); }
+  // True (and logged) when `op` must not run because the host owns the card.
+  bool refuseWhileUsbDriveOwnsCard(const char* op) const;
+#endif
 #if FREEINK_DEVICE_PICCO
   // Flush SdFat's cached FAT/directory sectors, end the SDMMC host and float the
   // bus pads before deep sleep (upstream 4a679d5d4, which the Picco's sleep
@@ -61,6 +92,11 @@ class HalStorage {
 
   bool initialized = false;
   SemaphoreHandle_t storageMutex = nullptr;
+#if FREEINK_CAP_USB_MSC
+  // Set once the volume is detached for the USB host; cleared only if the
+  // handoff fails before the host could see the card and the volume remounts.
+  std::atomic<bool> usbDriveOwnsCardFlag{false};
+#endif
 };
 
 #define Storage HalStorage::getInstance()

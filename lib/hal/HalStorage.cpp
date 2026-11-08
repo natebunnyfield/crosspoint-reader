@@ -3,11 +3,23 @@
 #include <FS.h>  // need to be included before SdFat.h for compatibility with FS.h's File class
 #include <Logging.h>
 #include <SDCardManager.h>
+#if FREEINK_CAP_USB_MSC
+#include <UsbMassStorage.h>
+#endif
 
 #include <cassert>
 #include <new>
 
 #define SDCard SDCardManager::getInstance()
+
+#if FREEINK_CAP_USB_MSC
+#if !FREEINK_SD_SDMMC
+#error "USB Drive requires an SDMMC-backed storage profile"
+#endif
+namespace {
+freeink::UsbMassStorage usbMassStorage;
+}  // namespace
+#endif
 
 HalStorage HalStorage::instance;
 
@@ -36,7 +48,7 @@ class HalStorage::StorageLock {
   ~StorageLock() { xSemaphoreGiveRecursive(HalStorage::getInstance().storageMutex); }
 };
 
-#if FREEINK_DEVICE_PICCO
+#if FREEINK_DEVICE_PICCO || FREEINK_CAP_USB_MSC
 namespace {
 // Write SdFat's cached FAT and directory sectors to the card. Needed before
 // anything that ends the volume: FsVolume::end() (SdFat 2.3.1,
@@ -72,8 +84,103 @@ void HalStorage::prepareForDeepSleep() {
 }
 #endif
 
+#if FREEINK_CAP_USB_MSC
+bool HalStorage::refuseWhileUsbDriveOwnsCard(const char* op) const {
+  if (!usbDriveOwnsCardFlag.load()) return false;
+  LOG_ERR("SD", "Refused %s: the USB Drive host owns the SD card", op);
+  return true;
+}
+
+bool HalStorage::beginUsbDrive() {
+  StorageLock lock;
+  if (usbDriveOwnsCardFlag.load()) {
+    LOG_ERR("USB", "USB Drive already owns the SD card");
+    return false;
+  }
+  if (!SDCard.ready()) {
+    LOG_ERR("USB", "USB Drive requires a mounted SDMMC filesystem");
+    return false;
+  }
+  // Flush BEFORE the detach: detachFilesystemForRawAccess() ends the volume
+  // with FsVolume::end(), which drops a dirty cached sector (syncSdFatCaches()
+  // above), and the host would mount a FAT that disagrees with its directory
+  // entries. A failed flush refuses the handoff with the volume still mounted.
+  if (!syncSdFatCaches()) {
+    LOG_ERR("USB", "USB Drive refused: could not flush the SD card's cached sectors");
+    return false;
+  }
+
+  auto* const blockDevice = SDCard.detachFilesystemForRawAccess();
+  if (!blockDevice) {
+    LOG_ERR("USB", "USB Drive requires a mounted SDMMC filesystem");
+    return false;
+  }
+  // From here the volume is gone, so nothing may reach SdFat until the reboot.
+  usbDriveOwnsCardFlag.store(true);
+
+  if (!usbMassStorage.begin(blockDevice)) {
+    LOG_ERR("USB", "USB Drive MSC initialization failed");
+    // No host ever saw the card (MSC or USB.begin() failed), so the card is
+    // exactly as SdFat left it a moment ago and remounting it is safe. This is
+    // the only remount-in-place on this path; every exit after a host could
+    // have the card is a reboot.
+    if (SDCard.begin()) {
+      usbDriveOwnsCardFlag.store(false);
+    } else {
+      LOG_ERR("USB", "Unable to remount SD card after USB Drive startup failure");
+    }
+    return false;
+  }
+  return true;
+}
+
+bool HalStorage::disconnectUsbDriveHost() {
+  StorageLock lock;
+  return usbMassStorage.disconnectHost();
+}
+
+void HalStorage::endUsbDrive() {
+  StorageLock lock;
+  // The card stays refused (usbDriveOwnsCardFlag) until the reboot that must
+  // follow: the host may have rewritten any sector SdFat knew about.
+  usbMassStorage.end();
+}
+
+UsbDriveState HalStorage::usbDriveState() const {
+  StorageLock lock;
+  switch (usbMassStorage.state()) {
+    case freeink::UsbMassStorageState::WaitingForHost:
+      return UsbDriveState::WaitingForHost;
+    case freeink::UsbMassStorageState::Connected:
+    case freeink::UsbMassStorageState::Accessed:
+      return UsbDriveState::Connected;
+    case freeink::UsbMassStorageState::Ejected:
+      return UsbDriveState::Ejected;
+    case freeink::UsbMassStorageState::Disconnected:
+      return UsbDriveState::Disconnected;
+    case freeink::UsbMassStorageState::IoError:
+      return UsbDriveState::IoError;
+    case freeink::UsbMassStorageState::Idle:
+      break;
+  }
+  return UsbDriveState::Unsupported;
+}
+
+// Every wrapped call below takes the lock and then refuses while the host owns
+// the card, returning the method's value-initialized result (false, 0, an empty
+// String or vector, a closed file).
+#define HAL_STORAGE_REFUSED(method, ...) \
+  if (HalStorage::getInstance().refuseWhileUsbDriveOwnsCard(#method)) return decltype(SDCard.method(__VA_ARGS__))();
+#define HAL_FILE_REFUSED(method, ...) \
+  if (HalStorage::getInstance().refuseWhileUsbDriveOwnsCard(#method)) return decltype(impl->file.method(__VA_ARGS__))();
+#else
+#define HAL_STORAGE_REFUSED(method, ...)
+#define HAL_FILE_REFUSED(method, ...)
+#endif
+
 #define HAL_STORAGE_WRAPPED_CALL(method, ...) \
   HalStorage::StorageLock lock;               \
+  HAL_STORAGE_REFUSED(method, __VA_ARGS__)    \
   return SDCard.method(__VA_ARGS__);
 
 std::vector<String> HalStorage::listFiles(const char* path, int maxFiles) {
@@ -132,6 +239,9 @@ HalFile& HalFile::operator=(HalFile&&) = default;
 
 HalFile HalStorage::open(const char* path, const oflag_t oflag) {
   StorageLock lock;  // ensure thread safety for the duration of this function
+#if FREEINK_CAP_USB_MSC
+  if (refuseWhileUsbDriveOwnsCard("open")) return HalFile();
+#endif
   return HalFile(HalFile::wrap(SDCard.open(path, oflag)));
 }
 
@@ -155,6 +265,9 @@ bool HalStorage::openFileForRead(const char* moduleName, const char* path, HalFi
   // an entry on free clusters, the cross-link pattern. No caller does that
   // today; this makes it impossible rather than merely absent.
   file = HalFile();
+#if FREEINK_CAP_USB_MSC
+  if (refuseWhileUsbDriveOwnsCard("openFileForRead")) return false;
+#endif
   FsFile fsFile;
   bool ok = SDCard.openFileForRead(moduleName, path, fsFile);
   file = HalFile(HalFile::wrap(std::move(fsFile)));
@@ -178,6 +291,9 @@ bool HalStorage::openFileForWrite(const char* moduleName, const char* path, HalF
   // an entry on free clusters, the cross-link pattern. No caller does that
   // today; this makes it impossible rather than merely absent.
   file = HalFile();
+#if FREEINK_CAP_USB_MSC
+  if (refuseWhileUsbDriveOwnsCard("openFileForWrite")) return false;
+#endif
   FsFile fsFile;
   bool ok = SDCard.openFileForWrite(moduleName, path, fsFile);
   file = HalFile(HalFile::wrap(std::move(fsFile)));
@@ -201,6 +317,7 @@ bool HalStorage::removeDir(const char* path) { HAL_STORAGE_WRAPPED_CALL(removeDi
 #define HAL_FILE_WRAPPED_CALL(method, ...) \
   HalStorage::StorageLock lock;            \
   assert(impl != nullptr);                 \
+  HAL_FILE_REFUSED(method, __VA_ARGS__)    \
   return impl->file.method(__VA_ARGS__);
 
 #define HAL_FILE_FORWARD_CALL(method, ...) \
@@ -224,6 +341,12 @@ void HalFile::flush() { HAL_FILE_WRAPPED_CALL(flush, ); }
 size_t HalFile::getName(char* name, size_t len) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if FREEINK_CAP_USB_MSC
+  if (HalStorage::getInstance().refuseWhileUsbDriveOwnsCard("getName")) {
+    if (name != nullptr && len > 0) name[0] = '\0';
+    return 0;
+  }
+#endif
   const size_t written = impl->file.getName(name, len);
   if (written == 0 && name != nullptr && len > 0) name[0] = '\0';
   return written;
@@ -255,6 +378,9 @@ bool HalFile::close() { HAL_FILE_WRAPPED_CALL(close, ); }
 HalFile HalFile::openNextFile() {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if FREEINK_CAP_USB_MSC
+  if (HalStorage::getInstance().refuseWhileUsbDriveOwnsCard("openNextFile")) return HalFile();
+#endif
   return HalFile(HalFile::wrap(impl->file.openNextFile()));
 }
 bool HalFile::isOpen() const { return impl != nullptr && impl->file.isOpen(); }  // already thread-safe, no need to wrap

@@ -42,6 +42,13 @@ class Activity {
 
   virtual bool skipLoopDelay() { return false; }
   virtual bool preventAutoSleep() { return false; }
+#if FREEINK_CAP_USB_MSC
+  // Exclusive storage activities (USB Drive) suspend global controls and normal
+  // activity transitions so no filesystem code races a raw SD-card owner.
+  // Upstream 218dc6aaf declares this on every board; here it exists only in USB
+  // Drive builds, so the X4/X3 vtables and main loop are untouched.
+  virtual bool requiresExclusiveStorageLoop() const { return false; }
+#endif
   virtual bool isReaderActivity() const { return false; }
   // Returns true when the activity schedules its own forced refresh.
   virtual bool handleForcedRefresh() { return false; }
