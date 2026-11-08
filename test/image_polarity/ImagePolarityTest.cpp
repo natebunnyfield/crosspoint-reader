@@ -176,7 +176,10 @@ class DimensionProbe : public ImageToFramebufferDecoder {
   bool decodeToFramebuffer(const std::string&, GfxRenderer&, const RenderConfig&) override { return false; }
   bool getDimensions(const std::string&, ImageDimensions&) const override { return false; }
   const char* getFormatName() const override { return "probe"; }
-  bool validate(int w, int h) { return validateImageDimensions(w, h, "probe"); }
+  bool validate(int64_t w, int64_t h) {
+    ImageDimensions out;
+    return validateAndStoreDimensions(w, h, out, "probe");
+  }
 };
 
 // The image-dimension guard is a security control: a Wi-Fi peer can PUT a
@@ -193,11 +196,16 @@ TEST(ImageDimensionGuard, RejectsAGeometryThatOverflowsSignedInt) {
   EXPECT_FALSE(p.validate(-1, -1));
 }
 
+// The budget is 8 MP since upstream d3b3b5669 (it bounds decode TIME; both
+// decoders stream), and each side must fit the int16 layout dimensions.
 TEST(ImageDimensionGuard, AcceptsAnImageWithinTheBudget) {
   DimensionProbe p;
   EXPECT_TRUE(p.validate(2048, 1536));
   EXPECT_TRUE(p.validate(800, 600));
-  EXPECT_FALSE(p.validate(2048, 1537));
+  EXPECT_TRUE(p.validate(2000, 3000));  // KDP's recommended cover
+  EXPECT_TRUE(p.validate(2048, 4096));
+  EXPECT_FALSE(p.validate(2048, 4097));
+  EXPECT_FALSE(p.validate(32768, 1));  // past int16, though tiny in area
 }
 
 }  // namespace
