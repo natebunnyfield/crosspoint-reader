@@ -42,7 +42,7 @@ class ImageBlock final : public Block {
 
   void render(GfxRenderer& renderer, const int x, const int y);
   bool serialize(serialization::BufferedFileWriter& out);
-  static std::unique_ptr<ImageBlock> deserialize(HalFile& file);
+  static std::unique_ptr<ImageBlock> deserialize(serialization::BufferedFileReader& file);
 
  private:
   std::string imagePath;

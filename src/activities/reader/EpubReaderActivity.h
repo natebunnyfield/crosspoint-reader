@@ -100,6 +100,43 @@ class EpubReaderActivity final : public Activity {
   int lastSavedPage = -1;
   int lastSavedPageCount = -1;
 
+  struct GrayPassTimes {
+    unsigned long t0, tPrewarm, tBwRender, tDisplay;
+  };
+  void renderGrayOverlay(Page& page, int fontId, int orientedMarginLeft, int paintMarginTop, bool needsTextGrayscale,
+                         bool needsAnyGrayscale, bool tiledGrayscale, bool overlapRefresh, const GrayPassTimes& times);
+  bool runDeferredGrayPass();
+  // Deferred anti-aliasing state (plan 2.2, docs/lag-reduction-plan-2026-11-07.md):
+  // the page whose gray pass renderContents() skipped, and loop()'s request for it.
+  bool grayDeferred = false;
+  bool grayPassRequested = false;
+  uint32_t grayDeferredGeneration = 0;
+  // Bumped wherever a Section is created, so state keyed on "this section" cannot
+  // be fooled by a new Section allocated at a freed one's address.
+  uint32_t sectionGeneration = 0;
+  // The next page's BW frame, drawn ahead while idle into PSRAM (plan 3.1;
+  // boards with PSRAM only, i.e. the Picco -- the allocation fails elsewhere and
+  // the feature is off). Valid for exactly the key below.
+  uint8_t* prerenderBuf = nullptr;
+  bool prerenderTried = false;  // allocation attempted (once per activity)
+  bool prerenderValid = false;
+  uint32_t prerenderGeneration = 0;
+  int prerenderSpine = -1;
+  int prerenderPage = -1;
+  int prerenderFontId = -1;
+  int prerenderMarginLeft = 0;
+  int prerenderPaintTop = 0;
+  // The paint geometry of the last renderContents, for drawing the next page ahead.
+  int lastPaintMarginLeft = 0;
+  int lastPaintTop = 0;
+  bool lastPaintValid = false;
+  void maybePrerenderNextPage();
+  void freePrerender();
+  int grayDeferredSpine = -1;
+  int grayDeferredPage = -1;
+  int grayDeferredMarginLeft = 0;
+  int grayDeferredPaintTop = 0;
+  uint32_t grayDeferredFrameHash = 0;
   void renderContents(std::unique_ptr<Page> page, int orientedMarginTop, int orientedMarginRight,
                       int orientedMarginBottom, int orientedMarginLeft);
   // Pages laid out per incremental-build pump: on the render path (catching up to the page

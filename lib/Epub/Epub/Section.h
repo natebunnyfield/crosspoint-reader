@@ -85,6 +85,10 @@ class Section {
   // partial/finalized file stays readable while a rebuild is in progress.
   std::string binTmpPath() const { return filePath + ".part"; }
   std::unique_ptr<Page> loadPageAt(int page) const;
+  // File halves of getParagraphIndexForPage / getFirstWordAnchorForPage, on a handle
+  // the caller opened, so getProgressAnchorsForPage can share one open.
+  std::optional<uint16_t> readParagraphIndexFrom(HalFile& f, uint16_t page) const;
+  std::optional<uint32_t> readFirstWordAnchorFrom(HalFile& f, uint16_t page) const;
   // Read a page already laid out by the in-progress build (page < build LUT size), from
   // the partially-written tmp .bin without disturbing the build's write cursor.
   std::unique_ptr<Page> loadPageDuringBuild(int page);
@@ -174,6 +178,9 @@ class Section {
   // 0 for page 0). The exact-reposition counterpart of the paragraph LUT:
   // stable across reflows even in chapters with no <p> elements at all.
   std::optional<uint32_t> getFirstWordAnchorForPage(uint16_t page) const;
+  // Both of the above from one open of the section file (saveProgress, every turn).
+  void getProgressAnchorsForPage(uint16_t page, std::optional<uint16_t>& paragraph,
+                                 std::optional<uint32_t>& wordAnchor) const;
 
   // The page whose span contains source position `anchor` under the CURRENT
   // pagination — the first page of the run whose start anchor <= anchor.

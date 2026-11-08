@@ -226,8 +226,8 @@ void BookNotesActivity::loop() {
     return;
   }
 
-  buttonNavigator.onNextRelease([&scrollBy] { scrollBy(3); });
-  buttonNavigator.onPreviousRelease([&scrollBy] { scrollBy(-3); });
+  buttonNavigator.onNextPress([&scrollBy] { scrollBy(3); });
+  buttonNavigator.onPreviousPress([&scrollBy] { scrollBy(-3); });
   buttonNavigator.onNextContinuous([&pageForward] { pageForward(); });
   buttonNavigator.onPreviousContinuous([&pageBack] { pageBack(); });
   buttonNavigator.onPageNext([&pageForward] { pageForward(); });

@@ -85,6 +85,16 @@ never silently cycle; the popup is what shows the user the alternative.
   fire on press, and should keep doing so (a release-fired tap feels a frame
   late on e-ink). Do not "fix" the inventory screen by screen; a screen moves
   from press to release only when it grows a hold.
+- **List cursor moves fire on PRESS; a hold then pages.** Owner ruling
+  2026-11-07 ("yes to everything else" on
+  `docs/lag-reduction-plan-2026-11-07.md`, plan 3.3). The front Left/Right
+  step one row on the press edge on every list (Settings, the file browser,
+  Manage Files, Recent Books, the chapter lists, Typography, the font picker,
+  the clock offset, the text viewer, the colophon, book notes), and a hold past
+  500 ms continues as page jumps (`ButtonNavigator::onNextContinuous`). They
+  used to step on release so a hold could page instead, which put the whole
+  click in front of every move. Home always worked this way. The reader's front
+  page turn is press-fired by the same reasoning (`ReaderUtils::detectPageTurn`).
 - `ActivityManager` arms `MappedInputManager::swallowUntilIdle()` on every
   activity swap: the incoming activity never sees the press/release edge that
   drove the transition. **Do not add per-activity release latches for

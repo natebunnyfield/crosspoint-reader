@@ -167,6 +167,35 @@ class GfxRenderer {
     _dirtyBottom = -1;
   }
 
+  // ---------------------------------------------------------- frame tiles
+  //
+  // What the glass shows, as one hash per tile of the last presented frame
+  // (physical coordinates: TILE_W_BYTES bytes = 80 px wide, TILE_H rows tall).
+  // The dirty rect above can only say "everything" once a render starts with
+  // clearScreen() -- which every list and menu does -- so a cursor move that
+  // changes two rows used to cost a whole-panel FAST. Diffing the tiles turns
+  // that into a window over what actually changed, and a frame identical to the
+  // one on the glass into no waveform at all
+  // (docs/lag-reduction-plan-2026-11-07.md, F2 and plan 2.1).
+  //
+  // The baseline is only trusted while the glass is known to show exactly the
+  // hashed BW frame: a gray (AA) pass since the last present, or an inversion
+  // change, drops back to the whole-panel refresh this replaced.
+  static constexpr int TILE_W_BYTES = 10;
+  static constexpr int TILE_H = 48;
+  static constexpr int MAX_TILES = 128;  // 800x480 is 10x10, X3's 792x528 is 10x11
+  mutable uint32_t _tileHash[MAX_TILES] = {};
+  mutable bool _tileHashValid = false;
+  mutable bool _tileHashInverted = false;
+  mutable bool _grayShownSinceHash = false;
+  // Rehash the framebuffer into _tileHash. Returns the number of tiles that
+  // changed and their bounding box in tile units; -1 when the panel does not
+  // fit MAX_TILES (the feature is then off).
+  int rehashTiles(int& minTx, int& minTy, int& maxTx, int& maxTy) const;
+  // After a present: the tiles now describe the glass. wholeFrame=false for a
+  // window, which cannot clear gray left outside it.
+  void noteFramePresented(bool wholeFrame = true) const;
+
   // CJK UI font fallback map: primary (built-in, Latin-only) UI font id -> a
   // size-matched SD-card font id that carries CJK glyphs. When a string drawn
   // or measured with a mapped primary font contains a CJK codepoint the primary
@@ -647,6 +676,9 @@ class GfxRenderer {
   // Low level functions
   uint8_t* getFrameBuffer() const;
   size_t getBufferSize() const;
+  // FNV-1a of the whole BW framebuffer: lets a deferred pass prove the frame it
+  // was deferred for is still the one in the buffer.
+  uint32_t frameHash() const;
   uint16_t getDisplayWidth() const { return panelWidth; }
   uint16_t getDisplayHeight() const { return panelHeight; }
   uint16_t getDisplayWidthBytes() const { return panelWidthBytes; }

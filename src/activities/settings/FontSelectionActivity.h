@@ -77,6 +77,11 @@ class FontSelectionActivity final : public Activity {
   ButtonNavigator buttonNavigator_;
   std::vector<FontEntry> fonts_;
   int selectedIndex_ = 0;
+  // Deferred specimen anti-aliasing (FontSelectionActivity::loop).
+  static constexpr unsigned long AA_DEFER_MS = 600;
+  bool aaPending_ = false;
+  bool aaPassRequested_ = false;
+  unsigned long aaPendingSinceMs_ = 0;
   int previewFontIndex_ = 0;
   // false: the pangram/diacritic grid, one line per style. true: a prose
   // passage, which is what actually shows how a face reads at length. Toggled

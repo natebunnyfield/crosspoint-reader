@@ -376,8 +376,8 @@ void TextViewerActivity::loop() {
     return;
   }
 
-  buttonNavigator.onNextRelease([this] { pageForward(); });
-  buttonNavigator.onPreviousRelease([this] { pageBack(); });
+  buttonNavigator.onNextPress([this] { pageForward(); });
+  buttonNavigator.onPreviousPress([this] { pageBack(); });
   buttonNavigator.onNextContinuous([this] { pageForward(); });
   buttonNavigator.onPreviousContinuous([this] { pageBack(); });
 

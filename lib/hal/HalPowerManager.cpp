@@ -219,7 +219,8 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
   // press, so a misread around the sleep transition costs one extra wake
   // blip, never a phantom press. Idle cost is zero — the pin only holds its
   // pressed level while a finger is on it.
-  esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(LIGHT_SLEEP_SLICE_MS) * 1000ULL);
+  const unsigned long sliceMs = gpio.isXteinkDevice() ? ADC_LADDER_LIGHT_SLEEP_SLICE_MS : LIGHT_SLEEP_SLICE_MS;
+  esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(sliceMs) * 1000ULL);
   const int8_t powerPin = BoardConfig::ACTIVE.input.power;
   if (powerPin >= 0) {
     gpio_wakeup_enable(static_cast<gpio_num_t>(powerPin),
@@ -242,6 +243,25 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
   const bool touchWake = touchIrq >= 0 && gpio_get_level(static_cast<gpio_num_t>(touchIrq)) != 0;
   if (touchWake) {
     gpio_wakeup_enable(static_cast<gpio_num_t>(touchIrq), GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+  }
+  // The rocker and the third button are plain active-low GPIOs on the Picco
+  // (BoardConfig.h PICCO input row), unlike the X4/X3's ADC ladder, so they can
+  // wake the slice the way Power does. Without this the rocker -- the Picco's
+  // page-turn and list control -- was first seen up to one 50 ms slice late
+  // after a second of idle, which is every page turn of a reader
+  // (docs/lag-reduction-plan-2026-11-07.md, F10). Armed only when the pin reads
+  // released at entry, for the same no-spin reason as the touch INT above; a
+  // held button keeps the timer cadence. Only an early poll: update()'s
+  // debounce still decides the press.
+  const int8_t buttonWakePins[] = {BoardConfig::ACTIVE.input.up, BoardConfig::ACTIVE.input.down,
+                                   BoardConfig::ACTIVE.input.confirm};
+  bool buttonWakeArmed[sizeof(buttonWakePins)] = {};
+  for (size_t i = 0; i < sizeof(buttonWakePins); ++i) {
+    const int8_t pin = buttonWakePins[i];
+    if (pin < 0 || gpio_get_level(static_cast<gpio_num_t>(pin)) == 0) continue;
+    gpio_wakeup_enable(static_cast<gpio_num_t>(pin), GPIO_INTR_LOW_LEVEL);
+    buttonWakeArmed[i] = true;
     esp_sleep_enable_gpio_wakeup();
   }
 #endif
@@ -273,6 +293,11 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
   if (touchWake) {
     gpio_wakeup_disable(static_cast<gpio_num_t>(touchIrq));
     gpio_set_intr_type(static_cast<gpio_num_t>(touchIrq), GPIO_INTR_DISABLE);
+  }
+  for (size_t i = 0; i < sizeof(buttonWakePins); ++i) {
+    if (!buttonWakeArmed[i]) continue;
+    gpio_wakeup_disable(static_cast<gpio_num_t>(buttonWakePins[i]));
+    gpio_set_intr_type(static_cast<gpio_num_t>(buttonWakePins[i]), GPIO_INTR_DISABLE);
   }
 #endif
 

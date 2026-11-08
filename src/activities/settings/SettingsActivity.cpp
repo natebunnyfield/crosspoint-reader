@@ -314,12 +314,12 @@ void SettingsActivity::loop() {
     return;
   }
 
-  buttonNavigator.onNextRelease([this] {
+  buttonNavigator.onNextPress([this] {
     selectedSettingIndex = ButtonNavigator::nextIndex(selectedSettingIndex, settingsCount);
     requestUpdate();
   });
 
-  buttonNavigator.onPreviousRelease([this] {
+  buttonNavigator.onPreviousPress([this] {
     selectedSettingIndex = ButtonNavigator::previousIndex(selectedSettingIndex, settingsCount);
     requestUpdate();
   });
@@ -363,8 +363,8 @@ void SettingsActivity::loopLightAdjust() {
   }
   // The rocker, through the same release/hold-repeat pair the list uses: the
   // upper end raises the value, the lower end lowers it.
-  buttonNavigator.onNextRelease([this] { stepLight(true); });
-  buttonNavigator.onPreviousRelease([this] { stepLight(false); });
+  buttonNavigator.onNextPress([this] { stepLight(true); });
+  buttonNavigator.onPreviousPress([this] { stepLight(false); });
   buttonNavigator.onNextContinuous([this] { stepLight(true); });
   buttonNavigator.onPreviousContinuous([this] { stepLight(false); });
 }

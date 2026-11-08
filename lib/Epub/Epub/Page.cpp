@@ -32,7 +32,7 @@ bool PageLine::serialize(serialization::BufferedFileWriter& out) {
   return block->serialize(out);
 }
 
-std::unique_ptr<PageLine> PageLine::deserialize(HalFile& file) {
+std::unique_ptr<PageLine> PageLine::deserialize(serialization::BufferedFileReader& file) {
   int16_t xPos;
   int16_t yPos;
   serialization::readPod(file, xPos);
@@ -69,7 +69,7 @@ bool PageImage::serialize(serialization::BufferedFileWriter& out) {
   return imageBlock->serialize(out);
 }
 
-std::unique_ptr<PageImage> PageImage::deserialize(HalFile& file) {
+std::unique_ptr<PageImage> PageImage::deserialize(serialization::BufferedFileReader& file) {
   int16_t xPos;
   int16_t yPos;
   serialization::readPod(file, xPos);
@@ -103,7 +103,7 @@ bool PageRotatedText::serialize(serialization::BufferedFileWriter& out) {
   return true;
 }
 
-std::unique_ptr<PageRotatedText> PageRotatedText::deserialize(HalFile& file) {
+std::unique_ptr<PageRotatedText> PageRotatedText::deserialize(serialization::BufferedFileReader& file) {
   int16_t xPos = 0;
   int16_t yPos = 0;
   uint8_t boldByte = 0;
@@ -140,7 +140,7 @@ bool PageVerticalRule::serialize(serialization::BufferedFileWriter& out) {
   return true;
 }
 
-std::unique_ptr<PageVerticalRule> PageVerticalRule::deserialize(HalFile& file) {
+std::unique_ptr<PageVerticalRule> PageVerticalRule::deserialize(serialization::BufferedFileReader& file) {
   int16_t xPos = 0;
   int16_t yPos = 0;
   uint16_t length = 0;
@@ -178,7 +178,7 @@ bool PageHorizontalRule::serialize(serialization::BufferedFileWriter& out) {
   return true;
 }
 
-std::unique_ptr<PageHorizontalRule> PageHorizontalRule::deserialize(HalFile& file) {
+std::unique_ptr<PageHorizontalRule> PageHorizontalRule::deserialize(serialization::BufferedFileReader& file) {
   int16_t xPos = 0;
   int16_t yPos = 0;
   uint16_t width = 0;
@@ -249,7 +249,7 @@ bool Page::serialize(serialization::BufferedFileWriter& out) const {
   return true;
 }
 
-std::unique_ptr<Page> Page::deserialize(HalFile& file) {
+std::unique_ptr<Page> Page::deserialize(serialization::BufferedFileReader& file) {
   auto page = std::unique_ptr<Page>(new (std::nothrow) Page());
   if (!page) {
     LOG_ERR("PGE", "OOM: Page while deserializing a cached section");

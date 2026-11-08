@@ -436,7 +436,7 @@ bool ImageBlock::serialize(serialization::BufferedFileWriter& out) {
   return true;
 }
 
-std::unique_ptr<ImageBlock> ImageBlock::deserialize(HalFile& file) {
+std::unique_ptr<ImageBlock> ImageBlock::deserialize(serialization::BufferedFileReader& file) {
   std::string path;
   std::string src;
   serialization::readString(file, path);

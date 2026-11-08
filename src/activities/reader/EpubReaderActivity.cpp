@@ -7,6 +7,9 @@
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
+#ifndef SIMULATOR
+#include <esp_heap_caps.h>  // PSRAM for the next-page prerender
+#endif
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -188,6 +191,7 @@ void EpubReaderActivity::onEnter() {
 
 void EpubReaderActivity::onExit() {
   Activity::onExit();
+  freePrerender();
 
   // "No page": tells a read-aloud consumer to stop speech. Inline no-op on
   // device.
@@ -265,13 +269,24 @@ void EpubReaderActivity::loop() {
   // pass draws nothing (FCM scan mode suppresses pixels), so the displayed
   // framebuffer is untouched; endScanAndPrewarm loads only glyphs not already
   // cached. Debounced past rapid page-flipping, one attempt per position, and
-  // deferred while a render/build owns the CPU or the heap is at the render
-  // floor. Cross-chapter prewarm is deliberately out of scope (next spine's
-  // section isn't loaded).
+  // deferred while a render owns the CPU or the heap is at the render floor.
+  // Cross-chapter prewarm is deliberately out of scope (next spine's section
+  // isn't loaded).
+  //
+  // It runs during a build too. It used to require !isBuilding(), but a first
+  // read builds each chapter lazily a few pages ahead of the reader, so the
+  // section counts as building until the reader nears its end: measured, the
+  // prewarm ran on 6 of 40 turns, and with an SD-card font every other turn
+  // loaded its glyphs from the card on the critical path
+  // (docs/lag-reduction-plan-2026-11-07.md, F4). loadPage() serves a page the
+  // build has already laid out (loadPageDuringBuild) and returns null past it;
+  // the attempt is only latched once the page exists, so a page the build has
+  // not reached yet is retried on a later tick.
   constexpr unsigned long IDLE_PREWARM_DEBOUNCE_MS = 400;
-  if (section && !section->isBuilding() && !RenderLock::peek() && renderer.hasFrameBuffer() &&
+  if (section && !RenderLock::peek() && renderer.hasFrameBuffer() &&
       lastRenderCompleteMs != 0 && millis() - lastRenderCompleteMs > IDLE_PREWARM_DEBOUNCE_MS &&
       ESP.getFreeHeap() > RENDER_MIN_FREE_HEAP && ESP.getMaxAllocHeap() > BACKGROUND_BUILD_MIN_MAX_ALLOC &&
+      (section->currentPage + 1 < static_cast<int>(section->pageCount) || !section->isBuilding()) &&
       (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage)) {
     RenderLock lock;  // the page table must not change under the scan
     // Re-check under the lock: peek() and acquisition are not atomic, so the render
@@ -282,12 +297,14 @@ void EpubReaderActivity::loop() {
     // cross-thread race. Do not "simplify" it away.
     // cppcheck-suppress knownConditionTrueFalse
     // cppcheck-suppress knownConditionTrueFalse
-    if (section && !section->isBuilding() &&
+    const int nextPage = section ? section->currentPage + 1 : 0;
+    const bool nextLaidOut = section && nextPage < static_cast<int>(section->pageCount);
+    const bool lastPage = section && !section->isBuilding() && !nextLaidOut;
+    if (section && (nextLaidOut || lastPage) &&
         (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage)) {
       idlePrewarmSpine = currentSpineIndex;
       idlePrewarmPage = section->currentPage;
-      const int nextPage = section->currentPage + 1;
-      if (nextPage < static_cast<int>(section->pageCount)) {
+      if (nextLaidOut) {
         if (const auto p = section->loadPage(nextPage)) {
           if (auto* fcm = renderer.getFontCacheManager()) {
             const auto t0 = millis();
@@ -299,6 +316,20 @@ void EpubReaderActivity::loop() {
         }
       }
     }
+  }
+
+  maybePrerenderNextPage();
+
+  // Deferred anti-aliasing (plan 2.2): once the page has rested with no input,
+  // ask the render task for the gray pass renderContents() skipped. A press in
+  // the meantime turns the page instead and the pass is dropped -- that is the
+  // point: flipping costs one waveform per page.
+  constexpr unsigned long GRAY_DEFER_MS = 600;
+  if (grayDeferred && !grayPassRequested && lastRenderCompleteMs != 0 &&
+      millis() - lastRenderCompleteMs >= GRAY_DEFER_MS && !mappedInput.wasAnyPressed() &&
+      !mappedInput.wasAnyReleased()) {
+    grayPassRequested = true;
+    requestUpdate();
   }
 
   // Lazily resume a partial's extension build once the reader nears its watermark. Far from
@@ -531,8 +562,9 @@ void EpubReaderActivity::loop() {
   // Side buttons whose press a chord already consumed: swallow the remainder of the gesture.
   // This has to sit ahead of BOTH the font block and detectPageTurn(), because both of them
   // are RELEASE-triggered whenever longPressButtonBehavior != OFF (the font tap branch reads
-  // detectSideRelease; detectPageTurn's `usePress` is false unless the setting is OFF — see
-  // ReaderUtils.h). An unswallowed release is therefore a second action from one press, which
+  // detectSideRelease; detectPageTurn's side-button edge is release unless the setting is OFF — see
+  // ReaderUtils.h; the front buttons turn on press and are not part of the chord). An
+  // unswallowed release is therefore a second action from one press, which
   // is the exact "one edge consumed by two handlers" failure this feature had to avoid.
   if (sideChordConsumed) {
     if (sideHeldNow.any()) {
@@ -1076,6 +1108,13 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     return;
   }
 
+  if (grayPassRequested) {
+    grayPassRequested = false;
+    if (runDeferredGrayPass()) return;
+    // The page moved (or the section changed) since the pass was asked for:
+    // this render is for the new state, so fall through to it.
+  }
+
   // A section build failure (e.g. an invalid/corrupt EPUB that fails XML parsing) leaves the
   // "Indexing" popup on screen with no way forward. Surface an explicit error instead of hanging.
   // clearScreen first so the error popup doesn't overlay the stale "Indexing" popup.
@@ -1147,6 +1186,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     const auto filepath = epub->getSpineItem(currentSpineIndex).href;
     LOG_DBG("ERS", "Loading file: %s, index: %d", filepath.c_str(), currentSpineIndex);
     section = makeUniqueNoThrow<Section>(epub, currentSpineIndex, renderer);
+    ++sectionGeneration;
     if (!section) {
       // render() already returns early in two other places; do the same rather
       // than carry a null section into the build below. The next render retries,
@@ -1583,15 +1623,14 @@ bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
   int paragraphIndex = -1;
   int64_t wordAnchor = -1;
   if (section) {
-    // Asked unconditionally, including mid-build: getParagraphIndexForPage()
+    // Asked unconditionally, including mid-build: getProgressAnchorsForPage()
     // consults the in-RAM build LUT first, and progress is routinely saved while
     // the section is still building.
-    if (const auto p = section->getParagraphIndexForPage(static_cast<uint16_t>(currentPage))) {
-      paragraphIndex = static_cast<int>(*p);
-    }
-    if (const auto a = section->getFirstWordAnchorForPage(static_cast<uint16_t>(currentPage))) {
-      wordAnchor = static_cast<int64_t>(*a);
-    }
+    std::optional<uint16_t> p;
+    std::optional<uint32_t> a;
+    section->getProgressAnchorsForPage(static_cast<uint16_t>(currentPage), p, a);
+    if (p) paragraphIndex = static_cast<int>(*p);
+    if (a) wordAnchor = static_cast<int64_t>(*a);
   }
   return EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, paragraphIndex, wordAnchor);
 }
@@ -1798,11 +1837,26 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     ~PxcSlotGuard() { ImageBlock::releaseRenderCache(); }
   } pxcSlotGuard;
 
+  // The next page drawn ahead while idle (plan 3.1, maybePrerenderNextPage):
+  // when it is THIS page with this geometry, the BW frame is a copy and both
+  // the scan and the BW render are skipped. Consumed either way -- a stale one
+  // must never survive into a later page.
+  const bool usePrerender = prerenderValid && prerenderBuf && prerenderGeneration == sectionGeneration &&
+                            section && prerenderSpine == currentSpineIndex && prerenderPage == section->currentPage &&
+                            prerenderFontId == fontId && prerenderMarginLeft == orientedMarginLeft &&
+                            prerenderPaintTop == paintMarginTop && !renderer.isDisplayInverted();
+  prerenderValid = false;
+  lastPaintMarginLeft = orientedMarginLeft;
+  lastPaintTop = paintMarginTop;
+  lastPaintValid = true;
+
   // Font prewarm: scan pass accumulates text, then prewarm, then real render
-  auto* fcm = renderer.getFontCacheManager();
-  auto scope = fcm->createPrewarmScope();
-  page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);  // scan pass
-  scope.endScanAndPrewarm();
+  if (!usePrerender) {
+    auto* fcm = renderer.getFontCacheManager();
+    auto scope = fcm->createPrewarmScope();
+    page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);  // scan pass
+    scope.endScanAndPrewarm();
+  }
   const auto tPrewarm = millis();
 
   const bool pageHasImages = page->hasImages();
@@ -1837,14 +1891,19 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // identical serial timing. Image pages take the blocking double-FAST path
   // below (no async refresh is ever started), so they'd spend the buffers with
   // nothing in flight to overlap.
-  const bool overlapRefresh = tiledGrayscale && renderer.supportsAsyncRefresh() && !pageHasImages;
-  auto renderGrayscalePass = [&]() {
-    if (needsTextGrayscale) {
-      page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);
-    } else {
-      page->renderImages(renderer, fontId, orientedMarginLeft, paintMarginTop);
-    }
-  };
+  //
+  // Deferred anti-aliasing (plan 2.2): a text-only page in light mode on a
+  // strip-capable panel shows its BW frame and stops; the gray pass follows
+  // once the page has rested (runDeferredGrayPass). Image pages keep their
+  // immediate pipeline -- their double-FAST sequence and the forced HALF after
+  // it are tuned around the gray pass following at once (#2190). Dark mode
+  // keeps it too: its BW base pass already paints the AA levels for an overlay
+  // that must then come (DarkAaScope above).
+  const bool deferGray =
+      tiledGrayscale && needsTextGrayscale && !pageHasImages && !renderer.isDisplayInverted();
+  grayDeferred = false;  // whatever was pending belonged to the frame being replaced
+  const bool overlapRefresh =
+      tiledGrayscale && renderer.supportsAsyncRefresh() && !pageHasImages && !deferGray;
 
   if (pageHasImagesNeedingDecode) {
     page->renderWithImagePlaceholders(renderer, fontId, orientedMarginLeft, paintMarginTop);
@@ -1853,7 +1912,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     renderer.clearScreen();
   }
 
-  page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);
+  if (usePrerender) {
+    memcpy(renderer.getFrameBuffer(), prerenderBuf, renderer.getBufferSize());
+  } else {
+    page->render(renderer, fontId, orientedMarginLeft, paintMarginTop);
+  }
   const auto tBwRender = millis();
 
   if (pageHasImages) {
@@ -1866,11 +1929,15 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     if (page->getImageBoundingBox(imgX, imgY, imgW, imgH)) {
       // Image pages intentionally bypass the regular refresh cadence. Preserve
       // a pending clean base before their double-FAST grayscale pipeline.
-      if (cleanImageBasePending) {
-        renderer.displayBuffer(HalDisplay::HALF_REFRESH);
-      }
+      //
+      // The clean base is laid with the image area ALREADY blanked: one HALF
+      // instead of HALF-then-FAST. The point of the double-FAST technique is
+      // that the image itself arrives by FAST (a HALF sets its particles too
+      // firmly for the gray LUT); a HALF of the page with the image area white
+      // keeps that, and drops a whole ~500 ms waveform from every image page
+      // that needed a clean base (docs/lag-reduction-plan-2026-11-07.md, F7).
       renderer.fillRect(imgX + orientedMarginLeft, imgY + paintMarginTop, imgW, imgH, false);
-      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+      renderer.displayBuffer(cleanImageBasePending ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
 
       // Re-render page content to restore images into the blanked area
       // Status bar is not re-rendered here to avoid reading stale dynamic values (e.g. battery %)
@@ -1893,6 +1960,47 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   }
   const auto tDisplay = millis();
   publishTurned();  // no-op when the placeholder pass above already did
+
+  if (deferGray) {
+    // Deferred anti-aliasing: the BW page above is the whole turn. The gray
+    // pass runs later, from loop(), once the page has rested GRAY_DEFER_MS
+    // with no input -- so flipping through pages costs one waveform per page
+    // instead of two (docs/lag-reduction-plan-2026-11-07.md, plan 2.2). The BW
+    // refresh was blocking (overlapRefresh is false here), so controller RAM
+    // already holds the differential baseline the next page needs.
+    grayDeferred = true;
+    grayDeferredGeneration = sectionGeneration;
+    grayDeferredSpine = currentSpineIndex;
+    grayDeferredPage = section ? section->currentPage : -1;
+    grayDeferredMarginLeft = orientedMarginLeft;
+    grayDeferredPaintTop = paintMarginTop;
+    grayDeferredFrameHash = renderer.frameHash();
+    LOG_DBG("ERS", "Page render (gray deferred): prewarm=%lums bw_render=%lums display=%lums total=%lums",
+            tPrewarm - t0, tBwRender - tPrewarm, tDisplay - tBwRender, millis() - t0);
+    return;
+  }
+  renderGrayOverlay(*page, fontId, orientedMarginLeft, paintMarginTop, needsTextGrayscale, needsAnyGrayscale,
+                    tiledGrayscale, overlapRefresh, {t0, tPrewarm, tBwRender, tDisplay});
+}
+
+// The anti-aliasing (gray) pass over a page whose BW frame is already on the
+// glass and still in the framebuffer. Runs straight after the BW refresh, or
+// later as the deferred pass (runDeferredGrayPass).
+void EpubReaderActivity::renderGrayOverlay(Page& page, const int fontId, const int orientedMarginLeft,
+                                           const int paintMarginTop, const bool needsTextGrayscale,
+                                           const bool needsAnyGrayscale, const bool tiledGrayscale,
+                                           const bool overlapRefresh, const GrayPassTimes& times) {
+  const auto t0 = times.t0;
+  const auto tPrewarm = times.tPrewarm;
+  const auto tBwRender = times.tBwRender;
+  const auto tDisplay = times.tDisplay;
+  auto renderGrayscalePass = [&]() {
+    if (needsTextGrayscale) {
+      page.render(renderer, fontId, orientedMarginLeft, paintMarginTop);
+    } else {
+      page.renderImages(renderer, fontId, orientedMarginLeft, paintMarginTop);
+    }
+  };
 
   // Tiled grayscale: render each plane band-by-band, leaving the BW
   // framebuffer intact so no full-frame storeBwBuffer is needed; controller
@@ -2083,6 +2191,101 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
               tBwRender - tPrewarm, tDisplay - tBwRender, tEnd - t0);
     }
   }
+}
+
+// The deferred half of a page turn (plan 2.2). Called from render() when loop()
+// asked for it; returns false when the page it was deferred for is no longer
+// the one on screen, in which case render() carries on with a normal render.
+bool EpubReaderActivity::runDeferredGrayPass() {
+  // The framebuffer must still hold exactly the BW page the pass was deferred
+  // for -- a child screen, a popup or a polarity flip may have drawn since, and
+  // then this render is for THAT (adversarial review 2026-11-07, finding 2).
+  // Inverted: the overlay cannot apply (FreeInkDisplay::displayGrayBuffer).
+  if (!grayDeferred || !section || sectionGeneration != grayDeferredGeneration ||
+      currentSpineIndex != grayDeferredSpine || section->currentPage != grayDeferredPage ||
+      renderer.isDisplayInverted() || renderer.frameHash() != grayDeferredFrameHash) {
+    grayDeferred = false;
+    return false;
+  }
+  grayDeferred = false;
+  auto page = section->loadPage(grayDeferredPage);
+  if (!page) return false;
+  const auto t0 = millis();
+  const int fontId = SETTINGS.getReaderFontId();
+  renderer.setGrayscaleAaStrength(ReaderUtils::textAaStrength());
+  renderGrayOverlay(*page, fontId, grayDeferredMarginLeft, grayDeferredPaintTop, /*needsTextGrayscale=*/true,
+                    /*needsAnyGrayscale=*/true, /*tiledGrayscale=*/true, /*overlapRefresh=*/false,
+                    {t0, t0, t0, t0});
+  LOG_DBG("ERS", "Deferred gray pass: spine %d page %d in %lums", currentSpineIndex, section->currentPage,
+          millis() - t0);
+  return true;
+}
+
+// Plan 3.1 (docs/lag-reduction-plan-2026-11-07.md): on a board with PSRAM, draw
+// the next page's BW frame while the reader rests, so the turn to it is a 48 KB
+// copy instead of a scan pass and a render. Text pages only -- an image page's
+// pipeline decodes and refreshes in stages -- and light mode only, whose BW base
+// pass does not depend on the AA overlay. Runs on the loop task under the
+// RenderLock, after the idle prewarm has loaded the page's glyphs.
+void EpubReaderActivity::maybePrerenderNextPage() {
+  constexpr unsigned long PRERENDER_IDLE_MS = 450;  // after IDLE_PREWARM_DEBOUNCE_MS
+  if (!section || !lastPaintValid || grayPassRequested || RenderLock::peek() || !renderer.hasFrameBuffer() ||
+      renderer.isDisplayInverted() || lastRenderCompleteMs == 0 ||
+      millis() - lastRenderCompleteMs <= PRERENDER_IDLE_MS) {
+    return;
+  }
+  const int next = section->currentPage + 1;
+  if (next >= static_cast<int>(section->pageCount)) return;
+  const int fontId = SETTINGS.getReaderFontId();
+  // One attempt per key, valid or not (an image page is attempted and skipped).
+  if (prerenderGeneration == sectionGeneration && prerenderSpine == currentSpineIndex && prerenderPage == next &&
+      prerenderFontId == fontId && prerenderMarginLeft == lastPaintMarginLeft && prerenderPaintTop == lastPaintTop) {
+    return;
+  }
+  if (!prerenderTried) {
+    prerenderTried = true;
+#ifdef SIMULATOR
+    // The simulator has no PSRAM to fail on; opt in to exercise the path.
+    if (std::getenv("CROSSPOINT_SIM_PRERENDER")) {
+      prerenderBuf = static_cast<uint8_t*>(malloc(renderer.getBufferSize()));
+    }
+#else
+    prerenderBuf = static_cast<uint8_t*>(heap_caps_malloc(renderer.getBufferSize(), MALLOC_CAP_SPIRAM));
+#endif
+    LOG_DBG("ERS", "Next-page prerender %s", prerenderBuf ? "on (PSRAM)" : "off (no PSRAM)");
+  }
+  if (!prerenderBuf) return;
+
+  RenderLock lock;
+  // Re-check under the lock, as the idle prewarm does.
+  if (!section || section->currentPage + 1 != next) return;
+  prerenderValid = false;
+  prerenderGeneration = sectionGeneration;
+  prerenderSpine = currentSpineIndex;
+  prerenderPage = next;
+  prerenderFontId = fontId;
+  prerenderMarginLeft = lastPaintMarginLeft;
+  prerenderPaintTop = lastPaintTop;
+  const auto page = section->loadPage(next);
+  if (!page || page->hasImages()) return;
+  const auto t0 = millis();
+  renderer.beginStripTarget(prerenderBuf, 0, renderer.getDisplayHeight());
+  renderer.clearScreen();
+  page->render(renderer, fontId, lastPaintMarginLeft, lastPaintTop);
+  renderer.endStripTarget();
+  prerenderValid = true;
+  LOG_DBG("ERS", "Prerendered page %d in %lums", next, millis() - t0);
+}
+
+void EpubReaderActivity::freePrerender() {
+  prerenderValid = false;
+  if (!prerenderBuf) return;
+#ifdef SIMULATOR
+  free(prerenderBuf);
+#else
+  heap_caps_free(prerenderBuf);
+#endif
+  prerenderBuf = nullptr;
 }
 
 void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool savePosition) {

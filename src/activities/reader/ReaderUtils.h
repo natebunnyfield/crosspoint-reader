@@ -68,20 +68,30 @@ struct PageTurnResult {
   bool next;
 };
 
+// The FRONT Left/Right turn on PRESS, always. They lost their only hold meaning
+// when chapter-skip was retired on 2026-09-01 (docs/hold-gestures.md), and
+// docs/ui-conventions.md rules that a control with no hold fires on press: a
+// release-fired turn added the whole time the finger was down to every page
+// (docs/lag-reduction-plan-2026-11-07.md, F1). On the Picco these are the
+// rocker's two ends.
+//
+// The SIDE pair (PageBack/PageForward) keeps the setting-driven edge: while
+// longPressButtonBehavior is FONT_SIZE_STEP a side hold is a font step, so a
+// side tap can only be told from a hold on release. Power keeps release for
+// the same reason (its hold sleeps).
 inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
-  const bool usePress = SETTINGS.longPressButtonBehavior == SETTINGS.OFF;
+  const bool sidePress = SETTINGS.longPressButtonBehavior == SETTINGS.OFF;
   const bool swapFront = input.isNavDirectionSwapped();
   const auto prevButton = swapFront ? MappedInputManager::Button::Right : MappedInputManager::Button::Left;
   const auto nextButton = swapFront ? MappedInputManager::Button::Left : MappedInputManager::Button::Right;
-  const bool prev =
-      (usePress ? (input.wasPressed(MappedInputManager::Button::PageBack) || input.wasPressed(prevButton))
-                : (input.wasReleased(MappedInputManager::Button::PageBack) || input.wasReleased(prevButton)));
+  const bool sidePrev = sidePress ? input.wasPressed(MappedInputManager::Button::PageBack)
+                                  : input.wasReleased(MappedInputManager::Button::PageBack);
+  const bool sideNext = sidePress ? input.wasPressed(MappedInputManager::Button::PageForward)
+                                  : input.wasReleased(MappedInputManager::Button::PageForward);
   const bool powerTurn = SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN &&
                          input.wasReleased(MappedInputManager::Button::Power);
-  const bool next = (usePress ? (input.wasPressed(MappedInputManager::Button::PageForward) || powerTurn ||
-                                 input.wasPressed(nextButton))
-                              : (input.wasReleased(MappedInputManager::Button::PageForward) || powerTurn ||
-                                 input.wasReleased(nextButton)));
+  const bool prev = sidePrev || input.wasPressed(prevButton);
+  const bool next = sideNext || powerTurn || input.wasPressed(nextButton);
   return {prev, next};
 }
 

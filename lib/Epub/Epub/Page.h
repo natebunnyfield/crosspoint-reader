@@ -44,7 +44,7 @@ class PageLine final : public PageElement {
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
   bool serialize(serialization::BufferedFileWriter& out) override;
   PageElementTag getTag() const override { return TAG_PageLine; }
-  static std::unique_ptr<PageLine> deserialize(HalFile& file);
+  static std::unique_ptr<PageLine> deserialize(serialization::BufferedFileReader& file);
 };
 
 // New PageImage class
@@ -58,7 +58,7 @@ class PageImage final : public PageElement {
   void renderPlaceholder(GfxRenderer& renderer, int xOffset, int yOffset) const;
   bool serialize(serialization::BufferedFileWriter& out) override;
   PageElementTag getTag() const override { return TAG_PageImage; }
-  static std::unique_ptr<PageImage> deserialize(HalFile& file);
+  static std::unique_ptr<PageImage> deserialize(serialization::BufferedFileReader& file);
   const ImageBlock& getImageBlock() const { return *imageBlock; }
 };
 
@@ -87,7 +87,7 @@ class PageRotatedText final : public PageElement {
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
   bool serialize(serialization::BufferedFileWriter& out) override;
   PageElementTag getTag() const override { return TAG_PageRotatedText; }
-  static std::unique_ptr<PageRotatedText> deserialize(HalFile& file);
+  static std::unique_ptr<PageRotatedText> deserialize(serialization::BufferedFileReader& file);
 };
 
 // The header rule of a rotated table page. Vertical on the upright page, which
@@ -103,7 +103,7 @@ class PageVerticalRule final : public PageElement {
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
   bool serialize(serialization::BufferedFileWriter& out) override;
   PageElementTag getTag() const override { return TAG_PageVerticalRule; }
-  static std::unique_ptr<PageVerticalRule> deserialize(HalFile& file);
+  static std::unique_ptr<PageVerticalRule> deserialize(serialization::BufferedFileReader& file);
 };
 
 class PageHorizontalRule final : public PageElement {
@@ -117,7 +117,7 @@ class PageHorizontalRule final : public PageElement {
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
   bool serialize(serialization::BufferedFileWriter& out) override;
   PageElementTag getTag() const override { return TAG_PageHorizontalRule; }
-  static std::unique_ptr<PageHorizontalRule> deserialize(HalFile& file);
+  static std::unique_ptr<PageHorizontalRule> deserialize(serialization::BufferedFileReader& file);
 
   // For tests: the two rules this class draws are visually distinct on purpose
   // -- an <hr> section break is a quarter of the measure at 2 px, a flattened
@@ -148,7 +148,7 @@ class Page {
   void renderImages(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) const;
   void renderWithImagePlaceholders(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) const;
   bool serialize(serialization::BufferedFileWriter& out) const;
-  static std::unique_ptr<Page> deserialize(HalFile& file);
+  static std::unique_ptr<Page> deserialize(serialization::BufferedFileReader& file);
 
   // Check if page contains any images (used to force full refresh)
   bool hasImages() const {

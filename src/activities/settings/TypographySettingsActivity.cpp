@@ -210,11 +210,11 @@ void TypographySettingsActivity::loop() {
 
   const int pageItems = GUI.getListPageItems(listHeight, hasSubtitle);
 
-  buttonNavigator_.onNextRelease([this, rowCount] {
+  buttonNavigator_.onNextPress([this, rowCount] {
     selectedIndex_ = ButtonNavigator::nextIndex(selectedIndex_, rowCount);
     requestUpdate();
   });
-  buttonNavigator_.onPreviousRelease([this, rowCount] {
+  buttonNavigator_.onPreviousPress([this, rowCount] {
     selectedIndex_ = ButtonNavigator::previousIndex(selectedIndex_, rowCount);
     requestUpdate();
   });

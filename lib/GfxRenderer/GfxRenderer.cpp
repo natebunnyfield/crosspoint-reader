@@ -2337,6 +2337,7 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   // has no previous frame to diff against, or when the band is more than two
   // thirds of the panel. So this is an offer, not an instruction, and a panel
   // with no windowed path (supportsWindowedRefresh() false) never sees it.
+  const int panelArea = static_cast<int>(panelWidth) * static_cast<int>(panelHeight);
   if (refreshMode == HalDisplay::FAST_REFRESH && !_dirtyAll && !_stripActive &&
       _dirtyBottom >= _dirtyTop && _dirtyRight >= _dirtyLeft && display.supportsWindowedRefresh()) {
     const int w = _dirtyRight - _dirtyLeft + 1;
@@ -2344,17 +2345,107 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
     // Area, not either edge on its own. In Portrait a line of text is narrow in
     // physical X and full height in physical Y, so a height test alone would
     // reject exactly the case this exists for.
-    const int panelArea = static_cast<int>(panelWidth) * static_cast<int>(panelHeight);
     if (w * h * 3 <= panelArea * 2) {
       display.displayWindow(static_cast<uint16_t>(_dirtyLeft), static_cast<uint16_t>(_dirtyTop),
                             static_cast<uint16_t>(w), static_cast<uint16_t>(h), fadingFix);
+      // The tiles must follow what this window put on the glass (a popup, a
+      // typed line), or the next whole-screen redraw diffs against the frame
+      // from BEFORE it and leaves the popup standing (adversarial review
+      // 2026-11-07, finding 1). Partial: gray outside the window is still
+      // there, so the gray flag is left as it was.
+      int a, b, c, d;
+      rehashTiles(a, b, c, d);
+      noteFramePresented(/*wholeFrame=*/false);
       resetDirty();
       return;
     }
   }
 
+  // Whole-screen redraw (clearScreen marked everything dirty): diff the tiles
+  // against what the glass shows. See _tileHash in GfxRenderer.h.
+  if (refreshMode == HalDisplay::FAST_REFRESH && _dirtyAll && !_stripActive && frameBuffer &&
+      display.supportsWindowedRefresh()) {
+    const bool baselineTrusted =
+        _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
+    int minTx, minTy, maxTx, maxTy;
+    const int changed = rehashTiles(minTx, minTy, maxTx, maxTy);
+    if (baselineTrusted && changed == 0) {
+      LOG_DBG("GFX", "Present skipped: frame identical to the glass");
+      resetDirty();
+      return;
+    }
+    if (baselineTrusted && changed > 0) {
+      const int x = minTx * TILE_W_BYTES * 8;
+      const int y = minTy * TILE_H;
+      const int w = std::min(static_cast<int>(panelWidth), (maxTx + 1) * TILE_W_BYTES * 8) - x;
+      const int h = std::min(static_cast<int>(panelHeight), (maxTy + 1) * TILE_H) - y;
+      if (w > 0 && h > 0 && w * h * 3 <= panelArea * 2) {
+        LOG_DBG("GFX", "Present windowed to %d changed tiles: %d,%d %dx%d", changed, x, y, w, h);
+        display.displayWindow(static_cast<uint16_t>(x), static_cast<uint16_t>(y), static_cast<uint16_t>(w),
+                              static_cast<uint16_t>(h), fadingFix);
+        noteFramePresented(/*wholeFrame=*/false);  // trusted baseline: no gray was showing
+        resetDirty();
+        return;
+      }
+    }
+    display.displayBuffer(refreshMode, fadingFix);
+    noteFramePresented();  // hashes already describe this frame
+    resetDirty();
+    return;
+  }
+
   display.displayBuffer(refreshMode, fadingFix);
+  int a, b, c, d;
+  rehashTiles(a, b, c, d);
+  noteFramePresented();
   resetDirty();
+}
+
+int GfxRenderer::rehashTiles(int& minTx, int& minTy, int& maxTx, int& maxTy) const {
+  minTx = minTy = INT32_MAX;
+  maxTx = maxTy = -1;
+  const int tilesX = (panelWidthBytes + TILE_W_BYTES - 1) / TILE_W_BYTES;
+  const int tilesY = (panelHeight + TILE_H - 1) / TILE_H;
+  if (!frameBuffer || tilesX * tilesY > MAX_TILES) {
+    _tileHashValid = false;
+    return -1;
+  }
+  int changed = 0;
+  for (int ty = 0; ty < tilesY; ++ty) {
+    const int rowEnd = std::min(static_cast<int>(panelHeight), (ty + 1) * TILE_H);
+    for (int tx = 0; tx < tilesX; ++tx) {
+      const int colStart = tx * TILE_W_BYTES;
+      const int colBytes = std::min(TILE_W_BYTES, static_cast<int>(panelWidthBytes) - colStart);
+      uint32_t h = 2166136261u;  // FNV-1a
+      for (int row = ty * TILE_H; row < rowEnd; ++row) {
+        const uint8_t* p = frameBuffer + static_cast<size_t>(row) * panelWidthBytes + colStart;
+        for (int i = 0; i < colBytes; ++i) h = (h ^ p[i]) * 16777619u;
+      }
+      uint32_t& slot = _tileHash[ty * tilesX + tx];
+      if (slot != h) {
+        slot = h;
+        ++changed;
+        minTx = std::min(minTx, tx);
+        maxTx = std::max(maxTx, tx);
+        minTy = std::min(minTy, ty);
+        maxTy = std::max(maxTy, ty);
+      }
+    }
+  }
+  return changed;
+}
+
+void GfxRenderer::noteFramePresented(const bool wholeFrame) const {
+  _tileHashValid = true;
+  _tileHashInverted = display.isInverted();
+  if (wholeFrame) _grayShownSinceHash = false;
+}
+
+uint32_t GfxRenderer::frameHash() const {
+  if (!frameBuffer) return 0;
+  uint32_t h = 2166136261u;  // FNV-1a
+  for (size_t i = 0; i < frameBufferSize; ++i) h = (h ^ frameBuffer[i]) * 16777619u;
+  return h;
 }
 
 void GfxRenderer::displayBufferAsync(const HalDisplay::RefreshMode refreshMode) const {
@@ -2362,9 +2453,15 @@ void GfxRenderer::displayBufferAsync(const HalDisplay::RefreshMode refreshMode) 
   // relies on; keep those users on the blocking path.
   if (fadingFix) {
     display.displayBuffer(refreshMode, fadingFix);
+    int a, b, c, d;
+    rehashTiles(a, b, c, d);
+    noteFramePresented();
     return;
   }
   display.displayBufferAsync(refreshMode);
+  int a, b, c, d;
+  rehashTiles(a, b, c, d);
+  noteFramePresented();
 }
 
 void GfxRenderer::waitRefreshComplete() const { display.waitRefreshComplete(); }
@@ -3134,6 +3231,9 @@ size_t GfxRenderer::getBufferSize() const { return frameBufferSize; }
 
 void GfxRenderer::displayGrayscaleBase(HalDisplay::RefreshMode fallback) const {
   display.displayGrayscaleBase(fallback, fadingFix);
+  int a, b, c, d;
+  rehashTiles(a, b, c, d);
+  noteFramePresented();
 }
 
 void GfxRenderer::preconditionGrayscale() const { display.preconditionGrayscale(); }
@@ -3161,7 +3261,10 @@ void GfxRenderer::copyGrayscaleLsbBuffers() const { display.copyGrayscaleLsbBuff
 
 void GfxRenderer::copyGrayscaleMsbBuffers() const { display.copyGrayscaleMsbBuffers(frameBuffer); }
 
-void GfxRenderer::displayGrayBuffer() const { display.displayGrayBuffer(fadingFix); }
+void GfxRenderer::displayGrayBuffer() const {
+  display.displayGrayBuffer(fadingFix);
+  _grayShownSinceHash = true;  // the glass is no longer the plain BW frame the tiles describe
+}
 
 void GfxRenderer::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* scratch, int yStart, int numRows) const {
   // Guard the uint16_t casts below: a negative would wrap to a huge length.

@@ -293,12 +293,12 @@ void FileBrowserActivity::loop() {
     return;
   }
 
-  buttonNavigator.onNextRelease([this, listSize] {
+  buttonNavigator.onNextPress([this, listSize] {
     selectorIndex = ButtonNavigator::nextIndex(static_cast<int>(selectorIndex), listSize);
     requestUpdate();
   });
 
-  buttonNavigator.onPreviousRelease([this, listSize] {
+  buttonNavigator.onPreviousPress([this, listSize] {
     selectorIndex = ButtonNavigator::previousIndex(static_cast<int>(selectorIndex), listSize);
     requestUpdate();
   });

@@ -65,12 +65,21 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
   }
 }
 
+// Same test loadRecentCovers() makes before generating, without generating:
+// a recent book with a cover path whose thumbnail at this height is missing,
+// in a format loadRecentCovers() knows how to thumbnail.
+bool HomeActivity::anyCoverNeedsThumb(const int coverHeight) const {
+  for (const RecentBook& book : recentBooks) {
+    if (book.coverBmpPath.empty()) continue;
+    if (!FsHelpers::hasEpubExtension(book.path) && !FsHelpers::hasXtcExtension(book.path)) continue;
+    const std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
+    if (!Storage.exists(coverPath.c_str())) return true;
+  }
+  return false;
+}
+
 void HomeActivity::loadRecentCovers(int coverHeight) {
   recentsLoading = true;
-  bool showingLoading = false;
-  Rect popupRect;
-
-  int progress = 0;
   for (RecentBook& book : recentBooks) {
     if (!book.coverBmpPath.empty()) {
       std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
@@ -81,12 +90,10 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
           // Skip loading css since we only need metadata here
           epub.load(false, true);
 
-          // Try to generate thumbnail image for Continue Reading card
-          if (!showingLoading) {
-            showingLoading = true;
-            popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
-          }
-          GUI.fillPopupProgress(renderer, popupRect, 10 + progress * (90 / recentBooks.size()));
+          // Generated with no popup: Home's first frame is already on the
+          // glass, and the "Loading" popup plus its progress bar were two
+          // more whole-panel FAST waveforms (~1 s) in front of the cover
+          // (docs/lag-reduction-plan-2026-11-07.md, F3).
           bool success = epub.generateThumbBmp(coverHeight);
           if (!success) {
             RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
@@ -98,12 +105,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
           // Handle XTC file
           Xtc xtc(book.path, "/.crosspoint");
           if (xtc.load()) {
-            // Try to generate thumbnail image for Continue Reading card
-            if (!showingLoading) {
-              showingLoading = true;
-              popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
-            }
-            GUI.fillPopupProgress(renderer, popupRect, 10 + progress * (90 / recentBooks.size()));
+            // No popup, as for epub above.
             bool success = xtc.generateThumbBmp(coverHeight);
             if (!success) {
               RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
@@ -115,7 +117,6 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
         }
       }
     }
-    progress++;
   }
 
   recentsLoaded = true;
@@ -499,7 +500,19 @@ void HomeActivity::render(RenderLock&&) {
 
   if (!firstRenderDone) {
     firstRenderDone = true;
-    requestUpdate();
+    // Missing cover thumbnails are generated AFTER this frame is on the glass.
+    // This used to be a second requestUpdate() whose render repainted a
+    // byte-identical frame before reaching loadRecentCovers() -- a whole FAST
+    // waveform (~500 ms) on every Home entry, thumbnails or not, with the first
+    // cursor move queued behind it (docs/lag-reduction-plan-2026-11-07.md, F2).
+    // Generating here instead is the same work on the same task, minus the
+    // repaint; loadRecentCovers() requests the render that shows the new cover.
+    if (anyCoverNeedsThumb(metrics.homeCoverHeight)) {
+      recentsLoading = true;
+      loadRecentCovers(metrics.homeCoverHeight);
+    } else {
+      recentsLoaded = true;
+    }
   } else if (!recentsLoaded && !recentsLoading) {
     recentsLoading = true;
     loadRecentCovers(metrics.homeCoverHeight);
@@ -518,7 +531,8 @@ void HomeActivity::recordFocus() {
   }
 }
 
-void HomeActivity::onSelectBook(const std::string& path) { activityManager.goToReader(path); }
+// FAST first page, as Activity::onSelectBook (plan 2.5).
+void HomeActivity::onSelectBook(const std::string& path) { activityManager.goToReader(path, true); }
 
 void HomeActivity::onFileBrowserOpen() { activityManager.goToFileBrowser(); }
 

@@ -11,7 +11,7 @@ edge and each panel call, hashes the framebuffer at every refresh, and counts
 storage calls between them. Nothing in the firmware was changed for this
 document.
 
-**Status of every item: PLAN. Nothing here is implemented.** Device timings
+**Status: IMPLEMENTED on branch `lag-reduction`, 2026-11-07 — see "Implementation" at the end. Everything is UNCONFIRMED on glass (device measurement skipped by owner ruling).** Device timings
 quoted as "measured" come from earlier on-glass sessions and are cited; every
 other device figure is labeled an estimate.
 
@@ -261,7 +261,7 @@ git -C ~/src/crosspoint-reader worktree add --detach $W/crosspoint-reader HEAD
 git -C ~/src/crosspoint-simulator worktree add --detach $W/crosspoint-simulator HEAD
 git -C $W/crosspoint-simulator apply ~/src/crosspoint-reader/docs/data/sim-latency-trace-2026-11-07.patch
 cd $W/crosspoint-reader && git submodule update --init --recursive
-PLATFORMIO_BUILD_FLAGS="-O2 -g" pio run -e simulator     # -O0 is the native default
+PLATFORMIO_BUILD_DIR=.pio/build-sim PLATFORMIO_BUILD_FLAGS="-O2 -g" pio run -e simulator  # own dir: -O2 changes the checksum, and a device build would wipe it
 # card: books/anne.epub (from ~/src/crosspoint-books), .crosspoint/state.json
 # {"openEpubPath":"/books/anne.epub","showBootScreen":false} and a recent.json
 # naming it. A FRESH COPY EVERY RUN: progress and caches persist.
@@ -287,3 +287,89 @@ tools/latency/run_scenario.sh $CARD run.log "3000:RIGHT:150;3900:RIGHT:150;...;Q
   (`PiccoInput.h:163-181`) and release-edge consumers one loop later
   (`HalGPIO.cpp:157-163`). So 1.1 and 3.3 shorten taps on the Picco too, by
   about a loop rather than a hold.
+
+## Implementation, 2026-11-07
+
+Owner rulings, verbatim: *"skip device measurement for now; yes to everything
+else"*, then mid-way *"prioritize picco"*. So Phase 0 is not done, every other
+item is, Picco-specific work went first, and **nothing below has been seen on
+glass**: each item is SHIPPED — UNCONFIRMED on device, with what to look for.
+
+A correction to the survey above: its simulator runs had the desktop host's
+`darkMode: 1` (the simulator's settings file next to the card), which the
+firmware reads as an INVERTED panel. The counts in the tables (refresh modes,
+storage calls, SAME-FRAME) are unaffected, but the overlapped async page turn
+and the anti-aliasing path were running their dark-mode branches. Every
+before/after below was re-run in light mode, and `tools/latency/gate.sh` pins
+it.
+
+| Item | Change | Simulator, before → after |
+|---|---|---|
+| F1 / 1.1 | Front Left/Right turn on PRESS (`ReaderUtils::detectPageTurn`); side pair and Power unchanged | action at +106–157 ms (release) → **+1 ms** after the press |
+| Picco | Rocker and third button armed as light-sleep wakes (`HalPowerManager::lightSleep`), like Power and the touch INT | code only (no Picco simulator) |
+| F2 / 1.2 | Home's second render dropped; thumbnails generated straight after the first frame | later Home entries 2 FAST → **1**; first entry 5 → **2** (the 2nd windowed to the cover) |
+| F3 / 1.3 | No "Loading" popup or progress frames for thumbnail generation | −2 FAST on the first Home entry |
+| F4 / 1.4 | Idle prewarm runs during a build when the next page is laid out | prewarm on 6/40 turns → **38/40** |
+| F5 / 1.5 | `Page::deserialize` and the block deserializers read through a 1 KB `BufferedFileReader`; `saveProgress` gets both anchors from one open (`Section::getProgressAnchorsForPage`) | **442–486 → 2–5** storage reads per turn; 2 fewer opens |
+| F8 / 1.6 | No 250 ms serial delay on a deep-sleep wake; recovery-chord settle 500 → 50 ms on the Picco only | code only |
+| F12 / 1.7 + 2.2 | Font picker specimen AA deferred until the cursor rests 600 ms | 2 waveforms per move → 1 |
+| 2.1 | `GfxRenderer::displayBuffer` keeps a hash per 80x48 tile of the last presented frame; a whole-screen FAST redraw is windowed to the changed tiles (≤ 2/3 panel) or skipped when nothing changed; untrusted after a gray pass or an inversion change | Settings row move: whole panel → **160x480 window** (two rows) |
+| F6 / 2.2 | Deferred AA in the reader: text pages in light mode show BW, the gray pass runs once the page rests 600 ms; any press first drops it | slow turns: gray @ ~+620 ms; **8 rapid turns: 0 gray passes** until rest |
+| 2.3 / 2.4 | `-DFREEINK_X4_FAST_DU_SHORTCUT -DFREEINK_X4_OVERCLOCK_SPI` in `[base]` (X4 profile only) | device only |
+| F9 / 2.5 | Book opened from Home / a browser: FAST first page (HALF kept after the Indexing popup) | resume: HALF → **FAST** |
+| F8 / 2.6 | Quick-resume wake on every board: RAM baseline restored, loading icon by FAST, FAST first page (the X3 already did) | code only |
+| F7 / 2.7 | Image page with a pending clean base: HALF on the frame with the image area already blanked, then FAST with the image | 3 waveforms → **2** |
+| 3.1 | Picco: next text page drawn ahead into PSRAM while idle, copied into the framebuffer on the turn (`maybePrerenderNextPage`); off where `heap_caps_malloc(MALLOC_CAP_SPIRAM)` fails (X4/X3) | `CROSSPOINT_SIM_PRERENDER=1`: 13 of 14 turns copied, **all 21 frame hashes identical** to the normal render |
+| 3.2 | Light-sleep slice 50 → 20 ms on the ADC-ladder boards (X4/X3) | code only; costs 2.5x the idle timer wakes |
+| 3.3 | Every list's cursor move on PRESS, hold still pages (`docs/ui-conventions.md` records it) | Settings row: release → press |
+| Phase 4 | `tools/latency/gate.sh` + `gate_check.py`: generated book, scripted session, asserts F1, F2/F3, F5, 2.2, 3.3 | passes; **fails** with press-to-turn reverted (verified) |
+
+### What to look for on the device
+
+- **Page turns** start as the button goes down. Text appears crisp first; the
+  anti-aliasing settles in about 0.6 s plus the gray waveform after you stop.
+  Flipping fast should show no gray pass at all.
+- **Menus**: a cursor move redraws only the rows that changed. Watch for a row
+  that keeps its old highlight (a missed tile) or ghosting at the window edges.
+- **X4 only**: the two SDK flags. Watch long sessions for blotching or heavier
+  ghosting; either flag is one line in `platformio.ini` to revert.
+- **Wake and book open** use FAST where they used HALF: watch for the previous
+  screen ghosting under the first page.
+- **Battery** on the X4/X3 (20 ms slice) and the Picco (button wakes).
+
+### Adversarial review, 2026-11-07 (read-only agent, before the first device build)
+
+- **Fixed, HIGH:** the small-change window path in `displayBuffer` presented
+  without rehashing the tiles, so a popup drawn over a showing screen (Pair/
+  Forget Bluetooth keyboard, every `OptionPopup`) was invisible to the diff and
+  the identical list redrawn after it was SKIPPED -- the popup would have stayed
+  on the glass. That path now rehashes, and a window no longer clears the
+  gray-shown flag (gray outside it is still there). Verified in the trace:
+  dismissing the Keyboard popup is a 560x336 window, not a skip.
+- **Fixed, LOW:** a deferred gray pass could collapse with another update and
+  swallow it (returning from a child screen, the Picco slide switch flipping
+  dark mode). It now runs only when the framebuffer still hashes to the frame it
+  was deferred for and the panel is not inverted, and it loads the page it
+  recorded rather than re-reading `currentPage` unlocked.
+- **Corrected, LOW:** on the SSD1677 (X4, Picco) the driver still promotes the
+  first refresh after `begin()` to its initial full sequence, so the wake saving
+  is the first page's HALF, not two; the comment in `main.cpp` says so.
+- **Accepted, INFO:** a book opened from Home always gets a FAST first page, so
+  an image first page runs its double-FAST over the Home frame -- the plan 2.5
+  trade.
+- **Checked clean** (per the reviewer): tile maths and alignment on all three
+  panels, every whole-frame present rehashes, no present bypasses the renderer,
+  deferred AA vs controller RAM and the HALF cadence, prerender keying/locking/
+  freeing and NULL PSRAM on the C3, prewarm and buffered reads during a build,
+  the one-open anchor lookup, all 12 press-fired lists, the Picco GPIO wakes,
+  the wake timing, the font picker deferral, Home thumbnails, the X4-only flags.
+
+### Not done, and why
+
+- **Phase 0** (device measurement): ruled out for now. The gray-waveform time,
+  the device CPU ratio and idle-press latency remain unmeasured.
+- **The `ActivityInputTest` suite** still does not compile (its host WiFi stub
+  predates `SavedWifiJoin.h`, the CI unit-tests red). Completing the stub
+  exposed missing WifiDiagnostics/WifiCredentialStore links; out of scope, so
+  the press-edge changes were verified in the simulator trace instead. 772 of
+  773 host tests pass; that suite is the one.

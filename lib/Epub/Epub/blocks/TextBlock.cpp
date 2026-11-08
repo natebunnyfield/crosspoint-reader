@@ -391,7 +391,7 @@ bool TextBlock::serialize(serialization::BufferedFileWriter& out) const {
   return true;
 }
 
-std::unique_ptr<TextBlock> TextBlock::deserialize(HalFile& file) {
+std::unique_ptr<TextBlock> TextBlock::deserialize(serialization::BufferedFileReader& file) {
   uint16_t wc;
   uint8_t hasFocus;
   uint16_t textBytes;

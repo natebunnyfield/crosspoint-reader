@@ -274,6 +274,9 @@ constexpr uint8_t SECTION_FILE_INCOMPLETE_VERSION = 0;
 constexpr uint8_t SECTION_FILE_PARTIAL_VERSION = 0xFE - (SECTION_FILE_VERSION - 28);
 // Write buffer for the page stream (see BuildContext::pageWriter).
 constexpr size_t PAGE_WRITE_BUFFER_SIZE = 1024;
+// Page loads: a typical page is ~2 KB, so ~2-3 refills instead of one storage
+// call per field. Transient, freed when the load returns.
+constexpr size_t PAGE_READ_BUFFER_SIZE = 1024;
 
 constexpr uint32_t HEADER_SIZE = sizeof(uint8_t) + sizeof(int) + sizeof(float) + sizeof(bool) + sizeof(uint8_t) +
                                  sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(bool) + sizeof(bool) +
@@ -1051,7 +1054,14 @@ std::unique_ptr<Page> Section::loadPageDuringBuild(const int page) {
   // onPageComplete keeps appending where it left off.
   const uint32_t writePos = file.position();
   file.seek(pos);
-  auto p = Page::deserialize(file);
+  std::unique_ptr<Page> p;
+  {
+    // Buffered for the same reason as loadPageAt(); the reader may read past
+    // the page into bytes the build wrote after it, which is harmless -- the
+    // seek below restores the write cursor either way.
+    serialization::BufferedFileReader in(file, PAGE_READ_BUFFER_SIZE);
+    p = Page::deserialize(in);
+  }
   file.seek(writePos);
   return p;
 }
@@ -1073,7 +1083,13 @@ std::unique_ptr<Page> Section::loadPageAt(const int page) const {
   serialization::readPod(f, pagePos);
   f.seek(pagePos);
 
-  return Page::deserialize(f);
+  // Every field used to be its own storage call: ~460 per page turn for ~2 KB,
+  // each a mutex round trip and SdFat bookkeeping on the device
+  // (docs/lag-reduction-plan-2026-11-07.md, F5). The read-side twin of the
+  // page stream's BufferedFileWriter. Allocation failure degrades to the old
+  // unbuffered passthrough (BufferedFileReader, cap 0).
+  serialization::BufferedFileReader in(f, PAGE_READ_BUFFER_SIZE);
+  return Page::deserialize(in);
   // No f.close() needed -- DESTRUCTOR_CLOSES_FILE=1 handles it at scope exit
 }
 
@@ -1225,7 +1241,10 @@ std::optional<uint16_t> Section::getParagraphIndexForPage(const uint16_t page) c
   if (!Storage.openFileForRead("SCT", filePath, f)) {
     return std::nullopt;
   }
+  return readParagraphIndexFrom(f, page);
+}
 
+std::optional<uint16_t> Section::readParagraphIndexFrom(HalFile& f, const uint16_t page) const {
   const uint32_t fileSize = f.size();
   f.seek(HEADER_SIZE - sizeof(uint32_t) * 3);
   uint32_t paragraphLutOffset;
@@ -1295,7 +1314,11 @@ std::optional<uint32_t> Section::getFirstWordAnchorForPage(const uint16_t page) 
   if (!Storage.openFileForRead("SCT", filePath, f)) {
     return std::nullopt;
   }
+  return readFirstWordAnchorFrom(f, page);
+}
 
+std::optional<uint32_t> Section::readFirstWordAnchorFrom(HalFile& f, const uint16_t page) const {
+  if (page == 0) return 0;
   const uint32_t fileSize = f.size();
   f.seek(HEADER_SIZE - sizeof(uint32_t));
   uint32_t wordLutOffset;
@@ -1311,6 +1334,23 @@ std::optional<uint32_t> Section::getFirstWordAnchorForPage(const uint16_t page) 
   uint32_t anchor;
   serialization::readPod(f, anchor);
   return anchor;
+}
+
+// Both progress anchors from ONE open of the section file. saveProgress used to
+// call the two lookups above back to back, each opening the same file and
+// re-reading the same header, on every page turn
+// (docs/lag-reduction-plan-2026-11-07.md, F5). Same answers as the two calls:
+// the in-RAM build tables first, the file only for what they cannot answer.
+void Section::getProgressAnchorsForPage(const uint16_t page, std::optional<uint16_t>& paragraph,
+                                        std::optional<uint32_t>& wordAnchor) const {
+  paragraph = getParagraphIndexForPageDuringBuild(page);
+  wordAnchor = getFirstWordAnchorForPageDuringBuild(page);
+  if (!wordAnchor && page == 0) wordAnchor = 0;
+  if (paragraph && wordAnchor) return;
+  HalFile f;
+  if (!Storage.openFileForRead("SCT", filePath, f)) return;
+  if (!paragraph) paragraph = readParagraphIndexFrom(f, page);
+  if (!wordAnchor) wordAnchor = readFirstWordAnchorFrom(f, page);
 }
 
 std::optional<uint16_t> Section::getPageForWordAnchor(const uint32_t anchor) const {

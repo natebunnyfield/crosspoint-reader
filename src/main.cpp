@@ -956,7 +956,18 @@ void setup() {
   // enumeration before we touch the CDC state — otherwise cold boot races
   // and the host has to be physically replugged for logs to flow. Warm reboot
   // worked without the delay because USB was already enumerated.
+  //
+  // Not on a wake from deep sleep: ENABLE_SERIAL_LOG is in the release envs
+  // too, so this was 250 ms in front of every wake-to-page for every user,
+  // cable or not (docs/lag-reduction-plan-2026-11-07.md, F8). The cost moves
+  // to the one case that needs it: a device woken from sleep WITH a cable
+  // attached may need a replug before its logs flow. A cold boot, a flash and
+  // a reset keep the delay.
+#ifdef SIMULATOR
   delay(250);
+#else
+  if (esp_reset_reason() != ESP_RST_DEEPSLEEP) delay(250);
+#endif
   Serial.begin(115200);
 #if LOG_SERIAL_HAS_TX_TIMEOUT
   logSerial.setTxTimeoutMs(1);  // This is a load-bearing 1. Do not modify.
@@ -1068,8 +1079,18 @@ void setup() {
     // Refresh the cached button state a few times — isPressed() needs ~half a second to settle
     // after boot per the HalGPIO contract. Use a millis-based deadline so we always wait the full
     // settle window even if the loop body takes longer than expected on slow boots.
+    //
+    // The half second is the ADC ladder's (X4/X3): its levels need it to
+    // settle. The Picco's buttons are plain GPIOs and read true at once, so
+    // they wait 50 ms -- a few debounce samples -- instead of putting 500 ms in
+    // front of every Power wake (docs/lag-reduction-plan-2026-11-07.md, F8).
+#if FREEINK_DEVICE_PICCO
+    constexpr unsigned long settleMs = 50;
+#else
+    constexpr unsigned long settleMs = 500;
+#endif
     const unsigned long settleStart = millis();
-    while (millis() - settleStart < 500) {
+    while (millis() - settleStart < settleMs) {
       gpio.update();
       delay(10);
     }
@@ -1129,21 +1150,28 @@ void setup() {
       APP_STATE.showBootScreen = true;
       APP_STATE.saveToFile();
       if (loadSleepFrameBuffer()) {
-        const bool useDifferentialRefresh = gpio.deviceIsX3();
-        if (useDifferentialRefresh) {
-          // begin() clears the X3 controller RAM, so restore the saved frame as
-          // the baseline before replacing the moon with the loading icon.
-          renderer.cleanupGrayscaleWithFrameBuffer();
-        }
+        // begin() clears the controller RAM, so restore the saved frame as the
+        // baseline before replacing the moon with the loading icon; the icon
+        // then goes out as a FAST differential refresh and so does the first
+        // page. The X3 has always done this. The X4 and the Picco used a
+        // blocking HALF here and another HALF for the first page
+        // (docs/lag-reduction-plan-2026-11-07.md, F8/plan 2.6, owner 2026-11-07
+        // "yes to everything else"). On the SSD1677 the driver still promotes
+        // this first refresh after begin() to its initial full sequence
+        // (Ssd1677Driver::initController arms _needsInitialFull), so the X4 and
+        // Picco saving is the FIRST PAGE's HALF, not two -- and that promotion is
+        // what keeps a FAST first page clean over a cover-image sleep frame
+        // (adversarial review 2026-11-07, finding 3).
+        renderer.cleanupGrayscaleWithFrameBuffer();
 
         const auto pageHeight = renderer.getScreenHeight();
         renderer.drawImage(LoadingIcon, 0, pageHeight - LOADINGICON_HEIGHT, LOADINGICON_WIDTH, LOADINGICON_HEIGHT);
-        if (useDifferentialRefresh) {
+        if (gpio.deviceIsX3()) {
           renderer.displayGrayscaleBase(HalDisplay::FAST_REFRESH);
-          allowFastInitialReaderRefresh = true;
         } else {
-          renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+          renderer.displayBuffer(HalDisplay::FAST_REFRESH);
         }
+        allowFastInitialReaderRefresh = true;
       } else {
         activityManager.goToBoot();  // frame file missing, fall back to the splash
       }

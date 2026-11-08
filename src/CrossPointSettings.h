@@ -522,9 +522,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   static constexpr uint8_t hideBatteryPercentage = HIDE_ALWAYS;
   // Long-press page turn button behavior. Defaults to stepping the reader font size
   // (long-press page-back = smaller, page-forward = larger). Note this default also
-  // decides the page-turn EDGE: ReaderUtils::detectPageTurn() turns on button PRESS only
-  // while this is OFF, and on RELEASE otherwise, so that a hold can be told apart from a
-  // tap. Every fresh install therefore turns pages on release.
+  // decides the SIDE buttons' page-turn edge: ReaderUtils::detectPageTurn() turns on a side
+  // PRESS only while this is OFF, and on RELEASE otherwise, so that a hold can be told apart
+  // from a tap. The front Left/Right turn on press regardless (they have no hold).
   static constexpr uint8_t longPressButtonBehavior = FONT_SIZE_STEP;
   // Typeface the UI chrome is drawn in -- headers, list rows, button hints,
   // popups, the battery readout. Swaps all three UI sizes (8/10/12 pt) at once;

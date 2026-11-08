@@ -203,6 +203,17 @@ void FontSelectionActivity::onEnter() {
 void FontSelectionActivity::onExit() { Activity::onExit(); }
 
 void FontSelectionActivity::loop() {
+  // Deferred anti-aliasing of the specimen (plan 2.2/1.7,
+  // docs/lag-reduction-plan-2026-11-07.md): a cursor move paints the BW frame
+  // only; the gray waveform follows once the cursor has rested. Any input
+  // drops a pending request, because the frame it was for is about to change.
+  if (mappedInput.wasAnyPressed() || mappedInput.wasAnyReleased()) {
+    aaPassRequested_ = false;
+  } else if (aaPending_ && !aaPassRequested_ && millis() - aaPendingSinceMs_ >= AA_DEFER_MS) {
+    aaPassRequested_ = true;
+    requestUpdate();
+  }
+
   // Back on PRESS. ActivityManager::swallowUntilIdle() is called at every
   // activity swap, so the outgoing activity's press edge is never visible to
   // the incoming one. FontSelectionActivity is launched only from Settings
@@ -314,13 +325,13 @@ void FontSelectionActivity::loop() {
   static const std::vector<MappedInputManager::Button> kNextButtons = {MappedInputManager::Button::Right};
   static const std::vector<MappedInputManager::Button> kPreviousButtons = {MappedInputManager::Button::Left};
 
-  buttonNavigator_.onRelease(kNextButtons, [this, listSize] {
+  buttonNavigator_.onPress(kNextButtons, [this, listSize] {
     notice_.clear();  // a one-shot line: it must not outlive the row it was about
     selectedIndex_ = ButtonNavigator::nextIndex(selectedIndex_, listSize);
     requestUpdate();
   });
 
-  buttonNavigator_.onRelease(kPreviousButtons, [this, listSize] {
+  buttonNavigator_.onPress(kPreviousButtons, [this, listSize] {
     notice_.clear();
     selectedIndex_ = ButtonNavigator::previousIndex(selectedIndex_, listSize);
     requestUpdate();
@@ -831,6 +842,18 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
 }
 
 void FontSelectionActivity::render(RenderLock&&) {
+  if (aaPassRequested_) {
+    aaPassRequested_ = false;
+    if (aaPending_) {
+      // The BW frame from the last full render is still in the framebuffer
+      // and on the glass: add the gray pass over the specimen and stop.
+      aaPending_ = false;
+      const int fontId = SETTINGS.getReaderFontId();
+      ReaderUtils::renderAntiAliased(renderer, [&] { renderPreviewSpecimen(afterHeader, previewHeight, fontId); });
+      return;
+    }
+  }
+  aaPending_ = false;
   renderer.clearScreen();
 
   const auto pageWidth = renderer.getScreenWidth();
@@ -922,7 +945,11 @@ void FontSelectionActivity::render(RenderLock&&) {
   // and the render is byte-identical to the pure-BW path. This is what makes
   // the specimen an honest sample of the reader with AA enabled — the same
   // glyph edges the reader softens are softened here.
+  //
+  // Deferred (see loop()): every cursor move used to cost this second
+  // waveform as well.
   if (SETTINGS.textAntiAliasing != CrossPointSettings::TEXT_AA_OFF) {
-    ReaderUtils::renderAntiAliased(renderer, [&] { renderPreviewSpecimen(previewTop, previewHeight, previewFontId); });
+    aaPending_ = true;
+    aaPendingSinceMs_ = millis();
   }
 }

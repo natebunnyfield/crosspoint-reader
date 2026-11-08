@@ -41,7 +41,10 @@ void Activity::requestUpdateAndWait() { activityManager.requestUpdateAndWait(); 
 
 void Activity::onGoHome(HomeMenuItem item) { activityManager.goHome(item); }
 
-void Activity::onSelectBook(const std::string& path) { activityManager.goToReader(path); }
+// FAST first page (plan 2.5, docs/lag-reduction-plan-2026-11-07.md): a HALF here
+// cost ~1.16 s on every book open. ReaderActivity still falls back to HALF when
+// it had to show the Indexing popup (an uncached book), which must be cleaned.
+void Activity::onSelectBook(const std::string& path) { activityManager.goToReader(path, true); }
 
 void Activity::startActivityForResult(std::unique_ptr<Activity>&& activity, ActivityResultHandler resultHandler) {
   this->resultHandler = std::move(resultHandler);

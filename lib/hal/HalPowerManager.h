@@ -59,6 +59,13 @@ class HalPowerManager {
 
   static constexpr unsigned long BATTERY_POLL_MS = 1500;     // ms
   static constexpr unsigned long LIGHT_SLEEP_SLICE_MS = 50;  // ms
+  // The X4/X3 front and side buttons are an ADC ladder that cannot wake light
+  // sleep, so the slice IS their first-press latency after a second of idle --
+  // which is every page turn of a reader. 20 ms instead of 50 (mean wait ~10 ms
+  // instead of ~25) for 2.5x the timer wakes; plan 3.2 of
+  // docs/lag-reduction-plan-2026-11-07.md, owner 2026-11-07. Boards whose
+  // buttons are GPIOs arm them as wake sources instead (the Picco) and keep 50.
+  static constexpr unsigned long ADC_LADDER_LIGHT_SLEEP_SLICE_MS = 20;  // ms
 
   // Timer bound for one BUSY-wait light-sleep slice. The refresh end itself
   // wakes exactly via GPIO level wake on the BUSY pin; the timer only bounds
