@@ -308,7 +308,10 @@ namespace {
 // v77: upstream 2b2ba72f0 (#3500). `list-style-type: none` (and the fork's
 // `list-style: none`) on a <ul>/<ol> drops its items' markers and hanging
 // gutter. Paired with CSS cache v12.
-constexpr uint8_t SECTION_FILE_VERSION = 77;
+// v78: upstream f4b4ff06c (#3585). An SD font's space advance falls back to
+// the glyph when the style's table answers 0 (not prewarmed), so a section laid
+// out during such a miss no longer has zero-width spaces.
+constexpr uint8_t SECTION_FILE_VERSION = 78;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

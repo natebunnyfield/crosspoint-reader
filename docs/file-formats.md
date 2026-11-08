@@ -172,6 +172,7 @@ before relying on any of them for a field layout:
 | 75 | upstream `6eda8f0b7` (#3390, campaign 2026-11-08) | **layout**: elements with the HTML `hidden` attribute are dropped (display:none) |
 | 76 | fork, guard from upstream `da3d50c24` (campaign 2026-11-08) | **layout**: a skipped (display:none / `hidden`) element's close no longer pops its container's block style, table or list state |
 | 77 | upstream `2b2ba72f0` (#3500, campaign 2026-11-08) | **layout**: `list-style-type: none` / `list-style: none` on a list drops its items' markers and hanging gutter; paired with CSS cache v12 |
+| 78 | upstream `f4b4ff06c` (#3585, campaign 2026-11-08) | **layout**, SD fonts: a space measured during a partial cache miss used 0 px; it falls back to the glyph advance now |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

@@ -27,6 +27,18 @@ namespace {
 uint8_t resolveSdCardStyle(const SdCardFont& font, const EpdFontFamily::Style style) {
   return font.resolveStyle(static_cast<uint8_t>(style));
 }
+
+// The space's advance from the style's table, or from its glyph when the table
+// answers 0. Zero means uncached (a full table whose style was not prewarmed,
+// or a failed preparation), and a space measured as 0 px collapses every gap
+// on the line (upstream f4b4ff06c). Same fallback as the per-codepoint path.
+uint16_t getSdCardSpaceAdvance(SdCardFont& font, const uint8_t resolvedStyle) {
+  const uint16_t advance = font.getAdvance(' ', resolvedStyle);
+  if (advance != 0) return advance;
+  const EpdFont* epdFont = font.getEpdFont(resolvedStyle);
+  const EpdGlyph* glyph = epdFont ? epdFont->getGlyph(' ') : nullptr;
+  return glyph ? glyph->advanceX : 0;
+}
 }  // namespace
 
 namespace {
@@ -2859,7 +2871,7 @@ int GfxRenderer::getSpaceWidth(const int fontId, const EpdFontFamily::Style styl
   auto sdIt = sdCardFonts_.find(fontId);
   if (sdIt != sdCardFonts_.end() && sdIt->second->hasAdvanceTable()) {
     const uint8_t resolvedStyle = resolveSdCardStyle(*sdIt->second, style);
-    return fp4::toPixel(sdIt->second->getAdvance(' ', resolvedStyle));
+    return fp4::toPixel(getSdCardSpaceAdvance(*sdIt->second, resolvedStyle));
   }
 
   const auto fontIt = fontMap.find(fontId);
@@ -2882,7 +2894,7 @@ int GfxRenderer::getSpaceAdvance(const int fontId, const uint32_t leftCp, const 
   auto sdIt = sdCardFonts_.find(fontId);
   if (sdIt != sdCardFonts_.end() && sdIt->second->hasAdvanceTable()) {
     const uint8_t resolvedStyle = resolveSdCardStyle(*sdIt->second, style);
-    const int32_t spaceFP = sdIt->second->getAdvance(' ', resolvedStyle);
+    const int32_t spaceFP = getSdCardSpaceAdvance(*sdIt->second, resolvedStyle);
     const int32_t kernFP = static_cast<int32_t>(sdIt->second->getMeasureKern(leftCp, ' ', resolvedStyle)) +
                            static_cast<int32_t>(sdIt->second->getMeasureKern(' ', rightCp, resolvedStyle));
     return fp4::toPixel(spaceFP + kernFP);
