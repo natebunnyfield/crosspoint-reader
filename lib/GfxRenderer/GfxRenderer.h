@@ -25,6 +25,10 @@ class SdCardFont;
 
 #include "Bitmap.h"
 
+namespace glyphBitmap {
+struct Frame;
+}
+
 // Color representation: uint8_t mapped to 4x4 Bayer matrix dithering levels
 // 0 = transparent, 1-16 = gray levels (white to black)
 enum Color : uint8_t { Clear = 0x00, White = 0x01, LightGray = 0x05, DarkGray = 0x0A, Black = 0x10 };
@@ -283,6 +287,21 @@ class GfxRenderer {
   static uint32_t outOfRangeCount() { return outOfRange.count; }
 #endif
 
+#ifdef GFX_GLYPH_FASTPATH_TOGGLE
+  // Test-only: false sends every glyph down renderCharImpl's per-pixel loops,
+  // so one binary can render the same text both ways and compare the frames,
+  // the dirty rect and the out-of-range count (test/glyph_bitmap). Not
+  // compiled on device.
+  static bool glyphFastPathEnabled;
+  static uint32_t glyphFastPathGlyphs;  // glyphs drawGlyphBitmap() accepted
+  struct DirtyRectForTest {
+    bool all;
+    int left, top, right, bottom;
+  };
+  DirtyRectForTest dirtyRectForTest() const { return {_dirtyAll, _dirtyLeft, _dirtyTop, _dirtyRight, _dirtyBottom}; }
+  void resetDirtyForTest() const { resetDirty(); }
+#endif
+
   // Setup
   void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);
@@ -510,6 +529,20 @@ class GfxRenderer {
   // Device-coordinate form of glyphIntersectsStrip(), for the hi-res glyph path.
   bool glyphIntersectsStripDevice(int dx0, int dy0, int dx1, int dy1) const;
 #endif
+  // Per-glyph fast path for renderCharImpl (GlyphBitmap.h, upstream 04ca1d53c).
+  // Paints a packed glyph placed by `frame` (logical coordinates, or device
+  // coordinates when `deviceSpace`) exactly as drawPixel() -- drawPixelDevice()
+  // for deviceSpace -- would for each painted pixel, with the rotation, bounds,
+  // strip-band and address work done once per glyph, and marks the glyph's
+  // physical cell dirty once. `rawLevels` and `clearBits` are glyphBitmap::draw's.
+  //
+  // Returns false, having written nothing, wherever that equivalence is not
+  // proved, and the caller then runs its per-pixel loop: a glyph not wholly on
+  // the panel (so drawPixel's out-of-range log and GFX_BOUNDS_COUNTER see every
+  // pixel they saw before), and a logical glyph on a supersampled host, where
+  // drawPixel paints an S x S block.
+  bool drawGlyphBitmap(const uint8_t* bitmap, int width, int height, const glyphBitmap::Frame& frame, bool deviceSpace,
+                       bool twoBit, uint8_t rawLevels, bool clearBits) const;
   void drawLine(int x1, int y1, int x2, int y2, bool state = true) const;
   void drawLine(int x1, int y1, int x2, int y2, int lineWidth, bool state) const;
   void drawArc(int maxRadius, int cx, int cy, int xDir, int yDir, int lineWidth, bool state) const;

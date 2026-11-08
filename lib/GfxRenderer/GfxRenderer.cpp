@@ -14,9 +14,14 @@
 
 #include "../Memory/Memory.h"
 #include "FontCacheManager.h"
+#include "GlyphBitmap.h"
 
 #ifdef GFX_BOUNDS_COUNTER
 GfxRenderer::OutOfRange GfxRenderer::outOfRange{};
+#endif
+#ifdef GFX_GLYPH_FASTPATH_TOGGLE
+bool GfxRenderer::glyphFastPathEnabled = true;
+uint32_t GfxRenderer::glyphFastPathGlyphs = 0;
 #endif
 
 namespace {
@@ -616,18 +621,41 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
   }
 
   const uint8_t* bitmap = renderer.getGlyphBitmap(fontData, glyph);
+  if (bitmap == nullptr) return;
 
-  if (bitmap != nullptr) {
+  // One table decides which glyph level the BW base pass paints and which
+  // plane each antialiased level flags, for both output polarities. See
+  // GlyphAaPlanes.h — in particular for WHY dark mode leaves the antialiased
+  // levels unpainted instead of painting them. 2-bit glyphs only; a 1-bit
+  // glyph paints its ink with pixelState in every pass.
+  const GlyphAa::Planes aa = renderer.getGlyphAaPlanes();
+  const uint8_t baseInkMask = aa.baseInk;
+  const uint8_t planeMask = (renderMode == GfxRenderer::GRAYSCALE_MSB)   ? aa.msb
+                            : (renderMode == GfxRenderer::GRAYSCALE_LSB) ? aa.lsb
+                                                                         : 0;
+
+  // Fast path: the whole glyph in one call (GfxRenderer::drawGlyphBitmap), with
+  // the same levels, the same state and the same cell mapping as the per-pixel
+  // loops below. Those loops stay as the fallback for every case it declines.
+  {
+    glyphBitmap::Frame frame;
+    if constexpr (rotation == TextRotation::Rotated90CW) {
+      frame = {outerBase, innerBase, 0, -1, 1, 0};  // glyph x runs up, glyph y runs right
+    } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+      frame = {outerBase, innerBase, 0, 1, -1, 0};  // glyph x runs down, glyph y runs left
+    } else {
+      frame = {innerBase, outerBase, 1, 0, 0, 1};
+    }
+    const bool bwPass = renderMode == GfxRenderer::BW;
+    const uint8_t rawLevels = glyphBitmap::rawLevels(bwPass ? baseInkMask : planeMask);
+    const bool clearBits = (!is2Bit || bwPass) ? pixelState : false;
+    if (renderer.drawGlyphBitmap(bitmap, width, height, frame, deviceSpace, is2Bit, rawLevels, clearBits)) {
+      return;
+    }
+  }
+
+  {  // Per-pixel fallback: the loops as they were before the fast path.
     if (is2Bit) {
-      // One table decides which glyph level the BW base pass paints and which
-      // plane each antialiased level flags, for both output polarities. See
-      // GlyphAaPlanes.h — in particular for WHY dark mode leaves the
-      // antialiased levels unpainted instead of painting them.
-      const GlyphAa::Planes aa = renderer.getGlyphAaPlanes();
-      const uint8_t baseInkMask = aa.baseInk;
-      const uint8_t planeMask = (renderMode == GfxRenderer::GRAYSCALE_MSB)   ? aa.msb
-                                : (renderMode == GfxRenderer::GRAYSCALE_LSB) ? aa.lsb
-                                                                             : 0;
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
         const int outerCoord = (rotation == TextRotation::Rotated90CCW) ? (outerBase - glyphY) : (outerBase + glyphY);
@@ -766,6 +794,65 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
   } else {
     target[byteIndex] |= 1 << bitPosition;  // Set bit
   }
+}
+
+// Equivalence with the per-pixel loops, case by case (each is what drawPixel /
+// drawPixelDevice does per pixel, hoisted):
+//   * rotation: rotateCoordinates is an orthogonal affine map, so rotating the
+//     origin and its two unit neighbors gives the exact physical position of
+//     every glyph pixel as origin + gx * dx + gy * dy;
+//   * bounds: the whole cell is tested once and an off-panel glyph is declined,
+//     so the per-pixel test could never have failed for a glyph drawn here;
+//   * strip band: draw() clips to [originY, originY + rows) of getWriteTarget(),
+//     the same band drawPixel tests, and addresses the same byte and bit;
+//   * dirty rect: drawPixel marks each pixel it paints. The cell rect marked
+//     here contains all of them (the rect only ever over-reports, which
+//     GfxRenderer.h documents as safe). A pass that paints no level marks
+//     nothing, as before.
+bool GfxRenderer::drawGlyphBitmap(const uint8_t* bitmap, const int width, const int height,
+                                  const glyphBitmap::Frame& frame, const bool deviceSpace, const bool twoBit,
+                                  const uint8_t rawLevels, const bool clearBits) const {
+#ifdef GFX_GLYPH_FASTPATH_TOGGLE
+  if (!glyphFastPathEnabled) return false;
+#endif
+#if CROSSPOINT_RENDER_SCALE > 1
+  // A logical pixel is an S x S block of device pixels here; only S == 1 is
+  // the same as one device pixel.
+  if (!deviceSpace && cp::renderScale() != 1) return false;
+#else
+  (void)deviceSpace;
+#endif
+  if (width <= 0 || height <= 0) return true;  // the loops draw nothing either
+
+  glyphBitmap::Target target{getWriteTarget(), panelWidth, panelWidthBytes, getWriteOriginY(), getWriteRows(), {}};
+  glyphBitmap::Frame& physical = target.frame;
+  rotateCoordinates(orientation, frame.x, frame.y, &physical.x, &physical.y, panelWidth, panelHeight);
+  int nextX, nextY;
+  rotateCoordinates(orientation, frame.x + frame.dxX, frame.y + frame.dxY, &nextX, &nextY, panelWidth, panelHeight);
+  physical.dxX = nextX - physical.x;
+  physical.dxY = nextY - physical.y;
+  rotateCoordinates(orientation, frame.x + frame.dyX, frame.y + frame.dyY, &nextX, &nextY, panelWidth, panelHeight);
+  physical.dyX = nextX - physical.x;
+  physical.dyY = nextY - physical.y;
+
+  // The glyph cell's opposite corner, then its inclusive physical box.
+  const int farX = physical.x + (width - 1) * physical.dxX + (height - 1) * physical.dyX;
+  const int farY = physical.y + (width - 1) * physical.dxY + (height - 1) * physical.dyY;
+  const int x0 = std::min(physical.x, farX);
+  const int x1 = std::max(physical.x, farX);
+  const int y0 = std::min(physical.y, farY);
+  const int y1 = std::max(physical.y, farY);
+  if (x0 < 0 || y0 < 0 || x1 >= panelWidth || y1 >= panelHeight) return false;
+
+  if (twoBit && rawLevels == 0) return true;  // this pass paints no level of a 2-bit glyph
+
+#ifdef GFX_GLYPH_FASTPATH_TOGGLE
+  glyphFastPathGlyphs++;
+#endif
+  markDirtyRect(x0, y0, x1, y1);
+  glyphBitmap::draw(bitmap, width, height, twoBit, rawLevels, clearBits, target,
+                    glyphBitmap::Clip{0, 0, width, height});
+  return true;
 }
 
 int GfxRenderer::getTextWidth(const int fontId, const char* text, const EpdFontFamily::Style style,
