@@ -143,7 +143,20 @@ class HalGPIO {
   // nothing. At >=1 s intervals the energy cost is unmeasurable (~µC/s), so 1 s
   // is chosen for prompt plug/unplug UX (battery icon, light-sleep USB guard /
   // CDC recovery). X4 detection is a single digitalRead and stays per-loop.
-  static constexpr unsigned long USB_POLL_X3_MS = 1000;
+  //
+  // 200 ms since 2026-11-08 (was 1000): this check is also the light-sleep USB
+  // guard on the X3 and the Picco, and for up to a whole poll after a cable goes
+  // in the device kept napping in 20-50 ms slices, each one cutting the USB link
+  // mid-enumeration. Upstream withdrew its light sleep over freezes on USB
+  // plug-in (#3077, which this fork declined: docs/fork-sync.md, "light sleep");
+  // the owner's ruling kept it and asked for this guard. ~0.3-1 ms of I2C every
+  // 200 ms is still well under 1% of the idle floor.
+  static constexpr unsigned long USB_POLL_X3_MS = 200;
+  // After USB was last seen, light sleep stays off this long: a cable going in
+  // or out bounces (power before data, a link that re-enumerates), and napping
+  // into that bounce is the plug-in path upstream's freezes point at.
+  static constexpr unsigned long USB_SLEEP_HOLDOFF_MS = 3000;
+  unsigned long lastUsbSeenMs = 0;
 
   // USB-Serial-JTAG SOF activity, sampled by update(): the host sends a SOF
   // frame every 1 ms while the bus is enumerated, so a frame index that moved
@@ -497,6 +510,14 @@ class HalGPIO {
   // USB state as sampled by the last update() call.
   // Prefer this in per-loop polling: isUsbConnected() performs a fresh I2C read on X3.
   bool isUsbConnectedCached() const { return lastUsbConnected; }
+
+  // The light-sleep guard (HalPowerManager::lightSleep and the e-ink BUSY slice):
+  // USB now, by either signal -- the power check OR the host's SOF heartbeat,
+  // which is the only signal on an X3 whose battery is full -- or seen within
+  // USB_SLEEP_HOLDOFF_MS. Owner ruling 2026-11-08 "Keep, guard USB".
+  bool isUsbSleepGuardActive() const {
+    return lastUsbConnected || (lastUsbSeenMs != 0 && millis() - lastUsbSeenMs < USB_SLEEP_HOLDOFF_MS);
+  }
 
   // Returns true once per edge (plug or unplug) since the last update()
   bool wasUsbStateChanged() const;

@@ -203,7 +203,7 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
     return false;
   }
   // Light sleep drops a WiFi association and kills an enumerated USB-CDC link.
-  if (WiFi.getMode() != WIFI_MODE_NULL || gpio.isUsbConnectedCached()) {
+  if (WiFi.getMode() != WIFI_MODE_NULL || gpio.isUsbSleepGuardActive()) {
     return false;
   }
 
@@ -318,7 +318,7 @@ bool HalPowerManager::lightSleep(const HalGPIO& gpio) const {
 bool HalPowerManager::onEinkBusyWaitSlice(const int8_t busyPin, const uint8_t busyLevel) {
   // Same exclusions as lightSleep(): light sleep drops a WiFi association and
   // kills an enumerated USB-CDC link. No LOG here — this runs ~50x/s mid-refresh.
-  if (WiFi.getMode() != WIFI_MODE_NULL || gpio.isUsbConnectedCached()) {
+  if (WiFi.getMode() != WIFI_MODE_NULL || gpio.isUsbSleepGuardActive()) {
     return false;
   }
 

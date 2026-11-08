@@ -192,6 +192,7 @@ void HalGPIO::updateUsbState(const unsigned long now) {
     usbElectricalConnected = isUsbElectricalConnected();
   }
   const bool connected = usbSofActive || usbElectricalConnected;
+  if (connected) lastUsbSeenMs = now;
   usbStateChanged = (connected != lastUsbConnected);
   lastUsbConnected = connected;
 }

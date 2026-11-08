@@ -274,8 +274,8 @@ record). The branch `upstream-campaign` (worktree `.claude/worktrees/upstream-sy
 still points at the PRE-rebase copies, head `ec1fd5f00`, whose section bumps
 read 67-69. Do not push it or rebase it: point it at `origin/main` first. Batch
 3 starts at upstream `62e84a16f` (392 non-merge commits after `57c692fe8`
-remained on 2026-11-08). One owner decision is still open: `81e192709` (light-sleep revert);
-`a757b9d10` was ruled 2026-11-08 ("Adopt, keep fork behavior", below).
+remained on 2026-11-08). Both owner decisions are ruled (2026-11-08, below): `a757b9d10` "Adopt, keep
+fork behavior"; `81e192709` "Keep, guard USB".
 
 Run by a second session once the campaign session had stopped with batch 2
 committed but unbuilt and unpushed. On the rebased tree: `pio run -e default`
@@ -309,6 +309,19 @@ port:
   fork's readers diverge heavily there (press-fired overlapped turns, chords,
   Find, its own end screen, no reader menu), so it is an architecture
   decision. `63fcbab02` (TXT `skipPages` end sentinel) waits on it.
+- **RULED 2026-11-08 — `81e192709` light-sleep revert: "Keep, guard USB".**
+  Not taken. Upstream's reasons, from PR #3077's discussion (not its commit
+  message): devices freezing when USB was plugged in, a user who could not run
+  without USB connected, and an unreproduced ~40 mA idle report; the revert put
+  an X3 back at 9.79 mA idle. The fork keeps light sleep (upstream's own X3
+  figure: idle 9.68 -> 2.78 mA) and the work built on it, and guards the
+  plug-in path instead: the X3/Picco power check polls every 200 ms (was 1 s),
+  light sleep stays off for 3 s after USB was last seen by either signal, and
+  both nap paths (`HalPowerManager::lightSleep`, the e-ink BUSY slice) use
+  `HalGPIO::isUsbSleepGuardActive()`. The SOF heartbeat stays in the guard: on
+  an X3 with a full battery the BQ27220 charge-current check reads "no USB",
+  and the heartbeat is the only signal. UNCONFIRMED on device; if a device ever
+  hangs on plug-in, this path is the first suspect. (Original flag below.)
 - **FLAG `81e192709` "revert light sleep code but keep battery drain fix"**:
   upstream withdrew #2525; this fork kept it (`816011c42`, [T-017]) and built
   on it (Picco slices `f09e426e2`, the lag plan). The part upstream kept is
