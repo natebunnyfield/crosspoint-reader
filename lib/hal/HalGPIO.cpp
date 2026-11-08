@@ -1,3 +1,4 @@
+#include <BatteryMonitor.h>
 #include <HalGPIO.h>
 #include <Logging.h>
 #include <PowerManager.h>
@@ -7,10 +8,6 @@
 #include <XteinkDetect.h>
 #include <esp_sleep.h>
 #include <soc/usb_serial_jtag_struct.h>
-
-#if FREEINK_DEVICE_PICCO
-#include <BatteryMonitor.h>
-#endif
 
 // Global HalGPIO instance
 HalGPIO gpio;
@@ -478,10 +475,16 @@ bool HalGPIO::isUsbElectricalConnected() const {
     return battery.isCharging();
   }
 #endif
-  if (BoardConfig::ACTIVE.usbDetect < 0) {
-    return false;
+  if (BoardConfig::ACTIVE.usbDetect >= 0) {
+    return digitalRead(BoardConfig::ACTIVE.usbDetect) == HIGH;
   }
-  return digitalRead(BoardConfig::ACTIVE.usbDetect) == HIGH;
+  // No digital USB-detect line (e.g. Sticky, whose PWR_IN_VOLT is an analog
+  // divider): infer external power from charging state instead. BatteryMonitor
+  // picks the board's best source — charger IC status, gauge Current() sign, or
+  // a /STAT pin — and reports false on boards with no battery telemetry at all.
+  // Caveat: charge termination at 100% reads as "not connected".
+  static const BatteryMonitor battery;
+  return battery.isCharging();
 }
 
 HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {
