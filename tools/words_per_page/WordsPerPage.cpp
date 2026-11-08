@@ -232,8 +232,8 @@ int main(int argc, char** argv) {
   const int screenMargin = 5;  // CrossPointSettings::SCREEN_MARGIN_DEFAULT
   const uint16_t viewportWidth =
       static_cast<uint16_t>(renderer.getScreenWidth() - (left + screenMargin) - (right + screenMargin));
-  const uint16_t viewportHeight =
-      static_cast<uint16_t>(renderer.getScreenHeight() - (top + screenMargin) - (bottom + screenMargin));
+  const uint16_t viewportHeight = static_cast<uint16_t>(renderer.getScreenHeight() - (top + screenMargin) -
+                                                        (bottom + 2 * screenMargin));  // 2x below, as the reader
 
   const std::string dir = fontRoot + "/" + family;
   const std::vector<int> sizes = installedSizes(dir, family);

@@ -87,3 +87,43 @@ exposed a real bug, fixed here with a failing-first test
 (`TableRowSeparator.SitsBetweenTheRowsNotInsideOne`): on a streamed flat table
 every row separator was drawn between the previous row's LAST TWO cells,
 because that row's last cell was still unlaid when the rule went down.
+
+## Adversarial review (2026-11-08, read-only agent, of `13390616f`)
+
+Two findings survived its own refutation; both fixed in the follow-up commit:
+
+1. `tools/words_per_page/WordsPerPage.cpp` built its viewport with 1x margin
+   below, so its figures came from a page 5 px taller than the device's at the
+   default margin. Now 2x.
+2. A `<tr id>` on a streamed flat table was recorded one page early when the
+   row opened a new page: the separator's retire flushed the pending id before
+   its overflow break. Probe: 5 of 60 rows wrong with `13390616f`, 4 of 60 on
+   the parent (pre-existing, made slightly worse). Fixed by holding the id
+   across the retire and the break; `TocAnchorPage.TableRowIdsNameTheRowsPage`
+   fails 5 rows without the hold and passes with it.
+
+Checked and found clean (do not re-read these for this change):
+
+- Viewport agreement: `getOrientedViewableTRBL` has 4 callers (EPUB reader,
+  TXT reader, CalendarSleepScreen, WordsPerPage); only the EPUB reader builds
+  sections, and the background extend and prebuild reuse
+  `buildViewportWidth/Height` from the same render, so build, load and extend
+  cannot disagree.
+- Cache keys: `ReaderRenderSpec` carries viewportHeight (book notes'
+  `layoutFingerprint`, section validation); at margin 0 the sinkage removal is
+  caught by v67; progress.bin restores by page/paragraph/word anchor as on any
+  bump; the TXT cache already checked lines-per-page and margin (the v6 bump is
+  redundant, harmless); XTC does no layout.
+- iOS zen sheet (`crosspoint-simulator`, CrossPointIOSShim.cpp:1270, :2143)
+  reads the published bottom inset and re-fits; no 1x constant there.
+- Margin underflow: worst case (max margin 45, landscape 480 tall) leaves
+  333 px; uint16 safe; TXT computes in int with a guard.
+- Separator retire: the buffered flatten paths call makePages() per cell, so
+  the new branch is a no-op there; the streaming path runs it only between
+  cells; neutral-style merge as in retirePendingBlockBeforeTable;
+  measureUnlaidLeadHeight unaffected; breakPageBefore's anchor is right and it
+  cannot make an empty page or loop.
+- Sinkage removal: no remaining reference; `snapToLineGrid`'s `<= 0` return
+  and the page-top collapses already keyed on `elements.empty()`, not y.
+- The reworked table tests are not tautologies; FindInBookTest (4, 1 perf
+  skipped) and TocHrefResolutionTest (14) also pass.

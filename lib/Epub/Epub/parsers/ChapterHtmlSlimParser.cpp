@@ -1421,7 +1421,23 @@ void ChapterHtmlSlimParser::emitTableRowSeparator() {
   // trace while removing the chapter sinkage. Same neutral successor style as
   // retirePendingBlockBeforeTable, for the same reason: the next cell reuses
   // this empty block and merges whatever it carries.
+  //
+  // A <tr id> waiting in pendingAnchorId belongs to the NEXT row, so it is held
+  // out of this retire (which would record it on the current page) and of the
+  // overflow break below, and handed back on every exit: the next row's first
+  // cell then records it on the page that cell actually lands on. Adversarial
+  // review 2026-11-08: without the hold, a row that opened a new page had its
+  // id recorded one page early.
+  struct HeldAnchor {
+    std::string& slot;
+    std::string held;
+    ~HeldAnchor() {
+      if (!held.empty() && slot.empty()) slot = std::move(held);
+    }
+  } heldAnchor{pendingAnchorId, {}};
   if (currentTextBlock && !currentTextBlock->isEmpty()) {
+    heldAnchor.held = std::move(pendingAnchorId);
+    pendingAnchorId.clear();
     startNewTextBlock(BlockStyle());
   }
   resetInterBlockCollapse();
