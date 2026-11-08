@@ -1365,13 +1365,6 @@ void loop() {
   handleSlideSwitch();
 #endif
 
-  // Under the render lock, so a step never overlaps the themes' gauge reads.
-  static bool gaugeCapacityPending = true;
-  if (gaugeCapacityPending) {
-    RenderLock lock(RenderLock::Mode::Try);
-    if (lock.ownsLock()) gaugeCapacityPending = BatteryMonitor::loadDesignCapacity();
-  }
-
   renderer.setFadingFix(SETTINGS.fadingFix);
 
   // Sample the heap into RTC memory unconditionally -- NOT gated on Serial.
