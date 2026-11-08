@@ -1258,6 +1258,15 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
         if (loadStyleKernLigatureData(s) && buildMiniKernMatrix(s, codepoints, cpCount)) {
           applyKernLigaturePointers(s, s.miniData);
         }
+      } else if (!metadataOnly && loadKernLig && !s.kernLigLoaded && s.header.ligaturePairCount > 0) {
+        // The kern matrix is still resident but the ligature table is not:
+        // clearPersistentCache() (which prewarmStyle's bitmap reservation calls
+        // under heap pressure) frees every style's kern/lig class maps and
+        // nulls the ligature views, and nothing re-pointed a style whose mini
+        // survived, so it drew without ligatures until its mini was rebuilt
+        // (adversarial review 2026-11-08, F2). Reload the small table and
+        // re-point the views.
+        if (loadStyleKernLigatureData(s)) applyKernLigaturePointers(s, s.miniData);
       }
       return missedInMini;
     }
