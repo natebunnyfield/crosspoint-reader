@@ -218,6 +218,7 @@ commits built on it are then taken normally.
 |---|---|---|---|---|---|
 | 1 | `0f747b82a`..`9e3cea2e5` (25) | 6 (`046827fc3` `1582e70ef` `596f0d3f7` `e4aae7bae` `2cac59714` `86eb1cbde`) | 3 (`5eec70de3` IPA except the two `reading`-set recipes; `d4733bfc6` CI split only, release.yml and sticky envs dropped per B-004; `7f8b005ae` AGENTS.md symlink only) | ALREADY 10 (incl. `d720891b2` dark mode = fork's whole-UI `c2d26ae29`; `4e6190357` X3 display/battery/crypto); SKIP 5 (`0f747b82a` superseded by word anchors, `9c48609f8` + `0423276d2` bookmarks/KOSync deleted, `fecb9eb3a` + `e9c3a166f` dictionary deleted in `1d37cb851`); FLAG 1 `9e3cea2e5` FUI -> ruled "Adopt FUI", ported separately | (this push) |
 | FUI | `9e3cea2e5` (1, owner ruling "Adopt FUI") | | 1, by hand + 5 fork-rule commits (see "FUI port" below) | | (this push) |
+| 2 | `e970abae8`..`57c692fe8` (40) | 10 (`e970abae8` `25cf99b21` `99724aa79` `618608e84` `6a501bba5` `c6fe67d48` `27f964b3e` `eef205044` `a4a03c6b4` `7e42d0707`) | 9 (`268c27f7d` Transparent sleep screen, appended as value 14; `48e39eb0e` reposition clearing on the fork's three-stage anchors; `4970ef1f6` PNG overlays + PNG viewer; `33f07db71` post-delete nav lock only; `bbca4886c` X3-UC8279 edge-button fix only; `d3b3b5669` dimension guard/8 MP/decode yield, not the image-margin clamp or single-base image refresh; `8eea7f865` Wi-Fi only; `a0daab994` font layer only; `93d572fcb` arabic preset only) | ALREADY 4 (`70faa29da` = `816011c42`; `e715532f9`; `080b1d719` = `ca1850a91`; `28377310d` fork has Wider/Widest); SKIP 15 (deleted subsystems: dictionary x2, status bar, Ubuntu UI face x2, font download; `b1d53ba81` ruling; `4d764de9c` press/release ruling; `413a1bd9d`+`151414d8c` revert pair; `81fd32237` would drop `.claude/skills`; `63fcbab02` needs `a757b9d10`; `b3d1e79d0` fixed-height Lyra rows; `75c079fe7` SDK-only; `da3d50c24` fork's own table columns); FLAG 2 (`a757b9d10` reader consolidation, `81e192709` light-sleep revert). Caches: section 66 -> 69, book.bin 11 -> 12 | (this push) |
 
 
 ### FUI port (`9e3cea2e5`), 2026-11-08
@@ -255,6 +256,39 @@ Picco's input rules). Each commit message carries the detail; the shape:
   (CLAUDE.md, "Adding or deleting a translation unit"). Device builds (X4,
   Picco) were not run for this item.
 
+
+### Batch 2 (2026-11-08): held for the owner, and what the SDK still lacks
+
+Report: the campaign scratchpad `batch-02-report.md`; each commit message
+carries its own detail. Recorded here because each is a decision, not a
+port:
+
+- **FLAG `a757b9d10` "consolidate reader activities"**: turns
+  `ReaderActivity` into an abstract base the Epub/Xtc/Txt readers derive from
+  (shared loop, refresh cadence, end-of-book options, back navigation). The
+  fork's readers diverge heavily there (press-fired overlapped turns, chords,
+  Find, its own end screen, no reader menu), so it is an architecture
+  decision. `63fcbab02` (TXT `skipPages` end sentinel) waits on it.
+- **FLAG `81e192709` "revert light sleep code but keep battery drain fix"**:
+  upstream withdrew #2525; this fork kept it (`816011c42`, [T-017]) and built
+  on it (Picco slices `f09e426e2`, the lag plan). The part upstream kept is
+  already here (`EpubReaderActivity.h` `skipLoopDelay`).
+- **Held from `bbca4886c` (X4 Pro / PaperMono)**: the two board targets and
+  their CI/release jobs, and the frontlight quick panel with its top-edge
+  swipe, which would also reach the Picco (it has a frontlight). Only the
+  X3-UC8279 edge-button fix was taken.
+- **Held from `d3b3b5669`**: upstream's single base refresh for image pages
+  in place of the double FAST; the fork's image path is the lag-plan F7
+  shape and wants a device comparison first.
+- **Not taken, no ruling needed:** `66a7ae10e`/`d72ae2ac8` restyle the
+  Ubuntu UI face this fork no longer ships (Libre Franklin is pinned).
+- **freeink-sdk commits upstream's pointer moves reach that the pin lacks**
+  (`git cherry` against `1dc07f6`), worth a look on the SDK fork:
+  `43b621e` (drop a redundant `exists()` in `openFileForRead`, a saved SD
+  call per open), `5c01a9c` + `a4976be` (perceptual gamma for the
+  frontlight; `HalFrontlight` drives `FrontlightManager` (Picco only, per its fork note), so this likely moves
+  the Picco's brightness curve). The rest are touch, list-layout (`fui::list`,
+  unused here) and other boards.
 
 Commands:
 ```bash
