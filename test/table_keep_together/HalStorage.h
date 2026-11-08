@@ -105,6 +105,8 @@ class HalStorage {
     return ::stat(p, &st) == 0;
   }
   bool remove(const char* p) { return ::remove(p) == 0; }
+  // CssParser's cache commit moves the tmp file and restores a backup.
+  bool rename(const char* from, const char* to) { return ::rename(from, to) == 0; }
 };
 
 #define Storage HalStorage::getInstance()

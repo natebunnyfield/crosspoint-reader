@@ -141,7 +141,7 @@ class LoadedCss {
       ADD_FAILURE() << "could not reopen the stylesheet fixture";
       return;
     }
-    if (!parser_.loadFromStream(f)) ADD_FAILURE() << "loadFromStream failed";
+    if (parser_.loadFromStream(f) != CssParser::ParseResult::Complete) ADD_FAILURE() << "loadFromStream failed";
   }
   ~LoadedCss() {
     if (!path_.empty()) ::remove(path_.c_str());
