@@ -167,6 +167,7 @@ before relying on any of them for a field layout:
 | 70 | upstream `c6fe67d48` (#3102, campaign 2026-11-08) | **layout**, ruby books: a ruby group is unbreakable again under the v68 boundary rules (its tokens drop `noSpaceBefore`), and a long paragraph does not soft-flush inside a ruby group |
 | 71 | upstream `52444a0c9` (#3221, campaign 2026-11-08) | **layout**: the block started after a closing element drops the parent's top/bottom margin and padding, so bare text or the next sibling no longer repeats the parent's top margin |
 | 72 | upstream `ce6c6cbce` (#3198, campaign 2026-11-08) | **layout**, mixed-direction books: the paragraph base direction comes from the block and `<html>`/`<body>` `dir` only, not from inline elements |
+| 73 | upstream `badfa95ff` (#3355, campaign 2026-11-08) | **layout**: an internal link's CSS `vertical-align: super/sub` is applied (footnote markers) |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

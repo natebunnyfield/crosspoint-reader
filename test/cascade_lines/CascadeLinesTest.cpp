@@ -102,6 +102,7 @@ struct Line {
   int y;
   CssTextAlign alignment;
   bool rtl = false;
+  bool anySup = false;
 };
 
 std::string writeTemp(const char* pattern, const std::string& contents) {
@@ -176,12 +177,15 @@ std::vector<Line> layout(const std::string& bodyHtml) {
           if (!line || !line->getBlock()) continue;
           const TextBlock& block = *line->getBlock();
           std::string text;
+          bool anySup = false;
           for (uint16_t i = 0; i < block.wordCount(); i++) {
             if (!text.empty()) text += ' ';
             text += block.wordText(i);
+            if (block.wordStyle(i) & EpdFontFamily::SUP) anySup = true;
           }
           lines.push_back(
-              {std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment, block.getBlockStyle().isRtl});
+              {std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment, block.getBlockStyle().isRtl,
+               anySup});
         }
       },
       /*embeddedStyle=*/true, /*contentBase=*/"", /*imageBasePath=*/"",
@@ -302,3 +306,22 @@ TEST(ParagraphDirection, BodyDirStillSetsTheParagraphDirection) {
 // set RTL, so an unmarked Hebrew paragraph that opens with an English term
 // reads correctly. Its price is an English paragraph with a Hebrew word among
 // its first three. Recorded in docs/fork-sync.md (batch 4), not changed here.
+
+// --- Footnote links keep vertical-align (upstream badfa95ff, section v73) ---
+// The internal-link branch returns before the generic inline path, so it lost
+// `vertical-align: super`, and footnote markers rendered at body size.
+
+TEST(FootnoteLinkStyle, AnInternalLinksSuperscriptIsKept) {
+  const auto lines = layout(
+      "<p>Body text<a href=\"#fn1\" style=\"vertical-align: super\">1</a> continues.</p>");
+  ASSERT_FALSE(lines.empty());
+  bool sawSup = false;
+  for (const Line& l : lines) sawSup = sawSup || l.anySup;
+  EXPECT_TRUE(sawSup);
+}
+
+TEST(FootnoteLinkStyle, APlainInternalLinkIsNotSuperscript) {
+  const auto lines = layout("<p>See <a href=\"#ch2\">chapter two</a> next.</p>");
+  ASSERT_FALSE(lines.empty());
+  for (const Line& l : lines) EXPECT_FALSE(l.anySup) << l.text;
+}

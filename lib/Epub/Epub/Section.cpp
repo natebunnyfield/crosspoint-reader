@@ -293,7 +293,10 @@ namespace {
 // its block (and <html>/<body> dir) only; an inline element's direction no
 // longer replaces it, so a Hebrew paragraph that opens with an English term
 // stays RTL. Moves line order and alignment in mixed-direction books.
-constexpr uint8_t SECTION_FILE_VERSION = 72;
+// v73: upstream badfa95ff (#3355). An internal link's CSS vertical-align
+// (super/sub) is applied, so footnote markers written as
+// <a style="vertical-align: super"> are superscript again.
+constexpr uint8_t SECTION_FILE_VERSION = 73;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
