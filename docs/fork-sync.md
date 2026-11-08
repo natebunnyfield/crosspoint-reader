@@ -166,7 +166,11 @@ web upload niceties, docs/templates/license).
 **Held for the owner (applies clean, but a user-visible choice):**
 - `99c2f09d1` vector font (.ttf/.otf) upload in the web server — a new font path
   beside this fork's curated `.cpfont` pipeline.
-- `965722cf8` Libron in Manage Fonts downloads — the font list is ruled.
+- `965722cf8` Libron in Manage Fonts downloads — **RULED 2026-11-08: SKIP.**
+  Owner, after seeing the same page of *Anne of Green Gables* set in Libron, Edgar,
+  TeX Gyre Schola and LibrisADF by the firmware's renderer: *"libron is too
+  ugly"*. Do not re-offer Libron. Proof page (tailnet):
+  `soup.taild108cf.ts.net/proofs/2026-11-08-libron/`.
 - `bde0809a4` build release candidates from `develop` — a branch this fork does
   not use.
 
