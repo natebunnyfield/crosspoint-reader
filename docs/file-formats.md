@@ -14,7 +14,7 @@ package that does not spell its metadata `dc:title`/`dc:creator`/`dc:language`
 (or its structure `opf:spine` etc.) no longer caches an empty title, author or
 language. Same rule as v11: a conclusion reached by the old matcher is stale.
 
-**Current version is 12** (the paragraphs below were written at 11) — `BOOK_CACHE_VERSION` at
+**Current version is 13** (the paragraphs below were written at 11; v12 is upstream `99724aa79`, v13 upstream `f437bb506` -- NFD Hangul titles and TOC labels compose) — `BOOK_CACHE_VERSION` at
 `lib/Epub/Epub/BookMetadataCache.cpp:35`. Check the live value with
 `grep -n 'BOOK_CACHE_VERSION = ' lib/Epub/Epub/BookMetadataCache.cpp` rather
 than trusting a number here; it will drift again. The ImHex pattern below still
@@ -168,6 +168,7 @@ before relying on any of them for a field layout:
 | 71 | upstream `52444a0c9` (#3221, campaign 2026-11-08) | **layout**: the block started after a closing element drops the parent's top/bottom margin and padding, so bare text or the next sibling no longer repeats the parent's top margin |
 | 72 | upstream `ce6c6cbce` (#3198, campaign 2026-11-08) | **layout**, mixed-direction books: the paragraph base direction comes from the block and `<html>`/`<body>` `dir` only, not from inline elements |
 | 73 | upstream `badfa95ff` (#3355, campaign 2026-11-08) | **layout**: an internal link's CSS `vertical-align: super/sub` is applied (footnote markers) |
+| 74 | upstream `f437bb506` (#3036, campaign 2026-11-08) | **layout**, NFD Korean books: conjoining Hangul jamo compose into syllables on every word; paired with `book.bin` v13 (titles and TOC go through the same composer) |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

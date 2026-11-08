@@ -7,6 +7,7 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Memory.h>
+#include <Utf8.h>
 #include <Xtc.h>
 
 #include <cstring>
@@ -923,7 +924,9 @@ void FileManagerActivity::render(RenderLock&&) {
   } else {
     GUI.drawList(
         renderer, Rect{0, contentTop, pageWidth, contentHeight}, files.size(), selectorIndex,
-        [this](int index) { return displayName(files[index]); }, nullptr,
+        // Composed for display only (macOS NFD names, upstream f437bb506);
+        // `files` stays raw for every path operation.
+        [this](int index) { return utf8ComposeNfc(displayName(files[index])); }, nullptr,
         [this](int index) { return UITheme::getFileIcon(files[index]); });
   }
 

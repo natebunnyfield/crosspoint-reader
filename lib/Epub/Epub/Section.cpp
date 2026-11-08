@@ -296,7 +296,10 @@ namespace {
 // v73: upstream badfa95ff (#3355). An internal link's CSS vertical-align
 // (super/sub) is applied, so footnote markers written as
 // <a style="vertical-align: super"> are superscript again.
-constexpr uint8_t SECTION_FILE_VERSION = 73;
+// v74: upstream f437bb506 (#3036). utf8ComposeNfc() composes conjoining Hangul
+// jamo (L+V[+T]) into syllables. It runs on every word, so a book stored in NFD
+// Korean re-lays out with the precomposed syllables the fonts carry.
+constexpr uint8_t SECTION_FILE_VERSION = 74;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

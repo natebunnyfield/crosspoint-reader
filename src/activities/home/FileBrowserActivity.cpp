@@ -5,6 +5,7 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Memory.h>
+#include <Utf8.h>
 
 #include <algorithm>
 
@@ -307,7 +308,10 @@ std::string getFileExtension(const std::string& filename) {
 }
 
 void FileBrowserActivity::describeRow(const int index, ListRow& row) const {
-  row.title = getFileName(files[index]);
+  // Display copy only: `files` keeps the raw (possibly NFD) name for every path
+  // operation. macOS writes filenames in NFD, which for Korean is conjoining jamo
+  // the fonts cannot draw (upstream f437bb506).
+  row.title = utf8ComposeNfc(getFileName(files[index]));
   row.icon = UITheme::getFileIcon(files[index]);
   row.value = getFileExtension(files[index]);
 }
