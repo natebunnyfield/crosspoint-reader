@@ -58,6 +58,19 @@ void appendMetadataText(std::string& out, const XML_Char* text, const int len, b
 
     if (out.size() >= MAX_METADATA_TEXT) {
       LOG_DBG("COF", "Metadata text exceeds %u bytes; truncating", static_cast<unsigned>(MAX_METADATA_TEXT));
+      // The clamp counts bytes, so it can land inside a multi-byte character
+      // (a 171-character CJK title is 513 bytes). Drop the incomplete tail, or
+      // book.bin keeps an orphaned lead byte that draws as U+FFFD
+      // (adversarial review 2026-11-08, F3).
+      size_t cont = 0;
+      while (cont < out.size() && cont < 3 && (static_cast<unsigned char>(out[out.size() - 1 - cont]) & 0xC0) == 0x80) {
+        cont++;
+      }
+      if (cont < out.size()) {
+        const auto lead = static_cast<unsigned char>(out[out.size() - 1 - cont]);
+        const size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+        if (need > cont + 1) out.resize(out.size() - 1 - cont);
+      }
       return;
     }
     if (separatorPending != nullptr && *separatorPending) {

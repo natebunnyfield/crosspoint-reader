@@ -52,6 +52,21 @@ Octavia E. Butler
   EXPECT_EQ(parser.author, "Ursula K. Le Guin, Octavia E. Butler");
 }
 
+TEST(ContentOpfParserMetadata, TheClampNeverEndsInsideACharacter) {
+  // 200 x U+4E2D (3 bytes each): 512 is not a multiple of 3, so a byte clamp
+  // would cut the 171st character after its lead byte.
+  std::string title;
+  for (int i = 0; i < 200; i++) title += "\xE4\xB8\xAD";
+  const std::string xml =
+      "<package xmlns:dc=\"urn:dc\"><metadata><dc:title>" + title + "</dc:title></metadata></package>";
+  ContentOpfParser parser("", "", xml.size(), nullptr);
+
+  parse(parser, xml);
+
+  EXPECT_EQ(parser.title.size(), 510u);  // 170 whole characters
+  EXPECT_EQ(parser.title.substr(507), "\xE4\xB8\xAD");
+}
+
 // Fork: upstream's two metadataOnly cases (StopsBeforeManifest..., NeverEntersManifest...)
 // belong to its Library index (held, 652ae0d83 remainder); the parser here has no
 // metadataOnly mode.
