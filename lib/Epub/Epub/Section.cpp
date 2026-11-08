@@ -265,7 +265,11 @@ namespace {
 // v66: upstream 1582e70ef/596f0d3f7. FOOTNOTE_HREF_LEN grew 96 -> 256, so each
 // serialized footnote record grew 128 -> 288 bytes. A STRUCTURAL change: a v65
 // page's footnotes would be read with the wrong stride.
-constexpr uint8_t SECTION_FILE_VERSION = 66;
+// v67 (2026-11-08): the chapter sinkage is gone, so a section's first page
+// starts at y=0 like every other. A LAYOUT change with an unchanged struct: a
+// v66 cache would keep every chapter opening dropped a fifth of the page.
+// docs/page-space-2026-11-08.md.
+constexpr uint8_t SECTION_FILE_VERSION = 67;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

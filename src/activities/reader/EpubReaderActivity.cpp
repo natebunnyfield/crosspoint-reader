@@ -1176,8 +1176,12 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   orientedMarginTop += SETTINGS.screenMargin;
   orientedMarginLeft += SETTINGS.screenMargin;
   orientedMarginRight += SETTINGS.screenMargin;
-
-  orientedMarginBottom += SETTINGS.screenMargin;
+  // Space below the text is twice the space above it (owner, 2026-11-08: "the
+  // space above text on a page is 1 unit and below is 2 units"). The unit is
+  // the screen margin: the viewable margins are panel pixels hidden behind the
+  // bezel, so the white a reader sees above the first line's cap is exactly
+  // screenMargin. docs/page-space-2026-11-08.md.
+  orientedMarginBottom += 2 * SETTINGS.screenMargin;
 
   const uint16_t viewportWidth = renderer.getScreenWidth() - orientedMarginLeft - orientedMarginRight;
   const uint16_t viewportHeight = renderer.getScreenHeight() - orientedMarginTop - orientedMarginBottom;

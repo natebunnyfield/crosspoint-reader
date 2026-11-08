@@ -53,7 +53,7 @@ constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
 // RULE: bump this when the format changes, when pagination changes, OR when
 // anything a measured advance depends on changes. The last clause is the one
 // that was missing.
-constexpr uint8_t CACHE_VERSION = 5;
+constexpr uint8_t CACHE_VERSION = 6;  // 6: bottom margin is 2x the screen margin
 }  // namespace
 
 void TxtReaderActivity::onEnter() {
@@ -150,7 +150,9 @@ void TxtReaderActivity::initializeReader() {
   cachedOrientedMarginTop += cachedScreenMargin;
   cachedOrientedMarginLeft += cachedScreenMargin;
   cachedOrientedMarginRight += cachedScreenMargin;
-  cachedOrientedMarginBottom += cachedScreenMargin;
+  // Twice the margin below the text as above it, as in the EPUB reader
+  // (owner, 2026-11-08; docs/page-space-2026-11-08.md).
+  cachedOrientedMarginBottom += 2 * cachedScreenMargin;
 
   viewportWidth = renderer.getScreenWidth() - cachedOrientedMarginLeft - cachedOrientedMarginRight;
   const int viewportHeight = renderer.getScreenHeight() - cachedOrientedMarginTop - cachedOrientedMarginBottom;

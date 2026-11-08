@@ -29,7 +29,8 @@ A ramp change that helps on one and hurts on the other is fitting, not fixing â€
 that is exactly how the Coelacanth L/XL candidate was caught and rejected. Any
 conclusion drawn from one passage alone is provisional.
 
-**A page here is a FULL page.** The chapter's sinkage page and the trailing
+**A page here is a FULL page.** The chapter's first page (the heading page;
+it carried the chapter sinkage until 2026-11-08) and the trailing
 partial page are both dropped; the figure is a mean over the rest.
 
 **Layout is tier-independent.** Every render scale lays out from the 1x cut, so

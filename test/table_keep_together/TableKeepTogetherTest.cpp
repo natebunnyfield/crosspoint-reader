@@ -241,6 +241,67 @@ std::vector<std::vector<RuleGeom>> layoutRules(const std::string& bodyHtml) {
   return pages;
 }
 
+// Every element on the FIRST page in paint order: a rule as "" at its y, a
+// line as its text at its y. For asserting WHERE a separator sits relative to
+// the cells around it, which counting rules cannot see.
+struct ElementAt {
+  int y;
+  std::string text;  // empty for a rule
+};
+
+std::vector<ElementAt> firstPageGeometry(const std::string& bodyHtml) {
+  char path[] = "/tmp/cp_table_geom_XXXXXX";
+  const int fd = mkstemp(path);
+  if (fd < 0) {
+    ADD_FAILURE() << "mkstemp failed";
+    return {};
+  }
+  const std::string doc =
+      "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+      "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\"><head><title>t</title></head><body>" +
+      bodyHtml + "</body></html>";
+  const ssize_t wrote = ::write(fd, doc.data(), doc.size());
+  ::close(fd);
+  if (wrote != static_cast<ssize_t>(doc.size())) {
+    ADD_FAILURE() << "short write of the fixture";
+    ::remove(path);
+    return {};
+  }
+
+  std::vector<ElementAt> out;
+  bool first = true;
+  const std::string filepath(path);
+  ChapterHtmlSlimParser parser(
+      nullptr, filepath, Gfx::instance().renderer(), LIBREFRANKLIN_READER_14_FONT_ID,
+      /*smallFontId=*/0, /*lineCompression=*/1.0f, /*extraParagraphSpacing=*/true,
+      /*paragraphAlignment=*/0, kViewportWidth, kViewportHeight, /*hyphenationEnabled=*/false,
+      /*focusReadingEnabled=*/false, /*lineGrid=*/false,
+      /*justifyThresholdChars=*/autojustify::THRESHOLD_CHARS,
+      [&out, &first](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
+        if (!first) return;
+        first = false;
+        for (const auto& element : page->elements) {
+          if (std::dynamic_pointer_cast<PageHorizontalRule>(element)) {
+            out.push_back({element->yPos, ""});
+            continue;
+          }
+          const auto line = std::dynamic_pointer_cast<PageLine>(element);
+          if (!line || !line->getBlock()) continue;
+          const TextBlock& block = *line->getBlock();
+          std::string text;
+          for (uint16_t i = 0; i < block.wordCount(); i++) {
+            if (!text.empty()) text += ' ';
+            text += block.wordText(i);
+          }
+          out.push_back({element->yPos, text});
+        }
+      },
+      /*embeddedStyle=*/false, /*contentBase=*/"", /*imageBasePath=*/"");
+  parser.parseAndBuildPages();
+  ::remove(path);
+  return out;
+}
+
 int totalRules(const std::vector<std::vector<RuleGeom>>& pages) {
   int n = 0;
   for (const auto& page : pages) n += static_cast<int>(page.size());
@@ -307,10 +368,28 @@ TEST(TableRowSeparator, OneAtEveryRowBoundaryAndNoneAtTheTableEnds) {
   // header means one under the header as well -- a rule under the head is
   // ordinary table typography and it is still a row boundary. So N data rows
   // under a header give N separators: head|r0, r0|r1, ... r(N-2)|r(N-1).
+  //
+  // Except where a boundary IS the page break: a separator that would land
+  // first on a page is dropped by design (emitTableRowSeparator), so the
+  // expected count is the boundaries whose two sides share a page. Counting
+  // them from the layout, not hard-coding 1/2/3/6, keeps this a test of the
+  // rule rather than of where one fixture's page breaks happen to fall -- the
+  // hard-coded counts held only while the chapter sinkage pushed the break
+  // mid-row, and broke when it was removed (2026-11-08).
+  for (const int rows : {1, 2, 3, 6}) {
+    const auto pages = layout(flatTable(rows));
+    int sharedBoundaries = 0;
+    for (int b = 0; b < rows; b++) {
+      const std::string above = b == 0 ? "H5" : "r" + std::to_string(b - 1) + "c5";
+      const std::string below = "r" + std::to_string(b) + "c0";
+      ASSERT_GE(pageOf(pages, above), 0) << above << " missing, rows=" << rows;
+      if (pageOf(pages, above) == pageOf(pages, below)) sharedBoundaries++;
+    }
+    EXPECT_GE(sharedBoundaries, rows - static_cast<int>(pages.size()) + 1)
+        << "more boundaries than page breaks fell on a break, rows=" << rows;
+    EXPECT_EQ(totalRules(layoutRules(flatTable(rows))), sharedBoundaries) << "rows=" << rows;
+  }
   EXPECT_EQ(totalRules(layoutRules(flatTable(1))), 1) << "the rule under the header";
-  EXPECT_EQ(totalRules(layoutRules(flatTable(2))), 2);
-  EXPECT_EQ(totalRules(layoutRules(flatTable(3))), 3);
-  EXPECT_EQ(totalRules(layoutRules(flatTable(6))), 6);
 
   // Never before the first row or after the last: those boundaries divide the
   // table from the prose around it, which is a different decision and not the
@@ -324,6 +403,33 @@ TEST(TableRowSeparator, OneAtEveryRowBoundaryAndNoneAtTheTableEnds) {
   }
   noHead += "</table>";
   EXPECT_EQ(totalRules(layoutRules(noHead)), 3) << "four records, three boundaries between them";
+}
+
+// The rule goes UNDER a row, between its last cell and the next row's first.
+// On the streaming path the previous row's last cell was still unlaid when the
+// separator was emitted, so every rule landed between that row's LAST TWO
+// cells (H4 | rule | H5, r0c4 | rule | r0c5). Found by a trace 2026-11-08.
+TEST(TableRowSeparator, SitsBetweenTheRowsNotInsideOne) {
+  const auto geom = firstPageGeometry(flatTable(2));
+  auto yOf = [&geom](const std::string& word) {
+    for (const ElementAt& e : geom) {
+      if (!e.text.empty() && lineHasWord(e.text, word)) return e.y;
+    }
+    return -1;
+  };
+  int rules = 0;
+  for (const ElementAt& e : geom) rules += e.text.empty() ? 1 : 0;
+  ASSERT_EQ(rules, 2) << "flatTable(2) should fit one page with both separators";
+  const int boundaries[2][2] = {{yOf("H5"), yOf("r0c0")}, {yOf("r0c5"), yOf("r1c0")}};
+  int r = 0;
+  for (const ElementAt& e : geom) {
+    if (!e.text.empty()) continue;
+    ASSERT_GE(boundaries[r][0], 0);
+    ASSERT_GE(boundaries[r][1], 0);
+    EXPECT_GT(e.y, boundaries[r][0]) << "separator " << r << " is above the row's last cell";
+    EXPECT_LT(e.y, boundaries[r][1]) << "separator " << r << " is below the next row's first cell";
+    r++;
+  }
 }
 
 TEST(TableRowSeparator, IsFullMeasureAndHairlineNotAnHrSectionBreak) {
@@ -522,6 +628,11 @@ TEST(TableKeepTogether, LooseProseAboveATableCostsAtMostOnePage) {
 // must degrade to one row and take it, rather than give up or drag a second row
 // it has no room for. It is also the rung the before/after render lands on.
 //
+// Lengthened 2026-11-08: until then a full 700 px page DID fit the header and
+// two rows, and the rung was only ever reached on the first page, which the
+// chapter sinkage shortened. With the sinkage gone each row carries one more
+// sentence, so "two will not fit an empty page" is true of every page again.
+//
 // The cells have to stay long WITHOUT defeating tablecolumns::planColumns: a
 // cell wide enough to break the plan sends the whole table to the key-block
 // fallback, where there is no header row to keep and this test silently
@@ -531,11 +642,13 @@ TEST(TableKeepTogether, DegradesToOneRowWhenTwoWillNotFit) {
       "<table><caption>Effort-to-payoff, best first</caption>"
       "<thead><tr><th>Addition</th><th>Effort</th><th>What it buys</th></tr></thead><tbody>"
       "<tr><td>Beans</td><td>Open, rinse</td><td>Fiber and protein in the same object; the single "
-      "cheapest upgrade in the store. Into pasta, quesadillas, anything.</td></tr>"
+      "cheapest upgrade in the store. Into pasta, quesadillas, anything. Keep three cans on the shelf at all "
+      "times.</td></tr>"
       "<tr><td>Lentils</td><td>Microwave</td><td>Picked ripe, flash-frozen, nutritionally comparable "
-      "to fresh, often better than fresh that trucked for a week.</td></tr>"
+      "to fresh, often better than fresh that trucked for a week. Steam them, roast them, or stir them into "
+      "soup.</td></tr>"
       "<tr><td>Kale</td><td>Open can</td><td>Seafood is the food family most people miss entirely. "
-      "Canned salmon, sardines, tuna: protein plus omega-3s.</td></tr>"
+      "Canned salmon, sardines, tuna: protein plus omega-3s. Mash into toast or fold into rice.</td></tr>"
       "</tbody></table>";
 
   bool sawTheRung = false;

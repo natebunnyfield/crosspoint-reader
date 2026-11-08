@@ -155,6 +155,7 @@ before relying on any of them for a field layout:
 | 61 | (this commit) | the automatic-justification default drops 40 → 34 characters, so the default 14 pt page justifies (`docs/auto-justification.md`, final section) |
 | 65 | upstream `046827fc3` (campaign 2026-11-08) | ruby edge overhangs reserved at layout instead of shifted at paint; ruby overhang widens the neighbor word; the breaker's DP prefers the longer line on a cost tie (`cost <= dp[i]`), so breaks move wherever two candidates tie. No field changed |
 | 66 | upstream `1582e70ef` + `596f0d3f7` (campaign 2026-11-08) | **structural**: the fixed-size footnote href field grows 96 → 256 bytes (`FOOTNOTE_HREF_LEN`, `lib/Epub/Epub/FootnoteEntry.h`), so each serialized footnote record goes 128 → 288 bytes; a v65 file would mis-parse every page after its first footnote |
+| 67 | (this commit) | chapter sinkage removed: a section's first page starts at y=0 like every other (owner 2026-11-08, `docs/page-space-2026-11-08.md`); no field changed, the first page's layout did |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

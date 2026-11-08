@@ -610,10 +610,10 @@ TEST(DefinitionListKeep, TheKeepDoesNotApplyToOrdinaryParagraphs) {
   const auto withList = layout(reportedEntry() + filler(40));
   const auto alone = layout(filler(40));
   ASSERT_GT(alone.size(), 2u);
-  // Page 0 is short in BOTH runs -- it carries the chapter sinkage, the
-  // designed drop a section's first page opens with. Take the full-page line
-  // count from a page that does not, and sanity-check that the stand-alone
-  // run's own interior pages agree on it.
+  // Page 0 is skipped in BOTH runs: until 2026-11-08 it carried the chapter
+  // sinkage, and the reported entry's heading still shapes it. Take the
+  // full-page line count from an interior page, and sanity-check that the
+  // stand-alone run's own interior pages agree on it.
   const size_t fullPageLines = alone[1].size();
   for (size_t p = 1; p + 1 < alone.size(); p++) {
     ASSERT_EQ(alone[p].size(), fullPageLines) << "the stand-alone prose run is not uniform at page " << p;

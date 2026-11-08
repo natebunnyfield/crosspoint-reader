@@ -273,6 +273,11 @@ sub-setting of §3.1 and should ship with it or not at all.
 
 ### 3.7 Chapter opening drop (sinkage)
 
+**Removed 2026-11-08** (owner: "the space above text on a page is 1 unit and
+below is 2 units"). Every page, chapter openings included, now starts at the
+top; see `docs/page-space-2026-11-08.md`. The text below is the 2026-08-25
+state, kept as the record.
+
 Every spine section's first page begins one fifth of the viewport down, snapped
 to a whole number of line-heights (`kChapterSinkageFraction = 5`,
 `ChapterHtmlSlimParser.cpp:2609-2617`; owner ruling 2026-08-22). A None / Small
