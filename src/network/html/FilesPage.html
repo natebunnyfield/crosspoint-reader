@@ -2812,8 +2812,8 @@
         item.title = `${img.width}×${img.height} - Cover image (locked)`;
         item.innerHTML = `
           <span class="image-state-badge cover-badge">🔒</span>
-          <img src="${img.dataUrl}" alt="${img.name}" loading="lazy">
-          <div class="image-name">${img.name}</div>
+          <img src="${img.dataUrl}" alt="${escapeHtml(img.name)}" loading="lazy">
+          <div class="image-name">${escapeHtml(img.name)}</div>
         `;
       } else if (isSeparator) {
         // Separator/ornament - locked, cannot be split
@@ -2821,8 +2821,8 @@
         item.title = `${img.width}×${img.height} - Separator (locked)`;
         item.innerHTML = `
           <span class="image-state-badge separator-badge">✦</span>
-          <img src="${img.dataUrl}" alt="${img.name}" loading="lazy">
-          <div class="image-name">${img.name}</div>
+          <img src="${img.dataUrl}" alt="${escapeHtml(img.name)}" loading="lazy">
+          <div class="image-name">${escapeHtml(img.name)}</div>
         `;
       } else {
         // All other images are selectable - all modes allowed
@@ -2879,8 +2879,8 @@
           <div class="image-preview-overlay">
             ${splitLinesHtml}
           </div>
-          <img src="${previewSrc}" alt="${img.name}" loading="lazy">
-          <div class="image-name">${img.name}</div>
+          <img src="${previewSrc}" alt="${escapeHtml(img.name)}" loading="lazy">
+          <div class="image-name">${escapeHtml(img.name)}</div>
         `;
       }
 
