@@ -232,3 +232,25 @@ dictionary or word-lookup specific. Those are features this fork does not have.
   still holds at that point, but the dramatic 61428 -> 102388 `maxAlloc` figure
   in their commit message is theirs, measured on their build. Do not repeat it
   as ours.
+
+## 2026-11-07 — third pass
+
+Re-surveyed against `upstream/develop` `818a15400`, the SDK, the simulator and
+the second-level forks. Full write-up, ranked shortlist, negative results and
+re-runnable method: [fork-survey-2026-11-07.md](fork-survey-2026-11-07.md).
+
+Corrections to this file's 2026-08-15 picture:
+
+- **The fork list was not capped.** REST pages every direct fork (1,632; all
+  four `sort=` orders give the same set) and GraphQL `totalCount` agrees
+  (1,629). The larger number (`forks_count`, now 2,257) counts forks of
+  forks, which this file's method never reached.
+- **CrossInk works on `development`, not `main`** (`main` unchanged since
+  2026-10-04; 782 new commits on `development` since 08-15). A default-branch
+  survey sees almost nothing of it.
+- New forks worth watching: `Belphemur/Xerif-eReader`, `TenorGroup/cross`,
+  `alyapin/crosspoint-reader`, `InsiderPhD/crosspoint-reader`, and the SDK
+  forks `jpirnay/freeink-sdk` and `homunet/freeink-sdk`.
+- The simulator side is still empty of anything to take, apart from one
+  scripted-run fix worth reading (Aelerinya `eaddac491`); our simulator fork
+  no longer shares an ancestor with upstream's `main` per the compare API.
