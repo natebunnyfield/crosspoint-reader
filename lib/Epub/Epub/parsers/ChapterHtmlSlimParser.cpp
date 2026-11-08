@@ -2793,8 +2793,21 @@ void XMLCALL ChapterHtmlSlimParser::defaultHandlerExpand(void* userData, const X
 void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* name) {
   auto* self = static_cast<ChapterHtmlSlimParser*>(userData);
 
+  // The closing element is the skipped (display:none / hidden) one or sits
+  // inside it. Its open pushed nothing -- startElement returns before any block,
+  // table, list or ruby bookkeeping -- so its close must not pop the enclosing
+  // element's state either. Without this a hidden paragraph popped its
+  // container's block style, so the paragraphs after it lost the container's
+  // margins, and a hidden nested list ended its parent list. Upstream carries
+  // the same guard, as part of da3d50c24 (its table columns, not taken here).
+  // Checked before depth is decremented, as there, and before the ruby branches
+  // below: their early returns skipped the "leaving skip" reset, so a hidden
+  // <rt> left skipUntilDepth stale and swallowed what followed (adversarial
+  // review 2026-11-08, F1). A skipped </rt> or </ruby> takes the general path.
+  const bool insideSkippedSubtree = self->depth - 1 >= self->skipUntilDepth;
+
   // Ruby text: </rt> distributes ruby to base words, </ruby> resets ruby state
-  if (strcmp(name, "rt") == 0) {
+  if (!insideSkippedSubtree && strcmp(name, "rt") == 0) {
     self->collectingRubyText = false;
     if (self->inRuby && self->currentTextBlock) {
       const int currentWordCount = static_cast<int>(self->currentTextBlock->size());
@@ -2826,7 +2839,7 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
     self->depth -= 1;
     return;
   }
-  if (strcmp(name, "ruby") == 0 && self->inRuby) {
+  if (!insideSkippedSubtree && strcmp(name, "ruby") == 0 && self->inRuby) {
     self->inRuby = false;
     self->rubyStartWordIndex = -1;
     self->rubyTextBuffer.clear();
@@ -2847,15 +2860,6 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
 
   const bool styleWillChange = willPopStyleStack || willClearBold || willClearItalic;
   const bool headerOrBlockTag = isHeaderOrBlock(name);
-  // The closing element is the skipped (display:none / hidden) one or sits
-  // inside it. Its open pushed nothing -- startElement returns before any block,
-  // table or list bookkeeping -- so its close must not pop the enclosing
-  // element's state either. Without this a hidden paragraph popped its
-  // container's block style, so the paragraphs after it lost the container's
-  // margins, and a hidden nested list ended its parent list. Upstream carries
-  // the same guard, as part of da3d50c24 (its table columns, not taken here).
-  // Checked before depth is decremented, as there.
-  const bool insideSkippedSubtree = self->depth - 1 >= self->skipUntilDepth;
   const bool tableStructuralTag = isTableStructuralTag(name);
 
   if (!insideSkippedSubtree && self->tableDepth > 1 && strcmp(name, "table") == 0) {

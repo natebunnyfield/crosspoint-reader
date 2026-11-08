@@ -404,3 +404,17 @@ TEST(ListStyleNone, AnOrdinaryListKeepsItsMarkers) {
   EXPECT_EQ(0u, lineWith(lines, "delta").find("1."));
   EXPECT_EQ(0u, lineWith(lines, "eps").find("\xe2\x80\xa2"));
 }
+
+// A hidden <rt>: the </rt> and </ruby> branches returned before the "leaving
+// skip" reset, so skipUntilDepth stayed stale. Later text at that depth was
+// dropped and the next close at that depth was read as skipped (adversarial
+// review 2026-11-08, F1).
+TEST(SkippedBlock, AHiddenRubyTextDoesNotSwallowWhatFollows) {
+  for (const char* rt : {"<rt hidden=\"\">kan</rt>", "<rt style=\"display:none\">kan</rt>"}) {
+    const std::string html = std::string("<p>alpha<ruby>X") + rt +
+                             "</ruby>beta</p><div class=\"cascade-d1\"><div><p>lostpara</p></div></div><p>afterpara</p>";
+    const auto lines = layout(html);
+    EXPECT_GE(xOf(lines, "lostpara"), 0) << rt;
+    EXPECT_EQ(0, xOf(lines, "afterpara")) << rt;
+  }
+}
