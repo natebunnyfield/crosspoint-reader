@@ -259,6 +259,15 @@ Picco's input rules). Each commit message carries the detail; the shape:
 
 ### Batch 2 gates (2026-11-08, after rebasing onto `3487265ff`)
 
+**Pushed as `ad6f614ce`** (21 batch commits rebased onto main, plus the gate
+record). The branch `upstream-campaign` (worktree `.claude/worktrees/upstream-sync`)
+still points at the PRE-rebase copies, head `ec1fd5f00`, whose section bumps
+read 67-69. Do not push it or rebase it: point it at `origin/main` first. Batch
+3 starts at upstream `62e84a16f` (392 non-merge commits after `57c692fe8`
+remained on 2026-11-08). Two owner decisions are still open: `a757b9d10` (reader
+consolidation, with `63fcbab02` waiting on it) and `81e192709` (light-sleep
+revert).
+
 Run by a second session once the campaign session had stopped with batch 2
 committed but unbuilt and unpushed. On the rebased tree: `pio run -e default`
 (X4) SUCCESS, `pio run -e picco` SUCCESS, `pio run -e simulator` SUCCESS,
