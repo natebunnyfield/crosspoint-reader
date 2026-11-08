@@ -15,8 +15,9 @@ class HalFile {
   size_t position() const { return 0; }
   size_t size() const { return 0; }
   bool seek(const size_t) { return false; }
-  void close() {}
-  bool available() const { return false; }
+  bool seekCur(const long) { return false; }
+  bool close() { return true; }
+  int available() const { return 0; }
   explicit operator bool() const { return false; }
 };
 
@@ -26,5 +27,6 @@ class HalStorageStub {
   bool openFileForWrite(const char*, const std::string&, HalFile&) { return false; }
   bool exists(const char*) { return false; }
   bool remove(const char*) { return false; }
+  bool rename(const char*, const char*) { return false; }
 };
 inline HalStorageStub Storage;
