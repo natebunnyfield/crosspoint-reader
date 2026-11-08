@@ -164,8 +164,18 @@ JPEG patch, font interval dedupe, `USE_SPI_ARRAY_TRANSFER=1` for ~3x SD reads,
 web upload niceties, docs/templates/license).
 
 **Held for the owner (applies clean, but a user-visible choice):**
-- `99c2f09d1` vector font (.ttf/.otf) upload in the web server — a new font path
-  beside this fork's curated `.cpfont` pipeline.
+- `99c2f09d1` vector font (.ttf/.otf) upload in the web server — **RULED
+  2026-11-08: SKIP, together with the renderer it needs, `aaf683798` ("Add
+  TrueType fonts on PSRAM boards", 43 files, +2,161).** The campaign has not
+  reached `aaf683798`; when it does, skip it on this ruling. Facts the owner
+  ruled on: upstream compiles the TTF path out without PSRAM
+  (`lib/EpdFont/VectorFontSupport.h`, `BOARD_HAS_PSRAM`), so it would be
+  Picco-only; it needs FreeInkFont (FreeType) from `freeink-sdk/libs/font`,
+  which the fork's pinned SDK `1dc07f67` lacks; the gain is skipping the
+  builder (whole font, any size, drop-in), the cost is on-device outline
+  rasterizing (speed unmeasured), losing the `.cpfont` tuning (synthetic
+  styles, `baseline_shift_em`, ramps), a Picco-only look, ~110 KB flash.
+  Owner chose "Skip both".
 - `965722cf8` Libron in Manage Fonts downloads — **RULED 2026-11-08: SKIP.**
   Owner, after seeing the same page of *Anne of Green Gables* set in Libron, Edgar,
   TeX Gyre Schola and LibrisADF by the firmware's renderer: *"libron is too
