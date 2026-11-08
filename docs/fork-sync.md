@@ -192,7 +192,21 @@ fork does not have — SD plugins, clippings, `HalMemory`), 29 conflicting;
 **freeink-sdk** upstream (`Free-Ink/freeink-sdk`, the fork's parent): 335 absent
 by patch id against the pinned `1dc07f6`, many for boards this fork does not
 build. Taking the conflicting set is a per-commit, by-hand campaign under the
-rules above — owner's call on scope and order.
+rules above.
+
+**Owner ruling 2026-11-08: "All of them".** Every applicable upstream commit is
+taken, by hand, in upstream order, in batches, each batch built (X4, Picco,
+simulator), gated (`tools/latency/gate.sh`, host tests) and pushed before the
+next. "Applicable" still means the standing rules: hunks in removed subsystems
+are dropped, scope rulings above stand (the three held commits stay held until
+asked), and every skip is recorded below with its reason. Progress is logged
+per batch under "Campaign log".
+
+### Campaign log
+
+| batch | upstream range | taken | partial | skipped (why) | pushed as |
+|---|---|---|---|---|---|
+
 
 Commands:
 ```bash
