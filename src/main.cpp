@@ -543,9 +543,11 @@ unsigned long t2 = 0;
 // Definitions for SilentRestart.h. RTC_NOINIT survives ESP.restart() but not power loss.
 RTC_NOINIT_ATTR uint32_t silentRebootMagic;
 RTC_NOINIT_ATTR uint32_t silentRebootTarget;
+RTC_NOINIT_ATTR uint32_t silentRebootPayload;
 constexpr uint32_t SILENT_REBOOT_MAGIC = 0xC1EAB007;
 constexpr uint32_t SILENT_REBOOT_TARGET_HOME = 0;
 constexpr uint32_t SILENT_REBOOT_TARGET_READER = 1;
+constexpr uint32_t SILENT_REBOOT_LIGHT_ON = 1U << 0;
 
 // How the device is coming back to life, resolved once at boot. Both resume
 // flows suppress the splash and leave the panel holding its pre-boot frame; a
@@ -571,10 +573,25 @@ static bool deepSleepInProgress = false;
 // put the device straight back to sleep on the first sample.
 static LowBatteryGuard lowBatteryGuard;
 
+// A silent restart is internal maintenance, so the light must come back exactly
+// as the user left it (upstream 3f874f847). SETTINGS.frontlightOn is the saved
+// preference and legitimately diverges from the live state (a wake with Restore
+// Light on Wake off leaves the light off while the saved "was on" is kept), so
+// the live state rides across the reboot instead. Cleared with the magic in
+// setup(). Only the Picco has a frontlight.
+static void armSilentReboot(const uint32_t target) {
+  silentRebootTarget = target;
+#if FREEINK_DEVICE_PICCO
+  silentRebootPayload = Frontlight.isOn() ? SILENT_REBOOT_LIGHT_ON : 0;
+#else
+  silentRebootPayload = 0;
+#endif
+  silentRebootMagic = SILENT_REBOOT_MAGIC;
+}
+
 void silentRestart() {
   if (deepSleepInProgress) return;  // sleeping supersedes the heap-defrag reboot
-  silentRebootTarget = SILENT_REBOOT_TARGET_HOME;
-  silentRebootMagic = SILENT_REBOOT_MAGIC;
+  armSilentReboot(SILENT_REBOOT_TARGET_HOME);
   LOG_DBG("MAIN", "Silent restart (target=home)");
   // E-ink retains the previous frame until Home's first paint lands (~2-3s).
   // Without an overlay, users don't see the reboot and fire input through to
@@ -587,8 +604,7 @@ void silentRestart() {
 
 void silentRestartToReader() {
   if (deepSleepInProgress) return;  // sleeping supersedes the heap-defrag reboot
-  silentRebootTarget = SILENT_REBOOT_TARGET_READER;
-  silentRebootMagic = SILENT_REBOOT_MAGIC;
+  armSilentReboot(SILENT_REBOOT_TARGET_READER);
   LOG_DBG("MAIN", "Silent restart (target=reader)");
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
   delay(50);
@@ -988,8 +1004,11 @@ void setup() {
   const bool isSilentReboot = (silentRebootMagic == SILENT_REBOOT_MAGIC);
   const uint32_t snapshotTarget =
       (isSilentReboot && silentRebootTarget <= SILENT_REBOOT_TARGET_READER) ? silentRebootTarget : 0;
+  [[maybe_unused]] const bool silentRebootLightOn =
+      isSilentReboot && (silentRebootPayload & SILENT_REBOOT_LIGHT_ON) != 0;
   silentRebootMagic = 0;
   silentRebootTarget = 0;
+  silentRebootPayload = 0;
 
   gpio.begin();
   powerManager.begin();
@@ -1035,12 +1054,12 @@ void setup() {
   // Brightness and warmth are always restored. A normal wake starts with the
   // light off unless Restore Light on Wake is enabled; a slide switch bound to
   // the light decides it from its position instead (upstream 261726f61,
-  // 8f4d035cb). Upstream also replays the live state across a silent
-  // heap-defrag reboot; this fork's silent restart carries no payload for it,
-  // so such a reboot takes the wake rule above.
-  const bool restoreLightOn = slideSwitchOwnsLight()
-                                  ? gpio.isToggleSwitchOn()
-                                  : (SETTINGS.frontlightOn != 0 && SETTINGS.frontlightRestoreOnWake != 0);
+  // 8f4d035cb), and still wins. A silent heap-defrag reboot replays the live
+  // state it carried (upstream 3f874f847), so the reboot does not change the
+  // light.
+  const bool restoreLightOn = slideSwitchOwnsLight() ? gpio.isToggleSwitchOn()
+                              : isSilentReboot       ? silentRebootLightOn
+                                               : (SETTINGS.frontlightOn != 0 && SETTINGS.frontlightRestoreOnWake != 0);
   Frontlight.begin(SETTINGS.frontlightBrightness, SETTINGS.frontlightWarmth, restoreLightOn);
 #endif
 
