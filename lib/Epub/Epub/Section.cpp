@@ -284,7 +284,12 @@ namespace {
 // TokenBoundary rules continues+noSpace is a BREAKABLE attachment, which let a
 // CJK ruby group split across lines), and a long paragraph no longer soft-
 // flushes in the middle of a ruby group. Both move line breaks in ruby books.
-constexpr uint8_t SECTION_FILE_VERSION = 70;
+// v71: upstream 52444a0c9 (#3221). The text block started after a closing
+// element now takes the parent's style without its top and bottom margins and
+// padding, so bare text (or the next sibling, through the empty-block merge)
+// no longer gets the parent's top margin a second time. Moves block spacing
+// in books with margined containers.
+constexpr uint8_t SECTION_FILE_VERSION = 71;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
