@@ -105,7 +105,9 @@ jobs:
           # mid-build ("No module named 'SCons.Tool.FortranCommon'"). Keep the penv
           # core on the same version as the outer core installed above.
           # See https://github.com/pioarduino/platform-espressif32/issues/529
-          pio pkg install -e ${{ matrix.env }}
+          # build-default has no matrix: `${{ matrix.env }}` expanded to nothing and
+          # failed this step ("Option '-e' requires an argument") on every push.
+          pio pkg install -e default
           uv pip install --python ~/.platformio/penv/bin/python "pioarduino==6.1.19"
           ~/.platformio/penv/bin/pio --version
 

@@ -323,6 +323,9 @@ void EpubReaderActivity::loop() {
   // tables for N+1's characters, and a deferred gray pass of page N drawn after
   // that kerned with the wrong table -- gray glyphs a few px off the BW ones
   // (P0/P1 sweep 2026-11-07, kern(T,o) -57 -> 0 reproduced on the host).
+  // touchActiveNow() is constant false off the Picco, which cppcheck (analyzing
+  // the X4 env) reports as an always-true condition; it is board-dependent.
+  // cppcheck-suppress knownConditionTrueFalse
   if (section && !grayDeferred && !RenderLock::peek() && renderer.hasFrameBuffer() && !touchActiveNow() &&
       lastRenderCompleteMs != 0 && millis() - lastRenderCompleteMs > IDLE_PREWARM_DEBOUNCE_MS &&
       ESP.getFreeHeap() > RENDER_MIN_FREE_HEAP && ESP.getMaxAllocHeap() > BACKGROUND_BUILD_MIN_MAX_ALLOC &&
@@ -335,11 +338,13 @@ void EpubReaderActivity::loop() {
     // reports both conditions as redundant given the outer check a few lines
     // up; they are not -- this re-check is load-bearing and guards a real
     // cross-thread race. Do not "simplify" it away.
-    // cppcheck-suppress knownConditionTrueFalse
+    // (A suppression applies to the next line only, so each re-checked line
+    // carries its own.)
     // cppcheck-suppress knownConditionTrueFalse
     const int nextPage = section ? section->currentPage + 1 : 0;
     const bool nextLaidOut = section && nextPage < static_cast<int>(section->pageCount);
     const bool lastPage = section && !section->isBuilding() && !nextLaidOut;
+    // cppcheck-suppress knownConditionTrueFalse
     if (section && !grayDeferred && (nextLaidOut || lastPage) &&
         (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage)) {
       idlePrewarmSpine = currentSpineIndex;
@@ -1874,13 +1879,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // PREVIOUS page in the new presentation for as long as this one took to draw
   // -- on an iPad held landscape, an upright page turned sideways and fed to the
   // phosphor trail (crosspoint-simulator adversarial review 2026-10-04, finding 5).
-  bool turned = false;
-  for (const auto& el : page->elements) {
-    if (el && el->getTag() == TAG_PageRotatedText) {
-      turned = true;
-      break;
-    }
-  }
+  const bool turned = std::any_of(page->elements.begin(), page->elements.end(),
+                                  [](const auto& el) { return el && el->getTag() == TAG_PageRotatedText; });
   bool turnedPublished = false;
   const auto publishTurned = [&]() {
     if (turnedPublished) return;
