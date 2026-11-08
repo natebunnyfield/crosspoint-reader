@@ -164,6 +164,7 @@ before relying on any of them for a field layout:
 | 67 | `ebf31274f` | chapter sinkage removed: a section's first page starts at y=0 like every other (owner 2026-11-08, `docs/page-space-2026-11-08.md`); no field changed, the first page's layout did |
 | 68 | upstream `25cf99b21` (#2892, campaign 2026-11-08) | **layout**, Focus Reading only: a focus-read word stays one token with its bold prefix as a byte boundary (`ParsedText::wordFocusBoundary`), so the hyphenator sees the whole word, and a visible hyphen or dash inside it is a break opportunity (`TokenBoundary.h`); line breaks move for books read with Focus Reading on |
 | 69 | upstream `99724aa79` (#3001, campaign 2026-11-08) | **decision**: the OPF language now parses when it is not spelled `dc:language`, and it selects the hyphenation patterns, which the section key does not carry; paired with `book.bin` v12 |
+| 70 | upstream `c6fe67d48` (#3102, campaign 2026-11-08) | **layout**, ruby books: a ruby group is unbreakable again under the v68 boundary rules (its tokens drop `noSpaceBefore`), and a long paragraph does not soft-flush inside a ruby group |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

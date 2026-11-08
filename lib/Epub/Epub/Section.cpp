@@ -279,7 +279,12 @@ namespace {
 // patterns (Section.cpp, Hyphenator::setPreferredLanguage), which this file's
 // key does not carry. A section built under the default language would keep
 // the wrong breaks for such a book.
-constexpr uint8_t SECTION_FILE_VERSION = 69;
+// v70: upstream c6fe67d48 (#3102). A ruby group's tokens are forced
+// unbreakable again (continues set, noSpaceBefore cleared: under the v68
+// TokenBoundary rules continues+noSpace is a BREAKABLE attachment, which let a
+// CJK ruby group split across lines), and a long paragraph no longer soft-
+// flushes in the middle of a ruby group. Both move line breaks in ruby books.
+constexpr uint8_t SECTION_FILE_VERSION = 70;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
