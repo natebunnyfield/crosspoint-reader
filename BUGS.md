@@ -34,6 +34,16 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-079] A scan pass painted rotated table text into the framebuffer of the page on screen — FIXED 2026-11-08
+**severity: medium-high (stray rotated text from the NEXT page could reach the glass through a later windowed present) · scope: `lib/GfxRenderer/GfxRenderer.cpp` · found by the 2026-11-07 fork survey (via Xerif `26d66ca2f9`), not reproduced**
+
+`drawText`, `fillRect`, `drawLine` and the bitmap path all return early in a font-cache scan pass; `drawTextRotated90CW` and `drawTextRotated90CCW` did not. The idle prewarm scans page N+1 with page N's frame in the framebuffer, so a turned table on N+1 was drawn onto N. Usually invisible -- the next full render replaces it -- but a popup or Indexing notice presented through a window (and the tile widening, B-076) could carry it to the glass, and it also defeated the deferred gray pass's frame-hash check. **Fix:** both rotated draws record the text for the prewarm and return, as `drawText` does.
+
+### [B-078] SdFat's cache could write a failed read's bytes back over another sector, FAT included — FIXED 2026-11-08 (patch_sdfat.py), UNCONFIRMED on device
+**severity: critical when it fires (card damage after a single read error; both FAT copies) · scope: SdFat `FsCache::prepare`, patched by `scripts/patch_sdfat.py` · upstream `e9245489f2` patch 0001 (#3685), found by the 2026-11-07 fork survey**
+
+`FsCache::prepare()` reads the new sector straight into `m_buffer`; when `readSector()` fails it returns without updating `m_sector`, but the buffer may already hold the new sector's bytes (SHARED_SPI: the data lands, then CMD12 fails). The cache then claims the PREVIOUS sector with different data; a later `prepare()` of that sector returns it, and a `CACHE_FOR_WRITE` writes it back. **Fix:** `invalidate()` on a failed read, a fourth entry in `scripts/patch_sdfat.py` (dirty data was synced before the read, so nothing is lost). Same class as B-073 -- a read error on a marginal card is exactly when it matters.
+
 ### [B-077] The deferred anti-aliasing pass kerned page N with page N+1's kern table — FIXED 2026-11-07, UNCONFIRMED on device
 **severity: high (gray fringes beside glyphs on every rested page with an SD font and AA on, all boards; worse under heap pressure) · scope: `src/activities/reader/EpubReaderActivity.cpp` · introduced 2026-11-07 by the lag work (1e2549a40), found the same day by the P0/P1 sweep, kern loss reproduced on the host**
 

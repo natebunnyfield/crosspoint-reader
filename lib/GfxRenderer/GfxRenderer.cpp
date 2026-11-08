@@ -3050,6 +3050,15 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
   // Route CJK-bearing strings to the fallback font (see resolveTextFontId).
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  // A scan pass draws nothing, exactly as drawText's does: it only records the
+  // text for the prewarm. Without this, the idle prewarm of the NEXT page
+  // painted its rotated table text into the framebuffer of the page on screen,
+  // where the next windowed present could put it on the glass (fork survey
+  // 2026-11-07, via Xerif 26d66ca2f9).
+  if (fontCacheManager_ && fontCacheManager_->isScanning()) {
+    fontCacheManager_->recordText(text, resolvedFontId, style);
+    return;
+  }
   // Redirected to the SD fallback: batch-load the string's glyphs so the draw
   // loop below doesn't fault them in one SD read at a time (#2725).
   if (resolvedFontId != fontId) {
@@ -3155,6 +3164,15 @@ void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int 
 
   // Route CJK-bearing strings to the fallback font (see resolveTextFontId).
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  // A scan pass draws nothing, exactly as drawText's does: it only records the
+  // text for the prewarm. Without this, the idle prewarm of the NEXT page
+  // painted its rotated table text into the framebuffer of the page on screen,
+  // where the next windowed present could put it on the glass (fork survey
+  // 2026-11-07, via Xerif 26d66ca2f9).
+  if (fontCacheManager_ && fontCacheManager_->isScanning()) {
+    fontCacheManager_->recordText(text, resolvedFontId, style);
+    return;
+  }
   // Redirected to the SD fallback: batch-load the string's glyphs so the draw
   // loop below doesn't fault them in one SD read at a time (#2725).
   if (resolvedFontId != fontId) {
