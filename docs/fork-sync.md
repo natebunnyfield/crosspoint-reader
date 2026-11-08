@@ -231,7 +231,7 @@ commits twice.
 | FUI | `9e3cea2e5` (1, owner ruling "Adopt FUI") | | 1, by hand + 5 fork-rule commits (see "FUI port" below) | | (this push) |
 | reader base | `a757b9d10` (1, owner ruling "Adopt, keep fork behavior") + `63fcbab02` | `a757b9d10` by hand as `69f7430aa` | | SKIP `63fcbab02` (TXT `skipPages()` end sentinel: the fork has no skipPages, chapter skip retired 2026-09-01) | `71dc70df5` |
 | 2 | `e970abae8`..`57c692fe8` (40) | 10 (`e970abae8` `25cf99b21` `99724aa79` `618608e84` `6a501bba5` `c6fe67d48` `27f964b3e` `eef205044` `a4a03c6b4` `7e42d0707`) | 9 (`268c27f7d` Transparent sleep screen, appended as value 14; `48e39eb0e` reposition clearing on the fork's three-stage anchors; `4970ef1f6` PNG overlays + PNG viewer; `33f07db71` post-delete nav lock only; `bbca4886c` X3-UC8279 edge-button fix only; `d3b3b5669` dimension guard/8 MP/decode yield, not the image-margin clamp or single-base image refresh; `8eea7f865` Wi-Fi only; `a0daab994` font layer only; `93d572fcb` arabic preset only) | ALREADY 4 (`70faa29da` = `816011c42`; `e715532f9`; `080b1d719` = `ca1850a91`; `28377310d` fork has Wider/Widest); SKIP 15 (deleted subsystems: dictionary x2, status bar, Ubuntu UI face x2, font download; `b1d53ba81` ruling; `4d764de9c` press/release ruling; `413a1bd9d`+`151414d8c` revert pair; `81fd32237` would drop `.claude/skills`; `63fcbab02` needs `a757b9d10`; `b3d1e79d0` fixed-height Lyra rows; `75c079fe7` SDK-only; `da3d50c24` fork's own table columns); FLAG 2 (`a757b9d10` reader consolidation, `81e192709` light-sleep revert). Caches: section 67 -> 70 (renumbered when rebased over page-space v67, `docs/page-space-2026-11-08.md`), book.bin 11 -> 12 | (this push) |
-| 3 | `62e84a16f`..`25bbfae76` (40) | 5 (`5182d27e2` `b6746c1df` `c484dc72b` `8141d7b9c`+`820d0b96a`) | 5 (`cdbe2a779` en/es only; `8bc1603e8` no SDK bump; `86976ab23` log only, fix ALREADY; `790a0817e` guard restores the prior mode; `52444a0c9` block-close insets, `!important` ALREADY) | ALREADY 6 (empty picks); REJECTED 1 (`e31dcbb08`); SKIP 16 (deleted subsystems, other boards, Swedish, fork Settings/list chrome; see "Batch 3" below); HELD 5 (frontlight panel x4, USB MSC, X4 Classic) + 2 RULED SKIP (wake rule, 2026-11-08 "go with rec"). Caches: section 70 -> 71, CSS stays 11 | (this push) |
+| 3 | `62e84a16f`..`25bbfae76` (40) | 5 (`5182d27e2` `b6746c1df` `c484dc72b` `8141d7b9c`+`820d0b96a`) | 5 (`cdbe2a779` en/es only; `8bc1603e8` no SDK bump; `86976ab23` log only, fix ALREADY; `790a0817e` guard restores the prior mode; `52444a0c9` block-close insets, `!important` ALREADY) | ALREADY 6 (empty picks); REJECTED 1 (`e31dcbb08`); SKIP 16 (deleted subsystems, other boards, Swedish, fork Settings/list chrome; see "Batch 3" below); HELD 4 (frontlight panel x4, X4 Classic... see below) + RULED: wake rule x2 SKIP ("go with rec"), USB MSC BUILD for the Picco ("build"). Caches: section 70 -> 71, CSS stays 11 | (this push) |
 
 
 ### FUI port (`9e3cea2e5`), 2026-11-08
@@ -404,7 +404,7 @@ message carries its own detail; the decisions:
     paints rows with).
   - Other boards and languages: `f0c655062` and `4638119b2` (X4 Pro),
     `e82b51740` (Swedish).
-- **HELD (5) and RULED (2):**
+- **HELD and RULED:**
   - The frontlight quick panel (the held remainder of `bbca4886c`), with
     `8575b1427`, `4f0b4b70f` and `25bbfae76` built on it. Decision: does the
     Picco (it has a frontlight) get the panel and its top-edge swipe?
@@ -423,9 +423,16 @@ message carries its own detail; the decisions:
     whether a Picco cold boot sets `wakePowerReleasePending` (`main.cpp`,
     the PowerButton case). The USB-serial part is ALREADY (fork F8,
     `main.cpp:958`).
-  - USB mass storage, `218dc6aaf`. A new mode, written for the X4 Pro and
-    entered from the deleted NetworkModeSelection screen. Decision: does the
-    Picco (also esp32s3) get it?
+  - **RULED 2026-11-08: USB mass storage, `218dc6aaf` -- BUILD it, for the
+    Picco.** Owner: *"build"* (asked with "skip" recommended, for the SD
+    corruption risk of an unplug mid-write, B-073). Only the Picco can have it:
+    its SD is native SDMMC (`platformio.ini:421`), which upstream's
+    `HalStorage::beginUsbDrive()` requires (`#error` otherwise), and the
+    ESP32-C3 in the X4/X3 has no USB OTG. Upstream enters it from
+    NetworkModeSelection, deleted here, so the entry point and the screen are
+    new fork work and visual-gated. The SDK fork has `UsbMassStorage` at
+    `1dc07f6` but not `SDCardManager::detachFilesystemForRawAccess()`.
+    Tracked as its own work item, not as a batch port.
   - The X4 Classic board target, `f021d1e5f`. It needs SDK board support the
     pin lacks; held with the other board targets.
 
