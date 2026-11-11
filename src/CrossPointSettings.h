@@ -46,6 +46,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     // on this path -- it is cleared before any sleep screen draws.
     CALENDAR_DARK = 12,
     CALENDAR_WESTSIDE_DARK = 13,
+    // Upstream's TRANSPARENT_CUSTOM (#2937): an overlay BMP drawn over the
+    // screen that was showing. Upstream numbers it 7, which this fork's
+    // CALENDAR holds, so it appends here.
+    TRANSPARENT_CUSTOM = 14,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };

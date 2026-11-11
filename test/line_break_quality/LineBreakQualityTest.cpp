@@ -408,10 +408,10 @@ void layoutParagraph(const std::string& text, const int fontId, const uint16_t m
   ParsedText block(/*extraParagraphSpacing=*/false, storedMode, /*focusReadingEnabled=*/false, style);
   for (const auto& w : splitWords(text)) block.addWord(w, EpdFontFamily::REGULAR);
 
-  std::vector<std::shared_ptr<TextBlock>> lines;
+  std::vector<std::unique_ptr<TextBlock>> lines;
   block.layoutAndExtractLines(
       Gfx::instance().renderer(), fontId, measure,
-      [&](const std::shared_ptr<TextBlock>& line) { lines.push_back(line); },
+      [&](std::unique_ptr<TextBlock> line) { lines.push_back(std::move(line)); },
       /*includeLastLine=*/true, justifyThresholdChars);
 
   auto& r = Gfx::instance().renderer();
@@ -967,7 +967,7 @@ TEST(LineBreakQuality, TotalFitCostsASmallMultipleOfGreedy) {
           int seen = 0;
           const auto t0 = std::chrono::steady_clock::now();
           block.layoutAndExtractLines(
-              Gfx::instance().renderer(), kRaggedFont, kMeasure, [&seen](const std::shared_ptr<TextBlock>&) { seen++; },
+              Gfx::instance().renderer(), kRaggedFont, kMeasure, [&seen](std::unique_ptr<TextBlock>) { seen++; },
               /*includeLastLine=*/true, autojustify::THRESHOLD_CHARS);
           total += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
           lines += seen;
@@ -1906,4 +1906,54 @@ TEST(LineBreakQuality, DISABLED_RaggedGateSweep) {
     for (int i = 0; i < 5 && i < static_cast<int>(deep.size()); ++i) printf("%8.2f", deep[i]);
     printf("    %8d\n", afterHy);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Focus Reading (upstream #2892, section v67)
+// ---------------------------------------------------------------------------
+
+namespace {
+std::vector<std::unique_ptr<TextBlock>> layoutFocus(const std::string& text, const int fontId, const uint16_t measure,
+                                                    const uint8_t storedMode) {
+  BlockStyle style;
+  style.alignment = CssTextAlign::Left;
+  ParsedText block(/*extraParagraphSpacing=*/false, storedMode, /*focusReadingEnabled=*/true, style);
+  for (const auto& w : splitWords(text)) block.addWord(w, EpdFontFamily::REGULAR);
+  std::vector<std::unique_ptr<TextBlock>> lines;
+  block.layoutAndExtractLines(
+      Gfx::instance().renderer(), fontId, measure,
+      [&](std::unique_ptr<TextBlock> line) { lines.push_back(std::move(line)); },
+      /*includeLastLine=*/true, kJustifiedThreshold);
+  return lines;
+}
+}  // namespace
+
+// A focus-read word is ONE TextBlock entry carrying its bold prefix as a byte
+// boundary, and the prefix advance is where the regular suffix resumes.
+TEST(LineBreakQuality, FocusReadingKeepsEachWordWhole) {
+  const auto lines = layoutFocus("remarkable", kJustifiedFont, kMeasure, linebreak::STORED_WHOLE_WORDS);
+  ASSERT_EQ(lines.size(), 1u);
+  const TextBlock& line = *lines[0];
+  ASSERT_EQ(line.wordCount(), 1u);
+  EXPECT_STREQ(line.wordText(0), "remarkable");
+  EXPECT_EQ(line.focusBoundary(0), 4) << "45% of 10 codepoints, floored";
+  EXPECT_EQ(line.wordStyle(0) & EpdFontFamily::BOLD, 0) << "the stored style is the suffix's";
+}
+
+// A visible hyphen inside a focus-read compound is a break opportunity: on a
+// measure too narrow for the whole compound but wide enough for "well-", the
+// compound breaks after the hyphen instead of overflowing.
+TEST(LineBreakQuality, FocusReadingBreaksAfterAVisibleHyphen) {
+  auto& r = Gfx::instance().renderer();
+  // Measured all-bold, which over-states each half, so either half fits alone.
+  const int partWidth = std::max(r.getTextAdvanceX(kJustifiedFont, "well-", EpdFontFamily::BOLD),
+                                 r.getTextAdvanceX(kJustifiedFont, "known", EpdFontFamily::BOLD));
+  const int wholeWidth = r.getTextAdvanceX(kJustifiedFont, "well-known", EpdFontFamily::REGULAR);
+  const auto measure = static_cast<uint16_t>(partWidth + 4);
+  ASSERT_LT(measure, wholeWidth);
+  const auto lines = layoutFocus("well-known", kJustifiedFont, measure, linebreak::STORED_WHOLE_WORDS);
+  ASSERT_EQ(lines.size(), 2u) << "the compound must break at its hyphen";
+  const TextBlock& last = *lines[1];
+  ASSERT_GE(last.wordCount(), 1u);
+  EXPECT_STREQ(last.wordText(0), "known");
 }

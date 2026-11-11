@@ -1,3 +1,4 @@
+#include <BatteryMonitor.h>
 #include <HalGPIO.h>
 #include <Logging.h>
 #include <PowerManager.h>
@@ -7,10 +8,6 @@
 #include <XteinkDetect.h>
 #include <esp_sleep.h>
 #include <soc/usb_serial_jtag_struct.h>
-
-#if FREEINK_DEVICE_PICCO
-#include <BatteryMonitor.h>
-#endif
 
 // Global HalGPIO instance
 HalGPIO gpio;
@@ -154,6 +151,16 @@ void HalGPIO::begin() {
   inputMgr.begin();
 }
 
+bool HalGPIO::isButtonContactClosed() {
+#if FREEINK_DEVICE_PICCO
+  return false;
+#else
+  // No touch on the C3 boards (FREEINK_CAP_TOUCH is 0), so getState() is two
+  // ADC reads and a pin read with no side effects.
+  return inputMgr.getState() != 0;
+#endif
+}
+
 void HalGPIO::update() {
   inputMgr.update();
 #if FREEINK_DEVICE_PICCO
@@ -192,6 +199,7 @@ void HalGPIO::updateUsbState(const unsigned long now) {
     usbElectricalConnected = isUsbElectricalConnected();
   }
   const bool connected = usbSofActive || usbElectricalConnected;
+  if (connected) lastUsbSeenMs = now;
   usbStateChanged = (connected != lastUsbConnected);
   lastUsbConnected = connected;
 }
@@ -283,6 +291,13 @@ bool HalGPIO::wasTouchDown(float& nx, float& ny) const {
   return inputMgr.wasTouchPressedAt(nx, ny);
 }
 
+bool HalGPIO::wasTouchReleased() const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchReleased();
+}
+
 bool HalGPIO::isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const {
 #if FREEINK_DEVICE_PICCO
   if (!keyboardTouch) return false;
@@ -296,6 +311,15 @@ bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const {
 #endif
   return inputMgr.isTouchHeldAt(nx, ny);
 }
+
+bool HalGPIO::wasTouchLongPress(float& nx, float& ny) const {
+#if FREEINK_DEVICE_PICCO
+  if (!keyboardTouch) return false;
+#endif
+  return inputMgr.wasTouchLongPress(nx, ny);
+}
+
+void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
 
 unsigned long HalGPIO::lastTouchHeldMs() const {
 #if FREEINK_DEVICE_PICCO
@@ -361,8 +385,6 @@ void HalGPIO::injectButtonTap(const uint8_t index) {
   synthPressedAt = millis();
 }
 
-void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
-
 bool HalGPIO::isTouchContactDown() const { return inputMgr.isTouchPressed(); }
 
 unsigned long HalGPIO::lastTouchReportMs() const { return inputMgr.getTouchPoint().timestamp; }
@@ -377,6 +399,12 @@ void HalGPIO::setKeyboardTouch(const bool on) {
 
 bool HalGPIO::isUsbPowerPresent() const { return isUsbElectricalConnected(); }
 #endif
+
+bool HalGPIO::hasEdgeSideButtons() const {
+  return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||
+         BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3Uc8279 ||
+         BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4Pro;
+}
 
 bool HalGPIO::isXteinkDevice() const {
   return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||
@@ -457,10 +485,16 @@ bool HalGPIO::isUsbElectricalConnected() const {
     return battery.isCharging();
   }
 #endif
-  if (BoardConfig::ACTIVE.usbDetect < 0) {
-    return false;
+  if (BoardConfig::ACTIVE.usbDetect >= 0) {
+    return digitalRead(BoardConfig::ACTIVE.usbDetect) == HIGH;
   }
-  return digitalRead(BoardConfig::ACTIVE.usbDetect) == HIGH;
+  // No digital USB-detect line (e.g. Sticky, whose PWR_IN_VOLT is an analog
+  // divider): infer external power from charging state instead. BatteryMonitor
+  // picks the board's best source — charger IC status, gauge Current() sign, or
+  // a /STAT pin — and reports false on boards with no battery telemetry at all.
+  // Caveat: charge termination at 100% reads as "not connected".
+  static const BatteryMonitor battery;
+  return battery.isCharging();
 }
 
 HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {

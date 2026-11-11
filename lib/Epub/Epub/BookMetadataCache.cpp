@@ -26,7 +26,20 @@ namespace {
 // changes, when pagination changes, OR when anything the cached pass DECIDED
 // changes. A cache is not only a layout; it is a record of conclusions, and a
 // conclusion reached by code that has since been fixed is stale.
-constexpr uint8_t BOOK_CACHE_VERSION = 11;
+// v12, 2026-11-08: NOT a format change either; upstream 99724aa79 (#3001).
+// The OPF parser matched elements by literal qualified name ("dc:title",
+// "opf:spine"), so a package that binds Dublin Core or OPF to another prefix,
+// or uses none, cached an empty title, author or language. It matches on the
+// local name now, and by the v11 rule a cached conclusion reached by the old
+// matcher is stale.
+// v13: upstream f437bb506. utf8ComposeNfc() now composes conjoining Hangul
+// jamo, and titles and TOC labels are cached through it (Epub.cpp,
+// BookMetadataCache.cpp), so a cached NFD Korean title is stale.
+// v14: upstream 652ae0d83 (its OPF metadata-text fix only). Title, author and
+// language collapse whitespace, clamp at 512 bytes, and an author split across
+// two character-data callbacks (a character reference) is no longer cut by
+// ", "; the author is NFC too. A cached v13 author can read "Bront, ë".
+constexpr uint8_t BOOK_CACHE_VERSION = 14;
 // Written into Header A while the file is still being built, and overwritten
 // with BOOK_CACHE_VERSION only once every byte is down. load() rejects it as a
 // version mismatch and rebuilds, so a file interrupted at any point -- a crash,
@@ -309,8 +322,13 @@ bool BookMetadataCache::buildBookBin(const std::string& epubPath, const BookMeta
   if (spineCount >= LARGE_SPINE_THRESHOLD) {
     LOG_DBG("BMC", "Using batch size lookup for %d spine items", spineCount);
 
+    // Targets cost 16 B per spine item, and a deque that cannot grow aborts
+    // under -fno-exceptions, so a book with thousands of chapters used to die
+    // here. Look sizes up SIZE_LOOKUP_CHUNK items at a time instead: one more
+    // central-directory scan per chunk, a bounded working set (upstream #3733).
     std::deque<ZipFile::SizeTarget> targets;
-    targets.resize(spineCount);
+    spineSizes.resize(spineCount, 0);
+    int matched = 0;
 
     spineIn.seek(0);
     for (int i = 0; i < spineCount; i++) {
@@ -321,15 +339,15 @@ bool BookMetadataCache::buildBookBin(const std::string& epubPath, const BookMeta
       t.hash = ZipFile::fnvHash64(path.c_str(), path.size());
       t.len = static_cast<uint16_t>(path.size());
       t.index = static_cast<uint16_t>(i);
-      targets[i] = t;
+      targets.push_back(t);
+      if (targets.size() < SIZE_LOOKUP_CHUNK && i + 1 < spineCount) continue;
+
+      std::sort(targets.begin(), targets.end(), [](const ZipFile::SizeTarget& a, const ZipFile::SizeTarget& b) {
+        return a.hash < b.hash || (a.hash == b.hash && a.len < b.len);
+      });
+      matched += zip.fillUncompressedSizes(targets, spineSizes);
+      targets.clear();
     }
-
-    std::sort(targets.begin(), targets.end(), [](const ZipFile::SizeTarget& a, const ZipFile::SizeTarget& b) {
-      return a.hash < b.hash || (a.hash == b.hash && a.len < b.len);
-    });
-
-    spineSizes.resize(spineCount, 0);
-    int matched = zip.fillUncompressedSizes(targets, spineSizes);
     LOG_DBG("BMC", "Batch lookup matched %d/%d spine items", matched, spineCount);
 
     targets.clear();

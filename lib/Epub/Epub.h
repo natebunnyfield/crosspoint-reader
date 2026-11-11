@@ -41,7 +41,7 @@ class Epub {
   // Last-resort cover discovery for EPUBs whose metadata and guide declare no
   // cover: scan the ZIP central directory for a plausible cover image.
   std::string findCoverFromZipEntries() const;
-  void parseCssFiles() const;
+  CssParser::ParseResult parseCssFiles(CssParser::CacheStatus existingCacheStatus) const;
 
  public:
   explicit Epub(std::string filepath, const std::string& cacheDir) : filepath(std::move(filepath)) {

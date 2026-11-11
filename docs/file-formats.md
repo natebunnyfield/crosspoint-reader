@@ -8,8 +8,14 @@ All POD fields are written in the ESP32 little-endian representation used by
 
 ### Version 10, superseded by Version 11 (2026-08-23) — struct unchanged, meaning changed
 
-**Current version is 11**, not 10 — `BOOK_CACHE_VERSION` at
-`lib/Epub/Epub/BookMetadataCache.cpp:29`. Check the live value with
+**Version 12 (2026-11-08, upstream `99724aa79`): struct unchanged, meaning
+changed again.** The OPF parser now matches elements by local name, so a
+package that does not spell its metadata `dc:title`/`dc:creator`/`dc:language`
+(or its structure `opf:spine` etc.) no longer caches an empty title, author or
+language. Same rule as v11: a conclusion reached by the old matcher is stale.
+
+**Current version is 14** (the paragraphs below were written at 11; v12 is upstream `99724aa79`, v13 upstream `f437bb506` -- NFD Hangul titles and TOC labels compose, v14 upstream `652ae0d83`'s metadata-text fix -- an author split at a character reference no longer reads "Bront, ë") — `BOOK_CACHE_VERSION` at
+`lib/Epub/Epub/BookMetadataCache.cpp:35`. Check the live value with
 `grep -n 'BOOK_CACHE_VERSION = ' lib/Epub/Epub/BookMetadataCache.cpp` rather
 than trusting a number here; it will drift again. The ImHex pattern below still
 describes the v10 byte layout, which v11 does not change — no field was added
@@ -153,6 +159,20 @@ before relying on any of them for a field layout:
 | 59 | (this commit) | justified hyphenating blocks are broken by Knuth-Plass total fit instead of greedy; no field changed, the breaks did (`docs/knuth-plass-line-breaking-2026-09-25.md` §13) |
 | 60 | (this commit) | "Just ship shrink": the Knuth-Plass breaker may narrow a justified line's gaps to 2/3 of a space, and extractLine paints the negative spare; breaks and painted x both move (§14) |
 | 61 | (this commit) | the automatic-justification default drops 40 → 34 characters, so the default 14 pt page justifies (`docs/auto-justification.md`, final section) |
+| 65 | upstream `046827fc3` (campaign 2026-11-08) | ruby edge overhangs reserved at layout instead of shifted at paint; ruby overhang widens the neighbor word; the breaker's DP prefers the longer line on a cost tie (`cost <= dp[i]`), so breaks move wherever two candidates tie. No field changed |
+| 66 | upstream `1582e70ef` + `596f0d3f7` (campaign 2026-11-08) | **structural**: the fixed-size footnote href field grows 96 → 256 bytes (`FOOTNOTE_HREF_LEN`, `lib/Epub/Epub/FootnoteEntry.h`), so each serialized footnote record goes 128 → 288 bytes; a v65 file would mis-parse every page after its first footnote |
+| 67 | `ebf31274f` | chapter sinkage removed: a section's first page starts at y=0 like every other (owner 2026-11-08, `docs/page-space-2026-11-08.md`); no field changed, the first page's layout did |
+| 68 | upstream `25cf99b21` (#2892, campaign 2026-11-08) | **layout**, Focus Reading only: a focus-read word stays one token with its bold prefix as a byte boundary (`ParsedText::wordFocusBoundary`), so the hyphenator sees the whole word, and a visible hyphen or dash inside it is a break opportunity (`TokenBoundary.h`); line breaks move for books read with Focus Reading on |
+| 69 | upstream `99724aa79` (#3001, campaign 2026-11-08) | **decision**: the OPF language now parses when it is not spelled `dc:language`, and it selects the hyphenation patterns, which the section key does not carry; paired with `book.bin` v12 |
+| 70 | upstream `c6fe67d48` (#3102, campaign 2026-11-08) | **layout**, ruby books: a ruby group is unbreakable again under the v68 boundary rules (its tokens drop `noSpaceBefore`), and a long paragraph does not soft-flush inside a ruby group |
+| 71 | upstream `52444a0c9` (#3221, campaign 2026-11-08) | **layout**: the block started after a closing element drops the parent's top/bottom margin and padding, so bare text or the next sibling no longer repeats the parent's top margin |
+| 72 | upstream `ce6c6cbce` (#3198, campaign 2026-11-08) | **layout**, mixed-direction books: the paragraph base direction comes from the block and `<html>`/`<body>` `dir` only, not from inline elements |
+| 73 | upstream `badfa95ff` (#3355, campaign 2026-11-08) | **layout**: an internal link's CSS `vertical-align: super/sub` is applied (footnote markers) |
+| 74 | upstream `f437bb506` (#3036, campaign 2026-11-08) | **layout**, NFD Korean books: conjoining Hangul jamo compose into syllables on every word; paired with `book.bin` v13 (titles and TOC go through the same composer) |
+| 75 | upstream `6eda8f0b7` (#3390, campaign 2026-11-08) | **layout**: elements with the HTML `hidden` attribute are dropped (display:none) |
+| 76 | fork, guard from upstream `da3d50c24` (campaign 2026-11-08) | **layout**: a skipped (display:none / `hidden`) element's close no longer pops its container's block style, table or list state |
+| 77 | upstream `2b2ba72f0` (#3500, campaign 2026-11-08) | **layout**: `list-style-type: none` / `list-style: none` on a list drops its items' markers and hanging gutter; paired with CSS cache v12 |
+| 78 | upstream `f4b4ff06c` (#3585, campaign 2026-11-08) | **layout**, SD fonts: a space measured during a partial cache miss used 0 px; it falls back to the glyph advance now |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
@@ -229,7 +249,7 @@ import std.core;
 #define EXPECTED_VERSION 30
 #define MAX_STRING_LENGTH 65535
 #define FOOTNOTE_NUMBER_LEN 32
-#define FOOTNOTE_HREF_LEN 96
+#define FOOTNOTE_HREF_LEN 96  // the v30 snapshot; 256 since v66 (288-byte footnote record)
 
 struct String {
     u32 length [[hidden, comment("String byte length")]];

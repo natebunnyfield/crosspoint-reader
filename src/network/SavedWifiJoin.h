@@ -41,6 +41,7 @@ class SavedWifiJoin {
     order.clear();
     index = 0;
     linkMs = 0;
+    linked = false;
     lastDnsTryMs = 0;
     recordSsid.clear();
     searchStartMs = millis();
@@ -48,6 +49,7 @@ class SavedWifiJoin {
     if (WiFi.status() == WL_CONNECTED) {
       LOG_INF(TAG, "Already associated; waiting for the resolver");
       linkMs = millis();
+      linked = true;
       return;
     }
 
@@ -75,11 +77,11 @@ class SavedWifiJoin {
   }
 
   Result poll() {
-    if (linkMs == 0) {
+    if (!linked) {
       if (order.empty()) return Result::NoSavedNetwork;
       const uint32_t now = millis();
-      const savedwifi::Step step = savedwifi::decide(linkState(), now - attemptStartMs, now - searchStartMs,
-                                                     order.size(), index);
+      const savedwifi::Step step =
+          savedwifi::decide(linkState(), now - attemptStartMs, now - searchStartMs, order.size(), index);
       switch (step) {
         case savedwifi::Step::Wait:
           return Result::Waiting;
@@ -98,6 +100,7 @@ class SavedWifiJoin {
           return Result::CouldNotJoin;
         case savedwifi::Step::Linked:
           linkMs = now;
+          linked = true;
           if (!order[index].empty() && order[index] != lastSsid) recordSsid = order[index];
           LOG_INF(TAG, "Joined %s in %lu ms; waiting for the resolver",
                   order[index].empty() ? "the host's network" : order[index].c_str(), now - searchStartMs);
@@ -206,6 +209,10 @@ class SavedWifiJoin {
   uint32_t searchStartMs = 0;
   uint32_t attemptStartMs = 0;
   uint32_t linkMs = 0;
+  // Linked is its own flag, not linkMs != 0: millis() is 0 at a host test's
+  // first tick and again at its 49.7-day wrap, and either made an associated
+  // radio read as unlinked (no saved network -> NO_WIFI).
+  bool linked = false;
   uint32_t lastDnsTryMs = 0;
   bool broughtUp = false;
   bool endedAssociated = false;

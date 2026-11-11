@@ -419,7 +419,7 @@ families:
 
   - name: Literata
     description: "Screen-optimized serif (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/googlefonts/literata/main/fonts/ttf/Literata-Regular.ttf"}
@@ -429,7 +429,7 @@ families:
 
   - name: SourceSerif4
     description: "Adobe transitional serif (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     # Uniform slots: xh 12/14/16/18, advY 34/40/46/51 — exact on all four.
     # This family is the historical anchor the slot targets were drawn from.
     sizes: [12, 14, 16, 18]
@@ -442,7 +442,7 @@ families:
 
   - name: NotoSerifExtended
     description: "Serif (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/notofonts/NotoSerif/main/fonts/ttf/unhinted/instance_ttf/NotoSerif-Regular.ttf"}
@@ -452,7 +452,7 @@ families:
 
   - name: Merriweather
     description: "Warm serif for long-form reading (Latin, Cyrillic)"
-    intervals: latin-ext,cyrillic
+    intervals: latin-ext,cyrillic,ipa-chars
     # Uniform slots: xh 12/14/16/18 (exact), advY 34/41/45/51 (+1 at slot 1).
     # From tools/blind-bench/sweep_blind.py; see blind_slots.json. Its advY
     # column is COMPUTED from the span, not read back from a built .cpfont, and
@@ -476,7 +476,7 @@ families:
 
   - name: Lora
     description: "Calligraphic serif for literary reading (Latin, Cyrillic)"
-    intervals: latin-ext,cyrillic
+    intervals: latin-ext,cyrillic,ipa-chars
     # Uniform slots: xh 12/14/16/17, advY 34/40/46/50 — slot 3 sits 1 px small
     # and tight because Lora's hinted x-height jumps 17 -> 19 px between 16 and
     # 18 pt; 16 pt is the closer landing.
@@ -490,7 +490,7 @@ families:
 
   - name: GentiumBookPlus
     description: "Scholarly serif with wide Unicode coverage (Latin, Greek, Cyrillic, IPA)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/gentiumbookplus/GentiumBookPlus-Regular.ttf"}
@@ -505,7 +505,7 @@ families:
     # smaller total. Cyrillic 168/256 with the full 64/64 core Russian
     # alphabet IS real. Description narrowed to what the face carries.
     description: "Professional serif (Latin, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexserif/IBMPlexSerif-Regular.ttf"}
@@ -515,7 +515,7 @@ families:
 
   - name: Bitter
     description: "Slab serif designed for e-ink (Latin, Cyrillic)"
-    intervals: latin-ext,cyrillic
+    intervals: latin-ext,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/bitter/Bitter%5Bwght%5D.ttf", variable: {wght: 500}}
@@ -560,7 +560,7 @@ families:
 
   - name: Domitian
     description: "A humanist serif for literary reading (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://mirrors.ctan.org/fonts/domitian/opentype/Domitian-Roman.otf"}
@@ -570,7 +570,7 @@ families:
 
   - name: LibreBaskerville
     description: "A serif reimplementing the classic Baskerville (Latin)"
-    intervals: latin-ext
+    intervals: latin-ext,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/impallari/Libre-Baskerville/master/fonts/ttf/LibreBaskerville-Regular.ttf"}
@@ -580,7 +580,7 @@ families:
 
   - name: Vollkorn
     description: "A serif for bread and butter use by Friedrich Althausen (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/vollkorn/Vollkorn%5Bwght%5D.ttf", variable: {wght: 400}}
@@ -2725,7 +2725,7 @@ families:
 
   - name: NotoSansExtended
     description: "Sans-serif (Latin, Greek, Cyrillic, Georgian, Armenian, Ethiopic)"
-    intervals: latin-ext,greek,cyrillic,georgian,armenian,ethiopic
+    intervals: latin-ext,greek,cyrillic,georgian,armenian,ethiopic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {path: "builtinFonts/source/NotoSans/NotoSans-Regular.ttf"}
@@ -2735,7 +2735,7 @@ families:
 
   - name: Inter
     description: "Modern sans-serif (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf", variable: {wght: 400, opsz: 14}}
@@ -2745,7 +2745,7 @@ families:
 
   - name: SourceSans3
     description: "Adobe humanist sans-serif (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-Regular.ttf"}
@@ -2769,7 +2769,7 @@ families:
   # 34/39/45/51.
   - name: IBMPlexSans
     description: "IBM corporate sans-serif (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf"}
@@ -2822,7 +2822,7 @@ families:
 
   - name: Alegreya
     description: "Calligraphic serif/display (Latin, Greek, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreya/Alegreya%5Bwght%5D.ttf", variable: {wght: 400}}
@@ -2837,7 +2837,7 @@ families:
     # not real Greek. Cyrillic 168/256 with the full 64/64 core Russian
     # alphabet IS real. Description narrowed to drop the false Greek claim.
     description: "Monospace for code and technical reading (Latin, Cyrillic)"
-    intervals: latin-ext,greek,cyrillic
+    intervals: latin-ext,greek,cyrillic,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexmono/IBMPlexMono-Regular.ttf"}
@@ -2942,7 +2942,7 @@ families:
 
   - name: SourceCodePro
     description: "Adobe monospace with excellent hinting (Latin, Greek, Cyrillic)"
-    intervals: latin-ext
+    intervals: latin-ext,ipa-chars
     sizes: [12, 14, 16, 18]
     styles:
       regular:    {url: "https://raw.githubusercontent.com/adobe-fonts/source-code-pro/release/TTF/SourceCodePro-Regular.ttf"}
@@ -2954,7 +2954,7 @@ families:
 
   - name: OpenDyslexic
     description: "Dyslexia-friendly font (Latin, Greek, Cyrillic)"
-    intervals: latin-ext
+    intervals: latin-ext,ipa-chars
     sizes: [8, 10, 12, 14]
     styles:
       regular:    {path: "builtinFonts/source/OpenDyslexic/OpenDyslexic-Regular.otf"}

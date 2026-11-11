@@ -52,8 +52,7 @@ lib/EpdFont/builtinFonts/nitti*.h
 /.dummy
 /CMakeLists.txt
 /dependencies.lock
-/sdkconfig.default
-/sdkconfig.defaults
+/sdkconfig.*
 sdkconfig.sticky
 
 # Simulator build artifacts
@@ -101,3 +100,4 @@ spike-capture.log
 # untracked on 2026-08-28 and they would have gone into a font commit.
 tools/words_per_page/*.o
 tools/words_per_page/wpp[0-9]
+flake.*

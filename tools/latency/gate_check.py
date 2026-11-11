@@ -7,7 +7,9 @@ Exit 1 with one line per failure; exit 0 with a one-line summary.
 import re
 import sys
 
+WINDOW = re.compile(r'Present windowed to \d+ changed tiles: (\d+),(\d+) (\d+)x(\d+)')
 LAT = re.compile(r'\[lat\] (\d+) (.+?) (-?\d+) opens=(\d+) reads=(\d+) rbytes=(\d+) seeks=(\d+) writes=(\d+)')
+PANEL_AREA = 480 * 800
 BTN = {0: 'BACK', 1: 'CONFIRM', 2: 'LEFT', 3: 'RIGHT', 4: 'UP', 5: 'DOWN'}
 
 presses = []  # one dict per btn-down
@@ -15,6 +17,10 @@ activity = None
 prev_fb = None
 failures = []
 for line in open(sys.argv[1], errors='replace'):
+    # Not a lag finding, but this run is the one place every boot is read:
+    # the settings list's reserve count has drifted five times unnoticed.
+    if 'FIXED_ENTRY_COUNT is' in line:
+        failures.append('settings: ' + line.strip().split('] ', 3)[-1])
     if 'Entering activity: ' in line:
         activity = line.split('Entering activity: ')[1].strip()
         if presses:
@@ -22,6 +28,9 @@ for line in open(sys.argv[1], errors='replace'):
         continue
     if 'Cache not found, building' in line and presses:
         presses[-1]['building'] = True
+    w = WINDOW.search(line)
+    if w and presses:
+        presses[-1]['windows'].append(int(w[3]) * int(w[4]))
     m = LAT.match(line)
     if not m:
         continue
@@ -29,7 +38,7 @@ for line in open(sys.argv[1], errors='replace'):
     reads = int(m[5])
     if what == 'btn-down':
         presses.append({'button': BTN.get(arg, arg), 'down': t, 'up': None, 'calls': [], 'reads': 0,
-                        'activity': activity, 'entered': None, 'building': False})
+                        'activity': activity, 'entered': None, 'building': False, 'windows': []})
         continue
     if not presses:
         continue
@@ -80,6 +89,13 @@ for p in settings_moves:
     first = next((c for c in p['calls'] if c[0] == 'refresh'), None)
     if first and p['up'] is not None and first[1] >= p['up']:
         failures.append("3.3: a Settings row move fired on the release")
+    # 2.1: a row move inside a page changes two rows, which the tile diff
+    # presents as a narrow window (160x480 in this run). A list that repaints
+    # every row on a step -- a scrolling list at its edge, a re-laid-out list,
+    # a changed font or band -- presents the whole panel instead. Guards the
+    # FUI list base (upstream 9e3cea2e5), whose rows Lyra Six paints.
+    if first and not any(area <= PANEL_AREA // 2 for area in p['windows']):
+        failures.append(f"2.1: a Settings row move was not a windowed present (windows {p['windows']})")
 
 if failures:
     print("\n".join(failures))

@@ -47,6 +47,10 @@ target_include_directories(ReaderTypographyControlsTest PRIVATE
   ${REPO_ROOT}/lib/hal
   ${REPO_ROOT}/lib/Utf8
   ${REPO_ROOT}/lib/Memory
+  # SettingsActivity.h sits on the FreeInkUI list base since the 9e3cea2e5
+  # port (UiListActivity.h -> UiAppHost.h -> FreeInkApp.h); headers only.
+  ${REPO_ROOT}/freeink-sdk/libs/ui/FreeInkUI/include
+  ${REPO_ROOT}/freeink-sdk/libs/assets/Icons/include
 )
 
 target_link_libraries(ReaderTypographyControlsTest PRIVATE crosspoint_test_common GTest::gtest GTest::gtest_main)

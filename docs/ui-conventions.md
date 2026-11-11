@@ -85,6 +85,20 @@ never silently cycle; the popup is what shows the user the alternative.
   fire on press, and should keep doing so (a release-fired tap feels a frame
   late on e-ink). Do not "fix" the inventory screen by screen; a screen moves
   from press to release only when it grows a hold.
+
+  **On the FUI list base (since the 2026-11-08 port of upstream `9e3cea2e5`)**
+  the edge lives in one place per screen: `UiListActivity::handleButtons()`.
+  The base default is Back and Confirm on PRESS (upstream's), which is right
+  for a screen with no Confirm hold — the time zone list
+  (`ClockOffsetActivity`) uses it as is. Every other converted screen
+  overrides it, and the overrides carry the inventory unchanged: PRESS in
+  `SettingsActivity` and `TypographySettingsActivity`; RELEASE in
+  `FileBrowserActivity` (hold = delete), `RecentBooksActivity` (hold = remove
+  from list), `EpubReaderChapterSelectionActivity`,
+  `XtcReaderChapterSelectionActivity` and `EpubReaderFootnotesActivity`.
+  A touch tap activates through `activateIndex()` on the tap's release
+  whatever the button edge is. Wi-Fi selection, Manage Files, the colophon
+  and the font pickers are not on the base and keep their own loops.
 - **List cursor moves fire on PRESS; a hold then pages.** Owner ruling
   2026-11-07 ("yes to everything else" on
   `docs/lag-reduction-plan-2026-11-07.md`, plan 3.3). The front Left/Right
@@ -116,6 +130,18 @@ Render through the theme: `drawHeader`, `drawList` (+ theme paging helpers),
 `drawButtonHints`, `drawProgressBar`, `drawTextField`, `drawCenteredText`.
 Hand-rolling one of these in an activity is a defect — the audit converted the
 XTC chapter list, the footnotes list, and two hand-rolled prompt screens.
+
+**A list screen derives `UiListActivity`** (since the 2026-11-08 port of
+upstream `9e3cea2e5`): `listCount()`, `describeRow()` (title, subtitle, value,
+icon), `buildScreen()` setting the margins and calling `drawRows()`,
+`activateIndex()`, and `handleButtons()` when the screen's Back/Confirm edges
+differ from the base's press default. `drawRows()` hands one page to
+`GUI.drawList`, so the theme paints the rows and pages them, and registers
+the FUI hit rects; the base wires press-step, hold-page and the side pair.
+Do not call `screen.list()` (fui::list) on a fork screen: it draws in its
+own font and row cadence (a different look), and it scrolls one row per step
+at the edge of the view, which repaints every row there instead of the two a
+paged move changes (the lag gate checks Settings row moves are windowed).
 
 Button-hint Back label names the **destination**: `STR_HOME` when it exits to
 Home, `STR_BACK` when it returns to a parent screen or up a directory,

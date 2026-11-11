@@ -83,3 +83,21 @@ replacing a working mechanism with a different working mechanism.
   [T-021] the rotated page, both against rendered proofs. CrossInk's `colspan`
   handling remains the reference if colspan is ever wanted; this fork's planner
   refuses ragged tables instead, which is the safe behaviour, not the same one.
+
+## 2026-11-07 — third pass, verified against `lag-reduction`
+
+[fork-survey-2026-11-07.md](fork-survey-2026-11-07.md) carries the per-commit
+verdicts, each checked against this tree with `file:line`. The two found
+present here and not elsewhere recorded:
+
+- **SdFat `FsCache::prepare` keeps a stale sector number after a failed read**
+  (`.pio/libdeps/default/SdFat/src/common/FsCache.cpp:40-43`), so a later write
+  can put the clobbered buffer on the card. Upstream `e9245489f2` patch 0001 is
+  the one-line fix; it belongs in `scripts/patch_sdfat.py`.
+- **`GfxRenderer::drawTextRotated90CCW` has no font-cache scan guard**
+  (`lib/GfxRenderer/GfxRenderer.cpp:3149`, against `drawText` at `:761`), so the
+  idle prewarm can draw page N+1's rotated-table text into the frame showing
+  page N. Found while checking Xerif `26d66ca2f9`; not reproduced.
+
+Its "checked — already present / N/A" tables are the half to read before
+proposing any sibling-fork commit again.

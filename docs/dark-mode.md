@@ -47,6 +47,17 @@ The one-line SDK change that would fix this is exposing `setBackgroundHint()` on
 `cleanupGrayscaleBuffers()`, which happens to land in the right controller RAM
 on both C3 drivers but also resets their grayscale sequencing state.
 
+**Fixed 2026-11-08** (owner: "yes to any bug fixes", the fork survey's §0). That
+one-line change is made: `FreeInkDisplay::setBackgroundHint()` is public in the
+fork's SDK and `HalDisplay::setInverted()` calls it. The SDK had meanwhile
+deleted the drivers' dark paths outright (`69349ec`, taken from upstream: "Remove
+dark background hint feature"); they are restored for SSD1677 (X4), UC8253 (X3),
+UC8279 (X3 alt, X4 variants) and UC8179, and the SSD1677 window path now streams
+the complement through `writeRamInverted` instead of allocating a second
+window-sized buffer. Device effect UNCONFIRMED: every fast refresh in dark mode
+re-drives every pixel (same scan time), which should stop the light residue
+accumulating between the reader's HALF refreshes.
+
 ## 2. Antialiasing in dark mode is a level remap, not an unblocking
 
 Removing the SDK gate is necessary and **not sufficient**, because the grayscale

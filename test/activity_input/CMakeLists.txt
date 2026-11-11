@@ -74,6 +74,7 @@ add_executable(ActivityInputTest
   LibraryUpdaterDouble.cpp
   FontUpdateFirstFrameTest.cpp
   FontUpdaterDouble.cpp
+  WifiJoinDouble.cpp
   HostHarness.cpp
   # activity + input layer under test
   ${REPO_ROOT}/src/MappedInputManager.cpp

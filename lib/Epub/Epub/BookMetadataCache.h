@@ -89,6 +89,8 @@ class BookMetadataCache {
   bool useSpineHrefIndex = false;
 
   static constexpr uint16_t LARGE_SPINE_THRESHOLD = 400;
+  // Spine items whose zip sizes are looked up per central-directory scan.
+  static constexpr size_t SIZE_LOOKUP_CHUNK = 2048;
 
   // FNV-1a 64-bit hash function
   static uint64_t fnvHash64(const std::string& s) {

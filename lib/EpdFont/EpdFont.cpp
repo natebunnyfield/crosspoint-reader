@@ -84,6 +84,18 @@ void EpdFont::getTextDimensions(const char* string, int* w, int* h) const {
   *h = maxY - minY;
 }
 
+// Split form: the search touches only the codepoint array. See EpdFontData::kernLeftCodepoints.
+static uint8_t lookupKernClassSplit(const uint16_t* codepoints, const uint8_t* classIds, const uint16_t count,
+                                    const uint32_t cp) {
+  if (!codepoints || count == 0 || cp > 0xFFFF) {
+    return 0;
+  }
+  const auto target = static_cast<uint16_t>(cp);
+  const uint16_t* end = codepoints + count;
+  const auto it = std::lower_bound(codepoints, end, target);
+  return (it != end && *it == target) ? classIds[it - codepoints] : 0;
+}
+
 static uint8_t lookupKernClass(const EpdKernClassEntry* entries, const uint16_t count, const uint32_t cp) {
   if (!entries || count == 0 || cp > 0xFFFF) {
     return 0;
@@ -108,14 +120,51 @@ int8_t EpdFont::getKerning(const uint32_t leftCp, const uint32_t rightCp) const 
   if (utf8IsCjkBreakable(leftCp) || utf8IsCjkBreakable(rightCp)) {
     return 0;
   }
-  if (!data->kernMatrix) {
+  if (!data->kernMatrix && !data->kernRowOffsets) {
     return 0;
   }
-  const uint8_t lc = lookupKernClass(data->kernLeftClasses, data->kernLeftEntryCount, leftCp);
+  if (!data->kernLeftClasses && !data->kernLeftCodepoints) {
+    return 0;
+  }
+  // Built-in fonts carry the split arrays, SD-card fonts the packed ones; never both.
+  const bool split = data->kernLeftCodepoints != nullptr;
+  const uint8_t lc =
+      split ? lookupKernClassSplit(data->kernLeftCodepoints, data->kernLeftClassIds, data->kernLeftEntryCount, leftCp)
+            : lookupKernClass(data->kernLeftClasses, data->kernLeftEntryCount, leftCp);
   if (lc == 0) return 0;
-  const uint8_t rc = lookupKernClass(data->kernRightClasses, data->kernRightEntryCount, rightCp);
+  const uint8_t rc = split ? lookupKernClassSplit(data->kernRightCodepoints, data->kernRightClassIds,
+                                                  data->kernRightEntryCount, rightCp)
+                           : lookupKernClass(data->kernRightClasses, data->kernRightEntryCount, rightCp);
   if (rc == 0) return 0;
+
+  // Sparse (built-in fonts): scan the row. Linear rather than binary — rows hold ~15 entries on
+  // average, short enough that the scan measured faster (worst-case mix +11% over dense against
+  // +19% for std::lower_bound), and it should widen on hardware that reads these arrays through
+  // a flash cache, since the scan walks forwards through a cache line.
+  if (data->kernRowOffsets) {
+    const uint16_t begin = data->kernRowOffsets[lc - 1];
+    const uint16_t end = data->kernRowOffsets[lc];
+    const auto target = static_cast<uint8_t>(rc - 1);
+    const uint8_t* cols = data->kernSparseCols;
+    for (uint16_t i = begin; i < end; i++) {
+      if (cols[i] == target) return data->kernSparseValues[i];
+      if (cols[i] > target) break;  // sorted ascending, so past the target means absent
+    }
+    return 0;
+  }
+
+  // Dense (SD-card fonts, mapped straight out of the .cpfont).
   return data->kernMatrix[(lc - 1) * data->kernRightClassCount + (rc - 1)];
+}
+
+// Arabic contextual joining (including Lam-Alef) is resolved earlier by
+// do_shape() in MiniBidi, which emits presentation forms in visual order.
+// Font GSUB ligatures must not run a second pass over that output: a shaped
+// Alef+Lam ("…ال…") is FEDF+FE8E, which the font's Lam-Alef pairs would
+// wrongly re-collapse into FEFB/FEFC — transposing the letters (e.g. کسالت →
+// کسلات). Latin ligatures (ff/fi/fl) key off ASCII and are unaffected.
+static inline bool isArabicPresentationForm(const uint32_t cp) {
+  return (cp >= 0xFB50 && cp <= 0xFDFF) || (cp >= 0xFE70 && cp <= 0xFEFF);
 }
 
 uint32_t EpdFont::getLigature(const uint32_t leftCp, const uint32_t rightCp) const {
@@ -155,7 +204,11 @@ uint32_t EpdFont::applyLigatures(uint32_t cp, const char*& text) const {
     const auto saved = reinterpret_cast<const uint8_t*>(text);
     const uint32_t nextCp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text));
     if (nextCp == 0) break;
-    const uint32_t lig = getLigature(cp, nextCp);
+    // Upstream 309923156 puts this guard in getLigature(); here it sits with
+    // the owner's per-ligature switch, for the reason above: getLigature()
+    // keeps reporting the pair the face carries.
+    const uint32_t lig =
+        (isArabicPresentationForm(cp) || isArabicPresentationForm(nextCp)) ? 0 : getLigature(cp, nextCp);
     // A suppressed pair stops the chain exactly as a missing one does: the
     // text cursor rewinds and `cp` stands. That is what makes a CHAINED
     // ligature behave sensibly -- switch Edgar's `ff` off and its `ffi`

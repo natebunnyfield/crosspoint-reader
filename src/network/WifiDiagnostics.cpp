@@ -173,10 +173,11 @@ void writeFailureLog(const char* what, const bool associated) {
 #endif
   // 320: a 32-byte SSID, the error text and a dev version string overran 160.
   char header[320];
-  const int n = snprintf(header, sizeof(header),
-                         "CrossPoint " CROSSPOINT_VERSION "\nWi-Fi join failed: %s\nlast reason %u (%s), %s\n\nLast logs:\n",
-                         what ? what : "?", static_cast<unsigned>(lastDisconnectReason()),
-                         reasonName(lastDisconnectReason()), associated ? "associated" : "not associated");
+  const int n =
+      snprintf(header, sizeof(header),
+               "CrossPoint " CROSSPOINT_VERSION "\nWi-Fi join failed: %s\nlast reason %u (%s), %s\n\nLast logs:\n",
+               what ? what : "?", static_cast<unsigned>(lastDisconnectReason()), reasonName(lastDisconnectReason()),
+               associated ? "associated" : "not associated");
   // snprintf returns what it WOULD have written; clamp to the buffer
   // (FontUpdateActivity::writeFailureLog has the story).
   const size_t headerLen =

@@ -482,6 +482,26 @@ PATCHES = [
   return removed;
 """,
     ),
+    # FsCache::prepare: a failed sector read may already have overwritten the
+    # buffer that still claims to hold the PREVIOUS sector (m_sector is not
+    # updated on failure). A later prepare() of that sector returns those wrong
+    # bytes, and a CACHE_FOR_WRITE prepare() writes them back -- to both FAT
+    # copies for a FAT sector. Any dirty data was synced before the read, so
+    # invalidating loses nothing. Upstream e9245489f2, patch 0001 (#3685);
+    # found by the fork survey 2026-11-07. P0: card damage on a read error.
+    (
+        os.path.join("src", "common", "FsCache.cpp"),
+        """      if (!m_blockDev->readSector(sector, m_buffer)) {
+        DBG_FAIL_MACRO;
+        goto fail;
+      }""",
+        """      if (!m_blockDev->readSector(sector, m_buffer)) {
+        // A failed transfer may have overwritten the old cached sector.
+        invalidate();
+        DBG_FAIL_MACRO;
+        goto fail;
+      }""",
+    ),
 ]
 
 

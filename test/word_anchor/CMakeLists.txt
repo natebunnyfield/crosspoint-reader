@@ -9,6 +9,7 @@ set(CP_PREVIEW "${REPO_ROOT}/tools/calendar_preview")
 
 add_executable(WordAnchorTest
   WordAnchorTest.cpp
+  SpacedSignLayoutTest.cpp
   ${REPO_ROOT}/lib/Epub/Epub/ParsedText.cpp
   ${REPO_ROOT}/lib/Epub/Epub/blocks/TextBlock.cpp
   ${REPO_ROOT}/lib/Epub/Epub/hyphenation/Hyphenator.cpp

@@ -33,6 +33,16 @@ std::unique_ptr<LibraryUpdateActivity> makeActivity() {
   return std::make_unique<LibraryUpdateActivity>(host::renderer(), host::input());
 }
 
+// Open the screen and run the tick the saved-network join spends answering
+// Ready (src/network/SavedWifiJoin.h, since 2026-10-20): the radio here is
+// already associated and the resolver answers, so the join takes exactly one
+// tick, and its waited-for repaint names GitHub. The check comes on the tick
+// after, which is where these tests used to start counting.
+void openPastTheJoin() {
+  host::setRootActivity(makeActivity());
+  host::frame();
+}
+
 class LibraryUpdateFirstFrame : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -55,7 +65,7 @@ TEST_F(LibraryUpdateFirstFrame, OnEnterWaitsForThePaintAndFetchesNothing) {
 // The check runs on the first loop() tick, and by then the paint has been
 // waited for. This is the ordering the screen exists to keep.
 TEST_F(LibraryUpdateFirstFrame, TheFirstNetworkCallComesAfterTheWaitedPaint) {
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();
 
   ASSERT_EQ(libdouble::observed().fetchCalls, 1);
@@ -66,7 +76,7 @@ TEST_F(LibraryUpdateFirstFrame, TheFirstNetworkCallComesAfterTheWaitedPaint) {
 // must not repaint; the READING step must. Repainting CONTACTING put a second,
 // identical refresh on top of the TLS handshake.
 TEST_F(LibraryUpdateFirstFrame, OnlyTheReadingStepRepaints) {
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();
 
   const auto& o = libdouble::observed();
@@ -82,7 +92,7 @@ TEST_F(LibraryUpdateFirstFrame, OnlyTheReadingStepRepaints) {
 // the summary.
 TEST_F(LibraryUpdateFirstFrame, EachBookSyncsOnItsOwnTick) {
   libdouble::script().books = 3;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
 
   // The check's tick: the manifest, the waited-for "Book 1 of 3" frame, and
   // no download yet.
@@ -90,7 +100,7 @@ TEST_F(LibraryUpdateFirstFrame, EachBookSyncsOnItsOwnTick) {
   const auto& o = libdouble::observed();
   ASSERT_EQ(o.fetchCalls, 1);
   EXPECT_TRUE(o.syncedBooks.empty());
-  EXPECT_EQ(host::counters().updateAndWaits, 2);  // CHECKING, then SYNCING
+  EXPECT_EQ(host::counters().updateAndWaits, 3);  // CHECKING, the join's GitHub frame, then SYNCING
   ASSERT_NE(host::currentActivity(), nullptr);
   EXPECT_TRUE(host::currentActivity()->preventAutoSleep());
 
@@ -124,7 +134,7 @@ TEST_F(LibraryUpdateFirstFrame, AllBooksFailingOnTheCardStillReachesTheSummary) 
   libdouble::script().books = 3;
   libdouble::script().failedBooks = 3;
   libdouble::script().failureKind = librarysync::FailureKind::STORAGE;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
 
   host::frame();    // the check
   host::frames(3);  // three books, each FAILED
@@ -146,8 +156,14 @@ TEST_F(LibraryUpdateFirstFrame, NoWifiPaintsDeferredAndNeverFetches) {
   WiFi.simSetConnected(false);
   host::setRootActivity(makeActivity());
 
-  EXPECT_EQ(host::counters().updateAndWaits, 0);
-  EXPECT_EQ(host::counters().updates, 1);
+  // onEnter always waits for the CHECKING frame now: the join runs under it
+  // (2026-10-20). With no link and nothing saved, the first tick answers
+  // NoSavedNetwork and the NO_WIFI frame is a deferred paint.
+  EXPECT_EQ(host::counters().updateAndWaits, 1);
+  const int updatesBefore = host::counters().updates;
+  host::frame();
+  EXPECT_EQ(host::counters().updateAndWaits, 1);
+  EXPECT_EQ(host::counters().updates, updatesBefore + 1);
 
   host::frames(3);
   EXPECT_EQ(libdouble::observed().fetchCalls, 0);
@@ -162,7 +178,7 @@ TEST_F(LibraryUpdateFirstFrame, NoWifiPaintsDeferredAndNeverFetches) {
 // into place, so stopping between books leaves no partial book.
 TEST_F(LibraryUpdateFirstFrame, BackStopsTheRunBetweenBooksAndFlushesTheLedger) {
   libdouble::script().books = 5;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();  // the check
   host::frame();  // book 0
   host::frame();  // book 1
@@ -189,7 +205,7 @@ TEST_F(LibraryUpdateFirstFrame, BackStopsTheRunBetweenBooksAndFlushesTheLedger) 
 // The stopped screen is dismissed like any other terminal state.
 TEST_F(LibraryUpdateFirstFrame, TheStoppedScreenIsDismissedWithBack) {
   libdouble::script().books = 4;
-  host::setRootActivity(makeActivity());
+  openPastTheJoin();
   host::frame();
   host::frame();
   host::pressFrame(HalGPIO::BTN_BACK);

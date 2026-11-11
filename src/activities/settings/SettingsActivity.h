@@ -6,10 +6,9 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
-#include "activities/Activity.h"
+#include "activities/UiListActivity.h"
 #include "activities/settings/SettingDisplayOrder.h"
 #include "components/OptionPopup.h"
-#include "util/ButtonNavigator.h"
 
 enum class SettingType { TOGGLE, ENUM, ACTION, VALUE, STRING };
 
@@ -238,12 +237,12 @@ struct SettingInfo {
   }
 };
 
-class SettingsActivity final : public Activity {
-  ButtonNavigator buttonNavigator;
-
-  // Index into deviceSettings[]. Plain 0-based: there is no tab bar, so no
-  // row 0 standing in for one.
-  int selectedSettingIndex = 0;
+// One flat list on UiListActivity. Upstream converted its tabbed Settings to
+// UiTabListActivity (9e3cea2e5); this fork's Settings has had no tab bar since
+// the Display, Controls and Reader tabs were withdrawn, so it is a plain list.
+class SettingsActivity final : public UiListActivity {
+  // The selection is nav.selected: an index into deviceSettings[]. Plain
+  // 0-based: there is no tab bar, so no row 0 standing in for one.
   int settingsCount = 0;
 
   // The one list the device shows: the STR_CAT_SYSTEM entries of the shared
@@ -259,6 +258,18 @@ class SettingsActivity final : public Activity {
   void toggleCurrentSetting();
   void rebuildSettingsLists();
 
+  int listCount() const override { return settingsCount; }
+  void describeRow(int index, ListRow& row) const override;
+  void buildScreen(UiScreen& screen) override;
+  void activateIndex(int index) override;
+  // Confirm toggles on PRESS (no hold meaning here), Back saves and goes Home.
+  bool handleButtons() override;
+  bool handleCustomInput() override;
+  const char* headerTitle() const override { return tr(STR_SETTINGS_TITLE); }
+  const char* headerSubtitle() const override;
+  void drawFooter() override;
+  OptionPopup* activePopup() override { return &optionPopup; }
+
 #if FREEINK_DEVICE_PICCO
   // Brightness or Warmth being stepped with the rocker (owner ruling
   // 2026-11-06, "Two Settings rows"). Confirm on the row starts it, Confirm or
@@ -273,9 +284,7 @@ class SettingsActivity final : public Activity {
 
  public:
   explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : Activity("Settings", renderer, mappedInput) {}
+      : UiListActivity("Settings", renderer, mappedInput) {}
   void onEnter() override;
   void onExit() override;
-  void loop() override;
-  void render(RenderLock&&) override;
 };

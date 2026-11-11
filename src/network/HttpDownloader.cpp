@@ -4,6 +4,7 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <base64.h>
+#include <esp_wifi.h>
 
 #include <functional>
 #include <string>
@@ -52,9 +53,35 @@ bool isRedirect(int status) {
   return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
 }
 
+// OtaUpdater.cpp already disables WiFi power-save for firmware downloads, but
+// OPDS feed/book fetches never did despite being able to run just as long for
+// a large category. Modem sleep periodically powers the radio down between
+// DTIM beacon intervals, which can drop or stall packets mid-transfer -- more
+// likely to be hit the longer a transfer takes, so small feeds mostly get
+// away with it while a large category consistently doesn't.
+//
+// Fork: the guard restores the mode it found rather than WIFI_PS_MIN_MODEM.
+// CrossPointWebServer turns sleep off for its whole session (WiFi.setSleep),
+// and a fixed restore would switch modem sleep back on under it after any
+// download made while it runs.
+struct WifiPowerSaveGuard {
+  wifi_ps_type_t previous = WIFI_PS_MIN_MODEM;
+  WifiPowerSaveGuard() {
+    if (esp_wifi_get_ps(&previous) != ESP_OK) previous = WIFI_PS_MIN_MODEM;
+    esp_err_t err = esp_wifi_set_ps(WIFI_PS_NONE);
+    if (err != ESP_OK) LOG_ERR("HTTP", "Failed to disable WiFi power-save: %d", err);
+  }
+  ~WifiPowerSaveGuard() {
+    if (previous == WIFI_PS_NONE) return;
+    esp_err_t err = esp_wifi_set_ps(previous);
+    if (err != ESP_OK) LOG_ERR("HTTP", "Failed to restore WiFi power-save: %d", err);
+  }
+};
+
 #if defined(FREEINK_NET_WOLFSSL)
 HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std::string& username,
                                          const std::string& password, Sink& sink) {
+  WifiPowerSaveGuard psGuard;
   std::string url = startUrl;
 
   for (int hop = 0; hop <= MAX_REDIRECTS; ++hop) {
@@ -157,6 +184,7 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
 // large/slow files and surfaces a short read directly.
 HttpDownloader::DownloadError runGet(const std::string& url, const std::string& username, const std::string& password,
                                      Sink& sink) {
+  WifiPowerSaveGuard psGuard;
   esp_http_client_config_t config = {};
   config.url = url.c_str();
   config.buffer_size = HTTP_RX_BUF;

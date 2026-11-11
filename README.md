@@ -36,7 +36,7 @@ CrossPoint is open-source e-reader firmware - community-built, fully hackable, f
   - AP mode (hotspot) and STA mode (join existing Wi-Fi), both with QR helpers
   - NTP clock sync on connect
 
-- **Customization**: sleep screen modes, side button swap (Prev/Next), power-button behavior, refresh cadence, reading typeface and size, and more. The interface itself is a single theme (Lyra Six) — the other four were removed on 2026-08-04. Firmware updates are installed via SD card (Settings > Device > SD Firmware Update); the wireless OTA-check screen was removed on 2026-08-08 as unreachable (no menu entry launched it).
+- **Customization**: sleep screen modes including transparent overlays, side button swap (Prev/Next), power-button behavior, refresh cadence, reading typeface and size, and more. The interface itself is a single theme (Lyra Six) — the other four were removed on 2026-08-04. Firmware updates are installed via SD card (Settings > Device > SD Firmware Update); the wireless OTA-check screen was removed on 2026-08-08 as unreachable (no menu entry launched it).
 
 - **Localization**: English and Spanish.
 
@@ -152,7 +152,7 @@ Conversion runs the firmware repo's `lib/EpdFont/scripts/fontconvert_sdcard.py` 
 - [Web server endpoints](./docs/webserver-endpoints.md)
 - [Project scope](./SCOPE.md)
 - [Contributing docs](./docs/contributing/README.md)
-- [Touch and UI development](./docs/contributing/touch-and-ui.md) - FreeInkUI components for new screens, the touch bridge for existing ones, and build envs for the non-Xteink touch devices
+- [Touch and UI development](./docs/contributing/touch-and-ui.md) - how to build new screens on the FreeInkUI activity bases (UiListActivity and friends), plus build envs for the non-Xteink touch devices
 - [Fork sync](./docs/fork-sync.md) - why this fork must not blind-merge upstream, how to take an upstream change safely, and which clones are working copies. Run `scripts/repo-status.sh` for a read-only status across repos
 - [Known bugs](./BUGS.md) - open defects and recently fixed ones, with how to close each
 
@@ -162,7 +162,7 @@ Conversion runs the firmware repo's `lib/EpdFont/scripts/fontconvert_sdcard.py` 
 
 ### Prerequisites
 
-- [pioarduino](https://github.com/pioarduino/pioarduino) or VS Code + pioarduino plugin
+- [pioarduino PlatformIO Core](https://github.com/pioarduino/platformio-core) or [VS Code + pioarduino IDE](https://github.com/pioarduino/pioarduino-vscode-ide)
 - Python 3.8+
 - `clang-format` 21
 - USB-C cable supporting data transfer

@@ -52,7 +52,11 @@ size_t zipFillCallback(void* vctx, const uint8_t** data) {
   // and the stream reported NEEDS_MORE_INPUT forever while InflateStream
   // neither refilled nor errored. Reproduced: a task-watchdog reset mid-book.
   const int bytesRead = ctx->file->read(ctx->readBuf, toRead);
-  if (bytesRead <= 0) return 0;  // 0 is tinfl's legitimate "no more input"
+  if (bytesRead < 0) {
+    LOG_ERR("ZIP", "Failed to read compressed data: %d", bytesRead);
+    return 0;
+  }
+  if (bytesRead == 0) return 0;  // tinfl's legitimate "no more input"
   ctx->fileRemaining -= static_cast<size_t>(bytesRead);
 
   *data = ctx->readBuf;
@@ -443,7 +447,7 @@ uint8_t* ZipFile::readFileToMemory(const char* filename, size_t* size, const boo
     // resolve inside it and no 32KB window is allocated.
     InflateStream inflate;
     if (!inflate.init(false)) {
-      LOG_ERR("ZIP", "Failed to init inflate stream");
+      LOG_ERR("ZIP", "Failed to init inflate stream for %s", filename);
       free(fileReadBuffer);
       free(data);
       return nullptr;
@@ -541,7 +545,7 @@ bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t ch
 
     InflateStream inflate;
     if (!inflate.init(true)) {
-      LOG_ERR("ZIP", "Failed to init inflate stream");
+      LOG_ERR("ZIP", "Failed to init inflate stream for %s", filename);
       free(outputBuffer);
       free(fileReadBuffer);
       return false;

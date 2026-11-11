@@ -23,6 +23,7 @@ add_executable(DefinitionListTest
   ${REPO_ROOT}/lib/Epub/Epub/parsers/XmlEncodingSupport.cpp
   ${REPO_ROOT}/lib/Epub/Epub/parsers/XmlEncodingTables.cpp
   ${REPO_ROOT}/lib/Epub/Epub/converters/ImageDimsProbe.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/converters/ImageToFramebufferDecoder.cpp
   ${REPO_ROOT}/lib/FsHelpers/FsHelpers.cpp
   ${REPO_ROOT}/lib/Epub/Epub/parsers/TableColumnLayout.cpp
   ${REPO_ROOT}/lib/Epub/Epub/css/CssParser.cpp

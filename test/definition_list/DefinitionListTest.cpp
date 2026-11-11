@@ -149,7 +149,7 @@ std::vector<PageLines> layout(const std::string& bodyHtml, const CssParser* css 
       [&pages](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
         PageLines lines;
         for (const auto& element : page->elements) {
-          const auto line = std::dynamic_pointer_cast<PageLine>(element);
+          const auto line = dynamic_cast<const PageLine*>(element.get());
           if (!line || !line->getBlock()) continue;
           const TextBlock& block = *line->getBlock();
           std::string text;
@@ -272,7 +272,7 @@ class LoadedCss {
       ADD_FAILURE() << "could not reopen the stylesheet fixture";
       return;
     }
-    if (!parser_.loadFromStream(f)) ADD_FAILURE() << "loadFromStream failed";
+    if (parser_.loadFromStream(f) != CssParser::ParseResult::Complete) ADD_FAILURE() << "loadFromStream failed";
   }
   ~LoadedCss() {
     if (!path_.empty()) ::remove(path_.c_str());
@@ -610,10 +610,10 @@ TEST(DefinitionListKeep, TheKeepDoesNotApplyToOrdinaryParagraphs) {
   const auto withList = layout(reportedEntry() + filler(40));
   const auto alone = layout(filler(40));
   ASSERT_GT(alone.size(), 2u);
-  // Page 0 is short in BOTH runs -- it carries the chapter sinkage, the
-  // designed drop a section's first page opens with. Take the full-page line
-  // count from a page that does not, and sanity-check that the stand-alone
-  // run's own interior pages agree on it.
+  // Page 0 is skipped in BOTH runs: until 2026-11-08 it carried the chapter
+  // sinkage, and the reported entry's heading still shapes it. Take the
+  // full-page line count from an interior page, and sanity-check that the
+  // stand-alone run's own interior pages agree on it.
   const size_t fullPageLines = alone[1].size();
   for (size_t p = 1; p + 1 < alone.size(); p++) {
     ASSERT_EQ(alone[p].size(), fullPageLines) << "the stand-alone prose run is not uniform at page " << p;

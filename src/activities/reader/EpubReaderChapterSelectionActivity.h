@@ -2,27 +2,34 @@
 #include <Epub.h>
 
 #include <memory>
+#include <string>
+#include <vector>
 
-#include "activities/Activity.h"
-#include "util/ButtonNavigator.h"
+#include "activities/UiListActivity.h"
 
-class EpubReaderChapterSelectionActivity final : public Activity {
+class EpubReaderChapterSelectionActivity final : public UiListActivity {
   std::shared_ptr<Epub> epub;
   std::string epubPath;
-  ButtonNavigator buttonNavigator;
   int currentSpineIndex = 0;
-  int selectorIndex = 0;
   // Position through the whole book, 0..1 (Epub::calculateProgress at the
   // reader's current page). Drawn as a thin bar under the header.
   float bookProgress = 0.0f;
 
-  // Number of items that fit on a page, derived from logical screen height.
-  // This adapts automatically when switching between portrait and landscape.
-  int getPageItems() const;
-
   // Total rows in the list: the Find row, the book-notes row when this book has
   // notes, then the TOC items.
-  int getTotalItems() const;
+  int listCount() const override { return epub ? epub->getTocItemsCount() + headerRowCount() : 0; }
+  // Index = list row: the Find row, the notes row when this book has notes,
+  // then the TOC items (read from the card only for the rows on screen).
+  void describeRow(int index, ListRow& row) const override;
+  void buildScreen(UiScreen& screen) override;
+  void activateIndex(int index) override;
+  // Back cancels with a result and Confirm activates on RELEASE here, and a
+  // missing epub swallows everything past Back.
+  bool handleButtons() override;
+  // Header plus the book-position bar under it, inside the safe area.
+  void drawChrome() override;
+  // Top of the list band: below the header and the book-position bar.
+  int listTop() const;
 
   // Rows above the first chapter: the Find row, then the notes row if any.
   int headerRowCount() const { return FIND_ROW_COUNT + noteRowCount; }
@@ -57,13 +64,10 @@ class EpubReaderChapterSelectionActivity final : public Activity {
   explicit EpubReaderChapterSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                               const std::shared_ptr<Epub>& epub, const std::string& epubPath,
                                               const int currentSpineIndex, const float bookProgress = 0.0f)
-      : Activity("EpubReaderChapterSelection", renderer, mappedInput),
+      : UiListActivity("EpubReaderChapterSelection", renderer, mappedInput),
         epub(epub),
         epubPath(epubPath),
         currentSpineIndex(currentSpineIndex),
         bookProgress(bookProgress) {}
   void onEnter() override;
-  void onExit() override;
-  void loop() override;
-  void render(RenderLock&&) override;
 };

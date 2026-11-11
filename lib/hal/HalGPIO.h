@@ -143,7 +143,20 @@ class HalGPIO {
   // nothing. At >=1 s intervals the energy cost is unmeasurable (~µC/s), so 1 s
   // is chosen for prompt plug/unplug UX (battery icon, light-sleep USB guard /
   // CDC recovery). X4 detection is a single digitalRead and stays per-loop.
-  static constexpr unsigned long USB_POLL_X3_MS = 1000;
+  //
+  // 200 ms since 2026-11-08 (was 1000): this check is also the light-sleep USB
+  // guard on the X3 and the Picco, and for up to a whole poll after a cable goes
+  // in the device kept napping in 20-50 ms slices, each one cutting the USB link
+  // mid-enumeration. Upstream withdrew its light sleep over freezes on USB
+  // plug-in (#3077, which this fork declined: docs/fork-sync.md, "light sleep");
+  // the owner's ruling kept it and asked for this guard. ~0.3-1 ms of I2C every
+  // 200 ms is still well under 1% of the idle floor.
+  static constexpr unsigned long USB_POLL_X3_MS = 200;
+  // After USB was last seen, light sleep stays off this long: a cable going in
+  // or out bounces (power before data, a link that re-enumerates), and napping
+  // into that bounce is the plug-in path upstream's freezes point at.
+  static constexpr unsigned long USB_SLEEP_HOLDOFF_MS = 3000;
+  unsigned long lastUsbSeenMs = 0;
 
   // USB-Serial-JTAG SOF activity, sampled by update(): the host sends a SOF
   // frame every 1 ms while the bus is enumerated, so a frame index that moved
@@ -179,11 +192,23 @@ class HalGPIO {
   inline bool deviceIsX4() const { return _deviceType == DeviceType::X4; }
   bool isXteinkDevice() const;
 
+  // True when the board's page buttons sit on the left/right screen edges
+  // (X3, X4 Pro) rather than an off-screen vertical rocker. Drives side-hint
+  // placement and the flipped large-step direction in selection activities.
+  // Keyed off the active BoardConfig profile, not the X3/X4 runtime detection.
+  bool hasEdgeSideButtons() const;
+
   // Start button GPIO and setup SPI for screen and SD card
   void begin();
 
   // Button input methods
   void update();
+  // A button contact is closed RIGHT NOW: a raw read, no debounce, no edge
+  // state touched, so it can be asked from inside long work on the loop task
+  // (the reader's background chapter build stops on it). X4/X3 only -- the ADC
+  // ladder and the power pin; on the Picco a raw read would run the touch state
+  // machine, so it answers false and a press is seen at the next update().
+  bool isButtonContactClosed();
   bool isPressed(uint8_t buttonIndex) const;
   bool wasPressed(uint8_t buttonIndex) const;
   bool wasAnyPressed() const;
@@ -199,8 +224,22 @@ class HalGPIO {
   bool hasTouch() const;
   bool wasTouchTap(float& nx, float& ny) const;
   bool wasTouchDown(float& nx, float& ny) const;
+  // Raw release edge, reported even when the contact was not a tap (swipe end,
+  // drag-off). Snapshot builders forward it so interaction routing can clear
+  // pressed state.
+  bool wasTouchReleased() const;
   bool isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const;
   bool isTouchHeldAt(float& nx, float& ny) const;
+  // One-shot long-press, fired by the SDK classifier while the finger is still
+  // down (stationary contact held past its threshold). Position = touch-down
+  // point. Callers that act on it should suppressTouchContact() so the lift
+  // cannot also tap.
+  bool wasTouchLongPress(float& nx, float& ny) const;
+  // Drop the rest of the contact on the glass: no further tap, hold, release
+  // or swipe from it. Self-clears once the contact ends. On the Picco a
+  // keyboard calls this once a touch has typed a key, so the same contact
+  // cannot also end as a Back swipe.
+  void suppressTouchContact();
   unsigned long lastTouchHeldMs() const;
   bool wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const;
   bool wasTouchActivity() const;
@@ -259,10 +298,6 @@ class HalGPIO {
   // per-button hold timer and main.cpp's auto-sleep timer treat a gesture as
   // the press it stands for (iOS's synthesized presses count as activity too).
   void injectButtonTap(uint8_t index);
-  // Drop the rest of the contact on the glass: no further tap, hold, release
-  // or swipe from it. A keyboard calls this once a touch has typed a key, so
-  // the same contact cannot also end as a Back swipe.
-  void suppressTouchContact();
   // True while a finger is on the glass, whatever the gate says. For the main
   // loop's idle poll ALONE (main.cpp touchContactDown): the touch INT wakes
   // only the slice a contact starts in, so a contact sampled once per 50 ms
@@ -481,6 +516,14 @@ class HalGPIO {
   // USB state as sampled by the last update() call.
   // Prefer this in per-loop polling: isUsbConnected() performs a fresh I2C read on X3.
   bool isUsbConnectedCached() const { return lastUsbConnected; }
+
+  // The light-sleep guard (HalPowerManager::lightSleep and the e-ink BUSY slice):
+  // USB now, by either signal -- the power check OR the host's SOF heartbeat,
+  // which is the only signal on an X3 whose battery is full -- or seen within
+  // USB_SLEEP_HOLDOFF_MS. Owner ruling 2026-11-08 "Keep, guard USB".
+  bool isUsbSleepGuardActive() const {
+    return lastUsbConnected || (lastUsbSeenMs != 0 && millis() - lastUsbSeenMs < USB_SLEEP_HOLDOFF_MS);
+  }
 
   // Returns true once per edge (plug or unplug) since the last update()
   bool wasUsbStateChanged() const;

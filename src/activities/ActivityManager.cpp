@@ -247,7 +247,13 @@ void ActivityManager::goToRecentBooks() {
 }
 
 void ActivityManager::goToReader(std::string path, const bool allowFastInitialRefresh) {
-  replaceActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, std::move(path), allowFastInitialRefresh));
+  if (path.empty()) {
+    goToFileBrowser("/");  // entering via Browse: start from the root
+    return;
+  }
+  if (auto reader = ReaderActivity::open(renderer, mappedInput, std::move(path), allowFastInitialRefresh)) {
+    replaceActivity(std::move(reader));
+  }
 }
 
 void ActivityManager::goToSleep(bool fromTimeout) {
@@ -271,7 +277,7 @@ void ActivityManager::goToFullScreenMessage(std::string message, EpdFontFamily::
   replaceActivity(std::make_unique<FullScreenMessageActivity>(renderer, mappedInput, std::move(message), style));
 }
 
-void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
+void ActivityManager::goHome(HomeMenuItem initialMenuItem, const bool cleanInitialRefresh) {
   // Land the selector back on the row the user left from.
   //
   // This used to match currentActivity->name against a hardcoded list of
@@ -283,7 +289,8 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
   if (initialMenuItem == HomeMenuItem::NONE) initialMenuItem = lastHomeMenuItem;
   // The cover path only matters when no menu row is in charge; HomeActivity
   // applies that precedence, so it is handed over unconditionally.
-  replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem, lastHomeBookPath));
+  replaceActivity(
+      std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem, lastHomeBookPath, cleanInitialRefresh));
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 
@@ -398,9 +405,8 @@ void ActivityManager::requestUpdateAndWait() {
 
 // RenderLock
 
-RenderLock::RenderLock() {
-  xSemaphoreTake(activityManager.renderingMutex, portMAX_DELAY);
-  isLocked = true;
+RenderLock::RenderLock(const Mode mode) {
+  isLocked = xSemaphoreTake(activityManager.renderingMutex, mode == Mode::Try ? 0 : portMAX_DELAY) == pdTRUE;
 }
 
 RenderLock::RenderLock([[maybe_unused]] Activity&) {

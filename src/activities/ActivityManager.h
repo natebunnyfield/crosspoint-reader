@@ -120,7 +120,10 @@ class ActivityManager {
   void goToClaudeChat();
   void goToFirmwareUpdate();
   void goToLibraryUpdate();
-  void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE);
+  // cleanInitialRefresh: the panel still shows a sleep image (a splashless wake
+  // with no retained Quick Resume frame), so Home's first paint goes out as a
+  // HALF refresh instead of FAST, or the image ghosts under it (upstream #3009).
+  void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE, bool cleanInitialRefresh = false);
 
   // This will move current activity to stack instead of deleting it
   void pushActivity(std::unique_ptr<Activity>&& activity);

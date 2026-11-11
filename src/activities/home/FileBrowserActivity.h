@@ -6,11 +6,10 @@
 #include <vector>
 
 #include "RecentBooksStore.h"
-#include "activities/Activity.h"
+#include "activities/UiListActivity.h"
 #include "components/OptionPopup.h"
-#include "util/ButtonNavigator.h"
 
-class FileBrowserActivity final : public Activity {
+class FileBrowserActivity final : public UiListActivity {
  public:
   // Books = standard reader browser; PickFirmware = filter to .bin only and return path via ActivityResult.
   enum class Mode { Books, PickFirmware };
@@ -37,10 +36,7 @@ class FileBrowserActivity final : public Activity {
     return false;
   }
 
-  ButtonNavigator buttonNavigator;
   OptionPopup deletePopup;
-
-  size_t selectorIndex = 0;
 
   // True when this activity was entered while Confirm was already held; we must swallow the next
   // release so we don't immediately auto-open the first entry.
@@ -53,6 +49,27 @@ class FileBrowserActivity final : public Activity {
   std::vector<std::string> files;
   std::unique_ptr<char[]> fileNameBuffer;
 
+  int listCount() const override { return static_cast<int>(files.size()); }
+  void describeRow(int index, ListRow& row) const override;
+  void buildScreen(UiScreen& screen) override;
+  void activateIndex(int index) override;
+  void onRowLongPress(int index) override;
+  // Short Back goes up a directory (home/cancel at root), and Confirm
+  // activates on RELEASE (a hold is "delete").
+  bool handleButtons() override;
+  // Header shows the current folder name; the path line under the list and
+  // the footer labels depend on path depth and picker mode.
+  void drawChrome() override;
+  void drawFooter() override;
+  OptionPopup* activePopup() override { return &deletePopup; }
+  // forceDelete routes the touch long-press to the delete branch; button
+  // navigation leaves it false and relies on the Confirm hold time instead.
+  // fromButton: only the physical Confirm path may consume the
+  // lockNextConfirmRelease swallow — a touch tap has no pending release.
+  void activateSelected(bool forceDelete = false, bool fromButton = false);
+  // Height of the path line + separator band above the button hints.
+  int pathReserved() const;
+
   // Data loading
   void loadFiles();
   size_t findEntry(const std::string& name) const;
@@ -60,11 +77,9 @@ class FileBrowserActivity final : public Activity {
  public:
   explicit FileBrowserActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string initialPath = "/",
                                Mode mode = Mode::Books)
-      : Activity("FileBrowser", renderer, mappedInput),
+      : UiListActivity("FileBrowser", renderer, mappedInput, /*wantsTouchLongPress=*/true),
         mode(mode),
         basepath(initialPath.empty() ? "/" : std::move(initialPath)) {}
   void onEnter() override;
   void onExit() override;
-  void loop() override;
-  void render(RenderLock&&) override;
 };

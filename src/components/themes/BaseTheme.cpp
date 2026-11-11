@@ -141,10 +141,11 @@ void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   constexpr int buttonHeight = BaseMetrics::values.buttonHintsHeight;
   constexpr int buttonY = BaseMetrics::values.buttonHintsHeight;  // Distance from bottom
   constexpr int textYOffset = 7;                                  // Distance from top of button to text baseline
-  // X3 has wider screen in portrait (528 vs 480), use more spacing
-  constexpr int x4ButtonPositions[] = {25, 130, 245, 350};
-  constexpr int x3ButtonPositions[] = {38, 154, 268, 384};
-  const int* buttonPositions = gpio.deviceIsX3() ? x3ButtonPositions : x4ButtonPositions;
+  // Keyed to the portrait panel width: the 528-wide X3 gets more spacing than
+  // the 480-wide boards (X4, X4 Pro, and the other 800x480 panels).
+  constexpr int narrowButtonPositions[] = {25, 130, 245, 350};
+  constexpr int wideButtonPositions[] = {38, 154, 268, 384};
+  const int* buttonPositions = renderer.getScreenWidth() >= 528 ? wideButtonPositions : narrowButtonPositions;
   const char* labels[] = {btn1, btn2, btn3, btn4};
 
   for (int i = 0; i < 4; i++) {
@@ -180,8 +181,8 @@ void BaseTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
   constexpr int buttonHeight = 80;                                       // Height on screen (width when rotated)
   constexpr int buttonMargin = 4;
 
-  if (gpio.deviceIsX3()) {
-    // X3 layout: Up on left side, Down on right side, positioned higher
+  if (gpio.hasEdgeSideButtons()) {
+    // Edge-button layout (X3, X4 Pro): Up on left side, Down on right side, positioned higher
     constexpr int x3ButtonY = 155;
 
     if (topBtn != nullptr && topBtn[0] != '\0') {
@@ -652,11 +653,28 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
       renderer.drawCenteredText(UI_10_FONT_ID, continueY, tr(STR_CONTINUE_READING), !bookSelected);
     }
   } else {
-    // No book to continue reading
-    const int y =
-        bookY + (bookHeight - renderer.getLineHeight(UI_12_FONT_ID) - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
-    renderer.drawCenteredText(UI_12_FONT_ID, y, tr(STR_NO_OPEN_BOOK));
-    renderer.drawCenteredText(UI_10_FONT_ID, y + renderer.getLineHeight(UI_12_FONT_ID), tr(STR_START_READING));
+    // No book to continue reading. Keep each line inside the empty cover frame: a longer translation
+    // (e.g. Russian "Нет открытой книги") steps down one font size; wrapping is only the last resort.
+    const int textWidth = std::max(1, bookWidth - 16);
+    const auto fitFont = [&](const char* text, const int preferred, const int smaller) {
+      return renderer.getTextWidth(preferred, text) <= textWidth ? preferred : smaller;
+    };
+    const int titleFont = fitFont(tr(STR_NO_OPEN_BOOK), UI_12_FONT_ID, UI_10_FONT_ID);
+    const int hintFont = fitFont(tr(STR_START_READING), UI_10_FONT_ID, SMALL_FONT_ID);
+    const auto title = renderer.wrappedText(titleFont, tr(STR_NO_OPEN_BOOK), textWidth, 3);
+    const auto hint = renderer.wrappedText(hintFont, tr(STR_START_READING), textWidth, 3);
+    const int titleLine = renderer.getLineHeight(titleFont);
+    const int hintLine = renderer.getLineHeight(hintFont);
+    int y = bookY +
+            (bookHeight - static_cast<int>(title.size()) * titleLine - static_cast<int>(hint.size()) * hintLine) / 2;
+    for (const auto& line : title) {
+      renderer.drawCenteredText(titleFont, y, line.c_str());
+      y += titleLine;
+    }
+    for (const auto& line : hint) {
+      renderer.drawCenteredText(hintFont, y, line.c_str());
+      y += hintLine;
+    }
   }
 }
 
@@ -956,6 +974,8 @@ void BaseTheme::drawGeneratedCover(const GfxRenderer& renderer, const Rect rect,
     UITheme::drawCenteredWrappedText(renderer, authorBounds, authorFontId, author, 2);
   }
 }
+
+int BaseTheme::getMenuRowHeight(const GfxRenderer&) const { return UITheme::getInstance().getMetrics().menuRowHeight; }
 
 void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                const std::function<std::string(int index)>& buttonLabel,

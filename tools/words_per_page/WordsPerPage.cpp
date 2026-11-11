@@ -8,7 +8,7 @@
 // Liang hyphenator, expat, GfxRenderer, SdCardFont — so the pages it counts are
 // the pages the device's paginator emits: real line breaking, real hyphenation,
 // real auto-justify demotion, real widow/orphan holdback, real half-line
-// paragraph gap, real chapter sinkage.
+// paragraph gap.
 //
 // The only thing it does that the reader does not is load an SD family by
 // ORDINAL SLOT rather than by nominal point size, so a six-slot ramp can be
@@ -232,8 +232,8 @@ int main(int argc, char** argv) {
   const int screenMargin = 5;  // CrossPointSettings::SCREEN_MARGIN_DEFAULT
   const uint16_t viewportWidth =
       static_cast<uint16_t>(renderer.getScreenWidth() - (left + screenMargin) - (right + screenMargin));
-  const uint16_t viewportHeight =
-      static_cast<uint16_t>(renderer.getScreenHeight() - (top + screenMargin) - (bottom + screenMargin));
+  const uint16_t viewportHeight = static_cast<uint16_t>(renderer.getScreenHeight() - (top + screenMargin) -
+                                                        (bottom + 2 * screenMargin));  // 2x below, as the reader
 
   const std::string dir = fontRoot + "/" + family;
   const std::vector<int> sizes = installedSizes(dir, family);
@@ -267,9 +267,9 @@ int main(int argc, char** argv) {
         /*embeddedStyle=*/false, /*contentBase=*/"", /*imageBasePath=*/"");
     parser.parseAndBuildPages();
 
-    // Page 1 carries the chapter sinkage (viewportHeight/5 rounded to a whole
-    // line) and the trailing page is whatever was left over. Neither is a FULL
-    // page, so neither is counted.
+    // Page 1 is skipped (it carried the chapter sinkage until 2026-11-08, and
+    // still opens on the chapter heading) and the trailing page is whatever was
+    // left over. Neither is a representative FULL page, so neither is counted.
     long sw = 0, sc = 0, sl = 0, st = 0;
     int n = 0;
     for (size_t i = 1; i + 1 < pages.size(); i++) {

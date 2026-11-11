@@ -429,9 +429,7 @@ unsigned long CrossPointSettings::getSleepTimeoutMs() const {
   return static_cast<unsigned long>(minutes) * 60UL * 1000UL;
 }
 
-int CrossPointSettings::getRefreshFrequency() const {
-  return refreshCadence == REFRESH_LESS ? 30 : 15;
-}
+int CrossPointSettings::getRefreshFrequency() const { return refreshCadence == REFRESH_LESS ? 30 : 15; }
 
 void CrossPointSettings::clearSdFontFamily() {
   sdFontFamilyName[0] = '\0';

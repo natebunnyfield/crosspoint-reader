@@ -1,5 +1,7 @@
 #include "Section.h"
 
+#include <FontCacheManager.h>
+#include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -254,12 +256,67 @@ namespace {
 // COUNTER-clockwise turn (owner 2026-10-04: "the iphone would need to be turned
 // ccw not clockwise"; RotatedTablePlacement.h). A cached v63 section holds the
 // flipped positions, which the CCW draw would put off the page.
-// v65: a space beside a lone math sign is set for equal drawn white on both
+// v65: upstream 046827fc3 (ruby/CJK line breaking). Ruby edge overhangs are
+// reserved at layout (extractLine) instead of shifted at paint, ruby overhang
+// widens the NEIGHBOR word rather than the ruby base, and the greedy breaker's
+// DP now prefers the longer line on a cost tie (`cost <= dp[i]`), which moves
+// line breaks in any book where two candidate breaks tie. Stale v64 caches
+// would keep the old breaks and paint positions.
+// v66: upstream 1582e70ef/596f0d3f7. FOOTNOTE_HREF_LEN grew 96 -> 256, so each
+// serialized footnote record grew 128 -> 288 bytes. A STRUCTURAL change: a v65
+// page's footnotes would be read with the wrong stride.
+// v67 (2026-11-08): the chapter sinkage is gone, so a section's first page
+// starts at y=0 like every other. A LAYOUT change with an unchanged struct: a
+// v66 cache would keep every chapter opening dropped a fifth of the page.
+// docs/page-space-2026-11-08.md.
+// v68: upstream 25cf99b21 (#2892). Focus Reading keeps each word whole and
+// carries its bold prefix as a byte boundary, so the hyphenator sees the whole
+// word, and a visible hyphen or dash inside a focus-read word becomes a break
+// opportunity. Both move line breaks (Focus Reading on only). Stale v67
+// caches would keep the old breaks.
+// v69: upstream 99724aa79 (#3001). The OPF language now parses when the package
+// does not spell it dc:language, and the language picks the hyphenation
+// patterns (Section.cpp, Hyphenator::setPreferredLanguage), which this file's
+// key does not carry. A section built under the default language would keep
+// the wrong breaks for such a book.
+// v70: upstream c6fe67d48 (#3102). A ruby group's tokens are forced
+// unbreakable again (continues set, noSpaceBefore cleared: under the v68
+// TokenBoundary rules continues+noSpace is a BREAKABLE attachment, which let a
+// CJK ruby group split across lines), and a long paragraph no longer soft-
+// flushes in the middle of a ruby group. Both move line breaks in ruby books.
+// v71: upstream 52444a0c9 (#3221). The text block started after a closing
+// element now takes the parent's style without its top and bottom margins and
+// padding, so bare text (or the next sibling, through the empty-block merge)
+// no longer gets the parent's top margin a second time. Moves block spacing
+// in books with margined containers.
+// v72: upstream ce6c6cbce (#3198). A paragraph's base direction comes from
+// its block (and <html>/<body> dir) only; an inline element's direction no
+// longer replaces it, so a Hebrew paragraph that opens with an English term
+// stays RTL. Moves line order and alignment in mixed-direction books.
+// v73: upstream badfa95ff (#3355). An internal link's CSS vertical-align
+// (super/sub) is applied, so footnote markers written as
+// <a style="vertical-align: super"> are superscript again.
+// v74: upstream f437bb506 (#3036). utf8ComposeNfc() composes conjoining Hangul
+// jamo (L+V[+T]) into syllables. It runs on every word, so a book stored in NFD
+// Korean re-lays out with the precomposed syllables the fonts carry.
+// v75: upstream 6eda8f0b7 (#3390). Elements with the HTML `hidden` attribute
+// are display:none, so their text no longer lays out.
+// v76: a skipped (display:none / hidden) element's close no longer pops the
+// enclosing block style, table or list state (the guard upstream carries in
+// da3d50c24). Paragraphs after a hidden block keep their container's margins,
+// and a hidden nested list no longer ends its parent list.
+// v77: upstream 2b2ba72f0 (#3500). `list-style-type: none` (and the fork's
+// `list-style: none`) on a <ul>/<ol> drops its items' markers and hanging
+// gutter. Paired with CSS cache v12.
+// v78: upstream f4b4ff06c (#3585). An SD font's space advance falls back to
+// the glyph when the style's table answers 0 (not prewarmed), so a section laid
+// out during such a miss no longer has zero-width spaces.
+// v79: a space beside a lone math sign is set for equal drawn white on both
 // sides of the sign (ParsedText's wordSpace, GfxRenderer::getSpacedSignGap,
 // SpacedSignWhite.h). Word positions in any line holding a spaced
 // + − × ÷ = < > and kin (not the hyphen-minus or the slash) move by a pixel or
 // two, and a cached section keeps the old ones.
-constexpr uint8_t SECTION_FILE_VERSION = 65;
+constexpr uint8_t SECTION_FILE_VERSION = 79;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
@@ -492,6 +549,10 @@ bool Section::startBuild(const ReaderRenderSpec& spec, const std::function<void(
     LOG_ERR("SCT", "startBuild called while a build is already active");
     return false;
   }
+  // Reclaim rebuildable font caches before CSS and layout allocations.
+  if (auto* fontCache = renderer.getFontCacheManager()) {
+    fontCache->releaseSdFontCaches();
+  }
   buildComplete_ = false;
   builtPageCount_ = 0;
   // Pages from a loaded partial stay readable (from filePath) while this build writes
@@ -636,8 +697,19 @@ bool Section::startBuild(const ReaderRenderSpec& spec, const std::function<void(
 
   if (spec.embeddedStyle) {
     ctx->cssParser = epub->getCssParser();
-    if (ctx->cssParser && !ctx->cssParser->loadFromCache()) {
-      LOG_ERR("SCT", "Failed to load CSS from cache");
+    if (ctx->cssParser) {
+      const CssParser::CacheLoadResult cacheResult = ctx->cssParser->loadFromCache();
+      if (cacheResult == CssParser::CacheLoadResult::LowMemory) {
+        LOG_ERR("SCT", "Insufficient heap to hydrate CSS; section build deferred");
+        ctx->cssParser->clear();
+        file.close();
+        Storage.remove(binTmpPath().c_str());
+        if (!ctx->reusedHtml) Storage.remove(ctx->tmpHtmlPath.c_str());
+        return false;
+      }
+      if (cacheResult == CssParser::CacheLoadResult::Invalid) {
+        LOG_ERR("SCT", "Failed to load CSS from cache");
+      }
     }
   }
 
@@ -703,7 +775,7 @@ bool Section::startBuild(const ReaderRenderSpec& spec, const std::function<void(
   return true;
 }
 
-bool Section::buildSomeMore(const int maxPages) {
+bool Section::buildSomeMore(const int maxPages, bool (*yieldNow)()) {
   if (!build_ || !build_->parser) {
     LOG_ERR("SCT", "buildSomeMore with no active build");
     return false;
@@ -722,8 +794,9 @@ bool Section::buildSomeMore(const int maxPages) {
     if (status == ChapterHtmlSlimParser::ParseStatus::Done) {
       return finalizeBuild();
     }
-    // ParseStatus::More: yield once we've laid out the requested number of pages.
-    if (maxPages > 0 && (builtPageCount_ - startCount) >= maxPages) {
+    // ParseStatus::More: yield once we've laid out the requested number of pages, or as soon
+    // as the caller has something more urgent to do.
+    if ((maxPages > 0 && (builtPageCount_ - startCount) >= maxPages) || (yieldNow && yieldNow())) {
       build_->bytesConsumed = build_->parser->parseBytesConsumed();
       return true;
     }

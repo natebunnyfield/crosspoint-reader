@@ -46,10 +46,10 @@ constexpr double kPi = 3.14159265358979323846;
 
 struct Controller {
   const char* name;
-  double reportHz;       // reports per second while a finger is down
-  double noisePx;        // per-report position noise (sigma)
-  double lostLiftOff;    // probability a lift-off report is lost
-  double stallPerPoll;   // probability a poll starts a main-loop stall
+  double reportHz;          // reports per second while a finger is down
+  double noisePx;           // per-report position noise (sigma)
+  double lostLiftOff;       // probability a lift-off report is lost
+  double stallPerPoll;      // probability a poll starts a main-loop stall
   double dropoutPerReport;  // probability a due report starts a 210-320 ms silence with the finger still down
 };
 
@@ -61,27 +61,43 @@ enum class Intent { Tap, Hold, SwipeLeft, SwipeRight, SwipeUp, SwipeDown, EdgeBa
 constexpr int kIntents = 9;
 const char* intentName(const Intent i) {
   switch (i) {
-    case Intent::Tap: return "tap";
-    case Intent::Hold: return "hold";
-    case Intent::SwipeLeft: return "swipe L";
-    case Intent::SwipeRight: return "swipe R";
-    case Intent::SwipeUp: return "swipe U";
-    case Intent::SwipeDown: return "swipe D";
-    case Intent::EdgeBack: return "edge back";
-    case Intent::LongPress: return "press 0.5s";
-    case Intent::SlowDrag: return "slow drag";
+    case Intent::Tap:
+      return "tap";
+    case Intent::Hold:
+      return "hold";
+    case Intent::SwipeLeft:
+      return "swipe L";
+    case Intent::SwipeRight:
+      return "swipe R";
+    case Intent::SwipeUp:
+      return "swipe U";
+    case Intent::SwipeDown:
+      return "swipe D";
+    case Intent::EdgeBack:
+      return "edge back";
+    case Intent::LongPress:
+      return "press 0.5s";
+    case Intent::SlowDrag:
+      return "slow drag";
   }
   return "?";
 }
 Button expected(const Intent i) {
   switch (i) {
-    case Intent::Tap: return Button::Right;
-    case Intent::Hold: return Button::Confirm;
-    case Intent::SwipeLeft: return Button::Right;
-    case Intent::SwipeRight: return Button::Left;
-    case Intent::SwipeUp: return Button::Back;
-    case Intent::SwipeDown: return Button::Confirm;
-    case Intent::EdgeBack: return Button::Back;
+    case Intent::Tap:
+      return Button::Right;
+    case Intent::Hold:
+      return Button::Confirm;
+    case Intent::SwipeLeft:
+      return Button::Right;
+    case Intent::SwipeRight:
+      return Button::Left;
+    case Intent::SwipeUp:
+      return Button::Back;
+    case Intent::SwipeDown:
+      return Button::Confirm;
+    case Intent::EdgeBack:
+      return Button::Back;
     case Intent::LongPress:
     case Intent::SlowDrag:
       return Button::Power;  // stands for "nothing": the decoder never fires Power
@@ -400,7 +416,8 @@ void print(const Controller& c, const Report& rep) {
     const struct {
       Button b;
       const char* name;
-    } names[] = {{Button::Right, "Right"}, {Button::Left, "Left"}, {Button::Back, "Back"}, {Button::Confirm, "Confirm"}};
+    } names[] = {
+        {Button::Right, "Right"}, {Button::Left, "Left"}, {Button::Back, "Back"}, {Button::Confirm, "Confirm"}};
     for (const auto& nm : names) {
       const int c = t.wrongAs[static_cast<int>(nm.b)];
       if (c) std::printf("  %s x%d", nm.name, c);

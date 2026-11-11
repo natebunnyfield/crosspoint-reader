@@ -284,6 +284,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     sleepScreenValues[CrossPointSettings::CALENDAR_WESTSIDE] = StrId::STR_SLEEP_WESTSIDE;
     sleepScreenValues[CrossPointSettings::CALENDAR_DARK] = StrId::STR_SLEEP_CALENDAR_DARK;
     sleepScreenValues[CrossPointSettings::CALENDAR_WESTSIDE_DARK] = StrId::STR_SLEEP_WESTSIDE_DARK;
+    sleepScreenValues[CrossPointSettings::TRANSPARENT_CUSTOM] = StrId::STR_TRANSPARENT;
 
     // Built one entry at a time instead of from a single braced initializer_list:
     // the whole list was materialised as one stack temporary (~50 x
@@ -334,6 +335,10 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // again without bumping this; the Picco boot log caught it 2026-11-06
     // ("FIXED_ENTRY_COUNT is 21 but the fixed block pushes 22").
     //
+    // 19 since 2026-11-07: Text Anti-Aliasing and Refresh Frequency
+    // (8293ef507), and AGAIN without bumping this -- caught by the P0/P1 sweep
+    // the same day. Fifth drift; tools/latency/gate.sh now fails on the log line.
+    //
     // Plus the BOOX Picco's five frontlight/slide-switch rows, compiled into
     // that env only (see the block above the gate below).
 #if FREEINK_DEVICE_PICCO
@@ -341,7 +346,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
 #else
     constexpr size_t PICCO_ENTRY_COUNT = 0;
 #endif
-    constexpr size_t FIXED_ENTRY_COUNT = 17 + PICCO_ENTRY_COUNT;
+    constexpr size_t FIXED_ENTRY_COUNT = 19 + PICCO_ENTRY_COUNT;
     std::vector<SettingInfo> v;
     v.reserve(FIXED_ENTRY_COUNT);
 
@@ -748,9 +753,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             // stay one contiguous block at the end.
             .withDisplaySubset({CrossPointSettings::BLANK, CrossPointSettings::DARK, CrossPointSettings::LIGHT,
                                 CrossPointSettings::CUSTOM, CrossPointSettings::COVER, CrossPointSettings::COVER_CUSTOM,
-                                CrossPointSettings::QUICK_RESUME, CrossPointSettings::CALENDAR,
-                                CrossPointSettings::CALENDAR_DARK, CrossPointSettings::CALENDAR_WESTSIDE,
-                                CrossPointSettings::CALENDAR_WESTSIDE_DARK}));
+                                CrossPointSettings::QUICK_RESUME, CrossPointSettings::TRANSPARENT_CUSTOM,
+                                CrossPointSettings::CALENDAR, CrossPointSettings::CALENDAR_DARK,
+                                CrossPointSettings::CALENDAR_WESTSIDE, CrossPointSettings::CALENDAR_WESTSIDE_DARK}));
 
     // Clock entries. Kept after the status bar was removed because the calendar
     // sleep screen shifts the RTC's UTC date by clockUtcOffsetQ

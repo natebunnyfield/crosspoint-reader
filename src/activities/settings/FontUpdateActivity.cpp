@@ -280,7 +280,9 @@ void FontUpdateActivity::requestStop() {
 
 void FontUpdateActivity::startStep(Step next) {
   step = next;
-  UPD_TRACE_MARK(next == Step::CHECK ? "step CHECK start" : next == Step::FINISH ? "step FINISH start" : "step FAMILY start");
+  UPD_TRACE_MARK(next == Step::CHECK    ? "step CHECK start"
+                 : next == Step::FINISH ? "step FINISH start"
+                                        : "step FAMILY start");
   worker.start(&FontUpdateActivity::runStep, this);
   // The device ran the step inline: collect it in THIS tick, exactly as the
   // code did before the worker existed (one family / one book per tick). A

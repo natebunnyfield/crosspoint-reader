@@ -126,7 +126,7 @@ Laid layout(const std::string& bodyHtml, std::vector<std::string> tocAnchors) {
       [&out](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
         PageLines lines;
         for (const auto& element : page->elements) {
-          const auto line = std::dynamic_pointer_cast<PageLine>(element);
+          const auto line = dynamic_cast<const PageLine*>(element.get());
           if (!line || !line->getBlock()) continue;
           const TextBlock& block = *line->getBlock();
           std::string text;
@@ -268,3 +268,26 @@ TEST(TocAnchorPage, IdOnAnAnchorInsideTheHeading) {
 }
 TEST(TocAnchorPage, IdOnTheFirstParagraph) { expectLandsOnTheHeading("id on <p>", idOnTheFirstParagraph); }
 TEST(TocAnchorPage, RuleThenHeading) { expectLandsOnTheHeading("<hr/> then <h2 id>", ruleThenHeading); }
+
+// A <tr id> names the page its row's first cell lands on. On a streamed flat
+// table the id waits while the previous row's last cell is laid out and the
+// row separator decides whether the page breaks; recording it inside that
+// retire put it one page early whenever the row opened a new page (adversarial
+// review 2026-11-08: 5 of 60 rows wrong, 4 of 60 before the separator fix).
+TEST(TocAnchorPage, TableRowIdsNameTheRowsPage) {
+  std::string html = "<table><tr><th>HA</th><th>HB</th><th>HC</th><th>HD</th><th>HE</th><th>HF</th></tr>";
+  for (int r = 0; r < 60; r++) {
+    const std::string k = std::to_string(r);
+    html += "<tr id=\"row" + k + "\"><td>R" + k + "A</td><td>R" + k + "B</td><td>R" + k + "C</td><td>R" + k +
+            "D</td><td>R" + k + "E</td><td>R" + k + "F</td></tr>";
+  }
+  html += "</table>";
+  const Laid laid = layout(html, {});
+  ASSERT_GT(laid.pages.size(), 4u) << "the table should span several pages";
+  for (int r = 0; r < 60; r++) {
+    const std::string k = std::to_string(r);
+    const int cellPage = pageOf(laid.pages, "R" + k + "A");
+    ASSERT_GE(cellPage, 0) << "row " << r << " missing";
+    EXPECT_EQ(anchorPage(laid, "row" + k), cellPage) << "row " << r;
+  }
+}

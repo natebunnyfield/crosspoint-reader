@@ -124,6 +124,28 @@ bool isProtectedItemName(const String& name) {
   }
   return false;
 }
+
+// Every component, not only the last. The listing hides dot entries and
+// HIDDEN_ITEMS, but each handler refused them by the final name alone, so
+// /download?path=/.crosspoint/wifi.json served the saved Wi-Fi passwords
+// (adversarial review 2026-11-08). This HTTP API never shows dot-paths, so
+// refusing them here removes nothing from the page. WebDAV mirrors them on
+// purpose (WebDAVHandler::isProtectedPath); that is a separate decision.
+bool isProtectedPath(const String& path) {
+  int start = 0;
+  while (start < static_cast<int>(path.length())) {
+    if (path.charAt(start) == '/') {
+      start++;
+      continue;
+    }
+    int end = path.indexOf('/', start);
+    if (end == -1) end = path.length();
+    if (isProtectedItemName(path.substring(start, end))) return true;
+    start = end + 1;
+  }
+  return false;
+}
+
 }  // namespace
 
 // File listing page template - now using generated headers:
@@ -233,8 +255,10 @@ void CrossPointWebServer::begin() {
   LOG_DBG("WEB", "[MEM] Free heap after route setup: %d bytes", ESP.getFreeHeap());
 
   // Collect WebDAV headers and register handler
-  const char* davHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout"};
-  server->collectHeaders(davHeaders, 6);
+  // If-None-Match is collected so the static-page handlers can answer conditional GETs with 304
+  const char* collectedHeaders[] = {"Depth",      "Destination", "Overwrite",    "If",
+                                    "Lock-Token", "Timeout",     "If-None-Match"};
+  server->collectHeaders(collectedHeaders, 7);
   // Raw new (nothrow) on purpose: WebServer takes ownership and deletes it when
   // the server stops, so a unique_ptr here would double-free. Without WebDAV the
   // HTTP file transfer still works, so a failure is logged and skipped.
@@ -418,19 +442,32 @@ CrossPointWebServer::WsUploadStatus CrossPointWebServer::getWsUploadStatus() con
   return status;
 }
 
-static void sendHtmlContent(WebServer* server, const char* data, size_t len) {
+static void sendStaticContent(WebServer* server, const char* data, size_t len, const char* etag,
+                              const char* contentType) {
+  // Content is baked into flash at build time, so the ETag is stable for the
+  // lifetime of a firmware image. Honor If-None-Match with a 304 so browsers
+  // reuse their cache instead of re-downloading on every navigation.
+  if (server->header("If-None-Match") == etag) {
+    server->sendHeader("ETag", etag);
+    server->sendHeader("Cache-Control", "no-cache");
+    server->send(304);
+    return;
+  }
   server->sendHeader("Content-Encoding", "gzip");
-  server->send_P(200, "text/html", data, len);
+  server->sendHeader("ETag", etag);
+  // no-cache: the browser may cache, but must revalidate (conditional GET)
+  // before reuse — this is what unlocks 304 responses.
+  server->sendHeader("Cache-Control", "no-cache");
+  server->send_P(200, contentType, data, len);
 }
 
 void CrossPointWebServer::handleRoot() const {
-  sendHtmlContent(server.get(), HomePageHtml, sizeof(HomePageHtml));
+  sendStaticContent(server.get(), HomePageHtml, sizeof(HomePageHtml), HomePageHtmlETag, "text/html");
   LOG_DBG("WEB", "Served root page");
 }
 
 void CrossPointWebServer::handleJszip() const {
-  server->sendHeader("Content-Encoding", "gzip");
-  server->send_P(200, "application/javascript", jszip_minJs, jszip_minJsCompressedSize);
+  sendStaticContent(server.get(), jszip_minJs, jszip_minJsCompressedSize, jszip_minJsETag, "application/javascript");
   LOG_DBG("WEB", "Served jszip.min.js");
 }
 
@@ -562,22 +599,18 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
 bool CrossPointWebServer::isEpubFile(const String& filename) const { return FsHelpers::hasEpubExtension(filename); }
 
 void CrossPointWebServer::handleFileList() const {
-  sendHtmlContent(server.get(), FilesPageHtml, sizeof(FilesPageHtml));
+  sendStaticContent(server.get(), FilesPageHtml, sizeof(FilesPageHtml), FilesPageHtmlETag, "text/html");
 }
 
 void CrossPointWebServer::handleFileListData() const {
   // Get current path from query string (default to root)
   String currentPath = "/";
   if (server->hasArg("path")) {
-    currentPath = server->arg("path");
-    // Ensure path starts with /
-    if (!currentPath.startsWith("/")) {
-      currentPath = "/" + currentPath;
-    }
-    // Remove trailing slash unless it's root
-    if (currentPath.length() > 1 && currentPath.endsWith("/")) {
-      currentPath = currentPath.substring(0, currentPath.length() - 1);
-    }
+    currentPath = normalizeWebPath(server->arg("path"));
+  }
+  if (isProtectedPath(currentPath)) {
+    server->send(403, "text/plain", "Cannot access protected items");
+    return;
   }
 
   server->setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -621,25 +654,15 @@ void CrossPointWebServer::handleDownload() const {
     return;
   }
 
-  String itemPath = server->arg("path");
+  String itemPath = normalizeWebPath(server->arg("path"));
   if (itemPath.isEmpty() || itemPath == "/") {
     server->send(400, "text/plain", "Invalid path");
     return;
   }
-  if (!itemPath.startsWith("/")) {
-    itemPath = "/" + itemPath;
-  }
 
-  const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (itemName.startsWith(".")) {
+  if (isProtectedPath(itemPath)) {
     server->send(403, "text/plain", "Cannot access system files");
     return;
-  }
-  for (const auto* item : HIDDEN_ITEMS) {
-    if (itemName.equals(item)) {
-      server->send(403, "text/plain", "Cannot access protected items");
-      return;
-    }
   }
 
   if (!Storage.exists(itemPath.c_str())) {
@@ -768,21 +791,24 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     totalWriteTime = 0;
     writeCount = 0;
 
+    if (!FsHelpers::isSafePathComponent(state.fileName)) {
+      state.error = "Invalid file name";
+      LOG_DBG("WEB", "[UPLOAD] Rejected unsafe filename: %s", state.fileName.c_str());
+      return;
+    }
+
     // Get upload path from query parameter (defaults to root if not specified)
     // Note: We use query parameter instead of form data because multipart form
     // fields aren't available until after file upload completes
     if (server->hasArg("path")) {
-      state.path = server->arg("path");
-      // Ensure path starts with /
-      if (!state.path.startsWith("/")) {
-        state.path = "/" + state.path;
-      }
-      // Remove trailing slash unless it's root
-      if (state.path.length() > 1 && state.path.endsWith("/")) {
-        state.path = state.path.substring(0, state.path.length() - 1);
-      }
+      state.path = normalizeWebPath(server->arg("path"));
     } else {
       state.path = "/";
+    }
+    if (isProtectedPath(state.path)) {
+      state.error = "Cannot upload into a protected folder";
+      LOG_DBG("WEB", "[UPLOAD] Rejected protected path: %s", state.path.c_str());
+      return;
     }
 
     LOG_DBG("WEB", "[UPLOAD] START: %s to path: %s", state.fileName.c_str(), state.path.c_str());
@@ -910,17 +936,25 @@ void CrossPointWebServer::handleCreateFolder() const {
     server->send(400, "text/plain", "Folder name cannot be empty");
     return;
   }
+  if (!FsHelpers::isSafePathComponent(folderName)) {
+    LOG_DBG("WEB", "Rejected unsafe folder name: %s", folderName.c_str());
+    server->send(400, "text/plain", "Invalid folder name");
+    return;
+  }
+  if (isProtectedItemName(folderName)) {
+    LOG_DBG("WEB", "Rejected protected folder name: %s", folderName.c_str());
+    server->send(403, "text/plain", "Cannot create protected item");
+    return;
+  }
 
   // Get parent path
   String parentPath = "/";
   if (server->hasArg("path")) {
-    parentPath = server->arg("path");
-    if (!parentPath.startsWith("/")) {
-      parentPath = "/" + parentPath;
-    }
-    if (parentPath.length() > 1 && parentPath.endsWith("/")) {
-      parentPath = parentPath.substring(0, parentPath.length() - 1);
-    }
+    parentPath = normalizeWebPath(server->arg("path"));
+  }
+  if (isProtectedPath(parentPath)) {
+    server->send(403, "text/plain", "Cannot create inside a protected folder");
+    return;
   }
 
   // Build full folder path
@@ -974,7 +1008,7 @@ void CrossPointWebServer::handleRename() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (isProtectedItemName(itemName)) {
+  if (isProtectedPath(itemPath)) {
     server->send(403, "text/plain", "Cannot rename protected item");
     return;
   }
@@ -1051,13 +1085,12 @@ void CrossPointWebServer::handleMove() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (isProtectedItemName(itemName)) {
+  if (isProtectedPath(itemPath)) {
     server->send(403, "text/plain", "Cannot move protected item");
     return;
   }
   if (destPath != "/") {
-    const String destName = destPath.substring(destPath.lastIndexOf('/') + 1);
-    if (isProtectedItemName(destName)) {
+    if (isProtectedPath(destPath)) {
       server->send(403, "text/plain", "Cannot move into protected folder");
       return;
     }
@@ -1172,7 +1205,7 @@ void CrossPointWebServer::handleDelete() const {
   String failedItems;
 
   for (const auto& p : paths) {
-    auto itemPath = p.as<String>();
+    auto itemPath = normalizeWebPath(p.as<String>());
 
     // Validate path
     if (itemPath.isEmpty() || itemPath == "/") {
@@ -1181,16 +1214,23 @@ void CrossPointWebServer::handleDelete() const {
       continue;
     }
 
-    // Ensure path starts with /
-    if (!itemPath.startsWith("/")) {
-      itemPath = "/" + itemPath;
+    // Normalized like every other mutating handler (rename, move, WebDAV):
+    // webUploadIsWriting() below compares text, and SdFat collapses "//" and
+    // resolves "." -- so "/books//a.epub" used to pass the guard and delete a
+    // file a WebSocket upload was still writing into, the B-073 cross-link the
+    // guard exists to prevent (P0/P1 sweep 2026-11-07).
+    itemPath = normalizeWebPath(itemPath);
+    if (itemPath == "/") {
+      failedItems += itemPath + " (cannot delete root); ";
+      allSuccess = false;
+      continue;
     }
 
     // Security check: prevent deletion of protected items
     const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
 
-    // Hidden/system files are protected
-    if (itemName.startsWith(".")) {
+    // Hidden/system files are protected, in any component of the path.
+    if (isProtectedPath(itemPath)) {
       failedItems += itemPath + " (hidden/system file); ";
       allSuccess = false;
       continue;
@@ -1258,7 +1298,7 @@ void CrossPointWebServer::handleDelete() const {
 }
 
 void CrossPointWebServer::handleSettingsPage() const {
-  sendHtmlContent(server.get(), SettingsPageHtml, sizeof(SettingsPageHtml));
+  sendStaticContent(server.get(), SettingsPageHtml, sizeof(SettingsPageHtml), SettingsPageHtmlETag, "text/html");
   LOG_DBG("WEB", "Served settings page");
 }
 
@@ -1679,6 +1719,15 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
             wsServer->sendTXT(num, "ERROR:Invalid START format");
             return;
           }
+          // The file name is joined onto the folder below and becomes the
+          // guard's target: a name carrying a separator, or "." / "..", would
+          // write outside the folder and give the guard a path no other
+          // handler spells the same way. Refused as handleRename refuses it.
+          if (!FsHelpers::isSafePathComponent(wsUploadFileName)) {
+            LOG_DBG("WS", "START rejected: invalid file name");
+            wsServer->sendTXT(num, "ERROR:Invalid file name");
+            return;
+          }
           wsUploadSize = static_cast<size_t>(parsedSize);
           wsUploadPath = msg.substring(secondColon + 1);
           wsUploadReceived = 0;
@@ -1690,6 +1739,11 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           // here would slip past the guard that keeps other requests off this
           // open handle.
           wsUploadPath = normalizeWebPath(wsUploadPath);
+          if (isProtectedPath(wsUploadPath)) {
+            LOG_DBG("WS", "START rejected: protected path");
+            wsServer->sendTXT(num, "ERROR:Cannot upload into a protected folder");
+            return;
+          }
 
           String filePath = wsUploadPath;
           if (!filePath.endsWith("/")) filePath += "/";
@@ -1808,7 +1862,7 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
 // --- Font management handlers ---
 
 void CrossPointWebServer::handleFontsPage() const {
-  sendHtmlContent(server.get(), FontsPageHtml, sizeof(FontsPageHtml));
+  sendStaticContent(server.get(), FontsPageHtml, sizeof(FontsPageHtml), FontsPageHtmlETag, "text/html");
   LOG_DBG("WEB", "Served fonts page");
 }
 

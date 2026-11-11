@@ -13,10 +13,16 @@
 #include <cmath>
 #include <cstdlib>
 
+#include "../Memory/Memory.h"
 #include "FontCacheManager.h"
+#include "GlyphBitmap.h"
 
 #ifdef GFX_BOUNDS_COUNTER
 GfxRenderer::OutOfRange GfxRenderer::outOfRange{};
+#endif
+#ifdef GFX_GLYPH_FASTPATH_TOGGLE
+bool GfxRenderer::glyphFastPathEnabled = true;
+uint32_t GfxRenderer::glyphFastPathGlyphs = 0;
 #endif
 
 namespace {
@@ -27,6 +33,18 @@ namespace {
  */
 uint8_t resolveSdCardStyle(const SdCardFont& font, const EpdFontFamily::Style style) {
   return font.resolveStyle(static_cast<uint8_t>(style));
+}
+
+// The space's advance from the style's table, or from its glyph when the table
+// answers 0. Zero means uncached (a full table whose style was not prewarmed,
+// or a failed preparation), and a space measured as 0 px collapses every gap
+// on the line (upstream f4b4ff06c). Same fallback as the per-codepoint path.
+uint16_t getSdCardSpaceAdvance(SdCardFont& font, const uint8_t resolvedStyle) {
+  const uint16_t advance = font.getAdvance(' ', resolvedStyle);
+  if (advance != 0) return advance;
+  const EpdFont* epdFont = font.getEpdFont(resolvedStyle);
+  const EpdGlyph* glyph = epdFont ? epdFont->getGlyph(' ') : nullptr;
+  return glyph ? glyph->advanceX : 0;
 }
 }  // namespace
 
@@ -184,6 +202,7 @@ void GfxRenderer::FrameBufferLoan::end() {
 bool GfxRenderer::isFontCacheScanning() const { return fontCacheManager_ && fontCacheManager_->isScanning(); }
 
 void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) {
+  invalidateDrawnBoxes();  // a box looked up before this id existed was cached as a failure
   auto result = fontMap.insert({fontId, font});
   if (!result.second) {
     LOG_ERR("GFX", "Font ID %d already registered, ignoring duplicate", fontId);
@@ -220,6 +239,54 @@ int GfxRenderer::resolveTextFontId(const int fontId, const char* text, const Epd
   return fontId;
 }
 
+void GfxRenderer::prewarmFallbackText(const int fontId, const TextGetter getter, const void* ctx,
+                                      const uint32_t textCount, const EpdFontFamily::Style style) const {
+  if (getter == nullptr || textCount == 0) {
+    return;
+  }
+  // Resolve the fallback id from the first string that actually redirects; a
+  // screen with no CJK strings resolves nothing and this is a no-op.
+  int fallbackFontId = fontId;
+  for (uint32_t i = 0; i < textCount && fallbackFontId == fontId; i++) {
+    const char* text = getter(ctx, i);
+    if (text == nullptr || *text == '\0') continue;
+    fallbackFontId = resolveTextFontId(fontId, text, style);
+  }
+  if (fallbackFontId == fontId) {
+    return;
+  }
+  const auto sdIt = sdCardFonts_.find(fallbackFontId);
+  if (sdIt == sdCardFonts_.end()) {
+    return;
+  }
+  const uint8_t styleMask = static_cast<uint8_t>(1u << (static_cast<uint8_t>(style) & 0x03));
+  // Append one virtual index for U+2026: truncation measures every long row
+  // as "label…", so an ellipsis missing from the batch forces a union rebuild
+  // on the first repaint.
+  struct WrapCtx {
+    TextGetter getter;
+    const void* ctx;
+    uint32_t count;
+  } wrap{getter, ctx, textCount};
+  const auto withEllipsis = [](const void* wc, uint32_t i) -> const char* {
+    const auto* w = static_cast<const WrapCtx*>(wc);
+    return i < w->count ? w->getter(w->ctx, i) : "\xe2\x80\xa6";
+  };
+  // loadKernLig=false: see ensureSdGlyphsResident below.
+  sdIt->second->prewarm(withEllipsis, &wrap, textCount + 1, styleMask, /*metadataOnly=*/false,
+                        /*loadKernLig=*/false);
+}
+
+void GfxRenderer::prewarmFallbackText(const int fontId, const char* text, const EpdFontFamily::Style style) const {
+  if (text == nullptr || *text == '\0') {
+    return;
+  }
+  const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  if (resolvedFontId != fontId) {
+    ensureSdGlyphsResident(resolvedFontId, text, style, false);
+  }
+}
+
 void GfxRenderer::ensureSdGlyphsResident(const int fontId, const char* text, const EpdFontFamily::Style style,
                                          const bool metadataOnly) const {
   const auto sdIt = sdCardFonts_.find(fontId);
@@ -228,8 +295,14 @@ void GfxRenderer::ensureSdGlyphsResident(const int fontId, const char* text, con
   }
   // SUP/SUB bits don't select a distinct .cpfont style bitstream — mask to the
   // base style. resolveStyleMask() inside prewarm folds absent styles.
+  // loadKernLig=false: redirected fallback strings (CJK titles, filenames)
+  // have no useful kern pairs, and the ~3KB class-table load plus per-rebuild
+  // mini-matrix build cost heap and SD time exactly where these strings live
+  // (heap-tight UI screens). The reader's PrewarmScope path keeps kern; a
+  // kern-wanting request that subset-hits a kern-free mini tops the matrix up
+  // in prewarmStyle without re-reading glyphs.
   const uint8_t styleMask = static_cast<uint8_t>(1u << (static_cast<uint8_t>(style) & 0x03));
-  sdIt->second->prewarm(text, styleMask, metadataOnly);
+  sdIt->second->prewarm(text, styleMask, metadataOnly, /*loadKernLig=*/false);
 }
 
 // Translate logical (x,y) coordinates to physical panel coordinates based on current orientation
@@ -550,18 +623,41 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
   }
 
   const uint8_t* bitmap = renderer.getGlyphBitmap(fontData, glyph);
+  if (bitmap == nullptr) return;
 
-  if (bitmap != nullptr) {
+  // One table decides which glyph level the BW base pass paints and which
+  // plane each antialiased level flags, for both output polarities. See
+  // GlyphAaPlanes.h — in particular for WHY dark mode leaves the antialiased
+  // levels unpainted instead of painting them. 2-bit glyphs only; a 1-bit
+  // glyph paints its ink with pixelState in every pass.
+  const GlyphAa::Planes aa = renderer.getGlyphAaPlanes();
+  const uint8_t baseInkMask = aa.baseInk;
+  const uint8_t planeMask = (renderMode == GfxRenderer::GRAYSCALE_MSB)   ? aa.msb
+                            : (renderMode == GfxRenderer::GRAYSCALE_LSB) ? aa.lsb
+                                                                         : 0;
+
+  // Fast path: the whole glyph in one call (GfxRenderer::drawGlyphBitmap), with
+  // the same levels, the same state and the same cell mapping as the per-pixel
+  // loops below. Those loops stay as the fallback for every case it declines.
+  {
+    glyphBitmap::Frame frame;
+    if constexpr (rotation == TextRotation::Rotated90CW) {
+      frame = {outerBase, innerBase, 0, -1, 1, 0};  // glyph x runs up, glyph y runs right
+    } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+      frame = {outerBase, innerBase, 0, 1, -1, 0};  // glyph x runs down, glyph y runs left
+    } else {
+      frame = {innerBase, outerBase, 1, 0, 0, 1};
+    }
+    const bool bwPass = renderMode == GfxRenderer::BW;
+    const uint8_t rawLevels = glyphBitmap::rawLevels(bwPass ? baseInkMask : planeMask);
+    const bool clearBits = (!is2Bit || bwPass) ? pixelState : false;
+    if (renderer.drawGlyphBitmap(bitmap, width, height, frame, deviceSpace, is2Bit, rawLevels, clearBits)) {
+      return;
+    }
+  }
+
+  {  // Per-pixel fallback: the loops as they were before the fast path.
     if (is2Bit) {
-      // One table decides which glyph level the BW base pass paints and which
-      // plane each antialiased level flags, for both output polarities. See
-      // GlyphAaPlanes.h — in particular for WHY dark mode leaves the
-      // antialiased levels unpainted instead of painting them.
-      const GlyphAa::Planes aa = renderer.getGlyphAaPlanes();
-      const uint8_t baseInkMask = aa.baseInk;
-      const uint8_t planeMask = (renderMode == GfxRenderer::GRAYSCALE_MSB)   ? aa.msb
-                                : (renderMode == GfxRenderer::GRAYSCALE_LSB) ? aa.lsb
-                                                                             : 0;
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
         const int outerCoord = (rotation == TextRotation::Rotated90CCW) ? (outerBase - glyphY) : (outerBase + glyphY);
@@ -702,6 +798,65 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
   }
 }
 
+// Equivalence with the per-pixel loops, case by case (each is what drawPixel /
+// drawPixelDevice does per pixel, hoisted):
+//   * rotation: rotateCoordinates is an orthogonal affine map, so rotating the
+//     origin and its two unit neighbors gives the exact physical position of
+//     every glyph pixel as origin + gx * dx + gy * dy;
+//   * bounds: the whole cell is tested once and an off-panel glyph is declined,
+//     so the per-pixel test could never have failed for a glyph drawn here;
+//   * strip band: draw() clips to [originY, originY + rows) of getWriteTarget(),
+//     the same band drawPixel tests, and addresses the same byte and bit;
+//   * dirty rect: drawPixel marks each pixel it paints. The cell rect marked
+//     here contains all of them (the rect only ever over-reports, which
+//     GfxRenderer.h documents as safe). A pass that paints no level marks
+//     nothing, as before.
+bool GfxRenderer::drawGlyphBitmap(const uint8_t* bitmap, const int width, const int height,
+                                  const glyphBitmap::Frame& frame, const bool deviceSpace, const bool twoBit,
+                                  const uint8_t rawLevels, const bool clearBits) const {
+#ifdef GFX_GLYPH_FASTPATH_TOGGLE
+  if (!glyphFastPathEnabled) return false;
+#endif
+#if CROSSPOINT_RENDER_SCALE > 1
+  // A logical pixel is an S x S block of device pixels here; only S == 1 is
+  // the same as one device pixel.
+  if (!deviceSpace && cp::renderScale() != 1) return false;
+#else
+  (void)deviceSpace;
+#endif
+  if (width <= 0 || height <= 0) return true;  // the loops draw nothing either
+
+  glyphBitmap::Target target{getWriteTarget(), panelWidth, panelWidthBytes, getWriteOriginY(), getWriteRows(), {}};
+  glyphBitmap::Frame& physical = target.frame;
+  rotateCoordinates(orientation, frame.x, frame.y, &physical.x, &physical.y, panelWidth, panelHeight);
+  int nextX, nextY;
+  rotateCoordinates(orientation, frame.x + frame.dxX, frame.y + frame.dxY, &nextX, &nextY, panelWidth, panelHeight);
+  physical.dxX = nextX - physical.x;
+  physical.dxY = nextY - physical.y;
+  rotateCoordinates(orientation, frame.x + frame.dyX, frame.y + frame.dyY, &nextX, &nextY, panelWidth, panelHeight);
+  physical.dyX = nextX - physical.x;
+  physical.dyY = nextY - physical.y;
+
+  // The glyph cell's opposite corner, then its inclusive physical box.
+  const int farX = physical.x + (width - 1) * physical.dxX + (height - 1) * physical.dyX;
+  const int farY = physical.y + (width - 1) * physical.dxY + (height - 1) * physical.dyY;
+  const int x0 = std::min(physical.x, farX);
+  const int x1 = std::max(physical.x, farX);
+  const int y0 = std::min(physical.y, farY);
+  const int y1 = std::max(physical.y, farY);
+  if (x0 < 0 || y0 < 0 || x1 >= panelWidth || y1 >= panelHeight) return false;
+
+  if (twoBit && rawLevels == 0) return true;  // this pass paints no level of a 2-bit glyph
+
+#ifdef GFX_GLYPH_FASTPATH_TOGGLE
+  glyphFastPathGlyphs++;
+#endif
+  markDirtyRect(x0, y0, x1, y1);
+  glyphBitmap::draw(bitmap, width, height, twoBit, rawLevels, clearBits, target,
+                    glyphBitmap::Clip{0, 0, width, height});
+  return true;
+}
+
 int GfxRenderer::getTextWidth(const int fontId, const char* text, const EpdFontFamily::Style style,
                               const BidiUtils::BidiBaseDir baseDir) const {
   if (text == nullptr || *text == '\0') {
@@ -752,7 +907,15 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   std::string visual;
   const char* renderedText = resolveVisualText(text, visual, baseDir);
 
-  const int yPos = y + getFontAscenderSize(resolvedFontId);
+  // Baseline from the resolved font; when the string was redirected to the
+  // fallback, the caller positioned this line with the REQUESTED font's
+  // metrics (row bands, icon centering), so center the fallback's line box
+  // inside the requested font's line box instead of letting a taller/shorter
+  // fallback hang below or float above the row's visual center.
+  int yPos = y + getFontAscenderSize(resolvedFontId);
+  if (resolvedFontId != fontId) {
+    yPos += (getLineHeight(fontId) - getLineHeight(resolvedFontId)) / 2;
+  }
   int lastBaseX = x;
   int lastBaseLeft = 0;
   int lastBaseWidth = 0;
@@ -1270,6 +1433,7 @@ void GfxRenderer::fillRectImpl(const int x, const int y, const int width, const 
   const int phyX1 = std::max(paX, pbX);  // inclusive
   int phyY0 = std::min(paY, pbY);
   int phyY1 = std::max(paY, pbY);
+  if (!_stripActive) markDirtyRect(phyX0, phyY0, phyX1, phyY1);
 
   // Strip mode: clip Y range to the active band and redirect writes.
   uint8_t* target = getWriteTarget();
@@ -1754,6 +1918,10 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, co
       break;
   }
   // TODO: Rotate bits
+  // HalDisplay writes the framebuffer directly; mark the whole panel rather than
+  // re-derive its rotated rectangle here (an icon blit is rare and small, and
+  // over-reporting only costs the window).
+  markAllDirty();
   display.drawImage(bitmap, rotatedX, rotatedY, width, height);
 #endif
 }
@@ -1821,15 +1989,16 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
   // Calculate output row size (2 bits per pixel, packed into bytes)
   // IMPORTANT: Use int, not uint8_t, to avoid overflow for images > 1020 pixels wide
   const int outputRowSize = (bitmap.getWidth() + 3) / 4;
-  auto* outputRow = static_cast<uint8_t*>(malloc(outputRowSize));
-  auto* rowBytes = static_cast<uint8_t*>(malloc(bitmap.getRowBytes()));
-
-  if (!outputRow || !rowBytes) {
+  // One scratch block for both rows (output row, then the raw BMP row): one
+  // heap allocation per image instead of two.
+  const auto rowBytesSize = static_cast<size_t>(bitmap.getRowBytes());
+  auto rowScratch = makeUniqueNoThrow<uint8_t[]>(static_cast<size_t>(outputRowSize) + rowBytesSize);
+  if (!rowScratch) {
     LOG_ERR("GFX", "!! Failed to allocate BMP row buffers");
-    free(outputRow);
-    free(rowBytes);
     return;
   }
+  auto* outputRow = rowScratch.get();
+  auto* rowBytes = rowScratch.get() + outputRowSize;
 
   for (int bmpY = 0; bmpY < (bitmap.getHeight() - cropPixY); bmpY++) {
     // The BMP's (0, 0) is the bottom-left corner (if the height is positive, top-left if negative).
@@ -1845,8 +2014,6 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
 
     if (bitmap.readNextRow(outputRow, rowBytes) != BmpReaderError::Ok) {
       LOG_ERR("GFX", "Failed to read row %d from bitmap", bmpY);
-      free(outputRow);
-      free(rowBytes);
       return;
     }
 
@@ -1884,9 +2051,6 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
     }
   }
 
-  free(outputRow);
-  free(rowBytes);
-
   // Bounding box actually painted above: the loops walk `source` pixels and map
   // pixel i to floor(i * scale), so the last one lands at floor((source-1)*scale).
   const int sourceWidth = bitmap.getWidth() - cropPixX * 2;
@@ -1912,22 +2076,19 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
 
   // For 1-bit BMP, output is still 2-bit packed (for consistency with readNextRow)
   const int outputRowSize = (bitmap.getWidth() + 3) / 4;
-  auto* outputRow = static_cast<uint8_t*>(malloc(outputRowSize));
-  auto* rowBytes = static_cast<uint8_t*>(malloc(bitmap.getRowBytes()));
-
-  if (!outputRow || !rowBytes) {
+  const auto rowBytesSize = static_cast<size_t>(bitmap.getRowBytes());
+  auto rowScratch = makeUniqueNoThrow<uint8_t[]>(static_cast<size_t>(outputRowSize) + rowBytesSize);
+  if (!rowScratch) {
     LOG_ERR("GFX", "!! Failed to allocate 1-bit BMP row buffers");
-    free(outputRow);
-    free(rowBytes);
     return;
   }
+  auto* outputRow = rowScratch.get();
+  auto* rowBytes = rowScratch.get() + outputRowSize;
 
   for (int bmpY = 0; bmpY < bitmap.getHeight(); bmpY++) {
     // Read rows sequentially using readNextRow
     if (bitmap.readNextRow(outputRow, rowBytes) != BmpReaderError::Ok) {
       LOG_ERR("GFX", "Failed to read row %d from 1-bit bitmap", bmpY);
-      free(outputRow);
-      free(rowBytes);
       return;
     }
 
@@ -1961,9 +2122,6 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
       // White pixels (val == 3) are not drawn (leave background)
     }
   }
-
-  free(outputRow);
-  free(rowBytes);
 
   const int renderedWidth =
       isScaled ? static_cast<int>(std::floor((bitmap.getWidth() - 1) * scale)) + 1 : bitmap.getWidth();
@@ -2000,6 +2158,7 @@ void GfxRenderer::preserveImagePolarity(const int x, const int y, const int widt
   const int top = std::max(0, std::min(ay, by));
   const int bottom = std::min(static_cast<int>(panelHeight) - 1, std::max(ay, by));
   if (left > right || top > bottom) return;
+  markDirtyRect(left, top, right, bottom);
 
   // MSB-first within a byte, so column c is bit (7 - (c & 7)). Head and tail
   // masks cover only the in-rect bits of the first and last byte; everything
@@ -2165,7 +2324,7 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
     if (minY < 0) minY = 0;
     if (maxY >= getScreenHeight() * S) maxY = getScreenHeight() * S - 1;
 
-    auto* nodeX = static_cast<int*>(malloc(numPoints * sizeof(int)));
+    auto nodeX = makeUniqueNoThrow<int[]>(numPoints);
     if (!nodeX) {
       LOG_ERR("GFX", "!! Failed to allocate polygon node buffer");
       return;
@@ -2181,7 +2340,7 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
         }
         j = i;
       }
-      std::sort(nodeX, nodeX + nodes);
+      std::sort(nodeX.get(), nodeX.get() + nodes);
       for (int i = 0; i < nodes - 1; i += 2) {
         int startX = nodeX[i];
         int endX = nodeX[i + 1];
@@ -2193,7 +2352,6 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
       }
     }
 
-    free(nodeX);
     return;
   }
 #endif
@@ -2210,7 +2368,7 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
   if (maxY >= getScreenHeight()) maxY = getScreenHeight() - 1;
 
   // Allocate node buffer for scanline algorithm
-  auto* nodeX = static_cast<int*>(malloc(numPoints * sizeof(int)));
+  auto nodeX = makeUniqueNoThrow<int[]>(numPoints);
   if (!nodeX) {
     LOG_ERR("GFX", "!! Failed to allocate polygon node buffer");
     return;
@@ -2234,7 +2392,7 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
     }
 
     // Sort nodes by X
-    std::sort(nodeX, nodeX + nodes);
+    std::sort(nodeX.get(), nodeX.get() + nodes);
 
     // Fill between pairs of nodes
     for (int i = 0; i < nodes - 1; i += 2) {
@@ -2251,8 +2409,6 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
       }
     }
   }
-
-  free(nodeX);
 }
 
 // For performance measurement (using static to allow "const" methods)
@@ -2339,8 +2495,21 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   // thirds of the panel. So this is an offer, not an instruction, and a panel
   // with no windowed path (supportsWindowedRefresh() false) never sees it.
   const int panelArea = static_cast<int>(panelWidth) * static_cast<int>(panelHeight);
-  if (refreshMode == HalDisplay::FAST_REFRESH && !_dirtyAll && !_stripActive &&
-      _dirtyBottom >= _dirtyTop && _dirtyRight >= _dirtyLeft && display.supportsWindowedRefresh()) {
+  if (refreshMode == HalDisplay::FAST_REFRESH && !_dirtyAll && !_stripActive && _dirtyBottom >= _dirtyTop &&
+      _dirtyRight >= _dirtyLeft && display.supportsWindowedRefresh()) {
+    // Widen the window to every tile whose content actually changed: the
+    // hashes see writes the dirty rect may not (a writer that forgot to mark),
+    // so the window can only grow toward the truth. Untrusted baseline (a gray
+    // pass, a polarity change): no widening, the dirty rect stands alone.
+    const bool baselineTrusted = _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
+    int minTx, minTy, maxTx, maxTy;
+    const int changedTiles = rehashTiles(minTx, minTy, maxTx, maxTy);
+    if (baselineTrusted && changedTiles > 0) {
+      _dirtyLeft = std::min(_dirtyLeft, minTx * TILE_W_BYTES * 8);
+      _dirtyTop = std::min(_dirtyTop, minTy * TILE_H);
+      _dirtyRight = std::max(_dirtyRight, std::min(static_cast<int>(panelWidth), (maxTx + 1) * TILE_W_BYTES * 8) - 1);
+      _dirtyBottom = std::max(_dirtyBottom, std::min(static_cast<int>(panelHeight), (maxTy + 1) * TILE_H) - 1);
+    }
     const int w = _dirtyRight - _dirtyLeft + 1;
     const int h = _dirtyBottom - _dirtyTop + 1;
     // Area, not either edge on its own. In Portrait a line of text is narrow in
@@ -2349,13 +2518,11 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
     if (w * h * 3 <= panelArea * 2) {
       display.displayWindow(static_cast<uint16_t>(_dirtyLeft), static_cast<uint16_t>(_dirtyTop),
                             static_cast<uint16_t>(w), static_cast<uint16_t>(h), fadingFix);
-      // The tiles must follow what this window put on the glass (a popup, a
-      // typed line), or the next whole-screen redraw diffs against the frame
-      // from BEFORE it and leaves the popup standing (adversarial review
+      // The tiles were rehashed above, so they follow what this window put on
+      // the glass (a popup, a typed line) -- or the next whole-screen redraw
+      // would diff against the frame from BEFORE it (adversarial review
       // 2026-11-07, finding 1). Partial: gray outside the window is still
       // there, so the gray flag is left as it was.
-      int a, b, c, d;
-      rehashTiles(a, b, c, d);
       noteFramePresented(/*wholeFrame=*/false);
       resetDirty();
       return;
@@ -2366,8 +2533,7 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   // against what the glass shows. See _tileHash in GfxRenderer.h.
   if (refreshMode == HalDisplay::FAST_REFRESH && _dirtyAll && !_stripActive && frameBuffer &&
       display.supportsWindowedRefresh()) {
-    const bool baselineTrusted =
-        _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
+    const bool baselineTrusted = _tileHashValid && !_grayShownSinceHash && _tileHashInverted == display.isInverted();
     int minTx, minTy, maxTx, maxTy;
     const int changed = rehashTiles(minTx, minTy, maxTx, maxTy);
     if (baselineTrusted && changed == 0) {
@@ -2459,9 +2625,13 @@ void GfxRenderer::displayBufferAsync(const HalDisplay::RefreshMode refreshMode) 
     noteFramePresented();
     return;
   }
-  display.displayBufferAsync(refreshMode);
+  // Hashed BEFORE the call: the async present leaves the framebuffer flipped
+  // to panel polarity until waitRefreshComplete() in dark mode
+  // (HalDisplay::displayBufferAsync), and hashing it then recorded the flipped
+  // frame (P0/P1 sweep 2026-11-07, sub-threshold).
   int a, b, c, d;
   rehashTiles(a, b, c, d);
+  display.displayBufferAsync(refreshMode);
   noteFramePresented();
 }
 
@@ -2497,6 +2667,7 @@ void GfxRenderer::writeFramebufferRegion(int x, int y, int w, int h, const uint8
   if (!mem.valid) return;
 
   const size_t rowBytes = mem.w / 8;  // exact: mem.w is a multiple of 8
+  markDirtyRect(mem.x, mem.y, mem.x + mem.w - 1, mem.y + mem.h - 1);
 
   for (uint16_t row = 0; row < mem.h; ++row) {
     const uint8_t* srcRow = src + (static_cast<size_t>(row) * rowBytes);
@@ -2518,11 +2689,38 @@ std::string GfxRenderer::truncatedText(const int fontId, const char* text, const
     return item;
   }
 
-  while (!item.empty() && getTextWidth(fontId, (item + ellipsis).c_str(), style) >= maxWidth) {
-    utf8RemoveLastChar(item);
+  size_t charCount = 0;
+  for (const unsigned char c : item) {
+    if ((c & 0xC0) != 0x80) ++charCount;
   }
 
-  return item.empty() ? ellipsis : item + ellipsis;
+  std::string candidate;
+  candidate.reserve(item.size() + 3);
+  const auto setCandidate = [&](const size_t characterCount) {
+    size_t end = 0;
+    for (size_t count = 0; end < item.size() && count < characterCount; ++count) {
+      ++end;
+      while (end < item.size() && (static_cast<unsigned char>(item[end]) & 0xC0) == 0x80) ++end;
+    }
+    candidate.assign(item.data(), end);
+    candidate += ellipsis;
+  };
+
+  // Binary search avoids repeatedly measuring nearly the entire long title.
+  size_t low = 0;
+  size_t high = charCount;
+  while (low < high) {
+    const size_t mid = low + (high - low + 1) / 2;
+    setCandidate(mid);
+    if (getTextWidth(fontId, candidate.c_str(), style) < maxWidth) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  setCandidate(low);
+  return candidate;
 }
 
 std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* text, const int maxWidth,
@@ -2737,6 +2935,7 @@ bool GfxRenderer::copyBufferToRegion(int lx, int ly, int lw, int lh, const uint8
   const int rowCount = y1 - y0 + 1;
   const size_t needed = static_cast<size_t>(bytesPerRow) * static_cast<size_t>(rowCount);
   if (bufSize < needed || !frameBuffer || !buf) return false;
+  markDirtyRect(byteX0 * 8, y0, byteX1 * 8 + 7, y1);
   for (int row = 0; row < rowCount; row++) {
     uint8_t* dst = frameBuffer + (y0 + row) * panelWidthBytes + byteX0;
     memcpy(dst, buf + row * bytesPerRow, bytesPerRow);
@@ -2749,7 +2948,7 @@ int GfxRenderer::getSpaceWidth(const int fontId, const EpdFontFamily::Style styl
   auto sdIt = sdCardFonts_.find(fontId);
   if (sdIt != sdCardFonts_.end() && sdIt->second->hasAdvanceTable()) {
     const uint8_t resolvedStyle = resolveSdCardStyle(*sdIt->second, style);
-    return fp4::toPixel(sdIt->second->getAdvance(' ', resolvedStyle));
+    return fp4::toPixel(getSdCardSpaceAdvance(*sdIt->second, resolvedStyle));
   }
 
   const auto fontIt = fontMap.find(fontId);
@@ -2772,7 +2971,7 @@ int GfxRenderer::getSpaceAdvance(const int fontId, const uint32_t leftCp, const 
   auto sdIt = sdCardFonts_.find(fontId);
   if (sdIt != sdCardFonts_.end() && sdIt->second->hasAdvanceTable()) {
     const uint8_t resolvedStyle = resolveSdCardStyle(*sdIt->second, style);
-    const int32_t spaceFP = sdIt->second->getAdvance(' ', resolvedStyle);
+    const int32_t spaceFP = getSdCardSpaceAdvance(*sdIt->second, resolvedStyle);
     const int32_t kernFP = static_cast<int32_t>(sdIt->second->getMeasureKern(leftCp, ' ', resolvedStyle)) +
                            static_cast<int32_t>(sdIt->second->getMeasureKern(' ', rightCp, resolvedStyle));
     return fp4::toPixel(spaceFP + kernFP);
@@ -3154,6 +3353,15 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
   // Route CJK-bearing strings to the fallback font (see resolveTextFontId).
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  // A scan pass draws nothing, exactly as drawText's does: it only records the
+  // text for the prewarm. Without this, the idle prewarm of the NEXT page
+  // painted its rotated table text into the framebuffer of the page on screen,
+  // where the next windowed present could put it on the glass (fork survey
+  // 2026-11-07, via Xerif 26d66ca2f9).
+  if (fontCacheManager_ && fontCacheManager_->isScanning()) {
+    fontCacheManager_->recordText(text, resolvedFontId, style);
+    return;
+  }
   // Redirected to the SD fallback: batch-load the string's glyphs so the draw
   // loop below doesn't fault them in one SD read at a time (#2725).
   if (resolvedFontId != fontId) {
@@ -3259,6 +3467,15 @@ void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int 
 
   // Route CJK-bearing strings to the fallback font (see resolveTextFontId).
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  // A scan pass draws nothing, exactly as drawText's does: it only records the
+  // text for the prewarm. Without this, the idle prewarm of the NEXT page
+  // painted its rotated table text into the framebuffer of the page on screen,
+  // where the next windowed present could put it on the glass (fork survey
+  // 2026-11-07, via Xerif 26d66ca2f9).
+  if (fontCacheManager_ && fontCacheManager_->isScanning()) {
+    fontCacheManager_->recordText(text, resolvedFontId, style);
+    return;
+  }
   // Redirected to the SD fallback: batch-load the string's glyphs so the draw
   // loop below doesn't fault them in one SD read at a time (#2725).
   if (resolvedFontId != fontId) {
@@ -3466,6 +3683,7 @@ void GfxRenderer::restoreBwBuffer() {
     return;
   }
 
+  markAllDirty();
   for (size_t i = 0; i < bwBufferChunks.size(); i++) {
     const size_t offset = i * BW_BUFFER_CHUNK_SIZE;
     const size_t chunkSize = std::min(BW_BUFFER_CHUNK_SIZE, static_cast<size_t>(frameBufferSize - offset));

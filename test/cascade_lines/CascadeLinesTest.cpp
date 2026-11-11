@@ -101,6 +101,8 @@ struct Line {
   int x;
   int y;
   CssTextAlign alignment;
+  bool rtl = false;
+  bool anySup = false;
 };
 
 std::string writeTemp(const char* pattern, const std::string& contents) {
@@ -141,7 +143,7 @@ class LoadedCss {
       ADD_FAILURE() << "could not reopen the stylesheet fixture";
       return;
     }
-    if (!parser_.loadFromStream(f)) ADD_FAILURE() << "loadFromStream failed";
+    if (parser_.loadFromStream(f) != CssParser::ParseResult::Complete) ADD_FAILURE() << "loadFromStream failed";
   }
   ~LoadedCss() {
     if (!path_.empty()) ::remove(path_.c_str());
@@ -171,15 +173,18 @@ std::vector<Line> layout(const std::string& bodyHtml) {
       /*justifyThresholdChars=*/autojustify::THRESHOLD_CHARS,
       [&lines](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
         for (const auto& element : page->elements) {
-          const auto line = std::dynamic_pointer_cast<PageLine>(element);
+          const auto line = dynamic_cast<const PageLine*>(element.get());
           if (!line || !line->getBlock()) continue;
           const TextBlock& block = *line->getBlock();
           std::string text;
+          bool anySup = false;
           for (uint16_t i = 0; i < block.wordCount(); i++) {
             if (!text.empty()) text += ' ';
             text += block.wordText(i);
+            if (block.wordStyle(i) & EpdFontFamily::SUP) anySup = true;
           }
-          lines.push_back({std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment});
+          lines.push_back({std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment,
+                           block.getBlockStyle().isRtl, anySup});
         }
       },
       /*embeddedStyle=*/true, /*contentBase=*/"", /*imageBasePath=*/"",
@@ -200,10 +205,15 @@ int lineHeight() {
 // Single-token markers so each line is findable by one word.
 std::string cascade(const bool withJoin) {
   const std::string join = withJoin ? " cascade-join" : "";
-  return "<p class=\"cascade-line" + join + "\">Alpha begins here</p>"
-         "<p class=\"cascade-line cascade-d1 cascade-cont" + join + "\">bravo steps in</p>"
+  return "<p class=\"cascade-line" + join +
+         "\">Alpha begins here</p>"
+         "<p class=\"cascade-line cascade-d1 cascade-cont" +
+         join +
+         "\">bravo steps in</p>"
          "<p class=\"cascade-line cascade-d2 cascade-cont\">charlie ends it.</p>"
-         "<p class=\"cascade-line" + join + "\">Delta opens another</p>"
+         "<p class=\"cascade-line" +
+         join +
+         "\">Delta opens another</p>"
          "<p class=\"cascade-line cascade-d1 cascade-cont\">echo closes.</p>";
 }
 
@@ -272,3 +282,140 @@ TEST(CascadeLines, DepthClassesIndentByTheStylesheetsEmSteps) {
 }
 
 }  // namespace
+
+// --- Paragraph base direction (upstream ce6c6cbce, section v72) -------------
+// An inline element's direction must not replace its paragraph's: a Hebrew
+// paragraph that OPENS with an English term (a common shape in technical
+// books) stays RTL. Before the port, the empty block took the span's ltr as
+// the paragraph direction, so the whole paragraph was set left-to-right.
+
+TEST(ParagraphDirection, AnOpeningLtrSpanDoesNotFlipAnRtlParagraph) {
+  const auto lines = layout(
+      "<p dir=\"rtl\"><span dir=\"ltr\">CSS</span> \xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D "
+      "\xD7\xA2\xD7\x95\xD7\x9C\xD7\x9D</p>");
+  ASSERT_FALSE(lines.empty());
+  for (const Line& l : lines) EXPECT_TRUE(l.rtl) << l.text;
+}
+
+TEST(ParagraphDirection, BodyDirStillSetsTheParagraphDirection) {
+  const auto lines = layout("<div dir=\"rtl\"><span>plain</span> words</div>");
+  ASSERT_FALSE(lines.empty());
+  for (const Line& l : lines) EXPECT_TRUE(l.rtl) << l.text;
+}
+
+// Deliberately NOT asserted: "<p>Alpha <span dir=rtl>HEBREW</span> omega</p>"
+// comes out RTL. That is ParsedText's paragraph auto-detection
+// (ParsedText.cpp, RTL_PARAGRAPH_PROBE_WORDS = 3, from upstream f5bc554ae): an
+// undirected paragraph whose first three words include one starting RTL is
+// set RTL, so an unmarked Hebrew paragraph that opens with an English term
+// reads correctly. Its price is an English paragraph with a Hebrew word among
+// its first three. Recorded in docs/fork-sync.md (batch 4), not changed here.
+
+// --- Footnote links keep vertical-align (upstream badfa95ff, section v73) ---
+// The internal-link branch returns before the generic inline path, so it lost
+// `vertical-align: super`, and footnote markers rendered at body size.
+
+TEST(FootnoteLinkStyle, AnInternalLinksSuperscriptIsKept) {
+  const auto lines = layout("<p>Body text<a href=\"#fn1\" style=\"vertical-align: super\">1</a> continues.</p>");
+  ASSERT_FALSE(lines.empty());
+  bool sawSup = false;
+  for (const Line& l : lines) sawSup = sawSup || l.anySup;
+  EXPECT_TRUE(sawSup);
+}
+
+TEST(FootnoteLinkStyle, APlainInternalLinkIsNotSuperscript) {
+  const auto lines = layout("<p>See <a href=\"#ch2\">chapter two</a> next.</p>");
+  ASSERT_FALSE(lines.empty());
+  for (const Line& l : lines) EXPECT_FALSE(l.anySup) << l.text;
+}
+
+// --- The HTML hidden attribute (upstream 6eda8f0b7, section v75) ------------
+
+TEST(HiddenAttribute, AHiddenElementLaysOutNothing) {
+  const auto lines =
+      layout("<p>Shown words</p><p hidden=\"hidden\">Secret words</p><div hidden=\"\">More secret</div>");
+  ASSERT_FALSE(lines.empty());
+  for (const Line& l : lines) {
+    EXPECT_EQ(l.text.find("Secret"), std::string::npos) << l.text;
+    EXPECT_EQ(l.text.find("secret"), std::string::npos) << l.text;
+  }
+}
+
+// --- A skipped (display:none) block must not pop its parent's style ---------
+// A display:none element pushes nothing when it opens, so its close must not
+// pop the block style, list or inline state of the element around it.
+
+int xOf(const std::vector<Line>& lines, const char* word) {
+  for (const Line& l : lines)
+    if (l.text.find(word) != std::string::npos) return l.x;
+  return -1;
+}
+
+TEST(SkippedBlock, AHiddenParagraphKeepsItsContainersIndent) {
+  const int control = xOf(layout("<div class=\"cascade-d1\"><p>after</p></div>"), "after");
+  ASSERT_GE(control, 0);
+  EXPECT_EQ(control, xOf(layout("<div class=\"cascade-d1\"><p hidden=\"\">x</p><p>after</p></div>"), "after"));
+  EXPECT_EQ(control,
+            xOf(layout("<div class=\"cascade-d1\"><p style=\"display:none\">x</p><p>after</p></div>"), "after"));
+}
+
+TEST(SkippedBlock, AHiddenSubtreeWithBlocksKeepsItsContainersIndent) {
+  const int control = xOf(layout("<div class=\"cascade-d1\"><p>after</p></div>"), "after");
+  ASSERT_GE(control, 0);
+  EXPECT_EQ(control, xOf(layout("<div class=\"cascade-d1\"><div hidden=\"\"><p>a</p><p>b</p></div>"
+                                "<p>after</p></div>"),
+                         "after"));
+}
+
+TEST(SkippedBlock, AHiddenNestedListDoesNotEndItsParentList) {
+  const auto lines =
+      layout("<ol><li>one</li><li>two<ol style=\"display:none\"><li>x</li></ol></li><li>three</li></ol>");
+  bool sawThree = false;
+  for (const Line& l : lines)
+    if (l.text.find("three") != std::string::npos) {
+      sawThree = true;
+      EXPECT_EQ(0u, l.text.find("3.")) << l.text;
+    }
+  EXPECT_TRUE(sawThree);
+}
+
+// --- list-style-type: none (upstream 2b2ba72f0, section v77) ---------------
+
+std::string lineWith(const std::vector<Line>& lines, const char* word) {
+  for (const Line& l : lines)
+    if (l.text.find(word) != std::string::npos) return l.text;
+  return {};
+}
+
+TEST(ListStyleNone, TheLonghandDropsTheMarker) {
+  const auto lines = layout("<ul style=\"list-style-type: none\"><li>alpha item</li></ul>");
+  EXPECT_EQ("alpha item", lineWith(lines, "alpha"));
+}
+
+TEST(ListStyleNone, TheShorthandDropsTheMarker) {
+  const auto lines = layout("<ol style=\"list-style: none\"><li>beta item</li><li>gamma item</li></ol>");
+  EXPECT_EQ("beta item", lineWith(lines, "beta"));
+  EXPECT_EQ("gamma item", lineWith(lines, "gamma"));
+}
+
+TEST(ListStyleNone, AnOrdinaryListKeepsItsMarkers) {
+  const auto lines =
+      layout("<ol><li>delta item</li></ol><ul style=\"list-style: square inside\"><li>eps item</li></ul>");
+  EXPECT_EQ(0u, lineWith(lines, "delta").find("1."));
+  EXPECT_EQ(0u, lineWith(lines, "eps").find("\xe2\x80\xa2"));
+}
+
+// A hidden <rt>: the </rt> and </ruby> branches returned before the "leaving
+// skip" reset, so skipUntilDepth stayed stale. Later text at that depth was
+// dropped and the next close at that depth was read as skipped (adversarial
+// review 2026-11-08, F1).
+TEST(SkippedBlock, AHiddenRubyTextDoesNotSwallowWhatFollows) {
+  for (const char* rt : {"<rt hidden=\"\">kan</rt>", "<rt style=\"display:none\">kan</rt>"}) {
+    const std::string html =
+        std::string("<p>alpha<ruby>X") + rt +
+        "</ruby>beta</p><div class=\"cascade-d1\"><div><p>lostpara</p></div></div><p>afterpara</p>";
+    const auto lines = layout(html);
+    EXPECT_GE(xOf(lines, "lostpara"), 0) << rt;
+    EXPECT_EQ(0, xOf(lines, "afterpara")) << rt;
+  }
+}

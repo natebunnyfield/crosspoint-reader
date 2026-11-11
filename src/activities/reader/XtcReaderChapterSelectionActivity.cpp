@@ -3,15 +3,21 @@
 #include <GfxRenderer.h>
 #include <I18n.h>
 
+#include <vector>
+
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
-int XtcReaderChapterSelectionActivity::getPageItems() const {
-  return UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, false);
-}
+namespace fui = freeink::ui;
 
-int XtcReaderChapterSelectionActivity::findChapterIndexForPage(uint32_t page) const {
+XtcReaderChapterSelectionActivity::XtcReaderChapterSelectionActivity(GfxRenderer& renderer,
+                                                                     MappedInputManager& mappedInput,
+                                                                     const std::shared_ptr<Xtc>& xtc,
+                                                                     const uint32_t currentPage)
+    : UiListActivity("XtcReaderChapterSelection", renderer, mappedInput), xtc(xtc), currentPage(currentPage) {}
+
+int XtcReaderChapterSelectionActivity::findChapterIndexForPage(const uint32_t page) const {
   if (!xtc) {
     return 0;
   }
@@ -26,133 +32,84 @@ int XtcReaderChapterSelectionActivity::findChapterIndexForPage(uint32_t page) co
 }
 
 void XtcReaderChapterSelectionActivity::onEnter() {
-  Activity::onEnter();
+  UiListActivity::onEnter();
 
   if (!xtc) {
     return;
   }
 
-  selectorIndex = findChapterIndexForPage(currentPage);
-
-  requestUpdate();
+  // Open on the current chapter, which may sit past the first page; the first
+  // screen build pulls the viewport to it (ListNav follow-on-build).
+  nav.selected = findChapterIndexForPage(currentPage);
 }
 
-void XtcReaderChapterSelectionActivity::onExit() { Activity::onExit(); }
+void XtcReaderChapterSelectionActivity::describeRow(const int index, ListRow& row) const {
+  const auto& chapter = xtc->getChapters()[index];
+  row.title = chapter.name.empty() ? std::string(tr(STR_UNNAMED)) : chapter.name;
+}
 
-void XtcReaderChapterSelectionActivity::loop() {
-  const int pageItems = getPageItems();
-  const int totalItems = static_cast<int>(xtc->getChapters().size());
+void XtcReaderChapterSelectionActivity::activateIndex(const int index) {
+  // The activated row leaves this screen (finish); a lingering flash would
+  // gray an unrelated element on the next render.
+  app.clearTapFlash();
+  const auto& chapters = xtc->getChapters();
+  if (!chapters.empty() && index >= 0 && index < static_cast<int>(chapters.size())) {
+    nav.selected = index;
+    setResult(PageResult{chapters[index].startPage});
+    finish();
+  }
+}
 
+bool XtcReaderChapterSelectionActivity::handleButtons() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     ActivityResult result;
     result.isCancelled = true;
     setResult(std::move(result));
     finish();
-    return;
+    return true;
   }
 
-  auto selectChapter = [this] {
-    const auto& chapters = xtc->getChapters();
-    if (!chapters.empty() && selectorIndex >= 0 && selectorIndex < static_cast<int>(chapters.size())) {
-      setResult(PageResult{chapters[selectorIndex].startPage});
-      finish();
-    }
-  };
-
-  auto metrics = UITheme::getInstance().getMetrics();
-  Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
-  switch (handleListTouch(selectorIndex, totalItems, contentTop, contentHeight, false)) {
-    case ListTouchResult::Activated:
-      selectChapter();
-      return;
-    case ListTouchResult::Consumed:
-      return;
-    case ListTouchResult::None:
-      break;
-  }
-
-  const auto swipe = mappedInput.wasSwipe();
-  if (swipe == MappedInputManager::SwipeDir::Up) {
-    selectorIndex = ButtonNavigator::nextPageIndex(selectorIndex, totalItems, pageItems);
-    requestUpdate();
-    return;
-  }
-  if (swipe == MappedInputManager::SwipeDir::Down) {
-    selectorIndex = ButtonNavigator::previousPageIndex(selectorIndex, totalItems, pageItems);
-    requestUpdate();
-    return;
+  if (!xtc) {
+    return true;  // no book: nothing else to route this pass
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    selectChapter();
+    activateIndex(nav.selected);
+    return true;
   }
 
-  buttonNavigator.onNextPress([this, totalItems] {
-    selectorIndex = ButtonNavigator::nextIndex(selectorIndex, totalItems);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPreviousPress([this, totalItems] {
-    selectorIndex = ButtonNavigator::previousIndex(selectorIndex, totalItems);
-    requestUpdate();
-  });
-
-  buttonNavigator.onNextContinuous([this, totalItems, pageItems] {
-    selectorIndex = ButtonNavigator::nextPageIndex(selectorIndex, totalItems, pageItems);
-    requestUpdate();
-  });
-
-  buttonNavigator.onPreviousContinuous([this, totalItems, pageItems] {
-    selectorIndex = ButtonNavigator::previousPageIndex(selectorIndex, totalItems, pageItems);
-    requestUpdate();
-  });
-
-  // The SIDE pair pages by a whole screenful; the FRONT pair above steps one
-  // row. They used to be the same action (docs/ui-conventions.md, "Side buttons
-  // should page, not repeat the front buttons"). pageDown/pageUp clamp at the
-  // ends and return false when nothing moved, so a short list costs no redraw.
-  buttonNavigator.onPageNext([this, totalItems, pageItems] {
-    if (!ButtonNavigator::pageDown(selectorIndex, totalItems, pageItems)) return;
-    requestUpdate();
-  });
-
-  buttonNavigator.onPagePrevious([this, totalItems, pageItems] {
-    if (!ButtonNavigator::pageUp(selectorIndex, totalItems, pageItems)) return;
-    requestUpdate();
-  });
+  return false;
 }
 
-void XtcReaderChapterSelectionActivity::render(RenderLock&&) {
-  renderer.clearScreen();
+void XtcReaderChapterSelectionActivity::buildScreen(UiScreen& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  // Content: the safe area minus the header band drawChrome paints the title in.
+  screen.setContentMargin(
+      fui::Insets{static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
+                  static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
+                  static_cast<int16_t>(renderer.getScreenHeight() - safe.height + metrics.verticalSpacing),
+                  static_cast<int16_t>(safe.x)});
+  // The list band ends where the pre-port screen's did: verticalSpacing above
+  // the safe area's height (its contentHeight was safe.height - contentTop -
+  // verticalSpacing).
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
-  auto metrics = UITheme::getInstance().getMetrics();
-  Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-
-  GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
-                 tr(STR_SELECT_CHAPTER));
-
-  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
-
-  const auto& chapters = xtc->getChapters();
-  if (chapters.empty()) {
-    renderer.drawText(UI_10_FONT_ID, screen.x + metrics.contentSidePadding, contentTop + 20, tr(STR_NO_CHAPTERS));
-  } else {
-    GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, static_cast<int>(chapters.size()),
-                 selectorIndex, [this](int index) {
-                   const auto& item = xtc->getChapters()[index];
-                   return item.name.empty() ? std::string(tr(STR_UNNAMED)) : item.name;
-                 });
+  if (!xtc) {
+    return;
   }
+  if (listCount() == 0) {
+    drawEmptyMessage(screen, tr(STR_NO_CHAPTERS));
+    return;
+  }
+  drawRows(screen, ListLook{});
+}
 
-  // Orientation is fixed at Portrait (GfxRenderer::orientation is a
-  // constexpr), so the old LandscapeClockwise hint-suppression branch was
-  // already dead; drawButtonHints is unconditional, matching
-  // EpubReaderChapterSelectionActivity.
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
-  renderer.displayBuffer();
+void XtcReaderChapterSelectionActivity::drawChrome() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  // The theme's header, inside the safe area (docs/ui-conventions.md,
+  // "Widgets": a hand-rolled header is a defect).
+  GUI.drawHeader(renderer, Rect{safe.x, safe.y + metrics.topPadding, safe.width, metrics.headerHeight},
+                 tr(STR_SELECT_CHAPTER));
 }

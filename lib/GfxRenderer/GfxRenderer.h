@@ -25,6 +25,10 @@ class SdCardFont;
 
 #include "Bitmap.h"
 
+namespace glyphBitmap {
+struct Frame;
+}
+
 // Color representation: uint8_t mapped to 4x4 Bayer matrix dithering levels
 // 0 = transparent, 1-16 = gray levels (white to black)
 enum Color : uint8_t { Clear = 0x00, White = 0x01, LightGray = 0x05, DarkGray = 0x0A, Black = 0x10 };
@@ -154,10 +158,15 @@ class GfxRenderer {
   // the controller's PTL window addresses.
   //
   // TRACKED AT THE PIXEL WRITERS, NOT AT THE CALLERS, and that is the safety
-  // argument. There are exactly three places that write frameBuffer --
-  // drawPixel/drawPixelDevice, the hi-res glyph blit in drawText, and
-  // clearScreen/invertScreen -- so instrumenting them is complete BY
-  // CONSTRUCTION. Tracking in the ~70 displayBuffer() callers instead would
+  // argument. The writers are drawPixel/drawPixelDevice, the hi-res glyph blit
+  // in drawText, clearScreen/invertScreen -- and, missed until 2026-11-07, the
+  // rectangle writers: fillRectImpl, preserveImagePolarity,
+  // writeFramebufferRegion, copyBufferToRegion, the scale-1 drawImage and
+  // restoreBwBuffer (markDirtyRect / markAllDirty below). A NEW writer of
+  // frameBuffer must mark what it writes. Since the same date the tile hashes
+  // (below) also widen every window to the tiles that actually changed, so a
+  // writer that forgets can no longer leave stale pixels while the baseline is
+  // trusted. Tracking in the ~70 displayBuffer() callers instead would
   // mean the rect is right only if every one was found, and the failure mode of
   // missing one is a stale region: the window refreshes what someone declared
   // and silently leaves the rest. Over-reporting is safe (a full refresh);
@@ -170,7 +179,7 @@ class GfxRenderer {
   mutable int _dirtyRight = 0;
   mutable int _dirtyTop = 0;
   mutable int _dirtyBottom = 0;
-  mutable bool _dirtyAll = true;   // until something says otherwise, assume everything
+  mutable bool _dirtyAll = true;  // until something says otherwise, assume everything
 
   inline void markDirty(const int phyX, const int phyY) const {
     if (_dirtyAll) return;
@@ -178,6 +187,18 @@ class GfxRenderer {
     if (phyX > _dirtyRight) _dirtyRight = phyX;
     if (phyY < _dirtyTop) _dirtyTop = phyY;
     if (phyY > _dirtyBottom) _dirtyBottom = phyY;
+  }
+  // A rectangle written in one go (fills, image blits, region copies), physical
+  // and inclusive. These writers bypass drawPixel, and before 2026-11-07 they
+  // marked nothing: a popup box drawn over a showing screen was windowed to its
+  // TEXT and its frame left unrefreshed (P0/P1 sweep 2026-11-07, reproduced
+  // under ASan on the X3 panel). Over-reporting is safe; missing one is not.
+  inline void markDirtyRect(const int x0, const int y0, const int x1, const int y1) const {
+    if (_dirtyAll) return;
+    if (x0 < _dirtyLeft) _dirtyLeft = x0;
+    if (x1 > _dirtyRight) _dirtyRight = x1;
+    if (y0 < _dirtyTop) _dirtyTop = y0;
+    if (y1 > _dirtyBottom) _dirtyBottom = y1;
   }
   // A whole-panel change: clearScreen, invertScreen, anything that cannot say
   // where it drew. Sticky until the next present.
@@ -291,6 +312,21 @@ class GfxRenderer {
   static uint32_t outOfRangeCount() { return outOfRange.count; }
 #endif
 
+#ifdef GFX_GLYPH_FASTPATH_TOGGLE
+  // Test-only: false sends every glyph down renderCharImpl's per-pixel loops,
+  // so one binary can render the same text both ways and compare the frames,
+  // the dirty rect and the out-of-range count (test/glyph_bitmap). Not
+  // compiled on device.
+  static bool glyphFastPathEnabled;
+  static uint32_t glyphFastPathGlyphs;  // glyphs drawGlyphBitmap() accepted
+  struct DirtyRectForTest {
+    bool all;
+    int left, top, right, bottom;
+  };
+  DirtyRectForTest dirtyRectForTest() const { return {_dirtyAll, _dirtyLeft, _dirtyTop, _dirtyRight, _dirtyBottom}; }
+  void resetDirtyForTest() const { resetDirty(); }
+#endif
+
   // Setup
   void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);
@@ -321,6 +357,21 @@ class GfxRenderer {
   }
   void setFontCacheManager(FontCacheManager* m) { fontCacheManager_ = m; }
   FontCacheManager* getFontCacheManager() const { return fontCacheManager_; }
+  // Batch-prewarm CJK fallback glyphs for a screenful of static strings in ONE
+  // SD pass. List screens redraw every visible row on each repaint; without an
+  // up-front batch each row's draw prewarms per-string, and under heap
+  // pressure (union merge disabled) each string evicts the previous one — SD
+  // reads on every repaint forever. Call once when the screen's strings are
+  // known (data load); later measures/draws become RAM-only subset hits.
+  // No-op when nothing routes to an SD fallback.
+  // The getter form fetches strings one at a time (allocation-free — callers
+  // must NOT build a concatenated std::string: its bare-new growth aborts on
+  // the heap-tight screens this exists for). A null getter result skips that
+  // index.
+  using TextGetter = const char* (*)(const void* ctx, uint32_t index);
+  void prewarmFallbackText(int fontId, TextGetter getter, const void* ctx, uint32_t textCount,
+                           EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  void prewarmFallbackText(int fontId, const char* text, EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   bool isFontCacheScanning() const;
   const std::map<int, EpdFontFamily>& getFontMap() const { return fontMap; }
   void registerSdCardFont(int fontId, SdCardFont* font) {
@@ -517,6 +568,20 @@ class GfxRenderer {
   // Device-coordinate form of glyphIntersectsStrip(), for the hi-res glyph path.
   bool glyphIntersectsStripDevice(int dx0, int dy0, int dx1, int dy1) const;
 #endif
+  // Per-glyph fast path for renderCharImpl (GlyphBitmap.h, upstream 04ca1d53c).
+  // Paints a packed glyph placed by `frame` (logical coordinates, or device
+  // coordinates when `deviceSpace`) exactly as drawPixel() -- drawPixelDevice()
+  // for deviceSpace -- would for each painted pixel, with the rotation, bounds,
+  // strip-band and address work done once per glyph, and marks the glyph's
+  // physical cell dirty once. `rawLevels` and `clearBits` are glyphBitmap::draw's.
+  //
+  // Returns false, having written nothing, wherever that equivalence is not
+  // proved, and the caller then runs its per-pixel loop: a glyph not wholly on
+  // the panel (so drawPixel's out-of-range log and GFX_BOUNDS_COUNTER see every
+  // pixel they saw before), and a logical glyph on a supersampled host, where
+  // drawPixel paints an S x S block.
+  bool drawGlyphBitmap(const uint8_t* bitmap, int width, int height, const glyphBitmap::Frame& frame, bool deviceSpace,
+                       bool twoBit, uint8_t rawLevels, bool clearBits) const;
   void drawLine(int x1, int y1, int x2, int y2, bool state = true) const;
   void drawLine(int x1, int y1, int x2, int y2, int lineWidth, bool state) const;
   void drawArc(int maxRadius, int cx, int cy, int xDir, int yDir, int lineWidth, bool state) const;

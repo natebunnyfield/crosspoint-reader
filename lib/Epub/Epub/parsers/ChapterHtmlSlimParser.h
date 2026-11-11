@@ -107,12 +107,12 @@ class ChapterHtmlSlimParser {
   // time, because lastExtractedLineSourceStart() has moved on by placement
   // time.
   struct PendingLine {
-    std::shared_ptr<TextBlock> line;
+    std::unique_ptr<TextBlock> line;
     uint32_t anchor;  // chapter-global source anchor of this line's first word
   };
   std::deque<PendingLine> pendingLines_;
   int paraLinesPlaced_ = 0;  // lines of the current paragraph already placed
-  void placeLineOnPage(std::shared_ptr<TextBlock> line, uint32_t anchor);
+  void placeLineOnPage(std::unique_ptr<TextBlock> line, uint32_t anchor);
   void flushPendingLines();
   // Completes the current page (if it holds anything) so the next placement
   // starts a fresh one. `anchor` is the source position the new page starts at.
@@ -126,10 +126,6 @@ class ChapterHtmlSlimParser {
   // Line Grid (2026-08-22, spec.lineGridEnabled): rounds currentPageNextY UP
   // to the next whole line-height multiple. No-op when the option is off.
   void snapToLineGrid();
-  // The y a freshly created page starts at: the chapter sinkage on the
-  // SECTION'S FIRST page (completedPageCount == 0), 0 on every later page.
-  // See the definition for the owner ruling and the sizing.
-  int16_t newPageStartY() const;
   int fontId;
   // The smallest cut of the same family, for the rotated table page (T-021).
   // Zero means "no smaller face" and the reading size is used.
@@ -162,6 +158,7 @@ class ChapterHtmlSlimParser {
     CssTextDecoration textDecoration = CssTextDecoration::None;
     bool hasDirection = false;
     CssTextDirection direction = CssTextDirection::Ltr;
+    bool setsParagraphDirection = false;
     bool hasSup = false, sup = false;
     bool hasSub = false, sub = false;
   };
@@ -292,7 +289,8 @@ class ChapterHtmlSlimParser {
   // wrapped lines return to the item's text edge, not the marker's.
   struct ListContext {
     bool ordered = false;
-    int nextValue = 1;  // number the next <li> takes (ordered lists only)
+    bool styleNone = false;  // list-style-type: none on the <ul>/<ol>: items get no marker
+    int nextValue = 1;       // number the next <li> takes (ordered lists only)
   };
   std::vector<ListContext> listStack_;
   // Set right after the marker word is added; consumed by the next
@@ -323,6 +321,8 @@ class ChapterHtmlSlimParser {
   uint32_t pageStartAnchor() const {
     return chapterSourceBytes_ + (currentTextBlock ? currentTextBlock->sourceByteCount() : 0);
   }
+  // Set at </html>: expat errors on trailing bytes after it are ignored.
+  bool htmlEnded_ = false;
 
   // Footnote link tracking
   bool insideFootnoteLink = false;
@@ -350,6 +350,7 @@ class ChapterHtmlSlimParser {
   static EpdFontFamily::Style fontStyleForTextDecoration(CssTextDecoration decoration);
   static void applyDirectionToEntry(StyleStackEntry& entry, const CssStyle& css);
   static void applyTextDecorationToEntry(StyleStackEntry& entry, const CssStyle& css);
+  static void applyVerticalAlignToEntry(StyleStackEntry& entry, const CssStyle& css);
   void pushDecorationStyleEntry(CssTextDecoration defaultDecoration, const CssStyle& cssStyle);
   void emitHorizontalRule(const BlockStyle& blockStyle);
 
@@ -427,7 +428,7 @@ class ChapterHtmlSlimParser {
   // Disarm the missing-glyph ledger and raise the note. See the .cpp.
   void reportMissingGlyphs();  // tear down without flushing (error / abandon)
 
-  void addLineToPage(std::shared_ptr<TextBlock> line);
+  void addLineToPage(std::unique_ptr<TextBlock> line);
   const std::vector<std::pair<std::string, uint16_t>>& getAnchors() const { return anchorData; }
 
   // Byte progress of the in-flight parse, used to estimate a still-building section's total page

@@ -1,6 +1,7 @@
 #include "PersistableStore.h"
 
 #include <HalStorage.h>
+#include <JsonSaveGuard.h>
 #include <Logging.h>
 #include <ObfuscationUtils.h>
 
@@ -55,9 +56,16 @@ bool PersistableStoreBase::writeDocToFile(const char* path, const JsonDocument& 
   // and this is the measurement. Both lines compile out at LOG_LEVEL 0.
   LOG_DBG("PERSIST", "save %s: before serialize maxAlloc=%u free=%u", path, ESP.getMaxAllocHeap(), ESP.getFreeHeap());
   String json;
-  serializeJson(doc, json);
+  const size_t written = serializeJson(doc, json);
   LOG_DBG("PERSIST", "save %s: json=%uB maxAlloc=%u free=%u", path, (unsigned)json.length(), ESP.getMaxAllocHeap(),
           ESP.getFreeHeap());
+  if (!jsonsave::serializedIsComplete(doc, written, json.length())) {
+    // A document that lost members, or text cut short, would replace good
+    // settings with a key-less file. Keep the old one (JsonSaveGuard.h).
+    LOG_ERR("PERSIST", "save %s refused: incomplete JSON (overflowed=%d, %u of %u bytes)", path,
+            doc.overflowed() ? 1 : 0, (unsigned)json.length(), (unsigned)measureJson(doc));
+    return false;
+  }
 
   // Identical bytes already on the card: nothing to write. The staged write
   // below is five directory operations and two FAT updates (temp create,

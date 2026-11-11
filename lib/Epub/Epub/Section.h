@@ -113,7 +113,10 @@ class Section {
   bool startBuild(const ReaderRenderSpec& spec, const std::function<void()>& popupFn = nullptr);
   // Lay out up to maxPages more pages (maxPages <= 0 = build to completion). Returns
   // false on error (the build is abandoned). Sets isBuildComplete() when finished.
-  bool buildSomeMore(int maxPages);
+  // yieldNow, when given, is asked after every parse step (1 KB of HTML); true ends
+  // the call early so the caller can serve input, and the next call resumes where
+  // this one stopped (fork survey #12, upstream f8936ba67c's early stop only).
+  bool buildSomeMore(int maxPages, bool (*yieldNow)() = nullptr);
   bool isBuilding() const { return static_cast<bool>(build_); }
   bool isBuildComplete() const { return buildComplete_; }
   // Best-known total page count: the exact pageCount once finalized, or a smoothed byte-based

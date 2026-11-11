@@ -4,8 +4,7 @@
 
 #include <string>
 
-#include "activities/Activity.h"
-#include "util/ButtonNavigator.h"
+#include "activities/UiListActivity.h"
 
 // Render a biased quarter-hour offset as "UTC+5:45" / "UTC-12:00".
 // Upstream keeps this next to the menu row that displays it, in
@@ -22,26 +21,27 @@ std::string formatUtcOffset(uint8_t biasedQ);
 // web settings API, e.g. Nepal +5:45) is surfaced as an extra "Custom offset"
 // row rather than discarded — arbitrary offsets remain settable via the web
 // settings control, which edits the raw byte.
-class ClockOffsetActivity final : public Activity {
+// Upstream's ClockOffsetActivity (9e3cea2e5) is a slider; this fork's is the
+// named time zone list, so it ports as a plain UiListActivity.
+class ClockOffsetActivity final : public UiListActivity {
  public:
   explicit ClockOffsetActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : Activity("ClockOffset", renderer, mappedInput) {}
+      : UiListActivity("ClockOffset", renderer, mappedInput) {}
 
   void onEnter() override;
-  void loop() override;
-  void render(RenderLock&&) override;
 
  private:
-  ButtonNavigator buttonNavigator;
-
-  int selectedIndex = 0;
-  // TZ_COUNT named rows, plus one trailing "Custom offset" row when the stored
-  // byte matches no named zone. Fixed for the lifetime of the activity.
   int itemCount = 0;
-  // Set when the stored offset matches no named zone; the raw byte it carries
-  // is what the custom row displays and preserves.
   bool hasCustomRow = false;
   uint8_t customOffsetQ = 48;
 
-  void handleSelection();
+  int listCount() const override { return itemCount; }
+  void describeRow(int index, ListRow& row) const override;
+  void buildScreen(UiScreen& screen) override;
+  void activateIndex(int index) override;
+  const char* headerTitle() const override { return tr(STR_CLOCK_UTC_OFFSET); }
+  // The live clock preview under the list, then the hints.
+  void drawFooter() override;
+  // Height of the preview line under the list (0 without a clock).
+  int previewHeight() const;
 };

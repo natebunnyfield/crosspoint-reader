@@ -160,8 +160,7 @@ class HalDisplay {
   // UC8253 (X3).
   bool supportsWindowedRefresh() const;
 
-  void displayGrayBuffer(bool turnOffScreen = false, const unsigned char* lut = nullptr,
-                         bool absolute = false);
+  void displayGrayBuffer(bool turnOffScreen = false, const unsigned char* lut = nullptr, bool absolute = false);
 
   // Does this panel actually have an absolute 4-level bank behind
   // displayGrayBuffer(..., absolute=true)? False on UC8253/X3, where the flag

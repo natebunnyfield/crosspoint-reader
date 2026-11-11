@@ -72,6 +72,13 @@ static unsigned long allowSleepAt = 0;
 // explicitly; on real hardware that is a no-op, since a chip reset would have
 // re-initialized it anyway.
 static unsigned long lastActivityTime = 0;
+// A wake hold must never become an in-app power-button action.  Boot may continue
+// while the button is held; swallow the one release that ends that wake gesture.
+static bool wakePowerReleasePending = false;
+// Cleared each time the power button is seen up. File scope, not a loop()-local
+// static, for lastActivityTime's reason: the simulator's in-process wake keeps
+// statics, so setup() re-arms it.
+static bool powerReleasedSinceWake = false;
 
 // Fonts
 //
@@ -536,17 +543,19 @@ unsigned long t2 = 0;
 // Definitions for SilentRestart.h. RTC_NOINIT survives ESP.restart() but not power loss.
 RTC_NOINIT_ATTR uint32_t silentRebootMagic;
 RTC_NOINIT_ATTR uint32_t silentRebootTarget;
+RTC_NOINIT_ATTR uint32_t silentRebootPayload;
 constexpr uint32_t SILENT_REBOOT_MAGIC = 0xC1EAB007;
 constexpr uint32_t SILENT_REBOOT_TARGET_HOME = 0;
 constexpr uint32_t SILENT_REBOOT_TARGET_READER = 1;
+constexpr uint32_t SILENT_REBOOT_LIGHT_ON = 1U << 0;
 
 // How the device is coming back to life, resolved once at boot. Both resume
 // flows suppress the splash and leave the panel holding its pre-boot frame; a
 // plain boot shows the splash. See setup() for the resolution.
 enum class BootResume : uint8_t {
-  Splash,       // cold boot, flash, panic, or plain reboot
-  Silent,       // heap-defrag ESP.restart() (RTC flag; lost on power loss)
-  QuickResume,  // wake from a quick-resume deep sleep (SD flag; survives power loss)
+  Splash,          // cold boot, flash, panic, or plain reboot
+  Silent,          // heap-defrag ESP.restart() (RTC flag; lost on power loss)
+  SplashlessWake,  // wake from deep sleep with the splash suppressed by the SD flag
 };
 
 // Latched true once enterDeepSleep() commits to sleeping, before it tears down
@@ -564,10 +573,25 @@ static bool deepSleepInProgress = false;
 // put the device straight back to sleep on the first sample.
 static LowBatteryGuard lowBatteryGuard;
 
+// A silent restart is internal maintenance, so the light must come back exactly
+// as the user left it (upstream 3f874f847). SETTINGS.frontlightOn is the saved
+// preference and legitimately diverges from the live state (a wake with Restore
+// Light on Wake off leaves the light off while the saved "was on" is kept), so
+// the live state rides across the reboot instead. Cleared with the magic in
+// setup(). Only the Picco has a frontlight.
+static void armSilentReboot(const uint32_t target) {
+  silentRebootTarget = target;
+#if FREEINK_DEVICE_PICCO
+  silentRebootPayload = Frontlight.isOn() ? SILENT_REBOOT_LIGHT_ON : 0;
+#else
+  silentRebootPayload = 0;
+#endif
+  silentRebootMagic = SILENT_REBOOT_MAGIC;
+}
+
 void silentRestart() {
   if (deepSleepInProgress) return;  // sleeping supersedes the heap-defrag reboot
-  silentRebootTarget = SILENT_REBOOT_TARGET_HOME;
-  silentRebootMagic = SILENT_REBOOT_MAGIC;
+  armSilentReboot(SILENT_REBOOT_TARGET_HOME);
   LOG_DBG("MAIN", "Silent restart (target=home)");
   // E-ink retains the previous frame until Home's first paint lands (~2-3s).
   // Without an overlay, users don't see the reboot and fire input through to
@@ -580,20 +604,11 @@ void silentRestart() {
 
 void silentRestartToReader() {
   if (deepSleepInProgress) return;  // sleeping supersedes the heap-defrag reboot
-  silentRebootTarget = SILENT_REBOOT_TARGET_READER;
-  silentRebootMagic = SILENT_REBOOT_MAGIC;
+  armSilentReboot(SILENT_REBOOT_TARGET_READER);
   LOG_DBG("MAIN", "Silent restart (target=reader)");
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
   delay(50);
   ESP.restart();
-}
-
-void waitForPowerRelease() {
-  gpio.update();
-  while (gpio.isPressed(HalGPIO::BTN_POWER)) {
-    delay(50);
-    gpio.update();
-  }
 }
 
 constexpr char SLEEP_FRAME_FILE[] = "/.crosspoint/sleep_frame.bin";
@@ -757,7 +772,9 @@ void enterDeepSleep(bool fromTimeout = false) {
   // frame nothing drew or drop the one it did.
   const bool isQuickResumeSleep =
       sleepscreen::shouldQuickResume(SETTINGS.sleepScreen, SETTINGS.quickResumeSleepScreen, fromTimeout);
-  APP_STATE.showBootScreen = !isQuickResumeSleep;
+  // Every sleep mode leaves a complete retained frame on the e-ink panel. Keep
+  // it visible until the first useful reader or home paint replaces it.
+  APP_STATE.showBootScreen = false;
 
   APP_STATE.saveToFile();
 
@@ -768,6 +785,9 @@ void enterDeepSleep(bool fromTimeout = false) {
 
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
+  } else if (Storage.exists(SLEEP_FRAME_FILE)) {
+    // A stale Quick Resume frame must not replace the selected sleep screen during wake.
+    Storage.remove(SLEEP_FRAME_FILE);
   }
 
   // Tear down WiFi so the modem power domain isn't held alive across deep sleep.
@@ -984,8 +1004,11 @@ void setup() {
   const bool isSilentReboot = (silentRebootMagic == SILENT_REBOOT_MAGIC);
   const uint32_t snapshotTarget =
       (isSilentReboot && silentRebootTarget <= SILENT_REBOOT_TARGET_READER) ? silentRebootTarget : 0;
+  [[maybe_unused]] const bool silentRebootLightOn =
+      isSilentReboot && (silentRebootPayload & SILENT_REBOOT_LIGHT_ON) != 0;
   silentRebootMagic = 0;
   silentRebootTarget = 0;
+  silentRebootPayload = 0;
 
   gpio.begin();
   powerManager.begin();
@@ -1031,12 +1054,12 @@ void setup() {
   // Brightness and warmth are always restored. A normal wake starts with the
   // light off unless Restore Light on Wake is enabled; a slide switch bound to
   // the light decides it from its position instead (upstream 261726f61,
-  // 8f4d035cb). Upstream also replays the live state across a silent
-  // heap-defrag reboot; this fork's silent restart carries no payload for it,
-  // so such a reboot takes the wake rule above.
-  const bool restoreLightOn = slideSwitchOwnsLight()
-                                  ? gpio.isToggleSwitchOn()
-                                  : (SETTINGS.frontlightOn != 0 && SETTINGS.frontlightRestoreOnWake != 0);
+  // 8f4d035cb), and still wins. A silent heap-defrag reboot replays the live
+  // state it carried (upstream 3f874f847), so the reboot does not change the
+  // light.
+  const bool restoreLightOn = slideSwitchOwnsLight() ? gpio.isToggleSwitchOn()
+                              : isSilentReboot       ? silentRebootLightOn
+                                               : (SETTINGS.frontlightOn != 0 && SETTINGS.frontlightRestoreOnWake != 0);
   Frontlight.begin(SETTINGS.frontlightBrightness, SETTINGS.frontlightWarmth, restoreLightOn);
 #endif
 
@@ -1052,6 +1075,7 @@ void setup() {
 #endif
         powerManager.startDeepSleep(gpio);
       }
+      wakePowerReleasePending = true;
       break;
     case HalGPIO::WakeupReason::AfterUSBPower:
       LOG_DBG("MAIN", "Wakeup reason: After USB Power");
@@ -1107,10 +1131,16 @@ void setup() {
   // skips the panel-clearing pass and the X3 initial-full-sync arming (see
   // HalDisplay::begin), so the first paint is FAST_REFRESH (~500ms) over the
   // retained frame and input dispatches against a visible UI.
-  const BootResume resume = isSilentReboot              ? BootResume::Silent
-                            : !APP_STATE.showBootScreen ? BootResume::QuickResume
-                                                        : BootResume::Splash;
+  // Only a verified deep-sleep wake may use the one-shot persisted flag.
+  // Otherwise a stale flag could suppress the splash on a cold boot.
+  const bool isSleepWake = wakeupReason == HalGPIO::WakeupReason::PowerButton;
+  const BootResume resume = isSilentReboot                             ? BootResume::Silent
+                            : isSleepWake && !APP_STATE.showBootScreen ? BootResume::SplashlessWake
+                                                                       : BootResume::Splash;
   bool allowFastInitialReaderRefresh = false;
+  // Splashless wake with no retained frame: the panel still physically shows
+  // the sleep image, so a Home landing must paint it away with a clean refresh.
+  bool needsWakeRefresh = false;
 
   // Second USB sample (first one right after powerManager.begin()): settles the
   // SOF host-link verdict before the first refresh can slice-sleep.
@@ -1143,13 +1173,13 @@ void setup() {
       // Splash skipped: the routing block below picks the target activity; the
       // panel keeps showing the pre-reboot popup until that first paint lands.
       break;
-    case BootResume::QuickResume:
-      // One-shot flag: re-arm the splash for the next non-quick-resume boot. Save
+    case BootResume::SplashlessWake:
+      // One-shot flag: re-arm the splash for the next ordinary boot. Save
       // before any painting so a hang in the blocking paint path can't strand
-      // us in a quick-resume-with-no-frame loop on the next boot.
+      // us in a splashless-with-no-frame loop on the next boot.
       APP_STATE.showBootScreen = true;
       APP_STATE.saveToFile();
-      if (loadSleepFrameBuffer()) {
+      if (Storage.exists(SLEEP_FRAME_FILE) && loadSleepFrameBuffer()) {
         // begin() clears the controller RAM, so restore the saved frame as the
         // baseline before replacing the moon with the loading icon; the icon
         // then goes out as a FAST differential refresh and so does the first
@@ -1173,7 +1203,7 @@ void setup() {
         }
         allowFastInitialReaderRefresh = true;
       } else {
-        activityManager.goToBoot();  // frame file missing, fall back to the splash
+        needsWakeRefresh = true;
       }
       break;
     case BootResume::Splash:
@@ -1232,10 +1262,10 @@ void setup() {
         APP_STATE.saveToFile();
         activityManager.goToReader(zenPath, allowFastInitialReaderRefresh);
       } else {
-        activityManager.goHome();
+        activityManager.goHome(HomeMenuItem::NONE, needsWakeRefresh);
       }
     } else {
-      activityManager.goHome();
+      activityManager.goHome(HomeMenuItem::NONE, needsWakeRefresh);
     }
   } else {
     // Clear app state to avoid getting into a boot loop if the epub doesn't load
@@ -1263,13 +1293,12 @@ void setup() {
     gpio.update();
   }
 
-  // Ensure we're not still holding the power button before leaving setup
-  waitForPowerRelease();
   allowSleepAt = millis() + 2000;
   // Both of these are what a chip reset would give us for free on hardware, and
   // what the simulator's in-process (longjmp) wake does not.
   lastActivityTime = millis();
   deepSleepInProgress = false;
+  powerReleasedSinceWake = false;
   lowBatteryGuard = LowBatteryGuard{};
 
   // A panic's serial output is lost when USB CDC drops with the crash, so
@@ -1379,9 +1408,18 @@ void loop() {
     lastHeapSample = millis();
   }
 
-  if (Serial && millis() - lastMemPrint >= 10000) {
+  // The ROM console does not depend on Arduino USB CDC's connection state, so a
+  // Sticky (ROM printf transport) printed no MEM line at all (upstream 3f70f5dfc).
+  if ((Serial || FREEINK_LOG_TRANSPORT == FREEINK_LOG_TRANSPORT_ROM_PRINTF) && millis() - lastMemPrint >= 10000) {
     LOG_INF("MEM", "Free: %d bytes, Total: %d bytes, Min Free: %d bytes, MaxAlloc: %d bytes", ESP.getFreeHeap(),
             ESP.getHeapSize(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+#ifdef BOARD_HAS_PSRAM
+    // Upstream b7bceb56c. ESP.getFreeHeap() and friends read MALLOC_CAP_INTERNAL,
+    // so the line above is the internal heap; the Picco's 8 MB PSRAM gets its own.
+    LOG_INF("MEM", "PSRAM: Free: %u bytes, Total: %u bytes, Min Free: %u bytes, MaxAlloc: %u bytes",
+            static_cast<unsigned>(ESP.getFreePsram()), static_cast<unsigned>(ESP.getPsramSize()),
+            static_cast<unsigned>(ESP.getMinFreePsram()), static_cast<unsigned>(ESP.getMaxAllocPsram()));
+#endif
     lastMemPrint = millis();
   }
 
@@ -1415,6 +1453,14 @@ void loop() {
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
   }
 
+  // Let wake continue as soon as its hold has been verified. The release can
+  // arrive after setup, so consume that one input frame rather than making it
+  // a page turn, refresh, or other short power-button action.
+  if (wakePowerReleasePending && !gpio.isPressed(HalGPIO::BTN_POWER)) {
+    wakePowerReleasePending = false;
+    return;
+  }
+
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
 #if FREEINK_DEVICE_PICCO
   // On USB power the Picco does not sleep on the idle timer: its sleep, even
@@ -1444,7 +1490,12 @@ void loop() {
     return;
   }
 
-  if (millis() >= allowSleepAt && gpio.isPressed(HalGPIO::BTN_POWER) &&
+  // A hold that woke the device must be released before it can count as a new
+  // in-app long press. Otherwise a user who keeps holding after wake would put
+  // the device straight back to sleep once allowSleepAt expires.
+  if (!gpio.isPressed(HalGPIO::BTN_POWER)) powerReleasedSinceWake = true;
+
+  if (powerReleasedSinceWake && millis() >= allowSleepAt && gpio.isPressed(HalGPIO::BTN_POWER) &&
       gpio.getPowerButtonHeldTime() > SETTINGS.getPowerButtonDuration()) {
     enterDeepSleep();
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start

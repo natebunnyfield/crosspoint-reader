@@ -1,27 +1,38 @@
 #pragma once
 #include <I18n.h>
 
-#include <functional>
 #include <string>
 #include <vector>
 
 #include "RecentBooksStore.h"
-#include "activities/Activity.h"
+#include "activities/UiListActivity.h"
 #include "components/OptionPopup.h"
-#include "util/ButtonNavigator.h"
 
-class RecentBooksActivity final : public Activity {
+class RecentBooksActivity final : public UiListActivity {
+ public:
+  explicit RecentBooksActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
+  void onEnter() override;
+  void onExit() override;
+
  private:
-  ButtonNavigator buttonNavigator;
-  OptionPopup removePopup;
+  int listCount() const override { return static_cast<int>(recentBooks.size()); }
+  void describeRow(int index, ListRow& row) const override;
+  void buildScreen(UiScreen& screen) override;
+  void activateIndex(int index) override;
+  void onRowLongPress(int index) override;
+  // Confirm activates on RELEASE here (a hold is "remove from list"), and Back
+  // goes home rather than finishing.
+  bool handleButtons() override;
+  const char* headerTitle() const override { return tr(STR_MENU_RECENT_BOOKS); }
+  void drawFooter() override;
+  OptionPopup* activePopup() override { return &removePopup; }
 
-  size_t selectorIndex = 0;
+  OptionPopup removePopup;
 
   // Set when a long-press has fired; input is swallowed until Confirm is released
   // again so the release doesn't also open the book.
   bool longPressFired = false;
 
-  // Recent tab state
   std::vector<RecentBook> recentBooks;
 
   // Data loading
@@ -29,12 +40,4 @@ class RecentBooksActivity final : public Activity {
 
   // Show an OK/Cancel prompt to remove the given book from the Recent Books list.
   void promptRemoveBook(const std::string& path, const std::string& title);
-
- public:
-  explicit RecentBooksActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : Activity("RecentBooks", renderer, mappedInput) {}
-  void onEnter() override;
-  void onExit() override;
-  void loop() override;
-  void render(RenderLock&&) override;
 };

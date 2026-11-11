@@ -500,6 +500,48 @@ happens at boot; the 2026-11-06 boot log showed it).
 (Frontlight / Dark Mode) and "Restore light on wake" join the Picco's device
 Settings list next to the frontlight rows. Picco only.
 
+### The FUI list base on the Picco (2026-11-08, upstream `9e3cea2e5` port)
+
+The port of upstream's FreeInkUI lists (`UiListActivity`, `UiAppHost`) adds a
+touch route to every converted list (Settings, Typography, the time zone list,
+Browse Files, Recent Books, the chapter and footnote lists). Re-checked
+against this board's rules, read from the code (no Picco simulator exists and
+no device build was run):
+
+- **Touch stays keyboard-only.** The route reads touch through
+  `touchSnapshotFrom()` (`src/components/UiAppHelpers.h`): tap, touch-down,
+  held point, long-press and raw release. The two new HAL queries the port
+  added, `HalGPIO::wasTouchReleased()` and `wasTouchLongPress()`, take the same
+  `keyboardTouch` gate as every other touch query in `lib/hal/HalGPIO.cpp`, so
+  outside a keyboard the route sees no contact and the lists are buttons-only
+  as before. `suppressTouchContact()` moved out of the Picco-only block
+  because the base calls it on every board; on the Picco it is the same call.
+- **The rocker is still Right/Left.** The lists step through
+  `ButtonNavigator::onNextPress`/`onPreviousPress` (`NavNext`/`NavPrevious`,
+  the front pair the rocker maps to) and page through the side pair, as
+  before; `MappedInputManager`'s mapping and `synthesizeGesture()` are
+  untouched, so a gesture still arrives as a synthesized button press and the
+  left-edge Back is still `wasBackGesture()`'s Picco branch (always false;
+  Back comes from the synthesized press).
+- **The Picco Settings rows are carried over unchanged:** the
+  `isPiccoDeviceRow` / `isHiddenLightRow` filter, the slide-switch rows, the
+  frontlight toggle reading the light, and the brightness/warmth stepping
+  mode, which now runs from `SettingsActivity::handleCustomInput()` (ahead of
+  the base's navigation, behind the popup gate, the order the old `loop()`
+  had) and shows `< value >` through `describeRow()`.
+- **`hasTouch()` is true here** and the theme reads it for layout; the FUI
+  base's touch-sized row height is not used, because Lyra Six paints the rows
+  (`UiListActivity::drawRows`).
+
+Compile evidence: `SettingsActivity.cpp`, `UiListActivity.cpp` and
+`MappedInputManager.cpp` were syntax-checked with `-DFREEINK_DEVICE_PICCO=1`
+against the simulator's headers; the only errors were the simulator
+`HalGPIO`'s missing Picco members (`setKeyboardTouch`, `hasToggleSwitch`,
+`readTouchContact`, `isKeyboardTouchOn`, `injectButtonTap`), none in the
+ported code. `lib/hal/HalGPIO.cpp`'s Picco branch is not compiled by any
+host or simulator target: it needs the `picco` device build. UNCONFIRMED on
+device.
+
 ### Open questions for the owner (from the port)
 
 Frontlight brightness/warmth has no on-device UI (web settings only); touch is

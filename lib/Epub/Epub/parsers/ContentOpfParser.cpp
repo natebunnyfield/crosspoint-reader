@@ -32,6 +32,58 @@ bool startsWithImageMediaType(const std::string& mediaType) {
 
   return true;
 }
+
+bool isXmlWhitespace(const char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; }
+
+// Metadata text comes straight from the (untrusted) OPF; unbounded growth on
+// a multi-megabyte title would exhaust the heap. Downstream consumers truncate
+// far below this anyway, so overflow is clamped, not fatal (upstream 652ae0d83).
+constexpr size_t MAX_METADATA_TEXT = 512;
+
+// Collapses whitespace runs to one space and trims both ends. The separator
+// between two authors is written only when the next <dc:creator> starts
+// (authorSeparatorPending), never between two character-data callbacks of ONE
+// creator: Expat splits a text node at a character reference (&#235;) or at a
+// feed boundary, and the old per-callback ", " turned "Bront&#235;" into
+// "Bront, ë".
+void appendMetadataText(std::string& out, const XML_Char* text, const int len, bool& spacePending,
+                        bool* separatorPending = nullptr) {
+  if (out.size() >= MAX_METADATA_TEXT) return;  // already clamped and logged
+  for (int i = 0; i < len; i++) {
+    const char c = text[i];
+    if (isXmlWhitespace(c)) {
+      spacePending = true;
+      continue;
+    }
+
+    if (out.size() >= MAX_METADATA_TEXT) {
+      LOG_DBG("COF", "Metadata text exceeds %u bytes; truncating", static_cast<unsigned>(MAX_METADATA_TEXT));
+      // The clamp counts bytes, so it can land inside a multi-byte character
+      // (a 171-character CJK title is 513 bytes). Drop the incomplete tail, or
+      // book.bin keeps an orphaned lead byte that draws as U+FFFD
+      // (adversarial review 2026-11-08, F3).
+      size_t cont = 0;
+      while (cont < out.size() && cont < 3 && (static_cast<unsigned char>(out[out.size() - 1 - cont]) & 0xC0) == 0x80) {
+        cont++;
+      }
+      if (cont < out.size()) {
+        const auto lead = static_cast<unsigned char>(out[out.size() - 1 - cont]);
+        const size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+        if (need > cont + 1) out.resize(out.size() - 1 - cont);
+      }
+      return;
+    }
+    if (separatorPending != nullptr && *separatorPending) {
+      out.append(", ");
+      *separatorPending = false;
+      spacePending = false;
+    } else if (spacePending && !out.empty()) {
+      out.push_back(' ');
+    }
+    spacePending = false;
+    out.push_back(c);
+  }
+}
 }  // namespace
 
 bool ContentOpfParser::setup() {
@@ -101,35 +153,39 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
   auto* self = static_cast<ContentOpfParser*>(userData);
   (void)atts;
 
-  if (self->state == START && (strcmp(name, "package") == 0 || strcmp(name, "opf:package") == 0)) {
+  if (self->state == START && xmlLocalNameEquals(name, "package")) {
     self->state = IN_PACKAGE;
     return;
   }
 
-  if (self->state == IN_PACKAGE && (strcmp(name, "metadata") == 0 || strcmp(name, "opf:metadata") == 0)) {
+  if (self->state == IN_PACKAGE && xmlLocalNameEquals(name, "metadata")) {
     self->state = IN_METADATA;
     return;
   }
 
-  if (self->state == IN_METADATA && strcmp(name, "dc:title") == 0) {
-    // Only capture the first dc:title element; subsequent ones are subtitles
+  if (self->state == IN_METADATA && xmlLocalNameEquals(name, "title")) {
+    // Only capture the first title element; subsequent ones are subtitles
     if (self->title.empty()) {
       self->state = IN_BOOK_TITLE;
+      self->metadataSpacePending = false;
     }
     return;
   }
 
-  if (self->state == IN_METADATA && strcmp(name, "dc:creator") == 0) {
+  if (self->state == IN_METADATA && xmlLocalNameEquals(name, "creator")) {
     self->state = IN_BOOK_AUTHOR;
+    self->metadataSpacePending = false;
+    self->authorSeparatorPending = !self->author.empty();
     return;
   }
 
-  if (self->state == IN_METADATA && strcmp(name, "dc:language") == 0) {
+  if (self->state == IN_METADATA && xmlLocalNameEquals(name, "language")) {
     self->state = IN_BOOK_LANGUAGE;
+    self->metadataSpacePending = false;
     return;
   }
 
-  if (self->state == IN_PACKAGE && (strcmp(name, "manifest") == 0 || strcmp(name, "opf:manifest") == 0)) {
+  if (self->state == IN_PACKAGE && xmlLocalNameEquals(name, "manifest")) {
     self->state = IN_MANIFEST;
     if (!Storage.openFileForWrite("COF", self->cachePath + itemCacheFile, self->tempItemStore)) {
       LOG_ERR("COF", "Couldn't open temp items file for writing. This is probably going to be a fatal error.");
@@ -137,7 +193,7 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     return;
   }
 
-  if (self->state == IN_PACKAGE && (strcmp(name, "spine") == 0 || strcmp(name, "opf:spine") == 0)) {
+  if (self->state == IN_PACKAGE && xmlLocalNameEquals(name, "spine")) {
     self->state = IN_SPINE;
     if (!Storage.openFileForRead("COF", self->cachePath + itemCacheFile, self->tempItemStore)) {
       LOG_ERR("COF", "Couldn't open temp items file for reading. This is probably going to be a fatal error.");
@@ -156,7 +212,7 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     return;
   }
 
-  if (self->state == IN_PACKAGE && (strcmp(name, "guide") == 0 || strcmp(name, "opf:guide") == 0)) {
+  if (self->state == IN_PACKAGE && xmlLocalNameEquals(name, "guide")) {
     self->state = IN_GUIDE;
     // TODO Remove print
     LOG_DBG("COF", "Entering guide state.");
@@ -166,7 +222,7 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     return;
   }
 
-  if (self->state == IN_METADATA && (strcmp(name, "meta") == 0 || strcmp(name, "opf:meta") == 0)) {
+  if (self->state == IN_METADATA && xmlLocalNameEquals(name, "meta")) {
     bool isCover = false;
     std::string coverItemId;
 
@@ -184,7 +240,7 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     return;
   }
 
-  if (self->state == IN_MANIFEST && (strcmp(name, "item") == 0 || strcmp(name, "opf:item") == 0)) {
+  if (self->state == IN_MANIFEST && xmlLocalNameEquals(name, "item")) {
     std::string itemId;
     std::string href;
     std::string mediaType;
@@ -236,7 +292,12 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
 
     // Collect CSS files
     if (mediaType == MEDIA_TYPE_CSS) {
-      self->cssFiles.push_back(href);
+      if (self->cssFiles.size() < MAX_CSS_FILES) {
+        self->cssFiles.push_back(href);
+      } else if (!self->cssFilesCapped) {
+        self->cssFilesCapped = true;
+        LOG_ERR("COF", "More than %u stylesheets in the manifest; ignoring the rest", (unsigned)MAX_CSS_FILES);
+      }
     }
 
     // EPUB 3: Check for nav document (properties contains "nav")
@@ -261,7 +322,7 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
   // NOTE: This relies on spine appearing after item manifest (which is pretty safe as it's part of the EPUB spec)
   // Only run the spine parsing if there's a cache to add it to
   if (self->cache) {
-    if (self->state == IN_SPINE && (strcmp(name, "itemref") == 0 || strcmp(name, "opf:itemref") == 0)) {
+    if (self->state == IN_SPINE && xmlLocalNameEquals(name, "itemref")) {
       for (int i = 0; atts[i]; i += 2) {
         if (strcmp(atts[i], "idref") == 0) {
           const std::string idref = atts[i + 1];
@@ -321,7 +382,7 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     }
   }
   // parse the guide
-  if (self->state == IN_GUIDE && (strcmp(name, "reference") == 0 || strcmp(name, "opf:reference") == 0)) {
+  if (self->state == IN_GUIDE && xmlLocalNameEquals(name, "reference")) {
     std::string type;
     std::string guideHref;
     for (int i = 0; atts[i]; i += 2) {
@@ -352,20 +413,17 @@ void XMLCALL ContentOpfParser::characterData(void* userData, const XML_Char* s, 
   auto* self = static_cast<ContentOpfParser*>(userData);
 
   if (self->state == IN_BOOK_TITLE) {
-    self->title.append(s, len);
+    appendMetadataText(self->title, s, len, self->metadataSpacePending);
     return;
   }
 
   if (self->state == IN_BOOK_AUTHOR) {
-    if (!self->author.empty()) {
-      self->author.append(", ");  // Add separator for multiple authors
-    }
-    self->author.append(s, len);
+    appendMetadataText(self->author, s, len, self->metadataSpacePending, &self->authorSeparatorPending);
     return;
   }
 
   if (self->state == IN_BOOK_LANGUAGE) {
-    self->language.append(s, len);
+    appendMetadataText(self->language, s, len, self->metadataSpacePending);
     return;
   }
 }
@@ -374,45 +432,45 @@ void XMLCALL ContentOpfParser::endElement(void* userData, const XML_Char* name) 
   auto* self = static_cast<ContentOpfParser*>(userData);
   (void)name;
 
-  if (self->state == IN_SPINE && (strcmp(name, "spine") == 0 || strcmp(name, "opf:spine") == 0)) {
+  if (self->state == IN_SPINE && xmlLocalNameEquals(name, "spine")) {
     self->state = IN_PACKAGE;
     self->tempItemStore.close();
     return;
   }
 
-  if (self->state == IN_GUIDE && (strcmp(name, "guide") == 0 || strcmp(name, "opf:guide") == 0)) {
+  if (self->state == IN_GUIDE && xmlLocalNameEquals(name, "guide")) {
     self->state = IN_PACKAGE;
     self->tempItemStore.close();
     return;
   }
 
-  if (self->state == IN_MANIFEST && (strcmp(name, "manifest") == 0 || strcmp(name, "opf:manifest") == 0)) {
+  if (self->state == IN_MANIFEST && xmlLocalNameEquals(name, "manifest")) {
     self->state = IN_PACKAGE;
     self->tempItemStore.close();
     return;
   }
 
-  if (self->state == IN_BOOK_TITLE && strcmp(name, "dc:title") == 0) {
+  if (self->state == IN_BOOK_TITLE && xmlLocalNameEquals(name, "title")) {
     self->state = IN_METADATA;
     return;
   }
 
-  if (self->state == IN_BOOK_AUTHOR && strcmp(name, "dc:creator") == 0) {
+  if (self->state == IN_BOOK_AUTHOR && xmlLocalNameEquals(name, "creator")) {
     self->state = IN_METADATA;
     return;
   }
 
-  if (self->state == IN_BOOK_LANGUAGE && strcmp(name, "dc:language") == 0) {
+  if (self->state == IN_BOOK_LANGUAGE && xmlLocalNameEquals(name, "language")) {
     self->state = IN_METADATA;
     return;
   }
 
-  if (self->state == IN_METADATA && (strcmp(name, "metadata") == 0 || strcmp(name, "opf:metadata") == 0)) {
+  if (self->state == IN_METADATA && xmlLocalNameEquals(name, "metadata")) {
     self->state = IN_PACKAGE;
     return;
   }
 
-  if (self->state == IN_PACKAGE && (strcmp(name, "package") == 0 || strcmp(name, "opf:package") == 0)) {
+  if (self->state == IN_PACKAGE && xmlLocalNameEquals(name, "package")) {
     self->state = START;
     return;
   }
