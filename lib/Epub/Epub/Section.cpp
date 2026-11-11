@@ -254,10 +254,11 @@ namespace {
 // COUNTER-clockwise turn (owner 2026-10-04: "the iphone would need to be turned
 // ccw not clockwise"; RotatedTablePlacement.h). A cached v63 section holds the
 // flipped positions, which the CCW draw would put off the page.
-// v65: a space beside a math sign is set for equal drawn white on both sides of
-// the sign (GfxRenderer::getSpaceAdvance, SpacedSignWhite.h). Word positions in
-// any line holding a spaced + - x / = < > and kin move by a pixel or two, and
-// a cached section keeps the old ones.
+// v65: a space beside a lone math sign is set for equal drawn white on both
+// sides of the sign (ParsedText's wordSpace, GfxRenderer::getSpacedSignGap,
+// SpacedSignWhite.h). Word positions in any line holding a spaced
+// + − × ÷ = < > and kin (not the hyphen-minus or the slash) move by a pixel or
+// two, and a cached section keeps the old ones.
 constexpr uint8_t SECTION_FILE_VERSION = 65;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /

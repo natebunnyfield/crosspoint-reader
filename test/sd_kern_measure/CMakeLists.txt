@@ -9,6 +9,7 @@ set(CP_PREVIEW "${REPO_ROOT}/tools/calendar_preview")
 
 add_executable(SdKernMeasureTest
   SdKernMeasureTest.cpp
+  SpacedSignGapTest.cpp
   ${REPO_ROOT}/lib/EpdFont/SdCardFontManager.cpp
   ${REPO_ROOT}/lib/EpdFont/SdCardFontRegistry.cpp
   ${REPO_ROOT}/lib/GfxRenderer/GfxRenderer.cpp

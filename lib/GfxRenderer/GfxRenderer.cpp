@@ -2764,55 +2764,6 @@ int GfxRenderer::getSpaceWidth(const int fontId, const EpdFontFamily::Style styl
 
 int GfxRenderer::getSpaceAdvance(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
                                  const EpdFontFamily::Style style) const {
-  // A space beside a math sign is set for equal white on both sides of the
-  // sign (SpacedSignWhite.h). Falls through to the ordinary space whenever a
-  // glyph box it needs is not available.
-  if (spacedsign::applies(leftCp, rightCp)) {
-    const int ruled = getSpacedSignAdvance(fontId, leftCp, rightCp, style);
-    if (ruled >= 0) return ruled;
-  }
-  return getPlainSpaceAdvance(fontId, leftCp, rightCp, style);
-}
-
-int GfxRenderer::getSpacedSignAdvance(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
-                                      const EpdFontFamily::Style style) const {
-  // Drawn box of one codepoint (SpacedSignWhite.h: the columns that paint, not
-  // the bitmap's box). An SD font reads it from its file, which works during
-  // layout; a resident font decodes the glyph it already holds.
-  auto boxOf = [&](const uint32_t cp, spacedsign::GlyphBox& out) -> bool {
-    auto sdIt = sdCardFonts_.find(fontId);
-    if (sdIt != sdCardFonts_.end()) {
-      const uint8_t resolvedStyle = resolveSdCardStyle(*sdIt->second, style);
-      uint16_t adv = 0;
-      int left = 0, width = 0;
-      if (!sdIt->second->getDrawnBox(cp, resolvedStyle, &adv, &left, &width)) return false;
-      out.advancePx = fp4::toPixel(adv);
-      out.leftPx = left;
-      out.widthPx = width;
-      return true;
-    }
-    const auto fontIt = fontMap.find(fontId);
-    if (fontIt == fontMap.end()) return false;
-    const EpdGlyph* g = fontIt->second.getGlyph(cp, style);
-    const EpdFontData* data = fontIt->second.getData(style);
-    if (!g || !data) return false;
-    int first = 0, last = -1;
-    if (!spacedsign::drawnColumns(getGlyphBitmap(data, g), g->width, g->height, data->is2Bit, first, last)) {
-      return false;
-    }
-    out.advancePx = fp4::toPixel(g->advanceX);
-    out.leftPx = g->left + first;
-    out.widthPx = last - first + 1;
-    return true;
-  };
-  spacedsign::GlyphBox left, right, figure;
-  if (!boxOf(leftCp, left) || !boxOf(rightCp, right) || !boxOf(spacedsign::kTargetFigure, figure)) return -1;
-  const int figureSpacePx = getPlainSpaceAdvance(fontId, spacedsign::kTargetFigure, spacedsign::kTargetFigure, style);
-  return spacedsign::spaceForWhitePx(left, right, spacedsign::targetWhitePx(figure, figureSpacePx));
-}
-
-int GfxRenderer::getPlainSpaceAdvance(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
-                                      const EpdFontFamily::Style style) const {
   // Advance table fast-path for SD card fonts during layout. The flanking
   // kerns are applied here since 2026-08-22 via the measure-kern rows
   // (docs/punctuation-kerning-audit-2026-08-22.md §4 P0). For every shipped
@@ -2837,6 +2788,134 @@ int GfxRenderer::getPlainSpaceAdvance(const int fontId, const uint32_t leftCp, c
   const int32_t kernFP = static_cast<int32_t>(font.getKerning(leftCp, ' ', style)) +
                          static_cast<int32_t>(font.getKerning(' ', rightCp, style));
   return fp4::toPixel(spaceAdvanceFP + kernFP);
+}
+
+uint8_t GfxRenderer::drawnBoxOf(const int fontId, const int tier, const EpdFontFamily::Style style, const uint32_t cp,
+                                uint16_t& advanceX, int& left, int& width) const {
+  using DB = SdCardFont::DrawnBox;
+  const uint8_t key = static_cast<uint8_t>((style & 0x03) | (tier ? 0x04 : 0));
+  for (int i = 0; i < drawnBoxCount_; i++) {
+    const DrawnBoxEntry e = drawnBoxes_[i];
+    if (e.fontId != fontId || e.codepoint != cp || e.key != key) continue;
+    // Move to front: the least recently used entry is always the last one.
+    for (int j = i; j > 0; j--) drawnBoxes_[j] = drawnBoxes_[j - 1];
+    drawnBoxes_[0] = e;
+    advanceX = e.advanceX;
+    left = e.left;
+    width = e.width;
+    return e.state;
+  }
+
+  DB state = DB::Failed;
+  uint16_t adv = 0;
+  int l = 0, w = 0;
+  // A face read from the card answers from its file; a face in memory decodes
+  // the glyph it holds. A codepoint the face does not carry -- including one it
+  // would draw as a fallback or notdef box -- is NotCarried.
+  auto resident = [&](const EpdFontFamily& family) {
+    EpdFontFamily::GlyphSource source = EpdFontFamily::GlyphSource::Direct;
+    const EpdGlyph* g = family.getGlyph(cp, style, &source);
+    const EpdFontData* data = family.getData(style);
+    if (!g || !data || source == EpdFontFamily::GlyphSource::Fallback) {
+      state = DB::NotCarried;
+      return;
+    }
+    int first = 0, last = -1;
+    if (!spacedsign::drawnColumns(getGlyphBitmap(data, g), g->width, g->height, data->is2Bit, first, last)) {
+      state = DB::Blank;
+      return;
+    }
+    adv = g->advanceX;
+    l = g->left + first;
+    w = last - first + 1;
+    state = DB::Drawn;
+  };
+  if (tier == 0) {
+    const auto sdIt = sdCardFonts_.find(fontId);
+    const auto fontIt = fontMap.find(fontId);
+    if (sdIt != sdCardFonts_.end() && sdIt->second) {
+      state = sdIt->second->getDrawnBox(cp, resolveSdCardStyle(*sdIt->second, style), &adv, &l, &w);
+    } else if (fontIt != fontMap.end()) {
+      resident(fontIt->second);
+    }
+  }
+#if CROSSPOINT_RENDER_SCALE > 1
+  else {
+    const auto hiSd = hiResSdFonts_.find(fontId);
+    const EpdFontFamily* hiFamily = getHiResFamily(fontId);
+    if (hiSd != hiResSdFonts_.end() && hiSd->second) {
+      state = hiSd->second->getDrawnBox(cp, resolveSdCardStyle(*hiSd->second, style), &adv, &l, &w);
+    } else if (hiFamily) {
+      resident(*hiFamily);
+    } else {
+      state = DB::NotCarried;  // no companion: drawText replicates the 1x glyph
+    }
+  }
+#endif
+
+  DrawnBoxEntry e = {};
+  e.fontId = fontId;
+  e.codepoint = cp;
+  e.key = key;
+  e.state = static_cast<uint8_t>(state);
+  // Out-of-range boxes (none at reading sizes) are recorded as failures.
+  if (state == DB::Drawn && (l < INT16_MIN || l > INT16_MAX || w < 1 || w > 255)) {
+    e.state = static_cast<uint8_t>(DB::Failed);
+  }
+  if (e.state == static_cast<uint8_t>(DB::Drawn)) {
+    e.advanceX = adv;
+    e.left = static_cast<int16_t>(l);
+    e.width = static_cast<uint8_t>(w);
+  }
+  const int n = drawnBoxCount_ < kDrawnBoxCache ? drawnBoxCount_ + 1 : kDrawnBoxCache;
+  for (int j = n - 1; j > 0; j--) drawnBoxes_[j] = drawnBoxes_[j - 1];
+  drawnBoxes_[0] = e;
+  drawnBoxCount_ = n;
+  advanceX = e.advanceX;
+  left = e.left;
+  width = e.width;
+  return e.state;
+}
+
+int GfxRenderer::getSpacedSignGap(const int fontId, const uint32_t leftCp, const EpdFontFamily::Style leftStyle,
+                                  const uint32_t rightCp, const EpdFontFamily::Style rightStyle,
+                                  const EpdFontFamily::Style signStyle) const {
+  using DB = SdCardFont::DrawnBox;
+  const int scale = renderScale();
+  // One glyph as drawn, in device pixels. The cursor steps on the logical grid
+  // by the 1x advance, so the advance is the 1x one times the scale; the ink is
+  // the hi-res companion's when it carries the glyph (drawText's own test), or
+  // the 1x glyph replicated scale x scale when it does not.
+  auto boxOf = [&](const uint32_t cp, const EpdFontFamily::Style style, spacedsign::GlyphBox& out) -> bool {
+    uint16_t adv = 0;
+    int left = 0, width = 0;
+    if (drawnBoxOf(fontId, 0, style, cp, adv, left, width) != static_cast<uint8_t>(DB::Drawn)) return false;
+    out.advancePx = fp4::toPixel(adv) * scale;
+    out.leftPx = left * scale;
+    out.widthPx = width * scale;
+#if CROSSPOINT_RENDER_SCALE > 1
+    if (scale > 1) {
+      uint16_t hiAdv = 0;
+      int hiLeft = 0, hiWidth = 0;
+      const uint8_t hi = drawnBoxOf(fontId, 1, style, cp, hiAdv, hiLeft, hiWidth);
+      if (hi == static_cast<uint8_t>(DB::Drawn)) {
+        out.leftPx = hiLeft;
+        out.widthPx = hiWidth;
+      } else if (hi != static_cast<uint8_t>(DB::NotCarried)) {
+        return false;
+      }
+    }
+#endif
+    return true;
+  };
+  spacedsign::GlyphBox left, right, figure;
+  if (!boxOf(leftCp, leftStyle, left) || !boxOf(rightCp, rightStyle, right) ||
+      !boxOf(spacedsign::kTargetFigure, signStyle, figure)) {
+    return -1;
+  }
+  const int figureSpacePx = getSpaceAdvance(fontId, spacedsign::kTargetFigure, spacedsign::kTargetFigure, signStyle);
+  const int target = spacedsign::targetWhitePx(figure, figureSpacePx * scale);
+  return spacedsign::spaceForWhite(left, right, target, scale);
 }
 
 int GfxRenderer::getKerning(const int fontId, const uint32_t leftCp, const uint32_t rightCp,

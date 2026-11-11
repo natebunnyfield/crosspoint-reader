@@ -92,6 +92,31 @@ class GfxRenderer {
   mutable std::map<int, SdCardFont*> hiResSdFonts_;
 #endif
 
+  // getSpacedSignGap's glyph boxes: one answer per (font id, tier, style,
+  // codepoint), failures included, so a read that fails once fails for every
+  // pass and measure and paint agree. LRU by move-to-front: a hit moves the
+  // entry to slot 0, a miss evicts the last slot. 64 x 16 bytes = 1 KB. Any
+  // font (de)registration empties it, so a reused font id cannot hit a box from
+  // another face.
+  struct DrawnBoxEntry {
+    int32_t fontId;
+    uint32_t codepoint;
+    uint16_t advanceX;  // 12.4, the tier's own glyph (only tier 0's is used)
+    int16_t left;       // drawn ink start, the tier's own pixels
+    uint8_t width;      // drawn ink width, the tier's own pixels
+    uint8_t key;        // style (bits 0-1) | tier (bit 2)
+    uint8_t state;      // SdCardFont::DrawnBox
+    uint8_t pad;
+  };
+  static constexpr int kDrawnBoxCache = 64;
+  mutable DrawnBoxEntry drawnBoxes_[kDrawnBoxCache] = {};
+  mutable int drawnBoxCount_ = 0;
+  void invalidateDrawnBoxes() const { drawnBoxCount_ = 0; }
+  // One tier's box of one codepoint (tier 0: the font itself; tier 1: its
+  // hi-res companion), through the cache. Returns an SdCardFont::DrawnBox.
+  uint8_t drawnBoxOf(int fontId, int tier, EpdFontFamily::Style style, uint32_t cp, uint16_t& advanceX, int& left,
+                     int& width) const;
+
   // Mutable because drawText() is const but needs to delegate scan-mode
   // recording to the (non-const) FontCacheManager. Same pragmatic compromise
   // as before, concentrated in a single pointer instead of four fields.
@@ -278,11 +303,15 @@ class GfxRenderer {
   // the setting read as changed. Worse on a 2x build, where the hi-res half of
   // the swap DID take (it uses insert_or_assign), so the UI briefly blitted the
   // new family's glyphs against the outgoing family's metrics.
-  void replaceFont(int fontId, EpdFontFamily font) { fontMap.insert_or_assign(fontId, font); }
+  void replaceFont(int fontId, EpdFontFamily font) {
+    fontMap.insert_or_assign(fontId, font);
+    invalidateDrawnBoxes();
+  }
   // Clears both the flash-font map and any SD-font registration for fontId.
   // Coupled to avoid dangling SdCardFont* in sdCardFonts_ when callers free
   // the underlying SdCardFont and forget the SD-side unregister.
   void removeFont(int fontId) {
+    invalidateDrawnBoxes();
     fontMap.erase(fontId);
     sdCardFonts_.erase(fontId);
     sdCardFontScales_.erase(fontId);
@@ -294,9 +323,13 @@ class GfxRenderer {
   FontCacheManager* getFontCacheManager() const { return fontCacheManager_; }
   bool isFontCacheScanning() const;
   const std::map<int, EpdFontFamily>& getFontMap() const { return fontMap; }
-  void registerSdCardFont(int fontId, SdCardFont* font) { sdCardFonts_[fontId] = font; }
+  void registerSdCardFont(int fontId, SdCardFont* font) {
+    sdCardFonts_[fontId] = font;
+    invalidateDrawnBoxes();
+  }
   void unregisterSdCardFont(int fontId) { removeFont(fontId); }
   void clearSdCardFonts() {
+    invalidateDrawnBoxes();
     sdCardFonts_.clear();
     sdCardFontScales_.clear();
 #if CROSSPOINT_RENDER_SCALE > 1
@@ -311,6 +344,7 @@ class GfxRenderer {
   // would move. Registration is optional; a font with no companion falls back to
   // the 1x glyph replicated RENDER_SCALE x RENDER_SCALE, i.e. today's output.
   void registerHiResFont(int fontId, SdCardFont* font, EpdFontFamily family) {
+    invalidateDrawnBoxes();
     hiResSdFonts_[fontId] = font;
     hiResFontMap_.insert_or_assign(fontId, family);
   }
@@ -319,8 +353,12 @@ class GfxRenderer {
   // prewarm glyphs off the card before a render pass, and it dereferences every
   // entry it holds. A built-in has nothing to prewarm -- its bitmaps are already
   // addressable -- so it belongs in the family map only.
-  void registerHiResBuiltinFont(int fontId, EpdFontFamily family) { hiResFontMap_.insert_or_assign(fontId, family); }
+  void registerHiResBuiltinFont(int fontId, EpdFontFamily family) {
+    invalidateDrawnBoxes();
+    hiResFontMap_.insert_or_assign(fontId, family);
+  }
   void removeHiResFont(int fontId) {
+    invalidateDrawnBoxes();
     hiResFontMap_.erase(fontId);
     hiResSdFonts_.erase(fontId);
   }
@@ -336,6 +374,7 @@ class GfxRenderer {
   // 1x pixels until the next reboot. loadFile re-registers the reader font
   // afterwards, which is why the reader looked fine and only the chrome broke.
   void clearSdCardHiResFonts() {
+    invalidateDrawnBoxes();
     for (const auto& entry : hiResSdFonts_) hiResFontMap_.erase(entry.first);
     hiResSdFonts_.clear();
   }
@@ -537,11 +576,16 @@ class GfxRenderer {
   /// Using a single snap avoids the +/-1 px rounding error that arises when space advance and kern are
   /// snapped separately and then added as integers.
   int getSpaceAdvance(int fontId, uint32_t leftCp, uint32_t rightCp, EpdFontFamily::Style style) const;
-  // getSpaceAdvance's two halves: the font's own space with its flanking kerns,
-  // and the spaced-sign rule (SpacedSignWhite.h), which returns -1 when a glyph
-  // box it needs is missing so the caller falls back to the plain space.
-  int getPlainSpaceAdvance(int fontId, uint32_t leftCp, uint32_t rightCp, EpdFontFamily::Style style) const;
-  int getSpacedSignAdvance(int fontId, uint32_t leftCp, uint32_t rightCp, EpdFontFamily::Style style) const;
+  /// The spaced-sign rule (SpacedSignWhite.h): the space, in logical px, that
+  /// gives the drawn white between leftCp and rightCp the sign's target. Each
+  /// neighbor is measured in its OWN word's style and the target is taken from
+  /// `signStyle`, so the two gaps of one sign share it. Measured in device
+  /// pixels on the tier drawText actually draws (the hi-res companion at a
+  /// render scale above 1). Returns -1 when a glyph it needs is not carried,
+  /// blank, or unreadable; the caller then uses getSpaceAdvance. Which gaps to
+  /// rule is the caller's decision (spacedsign::decide).
+  int getSpacedSignGap(int fontId, uint32_t leftCp, EpdFontFamily::Style leftStyle, uint32_t rightCp,
+                       EpdFontFamily::Style rightStyle, EpdFontFamily::Style signStyle) const;
   /// Returns the kerning adjustment between two adjacent codepoints.
   int getKerning(int fontId, uint32_t leftCp, uint32_t rightCp, EpdFontFamily::Style style) const;
   int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style) const;

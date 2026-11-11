@@ -1,16 +1,28 @@
-// The spaced-sign rule (lib/EpdFont/SpacedSignWhite.h): a space beside a math
-// sign is set so the visible white on both sides of the sign is one target.
+// The spaced-sign rule (lib/EpdFont/SpacedSignWhite.h): a space beside a LONE
+// math sign is set so the visible white on both sides of the sign is one
+// target; a sign is ruled on both sides or on neither.
 
 #include <SpacedSignWhite.h>
 #include <gtest/gtest.h>
 
+using spacedsign::FarSide;
 using spacedsign::GlyphBox;
+using spacedsign::Sign;
 
 namespace {
 
 // White drawn between two glyphs across a space: rsb(left) + space + lsb(right).
 int whiteAcross(const GlyphBox& left, const int spacePx, const GlyphBox& right) {
   return left.rightBearingPx() + spacePx + right.leftPx;
+}
+
+const FarSide kEdge{};                     // paragraph edge
+const FarSide kSpaced{true, true, false};  // an ordinary space to a full-size word
+const FarSide kGlued{true, false, false};  // a no-break space or an attached token
+const FarSide kSupSub{true, true, true};   // a superscript/subscript word
+
+Sign decide(const char* l, const char* r, const FarSide& before = kSpaced, const FarSide& after = kSpaced) {
+  return spacedsign::decide(l, false, r, false, before, after);
 }
 
 }  // namespace
@@ -28,13 +40,50 @@ TEST(SpacedSignWhite, SignSetIsTheMathSignsAndNotTheProseMarks) {
   }
 }
 
-TEST(SpacedSignWhite, AppliesOnlyBesideASign) {
-  EXPECT_TRUE(spacedsign::applies('1', '+'));
-  EXPECT_TRUE(spacedsign::applies('+', '1'));
-  EXPECT_TRUE(spacedsign::applies('=', 0x2212));
-  EXPECT_FALSE(spacedsign::applies('1', '1'));
-  EXPECT_FALSE(spacedsign::applies('n', 'n'));  // the layout's reference space
-  EXPECT_FALSE(spacedsign::applies('a', '-'));
+TEST(SpacedSignWhite, ALoneSignIsAWordThatIsExactlyOneSign) {
+  for (const char* w : {"+", "=", "<", ">", "\xC3\x97" /* × */, "\xE2\x88\x92" /* − */, "\xE2\x89\xA5" /* ≥ */}) {
+    EXPECT_TRUE(spacedsign::isLoneSign(w)) << w;
+  }
+  for (const char* w : {"", "C++", "A+", "18+", "<div>", "->", "!=", "-=", "==", "+1", "=7.", "-", "x",
+                        "+\xCC\x84" /* + with a combining macron */}) {
+    EXPECT_FALSE(spacedsign::isLoneSign(w)) << w;
+  }
+  EXPECT_FALSE(spacedsign::isLoneSign(nullptr));
+}
+
+TEST(SpacedSignWhite, SpacedSumsAreRuledOnTheSignSide) {
+  EXPECT_EQ(decide("1", "+"), Sign::Right);
+  EXPECT_EQ(decide("+", "1"), Sign::Left);
+  EXPECT_EQ(decide("x", "\xE2\x88\x92"), Sign::Right);       // x −
+  EXPECT_EQ(decide("=", "\xE2\x88\x92"), Sign::Right);       // = −: the right sign owns the gap
+  EXPECT_EQ(decide("1", "+", kSpaced, kEdge), Sign::Right);  // a sign ending the paragraph
+}
+
+// Prose and code that merely CONTAIN a sign keep the ordinary space, on both
+// sides (the review's list).
+TEST(SpacedSignWhite, ProseAndCodeAreUntouched) {
+  const char* pairs[][2] = {{"C++", "is"}, {"A+", "grade"}, {"18+", "years"}, {"<div>", "element"}, {"a", "->"},
+                            {"->", "b"},   {"a", "!="},     {"!=", "b"},      {"x", "-="},          {"-=", "1"},
+                            {"a", "-"},    {"-", "b"},      {"and", "/"},     {"the", "quiet"}};
+  for (const auto& p : pairs) {
+    EXPECT_EQ(decide(p[0], p[1]), Sign::None) << p[0] << " | " << p[1];
+  }
+}
+
+// A sign is ruled on both sides or neither: if its far side cannot be ruled,
+// this side is left alone too, so a sum is never made one-sided.
+TEST(SpacedSignWhite, ASignWhoseFarSideIsGluedOrHalfSizeIsLeftAlone) {
+  // "x&nbsp;= y": the gap (=, y) sees "=" glued to its left.
+  EXPECT_EQ(decide("=", "y", kGlued, kSpaced), Sign::None);
+  // "x =&nbsp;y": the gap (x, =) sees "=" glued to its right.
+  EXPECT_EQ(decide("x", "=", kSpaced, kGlued), Sign::None);
+  // "x<sup>2</sup> = y": the far side of "=" is a superscript.
+  EXPECT_EQ(decide("=", "y", kSupSub, kSpaced), Sign::None);
+  // A superscript neighbor in this gap.
+  EXPECT_EQ(spacedsign::decide("2", true, "=", false, kSpaced, kSpaced), Sign::None);
+  EXPECT_EQ(spacedsign::decide("=", false, "y", true, kSpaced, kSpaced), Sign::None);
+  // The far side of the OTHER word does not matter when that word is no sign.
+  EXPECT_EQ(decide("1", "+", kGlued, kSpaced), Sign::Right);
 }
 
 TEST(SpacedSignWhite, TargetIsTheFiguresWhiteAcrossASpace) {
@@ -52,22 +101,42 @@ TEST(SpacedSignWhite, BothSidesOfTheSignGetTheSameWhite) {
   const GlyphBox x{6, 0, 6};
   for (const GlyphBox& before : {one, four, x}) {
     for (const GlyphBox& after : {one, four, x}) {
-      const int leftSpace = spacedsign::spaceForWhitePx(before, plus, target);
-      const int rightSpace = spacedsign::spaceForWhitePx(plus, after, target);
+      const int leftSpace = spacedsign::spaceForWhite(before, plus, target);
+      const int rightSpace = spacedsign::spaceForWhite(plus, after, target);
       EXPECT_EQ(whiteAcross(before, leftSpace, plus), target);
       EXPECT_EQ(whiteAcross(plus, rightSpace, after), target);
     }
   }
 }
 
+// At a render scale of 2 the boxes are device pixels and the space is logical:
+// each side lands within one device pixel of the target.
+TEST(SpacedSignWhite, AtScaleTwoEachSideIsWithinOneDevicePixel) {
+  const int scale = 2;
+  const int target = 17;  // odd, so exact equality is impossible for some bearings
+  for (int rsb = -2; rsb <= 5; rsb++) {
+    for (int lsb = -2; lsb <= 5; lsb++) {
+      const GlyphBox left{20, 2, 18 - rsb};  // advance 20, ink from 2, rsb as given
+      const GlyphBox right{20, lsb, 10};
+      const int space = spacedsign::spaceForWhite(left, right, target, scale);
+      const int white = left.rightBearingPx() + space * scale + right.leftPx;
+      if (target - rsb - lsb > 0) {
+        EXPECT_LE(std::abs(white - target), 1) << rsb << " " << lsb;
+      } else {
+        EXPECT_EQ(space, 0);
+      }
+    }
+  }
+}
+
 TEST(SpacedSignWhite, BearingsWiderThanTheTargetFloorTheSpaceAtZero) {
   const GlyphBox wide{12, 5, 2};  // rsb 5, lsb 5
-  EXPECT_EQ(spacedsign::spaceForWhitePx(wide, wide, 6), 0);
+  EXPECT_EQ(spacedsign::spaceForWhite(wide, wide, 6), 0);
 }
 
 TEST(SpacedSignWhite, NegativeBearingsWidenTheSpace) {
   const GlyphBox overhang{6, -1, 8};  // ink past both edges: rsb -1, lsb -1
-  EXPECT_EQ(spacedsign::spaceForWhitePx(overhang, overhang, 6), 8);
+  EXPECT_EQ(spacedsign::spaceForWhite(overhang, overhang, 6), 8);
 }
 
 // The converter keeps FreeType's box but quantizes faint coverage to level 0,

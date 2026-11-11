@@ -3,6 +3,7 @@
 #include <BidiUtils.h>
 #include <GfxRenderer.h>
 #include <Logging.h>
+#include <SpacedSignWhite.h>
 #include <Utf8.h>
 
 #include <algorithm>
@@ -82,6 +83,58 @@ uint32_t lastCodepoint(const std::string& word) {
 }
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
+
+// The last codepoint of a word that draws ink of its own: a trailing combining
+// mark rides on the base before it (x̄), so the base is what the white is
+// measured from.
+uint32_t lastBaseCodepoint(const std::string& word) {
+  const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str());
+  uint32_t base = 0;
+  uint32_t cp;
+  while ((cp = utf8NextCodepoint(&ptr)) != 0) {
+    if (!utf8IsCombiningMark(cp)) base = cp;
+  }
+  return base;
+}
+
+bool isSupSub(const EpdFontFamily::Style style) { return (style & (EpdFontFamily::SUP | EpdFontFamily::SUB)) != 0; }
+
+// The token at `far` seen from a lone sign, across the gap before token
+// `gapToken` (the sign's other gap). Indices are into the same arrays the
+// caller's words come from; out of range means a paragraph or line edge.
+template <typename Styles, typename Flags>
+spacedsign::FarSide farSide(const long far, const long gapToken, const Styles& styles, const Flags& continues,
+                            const Flags& noSpaceBefore) {
+  spacedsign::FarSide f;
+  const long n = static_cast<long>(styles.size());
+  if (far < 0 || far >= n || gapToken < 0 || gapToken >= n) return f;
+  f.exists = true;
+  f.spaced = !continues[gapToken] && !noSpaceBefore[gapToken];
+  f.supSub = isSupSub(styles[far]);
+  return f;
+}
+
+// The ordinary word space between `left` and `right`: the font's space with its
+// flanking kerns, exactly as before -- unless one of the two words is a lone
+// math sign that spacedsign::decide rules, in which case the space gives the
+// drawn white on this side of the sign the sign's target (SpacedSignWhite.h).
+// `k` is the index of `right` in styles/continues/noSpaceBefore; the sign's
+// far side is read from k-2 (left sign) or k+1 (right sign).
+template <typename Styles, typename Flags>
+int wordSpace(const GfxRenderer& renderer, const int fontId, const std::string& left, const std::string& right,
+              const long k, const Styles& styles, const Flags& continues, const Flags& noSpaceBefore) {
+  const EpdFontFamily::Style leftStyle = styles[k - 1];
+  const EpdFontFamily::Style rightStyle = styles[k];
+  const int plain = renderer.getSpaceAdvance(fontId, lastCodepoint(left), firstCodepoint(right), leftStyle);
+  const spacedsign::Sign sign = spacedsign::decide(
+      left.c_str(), isSupSub(leftStyle), right.c_str(), isSupSub(rightStyle),
+      farSide(k - 2, k - 1, styles, continues, noSpaceBefore), farSide(k + 1, k + 1, styles, continues, noSpaceBefore));
+  if (sign == spacedsign::Sign::None) return plain;
+  const EpdFontFamily::Style signStyle = sign == spacedsign::Sign::Right ? rightStyle : leftStyle;
+  const int ruled = renderer.getSpacedSignGap(fontId, lastBaseCodepoint(left), leftStyle, firstCodepoint(right),
+                                              rightStyle, signStyle);
+  return ruled >= 0 ? ruled : plain;
+}
 
 // Alphabet length: the width of a-z set in this face at this size, which is
 // what the automatic-justification estimate divides the measure by (see
@@ -469,7 +522,7 @@ struct KnuthPlassModel {
   int gapBefore(const int k) const {
     if (noSpaceBefore[k]) return 0;
     if (!continues[k]) {
-      return renderer.getSpaceAdvance(fontId, lastCodepoint(words[k - 1]), firstCodepoint(words[k]), styles[k - 1]);
+      return wordSpace(renderer, fontId, words[k - 1], words[k], k, styles, continues, noSpaceBefore);
     }
     return renderer.getKerning(fontId, lastCodepoint(words[k - 1]), firstCodepoint(words[k]), styles[k - 1]);
   }
@@ -1122,8 +1175,8 @@ std::vector<size_t> ParsedText::computeLineBreaks(const GfxRenderer& renderer, c
       if (j > static_cast<size_t>(i) && noSpaceBeforeVec[j]) {
         gap = 0;
       } else if (j > static_cast<size_t>(i) && !continuesVec[j]) {
-        gap =
-            renderer.getSpaceAdvance(fontId, lastCodepoint(words[j - 1]), firstCodepoint(words[j]), wordStyles[j - 1]);
+        gap = wordSpace(renderer, fontId, words[j - 1], words[j], static_cast<long>(j), wordStyles, continuesVec,
+                        noSpaceBeforeVec);
       } else if (j > static_cast<size_t>(i) && continuesVec[j]) {
         // Cross-boundary kerning for continuation words (e.g. nonbreaking spaces, attached punctuation)
         gap = renderer.getKerning(fontId, lastCodepoint(words[j - 1]), firstCodepoint(words[j]), wordStyles[j - 1]);
@@ -1385,8 +1438,8 @@ std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& r
       if (!isFirstWord && noSpaceBeforeVec[currentIndex]) {
         spacing = 0;
       } else if (!isFirstWord && !continuesVec[currentIndex]) {
-        spacing = renderer.getSpaceAdvance(fontId, lastCodepoint(words[currentIndex - 1]),
-                                           firstCodepoint(words[currentIndex]), wordStyles[currentIndex - 1]);
+        spacing = wordSpace(renderer, fontId, words[currentIndex - 1], words[currentIndex],
+                            static_cast<long>(currentIndex), wordStyles, continuesVec, noSpaceBeforeVec);
       } else if (!isFirstWord && continuesVec[currentIndex]) {
         // Cross-boundary kerning for continuation words (e.g. nonbreaking spaces, attached punctuation)
         spacing = renderer.getKerning(fontId, lastCodepoint(words[currentIndex - 1]),
@@ -1619,8 +1672,9 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
             std::min(lineShrinkCap,
                      kpbreak::shrinkPerGapPx(renderer.getSpaceAdvance(fontId, 'n', 'n', lineWordStyles[wordIdx - 1])));
       }
-      totalNaturalGaps += renderer.getSpaceAdvance(fontId, lastCodepoint(lineWords[wordIdx - 1]),
-                                                   firstCodepoint(lineWords[wordIdx]), lineWordStyles[wordIdx - 1]);
+      totalNaturalGaps +=
+          wordSpace(renderer, fontId, lineWords[wordIdx - 1], lineWords[wordIdx],
+                    static_cast<long>(lastBreakAt + wordIdx), wordStyles, continuesVec, noSpaceBeforeVec);
     } else if (wordIdx > 0 && continuesVec[lastBreakAt + wordIdx]) {
       // Non-breaking space tokens (" " with continues=true) are visible, stretchable spaces —
       // count them as justifiable gaps so justifyExtra is distributed to them too.
@@ -1754,9 +1808,10 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
         reorderedGapCount++;
       } else if (wordIdx > 0 && !reorderedContinuesScratch[wordIdx]) {
         reorderedGapCount++;
-        reorderedNaturalGaps += renderer.getSpaceAdvance(fontId, lastCodepoint(reorderedWordsScratch[wordIdx - 1]),
-                                                         firstCodepoint(reorderedWordsScratch[wordIdx]),
-                                                         reorderedStylesScratch[wordIdx - 1]);
+        reorderedNaturalGaps +=
+            wordSpace(renderer, fontId, reorderedWordsScratch[wordIdx - 1], reorderedWordsScratch[wordIdx],
+                      static_cast<long>(wordIdx), reorderedStylesScratch, reorderedContinuesScratch,
+                      reorderedNoSpaceBeforeScratch);
       } else if (wordIdx > 0 && reorderedContinuesScratch[wordIdx]) {
         if (reorderedWordsScratch[wordIdx] == " ") {
           reorderedGapCount++;
@@ -1814,10 +1869,11 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
         xpos += advance;
       } else if (wordIdx + 1 < reorderedWidthsScratch.size()) {
         const bool nextNoSpace = reorderedNoSpaceBeforeScratch[wordIdx + 1];
-        int gap = nextNoSpace ? 0
-                              : renderer.getSpaceAdvance(fontId, lastCodepoint(reorderedWordsScratch[wordIdx]),
-                                                         firstCodepoint(reorderedWordsScratch[wordIdx + 1]),
-                                                         reorderedStylesScratch[wordIdx]);
+        int gap = nextNoSpace
+                      ? 0
+                      : wordSpace(renderer, fontId, reorderedWordsScratch[wordIdx], reorderedWordsScratch[wordIdx + 1],
+                                  static_cast<long>(wordIdx + 1), reorderedStylesScratch, reorderedContinuesScratch,
+                                  reorderedNoSpaceBeforeScratch);
         if (effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
           gap += reorderedJustifyExtra;
         }
@@ -1860,10 +1916,10 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
           bool nextNoSpace = false;
           if (wordIdx + 1 < lineWordCount) {
             nextNoSpace = noSpaceBeforeVec[lastBreakAt + wordIdx + 1];
-            gap = nextNoSpace
-                      ? 0
-                      : renderer.getSpaceAdvance(fontId, lastCodepoint(lineWords[wordIdx]),
-                                                 firstCodepoint(lineWords[wordIdx + 1]), lineWordStyles[wordIdx]);
+            gap = nextNoSpace ? 0
+                              : wordSpace(renderer, fontId, lineWords[wordIdx], lineWords[wordIdx + 1],
+                                          static_cast<long>(lastBreakAt + wordIdx + 1), wordStyles, continuesVec,
+                                          noSpaceBeforeVec);
           }
           if (wordIdx + 1 < lineWordCount && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
             gap += justifyExtra;
@@ -1903,10 +1959,10 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
           bool nextNoSpace = false;
           if (wordIdx + 1 < lineWordCount) {
             nextNoSpace = noSpaceBeforeVec[lastBreakAt + wordIdx + 1];
-            gap = nextNoSpace
-                      ? 0
-                      : renderer.getSpaceAdvance(fontId, lastCodepoint(lineWords[wordIdx]),
-                                                 firstCodepoint(lineWords[wordIdx + 1]), lineWordStyles[wordIdx]);
+            gap = nextNoSpace ? 0
+                              : wordSpace(renderer, fontId, lineWords[wordIdx], lineWords[wordIdx + 1],
+                                          static_cast<long>(lastBreakAt + wordIdx + 1), wordStyles, continuesVec,
+                                          noSpaceBeforeVec);
           }
           if (wordIdx + 1 < lineWordCount && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
             gap += justifyExtra;

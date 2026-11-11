@@ -63,12 +63,10 @@ class SdCardFont {
   // columns of its bitmap that paint a pixel, offset by its left bearing --
   // read straight from the file (record + bitmap), not from the page caches,
   // so it works during layout and leaves the overflow ring alone. For the
-  // spaced-sign rule (SpacedSignWhite.h), which asks it only beside a math
-  // sign; a 32-entry cache keeps a page of sums to a handful of reads.
-  // False for a codepoint the style does not carry, a blank glyph, or an I/O
-  // failure (only the last is not cached). `styleIdx` is a resolved style
-  // index.
-  bool getDrawnBox(uint32_t codepoint, uint8_t styleIdx, uint16_t* advanceX, int* drawnLeft, int* drawnWidth) const;
+  // spaced-sign rule (SpacedSignWhite.h); the caller (GfxRenderer) caches the
+  // answers, this does the I/O every time. `styleIdx` is a resolved index.
+  enum class DrawnBox : uint8_t { Drawn, Blank, NotCarried, Failed };
+  DrawnBox getDrawnBox(uint32_t codepoint, uint8_t styleIdx, uint16_t* advanceX, int* drawnLeft, int* drawnWidth) const;
 
   // Returns true if advance table is populated for at least one style.
   bool hasAdvanceTable() const;
@@ -362,21 +360,6 @@ class SdCardFont {
   // Merge sortedNew (sorted by codepoint, no overlap with existing) into the
   // advance table for styleIdx, preserving sort order; cap-truncates the tail.
   void mergeIntoAdvanceTable(uint8_t styleIdx, const AdvanceEntry* sortedNew, uint32_t newCount);
-
-  // getDrawnBox's cache. Glyph data never changes for a loaded file; load()
-  // empties it. Replaced round-robin. drawnWidth 0 records "no drawn box"
-  // (a blank glyph), so a blank neighbor does not reopen the file per call.
-  struct DrawnBoxEntry {
-    uint32_t codepoint;
-    uint16_t advanceX;
-    int16_t drawnLeft;
-    uint8_t drawnWidth;
-    uint8_t styleIdx;
-  };
-  static constexpr uint32_t DRAWN_BOX_CACHE = 32;
-  mutable DrawnBoxEntry drawnBoxes_[DRAWN_BOX_CACHE] = {};
-  mutable uint32_t drawnBoxCount_ = 0;
-  mutable uint32_t drawnBoxNext_ = 0;
 
   Stats stats_;
   uint32_t contentHash_ = 0;
