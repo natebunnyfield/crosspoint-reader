@@ -6,6 +6,7 @@
 #include <HalGPIO.h>
 #include <Logging.h>
 #include <SdCardFont.h>
+#include <SpacedSignWhite.h>
 #include <Utf8.h>
 
 #include <algorithm>
@@ -2763,6 +2764,55 @@ int GfxRenderer::getSpaceWidth(const int fontId, const EpdFontFamily::Style styl
 
 int GfxRenderer::getSpaceAdvance(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
                                  const EpdFontFamily::Style style) const {
+  // A space beside a math sign is set for equal white on both sides of the
+  // sign (SpacedSignWhite.h). Falls through to the ordinary space whenever a
+  // glyph box it needs is not available.
+  if (spacedsign::applies(leftCp, rightCp)) {
+    const int ruled = getSpacedSignAdvance(fontId, leftCp, rightCp, style);
+    if (ruled >= 0) return ruled;
+  }
+  return getPlainSpaceAdvance(fontId, leftCp, rightCp, style);
+}
+
+int GfxRenderer::getSpacedSignAdvance(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
+                                      const EpdFontFamily::Style style) const {
+  // Drawn box of one codepoint (SpacedSignWhite.h: the columns that paint, not
+  // the bitmap's box). An SD font reads it from its file, which works during
+  // layout; a resident font decodes the glyph it already holds.
+  auto boxOf = [&](const uint32_t cp, spacedsign::GlyphBox& out) -> bool {
+    auto sdIt = sdCardFonts_.find(fontId);
+    if (sdIt != sdCardFonts_.end()) {
+      const uint8_t resolvedStyle = resolveSdCardStyle(*sdIt->second, style);
+      uint16_t adv = 0;
+      int left = 0, width = 0;
+      if (!sdIt->second->getDrawnBox(cp, resolvedStyle, &adv, &left, &width)) return false;
+      out.advancePx = fp4::toPixel(adv);
+      out.leftPx = left;
+      out.widthPx = width;
+      return true;
+    }
+    const auto fontIt = fontMap.find(fontId);
+    if (fontIt == fontMap.end()) return false;
+    const EpdGlyph* g = fontIt->second.getGlyph(cp, style);
+    const EpdFontData* data = fontIt->second.getData(style);
+    if (!g || !data) return false;
+    int first = 0, last = -1;
+    if (!spacedsign::drawnColumns(getGlyphBitmap(data, g), g->width, g->height, data->is2Bit, first, last)) {
+      return false;
+    }
+    out.advancePx = fp4::toPixel(g->advanceX);
+    out.leftPx = g->left + first;
+    out.widthPx = last - first + 1;
+    return true;
+  };
+  spacedsign::GlyphBox left, right, figure;
+  if (!boxOf(leftCp, left) || !boxOf(rightCp, right) || !boxOf(spacedsign::kTargetFigure, figure)) return -1;
+  const int figureSpacePx = getPlainSpaceAdvance(fontId, spacedsign::kTargetFigure, spacedsign::kTargetFigure, style);
+  return spacedsign::spaceForWhitePx(left, right, spacedsign::targetWhitePx(figure, figureSpacePx));
+}
+
+int GfxRenderer::getPlainSpaceAdvance(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
+                                      const EpdFontFamily::Style style) const {
   // Advance table fast-path for SD card fonts during layout. The flanking
   // kerns are applied here since 2026-08-22 via the measure-kern rows
   // (docs/punctuation-kerning-audit-2026-08-22.md §4 P0). For every shipped

@@ -11,6 +11,7 @@
 
 #include "EpdFontFamily.h"
 #include "MissingGlyphLedger.h"
+#include "SpacedSignWhite.h"
 
 // The bytes a glyph's bitmap MUST hold for its declared geometry at the
 // font's bit depth. A card-side .cpfont is untrusted input (a Wi-Fi peer can
@@ -763,6 +764,8 @@ void SdCardFont::computeStyleFileOffsets(PerStyle& s, uint32_t baseOffset) {
 
 bool SdCardFont::load(const char* path) {
   freeAll();
+  drawnBoxCount_ = 0;
+  drawnBoxNext_ = 0;
   if (strlen(path) >= sizeof(filePath_)) {
     LOG_ERR("SDCF", "Path too long (%zu bytes, max %zu)", strlen(path), sizeof(filePath_) - 1);
     return false;
@@ -977,6 +980,61 @@ bool SdCardFont::load(const char* path) {
 }
 
 // --- Codepoint lookup ---
+
+bool SdCardFont::getDrawnBox(const uint32_t codepoint, const uint8_t styleIdx, uint16_t* advanceX, int* drawnLeft,
+                             int* drawnWidth) const {
+  if (!loaded_ || styleIdx >= MAX_STYLES || !styles_[styleIdx].present) return false;
+  for (uint32_t i = 0; i < drawnBoxCount_; i++) {
+    const DrawnBoxEntry& e = drawnBoxes_[i];
+    if (e.codepoint == codepoint && e.styleIdx == styleIdx) {
+      if (e.drawnWidth == 0) return false;
+      if (advanceX) *advanceX = e.advanceX;
+      if (drawnLeft) *drawnLeft = e.drawnLeft;
+      if (drawnWidth) *drawnWidth = e.drawnWidth;
+      return true;
+    }
+  }
+
+  const auto& s = styles_[styleIdx];
+  if (!s.fullIntervals && !s.bmpIntervals) return false;  // coverage index freed/never loaded
+  const int32_t globalIdx = findGlobalGlyphIndex(s, codepoint);
+  if (globalIdx < 0) return false;
+
+  HalFile file;
+  if (!Storage.openFileForRead("SDCF", filePath_, file)) return false;
+  EpdGlyph g = {};
+  if (!file.seekSet(s.glyphsFileOffset + static_cast<uint32_t>(globalIdx) * sizeof(EpdGlyph)) ||
+      file.read(reinterpret_cast<uint8_t*>(&g), sizeof(EpdGlyph)) != sizeof(EpdGlyph) ||
+      !glyphGeometryFitsData(g, s.header.is2Bit)) {
+    file.close();
+    return false;
+  }
+  int first = 0, last = -1;
+  if (g.dataLength > 0) {
+    std::unique_ptr<uint8_t[]> bitmap(new (std::nothrow) uint8_t[g.dataLength]);
+    if (!bitmap || !file.seekSet(s.bitmapFileOffset + g.dataOffset) ||
+        file.read(bitmap.get(), g.dataLength) != static_cast<int>(g.dataLength)) {
+      file.close();
+      return false;
+    }
+    spacedsign::drawnColumns(bitmap.get(), g.width, g.height, s.header.is2Bit, first, last);
+  }
+  file.close();
+
+  DrawnBoxEntry& e = drawnBoxes_[drawnBoxNext_];
+  drawnBoxNext_ = (drawnBoxNext_ + 1) % DRAWN_BOX_CACHE;
+  if (drawnBoxCount_ < DRAWN_BOX_CACHE) drawnBoxCount_++;
+  e.codepoint = codepoint;
+  e.styleIdx = styleIdx;
+  e.advanceX = g.advanceX;
+  e.drawnLeft = static_cast<int16_t>(g.left + (last >= 0 ? first : 0));
+  e.drawnWidth = static_cast<uint8_t>(last >= 0 ? last - first + 1 : 0);
+  if (e.drawnWidth == 0) return false;
+  if (advanceX) *advanceX = e.advanceX;
+  if (drawnLeft) *drawnLeft = e.drawnLeft;
+  if (drawnWidth) *drawnWidth = e.drawnWidth;
+  return true;
+}
 
 int32_t SdCardFont::findGlobalGlyphIndex(const PerStyle& s, uint32_t codepoint) const {
   int left = 0;
