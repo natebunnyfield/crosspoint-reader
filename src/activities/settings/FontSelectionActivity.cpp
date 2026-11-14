@@ -13,6 +13,7 @@
 #include "CrossPointSettings.h"
 #include "FontActivation.h"
 #include "FontDisplayNames.h"
+#include "FontPreviewLines.h"
 #include "MappedInputManager.h"
 #include "ReaderFontSizes.h"
 #include "ReadingFontList.h"
@@ -749,12 +750,25 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
 
   if (fontId == 0) return;
 
-  const int lineH = renderer.getTextHeight(fontId);
-  if (lineH <= 0) return;
+  const int ascender = renderer.getTextHeight(fontId);
+  if (ascender <= 0) return;
+
+  // Lines advance by the font's own line height, as the reader's do -- not by
+  // the ascender, which left no room for one line's descenders and the next
+  // line's accents (FontPreviewLines.h records the bug). The ink height is what a
+  // line needs below its top, for the fit check and for the last line.
+  const fontpreview::LineMetrics lineMetrics =
+      fontpreview::lineMetrics(ascender, renderer.getFontDescenderSize(fontId), renderer.getLineHeight(fontId));
+  const int lineStep = lineMetrics.step;
+  const int lineInkH = lineMetrics.inkHeight;
 
   const int innerHeight = height - metrics_.previewPadding - labelReserved;
-  const int lineStep = lineH + 2;
-  const int maxLines = std::max(1, innerHeight / lineStep);
+  // The prose specimen puts half a line of air before its closing italic, and
+  // that has to be counted here: otherwise the count says the italic fits and
+  // the fit check below then drops its last line -- the one thing the prose
+  // branch promises never to squeeze out.
+  const int proseGap = proseSpecimen_ ? lineStep / 2 : 0;
+  const int maxLines = fontpreview::maxLines(innerHeight - proseGap, lineMetrics);
 
   // Lines are COLLECTED first and drawn second, so the block can be centered in
   // the pane. The pane is now around half the screen (the list below it is
@@ -792,7 +806,7 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
       for (auto& line : renderer.wrappedText(fontId, I18N.get(StrId::STR_FONT_PREVIEW_PROSE_ITALIC), width, italicLines,
                                              EpdFontFamily::ITALIC)) {
         // Half a line of air between the passage and its closing sentence.
-        lines.push_back({std::move(line), EpdFontFamily::ITALIC, first ? lineStep / 2 : 0});
+        lines.push_back({std::move(line), EpdFontFamily::ITALIC, first ? proseGap : 0});
         first = false;
       }
     }
@@ -826,16 +840,16 @@ void FontSelectionActivity::renderPreviewSpecimen(int top, int height, int fontI
                    [](std::string& line) { return SpecimenLine{std::move(line), EpdFontFamily::REGULAR, 0}; });
   }
 
-  int blockHeight = std::accumulate(lines.begin(), lines.end(), 0, [lineStep](int acc, const SpecimenLine& line) {
+  const int advanced = std::accumulate(lines.begin(), lines.end(), 0, [lineStep](int acc, const SpecimenLine& line) {
     return acc + line.gapBefore + lineStep;
   });
-  blockHeight = std::max(0, blockHeight - 2);
+  const int blockHeight = fontpreview::blockHeight(advanced, static_cast<int>(lines.size()), lineMetrics);
 
   const int textBottomLimit = top + height - labelReserved;
   int y = top + metrics_.previewPadding + std::max(0, (innerHeight - blockHeight) / 2);
   for (const auto& line : lines) {
     y += line.gapBefore;
-    if (y + lineH > textBottomLimit) break;
+    if (y + lineInkH > textBottomLimit) break;
     renderer.drawText(fontId, left, y, line.text.c_str(), /*black=*/true, line.style);
     y += lineStep;
   }
