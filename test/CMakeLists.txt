@@ -216,6 +216,7 @@ add_subdirectory(font_cache_manager)
 add_subdirectory(ligature_guard)
 add_subdirectory(inflate_stream)
 add_subdirectory(zip_file)
+add_subdirectory(xtc_parser)
 add_subdirectory(fs_helpers)
 add_subdirectory(json_save_guard)
 
