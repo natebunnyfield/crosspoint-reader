@@ -8,6 +8,7 @@
 
 #include "CrossPointSettings.h"
 #include "FontDisplayNames.h"
+#include "FontPreviewLines.h"
 #include "MappedInputManager.h"
 #include "SdCardFontSystem.h"
 #include "activities/reader/ReaderUtils.h"
@@ -278,19 +279,29 @@ void EditorFontSelectionActivity::renderPreviewSpecimen(int top, int height, int
   const int left = metrics_.previewPadding;
   const int right = renderer.getScreenWidth() - metrics_.previewPadding;
   const int labelH = renderer.getTextHeight(UI_10_FONT_ID);
-  const int labelReserved = labelH + 4 + metrics_.previewPadding;
+  // The label AND the colophon under it, exactly as renderPreviewPane places
+  // them. The colophon was left out, so the pane the specimen was centered in
+  // ran down over the label; with lines spaced by the ascender the block was
+  // short enough not to show it.
+  const int labelReserved = labelH + 4 + metrics_.previewPadding + previewColophonHeight(right - left);
 
-  const int lineH = renderer.getTextHeight(fontId);
-  if (lineH <= 0) return;
-  const int lineStep = lineH + 2;
+  const int ascender = renderer.getTextHeight(fontId);
+  if (ascender <= 0) return;
+  // Lines advance by the font's own line height, as the note editor's do
+  // (NoteEditorActivity: lineHeight = getLineHeight(editorFontId)) -- not by the
+  // ascender, which left no room for one line's descenders and the next line's
+  // accents. FontPreviewLines.h records the bug; the reading picker shares it.
+  const fontpreview::LineMetrics lineMetrics =
+      fontpreview::lineMetrics(ascender, renderer.getFontDescenderSize(fontId), renderer.getLineHeight(fontId));
+  const int lineStep = lineMetrics.step;
 
   const int innerHeight = height - metrics_.previewPadding - labelReserved;
-  const int maxLines = std::max(1, innerHeight / lineStep);
+  const int maxLines = fontpreview::maxLines(innerHeight, lineMetrics);
 
   // Each source line is drawn through the editor's own markdown renderer, so
   // the gutter markers, the hanging indent and the bold/italic runs land where
   // they will while typing. indentStep is the line height, matching what
-  // NoteEditorActivity passes.
+  // NoteEditorActivity passes -- the font's line height, which is lineStep now.
   const char* specimen = I18N.get(StrId::STR_EDITOR_FONT_PREVIEW_TEXT);
   const int textBottomLimit = top + height - labelReserved;
 
@@ -306,7 +317,7 @@ void EditorFontSelectionActivity::renderPreviewSpecimen(int top, int height, int
     ++lineCount;
     c = nl ? nl + 1 : nullptr;
   }
-  const int blockHeight = std::max(0, lineCount * lineStep - 2);
+  const int blockHeight = fontpreview::blockHeight(lineCount * lineStep, lineCount, lineMetrics);
 
   int y = top + metrics_.previewPadding + std::max(0, (innerHeight - blockHeight) / 2);
   int drawn = 0;
@@ -314,8 +325,8 @@ void EditorFontSelectionActivity::renderPreviewSpecimen(int top, int height, int
   while (cursor != nullptr && *cursor != '\0' && drawn < maxLines) {
     const char* newline = std::strchr(cursor, '\n');
     const size_t len = newline ? static_cast<size_t>(newline - cursor) : std::strlen(cursor);
-    if (y + lineH > textBottomLimit) break;
-    if (len > 0) mdrender::drawLine(renderer, fontId, lineH, left, y, cursor, len, right);
+    if (y + lineMetrics.inkHeight > textBottomLimit) break;
+    if (len > 0) mdrender::drawLine(renderer, fontId, lineStep, left, y, cursor, len, right);
     y += lineStep;
     ++drawn;
     cursor = newline ? newline + 1 : nullptr;
