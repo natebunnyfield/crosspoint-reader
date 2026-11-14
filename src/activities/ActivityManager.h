@@ -120,6 +120,13 @@ class ActivityManager {
   void goToClaudeChat();
   void goToFirmwareUpdate();
   void goToLibraryUpdate();
+#if FREEINK_CAP_USB_MSC
+  // USB Drive (docs/usb-drive-picco.md): hands the SD card to a USB host until
+  // the host ejects or the cable goes, then reboots to Home. The ONE call the
+  // entry point makes; no screen calls it yet (the entry point and the screen
+  // are the owner's, visual-gated).
+  void goToUsbDrive();
+#endif
   // cleanInitialRefresh: the panel still shows a sleep image (a splashless wake
   // with no retained Quick Resume frame), so Home's first paint goes out as a
   // HALF refresh instead of FAST, or the image ghosts under it (upstream #3009).
@@ -145,6 +152,9 @@ class ActivityManager {
   std::string lastHomeBookPath;
 
   bool preventAutoSleep() const;
+#if FREEINK_CAP_USB_MSC
+  bool requiresExclusiveStorageLoop() const;
+#endif
   bool isReaderActivity() const;
   bool handleForcedRefresh();
   bool skipLoopDelay() const;

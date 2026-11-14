@@ -50,6 +50,10 @@
 #include "network/FirmwareBoardTag.h"
 #include "util/SlideSwitch.h"
 #endif
+#if FREEINK_CAP_USB_MSC
+#include "SilentRestart.h"
+#include "platform/UsbSerialJtagHandoff.h"
+#endif
 
 GfxRenderer renderer(display);
 MappedInputManager mappedInputManager(gpio, renderer);
@@ -610,6 +614,24 @@ void silentRestartToReader() {
   delay(50);
   ESP.restart();
 }
+
+#if FREEINK_CAP_USB_MSC
+void restartToHomeAfterStorageHandoff() {
+  // Never reached while sleeping in practice: USB Drive's exclusive loop (see
+  // loop()) skips every sleep path. Kept from upstream as the same guard
+  // silentRestart() carries.
+  if (deepSleepInProgress) return;
+  // Home, not the reader: the host may have moved, renamed or deleted the
+  // open book, so there is nothing safe to resume.
+  silentRebootTarget = SILENT_REBOOT_TARGET_HOME;
+  silentRebootMagic = SILENT_REBOOT_MAGIC;
+  LOG_DBG("MAIN", "Restart after storage handoff (target=home)");
+  GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
+  delay(50);
+  handoffUsbOtgToSerialJtag();
+  ESP.restart();
+}
+#endif
 
 constexpr char SLEEP_FRAME_FILE[] = "/.crosspoint/sleep_frame.bin";
 
@@ -1387,6 +1409,31 @@ void loop() {
   // settles the post-swap swallow's per-frame state at the frame boundary
   // (input-edge audit 2026-08-21, finding 6).
   mappedInputManager.update();
+
+#if FREEINK_CAP_USB_MSC
+  if (activityManager.requiresExclusiveStorageLoop()) {
+    // USB Drive handed the raw SD card to the host (upstream 218dc6aaf). Run
+    // only the activity: no slide-switch settings save (an SD write, just
+    // below), no serial screenshot, no auto-sleep, power-button sleep or
+    // low-battery sleep (each writes the sleep frame or settings to the card),
+    // and no normal navigation while the filesystem is detached. The activity
+    // leaves only by rebooting.
+    activityManager.loop();
+    if (activityManager.preventAutoSleep()) {
+      powerManager.setPowerSaving(false);
+      delay(10);
+    } else {
+      // No host is active, so a slower loop is safe. The activity itself
+      // times out the raw-storage handoff rather than entering deep sleep
+      // detached. LOW_POWER_FREQ is 80 MHz on the Picco (BOARD_HAS_PSRAM),
+      // upstream's X4 Pro value, not the C3's 10 MHz; USB-OTG at that clock is
+      // UNCONFIRMED here (docs/usb-drive-picco.md).
+      powerManager.setPowerSaving(true);
+      delay(50);
+    }
+    return;
+  }
+#endif
 
 #if FREEINK_DEVICE_PICCO
   // Saves settings to the SD card when the switch moves; cheap otherwise (two
