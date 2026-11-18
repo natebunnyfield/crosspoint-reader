@@ -36,6 +36,21 @@ jobs:
           PATH="/usr/lib/llvm-21/bin:$PATH" ./bin/clang-format-fix
           git diff --exit-code || (echo "Please run 'bin/clang-format-fix' to fix formatting issues" && exit 1)
 
+  # The web pages ship MINIFIED, and the minifier alone broke FilesPage.html's
+  # script for three months (the File Manager never left its spinner) while
+  # every source file stayed valid. Syntax-check what actually ships.
+  html-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Syntax-check minified inline scripts
+        run: python3 scripts/check_html_scripts.py
+
   cppcheck:
     runs-on: ubuntu-latest
     steps:

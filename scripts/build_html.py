@@ -50,19 +50,29 @@ def minify_html(html: str) -> str:
         preserve_blocks.append(match.group(0))
         return f"__PRESERVE_BLOCK_{len(preserve_blocks)-1}__"
 
-    html = re.sub(rf'<({preserve_regex})[\s\S]*?</\1>', preserve, html, flags=re.IGNORECASE)
-
-    # Minify inline <style> blocks (CSS comment stripping)
-    def minify_style_tag(match):
-        open_tag, inner, close_tag = match.group(1), match.group(2), match.group(3)
-        return open_tag + minify_css(inner) + close_tag
-    html = re.sub(r'(<style[^>]*>)([\s\S]*?)(</style>)', minify_style_tag, html, flags=re.IGNORECASE)
-
-    # Minify inline <script> blocks (comment-only line stripping)
+    # Minify inline <script> and <style> blocks, then PROTECT them like the
+    # tags above. Their line breaks are load-bearing: the whitespace collapse
+    # below folds a script onto one line, and the first trailing `// comment`
+    # then comments out everything after it. That shipped (2026-08-03 to
+    # 2026-11-18): FilesPage.html's script became a syntax error, hydrate()
+    # never ran, and the File Manager spun forever. These go first so the
+    # pre/code/textarea pass and the HTML-comment strip cannot reach inside
+    # a script's string literals either. Scripts before styles, because a
+    # script may hold a <style> tag in a string (FilesPage.html's
+    # DEFENSIVE_STYLE), and minify_css would add a newline inside the quotes.
     def minify_script_tag(match):
         open_tag, inner, close_tag = match.group(1), match.group(2), match.group(3)
-        return open_tag + minify_js(inner) + close_tag
+        preserve_blocks.append(open_tag + minify_js(inner) + close_tag)
+        return f"__PRESERVE_BLOCK_{len(preserve_blocks)-1}__"
     html = re.sub(r'(<script[^>]*>)([\s\S]*?)(</script>)', minify_script_tag, html, flags=re.IGNORECASE)
+
+    def minify_style_tag(match):
+        open_tag, inner, close_tag = match.group(1), match.group(2), match.group(3)
+        preserve_blocks.append(open_tag + minify_css(inner) + close_tag)
+        return f"__PRESERVE_BLOCK_{len(preserve_blocks)-1}__"
+    html = re.sub(r'(<style[^>]*>)([\s\S]*?)(</style>)', minify_style_tag, html, flags=re.IGNORECASE)
+
+    html = re.sub(rf'<({preserve_regex})[\s\S]*?</\1>', preserve, html, flags=re.IGNORECASE)
 
     # Remove HTML comments
     html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
@@ -73,8 +83,9 @@ def minify_html(html: str) -> str:
     # Collapse multiple spaces inside tags
     html = re.sub(r'\s+', ' ', html)
 
-    # Restore preserved blocks
-    for i, block in enumerate(preserve_blocks):
+    # Restore preserved blocks, newest first, so a placeholder that ended up
+    # inside a later block (a script inside a <pre>) is restored after it.
+    for i, block in reversed(list(enumerate(preserve_blocks))):
         html = html.replace(f"__PRESERVE_BLOCK_{i}__", block)
 
     return html.strip()
