@@ -1540,6 +1540,9 @@ void loop() {
   const unsigned long activityStartTime = millis();
   activityManager.loop();
   const unsigned long activityDuration = millis() - activityStartTime;
+  // Time blocked in the activity (e.g. a synchronous download) is not idle
+  // time, so it is not counted toward auto-sleep.
+  lastActivityTime += activityDuration;
 
   // Body complete: releases the slice hook's yield (see onEinkBusyWaitSlice).
   powerManager.noteMainLoopIteration();
