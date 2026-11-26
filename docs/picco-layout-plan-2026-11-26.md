@@ -56,4 +56,15 @@ reader margins and the header back arrow match the X4.
   starts N logical px in, N = 0..30 by 2. The owner reads, per edge, the
   smallest N whose block shows its full outer edge; the four numbers become
   the Picco's viewable insets. Do not re-ask.
-
+- **2026-11-26, B1: "Arrow only, + Note's".** On touch boards the header back
+  arrow is the design; no hint bar, rows keep their full height. Create Note,
+  which has no header, gets the same back arrow in its top-left corner. Do not
+  re-ask.
+- **2026-11-26, B2: "Grow 20%".** Picco only: the board profile's uiScale 1.2
+  applies to row heights, 40 -> 48 px (about 5.2 mm on the 3.97" panel).
+  X4/X3 unchanged. Do not re-ask.
+- **2026-11-26, B3: "Rocker up a row".** In the iOS Picco app the rocker moves
+  into the empty upper-right pad slot (the thumb row), beside the slide switch
+  and the third key; Power stays where it is. Do not re-ask.
+- **B5 is moot**: with the rocker in the upper-right slot there is no empty slot
+  for "the gap stays" to cover.
