@@ -203,6 +203,7 @@ void LibraryUpdateActivity::loop() {
 
   int x = 0;
   int y = 0;
+  mappedInput.claimScreenTaps();  // a tap dismisses, on the Picco too
   const bool dismissed =
       backPressed || mappedInput.wasPressed(MappedInputManager::Button::Confirm) || mappedInput.wasScreenTapped(x, y);
   if (dismissed && (state == State::FAILED || state == State::DONE || state == State::CANCELED ||

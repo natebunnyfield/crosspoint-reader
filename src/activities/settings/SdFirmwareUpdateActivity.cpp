@@ -217,6 +217,7 @@ void SdFirmwareUpdateActivity::loop() {
   if (state == State::FAILED) {
     int x = 0;
     int y = 0;
+    mappedInput.claimScreenTaps();  // a tap dismisses, on the Picco too
     if (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
         mappedInput.wasPressed(MappedInputManager::Button::Confirm) || mappedInput.wasScreenTapped(x, y)) {
       if (recoveryMode) {

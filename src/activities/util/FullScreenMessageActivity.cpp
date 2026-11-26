@@ -27,6 +27,7 @@ void FullScreenMessageActivity::onEnter() {
 void FullScreenMessageActivity::loop() {
   int x = 0;
   int y = 0;
+  mappedInput.claimScreenTaps();  // a tap dismisses, on the Picco too
   if (mappedInput.wasPressed(MappedInputManager::Button::Back) || mappedInput.wasScreenTapped(x, y)) {
     finish();
   }

@@ -93,6 +93,7 @@ void IntervalSelectionActivity::loop() {
     return;
   }
 
+  mappedInput.claimScreenTaps();  // the bar and the buttons are tapped, on the Picco too
   if (mappedInput.wasScreenTapped(tx, ty)) {
     if (ty >= barY - 20 && ty < barY + barHeight + 20 && tx >= barX && tx < barX + barWidth) {
       const int range = std::max(1, maxValue - minValue);

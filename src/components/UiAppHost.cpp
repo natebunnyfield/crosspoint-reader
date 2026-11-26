@@ -20,7 +20,8 @@ void UiAppHost::renderUi() {
 
 UiAppHost::TouchRoute UiAppHost::routeTouch(const MappedInputManager& input, const bool withLongPress,
                                             const bool routeHeld) {
-  TouchRoute result;  // named apart from route() — cppcheck flags the shadow
+  TouchRoute result;        // named apart from route() — cppcheck flags the shadow
+  input.claimScreenTaps();  // the Picco hands this screen its taps (MappedInputManager)
   if (!uiReady) return result;
   result.snap = touchSnapshotFrom(input, withLongPress);
   if (!result.snap.touchPressed && !result.snap.touchReleased && !(routeHeld && result.snap.touchHeld)) {

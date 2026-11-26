@@ -84,6 +84,10 @@ class OptionPopup {
     }
 
     const int count = static_cast<int>(ownedStrings.size());
+    // Modal: on the Picco every tap is this popup's (an option picks it, a tap
+    // outside the dialog dismisses it), never Right (owner 2026-11-25:
+    // "modal dialogs need to be touch screen too").
+    input.claimScreenTaps();
     int tx = 0;
     int ty = 0;
     if (input.wasScreenTouchDown(tx, ty)) {

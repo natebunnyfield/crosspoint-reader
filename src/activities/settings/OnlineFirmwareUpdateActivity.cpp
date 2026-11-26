@@ -108,6 +108,7 @@ void OnlineFirmwareUpdateActivity::loop() {
 
   int x = 0;
   int y = 0;
+  mappedInput.claimScreenTaps();  // a tap dismisses, on the Picco too
   const bool dismissed = mappedInput.wasPressed(MappedInputManager::Button::Back) ||
                          mappedInput.wasPressed(MappedInputManager::Button::Confirm) ||
                          mappedInput.wasScreenTapped(x, y);
