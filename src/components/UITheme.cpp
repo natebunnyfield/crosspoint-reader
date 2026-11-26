@@ -13,6 +13,10 @@
 #include "components/themes/BaseTheme.h"
 #include "components/themes/lyra/LyraSixTheme.h"
 
+#if FREEINK_DEVICE_PICCO
+#include <BoardConfig.h>  // the profile's uiScale, for the row heights (getMetrics)
+#endif
+
 UITheme UITheme::instance;
 
 UITheme::UITheme() { setTheme(); }
@@ -42,6 +46,17 @@ const ThemeMetrics& UITheme::getMetrics() const {
     if (touch) {
       adjustedMetrics.buttonHintsHeight = 0;
     }
+#if FREEINK_DEVICE_PICCO
+    // Finger-sized rows on the Picco (owner 2026-11-26, B2 "Grow 20%",
+    // docs/picco-layout-plan-2026-11-26.md): the board profile's uiScale
+    // (SDK BoardConfig.h PICCO, 1.2) applies to list and menu row heights,
+    // 40 -> 48 px. X4 and X3 keep theirs. Every row user asks the theme
+    // (getListRowStep, getButtonMenuRows), so drawing and hit-testing move
+    // together.
+    const float rowScale = BoardConfig::ACTIVE.uiScale;
+    adjustedMetrics.listRowHeight = static_cast<int>(adjustedMetrics.listRowHeight * rowScale + 0.5f);
+    adjustedMetrics.menuRowHeight = static_cast<int>(adjustedMetrics.menuRowHeight * rowScale + 0.5f);
+#endif
     metricsForTouch = touch;
     metricsValid = true;
   }

@@ -107,5 +107,28 @@ for i in "${!ROWS[@]}"; do
   fi
 done
 
+# SETTINGS ROWS BY TOUCH (2026-11-26, B2 "Grow 20%": Picco list rows are
+# 48 px, not 40). Measured on a capture of this build: the selection band of
+# row 0 runs y 108-150 and row 10's 588-630, so row i's center is 129 + 48 i.
+# A row tap must open the row's own screen, which it cannot if the hit rects
+# and the drawn rows disagree.
+SROWS=("1|Typography" "9|ClockOffset")
+for r in "${SROWS[@]}"; do
+  IFS='|' read -r i act <<<"$r"; name="Settings row $i by touch"
+  [ -n "$FILTER" ] && [[ "$name" != *"$FILTER"* ]] && continue
+  dir="$WORK/settings_row_$i"; mkdir -p "$dir"
+  y=$((129 + 48 * i)); t=3500; script="200:QTAP:BACK:2500"
+  for p in UP UP UP UP UP UP UP UP CONFIRM; do script="$script;$t:$p"; t=$((t + 900)); done
+  t=$((t + 2500))
+  ( cd "$dir" && CROSSPOINT_SIM_INPUT_SCRIPT="$script;$t:TAP:200,$y;$((t + 2500)):QUIT" \
+      SDL_VIDEODRIVER=dummy timeout 60 "$BIN" >"$dir/log" 2>&1 )
+  got=$(grep -o 'Entering activity: .*' "$dir/log" | sed -n 4p | sed 's/Entering activity: //')
+  if [ "$got" = "$act" ]; then
+    echo "PASS  $name -> $act"; pass=$((pass + 1))
+  else
+    echo "FAIL  $name -> expected $act, opened ${got:-nothing}  [$dir]"; fail=$((fail + 1))
+  fi
+done
+
 echo "$pass passed, $fail failed  (logs and screenshots: $WORK)"
 [ "$fail" -eq 0 ]

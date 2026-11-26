@@ -222,7 +222,8 @@ void LyraTheme::drawSubHeader(const GfxRenderer& renderer, Rect rect, const char
 }
 
 int LyraTheme::getListRowStep(bool hasSubtitle, int subtitleLines) const {
-  if (!hasSubtitle) return LyraMetrics::values.listRowHeight;
+  // The live metric, not the constant: the Picco grows it (UITheme::getMetrics).
+  if (!hasSubtitle) return UITheme::getInstance().getMetrics().listRowHeight;
   const int extraLines = std::max(0, subtitleLines - 1);
   return LyraMetrics::values.listWithSubtitleRowHeight + extraLines * LyraMetrics::values.listSubtitleLineStep;
 }
@@ -359,9 +360,14 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   // Draw all items
   const auto pageStartIndex = selectedIndex / pageItems * pageItems;
 
-  int iconY = (rowSubtitle != nullptr) ? 16 : 10;
+  // A single-line row grown past the theme's own height (the Picco's rows,
+  // UITheme::getMetrics) keeps its title and icon centered: the extra height
+  // is split above and below them. Zero on every other board.
+  const int growPad = rowSubtitle == nullptr ? (rowHeight - LyraMetrics::values.listRowHeight) / 2 : 0;
+  int iconY = ((rowSubtitle != nullptr) ? 16 : 10) + growPad;
   for (int i = pageStartIndex; i < itemCount && i < pageStartIndex + pageItems; i++) {
     const int itemY = rect.y + (i % pageItems) * rowHeight;
+    const int titleY = itemY + 7 + growPad;
     int rowTextWidth = textWidth;
 
     int valueWidth = 0;
@@ -383,7 +389,7 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
     auto itemName = rowTitle(i);
     auto item = renderer.truncatedText(UI_10_FONT_ID, itemName.c_str(), rowTextWidth);
-    renderer.drawText(UI_10_FONT_ID, textX, itemY + 7, item.c_str(), true);
+    renderer.drawText(UI_10_FONT_ID, textX, titleY, item.c_str(), true);
     // Rightmost pixel any of this row's text reaches. Only used to decide
     // whether the badge below is actually covering something.
     int textRight = textX + renderer.getTextWidth(UI_10_FONT_ID, item.c_str());
@@ -392,7 +398,7 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     if (rowDimmed && rowDimmed(i) && i != selectedIndex) {
       const int titleWidth = renderer.getTextWidth(UI_10_FONT_ID, item.c_str());
       const int lineH = renderer.getLineHeight(UI_10_FONT_ID);
-      for (int py = itemY + 7; py < itemY + 7 + lineH; py++)
+      for (int py = titleY; py < titleY + lineH; py++)
         for (int px = textX; px < textX + titleWidth; px++)
           if ((px + py) % 2 == 0) renderer.drawPixel(px, py, false);
     }
@@ -700,8 +706,10 @@ BaseTheme::MenuRows LyraTheme::getButtonMenuRows(const Rect rect, const int butt
   // y=833 on an 800px screen and cost 1756 dropped-pixel ERR lines per paint
   // (B-012). Compress the gap first, then the tiles, so every row stays
   // reachable rather than silently vanishing.
-  const int naturalPitch = LyraMetrics::values.menuRowHeight + LyraMetrics::values.menuSpacing;
-  int rowHeight = LyraMetrics::values.menuRowHeight;
+  // The live metric, not the constant: the Picco grows it (UITheme::getMetrics).
+  const int menuRowHeight = UITheme::getInstance().getMetrics().menuRowHeight;
+  const int naturalPitch = menuRowHeight + LyraMetrics::values.menuSpacing;
+  int rowHeight = menuRowHeight;
   int pitch = naturalPitch;
   if (buttonCount > 1 && rect.height > 0) {
     const int needed = (buttonCount - 1) * naturalPitch + rowHeight;
