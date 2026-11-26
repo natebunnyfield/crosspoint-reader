@@ -460,3 +460,6 @@ STR_KEY_REJECTED: "Not saved: a key cannot be empty, contain spaces or control c
 STR_CLAUDE_NEEDS_KEY: "No Claude API key. Add it in Settings > Claude API Key."
 STR_KEY_LENGTH_ONE: "1 character"
 STR_KEY_LENGTH_FORMAT: "%u characters"
+STR_EDGE_RULER: "Edge Ruler"
+STR_EDGE_RULER_HINT_1: "For each edge, note the smallest number"
+STR_EDGE_RULER_HINT_2: "whose block shows its full outer edge."

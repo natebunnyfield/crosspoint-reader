@@ -37,6 +37,8 @@ enum class SettingAction {
   // Stored in the key store (util/KeyStore.h), never in settings.json.
   GithubToken,
   ClaudeApiKey,
+  // Picco only: the bezel ruler (EdgeRulerActivity.h, owner 2026-11-26).
+  EdgeRuler,
 };
 
 struct SettingInfo {

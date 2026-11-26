@@ -12,6 +12,7 @@
 #include "ClockOffsetActivity.h"
 #include "ColophonActivity.h"
 #include "CrossPointSettings.h"
+#include "EdgeRulerActivity.h"
 #include "EditorFontSelectionActivity.h"
 #include "FontSelectionActivity.h"
 #include "FontUpdateActivity.h"
@@ -170,6 +171,10 @@ void SettingsActivity::rebuildSettingsLists() {
   // page has its own write-only Keys section (/api/keys).
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_GITHUB_TOKEN, SettingAction::GithubToken));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_CLAUDE_API_KEY, SettingAction::ClaudeApiKey));
+#if FREEINK_DEVICE_PICCO
+  // Measures where the bezel ends (owner 2026-11-26, "Ruler screen").
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_EDGE_RULER, SettingAction::EdgeRuler));
+#endif
   // Informational, so it sits last: who wrote this firmware and what it is
   // built out of. Nothing here changes a setting.
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_COLOPHON, SettingAction::Colophon));
@@ -535,6 +540,9 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::GithubToken:
       case SettingAction::ClaudeApiKey:
         openKeyRow(setting.action);
+        break;
+      case SettingAction::EdgeRuler:
+        startActivityForResult(std::make_unique<EdgeRulerActivity>(renderer, mappedInput), nullptr);
         break;
       case SettingAction::Colophon:
         // Read-only screen: nothing to persist, so it takes no result handler.

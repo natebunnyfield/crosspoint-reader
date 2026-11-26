@@ -48,3 +48,12 @@ exactly one control per physical input; pad cells sit on the X3 grid (within
 previous/next; paper 1:2 spacing out of zen; card top at the safe area; integer
 scale; the keyboard overlaps rather than shrinking the page; popups, list rows,
 reader margins and the header back arrow match the X4.
+
+## Rulings
+
+- **2026-11-26, B4: "Ruler screen".** Settings > Edge Ruler (Picco only,
+  `src/activities/settings/EdgeRulerActivity.h`): along each edge, block N
+  starts N logical px in, N = 0..30 by 2. The owner reads, per edge, the
+  smallest N whose block shows its full outer edge; the four numbers become
+  the Picco's viewable insets. Do not re-ask.
+
