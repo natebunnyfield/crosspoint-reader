@@ -64,6 +64,12 @@ class MappedInputManager {
   // off-target so FreeInkUI routing clears its pressed-element state.
   bool wasScreenTouchReleased() const;
   bool wasTapInRect(int x, int y, int width, int height) const;
+  // A screen that routes every tap itself (the FreeInkUI lists: Settings and
+  // the other UiListActivity screens) says so each loop. On the Picco a tap
+  // there reaches wasScreenTapped() instead of firing Right (owner 2026-11-25:
+  // "tap should be select row"); a tap on no row then does nothing. A no-op on
+  // every other board.
+  void claimScreenTaps() const;
   bool wasListItemTapped(int& index, int itemCount, int selectedIndex, int listTop, int listHeight,
                          bool hasSubtitle) const;
   bool wasListItemTouchedDown(int& index, int itemCount, int selectedIndex, int listTop, int listHeight,
@@ -186,6 +192,34 @@ class MappedInputManager {
   // a synthesized tap on the physical button its logical one maps to
   // (HalGPIO::injectButtonTap).
   void synthesizeGesture() const;
+
+  // TAP SELECTS A ROW (owner 2026-11-25: "picco and ios tap should be select
+  // row"). Every row query (wasListItemTapped/TouchedDown, rowTouch,
+  // colTouch) records the area it asked about; update() keeps the previous
+  // loop's set. A decoder TAP landing inside one of those areas is handed to
+  // the rows -- wasScreenTapped() reports its point for that one frame --
+  // instead of firing Right. A screen that asks no row query (the reader)
+  // records nothing, so its taps stay Right. Swipes and holds are unchanged.
+  struct TouchArea {
+    enum class Kind : uint8_t { List, Rows, Cols };
+    Kind kind = Kind::List;
+    // List: listTop, listHeight, itemCount, selectedIndex.
+    // Rows: top, rowStep, rowCount, xStart, xEnd, rowHeight.
+    // Cols: left, colStep, colCount, yStart, yEnd, colWidth.
+    int v[6] = {};
+    bool hasSubtitle = false;
+  };
+  static constexpr int kMaxTouchAreas = 4;  // 28 B each, two tables: 224 B
+  void noteTouchArea(const TouchArea& area) const;
+  bool touchAreaHit(const TouchArea& area, int x, int y) const;
+  mutable TouchArea touchAreasNow_[kMaxTouchAreas];
+  mutable TouchArea touchAreasPrev_[kMaxTouchAreas];
+  mutable int touchAreasNowCount_ = 0;
+  mutable int touchAreasPrevCount_ = 0;
+  // This frame's tap handed to the rows, in logical coordinates.
+  mutable bool rowTapValid_ = false;
+  mutable int rowTapX_ = 0;
+  mutable int rowTapY_ = 0;
 #endif
   // Fetch the pending swipe (if any) and map both endpoints to logical screen coords
   bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;

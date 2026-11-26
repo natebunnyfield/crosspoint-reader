@@ -334,10 +334,22 @@ void HomeActivity::loop() {
     return;
   }
 
+  // On a SPLIT home only the page on screen answers a touch (as render()
+  // decides it): the cover band on the cover page, the menu rows on the menu
+  // page. Before 2026-11-25 both were live on both pages and the rows were
+  // laid out below the covers even on the menu's own page, so on the menu page
+  // a tap on "Recent Books" (where the cover tile would be) opened the last
+  // book and every other row was off by the cover's height. No touch board
+  // ran a split home until the Picco (owner 2026-11-25: "tap should be select
+  // row").
+  const bool showCoversPage = !splitPages || selectorIndex < bookCount;
+  const bool showMenuPage = !splitPages || selectorIndex >= bookCount;
+
   int tx = 0;
   int ty = 0;
-  if (!recentBooks.empty() && mappedInput.wasScreenTouchDown(tx, ty) && tx >= 0 && tx < renderer.getScreenWidth() &&
-      ty >= metrics.homeTopPadding && ty < metrics.homeTopPadding + metrics.homeCoverTileHeight) {
+  if (showCoversPage && !recentBooks.empty() && mappedInput.wasScreenTouchDown(tx, ty) && tx >= 0 &&
+      tx < renderer.getScreenWidth() && ty >= metrics.homeTopPadding &&
+      ty < metrics.homeTopPadding + metrics.homeCoverTileHeight) {
     if (selectorIndex != 0) {
       selectorIndex = 0;
       requestUpdate();
@@ -345,14 +357,17 @@ void HomeActivity::loop() {
     return;
   }
 
-  if (!recentBooks.empty() &&
+  if (showCoversPage && !recentBooks.empty() &&
       mappedInput.wasTapInRect(0, metrics.homeTopPadding, renderer.getScreenWidth(), metrics.homeCoverTileHeight)) {
     selectorIndex = 0;
     activateSelection();
     return;
   }
 
-  const int menuTop = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
+  // The same top render() gives the menu: just under the header on its own
+  // page, under the covers otherwise.
+  const int menuTop = splitPages ? metrics.homeTopPadding + metrics.homeMenuTopOffset
+                                 : metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
   const int renderedMenuSelection =
       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - recentBooks.size();
   const int renderedMenuCount =
@@ -361,8 +376,9 @@ void HomeActivity::loop() {
   // Row height from the theme, not the metrics table, so the touch grid
   // matches the visuals exactly.
   const int menuRowHeight = GUI.getMenuRowHeight(renderer);
-  const auto menuTouch = mappedInput.rowTouch(menuRow, menuTop, menuRowHeight + metrics.menuSpacing, renderedMenuCount,
-                                              0, INT32_MAX, menuRowHeight);
+  const auto menuTouch = showMenuPage ? mappedInput.rowTouch(menuRow, menuTop, menuRowHeight + metrics.menuSpacing,
+                                                             renderedMenuCount, 0, INT32_MAX, menuRowHeight)
+                                      : MappedInputManager::RowTouch::None;
   if (menuTouch != MappedInputManager::RowTouch::None) {
     const int touchedIndex =
         metrics.homeContinueReadingInMenu ? menuRow : menuRow + static_cast<int>(recentBooks.size());

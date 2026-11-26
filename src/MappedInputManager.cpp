@@ -1,9 +1,11 @@
 #include "MappedInputManager.h"
 
 #include <GfxRenderer.h>
+#include <Logging.h>
 
 #include <algorithm>
 #include <cstdlib>
+#include <iterator>
 
 #include "CrossPointSettings.h"
 #include "components/EdgeSwipe.h"
@@ -172,6 +174,15 @@ void MappedInputManager::rememberTouchHeldTime() const {
 }
 
 bool MappedInputManager::wasScreenTapped(int& x, int& y) const {
+#if FREEINK_DEVICE_PICCO
+  // A decoder tap handed to the rows this frame (synthesizeGesture). Outside a
+  // keyboard the touch model below reads as no touch on the Picco.
+  if (rowTapValid_) {
+    x = rowTapX_;
+    y = rowTapY_;
+    return true;
+  }
+#endif
   float nx = 0.0f;
   float ny = 0.0f;
   if (!gpio.wasTouchTap(nx, ny)) return false;
@@ -218,6 +229,13 @@ bool MappedInputManager::wasTapInRect(const int x, const int y, const int width,
   return wasScreenTapped(tx, ty) && tx >= x && tx < x + width && ty >= y && ty < y + height;
 }
 
+void MappedInputManager::claimScreenTaps() const {
+#if FREEINK_DEVICE_PICCO
+  // One row covering the whole screen.
+  noteTouchArea(TouchArea{TouchArea::Kind::Rows, {0, INT32_MAX, 1, 0, INT32_MAX, 0}, false});
+#endif
+}
+
 bool MappedInputManager::listItemFromPoint(const int x, const int y, int& index, const int itemCount,
                                            const int selectedIndex, const int listTop, const int listHeight,
                                            const bool hasSubtitle) const {
@@ -241,6 +259,9 @@ bool MappedInputManager::listItemFromPoint(const int x, const int y, int& index,
 
 bool MappedInputManager::wasListItemTapped(int& index, const int itemCount, const int selectedIndex, const int listTop,
                                            const int listHeight, const bool hasSubtitle) const {
+#if FREEINK_DEVICE_PICCO
+  noteTouchArea(TouchArea{TouchArea::Kind::List, {listTop, listHeight, itemCount, selectedIndex, 0, 0}, hasSubtitle});
+#endif
   int tx = 0;
   int ty = 0;
   return wasScreenTapped(tx, ty) &&
@@ -249,6 +270,9 @@ bool MappedInputManager::wasListItemTapped(int& index, const int itemCount, cons
 
 bool MappedInputManager::wasListItemTouchedDown(int& index, const int itemCount, const int selectedIndex,
                                                 const int listTop, const int listHeight, const bool hasSubtitle) const {
+#if FREEINK_DEVICE_PICCO
+  noteTouchArea(TouchArea{TouchArea::Kind::List, {listTop, listHeight, itemCount, selectedIndex, 0, 0}, hasSubtitle});
+#endif
   int tx = 0;
   int ty = 0;
   return wasScreenTouchDown(tx, ty) &&
@@ -259,6 +283,9 @@ MappedInputManager::RowTouch MappedInputManager::rowTouch(int& row, const int to
                                                           const int rowCount, const int xStart, const int xEnd,
                                                           const int rowHeight) const {
   if (rowStep <= 0 || rowCount <= 0) return RowTouch::None;
+#if FREEINK_DEVICE_PICCO
+  noteTouchArea(TouchArea{TouchArea::Kind::Rows, {top, rowStep, rowCount, xStart, xEnd, rowHeight}, false});
+#endif
   const auto hit = [&](const int x, const int y) {
     if (x < xStart || x >= xEnd || y < top) return false;
     const int r = (y - top) / rowStep;
@@ -278,6 +305,9 @@ MappedInputManager::RowTouch MappedInputManager::colTouch(int& col, const int le
                                                           const int colCount, const int yStart, const int yEnd,
                                                           const int colWidth) const {
   if (colStep <= 0 || colCount <= 0) return RowTouch::None;
+#if FREEINK_DEVICE_PICCO
+  noteTouchArea(TouchArea{TouchArea::Kind::Cols, {left, colStep, colCount, yStart, yEnd, colWidth}, false});
+#endif
   const auto hit = [&](const int x, const int y) {
     if (y < yStart || y >= yEnd || x < left) return false;
     const int c = (x - left) / colStep;
@@ -390,6 +420,26 @@ void MappedInputManager::synthesizeGesture() const {
   const piccoinput::Result r =
       gestureDecoder.feed(sample, millis(), gpio.isKeyboardTouchOn(), renderer.getScreenWidth());
   if (!r.fired) return;
+  // A tap on a row the screen asked about last loop selects that row: it is
+  // reported through wasScreenTapped() for this frame, and Right is not fired.
+  if (r.tap) {
+    for (int i = 0; i < touchAreasPrevCount_; ++i) {
+      if (touchAreaHit(touchAreasPrev_[i], r.x, r.y)) {
+        rowTapValid_ = true;
+        rowTapX_ = r.x;
+        rowTapY_ = r.y;
+        LOG_DBG("INPUT", "Picco tap at %d,%d -> row", r.x, r.y);
+        return;
+      }
+    }
+    if (touchAreasPrevCount_ > 0) {
+      const TouchArea& a = touchAreasPrev_[0];
+      LOG_DBG("INPUT", "Picco tap at %d,%d on no row (%d areas; first kind %d: %d %d %d %d %d %d)", r.x, r.y,
+              touchAreasPrevCount_, static_cast<int>(a.kind), a.v[0], a.v[1], a.v[2], a.v[3], a.v[4], a.v[5]);
+    } else {
+      LOG_DBG("INPUT", "Picco tap at %d,%d: this screen asked about no rows", r.x, r.y);
+    }
+  }
   // A hold fires while the finger is down: end the contact so its lift cannot
   // also tap (here, or as a key if the Confirm opens a keyboard).
   if (r.endContact) gpio.suppressTouchContact();
@@ -411,11 +461,51 @@ void MappedInputManager::synthesizeGesture() const {
   }
   if (piccoinput::canSynthesizeTap(held, idx)) gpio.injectButtonTap(idx);
 }
+
+void MappedInputManager::noteTouchArea(const TouchArea& area) const {
+  for (int i = 0; i < touchAreasNowCount_; ++i) {
+    const TouchArea& a = touchAreasNow_[i];
+    if (a.kind == area.kind && a.hasSubtitle == area.hasSubtitle &&
+        std::equal(std::begin(a.v), std::end(a.v), std::begin(area.v))) {
+      return;  // the same query asked twice in one loop (handleListTouch asks both)
+    }
+  }
+  if (touchAreasNowCount_ < kMaxTouchAreas) touchAreasNow_[touchAreasNowCount_++] = area;
+}
+
+bool MappedInputManager::touchAreaHit(const TouchArea& area, const int x, const int y) const {
+  const int* v = area.v;
+  switch (area.kind) {
+    case TouchArea::Kind::List: {
+      int index = 0;
+      return listItemFromPoint(x, y, index, v[2], v[3], v[0], v[1], area.hasSubtitle);
+    }
+    case TouchArea::Kind::Rows: {
+      const int top = v[0], step = v[1], count = v[2], xStart = v[3], xEnd = v[4], height = v[5];
+      if (step <= 0 || x < xStart || x >= xEnd || y < top) return false;
+      if ((y - top) / step >= count) return false;
+      return height <= 0 || (y - top) % step < height;
+    }
+    case TouchArea::Kind::Cols: {
+      const int left = v[0], step = v[1], count = v[2], yStart = v[3], yEnd = v[4], width = v[5];
+      if (step <= 0 || y < yStart || y >= yEnd || x < left) return false;
+      if ((x - left) / step >= count) return false;
+      return width <= 0 || (x - left) % step < width;
+    }
+  }
+  return false;
+}
 #endif
 
 void MappedInputManager::update() const {
   gpio.update();
 #if FREEINK_DEVICE_PICCO
+  // The areas the screen asked about in the loop that just ran become the ones
+  // this frame's tap is judged against; a row tap lives for one frame.
+  std::copy(std::begin(touchAreasNow_), std::begin(touchAreasNow_) + touchAreasNowCount_, std::begin(touchAreasPrev_));
+  touchAreasPrevCount_ = touchAreasNowCount_;
+  touchAreasNowCount_ = 0;
+  rowTapValid_ = false;
   // Before the hold stamps and the swallow below read this frame's edges, so
   // a synthesized press is stamped and swallowed exactly like a real one.
   synthesizeGesture();

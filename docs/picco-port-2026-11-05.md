@@ -586,3 +586,30 @@ Picco.
   `src/network/SavedWifiJoin.h:89+` calls `HostWiFi::disconnect/mode/
   hostByName/persistent` and `WIFI_OFF`/`WIFI_STA`/`WL_CONNECT_FAILED`, none of
   which the host WiFi stub has. Not fixed here.
+
+**Ruling 2026-11-25, tap selects a row (supersedes "the firmware's own
+tap-row and tap-zone paths stay gated" in the 2026-11-06 ruling, for rows).**
+On the iOS Picco app's TestFlight build 3 the owner reported *"touching a menu
+item does not select it"* with on-screen counters showing every touch reached
+the firmware, then ruled: *"picco and ios tap should be select row"*. So on
+the Picco (device and iOS app alike) a tap on a list or menu row selects and
+opens it, as on the X4 Pro; anywhere else, the reader included, a tap is
+still Right. Swipes, the hold and the left-edge Back are unchanged.
+
+Mechanism (`MappedInputManager`): every row query (`wasListItemTapped`,
+`wasListItemTouchedDown`, `rowTouch`, `colTouch`) records its area each loop;
+a screen that routes every tap itself through FreeInkUI (`UiListActivity`:
+Settings and the other generic lists) claims the whole screen with
+`claimScreenTaps()`. A decoder TAP (`piccoinput::Result::tap`, with the down
+point) that lands in an area recorded in the previous loop is reported by
+`wasScreenTapped()` for that frame and fires no Right. On a claimed list
+screen a tap on no row therefore does nothing. The touch model itself stays
+gated outside keyboards. Two bugs found on the way, both on the split
+(two-page) Home that no touch board had run before: the rows were laid out
+below the covers even on the menu's own page, and the cover band answered
+taps on the menu page (a tap on Recent Books opened the last book). Home now
+answers only for the page it shows. Measured on the iOS app (iPhone Air
+simulator, Release, real UIKit taps): Home > Settings and Home > Recent Books
+open from a tap on the row, Settings > Dark Mode toggles from a tap, a tap in
+the reader still turns the page. `pio run -e picco` builds (RAM 22.0%, Flash
+30.8%). Device feel UNCONFIRMED.

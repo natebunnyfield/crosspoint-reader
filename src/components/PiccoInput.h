@@ -159,6 +159,13 @@ struct Result {
   // The hold fires while the finger is still down: the caller ends the contact
   // so its lift cannot also tap (owner's ruling; InputManager.h:117-123).
   bool endContact = false;
+  // A TAP (not a swipe or a hold), and the logical point the finger came down
+  // at. MappedInputManager hands a tap that lands on a list or menu row to
+  // that row instead of firing Right (owner 2026-11-25: "picco and ios tap
+  // should be select row").
+  bool tap = false;
+  int x = 0;
+  int y = 0;
 };
 
 constexpr Result fire(const Button button, const bool endContact = false) { return Result{true, button, endContact}; }
@@ -185,7 +192,11 @@ inline Result classifyRelease(const int sx, const int sy, const int ex, const in
   }
   // Inside a keyboard the keyboard itself types the tap.
   if (keyboard || movedBeyondTapSlop || durationMs > TAP_MAX_MS) return Result{};
-  return fire(Button::Right);
+  Result tap = fire(Button::Right);
+  tap.tap = true;
+  tap.x = sx;
+  tap.y = sy;
+  return tap;
 }
 
 // Fed once per input frame (MappedInputManager::update, right after

@@ -60,6 +60,7 @@ bool UiListActivity::handleButtons() {
 bool UiListActivity::routeListTouch() {
   // Touch goes through the FreeInkApp: render() registered the row hit rects;
   // route the snapshot and let the action trampoline dispatch.
+  mappedInput.claimScreenTaps();  // the Picco hands this screen its taps
   const auto route = UiAppHost::routeTouch(mappedInput, wantsTouchLongPress);
   // No pressed-state repaint: the render it triggers would drop a slow tap's
   // release inside the uiReady window (tap-to-activate needed two taps), and

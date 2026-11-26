@@ -125,6 +125,39 @@ TEST(PiccoGesture, TapIsRight) {
   EXPECT_EQ(only(run(d, stroke(240, 400, 240, 400, 80))), Button::Right);
 }
 
+// TAP SELECTS A ROW (owner 2026-11-25): MappedInputManager hands a tap on a
+// list row to the row, so a tap must say it is one and where it came down.
+// Nothing else may claim to be a tap, or a swipe or hold over a menu would
+// open the row it crossed.
+TEST(PiccoGesture, ATapCarriesItsDownPointAndNothingElseIsATap) {
+  {
+    piccoinput::GestureDecoder d;
+    const auto r = run(d, stroke(240, 400, 250, 410, 80));
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_TRUE(r[0].tap);
+    EXPECT_EQ(r[0].x, 240) << "the down point, not the lift";
+    EXPECT_EQ(r[0].y, 400);
+  }
+  {
+    piccoinput::GestureDecoder d;
+    const auto r = run(d, stroke(400, 400, 200, 410, 200));
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_FALSE(r[0].tap) << "swipe";
+  }
+  {
+    piccoinput::GestureDecoder d;
+    const auto r = run(d, stroke(20, 400, 260, 410, 200));
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_FALSE(r[0].tap) << "left-edge Back";
+  }
+  {
+    piccoinput::GestureDecoder d;
+    const auto r = run(d, stroke(240, 400, 240, 400, 900));
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_FALSE(r[0].tap) << "hold";
+  }
+}
+
 TEST(PiccoGesture, SwipesFollowTheIosZenDefaults) {
   {
     piccoinput::GestureDecoder d;
