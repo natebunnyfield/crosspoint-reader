@@ -86,6 +86,13 @@ reader margins and the header back arrow match the X4.
   visible, with an ellipsis at each end that is cut off. The multi-line
   editors (Create Note, the Claude chat input, anything opened with
   `TextEntryLines::Multi`) stay multi-line by design. Do not re-ask.
+- **2026-11-26, the slide switch: "immediate right of power".** Owner: *"move
+  picco switch to the immediate right of power and match vertical and
+  horizontal layout optics without resizing or fucking it up"*. iOS pad: the
+  switch keeps its size and sits one 8 pt step right of POWER, top and bottom
+  level with POWER, its right edge on Confirm's right edge in the row above.
+  The Back slot it used is empty again. Captured on iPhone Air and iPad mini.
+  Do not re-ask.
 
 ## Built (2026-11-26)
 
