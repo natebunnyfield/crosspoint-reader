@@ -716,3 +716,19 @@ UNCONFIRMED.
 **Not covered by the sweep:** reader-side screens (chapter list, footnotes, book
 notes) need a book on the card; the chapter list was checked once on iOS
 (`EpubReaderChapterSelection`, arrow -> `header back`, exited).
+
+### 2026-11-26: the licensed editor faces, copied into a worktree, no longer compile
+
+The 2026-11-07 advice above ("copy those headers into the worktree") stopped
+working: the primary checkout's `pragmatapro_*` / `nittitypewriter_*` headers
+were generated for an older `EpdFontData` (4 pointer fields where the struct now
+has 10), so a worktree Picco build with them fails ("cannot convert
+'std::nullptr_t' to 'uint16_t'"). What worked: symlink
+`lib/EpdFont/local_fonts` to the primary's, and regenerate the 48 headers with
+the worktree's own `fontconvert.py`, exactly the commands in
+`lib/EpdFont/scripts/convert-builtin-fonts.sh` (the PragmataPro and Nitti
+blocks; sizes 12 and 14, tiers 1/2/3x), in a venv with `zopfli`, `freetype-py`
+and `fonttools`. A regenerated header has 15 `nullptr` lines; a stale one has 8.
+Do NOT fan the jobs out with macOS `xargs -I{}`: it silently truncates a
+command over 255 bytes, so the long Nitti and PragmataPro jobs never ran and
+the stale copies stayed. A shell script with `&` and `wait` worked.
