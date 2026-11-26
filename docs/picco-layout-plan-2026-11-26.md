@@ -79,6 +79,13 @@ reader margins and the header back arrow match the X4.
   premise does not hold.
 - **2026-11-26, Clock UTC Offset:** the 8 px taller clock band on the Picco is
   B2 working as ruled. Do not re-ask.
+- **2026-11-26, text fields: "as before, text field needs to be one line".**
+  This extends the keys ruling ("do not wrap long secret inputs or outputs")
+  to every single-line text field, on every board: one line, never wrapping,
+  at a fixed height. A longer text scrolls sideways so the cursor stays
+  visible, with an ellipsis at each end that is cut off. The multi-line
+  editors (Create Note, the Claude chat input, anything opened with
+  `TextEntryLines::Multi`) stay multi-line by design. Do not re-ask.
 
 ## Built (2026-11-26)
 
@@ -259,3 +266,69 @@ seed book is `seed.epub`.
   simulator build in this worktree (`build/` holds only the Picco's), so only
   the Picco app was measured. The turned landscape is unaffected, since
   nothing was changed.
+
+## Built, round 3 (2026-11-26): one-line text fields
+
+The captures are in
+`/private/tmp/claude-501/-Users-natebunnyfield-src/2f7ddd19-354b-4b40-85d2-4aff02275054/scratchpad/picco-layout/r3/`,
+and the scripts there are `field.sh` (Find in Book: a Text field, 128 bytes)
+and `wifipw.sh` (the Wi-Fi password field). This item is a text-field rule
+for all boards, so X4/X3 pixel identity does not apply to it.
+
+- **The window,** `src/components/SingleLineField.h` (new, header-only),
+  `singleline::fit`. It is pure and stateless. When the text fits, all of it
+  shows. Otherwise the tail shows behind a leading ellipsis whenever the
+  cursor is inside it. If the cursor is left of the tail, the window starts
+  at the cursor, with an ellipsis at whichever ends are cut off. Every
+  boundary is a UTF-8 boundary of the shown string. A password's mask is one
+  '*' per byte, so the revealed character stays whole.
+- **KeyboardEntryActivity:**
+  - `render()` draws the one window (`fieldWindow`) at `inputStartY`, and
+    `inputHeight` is always 0, so the field, the tips and the keyboard never
+    move.
+  - The caret and the password's three-part cursor-mode draw are offset by
+    the window start.
+  - `cursorPositionFromPoint()` maps a tap through the same window. A tap on
+    a leading or trailing ellipsis goes to that end of the text: by touch,
+    that is the only way to reach the hidden part.
+  - The wrapping helper `lineBreakEnd` is gone. Short text draws exactly as
+    before.
+- **DaisyEntryActivity** already showed one line, with the tail. It now
+  takes the same window and shows the leading ellipsis. Its cursor is always
+  at the end.
+- **Secret** is unchanged: 8 '*' plus the length, clipped from the front.
+
+**Verification**
+
+- **Builds:** `simulator_picco`, `simulator_x3`, `simulator` and `picco` all
+  build.
+- **Host tests:** 959 of 959, including the new `SingleLineFieldTest`
+  (`test/single_line_field/`, 7 cases):
+  - fits whole;
+  - the tail with its offset;
+  - head with a trailing ellipsis;
+  - mid window;
+  - the window always holds the cursor (every position);
+  - UTF-8 boundaries, including a cursor inside a character;
+  - a masked password whose revealed multibyte character stays whole.
+- **A 120-character Text entry (Find in Book):**
+  - Empty, typed and returned to the start, on Picco | X4 | X3:
+    `picco-find-cmp.png`, `x4-find-cmp.png` and the strips
+    `picco-find-fields.png`, `x4x3-find-fields.png`.
+  - X4 and X3: Up held for cursor mode, then Left held for 125 s, brings the
+    cursor to "T". The window follows, with a trailing ellipsis.
+  - Picco (no cursor mode): a tap on the leading ellipsis puts the cursor at
+    the start, and a later mid-field tap places it there, with both
+    ellipses.
+  - Short against long text on Picco and X4: the only pixels that differ are
+    the text line (y 162-192). The field height, the tips and the keyboard
+    are identical.
+- **A 63-character Wi-Fi password** (the real field, Settings > Wi-Fi
+  Networks > Local Test Network (fake)), Picco and X4, empty and typed:
+  `wifipw-cmp.png`. It shows the tail behind an ellipsis.
+- **Not reachable on screen:** no caller opens `InputType::Password` or
+  `InputType::Url`. The Wi-Fi password field is `InputType::Text`
+  (`WifiSelectionActivity.cpp:331-336`, upstream #3080: shown while typed).
+  So the masked one-line path and the Url field are covered only by the host
+  test, which models the mask, and by code reading.
+- **`tools/key_store_check.sh`:** 15 of 15 (Secret still one line, 8 '*' plus the length). **The back sweep:** 30 of 30 (`r3/checks.txt`).
