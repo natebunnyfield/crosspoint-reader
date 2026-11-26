@@ -641,3 +641,12 @@ Measured on the iOS app (iPhone Air simulator, Release, real UIKit taps):
 Settings shows the arrow, a tap on it logs `Picco tap at 36,59 -> header
 back` and returns to Home. Device feel UNCONFIRMED. If the lost conversation
 settled a different design, it supersedes this.
+Review of 082eedf9b (read-only agent): clean on the title truncation math,
+the tap-read order (wasTouchTap is a per-frame level, and the Picco's row
+hand-off reads first), the icons (only Back24/Back32 added) and the rect's
+lifetime (cleared in exitActivity and on push). Its one finding, "backButton
+defaults to true, so every titled screen grows the arrow", is upstream's
+design (upstream BaseTheme.h: `bool backButton = true`), which the ruling
+ported; the arrow is Back, which every one of those screens already takes
+(on the Picco by swipe up and the left-edge swipe), so it opens no path that
+was closed.
