@@ -15,6 +15,12 @@ fs_
 # crosspoint-simulator/docs/reading-experiments.md
 /reading.jsonl
 /reading.jsonl.*
+# The desktop simulator's KEY STORE (crosspoint-simulator SimHostSettings.h),
+# written beside the simulated card like settings.json above. It holds GitHub
+# tokens and Claude API keys in plain text, and this fork is PUBLIC. Ignored at
+# the root and anywhere below it (a card run from a subdirectory).
+# docs/keys-and-paste-2026-11-26.md, pass 3.
+host-keys.txt
 lib/EpdFont/fontsrc
 lib/I18n/I18nKeys.h
 lib/I18n/I18nStrings.h

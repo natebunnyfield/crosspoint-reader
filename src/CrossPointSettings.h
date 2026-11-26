@@ -584,14 +584,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Owner name, shown on the sleep screens ("whose device is this"). Set from
   // Settings > System > Device owner; empty hides the line.
   char ownerName[48] = "";
-  // GitHub fine-grained personal access token for Update Library (the epub set
-  // is a release on a PRIVATE repo, so the fetch must authenticate). Sized for
-  // fine-grained PATs ("github_pat_" + 82 chars); classic 40-char tokens fit
-  // too. Empty means "not configured" and the Update Library screen says so
-  // instead of fetching. A /github-token.txt on the card root (one line, the
-  // /claude-key.txt pattern) is read FIRST and wins over this field; this one
-  // stays for cards that already carry it. NEVER log this value.
-  char githubToken[104] = "";
   // Remove a book from the Recent Books list when its End-of-Book screen is reached (0 = off, 1 = on)
   uint8_t removeReadBooksFromRecents = 0;
   // Move epub to /Read/ folder on SD card when finished (0 = disabled, 1 = enabled)

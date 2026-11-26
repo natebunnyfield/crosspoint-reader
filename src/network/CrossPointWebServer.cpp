@@ -28,6 +28,7 @@
 #include "html/js/jszip_minJs.generated.h"
 #include "util/BookCacheUtils.h"
 #include "util/DeviceId.h"
+#include "util/KeyStore.h"
 #include "util/TaskWatchdog.h"
 
 namespace {
@@ -250,15 +251,18 @@ void CrossPointWebServer::begin() {
   server->on("/api/wifi", HTTP_GET, [this] { handleGetWifiNetworks(); });
   server->on("/api/wifi", HTTP_POST, [this] { handlePostWifiNetwork(); });
   server->on("/api/wifi/delete", HTTP_POST, [this] { handleDeleteWifiNetwork(); });
+  server->on("/api/keys", HTTP_GET, [this] { handleGetKeys(); });
+  server->on("/api/keys", HTTP_POST, [this] { handlePostKeys(); });
 
   server->onNotFound([this] { handleNotFound(); });
   LOG_DBG("WEB", "[MEM] Free heap after route setup: %d bytes", ESP.getFreeHeap());
 
   // Collect WebDAV headers and register handler
   // If-None-Match is collected so the static-page handlers can answer conditional GETs with 304
-  const char* collectedHeaders[] = {"Depth",      "Destination", "Overwrite",    "If",
-                                    "Lock-Token", "Timeout",     "If-None-Match"};
-  server->collectHeaders(collectedHeaders, 7);
+  // Content-Type is collected for POST /api/keys, which takes JSON only.
+  const char* collectedHeaders[] = {"Depth",      "Destination", "Overwrite",     "If",
+                                    "Lock-Token", "Timeout",     "If-None-Match", "Content-Type"};
+  server->collectHeaders(collectedHeaders, 8);
   // Raw new (nothrow) on purpose: WebServer takes ownership and deletes it when
   // the server stops, so a unique_ptr here would double-free. Without WebDAV the
   // HTTP file transfer still works, so a failure is logged and skipped.
@@ -475,6 +479,15 @@ void CrossPointWebServer::handleNotFound() const {
   // CORS preflight: routes are registered per-method, so OPTIONS requests land
   // here. The Access-Control-Allow-* headers are added by enableCORS().
   if (server->method() == HTTP_OPTIONS) {
+    // Except for the key store: no other site's page may set or clear a key.
+    // POST /api/keys takes JSON only, which a browser sends cross-site only
+    // after a preflight, and this refuses that preflight (pass 3 of
+    // docs/keys-and-paste-2026-11-26.md). The device's own page is same-origin
+    // and never preflights.
+    if (server->uri() == "/api/keys") {
+      server->send(403, "text/plain", "");
+      return;
+    }
     server->send(204, "text/plain", "");
     return;
   }
@@ -1535,6 +1548,75 @@ void CrossPointWebServer::handleGetWifiNetworks() const {
   server->sendContent("]");
   server->sendContent("");
   LOG_DBG("WEB", "Served Wi-Fi credentials API (%zu network(s))", credentials.size());
+}
+
+// The keys the firmware sends to services, write-only. Never their values:
+// whether each is set and, when it is long enough, its last 4 characters --
+// exactly what Settings shows (owner 2026-11-26).
+void CrossPointWebServer::handleGetKeys() const {
+  JsonDocument doc;
+  JsonArray arr = doc.to<JsonArray>();
+  for (const keystore::Key key : keystore::kAllKeys) {
+    JsonObject o = arr.add<JsonObject>();
+    o["name"] = keystore::storageName(key);
+    std::string value;
+    const bool set = keystore::get(key, value);
+    o["set"] = set;
+    char tail[5];
+    keystore::last4(value, tail);
+    o["last4"] = tail;
+  }
+  String out;
+  serializeJson(doc, out);
+  server->send(200, "application/json", out);
+}
+
+// {"name": "githubToken"|"claudeApiKey", "value": "..."} sets a key;
+// {"name": ..., "clear": true} clears it. The response never carries the
+// value, and no error echoes the body.
+void CrossPointWebServer::handlePostKeys() {
+  // JSON only: a "simple" cross-site POST (text/plain, no preflight) is
+  // refused here, and the preflight a JSON one needs is refused in
+  // handleNotFound.
+  if (!server->header("Content-Type").startsWith("application/json")) {
+    server->send(415, "text/plain", "JSON only");
+    return;
+  }
+  if (!server->hasArg("plain")) {
+    server->send(400, "text/plain", "Missing JSON body");
+    return;
+  }
+  JsonDocument doc;
+  if (deserializeJson(doc, server->arg("plain"))) {
+    server->send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+  keystore::Key key;
+  if (!keystore::keyFromName(doc["name"] | "", key)) {
+    server->send(400, "text/plain", "Unknown key name");
+    return;
+  }
+  if (doc["clear"] | false) {
+    keystore::clear(key);
+  } else {
+    const std::string value = doc["value"] | std::string("");
+    if (!keystore::set(key, value)) {
+      server->send(400, "text/plain",
+                   "Not saved: a key cannot be empty, contain spaces or control characters, or be over 255 "
+                   "characters.");
+      return;
+    }
+  }
+  JsonDocument reply;
+  reply["name"] = keystore::storageName(key);
+  std::string stored;
+  reply["set"] = keystore::get(key, stored);
+  char tail[5];
+  keystore::last4(stored, tail);
+  reply["last4"] = tail;
+  String out;
+  serializeJson(reply, out);
+  server->send(200, "application/json", out);
 }
 
 void CrossPointWebServer::handlePostWifiNetwork() {

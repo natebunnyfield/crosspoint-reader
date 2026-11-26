@@ -1,6 +1,7 @@
 #include "KeyboardEntryActivity.h"
 
 #include "notes/Grid13Layout.h"
+#include "util/KeyStoreCore.h"
 namespace grid13ns = grid13;
 
 #include <HalGPIO.h>
@@ -175,8 +176,10 @@ void KeyboardEntryActivity::onEnter() {
   interactionsReady = false;
   // Tell the host a text field is open. No-op on device; on a simulator host
   // it raises that host's keyboard (a phone's on-screen one) and takes the
-  // keyboard off the button map for as long as we are here.
-  mappedInput.setTextEntryActive(true);
+  // keyboard off the button map for as long as we are here. A Secret field
+  // also asks it for no autocapitalization and no autocorrect.
+  mappedInput.setTextEntryActive(
+      true, inputType == InputType::Secret ? HalGPIO::TextEntryLines::SingleSecret : HalGPIO::TextEntryLines::Single);
 #if FREEINK_DEVICE_PICCO
   // The one place the Picco takes touch: this keyboard, while it is up.
   mappedInput.setKeyboardTouch(true);
@@ -452,6 +455,19 @@ bool KeyboardEntryActivity::clearAllOrAltOnSelected() {
 }
 
 std::string KeyboardEntryActivity::displayTextForCurrentState() const {
+  if (inputType == InputType::Secret) {
+    // One line, whatever the length (owner 2026-11-26: "do not wrap long
+    // secret inputs or outputs"): a fixed mask and the length, no character of
+    // the key. Clipped from the front if a narrow panel cannot fit it.
+    std::string shown = keystore::secretEntryText(text, tr(STR_KEY_LENGTH_ONE), tr(STR_KEY_LENGTH_FORMAT));
+    int availableWidth = renderer.getScreenWidth();
+    if (gpio.deviceIsX3()) availableWidth -= 2 * UITheme::getInstance().getMetrics().sideButtonHintsWidth;
+    const int fieldWidth = availableWidth * UITheme::getInstance().getMetrics().keyboardTextFieldWidthPercent / 100;
+    while (!shown.empty() && shown[0] == '*' && renderer.getTextWidth(UI_12_FONT_ID, shown.c_str()) > fieldWidth) {
+      shown.erase(0, 1);
+    }
+    return shown;
+  }
   std::string displayText = text;
   if (inputType != InputType::Password || passwordVisible) {
     return displayText;
@@ -659,7 +675,10 @@ void KeyboardEntryActivity::loop() {
   int ty = 0;
 
   size_t touchedCursorPos = 0;
-  if (mappedInput.wasScreenTapped(tx, ty) && cursorPositionFromPoint(tx, ty, touchedCursorPos)) {
+  // A Secret field has no cursor placement: the cursor stays at the end, so
+  // its display (a mask and a length) need not line up with the text.
+  if (inputType != InputType::Secret && mappedInput.wasScreenTapped(tx, ty) &&
+      cursorPositionFromPoint(tx, ty, touchedCursorPos)) {
     cursorPos = std::min(touchedCursorPos, text.length());
     // The masked text field maps taps per byte; snap back to a boundary so
     // the cursor never lands inside a multi-byte character.
@@ -754,7 +773,10 @@ void KeyboardEntryActivity::loop() {
     upLongHandled = false;
   }
 
-  if (upHeld && !upLongHandled && mappedInput.isPressed(MappedInputManager::Button::Up) &&
+  // No cursor mode in a Secret field: it draws the character under the
+  // cursor, which would put a character of the key on screen.
+  if (inputType != InputType::Secret && upHeld && !upLongHandled &&
+      mappedInput.isPressed(MappedInputManager::Button::Up) &&
       mappedInput.getHeldTime(MappedInputManager::Button::Up) > LONG_PRESS_MS) {
     cursorMode = true;
     upLongHandled = true;
@@ -930,6 +952,11 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   int inputHeight = 0;
 
   std::string displayText = displayTextForCurrentState();
+  // Where the cursor is drawn, in displayText. The text's own cursorPos for
+  // every field but Secret, whose display is a mask and a length that do not
+  // line up with the text byte for byte; its cursor is always at the end.
+  const bool secret = inputType == InputType::Secret;
+  const size_t shownCursor = secret ? displayText.length() : cursorPos;
 
   const bool isPassword = (inputType == InputType::Password);
   int availableWidth = pageWidth;
@@ -948,7 +975,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
 
   // The cursor spans a whole code point: a lone byte of it renders as a replacement glyph.
   // Masking is per byte, so displayText keeps text's length and the same span applies to both.
-  const size_t cursorCharBytes = (cursorPos < text.length()) ? utf8Next(text, cursorPos) - cursorPos : 0;
+  const size_t cursorCharBytes = (!secret && cursorPos < text.length()) ? utf8Next(text, cursorPos) - cursorPos : 0;
   char cursorChar[8] = {};         // the character under the cursor
   char displayCursorChar[8] = {};  // same span of displayText, masked for passwords
   if (cursorCharBytes > 0) {
@@ -976,13 +1003,13 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     {
       const bool isLastLine = (lineEndIdx == static_cast<int>(displayText.length()));
       bool isCursorLine = false;
-      if (!cursorDrawn && cursorPos >= lineStartIdx &&
-          (isLastLine ? cursorPos <= lineEndIdx : cursorPos < lineEndIdx)) {
+      if (!cursorDrawn && shownCursor >= lineStartIdx &&
+          (isLastLine ? shownCursor <= lineEndIdx : shownCursor < lineEndIdx)) {
         std::string beforeCursor;
         if (isPassword && !passwordVisible && cursorMode) {
-          beforeCursor = std::string(cursorPos - lineStartIdx, '*');
+          beforeCursor = std::string(shownCursor - lineStartIdx, '*');
         } else {
-          beforeCursor = displayText.substr(lineStartIdx, cursorPos - lineStartIdx);
+          beforeCursor = displayText.substr(lineStartIdx, shownCursor - lineStartIdx);
         }
         int beforeWidth = renderer.getTextAdvanceX(UI_12_FONT_ID, beforeCursor.c_str(), EpdFontFamily::REGULAR);
         int kernOffset = 0;
@@ -1008,11 +1035,11 @@ void KeyboardEntryActivity::render(RenderLock&&) {
         // Draw text in 3 parts to avoid block cursor overflowing onto next char.
         // displayText uses '*' for all chars; actual char may be wider than '*'.
         // Part 1: chars before cursor position
-        const std::string part1 = displayText.substr(lineStartIdx, cursorPos - lineStartIdx);
+        const std::string part1 = displayText.substr(lineStartIdx, shownCursor - lineStartIdx);
         renderer.drawText(UI_12_FONT_ID, lineStartX, inputStartY + inputHeight, part1.c_str());
         // Part 2: skip cursor slot (block + actual char drawn later)
         // Part 3: chars after cursor position (skip char under cursor), starting at cursorPixelX + cursorCharWidth
-        const int afterStart = static_cast<int>(cursorPos + cursorCharBytes);
+        const int afterStart = static_cast<int>(shownCursor + cursorCharBytes);
         const int afterEnd = lineEndIdx;
         if (afterStart < afterEnd) {
           const std::string part3 = displayText.substr(afterStart, afterEnd - afterStart);
@@ -1035,13 +1062,13 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   GUI.drawTextField(renderer, Rect{0, inputStartY, pageWidth, inputHeight}, fieldWidth, cursorMode, lineMargin,
                     pageWidth - 2 * lineMargin);
 
-  if (cursorMode && !togglePos && cursorPos <= displayText.length()) {
+  if (cursorMode && !togglePos && shownCursor <= displayText.length()) {
     static constexpr int blockPadding = 1;
     renderer.fillRect(cursorPixelX - blockPadding, cursorLineY, cursorCharWidth + blockPadding * 2, lineHeight, true);
     if (cursorCharBytes > 0) {
       renderer.drawText(UI_12_FONT_ID, cursorPixelX, cursorLineY, cursorChar, false);
     }
-  } else if (cursorPos <= displayText.length()) {
+  } else if (shownCursor <= displayText.length()) {
     static constexpr int serifW = 3;
     static constexpr int stemW = 2;
     static constexpr int serifH = 2;

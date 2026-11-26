@@ -32,6 +32,11 @@ enum class SettingAction {
   PairBluetoothKeyboard,
   ForgetBluetoothKeyboard,
   Colophon,
+  // The keys the firmware sends to services (owner 2026-11-26): each opens
+  // the text entry, shows only its last 4 characters, and can be cleared.
+  // Stored in the key store (util/KeyStore.h), never in settings.json.
+  GithubToken,
+  ClaudeApiKey,
 };
 
 struct SettingInfo {
@@ -254,6 +259,9 @@ class SettingsActivity final : public UiListActivity {
   std::vector<SettingInfo> deviceSettings;
 
   OptionPopup optionPopup;
+  // Settings > GitHub Token / Claude API Key: enter (or paste) and clear.
+  void openKeyRow(SettingAction action);
+  void enterKey(SettingAction action);
 
   void toggleCurrentSetting();
   void rebuildSettingsLists();

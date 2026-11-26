@@ -10,7 +10,7 @@
 
 class HalGPIO {
  public:
-  enum class TextEntryLines : uint8_t { Single, Multi };
+  enum class TextEntryLines : uint8_t { Single, Multi, SingleSecret };
   void setTextEntryActive(bool, TextEntryLines = TextEntryLines::Single) {}
   bool consumeTypedText(std::string&) { return false; }
   bool isHostKeyboardVisible() const { return false; }

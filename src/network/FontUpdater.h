@@ -105,7 +105,7 @@ class FontUpdater {
 
   enum FontError {
     OK = 0,
-    NO_TOKEN,        // no /github-token.txt and SETTINGS.githubToken empty — say so, do nothing else
+    NO_TOKEN,        // no GitHub token in the key store (util/KeyStore.h) — say so, do nothing else
     HTTP_ERROR,      // could not reach GitHub (or a non-404 failure)
     BAD_TOKEN,       // GitHub answered 401/403: the token is wrong, expired or unscoped
     NO_REPO_ACCESS,  // the token is valid but cannot see the fonts repo

@@ -313,6 +313,7 @@
   </div>
 
   <div id="wifi-container"></div>
+  <div id="keys-container"></div>
   <div id="opds-container"></div>
 
   <div class="card">
@@ -558,6 +559,80 @@
     btn.textContent = 'Save Settings';
   }
 
+  // --- Keys and tokens (write-only) ---
+  // /api/keys never returns a value: only whether each key is set and, when it
+  // is long enough, its last 4 characters. The input is never pre-filled, and
+  // is cleared after a save. "new-password" because browsers ignore "off" on a
+  // password input; nowrap because a key is never wrapped (owner 2026-11-26).
+  const KEY_LABELS = { githubToken: 'GitHub Token', claudeApiKey: 'Claude API Key' };
+  let keyStates = [];
+
+  function renderKeysSection() {
+    const container = document.getElementById('keys-container');
+    let html = '<div class="card"><h2>Keys and Tokens</h2>';
+    keyStates.forEach(function(k) {
+      const state = !k.set ? 'Not set' : (k.last4 ? 'Ends in ' + escapeHtml(k.last4) : 'Saved');
+      html += '<div class="opds-server">' +
+        '<div class="setting-row">' +
+          '<span class="setting-name">' + escapeHtml(KEY_LABELS[k.name] || k.name) + '</span>' +
+          '<span class="setting-control" style="white-space:nowrap;">' + state + '</span>' +
+        '</div>' +
+        '<div class="setting-row">' +
+          '<span class="setting-name">New value</span>' +
+          '<span class="setting-control"><input type="password" autocomplete="new-password" id="key-' + k.name + '"></span>' +
+        '</div>' +
+        '<div style="margin-top:8px;text-align:right;">' +
+          '<button class="btn-small btn-add" onclick="saveKey(\'' + k.name + '\')">Save</button> ' +
+          (k.set ? '<button class="btn-small btn-delete" onclick="clearKey(\'' + k.name + '\')">Clear</button>' : '') +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  async function loadKeys() {
+    try {
+      const resp = await fetch('/api/keys');
+      if (!resp.ok) throw new Error('Failed to load');
+      keyStates = await resp.json();
+      renderKeysSection();
+    } catch (e) {
+      console.error('Keys load error:', e);
+    }
+  }
+
+  async function postKey(data, done) {
+    try {
+      const resp = await fetch('/api/keys', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      showMessage(done, false);
+      await loadKeys();
+    } catch (e) {
+      showMessage('Error: ' + e.message, true);
+    }
+  }
+
+  async function saveKey(name) {
+    const input = document.getElementById('key-' + name);
+    const value = input.value.trim();
+    input.value = '';
+    if (!value) {
+      showMessage('Paste or type a value first.', true);
+      return;
+    }
+    await postKey({ name: name, value: value }, (KEY_LABELS[name] || name) + ' saved.');
+  }
+
+  async function clearKey(name) {
+    if (!confirm('Clear ' + (KEY_LABELS[name] || name) + '?')) return;
+    await postKey({ name: name, clear: true }, (KEY_LABELS[name] || name) + ' cleared.');
+  }
+
   // --- Wi-Fi Network Management ---
   // Renders an editable list of saved Wi-Fi networks using /api/wifi endpoints.
   // Password fields are never pre-filled; when left blank during edit, existing
@@ -791,6 +866,7 @@
   (async () => {
     await loadSettings();
     await loadWifiNetworks();
+    await loadKeys();
     await loadOpdsServers();
   })();
 </script>

@@ -586,11 +586,9 @@ int onGapEvent(ble_gap_event* event, void* /*arg*/) {
       uint16_t copied = 0;
       if (ble_hs_mbuf_to_flat(event->notify_rx.om, buf, sizeof(buf), &copied) != 0) return 0;
       gNotifies.fetch_add(1, std::memory_order_relaxed);
-#if LOG_LEVEL >= 2
-      char hex[3 * sizeof(buf) + 1] = {0};
-      for (uint16_t i = 0; i < copied && i < sizeof(buf); ++i) snprintf(hex + i * 3, 4, "%02x ", buf[i]);
-      LOG_DBG(TAG, "notify h=0x%04x len=%u [%s]", event->notify_rx.attr_handle, (unsigned)copied, hex);
-#endif
+      // No dump of the report's bytes: they are keystrokes, and a key or token
+      // typed on a Bluetooth keyboard could be read back from the serial log
+      // (owner 2026-11-26, "Remove the dump"). The count above is enough.
       decodeReport(buf, copied);
       return 0;
     }

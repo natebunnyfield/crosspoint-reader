@@ -339,7 +339,12 @@ class HalGPIO {
   // grid, a line break in a multi-line editor -- and only the activity knows
   // which it opened. Nothing on this board reads it; it is announced for the
   // same reason the flag itself is.
-  enum class TextEntryLines : uint8_t { Single, Multi };
+  //
+  // SingleSecret is a single-line field holding a key or token
+  // (InputType::Secret). A host keyboard then turns off autocapitalization
+  // and autocorrect, which would otherwise change a typed key unseen behind
+  // the mask (docs/keys-and-paste-2026-11-26.md, pass 3).
+  enum class TextEntryLines : uint8_t { Single, Multi, SingleSecret };
   void setTextEntryActive(bool /*active*/, TextEntryLines /*lines*/ = TextEntryLines::Single) {}
   bool consumeTypedText(std::string& /*out*/) { return false; }
 

@@ -5,6 +5,7 @@
 #include <ArduinoJson.h>
 #include <HalClock.h>
 #include <HalStorage.h>
+#include <I18n.h>
 #include <Logging.h>
 #include <SecureHttpClient.h>
 #include <WiFi.h>
@@ -15,15 +16,7 @@
 
 #include "CrossPointSettings.h"
 #include "WifiCredentialStore.h"
-#include "util/CardSecret.h"
-#ifdef SIMULATOR
-// The host's own settings surface, where a platform with no way to edit the
-// card's /claude-key.txt keeps this key instead. Simulator-only by
-// construction: the header is part of the simulator library and folds to a
-// constant everywhere but a phone. See SimHostSettings.h and
-// LibraryUpdater.cpp's githubTokenValue(), which this mirrors.
-#include <SimHostSettings.h>
-#endif
+#include "util/KeyStore.h"
 
 namespace claudechat {
 namespace {
@@ -35,7 +28,6 @@ namespace {
 #endif
 
 constexpr const char* TAG = "CLAUDE";
-constexpr const char* KEY_PATH = "/claude-key.txt";
 constexpr const char* TRANSCRIPT_PATH = "/claude-chat.md";
 constexpr const char* MODEL = "claude-haiku-4-5";
 constexpr int MAX_TOKENS = 1024;
@@ -109,39 +101,11 @@ bool appendToTranscript(const std::string& text) {
   return written == text.size();
 }
 
-// The reader lives in util/CardSecret.h so /github-token.txt (Update Library)
-// behaves exactly like this file does.
-//
-// On a host build, the key may instead come from the host's own settings
-// surface -- a phone cannot edit a file on the card, the same problem
-// LibraryUpdater's githubTokenValue() (LibraryUpdater.cpp) solves for the
-// GitHub token, and this mirrors that function line for line. Checked FIRST
-// and only when it returns something: a file the owner placed on the card is
-// still honored if the host field is empty.
+// The key from the key store (util/KeyStore.h): Settings > Claude API Key or
+// the device web page. An old /claude-key.txt on the card is ignored.
 //
 // NEVER LOG THE RETURN VALUE, here or at any call site.
-bool readApiKey(std::string& outKey) {
-#ifdef SIMULATOR
-  // Sized to match cardsecret::readOneLine's own cap (256 bytes, less the
-  // terminator) rather than to any particular key format, so a key that fits
-  // through the card file also fits through the host settings surface.
-  constexpr size_t kApiKeyBufSize = 256;
-  char hosted[kApiKeyBufSize] = {};
-  const size_t hostedLength = sim_host_settings::claudeApiKey(hosted, sizeof(hosted));
-  if (hostedLength != 0) {
-    // Length only. A key longer than the field is a paste error, and it will
-    // fail authentication with an error that says nothing about why -- so the
-    // one place that can tell says so, without the bytes.
-    if (hostedLength > sizeof(hosted) - 1) {
-      LOG_ERR(TAG, "host Claude API key is %u bytes; the field holds %u -- truncated, and it will not authenticate",
-              static_cast<unsigned>(hostedLength), static_cast<unsigned>(sizeof(hosted) - 1));
-    }
-    outKey = hosted;
-    return true;
-  }
-#endif
-  return cardsecret::readOneLine(TAG, KEY_PATH, outKey);
-}
+bool readApiKey(std::string& outKey) { return keystore::get(keystore::Key::ClaudeApiKey, outKey); }
 
 bool connectWifi(std::string& outErr, void (*statusCb)(void*, const char*), void* ctx) {
   WIFI_STORE.loadFromFile();
@@ -251,8 +215,8 @@ Result runExchange(const std::string& prompt, void (*statusCb)(void* ctx, const 
 
   std::string apiKey;
   if (!readApiKey(apiKey)) {
-    res.error = std::string("no API key at ") + KEY_PATH;
-    LOG_ERR(TAG, "%s (exists=%d)", res.error.c_str(), Storage.exists(KEY_PATH) ? 1 : 0);
+    res.error = tr(STR_CLAUDE_NEEDS_KEY);
+    LOG_ERR(TAG, "no Claude API key set");
     return res;
   }
   LOG_INF(TAG, "API key loaded (%u chars)", (unsigned)apiKey.size());

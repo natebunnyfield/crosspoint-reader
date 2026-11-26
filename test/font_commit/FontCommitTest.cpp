@@ -20,6 +20,7 @@
 #include "SdCardFontRegistry.h"
 #include "network/FontDeletionList.h"
 #include "network/FontUpdater.h"
+#include "util/KeyStore.h"
 
 namespace fs = std::filesystem;
 
@@ -142,7 +143,9 @@ class FontCommit : public ::testing::Test {
     halStorageRootRef() = root_.string();
     fakegh::reset();
     // A token, or fetchManifest answers NO_TOKEN before it reaches the network.
-    std::snprintf(SETTINGS.githubToken, sizeof(SETTINGS.githubToken), "%s", "ghp_test");
+    // The token lives in the key store (util/KeyStore.h; NVS, here the
+    // in-memory stubs/Preferences.h), never in settings.
+    keystore::set(keystore::Key::GithubToken, "ghp_test");
     SETTINGS.sdFontFamilyName[0] = '\0';
   }
   void TearDown() override {

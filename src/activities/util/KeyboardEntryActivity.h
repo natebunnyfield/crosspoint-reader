@@ -13,7 +13,12 @@
 #include "components/KeyboardTouch.h"
 #endif
 
-enum class InputType { Text, Password, Url };
+// Secret: a key or token (Settings > GitHub Token / Claude API Key). Unlike
+// Password there is no reveal toggle, no last-typed-character reveal and no
+// cursor placement: the field is one line, a fixed mask and the length
+// (keystore::secretEntryText), so no screenshot or recording carries any of
+// the key, and a long paste never wraps (owner 2026-11-26).
+enum class InputType { Text, Password, Url, Secret };
 
 // Text entry on the FreeInkUI keyboard component: the SDK layout tables and
 // keyboard() do the key rendering and hit-rect registration, InteractionBuffer

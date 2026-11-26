@@ -29,7 +29,11 @@ const char* FIXED_DATE = "Thu, 01 Jan 2024 00:00:00 GMT";
 
 bool WebDAVHandler::canHandle(WebServer& server, HTTPMethod method, const String& uri) {
   (void)server;
-  (void)uri;
+  // Not the key store's preflight: CrossPointWebServer::handleNotFound refuses
+  // it, so no other site's page can POST JSON to /api/keys. Claiming every
+  // OPTIONS here is what answered it 200 (with enableCORS's Allow-* headers)
+  // before; docs/keys-and-paste-2026-11-26.md, pass 3.
+  if (method == HTTP_OPTIONS && uri == "/api/keys") return false;
   switch (method) {
     case HTTP_OPTIONS:
     case HTTP_PROPFIND:

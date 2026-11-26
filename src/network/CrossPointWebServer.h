@@ -142,6 +142,10 @@ class CrossPointWebServer {
   void handleGetWifiNetworks() const;
   void handlePostWifiNetwork();
   void handleDeleteWifiNetwork();
+  // Keys and tokens (owner 2026-11-26): write-only. GET says only whether each
+  // key is set and its last 4 characters; POST sets or clears one.
+  void handleGetKeys() const;
+  void handlePostKeys();
 };
 
 // True while a WebSocket upload is writing `path`, or anything beneath it when

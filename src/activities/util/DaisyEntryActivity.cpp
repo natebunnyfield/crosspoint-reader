@@ -12,6 +12,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "notes/DaisyRings.h"
+#include "util/KeyStoreCore.h"
 #include "util/TypedTextInput.h"
 
 namespace {
@@ -44,7 +45,8 @@ void DaisyEntryActivity::onEnter() {
   pickHandled = false;
   // See KeyboardEntryActivity::onEnter -- the wheel is a text field too, and a
   // host that has a real keyboard should be able to type into it.
-  mappedInput.setTextEntryActive(true);
+  mappedInput.setTextEntryActive(
+      true, inputType == InputType::Secret ? HalGPIO::TextEntryLines::SingleSecret : HalGPIO::TextEntryLines::Single);
 #if FREEINK_DEVICE_PICCO
   // The wheel is an on-screen keyboard: the Picco takes touch while it is up.
   wheelTouch.reset();
@@ -284,6 +286,11 @@ bool DaisyEntryActivity::handleWheelTouch() {
 #endif
 
 std::string DaisyEntryActivity::displayText() const {
+  // One line, a fixed mask and the length (owner 2026-11-26: "do not wrap
+  // long secret inputs or outputs"); render() clips it from the front.
+  if (inputType == InputType::Secret) {
+    return keystore::secretEntryText(text, tr(STR_KEY_LENGTH_ONE), tr(STR_KEY_LENGTH_FORMAT));
+  }
   std::string shown = text;
   if (inputType == InputType::Password) {
     // Mask all but the most recent character, matching the grid keyboard.

@@ -15,8 +15,8 @@
  *
  * The shape mirrors OtaUpdater (check first, then act, progress by callback),
  * but the source repo is PRIVATE, so every request carries
- * "Authorization: Bearer <token>" — a GitHub fine-grained PAT read from
- * /github-token.txt on the card, or failing that SETTINGS.githubToken — and
+ * "Authorization: Bearer <token>" — a GitHub fine-grained PAT from the key
+ * store (util/KeyStore.h, Settings > GitHub Token) — and
  * assets download through the GitHub asset API with
  * "Accept: application/octet-stream" (browser_download_url does not serve a
  * private repo's assets). The token is never logged.
@@ -48,7 +48,7 @@ class LibraryUpdater {
 
   enum LibraryError {
     OK = 0,
-    NO_TOKEN,        // no /github-token.txt and SETTINGS.githubToken empty — say so, do nothing else
+    NO_TOKEN,        // no GitHub token in the key store (util/KeyStore.h) — say so, do nothing else
     HTTP_ERROR,      // could not reach GitHub (or a non-404 failure)
     BAD_TOKEN,       // GitHub answered 401/403: the token is wrong, expired or unscoped
     NO_REPO_ACCESS,  // the token is valid but cannot see the library repo

@@ -27,6 +27,7 @@
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "activities/boot_sleep/SleepScreenPolicy.h"
+#include "util/KeyStore.h"
 #ifndef CROSSPOINT_NO_DEVICE_FLASH
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #endif
@@ -1042,6 +1043,9 @@ void setup() {
   HalSystem::checkPanic();
 
   SETTINGS.loadFromFile();
+  // An old /github-token.txt or /claude-key.txt is deleted unread: File
+  // Transfer and WebDAV would serve it (owner 2026-11-26, "Delete at boot").
+  keystore::removeLegacyCardFiles();
   APP_STATE.loadFromFile();
   RECENT_BOOKS.loadFromFile();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));

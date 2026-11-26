@@ -31,6 +31,7 @@
 #include "activities/util/TextEntryFactory.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/KeyStore.h"
 
 namespace fui = freeink::ui;
 #if FREEINK_DEVICE_PICCO
@@ -164,6 +165,11 @@ void SettingsActivity::rebuildSettingsLists() {
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_UPDATE_FONTS, SettingAction::UpdateFonts));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_DEVICE_OWNER, SettingAction::DeviceOwner));
+  // The keys and tokens features send (owner 2026-11-26). Device-only ACTION
+  // rows with no key, so the web settings API never lists them; the web
+  // page has its own write-only Keys section (/api/keys).
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_GITHUB_TOKEN, SettingAction::GithubToken));
+  deviceSettings.push_back(SettingInfo::Action(StrId::STR_CLAUDE_API_KEY, SettingAction::ClaudeApiKey));
   // Informational, so it sits last: who wrote this firmware and what it is
   // built out of. Nothing here changes a setting.
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_COLOPHON, SettingAction::Colophon));
@@ -526,6 +532,10 @@ void SettingsActivity::toggleCurrentSetting() {
                                  }
                                });
         break;
+      case SettingAction::GithubToken:
+      case SettingAction::ClaudeApiKey:
+        openKeyRow(setting.action);
+        break;
       case SettingAction::Colophon:
         // Read-only screen: nothing to persist, so it takes no result handler.
         startActivityForResult(std::make_unique<ColophonActivity>(renderer, mappedInput), nullptr);
@@ -538,6 +548,57 @@ void SettingsActivity::toggleCurrentSetting() {
   // Every ACTION either opens a sub-activity whose result handler persists, or
   // has already done its work above. Nothing to save here: the generic rows
   // returned earlier, through settingrow::activate's onChanged.
+}
+
+namespace {
+keystore::Key keyForAction(const SettingAction action) {
+  return action == SettingAction::GithubToken ? keystore::Key::GithubToken : keystore::Key::ClaudeApiKey;
+}
+StrId titleForAction(const SettingAction action) {
+  return action == SettingAction::GithubToken ? StrId::STR_GITHUB_TOKEN : StrId::STR_CLAUDE_API_KEY;
+}
+}  // namespace
+
+// A key row: nothing set goes straight to the entry; a saved key offers Enter
+// or paste (replace) and Clear, in the in-place popup (docs/ui-conventions.md:
+// an enumerated pick is a popup, not a screen).
+void SettingsActivity::openKeyRow(const SettingAction action) {
+  const keystore::Key key = keyForAction(action);
+  if (!keystore::isSet(key)) {
+    enterKey(action);
+    return;
+  }
+  const StrId options[] = {StrId::STR_KEY_ENTER, StrId::STR_KEY_CLEAR};
+  optionPopup.show(titleForAction(action), options, 2, 0, [this, action, key](const int idx) {
+    if (idx == 0) {
+      enterKey(action);
+    } else {
+      keystore::clear(key);
+      requestUpdate();
+    }
+  });
+  requestUpdate();
+}
+
+// The text entry, in its Secret mode: the field never shows the key, only how
+// long it is and, once long enough, its last 4 characters. Empty is no change
+// (Clear is the way to remove a key). A value the store refuses (a space or a
+// control character inside, over 255 characters) is not saved and says so.
+void SettingsActivity::enterKey(const SettingAction action) {
+  const keystore::Key key = keyForAction(action);
+  startActivityForResult(makeTextEntryActivity(renderer, mappedInput, I18N.get(titleForAction(action)), "",
+                                               keystore::kMaxLength + 64, InputType::Secret),
+                         [this, action, key](const ActivityResult& result) {
+                           if (result.isCancelled) return;
+                           const auto& kb = std::get<KeyboardResult>(result.data);
+                           if (kb.text.empty()) return;
+                           if (!keystore::set(key, kb.text)) {
+                             const StrId ok[] = {StrId::STR_DONE};
+                             optionPopup.show(titleForAction(action), ok, 1, 0, [](int) {});
+                             optionPopup.setInfoLines({std::string(tr(STR_KEY_REJECTED))});
+                           }
+                           requestUpdate();
+                         });
 }
 
 // The firmware version, beside the title, as the pre-port screen drew it.
@@ -559,6 +620,27 @@ void SettingsActivity::describeRow(const int index, ListRow& row) const {
     return;
   }
 #endif
+  // A key row shows whether a key is saved and, when it is long enough, its
+  // last 4 characters: never more of it (owner 2026-11-26).
+  if (setting.type == SettingType::ACTION &&
+      (setting.action == SettingAction::GithubToken || setting.action == SettingAction::ClaudeApiKey)) {
+    const keystore::Key key = keyForAction(setting.action);
+    std::string value;
+    if (!keystore::get(key, value)) {
+      row.value = tr(STR_KEY_NOT_SET);
+      return;
+    }
+    char tail[5];
+    keystore::last4(value, tail);
+    if (tail[0] == '\0') {
+      row.value = tr(STR_KEY_SAVED);
+      return;
+    }
+    char text[48];
+    snprintf(text, sizeof(text), tr(STR_KEY_ENDS_IN_FORMAT), tail);
+    row.value = text;
+    return;
+  }
   // The stored byte here is a biased quarter-hour count; show the offset
   // it means, using the same helper the picker does. Every other row is
   // the generic shape, shared with the Typography screen.

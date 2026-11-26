@@ -82,7 +82,7 @@ class HalGPIO {
   // this is the one HAL surface a host CAN implement, so the suite scripts it
   // the same way it scripts buttons — simType() is the typist, and the flag
   // records what the activity announced.
-  enum class TextEntryLines : uint8_t { Single, Multi };
+  enum class TextEntryLines : uint8_t { Single, Multi, SingleSecret };
   void setTextEntryActive(const bool active, const TextEntryLines lines = TextEntryLines::Single) {
     textEntryActive_ = active;
     // Recorded, not acted on: on a host this is what decides who owns Return,
