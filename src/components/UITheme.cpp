@@ -55,6 +55,10 @@ const ThemeMetrics& UITheme::getMetrics() const {
     // together.
     const float rowScale = BoardConfig::ACTIVE.uiScale;
     adjustedMetrics.listRowHeight = static_cast<int>(adjustedMetrics.listRowHeight * rowScale + 0.5f);
+    // Subtitled rows too, 60 -> 72 (owner 2026-11-26, "Grow them too");
+    // LyraTheme::getListRowStep scales their extra subtitle lines with them.
+    adjustedMetrics.listWithSubtitleRowHeight =
+        static_cast<int>(adjustedMetrics.listWithSubtitleRowHeight * rowScale + 0.5f);
     adjustedMetrics.menuRowHeight = static_cast<int>(adjustedMetrics.menuRowHeight * rowScale + 0.5f);
 #endif
     metricsForTouch = touch;

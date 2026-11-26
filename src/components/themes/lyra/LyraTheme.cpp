@@ -221,11 +221,21 @@ void LyraTheme::drawSubHeader(const GfxRenderer& renderer, Rect rect, const char
   renderer.drawLine(rect.x, rect.y + rect.height - 1, rect.x + rect.width - 1, rect.y + rect.height - 1, true);
 }
 
-int LyraTheme::getListRowStep(bool hasSubtitle, int subtitleLines) const {
-  // The live metric, not the constant: the Picco grows it (UITheme::getMetrics).
-  if (!hasSubtitle) return UITheme::getInstance().getMetrics().listRowHeight;
+// The theme's own row height for a list, before any board grows it.
+static int baseListRowStep(const bool hasSubtitle, const int subtitleLines) {
+  if (!hasSubtitle) return LyraMetrics::values.listRowHeight;
   const int extraLines = std::max(0, subtitleLines - 1);
   return LyraMetrics::values.listWithSubtitleRowHeight + extraLines * LyraMetrics::values.listSubtitleLineStep;
+}
+
+int LyraTheme::getListRowStep(bool hasSubtitle, int subtitleLines) const {
+  // The live metric, not the constant: the Picco grows it (UITheme::getMetrics).
+  // A subtitled row grows by the same factor as the single-line row, whatever
+  // its subtitle line count (owner 2026-11-26, "Grow them too"): 60 -> 72 on
+  // the Picco, unchanged where listRowHeight is the theme's own 40.
+  const int liveRow = UITheme::getInstance().getMetrics().listRowHeight;
+  if (!hasSubtitle) return liveRow;
+  return baseListRowStep(true, subtitleLines) * liveRow / LyraMetrics::values.listRowHeight;
 }
 
 int LyraTheme::getListPageItems(int contentHeight, bool hasSubtitle, int subtitleLines) const {
@@ -242,6 +252,13 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
                          const std::function<bool(int index)>& rowDimmed, int subtitleLines) const {
   int rowHeight = getListRowStep(rowSubtitle != nullptr, subtitleLines);
   int pageItems = rowHeight > 0 ? std::max(1, rect.height / rowHeight) : 1;
+  // A row grown past the theme's own height (the Picco's rows,
+  // UITheme::getMetrics) keeps its content centered: the extra height is split
+  // above and below the title, icon, subtitle lines and selection band. Zero
+  // on every other board.
+  const int growPad = (rowHeight - baseListRowStep(rowSubtitle != nullptr, subtitleLines)) / 2;
+  // The single-line row as this board draws it, for the band and badge caps.
+  const int liveListRowHeight = UITheme::getInstance().getMetrics().listRowHeight;
 
   const int totalPages = (itemCount + pageItems - 1) / pageItems;
   if (totalPages > 1) {
@@ -343,13 +360,13 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       highlightH = std::min(subtitleTopFor(selLines) + (selLines - 1) * LyraMetrics::values.listSubtitleLineStep +
                                 renderer.getLineHeight(SMALL_FONT_ID) + kSelectionPadBottom,
                             rowHeight - kSelectionPadTop);
-      highlightY = selRow + kSelectionPadTop;
+      highlightY = selRow + kSelectionPadTop + growPad;
     } else {
       // Every list that does NOT ask for multiple subtitle lines keeps the
       // original geometry exactly — a full-height band, centred. Those rows are
       // sized to their content already, so there is nothing to hug, and moving
       // them even 2 px would retune every screen in the firmware to fix one.
-      highlightH = std::min(rowHeight, LyraMetrics::values.listRowHeight * 3 / 2);
+      highlightH = std::min(rowHeight, liveListRowHeight * 3 / 2);
       highlightY = selRow + (rowHeight - highlightH) / 2;
     }
     renderer.fillRoundedRect(rect.x + LyraMetrics::values.contentSidePadding, highlightY,
@@ -360,10 +377,6 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   // Draw all items
   const auto pageStartIndex = selectedIndex / pageItems * pageItems;
 
-  // A single-line row grown past the theme's own height (the Picco's rows,
-  // UITheme::getMetrics) keeps its title and icon centered: the extra height
-  // is split above and below them. Zero on every other board.
-  const int growPad = rowSubtitle == nullptr ? (rowHeight - LyraMetrics::values.listRowHeight) / 2 : 0;
   int iconY = ((rowSubtitle != nullptr) ? 16 : 10) + growPad;
   for (int i = pageStartIndex; i < itemCount && i < pageStartIndex + pageItems; i++) {
     const int itemY = rect.y + (i % pageItems) * rowHeight;
@@ -418,7 +431,7 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       std::string subtitleText = rowSubtitle(i);
       if (subtitleLines <= 1) {
         auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
-        renderer.drawText(SMALL_FONT_ID, textX, itemY + kSubtitleTopOffset, subtitle.c_str(), true);
+        renderer.drawText(SMALL_FONT_ID, textX, itemY + kSubtitleTopOffset + growPad, subtitle.c_str(), true);
         textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, subtitle.c_str()));
       } else {
         // A newline in the subtitle is an EXPLICIT line break, not whitespace:
@@ -429,7 +442,7 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
         // above does the segmenting; the selection band measures the same call,
         // so the band and these lines cannot drift apart.
         const auto subtitleTextLines = subtitleLinesFor(i);
-        int subtitleY = itemY + subtitleTopFor(static_cast<int>(subtitleTextLines.size()));
+        int subtitleY = itemY + growPad + subtitleTopFor(static_cast<int>(subtitleTextLines.size()));
         for (const auto& line : subtitleTextLines) {
           renderer.drawText(SMALL_FONT_ID, textX, subtitleY, line.c_str(), true);
           textRight = std::max(textRight, textX + renderer.getTextWidth(SMALL_FONT_ID, line.c_str()));
@@ -454,7 +467,7 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       // bottom; matching the highlight's height and vertical centring keeps the two
       // one bar. Same expression the highlight uses above: 1.5x the base
       // single-line row, clamped so a short row is unaffected.
-      const int badgeH = std::min(rowHeight, LyraMetrics::values.listRowHeight * 3 / 2);
+      const int badgeH = std::min(rowHeight, liveListRowHeight * 3 / 2);
       const int badgeY = itemY + (rowHeight - badgeH) / 2;
       renderer.fillRoundedRect(badgeX, badgeY, badgeW, badgeH, cornerRadius, badgeFill);
       // Outline ONLY when the badge actually covers text. The boundary is what
