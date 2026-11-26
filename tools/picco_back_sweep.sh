@@ -49,7 +49,10 @@ CASES=(
   "Settings > Firmware from SD card|UP UP UP UP UP UP UP UP CONFIRM UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP CONFIRM|FileBrowser"
   "Settings > Font Update|UP UP UP UP UP UP UP UP CONFIRM UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP CONFIRM|FontUpdate"
   "Settings > Text entry (keyboard)|UP UP UP UP UP UP UP UP CONFIRM UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP CONFIRM|KeyboardEntry"
-  "Settings > About|UP UP UP UP UP UP UP UP CONFIRM UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP CONFIRM|Colophon"
+  # About is row 24: GitHub Token, Claude API Key (669167dde) and Edge Ruler
+  # (a1cd8b3cd) were added after Device owner (row 20), so its old 21 now
+  # opens the GitHub Token entry.
+  "Settings > About|UP UP UP UP UP UP UP UP CONFIRM UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP CONFIRM|Colophon"
 )
 # Extra cases from the caller's environment, same format, one per line.
 if [ -n "${PICCO_SWEEP_EXTRA:-}" ]; then
