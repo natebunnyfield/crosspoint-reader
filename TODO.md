@@ -60,6 +60,46 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-035] Reduce the delay for keyboard entry
+**scope: text entry (KeyboardEntryActivity, DaisyEntryActivity, the host keyboard channel) · opened 2026-11-26**
+
+Owner, 2026-11-26: *"later todo: reduce the delay for keyboard entry"*. Not
+measured yet. Start from `tools/latency/` and `CROSSPOINT_SIM_LOG_LATENCY=1`
+(simulator CLAUDE.md), which time an input edge to its refresh, and find where
+a keystroke waits before the field repaints. Not started.
+
+### [T-034] Picco edge insets from the Edge Ruler — WAITING ON THE OWNER
+**scope: SDK `BoardConfig.h` PICCO `viewableInsets` · opened 2026-11-26**
+
+Layout plan B4 (`docs/picco-layout-plan-2026-11-26.md`, ruling "Ruler
+screen"). The Picco uses the X4's unmeasured insets, and with no hint bar Home's
+menu runs to the panel's bottom edge. Settings > Edge Ruler (Picco only, branch
+`picco-layout`, firmware `20261126T1848Z-crosspoint-a1cd8b3c.bin`, sent to the
+owner) shows numbered blocks 0-30 px in from each edge. Owed: the smallest
+fully visible number per edge (top, bottom, left, right). Then set the PICCO
+profile's `viewableInsets` and keep Home's menu off the bottom edge.
+
+### [T-033] Picco layout fixes — IN PROGRESS on `picco-layout`
+**scope: firmware + iOS app · opened 2026-11-26**
+
+From `docs/picco-layout-audit-2026-11-26.md` and the plan's rulings: A1 touch
+counters only with Diagnostics on; A2 keyboard tips that name no missing key;
+A3 a visible way out of Brightness/Warmth stepping; A4 a hollow slide-switch
+knob; B1 Create Note gets the header back arrow; B2 Picco rows 40 -> 48 px; B3
+the iOS rocker moves up to the thumb row. Being built on the local
+`picco-layout` branches (with the Edge Ruler); not pushed. Then: review,
+`main`, a TestFlight build.
+
+### [T-032] Pin TLS for the services keys are sent to — PROPOSED, not ruled
+**scope: `network/HttpDownloader.cpp:90`, `notes/ClaudeChat.cpp:306` · opened 2026-11-26**
+
+Both requests that carry a key (the GitHub token to GitHub, the Claude API key
+to api.anthropic.com) run `setInsecure()`, so anyone in the middle on the Wi-Fi
+receives the key. ClaudeChat's own comment: "NOT shippable with an API key".
+Proposal: pin the CA chains for `api.github.com`,
+`objects.githubusercontent.com` and `api.anthropic.com`. Recorded in
+`docs/keys-and-paste-2026-11-26.md`; an owner decision before any work.
+
 ### [T-031] No test can reach a mid-stream SD read error
 **scope: `test/` HalStorage stubs · opened 2026-09-10**
 
