@@ -68,6 +68,17 @@ reader margins and the header back arrow match the X4.
   and the third key; Power stays where it is. Do not re-ask.
 - **B5 is moot**: with the rocker in the upper-right slot there is no empty slot
   for "the gap stays" to cover.
+- **2026-11-26, Create Note top band: "Text beside the arrow".** On touch
+  boards the note's first line starts right of the corner arrow, at the old
+  top (y 5), and later lines use the full width. Do not re-ask.
+- **2026-11-26, subtitled rows: "Grow them too".** On the Picco, rows with a
+  subtitle (60 px and up) grow by the same 1.2 as B2. Do not re-ask.
+- **2026-11-26, the iPad pad edge: "Line it up".** The owner ruled on my
+  report that the iPad mini's Confirm cell ended about 3 px short of the page.
+  That report was wrong; see Built, round 2. The ruling is recorded, but its
+  premise does not hold.
+- **2026-11-26, Clock UTC Offset:** the 8 px taller clock band on the Picco is
+  B2 working as ruled. Do not re-ask.
 
 ## Built (2026-11-26)
 
@@ -172,9 +183,10 @@ eight repeat runs byte for byte before anything was changed.
   heights, 40 -> 48"; the 60 px subtitled rows are already 6.5 mm.
 - **B4 is waiting** on the owner's Edge Ruler reading.
 
-- **Seen while checking, not changed:** on the iPad mini the Picco pad's
-  Confirm cell ends about 3 device px short of the paper
-  (`after/ios-ipadmini-pad-crop.png`). This work does not move that cell.
+- **Seen while checking, not changed (WRONG, corrected in round 2):** I
+  reported here that on the iPad mini the Picco pad's Confirm cell ends about
+  3 device px short of the paper. A full-resolution measurement shows the
+  cell's stroke at x 263 and the paper starting at x 264, so they touch.
 
 ### Checked and found clean
 
@@ -187,3 +199,63 @@ eight repeat runs byte for byte before anything was changed.
   Editor Font selection, Wi-Fi and Home. The non-touch `metrics.listRowHeight`
   reads in `UiListActivity.cpp:144` and `UiTabListActivity.cpp:83` never run
   on the Picco.
+
+## Built, round 2 (2026-11-26)
+
+Same branches. Captures are in
+`/private/tmp/claude-501/-Users-natebunnyfield-src/2f7ddd19-354b-4b40-85d2-4aff02275054/scratchpad/picco-layout/r2after/`
+(`r2before/` for the before state) and, for the note, `after/`. The scripts
+there are `shot2.sh`, which now takes an optional book, and `recent.sh`. The
+seed book is `seed.epub`.
+
+| Item | Commit | Change | Where |
+|---|---|---|---|
+| Text beside the arrow | fw `d90058915` | The note's text starts at topPadding again (y 5). The arrow is centered on the first text row: icon y 5-36, tap rect x 0-64. The first display line starts at x 64 and is wrapped to the width left there; later lines get the full width. A view scrolled past line 0 leaves the arrow's row empty. One per-line geometry (`lineX`, `lineWidth`, `rowOffsetAt`, `rowsShownAt`) feeds wrapping (`relayout`), drawing, the caret x, `ensureCursorVisible` and page up/down. There is no tap-to-place-cursor in the editor, and its caret moves by logical line (`TextBuffer::cursorUp/Down`). The theme call is now `drawCornerBackButton(renderer, rowTop, rowHeight)` plus `cornerBackButtonRight()`: same icon, size, x and tap rect as the header's, moved to the row's height | `NoteEditorActivity.cpp` (`lineX` ... `rowsShownAt`, `relayout`, `render`); `LyraTheme.cpp` `drawBackArrow`, `drawCornerBackButton`; `BaseTheme.h` |
+| Grow them too | fw `9b3fc1045` | `getListRowStep` returns a subtitled row's base step x (live row / 40): 60 -> 72 on the Picco, unchanged elsewhere. `listWithSubtitleRowHeight` is scaled in `UITheme::getMetrics` too. `growPad` now centers subtitle lines and the multi-line selection band as well, and the band and badge caps follow the live row height | `LyraTheme.cpp` `baseListRowStep`, `getListRowStep`, `drawList`; `UITheme.cpp` `getMetrics` |
+| Line it up | not built | See below | |
+| Clock UTC Offset | none | Captured: `r2after/picco-clockoffset.png`. The "Current time" band is 48 + 16 = 64 px | |
+
+**Verification**
+
+- **Builds:** `simulator_picco`, `simulator_x3`, `simulator` and `picco` (RAM
+  22.1%, Flash 33.7%) all build, and so does the iOS app.
+- **Host tests:** 958 of 958.
+- **X4 and X3 are pixel-identical** to before on Home, Settings, Create Note,
+  text entry, Browse Files and Recent Books (`r2after/x3x4-pixel-diff.txt`).
+  The before captures for Browse Files and Recent Books came from the round-1
+  commit's binaries. A repeat run of X4 Recent Books matched byte for byte.
+- **Notes:**
+  - `after/note-beside-arrow.png` shows three states, left to right:
+    - empty: the arrow, with the caret beside it at x 64;
+    - wrapping: the first line starts at x 64 and the later lines at x 20;
+    - scrolled: the arrow's row is empty and the caret stays visible on the
+      last line.
+  - Single captures of each: `after/picco-note-{empty,wrap,scrolled}.png`.
+  - The back sweep's Create Note case taps the arrow where it now is,
+    (36, 21), and passes.
+- **Subtitled rows:** `r2after/cmp-recent.png` shows, left to right, Picco
+  before (60 px band), Picco after (72 px, content centered), X4 and X3.
+  Browse Files has no subtitle; its rows are the 48 px of B2
+  (`r2after/picco-browse.png`).
+- **Back sweep:** 30 of 30 in one run (`r2after/sweep.txt`).
+
+**Line it up: not built, needs the owner.** Measured at full resolution:
+
+- **iPad mini (A17 Pro):** the Picco pad is already flush with the page.
+  Confirm's stroke is at x 263 and the paper starts at x 264. On the right,
+  the paper ends at x 1223 and the rocker's stroke is at x 1224
+  (`r2after/ios-ipadmini-edge-3x.png`, 3x nearest). The 3 px gap I reported
+  was a misreading of a reduced capture.
+- **iPad Pro 13 (M5):** the pairs are centered in the margin band
+  (`layoutPad`'s tablet path, "Centred inside each inset band"). Confirm ends
+  at x 411 and the paper starts at x 552, a 141 px (70 pt) gap. The right
+  side mirrors it: paper ends at x 1512, the rocker starts at x 1652
+  (`r2after/ios-ipadpro13-pad.png`). On the mini the gap is 0 only because the
+  cell is limited by the band there.
+- **The decision:** making every tablet flush would move the larger iPads'
+  pairs about 70 pt inward, away from the thumbs that T-B placed them for
+  (`thumb-reach-2026-10-06.md`). That trade was not part of the question the
+  owner answered, so it waits for him. The X3 app is not configured as an iOS
+  simulator build in this worktree (`build/` holds only the Picco's), so only
+  the Picco app was measured. The turned landscape is unaffected, since
+  nothing was changed.
