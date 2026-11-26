@@ -381,6 +381,13 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   }
 }
 
+int BaseTheme::drawCornerBackButton(const GfxRenderer&, const Rect rect) const {
+  HeaderBackTapTarget::clear();  // the arrow is LyraTheme's, as drawHeader's is
+  return rect.y;
+}
+
+int BaseTheme::cornerBackButtonBottom(const Rect rect) const { return rect.y; }
+
 void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
                            const bool backButton) const {
   (void)backButton;  // the back button is drawn by LyraTheme, the fork's one live header

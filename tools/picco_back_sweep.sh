@@ -32,8 +32,9 @@ CASES=(
   "Browse Files|UP CONFIRM|FileBrowser"
   "Manage Files|UP UP CONFIRM|FileManager"
   "File Transfer|UP UP UP CONFIRM|CrossPointWebServer"
-  # Create Note (NoteEditor) is not here: the full-screen editor draws no
-  # header, so it has no arrow; its Back is the left-edge swipe.
+  # Create Note has no header; it draws the header's arrow alone in the same
+  # corner (owner 2026-11-26, B1 "Arrow only, + Note's").
+  "Create Note|UP UP UP UP CONFIRM|NoteEditor"
   "Claude|UP UP UP UP UP CONFIRM|ClaudeChat"
   "Update Firmware|UP UP UP UP UP UP CONFIRM|OnlineFirmwareUpdate"
   "Update Library|UP UP UP UP UP UP UP CONFIRM|LibraryUpdate"

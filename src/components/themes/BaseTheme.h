@@ -294,6 +294,14 @@ class BaseTheme {
   // false.
   virtual void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle = nullptr,
                           bool backButton = true) const;
+  // drawHeader's back arrow on its own, for a screen with no header (Create
+  // Note; owner 2026-11-26, B1 "Arrow only, + Note's"). Given drawHeader's
+  // rect it draws the same icon at the same place with the same tap rect, and
+  // only where drawHeader would (touch boards); elsewhere it clears the tap
+  // target. Returns the y just below the arrow, or rect.y when none is drawn.
+  virtual int drawCornerBackButton(const GfxRenderer& renderer, Rect rect) const;
+  // drawCornerBackButton's return value, without drawing: for layout.
+  virtual int cornerBackButtonBottom(Rect rect) const;
   virtual void drawSubHeader(const GfxRenderer& renderer, Rect rect, const char* label,
                              const char* rightLabel = nullptr) const;
   virtual void drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,

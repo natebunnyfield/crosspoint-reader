@@ -110,6 +110,32 @@ void LyraTheme::fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t
   }
 }
 
+namespace {
+// The header's back arrow and its tap rect, at drawHeader's place in `rect`.
+// One definition for the titled header and the headerless corner (Create Note).
+int drawBackArrow(const GfxRenderer& renderer, const Rect rect) {
+  const int iconX = rect.x + LyraMetrics::values.contentSidePadding;
+  const int iconY = rect.y + LyraMetrics::values.batteryBarHeight;
+  renderer.drawIcon(Back32LucideIcon, iconX, iconY, kHeaderBackIconSize);
+  HeaderBackTapTarget::set(rect.x, iconY - kHeaderBackTapMargin,
+                           iconX - rect.x + kHeaderBackIconSize + kHeaderBackTapMargin,
+                           kHeaderBackIconSize + 2 * kHeaderBackTapMargin);
+  return iconY + kHeaderBackIconSize;
+}
+}  // namespace
+
+int LyraTheme::cornerBackButtonBottom(const Rect rect) const {
+  return gpio.hasTouch() ? rect.y + LyraMetrics::values.batteryBarHeight + kHeaderBackIconSize : rect.y;
+}
+
+int LyraTheme::drawCornerBackButton(const GfxRenderer& renderer, const Rect rect) const {
+  if (!gpio.hasTouch()) {
+    HeaderBackTapTarget::clear();
+    return rect.y;
+  }
+  return drawBackArrow(renderer, rect);
+}
+
 void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
                            const bool backButton) const {
   renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
@@ -124,12 +150,7 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
   const int titleX =
       rect.x + LyraMetrics::values.contentSidePadding + (showBackButton ? kHeaderBackIconSize + kHeaderBackGap : 0);
   if (showBackButton) {
-    const int iconX = rect.x + LyraMetrics::values.contentSidePadding;
-    const int iconY = rect.y + LyraMetrics::values.batteryBarHeight;
-    renderer.drawIcon(Back32LucideIcon, iconX, iconY, kHeaderBackIconSize);
-    HeaderBackTapTarget::set(rect.x, iconY - kHeaderBackTapMargin,
-                             iconX - rect.x + kHeaderBackIconSize + kHeaderBackTapMargin,
-                             kHeaderBackIconSize + 2 * kHeaderBackTapMargin);
+    drawBackArrow(renderer, rect);
   } else {
     HeaderBackTapTarget::clear();
   }

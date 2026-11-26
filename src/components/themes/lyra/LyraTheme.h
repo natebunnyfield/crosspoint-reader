@@ -92,6 +92,8 @@ class LyraTheme : public BaseTheme {
   void fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t percentage) const override;
   void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle = nullptr,
                   bool backButton = true) const override;
+  int drawCornerBackButton(const GfxRenderer& renderer, Rect rect) const override;
+  int cornerBackButtonBottom(Rect rect) const override;
   void drawSubHeader(const GfxRenderer& renderer, Rect rect, const char* label,
                      const char* rightLabel = nullptr) const override;
   int getListRowStep(bool hasSubtitle, int subtitleLines = 1) const override;

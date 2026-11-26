@@ -19,6 +19,12 @@
 namespace {
 constexpr const char* TAG = "NOTEEDIT";
 constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
+// The rect a titled screen hands GUI.drawHeader (UiListActivity::drawChrome),
+// so the corner arrow lands where the header's does, with the same tap rect.
+Rect backArrowRect(const GfxRenderer& renderer) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  return Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight};
+}
 
 // The Editor Font setting picks from the editor-group families (see
 // src/notes/EditorFonts.h). If that family is not installed on the card the UI
@@ -103,8 +109,13 @@ void NoteEditorActivity::onEnter() {
   const auto& metrics = UITheme::getInstance().getMetrics();
   lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;
-  // Starts at topPadding: there is no header band to skip past any more.
-  contentTop = metrics.topPadding;
+  // Starts at topPadding: there is no header band to skip past any more. On a
+  // touch board the header's back arrow sits in the top-left corner (owner
+  // 2026-11-26, B1 "Arrow only, + Note's"), so the text starts below it and
+  // below its tap rect (the arrow's 12 px finger margin), never under a finger
+  // aimed at it.
+  const int arrowBottom = GUI.cornerBackButtonBottom(backArrowRect(renderer));
+  contentTop = arrowBottom > metrics.topPadding ? arrowBottom + metrics.verticalSpacing : metrics.topPadding;
   // No side gutter: the side-button hints that it reserved room for were
   // removed (owner ruling 2026-08-15), so the text gets the width back.
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
@@ -776,6 +787,11 @@ void NoteEditorActivity::render(RenderLock&&) {
   //
   // contentTop in relayout() reclaims the band, so this is a layout change and
   // not just a hidden draw call.
+  //
+  // What remains of it on a touch board is the header's back arrow, alone in
+  // the corner: a tap on it is Back, through the same path as on every titled
+  // screen (HeaderBackTapTarget, MappedInputManager).
+  GUI.drawCornerBackButton(renderer, backArrowRect(renderer));
 
   if (oomFailed || !buf) {
     // Wrapped and translated for the same reason as Claude's hint: a raw
