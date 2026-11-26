@@ -94,7 +94,7 @@ the iOS rocker moves up to the thumb row. Being built on the local
 `picco-layout` branches (with the Edge Ruler); not pushed. Then: review,
 `main`, a TestFlight build.
 
-### [T-032] Pin TLS for the services keys are sent to — PROPOSED, not ruled
+### [T-032] Pin TLS for the services keys are sent to — DECLINED 2026-11-26
 **scope: `network/HttpDownloader.cpp:90`, `notes/ClaudeChat.cpp:306` · opened 2026-11-26**
 
 Both requests that carry a key (the GitHub token to GitHub, the Claude API key
@@ -103,6 +103,9 @@ receives the key. ClaudeChat's own comment: "NOT shippable with an API key".
 Proposal: pin the CA chains for `api.github.com`,
 `objects.githubusercontent.com` and `api.anthropic.com`. Recorded in
 `docs/keys-and-paste-2026-11-26.md`; an owner decision before any work.
+
+Owner, 2026-11-26: "Leave it". The risk is accepted on home Wi-Fi; no
+pinning. Do not re-propose.
 
 ### [T-031] No test can reach a mid-stream SD read error
 **scope: `test/` HalStorage stubs · opened 2026-09-10**
