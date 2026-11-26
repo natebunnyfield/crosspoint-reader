@@ -68,3 +68,122 @@ reader margins and the header back arrow match the X4.
   and the third key; Power stays where it is. Do not re-ask.
 - **B5 is moot**: with the rocker in the upper-right slot there is no empty slot
   for "the gap stays" to cover.
+
+## Built (2026-11-26)
+
+On `picco-layout` in both worktrees of the `key-paste` pair, firmware on top of
+`aedd0761a` and simulator on top of `1740b8e8`. Nothing is pushed or merged.
+Captures are in
+`/private/tmp/claude-501/-Users-natebunnyfield-src/2f7ddd19-354b-4b40-85d2-4aff02275054/scratchpad/picco-layout/`,
+with `before/` taken from the unchanged tree first and `after/` taken from the
+built one. The capture script is `shot2.sh` there. It is the audit's `shot.sh`
+pointed at this worktree's binaries, plus `CROSSPOINT_SIM_GRAIN_SEED=1`.
+Without the seed, two runs of the same binary differ in every pixel, because
+the grain is re-rolled each launch. With it, eight X4/X3 before-runs matched
+eight repeat runs byte for byte before anything was changed.
+
+| Item | Commit | Change | Where |
+|---|---|---|---|
+| A1 | sim `dfc4a657` | `paintPiccoTouchDbg` returns at once unless `CrossPointPrefs_diagnosticsEnabled()` | `ios/CrossPointIOSShim.cpp:3460-3461` |
+| A2 | fw `908775559` | Picco: no "Hold UP to edit entry", no cursor-mode tip; the clear-all tip is `STR_KB_HINT_CLEAR_TEXT_PICCO` "On DEL, hold SELECT to clear all text" | `KeyboardEntryActivity.cpp:1157-1162`, `:1171-1186`; `english.yaml:397`, `spanish.yaml:345` |
+| A3 | fw `2c9060646` | The stepped row's title reads "Brightness (tap when done)"; a tap anywhere ends the step and saves, as Confirm and Back still do. The tap is claimed, so it no longer also steps the value as the rocker's Right | `SettingsActivity.cpp:306-314`, `:628-634`; `english.yaml:464`, `spanish.yaml:387` |
+| A4 | sim `ec3a392d` | The knob is stroke + face (`p.face`, was `p.faceDown`); its side is still the state | `ios/CrossPointIOSShim.cpp:3263-3293` |
+| B1 | fw `14e8ed7e9` | The arrow and its tap rect are one function, `drawBackArrow`, used by `drawHeader` and by the new `drawCornerBackButton` / `cornerBackButtonBottom` (Base: clear, no arrow). Create Note draws it at the header's rect. On touch boards the note's text starts below the tap rect (y 93, was 5) | `LyraTheme.cpp:116-137`; `BaseTheme.h:296-304`, `BaseTheme.cpp:384-389`; `NoteEditorActivity.cpp:24-27`, `:117-118`, `:794` |
+| B1 sweep | fw `14e8ed7e9`, `fcde7a2bd` | The Create Note case is back. The About case moves 21 -> 24 presses: the key rows and Edge Ruler pushed it down, so the old count opened the GitHub Token entry and failed "screen never opened". That failure predates this work | `tools/picco_back_sweep.sh:35-37`, `:52-55` |
+| B2 | fw `452e4c0f8`, sim `b50fe582` | `UITheme::getMetrics` scales `listRowHeight` (40 -> 48) and `menuRowHeight` (64 -> 77) by `BoardConfig::ACTIVE.uiScale`, Picco only. `getListRowStep` and `getButtonMenuRows` read the live metric, so `drawList`, `drawButtonMenu`, every list's hit rects and Home's grid move together. A grown single-line row keeps its title and icon centered (`growPad`). The simulator's `BoardProfile` gains `uiScale` with the SDK's values | `UITheme.cpp:16-18`, `:49-58`; `LyraTheme.cpp:226`, `:366-370`, `:710-713`; sim `src/BoardConfig.h:131-134`, `:160-170` |
+| B3 | sim `2abd9094` | In the Picco block of `layoutPad`, Up/Down take the Left/Right rects. All three layouts place that pair directly above the rocker's, at the same x. Power, the chip and the halves' mapping are unchanged | `ios/CrossPointIOSShim.cpp:1007-1017` |
+
+### Verification
+
+- **Builds:** `pio run -e simulator_picco`, `-e simulator_x3`, `-e simulator`
+  (X4), `-e picco` (RAM 22.1%, Flash 33.7%) and `-e default` all succeed. The
+  `BleHidHost.cpp.o` object exists for both `default` and `picco`. The iOS
+  build `cmake --build build/ios-sim-picco --config Release --target
+  CrossPointX3` succeeds.
+- **X4 and X3 are unchanged.** Home, Settings, Create Note and text entry
+  (Device owner, "abc" typed) are pixel-identical before and after on both
+  boards (`after/x3x4-pixel-diff.txt`).
+- **Picco before against after** (diff threshold 40 levels): Home is
+  identical. With no open book, Home's menu is squeezed to fit its rect, so
+  its rows are 46 px pitch either way, so the sweep's Home-row y centers
+  (404 + 46 i) still hold. Settings differs only in the box from y 117 to
+  761, which is the rows. Create Note differs only in the top-left corner (x
+  20-46, y 5-125), which is the arrow and the text's new top.
+- **`tools/picco_back_sweep.sh`:** 30 cases: 19 arrow cases (Create Note
+  included), 9 Home rows and 2 new Settings row taps. On the final tree, one
+  full run (`after/sweep-final.txt`) passed 28 of 30. File Transfer and Claude
+  each opened the row below their target, so the arrow tap had no screen to
+  leave. Both are the button walk on Home landing one row too far, and both
+  passed when rerun alone. That run shared the machine with another session's
+  load (fseventsd at 100%, a Paix OCR job at 82%). The previous full run, on
+  the same code before the include move below, passed both. Its only failure
+  was About, fixed in `fcde7a2bd`. A second full run on the final tree passed
+  30 of 30 (`after/sweep-final2.txt`). The Settings taps aim at row 1 (Typography)
+  and row 9 (Clock UTC Offset). Their centers are 129 + 48 i, measured from
+  the selection band in `after/picco-settings.png`: row 0 runs y 108-150 and
+  row 10 runs 588-630. Under the old 40 px grid, row 9's y of 561 would land
+  on Warmth, so the case tells the two grids apart.
+- **`tools/key_store_check.sh`:** 15 of 15.
+- **Firmware host tests:** 958 of 958 (`cmake -S test -B build/test && cmake
+  --build build/test && ctest --test-dir build/test -j8`). The first build
+  failed: the host test target has no `BoardConfig.h` on its include path.
+  The include in `UITheme.cpp` is now behind `#if FREEINK_DEVICE_PICCO`.
+  CssParserTest passed first time.
+- **A2 on the desktop Picco:** after two Del taps, no tip names Up
+  (`after/picco-kbentry-deltwice.png`). A tap on Del, then Select held for
+  2.5 s, clears the field, so the new tip is true
+  (`after/picco-kbentry-clearall.png`; the pair side by side:
+  `after/kbentry-del-checks.png`).
+- **A3 on the desktop Picco:** the row title while stepping is in
+  `after/picco-brightness.png`. A tap ends the step without stepping the value
+  (70 stays 70) and saves `"frontlightBrightness":70`
+  (`after/picco-brightness-tapdone.png`).
+- **iOS, iPhone Air simulator:** with Diagnostics off there are no counters
+  (`after/ios-reader-diag-off.png`), and with it on they show
+  (`after/ios-reader-diag-on.png`). The pad crop `after/ios-pad-crop.png`
+  shows the hollow knob and the rocker up on the thumb row; Power alone stays
+  below. On the iPad mini (`after/ios-ipadmini-pad-crop.png`) the rocker is
+  on the right of the thumb row, at the full cell height of that slot (it was
+  a half cell below). The simulator's Diagnostics pref was 1 before the run;
+  it was set to 0 for the capture and restored to 1. The iPad was shut down
+  again.
+- **Picco | X4 | X3 comparisons:** `after/cmp-{home,settings,note,kbentry}.png`.
+
+### Not done, or checked by code only
+
+- **The keyboard chip and the turned landscape were not captured.** Three
+  attempts to open a field from a scripted iOS launch did not reach one. The
+  app resumed in the book, and the scripted presses landed on Select Chapter
+  (`after/ios-chapter-list.png`). The chip's geometry is unchanged. On the
+  phone it is centered in the bottom row, which now holds only Power at the
+  left. On the tablet it sits at the bottom center. In the turned landscape
+  it sits above Back/Select in the left margin. The rocker moved to the
+  upper-right in every case, so it cannot meet the chip. The turned landscape
+  needs a wide-table page. Its rects (`src/TurnedPageLandscape.h:139-161`)
+  put Left directly above Up, which is all the move relies on.
+- **Home with an open book was not captured.** The menu page's rows there
+  grow from 64 to 77 px when they fit their rect. Drawing and the touch grid
+  share `getButtonMenuRows` (`HomeActivity.cpp:377`).
+- **One more reader of `metrics.listRowHeight` grows with it.**
+  `ClockOffsetActivity.cpp:132` reserves a band for its clock line of one
+  list row plus spacing, and only on a board with a clock. On the Picco that
+  band is now 64 px instead of 56. Not captured.
+- **Subtitled list rows (60 px) do not grow.** The ruling says "row
+  heights, 40 -> 48"; the 60 px subtitled rows are already 6.5 mm.
+- **B4 is waiting** on the owner's Edge Ruler reading.
+
+- **Seen while checking, not changed:** on the iPad mini the Picco pad's
+  Confirm cell ends about 3 device px short of the paper
+  (`after/ios-ipadmini-pad-crop.png`). This work does not move that cell.
+
+### Checked and found clean
+
+- `DaisyEntryActivity` names no control beyond the hint bar
+  (`DaisyEntryActivity.cpp:411-412`), which `drawButtonHints` drops on touch
+  boards (`LyraTheme.cpp`, `gpio.hasTouch()`). Nothing to change.
+- Every list row reaches row geometry through the theme (`getListRowStep`,
+  `getListPageItems`, `getButtonMenuRows`). The callers are
+  `MappedInputManager.cpp:255-258`, `UiListActivity.cpp:167-168`, Font and
+  Editor Font selection, Wi-Fi and Home. The non-touch `metrics.listRowHeight`
+  reads in `UiListActivity.cpp:144` and `UiTabListActivity.cpp:83` never run
+  on the Picco.
