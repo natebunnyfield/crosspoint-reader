@@ -58,6 +58,8 @@ ICONS = [
     # refresh-cw: this pulls a release off GitHub, and a recycle arrow reads as
     # "reload this screen" next to six rows that all open something.
     ("Update", "cloud-download"),
+    # The header back button (upstream 720b995a5, ported 2026-11-25).
+    ("Back", "arrow-left"),
 ]
 
 SIZES = (24, 32)

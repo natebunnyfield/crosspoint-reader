@@ -13,6 +13,7 @@
 
 #include "I18n.h"
 #include "RecentBooksStore.h"
+#include "components/HeaderBackTapTarget.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -380,7 +381,10 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   }
 }
 
-void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle) const {
+void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
+                           const bool backButton) const {
+  (void)backButton;  // the back button is drawn by LyraTheme, the fork's one live header
+  HeaderBackTapTarget::clear();
   // Hide last battery draw
   constexpr int maxBatteryWidth = 80;
   renderer.fillRect(rect.x + rect.width - maxBatteryWidth, rect.y + 5, maxBatteryWidth,

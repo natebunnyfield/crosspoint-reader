@@ -9,6 +9,7 @@
 
 #include "CrossPointSettings.h"
 #include "components/EdgeSwipe.h"
+#include "components/HeaderBackTapTarget.h"
 #include "components/UITheme.h"
 
 #if FREEINK_DEVICE_PICCO
@@ -186,7 +187,14 @@ bool MappedInputManager::wasScreenTapped(int& x, int& y) const {
   float nx = 0.0f;
   float ny = 0.0f;
   if (!gpio.wasTouchTap(nx, ny)) return false;
-  renderer.tapToLogical(nx, ny, x, y);
+  int tapX = 0;
+  int tapY = 0;
+  renderer.tapToLogical(nx, ny, tapX, tapY);
+  // A tap on the header back button is Back (wasBackGesture), not a screen tap:
+  // screens that route every tap would otherwise swallow it (upstream ce9f5c28e).
+  if (HeaderBackTapTarget::contains(tapX, tapY)) return false;
+  x = tapX;
+  y = tapY;
   rememberTouchHeldTime();
   return true;
 }
@@ -356,6 +364,23 @@ bool MappedInputManager::wasBackGesture() const {
   // see a swipe either.
   return false;
 #else
+  // A tap on the header back button (HeaderBackTapTarget, recorded by the
+  // theme's drawHeader; empty on screens without one) is Back, folded in here
+  // so every activity's existing Back handling picks it up (upstream
+  // 720b995a5 / ce9f5c28e).
+  {
+    float nx = 0.0f;
+    float ny = 0.0f;
+    if (gpio.wasTouchTap(nx, ny)) {
+      int tapX = 0;
+      int tapY = 0;
+      renderer.tapToLogical(nx, ny, tapX, tapY);
+      if (HeaderBackTapTarget::contains(tapX, tapY)) {
+        rememberTouchHeldTime();
+        return true;
+      }
+    }
+  }
   // Back = left-to-right swipe starting near the left edge (components/EdgeSwipe.h).
   int sx = 0;
   int sy = 0;
@@ -417,9 +442,15 @@ void MappedInputManager::synthesizeGesture() const {
   sample.contact = gpio.readTouchContact(nx, ny, live, sample.reportMs);
   sample.live = sample.contact && live;
   if (sample.live) renderer.tapToLogical(nx, ny, sample.x, sample.y);
-  const piccoinput::Result r =
-      gestureDecoder.feed(sample, millis(), gpio.isKeyboardTouchOn(), renderer.getScreenWidth());
+  piccoinput::Result r = gestureDecoder.feed(sample, millis(), gpio.isKeyboardTouchOn(), renderer.getScreenWidth());
   if (!r.fired) return;
+  // A tap on the header back button is Back (owner 2026-11-25, upstream's
+  // header button ported), before any row could claim it.
+  if (r.tap && HeaderBackTapTarget::contains(r.x, r.y)) {
+    LOG_DBG("INPUT", "Picco tap at %d,%d -> header back", r.x, r.y);
+    r.button = Button::Back;
+    r.tap = false;
+  }
   // A tap on a row the screen asked about last loop selects that row: it is
   // reported through wasScreenTapped() for this frame, and Right is not fired.
   if (r.tap) {

@@ -7,6 +7,7 @@
 
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
+#include "components/HeaderBackTapTarget.h"
 #include "home/CrashActivity.h"
 #include "home/FileBrowserActivity.h"
 #include "home/FileManagerActivity.h"
@@ -168,6 +169,8 @@ void ActivityManager::processPendingTransitions() {
       } else if (pendingAction == PendingAction::Push) {
         // Move current activity to stack
         stackActivities.push_back(std::move(currentActivity));
+        // The covered screen's back rect must not route taps on the pushed one.
+        HeaderBackTapTarget::clear();
         LOG_DBG("ACT", "Pushed to activity stack, new size = %zu", stackActivities.size());
       }
       pendingAction = PendingAction::None;
@@ -187,6 +190,9 @@ void ActivityManager::processPendingTransitions() {
 
 void ActivityManager::exitActivity(const RenderLock& lock) {
   // Note: lock must be held by the caller
+  // The outgoing screen's header back button must not take taps on the next
+  // screen; the next header draw records its own (upstream 720b995a5).
+  HeaderBackTapTarget::clear();
   if (currentActivity) {
     currentActivity->onExit();
     currentActivity.reset();

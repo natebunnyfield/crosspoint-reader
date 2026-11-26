@@ -1,5 +1,13 @@
 #include "LyraTheme.h"
 
+#include "components/HeaderBackTapTarget.h"
+
+namespace {
+constexpr int kHeaderBackIconSize = 32;
+constexpr int kHeaderBackGap = 10;        // arrow to title
+constexpr int kHeaderBackTapMargin = 12;  // beyond the arrow, for a finger
+}  // namespace
+
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
 #include <HalPowerManager.h>
@@ -102,8 +110,29 @@ void LyraTheme::fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t
   }
 }
 
-void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle) const {
+void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
+                           const bool backButton) const {
   renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
+
+  // THE HEADER BACK BUTTON (upstream 720b995a5, "add back buttons to the
+  // header"; ported for the Picco, owner 2026-11-25). On a touch board a
+  // titled header leads with a 32 px back arrow; a tap on it is Back
+  // (MappedInputManager). Root screens (Home, Crash) pass backButton = false.
+  // The tap rect is the arrow plus a finger's margin on every side, from the
+  // panel's left edge, so a thumb at the corner finds it.
+  const bool showBackButton = backButton && title != nullptr && gpio.hasTouch();
+  const int titleX =
+      rect.x + LyraMetrics::values.contentSidePadding + (showBackButton ? kHeaderBackIconSize + kHeaderBackGap : 0);
+  if (showBackButton) {
+    const int iconX = rect.x + LyraMetrics::values.contentSidePadding;
+    const int iconY = rect.y + LyraMetrics::values.batteryBarHeight;
+    renderer.drawIcon(Back32LucideIcon, iconX, iconY, kHeaderBackIconSize);
+    HeaderBackTapTarget::set(rect.x, iconY - kHeaderBackTapMargin,
+                             iconX - rect.x + kHeaderBackIconSize + kHeaderBackTapMargin,
+                             kHeaderBackIconSize + 2 * kHeaderBackTapMargin);
+  } else {
+    HeaderBackTapTarget::clear();
+  }
 
   const bool showBatteryPercentage =
       SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
@@ -118,7 +147,8 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
       subtitle != nullptr ? renderer.getTextWidth(SMALL_FONT_ID, subtitle, EpdFontFamily::REGULAR) : 0;
 
   // Available space is the distance between the side paddings, and a with side padding between title and subtitle.
-  const int availableSpace = rect.width - LyraMetrics::values.contentSidePadding * 3;
+  const int availableSpace = rect.width - LyraMetrics::values.contentSidePadding * 3 -
+                             (titleX - rect.x - LyraMetrics::values.contentSidePadding);
 
   if (maxTitleWidth + maxSubtitleWidth > availableSpace) {
     if ((maxTitleWidth > availableSpace / 2) && (maxSubtitleWidth > availableSpace / 2)) {
@@ -137,9 +167,8 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
 
   if (title) {
     auto truncatedTitle = renderer.truncatedText(UI_12_FONT_ID, title, maxTitleWidth, EpdFontFamily::BOLD);
-    renderer.drawText(UI_12_FONT_ID, rect.x + LyraMetrics::values.contentSidePadding,
-                      rect.y + LyraMetrics::values.batteryBarHeight + 3, truncatedTitle.c_str(), true,
-                      EpdFontFamily::BOLD);
+    renderer.drawText(UI_12_FONT_ID, titleX, rect.y + LyraMetrics::values.batteryBarHeight + 3, truncatedTitle.c_str(),
+                      true, EpdFontFamily::BOLD);
     renderer.drawLine(rect.x, rect.y + rect.height - 3, rect.x + rect.width - 1, rect.y + rect.height - 3, 3, true);
   }
 
