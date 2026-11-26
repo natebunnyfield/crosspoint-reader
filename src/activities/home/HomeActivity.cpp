@@ -364,20 +364,19 @@ void HomeActivity::loop() {
     return;
   }
 
-  // The same top render() gives the menu: just under the header on its own
-  // page, under the covers otherwise.
-  const int menuTop = splitPages ? metrics.homeTopPadding + metrics.homeMenuTopOffset
-                                 : metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
   const int renderedMenuSelection =
       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - recentBooks.size();
   const int renderedMenuCount =
       menuCount - (metrics.homeContinueReadingInMenu ? 0 : static_cast<int>(recentBooks.size()));
   int menuRow = -1;
-  // Row height from the theme, not the metrics table, so the touch grid
-  // matches the visuals exactly.
-  const int menuRowHeight = GUI.getMenuRowHeight(renderer);
-  const auto menuTouch = showMenuPage ? mappedInput.rowTouch(menuRow, menuTop, menuRowHeight + metrics.menuSpacing,
-                                                             renderedMenuCount, 0, INT32_MAX, menuRowHeight)
+  // The rows exactly as render() draws them: the same rect, and the theme's
+  // own layout of it, fit rule included. With no open book the menu does not
+  // fit its rect at the natural pitch and the theme squeezes it; a grid at
+  // the natural pitch then drifted a row per row (owner 2026-11-26, a tap on
+  // Settings opened Claude).
+  const auto rows = GUI.getButtonMenuRows(menuRect(), renderedMenuCount);
+  const auto menuTouch = showMenuPage ? mappedInput.rowTouch(menuRow, rows.top, rows.pitch, renderedMenuCount, 0,
+                                                             INT32_MAX, rows.rowHeight)
                                       : MappedInputManager::RowTouch::None;
   if (menuTouch != MappedInputManager::RowTouch::None) {
     const int touchedIndex =
@@ -399,19 +398,49 @@ void HomeActivity::loop() {
   }
 }
 
-void HomeActivity::render(RenderLock&&) {
+int HomeActivity::coverAreaHeight() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
   const int bookCount = static_cast<int>(recentBooks.size());
-
   // Cover grid shape. Every theme except Lyra Six is 1x1, for which coverRows is
   // 1 and coverAreaHeight is exactly metrics.homeCoverTileHeight — the value
   // this function used before the grid existed.
   const int coverColumns = std::max(1, metrics.homeCoverColumns);
   const int coverRows =
       bookCount > 0 ? std::min(std::max(1, metrics.homeCoverRows), (bookCount + coverColumns - 1) / coverColumns) : 1;
-  const int coverAreaHeight = metrics.homeCoverTileHeight * coverRows;
+  return metrics.homeCoverTileHeight * coverRows;
+}
+
+// The rect the menu is drawn in. One definition, read by render() to draw the
+// rows and by loop() to hit-test them.
+Rect HomeActivity::menuRect() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto pageWidth = renderer.getScreenWidth();
+  const auto pageHeight = renderer.getScreenHeight();
+  const bool splitPages = metrics.homeMenuOnSecondPage && !recentBooks.empty();
+  const int coverArea = coverAreaHeight();
+  // On its own page the menu starts just below the header instead of below
+  // the covers. The one-page geometry is left exactly as it was.
+  return splitPages
+             ? Rect{0, metrics.homeTopPadding + metrics.homeMenuTopOffset, pageWidth,
+                    pageHeight - (metrics.homeTopPadding + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)}
+             : Rect{0, metrics.homeTopPadding + coverArea + metrics.homeMenuTopOffset, pageWidth,
+                    // Subtract the SAME terms the y offset added, so the rect ends at
+                    // pageHeight - buttonHintsHeight exactly, like the split branch above.
+                    // This used to subtract headerHeight + verticalSpacing instead of
+                    // coverAreaHeight -- a leftover from when the menu sat under a header
+                    // rather than under the covers. On Lyra Six (cover tile 312, header 84,
+                    // spacing 16, hints 40) that put the rect's bottom at 972 on an 800px
+                    // screen, so drawButtonMenu laid out a row that fell off the panel and
+                    // drawPixel dropped it one ERR line at a time -- 1756 per Home paint.
+                    pageHeight -
+                        (metrics.homeTopPadding + coverArea + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)};
+}
+
+void HomeActivity::render(RenderLock&&) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto pageWidth = renderer.getScreenWidth();
+  const int bookCount = static_cast<int>(recentBooks.size());
+  const int coverAreaHeight = this->coverAreaHeight();
 
   // Two-page home (Lyra Six): the covers own page 0 and the menu rows own
   // page 1. There is no separate page state to keep in sync — the page is
@@ -484,22 +513,7 @@ void HomeActivity::render(RenderLock&&) {
       menuIcons.insert(menuIcons.begin(), Book);
     }
 
-    // On its own page the menu starts just below the header instead of below
-    // the covers. The one-page geometry is left exactly as it was.
-    const Rect menuRect =
-        splitPages ? Rect{0, metrics.homeTopPadding + metrics.homeMenuTopOffset, pageWidth,
-                          pageHeight - (metrics.homeTopPadding + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)}
-                   : Rect{0, metrics.homeTopPadding + coverAreaHeight + metrics.homeMenuTopOffset, pageWidth,
-                          // Subtract the SAME terms the y offset added, so the rect ends at
-                          // pageHeight - buttonHintsHeight exactly, like the split branch above.
-                          // This used to subtract headerHeight + verticalSpacing instead of
-                          // coverAreaHeight -- a leftover from when the menu sat under a header
-                          // rather than under the covers. On Lyra Six (cover tile 312, header 84,
-                          // spacing 16, hints 40) that put the rect's bottom at 972 on an 800px
-                          // screen, so drawButtonMenu laid out a row that fell off the panel and
-                          // drawPixel dropped it one ERR line at a time -- 1756 per Home paint.
-                          pageHeight - (metrics.homeTopPadding + coverAreaHeight + metrics.homeMenuTopOffset +
-                                        metrics.buttonHintsHeight)};
+    const Rect menuRect = this->menuRect();
 
     // Menu-relative selection. A theme that folds Continue Reading INTO the
     // menu gives that row index 0, so selectorIndex is already menu-relative;

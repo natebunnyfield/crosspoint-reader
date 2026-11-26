@@ -443,14 +443,13 @@ void MappedInputManager::synthesizeGesture() const {
   sample.live = sample.contact && live;
   if (sample.live) renderer.tapToLogical(nx, ny, sample.x, sample.y);
   piccoinput::Result r = gestureDecoder.feed(sample, millis(), gpio.isKeyboardTouchOn(), renderer.getScreenWidth());
-  if (!r.fired) return;
   // A tap on the header back button is Back (owner 2026-11-25, upstream's
-  // header button ported), before any row could claim it.
-  if (r.tap && HeaderBackTapTarget::contains(r.x, r.y)) {
-    LOG_DBG("INPUT", "Picco tap at %d,%d -> header back", r.x, r.y);
-    r.button = Button::Back;
-    r.tap = false;
-  }
+  // header button ported), before any row could claim it, and inside a
+  // keyboard too, where the decoder reports the tap without firing it.
+  const bool onHeaderBack = r.tap && HeaderBackTapTarget::contains(r.x, r.y);
+  if (onHeaderBack) LOG_DBG("INPUT", "Picco tap at %d,%d -> header back", r.x, r.y);
+  r = piccoinput::takeHeaderBack(r, onHeaderBack);
+  if (!r.fired) return;
   // A tap on a row the screen asked about last loop selects that row: it is
   // reported through wasScreenTapped() for this frame, and Right is not fired.
   if (r.tap) {

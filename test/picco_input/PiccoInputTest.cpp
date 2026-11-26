@@ -550,6 +550,70 @@ TEST(PiccoGestureKeyboard, EveryOtherGestureIsOff) {
   }
 }
 
+// The keyboard types a tap itself, so the decoder fires nothing for it, but
+// still reports it as a tap with its down point: the header back arrow is drawn
+// on keyboard screens and must be reachable there (owner 2026-11-26).
+TEST(PiccoGestureKeyboard, ATapIsReportedButNotFired) {
+  piccoinput::GestureDecoder d;
+  piccoinput::Result last;
+  int fired = 0;
+  for (const Frame& f : stroke(36, 62, 38, 63, 80)) {
+    const piccoinput::Result r = d.feed(f.s, f.ms, true, SCREEN_W);
+    if (r.fired) ++fired;
+    if (r.tap) last = r;
+  }
+  EXPECT_EQ(fired, 0);
+  EXPECT_TRUE(last.tap);
+  EXPECT_EQ(last.x, 36);
+  EXPECT_EQ(last.y, 62);
+}
+
+TEST(PiccoHeaderBack, ATapOnTheArrowIsBackInsideAndOutsideAKeyboard) {
+  for (const bool keyboard : {false, true}) {
+    piccoinput::GestureDecoder d;
+    piccoinput::Result got;
+    for (const Frame& f : stroke(36, 62, 36, 62, 80)) {
+      const piccoinput::Result r = piccoinput::takeHeaderBack(d.feed(f.s, f.ms, keyboard, SCREEN_W), true);
+      if (r.fired) got = r;
+    }
+    EXPECT_TRUE(got.fired) << "keyboard " << keyboard;
+    EXPECT_EQ(got.button, Button::Back) << "keyboard " << keyboard;
+    EXPECT_FALSE(got.tap) << "no row may also take it";
+  }
+}
+
+TEST(PiccoHeaderBack, OnlyATapOnTheArrowIsTaken) {
+  // A tap elsewhere is unchanged: Right outside a keyboard, nothing inside one.
+  {
+    piccoinput::GestureDecoder d;
+    const auto r = run(d, stroke(240, 400, 240, 400, 80));
+    ASSERT_EQ(r.size(), 1u);
+    const auto t = piccoinput::takeHeaderBack(r[0], false);
+    EXPECT_EQ(t.button, Button::Right);
+    EXPECT_TRUE(t.tap);
+  }
+  {
+    piccoinput::GestureDecoder d;
+    int fired = 0;
+    for (const Frame& f : stroke(240, 400, 240, 400, 80))
+      if (piccoinput::takeHeaderBack(d.feed(f.s, f.ms, true, SCREEN_W), false).fired) ++fired;
+    EXPECT_EQ(fired, 0) << "keyboard tap off the arrow";
+  }
+  // A swipe or a hold that starts on the arrow is not a tap: unchanged.
+  {
+    piccoinput::GestureDecoder d;
+    const auto r = run(d, stroke(36, 62, 36, 400, 200));
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_EQ(piccoinput::takeHeaderBack(r[0], true).button, Button::Confirm) << "swipe down";
+  }
+  {
+    piccoinput::GestureDecoder d;
+    const auto r = run(d, stroke(36, 62, 36, 62, 900));
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_EQ(piccoinput::takeHeaderBack(r[0], true).button, Button::Confirm) << "hold";
+  }
+}
+
 TEST(PiccoGestureKeyboard, AKeyboardOpeningUnderTheFingerEndsTheContact) {
   // The contact began outside a keyboard; the keyboard switched on mid-way.
   piccoinput::GestureDecoder d;

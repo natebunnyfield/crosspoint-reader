@@ -671,9 +671,7 @@ void LyraTheme::drawEmptyRecents(const GfxRenderer& renderer, const Rect rect) c
   renderer.drawText(UI_10_FONT_ID, rect.x + padding, rect.y + rect.height / 2 + 2, tr(STR_START_READING), true);
 }
 
-void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
-                               const std::function<std::string(int index)>& buttonLabel,
-                               const std::function<UIIcon(int index)>& rowIcon) const {
+BaseTheme::MenuRows LyraTheme::getButtonMenuRows(const Rect rect, const int buttonCount) const {
   // Rows must fit the rect they are handed. This used to lay out at a fixed
   // pitch from rect.y and never read rect.height, so a caller with less room
   // than buttonCount needs pushed its last row off the panel -- Home with no
@@ -694,10 +692,19 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
       }
     }
   }
+  return MenuRows{rect.y, pitch, rowHeight};
+}
+
+void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
+                               const std::function<std::string(int index)>& buttonLabel,
+                               const std::function<UIIcon(int index)>& rowIcon) const {
+  const MenuRows rows = getButtonMenuRows(rect, buttonCount);
+  const int pitch = rows.pitch;
+  const int rowHeight = rows.rowHeight;
 
   for (int i = 0; i < buttonCount; ++i) {
     int tileWidth = rect.width - LyraMetrics::values.contentSidePadding * 2;
-    Rect tileRect = Rect{rect.x + LyraMetrics::values.contentSidePadding, rect.y + i * pitch, tileWidth, rowHeight};
+    Rect tileRect = Rect{rect.x + LyraMetrics::values.contentSidePadding, rows.top + i * pitch, tileWidth, rowHeight};
 
     const bool selected = selectedIndex == i;
 

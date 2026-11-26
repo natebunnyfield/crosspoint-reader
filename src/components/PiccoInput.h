@@ -190,13 +190,30 @@ inline Result classifyRelease(const int sx, const int sy, const int ex, const in
     if (adx >= ady) return fire(dx < 0 ? Button::Right : Button::Left);
     return fire(dy < 0 ? Button::Back : Button::Confirm);
   }
-  // Inside a keyboard the keyboard itself types the tap.
-  if (keyboard || movedBeyondTapSlop || durationMs > TAP_MAX_MS) return Result{};
+  if (movedBeyondTapSlop || durationMs > TAP_MAX_MS) return Result{};
   Result tap = fire(Button::Right);
+  // Inside a keyboard the keyboard itself types the tap, so it fires nothing.
+  // It is still reported as a tap, with its point, so the header back button
+  // can take it (takeHeaderBack): the arrow is drawn on keyboard screens too,
+  // and was dead on every one of them (owner 2026-11-26, "on screen back
+  // button not working for me. check claude and all screens").
+  if (keyboard) tap.fired = false;
   tap.tap = true;
   tap.x = sx;
   tap.y = sy;
   return tap;
+}
+
+// The header back button takes a tap that lands on it, before any row and
+// inside a keyboard too: it becomes Back. `onHeaderBack` is whether the tap's
+// point is inside HeaderBackTapTarget (MappedInputManager asks; kept out of
+// here so this stays pure). Anything that is not a tap passes unchanged.
+constexpr Result takeHeaderBack(Result r, const bool onHeaderBack) {
+  if (!r.tap || !onHeaderBack) return r;
+  r.fired = true;
+  r.button = Button::Back;
+  r.tap = false;
+  return r;
 }
 
 // Fed once per input frame (MappedInputManager::update, right after

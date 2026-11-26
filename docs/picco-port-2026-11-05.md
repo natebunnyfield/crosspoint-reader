@@ -650,3 +650,69 @@ design (upstream BaseTheme.h: `bool backButton = true`), which the ruling
 ported; the arrow is Back, which every one of those screens already takes
 (on the Picco by swipe up and the left-edge swipe), so it opens no path that
 was closed.
+
+### 2026-11-26: the header back button, screen by screen
+
+Owner: *"on screen back button not working for me. check claude and all
+screens with tests. prove it is broken then prove it works"*.
+
+**The test.** `tools/picco_back_sweep.sh` boots the desktop Picco simulator
+(`pio run -e simulator_picco`) on an empty card, one fresh directory per case,
+reaches each screen with the Picco's own buttons (`UP` = rocker upper, next;
+`CONFIRM` = the GPIO5 key), taps the arrow at logical (36, 62) through the same
+contact model the iOS app feeds, and passes a case only if the firmware's log
+shows the tap read as `header back` AND the screen exiting. It also taps each of
+Home's nine rows with no open book and checks the screen each one opens. 27
+cases. Screens with no header are not in it: Create Note (the full-screen
+editor) draws no arrow; its Back is the left-edge swipe.
+
+**Before** (picco-fix at cda5e13be, the code in TestFlight build 5):
+
+| Case | Result | Cause |
+|---|---|---|
+| Claude | FAIL: the decoder fired nothing | below, 1 |
+| Settings > text entry (KeyboardEntry) | FAIL: the decoder fired nothing | below, 1 |
+| Settings > Clear Cache | FAIL: tap read as header back, screen stayed | below, 2 |
+| Home row 8 (Settings), no open book | opened Claude | below, 3 |
+| 12 other screens | PASS | |
+| Firmware from SD card, Font Update, About | not measured: the first run's 30 s timeout killed the run before the tap (fixed in the script, 120 s) | |
+
+On the iOS app (iPhone Air simulator, Release, real UIKit taps by the scratch
+XCUITest `Tapper`, Home -> six rocker presses -> the third key -> the arrow):
+Claude opened, the arrow tap logged no `Picco tap` line at all and the screen
+stayed; the on-screen counters read `read 1 gest 0` (the firmware read the
+contact, no gesture came of it).
+
+**Causes, each cited:**
+
+1. **Keyboard screens.** `PiccoInput.h` `classifyRelease` returned an empty
+   result for every tap while a keyboard owned touch ("the keyboard types it
+   itself"), and `MappedInputManager::synthesizeGesture` returned on
+   `!r.fired` before it ever asked `HeaderBackTapTarget`. The arrow is drawn on
+   those screens (`LyraTheme::drawHeader`), so it was dead on Claude, text
+   entry and the daisy wheel. Fix: a keyboard tap is now reported (`tap`, its
+   point) but not fired; the new pure `piccoinput::takeHeaderBack` turns a tap
+   on the arrow into Back before the `!r.fired` return, inside a keyboard and
+   out. A tap elsewhere in a keyboard still fires nothing.
+2. **Clear Cache.** The screen is its confirm popup. Back (and so the arrow)
+   closed the popup without a choice and left an empty screen; a second Back
+   left. Fix: closing the popup without Clear is a cancel and leaves at once
+   (`ClearCacheActivity::loop`).
+3. **Home's rows, no open book.** `LyraTheme::drawButtonMenu` squeezes the row
+   pitch when the menu does not fit its rect (B-012's fit rule), which it does
+   not with no book; Home's touch grid used the natural pitch, so taps drifted a
+   row per row: Settings (y 772) opened Claude. Fix: the fit rule moved to
+   `getButtonMenuRows` (Base and Lyra, byte-for-byte), `drawButtonMenu` and
+   Home's hit test both use it, and Home's menu rect is one function
+   (`HomeActivity::menuRect`) for both.
+
+**After:** the sweep passes 27 of 27. Unit tests: `PiccoInputTest` 37/37,
+including three new ones; with the old keyboard rule put back, exactly the two
+keyboard/header ones fail (mutation check). iOS app, same real-tap path: Claude's
+arrow logs `Picco tap at 35,61 -> header back` and returns to Home; Settings >
+Clear Cache's arrow logs `header back` and exits on the first tap. Device feel
+UNCONFIRMED.
+
+**Not covered by the sweep:** reader-side screens (chapter list, footnotes, book
+notes) need a book on the card; the chapter list was checked once on iOS
+(`EpubReaderChapterSelection`, arrow -> `header back`, exited).

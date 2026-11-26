@@ -981,11 +981,9 @@ void BaseTheme::drawGeneratedCover(const GfxRenderer& renderer, const Rect rect,
 
 int BaseTheme::getMenuRowHeight(const GfxRenderer&) const { return UITheme::getInstance().getMetrics().menuRowHeight; }
 
-void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
-                               const std::function<std::string(int index)>& buttonLabel,
-                               const std::function<UIIcon(int index)>& /*rowIcon*/) const {
-  // Same fit rule as LyraTheme::drawButtonMenu -- see the note there. Rows are
-  // compressed to stay inside rect rather than marching off the bottom of it.
+BaseTheme::MenuRows BaseTheme::getButtonMenuRows(const Rect rect, const int buttonCount) const {
+  // Same fit rule as LyraTheme::getButtonMenuRows -- see the note there. Rows
+  // are compressed to stay inside rect rather than marching off the bottom.
   const int naturalPitch = BaseMetrics::values.menuRowHeight + BaseMetrics::values.menuSpacing;
   const int avail = rect.height - BaseMetrics::values.verticalSpacing;
   int rowHeight = BaseMetrics::values.menuRowHeight;
@@ -1000,9 +998,18 @@ void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
       }
     }
   }
+  return MenuRows{rect.y + BaseMetrics::values.verticalSpacing, pitch, rowHeight};
+}
+
+void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
+                               const std::function<std::string(int index)>& buttonLabel,
+                               const std::function<UIIcon(int index)>& /*rowIcon*/) const {
+  const MenuRows rows = getButtonMenuRows(rect, buttonCount);
+  const int pitch = rows.pitch;
+  const int rowHeight = rows.rowHeight;
 
   for (int i = 0; i < buttonCount; ++i) {
-    const int tileY = BaseMetrics::values.verticalSpacing + rect.y + static_cast<int>(i) * pitch;
+    const int tileY = rows.top + static_cast<int>(i) * pitch;
 
     const bool selected = selectedIndex == i;
 

@@ -15,12 +15,10 @@ void ClearCacheActivity::onEnter() {
 
   state = WARNING;
   const char* options[] = {tr(STR_CANCEL), tr(STR_CLEAR_BUTTON)};
+  // Cancel is not handled here: a popup closed without Clear (Cancel, Back,
+  // the header arrow, a tap outside it) is a cancel, and loop() leaves on it.
   confirmPopup.show(tr(STR_CLEAR_READING_CACHE), options, 2, 0, [this](int idx) {
-    if (idx == 1) {
-      beginClear();
-    } else {
-      goBack();
-    }
+    if (idx == 1) beginClear();
   });
   requestUpdate();
 }
@@ -142,7 +140,19 @@ void ClearCacheActivity::clearCache() {
 
 void ClearCacheActivity::loop() {
   if (state == WARNING) {
-    if (confirmPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+    // The popup IS this screen while the warning is up. Closed without Clear
+    // (beginClear moves the state on), it used to leave an empty screen
+    // behind it: Back and the header arrow closed the popup, and only a
+    // SECOND Back left (owner 2026-11-26, "on screen back button not working
+    // for me", tools/picco_back_sweep.sh). Leave on the close instead.
+    const bool wasOpen = confirmPopup.isActive();
+    const bool handled = confirmPopup.handleInput(mappedInput, [this] { requestUpdate(); });
+    if (wasOpen && !confirmPopup.isActive() && state == WARNING) {
+      LOG_DBG("CLEAR_CACHE", "User cancelled");
+      goBack();
+      return;
+    }
+    if (handled) return;
 
     if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
       beginClear();

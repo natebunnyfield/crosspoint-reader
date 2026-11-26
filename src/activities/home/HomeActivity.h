@@ -97,6 +97,8 @@ class HomeActivity final : public Activity {
   void onLibraryUpdateOpen();
 
   int getMenuItemCount() const;
+  int coverAreaHeight() const;
+  Rect menuRect() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image
   bool restoreCoverBuffer();  // Restore frame buffer from stored cover
   void freeCoverBuffer();     // Free the stored cover buffer

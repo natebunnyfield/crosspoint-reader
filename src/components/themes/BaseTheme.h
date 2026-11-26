@@ -261,9 +261,21 @@ class BaseTheme {
   virtual void drawButtonHints(GfxRenderer& renderer, const char* btn1, const char* btn2, const char* btn3,
                                const char* btn4) const;
   virtual void drawSideButtonHints(const GfxRenderer& renderer, const char* topBtn, const char* bottomBtn) const;
-  // Menu row height as DRAWN by drawButtonMenu. HomeActivity builds its touch
-  // grid from this, so hit bands always match the visuals.
+  // Natural menu row height. Not what drawButtonMenu draws when its rect is
+  // short: a touch grid must come from getButtonMenuRows below (Home does).
   virtual int getMenuRowHeight(const GfxRenderer& renderer) const;
+  // Where drawButtonMenu puts its rows in `rect`: the first row's top, the
+  // pitch between rows and each row's height, after the fit rule squeezes them
+  // into a rect too short for the natural pitch (Home with no open book). A
+  // touch grid built from this lands on the rows drawn; one built from the
+  // natural pitch drifted a row per row (owner 2026-11-26: a tap on Settings
+  // opened Claude, three rows up).
+  struct MenuRows {
+    int top;
+    int pitch;
+    int rowHeight;
+  };
+  virtual MenuRows getButtonMenuRows(Rect rect, int buttonCount) const;
   // `subtitleLines` > 1 grows the row by listSubtitleLineStep per extra line,
   // for lists that wrap their subtitle rather than ellipsizing it. Every
   // caller that computes a page stride or hit-tests a row has to pass the same
