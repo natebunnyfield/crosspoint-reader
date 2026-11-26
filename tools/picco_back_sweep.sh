@@ -27,14 +27,18 @@ WORK="$(mktemp -d)"
 ARROW="36,62"
 
 # name | button presses after Home is up (space-separated) | activity that must exit
+#   [| where to tap, when it is not the header's arrow]
 CASES=(
   "Recent Books|CONFIRM|RecentBooks"
   "Browse Files|UP CONFIRM|FileBrowser"
   "Manage Files|UP UP CONFIRM|FileManager"
   "File Transfer|UP UP UP CONFIRM|CrossPointWebServer"
-  # Create Note has no header; it draws the header's arrow alone in the same
-  # corner (owner 2026-11-26, B1 "Arrow only, + Note's").
-  "Create Note|UP UP UP UP CONFIRM|NoteEditor"
+  # Create Note has no header; it draws the header's arrow alone in the
+  # top-left corner (owner 2026-11-26, B1 "Arrow only, + Note's"), centered on
+  # the first text row so the note's first line runs beside it ("Text beside
+  # the arrow"): icon x 20-51, y 5-36 at the 12 pt editor size (topPadding 5,
+  # line height 33), so its center is (36, 21).
+  "Create Note|UP UP UP UP CONFIRM|NoteEditor|36,21"
   "Claude|UP UP UP UP UP CONFIRM|ClaudeChat"
   "Update Firmware|UP UP UP UP UP UP CONFIRM|OnlineFirmwareUpdate"
   "Update Library|UP UP UP UP UP UP UP CONFIRM|LibraryUpdate"
@@ -61,7 +65,7 @@ fi
 
 pass=0; fail=0
 for c in "${CASES[@]}"; do
-  IFS='|' read -r name presses act <<<"$c"
+  IFS='|' read -r name presses act tap <<<"$c"
   [ -n "$FILTER" ] && [[ "$name" != *"$FILTER"* ]] && continue
   dir="$WORK/$(echo "$name" | tr ' /' '__')"; mkdir -p "$dir"
   # Hold Back across the boot's routing check so it lands on Home
@@ -69,7 +73,7 @@ for c in "${CASES[@]}"; do
   t=3500; script="200:QTAP:BACK:2500"
   for p in $presses; do script="$script;$t:$p"; t=$((t + 900)); done
   t=$((t + 2500)); tapAt=$t
-  script="$script;$tapAt:TAP:$ARROW;$((t + 2500)):QUIT"
+  script="$script;$tapAt:TAP:${tap:-$ARROW};$((t + 2500)):QUIT"
   ( cd "$dir" && CROSSPOINT_SIM_INPUT_SCRIPT="$script" \
       CROSSPOINT_SIM_SCREENSHOTS="$((tapAt - 300)):$dir/before.bmp;$((tapAt + 2000)):$dir/after.bmp" \
       SDL_VIDEODRIVER=dummy timeout 120 "$BIN" >"$dir/log" 2>&1 )

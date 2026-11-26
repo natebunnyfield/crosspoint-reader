@@ -19,12 +19,6 @@
 namespace {
 constexpr const char* TAG = "NOTEEDIT";
 constexpr int EDITOR_FONT_ID_FALLBACK = UI_10_FONT_ID;
-// The rect a titled screen hands GUI.drawHeader (UiListActivity::drawChrome),
-// so the corner arrow lands where the header's does, with the same tap rect.
-Rect backArrowRect(const GfxRenderer& renderer) {
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  return Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight};
-}
 
 // The Editor Font setting picks from the editor-group families (see
 // src/notes/EditorFonts.h). If that family is not installed on the card the UI
@@ -110,12 +104,13 @@ void NoteEditorActivity::onEnter() {
   lineHeight = renderer.getLineHeight(editorFontId);
   if (lineHeight < 1) lineHeight = 1;
   // Starts at topPadding: there is no header band to skip past any more. On a
-  // touch board the header's back arrow sits in the top-left corner (owner
-  // 2026-11-26, B1 "Arrow only, + Note's"), so the text starts below it and
-  // below its tap rect (the arrow's 12 px finger margin), never under a finger
-  // aimed at it.
-  const int arrowBottom = GUI.cornerBackButtonBottom(backArrowRect(renderer));
-  contentTop = arrowBottom > metrics.topPadding ? arrowBottom + metrics.verticalSpacing : metrics.topPadding;
+  // touch board the header's back arrow sits in the top-left corner, centered
+  // on the first text row (owner 2026-11-26, B1 "Arrow only, + Note's", then
+  // "Text beside the arrow"), and the note's first line starts right of the
+  // arrow's tap rect; every later line has the full width.
+  contentTop = metrics.topPadding;
+  const int arrowRight = GUI.cornerBackButtonRight();
+  firstIndent = arrowRight > metrics.contentSidePadding ? arrowRight - metrics.contentSidePadding : 0;
   // No side gutter: the side-button hints that it reserved room for were
   // removed (owner ruling 2026-08-15), so the text gets the width back.
   maxWidth = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
@@ -236,7 +231,7 @@ void NoteEditorActivity::relayout() {
       // which consumes the markers, so measuring the raw source charges the
       // line four characters for every "**bold**" it never puts on screen. The
       // wrap then broke early and left a gap after each styled word.
-      if (mdrender::measureLine(renderer, editorFontId, lineHeight, probe, cand) > maxWidth) break;
+      if (mdrender::measureLine(renderer, editorFontId, lineHeight, probe, cand) > lineWidth(lines.size())) break;
       if (text[j] == ' ') lastBreak = j + 1;
       ++j;
     }
@@ -270,23 +265,39 @@ size_t NoteEditorActivity::lineOfCursor() const {
 
 // Scroll only as far as needed to bring the cursor back on screen, so typing
 // mid-document does not jump the view.
+int NoteEditorActivity::lineX(const size_t line) const {
+  return UITheme::getInstance().getMetrics().contentSidePadding + (line == 0 ? firstIndent : 0);
+}
+
+int NoteEditorActivity::lineWidth(const size_t line) const { return maxWidth - (line == 0 ? firstIndent : 0); }
+
+// The arrow's row holds only the note's first line: a view that starts past it
+// leaves that row empty rather than run a full-width line under the arrow.
+int NoteEditorActivity::rowOffsetAt(const size_t top) const { return top > 0 && firstIndent > 0 ? 1 : 0; }
+
+size_t NoteEditorActivity::rowsShownAt(const size_t top) const {
+  const int rows = maxLines - rowOffsetAt(top);
+  return rows > 1 ? static_cast<size_t>(rows) : 1;
+}
+
 void NoteEditorActivity::ensureCursorVisible() {
   const size_t cl = lineOfCursor();
   if (cl < topLine) {
     topLine = cl;
-  } else if (cl >= topLine + static_cast<size_t>(maxLines)) {
-    topLine = cl - maxLines + 1;
+  } else if (cl >= topLine + rowsShownAt(topLine)) {
+    // Scrolled past line 0, so the view shows rowsShownAt(1) lines.
+    topLine = cl + 1 - rowsShownAt(1);
   }
 }
 
 void NoteEditorActivity::pageUp() {
-  const size_t step = static_cast<size_t>(maxLines) > 1 ? maxLines - 1 : 1;
+  const size_t step = rowsShownAt(1) > 1 ? rowsShownAt(1) - 1 : 1;
   topLine = topLine > step ? topLine - step : 0;
   if (buf && !lines.empty()) buf->cursorTo(lines[topLine].start);
 }
 
 void NoteEditorActivity::pageDown() {
-  const size_t step = static_cast<size_t>(maxLines) > 1 ? maxLines - 1 : 1;
+  const size_t step = rowsShownAt(1) > 1 ? rowsShownAt(1) - 1 : 1;
   if (topLine + step < lines.size()) topLine += step;
   if (buf && topLine < lines.size()) buf->cursorTo(lines[topLine].start);
 }
@@ -742,9 +753,8 @@ void NoteEditorActivity::loop() {
 // picker's specimen, so what that pane previews is what this draws, not an
 // imitation of it. The caret stays here: it is measured in the RAW source text
 // rather than the styled spans, because that is what the typist is editing.
-void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool showCursor, size_t cursorCol) {
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  mdrender::drawLine(renderer, editorFontId, lineHeight, metrics.contentSidePadding, y, text, len);
+void NoteEditorActivity::drawLine(const char* text, size_t len, const int x, int y, bool showCursor, size_t cursorCol) {
+  mdrender::drawLine(renderer, editorFontId, lineHeight, x, y, text, len);
 
   if (showCursor) {
     // The caret still tracks the SOURCE column -- that is what the typist is
@@ -760,8 +770,8 @@ void NoteEditorActivity::drawLine(const char* text, size_t len, int y, bool show
     // This also subsumes the old advanceOf() trailing-space workaround: caretX
     // measures spans, so a prefix ending in a space no longer loses that
     // space's advance the way a raw getTextWidth() call did.
-    const int cx = metrics.contentSidePadding +
-                   mdrender::caretX(renderer, editorFontId, lineHeight, text, len, cursorCol > len ? len : cursorCol);
+    const int cx =
+        x + mdrender::caretX(renderer, editorFontId, lineHeight, text, len, cursorCol > len ? len : cursorCol);
     // A BLOCK caret says "the buttons drive me now" without a word of text, and
     // it lands exactly where the eye already is. The status band carries the
     // sentence; this carries the state.
@@ -791,16 +801,18 @@ void NoteEditorActivity::render(RenderLock&&) {
   // What remains of it on a touch board is the header's back arrow, alone in
   // the corner: a tap on it is Back, through the same path as on every titled
   // screen (HeaderBackTapTarget, MappedInputManager).
-  GUI.drawCornerBackButton(renderer, backArrowRect(renderer));
+  // It sits on the first text row, beside the note's first line (lineX).
+  GUI.drawCornerBackButton(renderer, contentTop, lineHeight);
 
   if (oomFailed || !buf) {
     // Wrapped and translated for the same reason as Claude's hint: a raw
     // drawText of a long English literal overflows once the editor font is a
     // monospace face, and it is user-facing text, so it must go through tr().
     const auto oomLines = renderer.wrappedText(editorFontId, tr(STR_EDITOR_OOM), maxWidth, 3);
+    // Below the arrow's row on a touch board (rowOffsetAt(1)), as a scrolled note.
     for (size_t n = 0; n < oomLines.size(); ++n) {
-      renderer.drawText(editorFontId, metrics.contentSidePadding, contentTop + static_cast<int>(n) * lineHeight,
-                        oomLines[n].c_str());
+      renderer.drawText(editorFontId, metrics.contentSidePadding,
+                        contentTop + static_cast<int>(n + rowOffsetAt(1)) * lineHeight, oomLines[n].c_str());
     }
     const auto oomLabels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, oomLabels.btn1, oomLabels.btn2, oomLabels.btn3, oomLabels.btn4);
@@ -809,11 +821,13 @@ void NoteEditorActivity::render(RenderLock&&) {
   }
 
   const size_t cl = lineOfCursor();
-  for (size_t n = 0; n < static_cast<size_t>(maxLines) && topLine + n < lines.size(); ++n) {
+  const int rowOffset = rowOffsetAt(topLine);
+  for (size_t n = 0; n < rowsShownAt(topLine) && topLine + n < lines.size(); ++n) {
     const DisplayLine& dl = lines[topLine + n];
     const size_t len = dl.end > dl.start ? dl.end - dl.start : 0;
     const bool onThisLine = (topLine + n) == cl;
-    drawLine(buf ? buf->data() + dl.start : "", len, contentTop + static_cast<int>(n) * lineHeight, onThisLine,
+    drawLine(buf ? buf->data() + dl.start : "", len, lineX(topLine + n),
+             contentTop + static_cast<int>(n + rowOffset) * lineHeight, onThisLine,
              onThisLine && buf ? buf->cursor() - dl.start : 0);
   }
 

@@ -381,12 +381,12 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   }
 }
 
-int BaseTheme::drawCornerBackButton(const GfxRenderer&, const Rect rect) const {
+int BaseTheme::drawCornerBackButton(const GfxRenderer&, int, int) const {
   HeaderBackTapTarget::clear();  // the arrow is LyraTheme's, as drawHeader's is
-  return rect.y;
+  return 0;
 }
 
-int BaseTheme::cornerBackButtonBottom(const Rect rect) const { return rect.y; }
+int BaseTheme::cornerBackButtonRight() const { return 0; }
 
 void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
                            const bool backButton) const {

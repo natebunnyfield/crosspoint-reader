@@ -111,29 +111,29 @@ void LyraTheme::fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t
 }
 
 namespace {
-// The header's back arrow and its tap rect, at drawHeader's place in `rect`.
-// One definition for the titled header and the headerless corner (Create Note).
-int drawBackArrow(const GfxRenderer& renderer, const Rect rect) {
-  const int iconX = rect.x + LyraMetrics::values.contentSidePadding;
-  const int iconY = rect.y + LyraMetrics::values.batteryBarHeight;
+// The header's back arrow and its tap rect: the icon at (left +
+// contentSidePadding, iconY), the rect the icon plus a finger's margin, from
+// `left`. One definition for the titled header and the headerless corner
+// (Create Note). Returns the tap rect's right edge.
+int drawBackArrow(const GfxRenderer& renderer, const int left, const int iconY) {
+  const int iconX = left + LyraMetrics::values.contentSidePadding;
   renderer.drawIcon(Back32LucideIcon, iconX, iconY, kHeaderBackIconSize);
-  HeaderBackTapTarget::set(rect.x, iconY - kHeaderBackTapMargin,
-                           iconX - rect.x + kHeaderBackIconSize + kHeaderBackTapMargin,
-                           kHeaderBackIconSize + 2 * kHeaderBackTapMargin);
-  return iconY + kHeaderBackIconSize;
+  const int tapW = iconX - left + kHeaderBackIconSize + kHeaderBackTapMargin;
+  HeaderBackTapTarget::set(left, iconY - kHeaderBackTapMargin, tapW, kHeaderBackIconSize + 2 * kHeaderBackTapMargin);
+  return left + tapW;
 }
 }  // namespace
 
-int LyraTheme::cornerBackButtonBottom(const Rect rect) const {
-  return gpio.hasTouch() ? rect.y + LyraMetrics::values.batteryBarHeight + kHeaderBackIconSize : rect.y;
+int LyraTheme::cornerBackButtonRight() const {
+  return gpio.hasTouch() ? LyraMetrics::values.contentSidePadding + kHeaderBackIconSize + kHeaderBackTapMargin : 0;
 }
 
-int LyraTheme::drawCornerBackButton(const GfxRenderer& renderer, const Rect rect) const {
+int LyraTheme::drawCornerBackButton(const GfxRenderer& renderer, const int rowTop, const int rowHeight) const {
   if (!gpio.hasTouch()) {
     HeaderBackTapTarget::clear();
-    return rect.y;
+    return 0;
   }
-  return drawBackArrow(renderer, rect);
+  return drawBackArrow(renderer, 0, std::max(0, rowTop + (rowHeight - kHeaderBackIconSize) / 2));
 }
 
 void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
@@ -150,7 +150,7 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
   const int titleX =
       rect.x + LyraMetrics::values.contentSidePadding + (showBackButton ? kHeaderBackIconSize + kHeaderBackGap : 0);
   if (showBackButton) {
-    drawBackArrow(renderer, rect);
+    drawBackArrow(renderer, rect.x, rect.y + LyraMetrics::values.batteryBarHeight);
   } else {
     HeaderBackTapTarget::clear();
   }

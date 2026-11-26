@@ -42,6 +42,11 @@ class NoteEditorActivity final : public Activity {
   int maxLines = 1;
   int maxWidth = 0;
   int contentTop = 0;
+  // Touch boards: how far the note's first display line is indented, to run
+  // beside the corner back arrow (owner 2026-11-26, "Text beside the arrow").
+  // 0 elsewhere. A view scrolled past that line leaves the arrow's row empty
+  // (rowOffsetAt), so no text ever runs under the arrow.
+  int firstIndent = 0;
 
   // The on-screen keyboard is the DEFAULT input; a BLE keyboard is optional and
   // only started when one is already bonded.
@@ -105,7 +110,15 @@ class NoteEditorActivity final : public Activity {
   void loopCaretMode();
   bool repeatCaret(MappedInputManager::Button button, CaretDir dir);
   void moveCaret(CaretDir dir);
-  void drawLine(const char* text, size_t len, int y, bool showCursorAt, size_t cursorCol);
+  void drawLine(const char* text, size_t len, int x, int y, bool showCursorAt, size_t cursorCol);
+  // The per-line geometry, one definition for wrapping, drawing, the caret and
+  // scrolling: a display line's left x and width, and for a view starting at
+  // display line `top`, the screen rows it skips at the top and the display
+  // lines it shows.
+  int lineX(size_t line) const;
+  int lineWidth(size_t line) const;
+  int rowOffsetAt(size_t top) const;
+  size_t rowsShownAt(size_t top) const;
   bool save();
   // Shared exit for Back and keyboard Done: saves, then routes to FileManager
   // (when launched from there) or goes home.
