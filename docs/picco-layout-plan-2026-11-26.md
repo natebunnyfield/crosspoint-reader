@@ -281,6 +281,20 @@ seed book is `seed.epub`.
   the Picco app was measured. The turned landscape is unaffected, since
   nothing was changed.
 
+**Ruled 2026-11-26: "buttons should obviously not touch anything."** That
+answers it both ways. The larger iPads keep their pairs centered in the
+margins, where they were, and the iPad mini's flush edge was the defect. The
+tablet pad now keeps an 8 pt gap (`kPadPageGap`, simulator
+`ios/CrossPointIOSShim.cpp`) between each pair and the page. Where the margin
+has room for it, nothing moves. Where it does not (iPad mini portrait), the
+cell shrinks from 58 to 54 pt and the pair keeps 16 pt to the screen edge.
+Measured on the Picco app after the change: iPad mini, the left pad ends at
+x 247 with paper at x 264 and the rocker starts at x 1240 after paper ending
+at x 1223 (16 px = 8 pt each side); iPad Pro 13, unchanged at 140 px (70 pt)
+each side. The `[pad] tablet` log line now prints both page gaps. The pairs
+themselves stay fused capsules, which is the pad's design and was not part
+of this ruling.
+
 ## Built, round 3 (2026-11-26): one-line text fields
 
 The captures are in
