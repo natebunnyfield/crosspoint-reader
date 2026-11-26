@@ -1154,7 +1154,12 @@ void KeyboardEntryActivity::render(RenderLock&&) {
         }
       }
     } else {
+#if !FREEINK_DEVICE_PICCO
+      // Not on the Picco: its rocker never sends Up (PiccoInput.h rockerRoute),
+      // so the cursor mode this names cannot be reached there, and a tip may
+      // not name a control the device does not have (BaseTheme.cpp, 2026-08-09).
       renderer.drawCenteredText(SMALL_FONT_ID, hintY, tr(STR_KB_HINT_EDIT_ENTRY), true);
+#endif
     }
   }
 
@@ -1163,10 +1168,22 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   const int tipsLh = renderer.getLineHeight(SMALL_FONT_ID);
   const int underlineBottom = inputStartY + inputHeight + lineHeight + metrics.verticalSpacing + 4;
   auto drawTip = [&](const char* tip, int y) { renderer.drawCenteredText(SMALL_FONT_ID, y, tip, true); };
+#if FREEINK_DEVICE_PICCO
+  // A touch hold on Del deletes one character (owner 2026-11-06, "Keep the
+  // guard"); clear-all is Select held with Del selected (loop(), the
+  // DEL_LONG_PRESS_MS branch), and a tap on Del selects it.
+  const char* clearTip = tr(STR_KB_HINT_CLEAR_TEXT_PICCO);
+#else
+  const char* clearTip = tr(STR_KB_HINT_CLEAR_TEXT);
+#endif
 
   int tipCount = 0;
   if (cursorMode) {
+#if FREEINK_DEVICE_PICCO
+    tipCount = 0;  // its tip names Down, which the Picco's rocker never sends
+#else
     tipCount = 1;
+#endif
   } else if (urlPanel) {
     tipCount = 1 + (!text.empty() ? 1 : 0);
   } else if (symbols) {
@@ -1186,11 +1203,11 @@ void KeyboardEntryActivity::render(RenderLock&&) {
       drawTip(tr(STR_KB_HINT_EXIT_URL_MODE), y);
       y += tipsLh;
       if (!text.empty()) {
-        drawTip(tr(STR_KB_HINT_CLEAR_TEXT), y);
+        drawTip(clearTip, y);
       }
     } else if (symbols) {
       if (!text.empty()) {
-        drawTip(tr(STR_KB_HINT_CLEAR_TEXT), y);
+        drawTip(clearTip, y);
       }
     } else {
       // DERIVED from the layout on screen, not from which layout it is. Long
@@ -1222,7 +1239,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
         y += tipsLh;
       }
       if (!text.empty()) {
-        drawTip(tr(STR_KB_HINT_CLEAR_TEXT), y);
+        drawTip(clearTip, y);
       }
     }
   }
