@@ -613,3 +613,31 @@ simulator, Release, real UIKit taps): Home > Settings and Home > Recent Books
 open from a tap on the row, Settings > Dark Mode toggles from a tap, a tap in
 the reader still turns the page. `pio run -e picco` builds (RAM 22.0%, Flash
 30.8%). Device feel UNCONFIRMED.
+
+**2026-11-25, the header back button.** On TestFlight build 4 of the iOS
+Picco app the owner reported: *"I spent a day with you getting the back
+button just right, what happened to that work?"*, then: *"this was on screen
+back button in the upper left ... the conversation you and i had within the
+last week was not about swiping"*. Searched and NOT found: every Claude Code
+transcript on soup and on food with messages since 2026-11-16 (nine on soup,
+none mentioning a back button or the top left), every branch of the firmware,
+simulator and freeink-sdk repos since 2026-11-11 (local and origin), and the
+main checkout's uncommitted WIP. The conversation most likely ran in the
+Claude app or a cloud session. The one top-left back button in any CrossPoint
+history is upstream's header back button (720b995a5, 2026-09-24, plus
+ce9f5c28e and 0ecc7d781), reachable only from `upstream/develop`, never
+merged here. Owner ruling: **"Port upstream's button"**.
+
+Ported (082eedf9b): `HeaderBackTapTarget` verbatim; `LyraTheme::drawHeader`
+leads a titled header with a 32 px Lucide arrow-left on touch boards
+(`gpio.hasTouch()`: the Picco, X4 Pro), title shifted 42 px; root screens
+(Home, Crash) pass `backButton = false`; the rect is cleared on every screen
+exit and push. The arrow comes from `scripts/gen_lucide_icons.py` (pre-rotated
+for `GfxRenderer::drawIcon`), NOT upstream's `gen_icons.py`, whose unrotated
+bits drew the arrow pointing up. Input: on the Picco the decoder's tap on the
+arrow fires Back ahead of the row hand-off; elsewhere `wasBackGesture` folds
+a tap on it into Back and `wasScreenTapped` excludes it (upstream ce9f5c28e).
+Measured on the iOS app (iPhone Air simulator, Release, real UIKit taps):
+Settings shows the arrow, a tap on it logs `Picco tap at 36,59 -> header
+back` and returns to Home. Device feel UNCONFIRMED. If the lost conversation
+settled a different design, it supersedes this.
