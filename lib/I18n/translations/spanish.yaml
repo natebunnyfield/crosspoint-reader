@@ -384,6 +384,7 @@ STR_KEY_REJECTED: "No se guardó: una clave no puede estar vacía, contener espa
 STR_CLAUDE_NEEDS_KEY: "No hay clave de API de Claude. Añádela en Ajustes > Clave de API de Claude."
 STR_KEY_LENGTH_ONE: "1 carácter"
 STR_KEY_LENGTH_FORMAT: "%u caracteres"
+STR_LIGHT_ADJUST_TITLE_FORMAT: "%s (toque al terminar)"
 STR_EDGE_RULER: "Regla de bordes"
 STR_EDGE_RULER_HINT_1: "En cada borde, anota el número más pequeño"
 STR_EDGE_RULER_HINT_2: "cuyo bloque muestra entero su borde exterior."

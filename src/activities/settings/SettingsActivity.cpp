@@ -304,8 +304,14 @@ void SettingsActivity::activateIndex(const int index) {
 
 #if FREEINK_DEVICE_PICCO
 void SettingsActivity::loopLightAdjust() {
+  // A tap anywhere ends it too: the row says so (describeRow), since a touch
+  // board draws no hint bar to say "Done". Claimed, so the tap is not also
+  // the rocker's Right and steps the value (MappedInputManager::claimScreenTaps).
+  mappedInput.claimScreenTaps();
+  int tx = 0;
+  int ty = 0;
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm) ||
-      mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+      mappedInput.wasPressed(MappedInputManager::Button::Back) || mappedInput.wasScreenTapped(tx, ty)) {
     endLightAdjust();
     requestUpdate();
     return;
@@ -616,9 +622,13 @@ void SettingsActivity::describeRow(const int index, ListRow& row) const {
   const auto& setting = deviceSettings[index];
   row.title = I18N.get(setting.nameId);
 #if FREEINK_DEVICE_PICCO
-  // The row being stepped says so in its value column; the row style
-  // is otherwise the list's own.
+  // The row being stepped says so in its value column, and its title says how
+  // to end it: a touch board draws no hint bar, so the "Done" the footer asks
+  // for is never on screen. The row style is otherwise the list's own.
   if (adjustingLight && index == nav.selected) {
+    char title[64];
+    snprintf(title, sizeof(title), tr(STR_LIGHT_ADJUST_TITLE_FORMAT), I18N.get(setting.nameId));
+    row.title = title;
     row.value = "< " + settingrow::valueText(setting) + " >";
     return;
   }
