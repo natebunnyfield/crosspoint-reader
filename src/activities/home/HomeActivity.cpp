@@ -418,22 +418,32 @@ Rect HomeActivity::menuRect() const {
   const auto pageHeight = renderer.getScreenHeight();
   const bool splitPages = metrics.homeMenuOnSecondPage && !recentBooks.empty();
   const int coverArea = coverAreaHeight();
+  // The band kept clear under the menu: the hint bar's height, which a touch
+  // board zeroes (no hint bar), so on the Picco the last row ran to the panel's
+  // bottom edge. The Picco keeps the X4's 40 px band instead (owner 2026-11-26,
+  // layout plan B4 "Skip the measuring": no bezel measurement, keep Home's menu
+  // off the bottom edge with the X4's hint-band height). X4/X3 already reserve
+  // their own 40, unchanged.
+#if FREEINK_DEVICE_PICCO
+  constexpr int kPiccoMenuBottomBand = 40;
+  const int bottomBand = std::max(metrics.buttonHintsHeight, kPiccoMenuBottomBand);
+#else
+  const int bottomBand = metrics.buttonHintsHeight;
+#endif
   // On its own page the menu starts just below the header instead of below
   // the covers. The one-page geometry is left exactly as it was.
-  return splitPages
-             ? Rect{0, metrics.homeTopPadding + metrics.homeMenuTopOffset, pageWidth,
-                    pageHeight - (metrics.homeTopPadding + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)}
-             : Rect{0, metrics.homeTopPadding + coverArea + metrics.homeMenuTopOffset, pageWidth,
-                    // Subtract the SAME terms the y offset added, so the rect ends at
-                    // pageHeight - buttonHintsHeight exactly, like the split branch above.
-                    // This used to subtract headerHeight + verticalSpacing instead of
-                    // coverAreaHeight -- a leftover from when the menu sat under a header
-                    // rather than under the covers. On Lyra Six (cover tile 312, header 84,
-                    // spacing 16, hints 40) that put the rect's bottom at 972 on an 800px
-                    // screen, so drawButtonMenu laid out a row that fell off the panel and
-                    // drawPixel dropped it one ERR line at a time -- 1756 per Home paint.
-                    pageHeight -
-                        (metrics.homeTopPadding + coverArea + metrics.homeMenuTopOffset + metrics.buttonHintsHeight)};
+  return splitPages ? Rect{0, metrics.homeTopPadding + metrics.homeMenuTopOffset, pageWidth,
+                           pageHeight - (metrics.homeTopPadding + metrics.homeMenuTopOffset + bottomBand)}
+                    : Rect{0, metrics.homeTopPadding + coverArea + metrics.homeMenuTopOffset, pageWidth,
+                           // Subtract the SAME terms the y offset added, so the rect ends at
+                           // pageHeight - buttonHintsHeight exactly, like the split branch above.
+                           // This used to subtract headerHeight + verticalSpacing instead of
+                           // coverAreaHeight -- a leftover from when the menu sat under a header
+                           // rather than under the covers. On Lyra Six (cover tile 312, header 84,
+                           // spacing 16, hints 40) that put the rect's bottom at 972 on an 800px
+                           // screen, so drawButtonMenu laid out a row that fell off the panel and
+                           // drawPixel dropped it one ERR line at a time -- 1756 per Home paint.
+                           pageHeight - (metrics.homeTopPadding + coverArea + metrics.homeMenuTopOffset + bottomBand)};
 }
 
 void HomeActivity::render(RenderLock&&) {

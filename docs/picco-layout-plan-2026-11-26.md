@@ -95,6 +95,11 @@ reader margins and the header back arrow match the X4.
 - **2026-11-26, Select: "move select to over to the left obviously".** The
   third key (Confirm) takes the empty Back slot at the same size, so the left
   column is Select over Power, with the switch right of Power. Do not re-ask.
+- **2026-11-26, B4 changed: "Skip the measuring".** No bezel measurement. On
+  the Picco, Home's menu keeps the X4's 40 px hint-band height clear at the
+  bottom (`HomeActivity::menuRect`, Picco only); rows squeeze to fit and the
+  touch grid follows (`tools/picco_back_sweep.sh` Home rows now 401 + 41 i,
+  30/30). The Edge Ruler row stays in Settings. Do not re-ask.
 
 ## Built (2026-11-26)
 

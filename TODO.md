@@ -68,7 +68,7 @@ measured yet. Start from `tools/latency/` and `CROSSPOINT_SIM_LOG_LATENCY=1`
 (simulator CLAUDE.md), which time an input edge to its refresh, and find where
 a keystroke waits before the field repaints. Not started.
 
-### [T-034] Picco edge insets from the Edge Ruler — WAITING ON THE OWNER
+### [T-034] Picco edge insets from the Edge Ruler — CLOSED 2026-11-26, not measured
 **scope: SDK `BoardConfig.h` PICCO `viewableInsets` · opened 2026-11-26**
 
 Layout plan B4 (`docs/picco-layout-plan-2026-11-26.md`, ruling "Ruler
@@ -78,6 +78,10 @@ menu runs to the panel's bottom edge. Settings > Edge Ruler (Picco only, branch
 owner) shows numbered blocks 0-30 px in from each edge. Owed: the smallest
 fully visible number per edge (top, bottom, left, right). Then set the PICCO
 profile's `viewableInsets` and keep Home's menu off the bottom edge.
+
+Closed by the owner, "Skip the measuring": no numbers. Home's menu on the
+Picco keeps the X4's 40 px band clear at the bottom instead
+(`docs/picco-layout-plan-2026-11-26.md`, Rulings).
 
 ### [T-033] Picco layout fixes — IN PROGRESS on `picco-layout`
 **scope: firmware + iOS app · opened 2026-11-26**

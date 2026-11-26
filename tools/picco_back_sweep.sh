@@ -94,13 +94,13 @@ done
 # HOME'S ROWS BY TOUCH, on the same empty card (no open book). Found by this
 # sweep's first run (2026-11-26): a tap on Settings opened Claude, because
 # with no book the theme squeezes the menu's pitch and the touch grid did not.
-# Row centers as drawn on that card (480x800 logical, Lyra Six): 404 + 46 i.
+# Row centers as drawn on that card (480x800 logical, Lyra Six): 401 + 41 i.
 ROWS=(RecentBooks FileBrowser FileManager CrossPointWebServer NoteEditor ClaudeChat OnlineFirmwareUpdate LibraryUpdate Settings)
 for i in "${!ROWS[@]}"; do
   act=${ROWS[$i]}; name="Home row $i by touch"
   [ -n "$FILTER" ] && [[ "$name" != *"$FILTER"* ]] && continue
   dir="$WORK/home_row_$i"; mkdir -p "$dir"
-  y=$((404 + 46 * i))
+  y=$((401 + 41 * i))
   ( cd "$dir" && CROSSPOINT_SIM_INPUT_SCRIPT="200:QTAP:BACK:2500;4000:TAP:200,$y;6500:QUIT" \
       SDL_VIDEODRIVER=dummy timeout 60 "$BIN" >"$dir/log" 2>&1 )
   got=$(grep -o 'Entering activity: .*' "$dir/log" | sed -n 3p | sed 's/Entering activity: //')
