@@ -9,6 +9,7 @@
 #include <initializer_list>
 
 #include "MappedInputManager.h"
+#include "components/SingleLineField.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "notes/DaisyRings.h"
@@ -311,13 +312,16 @@ void DaisyEntryActivity::render(RenderLock&&) {
   const int fieldY = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing * 3;
   const int fieldMargin = 24;
   const int fieldWidth = pageWidth - 2 * fieldMargin;
+  // ONE line (owner 2026-11-26, "as before, text field needs to be one
+  // line"): the cursor is always at the end here, so a text wider than the
+  // field shows its tail, behind a leading ellipsis that says text is hidden
+  // (components/SingleLineField.h, the same rule as the grid keyboard).
   std::string shown = displayText();
-  // Drop leading characters until the tail (plus cursor) fits.
-  while (!shown.empty() && renderer.getTextWidth(UI_12_FONT_ID, shown.c_str()) > fieldWidth - 8) {
-    size_t cut = 1;
-    while (cut < shown.length() && (static_cast<uint8_t>(shown[cut]) & 0xC0) == 0x80) cut++;
-    shown.erase(0, cut);
-  }
+  constexpr const char* kEllipsis = "\xE2\x80\xA6";
+  const singleline::Window win = singleline::fit(
+      shown, shown.length(), fieldWidth - 8, 0, renderer.getTextWidth(UI_12_FONT_ID, kEllipsis),
+      [&](size_t a, size_t b) { return renderer.getTextWidth(UI_12_FONT_ID, shown.substr(a, b - a).c_str()); });
+  if (win.leftCut) shown = std::string(kEllipsis) + shown.substr(win.start);
   renderer.drawText(UI_12_FONT_ID, fieldMargin, fieldY, shown.c_str());
   const int cursorX = fieldMargin + renderer.getTextWidth(UI_12_FONT_ID, shown.c_str()) + 1;
   renderer.fillRect(cursorX, fieldY, 2, lineHeight, true);

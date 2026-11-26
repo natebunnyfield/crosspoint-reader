@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "activities/Activity.h"
+#include "components/SingleLineField.h"
 #include "util/ButtonNavigator.h"
 #if FREEINK_DEVICE_PICCO
 #include "components/KeyboardTouch.h"
@@ -144,10 +145,10 @@ class KeyboardEntryActivity : public Activity {
   // Advance of s[start, end) measured in place by temporarily null-terminating
   // at `end` — avoids a substr temporary per measurement.
   int measureRange(std::string& s, int start, int end) const;
-  // Largest line end in (start, s.length()] whose advance fits maxWidth.
-  // Binary search over the monotonic prefix advance; always advances at least
-  // one byte so an oversized glyph cannot stall the wrap loop.
-  int lineBreakEnd(std::string& s, int start, int maxWidth) const;
+  // The part of the shown text on screen: ONE line, never wrapped (owner
+  // 2026-11-26, "as before, text field needs to be one line"). Render and the
+  // tap-to-cursor mapping both ask here (components/SingleLineField.h).
+  singleline::Window fieldWindow(std::string& shown, size_t cursor, int maxLineWidth) const;
 
   const freeink::ui::KeyboardLayout& currentLayout() const;
   const freeink::ui::KeyboardKey* selectedKey() const;

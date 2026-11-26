@@ -22,6 +22,8 @@ namespace fui = freeink::ui;
 namespace {
 
 constexpr fui::ActionId ACTION_KEY = 1;
+// Marks the end of a one-line field whose text runs past it (fieldWindow).
+constexpr const char* kEllipsis = "\xE2\x80\xA6";
 
 // ---------------------------------------------------------------------------
 // URL layers. The SDK builtin layouts have no URL variant (":", "/", ".", the
@@ -495,31 +497,14 @@ int KeyboardEntryActivity::measureRange(std::string& s, const int start, const i
   return width;
 }
 
-int KeyboardEntryActivity::lineBreakEnd(std::string& s, const int start, const int maxWidth) const {
-  const int len = static_cast<int>(s.length());
-  if (measureRange(s, start, len) <= maxWidth) return len;
-  int lo = start + 1;
-  int hi = len - 1;
-  int best = start + 1;
-  while (lo <= hi) {
-    const int mid = lo + (hi - lo) / 2;
-    if (measureRange(s, start, mid) <= maxWidth) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-
-  // The byte-index search can stop inside a character; snap back to a boundary,
-  // keeping one whole character so the wrap loop always advances.
-  const int firstCharEnd = static_cast<int>(utf8Next(s, static_cast<size_t>(start)));
-  while (best > start && (static_cast<uint8_t>(s[best]) & 0xC0) == 0x80) best--;
-  // Widths measured mid-character are unreliable, so the search can overshoot.
-  while (best > firstCharEnd && measureRange(s, start, best) > maxWidth) {
-    best = static_cast<int>(utf8Prev(s, static_cast<size_t>(best)));
-  }
-  return best < firstCharEnd ? firstCharEnd : best;
+singleline::Window KeyboardEntryActivity::fieldWindow(std::string& shown, const size_t cursor,
+                                                      const int maxLineWidth) const {
+  // Room after the last character for the caret, when the window is the tail.
+  constexpr int kCaretReserve = 8;
+  const int ellipsisWidth = renderer.getTextAdvanceX(UI_12_FONT_ID, kEllipsis, EpdFontFamily::REGULAR);
+  return singleline::fit(shown, cursor, maxLineWidth, kCaretReserve, ellipsisWidth, [&](size_t a, size_t b) {
+    return measureRange(shown, static_cast<int>(a), static_cast<int>(b));
+  });
 }
 
 bool KeyboardEntryActivity::cursorPositionFromPoint(const int x, const int y, size_t& position) const {
@@ -548,64 +533,53 @@ bool KeyboardEntryActivity::cursorPositionFromPoint(const int x, const int y, si
   const int maxLineWidth = textAreaWidth;
   const bool centerText = metrics.keyboardCenteredText;
   std::string displayText = displayTextForCurrentState();
+  // The same one-line window render() draws (fieldWindow), so a tap maps to
+  // the byte it lands on whatever part of a long text is on screen.
+  const size_t shownCursor = inputType == InputType::Secret ? displayText.length() : cursorPos;
+  const singleline::Window win = fieldWindow(displayText, shownCursor, maxLineWidth);
+  const int ellipsisWidth = renderer.getTextAdvanceX(UI_12_FONT_ID, kEllipsis, EpdFontFamily::REGULAR);
+  const bool overflow = win.leftCut || win.rightCut;
+  const int runWidth = measureRange(displayText, static_cast<int>(win.start), static_cast<int>(win.end));
+  const int shownWidth = runWidth + (win.leftCut ? ellipsisWidth : 0) + (win.rightCut ? ellipsisWidth : 0);
+  const int lineStartX =
+      (centerText && !overflow) ? effectiveMargin + (maxLineWidth - shownWidth) / 2 : effectiveMargin;
+  const int textX = lineStartX + (win.leftCut ? ellipsisWidth : 0);
 
-  int lineStartIdx = 0;
-  int lineY = inputStartY;
-  int lastLineStartIdx = 0;
-  int lastLineEndIdx = static_cast<int>(displayText.length());
-  int lastLineStartX = effectiveMargin;
-  int lastLineWidth = 0;
-
-  while (true) {
-    const int lineEndIdx = lineBreakEnd(displayText, lineStartIdx, maxLineWidth);
-    const int textWidth = measureRange(displayText, lineStartIdx, lineEndIdx);
-    const int lineStartX = centerText ? effectiveMargin + (maxLineWidth - textWidth) / 2 : effectiveMargin;
-    lastLineStartIdx = lineStartIdx;
-    lastLineEndIdx = lineEndIdx;
-    lastLineStartX = lineStartX;
-    lastLineWidth = textWidth;
-
-    if (y >= lineY - metrics.verticalSpacing && y < lineY + lineHeight + metrics.verticalSpacing) {
-      if (x <= lineStartX) {
-        position = static_cast<size_t>(lineStartIdx);
-        return true;
-      }
-      if (x >= lineStartX + textWidth) {
-        position = static_cast<size_t>(lineEndIdx);
-        return true;
-      }
-
-      int previousWidth = 0;
-      for (int i = lineStartIdx; i < lineEndIdx; i++) {
-        const int nextWidth = measureRange(displayText, lineStartIdx, i + 1);
-        const int midpoint = lineStartX + previousWidth + (nextWidth - previousWidth) / 2;
-        if (x < midpoint) {
-          position = static_cast<size_t>(i);
-          return true;
-        }
-        previousWidth = nextWidth;
-      }
-      position = static_cast<size_t>(lineEndIdx);
-      return true;
-    }
-
-    if (lineEndIdx == static_cast<int>(displayText.length())) {
-      break;
-    }
-
-    lineY += lineHeight;
-    lineStartIdx = lineEndIdx;
+  const int underlineBottom = inputStartY + lineHeight + metrics.verticalSpacing + 8;
+  if (y < inputStartY - metrics.verticalSpacing || y >= underlineBottom || x < effectiveMargin ||
+      x >= effectiveMargin + maxLineWidth + toggleReserve) {
+    return false;
   }
-
-  const int underlineBottom = lineY + lineHeight + metrics.verticalSpacing + 8;
-  if (y >= inputStartY - metrics.verticalSpacing && y < underlineBottom && x >= effectiveMargin &&
-      x < effectiveMargin + maxLineWidth + toggleReserve) {
-    position = x < lastLineStartX + lastLineWidth ? static_cast<size_t>(lastLineStartIdx)
-                                                  : static_cast<size_t>(lastLineEndIdx);
+  // A tap on an ellipsis goes to that end of the text: the hidden part is the
+  // only way there by touch, and the window then follows the cursor.
+  if (win.leftCut && x < textX) {
+    position = 0;
     return true;
   }
-
-  return false;
+  if (win.rightCut && x >= textX + runWidth) {
+    position = displayText.length();
+    return true;
+  }
+  if (x <= textX) {
+    position = win.start;
+    return true;
+  }
+  if (x >= textX + runWidth) {
+    position = win.end;
+    return true;
+  }
+  int previousWidth = 0;
+  for (size_t i = win.start; i < win.end; i = singleline::nextBoundary(displayText, i)) {
+    const size_t next = singleline::nextBoundary(displayText, i);
+    const int nextWidth = measureRange(displayText, static_cast<int>(win.start), static_cast<int>(next));
+    if (x < textX + previousWidth + (nextWidth - previousWidth) / 2) {
+      position = i;
+      return true;
+    }
+    previousWidth = nextWidth;
+  }
+  position = win.end;
+  return true;
 }
 
 #if FREEINK_DEVICE_PICCO
@@ -949,7 +923,6 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
   const int inputStartY = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing +
                           metrics.verticalSpacing * 4 + metrics.keyboardVerticalOffset;
-  int inputHeight = 0;
 
   std::string displayText = displayTextForCurrentState();
   // Where the cursor is drawn, in displayText. The text's own cursorPos for
@@ -990,74 +963,63 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     if (w > cursorCharWidth) cursorCharWidth = w;
   }
 
-  int lineStartIdx = 0;
-  int textWidth = 0;
-  int cursorPixelX = effectiveMargin;
-  int cursorLineY = inputStartY;
-  bool cursorDrawn = false;
+  // ONE line, never wrapped (owner 2026-11-26, "as before, text field needs
+  // to be one line"): a text wider than the field shows a window of it that
+  // holds the cursor, with an ellipsis at each end that is cut off
+  // (fieldWindow, components/SingleLineField.h). The field's height, the tips
+  // and the keyboard therefore never move, whatever the length.
+  const singleline::Window win = fieldWindow(displayText, shownCursor, maxLineWidth);
+  const int ellipsisWidth = renderer.getTextAdvanceX(UI_12_FONT_ID, kEllipsis, EpdFontFamily::REGULAR);
+  const bool overflow = win.leftCut || win.rightCut;
+  const std::string lineText = displayText.substr(win.start, win.end - win.start);
+  const int runWidth = renderer.getTextAdvanceX(UI_12_FONT_ID, lineText.c_str(), EpdFontFamily::REGULAR);
+  const int textWidth = runWidth + (win.leftCut ? ellipsisWidth : 0) + (win.rightCut ? ellipsisWidth : 0);
+  const int lineStartX = (centerText && !overflow) ? effectiveMargin + (maxLineWidth - textWidth) / 2 : effectiveMargin;
+  const int textX = lineStartX + (win.leftCut ? ellipsisWidth : 0);
+  int cursorPixelX = textX;
+  const int cursorLineY = inputStartY;
 
-  while (true) {
-    const int lineEndIdx = lineBreakEnd(displayText, lineStartIdx, maxLineWidth);
-    const std::string lineText = displayText.substr(lineStartIdx, lineEndIdx - lineStartIdx);
-    textWidth = renderer.getTextAdvanceX(UI_12_FONT_ID, lineText.c_str(), EpdFontFamily::REGULAR);
-    {
-      const bool isLastLine = (lineEndIdx == static_cast<int>(displayText.length()));
-      bool isCursorLine = false;
-      if (!cursorDrawn && shownCursor >= lineStartIdx &&
-          (isLastLine ? shownCursor <= lineEndIdx : shownCursor < lineEndIdx)) {
-        std::string beforeCursor;
-        if (isPassword && !passwordVisible && cursorMode) {
-          beforeCursor = std::string(shownCursor - lineStartIdx, '*');
-        } else {
-          beforeCursor = displayText.substr(lineStartIdx, shownCursor - lineStartIdx);
-        }
-        int beforeWidth = renderer.getTextAdvanceX(UI_12_FONT_ID, beforeCursor.c_str(), EpdFontFamily::REGULAR);
-        int kernOffset = 0;
-        if (cursorCharBytes > 0) {
-          std::string beforeAndCursor = beforeCursor + displayCursorChar;
-          int beforeAndCursorWidth =
-              renderer.getTextAdvanceX(UI_12_FONT_ID, beforeAndCursor.c_str(), EpdFontFamily::REGULAR);
-          int charAdvance = renderer.getTextAdvanceX(UI_12_FONT_ID, displayCursorChar, EpdFontFamily::REGULAR);
-          kernOffset = beforeAndCursorWidth - beforeWidth - charAdvance;
-        }
-        if (centerText) {
-          cursorPixelX = effectiveMargin + (maxLineWidth - textWidth) / 2 + beforeWidth + kernOffset;
-        } else {
-          cursorPixelX = effectiveMargin + beforeWidth + kernOffset;
-        }
-        cursorLineY = inputStartY + inputHeight;
-        cursorDrawn = true;
-        isCursorLine = true;
-      }
-
-      const int lineStartX = centerText ? effectiveMargin + (maxLineWidth - textWidth) / 2 : effectiveMargin;
-      if (isCursorLine && cursorMode && isPassword && !passwordVisible && !togglePos) {
-        // Draw text in 3 parts to avoid block cursor overflowing onto next char.
-        // displayText uses '*' for all chars; actual char may be wider than '*'.
-        // Part 1: chars before cursor position
-        const std::string part1 = displayText.substr(lineStartIdx, shownCursor - lineStartIdx);
-        renderer.drawText(UI_12_FONT_ID, lineStartX, inputStartY + inputHeight, part1.c_str());
-        // Part 2: skip cursor slot (block + actual char drawn later)
-        // Part 3: chars after cursor position (skip char under cursor), starting at cursorPixelX + cursorCharWidth
-        const int afterStart = static_cast<int>(shownCursor + cursorCharBytes);
-        const int afterEnd = lineEndIdx;
-        if (afterStart < afterEnd) {
-          const std::string part3 = displayText.substr(afterStart, afterEnd - afterStart);
-          renderer.drawText(UI_12_FONT_ID, cursorPixelX + cursorCharWidth, inputStartY + inputHeight, part3.c_str());
-        }
-      } else {
-        renderer.drawText(UI_12_FONT_ID, lineStartX, inputStartY + inputHeight, lineText.c_str());
-      }
-      if (lineEndIdx == static_cast<int>(displayText.length())) {
-        break;
-      }
-
-      inputHeight += lineHeight;
-      lineStartIdx = lineEndIdx;
+  if (shownCursor >= win.start && shownCursor <= win.end) {
+    std::string beforeCursor;
+    if (isPassword && !passwordVisible && cursorMode) {
+      beforeCursor = std::string(shownCursor - win.start, '*');
+    } else {
+      beforeCursor = displayText.substr(win.start, shownCursor - win.start);
     }
+    const int beforeWidth = renderer.getTextAdvanceX(UI_12_FONT_ID, beforeCursor.c_str(), EpdFontFamily::REGULAR);
+    int kernOffset = 0;
+    if (cursorCharBytes > 0) {
+      const std::string beforeAndCursor = beforeCursor + displayCursorChar;
+      const int beforeAndCursorWidth =
+          renderer.getTextAdvanceX(UI_12_FONT_ID, beforeAndCursor.c_str(), EpdFontFamily::REGULAR);
+      const int charAdvance = renderer.getTextAdvanceX(UI_12_FONT_ID, displayCursorChar, EpdFontFamily::REGULAR);
+      kernOffset = beforeAndCursorWidth - beforeWidth - charAdvance;
+    }
+    cursorPixelX = textX + beforeWidth + kernOffset;
   }
 
-  const int fieldWidth = (inputHeight > 0) ? maxLineWidth : textWidth;
+  if (win.leftCut) renderer.drawText(UI_12_FONT_ID, lineStartX, inputStartY, kEllipsis);
+  if (cursorMode && isPassword && !passwordVisible && !togglePos && shownCursor >= win.start &&
+      shownCursor <= win.end) {
+    // Draw text in 3 parts to avoid block cursor overflowing onto next char.
+    // displayText uses '*' for all chars; actual char may be wider than '*'.
+    // Part 1: chars before cursor position
+    const std::string part1 = displayText.substr(win.start, shownCursor - win.start);
+    renderer.drawText(UI_12_FONT_ID, textX, inputStartY, part1.c_str());
+    // Part 2: skip cursor slot (block + actual char drawn later)
+    // Part 3: chars after cursor position (skip char under cursor), starting at cursorPixelX + cursorCharWidth
+    const size_t afterStart = shownCursor + cursorCharBytes;
+    if (afterStart < win.end) {
+      const std::string part3 = displayText.substr(afterStart, win.end - afterStart);
+      renderer.drawText(UI_12_FONT_ID, cursorPixelX + cursorCharWidth, inputStartY, part3.c_str());
+    }
+  } else {
+    renderer.drawText(UI_12_FONT_ID, textX, inputStartY, lineText.c_str());
+  }
+  if (win.rightCut) renderer.drawText(UI_12_FONT_ID, textX + runWidth, inputStartY, kEllipsis);
+  const int inputHeight = 0;  // one line: the field never grows
+
+  const int fieldWidth = overflow ? maxLineWidth : textWidth;
   const int lineMargin = effectiveMargin;
   GUI.drawTextField(renderer, Rect{0, inputStartY, pageWidth, inputHeight}, fieldWidth, cursorMode, lineMargin,
                     pageWidth - 2 * lineMargin);
