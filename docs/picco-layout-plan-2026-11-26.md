@@ -91,8 +91,10 @@ reader margins and the header back arrow match the X4.
   horizontal layout optics without resizing or fucking it up"*. iOS pad: the
   switch keeps its size and sits one 8 pt step right of POWER, top and bottom
   level with POWER, its right edge on Confirm's right edge in the row above.
-  The Back slot it used is empty again. Captured on iPhone Air and iPad mini.
-  Do not re-ask.
+  Captured on iPhone Air and iPad mini. Do not re-ask.
+- **2026-11-26, Select: "move select to over to the left obviously".** The
+  third key (Confirm) takes the empty Back slot at the same size, so the left
+  column is Select over Power, with the switch right of Power. Do not re-ask.
 
 ## Built (2026-11-26)
 
