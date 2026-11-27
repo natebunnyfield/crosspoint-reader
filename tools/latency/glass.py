@@ -12,8 +12,30 @@ usage: tools/latency/glass.py <log> [start_ms]   (presses before start_ms,
   done     the frame is wholly on the glass: the flip that finished its beam
            sweep, or its first flip when it landed whole (no sweep)
 A frame written but never flipped was coalesced away (the selection skipped
-it). A sweep 'over a STALE picture' painted the new frame down over a capture
-older than the frame the glass was showing: the old selection came back."""
+it), on a 1-bit screen; see LIMIT for the other case. A sweep 'over a STALE
+picture' painted the new frame down over a capture older than the frame the
+glass was showing: the old selection came back.
+
+LIMIT: 1-BIT SCREENS ONLY (review 2026-11-27, row R-18). A press is tied to a
+frame only through `written` lines, and the simulator emits `written` only from
+the 1-bit path (HalDisplay::refreshDisplay in crosspoint-simulator
+src/HalDisplay.cpp). A gray compose (composeGrayscalePreview, reached from
+displayGrayBuffer) takes a new frame number with no `written` line; its trace
+line is `gray-display`, which carries no frame number. So on a screen whose
+gray pass runs inside render() (the Colophon, the text viewer, anything else
+that composes there) the 1-bit frame is held and replaced, and this script
+gets three things wrong:
+  - the press prints '-' for glass and done, though its composed frame did
+    reach the glass;
+  - its 1-bit frame is counted under 'never on glass', though nothing was
+    coalesced away;
+  - the LAST such press before a return to a 1-bit screen is credited with
+    that later screen's frame and latency, because `shown` below is the first
+    later written frame that has a `glass` line, whichever press wrote it.
+The reader's deferred gray pass is not followed either, though its 1-bit page
+is. Measure menus and lists with this, pass a start_ms after the last gray
+screen, and do not read a number off a run that steps through one. The
+Settings measurements in the doc are 1-bit steps and are not affected."""
 import re, sys, statistics
 LAT = re.compile(r'\[lat\] (\d+) (\S+)(?: fb=\w+)? (-?\d+) ')
 ev = []

@@ -277,6 +277,25 @@ tables as max). The script's own clock is `millis()`, so a press the main thread
 was too busy to read shows up as a late `btn-down`, not as a longer latency:
 "read late" in the tables is that lateness.
 
+**`glass.py` is for 1-bit screens only** (review 2026-11-27, row R-18; read from
+the code, not run). It ties a press to a frame through the trace's `written`
+lines (`tools/latency/glass.py:65-67`), and the simulator emits `written` only
+from the 1-bit path, `HalDisplay::refreshDisplay` (`crosspoint-simulator
+src/HalDisplay.cpp:2588`). A gray compose takes a new frame number with no
+`written` line (`composeGrayscalePreview`, `HalDisplay.cpp:1161`, `:1193`), and
+`displayGrayBuffer` notes only `gray-display`, with no frame number (`:5344`).
+On a screen whose gray pass runs inside `render()`, such as the Colophon or the
+text viewer, the 1-bit frame is held and replaced, so the script prints `-` for
+that press, counts its 1-bit frame as "never on glass" (`glass.py:76`) though
+nothing was coalesced away, and gives the last such press before a return to a
+1-bit screen the next screen's frame and latency. The tool's docstring says the
+same. Every number in this file is a Settings step, which is 1-bit, so none is
+affected. The O2 row's Colophon figure (5 composed frames, no 1-bit one) is a
+count of presents by the pass that wrote them, which `glass.py` does not print.
+The tool is unchanged: this pass documents the limit. Following a compose would
+need the simulator to note the composed frame's number, as `written` does for
+the 1-bit one.
+
 ## Adversarial review of the ruled batch (2026-11-27, read-only agent)
 
 Over O1-O3, O5, O6 before they shipped (firmware fd49312eb..01421687d,
