@@ -1537,6 +1537,19 @@ void loop() {
     }
   }
 
+#if FREEINK_DEVICE_PICCO
+  // The panel stays powered between refreshes (owner ruling 2026-11-27, "Stay
+  // powered", docs/menu-nav-lag-2026-11-27.md O5); power it down once two
+  // seconds pass with no refresh. The due check is lock-free and false almost
+  // always; the power-off itself needs the render lock, and if a render holds
+  // it the next pass tries again.
+  constexpr uint32_t PANEL_IDLE_POWER_OFF_MS = 2000;
+  if (display.panelIdlePowerOffDue(PANEL_IDLE_POWER_OFF_MS)) {
+    RenderLock lock(RenderLock::Mode::Try);
+    if (lock.ownsLock()) display.powerOffIdlePanel();
+  }
+#endif
+
   // Add delay at the end of the loop to prevent tight spinning
   // When an activity requests skip loop delay (e.g., webserver running), use yield() for faster response
   // Otherwise, use longer delay to save power

@@ -79,6 +79,7 @@ void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen)
   toPanelPolarity();
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
   toLogicalPolarity();
+  noteRefresh();
 }
 
 void HalDisplay::displayBufferAsync(HalDisplay::RefreshMode mode) {
@@ -92,6 +93,7 @@ void HalDisplay::displayBufferAsync(HalDisplay::RefreshMode mode) {
   // not to touch the framebuffer until waitRefreshComplete(), which restores it.
   toPanelPolarity();
   einkDisplay.displayBufferAsyncNoShadow(convertRefreshMode(mode));
+  noteRefresh();
 }
 
 void HalDisplay::waitRefreshComplete() {
@@ -110,6 +112,7 @@ void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen
   toPanelPolarity();
   einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
   toLogicalPolarity();
+  noteRefresh();
 }
 
 void HalDisplay::setInverted(const bool inverted) {
@@ -167,6 +170,7 @@ void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) 
   toPanelPolarity();
   einkDisplay.displayGrayscaleBase(convertRefreshMode(fallback), turnOffScreen);
   toLogicalPolarity();
+  noteRefresh();
 }
 
 void HalDisplay::preconditionGrayscale() { einkDisplay.preconditionGrayscale(); }
@@ -202,6 +206,7 @@ void HalDisplay::displayWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h, b
   toPanelPolarity();
   einkDisplay.displayWindow(x, y, w, h, turnOffScreen);
   toLogicalPolarity();
+  noteRefresh();
 }
 
 bool HalDisplay::supportsWindowedRefresh() const {
@@ -217,6 +222,7 @@ void HalDisplay::displayGrayBuffer(bool turnOffScreen, const unsigned char* lut,
   toPanelPolarity();
   einkDisplay.displayGrayBuffer(turnOffScreen, lut, absolute);
   toLogicalPolarity();
+  noteRefresh();
 }
 
 bool HalDisplay::supportsAbsoluteGrayscale() const {
@@ -233,6 +239,32 @@ void HalDisplay::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, ui
 }
 
 bool HalDisplay::supportsStripGrayscale() const { return einkDisplay.supportsStripGrayscale(); }
+
+void HalDisplay::noteRefresh() {
+#if FREEINK_DEVICE_PICCO
+  lastRefreshMs.store(millis());
+  panelMayBePowered.store(true);
+#endif
+}
+
+bool HalDisplay::panelIdlePowerOffDue(const uint32_t idleAfterMs) const {
+#if FREEINK_DEVICE_PICCO
+  return panelMayBePowered.load() && millis() - lastRefreshMs.load() >= idleAfterMs;
+#else
+  (void)idleAfterMs;
+  return false;
+#endif
+}
+
+void HalDisplay::powerOffIdlePanel() {
+#if FREEINK_DEVICE_PICCO
+  // Caller holds the render lock, so no refresh is in flight. The SDK waits
+  // out any pending one anyway, then powers the analog rails down (RAM and the
+  // old plane are kept); a panel already off costs no bus traffic.
+  panelMayBePowered.store(false);
+  einkDisplay.powerOffBetweenFrames();
+#endif
+}
 
 uint16_t HalDisplay::getDisplayWidth() const { return einkDisplay.getDisplayWidth(); }
 

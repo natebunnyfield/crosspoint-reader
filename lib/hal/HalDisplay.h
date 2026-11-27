@@ -3,6 +3,8 @@
 #include <EInkDisplay.h>
 #include <PanelPolarity.h>
 
+#include <atomic>
+
 // Supersampling factor between the LOGICAL screen coordinate space every caller
 // draws in and the PHYSICAL framebuffer. On real hardware there is exactly one
 // framebuffer pixel per logical pixel, so this is 1 and every scale-aware branch
@@ -173,6 +175,16 @@ class HalDisplay {
   void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows);
   bool supportsStripGrayscale() const;
 
+  // THE PICCO'S PANEL STAYS POWERED BETWEEN REFRESHES (owner ruling
+  // 2026-11-27, "Stay powered", docs/menu-nav-lag-2026-11-27.md O5). Its
+  // SSD2677 driver now honors turnOff=false (the SDK used to power off after
+  // every refresh like stock), so a run of menu steps skips the power cycle on
+  // each. The panel must still go down once refreshes stop: the main loop asks
+  // panelIdlePowerOffDue() (lock-free) and then, holding the render lock, calls
+  // powerOffIdlePanel(). Both are no-ops off the Picco.
+  bool panelIdlePowerOffDue(uint32_t idleAfterMs) const;
+  void powerOffIdlePanel();
+
   // One activity render() has returned (ActivityManager's render task). A
   // no-op on the device. The simulator holds a 1-bit frame briefly so an
   // anti-aliased page's gray pass can replace it before it reaches the screen;
@@ -196,6 +208,10 @@ class HalDisplay {
   // Promote a FAST refresh to HALF for the one refresh that follows a polarity
   // change: a differential refresh cannot cross polarities.
   RefreshMode resolvePolarityMode(RefreshMode mode);
+  // Every refresh entry point records that the panel may now be powered.
+  void noteRefresh();
+  std::atomic<uint32_t> lastRefreshMs{0};
+  std::atomic<bool> panelMayBePowered{false};
 
   EInkDisplay einkDisplay;
   PanelPolarity polarity;
