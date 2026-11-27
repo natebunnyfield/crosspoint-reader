@@ -180,8 +180,9 @@ class HalDisplay {
   // SSD2677 driver now honors turnOff=false (the SDK used to power off after
   // every refresh like stock), so a run of menu steps skips the power cycle on
   // each. The panel must still go down once refreshes stop: the main loop asks
-  // panelIdlePowerOffDue() (lock-free) and then, holding the render lock, calls
-  // powerOffIdlePanel(). Both are no-ops off the Picco.
+  // panelIdlePowerOffDue() (lock-free; false while the panel reads BUSY) and
+  // then, holding the render lock, calls powerOffIdlePanel(). Both are no-ops
+  // off the Picco.
   bool panelIdlePowerOffDue(uint32_t idleAfterMs) const;
   void powerOffIdlePanel();
 

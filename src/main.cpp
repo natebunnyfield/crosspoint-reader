@@ -1552,7 +1552,8 @@ void loop() {
   // powered", docs/menu-nav-lag-2026-11-27.md O5); power it down once two
   // seconds pass with no refresh. The due check is lock-free and false almost
   // always; the power-off itself needs the render lock, and if a render holds
-  // it the next pass tries again.
+  // it the next pass tries again. It is also false while the panel reads BUSY,
+  // so this loop never starts a wait on a hung panel (HalDisplay.cpp).
   constexpr uint32_t PANEL_IDLE_POWER_OFF_MS = 2000;
   if (display.panelIdlePowerOffDue(PANEL_IDLE_POWER_OFF_MS)) {
     RenderLock lock(RenderLock::Mode::Try);

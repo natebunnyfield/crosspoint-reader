@@ -249,7 +249,22 @@ void HalDisplay::noteRefresh() {
 
 bool HalDisplay::panelIdlePowerOffDue(const uint32_t idleAfterMs) const {
 #if FREEINK_DEVICE_PICCO
-  return panelMayBePowered.load() && millis() - lastRefreshMs.load() >= idleAfterMs;
+  if (!panelMayBePowered.load() || millis() - lastRefreshMs.load() < idleAfterMs) return false;
+  // Not while the panel reads BUSY. Every refresh ends by waiting BUSY back to
+  // idle (EpdBus::waitRefreshComplete), so a healthy panel never shows it this
+  // long after its last one returned: an active line here is a refresh still
+  // in flight, where the caller's try-lock fails anyway, or a hung panel. On a
+  // hung panel the power-off command is followed by a wait on this same line
+  // that can only time out, 30 s later (EpdBus::waitBusy), and the caller is
+  // the main loop. That stopped everything the loop serves, File Transfer's
+  // requests included, after every screen update (review 2026-11-27, R-07).
+  // The main loop asks again each pass, so the power-off follows as soon as
+  // the line clears. The sleep paths call powerOffIdlePanel() directly and are
+  // not gated by this. BUSY is active low on the Picco's SSD2677 (freeink-sdk
+  // Ssd2677Driver.h busyPolarity), on the pin the SDK's bus was begun with.
+  const int8_t busyPin = BoardConfig::ACTIVE.display.busy;
+  if (busyPin >= 0 && digitalRead(busyPin) == LOW) return false;
+  return true;
 #else
   (void)idleAfterMs;
   return false;
