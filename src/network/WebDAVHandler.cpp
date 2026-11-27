@@ -13,6 +13,7 @@
 #include <new>
 
 #include "CrossPointWebServer.h"
+#include "DavPathDecode.h"
 #include "util/BookCacheUtils.h"
 #include "util/TaskWatchdog.h"
 
@@ -934,9 +935,12 @@ void WebDAVHandler::handleUnlock(WebServer& s) {
 
 String WebDAVHandler::getRequestPath(WebServer& s) const {
   String uri = s.uri();
-  String decoded = WebServer::urlDecode(uri);
+  // Not WebServer::urlDecode: that is the form decoder, where '+' is a space.
+  // In a path '+' is itself, and PROPFIND lists it so (DavPathDecode.h).
+  const std::string decoded = davpath::decode(uri.c_str());
 
-  // Normalize using FsHelpers
+  // Normalize using FsHelpers. c_str(): a decoded NUL ends the path here, as
+  // it did when this was an Arduino String.
   std::string normalized = FsHelpers::normalisePath(decoded.c_str());
   String result = normalized.c_str();
 
@@ -967,7 +971,7 @@ String WebDAVHandler::getDestinationPath(WebServer& s) const {
     }
   }
 
-  String decoded = WebServer::urlDecode(dest);
+  const std::string decoded = davpath::decode(dest.c_str());
   std::string normalized = FsHelpers::normalisePath(decoded.c_str());
   String result = normalized.c_str();
 

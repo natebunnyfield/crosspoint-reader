@@ -144,7 +144,7 @@ Measured on the desktop Picco simulator unless marked otherwise.
 
 | | `curl -g -T` (WebDAV PUT) | `curl -F` (POST /upload) |
 |---|---|---|
-| File name | curl appends the local name to an address ending in `/` and percent-encodes it. A name in the address renames | the name curl puts in the form. `-F "file=@\"x.epub\";filename=\"Other.epub\""` renames |
+| File name | curl appends the local name to an address ending in `/` and percent-encodes it. A name in the address renames: type a space as `%20`; a `+` is a `+` | the name curl puts in the form. `-F "file=@\"x.epub\";filename=\"Other.epub\""` renames |
 | What curl itself reads in the name | `[ ] { }` as a pattern, unless `-g` | `,` as "next file" and `;` as "options follow", unless the name is inside `\"` |
 | Folder | in the address, `%20` for a space | a `path` field **before** the file, typed as it is. `--form-string` and not `-F`, which cuts the folder at a `;` |
 | Existing file | **replaced**, `204` | **refused**, `400`, old bytes kept |
