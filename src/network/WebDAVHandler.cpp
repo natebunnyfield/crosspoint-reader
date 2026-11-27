@@ -58,6 +58,28 @@ bool WebDAVHandler::canRaw(WebServer& server, const String& uri) {
 }
 
 namespace {
+// Where a PUT's bytes go until the upload is whole. "<name>.davtmp" beside the
+// target, unless that would be longer than a name may be: the suffix is 7
+// bytes, so a name of 249 to 255 characters, which the card can hold, used to
+// fail on its own temp file (review 2026-11-27, R-11). Those get a short name
+// made from a hash of the target instead. Counted in bytes, which is never
+// fewer than the card's UTF-16 units, so the choice is safe on the card and on
+// a host file system that counts bytes.
+String putTempPathFor(const String& path) {
+  constexpr size_t SUFFIX_LEN = 7;  // ".davtmp"
+  const int lastSlash = path.lastIndexOf('/');
+  const size_t nameLen = path.length() - static_cast<size_t>(lastSlash + 1);
+  if (nameLen + SUFFIX_LEN <= FsHelpers::FAT_MAX_NAME_LENGTH) return path + ".davtmp";
+  uint32_t hash = 2166136261u;  // FNV-1a
+  for (size_t i = 0; i < path.length(); i++) {
+    hash ^= static_cast<uint8_t>(path[i]);
+    hash *= 16777619u;
+  }
+  char name[20];
+  snprintf(name, sizeof(name), "%08x.davtmp", static_cast<unsigned>(hash));
+  return path.substring(0, lastSlash + 1) + name;
+}
+
 String putFileName(const String& path) { return path.substring(path.lastIndexOf('/') + 1); }
 
 String putFolder(const String& path) {
@@ -124,8 +146,16 @@ void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
       if (existing) existing.close();
     }
 
+    // Over the limit under any counting, so it is refused before the body is
+    // sent rather than at the rename after it.
+    const FsHelpers::FatNameCheck nameCheck = FsHelpers::checkFatName(putFileName(_putPath));
+    if (nameCheck.problem == FsHelpers::FatNameProblem::TooLong) {
+      failPut(400, String(FsHelpers::describeFatNameProblem(nameCheck).c_str()));
+      return;
+    }
+
     // Write to a temp file to avoid destroying the original on failed upload
-    _putTempPath = _putPath + ".davtmp";
+    _putTempPath = putTempPathFor(_putPath);
     Storage.remove(_putTempPath.c_str());
     if (Storage.openFileForWrite("DAV", _putTempPath, _putFile)) {
       _putOk = true;
