@@ -37,6 +37,11 @@ class CrossPointWebServer {
     size_t size = 0;
     bool success = false;
     String error = "";
+    // This object outlives each request, and only a file part resets it. True
+    // from a file part's start until handleUploadPost() has answered for it:
+    // a POST with no file part must not be answered from the last upload's
+    // result (review 2026-11-27, R-02).
+    bool filePartSeen = false;
 
     // Upload write buffer - batches small writes into larger SD card operations
     // 4KB is a good balance: large enough to reduce syscall overhead, small enough

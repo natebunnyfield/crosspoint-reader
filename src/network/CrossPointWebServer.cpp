@@ -829,11 +829,20 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     state.size = 0;
     state.success = false;
     state.error = "";
+    state.filePartSeen = true;
     uploadStartTime = millis();
     lastLoggedSize = 0;
     state.bufferPos = 0;
     totalWriteTime = 0;
     writeCount = 0;
+
+    // A browser form submitted with no file chosen still sends the file part,
+    // with an empty name and no bytes.
+    if (state.fileName.isEmpty()) {
+      state.error = "Nothing was uploaded: no file was chosen";
+      LOG_DBG("WEB", "[UPLOAD] Rejected: file part with no name");
+      return;
+    }
 
     if (!FsHelpers::isSafePathComponent(state.fileName)) {
       state.error = "Invalid file name";
@@ -953,6 +962,10 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
       Storage.remove(filePath.c_str());
     }
     state.error = "Upload aborted";
+    // The parser gives up on the request here and handleUploadPost() never
+    // runs for it, so nothing is left for a later request to answer from.
+    state.success = false;
+    state.filePartSeen = false;
     LOG_DBG("WEB", "Upload aborted");
   }
 }
@@ -964,7 +977,25 @@ void CrossPointWebServer::handleUploadForm() const {
 void CrossPointWebServer::handleUploadPost(UploadState& state) const {
   // charset: after the no-script form (GET /upload) this reply IS the page the
   // browser shows, and without it a name like "Ñandú.epub" read as Latin-1.
-  if (state.success) {
+  //
+  // `state` outlives the request and only a file part resets it, so a POST
+  // with NO file part used to be answered from whatever the last upload left:
+  // "200 File uploaded successfully: <that file>", with nothing written. That
+  // is one slip away in curl (-F "file=NAME" without the @, --data-binary, the
+  // folder field alone) and on this reply curl -F has no other success signal
+  // (review 2026-11-27, R-02). The result is therefore claimed once, by the
+  // request whose file part produced it, and cleared.
+  const bool hadFilePart = state.filePartSeen;
+  const bool success = hadFilePart && state.success;
+  state.filePartSeen = false;
+  state.success = false;
+  if (!hadFilePart) {
+    server->send(400, "text/plain; charset=utf-8",
+                 "Nothing was uploaded: the request had no file in it. With curl, send one as -F \"file=@NAME\" "
+                 "(the @ is what reads the file), or use curl -T NAME http://ADDRESS/FOLDER/");
+    return;
+  }
+  if (success) {
     server->send(200, "text/plain; charset=utf-8", "File uploaded successfully: " + state.fileName);
   } else {
     const String error = state.error.isEmpty() ? "Unknown error during upload" : state.error;
