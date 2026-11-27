@@ -122,14 +122,32 @@ Successful response:
 File uploaded successfully: mybook.epub
 ```
 
+Refusals. Each names its cause, and none of them writes anything (the
+messages and codes below date from 2026-11-27; before that every refusal was a
+`400`, and a request with no file part was answered `200` with the PREVIOUS
+upload's name, review R-02):
+
+| Reply | Cause |
+|-------|-------|
+| `400 Nothing was uploaded: the request had no file in it. ...` | No file part: `-F "file=NAME"` without the `@`, `--data-binary`, the `path` field alone, a bare `POST` |
+| `400 Nothing was uploaded: no file was chosen` | A file part with an empty name (the plain form submitted with no file picked; device only, the simulator answers the line above) |
+| `400 Invalid file name` | The name is `.`, `..` or contains `/` or `\` |
+| `400 File already exists: <name>` | Same-named file on the card. The old file is kept (refused since `35a45f9c1`, 2026-07-15). WebDAV `PUT` replaces; see [upload-from-blink.md](upload-from-blink.md) |
+| `423 Locked: the File Transfer page is uploading "<name>" right now (<n> of <m> bytes, last data <s> s ago). ...` | A WebSocket upload from the page holds that name. It lets go when it finishes, its tab closes, or it gets no data for 30 s (see "WebSocket Upload") |
+| `400 Cannot upload into a protected folder` | A dot-folder, `System Volume Information` or `XTCache` in `path` |
+| `400 File name has a character the card cannot store: '<c>' (not allowed: " * : < > ? \ \|)` | The card refused the name and it holds one of FAT's reserved characters. Device only: the simulator and the iOS app store on a host file system that takes them |
+| `400 File name is too long: <n> characters, the card allows 255` | Over 255 UTF-16 units |
+| `400 File name is not valid UTF-8, which the card cannot store` | Raw bytes that are not UTF-8 |
+| `409 Folder <path> does not exist. Create it first, then upload` | The destination folder is missing (device; the simulator creates it instead) |
+| `500 Could not create the file on the card (the card may be full or failing)` | The card refused a valid name in a folder that exists |
+| `400 Failed to write to SD card - disk may be full`, `400 Failed to write final data to SD card` | A write came back short |
+
+The name, folder and card rows are worked out AFTER the card refuses the open
+(`explainCreateFailure` in `CrossPointWebServer.cpp`, rules in
+`FsHelpers::checkFatName`), so nothing the card would accept is turned away.
+
 Notes:
 
-- An existing file with the same name is NOT overwritten: the reply is
-  `400 File already exists: <name>` and the old file is kept (refused since
-  `35a45f9c1`, 2026-07-15; this line said "overwritten" until 2026-11-27). WebDAV
-  `PUT` replaces; see [upload-from-blink.md](upload-from-blink.md).
-- The destination directory must exist; on the device a missing one fails with
-  `400 Failed to create file on SD card`.
 - EPUB cache data for the uploaded path is cleared after a successful upload.
 - HTTP upload uses a 4 KB write buffer before flushing to the SD card.
 
@@ -409,12 +427,24 @@ Error messages include:
 |---------|-------|
 | `ERROR:Upload already in progress` | A second upload was started before the first completed |
 | `ERROR:Invalid START format` | Malformed START message or invalid size token |
-| `ERROR:Failed to create file` | Destination file could not be opened |
+| `ERROR:File name has a character the card cannot store: ...`, `ERROR:File name is too long: ...`, `ERROR:Folder <path> does not exist. ...`, `ERROR:Could not create the file on the card (the card may be full or failing)` | Destination file could not be opened; the same reasons as `POST /upload` (this was `ERROR:Failed to create file` until 2026-11-27) |
 | `ERROR:No upload in progress` | Binary data arrived without a matching START |
 | `ERROR:Upload overflow` | Client sent more bytes than declared |
 | `ERROR:Write failed - disk full?` | SD write failed |
+| `ERROR:Upload stalled: no data for 30 s, partial file removed` | No binary frame for 30 s with the socket still open |
 
 Incomplete WebSocket uploads are deleted on disconnect or error.
+
+**An upload that stalls is given up on after 30 s** (`WS_UPLOAD_STALL_MS` in
+`CrossPointWebServer.cpp`, since 2026-11-27, review R-01). A page whose script
+dies mid-upload, or a phone browser suspended with the tab open, keeps its
+socket, and the device's WebSocket library never times out an established
+connection. Before this the half-written file stayed open for as long as that
+tab did: its name was refused on `PUT`, `POST /upload` and `DELETE`, and no
+other page could `START`. The clock restarts after each frame is WRITTEN, so a
+slow card is not counted as a silent sender. While the upload holds a name,
+the other routes answer `423` with the byte count and the 30 s rule. The
+simulator reads `CROSSPOINT_SIM_WS_STALL_MS` to shorten the wait for tests.
 
 ## WebDAV
 
@@ -429,6 +459,23 @@ OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, MKCOL, MOVE, COPY, LOCK, UNLOCK
 Notes:
 
 - `PUT` writes to a temporary `.davtmp` file first, then renames it into place.
+  The temp file is `<name>.davtmp`, or `<8 hex digits>.davtmp` in the same
+  folder when the name is too long to take the suffix (249 characters and up;
+  such names failed outright until 2026-11-27, review R-11).
+- `PUT` answers `201` for a new file and `204` for a replaced one. Its
+  refusals, each with a plain-text reason (until 2026-11-27 every one of them
+  was `500 Write failed - incomplete upload or disk full`):
+
+  | Status | Reason |
+  |--------|--------|
+  | `405` | `<path> is a folder. To upload into it, end the URL with a slash ...` (`curl -T x.epub http://host/books`, no trailing slash) |
+  | `409` | `Folder <path> does not exist. Create it first (MKCOL), then upload` |
+  | `423` | `Locked: the File Transfer page is uploading "<name>" right now ...` (see "WebSocket Upload") |
+  | `400` | `File name is too long: <n> characters, the card allows 255`, refused before anything is written |
+  | `400` | `File name has a character the card cannot store: ...` or `File name is not valid UTF-8 ...`, when the card refuses the name (the reserved-character case is device only) |
+  | `400` | `Nothing was uploaded: the PUT had no plain body. ...` (a multipart `PUT`, which the device's parser never hands to the WebDAV handler) |
+  | `403` | `Forbidden` (a protected path) |
+  | `500` | `Could not create the file on the card (the card may be full or failing)`, or `Write to the card failed after <n> bytes (the card may be full). The upload was discarded` |
 - Dot-paths (`/.crosspoint`, `/.fonts`, …) are fully listed and writable over
   WebDAV — unlike the HTML file browser — so sync tools such as `rclone` can
   mirror an entire card, settings and fonts included. See
