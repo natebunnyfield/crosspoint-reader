@@ -931,6 +931,41 @@ static void discardFailedUpload(CrossPointWebServer::UploadState& state) {
   LOG_ERR("WEB", "[UPLOAD] %s: %s", filePath.c_str(), reason);
 }
 
+// A request can carry several file parts, and `state` describes one at a time.
+// This adds the part `state` now describes to the request's tally, once it is
+// finished: when the next part starts, and when the reply is written.
+static void tallyFinishedPart(CrossPointWebServer::UploadState& state) {
+  using UploadState = CrossPointWebServer::UploadState;
+  if (state.success) {
+    state.partsStored++;
+    const size_t longer = state.storedNames.length() + 2 + state.fileName.length();
+    if (state.storedNames.isEmpty()) {
+      state.storedNames = state.fileName;
+      state.storedNamesListed = 1;
+    } else if (state.storedNamesListed + 1 == state.partsStored && longer <= UploadState::STORED_NAMES_MAX) {
+      state.storedNames += ", ";
+      state.storedNames += state.fileName;
+      state.storedNamesListed++;
+    }
+    return;
+  }
+  if (state.partsRefused++ > 0) return;
+  state.firstRefusal = state.fileName.isEmpty() ? String("a file with no name") : state.fileName;
+  state.firstRefusal += " (";
+  state.firstRefusal += state.error.isEmpty() ? String("Unknown error during upload") : state.error;
+  state.firstRefusal += ")";
+  state.firstRefusalCode = state.errorCode;
+}
+
+static void clearPartTally(CrossPointWebServer::UploadState& state) {
+  state.partsStored = 0;
+  state.partsRefused = 0;
+  state.firstRefusal = "";
+  state.firstRefusalCode = 400;
+  state.storedNames = "";
+  state.storedNamesListed = 0;
+}
+
 void CrossPointWebServer::handleUpload(UploadState& state) const {
   static size_t lastLoggedSize = 0;
 
@@ -952,6 +987,17 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
   if (upload.status == UPLOAD_FILE_START) {
     // Reset watchdog - this is the critical 1% crash point
     resetTaskWatchdogIfSubscribed();
+
+    // The fields reset below are per part. A second file part in the same
+    // request used to erase the first one's outcome with them, and the reply
+    // spoke for the last part alone: a refused first file read as "200 File
+    // uploaded successfully", a stored first file as a 400 (review
+    // 2026-11-27). So the finished part is counted before it is forgotten.
+    if (state.filePartSeen) {
+      tallyFinishedPart(state);
+    } else {
+      clearPartTally(state);
+    }
 
     state.fileName = upload.filename;
     state.size = 0;
@@ -1129,6 +1175,7 @@ void CrossPointWebServer::handleUploadPost(UploadState& state) const {
   // request whose file part produced it, and cleared.
   const bool hadFilePart = state.filePartSeen;
   const bool success = hadFilePart && state.success;
+  if (hadFilePart) tallyFinishedPart(state);  // the last part, or the only one
   state.filePartSeen = false;
   state.success = false;
   if (!hadFilePart) {
@@ -1137,6 +1184,44 @@ void CrossPointWebServer::handleUploadPost(UploadState& state) const {
                  "(the @ is what reads the file), or use curl -T NAME http://ADDRESS/FOLDER/");
     return;
   }
+  // Several file parts in one request: the reply speaks for all of them, and
+  // it is not a 200 unless every one was stored. A request with one file part
+  // (the page, the plain form, the documented curl -F) is answered below,
+  // exactly as before.
+  const unsigned parts = state.partsStored + state.partsRefused;
+  if (parts > 1) {
+    // Counts go through snprintf: the host's String has no unsigned constructor.
+    char text[48];
+    String names = state.storedNames;
+    if (state.partsStored > state.storedNamesListed) {
+      snprintf(text, sizeof(text), " and %u more", state.partsStored - state.storedNamesListed);
+      names += text;
+    }
+    String reply;
+    int status = 200;
+    if (state.partsRefused == 0) {
+      snprintf(text, sizeof(text), "%u files uploaded successfully: ", parts);
+      reply = text;
+      reply += names;
+    } else {
+      status = state.firstRefusalCode;
+      snprintf(text, sizeof(text), "%u of %u files stored. Not stored: ", state.partsStored, parts);
+      reply = text;
+      reply += state.firstRefusal;
+      if (state.partsRefused > 1) {
+        snprintf(text, sizeof(text), " and %u more", state.partsRefused - 1);
+        reply += text;
+      }
+      if (state.partsStored > 0) {
+        reply += ". Stored: ";
+        reply += names;
+      }
+    }
+    clearPartTally(state);
+    server->send(status, "text/plain; charset=utf-8", reply);
+    return;
+  }
+  clearPartTally(state);
   if (success) {
     server->send(200, "text/plain; charset=utf-8", "File uploaded successfully: " + state.fileName);
   } else {

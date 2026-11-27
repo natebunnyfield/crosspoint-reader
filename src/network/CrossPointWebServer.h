@@ -44,6 +44,21 @@ class CrossPointWebServer {
     // a POST with no file part must not be answered from the last upload's
     // result (review 2026-11-27, R-02).
     bool filePartSeen = false;
+    // One request can carry several file parts (`curl -F file=@a -F file=@b`),
+    // and the fields above describe only the part being read. These are the
+    // parts already finished in this request, so the reply can speak for all
+    // of them: counted when the next part starts or the reply is written,
+    // cleared with filePartSeen.
+    unsigned partsStored = 0;
+    unsigned partsRefused = 0;
+    // "NAME (reason)" for the first part that was not stored, and its status.
+    String firstRefusal = "";
+    int firstRefusalCode = 400;
+    // The stored parts' names, comma separated, up to STORED_NAMES_MAX
+    // characters; storedNamesListed says how many of them fit.
+    static constexpr size_t STORED_NAMES_MAX = 256;
+    String storedNames = "";
+    unsigned storedNamesListed = 0;
 
     // Upload write buffer - batches small writes into larger SD card operations
     // 4KB is a good balance: large enough to reduce syscall overhead, small enough

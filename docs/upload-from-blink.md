@@ -121,6 +121,7 @@ full`.
 | `409 /books/x.epub is a file, not a folder` | The address runs on past a file name |
 | `400 File already exists: NAME` | `-F` never replaces. Use `-g -T`, or delete it first |
 | `400 Nothing was uploaded: the request had no file in it. ...` | The `@` is missing from `file=@` |
+| `1 of 2 files stored. Not stored: NAME (why). Stored: OTHER`, with the status of the refusal (`400`, `423`, `500`) | Two `-F "file=@..."` in one command. The files after `Stored:` landed; send the one that did not again, by itself, once the reason is dealt with. When every file lands the reply is `200 2 files uploaded successfully: A, B` |
 | `400 File name has a character the card cannot store: ':' (not allowed: ...)` | Upload under another name (step 2). Picco only, see below |
 | `400 File name is too long: 256 characters, the card allows 255` | Upload under a shorter name |
 | `423 Locked: the File Transfer page is uploading "NAME" right now (...)` | The web page is partway through that same name. It lets go when it finishes, its tab closes, or it sends nothing for 30 s. Retry then, or upload under another name |
@@ -328,6 +329,18 @@ on the card was checked by md5 against what was sent, under the name sent.
   write to SD card - disk may be full`, left the 6291456-byte partial file
   under its final name, and the retry answered `400 File already exists`.
   Pinned by the gate's check 12, which failed on the binary from before.
+- **Two files in one `-F` command** (desktop Picco simulator; not run on a
+  Picco): a file that exists followed by a new one answers `400 1 of 2 files
+  stored. Not stored: small.epub (File already exists: small.epub). Stored:
+  multi-b.epub`, the other order answers the same with the other name, two new
+  files answer `200 2 files uploaded successfully: multi-d.epub,
+  multi-e.epub`, and the same two again `400 0 of 2 files stored. Not stored:
+  multi-d.epub (File already exists: multi-d.epub) and 1 more`. Before the
+  tally in `handleUploadPost` the reply spoke for the last file alone: `200
+  File uploaded successfully: multi-b.epub` with the first file refused, and a
+  bare `400 File already exists: small.epub` with the first file stored. A
+  command with one file is answered exactly as before. Pinned by the gate's
+  check 13, which failed on the binary from before.
 - Gate: `crosspoint-simulator/tests/test_blink_upload.sh`, in
   `tests/run_all.sh` (`tests/run_all.sh -k blink_upload`), about 30 s. It
   does not yet send a name with `, ; [ ] { }`.
