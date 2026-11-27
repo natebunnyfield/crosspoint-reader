@@ -72,8 +72,10 @@ class ButtonNavigator final {
                                              bool wrap = kHoldPagingWraps);
 
   // Side-button paging arithmetic. Distinct from nextPageIndex/previousPageIndex
-  // above, which wrap and snap to the page boundary and stay wired to the front
-  // pair's hold-to-repeat:
+  // above, which snap to the page boundary and stay wired to the front pair's
+  // hold-to-repeat. Those wrap at the ends of a list only where
+  // kHoldPagingWraps is true; on the Picco it is false and they stop on the
+  // last or first row instead. pageDown/pageUp never wrap, on any device:
   //
   //  * Moves by exactly itemsPerPage, so the drawn page advances by exactly one
   //    ((i + p) / p == i / p + 1 for any i) and the highlight keeps its position
