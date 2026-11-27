@@ -884,6 +884,9 @@ void CrossPointWebServer::handleDownload() const {
 static unsigned long uploadStartTime = 0;
 static unsigned long totalWriteTime = 0;
 static size_t writeCount = 0;
+// Bytes of the current form upload the card has taken, for the reply when it
+// stops taking them.
+static size_t uploadBytesOnCard = 0;
 
 static bool flushUploadBuffer(CrossPointWebServer::UploadState& state) {
   if (state.bufferPos > 0 && state.file) {
@@ -892,6 +895,7 @@ static bool flushUploadBuffer(CrossPointWebServer::UploadState& state) {
     const size_t written = state.file.write(state.buffer, state.bufferPos);
     totalWriteTime += millis() - writeStart;
     writeCount++;
+    uploadBytesOnCard += written;
     resetTaskWatchdogIfSubscribed();  // Reset watchdog after SD write
 
     if (written != state.bufferPos) {
@@ -902,6 +906,29 @@ static bool flushUploadBuffer(CrossPointWebServer::UploadState& state) {
     state.bufferPos = 0;
   }
   return true;
+}
+
+// The card stopped taking a form upload partway (a full card, usually). The
+// partial file is removed and the reply is the one a WebDAV PUT gives in the
+// same spot. Left under its final name it was a truncated book in the library,
+// and the retry after freeing space was refused as "File already exists"
+// (review 2026-11-27).
+static void discardFailedUpload(CrossPointWebServer::UploadState& state) {
+  state.file.close();  // before the remove
+  String filePath = state.path;
+  if (!filePath.endsWith("/")) filePath += "/";
+  filePath += state.fileName;
+  resetTaskWatchdogIfSubscribed();
+  const bool removed = Storage.remove(filePath.c_str());
+  resetTaskWatchdogIfSubscribed();
+  char reason[160];
+  snprintf(
+      reason, sizeof(reason), "Write to the card failed after %lu bytes (the card may be full). %s",
+      static_cast<unsigned long>(uploadBytesOnCard),
+      removed ? "The upload was discarded" : "The partial file could not be removed: delete it before uploading again");
+  state.error = reason;
+  state.errorCode = 500;
+  LOG_ERR("WEB", "[UPLOAD] %s: %s", filePath.c_str(), reason);
 }
 
 void CrossPointWebServer::handleUpload(UploadState& state) const {
@@ -937,6 +964,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     state.bufferPos = 0;
     totalWriteTime = 0;
     writeCount = 0;
+    uploadBytesOnCard = 0;
 
     // A browser form submitted with no file chosen still sends the file part,
     // with an empty name and no bytes.
@@ -1022,8 +1050,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
         // Flush buffer when full
         if (state.bufferPos >= UploadState::UPLOAD_BUFFER_SIZE) {
           if (!flushUploadBuffer(state)) {
-            state.error = "Failed to write to SD card - disk may be full";
-            state.file.close();
+            discardFailedUpload(state);
             return;
           }
         }
@@ -1044,7 +1071,8 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     if (state.file) {
       // Flush any remaining buffered data
       if (!flushUploadBuffer(state)) {
-        state.error = "Failed to write final data to SD card";
+        discardFailedUpload(state);
+        return;
       }
       state.file.close();
 

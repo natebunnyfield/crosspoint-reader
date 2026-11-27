@@ -146,7 +146,7 @@ upload's name, review R-02):
 | `409 Folder <path> does not exist. Create it first, then upload` | The destination folder is missing (device; the simulator creates it instead) |
 | `409 <path> is a file, not a folder` | `path` names a file |
 | `500 Could not create the file on the card (the card may be full or failing)` | The card refused a valid name in a folder that exists |
-| `400 Failed to write to SD card - disk may be full`, `400 Failed to write final data to SD card` | A write came back short |
+| `500 Write to the card failed after <n> bytes (the card may be full). The upload was discarded` | A write came back short. The partial file is removed, so a retry is not refused as `File already exists` (it was left, with `400 Failed to write to SD card - disk may be full`, until 2026-11-27). If the removal itself fails the reply ends `The partial file could not be removed: delete it before uploading again` |
 
 The name, folder and card rows are worked out AFTER the card refuses the open
 (`explainCreateFailure` in `CrossPointWebServer.cpp`, rules in

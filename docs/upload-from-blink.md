@@ -109,8 +109,9 @@ Three limits that are the platform's, not the firmware's:
 
 ## What a reply means
 
-Every refusal says why in plain text, and nothing is written. Until 2026-11-27
-most of these were `500 Write failed - incomplete upload or disk full`.
+Every refusal says why in plain text, and nothing is left on the card. Until
+2026-11-27 most of these were `500 Write failed - incomplete upload or disk
+full`.
 
 | Reply | What to do |
 |---|---|
@@ -123,7 +124,7 @@ most of these were `500 Write failed - incomplete upload or disk full`.
 | `400 File name has a character the card cannot store: ':' (not allowed: ...)` | Upload under another name (step 2). Picco only, see below |
 | `400 File name is too long: 256 characters, the card allows 255` | Upload under a shorter name |
 | `423 Locked: the File Transfer page is uploading "NAME" right now (...)` | The web page is partway through that same name. It lets go when it finishes, its tab closes, or it sends nothing for 30 s. Retry then, or upload under another name |
-| `500 Could not create the file on the card ...`, `500 Write to the card failed after N bytes ...` | The card is full or failing |
+| `500 Could not create the file on the card ...`, `500 Write to the card failed after N bytes (the card may be full). The upload was discarded` | The card is full or failing. The part that arrived is removed, from `-T` and from `-F` alike, so the same command works once there is room |
 | `curl: (3) bad range ...`, `curl: (26) Failed to open/read local data`, `curl: cannot open 'NAME'` | curl gave up before sending anything: the `-g` or the `\"` pair is missing |
 
 **Names the Picco's card cannot store.** The card is FAT. It refuses a name
@@ -318,6 +319,15 @@ on the card was checked by md5 against what was sent, under the name sent.
   `400 Nothing was uploaded`, `400 ... too long` (a 256-character name) and
   the `501` for a piped body. The `423` and the 30 s release were measured in
   the R-01 fix and are pinned by the gate's check 11, not run again here.
+- **A card that stops taking writes partway** (desktop Picco simulator, its
+  files capped at 6 MiB by a process file-size limit; not run on a Picco):
+  `-T` and `-F` both answer `500 Write to the card failed after 6291456 bytes
+  (the card may be full). The upload was discarded` and leave no file, and a
+  `-F` under the same name then lands. Before `discardFailedUpload` in
+  `CrossPointWebServer.cpp`, `-F` and the plain form answered `400 Failed to
+  write to SD card - disk may be full`, left the 6291456-byte partial file
+  under its final name, and the retry answered `400 File already exists`.
+  Pinned by the gate's check 12, which failed on the binary from before.
 - Gate: `crosspoint-simulator/tests/test_blink_upload.sh`, in
   `tests/run_all.sh` (`tests/run_all.sh -k blink_upload`), about 30 s. It
   does not yet send a name with `, ; [ ] { }`.
