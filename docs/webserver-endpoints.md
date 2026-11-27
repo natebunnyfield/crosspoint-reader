@@ -17,6 +17,7 @@ the IP address shown on the device screen.
 |--------|------|---------|
 | `GET` | `/` | Home/status page |
 | `GET` | `/files` | File manager page |
+| `GET` | `/upload` | Plain upload form with no script, for a browser with JavaScript off or a broken page ([upload-from-blink.md](upload-from-blink.md)) |
 | `GET` | `/settings` | Web settings page |
 | `GET` | `/fonts` | SD-card font manager page |
 | `GET` | `/js/jszip.min.js` | JavaScript asset used by the file manager |
@@ -109,11 +110,11 @@ Uploads a file with HTTP multipart form data.
 curl -X POST -F "file=@mybook.epub" "http://crosspoint.local/upload?path=/Books"
 ```
 
-Query parameters:
+Parameters:
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `path` | No | `/` | Destination directory |
+| `path` | No | `/` | Destination directory, in the query string or as a form field placed BEFORE the file part (`-F "path=/Books" -F "file=@mybook.epub"`); on the device a `path` field after the file arrives too late and the file lands in `/` |
 
 Successful response:
 
@@ -123,7 +124,12 @@ File uploaded successfully: mybook.epub
 
 Notes:
 
-- Existing files with the same name are overwritten.
+- An existing file with the same name is NOT overwritten: the reply is
+  `400 File already exists: <name>` and the old file is kept (refused since
+  `35a45f9c1`, 2026-07-15; this line said "overwritten" until 2026-11-27). WebDAV
+  `PUT` replaces; see [upload-from-blink.md](upload-from-blink.md).
+- The destination directory must exist; on the device a missing one fails with
+  `400 Failed to create file on SD card`.
 - EPUB cache data for the uploaded path is cleared after a successful upload.
 - HTTP upload uses a 4 KB write buffer before flushing to the SD card.
 

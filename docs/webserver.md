@@ -115,6 +115,8 @@ Power users can use `curl`, WebDAV clients, or WebSocket clients while the web
 server is running.
 
 Endpoint details are documented in [webserver-endpoints.md](./webserver-endpoints.md).
+Uploading from a phone terminal such as Blink, or from any curl with no web
+page at all, is [upload-from-blink.md](./upload-from-blink.md).
 
 ## Mirroring a Whole Card with rclone
 
