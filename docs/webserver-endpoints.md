@@ -110,6 +110,11 @@ Uploads a file with HTTP multipart form data.
 curl -X POST -F "file=@mybook.epub" "http://crosspoint.local/upload?path=/Books"
 ```
 
+That form fails inside curl for a file name with a comma or a semicolon (curl
+reads them as separators). `-F "file=@\"Lee, Harper.epub\""` works for any
+name; so does `curl -g -T`. Both are in
+[upload-from-blink.md](upload-from-blink.md).
+
 Parameters:
 
 | Parameter | Required | Default | Description |
