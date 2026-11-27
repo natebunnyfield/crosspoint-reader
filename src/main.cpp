@@ -737,6 +737,11 @@ static void drawSleepChargeStrip(const bool charging, const uint16_t percent) {
   snprintf(text, sizeof(text), "%s  %u%%", charging ? tr(STR_CHARGING) : tr(STR_CHARGED), percent);
   renderer.drawCenteredText(SMALL_FONT_ID, y + 6, text);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+  // The USB hold light-sleeps in its own loop until the cable goes, so the
+  // main loop's 2 s idle power-off never runs: power the panel down here, or
+  // it would stay powered all night on a charger (adversarial review
+  // 2026-11-27 of "Stay powered", finding 1).
+  display.powerOffIdlePanel();
 }
 
 // Shows the charge strip while the power HAL holds sleep on USB power, and
@@ -805,6 +810,11 @@ void enterDeepSleep(bool fromTimeout = false) {
   // or the power button is pressed. Both need the panel awake, so they run
   // before display.deepSleep().
   Frontlight.setOn(false);
+  {
+    // The sleep screen's own refresh left the rails up ("Stay powered").
+    RenderLock lock;
+    display.powerOffIdlePanel();
+  }
   const bool wakeOnHeldButton = holdSleepWhileUsbPowered();
 #endif
 

@@ -241,3 +241,45 @@ one run per arm (the iOS medians are over 28 presses each; spread is in the
 tables as max). The script's own clock is `millis()`, so a press the main thread
 was too busy to read shows up as a late `btn-down`, not as a longer latency:
 "read late" in the tables is that lateness.
+
+## Adversarial review of the ruled batch (2026-11-27, read-only agent)
+
+Over O1-O3, O5, O6 before they shipped (firmware fd49312eb..01421687d,
+freeink-sdk 666ec93, simulator 6862b049..b59b6455). Found and FIXED:
+
+1. **Device risk: the panel stayed powered for a whole charging sleep.** The
+   USB hold (`holdSleepWhileUsbPowered`) light-sleeps in its own loop, so the
+   main loop's 2 s power-off never ran after the charge strip's refresh.
+   `drawSleepChargeStrip` now powers the panel off after each refresh, and
+   the sleep path powers it off before the hold starts.
+2. **Device risk, unproven: the gray refresh could skip its power-on.** With
+   the rails left up by a B/W frame, the gray pass loaded its LUT and refreshed
+   without the power-on stock always sent after the LUT; the gray LUT differs
+   from the B/W ones in byte 6 (0x2C against 0x10), which the controller may
+   only take at power-on. `Ssd2677Driver::displayGray` now powers off first,
+   so the gray pass runs stock's exact order (POF, LUT, PON, refresh);
+   `test_picco` pins the order and fails without the fix.
+4. **Simulator: the O2 release could let a sleep cover's 1-bit base out.**
+   SleepActivity draws its gray covers on the main thread outside the render
+   lock, and a render pass ending in between released any hold. The release
+   now clears only the hold its own pass armed, by compare-and-swap on that
+   value (`presentheld::releaseAtPassEnd`, `holdArmedThisThread`).
+5. **Simulator: ~16 MB stayed allocated on iOS** after the scanline texture
+   went (light page, scanlines off): `clear()` kept capacity. Freed with swap.
+6. Stale `delay(50)` comment in `SimulatorIdle.h`.
+
+LEFT, latent, to watch on the device (3): rails can stay up longer than 2 s
+while a long step holds the main thread or the render lock (a library check,
+indexing), and an `ESP.restart()` shortly after a progress refresh (firmware
+update, defrag reboot) resets a controller that may still be powered; the next
+boot's `begin()` hardware-resets it. Stock never did either. Not fixed: a
+shutdown hook that drives the panel bus could hang a restart instead.
+
+Checked and CLEAN (per the reviewer): every Picco power-on goes through the
+six HAL refresh points that now record a refresh; the try render lock cannot
+be starved for good; `powerOffBetweenFrames` is safe from the loop; deep
+sleep powers off before 0x07 on its only path; X4/X3 unchanged; every in-render
+gray pass composes inside `render()`; O6's partial-refill keys cover every
+input; all 7 O1 callers; nothing else read the 50 ms host slice. After the
+fixes: light Settings press->glass median 19.5 ms (desktop), tests green,
+picco and default build.
