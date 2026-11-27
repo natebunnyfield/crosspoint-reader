@@ -15,6 +15,9 @@ document.
 quoted as "measured" come from earlier on-glass sessions and are cited; every
 other device figure is labeled an estimate.
 
+Menu navigation on the Picco and in its iOS app, measured to the GLASS rather
+than to the panel call (2026-11-27): [menu-nav-lag-2026-11-27.md](menu-nav-lag-2026-11-27.md).
+
 ## The one-paragraph answer
 
 The simulator shows that the firmware's own CPU work per action is tiny on the

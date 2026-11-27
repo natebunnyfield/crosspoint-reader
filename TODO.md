@@ -60,6 +60,21 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
+### [T-036] Menu navigation on the Picco: the choices left after the lag fix
+**scope: list hold behavior (firmware), iOS present hold and idle slice (simulator), SSD2677 per-frame power (SDK) · opened 2026-11-27**
+
+Owner, 2026-11-27: *"fix the jumpy delay while navigating menus"*. The two
+defects behind it in the iOS app (stale beam sweeps; the whole letterpress
+field rebuilt per step) are fixed in the simulator (`8ede3c54`, `734d887a`,
+`95c2e568`): first flip 103 -> 55 ms, complete frame 197 -> 115 ms on the iOS
+Simulator. Left for the owner, each measured in
+`docs/menu-nav-lag-2026-11-27.md` ("Decisions for the owner"): O1 a held
+rocker on a list jumps a screen every 500 ms and wraps (Home steps rows); O2
+the 30 ms present hold on menus; O3 the host's 50 ms idle slice (first press
+after a rest read 16-51 ms late); O4 the 55 ms beam; O5 the SSD2677's
+whole-panel refresh with power-on/off per step (device); O6 the dark page's
+scanline field. Done when each is ruled on. Device feel UNCONFIRMED.
+
 ### [T-035] Reduce the delay for keyboard entry
 **scope: text entry (KeyboardEntryActivity, DaisyEntryActivity, the host keyboard channel) · opened 2026-11-26**
 
