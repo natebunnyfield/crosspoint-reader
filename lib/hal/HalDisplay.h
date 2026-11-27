@@ -188,9 +188,18 @@ class HalDisplay {
   // One activity render() has returned (ActivityManager's render task). A
   // no-op on the device. The simulator holds a 1-bit frame briefly so an
   // anti-aliased page's gray pass can replace it before it reaches the screen;
-  // every gray pass runs inside render(), so once render() returns with none,
-  // the hold can let the frame out at once instead of waiting out the window.
+  // a render() that wants that gray pass runs it before returning, so once
+  // render() returns with none, the hold that pass armed can let the frame out
+  // at once instead of waiting out the window. (The reader's deferred gray pass
+  // is a later render() of its own, GRAY_DEFER_MS after the page.)
   // Owner ruling 2026-11-27, "Hold only before gray" (docs/menu-nav-lag-2026-11-27.md O2).
+  //
+  // This is NOT "every gray pass runs inside render()". The sleep screen's do
+  // not: SleepActivity has no render() and calls displayGrayBuffer() from
+  // onEnter() on the main task, outside the render lock (renderBitmapSleepScreen
+  // and its two transparent-overlay paths). The simulator therefore releases
+  // only the hold the returning pass itself armed (crosspoint-simulator
+  // src/PresentHold.h, releaseAtPassEnd), which leaves a sleep cover's hold alone.
   void renderPassComplete() {}
 
   // Runtime geometry passthrough

@@ -58,8 +58,15 @@ void ActivityManager::renderTaskLoop() {
       HalPowerManager::Lock powerLock;  // Ensure we don't go into low-power mode while rendering
       currentActivity->render(std::move(lock));
     }
-    // Every gray pass runs inside render(), so the simulator's present hold
-    // can stop waiting for one here. A no-op on the device (HalDisplay.h).
+    // A render() that follows its 1-bit frame with a gray pass runs that pass
+    // before it returns, so the simulator's present hold can stop waiting for
+    // one here. A no-op on the device (HalDisplay.h). NOT every gray pass runs
+    // inside a render(): SleepActivity has none and draws its gray covers from
+    // onEnter() on the main task, which replaceActivity() and
+    // processPendingTransitions() below both call without the render lock. So
+    // the simulator releases only the hold this pass armed (crosspoint-simulator
+    // src/PresentHold.h, releaseAtPassEnd); do not simplify that guard away on
+    // the strength of this call.
     display.renderPassComplete();
     // Notify any task blocked in requestUpdateAndWait() that the render is done.
     TaskHandle_t waiter = nullptr;
