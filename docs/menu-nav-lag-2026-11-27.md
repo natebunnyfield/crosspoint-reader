@@ -7,9 +7,24 @@ selection through Home, Settings and the file lists lags, and the highlight jump
 instead of stepping.
 
 Surveyed at firmware `cf1bba014` (branch `picco-layout`) and simulator
-`d9c66408`. Simulator commits that came out of it: `8ede3c54` (trace),
-`734d887a` (beam fix), `95c2e568` (letterpress field). **No firmware source
-changed.** Everything below is measured in the desktop simulator and in the iOS
+`d9c66408`. Simulator commits that came out of the survey: `8ede3c54` (trace),
+`734d887a` (beam fix), `95c2e568` (letterpress field). The survey itself
+changed no firmware source. **The owner then ruled on all six options below
+the same day, and the rulings did change firmware source** (this paragraph
+said "No firmware source changed" until it was corrected on 2026-11-27, review
+row R-28):
+
+| | firmware | freeink-sdk | simulator |
+|---|---|---|---|
+| O1, held rocker stops at the ends | `fd49312eb` (`src/util/ButtonNavigator.{h,cpp}`) | | |
+| O2, hold released at the end of a render pass | `5bc238009` (`ActivityManager.cpp`, `lib/hal/HalDisplay.h`) | | `6862b049` |
+| O3, host idle slice 20 ms | | | `acf338aa` |
+| O4, the 55 ms beam | nothing to build | | |
+| O5, panel stays powered | `91e4c987c` (`lib/hal/HalDisplay.{h,cpp}`, `src/main.cpp`) | `666ec93` | `ee0690d3` (no-op mirror) |
+| O6, dark field refilled where needed | | | `b59b6455` |
+| fixes from the second review | `4998d84da` (`src/main.cpp`) | `119f3ed` | `36206135` |
+
+Everything below is measured in the desktop simulator and in the iOS
 Simulator (Mac-hosted, Release build of the Picco app on an iPhone 17
 simulator). **Nothing was measured on the owner's iPhone or on the Picco
 itself: device feel is UNCONFIRMED on both.**
@@ -28,22 +43,38 @@ phone's 2x, ~54 ms) on the main thread, which is also the firmware's loop, so fo
 those 54 ms no press was read either. After both fixes the iOS Simulator shows the
 first flip of a menu step at a median **55 ms** after the press (was 103) and the
 complete frame at **115 ms** (was 197), with no stale sweep and no lost frame.
-The **shared firmware** behavior that reads as "jumpy" on both the device and the
-app is a ruled convention, not a bug, so it is an owner decision below: **holding
-the rocker on a list jumps a whole screen every 500 ms and wraps** (Home steps
-rows). The **device's** own delay is one whole-panel FAST waveform with a panel
-power-on and power-off per step; it cannot be measured here.
+The **shared firmware** behavior that read as "jumpy" on both the device and the
+app was a ruled convention, not a bug, so it went to the owner as O1 below: when
+surveyed, **holding the rocker on a list jumped a whole screen every 500 ms and
+wrapped** (Home steps rows). The **device's** own delay was one whole-panel FAST
+waveform with a panel power-on and power-off per step; it cannot be measured
+here.
+
+**Both of those have changed since (the rulings, same day).** On the Picco a
+held rocker still jumps a whole screen every 500 ms but no longer wraps: it
+stops on the last or first row (O1, `ButtonNavigator::kHoldPagingWraps` false
+under `FREEINK_DEVICE_PICCO`, `src/util/ButtonNavigator.h:63-67`; the X4 and X3
+still wrap). And the Picco's panel is no longer powered on and off per step:
+the SSD2677 driver honors `turnOff`, so the rails stay up between refreshes and
+the main loop powers the panel off once 2 s pass with none (O5,
+`freeink-sdk .../Ssd2677Driver.cpp:137-149`, `src/main.cpp:1556-1559`). O5 is
+built and **UNCONFIRMED on the device**. On the app side the rulings took the
+light Settings step further than the two fixes above: desktop press -> glass
+median 54.5 -> 31.0 ms with the hold released at the end of the render pass
+(O2), and the dark step 39.3 -> 15.2 ms on the desktop and 66.8 -> 35.7 ms on
+the iOS Simulator with the scanline field refilled only where needed (O6). The
+rows of the table under "Decisions for the owner" carry each measurement.
 
 ## Which path each platform runs
 
 | Stage | Picco (hardware) | iOS app / desktop |
 |---|---|---|
 | Rocker | GPIO21/GPIO9, logical Right/Left (`src/components/PiccoInput.h:48-73`); armed as a light-sleep wake (`lib/hal/HalPowerManager.cpp:261-265`) | on-screen rocker capsule (`injectButtonDown/Up`, a real hold) or the volume buttons (`queueButtonTap`, 60 ms taps), `ios/CrossPointIOSShim.cpp:1043-1058`, `ios/CrossPointVolumeButtons.mm:291-300` |
-| Idle poll | light sleep, woken by the rocker edge | `HalPowerManager::lightSleep` is `delay(50)` (`crosspoint-simulator src/HalPowerManager.h:43-46`), no early wake |
+| Idle poll | light sleep, woken by the rocker edge | `HalPowerManager::lightSleep` is `delay(kHostIdleSliceMs)`, 20 ms since O3 (`crosspoint-simulator src/HalPowerManager.h:48-51`; `delay(50)` when surveyed), no early wake |
 | Step | `ButtonNavigator` press = one row; hold > 500 ms repeats every 500 ms (`src/util/ButtonNavigator.cpp:92-99`) | same firmware |
-| Hold on a list | page jump, wraps last page -> first (`src/activities/UiListActivity.cpp:115-118`, `ButtonNavigator.cpp:115-131`) | same firmware |
-| Render | render task, coalesces queued requests (`src/activities/ActivityManager.cpp:52`) | same, on a host thread |
-| Panel | windowed refresh offered (`lib/GfxRenderer/GfxRenderer.cpp:2535-2556`) but the SSD2677 has none: whole-panel FAST, PON + refresh + POF every frame (`freeink-sdk .../PanelDriver.h:60-63`, `Ssd2677Driver.cpp:89-105`, `:133-145`) | instant; then the present: 30 ms hold (`crosspoint-simulator src/HalDisplay.cpp:899`, armed at `:1111`), field builds, 55 ms beam, glass readback -- all on the main thread that also runs `loop()` |
+| Hold on a list | page jump (`src/activities/UiListActivity.cpp:115-118`); since O1 it stops on the last or first row on the Picco, where it wrapped last page -> first when surveyed and still does on the X4/X3 (`ButtonNavigator.cpp:115-155`, `ButtonNavigator.h:63-67`) | same firmware |
+| Render | render task, coalesces queued requests (`src/activities/ActivityManager.cpp:53`) | same, on a host thread |
+| Panel | windowed refresh offered (`lib/GfxRenderer/GfxRenderer.cpp:2535-2556`) but the SSD2677 has none: whole-panel FAST every frame (`freeink-sdk .../PanelDriver.h:60-63`, `Ssd2677Driver.cpp:89-109`). When surveyed each frame was PON + refresh + POF; since O5 the power-on runs only when the rails are down and the power-off waits for 2 s with no refresh (`Ssd2677Driver.cpp:137-149`, `src/main.cpp:1556-1559`) | instant; then the present: 30 ms hold (`crosspoint-simulator src/HalDisplay.cpp:906`, armed at `:1118`; since O2 released when the render pass ends with no gray pass, `:1129-1135`), field builds, 55 ms beam, glass readback -- all on the main thread that also runs `loop()` |
 
 ## Measured (iOS Simulator, Picco app, Settings, light)
 
@@ -117,7 +148,11 @@ main thread, so its timings are not the measurement runs'.
 The X3 app and the packaged Mac apps run the same present path, so both fixes
 reach them too; they were not measured separately.
 
-## Decisions for the owner (nothing built)
+## Decisions for the owner (all six ruled 2026-11-27; O1, O2, O3, O5, O6 built)
+
+When this table was written nothing in it was built, and the heading said so.
+Each row now leads with its ruling; the commits are in the table at the top of
+this file. O4 was ruled "keep", so it has nothing to build.
 
 | # | Option | Measured | Cost / risk |
 |---|---|---|---|
@@ -131,11 +166,11 @@ reach them too; they were not measured separately.
 ## On the device
 
 Presses during a waveform are coalesced: the render task takes every queued
-request in one `ulTaskNotifyTake(pdTRUE, ...)` (`ActivityManager.cpp:52`) and
+request in one `ulTaskNotifyTake(pdTRUE, ...)` (`ActivityManager.cpp:53`) and
 draws the latest selection, so a fast double click on the hardware shows one
 jump of two rows after one waveform. That is the right behavior for e-ink (a
 queue would trail the finger by a waveform per press); the per-step cost is what
-O5 would reduce. The FAST waveform's duration on the SE0400NQW47 is not known
+O5 reduces (built, device UNCONFIRMED). The FAST waveform's duration on the SE0400NQW47 is not known
 (only "full refresh 426 ms", `docs/picco-port-2026-11-05.md:104`).
 
 ## Checked and found clean
