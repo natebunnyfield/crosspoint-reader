@@ -4,7 +4,7 @@ Owner, 2026-11-27: *"take multiple passes until 12:55"*, then *"work without me"
 
 One timed workflow (`picco-multipass-blink`, 83 agents, 11:00 to 11:53 on the Mac's clock, 12:00 to 12:53 Eastern). Six read-only finders, one lens each (the simulator's present path, device power, the frontlit page, the web pages and Settings, tests and docs, cross-repo integration), over firmware `2c9136128..4998d84da`, simulator `4c95ebd9..36206135` and freeink-sdk `e05bb17..119f3ed`. Every finding went to three skeptics told to refute it (reproduce, look for a guard, check reach); it stood on two of three. In parallel one agent built the Blink upload path (`docs/upload-from-blink.md`), and three more skeptics then tried to break that.
 
-**Result: 23 findings reported, 22 confirmed, 1 refuted; the Blink skeptics demonstrated 15 failures (some are the same defect found twice). The time box ended before any fixer ran, so all 36 below were OPEN when this file was written.** Each row's status is updated by the commit that closes it. Limits: one round only (the second never started), one card, the desktop simulator and reading for everything device-side; nothing here was tried on the Picco or a real iPhone.
+**Result: 23 findings reported, 22 confirmed, 1 refuted; the Blink skeptics demonstrated 15 failures (some are the same defect found twice). The time box ended before any fixer ran, so all 36 below were OPEN when this file was written.** Fix pass the same day (below): 28 FIXED, R-15 partly fixed, 7 still OPEN (R-16, R-17, R-19, R-20, R-21, R-22, R-33). Each row's status is updated by the commit that closes it. Limits: one round only (the second never started), one card, the desktop simulator and reading for everything device-side; nothing here was tried on the Picco or a real iPhone.
 
 Repo key: **fw** = crosspoint-reader, **sim** = crosspoint-simulator, **sdk** = freeink-sdk. `[blink]` = found by the Blink skeptics.
 
@@ -13,7 +13,7 @@ Repo key: **fw** = crosspoint-reader, **sim** = crosspoint-simulator, **sdk** = 
 
 ### R-01 [blink] A page upload that stalls with its tab open locks that file name against every documented curl route, and the -T reply blames a missing slash or folder
 
-**status: OPEN** · fw `src/network/WebDAVHandler.cpp:64`
+**status: FIXED** (fw 4b02a5804) · fw `src/network/WebDAVHandler.cpp:64`
 
 This is the scenario the owner asked about: a File Transfer page bug stops curl. If the page's script sends a WebSocket START and then dies (or the phone's browser is suspended mid-upload) while the socket stays open, webUploadIsWriting() (CrossPointWebServer.cpp:342-348) stays true for that path. A WebDAV PUT is then refused at RAW_START (WebDAVHandler.cpp:64) and handlePut answers 500 'Write failed - incomplete upload or disk full' (WebDAVHandler.cpp:436-439). POST /upload answers 400 'File already exists' because the page's partial file is on the card (CrossPointWebServer.cpp:868), and DELETE answers 423 (WebDAVHandler.cpp:482-483). Nothing on the device times out a stalled WebSocket upload: there is no enableHeartbeat anywhere in src/network, no stall timer on wsUploadStartTime, and crosspoint-simulator BUGS.md (the 'One 5-second socket timeout' entry, around line 647) says the device's WebSocket library 'has no idle timeout on an established connection'. On the device the lock lasts until the page's socket closes or File Transfer is left. The simulator caps it at 120 s. Doc trap 1 (docs/upload-from-blink.md:104-108) attributes that 500 only to a missing trailing slash or a missing folder. Neither way out is documented: closing the page's tab, or a PUT to an explicit other name such as `curl -T x.epub http://host/books/x-2.epub`.
 
@@ -23,7 +23,7 @@ This is the scenario the owner asked about: a File Transfer page bug stops curl.
 
 ### R-02 [blink] POST /upload with no file part answers '200 File uploaded successfully: <previous file>' and writes nothing
 
-**status: OPEN** · fw `src/network/CrossPointWebServer.cpp:967`
+**status: FIXED** (fw 99a6b2ad9) · fw `src/network/CrossPointWebServer.cpp:967`
 
 The UploadState `upload` member lives across requests. state.success is reset only at UPLOAD_FILE_START (line 830), and a request with no file part never reaches that point. handleUploadPost (line 964-971) then reports the last successful upload of the session. On the curl -F route this reply is the only success signal (doc table, docs/upload-from-blink.md:100). Several easy Blink mistakes produce a 200 that names a different file while nothing reaches the card: dropping the '@' (`-F "file=My Book.epub"`), trying `--data-binary @x.epub`, or sending the path field alone. The same code runs on the device: arduino-esp32 3.3.7 _parseForm adds a text-only part to _postArgs and never raises UPLOAD_FILE_START. This was there before the change. Only the first such request after boot gets the honest 400 'Unknown error during upload'.
 
@@ -33,7 +33,7 @@ The UploadState `upload` member lives across requests. state.success is reset on
 
 ### R-03 [blink] The simulator and iOS app decode WebDAV paths twice, so `curl -T "C++ Primer.epub" .../books/` lands as 'C Primer.epub'
 
-**status: OPEN** · sim `src/WebServer.cpp:651`
+**status: FIXED** (sim 467f2fa4) · sim `src/WebServer.cpp:651`
 
 The shim percent-decodes the request path before storing it as currentUri (src/WebServer.cpp:651). The firmware's WebDAVHandler::getRequestPath then calls WebServer::urlDecode on it again (firmware WebDAVHandler.cpp:839), and the shim's urlDecodeStd turns '+' into a space. curl correctly sends %2B, so the first decode yields '+' and the second yields ' '. A literal '%XX' in a name would also be decoded twice. The device is correct: arduino-esp32 3.3.7 Parsing.cpp:110 stores _currentUri raw, so it is decoded once. The iOS app compiles this shim: cmake/CrossPointSources.cmake:39 lists src/WebServer.cpp and cmake/CrossPointIOSExclusions.cmake does not remove it. docs/upload-from-blink.md:73 documents exactly this route (`curl -T "My Book.epub" http://<phone-ip>:8080/books/`), so names with '+' are silently renamed on the phone app. It also means desktop runs, test_blink_upload included, decode WebDAV paths differently from the device.
 
@@ -43,7 +43,7 @@ The shim percent-decodes the request path before storing it as currentUri (src/W
 
 ### R-04 [blink] The documented `curl -F "file=@NAME"` fails for any name with a comma or semicolon, which covers 6 of the owner's 67 corpus epubs
 
-**status: OPEN** · fw `docs/upload-from-blink.md:43`
+**status: FIXED** (fw 6ea93b2bf) · fw `docs/upload-from-blink.md:43`
 
 In -F, curl reads ',' after '@' as a separator between several files and ';' as the start of type=/filename=. An unquoted name with either character fails locally with curl (26) and nothing is sent. Commas are common in book file names ('Lee, Harper'-style author sort, Anna's Archive names). The doc's 'Four traps' do not mention it. The fix is to quote inside the field, `-F 'file=@"Lee, Harper.epub"'`, which works. curl -T is not affected by commas.
 
@@ -53,7 +53,7 @@ In -F, curl reads ',' after '@' as a separator between several files and ';' as 
 
 ### R-05 [blink] The documented `curl -T "NAME"` fails for names with [ ] or { }, because curl globs the -T argument
 
-**status: OPEN** · fw `docs/upload-from-blink.md:29`
+**status: FIXED** (fw 6ea93b2bf) · fw `docs/upload-from-blink.md:29`
 
 curl expands {..} and [..] in the -T file name. The doc relies on that for `-T "{a.epub,b.epub}"` (line 34-35) but never warns that a single file whose name has brackets or braces breaks. 'Title [Author].epub' is a range error, and 'Series {1}.epub' turns into a request for 'Series 1.epub'. `-g` (--globoff) fixes both, but it also turns off the doc's own multi-file form, so it cannot be blanket advice. None of the owner's 67 corpus epubs has these characters, so this is a doc gap for other people's files, not for his library today.
 
@@ -63,7 +63,7 @@ curl expands {..} and [..] in the -T file name. The doc relies on that for `-T "
 
 ### R-06 [blink] Simulator and iOS app write curl -T bodies on the accept thread, so the doc's 'the shape is the same' is wrong and the md5 checks cannot show the main loop moved the bytes
 
-**status: OPEN** · sim `src/WebServer.cpp:694`
+**status: FIXED** (fw 6ea93b2bf (doc), sim 25eacbfc (comment); behavior kept by ruling) · sim `src/WebServer.cpp:694`
 
 In the shim, a WebDAV PUT body never goes through handleClient(). The accept worker calls WebDAVHandler::raw() itself for RAW_START, RAW_WRITE and RAW_END (WebServer.cpp:694, :699/:719, :743). That opens the .davtmp file, writes it, closes it and renames it to the final name (firmware WebDAVHandler.cpp:60-120). Only the status reply (handlePut) waits for the firmware's main loop. On the device all of it runs inside handleClient() on the loop task. So when the main loop is not pumping, the simulator and the iOS app put the whole file on the card and send no reply, while the device writes nothing. Three things follow. (1) firmware docs/upload-from-blink.md:186 says 'In the simulator and the iOS app the shape is the same... handleClient() runs it on the main thread'. That is false for curl -T, the doc's main Blink route. The shim's own comment at WebServer.cpp:328-331 ('nothing in a route handler runs on the worker thread') is also false for raw handlers. (2) test_blink_upload's md5 checks on the -T cases pass whether or not the main loop moved the bytes. Only the HTTP code checks catch a stalled loop, and nothing tests the device's real body path (5 s HTTP_MAX_DATA_WAIT on the loop task; the shim waits 60 s). (3) After a stall, the shim still serves requests whose curl already gave up: the socket buffer held the whole body, so the file lands later. A Blink user sees a failure, the file shows up anyway, and a retry with -F answers 400 'File already exists'.
 
@@ -73,7 +73,7 @@ In the shim, a WebDAV PUT body never goes through handleClient(). The accept wor
 
 ### R-07 [blink] A hung panel stalls Picco serving for up to 30 s per screen update, because the idle power-off waits on BUSY on the main loop
 
-**status: OPEN** · fw `src/main.cpp:1557`
+**status: FIXED** (fw e1eb42916 (UNCONFIRMED on device)) · fw `src/main.cpp:1557`
 
 The Picco's idle panel power-off runs on the main loop, which is the task that calls handleClient(). Two seconds after any refresh, main.cpp:1557-1559 takes a try-lock and calls display.powerOffIdlePanel(). That reaches FreeInkDisplay::powerOffBetweenFrames (FreeInkDisplay.cpp:577-584), then Ssd2677Driver::powerOffBetweenFrames (Ssd2677Driver.cpp:129-134), which sends POWER_OFF and calls bus.waitBusy(). The Picco's BUSY is ActiveLow (test_picco.cpp:175). With BUSY stuck at its active level, that wait loops until the 30 s cap (EpdBus.cpp:248). The slice hook declines with Wi-Fi on (HalPowerManager.cpp:321), so the wait is plain delays on the loop task, and handleClient() is not called the whole time. A timed-out refresh still calls noteRefresh() (HalDisplay.cpp:82 and the other call sites, all unconditional), so every screen update arms it again: a Wi-Fi bar change, a Wi-Fi drop or recovery, a USB edge, the slide switch, or the first SERVER_RUNNING paint. The try-lock does not help here: by then the render task has given up and released the lock. This contradicts the doc's 'a slow or stuck draw does not stop requests' (docs/upload-from-blink.md:180-181) and its table row 'costs one power-off command' (:198). Uploads are paused, not lost: curl has no default timeout, and lwIP holds the connection, so the request is served once the wait ends.
 
@@ -83,7 +83,7 @@ The Picco's idle panel power-off runs on the main loop, which is the task that c
 
 ### R-08 [blink] The doc's 30 s BUSY cap does not hold on the X4 Pro, so Force Refresh over a hung panel stops serving for good
 
-**status: OPEN** · fw `docs/upload-from-blink.md:181`
+**status: FIXED** (fw 6ea93b2bf) · fw `docs/upload-from-blink.md:181`
 
 The doc says 'A panel BUSY wait gives up after 30 s (EpdBus.cpp:225), so even a hung panel ends its render' (:181-182). Its Force Refresh row says serving pauses 'at most the 30 s BUSY cap' (:195). Line 225 is only the ActiveHigh path. The X4 Pro's UC8179 and UC8279 drivers use BusyPolarity::UcIdleHigh (Uc8179Driver.h:65, Uc8279X4Driver.h:70). That wait has 'deliberately no fixed millisecond timeout' (EpdBus.cpp:251-267), and waitRefreshComplete takes the same path (EpdBus.cpp:301-303). On an X4 Pro with a hung panel, the render task never leaves render() and keeps the render lock. File Transfer's own pump needs no lock, so uploads keep working until the main loop asks for the lock. A short Power press with Force Refresh takes RenderLock blocking (main.cpp:1520-1526) and then never returns, so serving stops until a hard reset. The Force Refresh row also leaves out that, even with no render running, the forced HALF refresh itself runs on the main loop. Serving pauses for that whole waveform on every press, not only when a render is in flight.
 
@@ -93,7 +93,7 @@ The doc says 'A panel BUSY wait gives up after 30 s (EpdBus.cpp:225), so even a 
 
 ### R-09 [blink] test_blink_upload SKIPs, and the suite stays green, when File Transfer's server never starts or the sim crashes
 
-**status: OPEN** · sim `tests/test_blink_upload.sh:72`
+**status: FIXED** (sim 6a42ece5) · sim `tests/test_blink_upload.sh:72`
 
 The test treats two cases as a missing precondition (exit 2, SKIP): the port never answering (line 72) and the simulator exiting before it answers (line 67). run_all.sh's run_shell_skip counts a SKIP as not failed and exits 0. Those two cases are exactly the regression the owner asked to guard against: File Transfer is entered but nothing can upload. The log already tells this apart from a drifted menu walk, since it contains 'Entering activity: CrossPointWebServer'. So the test could FAIL when the activity was entered but the port never answered, or when the process died after entering it.
 
@@ -103,7 +103,7 @@ The test treats two cases as a missing precondition (exit 2, SKIP): the port nev
 
 ### R-10 [blink] The doc's curl commands fail for names with [ ] { } (-T globbing) or , ; (-F separators), and the doc does not say so
 
-**status: OPEN** · fw `docs/upload-from-blink.md:29`
+**status: FIXED** (fw 6ea93b2bf) · fw `docs/upload-from-blink.md:29`
 
 The doc gives curl -T "My Book.epub" and curl -F "file=@My Book.epub" as the universal commands. curl globs the -T argument, the same feature the doc uses for -T "{a.epub,b.epub}". So a name with brackets fails before any request, and a name with braces is expanded into a file that does not exist. In -F, a comma separates several files and a semicolon starts a parameter. So 'Smith, John - Novel.epub' (Calibre-style author ordering) and 'Book; A Novel.epub' fail with error 26 even though the file exists. Ebook names with [Retail] or (Series #1) [2020] are common. Workarounds, measured: curl -g -T for brackets and braces (this disables the {a,b} multi-file form), and -F 'file=@"Smith, John - Novel.epub"' for commas and semicolons.
 
@@ -113,7 +113,7 @@ The doc gives curl -T "My Book.epub" and curl -F "file=@My Book.epub" as the uni
 
 ### R-11 [blink] A file name of 249-255 characters fails curl -T with a misleading '500 Write failed', while curl -F accepts it
 
-**status: OPEN** · fw `src/network/WebDAVHandler.cpp:93`
+**status: FIXED** (fw ba40f8cb7) · fw `src/network/WebDAVHandler.cpp:93`
 
 WebDAV PUT writes to _putPath + ".davtmp" first (WebDAVHandler.cpp:93). That temp name is 7 bytes longer than the real one, so it goes over the 255-unit long-name limit (SdFat FAT_MAX_LFN_LENGTH = 255, FsStructs.h:354, checked in FatFileLFN.cpp parsePathName; on the simulator, the macOS 255-byte limit) for names the card could hold. openFileForWrite fails, and handlePut answers 500 'Write failed - incomplete upload or disk full' (:439). The doc's trap 1 says that 500 means a missing trailing slash or a missing folder, so the user is sent the wrong way. POST /upload writes directly to the final name and takes the same file.
 
@@ -123,7 +123,7 @@ WebDAV PUT writes to _putPath + ".davtmp" first (WebDAVHandler.cpp:93). That tem
 
 ### R-12 [blink] On the Picco, names with : ? " * < > | are refused with misleading errors; the simulator accepts them, so neither the doc nor the gate shows it
 
-**status: OPEN** · fw `docs/upload-from-blink.md:104`
+**status: FIXED** (fw ee54dea76, 5373b207d, 6ea93b2bf) · fw `docs/upload-from-blink.md:104`
 
 FsHelpers::isSafePathComponent (lib/FsHelpers/FsHelpers.cpp:333) rejects only '/', '\', '.' and '..'. SdFat rejects the FAT long-name reserved set (FsStructs.h:108 lfnReservedChar, enforced in FatFileLFN.cpp:476 parsePathName with USE_UTF8_LONG_NAMES=1). So on the Picco, curl -T of 'Dune: Messiah.epub' fails at openFileForWrite (WebDAVHandler.cpp:94) and answers '500 Write failed - incomplete upload or disk full'. The doc attributes that error only to a missing trailing slash or folder. curl -F of the same name answers '400 Failed to create file on SD card'. The simulator stores the name on macOS and answers 201 or 200, so a desktop run passes where the device fails. The doc's rules table and trap list do not mention reserved characters.
 
@@ -133,7 +133,7 @@ FsHelpers::isSafePathComponent (lib/FsHelpers/FsHelpers.cpp:333) rejects only '/
 
 ### R-13 [blink] iOS app and simulator: uploads over 256 MB get 413, and a curl -F upload peaks at about 4.4x its size in RAM
 
-**status: OPEN** · sim `src/WebServer.cpp:675`
+**status: FIXED** (sim b0f5660f, 892f0fe7) · sim `src/WebServer.cpp:675`
 
 The shim refuses any body over MAX_BODY_SIZE = 256 MB (WebServer.cpp:30, :675) with 413. The Picco has no such cap. The doc presents the iOS app route as 'the same commands' and never mentions the cap. A multipart POST is buffered whole: currentBody (:766), then each part is copied again (part.data, :292). The measured peak was about 4.4x the file size. At the 256 MB cap that is roughly 1.1 GB, which risks an iOS memory kill of the app mid-upload. That risk is inferred and was not run on a phone. curl -T streams, so it is the safer route for large files on the app.
 
@@ -143,7 +143,7 @@ The shim refuses any body over MAX_BODY_SIZE = 256 MB (WebServer.cpp:30, :675) w
 
 ### R-14 [blink] test_blink_upload's FAIL lines still say 'bytes match'
 
-**status: OPEN** · sim `tests/test_blink_upload.sh:117`
+**status: FIXED** (sim 6a42ece5) · sim `tests/test_blink_upload.sh:117`
 
 The check messages are fixed strings ending in 'bytes match' (lines 99, 106, 117, 122), so a failing check reports success-sounding text.
 
@@ -153,7 +153,7 @@ The check messages are fixed strings ending in 'bytes match' (lines 99, 106, 117
 
 ### R-15 iOS: the sleep screen keeps the lit page's tones for the whole sleep, though the light is off
 
-**status: OPEN** · sim `ios/CrossPointIOSShim.cpp:4858`
+**status: PARTLY FIXED** (sim e4982508, light page only; the dark-mode arm is still open (F-10 below)) · sim `ios/CrossPointIOSShim.cpp:4858`
 
 The firmware draws the sleep screen while the light is still on, then switches the light off. On iOS the page only learns about light changes from the per-frame polls (pollPanelPalette, pollPanelGlow, pollScanlines), and those do not run while the firmware sleeps. So the sleep screen is presented in the lit tones and stays that way for the whole sleep. That breaks the model's own rule that with the light off the page is the frozen page (docs/frontlit-page-2026-11-27.md:28-31, src/FrontlitPage.h:15-17). The desktop as-shipped build goes the other way: its change hook repaints the frozen tones before sleep. So the two platforms disagree on the sleep screen. Fix directions, for whoever acts on this: have sleepTick run pollPanelPalette, pollPanelGlow and pollScanlines, or install simfrontlight's change hook on iOS too.
 
@@ -186,7 +186,7 @@ check_inline_scripts writes each inline script to a `.js` temp file and runs `no
 
 ### R-18 glass.py cannot follow a press whose frame is replaced by a gray compose, and can credit it with a later press's frame
 
-**status: OPEN** · fw `tools/latency/glass.py:43`
+**status: FIXED** (fw d9d11eddc (documented: glass.py is for 1-bit screens only)) · fw `tools/latency/glass.py:43`
 
 glass.py links presses to frames only through the simulator's `[lat] written <seq>` lines. The simulator emits `written` only from refreshDisplay, the 1-bit path (crosspoint-simulator src/HalDisplay.cpp:2588). composeGrayscalePreview (HalDisplay.cpp:1161) bumps pixelBufSeq under a new seq and emits no `written` line; displayGrayBuffer notes only `gray-display` with arg -1 (HalDisplay.cpp:5344). On a screen whose gray pass runs inside render(), the 1-bit frame is held and replaced, so its seq never gets a `glass` line, and the composed seq that does reach the screen was never `written`. glass.py:43-45 then takes the first LATER written seq that appears in `glass`, which may belong to a later press. glass.py:54 lists the press's own frame as 'never on glass', and the docstring at line 14 calls that 'coalesced away (the selection skipped it)'.
 
@@ -242,7 +242,7 @@ The test comment and run_all.sh say every setting clears 7:1 'over the whole gri
 
 ### R-23 Two comments still say the host idle slice is 50 ms after O3 made it 20 ms
 
-**status: OPEN** · sim `src/simulator_main.cpp:439`
+**status: FIXED** (sim e3f72238) · sim `src/simulator_main.cpp:439`
 
 acf338aa set the host light-sleep slice to 20 ms (HalPowerManager.h:48, kHostIdleSliceMs). 36206135's 'Stale idle-slice comment' fix updated only SimulatorIdle.h. Two other comments still describe a 50 ms slice: simulator_main.cpp:439-440 ('the firmware's 10 ms polls and the 50 ms idle slices') and HalGPIO.cpp:251 ('a 50 ms idle slice is a plain delay that pumps nothing'). The HalGPIO one is part of the reasoning for the Picco touch-lift deferral, so a reader sizing that window from it gets the wrong number.
 
@@ -252,7 +252,7 @@ acf338aa set the host light-sleep slice to 20 ms (HalPowerManager.h:48, kHostIdl
 
 ### R-24 The comments and the O2 write-up say every gray pass runs inside render(); the sleep screen's gray passes do not
 
-**status: OPEN** · fw `src/activities/ActivityManager.cpp:61`
+**status: FIXED** (fw 0359754b3, sim 75fbabe7) · fw `src/activities/ActivityManager.cpp:61`
 
 ActivityManager.cpp:61 ("Every gray pass runs inside render(), so the simulator's present hold can stop waiting for one here"), lib/hal/HalDisplay.h:191 ("every gray pass runs inside render(), so once render() returns with none, the hold can let the frame out") and docs/menu-nav-lag-2026-11-27.md:125 (O2, "since every gray pass runs inside render()") all state an invariant the firmware breaks. SleepActivity has no render() override (the base Activity::render at Activity.h:34 is an empty no-op). It draws its covers from onEnter() on the loop task: displayGrayscaleBase, then copyGrayscaleLsb/MsbBuffers, then displayGrayBuffer at SleepActivity.cpp:368-392, 767-794 and 841-862. processPendingTransitions releases the render lock before onEnter (ActivityManager.cpp:186, "onEnter may acquire its own lock"), so those passes also run outside the lock. On the device renderPassComplete() is an inline no-op, so nothing misbehaves on the Picco. The cost is what a reader takes away. The second review's finding 4 had to add the compare-and-swap in presentheld::releaseAtPassEnd precisely because this invariant is false. A comment that states it as true invites someone to simplify that guard away, and the guard is the only thing that keeps the sleep cover's 1-bit base from flashing in the simulator and apps.
 
@@ -262,7 +262,7 @@ ActivityManager.cpp:61 ("Every gray pass runs inside render(), so the simulator'
 
 ### R-25 Doc: 'with the switch off, the page is the frozen page' is false when the switch is bound to Dark Mode
 
-**status: OPEN** · sim `docs/frontlit-page-2026-11-27.md:34`
+**status: FIXED** (sim 598db51c) · sim `docs/frontlit-page-2026-11-27.md:34`
 
 The doc says the light follows the pad's slide switch and that with the switch off the page is frozen whatever the rows say. That holds only for the default binding (SLIDE_SWITCH_FRONTLIGHT). If Slide Switch is set to Dark Mode, the switch flips darkMode, and the light follows the Frontlight row and Restore Light on Wake instead. With the switch off, the page then shows the light page lit whenever the Frontlight row is on. The page code is right here; only the doc is wrong. It matters because the owner is judging the look from this doc.
 
@@ -272,7 +272,7 @@ The doc says the light follows the pad's slide switch and that with the switch o
 
 ### R-26 Picco list-order comments omit the new Reader Font Size row
 
-**status: OPEN** · fw `src/activities/settings/SettingsActivity.cpp:133`
+**status: FIXED** (fw b770b51d0) · fw `src/activities/settings/SettingsActivity.cpp:133`
 
 At :132-136 the comment says the isPiccoDeviceRow rows 'arrive in getSettingsList() order after Clock UTC Offset: Brightness, Warmth, Frontlight, Restore Light on Wake, Slide Switch'. isPiccoDeviceRow (:74) now also admits Font Size, which arrives FIRST: getSettingsList pushes FONT_FAMILY and then FONT_SIZE before everything else (SettingsList.h:361-365). The 'THE HEAD OF THE LIST' block (:199-212) calls itself 'the only place it is written down' and lists Reader Font, Typography Settings, Editor Font... On the Picco the rotate at :250 puts Reader Font Size at index 1. The same comment records that an earlier stale version 'sent a reader to the owner with a wrong question about ordering'.
 
@@ -282,7 +282,7 @@ At :132-136 the comment says the isPiccoDeviceRow rows 'arrive in getSettingsLis
 
 ### R-27 'Scanlines full from Brightness 10' holds only at mid Warmth; warm settings stay thinned
 
-**status: OPEN** · sim `docs/frontlit-page-2026-11-27.md:92`
+**status: FIXED** (sim 598db51c) · sim `docs/frontlit-page-2026-11-27.md:92`
 
 The doc (lines 90-93) and the src/FrontlitPage.h header (lines 48-53) say the dark page's scanlines fall to about 6% of their depth at Brightness 0, about 80% at 5, and are full from 10, with no qualifier. That is true at Warmth 50 only. Warmth moves the trace and the glass, so the contrast headroom that caps scanlines::effectiveDepth also moves. At warm settings the cap reaches higher up the Brightness row, on values the device's 5-step rows can reach.
 
@@ -292,7 +292,7 @@ The doc (lines 90-93) and the src/FrontlitPage.h header (lines 48-53) say the da
 
 ### R-28 menu-nav-lag doc's opening still says no firmware changed and nothing was built
 
-**status: OPEN** · fw `docs/menu-nav-lag-2026-11-27.md:11`
+**status: FIXED** (fw 28db20f6d) · fw `docs/menu-nav-lag-2026-11-27.md:11`
 
 The doc's own later rows record built firmware changes, but its opening sections were never updated. Line 11-12 says '**No firmware source changed.**', yet fd49312eb (ButtonNavigator), 5bc238009 (ActivityManager renderPassComplete), 91e4c987c (HalDisplay + main.cpp) and 4998d84da (main.cpp) all changed it. Line 120's heading reads 'Decisions for the owner (nothing built)', but five of its six rows say 'built'. The one-paragraph answer (lines 31-35) still says a held rocker 'jumps a whole screen every 500 ms and wraps' and the device does 'a panel power-on and power-off per step'. Both are false on the Picco since O1 and O5. The platform table (line 42) still gives the host idle poll as delay(50); it is 20 ms since acf338aa. A reader who stops at the summary gets the pre-ruling state.
 
@@ -302,7 +302,7 @@ The doc's own later rows record built firmware changes, but its opening sections
 
 ### R-29 Stale line citation SurfaceTube.cpp:310-313 in the frontlit doc
 
-**status: OPEN** · sim `docs/frontlit-page-2026-11-27.md:91`
+**status: FIXED** (sim 598db51c) · sim `docs/frontlit-page-2026-11-27.md:91`
 
 The doc cites `src/SurfaceTube.cpp:310-313` for the scanline depth budget. b59b6455 (O6) later inserted the resident-buffer statics and the partial predicate above it, so the budget lines are now 340-343. Lines 310-313 now hold the bloom/defocus key loads and the start of the cache-hit check.
 
@@ -312,7 +312,7 @@ The doc cites `src/SurfaceTube.cpp:310-313` for the scanline depth budget. b59b6
 
 ### R-30 ButtonNavigator.h still says nextPageIndex/previousPageIndex wrap
 
-**status: OPEN** · fw `src/util/ButtonNavigator.h:74`
+**status: FIXED** (fw 693f95a39) · fw `src/util/ButtonNavigator.h:74`
 
 The side-button paging comment says pageDown/pageUp are 'Distinct from nextPageIndex/previousPageIndex above, which wrap and snap to the page boundary'. fd49312eb made them not wrap on the Picco (kHoldPagingWraps=false, lines 58-72 of the same header). The comment now contradicts the one directly above it.
 
@@ -322,7 +322,7 @@ The side-button paging comment says pageDown/pageUp are 'Distinct from nextPageI
 
 ### R-31 Simulator CLAUDE.md still prices a menu keypress at 51-53 ms of panel field
 
-**status: OPEN** · sim `CLAUDE.md:875`
+**status: FIXED** (sim ea7ce32f) · sim `CLAUDE.md:875`
 
 CLAUDE.md:875 says navigation within a screen costs '51–53 ms of panel field per keypress'. 95c2e568 now rebuilds the letterpress field only inside the changed box. The menu-nav doc measures 5.5 ms per step for a 194x866 box (9.7 ms with the inkness pass). The guide future sessions read now overstates the per-step cost about tenfold.
 
@@ -332,7 +332,7 @@ CLAUDE.md:875 says navigation within a screen costs '51–53 ms of panel field p
 
 ### R-32 Frontlit write-up cites SurfaceTube.cpp:310-313 for the scanline depth cap; those lines are now the cache-key check
 
-**status: OPEN** · sim `docs/frontlit-page-2026-11-27.md:91`
+**status: FIXED** (sim 598db51c) · sim `docs/frontlit-page-2026-11-27.md:91`
 
 The doc says the dark page's scanline depth is capped by the contrast headroom at `src/SurfaceTube.cpp:310-313`. That was right when the doc was written (9e2f2645, where params.budgetMeanDarkening sat at line 312). The later O6 commit b59b6455 added the partial-refill block above it. At HEAD, lines 310-313 are the pitchKey/bloom/defocus/seq lines of the full-match check, and the budget is set at SurfaceTube.cpp:340-343. The other half of the citation, Scanlines.h:298-302 (effectiveDepth), is still correct.
 
@@ -355,7 +355,7 @@ Rule 3 (734d887a) moved the glass readback from the present where frame N's swee
 
 ### R-34 British spelling 'neighbour' in two of today's files
 
-**status: OPEN** · sim `src/ScanlinesDirty.h:16`
+**status: FIXED** (sim 1c28fcd1) · sim `src/ScanlinesDirty.h:16`
 
 'Nothing reads a neighbour's bucket' in src/ScanlinesDirty.h:16, and 'no neighbour' in tests/scanlines_dirty_test.cpp:105. Both were written today (b59b6455). The rest of today's added lines in all three repos scanned clean.
 
@@ -365,7 +365,7 @@ Rule 3 (734d887a) moved the glass readback from the present where frame N's swee
 
 ### R-35 Two simulator comments still describe a 50 ms host idle slice after O3 made it 20 ms
 
-**status: OPEN** · sim `src/simulator_main.cpp:439`
+**status: FIXED** (sim e3f72238) · sim `src/simulator_main.cpp:439`
 
 acf338aa set HalPowerManager::kHostIdleSliceMs to 20 and fixed the SimulatorIdle.h comment. Two other comments still say 50 ms: src/simulator_main.cpp:439 ('the firmware's 10 ms polls and the 50 ms idle slices') and src/HalGPIO.cpp:251 ('a 50 ms idle slice is a plain delay that pumps nothing'). The reasoning in both still holds at 20 ms; only the number is stale.
 
@@ -375,7 +375,7 @@ acf338aa set HalPowerManager::kHostIdleSliceMs to 20 and fixed the SimulatorIdle
 
 ### R-36 ButtonNavigator.h still says the hold page jumps 'wrap', which is no longer true on the Picco
 
-**status: OPEN** · fw `src/util/ButtonNavigator.h:75`
+**status: FIXED** (fw 693f95a39) · fw `src/util/ButtonNavigator.h:75`
 
 The side-button paging comment says nextPageIndex/previousPageIndex 'wrap and snap to the page boundary'. Since fd49312eb they take `wrap = kHoldPagingWraps`, which is false on the Picco (O1), and they then stop on the last or first row. The comment a few lines above the declarations states the Picco exception, so the stale clause conflicts with it.
 
@@ -387,3 +387,38 @@ The side-button paging comment says nextPageIndex/previousPageIndex 'wrap and sn
 ## Refuted (1)
 
 - iOS CI builds the pinned firmware 1b7fc3b26, which still ships the broken File Manager and has no script gate (`cmake/CrossPointSources.cmake`). The facts check out, but nothing here is broken code. It is the designed, documented behavior of a workflow nobody uses. What is true: - With a blank firmware_ref, testflight-ios.yml:136-146 does resolve CROSSPOINT_FIRMWARE_PIN, which is 1b7fc3b26 (CrossPointSources.cmake:14). - `git merge-base --is-ancestor 954d63187 1b7fc3b26` returns 1, so the pin lacks the fix. 589fddb9d, the commit that caused it, is an ancestor of the pin. - The cmake files run no build_html.py. Neither CMakeLists.txt nor cmake/*.cmake calls it or gen_i18n. Why it is not a defect: 1. Pinning is the stated design. The workflow input says a blank ref means "the commit pinned in cmake/CrossPointSources.cmake, which is the only tree the generated source set is guaranteed to match". Building newer firmware means passing firmware_ref, so a pin build lacks every firmware change since 2026-11-08. B-080 is not special, and the review's commits caused none of it. 2. The CI path is dormant. `gh run list -R natebunnyfield/crosspoint-simulator --workflow testflight-ios.yml` shows the last run on 2026-09-12, and the last three runs failed. Every build since then shipped from ios/testflight.sh; tag build-380 points at 4c95ebd9 (2026-11-26). The trigger means dispatching that workflow, which this task forbids anyway. 3. The path that actually ships regenerates the headers through the fixed script. ios/testflight.sh runs `pio run -e $CANARY_ENV` in FIRMWARE_DIR before the archive. The simulator env lists pre:scripts/build_html.py (platformio.ini:513). build_html.py has no mtime or up-to-date skip; it rebuilds every time and writes in-tree to src/network/html/*.generated.h (gitignored). The iOS cmake build compiles those files. So once the firmware checkout holds 954d63187, the next TestFlight run builds the fixed script with its node gate. 4. The manual cmake/Xcode route in ios/README.md is a local developer build that ships nothing. It reads generated outputs from the firmware tree, the same way it reads I18nStrings.cpp, and the next pio run refreshes them. 5. The primary checkout at 2730016ae is checkout state, as the finding itself says. It is fixed by pulling, which this task forbids doing to primary checkouts. At most this is a release-hygiene note: bump the pin or pass firmware_ref the next time CI is used. It is not a bug. The mechanism is real, but it does not reach any shipped build, and the severity is overstated. What holds up: - `git merge-base --is-ancestor 954d63187 1b7fc3b26` returns 1, so the pin lacks the fix. - 589fddb9d is an ancestor of the pin, so the pin carries the bug. - testflight-ios.yml:136-146 resolves a blank firmware_ref to CROSSPOINT_FIRMWARE_PIN, then :164-169 runs that tree's build_html.py. Why it does not reach a shipped build: 1. **The iOS Picco app cannot come from this workflow.** testflight-ios.yml has no Picco device at all: grep for PICCO, Picco and picco finds nothing. The only Picco path is `CROSSPOINT_IOS_DEVICE=PICCO ios/testflight.sh` (testflight.sh:55-80). The shipped Picco build, picco-build-15 (simulator 36206135, 2026-11-27 10:55), was built with `CROSSPOINT_FIRMWARE_DIR` set to the key-paste worktree. That is line 301 of crosspoint-simulator/build/ios-picco/CMakeCache.txt, and that worktree contains 954d63187. testflight.sh:~149 also runs the desktop canary `pio run -e $CANARY_ENV` in that firmware tree first. Through platformio.ini:510-513 (`pre:scripts/build_html.py`), that regenerates the html headers with the fixed, gated script. build/picco-deploy.log shows "desktop OK", then "source set is current (151 ... TUs)", then ARCHIVE SUCCEEDED and UPLOAD SUCCEEDED. The worktree's src/network/html/*.generated.h are dated Nov 27 11:23, after the fix. 2. **The real Picco, X4 and X3 devices are unaffected.** Every device env builds with pio, which runs the tree's own build_html.py, so they get the fix and the gate. 3. **The CI path is dormant and works as designed.** - `gh run list -R natebunnyfield/crosspoint-simulator --workflow testflight-ios.yml` shows the last dispatch on 2026-09-12, and the last three runs failed. - Every iOS build since then has been local: build-377 to build-380 sit on 4c95ebd9, and picco-build-1 to picco-build-15 were tagged by testflight.sh. - The workflow input says outright that blank means the pinned tree, "the only tree the generated source set is guaranteed to match". So every one of the 147 firmware commits since the pin is equally missing from CI. That is the documented pin contract, not a B-080 regression. - The task forbids running TestFlight, so the trigger is out of reach for this workflow. - I did not check whether simulator HEAD would even compile against the pin. The firmware HAL and settings headers moved 196 lines since then. 4. **The manual cmake/Xcode path (ios/README.md:96-102) is a developer path, not the shipping path.** On a fresh checkout the html headers are missing and the build fails to compile rather than shipping stale bytes. On a used checkout they come from a pio run of the same tree. The stale case needs a firmware pull followed by a cmake-only rebuild with no pio. 5. **The rest is checkout state, not code.** ~/src/crosspoint-reader is at 2730016ae, which lacks 954d63187 (checked). The current X3 app, build-380 at 4c95ebd9 (2026-11-26 16:04), predates the fix whichever path built it. It gets the fix the next time an X3 build runs from an up-to-date firmware tree, as any fix does. What is fair to keep, as a nit or docs item: - B-080 lists the iOS app's server as in scope and is marked FIXED. The X3 iOS app has not been rebuilt since the fix. - The CI pin and source set need a bump before anyone dispatches testflight-ios.yml again. That bump should also bring in check_inline_scripts. Neither one makes a shipped build serve a broken File Manager.
+
+
+## Fix pass, 2026-11-27 (workflow wf_b1fe41f9-0af)
+
+Fixers closed the rows marked FIXED above. Three reviewers then reviewed the fixes, and skeptics checked each of their findings: 12 reported, 11 confirmed. The six most severe were repaired and pinned by test_blink_upload checks that failed before each fix. Nothing in this section was run on a Picco, an X4 or a real iPhone. Device-side behavior comes from reading arduino-esp32 3.3.7 and SdFat.
+
+| id | finding (pre-existing unless noted) | fix |
+|----|---------|-----|
+| F-01 | A POST /upload that is not multipart (bare POST, `-d`, `--data-binary`) dereferenced a null upload and rebooted the device | fw da3da10d4 (`requestIsMultipart` guard), sim 927ed8a1 (the shim makes the device's callback calls) |
+| F-02 | A curl -F upload that the card stopped taking left a truncated file under its final name, and the retry was refused as "File already exists" | fw c592d0d74, sim 86b2af96 |
+| F-03 | A form with two file parts was answered for the last part only | fw 4df9eac7d, sim 31e2b44b |
+| F-04 | A chunked PUT (piped `curl -T`) on the device answered 201/204 with an empty file, and replaced an existing book with 0 bytes | fw 2b213e97b (refused), sim 3d08c4d2 |
+| F-05 | New Folder, Rename and Move from the page answered 400 on the simulator and the iOS app, because multipart fields were parsed only on upload routes | sim 80f343b5 |
+| F-06 | A '+' in a WebDAV path was read as a space, so a file named with '+' could not be fetched by its own listed href | fw 9c56e23a5, sim 93062304 |
+
+Confirmed, not repaired (over the cap of six or low severity):
+
+- **F-07 latent.** The protected-path check and the upload-lock check compare text without SdFat's trimming of leading spaces and trailing dots and spaces. `path=/ .crosspoint` reaches /.crosspoint (the same dot paths WebDAV already serves on purpose). On the device, `PUT /books/x.epub.` during a page upload of x.epub is not answered 423. Fix option: one FsHelpers function that trims each component the way SdFat does, used by both checks (`src/network/CrossPointWebServer.cpp:164`).
+- **F-08 test-gap.** test_blink_upload FAILs instead of SKIPping when its port is held by something that does not speak HTTP, or when port+1 is taken. Use a TCP probe like test_web_server_hardening.sh:32-36.
+- **F-09 test-gap.** The firmware's "no file was chosen" 400 cannot be reached on the simulator, because the shim turns a `filename=""` part into a text field (`src/WebServer.cpp:868`). Both paths answer 400 and write nothing.
+- **F-10 visible-bug (the R-15 dark arm).** In an iOS dark-mode session that was in light mode with the lamp on, the sleep screen still sits on the lit paper. Only the active polarity's pair is published (`ios/CrossPointIOSShim.cpp:1894`). Every option changes the look, so this is the owner's call: (a) publish both pairs whenever the pair syncs, (b) publish both from the sleep tick only, (c) leave it.
+- **F-11 cosmetic.** `docs/menu-nav-lag-2026-11-27.md:60,77` cites main.cpp:1556-1559. The block is now 1557-1560.
+- **F-12, outside the ask.** POST /api/fonts/upload has the R-02 shape. A POST with no file part, after a good font upload, answers `{"ok":true}` and writes nothing. Fix: claim fontUpload.valid once, as R-02 did.
+
+Gate on fw 9c56e23a5 / sim 93062304 / SDK 119f3ed (all green):
+- Firmware ctest: 976 of 976 pass.
+- `pio run` for picco (psram 6), default, simulator_picco and simulator_x3: all build.
+- Simulator `tests/run_all.sh`: 106 pass, 7 skip.
+- SDK run_picco.py: passes.
+- iOS Simulator xcodebuild (Release): succeeds.
+- build_html: clean.
+
+The skips: three tests need the desktop `simulator` env, which the gate does not build. Four need `fs_/.crosspoint/settings.json`. Those four were run off-gate on a scratch card:
+- test_web_server_hardening, test_manage_files_and_wifi_nav and test_note_editor_repaint pass.
+- **test_text_entry fails, and that is pre-existing.** Its "LEFT x2 is Device Owner" walk predates commit 669167dde, which put the GitHub Token and Claude API Key rows in between, so it now types into a secret field. The fix is to retarget the walk or assert on the row's title. It is not fixed yet.
