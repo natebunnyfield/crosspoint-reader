@@ -34,6 +34,11 @@ Not tracked as numbered items: the upstream backlog
 
 ## OPEN
 
+### [B-080] The web File Manager never listed files: the minified page script did not parse — FIXED 2026-11-26, UNCONFIRMED on device
+**severity: high (File Transfer's file list dead on every device, including the iOS app's server) · scope: `scripts/build_html.py` · reported by the owner on the Picco, reproduced headless**
+
+Symptom: `/files` showed the buttons and a spinner forever, with no "Home" breadcrumb. `hydrate()` writes that breadcrumb before its first fetch, so the script never ran. Cause: 589fddb9d (2026-08-03) dropped `script` from the minifier's preserved tags. `minify_js` keeps a `//` comment that follows code on the same line, and the `\s+` collapse then joined the whole script into one line, so the first such comment swallowed the rest. Node on the served bytes: `SyntaxError: Unexpected end of input`; the source parsed fine. Only FilesPage had trailing comments; Fonts, Home and Settings parsed. **Fix:** scripts are minified, then kept verbatim with their newlines (+2.3 KB gzip). **Gate:** `check_inline_scripts` runs `node --check` on every minified inline script and fails the build (warns and skips without node). Proved both ways on a two-page fixture. Headless Chrome against a mock `/api/files`: the old bytes spin, the new ones list the folder.
+
 ### [B-079] A scan pass painted rotated table text into the framebuffer of the page on screen — FIXED 2026-11-08
 **severity: medium-high (stray rotated text from the NEXT page could reach the glass through a later windowed present) · scope: `lib/GfxRenderer/GfxRenderer.cpp` · found by the 2026-11-07 fork survey (via Xerif `26d66ca2f9`), not reproduced**
 

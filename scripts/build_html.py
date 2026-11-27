@@ -2,6 +2,10 @@ import os
 import re
 import gzip
 import hashlib
+import shutil
+import subprocess
+import sys
+import tempfile
 
 SRC_DIR = "src"
 
@@ -50,6 +54,19 @@ def minify_html(html: str) -> str:
         preserve_blocks.append(match.group(0))
         return f"__PRESERVE_BLOCK_{len(preserve_blocks)-1}__"
 
+    # Inline <script> blocks: strip comment-only lines, then keep the rest
+    # verbatim, newlines included. minify_js leaves a // comment that follows
+    # code on the same line, so the whitespace collapse below used to join the
+    # script into one line and that comment then swallowed everything after
+    # it. From 589fddb9d (2026-08-03) FilesPage's script never ran: no
+    # breadcrumb, and the file list spun forever. Done first, so the
+    # pre/code/textarea and HTML-comment passes never reach into JS strings.
+    def minify_and_preserve_script(match):
+        open_tag, inner, close_tag = match.group(1), match.group(2), match.group(3)
+        preserve_blocks.append(open_tag + minify_js(inner) + close_tag)
+        return f"__PRESERVE_BLOCK_{len(preserve_blocks)-1}__"
+    html = re.sub(r'(<script[^>]*>)([\s\S]*?)(</script>)', minify_and_preserve_script, html, flags=re.IGNORECASE)
+
     html = re.sub(rf'<({preserve_regex})[\s\S]*?</\1>', preserve, html, flags=re.IGNORECASE)
 
     # Minify inline <style> blocks (CSS comment stripping)
@@ -57,12 +74,6 @@ def minify_html(html: str) -> str:
         open_tag, inner, close_tag = match.group(1), match.group(2), match.group(3)
         return open_tag + minify_css(inner) + close_tag
     html = re.sub(r'(<style[^>]*>)([\s\S]*?)(</style>)', minify_style_tag, html, flags=re.IGNORECASE)
-
-    # Minify inline <script> blocks (comment-only line stripping)
-    def minify_script_tag(match):
-        open_tag, inner, close_tag = match.group(1), match.group(2), match.group(3)
-        return open_tag + minify_js(inner) + close_tag
-    html = re.sub(r'(<script[^>]*>)([\s\S]*?)(</script>)', minify_script_tag, html, flags=re.IGNORECASE)
 
     # Remove HTML comments
     html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
@@ -78,6 +89,33 @@ def minify_html(html: str) -> str:
         html = html.replace(f"__PRESERVE_BLOCK_{i}__", block)
 
     return html.strip()
+
+def check_inline_scripts(file_path: str, html: str) -> None:
+    """Fail the build when an inline script no longer parses after minification.
+
+    What the browser runs is the minified page, not the source, and the two can
+    differ: from 589fddb9d to the fix beside this function, FilesPage's source
+    parsed while the page served to every phone did not. Needs node; without it
+    this prints a warning and skips.
+    """
+    node = shutil.which("node")
+    if not node:
+        print(f"WARNING: node not found; {file_path}: inline scripts not syntax-checked")
+        return
+    scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', html, flags=re.DOTALL | re.IGNORECASE)
+    for i, js in enumerate(scripts):
+        if not js.strip():
+            continue
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+            f.write(js)
+        try:
+            result = subprocess.run([node, "--check", f.name], capture_output=True, text=True)
+        finally:
+            os.unlink(f.name)
+        if result.returncode != 0:
+            err = next((l for l in result.stderr.splitlines() if l.startswith("SyntaxError")), "syntax error")
+            sys.exit(f"{file_path}: inline script {i} does not parse after minification: {err}")
+
 
 def sanitize_identifier(name: str) -> str:
     """Sanitize a filename to create a valid C identifier.
@@ -103,6 +141,7 @@ for root, _, files in os.walk(SRC_DIR):
             # Only minify HTML files; JS files are typically pre-minified (e.g., jszip.min.js)
             if file.endswith(".html"):
                 processed = minify_html(content)
+                check_inline_scripts(file_path, processed)
             else:
                 processed = content
 
