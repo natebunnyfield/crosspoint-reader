@@ -5,6 +5,7 @@
 #include <HalDisplay.h>
 #include <Logging.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -59,10 +60,18 @@ bool isRockerStepped(const SettingInfo& setting) {
 // main.cpp handleSlideSwitch() applies a new binding on the next loop. And
 // Frontlight on/off ("Add the row then"), which toggleCurrentSetting() handles
 // itself because it drives the light, not just the stored byte.
+//
+// And Font Size (owner 2026-11-26, "need a menu item for setting for font
+// size"). Reader Font steps the size with PageBack/PageForward only
+// (FontSelectionActivity::loop), and the Picco's rocker sends Left/Right and
+// nothing else (MappedInputManager::mapButton), so the device had no way to
+// change it. Matched by name: it is a getter/setter row with no valuePtr. The
+// generic picker sets the slot exactly as the web page does, and the reader
+// loads that size when a book opens (ReaderActivity::onEnter, ensureLoaded).
 bool isPiccoDeviceRow(const SettingInfo& setting) {
   return isRockerStepped(setting) || setting.valuePtr == &CrossPointSettings::frontlightOn ||
          setting.valuePtr == &CrossPointSettings::frontlightRestoreOnWake ||
-         setting.valuePtr == &CrossPointSettings::slideSwitchAction;
+         setting.valuePtr == &CrossPointSettings::slideSwitchAction || setting.nameId == StrId::STR_FONT_SIZE;
 }
 
 // Restore Light on Wake is shown only while the slide switch does NOT own the
@@ -230,6 +239,17 @@ void SettingsActivity::rebuildSettingsLists() {
                         SettingInfo::Action(StrId::STR_TYPOGRAPHY_SETTINGS, SettingAction::Typography));
   deviceSettings.insert(deviceSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
+#if FREEINK_DEVICE_PICCO
+  // Font Size sits directly under Reader Font, the screen whose size control
+  // the Picco cannot reach (isPiccoDeviceRow). The loop above placed it first
+  // among the generic rows, after Typography Settings; move it up one.
+  {
+    const auto fontSize = std::find_if(deviceSettings.begin(), deviceSettings.end(),
+                                       [](const SettingInfo& s) { return s.nameId == StrId::STR_FONT_SIZE; });
+    if (fontSize != deviceSettings.end() && fontSize > deviceSettings.begin())
+      std::rotate(deviceSettings.begin() + 1, fontSize, fontSize + 1);
+  }
+#endif
   // Manage Fonts is withdrawn. SD card fonts are still discovered and
   // selectable from Reader Font.
 
