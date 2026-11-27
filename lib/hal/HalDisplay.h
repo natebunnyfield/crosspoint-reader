@@ -173,6 +173,14 @@ class HalDisplay {
   void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows);
   bool supportsStripGrayscale() const;
 
+  // One activity render() has returned (ActivityManager's render task). A
+  // no-op on the device. The simulator holds a 1-bit frame briefly so an
+  // anti-aliased page's gray pass can replace it before it reaches the screen;
+  // every gray pass runs inside render(), so once render() returns with none,
+  // the hold can let the frame out at once instead of waiting out the window.
+  // Owner ruling 2026-11-27, "Hold only before gray" (docs/menu-nav-lag-2026-11-27.md O2).
+  void renderPassComplete() {}
+
   // Runtime geometry passthrough
   uint16_t getDisplayWidth() const;
   uint16_t getDisplayHeight() const;
