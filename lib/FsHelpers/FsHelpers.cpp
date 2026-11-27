@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -331,6 +332,63 @@ bool isSameFatPath(std::string_view a, std::string_view b) {
 
 bool isSafePathComponent(std::string_view name) {
   return !name.empty() && name.find_first_of("/\\") == std::string_view::npos && name != "." && name != "..";
+}
+
+FatNameCheck checkFatName(std::string_view name) {
+  FatNameCheck check;
+  size_t i = 0;
+  while (i < name.size() && name[i] == ' ') i++;  // SdFat skips leading spaces
+  size_t units = 0;
+  while (i < name.size()) {
+    const uint32_t cp = nextCodePoint(name, i);
+    if (cp >= 0x110000u) {
+      check.problem = FatNameProblem::BadEncoding;
+      return check;
+    }
+    // SdFat's lfnReservedChar. '/' is in it too; here it is a separator, and
+    // isSafePathComponent() has already refused it in a single name.
+    if (cp < 0x20 || cp == '"' || cp == '*' || cp == '/' || cp == ':' || cp == '<' || cp == '>' || cp == '?' ||
+        cp == '\\' || cp == '|') {
+      check.problem = FatNameProblem::ReservedChar;
+      check.reserved = static_cast<char>(cp);
+      return check;
+    }
+    units += cp <= 0xFFFF ? 1 : 2;
+    // Trailing dots and spaces are dropped: the length stops at the last
+    // character that is neither.
+    if (cp != '.' && cp != ' ') check.length = units;
+  }
+  if (check.length == 0) {
+    check.problem = FatNameProblem::Empty;
+  } else if (check.length > FAT_MAX_NAME_LENGTH) {
+    check.problem = FatNameProblem::TooLong;
+  }
+  return check;
+}
+
+std::string describeFatNameProblem(const FatNameCheck& check) {
+  switch (check.problem) {
+    case FatNameProblem::None:
+      return {};
+    case FatNameProblem::Empty:
+      return "File name is empty, or only spaces and dots, which the card cannot store";
+    case FatNameProblem::ReservedChar: {
+      const auto c = static_cast<unsigned char>(check.reserved);
+      if (c < 0x20) {
+        return "File name has a control character (code " + std::to_string(c) + "), which the card cannot store";
+      }
+      std::string message = "File name has a character the card cannot store: '";
+      message += check.reserved;
+      message += "' (not allowed: \" * : < > ? \\ |)";
+      return message;
+    }
+    case FatNameProblem::TooLong:
+      return "File name is too long: " + std::to_string(check.length) + " characters, the card allows " +
+             std::to_string(FAT_MAX_NAME_LENGTH);
+    case FatNameProblem::BadEncoding:
+      return "File name is not valid UTF-8, which the card cannot store";
+  }
+  return {};
 }
 
 void sanitizePathComponentForFat32(const char* input, char* output, size_t maxLen) {

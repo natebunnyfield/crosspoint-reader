@@ -1,6 +1,8 @@
 #pragma once
 #include <WString.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -108,6 +110,40 @@ bool isSameOrInside(std::string_view path, std::string_view ancestor);
 
 /** Whether two paths name the same entry on the card (same folding as above). */
 bool isSameFatPath(std::string_view a, std::string_view b);
+
+/**
+ * Why a FAT or exFAT card cannot store `name` as one path component. SdFat
+ * refuses these names when it parses the path (FatFileLFN.cpp parsePathName,
+ * ExFatFile.cpp parsePathName) and reports only "open failed", so a refused
+ * upload used to be blamed on a full disk or a missing folder (review
+ * 2026-11-27, R-11 and R-12). The rules here are SdFat's own: the reserved
+ * set is lfnReservedChar (FsStructs.h), the length is counted in UTF-16 units
+ * after leading spaces and trailing dots and spaces are dropped, and the limit
+ * is FAT_MAX_LFN_LENGTH / EXFAT_MAX_NAME_LENGTH.
+ *
+ * Ask AFTER the card refuses, to explain the refusal. The simulator and the
+ * iOS app store files on a host file system that accepts most of these names,
+ * so refusing them up front would take uploads away there.
+ */
+enum class FatNameProblem : uint8_t {
+  None,
+  Empty,         // nothing is left once the card drops spaces and dots
+  ReservedChar,  // `reserved` is the first one
+  TooLong,       // `length` is over FAT_MAX_NAME_LENGTH
+  BadEncoding,   // not UTF-8
+};
+struct FatNameCheck {
+  FatNameProblem problem = FatNameProblem::None;
+  char reserved = '\0';
+  size_t length = 0;  // UTF-16 units, the way the card counts
+};
+inline constexpr size_t FAT_MAX_NAME_LENGTH = 255;
+FatNameCheck checkFatName(std::string_view name);
+inline FatNameCheck checkFatName(const String& name) {
+  return checkFatName(std::string_view{name.c_str(), name.length()});
+}
+/** One sentence a person can act on, naming the rule; empty for None. */
+std::string describeFatNameProblem(const FatNameCheck& check);
 
 /**
  * Sanitize a filename/path component for FAT32 in a caller-provided buffer.
