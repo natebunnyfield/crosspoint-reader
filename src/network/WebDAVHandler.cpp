@@ -57,12 +57,46 @@ bool WebDAVHandler::canRaw(WebServer& server, const String& uri) {
   return server.method() == HTTP_PUT;
 }
 
+namespace {
+String putFileName(const String& path) { return path.substring(path.lastIndexOf('/') + 1); }
+
+String putFolder(const String& path) {
+  const int lastSlash = path.lastIndexOf('/');
+  return lastSlash > 0 ? path.substring(0, lastSlash) : String("/");
+}
+}  // namespace
+
+void WebDAVHandler::failPut(const int status, const String& reason) {
+  _putOk = false;
+  _putStatus = status;
+  _putError = reason;
+  LOG_DBG("DAV", "PUT refused (%d): %s", status, reason.c_str());
+}
+
+// Between requests the state says "no body was received", so a PUT whose body
+// never reached raw() (a multipart PUT skips it on the device) is answered
+// with that and not with the previous PUT's result.
+void WebDAVHandler::resetPut() {
+  _putOk = false;
+  _putExisted = false;
+  _putStatus = 400;
+  _putError = "";  // handlePut() reads empty as "no body was received"
+  _putTempPath = "";
+  _putBytes = 0;
+}
+
 void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
   (void)uri;
   if (raw.status == RAW_START) {
+    if (_putFile) _putFile.close();
+    resetPut();
     _putPath = getRequestPath(server);
-    if (isProtectedPath(_putPath) || webUploadIsWriting(_putPath.c_str())) {
-      _putOk = false;
+    if (isProtectedPath(_putPath)) {
+      failPut(403, "Forbidden");
+      return;
+    }
+    if (webUploadIsWriting(_putPath.c_str())) {
+      failPut(423, "Locked: upload in progress");
       return;
     }
 
@@ -71,60 +105,70 @@ void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
     if (lastSlash > 0) {
       String parentPath = _putPath.substring(0, lastSlash);
       if (!Storage.exists(parentPath.c_str())) {
-        _putOk = false;
+        failPut(409, "Folder " + parentPath + " does not exist. Create it first (MKCOL), then upload");
         return;
       }
     }
 
-    if (_putFile) _putFile.close();
     _putExisted = Storage.exists(_putPath.c_str());
 
     if (_putExisted) {
       HalFile existing = Storage.open(_putPath.c_str());
       if (existing && existing.isDirectory()) {
         existing.close();
-        _putOk = false;
+        failPut(405, _putPath +
+                         " is a folder. To upload into it, end the URL with a slash so the file name is added: "
+                         "curl -T NAME http://ADDRESS/FOLDER/");
         return;
       }
       if (existing) existing.close();
     }
 
     // Write to a temp file to avoid destroying the original on failed upload
-    String tempPath = _putPath + ".davtmp";
-    Storage.remove(tempPath.c_str());
-    _putOk = Storage.openFileForWrite("DAV", tempPath, _putFile);
+    _putTempPath = _putPath + ".davtmp";
+    Storage.remove(_putTempPath.c_str());
+    if (Storage.openFileForWrite("DAV", _putTempPath, _putFile)) {
+      _putOk = true;
+    } else {
+      const CreateFailure failure = explainCreateFailure(putFolder(_putPath), putFileName(_putPath));
+      failPut(failure.status, failure.reason);
+    }
     LOG_DBG("DAV", "PUT START: %s", _putPath.c_str());
 
   } else if (raw.status == RAW_WRITE) {
     if (_putFile && _putOk) {
       resetTaskWatchdogIfSubscribed();
       size_t written = _putFile.write(raw.buf, raw.currentSize);
+      _putBytes += written;
       if (written != raw.currentSize) {
-        _putOk = false;
+        char reason[112];
+        snprintf(reason, sizeof(reason),
+                 "Write to the card failed after %lu bytes (the card may be full). The upload was discarded",
+                 static_cast<unsigned long>(_putBytes));
+        failPut(500, reason);
       }
     }
 
   } else if (raw.status == RAW_END) {
     if (_putFile) _putFile.close();
     if (_putOk) {
-      String tempPath = _putPath + ".davtmp";
       if (_putExisted) Storage.remove(_putPath.c_str());
-      HalFile tmp = Storage.open(tempPath.c_str());
-      if (tmp) {
-        _putOk = tmp.rename(_putPath.c_str());
-        tmp.close();
-      } else {
-        _putOk = false;
+      HalFile tmp = Storage.open(_putTempPath.c_str());
+      const bool renamed = tmp && tmp.rename(_putPath.c_str());
+      if (tmp) tmp.close();
+      if (!renamed) {
+        // The bytes arrived; the card would not take the final name.
+        const CreateFailure failure = explainCreateFailure(putFolder(_putPath), putFileName(_putPath));
+        failPut(failure.status, failure.reason);
       }
-      if (!_putOk) Storage.remove(tempPath.c_str());
     }
+    if (!_putOk && !_putTempPath.isEmpty()) Storage.remove(_putTempPath.c_str());
     LOG_DBG("DAV", "PUT END: %u bytes, ok=%d", raw.totalSize, _putOk);
 
   } else if (raw.status == RAW_ABORTED) {
     if (_putFile) _putFile.close();
-    String tempPath = _putPath + ".davtmp";
-    Storage.remove(tempPath.c_str());
-    _putOk = false;
+    if (!_putTempPath.isEmpty()) Storage.remove(_putTempPath.c_str());
+    resetPut();
   }
 }
 
@@ -429,19 +473,28 @@ void WebDAVHandler::handlePut(WebServer& s) {
   LOG_DBG("DAV", "PUT %s", path.c_str());
 
   if (isProtectedPath(path)) {
+    resetPut();
     s.send(403, "text/plain", "Forbidden");
     return;
   }
 
+  // raw() has already removed its temp file on every failure. The result is
+  // claimed once and cleared (resetPut), so the next PUT cannot inherit it.
   if (!_putOk) {
-    String tempPath = path + ".davtmp";
-    Storage.remove(tempPath.c_str());
-    s.send(500, "text/plain", "Write failed - incomplete upload or disk full");
+    const int status = _putStatus;
+    const String reason =
+        _putError.isEmpty()
+            ? String("Nothing was uploaded: the PUT had no plain body. Send the file itself, as curl -T NAME URL does")
+            : _putError;
+    resetPut();
+    s.send(status, "text/plain; charset=utf-8", reason);
     return;
   }
 
+  const bool existed = _putExisted;
+  resetPut();
   clearBookCache(path.c_str());
-  s.send(_putExisted ? 204 : 201);
+  s.send(existed ? 204 : 201);
   LOG_DBG("DAV", "PUT complete: %s", path.c_str());
 
   // A .bin landing in /firmware/ is an update request. Record it and let the

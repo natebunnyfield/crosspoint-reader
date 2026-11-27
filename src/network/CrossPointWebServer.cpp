@@ -14,6 +14,7 @@
 #include <cctype>
 #include <memory>
 #include <new>
+#include <string>
 
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
@@ -345,6 +346,15 @@ bool webUploadIsWriting(const char* path) {
   if (!target.endsWith("/")) target += "/";
   target += wsUploadFileName;
   return FsHelpers::isSameOrInside(target.c_str(), path);
+}
+
+CreateFailure explainCreateFailure(const String& folder, const String& name) {
+  const std::string nameProblem = FsHelpers::describeFatNameProblem(FsHelpers::checkFatName(name));
+  if (!nameProblem.empty()) return {400, String(nameProblem.c_str())};
+  if (!folder.isEmpty() && folder != "/" && !Storage.exists(folder.c_str())) {
+    return {409, "Folder " + folder + " does not exist. Create it first, then upload"};
+  }
+  return {500, "Could not create the file on the card (the card may be full or failing)"};
 }
 
 void CrossPointWebServer::abortWsUpload(const char* tag) {
@@ -829,6 +839,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     state.size = 0;
     state.success = false;
     state.error = "";
+    state.errorCode = 400;
     state.filePartSeen = true;
     uploadStartTime = millis();
     lastLoggedSize = 0;
@@ -882,8 +893,10 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     // Open file for writing - this can be slow due to FAT cluster allocation
     resetTaskWatchdogIfSubscribed();
     if (!Storage.openFileForWrite("WEB", filePath, state.file)) {
-      state.error = "Failed to create file on SD card";
-      LOG_DBG("WEB", "[UPLOAD] FAILED to create file: %s", filePath.c_str());
+      const CreateFailure failure = explainCreateFailure(state.path, state.fileName);
+      state.error = failure.reason;
+      state.errorCode = failure.status;
+      LOG_DBG("WEB", "[UPLOAD] FAILED to create file: %s (%s)", filePath.c_str(), state.error.c_str());
       return;
     }
     resetTaskWatchdogIfSubscribed();
@@ -999,7 +1012,7 @@ void CrossPointWebServer::handleUploadPost(UploadState& state) const {
     server->send(200, "text/plain; charset=utf-8", "File uploaded successfully: " + state.fileName);
   } else {
     const String error = state.error.isEmpty() ? "Unknown error during upload" : state.error;
-    server->send(400, "text/plain; charset=utf-8", error);
+    server->send(state.errorCode, "text/plain; charset=utf-8", error);
   }
 }
 
@@ -1912,7 +1925,7 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           // Open file for writing
           resetTaskWatchdogIfSubscribed();
           if (!Storage.openFileForWrite("WS", filePath, wsUploadFile)) {
-            wsServer->sendTXT(num, "ERROR:Failed to create file");
+            wsServer->sendTXT(num, "ERROR:" + explainCreateFailure(wsUploadPath, wsUploadFileName).reason);
             wsUploadInProgress = false;
             wsUploadClientNum = 255;
             return;

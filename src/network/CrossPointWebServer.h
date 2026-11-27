@@ -37,6 +37,8 @@ class CrossPointWebServer {
     size_t size = 0;
     bool success = false;
     String error = "";
+    // The status sent with `error`. 400 unless the refusal has a better one.
+    int errorCode = 400;
     // This object outlives each request, and only a file part resets it. True
     // from a file part's start until handleUploadPost() has answered for it:
     // a POST with no file part must not be answered from the last upload's
@@ -162,3 +164,13 @@ class CrossPointWebServer {
 // slot is reused before the upload closes -- syncs the upload's cluster chain
 // into another file's entry. Mutating handlers refuse while this is true.
 bool webUploadIsWriting(const char* path);
+
+// Why the card would not create `name` in `folder`, as the reply to a failed
+// upload: a name the card cannot store (400, FsHelpers::checkFatName), a
+// folder that is not there (409), or neither, which leaves the card itself
+// (500). Call it AFTER the open or rename has failed.
+struct CreateFailure {
+  int status;
+  String reason;
+};
+CreateFailure explainCreateFailure(const String& folder, const String& name);

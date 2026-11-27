@@ -15,8 +15,17 @@ class WebDAVHandler : public RequestHandler {
   // PUT streaming state (raw() is called in chunks)
   HalFile _putFile;
   String _putPath;
+  String _putTempPath;
   bool _putOk = false;
   bool _putExisted = false;
+  // Why _putOk is false, as the reply handlePut() sends. Every PUT failure
+  // used to answer "500 Write failed - incomplete upload or disk full",
+  // whatever had gone wrong (review 2026-11-27, R-01, R-11, R-12).
+  int _putStatus = 400;
+  String _putError;
+  size_t _putBytes = 0;  // written to the temp file so far
+  void failPut(int status, const String& reason);
+  void resetPut();
 
   // WebDAV method handlers
   void handleOptions(WebServer& s);
