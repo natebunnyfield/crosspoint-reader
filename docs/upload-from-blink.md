@@ -124,6 +124,7 @@ full`.
 | `1 of 2 files stored. Not stored: NAME (why). Stored: OTHER`, with the status of the refusal (`400`, `423`, `500`) | Two `-F "file=@..."` in one command. The files after `Stored:` landed; send the one that did not again, by itself, once the reason is dealt with. When every file lands the reply is `200 2 files uploaded successfully: A, B` |
 | `400 File name has a character the card cannot store: ':' (not allowed: ...)` | Upload under another name (step 2). Picco only, see below |
 | `400 File name is too long: 256 characters, the card allows 255` | Upload under a shorter name |
+| `411 A piped upload (chunked, no length) cannot be read, so nothing was written. Give curl the file by name: ...` | Something was piped into `-T -`. Give curl the file by name. Whatever was under that name is untouched |
 | `423 Locked: the File Transfer page is uploading "NAME" right now (...)` | The web page is partway through that same name. It lets go when it finishes, its tab closes, or it sends nothing for 30 s. Retry then, or upload under another name |
 | `500 Could not create the file on the card ...`, `500 Write to the card failed after N bytes (the card may be full). The upload was discarded` | The card is full or failing. The part that arrived is removed, from `-T` and from `-F` alike, so the same command works once there is room |
 | `curl: (3) bad range ...`, `curl: (26) Failed to open/read local data`, `curl: cannot open 'NAME'` | curl gave up before sending anything: the `-g` or the `\"` pair is missing |
@@ -160,10 +161,12 @@ Four traps:
    right, so only the device shows this.
 2. **Never pipe into `-T`.** `cat x | curl -T - URL` sends a chunked body. The
    device's WebServer has no chunked request support (`Parsing.cpp:111-112`
-   sets the length to 0 and nothing reads chunks), so it would write an EMPTY
-   file and answer `201`. Read from source, not run on a device. The simulator
-   refuses with `501 Chunked transfer encoding not supported`. Always give
-   curl a file name.
+   sets the length to 0 and nothing reads chunks). It is refused with `411`
+   and nothing on the card changes (`WebDAVHandler::raw`, `RAW_START`). Until
+   2026-11-27 the device stored an EMPTY file and answered `201`, and over an
+   existing name it replaced the book with 0 bytes and answered `204`; the
+   simulator answered `501` by itself, so no desktop test saw that. Always
+   give curl a file name.
 3. **A big file pauses for about a second first.** curl asks for
    `100 Continue` on a large body and the server never sends it, so curl waits
    ~1 s and then sends anyway (measured: 5 MB PUT, 1.05 s on loopback).
@@ -318,8 +321,22 @@ on the card was checked by md5 against what was sent, under the name sent.
   `--form-string` put it in `/a;b,c`.
 - **The replies**: the `405`, both `409`s, `400 File already exists`,
   `400 Nothing was uploaded`, `400 ... too long` (a 256-character name) and
-  the `501` for a piped body. The `423` and the 30 s release were measured in
-  the R-01 fix and are pinned by the gate's check 11, not run again here.
+  the `501` for a piped body (the `411` now, below). The `423` and the 30 s
+  release were measured in the R-01 fix and are pinned by the gate's check 11,
+  not run again here.
+- **A file piped into `-T -`** (desktop Picco simulator, curl 8.23.0 and
+  macOS's 8.7.1; not run on a Picco): over a book that is there and to a new name, both answer `411 A
+  piped upload (chunked, no length) cannot be read, so nothing was written.
+  Give curl the file by name: curl -T NAME http://ADDRESS/FOLDER/`, the book
+  that was there keeps its bytes, no file and no `.davtmp` is left, and the
+  same file by name then lands. The simulator's server used to answer `501`
+  for this before the firmware saw it; it now hands a chunked `PUT` over as
+  the device's parser does (the body taken as zero bytes long), and reads a
+  header by name only when the firmware collected it, as the device does. On
+  a build without the firmware's check, and on one with the check but without
+  `Transfer-Encoding` in `collectHeaders`, the same two commands answered
+  `204` with the book replaced by 0 bytes and `201` with a 0-byte file.
+  Pinned by the gate's check 14, which failed on both of those builds.
 - **A card that stops taking writes partway** (desktop Picco simulator, its
   files capped at 6 MiB by a process file-size limit; not run on a Picco):
   `-T` and `-F` both answer `500 Write to the card failed after 6291456 bytes
@@ -348,8 +365,10 @@ on the card was checked by md5 against what was sent, under the name sent.
 **Unproven:** nothing here ran on a real Picco or a real iPhone. Read from
 source or platform knowledge, not observed: the Picco's refusal of reserved
 characters and its message, the folder-field order, the `-F` missing-folder
-`409`, the chunked-pipe empty file, the X4 Pro's endless BUSY wait, mDNS, the
-Local Network prompt. **Blink's own curl and shell were not inspected**: its
+`409`, the `411` for a piped body (what the device's parser does with a
+chunked body is read from `Parsing.cpp`; the simulator copies it), what curl
+sees when the device closes with the chunks unread, the X4 Pro's endless BUSY
+wait, mDNS, the Local Network prompt. **Blink's own curl and shell were not inspected**: its
 curl version, and whether its shell passes `\"` inside quotes through as the
 shells here do. If the form post misbehaves there, `-g -T` needs only one
 plain pair of quotes. The encoding of the appended file name was measured on
@@ -357,9 +376,6 @@ curl 8.7.1 and 8.23.0 only.
 
 **Proposed, not done** (each beyond what was asked; say the word):
 
-- A chunked PUT could be refused (`411`) on the device, as the simulator does,
-  instead of writing an empty file. Needs `Transfer-Encoding` added to
-  `collectHeaders` in `CrossPointWebServer::begin()`.
 - `POST /upload` could take an explicit `overwrite=1`.
 - The simulator's `HalStorage::open` creates missing parent folders, its
   multipart parser reads every field before the file, and its file system

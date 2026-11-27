@@ -336,9 +336,10 @@ void CrossPointWebServer::begin() {
   // Collect WebDAV headers and register handler
   // If-None-Match is collected so the static-page handlers can answer conditional GETs with 304
   // Content-Type is collected for POST /api/keys, which takes JSON only.
-  const char* collectedHeaders[] = {"Depth",      "Destination", "Overwrite",     "If",
-                                    "Lock-Token", "Timeout",     "If-None-Match", "Content-Type"};
-  server->collectHeaders(collectedHeaders, 8);
+  // Transfer-Encoding is collected so a chunked PUT can be refused (WebDAVHandler::raw).
+  const char* collectedHeaders[] = {"Depth",         "Destination",  "Overwrite",        "If", "Lock-Token", "Timeout",
+                                    "If-None-Match", "Content-Type", "Transfer-Encoding"};
+  server->collectHeaders(collectedHeaders, sizeof(collectedHeaders) / sizeof(collectedHeaders[0]));
   // Raw new (nothrow) on purpose: WebServer takes ownership and deletes it when
   // the server stops, so a unique_ptr here would double-free. Without WebDAV the
   // HTTP file transfer still works, so a failure is logged and skipped.

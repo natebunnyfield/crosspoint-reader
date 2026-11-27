@@ -117,6 +117,21 @@ void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
       failPut(403, "Forbidden");
       return;
     }
+    // A chunked body (`cat x | curl -T - URL`) cannot be read: the server's
+    // parser has no chunk support and, with no Content-Length, takes the body
+    // as zero bytes long. This then ran RAW_START and RAW_END with nothing
+    // between them, renamed the empty temporary file over the target and
+    // answered 201, or 204 with an existing book replaced by 0 bytes (review
+    // 2026-11-27). Refused before anything on the card is touched.
+    // Transfer-Encoding is in collectHeaders for this.
+    String transferEncoding = server.header("Transfer-Encoding");
+    transferEncoding.toLowerCase();
+    if (transferEncoding.indexOf("chunked") >= 0) {
+      failPut(411,
+              "A piped upload (chunked, no length) cannot be read, so nothing was written. "
+              "Give curl the file by name: curl -T NAME http://ADDRESS/FOLDER/");
+      return;
+    }
     if (webUploadIsWriting(_putPath.c_str())) {
       failPut(423, webUploadLockMessage());
       return;
