@@ -204,6 +204,22 @@ constexpr char UPLOAD_FORM_HTML[] = R"(<!DOCTYPE html>
 </body></html>
 )";
 
+// Whether the request being parsed is a multipart form: the only kind that has
+// a server->upload() to read. An upload callback is not called for file parts
+// alone. arduino-esp32's WebServer also calls it for the body of every POST
+// that is NOT multipart (Parsing.cpp "Parse raw": a route that has an upload
+// callback is a raw handler too, FunctionRequestHandler::canRaw, and its raw()
+// calls the same callback), once to start, once per buffer and once to end. No
+// upload exists then and WebServer::upload() dereferences a null pointer: a
+// load fault and a reboot, File Transfer gone, from
+// `curl --data-binary @book.epub .../upload`, `curl -d x .../upload` or a bare
+// `curl -X POST .../upload` (review 2026-11-27). So every upload callback asks
+// this before it touches upload(). It is the parser's own test on the same
+// header value (Content-Type is in collectHeaders), so it is true exactly when
+// the parser took the form path. The parser still reads a refused body and
+// drops it a buffer at a time, and the route's handler then answers for it.
+// Costs one short String per callback, freed on return.
+bool requestIsMultipart(WebServer& server) { return server.header("Content-Type").startsWith("multipart/"); }
 }  // namespace
 
 // File listing page template - now using generated headers:
@@ -899,6 +915,10 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     LOG_DBG("WEB", "[UPLOAD] ERROR: handleUpload called but server not running!");
     return;
   }
+
+  // A body with no form around it: there is no upload to read, and
+  // handleUploadPost() answers "Nothing was uploaded" (requestIsMultipart).
+  if (!requestIsMultipart(*server)) return;
 
   const HTTPUpload& upload = server->upload();
 
@@ -2156,6 +2176,9 @@ void CrossPointWebServer::handleFontList() const {
 }
 
 void CrossPointWebServer::handleFontUploadData() {
+  // A body with no form around it has no upload to read (requestIsMultipart).
+  if (!requestIsMultipart(*server)) return;
+
   HTTPUpload& upload = server->upload();
 
   switch (upload.status) {
