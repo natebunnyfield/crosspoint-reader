@@ -165,6 +165,11 @@ class CrossPointWebServer {
 // into another file's entry. Mutating handlers refuse while this is true.
 bool webUploadIsWriting(const char* path);
 
+// The reply body for a request refused because webUploadIsWriting(): which
+// upload holds the name, how far it got, and when it lets go, so the caller is
+// not left guessing at a bare "Locked".
+String webUploadLockMessage();
+
 // Why the card would not create `name` in `folder`, as the reply to a failed
 // upload: a name the card cannot store (400, FsHelpers::checkFatName), a
 // folder that is not there (409), or neither, which leaves the card itself

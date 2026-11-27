@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <memory>
 #include <new>
 #include <string>
@@ -92,10 +93,37 @@ size_t wsUploadReceived = 0;
 unsigned long wsUploadStartTime = 0;
 bool wsUploadInProgress = false;
 uint8_t wsUploadClientNum = 255;  // 255 = no active upload client
+// When the active upload last had data written (or was opened). See
+// WS_UPLOAD_STALL_MS.
+unsigned long wsUploadLastDataAt = 0;
 size_t wsLastProgressSent = 0;
 String wsLastCompleteName;
 size_t wsLastCompleteSize = 0;
 unsigned long wsLastCompleteAt = 0;
+
+// A WebSocket upload that gets no data for this long is given up on: the
+// partial file is removed and its name is free again. A page whose script
+// died mid-upload, or a phone browser suspended with the tab open, keeps its
+// socket, and the device's WebSocket library never times out an established
+// connection. Until this existed, the half-written file stayed open for as
+// long as that tab did, and its name was refused on every other route: WebDAV
+// PUT (curl -T), POST /upload (curl -F) and DELETE, plus every other page's
+// START (review 2026-11-27, R-01). A healthy upload sends 4 KB frames back to
+// back, so thirty silent seconds is not a slow link.
+constexpr unsigned long WS_UPLOAD_STALL_MS = 30000;
+
+unsigned long wsUploadStallMs() {
+#ifdef SIMULATOR
+  // A host test cannot wait out thirty seconds per case.
+  static const unsigned long overrideMs = [] {
+    const char* text = std::getenv("CROSSPOINT_SIM_WS_STALL_MS");
+    const long value = text ? std::atol(text) : 0;
+    return value > 0 ? static_cast<unsigned long>(value) : 0UL;
+  }();
+  if (overrideMs > 0) return overrideMs;
+#endif
+  return WS_UPLOAD_STALL_MS;
+}
 
 String normalizeWebPath(const String& inputPath) {
   if (inputPath.isEmpty() || inputPath == "/") {
@@ -348,6 +376,25 @@ bool webUploadIsWriting(const char* path) {
   return FsHelpers::isSameOrInside(target.c_str(), path);
 }
 
+String webUploadLockMessage() {
+  // Numbers through snprintf, not String(n): the host build's String takes
+  // only a 16-bit number, and a byte count does not fit one.
+  char progress[112];
+  snprintf(progress, sizeof(progress), "%lu of %lu bytes, last data %lu s ago",
+           static_cast<unsigned long>(wsUploadReceived), static_cast<unsigned long>(wsUploadSize),
+           (millis() - wsUploadLastDataAt) / 1000UL);
+  char release[32];
+  snprintf(release, sizeof(release), "%lu s", wsUploadStallMs() / 1000UL);
+  String message = "Locked: the File Transfer page is uploading \"";
+  message += wsUploadFileName;
+  message += "\" right now (";
+  message += progress;
+  message += "). The name is free again when that upload finishes, its tab closes, or it gets no data for ";
+  message += release;
+  message += ". Retry then, or upload under another name.";
+  return message;
+}
+
 CreateFailure explainCreateFailure(const String& folder, const String& name) {
   const std::string nameProblem = FsHelpers::describeFatNameProblem(FsHelpers::checkFatName(name));
   if (!nameProblem.empty()) return {400, String(nameProblem.c_str())};
@@ -450,6 +497,25 @@ void CrossPointWebServer::handleClient() {
   // Handle WebSocket events
   if (wsServer) {
     wsServer->loop();
+  }
+
+  // Give up on a WebSocket upload that has gone silent (WS_UPLOAD_STALL_MS).
+  // After wsServer->loop(), never before it: when this task has itself been
+  // held up (a long PUT, a panel wait), frames are waiting in the socket, and
+  // the loop() above has just written one and moved the stamp.
+  if (wsUploadInProgress && millis() - wsUploadLastDataAt >= wsUploadStallMs()) {
+    const uint8_t client = wsUploadClientNum;
+    LOG_ERR("WS", "Upload stalled, giving up: %s (%u of %u bytes, no data for %lu ms)", wsUploadFileName.c_str(),
+            static_cast<unsigned>(wsUploadReceived), static_cast<unsigned>(wsUploadSize),
+            millis() - wsUploadLastDataAt);
+    abortWsUpload("WS");
+    // The page, if its script still runs, shows this and stops sending.
+    if (wsServer) {
+      char notice[80];
+      snprintf(notice, sizeof(notice), "ERROR:Upload stalled: no data for %lu s, partial file removed",
+               wsUploadStallMs() / 1000UL);
+      wsServer->sendTXT(client, static_cast<const char*>(notice));
+    }
   }
 
   // Respond to discovery broadcasts
@@ -881,6 +947,16 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     String filePath = state.path;
     if (!filePath.endsWith("/")) filePath += "/";
     filePath += state.fileName;
+
+    // The File Transfer page is writing this very name over its WebSocket.
+    // Its partial file is on the card, so the check below would answer "File
+    // already exists", which is not what is in the way (R-01).
+    if (webUploadIsWriting(filePath.c_str())) {
+      state.error = webUploadLockMessage();
+      state.errorCode = 423;
+      LOG_DBG("WEB", "[UPLOAD] Locked by a WebSocket upload: %s", filePath.c_str());
+      return;
+    }
 
     // Check if file already exists - SD operations can be slow
     resetTaskWatchdogIfSubscribed();
@@ -1948,6 +2024,7 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
 
           wsUploadClientNum = num;
           wsUploadInProgress = true;
+          wsUploadLastDataAt = millis();
           wsServer->sendTXT(num, "READY");
         } else {
           wsServer->sendTXT(num, "ERROR:Invalid START format");
@@ -1980,6 +2057,9 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
       }
 
       wsUploadReceived += written;
+      // Stamped after the write, so the card's own slowness is never counted
+      // as the sender going quiet.
+      wsUploadLastDataAt = millis();
 
       // Send progress update (every 64KB or at end)
       if (wsUploadReceived - wsLastProgressSent >= 65536 || wsUploadReceived >= wsUploadSize) {

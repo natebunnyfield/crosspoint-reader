@@ -118,7 +118,7 @@ void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
       return;
     }
     if (webUploadIsWriting(_putPath.c_str())) {
-      failPut(423, "Locked: upload in progress");
+      failPut(423, webUploadLockMessage());
       return;
     }
 
