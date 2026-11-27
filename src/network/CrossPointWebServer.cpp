@@ -147,6 +147,34 @@ bool isProtectedPath(const String& path) {
   return false;
 }
 
+// GET /upload: an upload form that runs no script, for a browser with
+// JavaScript off or a File Manager whose script does not run. B-080 was the
+// second case: the page's script failed to parse for months and every upload
+// through it was silently dead. This posts to the same POST /upload handler the
+// page falls back to and `curl -F` uses, and it is a literal here rather than a
+// file in html/ so it never passes through scripts/build_html.py, whose
+// minifier is what broke the page.
+//
+// The folder field comes BEFORE the file input, and must stay there. Browsers
+// send multipart parts in document order, and the device's parser hands the
+// upload callback only the fields it has read so far (WebServer::arg() checks
+// _postArgs while the file streams, Parsing.cpp _parseForm), so a folder field
+// after the file would arrive too late and the file would land in "/".
+constexpr char UPLOAD_FORM_HTML[] = R"(<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CrossPoint Upload</title></head><body>
+<h1>Upload a file</h1>
+<form method="post" action="/upload" enctype="multipart/form-data">
+<p><label>Folder on the card<br><input name="path" value="/" size="32"></label></p>
+<p><input type="file" name="file" required></p>
+<p><button type="submit">Upload</button></p>
+</form>
+<p>This page runs no script. The folder must already exist, and a file with the same name is not replaced.</p>
+<p><a href="/files">File Manager</a></p>
+</body></html>
+)";
+
 }  // namespace
 
 // File listing page template - now using generated headers:
@@ -223,6 +251,9 @@ void CrossPointWebServer::begin() {
 
   // Upload endpoint with special handling for multipart form data
   server->on("/upload", HTTP_POST, [this] { handleUploadPost(upload); }, [this] { handleUpload(upload); });
+  // The same upload as a plain form with no script (UPLOAD_FORM_HTML). Before
+  // addHandler(davHandler) below, which otherwise claims every GET.
+  server->on("/upload", HTTP_GET, [this] { handleUploadForm(); });
 
   // Create folder endpoint
   server->on("/mkdir", HTTP_POST, [this] { handleCreateFolder(); });
@@ -926,12 +957,18 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
   }
 }
 
+void CrossPointWebServer::handleUploadForm() const {
+  server->send_P(200, "text/html; charset=utf-8", UPLOAD_FORM_HTML, sizeof(UPLOAD_FORM_HTML) - 1);
+}
+
 void CrossPointWebServer::handleUploadPost(UploadState& state) const {
+  // charset: after the no-script form (GET /upload) this reply IS the page the
+  // browser shows, and without it a name like "Ñandú.epub" read as Latin-1.
   if (state.success) {
-    server->send(200, "text/plain", "File uploaded successfully: " + state.fileName);
+    server->send(200, "text/plain; charset=utf-8", "File uploaded successfully: " + state.fileName);
   } else {
     const String error = state.error.isEmpty() ? "Unknown error during upload" : state.error;
-    server->send(400, "text/plain", error);
+    server->send(400, "text/plain; charset=utf-8", error);
   }
 }
 
