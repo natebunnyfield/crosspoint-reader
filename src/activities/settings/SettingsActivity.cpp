@@ -129,11 +129,15 @@ void SettingsActivity::rebuildSettingsLists() {
     // appended below) and Screen Margin, which now carries STR_CAT_SYSTEM and
     // so arrives through this loop.
 #if FREEINK_DEVICE_PICCO
-    // Plus the Picco's frontlight and slide-switch rows (isPiccoDeviceRow),
-    // which arrive in getSettingsList() order after Clock UTC Offset:
+    // Plus the Picco's own rows (isPiccoDeviceRow), in getSettingsList() order.
+    // Font Size arrives FIRST, ahead of every STR_CAT_SYSTEM row: the list
+    // pushes Font Family and Font Size before anything else, and the rotate at
+    // the foot of this function then lifts it to sit under Reader Font. The
+    // frontlight and slide-switch rows arrive after Clock UTC Offset:
     // Brightness, Warmth, Frontlight, Restore Light on Wake, Slide Switch
-    // (Frontlight and Restore Light on Wake only while the switch is bound to
-    // Dark Mode, isHiddenLightRow).
+    // (Frontlight and Restore Light on Wake only while the slide switch does
+    // not own the light: bound to Dark Mode, or absent as on the desktop
+    // simulator; isHiddenLightRow).
     if (setting.category != StrId::STR_CAT_SYSTEM && !isPiccoDeviceRow(setting)) continue;
 #else
     if (setting.category != StrId::STR_CAT_SYSTEM) continue;
@@ -199,18 +203,28 @@ void SettingsActivity::rebuildSettingsLists() {
   // THE HEAD OF THE LIST, in order, and this comment is the only place it is
   // written down -- the two rows it used to name (Typing Redraw Delay, Screen
   // Margin) had both been gone for days and it sent a reader to the owner with
-  // a wrong question about ordering. As it actually stands:
+  // a wrong question about ordering. As it actually stands (2026-11-27):
   //
-  //   Reader Font        (inserted here, and it leads: font family, size,
+  //   Reader Font          (inserted here, and it leads: font family, size,
   //                         live preview -- the reading screen's own settings)
+  //   Reader Font Size     PICCO ONLY (isPiccoDeviceRow; the rotate below
+  //                         moves it here from under Typography Settings)
   //   Typography Settings  (inserted here, owner ruling 2026-08-24:
   //                         "Typography Settings should be between Text
   //                         Settings and Editing Font")
   //   Editor Font          | the STR_CAT_SYSTEM rows the shared list
-  //   Dark Mode            | contributes, in getSettingsList() order
-  //   Keyboard
-  //   Sleep Screen
-  //   Clock UTC Offset
+  //   Screen Margin        | contributes, in getSettingsList() order
+  //   Dark Mode            | (Dark Mode is dropped on the Picco while the
+  //   Text Anti-Aliasing   |  slide switch is bound to it)
+  //   Refresh Frequency    |
+  //   Keyboard             |
+  //   Sleep Screen         |
+  //   Clock UTC Offset     |
+  //   Brightness           PICCO ONLY, these five (isPiccoDeviceRow):
+  //   Warmth
+  //   Frontlight           (these two only while the slide switch does not
+  //   Restore Light on Wake  own the light, isHiddenLightRow)
+  //   Slide Switch
   //   ... then the device-only ACTIONs appended above.
   //
   // Line Grid and Justified Text used to sit between Editor Font and Dark Mode.
@@ -218,20 +232,26 @@ void SettingsActivity::rebuildSettingsLists() {
   // STR_CAT_READER now, so the loop above drops them here. This block is why
   // that had to be edited in the same commit as the move.
   //
-  // Read off a rendered Settings screen on 2026-08-24, not off this file --
-  // the loop above drops every row whose category is not STR_CAT_SYSTEM, so
+  // Read off a rendered Settings screen, not off this file -- first on
+  // 2026-08-24, and again on 2026-11-27 on the Picco build (desktop
+  // simulator_picco, a fresh card: both pages matched the list above, with
+  // Frontlight and Restore Light on Wake showing because that host has no
+  // slide switch). The X4/X3 column is the same list without the PICCO ONLY
+  // rows; that half was read off the #if blocks on 2026-11-27, not re-rendered.
+  // The loop above drops every row whose category is not STR_CAT_SYSTEM, so
   // reading getSettingsList() in order gives a longer list than the device
   // shows. Editor Font SIZE and Focus Reading are the two that look like they
   // belong here and do not: both carry STR_CAT_READER and never arrive.
   //
-  // Two rows that a reader may go looking for and will not find: Typing Redraw
-  // Delay and Screen Margin. Both were WITHDRAWN, not deleted, and both VALUES
-  // still apply -- the debounce is `static constexpr displayDebounce` at 250 ms
+  // One row that a reader may go looking for and will not find: Typing Redraw
+  // Delay. It was WITHDRAWN, not deleted, and its VALUE still applies -- the
+  // debounce is `static constexpr displayDebounce` at 250 ms
   // (CrossPointSettings.h) and still governs how long typing settles before
-  // the panel redraws; the margin persists and is card-controlled (removed
-  // 2026-08-22 by owner layout-exactness order). Their StrIds are still in the
-  // translations, along with 70-odd others, because deleting a key renumbers
-  // StrId for every language for a few bytes of flash.
+  // the panel redraws. Its StrId is still in the translations, along with
+  // 70-odd others, because deleting a key renumbers StrId for every language
+  // for a few bytes of flash. Screen Margin left this list on 2026-08-22
+  // (8f97e7184) and came back on 2026-10-08 (188a3fa2a, owner: "put the margin
+  // setting back"), which is why it is in the list above again.
   //
   // The two inserts are written back-to-front on purpose: each goes to
   // begin(), so the LAST one inserted ends up first.
