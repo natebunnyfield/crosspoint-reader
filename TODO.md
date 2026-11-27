@@ -60,8 +60,15 @@ Two consequences, neither of them work items:
 
 ## OPEN
 
-### [T-036] Menu navigation on the Picco: the choices left after the lag fix
+### [T-036] Menu navigation on the Picco: the choices left after the lag fix — CLOSED 2026-11-27, all six ruled
 **scope: list hold behavior (firmware), iOS present hold and idle slice (simulator), SSD2677 per-frame power (SDK) · opened 2026-11-27**
+
+**Closed 2026-11-27.** Rulings, each built or recorded in
+`docs/menu-nav-lag-2026-11-27.md`: O1 "Pages, no wrap" (fd49312eb); O2 "Hold
+only before gray" (5bc238009, simulator 6862b049); O3 "20 ms" (simulator
+acf338aa); O4 "Keep 55 ms" (no change); O5 "Stay powered" (freeink-sdk
+666ec93, 91e4c987c; device UNCONFIRMED); O6 "Rebuild changed rows" (simulator
+b59b6455). The original entry follows.
 
 Owner, 2026-11-27: *"fix the jumpy delay while navigating menus"*. The two
 defects behind it in the iOS app (stale beam sweeps; the whole letterpress
