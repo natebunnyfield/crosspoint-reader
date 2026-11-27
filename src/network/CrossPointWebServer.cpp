@@ -398,8 +398,13 @@ String webUploadLockMessage() {
 CreateFailure explainCreateFailure(const String& folder, const String& name) {
   const std::string nameProblem = FsHelpers::describeFatNameProblem(FsHelpers::checkFatName(name));
   if (!nameProblem.empty()) return {400, String(nameProblem.c_str())};
-  if (!folder.isEmpty() && folder != "/" && !Storage.exists(folder.c_str())) {
-    return {409, "Folder " + folder + " does not exist. Create it first, then upload"};
+  if (!folder.isEmpty() && folder != "/") {
+    if (!Storage.exists(folder.c_str())) {
+      return {409, "Folder " + folder + " does not exist. Create it first, then upload"};
+    }
+    // A URL that runs on past a file name: curl -T x.epub http://host/books/y.epub/
+    HalFile parent = Storage.open(folder.c_str());
+    if (parent && !parent.isDirectory()) return {409, folder + " is a file, not a folder"};
   }
   return {500, "Could not create the file on the card (the card may be full or failing)"};
 }

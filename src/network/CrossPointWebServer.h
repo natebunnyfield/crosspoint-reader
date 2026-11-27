@@ -172,8 +172,8 @@ String webUploadLockMessage();
 
 // Why the card would not create `name` in `folder`, as the reply to a failed
 // upload: a name the card cannot store (400, FsHelpers::checkFatName), a
-// folder that is not there (409), or neither, which leaves the card itself
-// (500). Call it AFTER the open or rename has failed.
+// folder that is not there or is a file (409), or neither, which leaves the
+// card itself (500). Call it AFTER the open or rename has failed.
 struct CreateFailure {
   int status;
   String reason;

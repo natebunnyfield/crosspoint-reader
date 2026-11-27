@@ -139,6 +139,7 @@ upload's name, review R-02):
 | `400 File name is too long: <n> characters, the card allows 255` | Over 255 UTF-16 units |
 | `400 File name is not valid UTF-8, which the card cannot store` | Raw bytes that are not UTF-8 |
 | `409 Folder <path> does not exist. Create it first, then upload` | The destination folder is missing (device; the simulator creates it instead) |
+| `409 <path> is a file, not a folder` | `path` names a file |
 | `500 Could not create the file on the card (the card may be full or failing)` | The card refused a valid name in a folder that exists |
 | `400 Failed to write to SD card - disk may be full`, `400 Failed to write final data to SD card` | A write came back short |
 
@@ -469,7 +470,7 @@ Notes:
   | Status | Reason |
   |--------|--------|
   | `405` | `<path> is a folder. To upload into it, end the URL with a slash ...` (`curl -T x.epub http://host/books`, no trailing slash) |
-  | `409` | `Folder <path> does not exist. Create it first (MKCOL), then upload` |
+  | `409` | `Folder <path> does not exist. Create it first (MKCOL), then upload`, or `<path> is a file, not a folder` (a URL that runs on past a file name) |
   | `423` | `Locked: the File Transfer page is uploading "<name>" right now ...` (see "WebSocket Upload") |
   | `400` | `File name is too long: <n> characters, the card allows 255`, refused before anything is written |
   | `400` | `File name has a character the card cannot store: ...` or `File name is not valid UTF-8 ...`, when the card refuses the name (the reserved-character case is device only) |
