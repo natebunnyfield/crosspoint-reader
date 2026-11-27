@@ -109,6 +109,11 @@ never silently cycle; the popup is what shows the user the alternative.
   used to step on release so a hold could page instead, which put the whole
   click in front of every move. Home always worked this way. The reader's front
   page turn is press-fired by the same reasoning (`ReaderUtils::detectPageTurn`).
+  **On the Picco the hold's page jumps do not wrap** (owner ruling 2026-11-27,
+  "Pages, no wrap", `docs/menu-nav-lag-2026-11-27.md` O1): the held rocker
+  keeps its whole-screen jumps but stops at the ends, sliding onto the last or
+  first row as the side-button `pageDown`/`pageUp` do
+  (`ButtonNavigator::kHoldPagingWraps`). The X4 and X3 still wrap.
 - `ActivityManager` arms `MappedInputManager::swallowUntilIdle()` on every
   activity swap: the incoming activity never sees the press/release edge that
   drove the transition. **Do not add per-activity release latches for

@@ -228,4 +228,35 @@ TEST_F(ListPaging, AHeldSideButtonDoesNotSwallowTheNextFrontStep) {
   EXPECT_EQ(steps, 1) << "the front step after a side hold must not be swallowed";
 }
 
+// THE FRONT PAIR'S HOLD (nextPageIndex / previousPageIndex). Wrapping is the
+// X4/X3 behavior; the Picco's held rocker pages but stops at the ends (owner
+// ruling 2026-11-27, "Pages, no wrap", docs/menu-nav-lag-2026-11-27.md O1),
+// sliding onto the last or first row like pageDown/pageUp. Both arms are pinned
+// here with the explicit flag, since this suite is not a Picco build.
+TEST_F(ListPaging, HoldPagingWrapsWhereWrapIsOn) {
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(17, 20, 8, /*wrap=*/true), 0) << "last page wraps to the top";
+  EXPECT_EQ(ButtonNavigator::previousPageIndex(3, 20, 8, /*wrap=*/true), 16) << "first page wraps to the last";
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(4, 5, 8, /*wrap=*/true), 0) << "one-page list wraps by row";
+}
+
+TEST_F(ListPaging, HoldPagingStopsAtTheEndsWhereWrapIsOff) {
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(3, 20, 8, /*wrap=*/false), 8) << "still a whole-screen jump";
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(8, 20, 8, /*wrap=*/false), 16);
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(16, 20, 8, /*wrap=*/false), 19) << "last page: onto the final row";
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(19, 20, 8, /*wrap=*/false), 19) << "and it stays there";
+  EXPECT_EQ(ButtonNavigator::previousPageIndex(19, 20, 8, /*wrap=*/false), 8);
+  EXPECT_EQ(ButtonNavigator::previousPageIndex(5, 20, 8, /*wrap=*/false), 0) << "first page: onto row 0";
+  EXPECT_EQ(ButtonNavigator::previousPageIndex(0, 20, 8, /*wrap=*/false), 0) << "and it stays there";
+  // A list that fits one screen steps by row and stops at both ends.
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(4, 5, 8, /*wrap=*/false), 4);
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(2, 5, 8, /*wrap=*/false), 3);
+  EXPECT_EQ(ButtonNavigator::previousPageIndex(0, 5, 8, /*wrap=*/false), 0);
+}
+
+TEST_F(ListPaging, HoldPagingDefaultMatchesTheBoard) {
+  // This suite builds without FREEINK_DEVICE_PICCO, so the default must wrap.
+  EXPECT_TRUE(ButtonNavigator::kHoldPagingWraps);
+  EXPECT_EQ(ButtonNavigator::nextPageIndex(17, 20, 8), 0);
+}
+
 }  // namespace

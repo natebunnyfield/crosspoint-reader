@@ -55,8 +55,21 @@ class ButtonNavigator final {
   [[nodiscard]] static int nextIndex(int currentIndex, int totalItems);
   [[nodiscard]] static int previousIndex(int currentIndex, int totalItems);
 
-  [[nodiscard]] static int nextPageIndex(int currentIndex, int totalItems, int itemsPerPage);
-  [[nodiscard]] static int previousPageIndex(int currentIndex, int totalItems, int itemsPerPage);
+  // Whether a held front button's page jumps wrap at the ends of a list. They
+  // do everywhere but the Picco: owner ruling 2026-11-27 ("Pages, no wrap",
+  // docs/menu-nav-lag-2026-11-27.md O1) keeps the held rocker's whole-screen
+  // jumps there but stops them at the ends, where the jump slides the selection
+  // onto the last (or first) row, as pageDown/pageUp below do.
+#if FREEINK_DEVICE_PICCO
+  static constexpr bool kHoldPagingWraps = false;
+#else
+  static constexpr bool kHoldPagingWraps = true;
+#endif
+
+  [[nodiscard]] static int nextPageIndex(int currentIndex, int totalItems, int itemsPerPage,
+                                         bool wrap = kHoldPagingWraps);
+  [[nodiscard]] static int previousPageIndex(int currentIndex, int totalItems, int itemsPerPage,
+                                             bool wrap = kHoldPagingWraps);
 
   // Side-button paging arithmetic. Distinct from nextPageIndex/previousPageIndex
   // above, which wrap and snap to the page boundary and stay wired to the front

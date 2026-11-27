@@ -112,11 +112,13 @@ int ButtonNavigator::previousIndex(const int currentIndex, const int totalItems)
   return (currentIndex + totalItems - 1) % totalItems;
 }
 
-int ButtonNavigator::nextPageIndex(const int currentIndex, const int totalItems, const int itemsPerPage) {
+int ButtonNavigator::nextPageIndex(const int currentIndex, const int totalItems, const int itemsPerPage,
+                                   const bool wrap) {
   if (totalItems <= 0 || itemsPerPage <= 0) return 0;
 
   // When items fit on one page, use index navigation instead
   if (totalItems <= itemsPerPage) {
+    if (!wrap) return currentIndex + 1 < totalItems ? currentIndex + 1 : totalItems - 1;
     return nextIndex(currentIndex, totalItems);
   }
 
@@ -127,14 +129,17 @@ int ButtonNavigator::nextPageIndex(const int currentIndex, const int totalItems,
     return (currentPageIndex + 1) * itemsPerPage;
   }
 
-  return 0;
+  // On the last page: wrap to the top, or stop on the final row.
+  return wrap ? 0 : totalItems - 1;
 }
 
-int ButtonNavigator::previousPageIndex(const int currentIndex, const int totalItems, const int itemsPerPage) {
+int ButtonNavigator::previousPageIndex(const int currentIndex, const int totalItems, const int itemsPerPage,
+                                       const bool wrap) {
   if (totalItems <= 0 || itemsPerPage <= 0) return 0;
 
   // When items fit on one page, use index navigation instead
   if (totalItems <= itemsPerPage) {
+    if (!wrap) return currentIndex > 0 ? currentIndex - 1 : 0;
     return previousIndex(currentIndex, totalItems);
   }
 
@@ -145,7 +150,8 @@ int ButtonNavigator::previousPageIndex(const int currentIndex, const int totalIt
     return (currentPageIndex - 1) * itemsPerPage;
   }
 
-  return lastPageIndex * itemsPerPage;
+  // On the first page: wrap to the last page, or stop on the first row.
+  return wrap ? lastPageIndex * itemsPerPage : 0;
 }
 
 bool ButtonNavigator::pageDown(int& index, const int totalItems, const int itemsPerPage) {
