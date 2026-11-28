@@ -151,6 +151,15 @@ recorded here instead.
   commits that only serve on-page link selection or the link stack are skipped
   on this ruling.
 
+- **TXT and Markdown through the EPUB pipeline — RULED SKIP, owner 2026-11-27.**
+  Asked "keep the fork's plain-text reader, or adopt upstream's EPUB-style
+  rendering for `.txt` and `.md`?", the owner answered "plaintext". The fork
+  keeps `TxtReaderActivity` and its wider plain-text types (json, log, csv,
+  xml, yaml). Covers `9c103c87f` (23 files; it deletes `TxtReaderActivity`).
+  Later upstream commits that only serve TXT or Markdown in the EPUB pipeline
+  are skipped on this ruling; a fix to shared layout code that happens to
+  mention Markdown is still judged on its own.
+
 ### The two currently outstanding (2026-08-03)
 
 Both are `REVIEW`, both are genuinely mixed, and neither is a drive-by:
@@ -772,16 +781,16 @@ TAKE/PARTIAL was re-checked against the code and built before keeping it. Branch
 - **SKIP (8):** `0f01106ad` (Portuguese hyphenation, fork ships en/es), `022dfed60`, `6743b6835`,
   `28132052f`, `039f03ec3`, `707625a48`, `a68548d9c`, `9ea86717b` (its Bluetooth lines would break
   `BleHidHost.cpp`).
-- **RULED SKIP (owner, 2026-11-27, both recorded in the standing rulings above):**
+- **RULED SKIP (owner, 2026-11-27, all recorded in the standing rulings above):**
   - The SD plugin system: `2600a79ea`, `5b1f0605f`, `f331030f3`, `eced576be`.
   - Links in the reader: `b88b653a7`, `e6af0c951`, `664528b28`, `099e89bcb` (and batch 4's `7bcc3a692`).
+  - TXT and Markdown through the EPUB pipeline: `9c103c87f` ("plaintext": the fork's text reader stays).
 - **NOT PORTED, needs a human look:** `e9245489f`'s separate FAT cache. It adds
   `-DUSE_SEPARATE_FAT_CACHE=1` and an SdFat pin, and changes the one-shared-cache premise of
   `scripts/patch_sdfat.py` (B-073, free clusters only after the directory entry reaches the card).
   Needs a re-derivation and a card-corruption soak first.
 - **HELD, not yet asked (one question per feature, asked by the coordinator; nothing here is ruled):**
-  1. **TXT and Markdown through the EPUB pipeline** (`9c103c87f`): render .txt/.md as EPUB-style
-     books (deletes `TxtReaderActivity`) and keep or drop the fork's wider plain-text types.
+  1. (ruled SKIP 2026-11-27: TXT and Markdown, `9c103c87f`; see above.)
   2. **Settings checkbox look** (`d1509d073`): needs SDK `toggleCheckbox` props, absent at the pin.
   3. **Paragraph indentation setting** (`458be7ed2`): Off, 1-5 spaces, overrides CSS `text-indent`;
      a page-format change.
