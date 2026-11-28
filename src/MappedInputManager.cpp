@@ -18,6 +18,17 @@
 namespace {
 // One decoder: there is one MappedInputManager and one touch panel.
 piccoinput::GestureDecoder gestureDecoder;
+// THE PICCO APP (the simulator's iOS build) carries the X3's side pair on two
+// host-only button slots, HalGPIO::BTN_HOST_SIDE_UP / _DOWN, which its gesture
+// actions Up and Down press (owner 2026-11-27: "add the option for up and down
+// buttons to be in there (for font size and selection)"). The device has no
+// such keys and no such slots: false here, so rockerRoute never answers
+// HostSidePair and Up, Down and the page buttons still route to nothing.
+#if defined(SIMULATOR)
+constexpr bool kHostSidePair = true;
+#else
+constexpr bool kHostSidePair = false;
+#endif
 }  // namespace
 #endif
 
@@ -66,13 +77,24 @@ bool MappedInputManager::mapButton(const Button button, const std::function<bool
   // The rocker is Right (upper end) and Left (lower end) on every screen, and
   // sends nothing else: no Up/Down, no page buttons (owner 2026-11-06). Back,
   // Confirm and Power take the shared mapping below.
-  switch (piccoinput::rockerRoute(button)) {
+  switch (piccoinput::rockerRoute(button, kHostSidePair)) {
     case piccoinput::Route::RockerUpper:
       return fn(HalGPIO::BTN_UP);
     case piccoinput::Route::RockerLower:
       return fn(HalGPIO::BTN_DOWN);
     case piccoinput::Route::None:
       return false;
+    case piccoinput::Route::HostSidePair: {
+#if defined(SIMULATOR)
+      // The X3's side pair, as the X3 maps it (the shared switch below), on
+      // the app's host-only slots. Reached only in the Picco app.
+      const auto key = piccoinput::hostSideKey(button, SETTINGS.sideButtonLayout == CrossPointSettings::NEXT_PREV,
+                                               SETTINGS.sideButtonLayout == CrossPointSettings::SIDE_BUTTONS_DISABLED);
+      if (key == piccoinput::SideKey::Upper) return fn(HalGPIO::BTN_HOST_SIDE_UP);
+      if (key == piccoinput::SideKey::Lower) return fn(HalGPIO::BTN_HOST_SIDE_DOWN);
+#endif
+      return false;
+    }
     case piccoinput::Route::Unchanged:
       break;
   }

@@ -60,6 +60,73 @@ TEST(PiccoRocker, ExactlySixButtonsComeFromTheRocker) {
 }
 
 // ---------------------------------------------------------------------------
+// The X3's side pair, in the Picco APP only (owner 2026-11-27: "add the
+// option for up and down buttons to be in there (for font size and
+// selection)"). The iOS Picco app's gesture actions Up and Down press the X3's
+// side keys, carried on host-only slots; the device never asks for them, so
+// the default answer below must stay the device's.
+// ---------------------------------------------------------------------------
+
+TEST(PiccoHostSidePair, TheDeviceStillRoutesUpDownAndPagesToNothing) {
+  for (const Button b : {Button::Up, Button::Down, Button::ScreenUp, Button::ScreenDown, Button::PageBack,
+                         Button::PageForward, Button::PageNext, Button::PagePrevious}) {
+    EXPECT_EQ(piccoinput::rockerRoute(b, /*hostSidePair=*/false), Route::None) << static_cast<int>(b);
+  }
+}
+
+TEST(PiccoHostSidePair, TheAppSendsExactlyTheX3SidePairButtonsToIt) {
+  int sidePair = 0;
+  for (int i = 0; i <= static_cast<int>(Button::ScreenDown); ++i) {
+    const auto b = static_cast<Button>(i);
+    const Route device = piccoinput::rockerRoute(b, false);
+    const Route app = piccoinput::rockerRoute(b, true);
+    if (device == Route::None) {
+      EXPECT_EQ(app, Route::HostSidePair) << i;
+      ++sidePair;
+    } else {
+      // The rocker, Back, Confirm and Power are the same on device and in the app.
+      EXPECT_EQ(app, device) << i;
+    }
+  }
+  EXPECT_EQ(sidePair, 8);
+}
+
+// MappedInputManager::mapButton's X3 table for BTN_UP / BTN_DOWN, the side
+// pair: Up and ScreenUp are the upper key, Down and ScreenDown the lower; the
+// page buttons follow sideButtonLayout exactly as the shared mapping does.
+TEST(PiccoHostSidePair, WhichSideKeyFollowsTheX3Table) {
+  using piccoinput::SideKey;
+  // PREV_NEXT, the shipped layout (CrossPointSettings::sideButtonLayout).
+  EXPECT_EQ(piccoinput::hostSideKey(Button::Up, false, false), SideKey::Upper);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::ScreenUp, false, false), SideKey::Upper);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::Down, false, false), SideKey::Lower);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::ScreenDown, false, false), SideKey::Lower);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageBack, false, false), SideKey::Upper);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageForward, false, false), SideKey::Lower);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PagePrevious, false, false), SideKey::Upper);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageNext, false, false), SideKey::Lower);
+  // NEXT_PREV swaps the four page buttons and nothing else.
+  EXPECT_EQ(piccoinput::hostSideKey(Button::Up, true, false), SideKey::Upper);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::Down, true, false), SideKey::Lower);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageBack, true, false), SideKey::Lower);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageForward, true, false), SideKey::Upper);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PagePrevious, true, false), SideKey::Lower);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageNext, true, false), SideKey::Upper);
+  // SIDE_BUTTONS_DISABLED withdraws PageBack/PageForward only; PageNext and
+  // PagePrevious keep the natural order (MappedInputManager.cpp, PageNext).
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageBack, false, true), SideKey::None);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageForward, false, true), SideKey::None);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PageNext, false, true), SideKey::Lower);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::PagePrevious, false, true), SideKey::Upper);
+  EXPECT_EQ(piccoinput::hostSideKey(Button::Up, false, true), SideKey::Upper);
+  // Never a rocker, front or Power button.
+  for (const Button b : {Button::Back, Button::Confirm, Button::Left, Button::Right, Button::Power, Button::NavNext,
+                         Button::NavPrevious, Button::ScreenLeft, Button::ScreenRight}) {
+    EXPECT_EQ(piccoinput::hostSideKey(b, false, false), SideKey::None) << static_cast<int>(b);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Gestures
 // ---------------------------------------------------------------------------
 

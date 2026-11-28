@@ -38,14 +38,25 @@ using Button = MappedInputManager::Button;
 // Where a logical button comes from on the Picco. Unchanged = the shared
 // mapping in MappedInputManager::mapButton (Back, Confirm and Power: the
 // settings-driven front indices and BTN_POWER, so GPIO5 stays Confirm).
-enum class Route : uint8_t { Unchanged, RockerUpper, RockerLower, None };
+// HostSidePair: the Picco APP only (the simulator's iOS build, see
+// hostSideKey below). The device never asks for it, so it never sees it.
+enum class Route : uint8_t { Unchanged, RockerUpper, RockerLower, None, HostSidePair };
 
 // NavNext/NavPrevious and the four Screen* directions are resolved here rather
 // than through mapButton's recursion. The two are the same today:
 // isNavDirectionSwapped() is constant false and mapScreenDirection() is the
 // identity in portrait (MappedInputManager.cpp:12-41), which is the only
 // orientation the Picco's UI draws in.
-constexpr Route rockerRoute(const Button button) {
+//
+// `hostSidePair` is true only in the Picco APP (FREEINK_DEVICE_PICCO plus
+// SIMULATOR, MappedInputManager.cpp kHostSidePair). There the eight buttons
+// the rocker does not send go to the X3's side pair instead of nowhere, on
+// host-only slots the iOS app's gesture actions Up and Down press (owner
+// 2026-11-27: "add the option for up and down buttons to be in there (for
+// font size and selection)"). The rocker, Back, Confirm and Power are the
+// same either way, and the device passes false, so it still routes them to
+// None.
+constexpr Route rockerRoute(const Button button, const bool hostSidePair = false) {
   switch (button) {
     case Button::Right:
     case Button::NavNext:
@@ -63,13 +74,47 @@ constexpr Route rockerRoute(const Button button) {
     case Button::PageForward:
     case Button::PageNext:
     case Button::PagePrevious:
-      return Route::None;
+      return hostSidePair ? Route::HostSidePair : Route::None;
     case Button::Back:
     case Button::Confirm:
     case Button::Power:
       return Route::Unchanged;
   }
   return Route::Unchanged;
+}
+
+// --- The X3's side pair, in the Picco app ----------------------------------
+
+// Which X3 side key a logical button reads where rockerRoute answered
+// HostSidePair: MappedInputManager::mapButton's X3 table for BTN_UP (upper)
+// and BTN_DOWN (lower), restated here so it is pure and tested
+// (test/picco_input). Up and ScreenUp are the upper key, Down and ScreenDown
+// the lower; the four page buttons follow sideButtonLayout as the shared
+// mapping does: `nextPrev` is NEXT_PREV (the pair swapped), `sideDisabled` is
+// SIDE_BUTTONS_DISABLED, which withdraws PageBack/PageForward only.
+enum class SideKey : uint8_t { None, Upper, Lower };
+
+constexpr SideKey hostSideKey(const Button button, const bool nextPrev, const bool sideDisabled) {
+  switch (button) {
+    case Button::Up:
+    case Button::ScreenUp:
+      return SideKey::Upper;
+    case Button::Down:
+    case Button::ScreenDown:
+      return SideKey::Lower;
+    case Button::PageBack:
+      if (sideDisabled) return SideKey::None;
+      return nextPrev ? SideKey::Lower : SideKey::Upper;
+    case Button::PageForward:
+      if (sideDisabled) return SideKey::None;
+      return nextPrev ? SideKey::Upper : SideKey::Lower;
+    case Button::PageNext:
+      return nextPrev ? SideKey::Upper : SideKey::Lower;
+    case Button::PagePrevious:
+      return nextPrev ? SideKey::Lower : SideKey::Upper;
+    default:
+      return SideKey::None;
+  }
 }
 
 // --- Gestures ---------------------------------------------------------------
