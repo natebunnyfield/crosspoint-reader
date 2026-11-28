@@ -692,7 +692,8 @@ Measured at: firmware `origin/main` `f42b03cae`, `upstream/develop` `dd86a5ec1`
 
 **Where the campaign stands.** No batch followed batch 5. Since 2026-11-08 no
 commit on `main` carries a `cherry picked from` line, and one names an upstream
-port by hand (`082eedf9b`XX). Batch 6 still starts after `fca8f55f5`.
+port by hand (`082eedf9b`, 2026-11-25, the Picco header back button, from
+`720b995a5` with `ce9f5c28e`). Batch 6 still starts after `fca8f55f5`.
 
 | | count |
 |---|---|
