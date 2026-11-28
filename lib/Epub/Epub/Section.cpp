@@ -316,7 +316,13 @@ namespace {
 // SpacedSignWhite.h). Word positions in any line holding a spaced
 // + − × ÷ = < > and kin (not the hyphen-minus or the slash) move by a pixel or
 // two, and a cached section keeps the old ones.
-constexpr uint8_t SECTION_FILE_VERSION = 79;
+// v80: upstream 794ac97f4 (#3700). Hangul words are one token each and wrap at
+// spaces (CSS word-break: keep-all); with hyphenation on a Hangul word may also
+// split at a line end wherever the CJK boundary rules allow, with no hyphen
+// drawn (ParsedText's hangulLineEndBreaks, in the greedy and the Knuth-Plass
+// breaker alike). Justification stretches only word spaces. Line breaks and
+// word positions of Korean text move; the binary layout does not.
+constexpr uint8_t SECTION_FILE_VERSION = 80;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

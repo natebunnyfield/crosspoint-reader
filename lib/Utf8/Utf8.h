@@ -50,6 +50,16 @@ inline bool utf8IsCjkBreakable(const uint32_t cp) {
          || (cp >= 0x2A700 && cp <= 0x2B73F);  // CJK Extension C
 }
 
+// Returns true for Hangul letters. Korean separates words with spaces, so a boundary touching
+// Hangul is never an implicit line-break opportunity (CSS word-break: keep-all).
+inline bool utf8IsHangul(const uint32_t cp) {
+  return (cp >= 0x1100 && cp <= 0x11FF)      // Hangul Jamo
+         || (cp >= 0x3130 && cp <= 0x318F)   // Hangul Compatibility Jamo
+         || (cp >= 0xA960 && cp <= 0xA97F)   // Hangul Jamo Extended-A
+         || (cp >= 0xAC00 && cp <= 0xD7FF)   // Hangul Syllables, Hangul Jamo Extended-B
+         || (cp >= 0xFFA0 && cp <= 0xFFDC);  // Halfwidth Hangul
+}
+
 // Returns true for any codepoint in a CJK script block (Han, Kana, Hangul, Bopomofo,
 // radicals, and CJK punctuation/compatibility/enclosed forms). Used for fallback font
 // selection — deliberately broader than utf8IsCjkBreakable, whose ranges are tuned to

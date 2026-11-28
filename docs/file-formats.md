@@ -173,6 +173,8 @@ before relying on any of them for a field layout:
 | 76 | fork, guard from upstream `da3d50c24` (campaign 2026-11-08) | **layout**: a skipped (display:none / `hidden`) element's close no longer pops its container's block style, table or list state |
 | 77 | upstream `2b2ba72f0` (#3500, campaign 2026-11-08) | **layout**: `list-style-type: none` / `list-style: none` on a list drops its items' markers and hanging gutter; paired with CSS cache v12 |
 | 78 | upstream `f4b4ff06c` (#3585, campaign 2026-11-08) | **layout**, SD fonts: a space measured during a partial cache miss used 0 px; it falls back to the glyph advance now |
+| 79 | fork (see the `v79` comment above `SECTION_FILE_VERSION`) | **layout**: a space beside a lone math sign is set for equal drawn white on both sides of the sign; word positions in such lines move by a pixel or two |
+| 80 | upstream `794ac97f4` (#3700, campaign 2026-11-27) | **layout**, Korean: a Hangul word is one token and wraps at spaces (keep-all); with hyphenation on it may also split at a line end where the CJK boundary rules allow, no hyphen drawn, in the greedy and the Knuth-Plass breaker alike; justification stretches only word spaces. Binary layout unchanged |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
