@@ -452,30 +452,61 @@ Fix: under MAXIMUM (Metal, the phone) the trail is drawn over the whole glass du
 
 ### R-38 Each new deposit turns every older ghost back from the tail tint to the ink color
 
-**status: FIXED** (sim 0b818b49, ce1bd26b) · sim `src/TrailLayers.h`, `src/HalDisplay.cpp`
+**status: FIXED** (sim 0b818b49, ce1bd26b, then 3e8c8c82 after an independent review found three defects in the first version) · sim `src/TrailLayers.h`, `src/HalDisplay.cpp`
 
 Owner ruling 2026-11-27, relayed: *"Fix it"*, on the offer of two accumulators (one for the newest deposit, one for the older trail, each fading and tinted by its own age; cost one more screen-sized texture and one more draw per present while a trail is live).
 
 Seen in the same dump runs, both arms. The cascade tail's color ramp is one color multiply over the whole accumulator, driven by the age of the NEWEST deposit (`age = now - accumLastAddMs`, :4781). A deposit resets that age to 0, so every older ghost still in the buffer jumps from the dim tail tint back to the full ink color. In the fixed run the cover ghost strip went 29.6 (#6, dim red) -> 48.0 (#7, gray) at the present where the next frame was deposited; the deposited frame does not contain the cover. Preset 0 ships with a tail (`[glow] preset 0 -> 1095 ms trail, tail yes`). The code's own comment at :4755-4762 marks this as an approximation and names the exact fix: two accumulators running at the two layers' decay rates. This is probably part of the recording's "ghost back" at frame 458, but that was not checked against the recording. Not built: it is an architecture choice (a second output-sized accumulator, its memory and its draw), which goes to the owner first. (That paragraph is the finding as written before the ruling; the line numbers are at sim 3e35db04.)
 
-**What was built.** Two layers, decided by `src/TrailLayers.h` (pure) and drawn by `HalDisplay.cpp`. With a cascade tail, `youngTexture` holds light still handing over from ink to tail, on one clock, drawn at `rampT(its age)`. `accumTexture` becomes the settled layer: light whose handover is complete, drawn at the tail, which is exact for everything in it whatever its age. Young light moves into settled the present its ramp ends (400 ms on the shipped mix), where both layers draw the same color. Without a tail the young layer is never created and `accumTexture` is the single accumulator unchanged. Both blend paths keep their arithmetic: on Metal each layer composites MAXIMUM; on SDL's software renderer each layer composites ADD at alpha 96, and settling moves the light whole (ADD at 255), so the layers' sum equals the old sum.
+**What was built first (0b818b49, ce1bd26b), and why it was wrong.** A young layer drawn at its own age and a settled layer drawn at the tail. A deposit landing mid-ramp either joined the young layer (starting at that layer's t) or settled the young light early (its t jumping to 1). An independent read-only review found three defects, all reproduced by the test below before the fix:
+1. Joining drew a NEW deposit at the young layer's t. In a channel where the tail is brighter than the ink (P7 "Cascade" green, C4C6FF to 69FF87; P14 "Cascade Orange" red; P17 "Cascade Yellow" red and green), the deposit came out brighter than the frame it came from. That broke 2974e0d2's guarantee: under MAXIMUM, during a sweep, the un-swept old page brightened (P7: C4C6FF to C4E2FF for 55 ms).
+2. Settling early jumped young light to the tail, raising those same channels above the ghost's own ramp (P7, deposits at 16 and 1600 ms: MAXIMUM 64.161 -> 70.215).
+3. On the ADD fallback each layer capped at 255 on its own, so the sum reached about 510 where the single accumulator capped at 255.
 
-**The one approximation, and its bound.** A deposit that lands while the young layer is mid-ramp would need a third layer for exactness. With two, the new light either joins the young layer (it starts at that layer's t) or the young light settles early (its t jumps to 1), whichever misplaces light less on the ramp, so at most half the ramp. Both choices only move light FORWARD toward the tail. Neither raises a ghost's level or moves its tint back toward the ink, and that is what the test asserts. Isolated fades, and deposits landing after the young ramp has ended, are exact. This differs from the offer as relayed: the offer did not say what age the older layer's tint follows. Any single age for a layer holding light of several ages moves some of that light backward, so the older layer here holds only fully handed-over light and is drawn at the tail.
+The header's claim that neither choice could raise a channel was false for those three presets: it held only where every channel falls toward the tail, as on the shipped mix.
+
+**What is built now (3e8c8c82).**
+- **Every deposit goes into the settled layer** (`accumTexture`), so its intensity is the single accumulator exactly, cap and all, on both blend paths, and `accumPeakBound` bounds everything again.
+- **The young layer** (`youngTexture`) holds only recent light. It is used only with a tail, and only when a deposit lands while older light is still visible. An isolated fade never creates it and is drawn exactly as before, at exactly the old cost.
+- **Each layer is drawn, per channel, at the smaller end of the ramp over the span of deposits it holds** (`spanMod`). The ramp is linear in t, so that end is the minimum. Nothing is drawn brighter than its own ramp, whether a channel falls toward the tail or rises toward it.
+- **Composite:** on Metal, MAX(settled, young); on the ADD fallback, settled plus only the young layer's excess over settled's multiply. Either way no pixel is brighter than the single accumulator drew it.
+- **Events never raise a channel.** A deposit can only lower a span's young end. Starting the young layer over leaves its old light to settled's wider span, which draws it no brighter. The young layer is dropped only when its span has reached settled's older end, where both draw the same.
+- **When the palette has no tail**, the young texture is destroyed.
+- **No third texture was needed.** The coordinator's brief allowed one, created only for non-monotone ramps, within the owner's "Fix it" ruling. The span rule makes two enough.
+
+**What remains approximate.** Light that shares a span with younger light is drawn toward the younger end in a channel that rises along the ramp, and toward the older end in one that falls. It is always darker than exact, never brighter. On the shipped mix, every channel falls toward the tail. There the young layer gives the newest deposit its exact color, and the older light is exact too while it is the oldest in settled. On P7/P14/P17, an older ghost's rising channel is held at the newest deposit's ramp position while it shares settled with that deposit, and creeps back toward its own ramp as both age. This is a dip and recovery, never above its own ramp. Exactness there would take a layer per deposit clock.
+
+**Minors from the review.**
+- The young texture outliving a switch to a palette with no tail: fixed (it is destroyed).
+- The settled layer closing early on no-tail palettes under ADD: gone (settled is the single accumulator again, faded every present, never closed).
+- A switch from no tail to a tail mid-trail: not changed. Each layer then takes the new ramp at its span's ages. That is a palette change, and the light is recolored by the palette that is live.
 
 *Evidence:*
-- `tests/trail_layers_test.cpp` (new, in `tests/run_all.sh` as `trail_layers`) drives the real decisions through a per-pixel model of fade, deposit, settle and composite on both blend paths. Against the single-accumulator decision it fails: `ghost rose at 160 ms, channel 0: 131.424 -> 152.937`, `trail_layers_test: 11 check(s) FAILED`, exit 1. After: `trail_layers_test: all checks passed`, exit 0. It also pins that an isolated fade's level and color multiply equal the single accumulator's at every present on both paths.
-- `tests/run_all.sh -k` trail_layers, trail_lifetime, glass_capture, present_hold, letterpress_dirty, scanlines_dirty, frontlit_page (+ frontlit_page_sleep), and the five tests that read `HalDisplay.cpp` as text (font_resize_wiring, field_selection, composition, panel_palette, paper_defects): all PASS.
-- `pio run -e simulator_picco`: SUCCESS (one warning, the older `%u` at the `[present]` log). iOS Simulator Release xcodebuild: BUILD SUCCEEDED.
-- iOS Simulator, iPhone 17 Pro, Release Picco app, dark Home list, rocker presses at 4000/4250/4500/4750 ms, frame dumps. Cover-ghost strip luma (x 150-400, y 465-540; bare page about 26.8), `*` = a new deposit landed on that present:
-  - Before (sim 3e35db04): #5 45.4, #6 29.0, #7 28.1, **#8 43.7\***, #9 33.4, #10 27.2. The ghost jumps from the tail back to the ink.
-  - After: #5 42.8, #6 28.9, **#7 27.0\***, #8 26.9, #9 26.9, #10 26.9. It keeps fading.
-  - In this run the second deposit landed after the young ramp had ended (the exact case); the mid-ramp case was exercised only by the host test.
-- Desktop ADD path, `simulator_picco` headless (`CROSSPOINT_SIM_AS_SHIPPED=1`, dark card, the same four presses): `[accum] composite blend: ADD fallback`, and the cover ghost never rises at a deposit (29.29 -> 27.42 across the deposit at 4268 ms). At each deposit present it dips to the bare page for one present, which is R-37's clip kept by design on ADD, not this change.
-- clang-format 21.1.8: the new files are formatted (LLVM style, the simulator has no `.clang-format`); the changed `HalDisplay.cpp` lines stay within 80 columns, as the file is written.
+- **Against 0b818b49 (before the fix).** The same properties were run against the committed decision over every tailed case: 24 failures. Examples:
+  - `P7 MAX: deposit at 160 ms drawn brighter than its source, channel 1: 201 > ink 198`
+  - `P7 MAX: ghost above its own ramp at 1600 ms, channel 1: 70.228 > 63.343`
+  - `P7 ADD: layers above the single accumulator at 1600 ms, channel 1: 38.016 > 35.791`
+  - `shipped mix ADD: layers above the single accumulator at 304 ms, channel 0: 82.197 > 77.929`
+- **`tests/trail_layers_test.cpp` (3e8c8c82)** runs over every afterglow row of the preset table, resolved as `ios/CrossPointIOSShim.cpp` pushes it (dark ink, afterglow, whole-trail ramp: P7, P14, P17), plus the shipped mix. It uses five deposit schedules on both blend paths and checks, every present:
+  - no pixel lit only by the newest deposit is brighter than its source;
+  - no ghost is above its own ramp;
+  - no ghost brightens at a deposit;
+  - dropping the young layer changes no pixel;
+  - nothing exceeds the single accumulator (the ADD cap).
 
-*Cost.* One more output-sized ARGB texture (1206x2622, 12.6 MB on the iPhone 17 Pro), created only while a tail is live. Per present, one fill and one draw per layer that holds light: an isolated fade uses one layer at a time, as before. The `[timing]` accum bucket (CPU: fades, deposit, settle) read 0.37-0.45 ms per present before, and 0.35-0.44 ms after while one layer was live, 0.48-0.62 ms while both were. The extra composite draw sits in no timing bucket, and the GPU time was not measured (each present's total in these runs is dominated by the 13 MB frame dump).
+  It also pins that an isolated fade's multiply equals the single accumulator's at every present. Result: `trail_layers_test: all checks passed`. Five mutations of the decision were tried: spans at the newest end only, spans at the oldest end only, ADD adding the young layer's whole multiply, never starting the young layer over, and dropping it early. Every mutation fails the test except "never starts over", which is a policy choice that is equally safe by design.
+- `tests/run_all.sh -k` all PASS: trail_layers, trail_lifetime, glass_capture, present_hold, letterpress_dirty, scanlines_dirty, frontlit_page (+ frontlit_page_sleep), font_resize_wiring, field_selection, composition, panel_palette, paper_defects.
+- `pio run -e simulator_picco`: SUCCESS (the one warning is the older `%u`). iOS Simulator Release: BUILD SUCCEEDED.
+- **Desktop ADD path**, headless, as shipped, dark Home list, four presses: the cover ghost read 29.01 before the deposit at 4262 ms and at most 27.45 after it. That excludes the one-present dip to the bare page, which is R-37's ADD clip.
+- **iOS Simulator strips** (from ce1bd26b; not re-run): cover-ghost luma before 28.1 -> **43.7** at the deposit, after 28.9 -> **27.0**. The shipped mix's look in that run is unchanged by 3e8c8c82. Its channels all fall toward the tail, and the second deposit there landed after the young ramp had ended. In that case the old young layer and the new spans give the same color to every light: the first deposit at the tail, the second exact through the young layer.
 
-*Unconfirmed:* the look on the owner's iPhone, and the mid-ramp case on any real screen.
+*Cost.*
+- **Isolated fade:** identical to before R-38 (one texture filled, one drawn, no young texture).
+- **When a deposit lands over visible older light with a tail live:** one more output-sized texture (12.6 MB on an iPhone 17 Pro), one more fill and one more draw per present while it holds light, and one more deposit draw per deposit.
+- **Merge draws:** none. The first version drew one per settle; the young layer is now just dropped.
+- **Measured:** the CPU timing bucket was measured on ce1bd26b (0.37-0.45 ms per present before R-38, 0.48-0.62 ms with both layers live). It was not re-measured on 3e8c8c82, whose per-present work is the same or less. GPU time was not measured.
+
+*Unconfirmed:* the look on the owner's iPhone, and the mid-ramp case and the P7/P14/P17 behavior on any real screen.
 
 ### R-33: seen on the iOS Simulator
 
