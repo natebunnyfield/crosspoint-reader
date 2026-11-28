@@ -91,6 +91,20 @@ If you are unsure whether your idea falls into one of these categories, open a D
 > **Fork divergence from the two bullets above.** The note editor and Claude
 > chat ship on device in this fork. See the fork note at the top of this file.
 
+### CrossPoint as a downstream foundation
+
+CrossPoint is also used as a foundation for downstream forks with different
+product goals. Supporting that ecosystem does not expand CrossPoint's own
+product scope, but narrowly scoped, product-neutral improvements to existing
+low-level infrastructure may still be accepted when they are broadly reusable
+and do not impose substantial new dependencies, resource cost, or maintenance
+burden on CrossPoint itself.
+
+Downstream-specific UI, policy, workflows, and feature semantics remain out of
+scope. If a reusable primitive cannot be cleanly separated from the downstream
+feature that needs it, that work belongs in the downstream fork unless
+CrossPoint independently chooses to adopt it.
+
 ## 5. Calls to Action
 
 These are the areas where contributor help is most valuable right now. If you want to take one of these on, open a Discussion or issue first so we can coordinate.
