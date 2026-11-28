@@ -517,7 +517,7 @@ When using **Cover** or **Cover + Custom**, two additional settings apply:
 
 To use custom sleep images, set the sleep screen mode to **Custom** or **Cover + Custom**, then place images on the SD card:
 
-- **Multiple Images (recommended):** Create a `.sleep` directory in the root of the SD card and place any number of `.bmp` images inside. One will be randomly selected each time the device sleeps. (A directory named `sleep` is also accepted as a fallback.)
+- **Multiple Images (recommended):** Create a `.sleep` directory in the root of the SD card and place any number of `.bmp` images inside. One will be randomly selected each time the device sleeps, and every image is shown once, in shuffled order, before any repeats. (A directory named `sleep` is also accepted; images in both directories share one pool.)
 - **Device-Specific Image:** Place `sleep_<id>.bmp` in the root directory, where `<id>` is the unit's 6-character Device ID shown on the File Transfer screen (also in the web interface's status info). The ID is derived from the device's factory MAC address (the last 3 bytes as lowercase hex), so it is permanent and unique per physical unit — even two devices of the same model — letting one SD-card tree serve a whole family of readers. A device-specific file takes priority over `sleep.bmp`.
 - **Single Image:** Place a file named `sleep.bmp` in the root directory. This takes priority over the `.sleep`/`sleep` directories.
 - **No images at all:** the device falls back to the calendar sleep screen (on hardware with a real-time clock; otherwise the default logo screen).
@@ -526,7 +526,7 @@ To use custom sleep images, set the sleep screen mode to **Custom** or **Cover +
 
 To use transparent sleep overlays, set the sleep screen mode to **Transparent**, then place BMP or PNG files on the SD card:
 
-- **Multiple Images (recommended):** Create a `.sleep-overlay` directory in the root of the SD card and place any number of valid overlay `.bmp` or `.png` images inside. One will be randomly selected each time the device sleeps. A directory named `sleep-overlay` is also accepted as a fallback.
+- **Multiple Images (recommended):** Create a `.sleep-overlay` directory in the root of the SD card and place any number of valid overlay `.bmp` or `.png` images inside. One will be randomly selected each time the device sleeps, and every image is shown once before any repeats. A directory named `sleep-overlay` is also accepted; images in both directories share one pool.
 - **Single Image:** Place `sleep-overlay.bmp` or `sleep-overlay.png` in the root directory. A root BMP takes priority over a root PNG, and both take priority over the `.sleep-overlay`/`sleep-overlay` directories.
 
 Transparent overlay files are intentionally separate from normal sleep images. Regular BMP formats supported by CrossPoint are accepted; white pixels leave the existing screen unchanged. For per-pixel alpha transparency, use a PNG with an alpha channel or a 32-bit BGRA BMP with both visible and non-opaque pixels. Opaque white pixels in alpha images erase the content behind them.
