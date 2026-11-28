@@ -177,6 +177,7 @@ before relying on any of them for a field layout:
 | 80 | upstream `794ac97f4` (#3700, campaign 2026-11-27) | **layout**, Korean: a Hangul word is one token and wraps at spaces (keep-all); with hyphenation on it may also split at a line end where the CJK boundary rules allow, no hyphen drawn, in the greedy and the Knuth-Plass breaker alike; justification stretches only word spaces. Binary layout unchanged |
 | 81 | upstream `d5693c321` (#3875, campaign 2026-11-28) | **layout**: a paragraph soft-flushed mid-way keeps its continuity: no second first-line indent (negative indents included), and the block's top margin/padding is spent once, before its first line, through the page-top rule, the half-line gap cap and the Line Grid. Pages of long paragraphs move; binary layout unchanged |
 | 82 | upstream `9dfa92ba2` (#3883, campaign 2026-11-28) | **layout**: a word holding a visible hyphen or dash (`well-known`, `foo—bar`) is split into tokens after each hyphen/dash run, attached when they share a line and free to break between, with hyphenation on or off. Binary layout unchanged |
+| 83 | upstream `7394e40fa` (#3882, owner ruling "take" 2026-11-28) | **layout**: a solid block symbol (U+2588, U+25A0) the reading face lacks advances by the face's em width instead of the replacement glyph's; the page draws it as a filled rectangle. Binary layout unchanged |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

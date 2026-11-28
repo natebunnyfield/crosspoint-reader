@@ -30,6 +30,11 @@ class EpdFontFamily {
   /// See EpdFont::getGlyph -- `source` reports whether this is the codepoint's
   /// own glyph or a substitute for one the face has no shape for.
   const EpdGlyph* getGlyph(uint32_t cp, Style style = REGULAR, GlyphSource* source = nullptr) const;
+  /// See EpdFont::getGlyphMetrics -- a missing solid block symbol comes back as `solidFallback`.
+  const EpdGlyph* getGlyphMetrics(uint32_t cp, EpdGlyph& solidFallback, Style style = REGULAR,
+                                  GlyphSource* source = nullptr) const {
+    return getFont(style)->getGlyphMetrics(cp, solidFallback, source);
+  }
   /// Returns true if the resolved style's font can render `cp` directly
   /// (interval coverage only — see EpdFont::hasCodepoint).
   bool hasCodepoint(uint32_t cp, Style style = REGULAR) const;

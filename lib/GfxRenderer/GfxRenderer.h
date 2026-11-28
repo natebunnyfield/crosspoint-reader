@@ -593,6 +593,8 @@ class GfxRenderer {
                        bool roundTopRight, bool roundBottomLeft, bool roundBottomRight, bool state) const;
   void maskRoundedRectOutsideCorners(int x, int y, int width, int height, int radius, Color color = Color::White) const;
   void fillRect(int x, int y, int width, int height, bool state = true) const;
+  // A solid block symbol the reading font lacks: fillRect() without the text-only gate (see the .cpp).
+  void fillGlyphRect(int x, int y, int width, int height, bool state) const;
   void fillRectDither(int x, int y, int width, int height, Color color) const;
   void fillRoundedRect(int x, int y, int width, int height, int cornerRadius, Color color) const;
   void fillRoundedRect(int x, int y, int width, int height, int cornerRadius, bool roundTopLeft, bool roundTopRight,

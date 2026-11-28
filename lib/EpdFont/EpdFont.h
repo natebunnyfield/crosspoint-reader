@@ -23,6 +23,14 @@ class EpdFont {
   /// the same either way by construction.
   const EpdGlyph* getGlyph(uint32_t cp, GlyphSource* source = nullptr) const;
 
+  /// Like getGlyph(), but supplies metrics for a missing solid block symbol (U+2588 FULL BLOCK,
+  /// U+25A0 BLACK SQUARE): the codepoint is drawn as a filled rectangle sized to this font's em
+  /// width and ascender instead of the replacement glyph. When the returned pointer is
+  /// &solidFallback, fill a rectangle of its width x height at its left/top; it has no bitmap. The
+  /// caller owns the storage (a stack local), so this is safe from any task. A font that DOES carry
+  /// the symbol returns its own glyph, and a block is never counted as a missing glyph.
+  const EpdGlyph* getGlyphMetrics(uint32_t cp, EpdGlyph& solidFallback, GlyphSource* source = nullptr) const;
+
   /// Returns true if this font covers `cp`: either via its in-RAM interval
   /// table or, for SD card fonts, via the coverageHandler that consults the
   /// full RAM-resident coverage index. Unlike getGlyph(), it never performs

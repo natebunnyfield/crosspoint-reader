@@ -334,7 +334,12 @@ namespace {
 // ("well-known", "foo\xe2\x80\x94bar") is split into tokens at each hyphen/dash run, attached
 // (no space) when they share a line and free to break between, whether or not
 // hyphenation is on. Line breaks of such text move; the binary layout does not.
-constexpr uint8_t SECTION_FILE_VERSION = 82;
+// v83: upstream 7394e40fa (#3882), owner ruling "take" 2026-11-28. A solid block
+// symbol (U+2588 FULL BLOCK, U+25A0 BLACK SQUARE) the reading face lacks has the
+// advance of the face's em width instead of the replacement glyph's, so every line
+// that held one measures, and breaks, differently. A face that carries the symbol is
+// unchanged. Cached sections written before this hold the old advance.
+constexpr uint8_t SECTION_FILE_VERSION = 83;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

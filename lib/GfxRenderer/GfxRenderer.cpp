@@ -443,13 +443,25 @@ static inline bool glyphInBand(const GfxRenderer& renderer, const int x0, const 
 // The advance width is also halved in drawText() so layout reserves exactly the right
 // horizontal space for the scaled glyph.
 template <bool deviceSpace = false>
-static void renderCharScaled(const GfxRenderer& renderer, GfxRenderer::RenderMode /*renderMode*/,
+static void renderCharScaled(const GfxRenderer& renderer, GfxRenderer::RenderMode renderMode,
                              const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
                              const bool pixelState, const EpdFontFamily::Style style) {
-  const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
+  EpdGlyph solidFallback;
+  // A missing solid block symbol is metrics only (see EpdFont::getGlyphMetrics). Device space (the
+  // hi-res companion) never asks for one: drawText keeps those on the base face.
+  const EpdGlyph* glyph =
+      deviceSpace ? fontFamily.getGlyph(cp, style) : fontFamily.getGlyphMetrics(cp, solidFallback, style);
   if (!glyph) return;
 
   const EpdFontData* fontData = fontFamily.getData(style);
+  if (glyph == &solidFallback) {
+    // Half size, like every sup/sub glyph; the BW pass only, as a bitmap of full-ink pixels would be.
+    if (renderMode == GfxRenderer::BW) {
+      renderer.fillGlyphRect(cursorX + glyph->left / 2, cursorY - glyph->top / 2, (glyph->width + 1) / 2,
+                             (glyph->height + 1) / 2, pixelState);
+    }
+    return;
+  }
   const uint8_t* bitmap = renderer.getGlyphBitmap(fontData, glyph);
   if (!bitmap) return;
 
@@ -515,7 +527,9 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
                            const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
                            const bool pixelState, const EpdFontFamily::Style style) {
   EpdFontFamily::GlyphSource glyphSource = EpdFontFamily::GlyphSource::Direct;
-  const EpdGlyph* glyph = fontFamily.getGlyph(cp, style, &glyphSource);
+  EpdGlyph solidFallback;
+  const EpdGlyph* glyph = deviceSpace ? fontFamily.getGlyph(cp, style, &glyphSource)
+                                      : fontFamily.getGlyphMetrics(cp, solidFallback, style, &glyphSource);
   if (!glyph) {
     // DBG, not ERR: the firmware does not control what codepoints reach it. An
     // EPUB, a BLE-typed note, or a model answer can all carry an emoji no
@@ -604,6 +618,24 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     }
     plotGlyphPixel<deviceSpace>(renderer, screenX, screenY, pixelState);
   };
+
+  if (glyph == &solidFallback) {
+    // A solid block symbol the face lacks (upstream 7394e40fa): one filled rectangle in the glyph's
+    // own cell, so it lands exactly where the bitmap would have and measures as it draws. The BW pass
+    // paints it and the grayscale passes leave it alone -- every pixel is full ink (level 0), which
+    // GlyphAaPlanes never flags into a plane -- and `pixelState` is the ink, so dark mode needs no
+    // branch. Not routed through fillRect(): that one is a no-op in text-only mode, and this is text.
+    if (renderMode == GfxRenderer::BW && width > 0 && height > 0) {
+      if constexpr (rotation == TextRotation::Rotated90CW) {
+        renderer.fillGlyphRect(outerBase, innerBase - width + 1, height, width, pixelState);
+      } else if constexpr (rotation == TextRotation::Rotated90CCW) {
+        renderer.fillGlyphRect(outerBase - height + 1, innerBase, height, width, pixelState);
+      } else {
+        renderer.fillGlyphRect(innerBase, outerBase, width, height, pixelState);
+      }
+    }
+    return;
+  }
 
   if (drawNotdefBox) {
     // Ink on the rim only. The BW pass paints it and the grayscale passes leave
@@ -988,7 +1020,12 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     // of it via the prevCp reset below. getTextBounds (EpdFont.cpp) already
     // measures this way; if the draw side kerned where the measure side did
     // not, a line measured as exactly fitting could draw wider and clip.
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
+    EpdGlyph solidFallback;
+    const EpdGlyph* glyph = font.getGlyphMetrics(cp, solidFallback, style);
+    // A missing solid block is drawn from the base face's metrics only: a hi-res companion has
+    // nothing denser to offer for a filled rectangle, and drawing it from the companion's own
+    // metrics could land a pixel off the cell the layout measured.
+    const bool solidBlock = glyph == &solidFallback;
 
     // Differential rounding: snap (previous advance + current kern) as one unit so
     // identical character pairs always produce the same pixel step regardless of
@@ -1011,7 +1048,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     }
 
 #if CROSSPOINT_RENDER_SCALE > 1
-    if (hiRes && hiRes->getGlyph(cp, style)) {
+    if (hiRes && !solidBlock && hiRes->getGlyph(cp, style)) {
       const int devX = lastBaseX * renderScale();
       const int devY = yPos * renderScale();
       if (isSupSub) {
@@ -1383,6 +1420,17 @@ void GfxRenderer::drawPixelDither<Color::LightGray>(const int x, const int y) co
 template <>
 void GfxRenderer::drawPixelDither<Color::DarkGray>(const int x, const int y) const {
   drawPixel(x, y, (x + y) % 2 == 0);  // TODO: maybe find a better pattern?
+}
+
+// The block-symbol fill (EpdFont::getGlyphMetrics): the same rectangle writer as fillRect() minus
+// the text-only gate, because a solid block IS text and must survive a text-only redraw. The scan-pass
+// and strip guards live in fillRectImpl, so a prewarm scan still draws nothing.
+void GfxRenderer::fillGlyphRect(const int x, const int y, const int width, const int height, const bool state) const {
+  if (state) {
+    fillRectImpl<Color::Black>(x, y, width, height);
+  } else {
+    fillRectImpl<Color::White>(x, y, width, height);
+  }
 }
 
 void GfxRenderer::fillRectDither(const int x, const int y, const int width, const int height, Color color) const {
@@ -3184,8 +3232,9 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
         continue;
       }
       int32_t advFP = sdIt->second->getAdvance(cp, styleIdx);
-      if (advFP == 0) {
-        const EpdGlyph* glyph = font.getGlyph(cp, style);
+      if (advFP == 0 || (syntheticGlyph::isSolid(cp) && !font.hasCodepoint(cp, style))) {
+        EpdGlyph solidFallback;
+        const EpdGlyph* glyph = font.getGlyphMetrics(cp, solidFallback, style);
         advFP = glyph ? glyph->advanceX : 0;
       }
       if (prevCp != 0) {
@@ -3220,7 +3269,8 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
     }
     cp = font.applyLigatures(cp, text, style);
 
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
+    EpdGlyph solidFallback;
+    const EpdGlyph* glyph = font.getGlyphMetrics(cp, solidFallback, style);
 
     // Differential rounding: snap (previous advance + current kern) together,
     // matching drawText so measurement and rendering agree exactly.
@@ -3267,7 +3317,8 @@ bool GfxRenderer::getTextInkBounds(const int fontId, const char* text, int& inkT
   while (*cursor) {
     const uint32_t cp = utf8NextCodepoint(&cursor);
     if (cp == 0) break;
-    const EpdGlyph* g = fontIt->second.getGlyph(cp, style);
+    EpdGlyph solidFallback;
+    const EpdGlyph* g = fontIt->second.getGlyphMetrics(cp, solidFallback, style);
     // A blank (space) has no bitmap and must not drag the box to the baseline.
     if (g == nullptr || g->width == 0 || g->height == 0) continue;
     // drawText places a glyph's upper-left at (baseline - glyph.top), and the
@@ -3427,7 +3478,9 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
     // Differential rounding: snap (previous advance + current kern) as one unit,
     // subtracting for the rotated coordinate direction.
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
+    EpdGlyph solidFallback;
+    const EpdGlyph* glyph = font.getGlyphMetrics(cp, solidFallback, style);
+    const bool solidBlock = glyph == &solidFallback;  // drawn from the base face, see drawText
 
     if (prevCp != 0) {
       const int8_t kernFP = glyph ? font.getKerning(prevCp, cp, style) : 0;  // B-036
@@ -3440,7 +3493,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     prevAdvanceFP = glyph ? glyph->advanceX : 0;  // 12.4 fixed-point
 
 #if CROSSPOINT_RENDER_SCALE > 1
-    if (hiRes && hiRes->getGlyph(cp, style)) {
+    if (hiRes && !solidBlock && hiRes->getGlyph(cp, style)) {
       renderCharImpl<TextRotation::Rotated90CW, true>(*this, renderMode, *hiRes, cp, x * renderScale(),
                                                       lastBaseY * renderScale(), black, style);
       prevCp = glyph ? cp : 0;  // B-036
@@ -3542,7 +3595,9 @@ void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int 
 
     cp = font.applyLigatures(cp, text, style);
 
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
+    EpdGlyph solidFallback;
+    const EpdGlyph* glyph = font.getGlyphMetrics(cp, solidFallback, style);
+    const bool solidBlock = glyph == &solidFallback;  // drawn from the base face, see drawText
 
     // Differential rounding, as in the CW twin -- ADDING here, because this
     // rotation runs the other way down the page.
@@ -3557,7 +3612,7 @@ void GfxRenderer::drawTextRotated90CCW(const int fontId, const int x, const int 
     prevAdvanceFP = glyph ? glyph->advanceX : 0;  // 12.4 fixed-point
 
 #if CROSSPOINT_RENDER_SCALE > 1
-    if (hiRes && hiRes->getGlyph(cp, style)) {
+    if (hiRes && !solidBlock && hiRes->getGlyph(cp, style)) {
       renderCharImpl<TextRotation::Rotated90CCW, true>(*this, renderMode, *hiRes, cp, x * renderScale(),
                                                        lastBaseY * renderScale(), black, style);
       prevCp = glyph ? cp : 0;  // B-036
