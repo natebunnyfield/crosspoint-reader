@@ -790,6 +790,25 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // Light on Wake show on the device only while the switch is bound to Dark
     // Mode (isHiddenLightRow).
 #ifdef SIMULATOR
+    // The Picco app's CRT tube (CrossPointSettings::CRT_TUBE: the index is the
+    // stored value, append only). Above Brightness and Warmth (owner
+    // 2026-11-27, "put Tube above Brightness and Warmth"). The app and simulator builds only: the
+    // device's panel is e-ink, so its firmware, settings.json and web settings
+    // carry neither the row nor the key.
+    v.push_back(SettingInfo::Enum(
+        StrId::STR_TUBE, &CrossPointSettings::crtTube,
+        {StrId::STR_TUBE_MIXED, StrId::STR_TUBE_BLUE, StrId::STR_TUBE_PALE_BLUE, StrId::STR_TUBE_GREEN,
+         StrId::STR_TUBE_YELLOW, StrId::STR_TUBE_AMBER, StrId::STR_TUBE_RED, StrId::STR_TUBE_PALE_RED},
+        "crtTube", StrId::STR_CAT_DISPLAY)
+                    // The picker lists the tubes in order of invention (owner
+                    // 2026-11-27; crosspoint-simulator
+                    // docs/tube-chronology-2026-11-27.md): Amber P3, Blue P11,
+                    // Pale Blue P22B, Green P22G, Yellow P28, Red P22R, Pale
+                    // Red P56, then Mixed, the owner's own 2026 blend. Stored
+                    // indices do not move.
+                    .withDisplayOrder({5, 1, 2, 3, 4, 6, 7, 0}));
+#endif
+#ifdef SIMULATOR
     // The app's Brightness: -100..300 by 5, stored as the step 0..80
     // (CrossPointSettings.h, owner 2026-11-27). 0..100 shows and renders as
     // before; the simulator's page model takes the rest.
@@ -812,17 +831,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_SLIDE_SWITCH, &CrossPointSettings::slideSwitchAction,
                                   {StrId::STR_FRONTLIGHT, StrId::STR_DARK_MODE}, "slideSwitchAction",
                                   StrId::STR_CAT_CONTROLS));
-#ifdef SIMULATOR
-    // The Picco app's CRT tube (CrossPointSettings::CRT_TUBE: the index is the
-    // stored value, append only). The app and simulator builds only: the
-    // device's panel is e-ink, so its firmware, settings.json and web settings
-    // carry neither the row nor the key.
-    v.push_back(SettingInfo::Enum(
-        StrId::STR_TUBE, &CrossPointSettings::crtTube,
-        {StrId::STR_TUBE_MIXED, StrId::STR_TUBE_BLUE, StrId::STR_TUBE_PALE_BLUE, StrId::STR_TUBE_GREEN,
-         StrId::STR_TUBE_YELLOW, StrId::STR_TUBE_AMBER, StrId::STR_TUBE_RED, StrId::STR_TUBE_PALE_RED},
-        "crtTube", StrId::STR_CAT_DISPLAY));
-#endif
 #endif
 
     // The gate for FIXED_ENTRY_COUNT above. Runs ONCE, on the first call, and

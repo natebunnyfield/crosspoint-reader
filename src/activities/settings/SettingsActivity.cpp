@@ -190,8 +190,16 @@ void SettingsActivity::rebuildSettingsLists() {
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_GITHUB_TOKEN, SettingAction::GithubToken));
   deviceSettings.push_back(SettingInfo::Action(StrId::STR_CLAUDE_API_KEY, SettingAction::ClaudeApiKey));
 #if FREEINK_DEVICE_PICCO
-  // Measures where the bezel ends (owner 2026-11-26, "Ruler screen").
-  deviceSettings.push_back(SettingInfo::Action(StrId::STR_EDGE_RULER, SettingAction::EdgeRuler));
+  // Measures where the bezel ends (owner 2026-11-26, "Ruler screen"). It sits
+  // directly under Screen Margin (owner 2026-11-27, "move Edge Ruler under
+  // Screen Margin"), the row whose margins it measures; appended at the end
+  // if that row is ever absent.
+  {
+    const auto margin = std::find_if(deviceSettings.begin(), deviceSettings.end(),
+                                     [](const SettingInfo& s) { return s.nameId == StrId::STR_SCREEN_MARGIN; });
+    const auto at = margin == deviceSettings.end() ? deviceSettings.end() : margin + 1;
+    deviceSettings.insert(at, SettingInfo::Action(StrId::STR_EDGE_RULER, SettingAction::EdgeRuler));
+  }
 #endif
   // Informational, so it sits last: who wrote this firmware and what it is
   // built out of. Nothing here changes a setting.
@@ -219,19 +227,22 @@ void SettingsActivity::rebuildSettingsLists() {
   //                         Settings and Editing Font")
   //   Editor Font          | the STR_CAT_SYSTEM rows the shared list
   //   Screen Margin        | contributes, in getSettingsList() order
+  //   Edge Ruler           PICCO ONLY, under Screen Margin (owner 2026-11-27)
   //   Dark Mode            | (Dark Mode is dropped on the Picco while the
   //   Text Anti-Aliasing   |  slide switch is bound to it)
   //   Refresh Frequency    |
   //   Keyboard             |
   //   Sleep Screen         |
   //   Clock UTC Offset     |
+  //   Tube                 PICCO APP AND SIMULATOR ONLY (#ifdef SIMULATOR),
+  //                        above the light (owner 2026-11-27)
   //   Brightness           PICCO ONLY, these five (isPiccoDeviceRow):
   //   Warmth
   //   Frontlight           (these two only while the slide switch does not
   //   Restore Light on Wake  own the light, isHiddenLightRow)
   //   Slide Switch
-  //   Tube                 PICCO APP AND SIMULATOR ONLY (#ifdef SIMULATOR)
-  //   ... then the device-only ACTIONs appended above.
+  //   ... then the device-only ACTIONs appended above, except Edge Ruler
+  //   (PICCO ONLY), which is inserted directly under Screen Margin.
   //
   // Line Grid and Justified Text used to sit between Editor Font and Dark Mode.
   // They moved to Typography Settings on 2026-08-24 -- their category is
