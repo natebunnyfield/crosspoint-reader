@@ -508,6 +508,8 @@ The header's claim that neither choice could raise a channel was false for those
 
 *Unconfirmed:* the look on the owner's iPhone, and the mid-ramp case and the P7/P14/P17 behavior on any real screen.
 
+Second review (of 3e8c8c82) confirmed all three defects fixed. It found one new one: the spans were reset on any light-page present, so after a dark -> light -> dark flip inside the trail the returning light was drawn at the full tail color, above its own ramp on P7, P14 and P17. Fixed in sim 0aa4996b (`traillayers::trailDead`: only age, the invisible bound, or no deposit ends the spans). The second review found everything else clean: isolated fade exact, texture lifetime, end of trail, decay, render target.
+
 ### R-33: seen on the iOS Simulator
 
 In the fixed arm above, presents #4 and #5 each carried a new frame (`changed=1`, upload BUILD) with no deposit (`lastAdd` stayed 3690), and no glass capture ran between #2 and #6. So the row-1 frame was never captured or deposited, and the Browse Files band left no afterglow. That is the R-33 sequence, seen once. Not reproduced deliberately and not counted.
