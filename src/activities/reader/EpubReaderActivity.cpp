@@ -301,6 +301,8 @@ void EpubReaderActivity::loop() {
     return;
   }
 
+  rememberBookOnceRendered();
+
   // Idle glyph prewarm for the likely next page (currentPage + 1). The scan
   // pass draws nothing (FCM scan mode suppresses pixels), so the displayed
   // framebuffer is untouched; endScanAndPrewarm loads only glyphs not already
@@ -1182,6 +1184,8 @@ void EpubReaderActivity::renderBook(RenderLock&& lock) {
   const auto showBuildError = [this]() {
     gpio.publishTurnedPage(false);
     renderer.clearScreen();
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     GUI.drawPopup(renderer, tr(STR_INDEX_FAILED));
   };
 
@@ -1598,6 +1602,7 @@ void EpubReaderActivity::renderBook(RenderLock&& lock) {
     LOG_DBG("ERS", "Rendered spine %d page %d/%d in %dms", currentSpineIndex, section->currentPage,
             static_cast<int>(section->pageCount), static_cast<int>(millis() - start));
     lastRenderCompleteMs = millis();
+    markPageRendered();
   }
   // Only persist when the position actually changed. render() also runs on re-renders that
   // do not move the position, and writeAtomic is several FAT ops for 6 bytes.

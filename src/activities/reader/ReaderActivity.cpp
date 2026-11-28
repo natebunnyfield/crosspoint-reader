@@ -71,6 +71,13 @@ void ReaderActivity::onEnter() {
     return;
   }
 
+  // Forget the remembered book while it opens; rememberBookOnceRendered() puts
+  // it back after the first page is drawn.
+  if (!APP_STATE.openEpubPath.empty()) {
+    APP_STATE.openEpubPath.clear();
+    APP_STATE.saveToFile();
+  }
+
   sdFontSystem.ensureLoaded(renderer);
 
   if (!loadBook()) {
@@ -78,13 +85,17 @@ void ReaderActivity::onEnter() {
     return;
   }
 
+  // Trigger first update
+  requestUpdate();
+}
+
+void ReaderActivity::rememberBookOnceRendered() {
+  if (bookRemembered || !pageRendered.load(std::memory_order_acquire)) return;
+  bookRemembered = true;
   // Save the book as last opened and add it to recent books
   APP_STATE.openEpubPath = bookPath;
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(bookPath, getBookTitle(), getBookAuthor(), getBookThumbBmpPath());
-
-  // Trigger first update
-  requestUpdate();
 }
 
 void ReaderActivity::onExit() {
@@ -105,6 +116,7 @@ bool ReaderActivity::handleBackNavigation() {
 }
 
 void ReaderActivity::loop() {
+  rememberBookOnceRendered();
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
 
   // The end-of-book screen: Confirm (or the touch menu gesture) and Back go
@@ -156,6 +168,7 @@ void ReaderActivity::renderEndOfBook() {
   renderer.drawCenteredText(UI_12_FONT_ID, renderer.getScreenHeight() * 3 / 8, tr(STR_END_OF_BOOK), true,
                             EpdFontFamily::BOLD);
   renderer.displayBuffer();
+  markPageRendered();
 }
 
 bool ReaderActivity::handleForcedRefresh() {

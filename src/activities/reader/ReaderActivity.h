@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <string>
 
@@ -30,6 +31,15 @@ class ReaderActivity : public Activity {
   // is up (the EPUB reader's image pages) is kept here until that page can
   // issue its clean base pass.
   bool forcedRefreshPending = false;
+
+  // The book is remembered (APP_STATE.openEpubPath, Recent Books) only once a
+  // page has actually been drawn, so a book that cannot be read is not reopened
+  // on every wake. markPageRendered() runs on the render task;
+  // rememberBookOnceRendered() runs from loop() and does the SD writes.
+  std::atomic<bool> pageRendered{false};
+  bool bookRemembered = false;
+  void markPageRendered() { pageRendered.store(true, std::memory_order_release); }
+  void rememberBookOnceRendered();
 
   explicit ReaderActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
                           std::string bookPath, bool allowFastInitialRefresh);
