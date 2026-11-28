@@ -55,10 +55,7 @@ void EpubReaderChapterSelectionActivity::onEnter() {
 
   // Open on the current chapter, which may sit past the first page; the first
   // screen build pulls the viewport to it (ListNav follow-on-build).
-  int selected = epub->getTocIndexForSpineIndex(currentSpineIndex);
-  if (selected == -1) {
-    selected = 0;
-  }
+  int selected = currentTocIndex < 0 ? 0 : currentTocIndex;
   selected += headerRowCount();
   // A book with no table of contents has no chapter row to land on; highlight
   // Find rather than a row past the end of the list, where Confirm did nothing.

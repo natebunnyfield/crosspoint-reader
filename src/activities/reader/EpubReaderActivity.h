@@ -246,6 +246,8 @@ class EpubReaderActivity final : public ReaderActivity {
   // ramp does nothing at all (no settings write, no refresh).
   void stepReaderLineSpacing(int delta);
   void openChapterSelection();
+  // TOC entry for the page being read; call under the render lock.
+  int currentTocIndex() const;
   // Whole-book Find from the current page: releases the section, pushes
   // EpubReaderFindActivity, and on a hit jumps to its page.
   void startFind(const std::string& query);

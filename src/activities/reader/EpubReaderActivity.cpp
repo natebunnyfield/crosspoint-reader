@@ -1002,8 +1002,22 @@ void EpubReaderActivity::cycleReaderFontFamily(const int delta) {
   requestUpdate();
 }
 
+int EpubReaderActivity::currentTocIndex() const {
+  if (!epub) return 0;
+  if (section) return std::max(0, section->getTocIndexForPage(section->currentPage));
+  // No live section (released or not built yet): its saved anchor map is still readable.
+  Section cachedSection(epub, currentSpineIndex, renderer);
+  return std::max(0, cachedSection.getTocIndexForPage(nextPageNumber));
+}
+
 void EpubReaderActivity::openChapterSelection() {
   const int spineIdx = currentSpineIndex;
+  int tocIndex;
+  {
+    // The render task can replace the section; read it, and the anchor map it points at, under the lock.
+    RenderLock lock;
+    tocIndex = currentTocIndex();
+  }
   const std::string path = epub->getPath();
   // Position through the whole book (0..1) for the chapter screen's progress
   // bar: the byte-weighted progress the reader already tracks, at the page the
@@ -1016,7 +1030,7 @@ void EpubReaderActivity::openChapterSelection() {
     bookProgress = epub->calculateProgress(spineIdx, 0.0f);
   }
   startActivityForResult(
-      std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, spineIdx, bookProgress),
+      std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, tocIndex, bookProgress),
       [this](const ActivityResult& result) {
         if (result.isCancelled) return;
         if (const auto* find = std::get_if<FindQueryResult>(&result.data)) {

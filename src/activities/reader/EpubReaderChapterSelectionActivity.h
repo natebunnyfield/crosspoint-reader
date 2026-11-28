@@ -10,7 +10,9 @@
 class EpubReaderChapterSelectionActivity final : public UiListActivity {
   std::shared_ptr<Epub> epub;
   std::string epubPath;
-  int currentSpineIndex = 0;
+  // TOC entry of the page being read (Section::getTocIndexForPage), not just of the spine file:
+  // a file holding several chapters opens the list on the one the reader is in.
+  int currentTocIndex = 0;
   // Position through the whole book, 0..1 (Epub::calculateProgress at the
   // reader's current page). Drawn as a thin bar under the header.
   float bookProgress = 0.0f;
@@ -63,11 +65,11 @@ class EpubReaderChapterSelectionActivity final : public UiListActivity {
  public:
   explicit EpubReaderChapterSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                               const std::shared_ptr<Epub>& epub, const std::string& epubPath,
-                                              const int currentSpineIndex, const float bookProgress = 0.0f)
+                                              const int currentTocIndex, const float bookProgress = 0.0f)
       : UiListActivity("EpubReaderChapterSelection", renderer, mappedInput),
         epub(epub),
         epubPath(epubPath),
-        currentSpineIndex(currentSpineIndex),
+        currentTocIndex(currentTocIndex),
         bookProgress(bookProgress) {}
   void onEnter() override;
 };
