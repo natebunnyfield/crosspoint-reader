@@ -264,6 +264,22 @@ reaches them, not port them again:
   carry these six.
 
 
+**Taken EARLY, 2026-11-27 (batch 6 clean picks, owner-approved; 7 commits from the backlog probe).**
+Each was read against the fork's code before it was kept. Worktree branch `campaign-b6`:
+
+- `93e98bb78` pin pioarduino in release.yml -> ALREADY, not taken: `release.yml:101-112` already holds the step (fork `8fbac2827`, `f4f8494de`); the pick applies clean but would duplicate it.
+- `87f9c34c6` zip central directory, one read per entry -> TAKEN (fork `860011b28`), plus a new host suite `test/zip_file`. Adapted: its CMake dropped `lib/hal/HalMemory.cpp` and the hal include dir (the fork has no HalMemory unit, same as `test/inflate_stream`).
+- `6251054be` merge the two sleep image directory pools -> TAKEN as fork `26c927c9d`, as is. USER_GUIDE.md said the second directory was "a fallback"; corrected.
+- `d663dcc6f` show every sleep image once, shuffled, before repeats -> TAKEN as fork `9b4eb9dff`, as is. `state.json` drops `recentSleepImages` and friends and gains four `*LcgCount/*LcgState` keys; old keys are ignored and the shuffle simply restarts (no compat, owner rule). No cache is involved. Nothing else in the fork read the removed fields (grep).
+- `a4f64a3b6` XTC bit depth from its pages -> TAKEN as fork `63a999222`, plus host suite `test/xtc_parser`. Nothing caches by bit depth (a mismatched file failed at its first page before), so no cache bump.
+- `209cb53a7` blocked activity time is not idle -> TAKEN as fork `468af6bde`. Also adds each pass's `activityManager.loop()` time to `lastActivityTime`, so ordinary loop work makes the idle timer run slightly slow; upstream accepts this. The fork's Picco USB-power branch and light-sleep idle test read the same variable and are unchanged.
+- `bb7b65399` web rename keeps the extension -> TAKEN as fork `5b5bb4d05` (HTML only).
+
+No `freeink-sdk` pointer move in any of them. No translation unit added, deleted or renamed (the two new tests are host-only). No section, book.bin or CSS cache bump.
+
+Gates: `pio run -e default` (X4) SUCCESS, RAM 59,628 B (18.2%), Flash 4,881,821 B (74.5%). `pio run -e picco` SUCCESS, RAM 72,104 B (22.0%), Flash 4,688,686 B (31.0%). Host tests (`cmake -S test -B build/test`, `ctest -j4`): 993 of 993 run pass (17 of them the two new suites; 9 disabled or skipped by their own gates). **`pio run -e simulator` and `tools/latency/gate.sh` did NOT pass and the gate did not run:** the simulator build stops at `src/network/WebDAVHandler.cpp:129` (`String` has no `toLowerCase`) because `~/src/crosspoint-simulator` on this Mac is 37 commits behind its `origin/main`, which has the method (`src/WString.h:100`). That file is not touched by this batch (fork `9c56e23a5`); with `SCONSFLAGS=-k` the touched TUs (ZipFile, SleepActivity, CrossPointState, XtcParser, main) all compile in the simulator env; only the link is blocked. Pulling the simulator is the owner's call. Device behavior (zip speed, shuffle order across real sleeps, XTC files with mismatched headers, idle timeout) is UNCONFIRMED on device.
+
+
 | batch | upstream range | taken | partial | skipped (why) | pushed as |
 |---|---|---|---|---|---|
 | 1 | `0f747b82a`..`9e3cea2e5` (25) | 6 (`046827fc3` `1582e70ef` `596f0d3f7` `e4aae7bae` `2cac59714` `86eb1cbde`) | 3 (`5eec70de3` IPA except the two `reading`-set recipes; `d4733bfc6` CI split only, release.yml and sticky envs dropped per B-004; `7f8b005ae` AGENTS.md symlink only) | ALREADY 10 (incl. `d720891b2` dark mode = fork's whole-UI `c2d26ae29`; `4e6190357` X3 display/battery/crypto); SKIP 5 (`0f747b82a` superseded by word anchors, `9c48609f8` + `0423276d2` bookmarks/KOSync deleted, `fecb9eb3a` + `e9c3a166f` dictionary deleted in `1d37cb851`); FLAG 1 `9e3cea2e5` FUI -> ruled "Adopt FUI", ported separately | (this push) |
