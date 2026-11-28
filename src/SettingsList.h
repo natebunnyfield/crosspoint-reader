@@ -341,7 +341,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     //
     // Plus the BOOX Picco's five frontlight/slide-switch rows, compiled into
     // that env only (see the block above the gate below).
-#if FREEINK_DEVICE_PICCO
+#if FREEINK_DEVICE_PICCO && defined(SIMULATOR)
+    constexpr size_t PICCO_ENTRY_COUNT = 6;  // + the app's Tube row
+#elif FREEINK_DEVICE_PICCO
     constexpr size_t PICCO_ENTRY_COUNT = 5;
 #else
     constexpr size_t PICCO_ENTRY_COUNT = 0;
@@ -801,6 +803,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     v.push_back(SettingInfo::Enum(StrId::STR_SLIDE_SWITCH, &CrossPointSettings::slideSwitchAction,
                                   {StrId::STR_FRONTLIGHT, StrId::STR_DARK_MODE}, "slideSwitchAction",
                                   StrId::STR_CAT_CONTROLS));
+#ifdef SIMULATOR
+    // The Picco app's CRT tube (CrossPointSettings::CRT_TUBE: the index is the
+    // stored value, append only). The app and simulator builds only: the
+    // device's panel is e-ink, so its firmware, settings.json and web settings
+    // carry neither the row nor the key.
+    v.push_back(SettingInfo::Enum(
+        StrId::STR_TUBE, &CrossPointSettings::crtTube,
+        {StrId::STR_TUBE_MIXED, StrId::STR_TUBE_BLUE, StrId::STR_TUBE_PALE_BLUE, StrId::STR_TUBE_GREEN,
+         StrId::STR_TUBE_YELLOW, StrId::STR_TUBE_AMBER, StrId::STR_TUBE_RED, StrId::STR_TUBE_PALE_RED},
+        "crtTube", StrId::STR_CAT_DISPLAY));
+#endif
 #endif
 
     // The gate for FIXED_ENTRY_COUNT above. Runs ONCE, on the first call, and

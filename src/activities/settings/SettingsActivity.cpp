@@ -68,10 +68,15 @@ bool isRockerStepped(const SettingInfo& setting) {
 // change it. Matched by name: it is a getter/setter row with no valuePtr. The
 // generic picker sets the slot exactly as the web page does, and the reader
 // loads that size when a book opens (ReaderActivity::onEnter, ensureLoaded).
+//
+// And Tube (owner 2026-11-27, crosspoint-simulator
+// docs/crt-gamut-plan-2026-11-27.md), the app's CRT phosphor. Its row exists
+// only in a SIMULATOR build (SettingsList.h), so the device never meets it.
 bool isPiccoDeviceRow(const SettingInfo& setting) {
   return isRockerStepped(setting) || setting.valuePtr == &CrossPointSettings::frontlightOn ||
          setting.valuePtr == &CrossPointSettings::frontlightRestoreOnWake ||
-         setting.valuePtr == &CrossPointSettings::slideSwitchAction || setting.nameId == StrId::STR_FONT_SIZE;
+         setting.valuePtr == &CrossPointSettings::slideSwitchAction || setting.nameId == StrId::STR_FONT_SIZE ||
+         setting.valuePtr == &CrossPointSettings::crtTube;
 }
 
 // Restore Light on Wake is shown only while the slide switch does NOT own the
@@ -225,6 +230,7 @@ void SettingsActivity::rebuildSettingsLists() {
   //   Frontlight           (these two only while the slide switch does not
   //   Restore Light on Wake  own the light, isHiddenLightRow)
   //   Slide Switch
+  //   Tube                 PICCO APP AND SIMULATOR ONLY (#ifdef SIMULATOR)
   //   ... then the device-only ACTIONs appended above.
   //
   // Line Grid and Justified Text used to sit between Editor Font and Dark Mode.
@@ -466,11 +472,22 @@ void SettingsActivity::toggleCurrentSetting() {
   // specially; everything below is the ACTION rows, which are device-only and
   // have no counterpart there.
   if (setting.type != SettingType::ACTION) {
-    const bool opened = settingrow::activate(setting, optionPopup, [this, darkModeChanged] {
+#if FREEINK_DEVICE_PICCO && defined(SIMULATOR)
+    const bool tubeChanged = setting.valuePtr == &CrossPointSettings::crtTube;
+#else
+    constexpr bool tubeChanged = false;
+#endif
+    const bool opened = settingrow::activate(setting, optionPopup, [this, darkModeChanged, tubeChanged] {
       // Panel polarity has to reach the driver before this screen repaints,
       // or the row reads "on" over a still-white page until something else
       // forces a refresh.
       if (darkModeChanged) display.setInverted(SETTINGS.darkMode != 0);
+#if FREEINK_DEVICE_PICCO && defined(SIMULATOR)
+      // The app's tube is the simulated page's, so it goes live as it is picked.
+      if (tubeChanged) Frontlight.setTube(SETTINGS.crtTube);
+#else
+      (void)tubeChanged;
+#endif
       SETTINGS.saveToFile();
       // rebuildSettingsLists() clamps nav.selected to the new count.
       rebuildSettingsLists();

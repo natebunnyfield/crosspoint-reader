@@ -1075,6 +1075,11 @@ void setup() {
                               : isSilentReboot       ? silentRebootLightOn
                                                : (SETTINGS.frontlightOn != 0 && SETTINGS.frontlightRestoreOnWake != 0);
   Frontlight.begin(SETTINGS.frontlightBrightness, SETTINGS.frontlightWarmth, restoreLightOn);
+#ifdef SIMULATOR
+  // The Picco app's CRT tube (SettingsList.h): the simulator's HalFrontlight
+  // publishes it with the light, so the page wakes on the stored tube.
+  Frontlight.setTube(SETTINGS.crtTube);
+#endif
 #endif
 
   switch (wakeupReason) {

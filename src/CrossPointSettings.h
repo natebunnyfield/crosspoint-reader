@@ -259,6 +259,22 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     SLIDE_SWITCH_NIGHT_MODE = 1,  // this fork's Dark Mode (darkMode above)
   };
   uint8_t slideSwitchAction = SLIDE_SWITCH_FRONTLIGHT;
+  // The Picco APP's CRT tube: which phosphor the simulated dark page is (owner
+  // 2026-11-27, crosspoint-simulator docs/crt-gamut-plan-2026-11-27.md). A plain
+  // field like the light's, but its row exists only in a SIMULATOR Picco build:
+  // an e-ink panel shows no phosphor, so the device neither shows nor stores it.
+  // Persisted by index: append only. 0 is Mixed, the four-gun tube.
+  enum CRT_TUBE : uint8_t {
+    CRT_TUBE_MIXED = 0,
+    CRT_TUBE_BLUE,       // P11
+    CRT_TUBE_PALE_BLUE,  // P22B
+    CRT_TUBE_GREEN,      // P22G
+    CRT_TUBE_YELLOW,     // P28
+    CRT_TUBE_AMBER,      // P3
+    CRT_TUBE_RED,        // P22R
+    CRT_TUBE_PALE_RED,   // P56
+  };
+  uint8_t crtTube = CRT_TUBE_MIXED;
 
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
