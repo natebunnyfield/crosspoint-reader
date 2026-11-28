@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <BatteryMonitor.h>
 #include <BoardConfig.h>
 #include <Epub.h>
 #include <FontCacheManager.h>
@@ -1403,6 +1404,15 @@ void loop() {
   // compares against the debounced position).
   handleSlideSwitch();
 #endif
+
+  // X3: load the cell's design capacity into the BQ27220 (it falls back to TI's 3000 mAh whenever the
+  // gauge loses power). One short step per pass until it returns false; every other board returns false
+  // at once. Under the render lock, so a step never overlaps the themes' gauge reads.
+  static bool gaugeCapacityPending = true;
+  if (gaugeCapacityPending) {
+    RenderLock lock(RenderLock::Mode::Try);
+    if (lock.ownsLock()) gaugeCapacityPending = BatteryMonitor::loadDesignCapacity();
+  }
 
   renderer.setFadingFix(SETTINGS.fadingFix);
 
