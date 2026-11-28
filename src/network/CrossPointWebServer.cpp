@@ -1664,11 +1664,12 @@ void CrossPointWebServer::handleGetSettings() const {
       case SettingType::VALUE: {
         doc["type"] = "value";
         if (s.valuePtr) {
-          doc["value"] = static_cast<int>(SETTINGS.*(s.valuePtr));
+          doc["value"] = s.shown(SETTINGS.*(s.valuePtr));
         }
-        doc["min"] = s.valueRange.min;
-        doc["max"] = s.valueRange.max;
-        doc["step"] = s.valueRange.step;
+        // Shown units, the numbers the row on the reader says (SettingInfo::shown).
+        doc["min"] = s.shown(s.valueRange.min);
+        doc["max"] = s.shown(s.valueRange.max);
+        doc["step"] = s.valueRange.step * s.shownScale;
         break;
       }
       case SettingType::STRING: {
@@ -1750,8 +1751,11 @@ void CrossPointWebServer::handlePostSettings() {
         break;
       }
       case SettingType::VALUE: {
-        const int val = doc[s.key].as<int>();
-        if (val >= s.valueRange.min && val <= s.valueRange.max) {
+        // The page sends shown units; only a value the row can show is taken.
+        const int shownVal = doc[s.key].as<int>();
+        const int off = shownVal - s.shownOffset;
+        const int val = off / s.shownScale;
+        if (off % s.shownScale == 0 && val >= s.valueRange.min && val <= s.valueRange.max) {
           if (s.valuePtr) {
             SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
           }

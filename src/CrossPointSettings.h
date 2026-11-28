@@ -246,7 +246,18 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // writes their settings.json keys. Brightness and warmth are always restored
   // at boot; the on/off state only when frontlightRestoreOnWake is set, unless
   // the slide switch owns the light (then its position decides).
+#if FREEINK_DEVICE_PICCO && defined(SIMULATOR)
+  // The Picco APP's Brightness runs -100..300 by 5 (owner 2026-11-27: "let
+  // brightness go from -100 to 300, keeping current 0 to 100 as is"), which a
+  // byte cannot hold, so the app stores the STEP: shown = -100 + 5 x stored,
+  // 0..80, and 32 is the default 60. The row says so (SettingsList.h,
+  // withShown), and the simulator's HalFrontlight decodes the same byte
+  // (crosspoint-simulator src/FrontlitLight.h brightnessFromStored). The
+  // device's lamp keeps 0..100 percent: a PWM duty has nothing past either end.
+  uint8_t frontlightBrightness = 32;
+#else
   uint8_t frontlightBrightness = 60;
+#endif
   uint8_t frontlightWarmth = 50;  // 0 = cool .. 100 = warm
   uint8_t frontlightOn = 0;
   uint8_t frontlightRestoreOnWake = 1;

@@ -63,7 +63,7 @@ inline std::string valueText(const SettingInfo& setting) {
     return {};
   }
   if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
-    return std::to_string(SETTINGS.*(setting.valuePtr));
+    return std::to_string(setting.shown(SETTINGS.*(setting.valuePtr)));
   }
   return {};
 }

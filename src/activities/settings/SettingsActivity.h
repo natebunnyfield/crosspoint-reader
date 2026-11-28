@@ -137,6 +137,26 @@ struct SettingInfo {
     uint8_t step;
   };
   ValueRange valueRange = {};
+  // What a VALUE row SHOWS for its stored byte: shownOffset + stored x
+  // shownScale. Identity on every row but one: the Picco app's Brightness,
+  // which runs -100..300 by 5 and so stores the step (CrossPointSettings.h).
+  // valueRange stays in stored units; the row text and the web settings API
+  // speak shown units. App and simulator builds only: no device row uses it,
+  // so the device's ~100 SettingInfo copies do not carry the two fields.
+#ifdef SIMULATOR
+  int16_t shownOffset = 0;
+  uint8_t shownScale = 1;
+  int shown(const uint8_t stored) const { return shownOffset + static_cast<int>(stored) * shownScale; }
+  SettingInfo& withShown(const int16_t offset, const uint8_t scale) {
+    shownOffset = offset;
+    shownScale = scale;
+    return *this;
+  }
+#else
+  static constexpr int16_t shownOffset = 0;
+  static constexpr uint8_t shownScale = 1;
+  int shown(const uint8_t stored) const { return stored; }
+#endif
 
   const char* key = nullptr;             // JSON API key (nullptr for ACTION types)
   StrId category = StrId::STR_NONE_OPT;  // Category for web UI grouping

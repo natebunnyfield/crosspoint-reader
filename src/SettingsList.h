@@ -789,8 +789,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // row then"); SettingsActivity.cpp isPiccoDeviceRow. Frontlight and Restore
     // Light on Wake show on the device only while the switch is bound to Dark
     // Mode (isHiddenLightRow).
+#ifdef SIMULATOR
+    // The app's Brightness: -100..300 by 5, stored as the step 0..80
+    // (CrossPointSettings.h, owner 2026-11-27). 0..100 shows and renders as
+    // before; the simulator's page model takes the rest.
+    v.push_back(SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 80, 1},
+                                   "frontlightBrightness", StrId::STR_CAT_DISPLAY)
+                    .withShown(-100, 5));
+#else
     v.push_back(SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 100, 5},
                                    "frontlightBrightness", StrId::STR_CAT_DISPLAY));
+#endif
     v.push_back(SettingInfo::Value(StrId::STR_WARMTH, &CrossPointSettings::frontlightWarmth, {0, 100, 5},
                                    "frontlightWarmth", StrId::STR_CAT_DISPLAY));
     v.push_back(SettingInfo::Toggle(StrId::STR_FRONTLIGHT, &CrossPointSettings::frontlightOn, "frontlightOn",
