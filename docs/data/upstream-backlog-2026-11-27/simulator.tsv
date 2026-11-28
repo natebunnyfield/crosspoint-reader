@@ -1,0 +1,44 @@
+sha	date	patch_id	result	files	missing	other_lang	sdk	subject	live_conflict_files	missing_paths
+8323320d	2026-08-20	absent	conflict	13	0	0	0	feat: emulate M5Stack PaperMono (#34)	 src/BoardConfig.h src/HalClock.cpp src/HalDisplay.cpp src/HalFrontlight.cpp src/HalGPIO.cpp src/HalGPIO.h src/HalPowerManager.h	
+09e28c90	2026-08-28	absent	conflict	5	0	0	0	FreeRTOS shim: real binary semaphore, sleeping vTaskDelay, pdMS_TO_TICKS (#35)	 CLAUDE.md src/freertos/semphr.h	
+e39eab51	2026-08-28	absent	clean	2	0	0	0	fix: match verifyPowerButtonWakeup to the current firmware HAL (#37)		
+0220cd44	2026-08-30	absent	conflict	2	0	0	0	fix: match USB drive HAL API (#38)	 src/HalStorage.h	
+6aa3b547	2026-08-30	absent	conflict	11	0	0	0	feat: add X4 Classic emulation (#39)	 CLAUDE.md README.md src/BoardConfig.h src/HalClock.cpp	
+c55f168b	2026-09-02	absent	conflict	1	0	0	0	fix: add deep sleep shim	 src/HalStorage.h	
+59bc902a	2026-09-08	absent	clean	2	0	0	0	fix: add HalMemory shim to match current firmware HAL		
+047527f0	2026-09-10	absent	conflict	4	0	0	0	fix: update X4 Pro simulator interfaces	 src/HalDisplay.cpp src/HalDisplay.h	
+6864807e	2026-09-18	absent	conflict	8	0	0	0	fix: mirror firmware HAL additions	 src/Arduino.h src/BoardConfig.h src/HalDisplay.cpp src/HalDisplay.h src/HalStorage.cpp src/HalStorage.h	
+1a59596f	2026-09-23	absent	clean	3	2	0	0	Add HalMemory::PsramBuffer stub; disable macOS float-parse availability gate (#42)		 src/HalMemory.cpp src/HalMemory.h
+ecc4784f	2026-09-23	absent	conflict	8	2	0	0	fix: update shims and stubs	 sample-platformio-linux-wsl.ini sample-platformio-macos.ini src/HalStorage.cpp src/esp_heap_caps.h	 src/HalMemory.cpp src/HalMemory.h
+86995953	2026-09-23	absent	conflict	1	0	0	0	Fix bug where lightgray and darkgray are swapped (#41)	 src/HalDisplay.cpp	
+9d963b61	2026-09-29	absent	clean	2	0	0	0	fix: add clippings stubs		
+20e73803	2026-09-30	absent	conflict	15	0	0	0	Update simulator for SD plugins	 src/esp_wifi.h	
+62ec1ecc	2026-10-02	absent	clean-live-part	4	1	0	0	update stubs		 src/esp_random.h
+54c0aab6	2026-10-04	absent	conflict	18	0	0	0	feat: add Metalio E-Ink 4 simulator profile (#43)	 CLAUDE.md README.md sample-platformio-linux-wsl.ini sample-platformio-macos.ini src/BoardConfig.h src/HalClock.cpp src/HalDisplay.cpp src/HalGPIO.cpp src/HalGPIO.h src/HalTiltSensor.h	
+097f44e0	2026-10-04	absent	conflict	10	1	0	0	fix: run firmware web manager in simulator	 README.md src/WebServer.cpp	 src/wolfssl/wolfcrypt/aes.h
+0111b4c6	2026-10-07	absent	conflict	16	2	0	0	feat: add EEGO A4 simulator profile	 CLAUDE.md README.md sample-platformio-linux-wsl.ini sample-platformio-macos.ini src/BoardConfig.h src/HalClock.cpp src/HalDisplay.cpp src/HalFrontlight.cpp src/HalGPIO.cpp	 tests/check-profile-selection.py tests/native-stubs/GfxRenderer.h
+4d5bcbfb	2026-10-08	absent	conflict	6	3	0	0	fix: match EEGO Home key capability	 README.md src/BoardConfig.h	 docs/eego-a4.md tests/check-profile-selection.py tests/eego-input.cpp
+ba4d455c	2026-10-08	absent	dead-only	1	1	0	0	test: keep EEGO assertions enabled		 tests/eego-input.cpp
+98cb0daf	2026-10-15	absent	clean	1	0	0	0	fix: include system time declarations		
+82bf1d85	2026-10-18	absent	conflict	13	1	0	0	bluetooth stubs	 sample-platformio-linux-wsl.ini sample-platformio-macos.ini src/BoardConfig.h src/HTTPClient.h src/SecureHttpClient.h src/SimHttpFetch.h src/esp_wifi.h src/firmware_link_stubs.cpp	 src/ResumableFetch.h
+a52b4131	2026-10-19	absent	conflict	27	3	0	0	feat: add BOOX Picco simulator profile	 CLAUDE.md README.md sample-platformio-linux-wsl.ini sample-platformio-macos.ini src/BoardConfig.h src/HalClock.cpp src/HalDisplay.cpp src/HalFrontlight.cpp src/HalGPIO.cpp src/HalPowerManager.cpp src/HalPowerManager.h src/HalTiltSensor.h src/SimulatorLifecycle.cpp src/freertos/semphr.h	 tests/check-profile-selection.py tests/eego-input.cpp tests/metalio-input.cpp
+1520d2c2	2026-10-24	absent	conflict	1	0	0	0	fix: add missing stub, again	 src/BoardConfig.h	
+1777fe2f	2026-10-25	absent	conflict	1	0	0	0	fix: add missing stub, once more	 src/BoardConfig.h	
+e6d84457	2026-10-26	absent	conflict	6	2	0	0	fix: give plugins a stable device ID (#51)	 src/HalStorage.cpp	 src/wolfssl/wolfcrypt/hash.h test/crypto_stubs.cpp
+f1e0abb3	2026-10-26	absent	dead-only	1	1	0	0	test: enable plugins in the web manager smoke test (#47)		 test/web_manager_smoke.py
+d2dcc9d2	2026-10-26	absent	conflict	1	0	0	0	fix: run web handlers inside handleClient() (#48)	 src/WebServer.cpp	
+c9e68ef8	2026-10-26	absent	conflict	2	0	0	0	fix: hold scripted keys pressed at 0 ms during setup() (#49)	 README.md src/HalGPIO.cpp	
+39f73fa5	2026-10-26	absent	conflict	6	2	0	0	fix: use firmware HTTP timeouts in the curl shims (#50)	 src/HTTPClient.h src/SecureHttpClient.h src/SimHttpFetch.h src/esp_http_client.h	 test/http_client_compat.cpp test/http_client_compat.py
+5b380779	2026-10-27	absent	conflict	5	2	0	0	fix: match the SDK SecureHttpClient in the shim (#52)	 src/HTTPClient.h src/SecureHttpClient.h src/SimHttpFetch.h	 test/http_client_compat.cpp test/http_client_compat.py
+8dcf00b0	2026-10-31	absent	conflict	2	0	0	0	fix: add WebServer middleware to the shim (#54)	 src/WebServer.cpp	
+4c78f3ff	2026-11-02	absent	conflict	8	0	0	0	add missing webserver and halgpio stubs	 src/WebServer.cpp src/WebServer.h	
+022f7098	2026-11-06	absent	conflict	8	2	0	0	Bring up-to-date against Crosspoint-Reader: PiccoCst -> Tma525c; HalDisplay::controllerName(); HalStorage SD space (#61)	 CLAUDE.md src/BoardConfig.h src/HalDisplay.h src/HalStorage.h	 docs/picco.md tests/picco-input.cpp
+859e5cd1	2026-11-06	absent	conflict	11	0	0	0	feat: wait for log lines in input scripts (#55)	 README.md src/HalGPIO.cpp src/HardwareSerial.h src/simulator_main.cpp	
+1126805b	2026-11-06	absent	conflict	4	0	0	0	feat: answer HTTP requests from a routes file (#56)	 src/SimHttpFetch.h	
+55142986	2026-11-06	absent	conflict	6	0	0	0	feat: print the text on screen after each refresh (#58)	 CLAUDE.md README.md src/HalDisplay.cpp	
+6730fe5f	2026-11-07	absent	clean	2	0	0	0	feat: add a script to run one SD plugin (#59)		
+04332e7a	2026-11-07	absent	dead-only	1	1	0	0	fix: the theme constructor logged “Using Lyra theme” before the simulator’s log buffer was initialized.		 src/SimLog.cpp
+84c3421d	2026-11-10	absent	conflict	22	4	0	0	feat: add Metalio E-Ink 4 Plus simulator profile (#63)	 CLAUDE.md README.md sample-platformio-linux-wsl.ini sample-platformio-macos.ini src/Arduino.h src/BoardConfig.h src/EInkDisplay.h src/HalClock.cpp src/HalDisplay.cpp src/HalFrontlight.cpp src/HalGPIO.cpp src/HalGPIO.h src/HalTiltSensor.h src/esp_system.h src/esp_wifi.h src/freertos/task.h	 tests/check-profile-selection.py tests/metalio-input.cpp tests/native-stubs/GfxRenderer.h tests/run-metalio.sh
+212e764e	2026-11-20	absent	conflict	9	0	0	0	add missing board-profile, HAL, and HTTP definitions	 run_simulator.py src/BoardConfig.h src/HTTPClient.h src/HalDisplay.h src/HalSystem.cpp src/SecureHttpClient.h src/SimHttpFetch.h	
+bc025748	2026-11-23	absent	conflict	2	0	0	0	feat: enables window scaling via an environment variable (#64)	 README.md src/HalDisplay.cpp	
+74a116dd	2026-11-26	absent	conflict	6	1	0	0	fix: build against firmware develop (OnePage, bookmark sync, OPDS origin)	 src/BoardConfig.h src/HalPowerManager.cpp src/mbedtls/sha256.h	 src/ResumableFetch.h
