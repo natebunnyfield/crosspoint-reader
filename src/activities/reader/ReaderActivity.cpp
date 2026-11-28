@@ -71,12 +71,12 @@ void ReaderActivity::onEnter() {
     return;
   }
 
-  // Forget the remembered book while it opens; rememberBookOnceRendered() puts
-  // it back after the first page is drawn.
-  if (!APP_STATE.openEpubPath.empty()) {
-    APP_STATE.openEpubPath.clear();
-    APP_STATE.saveToFile();
-  }
+  // The remembered book is NOT cleared here (upstream a70ade72e does clear it).
+  // It stays the last book that drew a page until rememberBookOnceRendered()
+  // replaces it, so a book that never renders is never remembered. Clearing it
+  // would be wrong in this fork: main.cpp boots an empty openEpubPath into the
+  // first EPUB under /books, so a sleep during a long first index would wake
+  // into an unrelated book (adversarial review 2026-11-27, F1).
 
   sdFontSystem.ensureLoaded(renderer);
 
