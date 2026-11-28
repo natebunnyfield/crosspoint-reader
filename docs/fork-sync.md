@@ -814,6 +814,8 @@ run pass (993 before; 13 new: 6 Korean, 7 SD-font kerning).
 
 **Adversarial review before the push** (`docs/adversarial-review-2026-11-27-batch-6.md`): one finding fixed, F1: the port of `a70ade72e` cleared the remembered book while a book opened, and this fork boots an empty path into the first EPUB under `/books`, so a sleep during a long first index woke into an unrelated book. The clear is removed; a book that never renders is still never remembered. Two findings left as is and recorded there (a short Back tap can be lost during an upload; the framebuffer loan may add a refresh on image-heavy books, device-only). After the fix: `pio run -e default` SUCCESS (RAM 59,596 B, Flash 4,882,251 B), `pio run -e picco` SUCCESS, `pio run -e simulator` SUCCESS, `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). The host suite was not re-run for the fix (it removes one state write in `ReaderActivity::onEnter`; no suite covers that path).
 
+**Rebased before the push** onto `4b019d933` (four commits another session pushed to `main` the same evening; one shared file, `CrossPointWebServer.cpp`, no conflict). On the rebased tree: `pio run -e default` SUCCESS, `pio run -e picco` SUCCESS, `pio run -e simulator` SUCCESS, `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves), host tests 1006 of 1006 run pass.
+
 ### Backlog re-measured 2026-11-27: the campaign stopped after batch 5
 
 Owner: *"pull in upstream for crosspoint-firmware and crosspoint-simulator and
