@@ -208,13 +208,18 @@ O5 reduces (built, device UNCONFIRMED). The FAST waveform's duration on the SE04
   sweep, when the next 1-bit write arms the hold before the deferred readback
   runs. About one present wide and self-correcting; the tables count it
   ("landed whole"). The ~35 ms readback still costs the main thread, one present
-  later.
+  later. **Not only cosmetic, and not self-correcting for the frame it skips**
+  (review R-33 in `docs/review-passes-2026-11-27.md`, OPEN): a frame that
+  finished its sweep and is replaced before the deferred readback runs is never
+  captured, so it is never deposited and leaves no afterglow on a dark page.
 - **Checked clean** (per the reviewer): the glass cannot stay stale forever (every
   early return keeps the present owed or resets the glass; a present without a
   picture or with a stale size always captures first); no endless present loop;
   S-035's generation recapture is not lost; `glassSeq` is only ever set to
   `presentedSeq`; a reader page turn and the deferred gray pass sweep as before;
-  no double or missing phosphor deposit; the partial field's failure paths, the
+  no double phosphor deposit (a MISSING one is possible, R-33 above, so the
+  reviewer's "no double or missing phosphor deposit" was wrong); the partial
+  field's failure paths, the
   text-entry hold, the raking light, the cache keys, the reboot, `fillField`
   against the loop it replaced, and SDL3's sub-rect upload; the trace lines do
   not change `tools/latency/gate_check.py`.
