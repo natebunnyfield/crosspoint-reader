@@ -247,6 +247,11 @@ void EpubReaderActivity::onExit() {
   }
 }
 
+bool EpubReaderActivity::backgroundBuildWanted() const {
+  return section && section->isBuilding() &&
+         (section->isPartial() || static_cast<int>(section->pageCount) < section->currentPage + BUILD_WINDOW_AHEAD);
+}
+
 bool EpubReaderActivity::buildTickHeapGate() {
   const size_t freeHeap = ESP.getFreeHeap();
   const size_t maxBlock = ESP.getMaxAllocHeap();
@@ -418,9 +423,7 @@ void EpubReaderActivity::loop() {
     // A button down or a turn queued: the next frames act on it first, and a tick
     // already running stops at its next parse step (survey #12).
     RenderLock lock(RenderLock::Mode::Try);
-    if (lock.ownsLock() && section && section->isBuilding() && queuedTurns.load() == 0 &&
-        !gpio.isButtonContactClosed() &&
-        (section->isPartial() || static_cast<int>(section->pageCount) < section->currentPage + BUILD_WINDOW_AHEAD) &&
+    if (lock.ownsLock() && backgroundBuildWanted() && queuedTurns.load() == 0 && !gpio.isButtonContactClosed() &&
         buildTickHeapGate()) {
       if (!section->buildSomeMore(BACKGROUND_BUILD_PAGES_PER_TICK, [] { return gpio.isButtonContactClosed(); })) {
         LOG_ERR("ERS", "Background section build failed");

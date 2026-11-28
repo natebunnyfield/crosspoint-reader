@@ -161,6 +161,12 @@ class EpubReaderActivity final : public ReaderActivity {
   // any single allocation can actually have it. 16 KB also keeps the advance-table
   // batch path (16 KB scratch) viable during builds.
   static constexpr size_t BACKGROUND_BUILD_MIN_MAX_ALLOC = 16 * 1024;
+  // True while a section build is running and the reader is close enough to its
+  // watermark (or the section is a partial being extended) that a background
+  // tick should run. Reads `section`: call it under the render lock, or accept a
+  // stale read where the caller says so (skipLoopDelay()). Heap admission is the
+  // separate buildTickHeapGate().
+  bool backgroundBuildWanted() const;
   // Gate for a background build tick: true when the heap can take parse allocations.
   // Updates buildHeapPaused as a side effect.
   bool buildTickHeapGate();
@@ -285,10 +291,7 @@ class EpubReaderActivity final : public ReaderActivity {
   // a page -- doing no build work and blocking idle light-sleep. Gate on "a build tick
   // will actually run this pass" instead. Read unlocked like the other power heuristics
   // (setPowerSaving/lightSleep): a stale read costs at most one loop pass either way.
-  bool skipLoopDelay() override {
-    return section && section->isBuilding() && !buildHeapPaused &&
-           (section->isPartial() || static_cast<int>(section->pageCount) < section->currentPage + BUILD_WINDOW_AHEAD);
-  }
+  bool skipLoopDelay() override { return !buildHeapPaused && backgroundBuildWanted(); }
 
  protected:
   // Opens the EPUB (the indexing popup and the framebuffer loan on a first open)
