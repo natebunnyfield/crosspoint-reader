@@ -103,6 +103,7 @@ struct Line {
   CssTextAlign alignment;
   bool rtl = false;
   bool anySup = false;
+  int firstWordX = 0;  // the first word's x inside the block: where a first-line indent shows
 };
 
 std::string writeTemp(const char* pattern, const std::string& contents) {
@@ -131,7 +132,9 @@ constexpr const char* kCss =
     ".cascade-join { margin-bottom: 0; padding-bottom: 0; }\n"
     ".cascade-d1 { margin-left: 1em; }\n"
     ".cascade-d2 { margin-left: 2em; }\n"
-    ".cascade-d3 { margin-left: 2em; padding-left: 1em; }\n";
+    ".cascade-d3 { margin-left: 2em; padding-left: 1em; }\n"
+    ".lead { margin-top: 1.5em; text-align: left; }\n"
+    ".hang { text-indent: -1.5em; margin-left: 2em; margin-top: 1.5em; text-align: left; }\n";
 
 class LoadedCss {
  public:
@@ -155,7 +158,7 @@ class LoadedCss {
   std::string path_;
 };
 
-std::vector<Line> layout(const std::string& bodyHtml) {
+std::vector<Line> layout(const std::string& bodyHtml, const bool lineGrid = false) {
   static LoadedCss css(kCss);
   const std::string doc =
       "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
@@ -169,7 +172,7 @@ std::vector<Line> layout(const std::string& bodyHtml) {
       nullptr, path, Gfx::instance().renderer(), LIBREFRANKLIN_READER_14_FONT_ID,
       /*smallFontId=*/0, /*lineCompression=*/1.0f, /*extraParagraphSpacing=*/true,
       /*paragraphAlignment=*/0, kViewportWidth, kViewportHeight, /*hyphenationEnabled=*/false,
-      /*focusReadingEnabled=*/false, /*lineGridEnabled=*/false,
+      /*focusReadingEnabled=*/false, /*lineGridEnabled=*/lineGrid,
       /*justifyThresholdChars=*/autojustify::THRESHOLD_CHARS,
       [&lines](std::unique_ptr<Page> page, uint16_t, uint16_t, uint32_t) {
         for (const auto& element : page->elements) {
@@ -184,7 +187,7 @@ std::vector<Line> layout(const std::string& bodyHtml) {
             if (block.wordStyle(i) & EpdFontFamily::SUP) anySup = true;
           }
           lines.push_back({std::move(text), line->xPos, line->yPos, block.getBlockStyle().alignment,
-                           block.getBlockStyle().isRtl, anySup});
+                           block.getBlockStyle().isRtl, anySup, block.wordXpos(0)});
         }
       },
       /*embeddedStyle=*/true, /*contentBase=*/"", /*imageBasePath=*/"",
@@ -418,4 +421,98 @@ TEST(SkippedBlock, AHiddenRubyTextDoesNotSwallowWhatFollows) {
     EXPECT_GE(xOf(lines, "lostpara"), 0) << rt;
     EXPECT_EQ(0, xOf(lines, "afterpara")) << rt;
   }
+}
+
+// --- paragraph continuity across soft flushes (upstream d5693c321) ------------
+//
+// A paragraph longer than the soft-flush threshold (320 words with embedded CSS) is laid out in
+// two or more calls. Before the fix the tail came back as a NEW block: it took a second first-line
+// indent and spent the block's top margin again, in the middle of the paragraph.
+//
+// Pinned with it, because the soft flush now goes through makePages(): the fork's inter-block gap
+// cap (half a line), the Line Grid, and the widow/orphan hold-back.
+
+namespace {
+
+std::string longParagraph(const char* cls, const int words) {
+  std::string text;
+  for (int i = 0; i < words; ++i) {
+    text += (i % 7 == 6) ? "tomorrow " : "word ";
+  }
+  return std::string("<p class=\"") + cls + "\">" + text + "end.</p>";
+}
+
+// y of each line's page: a page break is where y does not increase.
+std::vector<int> pageSizes(const std::vector<Line>& lines) {
+  std::vector<int> sizes;
+  int count = 0;
+  for (size_t i = 0; i < lines.size(); ++i) {
+    if (i > 0 && lines[i].y <= lines[i - 1].y) {
+      sizes.push_back(count);
+      count = 0;
+    }
+    ++count;
+  }
+  if (count > 0) sizes.push_back(count);
+  return sizes;
+}
+
+}  // namespace
+
+TEST(SoftFlush, TheIndentIsAppliedToTheFirstLineOnly) {
+  // Positive text-indent is not honored while paragraphs are separated by a gap (the fork's
+  // ParsedText::resolveFirstLineIndent); a negative one is, so this pins the hanging first line.
+  const auto lines = layout(longParagraph("hang", 700));
+  ASSERT_GT(lines.size(), 12u);
+  const int bodyX = lines[1].firstWordX;
+  EXPECT_LT(lines[0].firstWordX, bodyX) << "the opening line hangs";
+  for (size_t i = 1; i < lines.size(); ++i) {
+    EXPECT_EQ(lines[i].firstWordX, bodyX) << "line " << i << " must not repeat the first-line indent";
+  }
+}
+
+TEST(SoftFlush, TheTopMarginIsSpentOnceBeforeTheFirstLineNotInTheMiddle) {
+  const auto lines = layout(longParagraph("lead", 700));
+  ASSERT_GT(lines.size(), 12u);
+  const int lh = lineHeight();
+  for (size_t i = 1; i < lines.size(); ++i) {
+    if (lines[i].y <= lines[i - 1].y) continue;  // a new page restarts y
+    EXPECT_EQ(lines[i].y - lines[i - 1].y, lh) << "line " << i << " carries extra space inside the paragraph";
+  }
+}
+
+TEST(SoftFlush, TheGapBetweenTwoLongParagraphsIsStillCappedAtHalfALine) {
+  // The first paragraph ends in the soft-flush tail, the second opens with a 1.5 em top margin and
+  // the first closes with the stylesheet's 0.75 em bottom margin: summed they exceed a half line.
+  const int lh = lineHeight();
+  bool seenGap = false;
+  // Several lengths, so the paragraph break lands mid-page for at least one of them.
+  for (const int words : {330, 345, 360, 375, 390}) {
+    const auto lines = layout(longParagraph("lead", words) + longParagraph("lead", words));
+    for (size_t i = 1; i < lines.size(); ++i) {
+      if (lines[i].y <= lines[i - 1].y) continue;
+      const int step = lines[i].y - lines[i - 1].y;
+      EXPECT_LE(step, lh + lh / 2) << words << " words, line " << i << ": the gap cap must hold";
+      if (step == lh + lh / 2) seenGap = true;
+    }
+  }
+  EXPECT_TRUE(seenGap) << "the paragraph break should still show the half-line gap";
+}
+
+TEST(SoftFlush, LineGridKeepsEveryBaselineOnTheGrid) {
+  const auto lines = layout(longParagraph("lead", 400) + longParagraph("lead", 400), /*lineGrid=*/true);
+  ASSERT_GT(lines.size(), 12u);
+  const int lh = lineHeight();
+  for (const Line& line : lines) {
+    EXPECT_EQ(line.y % lh, 0) << "baseline off the line grid at y=" << line.y;
+  }
+}
+
+TEST(SoftFlush, NoPageOfALongParagraphIsLeftWithASingleLine) {
+  // Widow/orphan hold-back: with a paragraph spanning several pages, no page carries just one line
+  // of it (the last line is held back with its predecessor).
+  const auto lines = layout(longParagraph("lead", 700));
+  const auto sizes = pageSizes(lines);
+  ASSERT_GE(sizes.size(), 2u) << "the fixture must span pages";
+  for (const int count : sizes) EXPECT_GE(count, 2);
 }

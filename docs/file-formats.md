@@ -175,6 +175,7 @@ before relying on any of them for a field layout:
 | 78 | upstream `f4b4ff06c` (#3585, campaign 2026-11-08) | **layout**, SD fonts: a space measured during a partial cache miss used 0 px; it falls back to the glyph advance now |
 | 79 | fork (see the `v79` comment above `SECTION_FILE_VERSION`) | **layout**: a space beside a lone math sign is set for equal drawn white on both sides of the sign; word positions in such lines move by a pixel or two |
 | 80 | upstream `794ac97f4` (#3700, campaign 2026-11-27) | **layout**, Korean: a Hangul word is one token and wraps at spaces (keep-all); with hyphenation on it may also split at a line end where the CJK boundary rules allow, no hyphen drawn, in the greedy and the Knuth-Plass breaker alike; justification stretches only word spaces. Binary layout unchanged |
+| 81 | upstream `d5693c321` (#3875, campaign 2026-11-28) | **layout**: a paragraph soft-flushed mid-way keeps its continuity: no second first-line indent (negative indents included), and the block's top margin/padding is spent once, before its first line, through the page-top rule, the half-line gap cap and the Line Grid. Pages of long paragraphs move; binary layout unchanged |
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the

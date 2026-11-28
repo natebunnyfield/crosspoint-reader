@@ -323,7 +323,14 @@ namespace {
 // drawn (ParsedText's hangulLineEndBreaks, in the greedy and the Knuth-Plass
 // breaker alike). Justification stretches only word spaces. Line breaks and
 // word positions of Korean text move; the binary layout does not.
-constexpr uint8_t SECTION_FILE_VERSION = 80;
+// v81: upstream d5693c321 (#3875). A paragraph that the parser soft-flushes
+// mid-way (750 words, 320 with embedded CSS) keeps its continuity: the rest has
+// no second first-line indent, and the block's top margin and padding are spent
+// once, before its first line, instead of again in the middle of the paragraph.
+// The soft flush goes through makePages(includeLastLine = false), so it now also
+// gets the page-top rule, the inter-block gap cap and the line grid at its
+// start. Pages of long paragraphs move; the binary layout does not.
+constexpr uint8_t SECTION_FILE_VERSION = 81;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects

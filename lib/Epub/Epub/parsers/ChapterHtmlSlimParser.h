@@ -346,7 +346,10 @@ class ChapterHtmlSlimParser {
   void startNewTextBlock(const BlockStyle& blockStyle);
   void flushPendingAnchor();
   void flushPartWordBuffer();
-  void makePages();
+  // includeLastLine = false is the soft flush of a very long paragraph: the lines but the last go onto
+  // the page, the top spacing is spent, and everything that belongs to the END of the block (the
+  // widow/orphan tail, footnote fallback, bottom spacing) waits for the final call.
+  void makePages(bool includeLastLine = true);
   static EpdFontFamily::Style fontStyleForTextDecoration(CssTextDecoration decoration);
   static void applyDirectionToEntry(StyleStackEntry& entry, const CssStyle& css);
   static void applyTextDecorationToEntry(StyleStackEntry& entry, const CssStyle& css);

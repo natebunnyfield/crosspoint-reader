@@ -56,6 +56,13 @@ class ParsedText {
   bool focusReadingEnabled;
   bool isNaturalAlign;
   bool hasRtlWord;
+  // A line of this block has been extracted already (a soft flush mid-paragraph): the rest is a
+  // continuation, so it takes no first-line indent. Upstream d5693c321.
+  bool firstLineConsumed = false;
+  // The paginator has spent this block's top margin and padding. Set once, by the first
+  // makePages() call that reaches the block, so the continuation after a soft flush does not
+  // spend it again in the middle of the paragraph.
+  bool topSpacingSpent = false;
   // Knuth-Plass set this call's lines with shrink, so extractLine may narrow a
   // line's gaps by up to its smallest gap cap (floor(space / 3) of each gap's
   // style; 0 for a CJK break or a no-break space). Reset on every layout call.
@@ -120,6 +127,8 @@ class ParsedText {
   void setBlockStyle(const BlockStyle& blockStyle) { this->blockStyle = blockStyle; }
   BlockStyle& getBlockStyle() { return blockStyle; }
   size_t size() const { return words.size(); }
+  bool isTopSpacingSpent() const { return topSpacingSpent; }
+  void markTopSpacingSpent() { topSpacingSpent = true; }
   bool isEmpty() const { return words.empty(); }
   // Total source bytes ever added to this block (unclamped). The parser sums
   // these across blocks into a chapter-global anchor space.

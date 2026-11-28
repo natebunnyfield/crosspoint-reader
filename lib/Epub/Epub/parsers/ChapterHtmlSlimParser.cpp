@@ -2786,14 +2786,7 @@ void XMLCALL ChapterHtmlSlimParser::characterData(void* userData, const XML_Char
       self->embeddedStyle ? TEXT_BLOCK_SOFT_FLUSH_WORDS_WITH_CSS : TEXT_BLOCK_SOFT_FLUSH_WORDS;
   if (blockWordCount > softFlushThreshold && !self->inRuby) {
     LOG_DBG("EHP", "Text block soft flush (%u words)", static_cast<unsigned>(blockWordCount));
-    const int horizontalInset = self->currentTextBlock->getBlockStyle().totalHorizontalInset();
-    const uint16_t effectiveWidth = (horizontalInset < self->viewportWidth)
-                                        ? static_cast<uint16_t>(self->viewportWidth - horizontalInset)
-                                        : self->viewportWidth;
-    self->currentTextBlock->layoutAndExtractLines(
-        self->renderer, self->fontId, effectiveWidth,
-        [self](std::unique_ptr<TextBlock> textBlock) { self->addLineToPage(std::move(textBlock)); }, false,
-        self->justifyThresholdChars);
+    self->makePages(/*includeLastLine=*/false);
   }
 }
 
@@ -3541,7 +3534,7 @@ void ChapterHtmlSlimParser::placeLineOnPage(std::unique_ptr<TextBlock> line, con
   snapToLineGrid();
 }
 
-void ChapterHtmlSlimParser::makePages() {
+void ChapterHtmlSlimParser::makePages(const bool includeLastLine) {
   if (!currentTextBlock) {
     LOG_ERR("EHP", "!! No text block to make pages for !!");
     return;
@@ -3568,7 +3561,14 @@ void ChapterHtmlSlimParser::makePages() {
   // noteAllocationFailure and returns), and everything below dereferences it.
   // Every breakBeforeStrandedTableHeader caller does the same re-test for the
   // same reason.
-  if (breakBeforeStrandedTerm() && !currentPage) return;
+  //
+  // Everything from here to the layout call is the START of the block: it runs once, on the first
+  // makePages() call that reaches it. A paragraph soft-flushed mid-way (includeLastLine = false)
+  // comes back here for its tail, and spending the top spacing again then put a margin in the
+  // middle of the paragraph (upstream d5693c321).
+  const bool startOfBlock = !currentTextBlock->isTopSpacingSpent();
+  currentTextBlock->markTopSpacingSpent();
+  if (startOfBlock && breakBeforeStrandedTerm() && !currentPage) return;
 
   // Apply top spacing before the paragraph (stored in pixels) — but NOT at the
   // top of a page. Classic page-top margin collapse: space-before exists to
@@ -3595,8 +3595,8 @@ void ChapterHtmlSlimParser::makePages() {
   // still collapses on an empty page.
   const int16_t prevBottomApplied = prevBlockBottomApplied_;
   const int16_t sceneBreakLift = sceneBreakLiftPx_;
-  resetInterBlockCollapse();
-  if (!currentPage->elements.empty()) {
+  if (startOfBlock) resetInterBlockCollapse();
+  if (startOfBlock && !currentPage->elements.empty()) {
     int topSpacing = blockStyle.marginTop > 0 ? blockStyle.marginTop : 0;
     if (blockStyle.paddingTop > 0) {
       topSpacing += blockStyle.paddingTop;
@@ -3621,8 +3621,13 @@ void ChapterHtmlSlimParser::makePages() {
 
   currentTextBlock->layoutAndExtractLines(
       renderer, fontId, effectiveWidth,
-      [this](std::unique_ptr<TextBlock> textBlock) { addLineToPage(std::move(textBlock)); }, /*includeLastLine=*/true,
+      [this](std::unique_ptr<TextBlock> textBlock) { addLineToPage(std::move(textBlock)); }, includeLastLine,
       justifyThresholdChars);
+
+  // A soft flush stops here: the tail of the paragraph is still to come, so the held-back
+  // widow/orphan lines, the anchor and footnote fallbacks and the bottom spacing all belong to the
+  // final call.
+  if (!includeLastLine) return;
 
   // Paragraph boundary: place the held-back tail with widow/orphan control.
   // Must run before the footnote fallback and bottom spacing below, and before
