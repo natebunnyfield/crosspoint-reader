@@ -679,6 +679,199 @@ purpose, and whether secrets leave that mirror went to the owner.
 Gates: `pio run -e default` (X4) SUCCESS, RAM 58,724 B, Flash 4,857,183 B. `pio run -e picco` SUCCESS, RAM 70,872 B, Flash 4,663,482 B. `pio run -e simulator` SUCCESS. `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). Host tests 940 of 940. `pio check` at the low threshold: no defects. clang-format 21: clean.
 
 
+### Backlog re-measured 2026-11-27: the campaign stopped after batch 5
+
+Owner: *"pull in upstream for crosspoint-firmware and crosspoint-simulator and
+see what is needed to keep up this fork with it"*. Both upstreams and the SDK's
+were fetched and measured. **Nothing was merged, picked or built.** This section
+is a map, not a batch.
+
+Measured at: firmware `origin/main` `f42b03cae`, `upstream/develop` `dd86a5ec1`
+(tag `2.1.0rc` + 6); simulator `origin/main` `d4e448b0`, `upstream/main`
+`74a116dd`; SDK fork pin `119f3ed`, upstream firmware's SDK pin `de19f15`.
+
+**Where the campaign stands.** No batch followed batch 5. Since 2026-11-08 no
+commit on `main` carries a `cherry picked from` line, and one names an upstream
+port by hand (`082eedf9b`XX). Batch 6 still starts after `fca8f55f5`.
+
+| | count |
+|---|---|
+| `main` ahead of / behind `upstream/develop` (from base `1a7f5a9e3`) | 1,194 / 552 |
+| absent by patch id (`git cherry`) | 506 (46 present) |
+| non-merge commits after `fca8f55f5` (the untriaged range) | **337** |
+| of those, dated before the campaign stopped (2026-11-08) | 251 |
+| of those, dated since | 86 |
+| upstream's pace, the 31 days to 2026-11-27 | 143 non-merge commits, about 32 a week |
+
+**Probe of the 337** (`scripts/upstream-probe.sh`, sequential, upstream order,
+throwaway worktree off `origin/main`, SDK pointer moves dropped). Unlike the
+2026-11-07 probe it also drops conflicts in paths the fork does not have, so
+"conflict" below means a file the fork still has. Every row is in
+`docs/data/upstream-backlog-2026-11-27/firmware.tsv`.
+
+| result | commits | meaning |
+|---|---|---|
+| conflict | 247 | conflicts in a live file; by-hand work or a skip |
+| dead-only | 46 | touches only paths the fork deleted; skip |
+| already here | 16 | empty pick or patch id present (3 of the 247 conflicts also have their patch id present) |
+| clean | 10 | applies as is |
+| clean-live-part | 9 | applies once its deleted-path hunks are dropped |
+| SDK pointer only | 9 | nothing to take in this repo; the change is in the SDK |
+
+Of the 10 clean: two are ruled SKIP (`99c2f09d1` TTF upload, `965722cf8`
+Libron), one was reverted on 2026-11-07 for missing SDK code (`0a9077722`). The
+other seven: `93e98bb78` pioarduino pin in release.yml, `87f9c34c6` zip central
+directory in one read per entry, `6251054be` merged sleep image pools,
+`d663dcc6f` sleep images shuffled without repeats, `a4f64a3b6` XTC bit depth
+from its pages, `209cb53a7` blocked activity time is not idle, `bb7b65399` web
+rename keeps the extension. Applies is not builds; none was built.
+
+Of the 247 conflicts: 89 conflict in a single file, and 27 conflict only in
+docs, translations, the test list or CI files. 34 touch 20 files or more. The
+files that conflict most often: `EpubReaderActivity.cpp` (50 commits),
+`english.yaml` (33), `CrossPointWebServer.cpp` (28), `USER_GUIDE.md` (25),
+`test/CMakeLists.txt`, `SettingsList.h` and `main.cpp` (24 each), `Section.cpp`
+(23), `CrossPointSettings.h` and `docs/file-formats.md` (21 each).
+
+**The 337 by subject** (a regex over commit subjects, first match wins, so each
+count is approximate; the grouping script is not kept, the subjects are in the
+TSV):
+
+| group | commits | where it stands |
+|---|---|---|
+| Settings, lists, headers, keyboard, themes, Home | 57 | live code, mostly conflicts; the fork's flat Settings and Lyra Six rules apply |
+| Reader and EPUB layout | 53 | live code; the core of what is worth taking |
+| SD plugin system (`2600a79ea`, 117 files, and its follow-ups) | 30 | **no ruling yet** |
+| Dictionary, clipping and highlight | 27 | dictionary deleted here (`1d37cb851`); clipping (`d7fcc7cec`, 104 files) has **no ruling yet** |
+| Fonts, SD fonts, glyphs | 25 | live code; the fork's font ids and families are hand-curated |
+| Docs, CI, chores | 22 | low value; taken or skipped per commit |
+| Other boards (Metalio, EEGO A4, OnePage, Paper Mono, LilyGO, X4 Pro) | 18 | boards held since 2026-09-14 |
+| KOReader sync, OPDS, bookmarks, sync on sleep | 15 | deleted subsystems; skip |
+| Power, heap, Wi-Fi, TLS, SdFat | 15 | live code, mostly fixes |
+| Web UI and server | 15 | live code |
+| Bluetooth page turner for X3/X4 (`fecee610c`, 64 files) and follow-ups | 11 | **no ruling yet** |
+| TrueType and embedded `@font-face` | 10 | ruled SKIP 2026-11-08 with `aaf683798` |
+| Translations and new languages (Indic `472021cb7`, 98 files) | 9 | en/es parts only, by the two-language ruling |
+| SDK pointer bumps | 9 | see the SDK below |
+| Upstream's own Picco support (`261726f61`, `fb2a8a8f1`, `8f4d035cb`, `b6b7a6c1f`, `6e7caa222`) | 5 | the fork has its own Picco port; reconcile by hand |
+| Unmatched | 16 | read the TSV |
+
+**Owner decisions the range will raise** (new features, none ruled; each also
+decides its follow-up commits): the SD plugin system; clipping and highlight;
+the Bluetooth page turner; TXT and Markdown through the EPUB pipeline
+(`9c103c87f`); the settings checkbox, grouping and reordered controls
+(`d1509d073`, `87fc4ab73`, `22c862002`) against the fork's flat list; paragraph
+indentation and line spacing as a percentage (`458be7ed2`, `072b6fc74`, both
+page-format changes); NotoSerif moved to an SD font (`fc2de152c`); static GIF
+(`b64d797c0`) and the JPEG viewer (`15503ac34`); swipe to delete
+(`ba39565ce`); a custom UI font (`5c4e609c0`); the image grayscale toggle and
+the all-panels display pass (`5d1142c18`, `5058eb436`); reading progress on
+Lyra (`08d9d68de`); Show File Extensions (`3a5bfac37`); opened-only Recent
+(`8df647a76`). The eight questions held from batch 5 and the seven held from
+batch 4 are still open above.
+
+#### What keeping up takes
+
+1. **A batch a week.** Upstream lands about 32 commits a week. The campaign's
+   batches were 40 to 50 commits, so one batch a week holds the line and
+   anything less grows the backlog by about 140 a month. Clearing the 337 is
+   seven batches.
+2. **Rule on features before the batch that reaches them.** About 110 of the
+   337 (plugins, dictionary and clipping, sync and OPDS, TrueType, other
+   boards, translations) are settled by a ruling, not by porting. Batches 3 to
+   5 spent most of their weight on HELD for the same reason.
+3. **Move the SDK, or most held items stay held.** See below. This is the
+   largest single cost and the batch log shows it: item after item waits on an
+   SDK API "absent at the pin".
+4. **Expect by-hand work on the same ten files.** The conflicts cluster in the
+   reader activity, the settings tables, the web server and `main.cpp`, where
+   the fork's own rules live. That does not go away; it is the price of the
+   divergence recorded at the top of this file.
+5. **The simulator follows the firmware.** Take a simulator stub when the
+   firmware takes the feature it stubs, not before.
+
+#### freeink-sdk
+
+The fork's SDK pin `119f3ed` is 69 commits past the common base `76e61c4e`
+(2026-08-15). Upstream firmware pins `de19f15`, 451 non-merge commits past that
+base: **429 absent by patch id, 22 present** (335 absent on 2026-11-07, against
+the older pin `1dc07f6`). 71 of them are dated since 2026-11-08. By directory
+(file touches across the 429): `libs/display` 570, `libs/hardware` 475,
+`libs/font` 449, `libs/network` 227, `libs/ui` 217, `libs/book` 75. Upstream
+keeps moving firmware work into the SDK (FreeInkFont, the list and UI kit,
+network and OPDS code), so a firmware commit that looks small often needs an
+SDK commit first. The 2026-09-14 rule still holds (cherry-pick by area, do not
+rebase), and the six fork commits listed under "Taken EARLY" must survive any
+bump. Not probed per commit this pass.
+
+#### Simulator
+
+The fork and upstream share **no merge base**: the fork's history was rewritten
+on 2026-10-11 when Albo left it (its own commit subjects say so), and the
+rewrite renamed the upstream side too (roots `5a7787ae` here, `d0c07a2d`
+upstream). So `git merge upstream/main`, the step `FORKING.md` gives, refuses
+as unrelated histories. Compare by patch id and cherry-pick.
+
+`git cherry origin/main upstream/main`: **43 absent, 103 present** (39 absent
+on 2026-11-07). All 43 are after the 2026-08-15 merge (`f97992f3..upstream/main`).
+Probe, same script, rows in `docs/data/upstream-backlog-2026-11-27/simulator.tsv`:
+33 conflict, 6 clean, 1 clean-live-part, 3 dead-only.
+
+- **Board profiles (11):** PaperMono `8323320d`, X4 Classic `6aa3b547`, Metalio
+  `54c0aab6` and Plus `84c3421d`, EEGO A4 `0111b4c6` `4d5bcbfb` `ba4d455c`,
+  upstream's Picco profile `a52b4131`, OnePage and the rest in `74a116dd`,
+  `212e764e`, `022f7098`. They follow the held boards. The fork has its own
+  Picco profile.
+- **Stubs for upstream firmware HAL and features (19):** USB drive, deep sleep,
+  `HalMemory`, X4 Pro, clippings, SD plugins, Bluetooth, the "missing stub"
+  series. Each is wanted only when the firmware takes its feature. A clean
+  apply here can still break the fork's build: `e39eab51` changes
+  `verifyPowerButtonWakeup` to upstream's signature.
+- **Simulator behavior and tooling, wanted whatever the firmware does
+  (13):** FreeRTOS shim with a real binary semaphore `09e28c90`; light and dark
+  gray swapped `86995953`; the firmware web manager running in the simulator
+  `097f44e0`, handlers inside `handleClient()` `d2dcc9d2`, WebServer
+  middleware `8dcf00b0`; scripted keys held at 0 ms `c9e68ef8`; HTTP shim
+  timeouts and `SecureHttpClient` `39f73fa5` `5b380779`; wait for log lines in
+  input scripts `859e5cd1`; HTTP answers from a routes file `1126805b`; print
+  the screen's text after each refresh `55142986`; window scaling by
+  environment variable `bc025748`; system time declarations `98cb0daf`
+  (clean). All but the last conflict. Whether the fork's own headless QA
+  (`crosspoint-simulator/docs/headless-qa.md`) already covers the scripting
+  ones was not checked.
+
+#### Limits of this pass
+
+- Sequential probe: a commit that applies clean was committed in the probe
+  tree, so later commits were tested on top of it. A conflicting commit was
+  dropped, so commits that depend on it also conflict.
+- "dead-only" and "clean-live-part" go by whether a path exists at the fork
+  head. A file upstream adds inside a deleted subsystem counts as applying.
+- The subject grouping is a regex; counts move by a few either way.
+- Nothing was built or run, on any board or in the simulator.
+- The SDK was counted, not probed.
+
+Re-run:
+
+```bash
+git fetch upstream
+git worktree add --detach /tmp/probe origin/main
+scripts/upstream-probe.sh /tmp/probe fca8f55f5 upstream/develop out.tsv   # firmware
+git worktree remove --force /tmp/probe
+# simulator, from ~/src/crosspoint-simulator, same script:
+#   .../scripts/upstream-probe.sh /tmp/simprobe f97992f3 upstream/main sim.tsv
+# SDK, from freeink-sdk/: git cherry <fork pin> <upstream pin>
+```
+
+**Working copies on this Mac, as found 2026-11-27** (left untouched):
+`~/src/crosspoint-reader` `main` is 245 behind `origin/main` and 1 ahead
+(`2730016ae`, 2026-11-13; a commit with the same subject is on `origin/main`),
+with uncommitted edits to `BUGS.md` (a B-074 entry dated 2026-10-09) and to
+this file (a "`main` history was rewritten after 2026-08-06" section dated
+2026-10-06, which is not on `origin/main`). `~/src/crosspoint-simulator` `main`
+is 37 behind `origin/main` with 15 untracked mockup images.
+
+
 ## One working copy per project
 
 Multiple clones is what actually costs time here. The live pair is:
