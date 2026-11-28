@@ -44,6 +44,9 @@ class TextBlock final : public Block {
   uint16_t textBytes = 0;  // total size of the text region, including NULs
   bool focusPresent = false;
   bool isValid = true;
+  // How this line's LAST token joins the first token of the next line: see JOIN_* below. Set by
+  // ParsedText::extractLine, serialized after the block style.
+  uint8_t endJoin = 0;
   // The ONLY allocation: makeUniqueNoThrow, so OOM yields an invalid block
   // instead of abort() (bare new is not nothrow with -fno-exceptions).
   std::unique_ptr<uint8_t[]> arena;
@@ -62,6 +65,17 @@ class TextBlock final : public Block {
   void bindArenaPointers();
 
  public:
+  // The line's last token is the start of a word that continues on the next line, for text-to-speech
+  // and Find (which rebuild words the layout broke apart). NONE: it does not. DROP_HYPHEN: the
+  // trailing '-' was inserted by the hyphenator, so drop it and join ("ex-" + "ample"). KEEP: the
+  // token ends in a hyphen or dash that belongs to the source word and the next token is glued to it,
+  // so join with no space and keep the character ("well-" + "known").
+  static constexpr uint8_t JOIN_NONE = 0;
+  static constexpr uint8_t JOIN_KEEP = 1;
+  static constexpr uint8_t JOIN_DROP_HYPHEN = 2;
+  uint8_t lineEndJoin() const { return endJoin; }
+  void setLineEndJoin(const uint8_t join) { endJoin = join; }
+
   // Flatten-on-construct: copies the layout-time vectors into the arena; the
   // vectors die with the caller. On arena OOM the block is empty and valid()
   // is false -- callers must check and fail the line instead of using it.

@@ -333,6 +333,7 @@ bool TextBlock::serialize(serialization::BufferedFileWriter& out) const {
   serialization::writePod(out, blockStyle.textIndentDefined);
   serialization::writePod(out, blockStyle.isRtl);
   serialization::writePod(out, blockStyle.directionDefined);
+  serialization::writePod(out, endJoin);
 
   return true;
 }
@@ -425,6 +426,8 @@ std::unique_ptr<TextBlock> TextBlock::deserialize(serialization::BufferedFileRea
   serialization::readPod(file, blockStyle.textIndentDefined);
   serialization::readPod(file, blockStyle.isRtl);
   serialization::readPod(file, blockStyle.directionDefined);
+  serialization::readPod(file, block->endJoin);
+  if (block->endJoin > TextBlock::JOIN_DROP_HYPHEN) block->endJoin = TextBlock::JOIN_NONE;
 
   return block;
 }

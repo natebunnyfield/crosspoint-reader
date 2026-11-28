@@ -45,6 +45,10 @@ class ParsedText {
   // position survive a font or size reflow. uint16_t: a single block beyond
   // 64 KB of text clamps and the anchor degrades to block-tail granularity.
   std::vector<uint16_t> wordSourceStart;
+  // 1 when the token ends in a hyphen the HYPHENATOR inserted at a split (splitWordAt), 0 for a hyphen
+  // that is part of the source word. Kept parallel to `words` like wordSourceStart; read by extractLine
+  // to tell the read-aloud capture which line-final '-' to drop when it rejoins the word.
+  std::vector<uint8_t> wordHyphenInserted;
   uint32_t sourceBytesTotal_ = 0;     // bytes added over this block's lifetime (unclamped)
   uint32_t lastLineSourceStart_ = 0;  // anchor of the line most recently handed to processLine
   std::deque<std::string> rubyTexts;

@@ -29,6 +29,7 @@ struct PageCaptureScratch {
     size_t begin;
     size_t count;
     bool barrierBefore;
+    uint8_t endJoin;
   };
   std::vector<CaptureToken> tokens;
   std::vector<LineSpan> spans;
@@ -71,8 +72,8 @@ inline void flattenPage(const Page& page, const GfxRenderer& renderer, const int
     // at y 15/68/104/137, i.e. yPos + yOffset plus a few px of internal leading
     // above cap height. Subtracting the ascender lifted every rect a full line,
     // so the highlight sat one line above the word being spoken.
-    s.spans.push_back(
-        {line.xPos + xOffset, line.yPos + yOffset, begin, s.tokens.size() - begin, sawNonLineSinceLastLine});
+    s.spans.push_back({line.xPos + xOffset, line.yPos + yOffset, begin, s.tokens.size() - begin,
+                       sawNonLineSinceLastLine, block->lineEndJoin()});
     sawNonLineSinceLastLine = false;
   }
   s.endsWithBarrier = sawNonLineSinceLastLine;
@@ -80,7 +81,8 @@ inline void flattenPage(const Page& page, const GfxRenderer& renderer, const int
   // `tokens` is complete and will not reallocate; now point the lines at it.
   s.lines.reserve(s.spans.size());
   for (const auto& span : s.spans) {
-    s.lines.push_back(CaptureLine{span.x, span.yTop, s.tokens.data() + span.begin, span.count, span.barrierBefore});
+    s.lines.push_back(
+        CaptureLine{span.x, span.yTop, s.tokens.data() + span.begin, span.count, span.barrierBefore, span.endJoin});
   }
 }
 

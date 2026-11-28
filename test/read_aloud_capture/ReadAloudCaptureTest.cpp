@@ -48,9 +48,11 @@ struct Rect {
 // Builds the pointer-stable line/token storage buildCapture() expects.
 class PageBuilder {
  public:
-  PageBuilder& line(int x, int yTop, std::vector<CaptureToken> tokens, bool barrierBefore = false) {
+  // `endJoin` is how THIS line's last token joins the next line's first (TextBlock::lineEndJoin).
+  PageBuilder& line(int x, int yTop, std::vector<CaptureToken> tokens, bool barrierBefore = false,
+                    uint8_t endJoin = readaloud::JOIN_NONE) {
     lineTokens_.push_back(std::move(tokens));
-    protoLines_.push_back({x, yTop, barrierBefore});
+    protoLines_.push_back({x, yTop, barrierBefore, endJoin});
     return *this;
   }
 
@@ -59,7 +61,7 @@ class PageBuilder {
     lines.reserve(protoLines_.size());
     for (size_t i = 0; i < protoLines_.size(); i++) {
       lines.push_back({protoLines_[i].x, protoLines_[i].yTop, lineTokens_[i].data(), lineTokens_[i].size(),
-                       protoLines_[i].barrierBefore});
+                       protoLines_[i].barrierBefore, protoLines_[i].endJoin});
     }
     std::string text;
     rects.clear();
@@ -71,6 +73,7 @@ class PageBuilder {
   struct Proto {
     int x, yTop;
     bool barrierBefore;
+    uint8_t endJoin;
   };
   std::vector<std::vector<CaptureToken>> lineTokens_;  // stable: inner buffers survive outer reallocation
   std::vector<Proto> protoLines_;
@@ -170,7 +173,8 @@ TEST(ReadAloudCapture, ResidentFontGluesAdjacentPunctuation) {
 // rejoined (hyphen dropped) with a resident font.
 TEST(ReadAloudCapture, ResidentFontRejoinsHyphenSplitWord) {
   PageBuilder page;
-  page.line(86, 506, {tok("find", 0, 90), tok("for-", 245, 61)}).line(86, 561, {tok("giveness", 0, 134)});
+  page.line(86, 506, {tok("find", 0, 90), tok("for-", 245, 61)}, false, readaloud::JOIN_DROP_HYPHEN)
+      .line(86, 561, {tok("giveness", 0, 134)});
 
   std::vector<Rect> rects;
   const std::string text = page.run(residentFont(), rects);
@@ -183,10 +187,80 @@ TEST(ReadAloudCapture, ResidentFontRejoinsHyphenSplitWord) {
 // join, so a line-final '-' before it is a real hyphen and stays.
 TEST(ReadAloudCapture, NonLineBarrierBreaksHyphenJoin) {
   PageBuilder page;
-  page.line(0, 0, {tok("wall-", 0, 90)}).line(0, 55, {tok("flower", 0, 120)}, /*barrierBefore=*/true);
+  page.line(0, 0, {tok("wall-", 0, 90)}, false, readaloud::JOIN_DROP_HYPHEN)
+      .line(0, 55, {tok("flower", 0, 120)}, /*barrierBefore=*/true);
 
   std::vector<Rect> rects;
   const std::string text = page.run(residentFont(), rects);
 
   EXPECT_EQ(text, "wall- flower");
+}
+
+// --- which line-final hyphen is dropped ---------------------------------------------------------
+//
+// Since upstream 9dfa92ba2 a word with a hyphen or dash inside ("well-known") wraps AT that hyphen,
+// so a line-final '-' no longer means "the hyphenator split this word". The layout says which it was
+// (TextBlock::lineEndJoin) and the capture follows it.
+
+TEST(ReadAloudCapture, AHyphenTheHyphenatorInsertedIsDroppedAndJoined) {
+  PageBuilder page;
+  page.line(0, 0, {tok("an", 0, 30), tok("ex-", 60, 40)}, false, readaloud::JOIN_DROP_HYPHEN)
+      .line(0, 55, {tok("ample", 0, 70)});
+  std::vector<Rect> rects;
+  EXPECT_EQ(page.run(residentFont(), rects), "an example");
+  ASSERT_EQ(rects.size(), 3u);
+  EXPECT_EQ(rects[1].byteOffset, rects[2].byteOffset) << "the two fragments share the joined word's range";
+  EXPECT_EQ(rects[2].byteLen, 7u);
+}
+
+TEST(ReadAloudCapture, AHyphenThatIsPartOfTheSourceWordIsKeptAndJoinedWithNoSpace) {
+  PageBuilder page;
+  page.line(0, 0, {tok("a", 0, 20), tok("well-", 40, 60)}, false, readaloud::JOIN_KEEP)
+      .line(0, 55, {tok("known", 0, 80), tok("fact", 100, 50)});
+  std::vector<Rect> rects;
+  const std::string text = page.run(residentFont(), rects);
+  EXPECT_EQ(text, "a well-known fact");
+  EXPECT_EQ(rects.size(), 4u);
+}
+
+TEST(ReadAloudCapture, AnEmDashAtTheLineEndStaysAndJoinsWithNoSpace) {
+  PageBuilder page;
+  page.line(0, 0, {tok("wait\xe2\x80\x94", 0, 70)}, false, readaloud::JOIN_KEEP).line(0, 55, {tok("what", 0, 60)});
+  std::vector<Rect> rects;
+  EXPECT_EQ(page.run(residentFont(), rects), "wait\xe2\x80\x94what");
+}
+
+TEST(ReadAloudCapture, AWordThatMerelyEndsInAHyphenBeforeASpaceDoesNotJoin) {
+  // "pre- and post-war": the first line ends in "pre-", the next starts "and" -- two words.
+  PageBuilder page;
+  page.line(0, 0, {tok("pre-", 0, 50)}).line(0, 55, {tok("and", 0, 40), tok("post-war", 60, 90)});
+  std::vector<Rect> rects;
+  EXPECT_EQ(page.run(residentFont(), rects), "pre- and post-war");
+}
+
+TEST(ReadAloudCapture, AParagraphsLastLineEndingInAHyphenJoinsNothing) {
+  PageBuilder page;
+  page.line(0, 0, {tok("stop-", 0, 60)}).line(0, 55, {tok("Next", 0, 50)});
+  std::vector<Rect> rects;
+  EXPECT_EQ(page.run(residentFont(), rects), "stop- Next");
+}
+
+TEST(ReadAloudCapture, SoftHyphensInsideTokensAreStrippedWhateverTheJoin) {
+  // A token may still carry U+00AD (the layout strips them from drawn text, but capture input may not).
+  PageBuilder page;
+  page.line(0, 0,
+            {tok("co\xc2\xad"
+                 "op-",
+                 0, 60)},
+            false, readaloud::JOIN_DROP_HYPHEN)
+      .line(0, 55, {tok("erate", 0, 60)});
+  std::vector<Rect> rects;
+  EXPECT_EQ(page.run(residentFont(), rects), "cooperate");
+
+  PageBuilder second;
+  second.line(0, 0,
+              {tok("in\xc2\xad"
+                   "side",
+                   0, 60)});
+  EXPECT_EQ(second.run(residentFont(), rects), "inside");
 }

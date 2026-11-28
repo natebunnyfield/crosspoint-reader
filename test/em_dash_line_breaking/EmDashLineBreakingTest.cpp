@@ -59,6 +59,7 @@ class Gfx {
 struct Line {
   std::vector<std::string> words;
   std::vector<int16_t> xpos;
+  uint8_t join = 0;  // TextBlock::lineEndJoin
 };
 
 int wide(const char* text) { return Gfx::instance().renderer().getTextAdvanceX(kFont, text, EpdFontFamily::REGULAR); }
@@ -81,6 +82,7 @@ std::vector<Line> layout(const std::vector<std::string>& words, const bool hyphe
                                  line.words.emplace_back(block->wordText(i));
                                  line.xpos.push_back(block->wordXpos(i));
                                }
+                               line.join = block->lineEndJoin();
                              });
   return lines;
 }
@@ -171,4 +173,50 @@ TEST(EmDashLineBreaking, MixedCjkAndLatinSplitsAtTheDash) {
   ASSERT_EQ(lines.size(), 2u);
   EXPECT_EQ(lines[1].words, (std::vector<std::string>{"bar"}));
   EXPECT_EQ(lines[0].words.back(), "\xe5\xad\x97\xe2\x80\x94");
+}
+
+// --- what the layout tells the read-aloud capture about a line-final hyphen -------------------------
+// (TextBlock::lineEndJoin, read by readaloud::buildCapture; the capture's own cases are in
+// test/read_aloud_capture.) A hyphen the hyphenator inserted is dropped when the word is rejoined, one
+// that is part of the source word is kept, and a line that just ends in a hyphen joins nothing.
+
+TEST(EmDashLineBreaking, ASourceHyphenAtTheLineEndIsKeptWhenRejoined) {
+  const auto lines = layout({"well-known"}, false, wide("well-") + 2);
+  ASSERT_EQ(wordsOf(lines), (Lines{{"well-"}, {"known"}}));
+  EXPECT_EQ(lines[0].join, TextBlock::JOIN_KEEP);
+  EXPECT_EQ(lines[1].join, TextBlock::JOIN_NONE) << "the paragraph's last line joins nothing";
+}
+
+TEST(EmDashLineBreaking, ADashAtTheLineEndIsKeptWhenRejoined) {
+  const auto lines = layout({"foo\xe2\x80\x94"
+                             "bar"},
+                            false, wide("foo\xe2\x80\x94") + 2);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(lines[0].join, TextBlock::JOIN_KEEP);
+}
+
+TEST(EmDashLineBreaking, AWordEndingInAHyphenBeforeASpaceJoinsNothing) {
+  // "pre- and": the hyphen is the end of a source word, the next token is a new word.
+  const auto lines = layout({"pre-", "and"}, false, wide("pre-") + 2);
+  ASSERT_EQ(wordsOf(lines), (Lines{{"pre-"}, {"and"}}));
+  EXPECT_EQ(lines[0].join, TextBlock::JOIN_NONE);
+}
+
+TEST(EmDashLineBreaking, AHyphenTheHyphenatorInsertsIsMarkedForDropping) {
+  // Scan every width: whenever "forgiveness" is split by hyphenation, the line ends in an inserted '-'
+  // and says so; a line that ends a whole word never does.
+  int hyphenated = 0;
+  for (int width = wide("for-"); width < wide("forgiveness"); width += 3) {
+    for (const bool knuthPlass : {false, true}) {
+      const auto lines = layout({"forgiveness"}, true, width, knuthPlass);
+      for (size_t i = 0; i + 1 < lines.size(); ++i) {
+        if (lines[i].words.back().back() == '-') {
+          ++hyphenated;
+          EXPECT_EQ(lines[i].join, TextBlock::JOIN_DROP_HYPHEN) << lines[i].words.back() << " at " << width;
+        }
+      }
+      EXPECT_EQ(lines.back().join, TextBlock::JOIN_NONE);
+    }
+  }
+  EXPECT_GT(hyphenated, 0) << "the scan never hyphenated: the fixture proves nothing";
 }

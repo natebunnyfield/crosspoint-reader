@@ -736,9 +736,13 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
   struct AnchorPad {
     std::deque<std::string>& words;
     std::vector<uint16_t>& anchors;
+    std::vector<uint8_t>& hyphenInserted;
     uint16_t off;
-    ~AnchorPad() { anchors.resize(words.size(), off); }
-  } anchorPad{words, wordSourceStart, srcOff};
+    ~AnchorPad() {
+      anchors.resize(words.size(), off);
+      hyphenInserted.resize(words.size(), 0);
+    }
+  } anchorPad{words, wordSourceStart, wordHyphenInserted, srcOff};
 
   EpdFontFamily::Style baseStyle = fontStyle;
   if (underline) {
@@ -1206,6 +1210,7 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
     wordNoSpaceBefore.erase(wordNoSpaceBefore.begin(), wordNoSpaceBefore.begin() + consumed);
     wordFocusBoundary.erase(wordFocusBoundary.begin(), wordFocusBoundary.begin() + consumed);
     wordSourceStart.erase(wordSourceStart.begin(), wordSourceStart.begin() + consumed);
+    wordHyphenInserted.erase(wordHyphenInserted.begin(), wordHyphenInserted.begin() + consumed);
     if (!rubyTexts.empty()) {
       const size_t rtConsumed = std::min(consumed, rubyTexts.size());
       rubyTexts.erase(rubyTexts.begin(), rubyTexts.begin() + rtConsumed);
@@ -1777,6 +1782,9 @@ void ParsedText::splitWordAt(const size_t wordIndex, const size_t chosenOffset, 
   // The remainder is still the same source word: it inherits the prefix's
   // anchor so a page that begins mid-word repositions to that word's start.
   wordSourceStart.insert(wordSourceStart.begin() + wordIndex + 1, wordSourceStart[wordIndex]);
+  // The prefix now ends in a hyphen of ours when one was appended above; the remainder starts clean.
+  wordHyphenInserted.insert(wordHyphenInserted.begin() + wordIndex + 1, 0);
+  wordHyphenInserted[wordIndex] = chosenNeedsHyphen ? 1 : 0;
   // Emphasis follows the text across the split, so a break at or after the boundary leaves the
   // remainder fully regular.
   const uint8_t focusBoundary = wordFocusBoundary[wordIndex];
@@ -1862,6 +1870,22 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     }
     lineWords.push_back(std::move(word));
     lineWordStyles.push_back(wordStyles[lastBreakAt + i]);
+  }
+
+  // How this line's last token joins the first token of the NEXT line, for the read-aloud capture
+  // (TextBlock::lineEndJoin). A word wrapped at a hyphen the hyphenator inserted drops that hyphen
+  // when rejoined ("ex-" + "ample" = "example"); one wrapped at a hyphen or dash that is part of the
+  // source word, glued to its follower with no space ("well-" + "known"), keeps it, joined with no
+  // space. Anything else (a paragraph's last line, a word that merely ends in a hyphen before a space)
+  // does not join.
+  uint8_t endJoin = TextBlock::JOIN_NONE;
+  if (lineBreak < words.size() && lineBreak < continuesVec.size() && !lineWords.empty()) {
+    if (lastBreakAt + lineWordCount - 1 < wordHyphenInserted.size() &&
+        wordHyphenInserted[lastBreakAt + lineWordCount - 1] != 0) {
+      endJoin = TextBlock::JOIN_DROP_HYPHEN;
+    } else if (continuesVec[lineBreak] && endsWithBreakableHyphen(lineWords.back())) {
+      endJoin = TextBlock::JOIN_KEEP;
+    }
   }
 
   // Calculate total word width for this line, count actual word gaps,
@@ -2216,6 +2240,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       LOG_ERR("PTX", "Dropping line: TextBlock or arena allocation failed");
       return;
     }
+    block->setLineEndJoin(endJoin);
     processLine(std::move(block));
     return;
   }
@@ -2239,5 +2264,6 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     LOG_ERR("PTX", "Dropping line: TextBlock or arena allocation failed");
     return;
   }
+  block->setLineEndJoin(endJoin);
   processLine(std::move(block));
 }

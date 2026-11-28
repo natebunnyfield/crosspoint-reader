@@ -339,6 +339,10 @@ namespace {
 // advance of the face's em width instead of the replacement glyph's, so every line
 // that held one measures, and breaks, differently. A face that carries the symbol is
 // unchanged. Cached sections written before this hold the old advance.
+// v83 also carries one byte per TextBlock after its block style, lineEndJoin (how
+// the line's last token joins the next line's first, for read-aloud and Find),
+// added with the read-aloud fix for the hyphen/dash tokens of v82. Neither v82
+// nor v83 was released, so they share one number.
 constexpr uint8_t SECTION_FILE_VERSION = 83;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /

@@ -42,12 +42,19 @@ struct CaptureToken {
 // (image, rule) sat between this line and the previous one: it stops a hyphen
 // join from reaching across that gap, exactly as the original loop reset its
 // pending-join flag on any non-PageLine element.
+// How a line's last token joins the next line's first token (TextBlock::lineEndJoin, set by
+// ParsedText::extractLine; the numbers are the same).
+constexpr uint8_t JOIN_NONE = 0;         // no join: the next line starts a new word
+constexpr uint8_t JOIN_KEEP = 1;         // a source hyphen or dash: join with no space, keep it ("well-" "known")
+constexpr uint8_t JOIN_DROP_HYPHEN = 2;  // a hyphen the hyphenator inserted: drop it and join ("ex-" "ample")
+
 struct CaptureLine {
   int x;     // line left in page space (line.xPos + xOffset)
   int yTop;  // line top  in page space (line.yPos + yOffset)
   const CaptureToken* tokens;
   size_t count;
   bool hyphenBarrierBefore;
+  uint8_t endJoin = JOIN_NONE;  // how the last token joins the next line's first
 };
 
 // Renderer metrics for the reader font. lineHeight and spaceWidth BOTH read 0
@@ -94,10 +101,10 @@ inline void buildCapture(const CaptureLine* lines, size_t lineCount, const Captu
   const bool haveSpaceMetric = m.spaceWidth > 0;
   const auto clampU16 = [](const int v) { return static_cast<uint16_t>(v < 0 ? 0 : (v > 0xFFFF ? 0xFFFF : v)); };
 
-  bool pendingHyphenJoin = false;
+  uint8_t pendingJoin = JOIN_NONE;  // the previous line asked for a join onto this line's first run
   for (size_t li = 0; li < lineCount; li++) {
     const CaptureLine& line = lines[li];
-    if (line.hyphenBarrierBefore) pendingHyphenJoin = false;
+    if (line.hyphenBarrierBefore) pendingJoin = JOIN_NONE;
     const int lineX = line.x;
     const int lineTop = line.yTop;
     const size_t n = line.count;
@@ -125,16 +132,14 @@ inline void buildCapture(const CaptureLine* lines, size_t lineCount, const Captu
       const uint16_t ry = clampU16(lineTop);
       const uint16_t rw = clampU16(runEndX - runX);
       const uint16_t rh = clampU16(lineH);
-      // A word the layout hyphen-split across lines arrives as two tokens whose
-      // prefix ends in '-' at the end of its line (ParsedText appends the visible
-      // hyphen to the stored prefix). The TextBlock arena carries no source
-      // anchors, so reuniting them is a display-list heuristic: a line-final '-'
-      // joins to the next line's first word, dropping the hyphen; the joined
-      // word's fragments publish one rect each, sharing its byte range. Known
-      // false positive: a paragraph-final real hyphen. Rare, and the capture
-      // audit (gate G0) watches for it.
-      if (pendingHyphenJoin && firstRunOnLine && !rects.empty() && !text.empty() && text.back() == '-') {
-        text.pop_back();
+      // A word the layout split across lines arrives as two tokens, and the layout says how to put it
+      // back together (TextBlock::lineEndJoin, from ParsedText::extractLine, which knows what the
+      // text cannot): a hyphen the hyphenator inserted is dropped ("ex-" "ample" -> "example"), a
+      // hyphen or dash that is part of the source word is kept with no space ("well-" "known" ->
+      // "well-known"), and a line that merely ends in a hyphen before a space, or ends a paragraph,
+      // joins nothing. The joined word's fragments publish one rect each, sharing its byte range.
+      if (pendingJoin != JOIN_NONE && firstRunOnLine && !rects.empty() && !text.empty()) {
+        if (pendingJoin == JOIN_DROP_HYPHEN && text.back() == '-') text.pop_back();
         const uint32_t off = rects.back().byteOffset;
         text += runText;
         const uint16_t newLen = static_cast<uint16_t>(std::min<size_t>(text.size() - off, 0xFFFF));
@@ -148,7 +153,7 @@ inline void buildCapture(const CaptureLine* lines, size_t lineCount, const Captu
       }
       firstRunOnLine = false;
     }
-    pendingHyphenJoin = !text.empty() && text.back() == '-';
+    pendingJoin = text.empty() ? JOIN_NONE : line.endJoin;
   }
 }
 
