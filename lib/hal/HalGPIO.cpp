@@ -4,44 +4,12 @@
 #include <PowerManager.h>
 #include <Preferences.h>
 #include <SPI.h>
-#include <Wire.h>
 #include <XteinkDetect.h>
 #include <esp_sleep.h>
 #include <soc/usb_serial_jtag_struct.h>
 
 // Global HalGPIO instance
 HalGPIO gpio;
-
-namespace X3GPIO {
-
-bool readI2CReg16LE(uint8_t addr, uint8_t reg, uint16_t* outValue) {
-  Wire.beginTransmission(addr);
-  Wire.write(reg);
-  if (Wire.endTransmission(false) != 0) {
-    return false;
-  }
-  if (Wire.requestFrom(addr, static_cast<uint8_t>(2), static_cast<uint8_t>(true)) < 2) {
-    while (Wire.available()) {
-      Wire.read();
-    }
-    return false;
-  }
-  const uint8_t lo = Wire.read();
-  const uint8_t hi = Wire.read();
-  *outValue = (static_cast<uint16_t>(hi) << 8) | lo;
-  return true;
-}
-
-bool readBQ27220CurrentMA(int16_t* outCurrent) {
-  uint16_t raw = 0;
-  if (!readI2CReg16LE(I2C_ADDR_BQ27220, BQ27220_CUR_REG, &raw)) {
-    return false;
-  }
-  *outCurrent = static_cast<int16_t>(raw);
-  return true;
-}
-
-}  // namespace X3GPIO
 
 namespace {
 constexpr char HW_NAMESPACE[] = "cphw";
@@ -460,19 +428,6 @@ bool HalGPIO::isUsbConnected() const {
 }
 
 bool HalGPIO::isUsbElectricalConnected() const {
-  if (deviceIsX3()) {
-    // X3: infer USB/charging via BQ27220 Current() register (0x0C, signed mA).
-    // Positive current means charging. Misses a data-only cable and a full
-    // battery — the SOF check in update() covers those.
-    for (uint8_t attempt = 0; attempt < 2; ++attempt) {
-      int16_t currentMa = 0;
-      if (X3GPIO::readBQ27220CurrentMA(&currentMa)) {
-        return currentMa > 0;
-      }
-      delay(2);
-    }
-    return false;
-  }
 #if FREEINK_DEVICE_PICCO
   {
     // Picco: no USB-detect pin. The SGM41562 charger reports its input rail
@@ -485,9 +440,13 @@ bool HalGPIO::isUsbElectricalConnected() const {
     return battery.isCharging();
   }
 #endif
-  if (BoardConfig::ACTIVE.usbDetect >= 0) {
+  if (!deviceIsX3() && BoardConfig::ACTIVE.usbDetect >= 0) {
     return digitalRead(BoardConfig::ACTIVE.usbDetect) == HIGH;
   }
+  // X3 uses GPIO20 for I2C, not USB detection: it is inferred from charging state below, through the
+  // SDK's BatteryMonitor, which brings the I2C bus up before it reads the BQ27220 (upstream: the raw Wire read
+  // this replaces ran before the bus was initialized). Misses a data-only cable and a full battery,
+  // as before; the SOF check in update() covers those.
   // No digital USB-detect line (e.g. Sticky, whose PWR_IN_VOLT is an analog
   // divider): infer external power from charging state instead. BatteryMonitor
   // picks the board's best source — charger IC status, gauge Current() sign, or
