@@ -49,6 +49,10 @@ class CrossPointWebServerActivity final : public Activity {
   // Performance monitoring
   unsigned long lastHandleClientTime = 0;
 
+  // Set when Back or Home is seen while an upload holds handleClient().
+  bool leaveRequested = false;
+  unsigned long lastUploadInputPollMs = 0;
+
   // Sustained WiFi-loss tracking; abandon only after WIFI_ABANDON_MS.
   int consecutiveDisconnects = 0;
   unsigned long firstDisconnectAt = 0;

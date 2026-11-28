@@ -338,6 +338,22 @@ void CrossPointWebServerActivity::startWebServer() {
     onGoHome();
     return;
   }
+  // An upload holds loop() inside handleClient(), so input is sampled on each received chunk instead
+  // (at most every 20 ms). On a slow link chunks come ~0.5 s apart, so a held Back is confirmed past
+  // the SDK's 5 ms debounce by the next one. THIS IS THE ONE MID-FRAME update() in the fork: the
+  // handleClient loop below avoids it because update() clears the frame's edges for other readers
+  // (input-edge audit 2026-08-21, finding 7); here the frame ends in onGoHome() or carries on with an
+  // upload that has already held the loop for seconds, and only Back and Home are read.
+  webServer->setUploadCancelCheck([this] {
+    if (leaveRequested) return true;
+    const unsigned long now = millis();
+    if (now - lastUploadInputPollMs < 20) return false;
+    lastUploadInputPollMs = now;
+    mappedInput.update();
+    leaveRequested = mappedInput.isPressed(MappedInputManager::Button::Back) ||
+                     mappedInput.wasPressed(MappedInputManager::Button::Back) || mappedInput.wasHomeGesture();
+    return leaveRequested;
+  });
   webServer->begin();
 
   if (webServer->isRunning()) {
@@ -474,6 +490,10 @@ void CrossPointWebServerActivity::loop() {
       const unsigned long batchStart = millis();
       for (int i = 0; i < MAX_ITERATIONS && webServer->isRunning(); i++) {
         webServer->handleClient();
+        if (leaveRequested) {
+          onGoHome();
+          return;
+        }
         // Reset watchdog every 32 iterations
         if ((i & 0x1F) == 0x1F) {
           resetTaskWatchdogIfSubscribed();
