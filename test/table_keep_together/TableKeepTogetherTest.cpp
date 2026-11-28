@@ -178,6 +178,8 @@ std::vector<PageLines> layout(const std::string& bodyHtml, const bool lineGrid =
   return pages;
 }
 
+// A word with a hyphen inside ("Effort-to-payoff,") is several attached tokens since upstream
+// 9dfa92ba2, which the helper that flattens a line joins with spaces: look for its last token.
 bool lineHasWord(const std::string& line, const std::string& word) {
   size_t start = 0;
   while (start <= line.size()) {
@@ -523,7 +525,7 @@ TEST(TableKeepTogether, CaptionTravelsWithTheHeader) {
     const auto pages = layout(filler(n) + reportedTable(/*withCaption=*/true));
     const int header = pageOf(pages, "Addition");
     ASSERT_GE(header, 0) << "header row missing entirely, fillers=" << n;
-    EXPECT_EQ(pageOf(pages, "Effort-to-payoff,"), header) << "caption stranded, fillers=" << n;
+    EXPECT_EQ(pageOf(pages, "payoff,"), header) << "caption stranded, fillers=" << n;
     EXPECT_EQ(pageOf(pages, "Beans"), header) << "first body row left behind, fillers=" << n;
     EXPECT_EQ(pageOf(pages, "Lentils"), header) << "second body row left behind, fillers=" << n;
   }
@@ -578,7 +580,7 @@ TEST(TableKeepTogether, HeaderTravelsWithItsRowsOnTheLineGridToo) {
     const auto pages = layout(filler(n) + reportedTable(/*withCaption=*/true), /*lineGrid=*/true);
     const int header = pageOf(pages, "Addition");
     ASSERT_GE(header, 0) << "header row missing entirely, fillers=" << n;
-    EXPECT_EQ(pageOf(pages, "Effort-to-payoff,"), header) << "caption stranded, fillers=" << n;
+    EXPECT_EQ(pageOf(pages, "payoff,"), header) << "caption stranded, fillers=" << n;
     EXPECT_EQ(pageOf(pages, "Beans"), header) << "first body row left behind, fillers=" << n;
     for (size_t p = 0; p < pages.size(); p++) {
       EXPECT_FALSE(pages[p].empty()) << "blank page " << p << ", fillers=" << n;

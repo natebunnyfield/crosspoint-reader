@@ -55,6 +55,7 @@
 #include "Epub/KnuthPlassBreaker.h"
 #include "Epub/LineBreakMode.h"
 #include "Epub/ParsedText.h"
+#include "Epub/TokenBoundary.h"
 #include "Epub/blocks/TextBlock.h"
 #include "Epub/hyphenation/Hyphenator.h"
 #include "KnuthPlass.h"
@@ -436,11 +437,16 @@ bool cutsFromBlocks(const std::vector<std::string>& words, const std::vector<std
         endPos = {k, 0, false, false};
         continue;
       }
-      if (i + 1 != b->wordCount()) return false;  // only a line's LAST token may be a prefix
+      // A word with a visible hyphen or dash inside is several attached tokens since upstream
+      // 9dfa92ba2 ("well-known" is "well-" + "known"); any fragment that is a prefix of the rest is
+      // one, and several can share a line.
       if (rest.compare(0, tok.size(), tok) == 0) {
         o += static_cast<int>(tok.size());  // an explicit hyphen already in the word
         endPos = {k, o, false, true};
-      } else if (!tok.empty() && tok.back() == '-' && rest.compare(0, tok.size() - 1, tok, 0, tok.size() - 1) == 0) {
+        continue;
+      }
+      if (i + 1 != b->wordCount()) return false;  // only a line's LAST token may carry an inserted hyphen
+      if (!tok.empty() && tok.back() == '-' && rest.compare(0, tok.size() - 1, tok, 0, tok.size() - 1) == 0) {
         o += static_cast<int>(tok.size()) - 1;
         endPos = {k, o, true, true};
       } else {
@@ -456,16 +462,27 @@ bool cutsFromBlocks(const std::vector<std::string>& words, const std::vector<std
 int mismatchedLines(const std::vector<Line>& model, const std::vector<std::unique_ptr<TextBlock>>& blocks) {
   int bad = 0;
   for (size_t l = 0; l < std::max(model.size(), blocks.size()); ++l) {
-    if (l >= model.size() || l >= blocks.size() || model[l].texts.size() != blocks[l]->wordCount()) {
+    if (l >= model.size() || l >= blocks.size()) {
       bad++;
       continue;
     }
-    for (uint16_t i = 0; i < blocks[l]->wordCount(); ++i) {
-      if (model[l].xpos[i] != blocks[l]->wordXpos(i) || model[l].texts[i] != blocks[l]->wordText(i)) {
-        bad++;
+    // The model sets one entry per source word. Since upstream 9dfa92ba2 ParsedText sets a word with
+    // a visible hyphen or dash inside ("well-known") as several attached tokens on the same line, so
+    // consecutive real tokens are folded back into the model's entry when they spell it, and the
+    // entry is compared at the x of its first token.
+    const TextBlock& block = *blocks[l];
+    uint16_t t = 0;
+    bool lineOk = true;
+    for (size_t j = 0; j < model[l].texts.size() && lineOk; ++j) {
+      if (t >= block.wordCount() || model[l].xpos[j] != block.wordXpos(t)) {
+        lineOk = false;
         break;
       }
+      std::string folded;
+      while (t < block.wordCount() && folded.size() < model[l].texts[j].size()) folded += block.wordText(t++);
+      if (folded != model[l].texts[j]) lineOk = false;
     }
+    if (!lineOk || t != block.wordCount()) bad++;
   }
   return bad;
 }
@@ -1933,6 +1950,8 @@ Painted inspect(const std::vector<std::unique_ptr<TextBlock>>& lines, const int 
       const int gap = b.wordXpos(i + 1) - end;
       p.negativeGaps += gap < 0;
       if (!wordSpaces || a == " " || c == " ") continue;
+      // "well-" + "known" are one attached word since upstream 9dfa92ba2: no word space between them.
+      if (TokenBoundary::allowsBreakAfterExplicitHyphen(lastCp(a))) continue;
       const int natural = r.getSpaceAdvance(fontId, lastCp(a), firstCp(c), b.wordStyle(i));
       const int space = r.getSpaceAdvance(fontId, 'n', 'n', b.wordStyle(i));
       p.shrunkGaps += gap < natural;

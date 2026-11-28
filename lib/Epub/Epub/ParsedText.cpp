@@ -160,6 +160,10 @@ int measureLowercaseAlphabet(const GfxRenderer& renderer, const int fontId) {
 }
 
 bool isNoBreakBeforeCjkPunctuation(const uint32_t cp) {
+  // A line may end after a visible hyphen or dash, never begin with one (upstream 9dfa92ba2).
+  if (TokenBoundary::allowsBreakAfterExplicitHyphen(cp)) {
+    return true;
+  }
   switch (cp) {
     case '.':
     case ',':
@@ -239,6 +243,9 @@ bool containsCjkBreakableCodepoint(const std::string& text) {
 }
 
 bool cjkBoundaryAllowsBreak(const uint32_t leftCp, const uint32_t rightCp) {
+  if (TokenBoundary::allowsBreakAfterExplicitHyphen(leftCp)) {
+    return !isNoBreakBeforeCjkPunctuation(rightCp);
+  }
   if (!utf8IsCjkBreakable(leftCp) && !utf8IsCjkBreakable(rightCp)) return false;
   if (isNoBreakAfterCjkPunctuation(leftCp) || isNoBreakBeforeCjkPunctuation(rightCp)) return false;
   if (utf8IsCombiningMark(rightCp)) return false;
@@ -248,6 +255,9 @@ bool cjkBoundaryAllowsBreak(const uint32_t leftCp, const uint32_t rightCp) {
 // Korean separates words with spaces, so a boundary touching Hangul is not a gap-less break inside
 // a line (upstream 794ac97f4). hangulLineEndBreaks() still lets a Hangul word split there at a line end.
 bool hasCjkBreakOpportunityBetween(const uint32_t leftCp, const uint32_t rightCp) {
+  if (TokenBoundary::allowsBreakAfterExplicitHyphen(leftCp)) {
+    return cjkBoundaryAllowsBreak(leftCp, rightCp);
+  }
   if (utf8IsHangul(leftCp) || utf8IsHangul(rightCp)) return false;
   return cjkBoundaryAllowsBreak(leftCp, rightCp);
 }
@@ -349,6 +359,42 @@ std::vector<size_t> cjkCharacterBreakByteOffsets(const std::string& text) {
 // maxShrinkPerGap, so a line nobody chose to shrink (a forced overfull one)
 // can never have its words driven into each other -- it overflows, as before.
 // Every other caller passes 0 and gets exactly the old stretch-only answer.
+// Scans text for explicit hyphens or dashes and returns byte offsets where a line break is permitted right after
+// the hyphen/dash. Multi-character hyphen/dash runs are kept together as an indivisible unit.
+std::vector<size_t> explicitHyphenBreakByteOffsets(const std::string& text, const bool attachToPrevious) {
+  std::vector<size_t> breakOffsets;
+  const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
+  const auto* const start = ptr;
+  const auto* const end = ptr + text.size();
+
+  bool hasLeadingContent = attachToPrevious;
+
+  while (ptr < end) {
+    const uint32_t cp = utf8NextCodepoint(&ptr);
+    if (cp == 0) break;
+
+    if (TokenBoundary::allowsBreakAfterExplicitHyphen(cp)) {
+      while (ptr < end) {
+        const auto* const nextStart = ptr;
+        const uint32_t nextCp = utf8NextCodepoint(&ptr);
+        if (!TokenBoundary::allowsBreakAfterExplicitHyphen(nextCp)) {
+          ptr = nextStart;
+          break;
+        }
+      }
+
+      if (hasLeadingContent && ptr < end) {
+        breakOffsets.push_back(static_cast<size_t>(ptr - start));
+      }
+      hasLeadingContent = true;
+    } else {
+      hasLeadingContent = true;
+    }
+  }
+
+  return breakOffsets;
+}
+
 int computeJustifyExtra(const int spareSpace, const size_t gapCount, const int maxShrinkPerGap = 0) {
   if (gapCount < MIN_JUSTIFY_GAPS) return 0;
   if (spareSpace < 0 && maxShrinkPerGap > 0) {
@@ -719,8 +765,12 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
   // previous one in the source) may be turned into a gap-less break opportunity. When real
   // whitespace separated the two words, that space is content and must be rendered: Korean
   // is a space-delimited script written in Hangul, which utf8IsCjkBreakable() covers.
-  if (attachToPrevious && !words.empty() &&
-      hasCjkBreakOpportunityBetween(lastCodepoint(words.back()), firstCodepoint(word))) {
+  if (attachToPrevious && !words.empty() && endsWithBreakableHyphen(words.back())) {
+    // Glued to a token that ends in a visible hyphen or dash: stays attached when unbroken, may break.
+    effectiveAttachToPrevious = true;
+    effectiveNoSpaceBefore = true;
+  } else if (attachToPrevious && !words.empty() &&
+             hasCjkBreakOpportunityBetween(lastCodepoint(words.back()), firstCodepoint(word))) {
     effectiveAttachToPrevious = false;
     effectiveNoSpaceBefore = true;
   }
@@ -765,14 +815,17 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
     size_t tokenStart = 0;
     for (const size_t breakOffset : breakOffsets) {
       if (breakOffset <= tokenStart || breakOffset > word.size()) continue;
-      pushToken(word.substr(tokenStart, breakOffset - tokenStart), firstToken ? effectiveAttachToPrevious : false,
-                firstToken ? effectiveNoSpaceBefore : true, /*focusBoundary=*/0);
+      const bool attach =
+          firstToken ? effectiveAttachToPrevious : (!words.empty() && endsWithBreakableHyphen(words.back()));
+      pushToken(word.substr(tokenStart, breakOffset - tokenStart), attach, firstToken ? effectiveNoSpaceBefore : true,
+                /*focusBoundary=*/0);
       firstToken = false;
       tokenStart = breakOffset;
     }
     if (tokenStart < word.size()) {
-      pushToken(word.substr(tokenStart), firstToken ? effectiveAttachToPrevious : false,
-                firstToken ? effectiveNoSpaceBefore : true, /*focusBoundary=*/0);
+      const bool attach =
+          firstToken ? effectiveAttachToPrevious : (!words.empty() && endsWithBreakableHyphen(words.back()));
+      pushToken(word.substr(tokenStart), attach, firstToken ? effectiveNoSpaceBefore : true, /*focusBoundary=*/0);
     }
     if (wordStartsRtl) {
       hasRtlWord = true;
@@ -790,6 +843,30 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
 
   // Already-bold text should stay fully bold; focus splitting would make its suffix regular later.
   if (!this->focusReadingEnabled || (baseStyle & EpdFontFamily::BOLD) != 0) {
+    // foo-bar and foo\xe2\x80\x94bar: break allowed after the visible hyphen or dash, text stays attached
+    // when unbroken (continues + noSpaceBefore), which is how the focus-reading path below already
+    // treats them (upstream 9dfa92ba2).
+    if (auto breakOffsets = explicitHyphenBreakByteOffsets(word, effectiveAttachToPrevious); !breakOffsets.empty()) {
+      ensureTokenCapacity(breakOffsets.size() + 1);
+      bool firstToken = true;
+      size_t tokenStart = 0;
+      for (const size_t breakOffset : breakOffsets) {
+        if (breakOffset <= tokenStart || breakOffset > word.size()) continue;
+        pushToken(word.substr(tokenStart, breakOffset - tokenStart), firstToken ? effectiveAttachToPrevious : true,
+                  firstToken ? effectiveNoSpaceBefore : true, /*focusBoundary=*/0);
+        firstToken = false;
+        tokenStart = breakOffset;
+      }
+      if (tokenStart < word.size()) {
+        pushToken(word.substr(tokenStart), firstToken ? effectiveAttachToPrevious : true,
+                  firstToken ? effectiveNoSpaceBefore : true, /*focusBoundary=*/0);
+      }
+      if (wordStartsRtl) {
+        hasRtlWord = true;
+      }
+      return;
+    }
+
     pushToken(std::move(word), effectiveAttachToPrevious, effectiveNoSpaceBefore, /*focusBoundary=*/0);
     if (wordStartsRtl) {
       hasRtlWord = true;

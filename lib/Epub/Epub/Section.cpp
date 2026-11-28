@@ -330,7 +330,11 @@ namespace {
 // The soft flush goes through makePages(includeLastLine = false), so it now also
 // gets the page-top rule, the inter-block gap cap and the line grid at its
 // start. Pages of long paragraphs move; the binary layout does not.
-constexpr uint8_t SECTION_FILE_VERSION = 81;
+// v82: upstream 9dfa92ba2 (#3883). A word with a visible hyphen or dash inside
+// ("well-known", "foo\xe2\x80\x94bar") is split into tokens at each hyphen/dash run, attached
+// (no space) when they share a line and free to break between, whether or not
+// hyphenation is on. Line breaks of such text move; the binary layout does not.
+constexpr uint8_t SECTION_FILE_VERSION = 82;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
