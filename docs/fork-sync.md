@@ -160,6 +160,13 @@ recorded here instead.
   are skipped on this ruling; a fix to shared layout code that happens to
   mention Markdown is still judged on its own.
 
+- **Paragraph Indentation setting — RULED SKIP, owner 2026-11-27.** Asked "add
+  the Paragraph Indentation setting, or leave indents to the book?", the owner
+  answered "leave". Paragraph indents stay with the book's own CSS; no setting
+  overrides `text-indent`. Covers `458be7ed2` (Off, 1-5 spaces; a page-format
+  change). Later upstream commits that only serve that setting are skipped on
+  this ruling.
+
 ### The two currently outstanding (2026-08-03)
 
 Both are `REVIEW`, both are genuinely mixed, and neither is a drive-by:
@@ -785,6 +792,7 @@ TAKE/PARTIAL was re-checked against the code and built before keeping it. Branch
   - The SD plugin system: `2600a79ea`, `5b1f0605f`, `f331030f3`, `eced576be`.
   - Links in the reader: `b88b653a7`, `e6af0c951`, `664528b28`, `099e89bcb` (and batch 4's `7bcc3a692`).
   - TXT and Markdown through the EPUB pipeline: `9c103c87f` ("plaintext": the fork's text reader stays).
+  - Paragraph Indentation setting: `458be7ed2` ("leave": indents stay with the book's CSS).
 - **NOT PORTED, needs a human look:** `e9245489f`'s separate FAT cache. It adds
   `-DUSE_SEPARATE_FAT_CACHE=1` and an SdFat pin, and changes the one-shared-cache premise of
   `scripts/patch_sdfat.py` (B-073, free clusters only after the directory entry reaches the card).
@@ -792,8 +800,7 @@ TAKE/PARTIAL was re-checked against the code and built before keeping it. Branch
 - **HELD, not yet asked (one question per feature, asked by the coordinator; nothing here is ruled):**
   1. (ruled SKIP 2026-11-27: TXT and Markdown, `9c103c87f`; see above.)
   2. **Settings checkbox look** (`d1509d073`): needs SDK `toggleCheckbox` props, absent at the pin.
-  3. **Paragraph indentation setting** (`458be7ed2`): Off, 1-5 spaces, overrides CSS `text-indent`;
-     a page-format change.
+  3. (ruled SKIP 2026-11-27: Paragraph Indentation setting, `458be7ed2`; see above.)
   4. **Keyboard layout and look** (`b145c1431`, `8e30a699a`; also batch 4's `d5d2d67a5`/`b0b844fcc`):
      needs SDK `225c097` keyboard props; he signed off the current keyboard.
   5. **Library view** (`4a6283db9`, with `28132052f` skipped behind it): batch 5 question 1 still open.
