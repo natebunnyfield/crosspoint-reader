@@ -141,6 +141,10 @@ recorded here instead.
   10,700 lines plus about 29 follow-ups already in the backlog; new relay and
   plugin-file endpoints on the web server.
 
+- **Redaction blocks — RULED TAKE, owner 2026-11-28.** Asked "take it or skip it?" about `7394e40fa`
+  (solid rectangles for U+2588 and U+25A0 when the reading font lacks them), the owner answered "take".
+  Taken in batch 7 (fork `587d26f5d`).
+
 - **Links in the reader — RULED SKIP, owner 2026-11-27.** Asked "Keep the
   fork's footnote list, or adopt upstream's selectable links?", the owner
   answered "list". The fork keeps its footnote list and non-interactive links.
@@ -328,6 +332,7 @@ Gates: `pio run -e default` (X4) SUCCESS, RAM 59,628 B (18.2%), Flash 4,881,821 
 | 4 | `84fcff848`..`e33e3cf39` (50) | 11 (`309923156` `ce6c6cbce` `5fcd26330` `93b6fe111` `b5fb406f5` `03c484778` `6eda8f0b7` `3e60e1302` `c33a8b0e8` `c80c537f2` `0475e6938`) | 7 (`badfa95ff` `365618e47` `9d2f234e1` `54337e6d7` `b7bceb56c` `f437bb506` `2b2ba72f0`; see "Batch 4" below) | ALREADY 7; SKIP 18 (deleted subsystems, other languages, fork-curated font ids); HELD 7 (keyboard layouts, link tapping, language fonts, pioarduino bump, grayscale SDK series x2, X4 Classic CI). Plus a fork fix from `da3d50c24` (skipped-subtree close guard). Caches: section 71 -> 77, book.bin 12 -> 13, CSS 11 -> 12 | (this push) |
 | 5 | `123f3760e`..`fca8f55f5` (50) | 6 (`f64ba736a` `3555ff556` `3f874f847` `f4b4ff06c` `8e10f51df` `04ca1d53c`) | 3 (`652ae0d83` OPF metadata fix only; `92ef5707a` grey bins only; `3f70f5dfc` MEM gate only) | ALREADY 8; SKIP 18; RULED SKIP 1 (`aaf683798`); HELD 14 (9 owner questions). Plus six fixes from the adversarial review. Caches: section 77 -> 78, book.bin 13 -> 14 | (this push) |
 | 6 | `0f01106ad`..`8e30a699a` (50) | 8 (`f03d7f4db` `1d61100f9` `a70ade72e` `794ac97f4` `637ad4a5e` `457f64c69` `e2dfdeaf9` `fc4feed7e`) | 7 (`6410894cd` Spanish key only; `a09460975` list captures; `10cb2c3b2` predicate only; `56c677f68` probe loan; `f1d0af1af` 4 of 5 bugs; `ce9f5c28e` already; `e9245489f` patch 0001 already) | ALREADY 12; SKIP 8; RULED SKIP 8 (plugins x4, links x4); HELD 6 questions, not yet asked. Caches: section 79 -> 80 | (this push) |
+| 7 | `50823ffa1`..`83f9cc058` (50) | 5 (`bb855ef93` `0a9077722` `aad48b40d` `d5693c321` `9dfa92ba2`; plus `7394e40fa` RULED TAKE 2026-11-28, and a read-aloud fix from the adversarial review) | 0 | ALREADY 5 (incl. `93a14afd9`, found already in the SDK pin); SKIP 31 (incl. `bbb45c39a`, dropped after review F1); NOT PORTED 2 (`fdf5f76c0`+`28971493d`, needs a heap measurement and the `unloadAll` fix; `9610da702`, needs a human look and a heap soak); HELD 4 questions, not yet asked. SDK pointer 119f3ed -> 65c8bd8 (one cherry-pick, branch `campaign-b7`, unpushed). Caches: section 80 -> 83 | (this push) |
 
 
 ### FUI port (`9e3cea2e5`), 2026-11-08
@@ -832,6 +837,112 @@ run pass (993 before; 13 new: 6 Korean, 7 SD-font kerning).
 **Adversarial review before the push** (`docs/adversarial-review-2026-11-27-batch-6.md`): one finding fixed, F1: the port of `a70ade72e` cleared the remembered book while a book opened, and this fork boots an empty path into the first EPUB under `/books`, so a sleep during a long first index woke into an unrelated book. The clear is removed; a book that never renders is still never remembered. Two findings left as is and recorded there (a short Back tap can be lost during an upload; the framebuffer loan may add a refresh on image-heavy books, device-only). After the fix: `pio run -e default` SUCCESS (RAM 59,596 B, Flash 4,882,251 B), `pio run -e picco` SUCCESS, `pio run -e simulator` SUCCESS, `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). The host suite was not re-run for the fix (it removes one state write in `ReaderActivity::onEnter`; no suite covers that path).
 
 **Rebased before the push** onto `4b019d933` (four commits another session pushed to `main` the same evening; one shared file, `CrossPointWebServer.cpp`, no conflict). On the rebased tree: `pio run -e default` SUCCESS, `pio run -e picco` SUCCESS, `pio run -e simulator` SUCCESS, `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves), host tests 1006 of 1006 run pass.
+
+### Batch 7 (2026-11-28): `50823ffa1`..`83f9cc058`, 50 commits
+
+Upstream commits 51-100 after `fca8f55f5`. A read-only agent triaged the batch against `5546b040b`
+(it built nothing); each TAKE was re-checked against the code, ported by hand and built.
+Branch `campaign-b7` on `origin/main` `5546b040b`, one commit per upstream commit with `(ported from
+upstream <sha>)`. One SDK move (below). The standing rulings of batch 6 (plugins, links, TXT/Markdown,
+indentation) were applied without asking.
+
+- **TAKEN (5, plus the ruled take and one review fix):**
+  - `bb855ef93` SCOPE.md downstream-foundation section (fork `2435f435f`), under the fork banner.
+  - `0a9077722` X3 battery capacity loaded into the BQ27220 (fork `517b85934`, plus `fix(sim)` below).
+    SDK `e040e9a2` cherry-picked with `-x` on the fork's SDK branch `campaign-b7` (SDK sha
+    `65c8bd848354761b108bd6cc0c21e6540289c9a3`, on `119f3ed`, NOT pushed); it conflicted only where the fork
+    already carried neighboring code (`designCapacityMah` already present, `enterShipMode` and
+    `configureCharger` kept beside `loadDesignCapacity`, the host test dir and `docs/testing.md`). Both
+    SDK host suites pass (4,554 and 54,178 checks). The six "Taken EARLY" SDK commits are still ancestors.
+    Device only, X3 only: UNCONFIRMED on device.
+  - `aad48b40d` sub-chapter contents navigation (fork `79aa8dd14`): the chapter list opens on the TOC
+    entry for the page being read. The fork opens the list from `openChapterSelection`, so the menu and
+    Contents-overlay hunks are dropped. No cache bump.
+  - `d5693c321` paragraph continuity across soft flushes (fork `8c9a1e1f0`), section 80 -> 81. The fork's
+    `makePages` has a half-line gap cap, Line Grid and widow/orphan hold-back that upstream lacks: the
+    block's start (stranded-term keep, collapse reset, page-top rule, gap cap, scene-break lift, grid snap)
+    now runs once, guarded by `ParsedText::topSpacingSpent`, and its end (held-back tail, anchor and
+    footnote fallbacks, bottom spacing) runs only for `includeLastLine`. Five new `SoftFlush` host cases:
+    two fail on the old code (a hanging indent repeated, a margin inside the paragraph), three pin the cap,
+    the grid and no one-line page. Positive `text-indent` is not honored while paragraphs carry a gap
+    (`resolveFirstLineIndent`), so the indent case uses a negative one.
+  - `9dfa92ba2` break after hyphens and dashes (fork `33baca3d8`), section 81 -> 82. The fork already had
+    `endsWithBreakableHyphen` and the focus-reading split (batch 2); only the standard path is new. New
+    suite `test/em_dash_line_breaking` (three of eight fail on the old code). Three suites assumed one
+    token per source word and were adapted, not weakened: the Knuth-Plass model comparison folds attached
+    fragments back, its gap inspector skips the attach, `table_keep_together` finds a hyphenated caption
+    by its last token. Review F2 (below) found its side effect on read-aloud and it is fixed.
+  - Read-aloud fix after review F2 (fork `f262d9b34`): see "Adversarial review" below.
+- **RULED TAKE (owner, 2026-11-28):** `7394e40fa` redaction blocks (fork `1aa4210a7`). Asked "take it or
+  skip it?", the owner answered "take". Missing U+2588 and U+25A0 are drawn as filled rectangles (em width,
+  ascender) in the BW pass; measured by `getTextAdvanceX`, `getTextBounds`, ink bounds; drawn upright,
+  sup/sub (half), both rotations, dark mode; never counted as a missing glyph. A hi-res companion is
+  bypassed for a solid block (it has nothing denser to offer). Ten framebuffer cases in `test/solid_blocks`
+  (seven fail on the old code) plus upstream's five `EpdFont` cases. The scale-2 hi-res path is not exercised
+  (the host build is scale 1). Section 82 -> 83 (a face lacking the symbol now advances by the em width).
+- **ALREADY (5):** `14423d4af` (fork `48b758905`), `c1a62f663` (fork `acba47e28`), `87f9c34c6` (taken EARLY),
+  `5bd059838` (fork `870def5e1`), and `93a14afd9` (SDK `c2d711a0`): the triage said the pin lacks the
+  `txn.end()` before `CMD_PARTIAL_OUT`; it has it, as `bus.endTxn()` in `writeGrayscalePlaneStrip`
+  (the cherry-pick conflicted on exactly that line). The first four were not re-verified here.
+- **SKIP (31):** `bbb45c39a` (scope the Git version define to sources that use it; DROPPED after review F1: `scripts/stamp_app_desc.py` reads the version from `env.get("CPPDEFINES")`, and the port moves the define onto per-source cloned envs, so for `default` and `gh_release_rc` the app-descriptor stamp finds no version and leaves the stale prebuilt one, the B-033 bug; the gain was build time only. A future take must hand the version string to the stamp script some other way, e.g. a second env variable it reads, and verify the stamp line on a `gh_release_rc` build). Also: plugins (RULED SKIP 2026-11-27): `79915f070` `09fedb97e` `83f9cc058`. Links (RULED SKIP
+  2026-11-27): `0855a14f3`. TrueType and Libron (RULED SKIP 2026-11-08): `99c2f09d1` `965722cf8`. KOSync and
+  OPDS (deleted): `f47a218b6` `43694c901` `3a03be890` `aa76a31b7` `26ccbe281` `65e3f9d07`. Dictionary
+  (deleted): `c201af437` `f889b828a` `b90389eaf`. Quick panel (ruled NO): `14b4c939d`. Other boards:
+  `2f6a52c5d` `e54c00873` `c17b80ab7` `98b8ac043` `01f09e0ea` `ad08729e0`. Language: `40b313a3c`. Agents docs
+  (the fork carries `.claude/skills`): `6d2cd3a1c` `3607ea7bb` `d1f5d1eca`. Code the fork lacks: `50823ffa1`
+  `1a5c8cd11` `8fc2b6618` `c71c1562a`.
+- **NOT PORTED, needs a heap measurement and the `unloadAll` fix first:** `fdf5f76c0` + `28971493d` (non-CJK GUI
+  fallback font; ported and then DROPPED after review F4). `setupUiFallbacks` would load the 8, 10 and 12 pt UI
+  sizes of any SD family that has Greek, Cyrillic or U+0259, an unmeasured RAM and SD cost on a 380 KB device; and
+  `SdCardFontManager::unloadAll` -> `clearFallbackFonts()` wipes the Noto coverage entries this change makes live,
+  so the fallback would vanish after any font switch until reboot. A future take needs the heap numbers and that
+  fix. (Facts from the port, for whoever redoes it: upstream's diff drops the Thai and Devanagari probes its own
+  PR text lists; `utf8IsCjkCodepoint` must stay; the docs hunk's TTF section does not apply.)
+- **NOT PORTED, needs a human look and a device heap soak:** `9610da702` (SD-font caches stop splitting the heap
+  while reading). It streams the kern class tables from SD, which collides with the fork's load-time class-id
+  refusal (`SdCardFont.cpp`, "VALIDATE EVERY CLASS ID") and the F2 ligature-reload branch, and it supersedes
+  the batch-6 `f1d0af1af` port (`ede1608c5`) and its tests. Needs those re-derived and a heap soak on hardware
+  (UNCONFIRMED).
+- **HELD, not yet asked (one question per feature):**
+  1. **Image viewer for JPEG, and a confirm before Set as sleep cover** (`15503ac34`, `6d649b66f`): open
+     .jpg/.jpeg in the viewer (the fork's is BMP and PNG).
+  2. **Clip and highlight text in EPUBs** (`d7fcc7cec`, 104 files): leans on the deleted reader menu and
+     word selection.
+  3. **Restyle the device web pages** with upstream's logo, colors and shared templates (`5789260cd`).
+  4. **Swipe a list row to delete** (`ba39565ce`).
+- **Caches:** section 80 -> 81 -> 82 -> 83; book.bin and CSS unchanged. `docs/file-formats.md` rows 81-83. Row 83
+  also records the new byte after each serialized `TextBlock` (`lineEndJoin`, from the read-aloud fix); v82 and v83
+  were never released, so they share it. The two drops do not touch layout.
+- **Translation units / tests:** no firmware unit added or removed; new host suites `test/em_dash_line_breaking`,
+  `test/solid_blocks`, `SoftFlush` cases in `test/cascade_lines`, and eleven new read-aloud and join cases.
+- **Adversarial review** (`docs/adversarial-review-2026-11-28-batch-7.md`): five findings. F1 dropped (above),
+  F2 fixed (`f262d9b34`; a hyphen the hyphenator inserted is still dropped when a wrapped word is rejoined, a hyphen
+  or dash that belongs to the source word is kept and joined with no space; the layout records which on each line,
+  `TextBlock::lineEndJoin`), F4 dropped (above). **Recorded, not fixed:** F3 (the X3 gauge load can be cut off by a
+  power-off in its first ~8 s after the gauge lost power; recovered at the next boot; latent) and F5
+  (`EpubReaderActivity::currentTocIndex` with no live section reads a possibly stale section file, so the chapter
+  list can open one row off; cosmetic). `Section::getTextFromSectionFile` joins every token with a space but has no
+  caller (declaration and definition only), so it is left alone.
+- **Simulator:** the simulator's `BatteryMonitor` stub has no `BatteryMonitor::loadDesignCapacity()` (static,
+  no arguments, returns bool), so the `main.cpp` hook is wrapped in `#ifndef SIMULATOR`; whoever extends the
+  stub can drop the guard.
+- **Triage claims corrected:** `93a14afd9` is already in the pin (above); `bbb45c39a` missed that
+  `ColophonData.h` uses the macro; `fdf5f76c0`'s diff drops two probes; `aad48b40d` and `d5693c321` needed
+  the fork's own call sites; `0a9077722`'s SDK half was not a clean pick; the triage's em-dash test needed a
+  stub renderer the fork does not have, so the new suites measure real widths.
+- **Device behavior is UNCONFIRMED** for every taken item that touches hardware or feel: the X3 gauge,
+  the fallback-font redirect with an SD family, chapter-list selection, soft-flushed paragraphs, hyphen
+  breaks, and the redaction blocks on a real panel.
+
+Gates (final tree, after the review fixes): `pio run -e default` SUCCESS, RAM 59,612 B, Flash 4,886,063 B
+(baseline 4,882,251); its `stamp_app_desc` line stamps the dev version. `pio run -e picco` SUCCESS, RAM 72,032 B,
+Flash 4,692,866 B. `pio run -e simulator` SUCCESS and `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2
+Settings moves); the first simulator build had failed on the missing stub symbol and was fixed by the guard above.
+Host tests (`cmake -S test -B build/test`, `ctest -j4`): 1038 of 1038 run pass (1006 before the batch).
+Compile-only release check: `CROSSPOINT_ALLOW_MISSING_EDITOR_FACES=1 pio run -e gh_release` SUCCESS, RAM 59,596 B,
+Flash 4,842,867 B; the override is only because this worktree lacks the licensed editor fonts, and that binary is
+NOT for shipping.
+
 
 ### Backlog re-measured 2026-11-27: the campaign stopped after batch 5
 
