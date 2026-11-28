@@ -196,6 +196,7 @@ void SdCardFont::freeStyleMiniKern(PerStyle& s) {
   s.miniKernLeftCapacity = 0;
   s.miniKernRightCapacity = 0;
   s.miniKernMatrixCapacity = 0;
+  s.miniKernBuilt = false;
 }
 
 void SdCardFont::freeStyleMeasureKern(PerStyle& s) {
@@ -492,16 +493,16 @@ bool SdCardFont::buildMiniKernMatrix(PerStyle& s, const uint32_t* codepoints, ui
   uint8_t* const rightRenumber = scratch.get() + 3 * kScratchStride;
   uint8_t* const newToOldLeft = scratch.get() + 4 * kScratchStride;
   uint8_t* const newToOldRight = scratch.get() + 5 * kScratchStride;
-  uint8_t numLeft = 0, numRight = 0;
+  uint16_t numLeft = 0, numRight = 0;  // up to 255: a uint8_t loop counter would never end
   for (int i = 1; i < 256; i++) {
     if (usedLeft[i]) {
       numLeft++;
-      leftRenumber[i] = numLeft;
+      leftRenumber[i] = static_cast<uint8_t>(numLeft);
       newToOldLeft[numLeft] = static_cast<uint8_t>(i);
     }
     if (usedRight[i]) {
       numRight++;
-      rightRenumber[i] = numRight;
+      rightRenumber[i] = static_cast<uint8_t>(numRight);
       newToOldRight[numRight] = static_cast<uint8_t>(i);
     }
   }
@@ -570,7 +571,7 @@ bool SdCardFont::buildMiniKernMatrix(PerStyle& s, const uint32_t* codepoints, ui
     return false;
   }
 
-  for (uint8_t newL = 1; newL <= numLeft; newL++) {
+  for (uint16_t newL = 1; newL <= numLeft; newL++) {
     const uint8_t oldL = newToOldLeft[newL];
     const uint32_t rowFileOff = s.kernMatrixFileOffset + (oldL - 1u) * s.header.kernRightClassCount;
     if (!file.seekSet(rowFileOff)) {
@@ -585,15 +586,15 @@ bool SdCardFont::buildMiniKernMatrix(PerStyle& s, const uint32_t* codepoints, ui
       return false;
     }
     int8_t* miniRow = s.miniKernMatrix + (newL - 1u) * numRight;
-    for (uint8_t newR = 1; newR <= numRight; newR++) {
+    for (uint16_t newR = 1; newR <= numRight; newR++) {
       miniRow[newR - 1] = rowBuf[newToOldRight[newR] - 1u];
     }
   }
 
   s.miniKernLeftEntryCount = lIdx;
   s.miniKernRightEntryCount = rIdx;
-  s.miniKernLeftClassCount = numLeft;
-  s.miniKernRightClassCount = numRight;
+  s.miniKernLeftClassCount = static_cast<uint8_t>(numLeft);
+  s.miniKernRightClassCount = static_cast<uint8_t>(numRight);
 
   LOG_DBG("SDCF", "Built mini kern: %u×%u matrix (%u bytes, full was %u×%u = %u bytes)", numLeft, numRight, matrixBytes,
           s.header.kernLeftClassCount, s.header.kernRightClassCount,
@@ -1288,10 +1289,30 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
     }
     if (covered) {
       // A kern-wanting request (reader path) can subset-hit a mini that a
-      // kern-free UI prewarm built: top up the kern matrix for the requested
-      // codepoints without re-reading any glyphs.
-      if (!metadataOnly && loadKernLig && s.miniKernLeftClassCount == 0 && s.header.kernLeftEntryCount > 0) {
-        if (loadStyleKernLigatureData(s) && buildMiniKernMatrix(s, codepoints, cpCount)) {
+      // kern-free UI prewarm built: top up the kern matrix and ligatures
+      // without re-reading any glyphs. The matrix covers every resident glyph
+      // so later subset hits can skip it; a request-only matrix would leave
+      // them to rebuild (upstream f1d0af1af, bugs 1 and 5). Runs for fonts
+      // without kern classes too: it is also what attaches their ligatures,
+      // and the matrix build returns at once for them.
+      if (!metadataOnly && loadKernLig && !s.miniKernBuilt) {
+        auto resident = makeUniqueNoThrow<uint32_t[]>(s.miniGlyphCount);
+        uint32_t residentCount = 0;
+        if (resident) {
+          for (uint32_t iv = 0; iv < s.miniIntervalCount; iv++) {
+            for (uint32_t cp = s.miniIntervals[iv].first;
+                 cp <= s.miniIntervals[iv].last && residentCount < s.miniGlyphCount; cp++) {
+              resident[residentCount++] = cp;
+            }
+          }
+        } else {
+          LOG_ERR("SDCF", "OOM: resident kern codepoints (%u) for style %u", s.miniGlyphCount, styleIdx);
+        }
+        const uint32_t* kernCps = resident ? resident.get() : codepoints;
+        const uint32_t kernCount = resident ? residentCount : cpCount;
+        if (loadStyleKernLigatureData(s)) {
+          // Request-only coverage (no list) leaves the flag unset so the next request builds again.
+          s.miniKernBuilt = buildMiniKernMatrix(s, kernCps, kernCount) && resident != nullptr;
           applyKernLigaturePointers(s, s.miniData);
         }
       } else if (!metadataOnly && loadKernLig && !s.kernLigLoaded && s.header.ligaturePairCount > 0) {
@@ -1623,15 +1644,16 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // advanceX and the mini kern would be thrown away before rendering. (Layout
   // measurement gets its kerning from the measure-kern rows built alongside
   // the advance table — see loadMeasureKernRows — not from this mini matrix.)
-  bool kernLigOk = false;
+  bool tablesOk = false;
+  bool kernOk = false;
   if (!metadataOnly && loadKernLig) {
-    if (loadStyleKernLigatureData(s)) {
-      kernLigOk = buildMiniKernMatrix(s, codepoints, cpCount);
-    }
+    tablesOk = loadStyleKernLigatureData(s);
+    if (tablesOk) kernOk = buildMiniKernMatrix(s, codepoints, cpCount);
   }
 
   // Populate miniData and swap
   s.miniMetadataOnly = metadataOnly;
+  s.miniKernBuilt = kernOk;
   s.miniHysteresisPending = !metadataOnly;  // one hysteresis evaluation per rebuild
   memset(&s.miniData, 0, sizeof(s.miniData));
   // A METADATA-ONLY PREWARM MUST NOT PUBLISH A BITMAP BASE.
@@ -1656,7 +1678,8 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   s.miniData.ascender = s.header.ascender;
   s.miniData.descender = s.header.descender;
   s.miniData.is2Bit = s.header.is2Bit;
-  if (kernLigOk) {
+  if (tablesOk) {
+    // A failed kern build leaves the mini kern empty, so the page keeps its ligatures and kerns as none.
     applyKernLigaturePointers(s, s.miniData);
   }
   s.miniData.glyphMissHandler = &SdCardFont::onGlyphMiss;
