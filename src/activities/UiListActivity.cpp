@@ -102,32 +102,41 @@ void UiListActivity::loop() {
 }
 
 void UiListActivity::navigateButtons() {
-  const int count = listCount();
-  auto& n = activeNav();
+  // Each callback captures only `this` and reads the count and the nav state
+  // when it fires: a capture past two words (this + count + &n) overflows
+  // std::function's small buffer and allocates on every loop() pass.
+  //
   // The front pair steps one row on the PRESS edge; a hold past 500 ms then
   // continues as page jumps. Owner ruling 2026-11-07 (docs/ui-conventions.md,
   // "List cursor moves fire on PRESS; a hold then pages"). Upstream's base
   // steps on release so a hold can page instead, which puts the whole click
   // in front of every move.
-  buttonNavigator.onNextPress([this, count, &n] { moveSelectionTo(ButtonNavigator::nextIndex(n.selected, count)); });
+  buttonNavigator.onNextPress(
+      [this] { moveSelectionTo(ButtonNavigator::nextIndex(activeNav().selected, listCount())); });
   buttonNavigator.onPreviousPress(
-      [this, count, &n] { moveSelectionTo(ButtonNavigator::previousIndex(n.selected, count)); });
-  buttonNavigator.onNextContinuous(
-      [this, count, &n] { moveSelectionTo(ButtonNavigator::nextPageIndex(n.selected, count, n.visibleRows)); });
-  buttonNavigator.onPreviousContinuous(
-      [this, count, &n] { moveSelectionTo(ButtonNavigator::previousPageIndex(n.selected, count, n.visibleRows)); });
+      [this] { moveSelectionTo(ButtonNavigator::previousIndex(activeNav().selected, listCount())); });
+  buttonNavigator.onNextContinuous([this] {
+    const auto& n = activeNav();
+    moveSelectionTo(ButtonNavigator::nextPageIndex(n.selected, listCount(), n.visibleRows));
+  });
+  buttonNavigator.onPreviousContinuous([this] {
+    const auto& n = activeNav();
+    moveSelectionTo(ButtonNavigator::previousPageIndex(n.selected, listCount(), n.visibleRows));
+  });
   // The SIDE pair pages by a whole screenful (docs/ui-conventions.md, "Side
   // buttons should page, not repeat the front buttons"). pageDown/pageUp clamp
   // at the ends and return false when nothing moved, so a short list costs no
   // redraw.
-  buttonNavigator.onPageNext([this, count, &n] {
+  buttonNavigator.onPageNext([this] {
+    const auto& n = activeNav();
     int index = n.selected;
-    if (!ButtonNavigator::pageDown(index, count, n.visibleRows)) return;
+    if (!ButtonNavigator::pageDown(index, listCount(), n.visibleRows)) return;
     moveSelectionTo(index);
   });
-  buttonNavigator.onPagePrevious([this, count, &n] {
+  buttonNavigator.onPagePrevious([this] {
+    const auto& n = activeNav();
     int index = n.selected;
-    if (!ButtonNavigator::pageUp(index, count, n.visibleRows)) return;
+    if (!ButtonNavigator::pageUp(index, listCount(), n.visibleRows)) return;
     moveSelectionTo(index);
   });
 }
