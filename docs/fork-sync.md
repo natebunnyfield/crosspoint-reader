@@ -793,6 +793,7 @@ TAKE/PARTIAL was re-checked against the code and built before keeping it. Branch
   - Links in the reader: `b88b653a7`, `e6af0c951`, `664528b28`, `099e89bcb` (and batch 4's `7bcc3a692`).
   - TXT and Markdown through the EPUB pipeline: `9c103c87f` ("plaintext": the fork's text reader stays).
   - Paragraph Indentation setting: `458be7ed2` ("leave": indents stay with the book's CSS).
+- **RULED TAKE (owner, 2026-11-27):** `f7eedbae1` drop the loading mark on wake. Asked "drop the loading mark on wake, or keep it?", the owner answered "drop". Ported after the batch push: `main.cpp` no longer draws or refreshes the mark on a splashless wake and `src/images/LoadingIcon.h` is deleted (a header, so no translation unit changes). The fork keeps its own shape: the saved sleep frame is still restored as the baseline on every board and the first page is still requested FAST; on the SSD1677 (X4, Picco) the driver's initial-full promotion now lands on the first page instead of the mark. Gates: `pio run -e default`, `-e picco`, `-e simulator` SUCCESS, `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves); host tests not re-run (no suite builds `main.cpp`). **UNCONFIRMED on device**: watch a wake into a book on the X4, X3 and Picco, especially over a cover-image sleep frame, for ghosting on the first page, and a wake that lands on Home.
 - **NOT PORTED, needs a human look:** `e9245489f`'s separate FAT cache. It adds
   `-DUSE_SEPARATE_FAT_CACHE=1` and an SdFat pin, and changes the one-shared-cache premise of
   `scripts/patch_sdfat.py` (B-073, free clusters only after the directory entry reaches the card).
@@ -804,7 +805,7 @@ TAKE/PARTIAL was re-checked against the code and built before keeping it. Branch
   4. **Keyboard layout and look** (`b145c1431`, `8e30a699a`; also batch 4's `d5d2d67a5`/`b0b844fcc`):
      needs SDK `225c097` keyboard props; he signed off the current keyboard.
   5. **Library view** (`4a6283db9`, with `28132052f` skipped behind it): batch 5 question 1 still open.
-  6. **Startup loading icon** (`f7eedbae1`): drop the mark drawn on quick-resume wake.
+  6. (ruled TAKE 2026-11-27 and ported: the loading mark on wake, `f7eedbae1`; see above.)
 - **Caches:** section 79 -> 80 (`794ac97f4`); book.bin and CSS unchanged. `docs/file-formats.md`
   gains rows 79 (which was missing) and 80.
 - **Translation units:** none added or removed in firmware; one new host suite

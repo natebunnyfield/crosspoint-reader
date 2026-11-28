@@ -39,7 +39,6 @@
 #endif
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "images/LoadingIcon.h"
 #include "util/ButtonNavigator.h"
 #include "util/LowBatteryGuard.h"
 
@@ -1200,26 +1199,18 @@ void setup() {
       APP_STATE.saveToFile();
       if (Storage.exists(SLEEP_FRAME_FILE) && loadSleepFrameBuffer()) {
         // begin() clears the controller RAM, so restore the saved frame as the
-        // baseline before replacing the moon with the loading icon; the icon
-        // then goes out as a FAST differential refresh and so does the first
-        // page. The X3 has always done this. The X4 and the Picco used a
-        // blocking HALF here and another HALF for the first page
-        // (docs/lag-reduction-plan-2026-11-07.md, F8/plan 2.6, owner 2026-11-07
-        // "yes to everything else"). On the SSD1677 the driver still promotes
-        // this first refresh after begin() to its initial full sequence
-        // (Ssd1677Driver::initController arms _needsInitialFull), so the X4 and
-        // Picco saving is the FIRST PAGE's HALF, not two -- and that promotion is
-        // what keeps a FAST first page clean over a cover-image sleep frame
-        // (adversarial review 2026-11-07, finding 3).
+        // baseline for the first paint, WITHOUT refreshing the panel: the page
+        // (or Home) is the first thing drawn after a wake. Upstream f7eedbae1,
+        // owner 2026-11-27 "drop": the loading mark that used to go out here
+        // cost a refresh of its own. On the X3 the first page is a FAST
+        // differential against this baseline. On the SSD1677 (X4, Picco) the
+        // first refresh after begin() is promoted to the driver's initial full
+        // sequence (Ssd1677Driver::initController arms _needsInitialFull); that
+        // promotion used to land on the mark and now lands on the first page,
+        // which is what keeps it clean over a cover-image sleep frame
+        // (adversarial review 2026-11-07, finding 3; the FAST first page itself
+        // is docs/lag-reduction-plan-2026-11-07.md, F8/plan 2.6).
         renderer.cleanupGrayscaleWithFrameBuffer();
-
-        const auto pageHeight = renderer.getScreenHeight();
-        renderer.drawImage(LoadingIcon, 0, pageHeight - LOADINGICON_HEIGHT, LOADINGICON_WIDTH, LOADINGICON_HEIGHT);
-        if (gpio.deviceIsX3()) {
-          renderer.displayGrayscaleBase(HalDisplay::FAST_REFRESH);
-        } else {
-          renderer.displayBuffer(HalDisplay::FAST_REFRESH);
-        }
         allowFastInitialReaderRefresh = true;
       } else {
         needsWakeRefresh = true;
