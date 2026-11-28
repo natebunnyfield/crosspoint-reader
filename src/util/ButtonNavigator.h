@@ -1,13 +1,14 @@
 #pragma once
 
 #include <functional>
-#include <vector>
+#include <initializer_list>
 
 #include "MappedInputManager.h"
 
 class ButtonNavigator final {
   using Callback = std::function<void()>;
-  using Buttons = std::vector<MappedInputManager::Button>;
+  // Borrowed lists are consumed synchronously and never retained.
+  using Buttons = std::initializer_list<MappedInputManager::Button>;
 
   const uint16_t continuousStartMs;
   const uint16_t continuousIntervalMs;
@@ -94,8 +95,20 @@ class ButtonNavigator final {
 
   // Navigation uses the logical NavNext / NavPrevious buttons; MappedInputManager::mapButton resolves
   // them to physical buttons and applies any orientation-based direction swap, so this stays settings-free.
-  [[nodiscard]] static Buttons getNextButtons() { return {MappedInputManager::Button::NavNext}; }
-  [[nodiscard]] static Buttons getPreviousButtons() { return {MappedInputManager::Button::NavPrevious}; }
-  [[nodiscard]] static Buttons getPageNextButtons() { return {MappedInputManager::Button::PageNext}; }
-  [[nodiscard]] static Buttons getPagePreviousButtons() { return {MappedInputManager::Button::PagePrevious}; }
+  [[nodiscard]] static Buttons getNextButtons() {
+    static constexpr Buttons buttons = {MappedInputManager::Button::NavNext};
+    return buttons;
+  }
+  [[nodiscard]] static Buttons getPreviousButtons() {
+    static constexpr Buttons buttons = {MappedInputManager::Button::NavPrevious};
+    return buttons;
+  }
+  [[nodiscard]] static Buttons getPageNextButtons() {
+    static constexpr Buttons buttons = {MappedInputManager::Button::PageNext};
+    return buttons;
+  }
+  [[nodiscard]] static Buttons getPagePreviousButtons() {
+    static constexpr Buttons buttons = {MappedInputManager::Button::PagePrevious};
+    return buttons;
+  }
 };

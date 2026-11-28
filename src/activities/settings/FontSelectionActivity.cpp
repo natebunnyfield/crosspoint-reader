@@ -322,9 +322,10 @@ void FontSelectionActivity::loop() {
   // size. This is one of the two screens the "side buttons page" ruling
   // deliberately exempts — see the size handler above and
   // docs/ui-conventions.md.
-  // ButtonNavigator::Buttons is a private alias, so spell out the vector type.
-  static const std::vector<MappedInputManager::Button> kNextButtons = {MappedInputManager::Button::Right};
-  static const std::vector<MappedInputManager::Button> kPreviousButtons = {MappedInputManager::Button::Left};
+  // ButtonNavigator::Buttons is a private alias, so spell out the list type.
+  static constexpr std::initializer_list<MappedInputManager::Button> kNextButtons = {MappedInputManager::Button::Right};
+  static constexpr std::initializer_list<MappedInputManager::Button> kPreviousButtons = {
+      MappedInputManager::Button::Left};
 
   buttonNavigator_.onPress(kNextButtons, [this, listSize] {
     notice_.clear();  // a one-shot line: it must not outlive the row it was about

@@ -252,8 +252,9 @@ void EditorFontSelectionActivity::loop() {
   // exempts; see docs/ui-conventions.md. That exemption was written in
   // f278be2fc (2026-08-15) describing a handler that did not exist yet, and
   // was still describing one on 2026-08-18 when this screen finally grew it.
-  static const std::vector<MappedInputManager::Button> kNextButtons = {MappedInputManager::Button::Right};
-  static const std::vector<MappedInputManager::Button> kPreviousButtons = {MappedInputManager::Button::Left};
+  static constexpr std::initializer_list<MappedInputManager::Button> kNextButtons = {MappedInputManager::Button::Right};
+  static constexpr std::initializer_list<MappedInputManager::Button> kPreviousButtons = {
+      MappedInputManager::Button::Left};
 
   buttonNavigator_.onRelease(kNextButtons, [this, listSize] {
     selectedIndex_ = ButtonNavigator::nextIndex(selectedIndex_, listSize);
