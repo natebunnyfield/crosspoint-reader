@@ -1408,11 +1408,13 @@ void loop() {
   // X3: load the cell's design capacity into the BQ27220 (it falls back to TI's 3000 mAh whenever the
   // gauge loses power). One short step per pass until it returns false; every other board returns false
   // at once. Under the render lock, so a step never overlaps the themes' gauge reads.
+#ifndef SIMULATOR  // the simulator has no fuel gauge, and its BatteryMonitor stub has no loadDesignCapacity()
   static bool gaugeCapacityPending = true;
   if (gaugeCapacityPending) {
     RenderLock lock(RenderLock::Mode::Try);
     if (lock.ownsLock()) gaugeCapacityPending = BatteryMonitor::loadDesignCapacity();
   }
+#endif
 
   renderer.setFadingFix(SETTINGS.fadingFix);
 
