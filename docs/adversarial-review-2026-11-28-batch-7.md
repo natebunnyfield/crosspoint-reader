@@ -152,3 +152,19 @@ by mistake and denied by the permission system; nothing changed.
 - No heap measurement of F4's extra UI font sizes.
 - `findAnchorDuringBuild` inside `getTocIndexForPage` during a live build was read,
   not exercised; a spine item at the end-of-book position was not examined.
+
+## Follow-up: the read-aloud fix itself (`f262d9b34`)
+
+The F2 fix grew past the capture: the layout now records, per line, whether its
+end hyphen was inserted (`TextBlock::lineEndJoin`, one serialized byte, folded
+into section v83). The same reviewer read that one commit, by reading only.
+No defects. Checked clean: the byte's writer and reader are the only two sites
+and every section path goes through `TextBlock::deserialize`, which clamps an
+out-of-range value; `wordHyphenInserted` is kept parallel to `words` at every
+insert and erase (all splits go through `splitWordAt`); the join rule for an
+inserted hyphen, a source hyphen, an em dash, a hyphen before a space and a
+paragraph's last line; nothing per word is serialized or kept after layout.
+Two notes, neither a regression: a build of the unpushed pre-fix v83 would
+leave caches one byte short per line (none was ever flashed or pushed, so the
+version stays 83); and a word split across a PAGE boundary is still not
+rejoined in speech, as before this batch.
