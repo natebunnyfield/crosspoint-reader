@@ -129,6 +129,28 @@ recorded here instead.
   Heros ships unmodified and this does not reopen.
   Full measurements: `docs/heros-letterfit-2026-08-24.md`.
 
+- **SD plugin system — RULED SKIP, owner 2026-11-27.** Asked "take it or skip
+  it?", the owner answered "skip". It covers `2600a79ea` (117 files) and every
+  commit built on it: `5b1f0605f`, `f331030f3`, `eced576be` (batch 6), and later
+  every upstream commit that only serves plugins (catalogs, Plugin Hub, plugin
+  events, the plugin job queue, `/api/relay`, `/api/crypto`, `/api/fetch`,
+  `/api/plugin-fs`, the Plugins web page). Skip those without asking. Reasons
+  given to the owner: it hosts what the fork deleted or ruled out (OPDS,
+  KOReader sync, catalogs); its `sleep.enter` event brings Wi-Fi up on the way
+  into sleep, against the fork's owner-initiated-Wi-Fi-only reading; about
+  10,700 lines plus about 29 follow-ups already in the backlog; new relay and
+  plugin-file endpoints on the web server.
+
+- **Links in the reader — RULED SKIP, owner 2026-11-27.** Asked "Keep the
+  fork's footnote list, or adopt upstream's selectable links?", the owner
+  answered "list". The fork keeps its footnote list and non-interactive links.
+  Covers `b88b653a7` (better footnotes navigation), `e6af0c951` (footnote
+  selection with power button), `664528b28` ("Links and footnotes" label),
+  `099e89bcb` (reopen on the viewed page after following a link), and settles
+  batch 4's held `7bcc3a692` (tap a link to follow it) as SKIP. Later upstream
+  commits that only serve on-page link selection or the link stack are skipped
+  on this ruling.
+
 ### The two currently outstanding (2026-08-03)
 
 Both are `REVIEW`, both are genuinely mixed, and neither is a drive-by:
@@ -289,6 +311,7 @@ Gates: `pio run -e default` (X4) SUCCESS, RAM 59,628 B (18.2%), Flash 4,881,821 
 | 3 | `62e84a16f`..`25bbfae76` (40) | 5 (`5182d27e2` `b6746c1df` `c484dc72b` `8141d7b9c`+`820d0b96a`) | 5 (`cdbe2a779` en/es only; `8bc1603e8` no SDK bump; `86976ab23` log only, fix ALREADY; `790a0817e` guard restores the prior mode; `52444a0c9` block-close insets, `!important` ALREADY) | ALREADY 6 (empty picks); REJECTED 1 (`e31dcbb08`); SKIP 16 (deleted subsystems, other boards, Swedish, fork Settings/list chrome; see "Batch 3" below); HELD 4 (frontlight panel x4, X4 Classic... see below) + RULED: wake rule x2 SKIP ("go with rec"), USB MSC BUILD for the Picco ("build"). Caches: section 70 -> 71, CSS stays 11 | (this push) |
 | 4 | `84fcff848`..`e33e3cf39` (50) | 11 (`309923156` `ce6c6cbce` `5fcd26330` `93b6fe111` `b5fb406f5` `03c484778` `6eda8f0b7` `3e60e1302` `c33a8b0e8` `c80c537f2` `0475e6938`) | 7 (`badfa95ff` `365618e47` `9d2f234e1` `54337e6d7` `b7bceb56c` `f437bb506` `2b2ba72f0`; see "Batch 4" below) | ALREADY 7; SKIP 18 (deleted subsystems, other languages, fork-curated font ids); HELD 7 (keyboard layouts, link tapping, language fonts, pioarduino bump, grayscale SDK series x2, X4 Classic CI). Plus a fork fix from `da3d50c24` (skipped-subtree close guard). Caches: section 71 -> 77, book.bin 12 -> 13, CSS 11 -> 12 | (this push) |
 | 5 | `123f3760e`..`fca8f55f5` (50) | 6 (`f64ba736a` `3555ff556` `3f874f847` `f4b4ff06c` `8e10f51df` `04ca1d53c`) | 3 (`652ae0d83` OPF metadata fix only; `92ef5707a` grey bins only; `3f70f5dfc` MEM gate only) | ALREADY 8; SKIP 18; RULED SKIP 1 (`aaf683798`); HELD 14 (9 owner questions). Plus six fixes from the adversarial review. Caches: section 77 -> 78, book.bin 13 -> 14 | (this push) |
+| 6 | `0f01106ad`..`8e30a699a` (50) | 8 (`f03d7f4db` `1d61100f9` `a70ade72e` `794ac97f4` `637ad4a5e` `457f64c69` `e2dfdeaf9` `fc4feed7e`) | 7 (`6410894cd` Spanish key only; `a09460975` list captures; `10cb2c3b2` predicate only; `56c677f68` probe loan; `f1d0af1af` 4 of 5 bugs; `ce9f5c28e` already; `e9245489f` patch 0001 already) | ALREADY 12; SKIP 8; RULED SKIP 8 (plugins x4, links x4); HELD 6 questions, not yet asked. Caches: section 79 -> 80 | (this push) |
 
 
 ### FUI port (`9e3cea2e5`), 2026-11-08
@@ -563,6 +586,8 @@ decisions:
   - `7bcc3a692`: tap a link to follow it. The fork made links non-interactive
     on purpose (`ChapterHtmlSlimParser.cpp:2189`), and it changes the page
     format.
+    **Ruled SKIP by the owner on 2026-11-27** ("list": keep the footnote
+    list; see the standing rulings).
   - `1f9523eb4`: 12 Hebrew/Arabic/Korean families for the ruled
     `sd-fonts.yaml` list.
   - `7db14a015`: pioarduino 55.03.311. It edits the REJECTED
@@ -693,6 +718,99 @@ purpose, and whether secrets leave that mirror went to the owner.
 **Caches:** section 77 -> 78; book.bin 13 -> 14; CSS stays 12.
 
 Gates: `pio run -e default` (X4) SUCCESS, RAM 58,724 B, Flash 4,857,183 B. `pio run -e picco` SUCCESS, RAM 70,872 B, Flash 4,663,482 B. `pio run -e simulator` SUCCESS. `tools/latency/gate.sh` OK (14 turns, 2 Home entries, 2 Settings moves). Host tests 940 of 940. `pio check` at the low threshold: no defects. clang-format 21: clean.
+
+
+### Batch 6 (2026-11-27): `0f01106ad`..`8e30a699a`, 50 commits
+
+A read-only agent triaged the batch (without building) against `f42b03cae`; each
+TAKE/PARTIAL was re-checked against the code and built before keeping it. Branch
+`campaign-b6`, one commit per upstream commit, each with `(ported from upstream
+<sha>)`. Seven earlier clean picks from the backlog probe are logged under
+"Taken EARLY, 2026-11-27" above (not repeated here).
+
+- **TAKEN (8):**
+  - `f03d7f4db` ButtonNavigator without allocation churn (fork `125762246`): `Buttons` is an
+    `initializer_list`; the fork's extra getters (`getPageNextButtons`, `getPagePreviousButtons`)
+    and the two `static const std::vector<Button>` call sites (`FontSelectionActivity`,
+    `EditorFontSelectionActivity`) converted too.
+  - `1d61100f9` SD-font caches released on reader exit (fork `f8cf5939b`). Heap effect UNCONFIRMED.
+  - `a70ade72e` an unreadable EPUB is not reopened on wake (fork `b81c31972`): `openEpubPath` and the
+    Recent Books entry are written only after the first page is drawn. The fork's EPUB reader has
+    its own `loop()`, so it calls `rememberBookOnceRendered()` itself. The fork's crash guard
+    (`readerActivityLoadCount`) and `main.cpp` boot logic are untouched.
+  - `794ac97f4` Korean justified by word spaces only (fork `930c2921b`), see Caches.
+  - `637ad4a5e` RTL tap zones (fork `0b579d1b8`): only the tap zones swap, and only for he/iw/ar/fa
+    books; LTR behavior is bit-for-bit the old split, so no Picco ruling is touched.
+  - `457f64c69` Back leaves File Transfer during a slow upload (fork `5a7809d3e`).
+  - `e2dfdeaf9` X3 USB detection through `BatteryMonitor::isCharging` (fork `0a83f5ec0`). Same
+    positive-current signal in the SDK at the pin; the SOF heartbeat and `isUsbConnected()` are kept.
+  - `fc4feed7e` Python Sonar lint fixes (fork `ad0c97bdb`).
+- **PARTIAL (7):**
+  - `6410894cd` Spanish `STR_CAT_CONTROLS` only (fork `81f2a24a2`).
+  - `a09460975` `UiListActivity::navigateButtons` callbacks capture only `this` (fork `47f047541`);
+    the Home and Library hunks dropped.
+  - `10cb2c3b2` the remainder is the shared `backgroundBuildWanted()` predicate (fork `859588b27`).
+    The `RenderLock::Mode::Try` half was taken early; the `main.cpp` early return and the locked
+    `skipLoopDelay()` read stay NOT taken (the fork keeps `skipLoopDelay()` unlocked on purpose and
+    keeps polling input during a render).
+  - `56c677f68` the dimension probe retries with the framebuffer lent, the extraction fallback runs
+    under a loan, `GfxRenderer::frameBufferLoanCount()`, and the background tick redraws when a loan
+    happened (fork `e3d4b9343`). Dropped: `Overlay`/`pageBufferStale` hunks (toolbar and panel
+    overlays are deleted) and the test stub.
+  - `f1d0af1af` SD-font kerning and ligature edge cases (fork `ede1608c5`): bugs 1, 3, 4, 5 taken;
+    run against the old code the bug 1, 4 and 5 tests fail and the bug 3 test hangs (an infinite
+    loop with 255 kern classes). Bug 2 (class id past the matrix) was already handled, more
+    strictly (the whole kern table is refused); its upstream test is adapted to that.
+  - `ce9f5c28e`: nothing taken. Re-checked here: its routing is in `MappedInputManager.cpp`
+    (`wasScreenTapped` excludes `HeaderBackTapTarget`, `wasBackGesture` folds it in) from
+    `082eedf9b`; its keyboard hide-selection hunk is deliberately not taken (it would hide the
+    Picco rocker's cursor).
+  - `e9245489f` patch 0001 ALREADY (fork `121ce7a42`); the separate FAT cache is not ported.
+- **ALREADY (12):** `720b995a5` (fork `082eedf9b`), `8bae59d78`, `5bfaf7bdb`, `ef08c3ad1`,
+  `93e98bb78`, `1f08ce934`, `38280863a`, `813aaa128`, `149dd5329`, `1f77b83db`, `5ab0f290a`,
+  `cdac66ffe`, as the triage found them. I did not re-verify these twelve ALREADY claims.
+- **SKIP (8):** `0f01106ad` (Portuguese hyphenation, fork ships en/es), `022dfed60`, `6743b6835`,
+  `28132052f`, `039f03ec3`, `707625a48`, `a68548d9c`, `9ea86717b` (its Bluetooth lines would break
+  `BleHidHost.cpp`).
+- **RULED SKIP (owner, 2026-11-27, both recorded in the standing rulings above):**
+  - The SD plugin system: `2600a79ea`, `5b1f0605f`, `f331030f3`, `eced576be`.
+  - Links in the reader: `b88b653a7`, `e6af0c951`, `664528b28`, `099e89bcb` (and batch 4's `7bcc3a692`).
+- **NOT PORTED, needs a human look:** `e9245489f`'s separate FAT cache. It adds
+  `-DUSE_SEPARATE_FAT_CACHE=1` and an SdFat pin, and changes the one-shared-cache premise of
+  `scripts/patch_sdfat.py` (B-073, free clusters only after the directory entry reaches the card).
+  Needs a re-derivation and a card-corruption soak first.
+- **HELD, not yet asked (one question per feature, asked by the coordinator; nothing here is ruled):**
+  1. **TXT and Markdown through the EPUB pipeline** (`9c103c87f`): render .txt/.md as EPUB-style
+     books (deletes `TxtReaderActivity`) and keep or drop the fork's wider plain-text types.
+  2. **Settings checkbox look** (`d1509d073`): needs SDK `toggleCheckbox` props, absent at the pin.
+  3. **Paragraph indentation setting** (`458be7ed2`): Off, 1-5 spaces, overrides CSS `text-indent`;
+     a page-format change.
+  4. **Keyboard layout and look** (`b145c1431`, `8e30a699a`; also batch 4's `d5d2d67a5`/`b0b844fcc`):
+     needs SDK `225c097` keyboard props; he signed off the current keyboard.
+  5. **Library view** (`4a6283db9`, with `28132052f` skipped behind it): batch 5 question 1 still open.
+  6. **Startup loading icon** (`f7eedbae1`): drop the mark drawn on quick-resume wake.
+- **Caches:** section 79 -> 80 (`794ac97f4`); book.bin and CSS unchanged. `docs/file-formats.md`
+  gains rows 79 (which was missing) and 80.
+- **Translation units:** none added or removed in firmware; one new host suite
+  (`test/korean_line_breaking`, written for this tree: upstream's depends on a stub renderer the fork
+  does not have). `test/sd_card_font` gains `EpdFont.cpp` and `LigatureControl.cpp` in its CMake.
+- **Triage claims corrected:** `fc4feed7e` also conflicted in `generate_strings_header`'s call (the
+  unused `language_names` parameter), not only the `Import("env")` tail; `56c677f68`'s test stub
+  does not apply (the fork has no `test/chapter_html_slim_parser`; its parser suites link the real
+  `GfxRenderer.cpp`); `794ac97f4` missed that the fork's Knuth-Plass breaker reads
+  `Hyphenator::breakOffsets` itself, so the Hangul split points had to reach both breakers.
+- **Method:** `git show` per commit, the fork's functions read first, hand port or
+  `cherry-pick -n` and resolve; host tests per area; the four gates once on the final tree.
+  Limit: nothing here was run on a device. **Device behavior is UNCONFIRMED** for every taken item
+  that touches hardware or feel (`e2dfdeaf9` USB detection on an X3, `457f64c69` Back during a
+  real slow upload, `a70ade72e` wake after a bad book, `1d61100f9` heap on Home, `56c677f68`,
+  `637ad4a5e` RTL taps, the Korean line breaks).
+
+Gates (final tree): `pio run -e default` SUCCESS, RAM 59,596 B, Flash 4,882,281 B (clean picks:
+59,628 / 4,881,821). `pio run -e picco` SUCCESS, RAM 72,016 B, Flash 4,689,354 B (72,104 /
+4,688,686). `pio run -e simulator` SUCCESS and `tools/latency/gate.sh` OK (14 turns, 2 Home
+entries, 2 Settings moves). Host tests (`cmake -S test -B build/test`, `ctest -j4`): 1006 of 1006
+run pass (993 before; 13 new: 6 Korean, 7 SD-font kerning).
 
 
 ### Backlog re-measured 2026-11-27: the campaign stopped after batch 5
