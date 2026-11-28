@@ -1751,11 +1751,12 @@ void CrossPointWebServer::handlePostSettings() {
         break;
       }
       case SettingType::VALUE: {
-        // The page sends shown units; only a value the row can show is taken.
+        // The page sends shown units; an off-grid value (62 on a by-5 row)
+        // takes the nearest step the row can show rather than being dropped.
         const int shownVal = doc[s.key].as<int>();
         const int off = shownVal - s.shownOffset;
-        const int val = off / s.shownScale;
-        if (off % s.shownScale == 0 && val >= s.valueRange.min && val <= s.valueRange.max) {
+        const int val = (off >= 0 ? off + s.shownScale / 2 : off - s.shownScale / 2) / s.shownScale;
+        if (val >= s.valueRange.min && val <= s.valueRange.max) {
           if (s.valuePtr) {
             SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
           }

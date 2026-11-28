@@ -45,8 +45,8 @@ namespace fui = freeink::ui;
 namespace {
 // The two frontlight rows the rocker steps (owner ruling 2026-11-06, "Two
 // Settings rows"). Their SettingInfo stays in getSettingsList() exactly as the
-// web page edits it (same keys, same 0..100 by 5); only the device list
-// admits them.
+// web page edits it (same keys; 0..100 by 5 on the device, Brightness -100..300
+// by 5 in the Picco app, stored as its step); only the device list admits them.
 bool isRockerStepped(const SettingInfo& setting) {
   return setting.type == SettingType::VALUE && (setting.valuePtr == &CrossPointSettings::frontlightBrightness ||
                                                 setting.valuePtr == &CrossPointSettings::frontlightWarmth);
