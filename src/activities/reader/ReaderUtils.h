@@ -6,6 +6,8 @@
 #include <Logging.h>
 #include <components/bars/tap-zones.h>
 
+#include <cctype>
+#include <string_view>
 #include <type_traits>
 
 #include "MappedInputManager.h"
@@ -185,7 +187,20 @@ struct TouchPageTurn {
   unsigned long heldMs;
 };
 
-inline TouchPageTurn detectTouchPageTurn(GfxRenderer& renderer, const MappedInputManager& input) {
+// Book languages written right to left (Hebrew, Arabic, Persian), from a BCP-47 / OPF tag.
+inline bool isRtlBookLanguage(std::string_view tag) {
+  if (tag.size() < 2 || (tag.size() > 2 && tag[2] != '-' && tag[2] != '_')) return false;
+  const auto first = std::tolower(static_cast<unsigned char>(tag[0]));
+  const auto second = std::tolower(static_cast<unsigned char>(tag[1]));
+  return (first == 'h' && second == 'e') || (first == 'i' && second == 'w') || (first == 'a' && second == 'r') ||
+         (first == 'f' && second == 'a');
+}
+
+// `rtlBook` swaps the two tap zones: the left two thirds turn forward, the right third back (see the zones below).
+// Only taps are handled here: the fork's swipes arrive as button presses (docs/picco-gestures-2026-11-07.md),
+// so upstream 637ad4a5e's swipe-direction swap has nothing to attach to and is not taken.
+inline TouchPageTurn detectTouchPageTurn(GfxRenderer& renderer, const MappedInputManager& input,
+                                         const bool rtlBook = false) {
   TouchPageTurn result{false, false, 0};
   if (!SETTINGS.touchReaderControls || !input.hasTouch()) {
     return result;
@@ -199,11 +214,13 @@ inline TouchPageTurn detectTouchPageTurn(GfxRenderer& renderer, const MappedInpu
 
   const int16_t width = static_cast<int16_t>(renderer.getScreenWidth());
   const int16_t height = static_cast<int16_t>(renderer.getScreenHeight());
-  const int16_t previousZoneWidth = width / 3;
+  // LTR: the left third is previous, the rest next. RTL books mirror it: the right third is
+  // previous, the left two thirds next (the split sits at 2/3 as upstream's does).
+  const int16_t leftWidth = rtlBook ? static_cast<int16_t>(width * 2 / 3) : static_cast<int16_t>(width / 3);
   const freeink::ui::TapZone zones[] = {
-      {freeink::ui::Rect{0, 0, previousZoneWidth, height}, READER_TOUCH_PREV},
-      {freeink::ui::Rect{previousZoneWidth, 0, static_cast<int16_t>(width - previousZoneWidth), height},
-       READER_TOUCH_NEXT},
+      {freeink::ui::Rect{0, 0, leftWidth, height}, rtlBook ? READER_TOUCH_NEXT : READER_TOUCH_PREV},
+      {freeink::ui::Rect{leftWidth, 0, static_cast<int16_t>(width - leftWidth), height},
+       rtlBook ? READER_TOUCH_PREV : READER_TOUCH_NEXT},
   };
 
   for (const auto& zone : zones) {

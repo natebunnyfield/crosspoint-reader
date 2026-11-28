@@ -517,7 +517,8 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
+  const auto touch =
+      ReaderUtils::detectTouchPageTurn(renderer, mappedInput, ReaderUtils::isRtlBookLanguage(epub->getLanguage()));
 
   // ---- CONFIRM AS A MODIFIER KEY (Confirm held + side button tap = line spacing) ----
   //
